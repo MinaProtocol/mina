@@ -1,91 +1,15 @@
 open Core
 open Async
 
-type peer_stream = Peer.Event.t Pipe.Reader.t
-
-module type Swim_intf = sig
-  val connect
-    : initial_peers:Peer.t list
-    -> peer_stream Deferred.t (* TODO: Deferred? *)
-end
-
-module type Gossip_net_intf =
-  functor
-    (Message : sig type t [@@deriving bin_io] end) ->
-  sig
-    type t
-
-    module Params : sig
-      type t =
-        { timeout           : Time.Span.t
-        ; initial_peers     : Peer.t list
-        ; target_peer_count : int
-        }
-    end
-
-    val create
-      :  peer_stream
-      -> Params.t
-      -> t Deferred.t
-
-    val received : t -> Message.t Pipe.Reader.t
-
-    val broadcast : t -> Message.t Pipe.Writer.t
-
-    val new_peers : t -> Peer.t Pipe.Reader.t
-
-    val query_random_peers
-      : t
-      -> int
-      -> ('q, 'r) Rpc.Rpc.t
-      -> 'q
-      -> 'r Or_error.t list Deferred.t
-
-    val add_handler
-      : t
-      -> ('q, 'r) Rpc.Rpc.t
-      -> ('q -> 'r Or_error.t Deferred.t)
-      -> unit
-
-    val query_peer
-      : t
-      -> Peer.t
-      -> ('q, 'r) Rpc.Rpc.t
-      -> 'q
-      -> 'r Or_error.t Deferred.t
-  end
-
-module type Miner_intf = sig
-  val mine
-    :  [ `Change_head of Block.t ] Pipe.Reader.t
-    -> Block.t Pipe.Reader.t Deferred.t
-end
-
 module Rpcs = struct
   module Get_strongest_block = struct
     type query = unit [@@deriving bin_io]
     type response = Block.t [@@deriving bin_io]
 
-    (* TODO: Remember the right way to version things *)
+    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Get_strongest_block" ~version:0
         ~bin_query ~bin_response
-  end
-end
-
-module type Blockchain_intf = sig
-  module Update : sig
-    type t =
-      | New_block of Block.t
-  end
-
-  module Chain_state : sig
-    type t
-
-    val create
-      :  strongest_block:Block.t Pipe.Writer.t
-      -> updates:Update.t Pipe.Reader.t
-      -> t
   end
 end
 
@@ -107,27 +31,24 @@ let filter_map_unordered
   reader
 ;;
 
+module Message = struct
+  type t =
+    | New_strongest_block of Block.t
+  [@@deriving bin_io]
+end
+
 module Make
-    (Swim : Swim_intf)
-    (Gossip_net : Gossip_net_intf)
-    (Miner : Miner_intf)
-    (Blockchain : Blockchain_intf)
+    (Swim       : Swim.S)
+    (Gossip_net : Gossip_net.S)
+    (Miner      : Miner.S)
   =
 struct
-  module Message = struct
-    type t =
-      | New_strongest_block of Block.t
-    [@@deriving bin_io]
-  end
-
   module Gossip_net = Gossip_net(Message)
 
   let peer_strongest_blocks gossip_net
     : Blockchain.Update.t Pipe.Reader.t
     =
     let from_new_peers =
-      (* TODO: Gossip net should actually re-export a pipe of
-         just connects *)
       filter_map_unordered (Gossip_net.new_peers gossip_net) ~f:(fun peer ->
         Deferred.map ~f:(function
           | Ok b -> Some (Blockchain.Update.New_block b)
@@ -147,7 +68,7 @@ struct
       ]
   ;;
 
-  let main initial_peers should_mine =
+  let main initial_block initial_peers should_mine =
     let open Let_syntax in
     let params : Gossip_net.Params.t =
       { timeout = Time.Span.of_sec 1.
@@ -155,7 +76,7 @@ struct
       ; target_peer_count = 8
       }
     in
-    let%bind peer_stream = Swim.connect ~initial_peers in
+    let peer_stream = Swim.connect ~initial_peers in
     let%bind gossip_net = Gossip_net.create peer_stream params in
     (* Are peers bi-directional? *)
     let strongest_block_reader, strongest_block_writer = Pipe.create () in
@@ -169,7 +90,8 @@ struct
         (Pipe.map strongest_block_reader
            ~f:(fun b -> `Change_head b))
     in
-    Blockchain.Chain_state.create
+    Blockchain.accumulate
+      ~init:initial_block
       ~strongest_block:strongest_block_writer
       ~updates:(
         Pipe.merge ~cmp:(fun _ _ -> 1)
