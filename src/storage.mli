@@ -7,10 +7,10 @@ module type S = sig
   val load
     : location -> Block.t option Deferred.t
 
-  val serialize
+  val persist
     : location
     -> [ `Change_head of Block.t ] Pipe.Reader.t
     -> unit
 end
 
-module Filesystem : S
+module Filesystem : S with type location = string

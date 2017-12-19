@@ -41,6 +41,7 @@ module Make
     (Swim       : Swim.S)
     (Gossip_net : Gossip_net.S)
     (Miner      : Miner.S)
+    (Storage    : Storage.S)
   =
 struct
   module Gossip_net = Gossip_net(Message)
@@ -68,7 +69,7 @@ struct
       ]
   ;;
 
-  let main initial_block initial_peers should_mine =
+  let main storage_location genesis_block initial_peers should_mine =
     let open Let_syntax in
     let params : Gossip_net.Params.t =
       { timeout = Time.Span.of_sec 1.
@@ -78,6 +79,11 @@ struct
     in
     let peer_stream = Swim.connect ~initial_peers in
     let%bind gossip_net = Gossip_net.create peer_stream params in
+    let%bind initial_block = 
+      match%map Storage.load storage_location with
+      | Some x -> x
+      | None -> genesis_block
+    in
     (* Are peers bi-directional? *)
     let strongest_block_reader, strongest_block_writer = Pipe.create () in
     don't_wait_for begin
@@ -85,11 +91,12 @@ struct
         strongest_block_reader
         (Gossip_net.broadcast gossip_net);
     end;
-    let%map mined_blocks =
-      Miner.mine
-        (Pipe.map strongest_block_reader
-           ~f:(fun b -> `Change_head b))
+    let head_changes = 
+      Pipe.map strongest_block_reader
+        ~f:(fun b -> `Change_head b) 
     in
+    let%map mined_blocks = Miner.mine head_changes in
+    Storage.persist storage_location head_changes;
     Blockchain.accumulate
       ~init:initial_block
       ~strongest_block:strongest_block_writer
