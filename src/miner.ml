@@ -62,8 +62,8 @@ module Cpu = struct
     don't_wait_for (go ());
     don't_wait_for begin
       Pipe.iter' updates ~f:(fun q ->
-        state.id <- state.id + 1;
         Queue.iter q ~f:(fun u ->
+          state.id <- state.id + 1;
           begin match u with
           | Change_previous b ->
             state.previous_header_hash <- hash_header b.header
