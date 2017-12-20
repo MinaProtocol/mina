@@ -14,17 +14,14 @@ type t =
 
 let accumulate ~init ~updates ~strongest_block =
   don't_wait_for begin
-    let rec go block =
-      let%bind update = Pipe.read updates in
-      match update with
-      | `Eof -> return ()
-      | `Ok (Update.New_block new_block) ->
+    let%map _last_block =
+      Pipe.fold updates ~init ~f:(fun block (Update.New_block new_block) ->
         match Block.strongest block new_block with
         | `First ->
-          go block
+          return block
         | `Second ->
-          let%bind () = Pipe.write strongest_block new_block in
-          go new_block
+          let%map () = Pipe.write strongest_block new_block in
+          new_block)
     in
-    go init
+    ()
   end
