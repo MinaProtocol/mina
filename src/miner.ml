@@ -1,48 +1,76 @@
 open Core_kernel
 open Async_kernel
 
-module type S = sig
-  val mine
-    : [ `Change_head of Block.t ] Pipe.Reader.t
-    -> [ `Change_body of Block.Body.t ] Pipe.Reader.t
-    -> Block.t Pipe.Reader.t Deferred.t
+module Update = struct
+  type t =
+    | Change_previous of Block.t
+    | Change_body of Block.Body.t
 end
 
-let mine (head : [`Change_head of Block.t]) (body : [`Change_body of Block.Body.t]) = 
-  let%bind () = Async.after (Time.Span.of_sec 1.4) in
-  return None
-  (*return (Some (`Change_head head))*)
-
-let replace_with_newest curr updates = 
-  let newest = Pipe.read_now' updates in
-  let next = 
-    match newest with
-    | `Eof | `Nothing_available -> None
-    | `Ok newest -> Queue.fold newest ~init:None ~f:(fun x y -> Some y)
-  in
-  match next with
-  | None -> curr
-  | Some next -> next
+module type S = sig
+  val mine
+    : previous:Block.t
+    -> body:Block.Body.t
+    -> Update.t Pipe.Reader.t
+    -> Block.t Pipe.Reader.t
+end
 
 module Cpu = struct
-  let mine head_updates body_updates = 
-    let mined_blocks_reader, mined_blocks_writer = Pipe.create () in
-    let () = 
-      don't_wait_for begin
-        let rec go head body = 
-          let%bind () = 
-            match%bind mine head body with
-            | None -> return ()
-            | Some block -> Pipe.write mined_blocks_writer block
-          in
-          go (replace_with_newest head head_updates) (replace_with_newest body body_updates)
-        in
-        let%bind head = Pipe.read head_updates 
-        and body = Pipe.read body_updates in
-        match (head, body) with
-        | (`Ok head, `Ok body) -> go head body
-        | _ -> return ()
-      end
+  let find_block (previous : Pedersen.Digest.t) (body : Block.Body.t)
+    : (Block.t * Pedersen.Digest.t) option Deferred.t =
+    failwith "TODO"
+  ;;
+
+  module State = struct
+    type t =
+      { mutable previous_header_hash : Pedersen.Digest.t
+      ; mutable body                 : Block.Body.t
+      ; mutable id                   : int
+      }
+  end
+
+  let hash_header header =
+    let buf = Bigstring.create (Block.Header.bin_size_t header) in
+    ignore (Block.Header.bin_write_t buf ~pos:0 header);
+    let s = Pedersen.State.create () in
+    Pedersen.State.update s buf;
+    Pedersen.State.digest s
+  ;;
+
+  let mine ~previous ~body (updates : Update.t Pipe.Reader.t) =
+    let state =
+      { State.previous_header_hash = hash_header previous.Block.header
+      ; body
+      ; id = 0
+      }
     in
-    return mined_blocks_reader
+    let mined_blocks_reader, mined_blocks_writer = Pipe.create () in
+    let rec go () =
+      let id = state.id in
+      match%bind find_block state.previous_header_hash state.body with
+      | None -> go ()
+      | Some (block, header_hash) ->
+        if id = state.id
+        then begin
+          let%bind () = Pipe.write mined_blocks_writer block in
+          state.previous_header_hash <- header_hash;
+          state.id <- state.id + 1;
+          go ()
+        end else
+          go ()
+    in
+    don't_wait_for (go ());
+    don't_wait_for begin
+      Pipe.iter' updates ~f:(fun q ->
+        state.id <- state.id + 1;
+        Queue.iter q ~f:(fun u ->
+          begin match u with
+          | Change_previous b ->
+            state.previous_header_hash <- hash_header b.header
+          | Change_body body ->
+            state.body <- body
+          end);
+        Deferred.unit)
+    end;
+    mined_blocks_reader
 end
