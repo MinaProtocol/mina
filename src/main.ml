@@ -95,7 +95,15 @@ struct
       Pipe.map strongest_block_reader
         ~f:(fun b -> `Change_head b) 
     in
-    let%map mined_blocks = Miner.mine head_changes in
+    let body_changes_reader, body_changes_writer = Pipe.create () in
+    let () =
+      don't_wait_for begin
+        Pipe.iter strongest_block_reader 
+          ~f:(fun b -> 
+            Pipe.write body_changes_writer (`Change_body (Int64.(b.body + Int64.one))))
+      end
+    in
+    let%map mined_blocks = Miner.mine head_changes body_changes_reader in
     Storage.persist storage_location head_changes;
     Blockchain.accumulate
       ~init:initial_block
