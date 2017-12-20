@@ -21,8 +21,4 @@ type t =
   }
 [@@deriving bin_io]
 
-type first_or_second = 
-  | First
-  | Second
-
-let strongest a b : first_or_second Async.Deferred.t = failwith "TODO"
+let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"
