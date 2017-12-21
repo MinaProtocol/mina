@@ -40,11 +40,13 @@ end
 module Make
     (Swim       : Swim.S)
     (Gossip_net : Gossip_net.S)
-    (Miner      : Miner.S)
+    (Miner_impl : Miner.S)
     (Storage    : Storage.S)
   =
 struct
   module Gossip_net = Gossip_net(Message)
+
+  let merge = Pipe.merge ~cmp:(fun _ _ -> 1)
 
   let peer_strongest_blocks gossip_net
     : Blockchain.Update.t Pipe.Reader.t
@@ -62,8 +64,7 @@ struct
         ~f:(function
           | New_strongest_block b -> Some (Blockchain.Update.New_block b))
     in
-    Pipe.merge
-      ~cmp:(fun _ _ -> 1)
+    merge
       [ from_new_peers
       ; broadcasts
       ]
@@ -79,7 +80,7 @@ struct
     in
     let peer_stream = Swim.connect ~initial_peers in
     let%bind gossip_net = Gossip_net.create peer_stream params in
-    let%bind initial_block = 
+    let%map initial_block =
       match%map Storage.load storage_location with
       | Some x -> x
       | None -> genesis_block
@@ -91,17 +92,31 @@ struct
         strongest_block_reader
         (Gossip_net.broadcast gossip_net);
     end;
-    let head_changes = 
-      Pipe.map strongest_block_reader
-        ~f:(fun b -> `Change_head b) 
+    let body_changes_reader, body_changes_writer = Pipe.create () in
+    let () =
+      don't_wait_for begin
+        Pipe.iter strongest_block_reader
+          ~f:(fun b ->
+            Pipe.write body_changes_writer
+              (Miner.Update.Change_body (Int64.(b.body + Int64.one))))
+      end
     in
-    let%map mined_blocks = Miner.mine head_changes in
-    Storage.persist storage_location head_changes;
+    let mined_blocks =
+      Miner_impl.mine
+        ~previous:initial_block
+        ~body:(Int64.succ initial_block.body)
+        (merge
+          [ Pipe.map strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
+          ; body_changes_reader
+          ])
+    in
+    Storage.persist storage_location
+      (Pipe.map strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain.accumulate
       ~init:initial_block
       ~strongest_block:strongest_block_writer
       ~updates:(
-        Pipe.merge ~cmp:(fun _ _ -> 1)
+        merge
           [ peer_strongest_blocks gossip_net
           ; Pipe.map mined_blocks ~f:(fun b -> Blockchain.Update.New_block b)
           ])
