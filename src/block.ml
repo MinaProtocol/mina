@@ -8,6 +8,12 @@ module Header = struct
     ; deltas               : Block_time.Span.t list
     }
   [@@deriving bin_io]
+
+  let hash t =
+    let buf = Bigstring.create (bin_size_t t) in
+    let s = Pedersen.State.create () in
+    Pedersen.State.update s buf;
+    Pedersen.State.digest s
 end
 
 module Body = struct

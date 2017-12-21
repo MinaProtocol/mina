@@ -7,24 +7,24 @@ module type S = sig
   val load
     : location -> Block.t option Deferred.t
 
-  val persist 
+  val persist
     : location
     -> [ `Change_head of Block.t ] Pipe.Reader.t
     -> unit
 end
 
-module Filesystem : S = struct
+module Filesystem : S with type location = string = struct
   open Core
   open Async
 
   type location = string
 
-  let load location = 
+  let load location =
     match%map Reader.load_bin_prot location Block.bin_reader_t with
     | Ok block -> Some block
     | Error _e -> None
 
-  let persist location block_stream = 
+  let persist location block_stream =
     don't_wait_for begin
       Pipe.iter_without_pushback block_stream ~f:(fun (`Change_head block) ->
         don't_wait_for begin
