@@ -20,3 +20,5 @@ type t =
   ; body   : Body.t
   }
 [@@deriving bin_io]
+
+let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"

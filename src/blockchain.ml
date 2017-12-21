@@ -12,4 +12,16 @@ type t =
   }
 [@@deriving bin_io]
 
-let accumulate = failwith "TODO"
+let accumulate ~init ~updates ~strongest_block =
+  don't_wait_for begin
+    let%map _last_block =
+      Pipe.fold updates ~init ~f:(fun block (Update.New_block new_block) ->
+        match Block.strongest block new_block with
+        | `First ->
+          return block
+        | `Second ->
+          let%map () = Pipe.write strongest_block new_block in
+          new_block)
+    in
+    ()
+  end
