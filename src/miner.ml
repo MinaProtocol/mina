@@ -29,17 +29,9 @@ module Cpu = struct
       }
   end
 
-  let hash_header header =
-    let buf = Bigstring.create (Block.Header.bin_size_t header) in
-    ignore (Block.Header.bin_write_t buf ~pos:0 header);
-    let s = Pedersen.State.create () in
-    Pedersen.State.update s buf;
-    Pedersen.State.digest s
-  ;;
-
   let mine ~previous ~body (updates : Update.t Pipe.Reader.t) =
     let state =
-      { State.previous_header_hash = hash_header previous.Block.header
+      { State.previous_header_hash = Block.Header.hash previous.Block.header
       ; body
       ; id = 0
       }
@@ -66,7 +58,7 @@ module Cpu = struct
           state.id <- state.id + 1;
           begin match u with
           | Change_previous b ->
-            state.previous_header_hash <- hash_header b.header
+            state.previous_header_hash <- Block.Header.hash b.header
           | Change_body body ->
             state.body <- body
           end);
