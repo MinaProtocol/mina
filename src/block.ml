@@ -24,10 +24,12 @@ module Body = struct
   [@@deriving bin_io]
 end
 
-type t =
-  { header : Header.t
-  ; body   : Body.t
+type ('header, 'body) t_ =
+  { header : 'header
+  ; body   : 'body
   }
 [@@deriving bin_io]
+
+type t = (Header.t, Body.t) t_ [@@deriving bin_io]
 
 let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"

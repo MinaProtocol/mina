@@ -123,10 +123,13 @@ module Types (Impl : Snark_intf.S) = struct
       let bits_per_element = Field.size_in_bits - 1
     end)
 
-  module Digest = struct
-  end
+  module Digest = Bits0(struct
+      let bit_length = Field.size_in_bits * 2
+      let bits_per_element = Field.size_in_bits
+    end)
 
   module Block = struct
-    type t = (Pedersen.Digest.
+    module Header = struct
+    end
   end
 end
