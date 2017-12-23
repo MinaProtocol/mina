@@ -1,12 +1,15 @@
 open Core_kernel
 
 module Header = struct
-  type t =
+  type ('hash, 'time, 'span) t_ =
     { previous_header_hash : Pedersen.Digest.t
     ; body_hash            : Pedersen.Digest.t
     ; time                 : Block_time.t
     ; deltas               : Block_time.Span.t list
     }
+  [@@deriving bin_io]
+
+  type t = (Pedersen.Digest.t, Block_time.t, Block_time.Span.t) t_
   [@@deriving bin_io]
 
   let hash t =
