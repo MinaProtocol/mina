@@ -1,2 +1,3 @@
-type t = Todo
-[@@deriving sexp]
+open Core_kernel
+
+type t = Todo [@@deriving bin_io]

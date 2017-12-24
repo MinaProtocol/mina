@@ -5,11 +5,12 @@ open Async_rpc_kernel
 module type S =
   functor (Message : sig type t [@@deriving bin_io] end) -> sig
     type t
+    type peer = Host_and_port.t
 
     module Params : sig
       type t =
         { timeout           : Time.Span.t
-        ; initial_peers     : Peer.t list
+        ; initial_peers     : peer list
         ; target_peer_count : int
         }
     end
@@ -23,7 +24,7 @@ module type S =
 
     val broadcast : t -> Message.t Pipe.Writer.t
 
-    val new_peers : t -> Peer.t Pipe.Reader.t
+    val new_peers : t -> peer Pipe.Reader.t
 
     val query_random_peers
       : t
@@ -40,7 +41,7 @@ module type S =
 
     val query_peer
       : t
-      -> Peer.t
+      -> peer
       -> ('q, 'r) Rpc.Rpc.t
       -> 'q
       -> 'r Or_error.t Deferred.t
@@ -48,11 +49,12 @@ module type S =
 
 module Make (Message : sig type t [@@deriving bin_io] end) = struct
   type t = Todo
+  type peer = Host_and_port.t
 
   module Params = struct
     type t =
       { timeout           : Time.Span.t
-      ; initial_peers     : Peer.t list
+      ; initial_peers     : peer list
       ; target_peer_count : int
       }
   end

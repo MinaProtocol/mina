@@ -70,7 +70,7 @@ struct
       ]
   ;;
 
-  let main storage_location genesis_block initial_peers should_mine =
+  let main storage_location genesis_block initial_peers should_mine me =
     let open Let_syntax in
     let params : Gossip_net.Params.t =
       { timeout = Time.Span.of_sec 1.
@@ -78,9 +78,9 @@ struct
       ; target_peer_count = 8
       }
     in
-    let peer_stream = Swim.connect ~initial_peers in
-    let%bind gossip_net = Gossip_net.create peer_stream params in
-    let%map initial_block =
+    let%bind swim = Swim.connect ~initial_peers ~me in
+    let%bind gossip_net = Gossip_net.create (Swim.changes swim) params in
+    let%map initial_block = 
       match%map Storage.load storage_location with
       | Some x -> x
       | None -> genesis_block

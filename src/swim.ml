@@ -1,126 +1,226 @@
 open Core_kernel
 open Async_kernel
 
+(* TODO Change this to Peer.t when bin_io works on it *)
+type peer = Host_and_port.t [@@deriving bin_io, sexp]
+
 module type S = sig
   type t
 
   val connect
-    : initial_peers:Peer.t list -> t
+    : initial_peers:peer list -> me:Host_and_port.t -> t Deferred.t
 
-  val peers : t -> Peer.t list
+  val peers : t -> peer list
 
   val changes : t -> Peer.Event.t Pipe.Reader.t
 end
 
-module Messager (Payload : sig
-  type t [@@deriving bin_io]
-end)
-(* TODO imeckler for bkase: Can we give this a more descriptive name? I have no idea what the intention is
-   from reading the signature *)
-    (Contextual : sig
-  type t
-
-  type ctx [@@deriving bin_io]
-
-  (* TODO: Reviewer: I don't like that this is mutable, but I think it make sense
-   * the concrete impl for swim will take information about a set of nodes being
-   * dead or alive and merge it into some collection in a special order to get
-   * Round-Robin extension benefits of the algorithm.
-   *
-   * Can't think of a nice way to make this immutable since it changes
-   * asynchronously when messages come in.
-   *)
-  val add : t -> ctx -> unit
-
-  val get : t -> ctx
-end) : (sig
-  type t
-
-(* TODO imeckler for bkase: You have to expose the definition of [ackable] or else it will be impossible
-   to construct hte [incoming_stream] you need to hand to [create] *)
-  type 'a ackable [@@deriving bin_io]
-
-  type incoming_stream = (Host_and_port.t * Payload.t ackable * Contextual.ctx) Pipe.Reader.t
-  type outgoing_stream = (Payload.t ackable * Contextual.ctx) Pipe.Writer.t
-
-  val create : timeout:Time.Span.t
-    -> incoming_stream
-    -> Contextual.t
-    (* to send messages *)
-    -> (Host_and_port.t -> outgoing_stream option Deferred.t)
-    (* handle incoming msgs *)
-    -> (Payload.t -> unit Deferred.t)
-    -> t
-
-  val send : t -> Host_and_port.t -> Payload.t -> [ `Failed | `Acked ] Deferred.t
-end) = struct
-  (* TODO imeckler for bkase: What do you think of
-     module Request_or_ack = struct
-      type 'a t = Ack | Request of 'a [@@deriving bin_io]
-     end *)
-
-  type 'a ackable = Ack | Req of 'a [@@deriving bin_io]
-
-  type incoming_stream = (Host_and_port.t * Payload.t ackable * Contextual.ctx) Pipe.Reader.t
-  type outgoing_stream = (Payload.t ackable * Contextual.ctx) Pipe.Writer.t
+module Node = struct
+  type state = Dead | Alive [@@deriving bin_io, sexp]
 
   type t =
-    { table : unit Ivar.t Host_and_port.Table.t
-    ; contextual : Contextual.t
-    (* TODO imeckler for bkase: How about, [open_outgoing] (and have it return an [Or_error.t] instead of an option)? *)
-    ; outgoing : Host_and_port.t -> outgoing_stream option Deferred.t
-    (* TODO(bkase): Remember to handle different msgs having diff timeouts *)
-    ; timeout : Time.Span.t
+    { peer : peer
+    ; mutable state : state
+    } [@@deriving bin_io, sexp]
+
+  let is_alive t = t.state = Alive
+  let is_dead t = t.state = Dead
+
+  let alive peer = { peer ; state = Alive }
+
+
+  let dead peer = { peer ; state = Dead }
+end
+
+module type RandomIterer_intf = sig
+  type 'a t
+
+  val create : initial:'a list -> 'a t
+
+  (* Add an element that may at random be chosen for an iteration that's already happenning *)
+  val add : 'a t -> 'a -> unit
+
+  (* Semantics:
+   * 1. Merge all pending adds into the list
+   * 2. Permute the list randomly
+   * 3. Start iterating slowly through the frozen list of size `n`
+   * 4. During iteration, new entries could have been added to our `t` structure
+   * Whenever there exists `k` items that have been added, with
+   * probability `k / (n + k)` choose an element `x` from the new entries
+   * without replacement and use that instead
+   *)
+  val effectful_iter_async : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
+end
+
+(* Rough sketch of a possible idea *)
+module RandomIterer = struct
+  type 'a collection = Todo
+
+  type 'a t =
+    { frozen : 'a list
+    ; mutable consuming : 'a collection
+    ; mutable pending : 'a collection
     }
 
-  let raw_send t addr ackable_msg before_send : _ Deferred.t =
-    (* TODO imeckler for bkase: You can just use [Let_syntax] if you want (Async brings it in scope). I don't fell
-    strongly either way. *)
-    let open Deferred.Let_syntax in
-    (* TODO: Reviewer: Do I understand the semantics of write well?
-       imeckler: Not sure how to answer -- could you say more about your intention?
-    *)
-    (* TODO imeckler for bkase: How about
-       [outgoing] should return [None] if pipe open fails *)
-    (* Assuming if pipe open fails we'll hit the None case *)
-    match%bind (t.outgoing addr) with
-    | Some stream ->
-      (* TODO: Reviewer with_timeout is deprecated in this module, but can't find the real one *)
-        let res = before_send () in
-        (* TODO imeckler for bkase: I changed this to use Let_syntax (which I think in general should be preferred).
-           The thinking is that code should be uniform and explicit. Let me know what you think.
-           You can delete this once you read it. *)
-        let%bind () = Pipe.write stream (ackable_msg, (Contextual.get t.contextual)) in
-        res
-    | None -> return `Failed
+  let create ~initial = failwith "TODO"
 
-  let create ~timeout incoming contextual outgoing handle_msg =
-    let table = Host_and_port.Table.create () in
-    (* TODO imeckler for bkase: Change to
-      let t =
-        { table
-        ; contextual
-        ; outgoing
-        ; timeout
-        }
-      in *)
-    let t = { table
-            ; contextual
-            ; outgoing
-            ; timeout
-            } in
-    (* TODO: Consider using the 'a Queue version for efficiency
-       imeckkler: My guess would be it's not necessary, but feel free to.
-    *)
+  let add t x = failwith "TODO"
+
+  let effectful_iter_async t ~f = failwith "TODO"
+end
+
+module type NetworkState_intf = sig
+  type t
+
+  (* A slice of state for network delivery *)
+  type slice [@@deriving bin_io, sexp]
+
+  val create : unit -> t
+
+  val add : t -> Node.t -> unit
+
+  val add_slice : t -> slice -> unit
+
+  (* Pure getter for live_nodes *)
+  val live_nodes : t -> Node.t list
+
+  (* Effectfully (mutating t) extracts a slice of the network state
+   * maintaining necessary SWIM invariants *)
+  val extract : t -> transmit_limit:int -> Host_and_port.t -> slice
+end
+
+(* Taken mostly from mirage-swim *)
+(* TODO(bkase): Does it matter that we never remove entries from table *)
+module NetworkState : NetworkState_intf = struct
+  module E = struct
+    type t = Node.t
+    type id = peer
+
+    let invalidates (node : t) (node' : t) : bool =
+      node.peer = node'.peer && node.state <> node'.state
+
+    let skip (node : t) peer =
+      node.peer = peer
+
+    let size = Node.bin_size_t
+  end
+
+  type t = (int * E.t) list ref
+
+  type slice = Node.t list [@@deriving bin_io, sexp]
+
+  let create () = ref []
+
+  let add t (node : Node.t) =
+    if not (List.exists !t ~f:(fun (_, node') -> node = node')) then begin
+      let q = List.filter !t ~f:(fun (_, node') -> not (E.invalidates node node')) in
+      printf "NetworkState: New state %s" (node |> Node.sexp_of_t |> Sexp.to_string);
+      t := ((0, node)::q)
+    end
+
+  let add_slice t slice =
+    List.iter slice (add t)
+
+  let live_nodes t =
+    !t
+    |> List.map ~f:(fun (_, node) -> node)
+    |> List.filter ~f:Node.is_alive
+
+  let extract t ~transmit_limit addr =
+    let select memo elem =
+      let transmit, elems, bytes_left = memo in
+      let transmit_count, broadcast = elem in
+      let size = E.size broadcast in
+      if transmit_count > transmit_limit then
+        (transmit, elems, bytes_left)
+      else if size > bytes_left || E.skip broadcast addr then
+        (transmit, elem::elems, bytes_left)
+      else
+        (broadcast::transmit, (transmit_count+1, broadcast)::elems, bytes_left - size)
+    in
+    let transmit, t', _ = List.fold_left !t ~f:select ~init:([], [], 65507) in
+    t := List.sort ~cmp:(fun e e' -> Int.compare (fst e) (fst e')) t';
+    transmit
+end
+
+module Request_or_ack = struct
+  type 'a t = Ack | Request of 'a [@@deriving bin_io, sexp]
+end
+
+module Payload = struct
+  type t = Ping | Ping_req of Host_and_port.t [@@deriving bin_io, sexp]
+end
+
+module AckTable = struct
+  type t = (int, unit Ivar.t) Hashtbl.t
+end
+
+module Messager : (sig
+  type t
+  type msg = peer * Payload.t Request_or_ack.t * NetworkState.slice * int [@@deriving bin_io, sexp]
+
+  val create : incoming:msg Pipe.Reader.t
+    -> net_state:NetworkState.t
+    -> get_transmit_limit:(unit -> int)
+    (* to send messages *)
+    -> send_msg:(recipient:Host_and_port.t -> msg -> unit Or_error.t Deferred.t)
+    (* handle incoming msgs (with seq_no) *)
+    -> handle_msg:(t -> Payload.t * int -> [`Stop | `Want_ack] Deferred.t)
+    -> me: Host_and_port.t
+    -> t
+
+  val send : t -> (Host_and_port.t * Payload.t) list -> seq_no:int -> timeout:Time.Span.t -> [ `Timeout | `Acked ] Deferred.t
+end) = struct
+
+  type msg = peer * Payload.t Request_or_ack.t * NetworkState.slice * int [@@deriving bin_io, sexp]
+
+  type t =
+    { table : AckTable.t
+    ; net_state : NetworkState.t
+    ; get_transmit_limit : unit -> int
+    ; send_msg : recipient:Host_and_port.t -> msg -> unit Or_error.t Deferred.t
+    ; me : Host_and_port.t
+    (* TODO(bkase): Remember to handle different msgs having diff timeouts *)
+    }
+
+  let raw_send t addr ackable_msg seq_no : _ Or_error.t Deferred.t =
+    let open Let_syntax in
+    t.send_msg ~recipient:addr (t.me, ackable_msg, NetworkState.extract t.net_state ~transmit_limit:(t.get_transmit_limit ()) addr, seq_no)
+
+  let create : incoming:msg Pipe.Reader.t
+    -> net_state:NetworkState.t
+    -> get_transmit_limit:(unit -> int)
+    (* to send messages *)
+    -> send_msg:(recipient:Host_and_port.t -> msg -> unit Or_error.t Deferred.t)
+    (* handle incoming msgs (with seq_no) *)
+    -> handle_msg:(t -> Payload.t * int -> [`Stop | `Want_ack] Deferred.t)
+    -> me: Host_and_port.t
+    -> t = fun ~incoming ~net_state ~get_transmit_limit ~send_msg ~handle_msg ~me ->
+    let table = Hashtbl.Poly.create () in
+    let t =
+      { table
+      ; net_state
+      ; get_transmit_limit
+      ; send_msg
+      ; me
+      }
+    in
+
     don't_wait_for begin
       (* TODO imeckler for bkase: Is not pushing back the right thing to do?
          (I changed to [iter_without_pushback] because that was what this was doing anyway)
       *)
-      Pipe.iter_without_pushback incoming (fun (from, p, ctx) ->
-        Contextual.add contextual ctx;
-        let open Deferred.Let_syntax in
+      Pipe.iter_without_pushback incoming (fun (from, p, slice, seq_no) ->
+        let open Let_syntax in
+        let open Request_or_ack in
+
+        (* piggybacked state *)
+        NetworkState.add_slice net_state slice;
+        (* the sender must have been alive *)
+        NetworkState.add net_state {peer = from; state = Alive};
+
         match p with
-        | Req x ->
+        | Request x ->
            (* TODO: Reviewer: If we don't_wait_for here, then we could overload
             * system resources (open sockets etc) if we receive packets faster than
             * we can send them.
@@ -135,48 +235,197 @@ end) = struct
               imeckler: Yeah this is tricky. Let's leave it as is for now I think.
             *)
            don't_wait_for begin
-             let%bind wait_handle_msg = handle_msg x in
-             let%map _ = raw_send t from Ack (fun () -> return `Failed) in
-             ()
+             match%bind handle_msg t (x, seq_no) with
+             | `Stop -> return ()
+             | `Want_ack ->
+               let%map _ = raw_send t from Ack seq_no in
+               ()
            end
         | Ack ->
-          (* TODO imeckler for bkase:
-             Consider using Option.iter now that it's no longer deferred *)
-          match Host_and_port.Table.find t.table from with
-          | Some ivar ->
-              Ivar.fill_if_empty ivar ();
-              Host_and_port.Table.remove t.table from
-          | None -> ()
+          Option.iter (Hashtbl.Poly.find t.table seq_no) (fun ivar ->
+              Hashtbl.Poly.remove t.table seq_no;
+              Ivar.fill_if_empty ivar ()
+          )
       )
     end;
     t
 
-  let send t addr msg =
-    let open Deferred.Let_syntax in
-    let wait_ack = raw_send t addr (Req msg) (fun () ->
-      Deferred.map ~f:(fun () -> `Acked) (Deferred.create (fun ivar ->
-        Host_and_port.Table.set ~key:addr t.table ~data:ivar
-      ))
+  let send t msgs ~seq_no ~timeout =
+    let open Let_syntax in
+    let wait_ack = Deferred.create (fun _ivar ->
+      Hashtbl.Poly.set ~key:seq_no t.table ~data:_ivar;
     ) in
-    (* TODO imeckler for bkase: Are we triing to make this only depend on [core_kernel] and
-       [async_kernel] and not on Core/Async? [Async.with_timeout] is the [Time.Span.t] version.
-       And async_kernel has the [Time_ns.Span.t] version for whatever reason. Probably switch to
-       the async_kernel one, no? And I'm not sure the story on using [Time_ns] vs [Time]. I remember in
-       the past (core|async)_kernel didn't have Time and only had Time_ns but that seems to have changed.  *)
-    match%map Core.Std.with_timeout t.timeout wait_ack with
+    List.iter msgs (fun (addr, payload) ->
+      (* We're implicitly waiting for an ack, so no risk for async pressure *)
+      don't_wait_for(
+        match%map raw_send t addr (Request_or_ack.Request payload) seq_no with
+        | Ok () -> ()
+        | Error e -> printf "Failed with err %s" (Error.to_string_hum e)
+      );
+    );
+    match%map Async.with_timeout timeout wait_ack with
     | `Timeout ->
-        Host_and_port.Table.remove t.table addr;
-        `Failed
+        Hashtbl.Poly.remove t.table seq_no;
+        `Timeout
     | `Result () -> `Acked
 
 end
 
+(* TODO(bkase): Replace with real networking code (or functorize) *)
+module NetMake (Msg : sig
+  type t [@@deriving bin_io, sexp]
+end) = struct
+  open Async
+  open Core
+
+  let send : recipient:Host_and_port.t -> Msg.t -> unit Or_error.t Deferred.t = fun ~recipient msg ->
+    let socket = Socket.create Socket.Type.udp in
+    let addr = Socket.Address.Inet.create (Unix.Inet_addr.of_string (Host_and_port.host recipient)) ~port:(Host_and_port.port recipient) in
+    let iobuf = Iobuf.create ~len:(Msg.bin_size_t msg) in
+    printf "Making an iobuf to send of size %d" (Msg.bin_size_t msg);
+    Iobuf.Fill.bin_prot Msg.bin_writer_t iobuf msg;
+    (* TODO: Actually send full data! *)
+    let open Or_error.Let_syntax in
+    match Udp.sendto () with
+    | Ok sendto ->
+        let open Deferred.Let_syntax in
+        let%map () = sendto (Socket.fd socket) iobuf addr in
+        printf "Sent buf %s over socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+        Ok ()
+    | Error _ as e -> Deferred.return e
+    (*printf "Got sendto error code of %d" code;*)
+
+  let listen : port:int -> Msg.t Pipe.Reader.t Deferred.t =
+    fun ~port ->
+      let socket_addr =
+        Socket.Address.Inet.create
+          (Unix.Inet_addr.of_string "127.0.0.1")
+          ~port:port
+      in
+      let open Deferred.Let_syntax in
+      let%map socket = Udp.bind socket_addr in
+      let (r,w) = Pipe.create () in
+      don't_wait_for begin
+        Udp.recvfrom_loop (Socket.fd socket) (fun buf addr ->
+          let msg = Iobuf.Consume.bin_prot Msg.bin_reader_t buf in
+          printf "Got msg %s on socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+          (* TODO: Do we need pushback here? *)
+          Pipe.write_without_pushback w msg
+        )
+      end;
+      r
+end
+
 module Udp : S = struct
-  type t
+  type config =
+    { indirect_ping_count : int
+    ; protocol_period : Time.Span.t
+    ; rtt : Time.Span.t
+    }
 
-  let connect ~initial_peers = failwith "TODO"
+  (* TODO: Make this a parameter *)
+  let my_config : config =
+    { indirect_ping_count = 6
+    ; protocol_period = Time.Span.of_int_sec 2
+    ; rtt = Time.Span.of_sec 0.5
+    }
 
-  let peers t = failwith "TODO"
+  type t =
+    { messager : Messager.t
+    ; net_state  : NetworkState.t
+    ; mutable seq_no : int
+    }
+
+  let fresh_seq_no t =
+    let seq_no = t.seq_no in
+    t.seq_no <- t.seq_no + 1;
+    seq_no
+
+  let prob_node t (m_i : Node.t) =
+    let sample_nodes xs k exclude =
+      xs
+      |> List.filter ~f:(fun n -> n <> exclude)
+      |> List.permute
+      |> fun l -> List.take l k
+    in
+
+    let seq_no = fresh_seq_no t in
+    printf "Begin round %d probing node %s" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
+    match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:my_config.rtt with
+    | `Acked ->
+        printf "Round %d acked" t.seq_no;
+        return ()
+    | `Timeout ->
+        printf "Round %d timeout" t.seq_no;
+        let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) my_config.indirect_ping_count m_i in
+        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k.peer, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.(my_config.protocol_period - my_config.rtt) with
+        | `Acked ->
+            printf "Round %d secondary acked" t.seq_no
+        | `Timeout ->
+            m_i.state <- Node.Dead;
+            printf "Round %d m_i died" t.seq_no
+
+  (* TODO: Round-Robin extension *)
+  let rec failure_detect t : _ Deferred.t =
+    let choose xs =
+      Option.value_exn (List.nth xs (Random.int (List.length xs))) in
+
+    let m_i = choose (NetworkState.live_nodes t.net_state) in
+    let%bind () = prob_node t m_i in
+    failure_detect t
+
+  (* From mirage-swim *)
+  let transmit_limit net_state =
+    let live_count = List.length (NetworkState.live_nodes net_state) in
+    if live_count = 0 then
+      0
+    else
+      live_count
+      |> Float.of_int
+      |> log
+      |> Float.round_up
+      |> Float.to_int
+
+  module Net = NetMake(struct
+    type t = Messager.msg [@@deriving bin_io, sexp]
+  end)
+
+  let connect ~initial_peers ~me =
+    let%map incoming = Net.listen (Host_and_port.port me) in
+    let net_state = NetworkState.create () in
+    let rec handle_msg messager = function
+      | (Payload.Ping, _) -> Deferred.return `Want_ack
+      | (Payload.Ping_req addr_i, seq_no) ->
+          match%map Messager.send messager [(addr_i, Payload.Ping)] ~seq_no:seq_no ~timeout:my_config.rtt with
+          | `Timeout -> `Stop
+          | `Acked -> `Want_ack
+    and make_messager () =
+      Messager.create
+        ~incoming
+        ~net_state
+        ~get_transmit_limit:(fun () -> transmit_limit net_state)
+        ~send_msg:Net.send
+        ~handle_msg
+        ~me
+    in
+    let t =
+      { messager = make_messager ()
+      ; net_state
+      (* Assume all initial_peers start alive *)
+      ; seq_no = 0
+      }
+    in
+    (* Assume initial peers are alive *)
+    List.iter initial_peers ~f:(fun peer ->
+      NetworkState.add t.net_state (Node.alive peer);
+    );
+
+    (* TODO: An explicit join_network shouldn't be necessary since failure_detect will implicitly join when pings happen *)
+    don't_wait_for(schedule' (fun () -> failure_detect t));
+
+    t
+
+  let peers t = List.map ~f:(fun x -> x.peer) (NetworkState.live_nodes t.net_state)
 
   let changes t = failwith "TODO"
 end
