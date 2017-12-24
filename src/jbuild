@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
 (executable
-  ((name main)
+  ((name test)
    (libraries (core async async_extra))
    (preprocess (pps (ppx_jane)))
    (flags (-w -40 -g))
@@ -10,5 +10,5 @@
 
 (install
  ((section bin)
-  (files ((main.exe as main)))))
+  (files ((test.exe as test)))))
 

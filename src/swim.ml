@@ -114,7 +114,7 @@ module NetworkState : NetworkState_intf = struct
   let add t (node : Node.t) =
     if not (List.exists !t ~f:(fun (_, node') -> node = node')) then begin
       let q = List.filter !t ~f:(fun (_, node') -> not (E.invalidates node node')) in
-      printf "NetworkState: New state %s" (node |> Node.sexp_of_t |> Sexp.to_string);
+      printf "NetworkState: New state %s\n" (node |> Node.sexp_of_t |> Sexp.to_string);
       t := ((0, node)::q)
     end
 
@@ -260,7 +260,7 @@ end) = struct
       don't_wait_for(
         match%map raw_send t addr (Request_or_ack.Request payload) seq_no with
         | Ok () -> ()
-        | Error e -> printf "Failed with err %s" (Error.to_string_hum e)
+        | Error e -> printf "Failed with err %s\n" (Error.to_string_hum e)
       );
     );
     match%map Async.with_timeout timeout wait_ack with
@@ -282,7 +282,7 @@ end) = struct
     let socket = Socket.create Socket.Type.udp in
     let addr = Socket.Address.Inet.create (Unix.Inet_addr.of_string (Host_and_port.host recipient)) ~port:(Host_and_port.port recipient) in
     let iobuf = Iobuf.create ~len:(Msg.bin_size_t msg) in
-    printf "Making an iobuf to send of size %d" (Msg.bin_size_t msg);
+    printf "Making an iobuf to send of size %d\n" (Msg.bin_size_t msg);
     Iobuf.Fill.bin_prot Msg.bin_writer_t iobuf msg;
     (* TODO: Actually send full data! *)
     let open Or_error.Let_syntax in
@@ -290,7 +290,7 @@ end) = struct
     | Ok sendto ->
         let open Deferred.Let_syntax in
         let%map () = sendto (Socket.fd socket) iobuf addr in
-        printf "Sent buf %s over socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+        printf "Sent buf %s over socket\n" (msg |> Msg.sexp_of_t |> Sexp.to_string);
         Ok ()
     | Error _ as e -> Deferred.return e
     (*printf "Got sendto error code of %d" code;*)
@@ -308,7 +308,7 @@ end) = struct
       don't_wait_for begin
         Udp.recvfrom_loop (Socket.fd socket) (fun buf addr ->
           let msg = Iobuf.Consume.bin_prot Msg.bin_reader_t buf in
-          printf "Got msg %s on socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+          printf "Got msg %s on socket\n" (msg |> Msg.sexp_of_t |> Sexp.to_string);
           (* TODO: Do we need pushback here? *)
           Pipe.write_without_pushback w msg
         )
@@ -350,28 +350,34 @@ module Udp : S = struct
     in
 
     let seq_no = fresh_seq_no t in
-    printf "Begin round %d probing node %s" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
+    printf "Begin round %d probing node %s\n" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
     match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:my_config.rtt with
     | `Acked ->
-        printf "Round %d acked" t.seq_no;
+        printf "Round %d acked\n" t.seq_no;
         return ()
     | `Timeout ->
-        printf "Round %d timeout" t.seq_no;
+        printf "Round %d timeout\n" t.seq_no;
         let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) my_config.indirect_ping_count m_i in
         match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k.peer, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.(my_config.protocol_period - my_config.rtt) with
         | `Acked ->
-            printf "Round %d secondary acked" t.seq_no
+            printf "Round %d secondary acked\n" t.seq_no
         | `Timeout ->
             m_i.state <- Node.Dead;
-            printf "Round %d m_i died" t.seq_no
+            printf "Round %d m_i died\n" t.seq_no
 
   (* TODO: Round-Robin extension *)
-  let rec failure_detect t : _ Deferred.t =
-    let choose xs =
-      Option.value_exn (List.nth xs (Random.int (List.length xs))) in
+  let rec failure_detect (t : t) : _ Deferred.t =
+    let%bind () =
+      match List.length (NetworkState.live_nodes t.net_state) with
+      | 0 ->
+        Async.after my_config.protocol_period
+      | _ ->
+        let choose xs =
+          Option.value_exn (List.nth xs (Random.int (List.length xs))) in
 
-    let m_i = choose (NetworkState.live_nodes t.net_state) in
-    let%bind () = prob_node t m_i in
+        let m_i = choose (NetworkState.live_nodes t.net_state) in
+        prob_node t m_i
+    in
     failure_detect t
 
   (* From mirage-swim *)
