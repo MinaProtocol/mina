@@ -32,7 +32,7 @@ let bracket (reader : 'a Reader.t) dx =
   end
 ;;
 
-let bracket_forever_sync (reader : 'a Reader.t) =
+let set_reader_sync (reader : 'a Reader.t) =
   if reader.has_reader
   then failwith "Linear_pipe.bracket: had reader"
   else 
@@ -48,22 +48,22 @@ let iter ?consumer ?continue_on_error reader ~f =
 
 let of_list xs = 
   let reader = wrap_reader (Pipe.of_list xs) in
-  bracket_forever_sync reader;
+  set_reader_sync reader;
   reader
 ;;
 
 let fold reader ~init ~f =
-  bracket_forever_sync reader;
+  set_reader_sync reader;
   Pipe.fold reader.Reader.pipe ~init ~f
 
 let map (reader : 'a Reader.t) ~f = 
-  bracket_forever_sync reader;
+  set_reader_sync reader;
   let r = Pipe.map reader.Reader.pipe ~f in
   wrap_reader r
 ;;
 
 let filter_map (reader : 'a Reader.t) ~f = 
-  bracket_forever_sync reader;
+  set_reader_sync reader;
   let r = Pipe.filter_map reader.Reader.pipe ~f in
   wrap_reader r
 ;;
@@ -75,6 +75,7 @@ let transfer reader writer ~f =
 let merge rs = 
   let mergedReader, merged_writer = create () in
   ignore (List.map rs ~f:(fun reader -> 
+    set_reader_sync reader;
     don't_wait_for (iter reader ~f:(fun x -> 
       Pipe.write merged_writer x))
   ));
@@ -92,12 +93,13 @@ let fork reader n =
   let pipes = List.map (List.range 0 n) ~f:(fun _ -> create ()) in
   let writers = List.map pipes ~f:(fun (r, w) -> w) in
   let readers = List.map pipes ~f:(fun (r, w) -> r) in
-  let () = don't_wait_for (iter reader ~f:(fun x -> 
-    Deferred.all_ignore (List.map writers ~f:(fun writer -> 
-      if not (Pipe.is_closed writer) 
-      then Pipe.write writer x
-      else return ()))))
-  in
+  don't_wait_for begin
+    iter reader ~f:(fun x -> 
+      Deferred.all_ignore (List.map writers ~f:(fun writer -> 
+        if not (Pipe.is_closed writer) 
+        then Pipe.write writer x
+        else return ())))
+  end;
   don't_wait_for begin
     let%map () = Deferred.all_ignore (List.map readers ~f:closed) in
     close_read reader
@@ -117,11 +119,12 @@ let fork3 reader =
 
 let partition_map2 reader ~f =
   let ((readerA, writerA), (readerB, writerB)) = (create (), create ()) in
-  let () = don't_wait_for (iter reader ~f:(fun x -> 
-    match f x with
-    | `Fst x -> Pipe.write writerA x
-    | `Snd x -> Pipe.write writerB x))
-  in
+  don't_wait_for begin
+    iter reader ~f:(fun x ->
+      match f x with
+      | `Fst x -> Pipe.write writerA x
+      | `Snd x -> Pipe.write writerB x)
+  end;
   don't_wait_for begin
     let%map () = closed readerA 
     and () = closed readerB in
@@ -131,12 +134,13 @@ let partition_map2 reader ~f =
 
 let partition_map3 reader ~f =
   let ((readerA, writerA), (readerB, writerB), (readerC, writerC)) = (create (), create (), create ()) in
-  let () = don't_wait_for (iter reader ~f:(fun x -> 
-    match f x with
-    | `Fst x -> Pipe.write writerA x
-    | `Snd x -> Pipe.write writerB x
-    | `Trd x -> Pipe.write writerC x))
-  in
+  don't_wait_for begin
+    iter reader ~f:(fun x -> 
+      match f x with
+      | `Fst x -> Pipe.write writerA x
+      | `Snd x -> Pipe.write writerB x
+      | `Trd x -> Pipe.write writerC x)
+  end;
   don't_wait_for begin
     let%map () = closed readerA 
     and () = closed readerB 
