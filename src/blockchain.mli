@@ -14,8 +14,8 @@ end
 
 val accumulate
   :  init:t
-  -> updates:Update.t Pipe.Reader.t
-  -> strongest_block:t Pipe.Writer.t
+  -> updates:Update.t Linear_pipe.Reader.t
+  -> strongest_block:t Linear_pipe.Writer.t
   -> unit
 
 val valid : t -> bool

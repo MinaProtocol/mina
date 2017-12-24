@@ -11,8 +11,8 @@ module type S = sig
   val mine
     : previous:Blockchain.t
     -> body:Block.Body.t
-    -> Update.t Pipe.Reader.t
-    -> Blockchain.t Pipe.Reader.t
+    -> Update.t Linear_pipe.Reader.t
+    -> Blockchain.t Linear_pipe.Reader.t
 end
 
 module Cpu : S

@@ -38,7 +38,7 @@ module type S = sig
 
   val peers : t -> Peer.t list
 
-  val changes : t -> Peer.Event.t Pipe.Reader.t
+  val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   val stop : t -> unit
 
@@ -70,7 +70,7 @@ module type Network_state_intf = sig
 
   val add_slice : t -> slice -> unit
 
-  val changes : t -> Peer.Event.t Pipe.Reader.t
+  val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   (* Pure getter for live_nodes *)
   val live_nodes : t -> Peer.t Set.Poly.t
@@ -101,7 +101,7 @@ module Network_state : Network_state_intf = struct
     { mutable broadcast_list : broadcast_list
     ; mutable live_nodes : Peer.t Set.Poly.t
     ; logger : Log.logger
-    ; changes : Peer.Event.t Pipe.Reader.t * Peer.Event.t Pipe.Writer.t
+    ; changes : Peer.Event.t Linear_pipe.Reader.t * Peer.Event.t Linear_pipe.Writer.t
     }
 
   type slice = Node.t list [@@deriving bin_io, sexp]
@@ -110,7 +110,7 @@ module Network_state : Network_state_intf = struct
     { broadcast_list = []
     ; live_nodes = Set.Poly.empty
     ; logger
-    ; changes = Pipe.create ()
+    ; changes = Linear_pipe.create ()
     }
 
   let update_live t (node : E.t) =
@@ -200,7 +200,7 @@ module Messager : sig
     ; seq_no: int
     } [@@deriving bin_io, sexp]
 
-  val create : incoming:msg Pipe.Reader.t
+  val create : incoming:(msg Linear_pipe.Reader.t)
     -> net_state:Network_state.t
     -> get_transmit_limit:(unit -> int)
     (* to send messages *)
@@ -248,7 +248,8 @@ end = struct
     in
 
     don't_wait_for begin
-      Pipe.iter_without_pushback incoming (fun {from; action; net_slice; seq_no} ->
+      (* TODO *)
+      Pipe.iter_without_pushback (incoming.Linear_pipe.Reader.pipe) (fun {from; action; net_slice; seq_no} ->
         let open Let_syntax in
         let open Request_or_ack in
 
@@ -305,7 +306,7 @@ module type Transport_intf =
     val create : logger -> port:int -> t
 
     val send : t -> recipient:Peer.t -> Message.t -> unit Or_error.t Deferred.t
-    val listen : t -> Message.t Pipe.Reader.t Deferred.t
+    val listen : t -> Message.t Linear_pipe.Reader.t Deferred.t
 
     val stop_listening : t -> unit
 
@@ -347,8 +348,8 @@ end) = struct
     | (_, None) -> return (Ok ())
     | (_, Some fn) -> fn ~recipient msg
 
-  let listen (t: t) : Message.t Pipe.Reader.t Deferred.t =
-    let (r,w) = Pipe.create () in
+  let listen (t: t) : Message.t Linear_pipe.Reader.t Deferred.t =
+    let (r,w) = Linear_pipe.create () in
     Host_and_port.Table.add_exn network.connected
       ~key:(me t)
       ~data:(fun ~recipient msg ->
@@ -380,7 +381,6 @@ end) = struct
           )
       | None -> ()
   end
-
 end
 
 
@@ -428,7 +428,7 @@ end) = struct
         Ok ()
     | Error _ as e -> Deferred.return e
 
-  let listen : t -> Message.t Pipe.Reader.t Deferred.t =
+  let listen : t -> Message.t Linear_pipe.Reader.t Deferred.t =
     fun t ->
       let socket_addr =
         Socket.Address.Inet.create
@@ -437,9 +437,9 @@ end) = struct
       in
       let open Deferred.Let_syntax in
       let%map socket = Udp.bind socket_addr in
-      let (r,w) = Pipe.create () in
+      let (r,w) = Linear_pipe.create () in
       don't_wait_for begin
-        Udp.recvfrom_loop (Socket.fd socket) (fun buf addr ->
+        Udp.recvfrom_loop ~config:(Udp.Config.create ~capacity:9000 ~max_ready:64 ()) (Socket.fd socket) (fun buf addr ->
           let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
           t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
           (* TODO(es92): We need a linear_pipe method for capped-buffer-than-drop-packets write *)

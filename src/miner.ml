@@ -11,8 +11,8 @@ module type S = sig
   val mine
     : previous:Blockchain.t
     -> body:Block.Body.t
-    -> Update.t Pipe.Reader.t
-    -> Blockchain.t Pipe.Reader.t
+    -> Update.t Linear_pipe.Reader.t
+    -> Blockchain.t Linear_pipe.Reader.t
 end
 
 module Cpu = struct
@@ -29,14 +29,14 @@ module Cpu = struct
       }
   end
 
-  let mine ~previous ~body (updates : Update.t Pipe.Reader.t) =
+  let mine ~previous ~body (updates : Update.t Linear_pipe.Reader.t) =
     let state =
       { State.previous_header_hash = Block.Header.hash previous.Blockchain.block.header
       ; body
       ; id = 0
       }
     in
-    let mined_blocks_reader, mined_blocks_writer = Pipe.create () in
+    let mined_blocks_reader, mined_blocks_writer = Linear_pipe.create () in
     let rec go () =
       let id = state.id in
       match%bind find_block state.previous_header_hash state.body with
@@ -53,15 +53,14 @@ module Cpu = struct
     in
     don't_wait_for (go ());
     don't_wait_for begin
-      Pipe.iter' updates ~f:(fun q ->
-        Queue.iter q ~f:(fun u ->
-          state.id <- state.id + 1;
-          begin match u with
-          | Change_previous b ->
-            state.previous_header_hash <- Block.Header.hash b.block.header
-          | Change_body body ->
-            state.body <- body
-          end);
+      Linear_pipe.iter updates ~f:(fun u ->
+        state.id <- state.id + 1;
+        begin match u with
+        | Change_previous b ->
+          state.previous_header_hash <- Block.Header.hash b.block.header
+        | Change_body body ->
+          state.body <- body
+        end;
         Deferred.unit)
     end;
     mined_blocks_reader
