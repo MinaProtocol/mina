@@ -302,9 +302,10 @@ end) = struct
     match Udp.sendto () with
     | Ok sendto ->
         let open Deferred.Let_syntax in
-        let%map () = sendto (Socket.fd socket) iobuf addr in
+        let fd = Socket.fd socket in
+        let%bind () = sendto fd iobuf addr in
+        let%map () = Fd.close fd in
         logger#logf Debug "Sent buf %s over socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
-        Socket.shutdown socket `Both;
         Ok ()
     | Error _ as e -> Deferred.return e
     (*printf "Got sendto error code of %d" code;*)
