@@ -75,14 +75,14 @@ module type NetworkState_intf = sig
   (* A slice of state for network delivery *)
   type slice [@@deriving bin_io, sexp]
 
-  val create : unit -> t
+  val create : Log.logger -> t
 
   val add : t -> Node.t -> unit
 
   val add_slice : t -> slice -> unit
 
   (* Pure getter for live_nodes *)
-  val live_nodes : t -> Node.t list
+  val live_nodes : t -> peer Set.Poly.t
 
   (* Effectfully (mutating t) extracts a slice of the network state
    * maintaining necessary SWIM invariants *)
@@ -90,10 +90,9 @@ module type NetworkState_intf = sig
 end
 
 (* Taken mostly from mirage-swim *)
-(* TODO(bkase): Does it matter that we never remove entries from table *)
 module NetworkState : NetworkState_intf = struct
   module E = struct
-    type t = Node.t
+    type t = Node.t [@@deriving sexp]
     type id = peer
 
     let invalidates (node : t) (node' : t) : bool =
@@ -105,28 +104,40 @@ module NetworkState : NetworkState_intf = struct
     let size = Node.bin_size_t
   end
 
-  type t = (int * E.t) list ref
+  type broadcast_queue_t = (int * E.t) list [@@deriving sexp]
+  type t =
+    { mutable broadcast_queue : broadcast_queue_t
+    ; mutable live_nodes : peer Set.Poly.t
+    ; logger : Log.logger
+    }
 
   type slice = Node.t list [@@deriving bin_io, sexp]
 
-  let create () = ref []
+  let create logger : t =
+    { broadcast_queue = []
+    ; live_nodes = Set.Poly.empty
+    ; logger
+    }
 
-  let add t (node : Node.t) =
-    if not (List.exists !t ~f:(fun (_, node') -> node = node')) then begin
-      let q = List.filter !t ~f:(fun (_, node') -> not (E.invalidates node node')) in
-      printf "NetworkState: New state %s\n" (node |> Node.sexp_of_t |> Sexp.to_string);
-      t := ((0, node)::q)
+  let update_live t (node : E.t) =
+    if node.state = Node.Alive then
+      t.live_nodes <- Set.Poly.add t.live_nodes node.peer
+    else
+      t.live_nodes <- Set.Poly.remove t.live_nodes node.peer
+
+  let add (t : t) (node : E.t) =
+    update_live t node;
+    if not (List.exists t.broadcast_queue ~f:(fun (_, node') -> node = node')) then begin
+      let q = List.filter t.broadcast_queue ~f:(fun (_, node') -> not (E.invalidates node node')) in
+      t.broadcast_queue <- ((0, node)::q)
     end
 
   let add_slice t slice =
     List.iter slice (add t)
 
-  let live_nodes t =
-    !t
-    |> List.map ~f:(fun (_, node) -> node)
-    |> List.filter ~f:Node.is_alive
+  let live_nodes t = t.live_nodes
 
-  let extract t ~transmit_limit addr =
+  let extract (t : t) ~transmit_limit addr =
     let select memo elem =
       let transmit, elems, bytes_left = memo in
       let transmit_count, broadcast = elem in
@@ -138,8 +149,8 @@ module NetworkState : NetworkState_intf = struct
       else
         (broadcast::transmit, (transmit_count+1, broadcast)::elems, bytes_left - size)
     in
-    let transmit, t', _ = List.fold_left !t ~f:select ~init:([], [], 65507) in
-    t := List.sort ~cmp:(fun e e' -> Int.compare (fst e) (fst e')) t';
+    let transmit, bq', _ = List.fold_left t.broadcast_queue ~f:select ~init:([], [], 65507) in
+    t.broadcast_queue <- List.sort ~cmp:(fun e e' -> Int.compare (fst e) (fst e')) bq';
     transmit
 end
 
@@ -260,7 +271,7 @@ end) = struct
       don't_wait_for(
         match%map raw_send t addr (Request_or_ack.Request payload) seq_no with
         | Ok () -> ()
-        | Error e -> printf "Failed with err %s\n" (Error.to_string_hum e)
+        | Error e -> printf "Failed with err %s" (Error.to_string_hum e)
       );
     );
     match%map Async.with_timeout timeout wait_ack with
@@ -275,28 +286,31 @@ end
 module NetMake (Msg : sig
   type t [@@deriving bin_io, sexp]
 end) = struct
+  module MyLog = struct include Log end
   open Async
   open Core
 
-  let send : recipient:Host_and_port.t -> Msg.t -> unit Or_error.t Deferred.t = fun ~recipient msg ->
+  let send : logger:MyLog.logger -> recipient:Host_and_port.t -> Msg.t -> unit Or_error.t Deferred.t = fun ~logger ~recipient msg ->
     let socket = Socket.create Socket.Type.udp in
     let addr = Socket.Address.Inet.create (Unix.Inet_addr.of_string (Host_and_port.host recipient)) ~port:(Host_and_port.port recipient) in
     let iobuf = Iobuf.create ~len:(Msg.bin_size_t msg) in
-    printf "Making an iobuf to send of size %d\n" (Msg.bin_size_t msg);
+    logger#logf Debug "Making an iobuf to send of size %d" (Msg.bin_size_t msg);
     Iobuf.Fill.bin_prot Msg.bin_writer_t iobuf msg;
+    Iobuf.flip_lo iobuf;
     (* TODO: Actually send full data! *)
     let open Or_error.Let_syntax in
     match Udp.sendto () with
     | Ok sendto ->
         let open Deferred.Let_syntax in
         let%map () = sendto (Socket.fd socket) iobuf addr in
-        printf "Sent buf %s over socket\n" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+        logger#logf Debug "Sent buf %s over socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+        Socket.shutdown socket `Both;
         Ok ()
     | Error _ as e -> Deferred.return e
     (*printf "Got sendto error code of %d" code;*)
 
-  let listen : port:int -> Msg.t Pipe.Reader.t Deferred.t =
-    fun ~port ->
+  let listen : logger:MyLog.logger -> port:int -> Msg.t Pipe.Reader.t Deferred.t =
+    fun ~logger ~port ->
       let socket_addr =
         Socket.Address.Inet.create
           (Unix.Inet_addr.of_string "127.0.0.1")
@@ -308,7 +322,7 @@ end) = struct
       don't_wait_for begin
         Udp.recvfrom_loop (Socket.fd socket) (fun buf addr ->
           let msg = Iobuf.Consume.bin_prot Msg.bin_reader_t buf in
-          printf "Got msg %s on socket\n" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+          logger#logf Debug "Got msg %s on socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
           (* TODO: Do we need pushback here? *)
           Pipe.write_without_pushback w msg
         )
@@ -334,6 +348,7 @@ module Udp : S = struct
     { messager : Messager.t
     ; net_state  : NetworkState.t
     ; mutable seq_no : int
+    ; logger : Log.logger
     }
 
   let fresh_seq_no t =
@@ -343,46 +358,52 @@ module Udp : S = struct
 
   let prob_node t (m_i : Node.t) =
     let sample_nodes xs k exclude =
-      xs
+      xs |> Set.Poly.to_list
       |> List.filter ~f:(fun n -> n <> exclude)
       |> List.permute
       |> fun l -> List.take l k
     in
 
     let seq_no = fresh_seq_no t in
-    printf "Begin round %d probing node %s\n" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
+    t.logger#logf Info "Begin round %d probing node %s" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
     match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:my_config.rtt with
     | `Acked ->
-        printf "Round %d acked\n" t.seq_no;
+        t.logger#logf Info "Round %d acked" t.seq_no;
         return ()
     | `Timeout ->
-        printf "Round %d timeout\n" t.seq_no;
-        let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) my_config.indirect_ping_count m_i in
-        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k.peer, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.(my_config.protocol_period - my_config.rtt) with
+        t.logger#logf Info "Round %d timeout" t.seq_no;
+        let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) my_config.indirect_ping_count m_i.peer in
+        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.(my_config.protocol_period - my_config.rtt) with
         | `Acked ->
-            printf "Round %d secondary acked\n" t.seq_no
+            t.logger#logf Info "Round %d secondary acked" t.seq_no
         | `Timeout ->
             m_i.state <- Node.Dead;
-            printf "Round %d m_i died\n" t.seq_no
+            t.logger#logf Info "Round %d m_i died" t.seq_no
 
   (* TODO: Round-Robin extension *)
   let rec failure_detect (t : t) : _ Deferred.t =
+    t.logger#logf Debug "Start failure_detect";
+    (* TODO: WTF if I don't flush stdout here, nothing ever gets logged *)
+    Out_channel.flush stdout;
     let%bind () =
-      match List.length (NetworkState.live_nodes t.net_state) with
+      match Set.Poly.length (NetworkState.live_nodes t.net_state) with
       | 0 ->
         Async.after my_config.protocol_period
       | _ ->
         let choose xs =
           Option.value_exn (List.nth xs (Random.int (List.length xs))) in
 
-        let m_i = choose (NetworkState.live_nodes t.net_state) in
-        prob_node t m_i
+        let m_i = choose (NetworkState.live_nodes t.net_state |> Set.Poly.to_list) in
+        let%map ((), ()) = Deferred.both
+          (prob_node t {peer=m_i;state=Alive})
+          (Async.after my_config.protocol_period) in
+        ()
     in
     failure_detect t
 
   (* From mirage-swim *)
   let transmit_limit net_state =
-    let live_count = List.length (NetworkState.live_nodes net_state) in
+    let live_count = Set.Poly.length (NetworkState.live_nodes net_state) in
     if live_count = 0 then
       0
     else
@@ -397,8 +418,9 @@ module Udp : S = struct
   end)
 
   let connect ~initial_peers ~me =
-    let%map incoming = Net.listen (Host_and_port.port me) in
-    let net_state = NetworkState.create () in
+    let logger = new Log.logger (Printf.sprintf "Swim:%s" (me |> Host_and_port.port |> string_of_int)) in
+    let%map incoming = Net.listen logger (Host_and_port.port me) in
+    let net_state = NetworkState.create logger in
     let rec handle_msg messager = function
       | (Payload.Ping, _) -> Deferred.return `Want_ack
       | (Payload.Ping_req addr_i, seq_no) ->
@@ -410,7 +432,7 @@ module Udp : S = struct
         ~incoming
         ~net_state
         ~get_transmit_limit:(fun () -> transmit_limit net_state)
-        ~send_msg:Net.send
+        ~send_msg:(Net.send ~logger)
         ~handle_msg
         ~me
     in
@@ -419,6 +441,7 @@ module Udp : S = struct
       ; net_state
       (* Assume all initial_peers start alive *)
       ; seq_no = 0
+      ; logger
       }
     in
     (* Assume initial peers are alive *)
@@ -431,7 +454,7 @@ module Udp : S = struct
 
     t
 
-  let peers t = List.map ~f:(fun x -> x.peer) (NetworkState.live_nodes t.net_state)
+  let peers t = NetworkState.live_nodes t.net_state |> Set.Poly.to_list
 
   let changes t = failwith "TODO"
 end
