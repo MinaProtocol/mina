@@ -17,6 +17,11 @@ let create () =
 let wrap_reader reader = { Reader.pipe = reader; has_reader = false }
 ;;
 
+let write_with_capacity ~capacity writer reader x = 
+  if Pipe.length reader.Reader.pipe > capacity
+  then ignore (Pipe.read_now reader.Reader.pipe);
+  Pipe.write_without_pushback writer x
+
 let close_read (reader : 'a Reader.t) = Pipe.close_read reader.pipe
 
 let closed (reader : 'a Reader.t) = Pipe.closed reader.pipe

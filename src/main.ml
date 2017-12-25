@@ -32,21 +32,29 @@ struct
   let peer_strongest_blocks gossip_net
     : Blockchain.Update.t Linear_pipe.Reader.t
     =
-    let from_new_peers =
-      Linear_pipe.filter_map_unordered ~max_concurrency:64 (Gossip_net.new_peers gossip_net) ~f:(fun peer ->
-        Deferred.map ~f:(function
-          | Ok b -> Some (Blockchain.Update.New_block b)
-          | Error _ -> None)
-          (Gossip_net.query_peer gossip_net peer
-              Rpcs.Get_strongest_block.rpc ()))
+    let from_new_peers_reader, from_new_peers_writer = Linear_pipe.create () in
+    let fetch_period = Time.Span.of_min 10. in
+    let fetch_peers = 4 in
+    let rec timer () = 
+      let%bind () = after fetch_period in
+      let%bind () = 
+        Deferred.List.iter
+          ~how:`Parallel
+          (Gossip_net.query_random_peers gossip_net fetch_peers Rpcs.Get_strongest_block.rpc ())
+          ~f:(fun x -> match%bind x with
+            | Ok b -> Pipe.write from_new_peers_writer (Blockchain.Update.New_block b)
+            | Error _ -> return ())
+      in
+      timer ()
     in
+    don't_wait_for (timer ());
     let broadcasts =
       Linear_pipe.filter_map (Gossip_net.received gossip_net)
         ~f:(function
           | New_strongest_block b -> Some (Blockchain.Update.New_block b))
     in
     Linear_pipe.merge_unordered
-      [ from_new_peers
+      [ from_new_peers_reader
       ; broadcasts
       ]
   ;;
@@ -55,12 +63,31 @@ struct
     let open Let_syntax in
     let params : Gossip_net.Params.t =
       { timeout = Time.Span.of_sec 1.
-      ; initial_peers
       ; target_peer_count = 8
+      ; address = me
       }
     in
+    let strongest_block_reader, strongest_block_writer = Pipe.create () in
+    let latest_strongest_block = ref Blockchain.genesis in
+    let () =
+      don't_wait_for begin
+        Pipe.iter strongest_block_reader
+          ~f:(fun b -> return (latest_strongest_block := b))
+      end
+    in
+    let get_strongest_block_handler _ _ = 
+      return !latest_strongest_block
+    in
+    let handlers = [
+      (Rpcs.Get_strongest_block.rpc, get_strongest_block_handler)
+    ] in
+    let implementations = 
+      Rpc.Implementations.create_exn 
+        ~implementations: (List.map handlers ~f:(fun (rpc, cb) -> (Rpc.Rpc.implement rpc cb)))
+        ~on_unknown_rpc:`Close_connection
+    in
     let swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
-    let%bind gossip_net = Gossip_net.create (Swim.changes swim) params in
+    let gossip_net = Gossip_net.create (Swim.changes swim) params implementations in
     let%map initial_blockchain =
       match%map Storage.load storage_location with
       | Some x -> x
@@ -112,6 +139,13 @@ end
 
 module Main = Make(Swim.Udp)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
 
+let int16 =
+  let max_port = 1 lsl 16 in
+  Command.Arg_type.map Command.Param.int ~f:(fun x ->
+    if 0 <= x && x < max_port
+    then x
+    else failwithf "Port not between 0 and %d" max_port ())
+
 let () =
   let open Command.Let_syntax in
   Command.async
@@ -125,6 +159,9 @@ let () =
         and should_mine =
           flag "mine"
             ~doc:"Run the miner" (required bool)
+        and port =
+          flag "port"
+            ~doc:"server port" (required int16)
         in
         fun () ->
           let open Deferred.Let_syntax in
