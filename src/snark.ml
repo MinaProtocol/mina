@@ -1,135 +1,146 @@
 open Core_kernel
-open Camlsnark
 
-module Main = Snark.Make(Backends.Mnt4)
-module Other = Snark.Make(Backends.Mnt6)
+module Extend (Impl : Camlsnark.Snark_intf.S) : Snark_intf.S = struct
+  include Impl
+
+  module Snarkable = struct
+    module type S = sig
+      type var
+      type value
+      val spec : (var, value) Var_spec.t
+    end
+
+    module Bits = struct
+      module type S = sig
+        module Packed : sig
+          type var
+          type value
+          val spec : (var, value) Var_spec.t
+        end
+
+        module Unpacked : sig
+          type var = Boolean.var list
+          type value
+          val spec : (var, value) Var_spec.t
+
+          module Padded : sig
+            type var = private Boolean.var list
+            type value
+            val spec : (var, value) Var_spec.t
+          end
+        end
+
+        module Checked : sig
+          val pad : Unpacked.var -> Unpacked.Padded.var
+          val unpack : Packed.var -> (Unpacked.var, _) Checked.t
+        end
+      end
+    end
+  end
+end
+
+module Make_types (Impl : Snark_intf.S) = struct
+  module Digest = Pedersen.Digest.Snarkable(Impl)
+  module Time = Block_time.Snarkable(Impl)
+  module Span = Block_time.Span.Snarkable(Impl)
+  module Target = Target.Snarkable(Impl)
+  module Nonce = Nonce.Snarkable(Impl)
+  module Strength = Strength.Snarkable(Impl)
+  module Block = Block.Snarkable(Impl)(Digest)(Time)(Span)(Target)(Nonce)(Strength)
+end
+
+module Main_curve = Camlsnark.Backends.Mnt4
+module Other_curve = Camlsnark.Backends.Mnt6
+module Main = struct
+  module T = Extend(Camlsnark.Snark.Make(Main_curve))
+  include T
+  include Make_types(T)
+end
+module Other = struct
+  module T = Extend(Camlsnark.Snark.Make(Other_curve))
+  include T
+  include Make_types(T)
+end
+
+
+module Other = Camlsnark.Snark.Make(Other_curve)
 
 let () = assert (Main.Field.size_in_bits = Other.Field.size_in_bits)
 
-module Types (Impl : Snark_intf.S) = struct
-  open Impl
+let step_input () =
+  let open Main in
+  let open Data_spec in
+  [ Digest.Packed.spec (* Self key hash *)
+  ; Digest.Packed.spec (* Block header hash *)
+  ]
 
-  module Bits_types = struct
-    type var = Boolean.var list
-    type value = Boolean.value list
+module Wrap = struct
+  let step_input_size = Main.Data_spec.size (step_input ())
+
+  open Other
+
+  module Verifier =
+    Camlsnark.Verifier_gadget.Make(Other)(Other_curve)(Main_curve)
+      (struct let input_size = step_input_size end)
+
+  let step_vk_length = 11324
+  let step_vk_size = 38
+  let step_vk_spec =
+    Var_spec.list ~length:step_vk_size Var_spec.field
+
+  let input_spec =
+    Var_spec.list ~length:step_input_size Var_spec.field
+
+  let input () =
+    Data_spec.([ step_vk_spec; input_spec ])
+
+  module Prover_state = struct
+    type t =
+      { vk    : Main_curve.Verification_key.t
+      ; proof : Main_curve.Proof.t
+      }
   end
 
-  module Make_unpacked
-      (M : sig val bit_length : int val element_length : int end)
-  = struct
-    include Bits_types
-    let spec : (var, value) Var_spec.t =
-      Var_spec.list ~length:M.bit_length Boolean.spec
-
-    module Padded = struct
-      include Bits_types
-
-      let spec : (var, value) Var_spec.t =
-        Var_spec.list ~length:(M.element_length * Field.size_in_bits)
-          Boolean.spec
-    end
-  end
-
-  module Bits_small(M : sig val bit_length : int end) = struct
-    include M
-
-    let () = assert (bit_length < Field.size_in_bits)
-
-    module Packed = struct
-      type var = Cvar.t
-      type value = Field.t
-      let spec = Var_spec.field
-    end
-
-    module Unpacked = Make_unpacked(struct
-        include M
-        let element_length = 1
-      end)
-
-    module Checked = struct
-      let unpack : Packed.var -> (Unpacked.var, _) Checked.t =
-        Checked.unpack ~length:bit_length
-
-      let padding =
-        List.init (Field.size_in_bits - bit_length) ~f:(fun _ -> Boolean.false_)
-
-      let pad x = x @ padding
-    end
-  end
-
-  module Bits0 (M : sig
-      val bit_length : int
-      val bits_per_element : int
-    end) = struct
-    include M
-
-    let element_length =
-      Float.(to_int (round_up (of_int bit_length / of_int bits_per_element)))
-
-    module Packed = struct
-      type var = Cvar.t list
-      type value = Field.t list
-    end
-
-    module Unpacked = Make_unpacked(struct
-        let bit_length = bit_length
-        let element_length = element_length
-      end)
-
-    module Checked = struct
-      let unpack : Packed.var -> (Unpacked.var, _) Checked.t =
-        let open Let_syntax in
-        let rec go remaining acc = function
-          | x :: xs ->
-            let to_unpack = min remaining bits_per_element in
-            let%bind bs = Checked.unpack x ~length:to_unpack in
-            go (remaining - to_unpack) (List.rev_append bs acc) xs
-          | [] ->
-            assert (remaining = 0);
-            return (List.rev acc)
-        in
-        fun xs -> go bit_length [] xs
-
-      let padding =
-        List.init (element_length * Field.size_in_bits - bit_length)
-          ~f:(fun _ -> Boolean.false_)
-
-      let pad x = x @ padding
-    end
-
-    (* TODO: Would be nice to write this code only once. *)
-    let unpack : Packed.value -> Unpacked.value =
-      let rec go remaining acc = function
-        | x :: xs ->
-          let to_unpack = min remaining bits_per_element in
-          let bs = List.take (Field.unpack x) to_unpack in
-          go (remaining - to_unpack) (List.rev_append bs acc) xs
-        | [] ->
-          assert (remaining = 0);
-          List.rev acc
+  let main verification_key (input : Cvar.t list) =
+    let open Let_syntax in
+    let%bind v =
+      let%bind input =
+        List.map ~f:(Checked.unpack ~length:Main_curve.Field.size_in_bits) input
+        |> Checked.all
+        |> Checked.map ~f:List.concat
       in
-      fun xs -> go bit_length [] xs
+      (* TODO: Unpacking here is totally pointless. Edit libsnark
+          so we don't have to do this. *)
+      let%bind verification_key =
+        List.map ~f:(Checked.unpack ~length:Main_curve.Field.size_in_bits) verification_key
+        |> Checked.all
+        |> Checked.map ~f:List.concat
+      in
+      Verifier.All_in_one.create ~verification_key ~input
+        As_prover.(map get_state ~f:(fun {Prover_state.vk; proof} ->
+          { Verifier.All_in_one.verification_key=vk; proof }))
+    in
+    assert_equal (Verifier.All_in_one.result v :> Cvar.t) (Cvar.constant Field.one)
+  ;;
 
-    let padding =
-      List.init (element_length * Field.size_in_bits - bit_length)
-        ~f:(fun _ -> false)
+  let keypair = generate_keypair (input ()) main
 
-    let pad x = x @ padding
+  let vk = Keypair.vk keypair
+  let pk = Keypair.pk keypair
+end
+
+module Step = struct
+  open Main
+
+  module Prover_state = struct
+    type t =
+      { block      : Block.Packed.value
+      ; prev_block : Block.Packed.value
+      ; prev_proof : Other.Proof.t
+      ; self       : bool list
+      }
+    [@@deriving fields]
   end
 
-  module Bits(M : sig val bit_length : int end) =
-    Bits0(struct
-      include M
-      let bits_per_element = Field.size_in_bits - 1
-    end)
-
-  module Digest = Bits0(struct
-      let bit_length = Field.size_in_bits * 2
-      let bits_per_element = Field.size_in_bits
-    end)
-
-  module Block = struct
-    module Header = struct
-    end
-  end
+  module Verifier =
 end

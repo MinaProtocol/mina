@@ -4,7 +4,10 @@ open Core_kernel
 type t = Int64.t
 [@@deriving bin_io]
 
+module Snarkable = Bits.Make_Int64
+
 module Span = struct
+  module Snarkable = Bits.Make_Int64
   type t = Int64.t [@@deriving bin_io]
 end
 
