@@ -7,10 +7,20 @@ module Digest : sig
     Impl.Snarkable.Bits.S
 end
 
+module Curve
+  : Camlsnark.Curves.Complete_intf_basic
+    with type field := Snark_params.Main.Field.t
+
+module Params : sig
+  type t = Curve.t array
+
+  val random : max_input_length:int -> t
+end
+
 module State : sig
   type t
 
-  val create : unit ->  t
+  val create : Params.t ->  t
 
   val update : t -> Bigstring.t -> unit
 
