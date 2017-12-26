@@ -6,6 +6,9 @@ type t = Int64.t
 
 module Span = struct
   type t = Int64.t [@@deriving bin_io]
+
+  let of_time_span s =
+    Int64.of_float (Time.Span.to_ms s)
 end
 
 let diff x y = Int64.(x - y)

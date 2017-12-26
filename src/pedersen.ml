@@ -7,9 +7,17 @@ end
 module State = struct
   type t = Todo
 
-  let create = failwith "TODO"
+  let create () = failwith "TODO"
 
-  let update = failwith "TODO"
+  let update _ _ : unit = failwith "TODO"
 
-  let digest = failwith "TODO"
+  let digest _ = failwith "TODO"
 end
+
+let hash x =
+  let s = State.create () in
+  State.update s x;
+  State.digest s
+;;
+
+let zero_hash = failwith "TODO"

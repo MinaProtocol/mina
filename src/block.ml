@@ -14,6 +14,8 @@ module Header = struct
     let s = Pedersen.State.create () in
     Pedersen.State.update s buf;
     Pedersen.State.digest s
+
+  let num_deltas = 16
 end
 
 module Body = struct
@@ -26,5 +28,17 @@ type t =
   ; body   : Body.t
   }
 [@@deriving bin_io]
+
+let genesis =
+  { header =
+      { previous_header_hash = Pedersen.zero_hash
+      ; body_hash = Pedersen.zero_hash
+      ; time = Block_time.of_time Time.epoch
+      ; deltas =
+          List.init Header.num_deltas ~f:(fun _ ->
+            Block_time.Span.of_time_span Time.Span.zero)
+      }
+  ; body = Int64.zero
+  }
 
 let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"

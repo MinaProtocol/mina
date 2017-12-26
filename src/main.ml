@@ -102,13 +102,16 @@ struct
       end
     in
     let mined_blocks =
-      Miner_impl.mine
-        ~previous:initial_block
-        ~body:(Int64.succ initial_block.body)
-        (merge
-          [ Pipe.map strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
-          ; body_changes_reader
-          ])
+      if should_mine
+      then
+        Miner_impl.mine
+          ~previous:initial_block
+          ~body:(Int64.succ initial_block.body)
+          (merge
+            [ Pipe.map strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
+            ; body_changes_reader
+            ])
+      else Pipe.of_list []
     in
     Storage.persist storage_location
       (Pipe.map strongest_block_reader ~f:(fun b -> `Change_head b));
@@ -122,3 +125,34 @@ struct
           ])
   ;;
 end
+
+module Main = Make(Swim.Udp)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
+
+let () =
+  let open Command.Let_syntax in
+  Command.async
+    ~summary:"Current daemon"
+    begin
+      [%map_open
+        let conf_dir =
+          flag "config directory"
+            ~doc:"Configuration directory"
+            (optional file)
+        and should_mine =
+          flag "mine"
+            ~doc:"Run the miner" (required bool)
+        in
+        fun () ->
+          let open Deferred.Let_syntax in
+          let%bind home = Sys.home_directory () in
+          let conf_dir =
+            Option.value ~default:(home ^/ ".current-config") conf_dir
+          in
+          let%bind initial_peers =
+            Reader.load_sexps_exn conf_dir Peer.t_of_sexp
+          in
+          Main.main (conf_dir ^/ "storage") Block.genesis initial_peers should_mine
+      ]
+    end
+  |> Command.run
+;;
