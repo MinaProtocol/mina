@@ -7,12 +7,24 @@ type peer = Host_and_port.t [@@deriving bin_io, sexp]
 module type S = sig
   type t
 
+  (* TODO: Make this a module *)
+  type config =
+    { indirect_ping_count : int
+    ; protocol_period : Time.Span.t
+    ; rtt : Time.Span.t
+    }
+
   val connect
-    : initial_peers:peer list -> me:Host_and_port.t -> t Deferred.t
+    : ?config:config -> initial_peers:peer list -> me:Host_and_port.t -> t Deferred.t
 
   val peers : t -> peer list
 
   val changes : t -> Peer.Event.t Pipe.Reader.t
+
+  val stop : t -> unit
+
+  val test_only_network_partition_add : from:Host_and_port.t -> to_:Host_and_port.t -> unit
+  val test_only_network_partition_remove : from:Host_and_port.t -> to_:Host_and_port.t -> unit
 end
 
 module Node = struct
@@ -282,20 +294,125 @@ end) = struct
 
 end
 
-(* TODO(bkase): Replace with real networking code (or functorize) *)
-module NetMake (Msg : sig
+type logger = Log.logger
+module type Transport_intf =
+  functor (Message : sig type t [@@deriving bin_io, sexp] end) -> sig
+    type t
+
+    val create : logger -> port:int -> t
+
+    val send : t -> recipient:Host_and_port.t -> Message.t -> unit Or_error.t Deferred.t
+    val listen : t -> Message.t Pipe.Reader.t Deferred.t
+
+    val stop_listening : t -> unit
+
+    val test_only_network_partition_add : from:Host_and_port.t -> to_:Host_and_port.t -> unit
+    val test_only_network_partition_remove : from:Host_and_port.t -> to_:Host_and_port.t -> unit
+  end
+
+module FakeTransport (Message : sig
   type t [@@deriving bin_io, sexp]
 end) = struct
-  module MyLog = struct include Log end
+  type network_t =
+    { connected : (recipient:Host_and_port.t -> Message.t -> unit Or_error.t Deferred.t) Host_and_port.Table.t
+    ; partition_key_to_val : Host_and_port.t list Host_and_port.Table.t
+    }
+
+  let network : network_t =
+    { connected = Host_and_port.Table.create ()
+    ; partition_key_to_val = Host_and_port.Table.create ()
+    }
+
+  type t =
+    { logger : logger
+    ; port : int
+    }
+
+  let create logger ~port : t =
+    { logger
+    ; port
+    }
+
+  let me (t : t) =
+      Host_and_port.create ~host:"127.0.0.1" ~port:t.port
+
+  let send (t : t) ~recipient msg =
+    match (
+      Host_and_port.Table.find network.partition_key_to_val (me t),
+      Host_and_port.Table.find network.connected recipient
+    ) with
+    | (Some xs, _) when List.mem xs recipient ~equal:Host_and_port.equal -> return (Ok ())
+    | (_, None) -> return (Ok ())
+    | (_, Some fn) -> fn ~recipient msg
+
+  let listen (t: t) : Message.t Pipe.Reader.t Deferred.t =
+    let (r,w) = Pipe.create () in
+    Host_and_port.Table.add_exn network.connected
+      ~key:(me t)
+      ~data:(fun ~recipient msg ->
+        let%bind () = Pipe.write w msg in
+        return (Ok ())
+      );
+    return r
+
+  let stop_listening t =
+    Host_and_port.Table.remove network.connected (me t)
+
+  let test_only_network_partition_add ~from ~to_ =
+    match Host_and_port.Table.find network.partition_key_to_val from with
+    | Some xs ->
+        Host_and_port.Table.remove network.partition_key_to_val from;
+        Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:(
+          to_::xs
+        )
+    | None ->
+        Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:([to_])
+
+  let test_only_network_partition_remove ~from ~to_ =
+    match Host_and_port.Table.find network.partition_key_to_val from with
+    | Some xs ->
+        Host_and_port.Table.remove network.partition_key_to_val from;
+        Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:(
+          List.filter xs ~f:(fun x -> x <> to_)
+        )
+    | None -> ()
+
+end
+
+
+(* TODO(bkase): Replace with real networking code (or functorize) *)
+module UdpTransport (Message : sig
+  type t [@@deriving bin_io, sexp]
+end) = struct
   open Async
   open Core
 
-  let send : logger:MyLog.logger -> recipient:Host_and_port.t -> Msg.t -> unit Or_error.t Deferred.t = fun ~logger ~recipient msg ->
+  type t =
+    { logger : logger
+    ; config : Udp.Config.t
+    ; stop : unit -> unit
+    ; port : int
+    }
+
+  let create logger ~port : t =
+    let stop_fn = ref None in
+    let stop_deferred = Deferred.create (fun ivar ->
+      stop_fn := Some (fun () -> Ivar.fill ivar ())
+    ) in
+    { logger
+    ; config = Udp.Config.create ~stop:stop_deferred ()
+    ; stop = Option.value_exn !stop_fn
+    ; port
+    }
+
+  let stop_listening t = t.stop ()
+
+  let send : t -> recipient:Host_and_port.t -> Message.t -> unit Or_error.t Deferred.t = fun t ~recipient msg ->
     let socket = Socket.create Socket.Type.udp in
     let addr = Socket.Address.Inet.create (Unix.Inet_addr.of_string (Host_and_port.host recipient)) ~port:(Host_and_port.port recipient) in
-    let iobuf = Iobuf.create ~len:(Msg.bin_size_t msg) in
-    logger#logf Debug "Making an iobuf to send of size %d" (Msg.bin_size_t msg);
-    Iobuf.Fill.bin_prot Msg.bin_writer_t iobuf msg;
+    let iobuf = Iobuf.create ~len:(Message.bin_size_t msg) in
+    t.logger#logf Debug "Making an iobuf to send of size %d" (Message.bin_size_t msg);
+    Iobuf.Fill.bin_prot Message.bin_writer_t iobuf msg;
     Iobuf.flip_lo iobuf;
     (* TODO: Actually send full data! *)
     let open Or_error.Let_syntax in
@@ -305,41 +422,51 @@ end) = struct
         let fd = Socket.fd socket in
         let%bind () = sendto fd iobuf addr in
         let%map () = Fd.close fd in
-        logger#logf Debug "Sent buf %s over socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+        t.logger#logf Debug "Sent buf %s over socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
         Ok ()
     | Error _ as e -> Deferred.return e
     (*printf "Got sendto error code of %d" code;*)
 
-  let listen : logger:MyLog.logger -> port:int -> Msg.t Pipe.Reader.t Deferred.t =
-    fun ~logger ~port ->
+  let listen : t -> Message.t Pipe.Reader.t Deferred.t =
+    fun t ->
       let socket_addr =
         Socket.Address.Inet.create
           (Unix.Inet_addr.of_string "127.0.0.1")
-          ~port:port
+          ~port:t.port
       in
       let open Deferred.Let_syntax in
       let%map socket = Udp.bind socket_addr in
       let (r,w) = Pipe.create () in
+      (* TODO: If we ever want to be able to stop then start the swim, we need to care about this deferred *)
       don't_wait_for begin
         Udp.recvfrom_loop (Socket.fd socket) (fun buf addr ->
-          let msg = Iobuf.Consume.bin_prot Msg.bin_reader_t buf in
-          logger#logf Debug "Got msg %s on socket" (msg |> Msg.sexp_of_t |> Sexp.to_string);
+          let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
+          t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
           (* TODO: Do we need pushback here? *)
           Pipe.write_without_pushback w msg
         )
       end;
       r
+
+  let test_only_network_partition_add ~from ~to_ =
+    failwith "only for tests"
+  let test_only_network_partition_remove ~from ~to_ =
+    failwith "only for tests"
 end
 
-module Udp : S = struct
+module Make (Transport : Transport_intf) = struct
+  module Net = Transport(struct
+    type t = Messager.msg [@@deriving bin_io, sexp]
+  end)
+
+  (* TODO: Make this a module *)
   type config =
     { indirect_ping_count : int
     ; protocol_period : Time.Span.t
     ; rtt : Time.Span.t
     }
 
-  (* TODO: Make this a parameter *)
-  let my_config : config =
+  let default_config : config =
     { indirect_ping_count = 6
     ; protocol_period = Time.Span.of_int_sec 2
     ; rtt = Time.Span.of_sec 0.5
@@ -350,6 +477,9 @@ module Udp : S = struct
     ; net_state  : NetworkState.t
     ; mutable seq_no : int
     ; logger : Log.logger
+    ; net : Net.t
+    ; config : config
+    ; mutable stop : bool
     }
 
   let fresh_seq_no t =
@@ -367,14 +497,14 @@ module Udp : S = struct
 
     let seq_no = fresh_seq_no t in
     t.logger#logf Info "Begin round %d probing node %s" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
-    match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:my_config.rtt with
+    match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:t.config.rtt with
     | `Acked ->
         t.logger#logf Info "Round %d acked" t.seq_no;
         return ()
     | `Timeout ->
         t.logger#logf Info "Round %d timeout" t.seq_no;
-        let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) my_config.indirect_ping_count m_i.peer in
-        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.(my_config.protocol_period - my_config.rtt) with
+        let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) t.config.indirect_ping_count m_i.peer in
+        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.(t.config.protocol_period - t.config.rtt) with
         | `Acked ->
             t.logger#logf Info "Round %d secondary acked" t.seq_no
         | `Timeout ->
@@ -382,14 +512,14 @@ module Udp : S = struct
             t.logger#logf Info "Round %d m_i died" t.seq_no
 
   (* TODO: Round-Robin extension *)
-  let rec failure_detect (t : t) : _ Deferred.t =
+  let rec failure_detect (t : t) : unit Deferred.t =
     t.logger#logf Debug "Start failure_detect";
     (* TODO: WTF if I don't flush stdout here, nothing ever gets logged *)
     Out_channel.flush stdout;
     let%bind () =
       match Set.Poly.length (NetworkState.live_nodes t.net_state) with
       | 0 ->
-        Async.after my_config.protocol_period
+        Async.after t.config.protocol_period
       | _ ->
         let choose xs =
           Option.value_exn (List.nth xs (Random.int (List.length xs))) in
@@ -397,10 +527,14 @@ module Udp : S = struct
         let m_i = choose (NetworkState.live_nodes t.net_state |> Set.Poly.to_list) in
         let%map ((), ()) = Deferred.both
           (prob_node t {peer=m_i;state=Alive})
-          (Async.after my_config.protocol_period) in
+          (Async.after t.config.protocol_period) in
         ()
     in
-    failure_detect t
+    if not t.stop then
+      failure_detect t
+    else
+      return ()
+
 
   (* From mirage-swim *)
   let transmit_limit net_state =
@@ -414,18 +548,15 @@ module Udp : S = struct
       |> Float.round_up
       |> Float.to_int
 
-  module Net = NetMake(struct
-    type t = Messager.msg [@@deriving bin_io, sexp]
-  end)
-
-  let connect ~initial_peers ~me =
+  let connect ?config:(config=default_config) ~initial_peers ~me =
     let logger = new Log.logger (Printf.sprintf "Swim:%s" (me |> Host_and_port.port |> string_of_int)) in
-    let%map incoming = Net.listen logger (Host_and_port.port me) in
+    let net = Net.create ~port:(Host_and_port.port me) logger in
+    let%map incoming = Net.listen net in
     let net_state = NetworkState.create logger in
     let rec handle_msg messager = function
       | (Payload.Ping, _) -> Deferred.return `Want_ack
       | (Payload.Ping_req addr_i, seq_no) ->
-          match%map Messager.send messager [(addr_i, Payload.Ping)] ~seq_no:seq_no ~timeout:my_config.rtt with
+          match%map Messager.send messager [(addr_i, Payload.Ping)] ~seq_no:seq_no ~timeout:config.rtt with
           | `Timeout -> `Stop
           | `Acked -> `Want_ack
     and make_messager () =
@@ -433,7 +564,7 @@ module Udp : S = struct
         ~incoming
         ~net_state
         ~get_transmit_limit:(fun () -> transmit_limit net_state)
-        ~send_msg:(Net.send ~logger)
+        ~send_msg:(Net.send net)
         ~handle_msg
         ~me
     in
@@ -443,6 +574,9 @@ module Udp : S = struct
       (* Assume all initial_peers start alive *)
       ; seq_no = 0
       ; logger
+      ; net
+      ; config
+      ; stop = false
       }
     in
     (* Assume initial peers are alive *)
@@ -458,4 +592,17 @@ module Udp : S = struct
   let peers t = NetworkState.live_nodes t.net_state |> Set.Poly.to_list
 
   let changes t = failwith "TODO"
+
+  let stop t =
+    Net.stop_listening t.net;
+    t.stop <- true
+
+  let test_only_network_partition_add ~from ~to_ =
+    Net.test_only_network_partition_add ~from:from ~to_:to_
+
+  let test_only_network_partition_remove ~from ~to_ =
+    Net.test_only_network_partition_remove ~from:from ~to_:to_
 end
+
+module Udp : S = Make(UdpTransport)
+module Test : S = Make(FakeTransport)
