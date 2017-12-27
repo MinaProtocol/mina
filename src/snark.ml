@@ -1,6 +1,6 @@
 open Core_kernel
 
-module Extend (Impl : Camlsnark.Snark_intf.S) : Snark_intf.S = struct
+module Extend (Impl : Camlsnark.Snark_intf.S) = struct
   include Impl
 
   module Snarkable = struct
@@ -143,4 +143,11 @@ module Step = struct
   end
 
   module Verifier =
+    Camlsnark.Verifier_gadget.Make(Main)(Main_curve)(Other_curve)
+      (struct let input_size = Other.Data_spec.size (Wrap.input ()) end)
+
+  let input = step_input
+
+  let self_vk_spec =
+    Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
 end
