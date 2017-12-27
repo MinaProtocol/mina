@@ -20,7 +20,7 @@ module Header = struct
 
   let hash t =
     let buf = Bigstring.create (bin_size_t t) in
-    let s = Pedersen.State.create () in
+    let s = Pedersen.State.create Pedersen.Params.t in
     Pedersen.State.update s buf;
     Pedersen.State.digest s
 
@@ -59,7 +59,7 @@ module Snarkable
     (Target : Impl.Snarkable.Bits.S)
     (Nonce : Impl.Snarkable.Bits.S)
     (Strength : Impl.Snarkable.Bits.S)
-= struct 
+= struct
   open Impl
 
   module Header = struct

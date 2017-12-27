@@ -12,7 +12,7 @@ end
 
 module Field = Snark_params.Main.Field
 
-module Curve = Make_edwards_basic(Field)(struct
+module Curve = Camlsnark.Curves.Make_edwards_basic(Field)(struct
     let d = failwith "TODO"
     let cofactor = failwith "TODO"
     let generator = failwith "TODO"
@@ -34,7 +34,7 @@ module Params = struct
           then Curve.add acc pt
           else acc
         in
-        go (Field.double pt) (i + 1) acc
+        go (Curve.double pt) (i + 1) acc
     in
     go Curve.generator 0 Curve.identity
   ;;
@@ -43,6 +43,10 @@ module Params = struct
     Array.init max_input_length ~f:(fun _ -> random_elt ())
 
   let max_input_length t = Array.length t
+
+  let t =
+    let max_input_length = 8 * Field.size_in_bits in
+    random ~max_input_length
 end
 
 module State = struct
@@ -52,7 +56,7 @@ module State = struct
     ; params      : Params.t
     }
 
-  let create () = ref { acc = Curve.identity; i = 0 }
+  let create params = { acc = Curve.identity; i = 0; params }
 
   let ith_bit_int n i =
     ((n lsr i) land 1) = 1
@@ -69,8 +73,8 @@ module State = struct
         then Curve.add acc t.params.(i)
         else acc
       in
-      acc <-
-        t.acc
+      acc :=
+        !acc
         |> cond_add 0
         |> cond_add 1
         |> cond_add 2
@@ -81,7 +85,7 @@ module State = struct
         |> cond_add 7
     done;
     t.acc <- !acc;
-    t.i   <- t.i + n
+    t.i   <- t.i + bit_length
   ;;
 
   let digest t = t.acc

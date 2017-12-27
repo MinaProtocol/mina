@@ -15,6 +15,8 @@ module Params : sig
   type t = Curve.t array
 
   val random : max_input_length:int -> t
+
+  val t : t
 end
 
 module State : sig

@@ -168,6 +168,6 @@ module Step = struct
     block_packed
   ;;
 
-  let main (self_hash_packed : Digest.Packed.var) : (unit, Prover_state.t) =
+  let main (self_hash_packed : Digest.Packed.var) : (unit, Prover_state.t) Checked.t =
     let%bind prev_state = () in ()
 end
