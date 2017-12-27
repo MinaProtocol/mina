@@ -3,14 +3,23 @@ open Core_kernel
 
 module type S = sig
   type t
-  type config =
-    { indirect_ping_count : int
-    ; protocol_period : Time.Span.t
-    ; rtt : Time.Span.t
-    }
+
+  module Config : sig
+    type t
+
+    val create : ?indirect_ping_count:int
+      -> ?protocol_period:Time.Span.t
+      -> ?rtt:Time.Span.t
+      -> unit
+      -> t
+
+    val indirect_ping_count : t -> int
+    val protocol_period : t -> Time.Span.t
+    val rtt : t -> Time.Span.t
+  end
 
   val connect
-    : ?config:config -> initial_peers:Host_and_port.t list -> me:Host_and_port.t -> t Deferred.t
+    : config:Config.t -> initial_peers:Host_and_port.t list -> me:Host_and_port.t -> t Deferred.t
 
   val peers : t -> Host_and_port.t list
 

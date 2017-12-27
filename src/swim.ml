@@ -7,15 +7,21 @@ type peer = Host_and_port.t [@@deriving bin_io, sexp]
 module type S = sig
   type t
 
-  (* TODO: Make this a module *)
-  type config =
-    { indirect_ping_count : int
-    ; protocol_period : Time.Span.t
-    ; rtt : Time.Span.t
-    }
+  module Config : sig
+    type t
 
-  val connect
-    : ?config:config -> initial_peers:peer list -> me:Host_and_port.t -> t Deferred.t
+    val create : ?indirect_ping_count:int
+      -> ?protocol_period:Time.Span.t
+      -> ?rtt:Time.Span.t
+      -> unit
+      -> t
+
+    val indirect_ping_count : t -> int
+    val protocol_period : t -> Time.Span.t
+    val rtt : t -> Time.Span.t
+  end
+
+  val connect : config:Config.t -> initial_peers:peer list -> me:Host_and_port.t -> t Deferred.t
 
   val peers : t -> peer list
 
@@ -230,9 +236,6 @@ end) = struct
     in
 
     don't_wait_for begin
-      (* TODO imeckler for bkase: Is not pushing back the right thing to do?
-         (I changed to [iter_without_pushback] because that was what this was doing anyway)
-      *)
       Pipe.iter_without_pushback incoming (fun (from, p, slice, seq_no) ->
         let open Let_syntax in
         let open Request_or_ack in
@@ -244,19 +247,8 @@ end) = struct
 
         match p with
         | Request x ->
-           (* TODO: Reviewer: If we don't_wait_for here, then we could overload
-            * system resources (open sockets etc) if we receive packets faster than
-            * we can send them.
-            *
-            * On the other side, if we wait then we certainly will be overloaded
-            * with incoming packets and we won't respond fast enough.
-            *
-            * This may have to get more complex to properly handle flow control,
-            * but I think that udp packates should be sent fast enough that it
-            * should be okay?
-
-              imeckler: Yeah this is tricky. Let's leave it as is for now I think.
-            *)
+           (* Not pushing-back here since UDP packets should send fast *)
+           (* Plus handle_msg will be very slow, but is mostly IO blocked not compute bound *)
            don't_wait_for begin
              match%bind handle_msg t (x, seq_no) with
              | `Stop -> return ()
@@ -380,7 +372,6 @@ end) = struct
 end
 
 
-(* TODO(bkase): Replace with real networking code (or functorize) *)
 module UdpTransport (Message : sig
   type t [@@deriving bin_io, sexp]
 end) = struct
@@ -414,7 +405,6 @@ end) = struct
     t.logger#logf Debug "Making an iobuf to send of size %d" (Message.bin_size_t msg);
     Iobuf.Fill.bin_prot Message.bin_writer_t iobuf msg;
     Iobuf.flip_lo iobuf;
-    (* TODO: Actually send full data! *)
     let open Or_error.Let_syntax in
     match Udp.sendto () with
     | Ok sendto ->
@@ -437,7 +427,6 @@ end) = struct
       let open Deferred.Let_syntax in
       let%map socket = Udp.bind socket_addr in
       let (r,w) = Pipe.create () in
-      (* TODO: If we ever want to be able to stop then start the swim, we need to care about this deferred *)
       don't_wait_for begin
         Udp.recvfrom_loop (Socket.fd socket) (fun buf addr ->
           let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
@@ -459,18 +448,29 @@ module Make (Transport : Transport_intf) = struct
     type t = Messager.msg [@@deriving bin_io, sexp]
   end)
 
-  (* TODO: Make this a module *)
-  type config =
-    { indirect_ping_count : int
-    ; protocol_period : Time.Span.t
-    ; rtt : Time.Span.t
-    }
+  module Config = struct
+    type t =
+      { indirect_ping_count : int
+      ; protocol_period : Time.Span.t
+      ; rtt : Time.Span.t
+      }
 
-  let default_config : config =
-    { indirect_ping_count = 6
-    ; protocol_period = Time.Span.of_int_sec 2
-    ; rtt = Time.Span.of_sec 0.5
-    }
+    let create ?indirect_ping_count:(indirect_ping_count=6)
+      ?protocol_period:(protocol_period=Time.Span.of_int_sec 2)
+      ?rtt:(rtt=Time.Span.of_sec 0.5)
+      () =
+        if Time.Span.(rtt + rtt + rtt > protocol_period) then
+          failwith "Protocol_period must be at least 3*RTT"
+        else
+          { indirect_ping_count
+          ; protocol_period
+          ; rtt
+          }
+
+    let indirect_ping_count t = t.indirect_ping_count
+    let protocol_period t = t.protocol_period
+    let rtt t = t.rtt
+  end
 
   type t =
     { messager : Messager.t
@@ -478,7 +478,7 @@ module Make (Transport : Transport_intf) = struct
     ; mutable seq_no : int
     ; logger : Log.logger
     ; net : Net.t
-    ; config : config
+    ; config : Config.t
     ; mutable stop : bool
     }
 
@@ -497,14 +497,14 @@ module Make (Transport : Transport_intf) = struct
 
     let seq_no = fresh_seq_no t in
     t.logger#logf Info "Begin round %d probing node %s" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
-    match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:t.config.rtt with
+    match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:(Config.rtt t.config) with
     | `Acked ->
         t.logger#logf Info "Round %d acked" t.seq_no;
         return ()
     | `Timeout ->
         t.logger#logf Info "Round %d timeout" t.seq_no;
-        let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) t.config.indirect_ping_count m_i.peer in
-        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.(t.config.protocol_period - t.config.rtt) with
+        let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) (Config.indirect_ping_count t.config) m_i.peer in
+        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.((Config.protocol_period t.config) - (Config.rtt t.config)) with
         | `Acked ->
             t.logger#logf Info "Round %d secondary acked" t.seq_no
         | `Timeout ->
@@ -514,12 +514,10 @@ module Make (Transport : Transport_intf) = struct
   (* TODO: Round-Robin extension *)
   let rec failure_detect (t : t) : unit Deferred.t =
     t.logger#logf Debug "Start failure_detect";
-    (* TODO: WTF if I don't flush stdout here, nothing ever gets logged *)
-    Out_channel.flush stdout;
     let%bind () =
       match Set.Poly.length (NetworkState.live_nodes t.net_state) with
       | 0 ->
-        Async.after t.config.protocol_period
+        Async.after (Config.protocol_period t.config)
       | _ ->
         let choose xs =
           Option.value_exn (List.nth xs (Random.int (List.length xs))) in
@@ -527,7 +525,7 @@ module Make (Transport : Transport_intf) = struct
         let m_i = choose (NetworkState.live_nodes t.net_state |> Set.Poly.to_list) in
         let%map ((), ()) = Deferred.both
           (prob_node t {peer=m_i;state=Alive})
-          (Async.after t.config.protocol_period) in
+          (Async.after (Config.protocol_period t.config)) in
         ()
     in
     if not t.stop then
@@ -548,7 +546,7 @@ module Make (Transport : Transport_intf) = struct
       |> Float.round_up
       |> Float.to_int
 
-  let connect ?config:(config=default_config) ~initial_peers ~me =
+  let connect ~config ~initial_peers ~me =
     let logger = new Log.logger (Printf.sprintf "Swim:%s" (me |> Host_and_port.port |> string_of_int)) in
     let net = Net.create ~port:(Host_and_port.port me) logger in
     let%map incoming = Net.listen net in
@@ -556,7 +554,7 @@ module Make (Transport : Transport_intf) = struct
     let rec handle_msg messager = function
       | (Payload.Ping, _) -> Deferred.return `Want_ack
       | (Payload.Ping_req addr_i, seq_no) ->
-          match%map Messager.send messager [(addr_i, Payload.Ping)] ~seq_no:seq_no ~timeout:config.rtt with
+          match%map Messager.send messager [(addr_i, Payload.Ping)] ~seq_no:seq_no ~timeout:(Config.rtt config) with
           | `Timeout -> `Stop
           | `Acked -> `Want_ack
     and make_messager () =
@@ -584,7 +582,6 @@ module Make (Transport : Transport_intf) = struct
       NetworkState.add t.net_state (Node.alive peer);
     );
 
-    (* TODO: An explicit join_network shouldn't be necessary since failure_detect will implicitly join when pings happen *)
     don't_wait_for(schedule' (fun () -> failure_detect t));
 
     t

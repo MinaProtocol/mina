@@ -19,11 +19,12 @@ module Test (Swim : Swim.S) = struct
   let swim_client idx =
     printf "Starting client %d\n" idx;
     (idx, Swim.connect
-        ~config:
-          { indirect_ping_count = 6
-          ; protocol_period = Time.Span.of_sec 0.04
-          ; rtt = Time.Span.of_sec 0.01
-          }
+        ~config:(Swim.Config.create
+          ~indirect_ping_count:6
+          ~protocol_period:(Time.Span.of_sec 0.04)
+          ~rtt:(Time.Span.of_sec 0.01)
+          ()
+        )
         ~initial_peers:(List.init idx addr)
         ~me:(addr idx))
 
@@ -110,12 +111,13 @@ module Test (Swim : Swim.S) = struct
       );
       Swim.test_only_network_partition_remove ~from:(addr x) ~to_:(addr (List.nth_exn xs 0));
 
-      let%map clients =
+      let%bind clients =
         create_with_delay_in_between
           ~delay:(Time.Span.of_sec 0.1)
           ~count:count
       in
 
+      let%map () = wait_stabalize () in
       assert_stable clients;
 
       shutdown clients
