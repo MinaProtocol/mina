@@ -1,6 +1,6 @@
 open Core_kernel
 
-module Extend (Impl : Camlsnark.Snark_intf.S) : Snark_intf.S = struct
+module Extend (Impl : Camlsnark.Snark_intf.S) = struct
   include Impl
 
   module Snarkable = struct
@@ -144,6 +144,15 @@ module Step = struct
     [@@deriving fields]
   end
 
+  module Verifier =
+    Camlsnark.Verifier_gadget.Make(Main)(Main_curve)(Other_curve)
+      (struct let input_size = Other.Data_spec.size (Wrap.input ()) end)
+
+  let input = step_input
+
+  let self_vk_spec =
+    Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
+
   let excavate_block (hash : Digest.var) ~f =
     let%bind block_packed =
       store Block.Packed.spec As_prover.(map get_state ~f)
@@ -160,6 +169,5 @@ module Step = struct
   ;;
 
   let main (self_hash_packed : Digest.Packed.var) : (unit, Prover_state.t) =
-    let%bind prev_state
-
+    let%bind prev_state = () in ()
 end
