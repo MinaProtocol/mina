@@ -58,7 +58,7 @@ module State = struct
     ((n lsr i) land 1) = 1
 
   let update (t : t) s =
-    let byte_length = Bigstring.length s
+    let byte_length = Bigstring.length s in
     let bit_length = 8 * byte_length in
     assert (bit_length <= Params.max_input_length t.params - t.i);
     let acc = ref t.acc in

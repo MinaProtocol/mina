@@ -142,5 +142,4 @@ module Step = struct
     [@@deriving fields]
   end
 
-  module Verifier =
 end
