@@ -3,11 +3,7 @@ open Core_kernel
 module Digest = struct
   type t = Bigstring.t [@@deriving bin_io]
 
-  module Snarkable (Impl : Snark_intf.S) =
-    Bits.Make0(Impl)(struct
-      let bit_length = 2 * Impl.Field.size_in_bits
-      let bits_per_element = Impl.Field.size_in_bits
-    end)
+  module Snarkable = Bits.Field_element
 end
 
 module Field = Snark_params.Main.Field
@@ -88,5 +84,23 @@ module State = struct
     t.i   <- t.i + bit_length
   ;;
 
-  let digest t = t.acc
+  let (/^) x y = Float.(to_int (round_up (x // y)))
+
+  let digest t =
+    let open Snark_params.Main in
+    let (x, _y) = t.acc in
+    let n = Bigint.of_field x in
+    let b i j =
+      if Bigint.test_bit n (i + j) then 1 lsl i else 0
+    in
+    Bigstring.init (Field.size_in_bits /^ 8) ~f:(fun i ->
+      Char.of_int_exn (
+        b i 0
+        lor b i 1
+        lor b i 2
+        lor b i 3
+        lor b i 4
+        lor b i 5
+        lor b i 6
+        lor b i 7))
 end

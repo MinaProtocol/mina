@@ -4,7 +4,7 @@ module Make_small_bitvector
     (Impl : Camlsnark.Snark_intf.S)
     (V : sig
        type t
-       val length : int 
+       val length : int
        val get : t -> int -> bool
        val set : t -> int -> bool -> t
      end)
@@ -51,7 +51,7 @@ module Make_Int64 (Impl : Camlsnark.Snark_intf.S) =
     include Int64
 
     let get t i = (t lsr i) land one = one
-    let set t i b = 
+    let set t i b =
       if b
       then t lor (one lsl i)
       else t land (lnot (one lsl i))
@@ -233,13 +233,11 @@ module Make_unpacked
   end
 end
 
-module Small
+module Small0
     (Impl : Camlsnark.Snark_intf.S)
     (M : sig val bit_length : int end) = struct
   open Impl
   include M
-
-  let () = assert (bit_length < Field.size_in_bits)
 
   module Packed = struct
     type var = Cvar.t
@@ -261,6 +259,18 @@ module Small
 
     let pad x = x @ padding
   end
+end
+
+module Field_element (Impl : Camlsnark.Snark_intf.S) =
+  Small0(Impl)(struct let bit_length = Impl.Field.size_in_bits end)
+
+module Small
+    (Impl : Camlsnark.Snark_intf.S)
+    (M : sig val bit_length : int end)
+= struct
+  let () = assert (M.bit_length < Impl.Field.size_in_bits)
+
+  include Small0(Impl)(M)
 end
 
 module Make0
