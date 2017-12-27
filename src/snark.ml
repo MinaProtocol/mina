@@ -47,17 +47,17 @@ module Make_types (Impl : Snark_intf.S) = struct
   module Nonce = Nonce.Snarkable(Impl)
   module Strength = Strength.Snarkable(Impl)
   module Block = Block.Snarkable(Impl)(Digest)(Time)(Span)(Target)(Nonce)(Strength)
+
+  module Pedersen = Camlsnark.Pedersen.Make(Impl)(Pedersen.Curve)
 end
 
-module Main_curve = Camlsnark.Backends.Mnt4
-module Other_curve = Camlsnark.Backends.Mnt6
 module Main = struct
-  module T = Extend(Camlsnark.Snark.Make(Main_curve))
+  module T = Extend(Snark_params.Main)
   include T
   include Make_types(T)
 end
 module Other = struct
-  module T = Extend(Camlsnark.Snark.Make(Other_curve))
+  module T = Extend(Snark_params.Other)
   include T
   include Make_types(T)
 end
