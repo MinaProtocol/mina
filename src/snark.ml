@@ -132,6 +132,8 @@ end
 module Step = struct
   open Main
 
+  open Let_syntax
+
   module Prover_state = struct
     type t =
       { block      : Block.Packed.value
@@ -141,5 +143,23 @@ module Step = struct
       }
     [@@deriving fields]
   end
+
+  let excavate_block (hash : Digest.var) ~f =
+    let%bind block_packed =
+      store Block.Packed.spec As_prover.(map get_state ~f)
+    in
+    let%bind () =
+      let%bind h = Pedersen.hash block_unpacked.body in
+      Digest.assert_equal h block_packed.body_hash
+    in
+    let%bind () =
+      let%bind h = Pedersen.hash (Block.Header.to_bits block_unpacked.header) in
+      Digest.assert_equal h hash
+    in
+    block_packed
+  ;;
+
+  let main (self_hash_packed : Digest.Packed.var) : (unit, Prover_state.t) =
+    let%bind prev_state
 
 end
