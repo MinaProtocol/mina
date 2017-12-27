@@ -48,7 +48,13 @@ module Make_types (Impl : Snark_intf.S) = struct
   module Strength = Strength.Snarkable(Impl)
   module Block = Block.Snarkable(Impl)(Digest)(Time)(Span)(Target)(Nonce)(Strength)
 
-  module Pedersen = Camlsnark.Pedersen.Make(Impl)(Pedersen.Curve)
+  module Curve =
+    Camlsnark.Snark.Curves.Edwards.Extend
+      (Impl)
+      (Scalar)
+      (Pedersen.Curve)
+
+  module Pedersen = Camlsnark.Pedersen.Make(Impl)(Curve)
 end
 
 module Main = struct
@@ -130,6 +136,11 @@ module Wrap = struct
 end
 
 module Step = struct
+  let hash =
+    Main.Pedersen.hash
+      ~params:Pedersen.Params.t
+      ~init:Main.Pedersen.Curve.Checked.identity
+
   open Main
 
   open Let_syntax
@@ -153,7 +164,7 @@ module Step = struct
   let self_vk_spec =
     Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
 
-  let excavate_block (hash : Digest.var) ~f =
+  let excavate_block (hash : Digest.Packed.var) ~f =
     let%bind block_packed =
       store Block.Packed.spec As_prover.(map get_state ~f)
     in

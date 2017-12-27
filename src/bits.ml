@@ -242,7 +242,10 @@ module Small0
   module Packed = struct
     type var = Cvar.t
     type value = Field.t
+
     let spec = Var_spec.field
+
+    let assert_equal = assert_equal
   end
 
   module Unpacked = Make_unpacked(Impl)(struct
