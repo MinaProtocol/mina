@@ -8,8 +8,7 @@ module type S = sig
     type t
 
     val create : ?indirect_ping_count:int
-      -> ?protocol_period:Time.Span.t
-      -> ?rtt:Time.Span.t
+      -> ?expected_latency:Time.Span.t
       -> unit
       -> t
 
@@ -32,17 +31,6 @@ module type S = sig
   val test_only_network_partition_remove : from:Host_and_port.t -> to_:Host_and_port.t -> unit
 end
 
-
-(*module type S = sig*)
-  (*type t*)
-
-  (*val connect*)
-    (*: initial_peers:Peer.t list -> t*)
-
-  (*val peers : t -> Peer.t list*)
-
-  (*val changes : t -> Peer.Event.t Pipe.Reader.t*)
-(*end*)
 
 module Udp : S
 module Test : S

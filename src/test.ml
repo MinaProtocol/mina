@@ -20,9 +20,7 @@ module Test (Swim : Swim.S) = struct
     printf "Starting client %d\n" idx;
     (idx, Swim.connect
         ~config:(Swim.Config.create
-          ~indirect_ping_count:6
-          ~protocol_period:(Time.Span.of_sec 0.04)
-          ~rtt:(Time.Span.of_sec 0.01)
+          ~expected_latency:(Time.Span.of_ms 5.)
           ()
         )
         ~initial_peers:(List.init idx addr)

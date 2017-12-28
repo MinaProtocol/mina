@@ -11,8 +11,7 @@ module type S = sig
     type t
 
     val create : ?indirect_ping_count:int
-      -> ?protocol_period:Time.Span.t
-      -> ?rtt:Time.Span.t
+      -> ?expected_latency:Time.Span.t
       -> unit
       -> t
 
@@ -456,16 +455,15 @@ module Make (Transport : Transport_intf) = struct
       }
 
     let create ?indirect_ping_count:(indirect_ping_count=6)
-      ?protocol_period:(protocol_period=Time.Span.of_int_sec 2)
-      ?rtt:(rtt=Time.Span.of_sec 0.5)
+      ?expected_latency:(expected_latency=Time.Span.of_ms 500.)
       () =
-        if Time.Span.(rtt + rtt + rtt > protocol_period) then
-          failwith "Protocol_period must be at least 3*RTT"
-        else
-          { indirect_ping_count
-          ; protocol_period
-          ; rtt
-          }
+        let epsilon = Time.Span.of_ms 5. in
+        let rtt = Time.Span.(expected_latency + expected_latency) in
+        let protocol_period = Time.Span.(rtt + rtt + rtt + epsilon) in
+        { indirect_ping_count
+        ; protocol_period
+        ; rtt
+        }
 
     let indirect_ping_count t = t.indirect_ping_count
     let protocol_period t = t.protocol_period
