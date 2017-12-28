@@ -1,23 +1,48 @@
 open Core_kernel
 
+module type S = sig
+  type curve
+
+  module Digest : sig
+    type t [@@deriving bin_io]
+
+    module Snarkable : functor (Impl : Snark_intf.S) ->
+      Impl.Snarkable.Bits.S
+  end
+
+  module Params : sig
+    type t = curve array
+
+    val random : max_input_length:int -> t
+  end
+
+  module State : sig
+    type t
+
+    val create : Params.t ->  t
+
+    val update : t -> Bigstring.t -> unit
+
+    val digest : t -> Digest.t
+  end
+end
+
 module Make
     (Field : Camlsnark.Field_intf.S)
-    (Curve : Camlsnark.Curves.Edwards.S with type field := Field.t) =
+    (Bigint : Camlsnark.Bigint_intf.S with type field := Field.t)
+    (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
-
   module Digest = struct
     type t = Bigstring.t [@@deriving bin_io]
 
+    let () = assert (Snark_params.Main.Field.size_in_bits = Snark_params.Other.Field.size_in_bits)
     module Snarkable = Bits.Field_element
   end
-
-  module Field = Snark_params.Main.Field
 
   module Params = struct
     type t = Curve.t array
 
     let random_elt () =
-      let open Snark_params.Main in
       let x = Field.random () in
       let n = Bigint.of_field x in
       let rec go pt i acc =
@@ -38,10 +63,6 @@ struct
       Array.init max_input_length ~f:(fun _ -> random_elt ())
 
     let max_input_length t = Array.length t
-
-    let t =
-      let max_input_length = 8 * Field.size_in_bits in
-      random ~max_input_length
   end
 
   module State = struct
@@ -86,7 +107,6 @@ struct
     let (/^) x y = Float.(to_int (round_up (x // y)))
 
     let digest t =
-      let open Snark_params.Main in
       let (x, _y) = t.acc in
       let n = Bigint.of_field x in
       let b i j =
@@ -103,5 +123,28 @@ struct
           lor b i 6
           lor b i 7))
   end
+end
+
+module Main = struct
+  module Curve = struct
+    include Snark_params.Main.Hash_curve
+
+    module Scalar (Impl : Camlsnark.Snark_intf.S) = struct
+      (* Someday: Make more efficient *)
+      open Impl
+      type var = Boolean.var list
+      type value = bool list
+
+      let length = bit_length
+      let spec : (var, value) Var_spec.t = Var_spec.list ~length Boolean.spec
+      let assert_equal = Checked.Assert.equal_bitstrings
+    end
+  end
+
+  include Make(Snark_params.Main.Field)(Snark_params.Main.Bigint)(Curve)
+
+  let params =
+    let max_input_length = 8 * Snark_params.Main.Field.size_in_bits in
+    Params.random ~max_input_length
 end
 

@@ -2,6 +2,8 @@ open Core_kernel
 
 let num_deltas = 16
 
+module Pedersen = Pedersen.Main
+
 module Header = struct
   type ('hash, 'time, 'span, 'target, 'nonce, 'strength) t_ =
     { previous_header_hash : 'hash
@@ -20,7 +22,7 @@ module Header = struct
 
   let hash t =
     let buf = Bigstring.create (bin_size_t t) in
-    let s = Pedersen.State.create Pedersen.Params.t in
+    let s = Pedersen.State.create Pedersen.params in
     Pedersen.State.update s buf;
     Pedersen.State.digest s
 

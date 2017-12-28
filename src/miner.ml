@@ -16,14 +16,14 @@ module type S = sig
 end
 
 module Cpu = struct
-  let find_block (previous : Pedersen.Digest.t) (body : Block.Body.t)
-    : (Block.t * Pedersen.Digest.t) option Deferred.t =
+  let find_block (previous : Pedersen.Main.Digest.t) (body : Block.Body.t)
+    : (Block.t * Pedersen.Main.Digest.t) option Deferred.t =
     failwith "TODO"
   ;;
 
   module State = struct
     type t =
-      { mutable previous_header_hash : Pedersen.Digest.t
+      { mutable previous_header_hash : Pedersen.Main.Digest.t
       ; mutable body                 : Block.Body.t
       ; mutable id                   : int
       }

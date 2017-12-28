@@ -1,6 +1,8 @@
 open Core
 open Async
 
+module Snark = Snark
+
 module Rpcs = struct
   module Get_strongest_block = struct
     type query = unit [@@deriving bin_io]
