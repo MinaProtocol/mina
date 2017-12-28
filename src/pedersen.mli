@@ -13,3 +13,7 @@ module State : sig
 
   val digest : t -> Digest.t
 end
+
+val hash : Bigstring.t -> Digest.t
+
+val zero_hash : Digest.t
