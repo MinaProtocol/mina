@@ -95,6 +95,7 @@ module Wrap = struct
     Camlsnark.Verifier_gadget.Make(Other)(Other_curve)(Main_curve)
       (struct let input_size = step_input_size end)
 
+  (* TODO: These numbers are wrong *)
   let step_vk_length = 11324
   let step_vk_size = 38
   let step_vk_spec =
@@ -134,11 +135,6 @@ module Wrap = struct
     in
     assert_equal (Verifier.All_in_one.result v :> Cvar.t) (Cvar.constant Field.one)
   ;;
-
-  let keypair = generate_keypair (input ()) main
-
-  let vk = Keypair.vk keypair
-  let pk = Keypair.pk keypair
 end
 
 module Step = struct
