@@ -5,6 +5,7 @@ module Main = struct
   include Camlsnark.Snark.Make(Main_curve)
 
   module Hash_curve = struct
+    (* someday: Compute this from the number inside of ocaml *)
     let bit_length = 262
 
     include Camlsnark.Curves.Edwards.Basic.Make(Field)(struct
