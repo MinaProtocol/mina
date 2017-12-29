@@ -148,4 +148,12 @@ module Main = struct
   let params =
     let max_input_length = 8 * Snark_params.Main.Field.size_in_bits in
     Params.random ~max_input_length
+
+  let hash x : Digest.t =
+    let s = State.create params in
+    State.update s x;
+    State.digest s
+  ;;
+
+  let zero_hash = hash (Bigstring.create 0)
 end

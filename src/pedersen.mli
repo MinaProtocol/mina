@@ -46,13 +46,14 @@ module Main : sig
       val spec : (var, value) Impl.Var_spec.t
       val assert_equal : var -> var -> (unit, _) Impl.Checked.t
     end
-end
+  end
 
   include S with type curve := Curve.t
+
+  val hash : Bigstring.t -> Digest.t
+
+  val zero_hash : Digest.t
 
   val params : Params.t
 end
 
-val hash : Bigstring.t -> Digest.t
-
-val zero_hash : Digest.t
