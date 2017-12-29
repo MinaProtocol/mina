@@ -233,13 +233,11 @@ module Make_unpacked
   end
 end
 
-module Small
+module Small0
     (Impl : Camlsnark.Snark_intf.S)
     (M : sig val bit_length : int end) = struct
   open Impl
   include M
-
-  let () = assert (bit_length < Field.size_in_bits)
 
   module Packed = struct
     type var = Cvar.t
@@ -261,6 +259,17 @@ module Small
 
     let pad x = x @ padding
   end
+end
+
+module Field_element (Impl : Camlsnark.Snark_intf.S) =
+  Small0(Impl)(struct let bit_length = Impl.Field.size_in_bits end)
+
+module Small
+    (Impl : Camlsnark.Snark_intf.S)
+    (M : sig val bit_length : int end) = struct
+  let () = assert (M.bit_length < Impl.Field.size_in_bits)
+
+  include Small0(Impl)(M)
 end
 
 module Make0

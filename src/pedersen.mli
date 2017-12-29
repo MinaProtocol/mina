@@ -9,12 +9,14 @@ end
 
 module Curve
   : Camlsnark.Curves.Complete_intf_basic
-    with type field := Snark_params.Main.Field.t
+    with type field := Crypto_params.Main.Field.t
 
 module Params : sig
   type t = Curve.t array
 
   val random : max_input_length:int -> t
+
+  val t : t
 end
 
 module State : sig
