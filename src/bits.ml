@@ -4,6 +4,7 @@ module Make_small_bitvector
     (Impl : Camlsnark.Snark_intf.S)
     (V : sig
        type t
+       val empty : t
        val length : int
        val get : t -> int -> bool
        val set : t -> int -> bool -> t
@@ -16,21 +17,67 @@ struct
 
   let () = assert (bit_length < Field.size_in_bits)
 
+  let init ~f =
+    let rec go acc i =
+      if i = V.length
+      then acc
+      else go (V.set acc i (f i)) (i + 1)
+    in
+    go V.empty 0
+
   module Packed = struct
     type var = Cvar.t
     type value = V.t
-    let spec : (var, value) Var_spec.t = failwith "TODO"
+
+    let spec : (var, value) Var_spec.t =
+      let open Var_spec in
+      let read v =
+        let open Read.Let_syntax in
+        let%map x = Read.read v in
+        let n = Bigint.of_field x in
+        init ~f:(fun i -> Bigint.test_bit n i)
+      in
+      let store t =
+        let open Store.Let_syntax in
+        let rec go pt i acc =
+          if i = V.length
+          then acc
+          else
+            let acc =
+              if V.get t i then Field.add pt acc else acc
+            in
+            go (Field.add pt pt) (i + 1) acc
+        in
+        Store.store (go Field.one 0 Field.zero)
+      in
+      let alloc = Alloc.alloc in
+      let check _ = Checked.return () in
+      { read; store; alloc; check }
   end
 
   module Unpacked = struct
     type var = Boolean.var list
     type value = V.t
-    let spec : (var, value) Var_spec.t = failwith "TODO"
+
+    let v_to_list n v =
+      List.init n ~f:(fun i -> if i < V.length then V.get v i else false)
+
+    let v_of_list vs =
+      List.foldi vs ~init:V.empty
+        ~f:(fun i acc b -> if i < V.length then V.set acc i b else acc)
+
+    let spec : (var, value) Var_spec.t =
+      Var_spec.transport (Var_spec.list ~length:V.length Boolean.spec)
+        ~there:(v_to_list V.length)
+        ~back:v_of_list
 
     module Padded = struct
       type var = Boolean.var list
       type value = V.t
-      let spec : (var, value) Var_spec.t = failwith "TODO"
+      let spec : (var, value) Var_spec.t =
+        Var_spec.transport (Var_spec.list ~length:Field.size_in_bits Boolean.spec)
+          ~there:(v_to_list Field.size_in_bits)
+          ~back:v_of_list
     end
   end
 
@@ -48,6 +95,7 @@ end
 module Make_Int64 (Impl : Camlsnark.Snark_intf.S) =
   Make_small_bitvector(Impl)(struct
     let length = 64
+    let empty = Int64.zero
     include Int64
 
     let get t i = (t lsr i) land one = one

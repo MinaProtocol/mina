@@ -142,10 +142,11 @@ module Wrap = struct
 end
 
 module Step = struct
-  let hash =
-    Main.Pedersen.hash
+  let hash x =
+    Main.Pedersen.hash x
       ~params:Pedersen.Main.params
       ~init:Main.Hash_curve.Checked.identity
+
   open Main
 
   open Let_syntax
@@ -169,21 +170,6 @@ module Step = struct
   let self_vk_spec =
     Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
 
-  let excavate_block (hash : Digest.Packed.var) ~f =
-    let%bind block_packed =
-      store Block.Packed.spec As_prover.(map get_state ~f)
-    in
-    let%bind () =
-      let%bind h = Pedersen.hash block_unpacked.body in
-      Digest.assert_equal h block_packed.body_hash
-    in
-    let%bind () =
-      let%bind h = Pedersen.hash (Block.Header.to_bits block_unpacked.header) in
-      Digest.assert_equal h hash
-    in
-    block_packed
-  ;;
-
   let main (self_hash_packed : Digest.Packed.var) : (unit, Prover_state.t) Checked.t =
-    let%bind prev_state = () in ()
+    return ()
 end
