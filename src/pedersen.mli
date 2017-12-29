@@ -52,3 +52,7 @@ end
 
   val params : Params.t
 end
+
+val hash : Bigstring.t -> Digest.t
+
+val zero_hash : Digest.t

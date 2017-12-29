@@ -16,6 +16,8 @@ module Span : sig
     with type Unpacked.value = t
     and type Unpacked.Padded.value = t
     and type Packed.value = t
+
+  val of_time_span : Time.Span.t -> t
 end
 
 val diff : t -> t -> Span.t

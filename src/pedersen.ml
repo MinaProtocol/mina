@@ -149,4 +149,3 @@ module Main = struct
     let max_input_length = 8 * Snark_params.Main.Field.size_in_bits in
     Params.random ~max_input_length
 end
-

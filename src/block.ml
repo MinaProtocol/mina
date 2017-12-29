@@ -33,6 +33,8 @@ module Header = struct
     let open H_list in
     fun [ previous_header_hash; body_hash; time; target; deltas; nonce; strength ] ->
       { previous_header_hash; body_hash; time; target; deltas; nonce; strength }
+
+  let num_deltas = 16
 end
 
 module Body = struct
@@ -47,6 +49,21 @@ type ('header, 'body) t_ =
 [@@deriving bin_io]
 
 type t = (Header.t, Body.t) t_ [@@deriving bin_io]
+
+let genesis : t =
+  { header =
+      { previous_header_hash = Pedersen.zero_hash
+      ; target = Target.max_value
+      ; strength = Strength.zero
+      ; nonce = Nonce.zero
+      ; body_hash = Pedersen.zero_hash
+      ; time = Block_time.of_time Time.epoch
+      ; deltas =
+          List.init Header.num_deltas ~f:(fun _ ->
+            Block_time.Span.of_time_span Time.Span.zero)
+      }
+  ; body = Int64.zero
+  }
 
 let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"
 
