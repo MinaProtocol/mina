@@ -145,6 +145,8 @@ module Main = struct
 
   include Make(Snark_params.Main.Field)(Snark_params.Main.Bigint)(Curve)
 
+(* Someday: This takes a while to run which delays program start. Generate some parameters
+   and stick them here *)
   let params =
     let max_input_length = 8 * Snark_params.Main.Field.size_in_bits in
     Params.random ~max_input_length
