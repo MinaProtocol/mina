@@ -1,5 +1,7 @@
 open Core_kernel
 
+open Snark_params
+
 module Extend (Impl : Camlsnark.Snark_intf.S) = struct
   include Impl
 
@@ -40,7 +42,7 @@ module Extend (Impl : Camlsnark.Snark_intf.S) = struct
 end
 
 module Make_types (Impl : Snark_intf.S) = struct
-  module Digest = Pedersen.Digest.Snarkable(Impl)
+  module Digest = Pedersen.Main.Digest.Snarkable(Impl)
   module Time = Block_time.Snarkable(Impl)
   module Span = Block_time.Span.Snarkable(Impl)
   module Target = Target.Snarkable(Impl)
@@ -48,13 +50,25 @@ module Make_types (Impl : Snark_intf.S) = struct
   module Strength = Strength.Snarkable(Impl)
   module Block = Block.Snarkable(Impl)(Digest)(Time)(Span)(Target)(Nonce)(Strength)
 
-  module Pedersen = Camlsnark.Pedersen.Make(Impl)(Pedersen.Curve)
+  module Scalar = Pedersen.Main.Curve.Scalar(Impl)
 end
 
 module Main = struct
   module T = Extend(Snark_params.Main)
+
   include T
   include Make_types(T)
+
+  module Hash_curve =
+    Camlsnark.Curves.Edwards.Extend
+      (T)
+      (Scalar)
+      (Pedersen.Main.Curve)
+
+  module Pedersen = Camlsnark.Pedersen.Make(T)(struct
+      include Hash_curve
+      let cond_add = Hash_curve.Checked.cond_add
+    end)
 end
 module Other = struct
   module T = Extend(Snark_params.Other)
@@ -62,8 +76,6 @@ module Other = struct
   include Make_types(T)
 end
 
-
-module Other = Camlsnark.Snark.Make(Other_curve)
 
 let () = assert (Main.Field.size_in_bits = Other.Field.size_in_bits)
 
@@ -130,6 +142,10 @@ module Wrap = struct
 end
 
 module Step = struct
+  let hash =
+    Main.Pedersen.hash
+      ~params:Pedersen.Main.params
+      ~init:Main.Hash_curve.Checked.identity
   open Main
 
   open Let_syntax
@@ -153,7 +169,7 @@ module Step = struct
   let self_vk_spec =
     Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
 
-  let excavate_block (hash : Digest.var) ~f =
+  let excavate_block (hash : Digest.Packed.var) ~f =
     let%bind block_packed =
       store Block.Packed.spec As_prover.(map get_state ~f)
     in
@@ -168,6 +184,6 @@ module Step = struct
     block_packed
   ;;
 
-  let main (self_hash_packed : Digest.Packed.var) : (unit, Prover_state.t) =
+  let main (self_hash_packed : Digest.Packed.var) : (unit, Prover_state.t) Checked.t =
     let%bind prev_state = () in ()
 end
