@@ -130,7 +130,7 @@ module Main = Make(Swim.Udp)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
 
 let () =
   let open Command.Let_syntax in
-  Command.async
+  Command.async'
     ~summary:"Current daemon"
     begin
       [%map_open
