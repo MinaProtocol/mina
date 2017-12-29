@@ -177,7 +177,34 @@ struct
     module Padded = struct
       type var = Boolean.var list
       type value = Bigstring.t
-      let spec = failwith "TODO"
+
+      let padding =
+        List.init (element_length * Field.size_in_bits - bit_length)
+          ~f:(fun _ -> Boolean.false_)
+
+      let spec =
+        let open Var_spec in
+        let nth_bit c n = ((Char.to_int c lsl n) land 1) = 1 in
+        let store (t : value) : var Store.t =
+          let open Store.Let_syntax in
+          let rec go acc i =
+            if i < 0
+            then return acc
+            else
+              let b = nth_bit (Bigstring.get t (i / bits_per_char)) (i mod bits_per_char) in
+              let%bind b = Boolean.spec.store b in
+              go (b :: acc) (i - 1)
+          in
+          go padding (bits_per_char * Bigstring.length t)
+        in
+        let read bs =
+          Read.map (Read.all (List.map ~f:Boolean.spec.read (List.take bs bit_length)))
+            ~f:of_bool_list
+        in
+        let check bs = Checked.all_ignore (List.map ~f:Boolean.spec.check bs) in
+        let alloc = Alloc.all (List.init (element_length * Field.size_in_bits) ~f:(fun _ -> Boolean.spec.alloc)) in
+        { store; read; check; alloc }
+      ;;
     end
   end
 
@@ -327,7 +354,7 @@ module Make0
     (Impl : Camlsnark.Snark_intf.S)
     (M : sig
       val bit_length : int
-(* TODO: Just make this [val kind : [`Arbitary | `Field_element]] *)
+(* Someday: Just make this [val kind : [`Arbitary | `Field_element]] *)
       val bits_per_element : int
     end) = struct
   open Impl
@@ -369,7 +396,7 @@ module Make0
     let pad x = x @ padding
   end
 
-  (* TODO: Would be nice to write this code only once. *)
+  (* Someday: Would be nice to write this code only once. *)
   let unpack : Packed.value -> Unpacked.value =
     let rec go remaining acc = function
       | x :: xs ->

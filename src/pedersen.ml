@@ -82,7 +82,7 @@ struct
       let bit_length = 8 * byte_length in
       assert (bit_length <= Params.max_input_length t.params - t.i);
       let acc = ref t.acc in
-      for i = 0 to byte_length do
+      for i = 0 to byte_length - 1 do
         let c = Char.to_int (Bigstring.get s i) in
         let cond_add j acc =
           if ith_bit_int c j
