@@ -8,6 +8,8 @@ module type S = sig
 
     module Snarkable : functor (Impl : Snark_intf.S) ->
       Impl.Snarkable.Bits.S
+      with type Packed.var = Impl.Cvar.t
+       and type Packed.value = Impl.Field.t
   end
 
   module Params : sig
@@ -35,7 +37,12 @@ struct
   module Digest = struct
     type t = Bigstring.t [@@deriving bin_io]
 
-    let () = assert (Snark_params.Main.Field.size_in_bits = Snark_params.Other.Field.size_in_bits)
+    (* TODO: Assert that main_curve modulus is smaller than other_curve *)
+    let () = 
+      let open Snark_params in
+      assert
+        (Main_curve.Field.size_in_bits = Other_curve.Field.size_in_bits)
+
     module Snarkable = Bits.Field_element
   end
 

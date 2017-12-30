@@ -8,6 +8,8 @@ module type S = sig
 
     module Snarkable : functor (Impl : Snark_intf.S) ->
       Impl.Snarkable.Bits.S
+      with type Packed.var = Impl.Cvar.t
+       and type Packed.value = Impl.Field.t
   end
 
   module Params : sig

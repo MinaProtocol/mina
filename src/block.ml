@@ -14,7 +14,7 @@ module Header = struct
     ; nonce                : 'nonce
     ; strength             : 'strength
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, fields]
 
   type t =
     (Pedersen.Digest.t, Block_time.t, Block_time.Span.t, Target.t, Nonce.t, Strength.t) t_
@@ -117,6 +117,9 @@ module Snarkable
     module Unpacked = struct
       include Make(Hash.Unpacked)(Time.Unpacked)(Span.Unpacked)(Target.Unpacked)(Nonce.Unpacked)(Strength.Unpacked)
       module Padded = Make(Hash.Unpacked.Padded)(Time.Unpacked.Padded)(Span.Unpacked.Padded)(Target.Unpacked.Padded)(Nonce.Unpacked.Padded)(Strength.Unpacked.Padded)
+
+      let to_bits { previous_header_hash; body_hash; time; target; deltas; nonce; strength } =
+        previous_header_hash @ body_hash @ time @ target @ List.concat deltas @ nonce @ strength
     end
 
     module Checked = struct
@@ -159,5 +162,8 @@ module Snarkable
   module Unpacked = struct
     include Make(Header.Unpacked)(Body.Unpacked)
     module Padded = Make(Header.Unpacked.Padded)(Body.Unpacked.Padded)
+
+    let to_bits { header; body } =
+      Header.Unpacked.to_bits header @ body
   end
 end

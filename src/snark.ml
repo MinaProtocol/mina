@@ -69,6 +69,8 @@ module Main = struct
       include Hash_curve
       let cond_add = Hash_curve.Checked.cond_add
     end)
+
+  module Util = Snark_util.Make(T)
 end
 module Other = struct
   module T = Extend(Snark_params.Other)
@@ -143,16 +145,20 @@ module Step = struct
       ~params:Pedersen.Main.params
       ~init:Main.Hash_curve.Checked.identity
 
+  module Block0 = Block
+
   open Main
 
   open Let_syntax
 
   module Prover_state = struct
     type t =
-      { block      : Block.Packed.value
-      ; prev_block : Block.Packed.value
-      ; prev_proof : Other.Proof.t
-      ; self       : bool list
+(*       { block             : Block.Packed.value *)
+      { block_unpacked       : Block.Unpacked.value
+(*       ; prev_block        : Block.Packed.value *)
+      ; prev_header_unpacked : Block.Header.Unpacked.value
+      ; prev_proof           : Other.Proof.t
+      ; self                 : bool list
       }
     [@@deriving fields]
   end
@@ -166,6 +172,66 @@ module Step = struct
   let self_vk_spec =
     Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
 
-  let main (self_hash_packed : Digest.Packed.var) : (unit, Prover_state.t) Checked.t =
-    return ()
+  let unhash ~spec ~f ~to_bits h =
+    let%bind b = store spec As_prover.(map get_state ~f) in
+    let%bind h' = hash (to_bits b) >>| Pedersen.digest in
+    let%map () = assert_equal h h' in
+    b
+  ;;
+
+  let get_prev_header_unpacked =
+    store Block.Header.Unpacked.spec
+      As_prover.(map get_state ~f:Prover_state.prev_header_unpacked)
+  ;;
+
+  let hash_is h b =
+    let%bind h' = hash b >>| Pedersen.digest in
+    assert_equal h' h
+  ;;
+
+  let compute_target _ _ = return (failwith "TODO")
+
+  let construct_block_unpacked (prev_block_header : Block.Header.Unpacked.var) =
+    let%bind body =
+      store Block.Body.Unpacked.spec 
+        As_prover.(map get_state ~f:(fun s -> s.Prover_state.block_unpacked.body))
+    in
+    let%bind (header : Block.Header.Unpacked.var) =
+      let get spec f =
+        store spec
+          As_prover.(map get_state ~f:(fun s -> f s.Prover_state.block_unpacked.header))
+      in
+      let open Block0.Header in
+      let%bind previous_header_hash = get Digest.Unpacked.spec previous_header_hash
+      and body_hash                 = get Digest.Unpacked.spec body_hash
+      and time                      = get Time.Unpacked.spec time
+      and nonce                     = get Nonce.Unpacked.spec nonce
+      in
+      let deltas = failwith "TODO" in
+      let%bind target =
+        compute_target prev_block_header.deltas prev_block_header.strength 
+      in
+      let%map () = hash_is (Checked.pack body_hash) body in
+      { previous_header_hash
+      ; body_hash
+      ; time
+      ; target
+      ; nonce
+      ; deltas
+      ; strength = failwith "TODO"
+      }
+    in
+    return { Block0.body; header }
+
+  let main
+        (self_hash_packed : Digest.Packed.var)
+        (header_hash_packed : Digest.Packed.var)
+    : (unit, Prover_state.t) Checked.t =
+    let%bind self =
+      unhash self_hash_packed ~f:Prover_state.self
+        ~spec:self_vk_spec ~to_bits:Fn.id
+    in
+    let%bind prev_header_unpacked = get_prev_header_unpacked in
+    let%bind block_unpacked = construct_block_unpacked prev_header_unpacked in
+    hash_is header_hash_packed (Block.Header.Unpacked.to_bits block_unpacked.header)
 end

@@ -1,6 +1,6 @@
 open Core_kernel
 
-module Make_util (Impl : Camlsnark.Snark_intf.S) = struct
+module Make (Impl : Camlsnark.Snark_intf.S) = struct
   open Impl
   open Let_syntax
 
@@ -75,21 +75,25 @@ module Make_util (Impl : Camlsnark.Snark_intf.S) = struct
     in
     go (Field.size_in_bits - 1)
 
+(* (#<=) >= n/2
+   (#>=) >= n/2 *)
   let median
         ~bit_length
         (xs : Cvar.t list)
     =
     let length = List.length xs in
     let index = length / 2 in
-    let m =
+    let _m =
       store Var_spec.field As_prover.(Let_syntax.(
         let%map xs = read Var_spec.(list ~length field) xs in
         let xs = List.sort ~cmp:compare_field xs in
         List.nth_exn xs index))
     in
-    let%bind () = Assert.mem m xs in
+    return (failwith "TODO")
+(*
     let%bind () =
       List.map xs ~f:(fun 
+*)
 
   ;;
 end
