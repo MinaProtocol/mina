@@ -1,113 +1,90 @@
 open Core_kernel
 open Async_kernel
 
+module Config = struct
+  type t =
+    { indirect_ping_count : int
+    ; protocol_period : Time.Span.t
+    (* Round-trip-time *)
+    ; round_trip_time : Time.Span.t
+    }
+
+  let create ?indirect_ping_count:(indirect_ping_count=6)
+    ?expected_latency:(expected_latency=Time.Span.of_ms 500.)
+    ()
+    =
+      let epsilon = Time.Span.of_ms 5. in
+      let round_trip_time = Time.Span.(expected_latency + expected_latency) in
+      let protocol_period = Time.Span.(round_trip_time + round_trip_time + round_trip_time + epsilon) in
+      { indirect_ping_count
+      ; protocol_period
+      ; round_trip_time
+      }
+
+  let indirect_ping_count t = t.indirect_ping_count
+  let protocol_period t = t.protocol_period
+  let round_trip_time t = t.round_trip_time
+end
+
+module type TestOnly_intf = sig
+  val network_partition_add : from:Peer.t -> to_:Peer.t -> unit
+  val network_partition_remove : from:Peer.t -> to_:Peer.t -> unit
+end
+
 module type S = sig
   type t
 
-  module Config : sig
-    type t
+  val connect : config:Config.t -> initial_peers:Peer.t list -> me:Peer.t -> t Deferred.t
 
-    val create : ?indirect_ping_count:int
-      -> ?expected_latency:Time.Span.t
-      -> unit
-      -> t
-
-    val indirect_ping_count : t -> int
-    val protocol_period : t -> Time.Span.t
-    val rtt : t -> Time.Span.t
-  end
-
-  val connect : config:Config.t -> initial_peers:Host_and_port.t list -> me:Host_and_port.t -> t Deferred.t
-
-  val peers : t -> Host_and_port.t list
+  val peers : t -> Peer.t list
 
   val changes : t -> Peer.Event.t Pipe.Reader.t
 
   val stop : t -> unit
 
-  val test_only_network_partition_add : from:Host_and_port.t -> to_:Host_and_port.t -> unit
-  val test_only_network_partition_remove : from:Host_and_port.t -> to_:Host_and_port.t -> unit
+  module TestOnly : TestOnly_intf
 end
 
 module Node = struct
-  type state = Dead | Alive [@@deriving bin_io, sexp]
-
   type t =
-    { peer : Host_and_port.t
-    ; mutable state : state
+    { peer : Peer.t
+    ; mutable state : [`Dead | `Alive]
     } [@@deriving bin_io, sexp]
 
-  let is_alive t = t.state = Alive
-  let is_dead t = t.state = Dead
+  let is_alive t = t.state = `Alive
+  let is_dead t = t.state = `Dead
 
-  let alive peer = { peer ; state = Alive }
+  let alive peer = { peer ; state = `Alive }
 
 
-  let dead peer = { peer ; state = Dead }
+  let dead peer = { peer ; state = `Dead }
 end
 
-module type RandomIterer_intf = sig
-  type 'a t
-
-  val create : initial:'a list -> 'a t
-
-  (* Add an element that may at random be chosen for an iteration that's already happenning *)
-  val add : 'a t -> 'a -> unit
-
-  (* Semantics:
-   * 1. Merge all pending adds into the list
-   * 2. Permute the list randomly
-   * 3. Start iterating slowly through the frozen list of size `n`
-   * 4. During iteration, new entries could have been added to our `t` structure
-   * Whenever there exists `k` items that have been added, with
-   * probability `k / (n + k)` choose an element `x` from the new entries
-   * without replacement and use that instead
-   *)
-  val effectful_iter_async : 'a t -> f:('a -> unit Deferred.t) -> unit Deferred.t
-end
-
-(* Rough sketch of a possible idea *)
-module RandomIterer = struct
-  type 'a collection = Todo
-
-  type 'a t =
-    { frozen : 'a list
-    ; mutable consuming : 'a collection
-    ; mutable pending : 'a collection
-    }
-
-  let create ~initial = failwith "TODO"
-
-  let add t x = failwith "TODO"
-
-  let effectful_iter_async t ~f = failwith "TODO"
-end
-
-module type NetworkState_intf = sig
+module type Network_state_intf = sig
   type t
 
-  (* A slice of state for network delivery *)
+  (* A subset of information about the network's live/dead nodes *)
   type slice = Node.t list [@@deriving bin_io, sexp]
 
   val create : Log.logger -> t
 
-  val add_slice : t -> slice -> unit Deferred.t
+  val add_slice : t -> slice -> unit
 
   val changes : t -> Peer.Event.t Pipe.Reader.t
 
   (* Pure getter for live_nodes *)
-  val live_nodes : t -> Host_and_port.t Set.Poly.t
+  val live_nodes : t -> Peer.t Set.Poly.t
 
   (* Effectfully (mutating t) extracts a slice of the network state
    * maintaining necessary SWIM invariants *)
-  val extract : t -> transmit_limit:int -> Host_and_port.t -> slice
+  val extract : t -> transmit_limit:int -> Peer.t -> slice
 end
 
 (* Taken mostly from mirage-swim *)
-module NetworkState : NetworkState_intf = struct
+module Network_state : Network_state_intf = struct
   module E = struct
     type t = Node.t [@@deriving sexp]
-    type id = Host_and_port.t
+    type id = Peer.t
 
     let invalidates (node : t) (node' : t) : bool =
       node.peer = node'.peer && node.state <> node'.state
@@ -118,10 +95,11 @@ module NetworkState : NetworkState_intf = struct
     let size = Node.bin_size_t
   end
 
-  type broadcast_queue_t = (int * E.t) list [@@deriving sexp]
+  (* This is the collection of node liveness to be sent over the network *)
+  type broadcast_list = (int * E.t) list [@@deriving sexp]
   type t =
-    { mutable broadcast_queue : broadcast_queue_t
-    ; mutable live_nodes : Host_and_port.t Set.Poly.t
+    { mutable broadcast_list : broadcast_list
+    ; mutable live_nodes : Peer.t Set.Poly.t
     ; logger : Log.logger
     ; changes : Peer.Event.t Pipe.Reader.t * Peer.Event.t Pipe.Writer.t
     }
@@ -129,23 +107,23 @@ module NetworkState : NetworkState_intf = struct
   type slice = Node.t list [@@deriving bin_io, sexp]
 
   let create logger : t =
-    { broadcast_queue = []
+    { broadcast_list = []
     ; live_nodes = Set.Poly.empty
     ; logger
     ; changes = Pipe.create ()
     }
 
   let update_live t (node : E.t) =
-    if node.state = Node.Alive then
+    if node.state = `Alive then
       t.live_nodes <- Set.Poly.add t.live_nodes node.peer
     else
       t.live_nodes <- Set.Poly.remove t.live_nodes node.peer
 
   let add (t : t) (node : E.t) =
     update_live t node;
-    if not (List.exists t.broadcast_queue ~f:(fun (_, node') -> node = node')) then begin
-      let q = List.filter t.broadcast_queue ~f:(fun (_, node') -> not (E.invalidates node node')) in
-      t.broadcast_queue <- ((0, node)::q)
+    if not (List.exists t.broadcast_list ~f:(fun (_, node') -> node = node')) then begin
+      let q = List.filter t.broadcast_list ~f:(fun (_, node') -> not (E.invalidates node node')) in
+      t.broadcast_list <- ((0, node)::q)
     end
 
   let push_changes t slice =
@@ -154,22 +132,26 @@ module NetworkState : NetworkState_intf = struct
       slice
       |> List.filter ~f:(fun (node : Node.t) ->
         (* dead information is new information *)
-        node.state = Node.Dead ||
+        node.state = `Dead ||
           (* skip over the live nodes in the slice if we already know about them *)
           not (Set.Poly.mem t.live_nodes node.peer)
         )
       |> List.partition_map ~f:(fun (node : Node.t) ->
           match node.state with
-          | Node.Alive -> `Fst node.peer
-          | Node.Dead -> `Snd node.peer
+          | `Alive -> `Fst node.peer
+          | `Dead -> `Snd node.peer
         )
     in
     let%bind () = Pipe.write w (Peer.Event.Disconnect disconnected) in
-    let%map () = Pipe.write w (Peer.Event.Connect connected) in
-    ()
+    Pipe.write w (Peer.Event.Connect connected)
 
   let add_slice t slice =
-    let%map () = push_changes t slice in
+    (* We need this iter to be fast so rest of protocol doesn't build up *)
+    (* Implicit contract with change pipe consumer to keep up with events *)
+    don't_wait_for (
+      push_changes t slice
+    );
+    t.logger#logf Debug "Adding slice %s" (slice |> sexp_of_slice |> Sexp.to_string);
     List.iter slice (add t)
 
   let live_nodes t = t.live_nodes
@@ -183,15 +165,17 @@ module NetworkState : NetworkState_intf = struct
       let transmit, elems, bytes_left = memo in
       let transmit_count, broadcast = elem in
       let size = E.size broadcast in
+      (* If we've sent this info around enough, we can forget about it *)
       if transmit_count > transmit_limit then
         (transmit, elems, bytes_left)
+      (* If we're out of bytes, then wait until another round to send the info *)
       else if size > bytes_left || E.skip broadcast addr then
         (transmit, elem::elems, bytes_left)
       else
         (broadcast::transmit, (transmit_count+1, broadcast)::elems, bytes_left - size)
     in
-    let transmit, bq', _ = List.fold_left t.broadcast_queue ~f:select ~init:([], [], 65507) in
-    t.broadcast_queue <- List.sort ~cmp:(fun e e' -> Int.compare (fst e) (fst e')) bq';
+    let transmit, bq', _ = List.fold_left t.broadcast_list ~f:select ~init:([], [], 65507) in
+    t.broadcast_list <- List.sort ~cmp:(fun e e' -> Int.compare (fst e) (fst e')) bq';
     transmit
 end
 
@@ -200,48 +184,47 @@ module Request_or_ack = struct
 end
 
 module Payload = struct
-  type t = Ping | Ping_req of Host_and_port.t [@@deriving bin_io, sexp]
+  type t = Ping | Ping_req of Peer.t [@@deriving bin_io, sexp]
 end
 
-module AckTable = struct
+module Ack_table = struct
   type t = (int, unit Ivar.t) Hashtbl.t
 end
 
-module Messager : (sig
+module Messager : sig
   type t
   type msg =
-    { from: Host_and_port.t
+    { from: Peer.t
     ; action: Payload.t Request_or_ack.t
-    ; net_slice: NetworkState.slice
+    ; net_slice: Network_state.slice
     ; seq_no: int
     } [@@deriving bin_io, sexp]
 
   val create : incoming:msg Pipe.Reader.t
-    -> net_state:NetworkState.t
+    -> net_state:Network_state.t
     -> get_transmit_limit:(unit -> int)
     (* to send messages *)
-    -> send_msg:(recipient:Host_and_port.t -> msg -> unit Or_error.t Deferred.t)
+    -> send_msg:(recipient:Peer.t -> msg -> unit Or_error.t Deferred.t)
     (* handle incoming msgs (with seq_no) *)
     -> handle_msg:(t -> Payload.t * int -> [`Stop | `Want_ack] Deferred.t)
-    -> me: Host_and_port.t
+    -> me: Peer.t
     -> t
 
-  val send : t -> (Host_and_port.t * Payload.t) list -> seq_no:int -> timeout:Time.Span.t -> [ `Timeout | `Acked ] Deferred.t
-end) = struct
+  val send : t -> (Peer.t * Payload.t) list -> seq_no:int -> timeout:Time.Span.t -> [ `Timeout | `Acked ] Deferred.t
+end = struct
   type msg =
-    { from: Host_and_port.t
+    { from: Peer.t
     ; action: Payload.t Request_or_ack.t
-    ; net_slice: NetworkState.slice
+    ; net_slice: Network_state.slice
     ; seq_no: int
     } [@@deriving bin_io, sexp]
 
   type t =
-    { table : AckTable.t
-    ; net_state : NetworkState.t
+    { table : Ack_table.t
+    ; net_state : Network_state.t
     ; get_transmit_limit : unit -> int
-    ; send_msg : recipient:Host_and_port.t -> msg -> unit Or_error.t Deferred.t
-    ; me : Host_and_port.t
-    (* TODO(bkase): Remember to handle different msgs having diff timeouts *)
+    ; send_msg : recipient:Peer.t -> msg -> unit Or_error.t Deferred.t
+    ; me : Peer.t
     }
 
   let raw_send t addr action seq_no : _ Or_error.t Deferred.t =
@@ -249,19 +232,11 @@ end) = struct
     t.send_msg ~recipient:addr
       { from = t.me
       ; action
-      ; net_slice = NetworkState.extract t.net_state ~transmit_limit:(t.get_transmit_limit ()) addr
+      ; net_slice = Network_state.extract t.net_state ~transmit_limit:(t.get_transmit_limit ()) addr
       ; seq_no
       }
 
-  let create : incoming:msg Pipe.Reader.t
-    -> net_state:NetworkState.t
-    -> get_transmit_limit:(unit -> int)
-    (* to send messages *)
-    -> send_msg:(recipient:Host_and_port.t -> msg -> unit Or_error.t Deferred.t)
-    (* handle incoming msgs (with seq_no) *)
-    -> handle_msg:(t -> Payload.t * int -> [`Stop | `Want_ack] Deferred.t)
-    -> me: Host_and_port.t
-    -> t = fun ~incoming ~net_state ~get_transmit_limit ~send_msg ~handle_msg ~me ->
+  let create ~incoming ~net_state ~get_transmit_limit ~send_msg ~handle_msg ~me =
     let table = Hashtbl.Poly.create () in
     let t =
       { table
@@ -278,12 +253,8 @@ end) = struct
         let open Request_or_ack in
 
         (* the sender must have been alive *)
-        let with_sender : Node.t list = ({peer = from; state = Alive}::net_slice) in
-        (* We need this iter to be fast so UDP packets don't build up *)
-        (* Implicit contract with change pipe consumer to keep up with events *)
-        don't_wait_for begin
-          NetworkState.add_slice net_state with_sender
-        end;
+        let with_sender : Node.t list = ({peer = from; state = `Alive}::net_slice) in
+        Network_state.add_slice net_state with_sender;
 
         match action with
         | Request x ->
@@ -308,11 +279,11 @@ end) = struct
   let send t msgs ~seq_no ~timeout =
     let open Let_syntax in
     let wait_ack = Deferred.create (fun _ivar ->
-      Hashtbl.Poly.set ~key:seq_no t.table ~data:_ivar;
-    ) in
+      Hashtbl.Poly.set ~key:seq_no t.table ~data:_ivar)
+    in
     List.iter msgs (fun (addr, payload) ->
       (* We're implicitly waiting for an ack, so no risk for async pressure *)
-      don't_wait_for(
+      don't_wait_for (
         match%map raw_send t addr (Request_or_ack.Request payload) seq_no with
         | Ok () -> ()
         | Error e -> printf "Failed with err %s" (Error.to_string_hum e)
@@ -333,21 +304,20 @@ module type Transport_intf =
 
     val create : logger -> port:int -> t
 
-    val send : t -> recipient:Host_and_port.t -> Message.t -> unit Or_error.t Deferred.t
+    val send : t -> recipient:Peer.t -> Message.t -> unit Or_error.t Deferred.t
     val listen : t -> Message.t Pipe.Reader.t Deferred.t
 
     val stop_listening : t -> unit
 
-    val test_only_network_partition_add : from:Host_and_port.t -> to_:Host_and_port.t -> unit
-    val test_only_network_partition_remove : from:Host_and_port.t -> to_:Host_and_port.t -> unit
+    module TestOnly: TestOnly_intf
   end
 
-module FakeTransport (Message : sig
+module Fake_transport (Message : sig
   type t [@@deriving bin_io, sexp]
 end) = struct
   type network_t =
-    { connected : (recipient:Host_and_port.t -> Message.t -> unit Or_error.t Deferred.t) Host_and_port.Table.t
-    ; partition_key_to_val : Host_and_port.t list Host_and_port.Table.t
+    { connected : (recipient:Peer.t -> Message.t -> unit Or_error.t Deferred.t) Host_and_port.Table.t
+    ; partition_key_to_val : Peer.t list Host_and_port.Table.t
     }
 
   let network : network_t =
@@ -390,29 +360,31 @@ end) = struct
   let stop_listening t =
     Host_and_port.Table.remove network.connected (me t)
 
-  let test_only_network_partition_add ~from ~to_ =
-    match Host_and_port.Table.find network.partition_key_to_val from with
-    | Some xs ->
-        Host_and_port.Table.remove network.partition_key_to_val from;
-        Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:(
-          to_::xs
-        )
-    | None ->
-        Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:([to_])
+  module TestOnly = struct
+    let network_partition_add ~from ~to_ =
+      match Host_and_port.Table.find network.partition_key_to_val from with
+      | Some xs ->
+          Host_and_port.Table.remove network.partition_key_to_val from;
+          Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:(
+            to_::xs
+          )
+      | None ->
+          Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:([to_])
 
-  let test_only_network_partition_remove ~from ~to_ =
-    match Host_and_port.Table.find network.partition_key_to_val from with
-    | Some xs ->
-        Host_and_port.Table.remove network.partition_key_to_val from;
-        Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:(
-          List.filter xs ~f:(fun x -> x <> to_)
-        )
-    | None -> ()
+    let network_partition_remove ~from ~to_ =
+      match Host_and_port.Table.find network.partition_key_to_val from with
+      | Some xs ->
+          Host_and_port.Table.remove network.partition_key_to_val from;
+          Host_and_port.Table.add_exn network.partition_key_to_val ~key:from ~data:(
+            List.filter xs ~f:(fun x -> x <> to_)
+          )
+      | None -> ()
+  end
 
 end
 
 
-module UdpTransport (Message : sig
+module Udp_transport (Message : sig
   type t [@@deriving bin_io, sexp]
 end) = struct
   open Async
@@ -428,8 +400,8 @@ end) = struct
   let create logger ~port : t =
     let stop_fn = ref None in
     let stop_deferred = Deferred.create (fun ivar ->
-      stop_fn := Some (fun () -> Ivar.fill ivar ())
-    ) in
+      stop_fn := Some (fun () -> Ivar.fill ivar ()))
+    in
     { logger
     ; config = Udp.Config.create ~stop:stop_deferred ()
     ; stop = Option.value_exn !stop_fn
@@ -438,7 +410,7 @@ end) = struct
 
   let stop_listening t = t.stop ()
 
-  let send : t -> recipient:Host_and_port.t -> Message.t -> unit Or_error.t Deferred.t = fun t ~recipient msg ->
+  let send : t -> recipient:Peer.t -> Message.t -> unit Or_error.t Deferred.t = fun t ~recipient msg ->
     let socket = Socket.create Socket.Type.udp in
     let addr = Socket.Address.Inet.create (Unix.Inet_addr.of_string (Host_and_port.host recipient)) ~port:(Host_and_port.port recipient) in
     let iobuf = Iobuf.create ~len:(Message.bin_size_t msg) in
@@ -455,7 +427,6 @@ end) = struct
         t.logger#logf Debug "Sent buf %s over socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
         Ok ()
     | Error _ as e -> Deferred.return e
-    (*printf "Got sendto error code of %d" code;*)
 
   let listen : t -> Message.t Pipe.Reader.t Deferred.t =
     fun t ->
@@ -477,10 +448,12 @@ end) = struct
       end;
       r
 
-  let test_only_network_partition_add ~from ~to_ =
-    failwith "only for tests"
-  let test_only_network_partition_remove ~from ~to_ =
-    failwith "only for tests"
+  module TestOnly = struct
+    let network_partition_add ~from ~to_ =
+      failwith "only for tests"
+    let network_partition_remove ~from ~to_ =
+      failwith "only for tests"
+  end
 end
 
 module Make (Transport : Transport_intf) = struct
@@ -488,32 +461,9 @@ module Make (Transport : Transport_intf) = struct
     type t = Messager.msg [@@deriving bin_io, sexp]
   end)
 
-  module Config = struct
-    type t =
-      { indirect_ping_count : int
-      ; protocol_period : Time.Span.t
-      ; rtt : Time.Span.t
-      }
-
-    let create ?indirect_ping_count:(indirect_ping_count=6)
-      ?expected_latency:(expected_latency=Time.Span.of_ms 500.)
-      () =
-        let epsilon = Time.Span.of_ms 5. in
-        let rtt = Time.Span.(expected_latency + expected_latency) in
-        let protocol_period = Time.Span.(rtt + rtt + rtt + epsilon) in
-        { indirect_ping_count
-        ; protocol_period
-        ; rtt
-        }
-
-    let indirect_ping_count t = t.indirect_ping_count
-    let protocol_period t = t.protocol_period
-    let rtt t = t.rtt
-  end
-
   type t =
     { messager : Messager.t
-    ; net_state  : NetworkState.t
+    ; net_state  : Network_state.t
     ; mutable seq_no : int
     ; logger : Log.logger
     ; net : Net.t
@@ -536,35 +486,35 @@ module Make (Transport : Transport_intf) = struct
 
     let seq_no = fresh_seq_no t in
     t.logger#logf Info "Begin round %d probing node %s" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
-    match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:(Config.rtt t.config) with
+    match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:(Config.round_trip_time t.config) with
     | `Acked ->
         t.logger#logf Info "Round %d acked" t.seq_no;
         return ()
     | `Timeout ->
         t.logger#logf Info "Round %d timeout" t.seq_no;
-        let m_ks = sample_nodes (NetworkState.live_nodes t.net_state) (Config.indirect_ping_count t.config) m_i.peer in
-        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.((Config.protocol_period t.config) - (Config.rtt t.config)) with
+        let m_ks = sample_nodes (Network_state.live_nodes t.net_state) (Config.indirect_ping_count t.config) m_i.peer in
+        match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.((Config.protocol_period t.config) - (Config.round_trip_time t.config)) with
         | `Acked ->
             t.logger#logf Info "Round %d secondary acked" t.seq_no
         | `Timeout ->
-            m_i.state <- Node.Dead;
+            m_i.state <- `Dead;
             t.logger#logf Info "Round %d m_i died" t.seq_no
 
   (* TODO: Round-Robin extension *)
+  (* Use Random_iterer here *)
   let rec failure_detect (t : t) : unit Deferred.t =
     t.logger#logf Debug "Start failure_detect";
     let%bind () =
-      match Set.Poly.length (NetworkState.live_nodes t.net_state) with
+      match Set.Poly.length (Network_state.live_nodes t.net_state) with
       | 0 ->
         Async.after (Config.protocol_period t.config)
       | _ ->
         let choose xs =
-          Option.value_exn (List.nth xs (Random.int (List.length xs))) in
-
-        let m_i = choose (NetworkState.live_nodes t.net_state |> Set.Poly.to_list) in
-        let%map ((), ()) = Deferred.both
-          (prob_node t {peer=m_i;state=Alive})
-          (Async.after (Config.protocol_period t.config)) in
+          Option.value_exn (List.nth xs (Random.int (List.length xs)))
+        in
+        let m_i = choose (Network_state.live_nodes t.net_state |> Set.Poly.to_list) in
+        let%map () = prob_node t {peer=m_i;state=`Alive}
+        and () = Async.after (Config.protocol_period t.config) in
         ()
     in
     if not t.stop then
@@ -575,7 +525,7 @@ module Make (Transport : Transport_intf) = struct
 
   (* From mirage-swim *)
   let transmit_limit net_state =
-    let live_count = Set.Poly.length (NetworkState.live_nodes net_state) in
+    let live_count = Set.Poly.length (Network_state.live_nodes net_state) in
     if live_count = 0 then
       0
     else
@@ -589,14 +539,15 @@ module Make (Transport : Transport_intf) = struct
     let logger = new Log.logger (Printf.sprintf "Swim:%s" (me |> Host_and_port.port |> string_of_int)) in
     let net = Net.create ~port:(Host_and_port.port me) logger in
     let%map incoming = Net.listen net in
-    let net_state = NetworkState.create logger in
+    let net_state = Network_state.create logger in
     let rec handle_msg messager = function
       | (Payload.Ping, _) -> Deferred.return `Want_ack
       | (Payload.Ping_req addr_i, seq_no) ->
-          match%map Messager.send messager [(addr_i, Payload.Ping)] ~seq_no:seq_no ~timeout:(Config.rtt config) with
+          match%map Messager.send messager [(addr_i, Payload.Ping)] ~seq_no:seq_no ~timeout:(Config.round_trip_time config) with
           | `Timeout -> `Stop
           | `Acked -> `Want_ack
-    and make_messager () =
+    in
+    let make_messager () =
       Messager.create
         ~incoming
         ~net_state
@@ -617,30 +568,30 @@ module Make (Transport : Transport_intf) = struct
       }
     in
     (* Assume initial peers are alive *)
-    don't_wait_for begin
-      NetworkState.add_slice t.net_state
-        (List.map initial_peers ~f:Node.alive)
-    end;
+    Network_state.add_slice t.net_state
+      (List.map initial_peers ~f:Node.alive);
 
     don't_wait_for(schedule' (fun () -> failure_detect t));
 
     t
 
-  let peers t = NetworkState.live_nodes t.net_state |> Set.Poly.to_list
+  let peers t = Network_state.live_nodes t.net_state |> Set.Poly.to_list
 
   let changes t =
-    NetworkState.changes t.net_state
+    Network_state.changes t.net_state
 
   let stop t =
     Net.stop_listening t.net;
     t.stop <- true
 
-  let test_only_network_partition_add ~from ~to_ =
-    Net.test_only_network_partition_add ~from:from ~to_:to_
+  module TestOnly = struct
+    let network_partition_add ~from ~to_ =
+      Net.TestOnly.network_partition_add ~from:from ~to_:to_
 
-  let test_only_network_partition_remove ~from ~to_ =
-    Net.test_only_network_partition_remove ~from:from ~to_:to_
+    let network_partition_remove ~from ~to_ =
+      Net.TestOnly.network_partition_remove ~from:from ~to_:to_
+  end
 end
 
-module Udp : S = Make(UdpTransport)
-module Test : S = Make(FakeTransport)
+module Udp : S = Make(Udp_transport)
+module Test : S = Make(Fake_transport)

@@ -1,7 +1,9 @@
 open Core_kernel
 
+type t = Host_and_port.t [@@deriving bin_io, sexp, compare]
+
 module Event = struct
-  type t =
-    | Connect of Host_and_port.t list
-    | Disconnect of Host_and_port.t list
+  type nonrec t =
+    | Connect of t list
+    | Disconnect of t list
 end

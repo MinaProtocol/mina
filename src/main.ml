@@ -37,6 +37,7 @@ module Message = struct
   [@@deriving bin_io]
 end
 
+module SwimConfig = Swim.Config
 module Make
     (Swim       : Swim.S)
     (Gossip_net : Gossip_net.S)
@@ -78,7 +79,7 @@ struct
       ; target_peer_count = 8
       }
     in
-    let%bind swim = Swim.connect ~config:(Swim.Config.create ()) ~initial_peers ~me in
+    let%bind swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
     let%bind gossip_net = Gossip_net.create (Swim.changes swim) params in
     let%map initial_block =
       match%map Storage.load storage_location with

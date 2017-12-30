@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 
+module SwimConfig = Swim.Config
 module Test (Swim : Swim.S) = struct
   let shutdown clients =
     List.iter clients ~f:(fun (_, c) ->
@@ -19,7 +20,7 @@ module Test (Swim : Swim.S) = struct
   let swim_client idx =
     printf "Starting client %d\n" idx;
     (idx, Swim.connect
-        ~config:(Swim.Config.create
+        ~config:(SwimConfig.create
           ~expected_latency:(Time.Span.of_ms 5.)
           ()
         )
@@ -28,10 +29,11 @@ module Test (Swim : Swim.S) = struct
 
   let live_nodes_str client =
     let nodes = Swim.peers client in
-    let strs = List.map nodes ~f:(fun node -> node
-      |> Host_and_port.sexp_of_t
-      |> Sexp.to_string
-    ) in
+    let strs =
+      List.map nodes ~f:(fun node -> node
+        |> Host_and_port.sexp_of_t
+        |> Sexp.to_string)
+    in
     String.concat ~sep:"," strs
 
   let peers_and_self (idx, swim) =
@@ -49,7 +51,6 @@ module Test (Swim : Swim.S) = struct
     List.iter (List.take clients 3) (fun (idx, c) ->
       printf "%d:%s\n" idx (live_nodes_str c)
     );
-
     match clients with
     | [] -> ()
     | (idx, c)::xs ->
@@ -74,11 +75,9 @@ module Test (Swim : Swim.S) = struct
         ~delay:(Time.Span.of_sec 0.1)
         ~count:count
     in
-
     let%bind () = wait_stabalize () in
     (* Full network *)
     assert_stable clients;
-
     match clients with
     | [] ->
       return (failwith "unreachable")
@@ -88,14 +87,12 @@ module Test (Swim : Swim.S) = struct
       let%bind () = wait_stabalize () in
       (* Node0 dead *)
       assert_stable xs;
-
       let%bind c0::_ = create_with_delay_in_between
         ~delay:(Time.Span.of_sec 0.1)
         ~count:1 in
       let%map () = wait_stabalize () in
       (* Node0 revived *)
       assert_stable (c0::xs);
-
       shutdown (c0::xs)
 
   let test_network_partition ~count () : unit Deferred.t =
@@ -105,21 +102,17 @@ module Test (Swim : Swim.S) = struct
     | x::xs ->
       (* Partition node 0 from everything except node 1 *)
       List.iter xs (fun x' ->
-        Swim.test_only_network_partition_add ~from:(addr x) ~to_:(addr x')
+        Swim.TestOnly.network_partition_add ~from:(addr x) ~to_:(addr x')
       );
-      Swim.test_only_network_partition_remove ~from:(addr x) ~to_:(addr (List.nth_exn xs 0));
-
+      Swim.TestOnly.network_partition_remove ~from:(addr x) ~to_:(addr (List.nth_exn xs 0));
       let%bind clients =
         create_with_delay_in_between
           ~delay:(Time.Span.of_sec 0.1)
           ~count:count
       in
-
       let%map () = wait_stabalize () in
       assert_stable clients;
-
       shutdown clients
-
 end
 
 module Mock = Test(Swim.Test)
