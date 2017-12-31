@@ -1,19 +1,25 @@
 open Core_kernel
 open Async_kernel
 
-module Update : sig
-  type t =
-    | New_block of Block.t
-end
-
 type t =
   { block : Block.t
   ; proof : Proof.t
   }
 [@@deriving bin_io]
 
+type blockchain = t
+
+module Update : sig
+  type t =
+    | New_block of blockchain
+end
+
 val accumulate
-  :  init:Block.t
+  :  init:t option
   -> updates:Update.t Pipe.Reader.t
-  -> strongest_block:Block.t Pipe.Writer.t
+  -> strongest_block:t Pipe.Writer.t
   -> unit
+
+val valid : t -> bool
+
+val genesis : t
