@@ -46,6 +46,19 @@ let iter ?consumer ?continue_on_error reader ~f =
       ?consumer ?continue_on_error ~f)
 ;;
 
+let iter_unordered ?consumer reader ~f ~budget =
+  bracket reader 
+    (let rec run_reader ()=
+       match%bind Pipe.read ?consumer reader.Reader.pipe with
+       | `Eof -> return ()
+       | `Ok v -> 
+         f v;
+         run_reader ()
+     in
+     Deferred.all_unit (List.map (List.range 0 budget) ~f:(fun _ -> run_reader ()))
+    )
+;;
+
 let of_list xs = 
   let reader = wrap_reader (Pipe.of_list xs) in
   set_reader_sync reader;
