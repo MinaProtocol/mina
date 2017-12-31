@@ -13,7 +13,7 @@ module type S = sig
   module Params : sig
     type t = curve array
 
-    val random : max_input_length:int -> t
+    val random : (unit -> bool) -> max_input_length:int -> t
   end
 
   module State : sig
@@ -28,8 +28,9 @@ module type S = sig
 end
 
 module Make
-    (Field : Camlsnark.Field_intf.S)
-    (Bigint : Camlsnark.Bigint_intf.S with type field := Field.t)
+    (Field : Camlsnark.Field_intf.Extended)
+    (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
+    (Field_size : sig val size : Bigint.t end)
     (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
   module Digest = struct
@@ -59,10 +60,66 @@ struct
       go Curve.generator 0 Curve.identity
     ;;
 
-    let random ~max_input_length =
-      Array.init max_input_length ~f:(fun _ -> random_elt ())
-
     let max_input_length t = Array.length t
+
+    module Random (R : sig val random_bool : unit -> bool end) = struct
+      open R
+
+      let rec random_field_element () =
+        let n =
+          Bigint.of_numeral ~base:2
+            (String.init Field.size_in_bits ~f:(fun _ ->
+              if random_bool () then '\001' else '\000'))
+        in
+        if Bigint.compare n Field_size.size = -1
+        then Bigint.to_field n
+        else random_field_element ()
+      ;;
+
+      let double_points =
+        [ Field.one
+        ; Field.(negate one)
+        ]
+      ;;
+
+      let is_double_point x = List.mem double_points x ~equal:Field.equal
+
+      (* x^2 + y^2 = 1 + dx^2 y^2
+         (1 - dx^2) y^2 = 1 - x^2
+         y^2 = (1 - x^2)/(1-dx^2)
+      *)
+
+      let sqrt x =
+        let a = Field.sqrt x in
+        let b = Field.negate a in
+        if Bigint.(compare (of_field a) (of_field b)) = -1
+        then (a, b)
+        else (b, a)
+      ;;
+
+      let rec random_point () =
+        let x = random_field_element () in
+        if is_double_point x
+        then
+          (if random_bool () then (x, Field.zero) else random_point ())
+        else
+          let c = Field.(Infix.((one - x * x) / (one - Curve.Params.d * x * x))) in
+          if Field.is_square c
+          then
+            let (a, b) = sqrt c in
+            (if random_bool () then (x, a) else (x, b))
+          else
+            random_point ()
+      ;;
+
+      let params max_input_length =
+        Array.init max_input_length ~f:(fun _ -> random_point ())
+      ;;
+    end
+
+    let random random_bool ~max_input_length =
+      let module M = Random(struct let random_bool = random_bool end) in
+      M.params max_input_length
   end
 
   module State = struct
@@ -143,7 +200,10 @@ module Main = struct
     end
   end
 
-  include Make(Snark_params.Main.Field)(Snark_params.Main.Bigint)(Curve)
+  include Make
+      (Snark_params.Main.Field)(Snark_params.Main_curve.Bigint.R)
+      (struct let size = Snark_params.Main_curve.field_size end)
+      (Curve)
 
   let params = Pedersen_params.t
 

@@ -20,6 +20,9 @@ module Header = struct
     (Pedersen.Digest.t, Block_time.t, Block_time.Span.t, Target.t, Nonce.t, Strength.t) t_
   [@@deriving bin_io]
 
+  (* TODO: The deltas don't need to be included in the hash (nor does strength)!
+     Separate deltas, strength from header.
+  *)
   let hash t =
     let buf = Bigstring.create (bin_size_t t) in
     let s = Pedersen.State.create Pedersen.params in

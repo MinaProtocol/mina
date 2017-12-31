@@ -13,7 +13,7 @@ module type S = sig
   module Params : sig
     type t = curve array
 
-    val random : max_input_length:int -> t
+    val random : (unit -> bool) -> max_input_length:int -> t
   end
 
   module State : sig
@@ -29,8 +29,9 @@ end
 
 module Make
   : functor
-    (Field : Camlsnark.Field_intf.S)
-    (Bigint : Camlsnark.Bigint_intf.S with type field := Field.t)
+    (Field : Camlsnark.Field_intf.Extended)
+    (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
+    (Field_size : sig val size : Bigint.t end)
     (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) ->
     S with type curve := Curve.t
 
