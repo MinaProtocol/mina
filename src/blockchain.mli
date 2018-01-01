@@ -13,7 +13,7 @@ module Update : sig
 end
 
 val accumulate
-  :  init:t option
+  :  init:t
   -> updates:Update.t Pipe.Reader.t
   -> strongest_block:t Pipe.Writer.t
   -> unit

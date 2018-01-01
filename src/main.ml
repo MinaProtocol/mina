@@ -117,7 +117,7 @@ struct
     Storage.persist storage_location
       (Pipe.map strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain.accumulate
-      ~init:(Some initial_blockchain)
+      ~init:initial_blockchain
       ~strongest_block:strongest_block_writer
       ~updates:(
         merge
