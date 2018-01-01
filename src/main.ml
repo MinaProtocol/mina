@@ -37,6 +37,7 @@ module Message = struct
   [@@deriving bin_io]
 end
 
+module SwimConfig = Swim.Config
 module Make
     (Swim       : Swim.S)
     (Gossip_net : Gossip_net.S)
@@ -70,7 +71,7 @@ struct
       ]
   ;;
 
-  let main storage_location genesis_block initial_peers should_mine =
+  let main storage_location genesis_block initial_peers should_mine me =
     let open Let_syntax in
     let params : Gossip_net.Params.t =
       { timeout = Time.Span.of_sec 1.
@@ -78,8 +79,8 @@ struct
       ; target_peer_count = 8
       }
     in
-    let peer_stream = Swim.connect ~initial_peers in
-    let%bind gossip_net = Gossip_net.create peer_stream params in
+    let%bind swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
+    let%bind gossip_net = Gossip_net.create (Swim.changes swim) params in
     let%map initial_block =
       match%map Storage.load storage_location with
       | Some x -> x
@@ -149,9 +150,11 @@ let () =
             Option.value ~default:(home ^/ ".current-config") conf_dir
           in
           let%bind initial_peers =
-            Reader.load_sexps_exn conf_dir Peer.t_of_sexp
+            Reader.load_sexps_exn conf_dir Host_and_port.t_of_sexp
           in
           Main.main (conf_dir ^/ "storage") Block.genesis initial_peers should_mine
+            (* TODO: This should be inside the config_dir right? *)
+            (Host_and_port.create ~host:"127.0.0.1" ~port:8884)
       ]
     end
   |> Command.run
