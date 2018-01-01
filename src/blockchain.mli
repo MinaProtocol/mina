@@ -7,11 +7,9 @@ type t =
   }
 [@@deriving bin_io]
 
-type blockchain = t
-
 module Update : sig
-  type t =
-    | New_block of blockchain
+  type nonrec t =
+    | New_block of t
 end
 
 val accumulate
