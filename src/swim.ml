@@ -442,7 +442,7 @@ end) = struct
         Udp.recvfrom_loop (Socket.fd socket) (fun buf addr ->
           let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
           t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
-          (* TODO: Do we need pushback here? *)
+          (* TODO(es92): We need a linear_pipe method for capped-buffer-than-drop-packets write *)
           Pipe.write_without_pushback w msg
         )
       end;
