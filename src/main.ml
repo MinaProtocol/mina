@@ -4,7 +4,7 @@ open Async
 module Rpcs = struct
   module Get_strongest_block = struct
     type query = unit [@@deriving bin_io]
-    type response = Block.t [@@deriving bin_io]
+    type response = Blockchain.t [@@deriving bin_io]
 
     (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
@@ -33,7 +33,7 @@ let filter_map_unordered
 
 module Message = struct
   type t =
-    | New_strongest_block of Block.t
+    | New_strongest_block of Blockchain.t
   [@@deriving bin_io]
 end
 
@@ -81,7 +81,7 @@ struct
     in
     let%bind swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
     let%bind gossip_net = Gossip_net.create (Swim.changes swim) params in
-    let%map initial_block =
+    let%map initial_blockchain =
       match%map Storage.load storage_location with
       | Some x -> x
       | None -> genesis_block
@@ -99,15 +99,15 @@ struct
         Pipe.iter strongest_block_reader
           ~f:(fun b ->
             Pipe.write body_changes_writer
-              (Miner.Update.Change_body (Int64.(b.body + Int64.one))))
+              (Miner.Update.Change_body (Int64.(b.block.body + Int64.one))))
       end
     in
     let mined_blocks =
       if should_mine
       then
         Miner_impl.mine
-          ~previous:initial_block
-          ~body:(Int64.succ initial_block.body)
+          ~previous:initial_blockchain
+          ~body:(Int64.succ initial_blockchain.block.body)
           (merge
             [ Pipe.map strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
             ; body_changes_reader
@@ -117,7 +117,7 @@ struct
     Storage.persist storage_location
       (Pipe.map strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain.accumulate
-      ~init:initial_block
+      ~init:initial_blockchain
       ~strongest_block:strongest_block_writer
       ~updates:(
         merge
@@ -152,7 +152,7 @@ let () =
           let%bind initial_peers =
             Reader.load_sexps_exn conf_dir Host_and_port.t_of_sexp
           in
-          Main.main (conf_dir ^/ "storage") Block.genesis initial_peers should_mine
+          Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
             (* TODO: This should be inside the config_dir right? *)
             (Host_and_port.create ~host:"127.0.0.1" ~port:8884)
       ]
