@@ -1,5 +1,5 @@
 open Core_kernel
-
+open Util
 open Snark_params
 
 module Extend (Impl : Camlsnark.Snark_intf.S) = struct
@@ -139,8 +139,122 @@ module Wrap = struct
   ;;
 end
 
-module Step = struct
+module Make_step (M : sig
+    open Main
 
+    module State : sig
+      type var
+      type value
+      val spec : (var, value) Var_spec.t
+
+      val is_base_case : var -> (Boolean.var, _) Checked.t
+      val hash : var -> (Pedersen.Digest.var, _) Checked.t
+    end
+
+    module Update : sig
+      type var
+      type value
+      val spec : (var, value) Var_spec.t
+
+      val apply : var -> State.var -> (State.var, _) Checked.t
+    end
+  end)
+= struct
+  open M
+
+  module Prover_state = struct
+    type t =
+      { self       : bool list
+      ; prev_state : State.value
+      ; update     : Update.value
+      }
+    [@@deriving fields]
+  end
+
+  open Main
+  open Let_syntax
+
+  module Verifier =
+    Camlsnark.Verifier_gadget.Make(Main)(Main_curve)(Other_curve)
+      (struct let input_size = Other.Data_spec.size (Wrap.input ()) end)
+
+  let input = step_input
+
+  let self_vk_spec =
+    Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
+
+  let hash_digest x =
+    Main.Pedersen.hash x
+      ~params:Pedersen_params.t
+      ~init:Main.Hash_curve.Checked.identity
+    >>| Main.Pedersen.digest
+
+  let get spec ~f = store spec As_prover.(map get_state ~f)
+
+  let unhash ~spec ~f ~to_bits h =
+    let%bind b = get spec ~f in
+    let%bind h' = hash_digest (to_bits b) in
+    let%map () = assert_equal h h' in
+    b
+  ;;
+
+  let main self_hash_packed state_hash =
+    let%bind self =
+      unhash self_hash_packed ~f:Prover_state.self
+        ~spec:self_vk_spec ~to_bits:Fn.id
+    in
+    let%bind prev_state = get State.spec ~f:Prover_state.prev_state
+    and update          = get Update.spec ~f:Prover_state.update
+    in
+    let%bind next_state = Update.apply update prev_state in
+    let%bind h = State.hash next_state in
+    assert_equal h state_hash
+end
+
+module Step = struct
+  open Main
+
+  module State = struct
+    let difficulty_window = 16
+
+    type ('time, 'target, 'digest) t =
+      { difficulty_info : ('time * 'target) list
+      ; header_hash     : 'digest
+      }
+
+    type var = (Time.Unpacked.var, Target.Unpacked.var, Pedersen.Digest.var) t
+    type value = (Time.Unpacked.value, Target.Unpacked.value, Pedersen.Digest.value) t
+
+    let to_hlist { difficulty_info; header_hash } = H_list.([ difficulty_info; header_hash ])
+    let of_hlist = H_list.(fun [ difficulty_info; header_hash ] -> { difficulty_info; header_hash })
+
+    let data_spec =
+      let open Data_spec in
+      [ Var_spec.(list ~length:difficulty_window (tuple2 Time.Unpacked.spec Target.Unpacked.spec))
+      ; Pedersen.Digest.spec
+      ]
+
+    let spec : (var, value) Var_spec.t =
+      Var_spec.of_hlistable data_spec
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  end
+
+  module Update = struct
+    type var = Block.Packed.var
+    type value = Block.Packed.var
+    let spec = Block.Packed.spec
+
+    let all_but_last_exn xs = fst (split_last_exn xs)
+
+    open Let_syntax
+
+    let apply (block : var) (state : State.var) =
+      let%target = compute_target difficulty_infos in
+      failwith "TODO"
+  end
+
+  (*
   module Block0 = Block
 
   open Main
@@ -158,10 +272,6 @@ module Step = struct
       }
     [@@deriving fields]
   end
-
-  module Verifier =
-    Camlsnark.Verifier_gadget.Make(Main)(Main_curve)(Other_curve)
-      (struct let input_size = Other.Data_spec.size (Wrap.input ()) end)
 
   let input = step_input
 
@@ -184,11 +294,6 @@ module Step = struct
   let get_prev_header_unpacked =
     store Block.Header.Unpacked.spec
       As_prover.(map get_state ~f:Prover_state.prev_header_unpacked)
-  ;;
-
-  let hash_is h b =
-    let%bind h' = hash_digest b in
-    assert_equal h' h
   ;;
 
   let hash_unpacked bs = hash_digest bs >>= Pedersen.Digest.unpack
@@ -239,5 +344,5 @@ module Step = struct
     in
     let%bind prev_header_unpacked = get_prev_header_unpacked in
     let%bind block_unpacked = construct_next_block prev_header_unpacked in
-    hash_is header_hash_packed (Block.Header.Unpacked.to_bits block_unpacked.header)
+    hash_is header_hash_packed (Block.Header.Unpacked.to_bits block_unpacked.header) *)
 end

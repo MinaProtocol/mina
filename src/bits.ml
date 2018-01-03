@@ -1,4 +1,5 @@
 open Core_kernel
+open Util
 
 module Make_small_bitvector
     (Impl : Camlsnark.Snark_intf.S)
@@ -210,17 +211,6 @@ struct
 
   let bits_in_final_elt = bit_length mod bits_per_element
 
-  let split_last =
-    let rec go acc x xs =
-      match xs with
-      | [] -> List.rev acc, x
-      | x' :: xs -> go (x :: acc) x' xs
-    in
-    function
-    | [] -> failwith "split_last: Empty list"
-    | x :: xs -> go [] x xs
-  ;;
-
   module Packed = struct
     type var = Cvar.t list
     type value = Bigstring.t
@@ -273,7 +263,7 @@ struct
     let pad x = x @ padding
 
     let unpack vs0 =
-      let vs, v = split_last vs0 in
+      let vs, v = split_last_exn vs0 in
       let open Let_syntax in
       let%map bss =
         Checked.all (List.map vs ~f:(Checked.unpack ~length:bits_per_element))
