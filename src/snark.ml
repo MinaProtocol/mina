@@ -140,10 +140,6 @@ module Wrap = struct
 end
 
 module Step = struct
-  let hash x =
-    Main.Pedersen.hash x
-      ~params:Pedersen.Main.params
-      ~init:Main.Hash_curve.Checked.identity
 
   module Block0 = Block
 
@@ -172,9 +168,15 @@ module Step = struct
   let self_vk_spec =
     Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
 
+  let hash_digest x =
+    Main.Pedersen.hash x
+      ~params:Pedersen_params.t
+      ~init:Main.Hash_curve.Checked.identity
+    >>| Main.Pedersen.digest
+
   let unhash ~spec ~f ~to_bits h =
     let%bind b = store spec As_prover.(map get_state ~f) in
-    let%bind h' = hash (to_bits b) >>| Pedersen.digest in
+    let%bind h' = hash_digest (to_bits b) in
     let%map () = assert_equal h h' in
     b
   ;;
@@ -185,13 +187,17 @@ module Step = struct
   ;;
 
   let hash_is h b =
-    let%bind h' = hash b >>| Pedersen.digest in
+    let%bind h' = hash_digest b in
     assert_equal h' h
   ;;
 
+  let hash_unpacked bs = hash_digest bs >>= Pedersen.Digest.unpack
+
   let compute_target _ _ = return (failwith "TODO")
 
-  let construct_block_unpacked (prev_block_header : Block.Header.Unpacked.var) =
+  let construct_next_block (prev_block_header : Block.Header.Unpacked.var)
+    : (Block.Unpacked.var, _) Checked.t
+    =
     let%bind body =
       store Block.Body.Unpacked.spec 
         As_prover.(map get_state ~f:(fun s -> s.Prover_state.block_unpacked.body))
@@ -201,18 +207,18 @@ module Step = struct
         store spec
           As_prover.(map get_state ~f:(fun s -> f s.Prover_state.block_unpacked.header))
       in
-      let open Block0.Header in
-      let%bind previous_header_hash = get Digest.Unpacked.spec previous_header_hash
-      and body_hash                 = get Digest.Unpacked.spec body_hash
-      and time                      = get Time.Unpacked.spec time
-      and nonce                     = get Nonce.Unpacked.spec nonce
+      let module H = Block0.Header in
+      let%bind previous_header_hash =
+        hash_unpacked (Block.Header.Unpacked.to_bits prev_block_header)
+      and body_hash = hash_unpacked body
+      and time      = get Time.Unpacked.spec H.time
+      and nonce     = get Nonce.Unpacked.spec H.nonce
       in
       let deltas = failwith "TODO" in
-      let%bind target =
+      let%map target =
         compute_target prev_block_header.deltas prev_block_header.strength 
       in
-      let%map () = hash_is (Checked.pack body_hash) body in
-      { previous_header_hash
+      { H.previous_header_hash
       ; body_hash
       ; time
       ; target
@@ -232,6 +238,6 @@ module Step = struct
         ~spec:self_vk_spec ~to_bits:Fn.id
     in
     let%bind prev_header_unpacked = get_prev_header_unpacked in
-    let%bind block_unpacked = construct_block_unpacked prev_header_unpacked in
+    let%bind block_unpacked = construct_next_block prev_header_unpacked in
     hash_is header_hash_packed (Block.Header.Unpacked.to_bits block_unpacked.header)
 end
