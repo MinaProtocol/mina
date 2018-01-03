@@ -3,7 +3,7 @@ open Core_kernel
 module Pedersen = Pedersen.Main
 
 module Header = struct
-  type ('hash, 'time, 'span, 'target, 'nonce, 'strength) t_ =
+  type ('hash, 'time, 'target, 'nonce, 'strength) t_ =
     { previous_header_hash : 'hash
     ; body_hash            : 'hash
     ; time                 : 'time
@@ -14,7 +14,7 @@ module Header = struct
   [@@deriving bin_io]
 
   type t =
-    (Pedersen.Digest.t, Block_time.t, Block_time.Span.t, Target.t, Nonce.t, Strength.t) t_
+    (Pedersen.Digest.t, Block_time.t, Target.t, Nonce.t, Strength.t) t_
   [@@deriving bin_io]
 
   let hash t =
@@ -66,7 +66,6 @@ module Snarkable
     (Impl : Snark_intf.S)
     (Hash : Impl.Snarkable.Bits.S)
     (Time : Impl.Snarkable.Bits.S)
-    (Span : Impl.Snarkable.Bits.S)
     (Target : Impl.Snarkable.Bits.S)
     (Nonce : Impl.Snarkable.Bits.S)
     (Strength : Impl.Snarkable.Bits.S)
@@ -79,13 +78,12 @@ module Snarkable
     module Make
       (Hash : Snarkable.S)
       (Time : Snarkable.S)
-      (Span : Snarkable.S)
       (Target : Snarkable.S)
       (Nonce : Snarkable.S)
       (Strength : Snarkable.S)
     = struct
-      type var = (Hash.var, Time.var, Span.var, Target.var, Nonce.var, Strength.var) t_
-      type value = (Hash.value, Time.value, Span.value, Target.value, Nonce.value, Strength.value) t_
+      type var = (Hash.var, Time.var, Target.var, Nonce.var, Strength.var) t_
+      type value = (Hash.value, Time.value, Target.value, Nonce.value, Strength.value) t_
 
       let data_spec =
         Data_spec.(
@@ -102,10 +100,10 @@ module Snarkable
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
-    module Packed = Make(Hash.Packed)(Time.Packed)(Span.Packed)(Target.Packed)(Nonce.Packed)(Strength.Packed)
+    module Packed = Make(Hash.Packed)(Time.Packed)(Target.Packed)(Nonce.Packed)(Strength.Packed)
     module Unpacked = struct
-      include Make(Hash.Unpacked)(Time.Unpacked)(Span.Unpacked)(Target.Unpacked)(Nonce.Unpacked)(Strength.Unpacked)
-      module Padded = Make(Hash.Unpacked.Padded)(Time.Unpacked.Padded)(Span.Unpacked.Padded)(Target.Unpacked.Padded)(Nonce.Unpacked.Padded)(Strength.Unpacked.Padded)
+      include Make(Hash.Unpacked)(Time.Unpacked)(Target.Unpacked)(Nonce.Unpacked)(Strength.Unpacked)
+      module Padded = Make(Hash.Unpacked.Padded)(Time.Unpacked.Padded)(Target.Unpacked.Padded)(Nonce.Unpacked.Padded)(Strength.Unpacked.Padded)
     end
 
     module Checked = struct

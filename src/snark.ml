@@ -44,11 +44,10 @@ end
 module Make_types (Impl : Snark_intf.S) = struct
   module Digest = Pedersen.Main.Digest.Snarkable(Impl)
   module Time = Block_time.Snarkable(Impl)
-  module Span = Block_time.Span.Snarkable(Impl)
   module Target = Target.Snarkable(Impl)
   module Nonce = Nonce.Snarkable(Impl)
   module Strength = Strength.Snarkable(Impl)
-  module Block = Block.Snarkable(Impl)(Digest)(Time)(Span)(Target)(Nonce)(Strength)
+  module Block = Block.Snarkable(Impl)(Digest)(Time)(Target)(Nonce)(Strength)
 
   module Scalar = Pedersen.Main.Curve.Scalar(Impl)
 end
