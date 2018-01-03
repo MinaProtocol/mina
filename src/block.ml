@@ -4,12 +4,11 @@ module Pedersen = Pedersen.Main
 
 module Header = struct
   type ('hash, 'time, 'span, 'target, 'nonce, 'strength) t_ =
-    { previous_header_hash : 'hash
-    ; body_hash            : 'hash
-    ; time                 : 'time
-    ; target               : 'target
-    ; nonce                : 'nonce
-    ; strength             : 'strength
+    { previous_block_hash : 'hash
+    ; time                : 'time
+    ; target              : 'target
+    ; nonce               : 'nonce
+    ; strength            : 'strength
     }
   [@@deriving bin_io, fields]
 
@@ -17,19 +16,13 @@ module Header = struct
     (Pedersen.Digest.t, Block_time.t, Block_time.Span.t, Target.t, Nonce.t, Strength.t) t_
   [@@deriving bin_io]
 
-  let hash t =
-    let buf = Bigstring.create (bin_size_t t) in
-    let s = Pedersen.State.create Pedersen.params in
-    Pedersen.State.update s buf;
-    Pedersen.State.digest s
-
-  let to_hlist { previous_header_hash; body_hash; time; target; nonce; strength } =
-      H_list.([ previous_header_hash; body_hash; time; target; nonce; strength ])
+  let to_hlist { previous_block_hash; time; target; nonce; strength } =
+      H_list.([ previous_block_hash; time; target; nonce; strength ])
 
   let of_hlist =
     let open H_list in
-    fun [ previous_header_hash; body_hash; time; target; nonce; strength ] ->
-      { previous_header_hash; body_hash; time; target; nonce; strength }
+    fun [ previous_block_hash; time; target; nonce; strength ] ->
+      { previous_block_hash; time; target; nonce; strength }
 end
 
 module Body = struct
@@ -45,13 +38,18 @@ type ('header, 'body) t_ =
 
 type t = (Header.t, Body.t) t_ [@@deriving bin_io]
 
+let hash t =
+  let buf = Bigstring.create (bin_size_t t) in
+  let s = Pedersen.State.create Pedersen.params in
+  Pedersen.State.update s buf;
+  Pedersen.State.digest s
+
 let genesis : t =
   { header =
-      { previous_header_hash = Pedersen.zero_hash
+      { previous_block_hash = Pedersen.zero_hash
       ; target = Target.max_value
       ; strength = Strength.zero
       ; nonce = Nonce.zero
-      ; body_hash = Pedersen.zero_hash
       ; time = Block_time.of_time Time.epoch
       }
   ; body = Int64.zero
@@ -90,7 +88,6 @@ module Snarkable
       let data_spec =
         Data_spec.(
           [ Hash.spec
-          ; Hash.spec
           ; Time.spec
           ; Target.spec
           ; Nonce.spec
@@ -107,23 +104,22 @@ module Snarkable
       include Make(Hash.Unpacked)(Time.Unpacked)(Span.Unpacked)(Target.Unpacked)(Nonce.Unpacked)(Strength.Unpacked)
       module Padded = Make(Hash.Unpacked.Padded)(Time.Unpacked.Padded)(Span.Unpacked.Padded)(Target.Unpacked.Padded)(Nonce.Unpacked.Padded)(Strength.Unpacked.Padded)
 
-      let to_bits { previous_header_hash; body_hash; time; target; nonce; strength } =
-        previous_header_hash @ body_hash @ time @ target @  nonce @ strength
+      let to_bits { previous_block_hash; time; target; nonce; strength } =
+        previous_block_hash @ time @ target @  nonce @ strength
     end
 
     module Checked = struct
       let unpack
-            { previous_header_hash; body_hash; time; target; nonce; strength }
+            { previous_block_hash; time; target; nonce; strength }
         =
         let open Let_syntax in
-        let%map previous_header_hash = Hash.Checked.unpack previous_header_hash
-        and body_hash = Hash.Checked.unpack body_hash
+        let%map previous_header_hash = Hash.Checked.unpack previous_block_hash
         and time = Time.Checked.unpack time
         and target = Target.Checked.unpack target
         and nonce = Nonce.Checked.unpack nonce
         and strength = Strength.Checked.unpack strength
         in
-        { previous_header_hash; body_hash; time; target; nonce; strength }
+        { previous_block_hash; time; target; nonce; strength }
       ;;
     end
 
@@ -153,5 +149,14 @@ module Snarkable
 
     let to_bits { header; body } =
       Header.Unpacked.to_bits header @ body
+  end
+
+  module Checked = struct
+    let unpack { header; body } =
+      let open Let_syntax in
+      let%map header = Header.Checked.unpack header
+      and body = Body.Checked.unpack body
+      in
+      { header; body }
   end
 end

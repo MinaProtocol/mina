@@ -71,6 +71,14 @@ module Main = struct
     end)
 
   module Util = Snark_util.Make(T)
+
+  let hash_digest x =
+    let open Checked in
+    Pedersen.hash x
+      ~params:Pedersen_params.t
+      ~init:Hash_curve.Checked.identity
+    >>| Pedersen.digest
+
 end
 module Other = struct
   module T = Extend(Snark_params.Other)
@@ -183,12 +191,6 @@ module Make_step (M : sig
   let self_vk_spec =
     Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
 
-  let hash_digest x =
-    Main.Pedersen.hash x
-      ~params:Pedersen_params.t
-      ~init:Main.Hash_curve.Checked.identity
-    >>| Main.Pedersen.digest
-
   let get spec ~f = store spec As_prover.(map get_state ~f)
 
   let unhash ~spec ~f ~to_bits h =
@@ -212,21 +214,25 @@ module Make_step (M : sig
 end
 
 module Step = struct
+  module Block0 = Block
   open Main
+  open Let_syntax
 
   module State = struct
-    let difficulty_window = 16
+    let difficulty_window = 10
 
     type ('time, 'target, 'digest) t =
       { difficulty_info : ('time * 'target) list
-      ; header_hash     : 'digest
+      ; block_hash      : 'digest
       }
 
+(* Someday: It may well be worth using bitcoin's compact nbits for target values since
+   targets are quite chunky *)
     type var = (Time.Unpacked.var, Target.Unpacked.var, Pedersen.Digest.var) t
     type value = (Time.Unpacked.value, Target.Unpacked.value, Pedersen.Digest.value) t
 
-    let to_hlist { difficulty_info; header_hash } = H_list.([ difficulty_info; header_hash ])
-    let of_hlist = H_list.(fun [ difficulty_info; header_hash ] -> { difficulty_info; header_hash })
+    let to_hlist { difficulty_info; block_hash } = H_list.([ difficulty_info; block_hash ])
+    let of_hlist = H_list.(fun [ difficulty_info; block_hash ] -> { difficulty_info; block_hash })
 
     let data_spec =
       let open Data_spec in
@@ -238,6 +244,12 @@ module Step = struct
       Var_spec.of_hlistable data_spec
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    let to_bits { difficulty_info; block_hash } =
+      let%map bs = Pedersen.Digest.unpack block_hash in
+      List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info @ bs
+
+    let hash (t : var) = to_bits t >>= hash_digest 
   end
 
   module Update = struct
@@ -247,15 +259,23 @@ module Step = struct
 
     let all_but_last_exn xs = fst (split_last_exn xs)
 
-    open Let_syntax
+    let compute_target _ = failwith "TODO"
+
+    let meets_target _ _ = failwith "TODO"
 
     let apply (block : var) (state : State.var) =
-      let%target = compute_target difficulty_infos in
+      let%bind target = compute_target state.difficulty_info in
+      let%bind block_unpacked = Block.Checked.unpack block in
+      let%bind () =
+        let%bind h = hash_digest (Block.Unpacked.to_bits block_unpacked) in
+        assert_equal h block.header.body_hash
+      in
+      let%bind h = hash_digest (Block.Header.Unpacked.to_bits block_unpacked) in
+      let%bind () = meets_target block.header target in
       failwith "TODO"
   end
 
   (*
-  module Block0 = Block
 
   open Main
 
