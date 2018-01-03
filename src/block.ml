@@ -1,7 +1,5 @@
 open Core_kernel
 
-let num_deltas = 16
-
 module Pedersen = Pedersen.Main
 
 module Header = struct
@@ -10,7 +8,6 @@ module Header = struct
     ; body_hash            : 'hash
     ; time                 : 'time
     ; target               : 'target
-    ; deltas               : 'span list
     ; nonce                : 'nonce
     ; strength             : 'strength
     }
@@ -29,15 +26,13 @@ module Header = struct
     Pedersen.State.update s buf;
     Pedersen.State.digest s
 
-  let to_hlist { previous_header_hash; body_hash; time; target; deltas; nonce; strength } =
-      H_list.([ previous_header_hash; body_hash; time; target; deltas; nonce; strength ])
+  let to_hlist { previous_header_hash; body_hash; time; target; nonce; strength } =
+      H_list.([ previous_header_hash; body_hash; time; target; nonce; strength ])
 
   let of_hlist =
     let open H_list in
-    fun [ previous_header_hash; body_hash; time; target; deltas; nonce; strength ] ->
-      { previous_header_hash; body_hash; time; target; deltas; nonce; strength }
-
-  let num_deltas = 16
+    fun [ previous_header_hash; body_hash; time; target; nonce; strength ] ->
+      { previous_header_hash; body_hash; time; target; nonce; strength }
 end
 
 module Body = struct
@@ -61,9 +56,6 @@ let genesis : t =
       ; nonce = Nonce.zero
       ; body_hash = Pedersen.zero_hash
       ; time = Block_time.of_time Time.epoch
-      ; deltas =
-          List.init Header.num_deltas ~f:(fun _ ->
-            Block_time.Span.of_time_span Time.Span.zero)
       }
   ; body = Int64.zero
   }
@@ -98,15 +90,12 @@ module Snarkable
       type var = (Hash.var, Time.var, Span.var, Target.var, Nonce.var, Strength.var) t_
       type value = (Hash.value, Time.value, Span.value, Target.value, Nonce.value, Strength.value) t_
 
-      let deltas_spec = Var_spec.list ~length:num_deltas Span.spec
-
       let data_spec =
         Data_spec.(
           [ Hash.spec
           ; Hash.spec
           ; Time.spec
           ; Target.spec
-          ; deltas_spec
           ; Nonce.spec
           ; Strength.spec
           ])
@@ -124,18 +113,17 @@ module Snarkable
 
     module Checked = struct
       let unpack
-            { previous_header_hash; body_hash; time; target; deltas; nonce; strength }
+            { previous_header_hash; body_hash; time; target; nonce; strength }
         =
         let open Let_syntax in
         let%map previous_header_hash = Hash.Checked.unpack previous_header_hash
         and body_hash = Hash.Checked.unpack body_hash
         and time = Time.Checked.unpack time
         and target = Target.Checked.unpack target
-        and deltas = Checked.all (List.map ~f:Span.Checked.unpack deltas)
         and nonce = Nonce.Checked.unpack nonce
         and strength = Strength.Checked.unpack strength
         in
-        { previous_header_hash; body_hash; time; target; deltas; nonce; strength }
+        { previous_header_hash; body_hash; time; target; nonce; strength }
       ;;
     end
 
