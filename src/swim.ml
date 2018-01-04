@@ -248,8 +248,8 @@ end = struct
     in
 
     don't_wait_for begin
-      (* TODO *)
-      Pipe.iter_without_pushback (incoming.Linear_pipe.Reader.pipe) (fun {from; action; net_slice; seq_no} ->
+      let max_ready = 64 in
+      Linear_pipe.iter_unordered ~budget:max_ready incoming ~f:(fun {from; action; net_slice; seq_no} ->
         let open Let_syntax in
         let open Request_or_ack in
 
@@ -261,18 +261,17 @@ end = struct
         | Request x ->
            (* Not pushing-back here since UDP packets should send fast *)
            (* Plus handle_msg will be very slow, but is mostly IO blocked not compute bound *)
-           don't_wait_for begin
-             match%bind handle_msg t (x, seq_no) with
-             | `Stop -> return ()
-             | `Want_ack ->
-               let%map _ = raw_send t from Ack seq_no in
-               ()
-           end
+           (match%bind handle_msg t (x, seq_no) with
+           | `Stop -> return ()
+           | `Want_ack ->
+             let%map _ = raw_send t from Ack seq_no in
+             ())
         | Ack ->
           Option.iter (Hashtbl.Poly.find t.table seq_no) (fun ivar ->
               Hashtbl.Poly.remove t.table seq_no;
               Ivar.fill_if_empty ivar ()
-          )
+          );
+          return ()
       )
     end;
     t
@@ -438,11 +437,15 @@ end) = struct
       let open Deferred.Let_syntax in
       let%map socket = Udp.bind socket_addr in
       let (r,w) = Linear_pipe.create () in
+      let capacity = 8192 in
+      let max_ready = 64 in
       don't_wait_for begin
-        Udp.recvfrom_loop ~config:(Udp.Config.create ~capacity:9000 ~max_ready:64 ()) (Socket.fd socket) (fun buf addr ->
+        Udp.recvfrom_loop ~config:(Udp.Config.create ~capacity ~max_ready ()) (Socket.fd socket) (fun buf addr ->
           let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
           t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
-          (* TODO(es92): We need a linear_pipe method for capped-buffer-than-drop-packets write *)
+          (* TODO need to check to make sure this is the correct side to drain from once > capacity *)
+          if Pipe.length r.Linear_pipe.Reader.pipe > capacity
+          then ignore (Pipe.read_now r.Linear_pipe.Reader.pipe);
           Pipe.write_without_pushback w msg
         )
       end;

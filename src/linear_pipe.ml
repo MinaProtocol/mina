@@ -46,7 +46,7 @@ let iter ?consumer ?continue_on_error reader ~f =
       ?consumer ?continue_on_error ~f)
 ;;
 
-let iter_unordered ?consumer reader ~f ~budget =
+let iter_unordered ?consumer ~budget reader ~f =
   bracket reader 
     (let rec run_reader ()=
        match%bind Pipe.read ?consumer reader.Reader.pipe with

@@ -25,9 +25,9 @@ val iter
 
 val iter_unordered
   :  ?consumer          : Pipe.Consumer.t
+  -> budget             : int
   -> 'a Reader.t
   -> f                  : ('a -> unit Deferred.t)
-  -> budget             : int
   -> unit Deferred.t
                                     
 val fold : 'a Reader.t -> init:'accum -> f:('accum -> 'a -> 'accum Deferred.t) -> 'accum Deferred.t
