@@ -16,9 +16,35 @@ module type S = sig
 end
 
 module Cpu = struct
-  let find_block (previous : Pedersen.Main.Digest.t) (body : Block.Body.t)
+  let find_block (previous : Pedersen.Main.Digest.t) (body : Block.Body.t) (nonce: Nonce.t)
     : (Block.t * Pedersen.Main.Digest.t) option Deferred.t =
-    failwith "TODO"
+      let target : Target.t = failwith "TODO" in
+      let bigger : Pedersen.Main.Digest.t -> Target.t -> bool = failwith "TODO" in
+
+      let block : Block.t =
+        { header =
+            { previous_header_hash = previous
+            ; body_hash = Block.Body.hash body
+            ; time = Block_time.of_time (Time.now ())
+            ; target
+            ; nonce
+            ; strength = Strength.zero (* TODO: What is strength *)
+            }
+        ; body = body
+        }
+      in
+      (* TODO: Assuming this is the slow bit we want to make deferred *)
+      let%map block_hash =
+        Deferred.create (fun ivar ->
+          (* TODO: How to schedule this in the background *)
+          let hash = Block.Body.hash body in
+          Ivar.fill ivar hash;
+        )
+      in
+
+      Option.some_if
+        (bigger block_hash target)
+        (block, block_hash)
   ;;
 
   module State = struct
@@ -37,21 +63,21 @@ module Cpu = struct
       }
     in
     let mined_blocks_reader, mined_blocks_writer = Pipe.create () in
-    let rec go () =
+    let rec go nonce =
       let id = state.id in
-      match%bind find_block state.previous_header_hash state.body with
-      | None -> go ()
+      match%bind find_block state.previous_header_hash state.body nonce with
+      | None -> go (Nonce.increment nonce)
       | Some (block, header_hash) ->
         if id = state.id
         then begin
           let%bind () = Pipe.write mined_blocks_writer block in
           state.previous_header_hash <- header_hash;
           state.id <- state.id + 1;
-          go ()
+          go Nonce.zero
         end else
-          go ()
+          go Nonce.zero
     in
-    don't_wait_for (go ());
+    don't_wait_for (go Nonce.zero);
     don't_wait_for begin
       Pipe.iter' updates ~f:(fun q ->
         Queue.iter q ~f:(fun u ->

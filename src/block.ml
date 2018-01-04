@@ -35,6 +35,13 @@ end
 module Body = struct
   type t = Int64.t
   [@@deriving bin_io]
+
+  let hash t =
+    let buf = Bigstring.create 8 (* 64bits = 8 bytes *) in
+    let _ = Bigstring.write_bin_prot buf Int64.bin_writer_t t in
+    (* TODO: Why does Pedersen.Main.hash not build? *)
+    let pedersen_hash : Bigstring.t -> Pedersen.Digest.t = failwith "TODO" in
+    pedersen_hash buf
 end
 
 type ('header, 'body) t_ =
