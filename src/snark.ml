@@ -221,6 +221,8 @@ module Step = struct
     let difficulty_window = 10
 
     type ('time, 'target, 'digest) t =
+      (* Someday: To avoid hashing a big list it might be better to make this a blockchain
+         (that is verified as things go). *)
       { difficulty_info : ('time * 'target) list
       ; block_hash      : 'digest
       }
@@ -260,108 +262,21 @@ module Step = struct
 
     let compute_target _ = failwith "TODO"
 
-    let meets_target _ _ = failwith "TODO"
+    let meets_target (target : Target.Packed.var) (hash : Pedersen.Digest.var) =
+      Snark_util.Make
+      compare
 
     let apply (block : var) (state : State.var) =
       let%bind target = compute_target state.difficulty_info in
       let%bind block_unpacked = Block.Checked.unpack block in
-      let%bind () =
-        let%bind h = hash_digest (Block.Unpacked.to_bits block_unpacked) in
-        assert_equal h block.header.body_hash
-      in
-      let%bind h = hash_digest (Block.Header.Unpacked.to_bits block_unpacked) in
-      let%bind () = meets_target block.header target in
-      failwith "TODO"
-  end
-
-  (*
-
-  open Main
-
-  open Let_syntax
-
-  module Prover_state = struct
-    type t =
-(*       { block             : Block.Packed.value *)
-      { block_unpacked       : Block.Unpacked.value
-(*       ; prev_block        : Block.Packed.value *)
-      ; prev_header_unpacked : Block.Header.Unpacked.value
-      ; prev_proof           : Other.Proof.t
-      ; self                 : bool list
+      let%bind block_hash = hash_digest (Block.Unpacked.to_bits block_unpacked) in
+      let%bind () = meets_target target block_hash in
+      let%map target_unpacked = Target.Checked.unpack target in
+      { State.difficulty_info =
+          (block_unpacked.header.time, target_unpacked)
+          :: all_but_last_exn state.difficulty_info
+      ; block_hash
       }
-    [@@deriving fields]
+    ;;
   end
-
-  let input = step_input
-
-  let self_vk_spec =
-    Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
-
-  let hash_digest x =
-    Main.Pedersen.hash x
-      ~params:Pedersen_params.t
-      ~init:Main.Hash_curve.Checked.identity
-    >>| Main.Pedersen.digest
-
-  let unhash ~spec ~f ~to_bits h =
-    let%bind b = store spec As_prover.(map get_state ~f) in
-    let%bind h' = hash_digest (to_bits b) in
-    let%map () = assert_equal h h' in
-    b
-  ;;
-
-  let get_prev_header_unpacked =
-    store Block.Header.Unpacked.spec
-      As_prover.(map get_state ~f:Prover_state.prev_header_unpacked)
-  ;;
-
-  let hash_unpacked bs = hash_digest bs >>= Pedersen.Digest.unpack
-
-  let compute_target _ _ = return (failwith "TODO")
-
-  let construct_next_block (prev_block_header : Block.Header.Unpacked.var)
-    : (Block.Unpacked.var, _) Checked.t
-    =
-    let%bind body =
-      store Block.Body.Unpacked.spec 
-        As_prover.(map get_state ~f:(fun s -> s.Prover_state.block_unpacked.body))
-    in
-    let%bind (header : Block.Header.Unpacked.var) =
-      let get spec f =
-        store spec
-          As_prover.(map get_state ~f:(fun s -> f s.Prover_state.block_unpacked.header))
-      in
-      let module H = Block0.Header in
-      let%bind previous_header_hash =
-        hash_unpacked (Block.Header.Unpacked.to_bits prev_block_header)
-      and body_hash = hash_unpacked body
-      and time      = get Time.Unpacked.spec H.time
-      and nonce     = get Nonce.Unpacked.spec H.nonce
-      in
-      let deltas = failwith "TODO" in
-      let%map target =
-        compute_target prev_block_header.deltas prev_block_header.strength 
-      in
-      { H.previous_header_hash
-      ; body_hash
-      ; time
-      ; target
-      ; nonce
-      ; deltas
-      ; strength = failwith "TODO"
-      }
-    in
-    return { Block0.body; header }
-
-  let main
-        (self_hash_packed : Digest.Packed.var)
-        (header_hash_packed : Digest.Packed.var)
-    : (unit, Prover_state.t) Checked.t =
-    let%bind self =
-      unhash self_hash_packed ~f:Prover_state.self
-        ~spec:self_vk_spec ~to_bits:Fn.id
-    in
-    let%bind prev_header_unpacked = get_prev_header_unpacked in
-    let%bind block_unpacked = construct_next_block prev_header_unpacked in
-    hash_is header_hash_packed (Block.Header.Unpacked.to_bits block_unpacked.header) *)
 end

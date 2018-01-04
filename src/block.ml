@@ -111,7 +111,7 @@ module Snarkable
             { previous_block_hash; time; target; nonce; strength }
         =
         let open Let_syntax in
-        let%map previous_header_hash = Hash.Checked.unpack previous_block_hash
+        let%map previous_block_hash = Hash.Checked.unpack previous_block_hash
         and time = Time.Checked.unpack time
         and target = Target.Checked.unpack target
         and nonce = Nonce.Checked.unpack nonce
