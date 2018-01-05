@@ -25,7 +25,7 @@ val iter
 
 val iter_unordered
   :  ?consumer          : Pipe.Consumer.t
-  -> budget             : int
+  -> max_concurrency    : int
   -> 'a Reader.t
   -> f                  : ('a -> unit Deferred.t)
   -> unit Deferred.t
@@ -57,7 +57,7 @@ val partition_map2 : 'a Reader.t -> f:('a -> [ `Fst of 'b  | `Snd of 'c ]) -> 'b
 val partition_map3 : 'a Reader.t -> f:('a -> [ `Fst of 'b  | `Snd of 'c | `Trd of 'd ]) -> 'b Reader.t * 'c Reader.t * 'd Reader.t
 
 val filter_map_unordered 
-  : budget:int
+  : max_concurrency:int
   -> 'a Reader.t 
   -> f:('a -> 'b option Deferred.t) 
   -> 'b Reader.t

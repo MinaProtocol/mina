@@ -44,17 +44,17 @@ let iter ?consumer ?continue_on_error reader ~f =
       ?consumer ?continue_on_error ~f)
 ;;
 
-let iter_unordered ?consumer ~budget reader ~f =
+let iter_unordered ?consumer ~max_concurrency reader ~f =
   bracket reader 
     (let rec run_reader () =
        match%bind Pipe.read ?consumer reader.Reader.pipe with
        | `Eof -> return ()
        | `Ok v -> 
-         f v;
+         let%bind () = f v in
          run_reader ()
      in
      Deferred.all_unit 
-       (List.map (List.range 0 budget) ~f:(fun _ -> run_reader ())))
+       (List.map (List.range 0 max_concurrency) ~f:(fun _ -> run_reader ())))
 ;;
 
 let of_list xs = 
@@ -161,10 +161,10 @@ let partition_map3 reader ~f =
 
 
 (* TODO delete and use iter_unordered *)
-let filter_map_unordered ~budget t ~f =
+let filter_map_unordered ~max_concurrency t ~f =
   let reader, writer = create () in
   don't_wait_for begin
-    iter_unordered ~budget t ~f:(fun x ->
+    iter_unordered ~max_concurrency t ~f:(fun x ->
       match%bind f x with
       | Some y -> Pipe.write writer y
       | None -> return ())

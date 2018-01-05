@@ -249,7 +249,7 @@ end = struct
 
     don't_wait_for begin
       let max_ready = 64 in
-      Linear_pipe.iter_unordered ~budget:max_ready incoming ~f:(fun {from; action; net_slice; seq_no} ->
+      Linear_pipe.iter_unordered ~max_concurrency:max_ready incoming ~f:(fun {from; action; net_slice; seq_no} ->
         let open Let_syntax in
         let open Request_or_ack in
 
