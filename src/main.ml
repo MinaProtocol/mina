@@ -35,7 +35,7 @@ struct
     : Blockchain.Update.t Linear_pipe.Reader.t
     =
     let from_new_peers =
-      Linear_pipe.filter_map_unordered (Gossip_net.new_peers gossip_net) ~f:(fun peer ->
+      Linear_pipe.filter_map_unordered ~budget:64 (Gossip_net.new_peers gossip_net) ~f:(fun peer ->
         Deferred.map ~f:(function
           | Ok b -> Some (Blockchain.Update.New_block b)
           | Error _ -> None)

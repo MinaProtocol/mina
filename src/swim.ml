@@ -259,8 +259,6 @@ end = struct
 
         match action with
         | Request x ->
-           (* Not pushing-back here since UDP packets should send fast *)
-           (* Plus handle_msg will be very slow, but is mostly IO blocked not compute bound *)
            (match%bind handle_msg t (x, seq_no) with
            | `Stop -> return ()
            | `Want_ack ->

@@ -32,12 +32,10 @@ let bracket (reader : 'a Reader.t) dx =
   end
 ;;
 
-let set_reader_sync (reader : 'a Reader.t) =
+let set_has_reader (reader : 'a Reader.t) =
   if reader.has_reader
   then failwith "Linear_pipe.bracket: had reader"
-  else 
-    reader.has_reader <- true;
-    ()
+  else reader.has_reader <- true
 
 let iter ?consumer ?continue_on_error reader ~f =
   bracket reader 
@@ -48,62 +46,59 @@ let iter ?consumer ?continue_on_error reader ~f =
 
 let iter_unordered ?consumer ~budget reader ~f =
   bracket reader 
-    (let rec run_reader ()=
+    (let rec run_reader () =
        match%bind Pipe.read ?consumer reader.Reader.pipe with
        | `Eof -> return ()
        | `Ok v -> 
          f v;
          run_reader ()
      in
-     Deferred.all_unit (List.map (List.range 0 budget) ~f:(fun _ -> run_reader ()))
-    )
+     Deferred.all_unit 
+       (List.map (List.range 0 budget) ~f:(fun _ -> run_reader ())))
 ;;
 
 let of_list xs = 
   let reader = wrap_reader (Pipe.of_list xs) in
-  set_reader_sync reader;
+  set_has_reader reader;
   reader
 ;;
 
 let fold reader ~init ~f =
-  set_reader_sync reader;
-  Pipe.fold reader.Reader.pipe ~init ~f
+  bracket 
+    reader
+    (Pipe.fold reader.Reader.pipe ~init ~f)
 
 let map (reader : 'a Reader.t) ~f = 
-  set_reader_sync reader;
-  let r = Pipe.map reader.Reader.pipe ~f in
-  wrap_reader r
+  set_has_reader reader;
+  wrap_reader (Pipe.map reader.Reader.pipe ~f)
 ;;
 
 let filter_map (reader : 'a Reader.t) ~f = 
-  set_reader_sync reader;
-  let r = Pipe.filter_map reader.Reader.pipe ~f in
-  wrap_reader r
+  set_has_reader reader;
+  wrap_reader (Pipe.filter_map reader.Reader.pipe ~f)
 ;;
 
 let transfer reader writer ~f = 
   bracket reader (Pipe.transfer reader.Reader.pipe writer ~f)
 ;;
 
+(* TODO ensure cmp doesn't cause readers to be blocked *)
 let merge rs = 
-  let mergedReader, merged_writer = create () in
-  ignore (List.map rs ~f:(fun reader -> 
-    set_reader_sync reader;
-    don't_wait_for (iter reader ~f:(fun x -> 
-      Pipe.write merged_writer x))
-  ));
+  ignore (List.map rs ~f:(fun reader -> set_has_reader reader));
+  let readers = List.map rs ~f:(fun r -> r.pipe) in
+  let merged_reader = wrap_reader (Pipe.merge readers (fun _ _ -> 1)) in
   don't_wait_for begin
     let%map () = Deferred.all_ignore (List.map rs ~f:closed) in
-    Pipe.close merged_writer
+    Pipe.close_read merged_reader.pipe
   end;
-  mergedReader
+  merged_reader
 ;;
 
 (* TODO following are all efficient with iter', 
  * but I get write' doesn't exist on my version of ocaml *)
 
 let fork reader n = 
-  let pipes = List.map (List.range 0 n) ~f:(fun _ -> create ()) in
+  let pipes = List.init n ~f:(fun _ -> create ()) in
   let writers = List.map pipes ~f:(fun (r, w) -> w) in
   let readers = List.map pipes ~f:(fun (r, w) -> r) in
   don't_wait_for begin
@@ -121,58 +116,58 @@ let fork reader n =
 ;;
 
 let fork2 reader = 
-  let rs = fork reader 2 in
-  (List.nth_exn rs 0, List.nth_exn rs 1)
+  match fork reader 2 with
+  | [x; y] -> (x, y)
+  | _ -> assert false
 ;;
 
 let fork3 reader = 
-  let rs = fork reader 3 in
-  (List.nth_exn rs 0, List.nth_exn rs 1, List.nth_exn rs 2)
+  match fork reader 3 with
+  | [x; y; z] -> (x, y, z)
+  | _ -> assert false
 ;;
 
 let partition_map2 reader ~f =
-  let ((readerA, writerA), (readerB, writerB)) = (create (), create ()) in
+  let ((reader_a, writer_a), (reader_b, writer_b)) = (create (), create ()) in
   don't_wait_for begin
     iter reader ~f:(fun x ->
       match f x with
-      | `Fst x -> Pipe.write writerA x
-      | `Snd x -> Pipe.write writerB x)
+      | `Fst x -> Pipe.write writer_a x
+      | `Snd x -> Pipe.write writer_b x)
   end;
   don't_wait_for begin
-    let%map () = closed readerA 
-    and () = closed readerB in
+    let%map () = closed reader_a
+    and () = closed reader_b in
     close_read reader
   end;
-  (readerA, readerB)
+  (reader_a, reader_b)
 
 let partition_map3 reader ~f =
-  let ((readerA, writerA), (readerB, writerB), (readerC, writerC)) = (create (), create (), create ()) in
+  let ((reader_a, writer_a), (reader_b, writer_b), (reader_c, writer_c)) = (create (), create (), create ()) in
   don't_wait_for begin
     iter reader ~f:(fun x -> 
       match f x with
-      | `Fst x -> Pipe.write writerA x
-      | `Snd x -> Pipe.write writerB x
-      | `Trd x -> Pipe.write writerC x)
+      | `Fst x -> Pipe.write writer_a x
+      | `Snd x -> Pipe.write writer_b x
+      | `Trd x -> Pipe.write writer_c x)
   end;
   don't_wait_for begin
-    let%map () = closed readerA 
-    and () = closed readerB 
-    and () = closed readerC in
+    let%map () = closed reader_a 
+    and () = closed reader_b 
+    and () = closed reader_c in
     close_read reader
   end;
-  (readerA, readerB, readerC)
+  (reader_a, reader_b, reader_c)
 
 
-let filter_map_unordered t ~f =
+(* TODO delete and use iter_unordered *)
+let filter_map_unordered ~budget t ~f =
   let reader, writer = create () in
   don't_wait_for begin
-    iter t ~f:(fun x ->
-      don't_wait_for begin
-        match%map f x with
-        | Some y -> Pipe.write_without_pushback writer y
-        | None -> ()
-      end;
-      return ())
+    iter_unordered ~budget t ~f:(fun x ->
+      match%bind f x with
+      | Some y -> Pipe.write writer y
+      | None -> return ())
   end;
   don't_wait_for begin
     let%map () = closed reader in
