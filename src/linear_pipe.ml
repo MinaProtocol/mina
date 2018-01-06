@@ -94,7 +94,7 @@ let merge rs =
   merged_reader
 ;;
 
-(* TODO following are all efficient with iter', 
+(* TODO following are all more efficient with iter', 
  * but I get write' doesn't exist on my version of ocaml *)
 
 let fork reader n = 
