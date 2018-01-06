@@ -160,7 +160,6 @@ let partition_map3 reader ~f =
   (reader_a, reader_b, reader_c)
 
 
-(* TODO delete and use iter_unordered *)
 let filter_map_unordered ~max_concurrency t ~f =
   let reader, writer = create () in
   don't_wait_for begin
