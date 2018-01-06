@@ -82,17 +82,18 @@ let transfer reader writer ~f =
   bracket reader (Pipe.transfer reader.Reader.pipe writer ~f)
 ;;
 
-(* TODO ensure cmp doesn't cause readers to be blocked *)
-let merge rs = 
-  List.iter rs ~f:(fun reader -> set_has_reader reader);
-  let readers = List.map rs ~f:(fun r -> r.pipe) in
-  let merged_reader = wrap_reader (Pipe.merge readers (fun _ _ -> 1)) in
-  don't_wait_for begin
-    let%map () = Deferred.all_ignore (List.map rs ~f:closed) in
-    Pipe.close_read merged_reader.pipe
-  end;
-  merged_reader
-;;
+let merge_unordered rs = 
+   let merged_reader, merged_writer = create () in
+   List.iter rs ~f:(fun reader -> 
+     don't_wait_for (iter reader ~f:(fun x -> 
+       Pipe.write merged_writer x))
+   );
+   don't_wait_for begin
+     let%map () = Deferred.all_ignore (List.map rs ~f:closed) in
+     Pipe.close merged_writer
+   end;
+   merged_reader
+ ;;
 
 (* TODO following are all more efficient with iter', 
  * but I get write' doesn't exist on my version of ocaml *)

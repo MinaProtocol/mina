@@ -29,8 +29,6 @@ module Make
 struct
   module Gossip_net = Gossip_net(Message)
 
-  let merge = Linear_pipe.merge
-
   let peer_strongest_blocks gossip_net
     : Blockchain.Update.t Linear_pipe.Reader.t
     =
@@ -47,7 +45,7 @@ struct
         ~f:(function
           | New_strongest_block b -> Some (Blockchain.Update.New_block b))
     in
-    merge
+    Linear_pipe.merge_unordered
       [ from_new_peers
       ; broadcasts
       ]
@@ -93,7 +91,7 @@ struct
         Miner_impl.mine
           ~previous:initial_blockchain
           ~body:(Int64.succ initial_blockchain.block.body)
-          (merge
+          (Linear_pipe.merge_unordered
             [ Linear_pipe.map body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
             ; body_changes_reader
             ])
@@ -105,7 +103,7 @@ struct
       ~init:initial_blockchain
       ~strongest_block:strongest_block_writer
       ~updates:(
-        merge
+        Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
           ; Linear_pipe.map mined_blocks ~f:(fun b -> Blockchain.Update.New_block b)
           ])

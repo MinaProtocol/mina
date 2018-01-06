@@ -40,7 +40,7 @@ val filter_map : 'a Reader.t -> f:('a -> 'b option) -> 'b Reader.t
 
 val transfer : 'a Reader.t -> 'b Writer.t -> f:('a -> 'b ) -> unit Deferred.t
 
-val merge : 'a Reader.t List.t -> 'a Reader.t
+val merge_unordered : 'a Reader.t List.t -> 'a Reader.t
 
 val close_read : 'a Reader.t -> unit
 
