@@ -84,7 +84,7 @@ let transfer reader writer ~f =
 
 (* TODO ensure cmp doesn't cause readers to be blocked *)
 let merge rs = 
-  ignore (List.map rs ~f:(fun reader -> set_has_reader reader));
+  List.iter rs ~f:(fun reader -> set_has_reader reader);
   let readers = List.map rs ~f:(fun r -> r.pipe) in
   let merged_reader = wrap_reader (Pipe.merge readers (fun _ _ -> 1)) in
   don't_wait_for begin
