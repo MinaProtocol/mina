@@ -16,7 +16,7 @@ module type S = sig
 end
 
 module Cpu = struct
-  let find_block (previous : Pedersen.Main.Digest.t) (body : Block.Body.t) (nonce: Nonce.t)
+  let find_block (previous : Pedersen.Main.Digest.t) (body : Block.Body.t) (nonce: Nonce.t) (current_strength: Strength.t)
     : (Block.t * Pedersen.Main.Digest.t) option Deferred.t =
       let target : Target.t = failwith "TODO" in
       let bigger : Pedersen.Main.Digest.t -> Target.t -> bool = failwith "TODO" in
@@ -28,7 +28,7 @@ module Cpu = struct
             ; time = Block_time.of_time (Time.now ())
             ; target
             ; nonce
-            ; strength = Strength.zero (* TODO: What is strength *)
+            ; strength = Strength.increment current_strength
             }
         ; body = body
         }
@@ -52,6 +52,7 @@ module Cpu = struct
       { mutable previous_header_hash : Pedersen.Main.Digest.t
       ; mutable body                 : Block.Body.t
       ; mutable id                   : int
+      ; mutable current_strength     : Strength.t
       }
   end
 
@@ -60,12 +61,13 @@ module Cpu = struct
       { State.previous_header_hash = Block.Header.hash previous.Block.header
       ; body
       ; id = 0
+      ; current_strength = previous.Block.header.strength
       }
     in
     let mined_blocks_reader, mined_blocks_writer = Pipe.create () in
     let rec go nonce =
       let id = state.id in
-      match%bind find_block state.previous_header_hash state.body nonce with
+      match%bind find_block state.previous_header_hash state.body nonce state.current_strength with
       | None -> go (Nonce.increment nonce)
       | Some (block, header_hash) ->
         if id = state.id
@@ -73,6 +75,7 @@ module Cpu = struct
           let%bind () = Pipe.write mined_blocks_writer block in
           state.previous_header_hash <- header_hash;
           state.id <- state.id + 1;
+          state.current_strength <- block.header.strength;
           go Nonce.zero
         end else
           go Nonce.zero

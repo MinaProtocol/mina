@@ -64,7 +64,10 @@ let genesis : t =
   ; body = Int64.zero
   }
 
-let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"
+let strongest (a : t) (b : t) : [ `First | `Second ] =
+  match Strength.compare a.header.strength b.header.strength with
+  | x when x <= 0 -> `First
+  | _ -> `Second
 
 (* TODO: Come up with a cleaner way to do this. Maybe use a function instead of functor?
   Or maybe it's worth writing a deriving plugin.
