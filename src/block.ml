@@ -35,6 +35,13 @@ end
 module Body = struct
   type t = Int64.t
   [@@deriving bin_io]
+
+  let hash t =
+    let buf = Bigstring.create 8 (* 64bits = 8 bytes *) in
+    let _ = Bigstring.write_bin_prot buf Int64.bin_writer_t t in
+    (* TODO: Why does Pedersen.Main.hash not build? *)
+    let pedersen_hash : Bigstring.t -> Pedersen.Digest.t = failwith "TODO" in
+    pedersen_hash buf
 end
 
 type ('header, 'body) t_ =
@@ -57,7 +64,10 @@ let genesis : t =
   ; body = Int64.zero
   }
 
-let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"
+let strongest (a : t) (b : t) : [ `First | `Second ] =
+  match Strength.compare a.header.strength b.header.strength with
+  | x when x <= 0 -> `First
+  | _ -> `Second
 
 (* TODO: Come up with a cleaner way to do this. Maybe use a function instead of functor?
   Or maybe it's worth writing a deriving plugin.

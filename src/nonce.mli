@@ -5,6 +5,8 @@ type t = private Bigstring.t
 
 val zero : t
 
+val increment : t -> t
+
 module Snarkable : functor (Impl : Snark_intf.S) ->
   Impl.Snarkable.Bits.S
 
