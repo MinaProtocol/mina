@@ -31,11 +31,58 @@ end
 
 module Make
     (Field : Camlsnark.Field_intf.S)
-    (Bigint : Camlsnark.Bigint_intf.S with type field := Field.t)
+    (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
     (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
+  let (/^) x y = Float.(to_int (round_up (x // y)))
+
+  let field_size_in_bytes = Field.size_in_bits /^ 8
+
+(* Someday: There should be a more efficient way of doing
+    this since bigints are backed by a char[] *)
+  let field_to_bigstring x =
+    let n = Bigint.of_field x in
+    let b i j =
+      if Bigint.test_bit n (i + j)
+      then 1 lsl j
+      else 0
+    in
+    Bigstring.init field_size_in_bytes ~f:(fun i ->
+      Char.of_int_exn (
+        b i 0
+        lor b i 1
+        lor b i 2
+        lor b i 3
+        lor b i 4
+        lor b i 5
+        lor b i 6
+        lor b i 7))
+
+  (* Someday:
+     This/the reader can definitely be made more efficient as well.
+     bin_read should probably be in C. *)
+  let bigstring_to_field s =
+    Bigstring.to_string ~len:field_size_in_bytes ~pos:0 s
+    |> Bigint.of_numeral ~base:256
+    |> Bigint.to_field
+
+  (* TODO: Unit tests for field_to_bigstring/bigstring_to_field *)
+
   module Digest = struct
-    type t = Bigstring.t [@@deriving bin_io]
+    type t = Field.t
+
+    let ({ Bin_prot.Type_class.
+           reader = bin_reader_t
+         ; writer = bin_writer_t
+         ; shape = bin_shape_t
+         } as bin_t) =
+      Bin_prot.Type_class.cnv Fn.id
+        field_to_bigstring
+        bigstring_to_field
+        Bigstring.bin_t
+
+    let { Bin_prot.Type_class.read = bin_read_t; vtag_read = __bin_read_t__ } = bin_reader_t
+    let { Bin_prot.Type_class.write = bin_write_t; size = bin_size_t } = bin_writer_t
 
     (* TODO: Assert that main_curve modulus is smaller than other_curve *)
     let () = 
@@ -111,26 +158,7 @@ struct
       t.i   <- t.i + bit_length
     ;;
 
-    let (/^) x y = Float.(to_int (round_up (x // y)))
-
-  (* Someday: There should be a more efficient way of doing
-     this since bigints are backed by a char[] *)
-    let digest t =
-      let (x, _y) = t.acc in
-      let n = Bigint.of_field x in
-      let b i j =
-        if Bigint.test_bit n (i + j) then 1 lsl i else 0
-      in
-      Bigstring.init (Field.size_in_bits /^ 8) ~f:(fun i ->
-        Char.of_int_exn (
-          b i 0
-          lor b i 1
-          lor b i 2
-          lor b i 3
-          lor b i 4
-          lor b i 5
-          lor b i 6
-          lor b i 7))
+    let digest t = let (x, _y) = t.acc in x
   end
 end
 
@@ -150,7 +178,7 @@ module Main = struct
     end
   end
 
-  include Make(Snark_params.Main.Field)(Snark_params.Main.Bigint)(Curve)
+  include Make(Snark_params.Main.Field)(Snark_params.Main_curve.Bigint.R)(Curve)
 
   let params = Pedersen_params.t
 

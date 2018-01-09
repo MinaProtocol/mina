@@ -3,26 +3,26 @@ open Core_kernel
 module Pedersen = Pedersen.Main
 
 module Header = struct
-  type ('hash, 'time, 'target, 'nonce, 'strength) t_ =
+  (* TODO: Is there some reason [target] should be in here? *)
+  type ('hash, 'time, 'nonce, 'strength) t_ =
     { previous_block_hash : 'hash
     ; time                : 'time
-    ; target              : 'target
     ; nonce               : 'nonce
     ; strength            : 'strength
     }
   [@@deriving bin_io, fields]
 
   type t =
-    (Pedersen.Digest.t, Block_time.t, Target.t, Nonce.t, Strength.t) t_
+    (Pedersen.Digest.t, Block_time.t, Nonce.t, Strength.t) t_
   [@@deriving bin_io]
 
-  let to_hlist { previous_block_hash; time; target; nonce; strength } =
-      H_list.([ previous_block_hash; time; target; nonce; strength ])
+  let to_hlist { previous_block_hash; time; nonce; strength } =
+      H_list.([ previous_block_hash; time; nonce; strength ])
 
   let of_hlist =
     let open H_list in
-    fun [ previous_block_hash; time; target; nonce; strength ] ->
-      { previous_block_hash; time; target; nonce; strength }
+    fun [ previous_block_hash; time; nonce; strength ] ->
+      { previous_block_hash; time; nonce; strength }
 end
 
 module Body = struct
@@ -47,7 +47,6 @@ let hash t =
 let genesis : t =
   { header =
       { previous_block_hash = Pedersen.zero_hash
-      ; target = Target.max_value
       ; strength = Strength.zero
       ; nonce = Nonce.zero
       ; time = Block_time.of_time Time.epoch
@@ -64,7 +63,6 @@ module Snarkable
     (Impl : Snark_intf.S)
     (Hash : Impl.Snarkable.Bits.S)
     (Time : Impl.Snarkable.Bits.S)
-    (Target : Impl.Snarkable.Bits.S)
     (Nonce : Impl.Snarkable.Bits.S)
     (Strength : Impl.Snarkable.Bits.S)
 = struct
@@ -76,48 +74,46 @@ module Snarkable
     module Make
       (Hash : Snarkable.S)
       (Time : Snarkable.S)
-      (Target : Snarkable.S)
       (Nonce : Snarkable.S)
       (Strength : Snarkable.S)
     = struct
-      type var = (Hash.var, Time.var, Target.var, Nonce.var, Strength.var) t_
-      type value = (Hash.value, Time.value, Target.value, Nonce.value, Strength.value) t_
+      type var = (Hash.var, Time.var, Nonce.var, Strength.var) t_
+      type value = (Hash.value, Time.value, Nonce.value, Strength.value) t_
 
       let data_spec =
         Data_spec.(
           [ Hash.spec
           ; Time.spec
-          ; Target.spec
           ; Nonce.spec
           ; Strength.spec
           ])
+
       let spec : (var, value) Var_spec.t =
         Var_spec.of_hlistable data_spec
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
-    module Packed = Make(Hash.Packed)(Time.Packed)(Target.Packed)(Nonce.Packed)(Strength.Packed)
+    module Packed = Make(Hash.Packed)(Time.Packed)(Nonce.Packed)(Strength.Packed)
     module Unpacked = struct
-      include Make(Hash.Unpacked)(Time.Unpacked)(Target.Unpacked)(Nonce.Unpacked)(Strength.Unpacked)
-      module Padded = Make(Hash.Unpacked.Padded)(Time.Unpacked.Padded)(Target.Unpacked.Padded)(Nonce.Unpacked.Padded)(Strength.Unpacked.Padded)
+      include Make(Hash.Unpacked)(Time.Unpacked)(Nonce.Unpacked)(Strength.Unpacked)
+      module Padded = Make(Hash.Unpacked.Padded)(Time.Unpacked.Padded)(Nonce.Unpacked.Padded)(Strength.Unpacked.Padded)
 
-      let to_bits { previous_block_hash; time; target; nonce; strength } =
-        previous_block_hash @ time @ target @  nonce @ strength
+      let to_bits { previous_block_hash; time; nonce; strength } =
+        previous_block_hash @ time @  nonce @ strength
     end
 
     module Checked = struct
       let unpack
-            { previous_block_hash; time; target; nonce; strength }
+            { previous_block_hash; time; nonce; strength }
         =
         let open Let_syntax in
         let%map previous_block_hash = Hash.Checked.unpack previous_block_hash
         and time = Time.Checked.unpack time
-        and target = Target.Checked.unpack target
         and nonce = Nonce.Checked.unpack nonce
         and strength = Strength.Checked.unpack strength
         in
-        { previous_block_hash; time; target; nonce; strength }
+        { previous_block_hash; time; nonce; strength }
       ;;
     end
 

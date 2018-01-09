@@ -8,7 +8,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     let rec go acc i =
       if i = 0
       then acc
-      else go Field.Infix.(acc + acc) i
+      else go Field.Infix.(acc + acc) (i - 1)
     in
     go Field.one n
   ;;

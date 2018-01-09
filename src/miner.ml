@@ -23,7 +23,7 @@ module Cpu = struct
 
   module State = struct
     type t =
-      { mutable previous_header_hash : Pedersen.Main.Digest.t
+      { mutable previous_block_hash : Pedersen.Main.Digest.t
       ; mutable body                 : Block.Body.t
       ; mutable id                   : int
       }
@@ -31,7 +31,7 @@ module Cpu = struct
 
   let mine ~previous ~body (updates : Update.t Pipe.Reader.t) =
     let state =
-      { State.previous_header_hash = Block.Header.hash previous.Block.header
+      { State.previous_block_hash = Block.hash previous
       ; body
       ; id = 0
       }
@@ -39,13 +39,13 @@ module Cpu = struct
     let mined_blocks_reader, mined_blocks_writer = Pipe.create () in
     let rec go () =
       let id = state.id in
-      match%bind find_block state.previous_header_hash state.body with
+      match%bind find_block state.previous_block_hash state.body with
       | None -> go ()
       | Some (block, header_hash) ->
         if id = state.id
         then begin
           let%bind () = Pipe.write mined_blocks_writer block in
-          state.previous_header_hash <- header_hash;
+          state.previous_block_hash <- header_hash;
           state.id <- state.id + 1;
           go ()
         end else
@@ -58,7 +58,7 @@ module Cpu = struct
           state.id <- state.id + 1;
           begin match u with
           | Change_previous b ->
-            state.previous_header_hash <- Block.Header.hash b.header
+            state.previous_block_hash <- Block.hash b
           | Change_body body ->
             state.body <- body
           end);

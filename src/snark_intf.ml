@@ -10,6 +10,8 @@ module type S = sig
 
     module Bits : sig
       module type S = sig
+        val bit_length : int
+
         module Packed : sig
           type var
           type value

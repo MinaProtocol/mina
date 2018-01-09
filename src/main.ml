@@ -1,8 +1,12 @@
 open Core
 open Async
 
-module Snark = Snark
+let verification_key =
+  Snark_params.Main.generate_keypair
+    (Snark.Transition.input ())
+    Snark.Transition.main
 
+(*
 module Rpcs = struct
   module Get_strongest_block = struct
     type query = unit [@@deriving bin_io]
@@ -157,4 +161,4 @@ let () =
       ]
     end
   |> Command.run
-;;
+;; *)

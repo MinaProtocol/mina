@@ -14,6 +14,8 @@ module Extend (Impl : Camlsnark.Snark_intf.S) = struct
 
     module Bits = struct
       module type S = sig
+        val bit_length : int
+
         module Packed : sig
           type var
           type value
@@ -44,10 +46,10 @@ end
 module Make_types (Impl : Snark_intf.S) = struct
   module Digest = Pedersen.Main.Digest.Snarkable(Impl)
   module Time = Block_time.Snarkable(Impl)
-  module Target = Target.Snarkable(Impl)
+  module Target = Digest
   module Nonce = Nonce.Snarkable(Impl)
   module Strength = Strength.Snarkable(Impl)
-  module Block = Block.Snarkable(Impl)(Digest)(Time)(Target)(Nonce)(Strength)
+  module Block = Block.Snarkable(Impl)(Digest)(Time)(Nonce)(Strength)
 
   module Scalar = Pedersen.Main.Curve.Scalar(Impl)
 end
@@ -66,7 +68,7 @@ module Main = struct
 
   module Pedersen = Camlsnark.Pedersen.Make(T)(struct
       include Hash_curve
-      let cond_add = Hash_curve.Checked.cond_add
+      let cond_add = Checked.cond_add
     end)
 
   module Util = Snark_util.Make(T)
@@ -146,7 +148,9 @@ module Wrap = struct
   ;;
 end
 
-module Make_step (M : sig
+module Block0 = Block
+
+module Make_transition_system (M : sig
     open Main
 
     module State : sig
@@ -154,8 +158,8 @@ module Make_step (M : sig
       type value
       val spec : (var, value) Var_spec.t
 
-      val is_base_case : var -> (Boolean.var, _) Checked.t
-      val hash : var -> (Pedersen.Digest.var, _) Checked.t
+      val is_base_hash : Digest.Packed.var -> (Boolean.var, _) Checked.t
+      val hash : var -> (Digest.Packed.var, _) Checked.t
     end
 
     module Update : sig
@@ -163,7 +167,10 @@ module Make_step (M : sig
       type value
       val spec : (var, value) Var_spec.t
 
-      val apply : var -> State.var -> (State.var, _) Checked.t
+      val apply
+        : var
+        -> State.var
+        -> (State.var * [ `Success of Boolean.var ], _) Checked.t
     end
   end)
 = struct
@@ -200,6 +207,7 @@ module Make_step (M : sig
   ;;
 
   let main self_hash_packed state_hash =
+    let%bind is_base_case = State.is_base_hash state_hash in
     let%bind self =
       unhash self_hash_packed ~f:Prover_state.self
         ~spec:self_vk_spec ~to_bits:Fn.id
@@ -207,13 +215,20 @@ module Make_step (M : sig
     let%bind prev_state = get State.spec ~f:Prover_state.prev_state
     and update          = get Update.spec ~f:Prover_state.update
     in
-    let%bind next_state = Update.apply update prev_state in
-    let%bind h = State.hash next_state in
-    assert_equal h state_hash
+    let%bind (next_state, `Success success) = Update.apply update prev_state in
+    let%bind correct_hash =
+      State.hash next_state >>= Checked.equal state_hash
+    in
+    let%bind inductive_case_passed =
+      Boolean.(success && correct_hash)
+    in
+    Checked.Assert.any
+      [ is_base_case
+      ; inductive_case_passed
+      ]
 end
 
 module Step = struct
-  module Block0 = Block
   open Main
   open Let_syntax
 
@@ -229,8 +244,8 @@ module Step = struct
 
 (* Someday: It may well be worth using bitcoin's compact nbits for target values since
    targets are quite chunky *)
-    type var = (Time.Unpacked.var, Target.Unpacked.var, Pedersen.Digest.var) t
-    type value = (Time.Unpacked.value, Target.Unpacked.value, Pedersen.Digest.value) t
+    type var = (Time.Unpacked.var, Target.Unpacked.var, Digest.Packed.var) t
+    type value = (Time.Unpacked.value, Target.Unpacked.value, Digest.Packed.value) t
 
     let to_hlist { difficulty_info; block_hash } = H_list.([ difficulty_info; block_hash ])
     let of_hlist = H_list.(fun [ difficulty_info; block_hash ] -> { difficulty_info; block_hash })
@@ -238,7 +253,7 @@ module Step = struct
     let data_spec =
       let open Data_spec in
       [ Var_spec.(list ~length:difficulty_window (tuple2 Time.Unpacked.spec Target.Unpacked.spec))
-      ; Pedersen.Digest.spec
+      ; Digest.Packed.spec
       ]
 
     let spec : (var, value) Var_spec.t =
@@ -247,36 +262,48 @@ module Step = struct
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
     let to_bits { difficulty_info; block_hash } =
-      let%map bs = Pedersen.Digest.unpack block_hash in
+      let%map bs = Digest.Checked.unpack block_hash in
       List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info @ bs
 
     let hash (t : var) = to_bits t >>= hash_digest 
+
+    let base_hash = Cvar.constant Block0.(hash genesis)
+    let is_base_hash h = Checked.equal base_hash h
   end
 
   module Update = struct
     type var = Block.Packed.var
-    type value = Block.Packed.var
-    let spec = Block.Packed.spec
+    type value = Block.Packed.value
+    let spec : (var, value) Var_spec.t = Block.Packed.spec
 
     let all_but_last_exn xs = fst (split_last_exn xs)
 
-    let compute_target _ = failwith "TODO"
+    let compute_target _ =
+      return (Cvar.constant Field.(negate one))
 
-    let meets_target (target : Target.Packed.var) (hash : Pedersen.Digest.var) =
-      Snark_util.Make
-      compare
+    let () = assert
+      (Target.bit_length = Digest.bit_length)
+
+    let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
+      let%map { less } = Util.compare ~length:Target.bit_length target hash in
+      less
+    ;;
 
     let apply (block : var) (state : State.var) =
       let%bind target = compute_target state.difficulty_info in
       let%bind block_unpacked = Block.Checked.unpack block in
       let%bind block_hash = hash_digest (Block.Unpacked.to_bits block_unpacked) in
-      let%bind () = meets_target target block_hash in
+      let%bind meets_target = meets_target target block_hash in
       let%map target_unpacked = Target.Checked.unpack target in
-      { State.difficulty_info =
-          (block_unpacked.header.time, target_unpacked)
-          :: all_but_last_exn state.difficulty_info
-      ; block_hash
-      }
+      ( { State.difficulty_info =
+            (block_unpacked.header.time, target_unpacked)
+            :: all_but_last_exn state.difficulty_info
+        ; block_hash
+        }
+      , `Success meets_target
+      )
     ;;
   end
 end
+
+module Transition = Make_transition_system(Step)
