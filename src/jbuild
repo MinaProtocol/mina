@@ -2,7 +2,7 @@
 
 (executable
   ((name main)
-   (libraries (core async camlsnark))
+   (libraries (core async async_extra camlsnark))
    (preprocess (pps (ppx_jane)))
    (flags (-w -40 -g))
    (modes (native))

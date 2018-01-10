@@ -3,21 +3,21 @@ open Async_kernel
 
 module Update = struct
   type t =
-    | Change_previous of Block.t
+    | Change_previous of Blockchain.t
     | Change_body of Block.Body.t
 end
 
 module type S = sig
   val mine
-    : previous:Block.t
+    : previous:Blockchain.t
     -> body:Block.Body.t
     -> Update.t Pipe.Reader.t
-    -> Block.t Pipe.Reader.t
+    -> Blockchain.t Pipe.Reader.t
 end
 
 module Cpu = struct
   let find_block (previous : Pedersen.Main.Digest.t) (body : Block.Body.t)
-    : (Block.t * Pedersen.Main.Digest.t) option Deferred.t =
+    : (Blockchain.t * Pedersen.Main.Digest.t) option Deferred.t =
     failwith "TODO"
   ;;
 
@@ -31,7 +31,7 @@ module Cpu = struct
 
   let mine ~previous ~body (updates : Update.t Pipe.Reader.t) =
     let state =
-      { State.previous_header_hash = Block.Header.hash previous.Block.header
+      { State.previous_header_hash = Block.Header.hash previous.Blockchain.block.header
       ; body
       ; id = 0
       }
@@ -58,7 +58,7 @@ module Cpu = struct
           state.id <- state.id + 1;
           begin match u with
           | Change_previous b ->
-            state.previous_header_hash <- Block.Header.hash b.header
+            state.previous_header_hash <- Block.Header.hash b.block.header
           | Change_body body ->
             state.body <- body
           end);

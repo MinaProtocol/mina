@@ -6,7 +6,7 @@ module Snark = Snark
 module Rpcs = struct
   module Get_strongest_block = struct
     type query = unit [@@deriving bin_io]
-    type response = Block.t [@@deriving bin_io]
+    type response = Blockchain.t [@@deriving bin_io]
 
     (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
@@ -35,10 +35,11 @@ let filter_map_unordered
 
 module Message = struct
   type t =
-    | New_strongest_block of Block.t
+    | New_strongest_block of Blockchain.t
   [@@deriving bin_io]
 end
 
+module SwimConfig = Swim.Config
 module Make
     (Swim       : Swim.S)
     (Gossip_net : Gossip_net.S)
@@ -72,7 +73,7 @@ struct
       ]
   ;;
 
-  let main storage_location genesis_block initial_peers should_mine =
+  let main storage_location genesis_block initial_peers should_mine me =
     let open Let_syntax in
     let params : Gossip_net.Params.t =
       { timeout = Time.Span.of_sec 1.
@@ -80,9 +81,9 @@ struct
       ; target_peer_count = 8
       }
     in
-    let peer_stream = Swim.connect ~initial_peers in
-    let%bind gossip_net = Gossip_net.create peer_stream params in
-    let%map initial_block =
+    let%bind swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
+    let%bind gossip_net = Gossip_net.create (Swim.changes swim) params in
+    let%map initial_blockchain =
       match%map Storage.load storage_location with
       | Some x -> x
       | None -> genesis_block
@@ -100,15 +101,15 @@ struct
         Pipe.iter strongest_block_reader
           ~f:(fun b ->
             Pipe.write body_changes_writer
-              (Miner.Update.Change_body (Int64.(b.body + Int64.one))))
+              (Miner.Update.Change_body (Int64.(b.block.body + Int64.one))))
       end
     in
     let mined_blocks =
       if should_mine
       then
         Miner_impl.mine
-          ~previous:initial_block
-          ~body:(Int64.succ initial_block.body)
+          ~previous:initial_blockchain
+          ~body:(Int64.succ initial_blockchain.block.body)
           (merge
             [ Pipe.map strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
             ; body_changes_reader
@@ -118,7 +119,7 @@ struct
     Storage.persist storage_location
       (Pipe.map strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain.accumulate
-      ~init:initial_block
+      ~init:initial_blockchain
       ~strongest_block:strongest_block_writer
       ~updates:(
         merge
@@ -151,9 +152,11 @@ let () =
             Option.value ~default:(home ^/ ".current-config") conf_dir
           in
           let%bind initial_peers =
-            Reader.load_sexps_exn conf_dir Peer.t_of_sexp
+            Reader.load_sexps_exn conf_dir Host_and_port.t_of_sexp
           in
-          Main.main (conf_dir ^/ "storage") Block.genesis initial_peers should_mine
+          Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
+            (* TODO: This should be inside the config_dir right? *)
+            (Host_and_port.create ~host:"127.0.0.1" ~port:8884)
       ]
     end
   |> Command.run
