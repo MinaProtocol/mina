@@ -18,14 +18,14 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     ; less_or_equal : Boolean.var
     }
 
-  let compare ~length a b =
+  let compare ~bit_length a b =
     let alpha_packed =
       let open Cvar.Infix in
-      Cvar.constant (two_to_the length) + b - a
+      Cvar.constant (two_to_the bit_length) + b - a
     in
-    let%bind alpha = Checked.unpack alpha_packed ~length:(length + 1) in
+    let%bind alpha = Checked.unpack alpha_packed ~length:(bit_length + 1) in
     let (prefix, less_or_equal) =
-      match List.split_n alpha length with
+      match List.split_n alpha bit_length with
       | (p, [l]) -> (p, l)
       | _ -> failwith "compare: Invalid alpha"
     in
@@ -74,6 +74,53 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
         | false, true -> -1
     in
     go (Field.size_in_bits - 1)
+
+  let median_split length =
+    let k = length / 2 in
+    let r = length mod 2 in
+    (`Less_equal (k + r), `Greater_equal k)
+  ;;
+
+  let int_log2 =
+    let rec go acc n =
+      if n = 0
+      then acc
+      else go (1 + acc) (n lsr 1)
+    in
+    go 0
+  ;;
+
+  let median ~bit_length (xs : Cvar.t list) =
+    let length = List.length xs in
+    let length_bit_length = int_log2 length in
+    let assert_gte x y =
+    (* TODO: Save a constraint by doing a comparison that doesn't bother computing [less] from [less_or_equal] like [compare] does. *)
+      let%bind { less_or_equal; _ } =
+        compare ~bit_length:length_bit_length (Cvar.constant (Field.of_int y)) x
+      in
+      Boolean.assert_ less_or_equal
+    in
+    let (`Less_equal le, `Greater_equal ge) = median_split length in
+    let index = le - 1 in
+    let%bind m =
+      store Var_spec.field As_prover.(Let_syntax.(
+        let%map xs = read Var_spec.(list ~length field) xs in
+        let xs = List.sort ~cmp:compare_field xs in
+        List.nth_exn xs index))
+    in
+    let%bind cs = Checked.all (List.map ~f:(compare ~bit_length m) xs) in
+    let le_count = Cvar.sum (List.map cs ~f:(fun c -> (c.less_or_equal :> Cvar.t))) in
+    let ge_count = Cvar.sum (List.map cs ~f:(fun c -> (Boolean.not c.less :> Cvar.t))) in
+    let eq_count =
+      (* TODO: I think we can compute this more efficiently from the comparison results *)
+      Checked.Assert.any
+        (Checked.all (List.map xs ~f:(fun c -> Boolean.(c.less_or_equal 
+    let%map () = assert_gte le_count le
+    and () = assert_gte ge_count ge
+    and () = 
+    in
+    m
+  ;;
 
 (* (#<=) >= n/2
    (#>=) >= n/2 *)
