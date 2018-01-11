@@ -26,6 +26,9 @@ module Config = struct
   let round_trip_time t = t.round_trip_time
 end
 
+let udp_packet_size = 8192
+;;
+
 module type TestOnly_intf = sig
   val network_partition_add : from:Peer.t -> to_:Peer.t -> unit
   val network_partition_remove : from:Peer.t -> to_:Peer.t -> unit
@@ -174,7 +177,7 @@ module Network_state : Network_state_intf = struct
       else
         (broadcast::transmit, (transmit_count+1, broadcast)::elems, bytes_left - size)
     in
-    let transmit, bq', _ = List.fold_left t.broadcast_list ~f:select ~init:([], [], 65507) in
+    let transmit, bq', _ = List.fold_left t.broadcast_list ~f:select ~init:([], [], udp_packet_size) in
     t.broadcast_list <- List.sort ~cmp:(fun e e' -> Int.compare (fst e) (fst e')) bq';
     transmit
 end
@@ -405,6 +408,7 @@ end) = struct
     ; port
     }
 
+
   let stop_listening t = t.stop ()
 
   let send : t -> recipient:Peer.t -> Message.t -> unit Or_error.t Deferred.t = fun t ~recipient msg ->
@@ -435,16 +439,19 @@ end) = struct
       let open Deferred.Let_syntax in
       let%map socket = Udp.bind socket_addr in
       let (r,w) = Linear_pipe.create () in
-      let capacity = 8192 in
       let max_ready = 64 in
+      let capacity = 8192 in
       don't_wait_for begin
-        Udp.recvfrom_loop ~config:(Udp.Config.create ~capacity ~max_ready ()) (Socket.fd socket) (fun buf addr ->
-          let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
-          t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
-          (* TODO need to check to make sure this is the correct side to drain from once > capacity *)
-          if Pipe.length r.Linear_pipe.Reader.pipe > capacity
-          then ignore (Pipe.read_now r.Linear_pipe.Reader.pipe);
-          Pipe.write_without_pushback w msg
+        Udp.recvfrom_loop 
+          ~config:(Udp.Config.create ~capacity:udp_packet_size ~max_ready ()) 
+          (Socket.fd socket) 
+          (fun buf addr ->
+            let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
+            t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
+            (* TODO need to check to make sure this is the correct side to drain from once > capacity *)
+            if Pipe.length r.Linear_pipe.Reader.pipe > capacity
+            then ignore (Pipe.read_now r.Linear_pipe.Reader.pipe);
+            Pipe.write_without_pushback w msg
         )
       end;
       r
