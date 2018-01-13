@@ -26,6 +26,9 @@ module Config = struct
   let round_trip_time t = t.round_trip_time
 end
 
+let udp_packet_size = 8192
+;;
+
 module type TestOnly_intf = sig
   val network_partition_add : from:Peer.t -> to_:Peer.t -> unit
   val network_partition_remove : from:Peer.t -> to_:Peer.t -> unit
@@ -38,7 +41,7 @@ module type S = sig
 
   val peers : t -> Peer.t list
 
-  val changes : t -> Peer.Event.t Pipe.Reader.t
+  val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   val stop : t -> unit
 
@@ -70,7 +73,7 @@ module type Network_state_intf = sig
 
   val add_slice : t -> slice -> unit
 
-  val changes : t -> Peer.Event.t Pipe.Reader.t
+  val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   (* Pure getter for live_nodes *)
   val live_nodes : t -> Peer.t Set.Poly.t
@@ -101,7 +104,7 @@ module Network_state : Network_state_intf = struct
     { mutable broadcast_list : broadcast_list
     ; mutable live_nodes : Peer.t Set.Poly.t
     ; logger : Log.logger
-    ; changes : Peer.Event.t Pipe.Reader.t * Peer.Event.t Pipe.Writer.t
+    ; changes : Peer.Event.t Linear_pipe.Reader.t * Peer.Event.t Linear_pipe.Writer.t
     }
 
   type slice = Node.t list [@@deriving bin_io, sexp]
@@ -110,7 +113,7 @@ module Network_state : Network_state_intf = struct
     { broadcast_list = []
     ; live_nodes = Set.Poly.empty
     ; logger
-    ; changes = Pipe.create ()
+    ; changes = Linear_pipe.create ()
     }
 
   let update_live t (node : E.t) =
@@ -174,7 +177,7 @@ module Network_state : Network_state_intf = struct
       else
         (broadcast::transmit, (transmit_count+1, broadcast)::elems, bytes_left - size)
     in
-    let transmit, bq', _ = List.fold_left t.broadcast_list ~f:select ~init:([], [], 65507) in
+    let transmit, bq', _ = List.fold_left t.broadcast_list ~f:select ~init:([], [], udp_packet_size) in
     t.broadcast_list <- List.sort ~cmp:(fun e e' -> Int.compare (fst e) (fst e')) bq';
     transmit
 end
@@ -200,7 +203,7 @@ module Messager : sig
     ; seq_no: int
     } [@@deriving bin_io, sexp]
 
-  val create : incoming:msg Pipe.Reader.t
+  val create : incoming:(msg Linear_pipe.Reader.t)
     -> net_state:Network_state.t
     -> get_transmit_limit:(unit -> int)
     (* to send messages *)
@@ -248,7 +251,8 @@ end = struct
     in
 
     don't_wait_for begin
-      Pipe.iter_without_pushback incoming (fun {from; action; net_slice; seq_no} ->
+      let max_ready = 64 in
+      Linear_pipe.iter_unordered ~max_concurrency:max_ready incoming ~f:(fun {from; action; net_slice; seq_no} ->
         let open Let_syntax in
         let open Request_or_ack in
 
@@ -258,20 +262,17 @@ end = struct
 
         match action with
         | Request x ->
-           (* Not pushing-back here since UDP packets should send fast *)
-           (* Plus handle_msg will be very slow, but is mostly IO blocked not compute bound *)
-           don't_wait_for begin
-             match%bind handle_msg t (x, seq_no) with
-             | `Stop -> return ()
-             | `Want_ack ->
-               let%map _ = raw_send t from Ack seq_no in
-               ()
-           end
+           (match%bind handle_msg t (x, seq_no) with
+           | `Stop -> return ()
+           | `Want_ack ->
+             let%map _ = raw_send t from Ack seq_no in
+             ())
         | Ack ->
           Option.iter (Hashtbl.Poly.find t.table seq_no) (fun ivar ->
               Hashtbl.Poly.remove t.table seq_no;
               Ivar.fill_if_empty ivar ()
-          )
+          );
+          return ()
       )
     end;
     t
@@ -305,7 +306,7 @@ module type Transport_intf =
     val create : logger -> port:int -> t
 
     val send : t -> recipient:Peer.t -> Message.t -> unit Or_error.t Deferred.t
-    val listen : t -> Message.t Pipe.Reader.t Deferred.t
+    val listen : t -> Message.t Linear_pipe.Reader.t Deferred.t
 
     val stop_listening : t -> unit
 
@@ -347,8 +348,8 @@ end) = struct
     | (_, None) -> return (Ok ())
     | (_, Some fn) -> fn ~recipient msg
 
-  let listen (t: t) : Message.t Pipe.Reader.t Deferred.t =
-    let (r,w) = Pipe.create () in
+  let listen (t: t) : Message.t Linear_pipe.Reader.t Deferred.t =
+    let (r,w) = Linear_pipe.create () in
     Host_and_port.Table.add_exn network.connected
       ~key:(me t)
       ~data:(fun ~recipient msg ->
@@ -380,7 +381,6 @@ end) = struct
           )
       | None -> ()
   end
-
 end
 
 
@@ -408,6 +408,7 @@ end) = struct
     ; port
     }
 
+
   let stop_listening t = t.stop ()
 
   let send : t -> recipient:Peer.t -> Message.t -> unit Or_error.t Deferred.t = fun t ~recipient msg ->
@@ -428,7 +429,7 @@ end) = struct
         Ok ()
     | Error _ as e -> Deferred.return e
 
-  let listen : t -> Message.t Pipe.Reader.t Deferred.t =
+  let listen : t -> Message.t Linear_pipe.Reader.t Deferred.t =
     fun t ->
       let socket_addr =
         Socket.Address.Inet.create
@@ -437,13 +438,20 @@ end) = struct
       in
       let open Deferred.Let_syntax in
       let%map socket = Udp.bind socket_addr in
-      let (r,w) = Pipe.create () in
+      let (r,w) = Linear_pipe.create () in
+      let max_ready = 64 in
+      let capacity = 8192 in
       don't_wait_for begin
-        Udp.recvfrom_loop (Socket.fd socket) (fun buf addr ->
-          let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
-          t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
-          (* TODO(es92): We need a linear_pipe method for capped-buffer-than-drop-packets write *)
-          Pipe.write_without_pushback w msg
+        Udp.recvfrom_loop 
+          ~config:(Udp.Config.create ~capacity:udp_packet_size ~max_ready ()) 
+          (Socket.fd socket) 
+          (fun buf addr ->
+            let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
+            t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
+            (* TODO need to check to make sure this is the correct side to drain from once > capacity *)
+            if Pipe.length r.Linear_pipe.Reader.pipe > capacity
+            then ignore (Pipe.read_now r.Linear_pipe.Reader.pipe);
+            Pipe.write_without_pushback w msg
         )
       end;
       r

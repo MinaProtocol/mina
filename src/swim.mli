@@ -22,7 +22,7 @@ module type S = sig
 
   val peers : t -> Peer.t list
 
-  val changes : t -> Peer.Event.t Pipe.Reader.t
+  val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   val stop : t -> unit
 

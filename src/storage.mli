@@ -9,7 +9,7 @@ module type S = sig
 
   val persist
     : location
-    -> [ `Change_head of Blockchain.t ] Pipe.Reader.t
+    -> [ `Change_head of Blockchain.t ] Linear_pipe.Reader.t
     -> unit
 end
 
