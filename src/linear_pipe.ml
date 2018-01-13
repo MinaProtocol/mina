@@ -54,7 +54,7 @@ let iter_unordered ?consumer ~max_concurrency reader ~f =
          run_reader ()
      in
      Deferred.all_unit 
-       (List.map (List.range 0 max_concurrency) ~f:(fun _ -> run_reader ())))
+       (List.init max_concurrency ~f:(fun _ -> run_reader ())))
 ;;
 
 let of_list xs = 
