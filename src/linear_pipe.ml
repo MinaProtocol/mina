@@ -89,7 +89,7 @@ let merge_unordered rs =
        Pipe.write merged_writer x))
    );
    don't_wait_for begin
-     let%map () = Deferred.all_ignore (List.map rs ~f:closed) in
+     let%map () = Deferred.List.iter rs ~f:closed in
      Pipe.close merged_writer
    end;
    merged_reader
@@ -104,13 +104,13 @@ let fork reader n =
   let readers = List.map pipes ~f:(fun (r, w) -> r) in
   don't_wait_for begin
     iter reader ~f:(fun x -> 
-      Deferred.all_ignore (List.map writers ~f:(fun writer -> 
+      Deferred.List.iter writers ~f:(fun writer -> 
         if not (Pipe.is_closed writer) 
         then Pipe.write writer x
-        else return ())))
+        else return ()))
   end;
   don't_wait_for begin
-    let%map () = Deferred.all_ignore (List.map readers ~f:closed) in
+    let%map () = Deferred.List.iter readers ~f:closed in
     close_read reader
   end;
   readers
