@@ -6,7 +6,7 @@ module Snark = Snark
 module Rpcs = struct
   module Get_strongest_block = struct
     type query = unit [@@deriving bin_io]
-    type response = Block.t [@@deriving bin_io]
+    type response = Blockchain.t [@@deriving bin_io]
 
     (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
@@ -15,30 +15,13 @@ module Rpcs = struct
   end
 end
 
-let filter_map_unordered
-      (t : 'a Pipe.Reader.t)
-      ~(f : 'a -> 'b option Deferred.t)
-  : 'b Pipe.Reader.t
-  =
-  let reader, writer = Pipe.create () in
-  (* TODO: Is this bad? *)
-  don't_wait_for begin
-    Pipe.iter_without_pushback t ~f:(fun x ->
-      don't_wait_for begin
-        match%map f x with
-        | Some y -> Pipe.write_without_pushback writer y
-        | None -> ()
-      end)
-  end;
-  reader
-;;
-
 module Message = struct
   type t =
-    | New_strongest_block of Block.t
+    | New_strongest_block of Blockchain.t
   [@@deriving bin_io]
 end
 
+module SwimConfig = Swim.Config
 module Make
     (Swim       : Swim.S)
     (Gossip_net : Gossip_net.S)
@@ -48,13 +31,11 @@ module Make
 struct
   module Gossip_net = Gossip_net(Message)
 
-  let merge = Pipe.merge ~cmp:(fun _ _ -> 1)
-
   let peer_strongest_blocks gossip_net
-    : Blockchain.Update.t Pipe.Reader.t
+    : Blockchain.Update.t Linear_pipe.Reader.t
     =
     let from_new_peers =
-      filter_map_unordered (Gossip_net.new_peers gossip_net) ~f:(fun peer ->
+      Linear_pipe.filter_map_unordered ~max_concurrency:64 (Gossip_net.new_peers gossip_net) ~f:(fun peer ->
         Deferred.map ~f:(function
           | Ok b -> Some (Blockchain.Update.New_block b)
           | Error _ -> None)
@@ -62,17 +43,17 @@ struct
               Rpcs.Get_strongest_block.rpc ()))
     in
     let broadcasts =
-      Pipe.filter_map (Gossip_net.received gossip_net)
+      Linear_pipe.filter_map (Gossip_net.received gossip_net)
         ~f:(function
           | New_strongest_block b -> Some (Blockchain.Update.New_block b))
     in
-    merge
+    Linear_pipe.merge_unordered
       [ from_new_peers
       ; broadcasts
       ]
   ;;
 
-  let main storage_location genesis_block initial_peers should_mine =
+  let main storage_location genesis_block initial_peers should_mine me =
     let open Let_syntax in
     let params : Gossip_net.Params.t =
       { timeout = Time.Span.of_sec 1.
@@ -80,50 +61,53 @@ struct
       ; target_peer_count = 8
       }
     in
-    let peer_stream = Swim.connect ~initial_peers in
-    let%bind gossip_net = Gossip_net.create peer_stream params in
-    let%map initial_block =
+    let%bind swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
+    let%bind gossip_net = Gossip_net.create (Swim.changes swim) params in
+    let%map initial_blockchain =
       match%map Storage.load storage_location with
       | Some x -> x
       | None -> genesis_block
     in
     (* Are peers bi-directional? *)
-    let strongest_block_reader, strongest_block_writer = Pipe.create () in
+    let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
+    let gossip_net_strongest_block_reader, 
+        body_changes_strongest_block_reader,
+        storage_strongest_block_reader = Linear_pipe.fork3 strongest_block_reader in
     don't_wait_for begin
-      Pipe.transfer ~f:(fun b -> New_strongest_block b)
-        strongest_block_reader
+      Linear_pipe.transfer ~f:(fun b -> New_strongest_block b)
+        gossip_net_strongest_block_reader 
         (Gossip_net.broadcast gossip_net);
     end;
-    let body_changes_reader, body_changes_writer = Pipe.create () in
+    let body_changes_reader, body_changes_writer = Linear_pipe.create () in
     let () =
       don't_wait_for begin
-        Pipe.iter strongest_block_reader
+        Linear_pipe.iter gossip_net_strongest_block_reader
           ~f:(fun b ->
             Pipe.write body_changes_writer
-              (Miner.Update.Change_body (Int64.(b.body + Int64.one))))
+              (Miner.Update.Change_body (Int64.(b.block.body + Int64.one))))
       end
     in
     let mined_blocks =
       if should_mine
       then
         Miner_impl.mine
-          ~previous:initial_block
-          ~body:(Int64.succ initial_block.body)
-          (merge
-            [ Pipe.map strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
+          ~previous:initial_blockchain
+          ~body:(Int64.succ initial_blockchain.block.body)
+          (Linear_pipe.merge_unordered
+            [ Linear_pipe.map body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
             ; body_changes_reader
             ])
-      else Pipe.of_list []
+      else Linear_pipe.of_list []
     in
     Storage.persist storage_location
-      (Pipe.map strongest_block_reader ~f:(fun b -> `Change_head b));
+      (Linear_pipe.map storage_strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain.accumulate
-      ~init:initial_block
+      ~init:initial_blockchain
       ~strongest_block:strongest_block_writer
       ~updates:(
-        merge
+        Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
-          ; Pipe.map mined_blocks ~f:(fun b -> Blockchain.Update.New_block b)
+          ; Linear_pipe.map mined_blocks ~f:(fun b -> Blockchain.Update.New_block b)
           ])
   ;;
 end
@@ -151,9 +135,11 @@ let () =
             Option.value ~default:(home ^/ ".current-config") conf_dir
           in
           let%bind initial_peers =
-            Reader.load_sexps_exn conf_dir Peer.t_of_sexp
+            Reader.load_sexps_exn conf_dir Host_and_port.t_of_sexp
           in
-          Main.main (conf_dir ^/ "storage") Block.genesis initial_peers should_mine
+          Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
+            (* TODO: This should be inside the config_dir right? *)
+            (Host_and_port.create ~host:"127.0.0.1" ~port:8884)
       ]
     end
   |> Command.run

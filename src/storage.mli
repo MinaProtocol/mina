@@ -5,11 +5,11 @@ module type S = sig
   type location
 
   val load
-    : location -> Block.t option Deferred.t
+    : location -> Blockchain.t option Deferred.t
 
   val persist
     : location
-    -> [ `Change_head of Block.t ] Pipe.Reader.t
+    -> [ `Change_head of Blockchain.t ] Linear_pipe.Reader.t
     -> unit
 end
 

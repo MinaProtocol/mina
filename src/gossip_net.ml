@@ -15,15 +15,15 @@ module type S =
     end
 
     val create
-      :  Peer.Event.t Pipe.Reader.t
+      :  Peer.Event.t Linear_pipe.Reader.t
       -> Params.t
       -> t Deferred.t
 
-    val received : t -> Message.t Pipe.Reader.t
+    val received : t -> Message.t Linear_pipe.Reader.t
 
-    val broadcast : t -> Message.t Pipe.Writer.t
+    val broadcast : t -> Message.t Linear_pipe.Writer.t
 
-    val new_peers : t -> Peer.t Pipe.Reader.t
+    val new_peers : t -> Peer.t Linear_pipe.Reader.t
 
     val query_random_peers
       : t

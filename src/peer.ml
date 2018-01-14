@@ -1,13 +1,9 @@
-open Core
+open Core_kernel
 
-type t =
-  { ip         : Host_and_port.t
-  ; public_key : Public_key.t
-  }
-[@@deriving sexp]
+type t = Host_and_port.t [@@deriving bin_io, sexp, compare]
 
 module Event = struct
-  type t =
+  type nonrec t =
     | Connect of t list
     | Disconnect of t list
 end
