@@ -38,10 +38,15 @@ module Extend (Impl : Camlsnark.Snark_intf.S) = struct
           val pad : Unpacked.var -> Unpacked.Padded.var
           val unpack : Packed.var -> (Unpacked.var, _) Checked.t
         end
+
+        val unpack : Packed.value -> Unpacked.value
+        val to_bits : Unpacked.value -> bool list
       end
     end
   end
 end
+
+let hash_unchecked = Pedersen.Main.hash
 
 module Make_types (Impl : Snark_intf.S) = struct
   module Digest = Pedersen.Main.Digest.Snarkable(Impl)
@@ -93,12 +98,32 @@ let () = assert (Main.Field.size_in_bits = Other.Field.size_in_bits)
 let step_input () =
   let open Main in
   let open Data_spec in
-  [ Digest.Packed.spec (* Self key hash *)
-  ; Digest.Packed.spec (* Block header hash *)
+  [ Digest.Packed.spec (* H(wrap_vk, H(state)) *)
   ]
 
-module Wrap = struct
-  let step_input_size = Main.Data_spec.size (step_input ())
+let step_input_size = Main.Data_spec.size (step_input ())
+
+
+(*
+let step_vk_size = 38
+
+let step_vk_spec =
+  Other.(Var_spec.list ~length:step_vk_size Var_spec.field)
+   *)
+
+(* TODO: Important that a digest can fit into an Other.Field.t *)
+let wrap_input () =
+  let open Other in
+  let open Data_spec in
+  [ Var_spec.field ]
+
+module Make_wrap (M : sig
+    val verification_key : Main.Verification_key.t
+  end)
+= struct
+  (* TODO: Important to assert that main field is smaller than other field *)
+
+  let input = wrap_input
 
   open Other
 
@@ -106,49 +131,42 @@ module Wrap = struct
     Camlsnark.Verifier_gadget.Make(Other)(Other_curve)(Main_curve)
       (struct let input_size = step_input_size end)
 
-  (* TODO: These numbers are wrong *)
-  let step_vk_length = 11324
-  let step_vk_size = 38
-  let step_vk_spec =
-    Var_spec.list ~length:step_vk_size Var_spec.field
-
-  let input_spec =
-    Var_spec.list ~length:step_input_size Var_spec.field
-
-  let input () =
-    Data_spec.([ step_vk_spec; input_spec ])
-
   module Prover_state = struct
     type t =
-      { vk    : Main_curve.Verification_key.t
-      ; proof : Main_curve.Proof.t
+      { proof : Main_curve.Proof.t
       }
   end
 
-  let main verification_key (input : Cvar.t list) =
+  let vk_bits =
+    Verifier.Verification_key.to_bool_list M.verification_key
+
+  let main (input : Cvar.t) =
     let open Let_syntax in
     let%bind v =
-      let%bind input =
-        List.map ~f:(Checked.unpack ~length:Main_curve.Field.size_in_bits) input
-        |> Checked.all
-        |> Checked.map ~f:List.concat
-      in
-      (* TODO: Unpacking here is totally pointless. Edit libsnark
-          so we don't have to do this. *)
-      let%bind verification_key =
-        List.map ~f:(Checked.unpack ~length:Main_curve.Field.size_in_bits) verification_key
-        |> Checked.all
-        |> Checked.map ~f:List.concat
-      in
+      let%bind input = Checked.unpack ~length:Main_curve.Field.size_in_bits input in
+      let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
       Verifier.All_in_one.create ~verification_key ~input
-        As_prover.(map get_state ~f:(fun {Prover_state.vk; proof} ->
-          { Verifier.All_in_one.verification_key=vk; proof }))
+        As_prover.(map get_state ~f:(fun {Prover_state.proof} ->
+          { Verifier.All_in_one.verification_key=M.verification_key; proof }))
     in
-    assert_equal (Verifier.All_in_one.result v :> Cvar.t) (Cvar.constant Field.one)
+    Boolean.Assert.is_true (Verifier.All_in_one.result v)
   ;;
 end
 
 module Block0 = Block
+
+let get_witness spec ~f =
+  let open Main in
+  store spec As_prover.(map get_state ~f)
+;;
+
+let unhash ~spec ~f ~to_bits h =
+  let open Main in let open Let_syntax in
+  let%bind b = get_witness spec ~f in
+  let%bind h' = hash_digest (to_bits b) in
+  let%map () = assert_equal h h' in
+  b
+;;
 
 module Make_transition_system (M : sig
     open Main
@@ -178,7 +196,8 @@ module Make_transition_system (M : sig
 
   module Prover_state = struct
     type t =
-      { self       : bool list
+      { wrap_vk    : Other_curve.Verification_key.t
+      ; prev_proof : Other_curve.Proof.t
       ; prev_state : State.value
       ; update     : Update.value
       }
@@ -190,42 +209,52 @@ module Make_transition_system (M : sig
 
   module Verifier =
     Camlsnark.Verifier_gadget.Make(Main)(Main_curve)(Other_curve)
-      (struct let input_size = Other.Data_spec.size (Wrap.input ()) end)
+      (struct let input_size = Other.Data_spec.size (wrap_input ()) end)
 
   let input = step_input
 
-  let self_vk_spec =
-    Var_spec.list ~length:Wrap.step_vk_length Boolean.spec
+  let wrap_vk_length = 0
 
-  let get spec ~f = store spec As_prover.(map get_state ~f)
+  let wrap_vk_spec =
+    Var_spec.list ~length:wrap_vk_length Boolean.spec
 
-  let unhash ~spec ~f ~to_bits h =
-    let%bind b = get spec ~f in
-    let%bind h' = hash_digest (to_bits b) in
-    let%map () = assert_equal h h' in
-    b
+  let prev_state_valid wrap_vk prev_state =
+    let%bind prev_state_hash =
+      State.hash prev_state >>= Main.Digest.Checked.unpack
+    in
+    let%bind prev_top_hash =
+      hash_digest (wrap_vk @ prev_state_hash) >>= Main.Digest.Checked.unpack
+    in
+    let%map v =
+      Verifier.All_in_one.create ~verification_key:wrap_vk ~input:prev_top_hash
+        As_prover.(map get_state ~f:(fun { Prover_state.prev_proof; wrap_vk } ->
+          { Verifier.All_in_one.verification_key=wrap_vk; proof=prev_proof }))
+    in
+    Verifier.All_in_one.result v
   ;;
 
-  let main self_hash_packed state_hash =
-    let%bind is_base_case = State.is_base_hash state_hash in
-    let%bind self =
-      unhash self_hash_packed ~f:Prover_state.self
-        ~spec:self_vk_spec ~to_bits:Fn.id
+  let step top_hash =
+    let%bind wrap_vk =
+      get_witness wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
+        Verifier.Verification_key.to_bool_list wrap_vk)
     in
-    let%bind prev_state = get State.spec ~f:Prover_state.prev_state
-    and update          = get Update.spec ~f:Prover_state.update
+    let%bind prev_state = get_witness State.spec ~f:Prover_state.prev_state
+    and update          = get_witness Update.spec ~f:Prover_state.update
     in
     let%bind (next_state, `Success success) = Update.apply update prev_state in
-    let%bind correct_hash =
-      State.hash next_state >>= Checked.equal state_hash
+    let%bind state_hash = State.hash next_state in
+    let%bind () =
+      let%bind sh = Main.Digest.Checked.unpack state_hash in
+      hash_digest (wrap_vk @ sh) >>= assert_equal top_hash
     in
-    let%bind inductive_case_passed =
-      Boolean.(success && correct_hash)
-    in
-    Checked.Assert.any
+    let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
+    let%bind inductive_case_passed = Boolean.(prev_state_valid && success) in
+    let%bind is_base_case = State.is_base_hash state_hash in
+    Boolean.Assert.any
       [ is_base_case
       ; inductive_case_passed
       ]
+  ;;
 end
 
 module Step = struct
@@ -261,13 +290,33 @@ module Step = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-    let to_bits { difficulty_info; block_hash } =
-      let%map bs = Digest.Checked.unpack block_hash in
-      List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info @ bs
+    module Checked = struct
+      let to_bits { difficulty_info; block_hash } =
+        let%map bs = Digest.Checked.unpack block_hash in
+        List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info @ bs
 
-    let hash (t : var) = to_bits t >>= hash_digest 
+      let hash (t : var) = to_bits t >>= hash_digest 
+    end
 
-    let base_hash = Cvar.constant Block0.(hash genesis)
+    let to_bits ({ difficulty_info; block_hash } : value) : bool list =
+      List.concat_map difficulty_info
+        ~f:(fun (x, y) -> Time.to_bits x @ Target.to_bits y)
+      @ Digest.(to_bits (unpack block_hash))
+    ;;
+
+    let base_state : value =
+      let time = Block_time.of_time Core.Time.epoch in
+      let target : Target.Unpacked.value =
+        Target.unpack (Field.of_int (-1))
+      in
+      { difficulty_info =
+          List.init difficulty_window ~f:(fun _ -> (time, target))
+      ; block_hash = Block0.(hash genesis)
+      }
+
+    let base_hash =
+      hash_digest (to_bits base_state)
+
     let is_base_hash h = Checked.equal base_hash h
   end
 
@@ -286,7 +335,7 @@ module Step = struct
       (Target.bit_length = Digest.bit_length)
 
     let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
-      let%map { less } = Util.compare ~length:Target.bit_length target hash in
+      let%map { less } = Util.compare ~bit_length:Target.bit_length target hash in
       less
     ;;
 
@@ -308,3 +357,11 @@ module Step = struct
 end
 
 module Transition = Make_transition_system(Step)
+
+let step_keys = Main.generate_keypair (Transition.input ()) Transition.step
+let step_vk = Main.Keypair.vk step_keys
+
+module Wrap = Make_wrap(struct let verification_key = step_vk end)
+
+let wrap_keys = Other.generate_keypair (Wrap.input ()) Wrap.main
+

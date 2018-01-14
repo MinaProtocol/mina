@@ -41,7 +41,7 @@ type t = (Header.t, Body.t) t_ [@@deriving bin_io]
 let hash t =
   let buf = Bigstring.create (bin_size_t t) in
   let s = Pedersen.State.create Pedersen.params in
-  Pedersen.State.update s buf;
+  Pedersen.State.update_bitstring s buf;
   Pedersen.State.digest s
 
 let genesis : t =

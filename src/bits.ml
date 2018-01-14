@@ -1,6 +1,55 @@
 open Core_kernel
 open Util
 
+module type Basic = sig
+  type t
+
+  val fold : t -> init:'a -> f:('a -> bool -> 'a) -> 'a
+end
+
+module type S = sig
+  include Basic
+
+  val iter : t -> f:(bool -> unit) -> unit
+  val to_bits : t -> bool list
+end
+
+module Int64 : S with type t = Int64.t = struct
+  type t = Int64.t
+
+  let get t i = Int64.((t lsr i) land one = one)
+
+  let fold t ~init ~f =
+    let rec go acc i =
+      if i = 64
+      then acc
+      else go (f acc (get t i)) (i + 1)
+    in
+    go init 0
+  ;;
+
+  let iter t ~f =
+    for i = 0 to 63 do
+      f (get t i)
+    done
+
+  let to_bits t = List.init 64 ~f:(get t)
+end
+
+module Make_field
+    (Field : Camlsnark.Field_intf)
+    (Bigint : Camlsnark.Bigint_intf)
+  =
+struct
+
+end
+
+
+(* Someday: Make more efficient by giving Field.unpack a length argument in
+camlsnark *)
+let unpack_field unpack ~bit_length x =
+  List.take (unpack x) bit_length 
+
 module Make_small_bitvector
     (Impl : Camlsnark.Snark_intf.S)
     (V : sig
@@ -56,16 +105,16 @@ struct
       { read; store; alloc; check }
   end
 
+  let v_to_list n v =
+    List.init n ~f:(fun i -> if i < V.length then V.get v i else false)
+
+  let v_of_list vs =
+    List.foldi vs ~init:V.empty
+      ~f:(fun i acc b -> if i < V.length then V.set acc i b else acc)
+
   module Unpacked = struct
     type var = Boolean.var list
     type value = V.t
-
-    let v_to_list n v =
-      List.init n ~f:(fun i -> if i < V.length then V.get v i else false)
-
-    let v_of_list vs =
-      List.foldi vs ~init:V.empty
-        ~f:(fun i acc b -> if i < V.length then V.set acc i b else acc)
 
     let spec : (var, value) Var_spec.t =
       Var_spec.transport (Var_spec.list ~length:V.length Boolean.spec)
@@ -80,6 +129,21 @@ struct
           ~there:(v_to_list Field.size_in_bits)
           ~back:v_of_list
     end
+
+    let to_bits (x : value) : bool list = v_to_list V.length x
+
+    let fold (x : value) ~init ~f =
+      let rec go acc i =
+        if i = V.length
+        then acc
+        else go (f acc (V.get x i)) (i + 1)
+      in
+      go init 0
+
+    let iter (x : value) ~f =
+      for i = 0 to V.length - 1 do
+        f (V.get x i)
+      done
   end
 
   module Checked = struct
@@ -91,6 +155,8 @@ struct
 
     let unpack x = Checked.unpack x ~length:bit_length
   end
+
+  let unpack (x : Packed.value) : Unpacked.value = x
 end
 
 module Make_Int64 (Impl : Camlsnark.Snark_intf.S) =
@@ -147,20 +213,25 @@ struct
     Float.to_int
       (Float.round_up (Float.of_int bit_length /. Float.of_int bits_per_element))
 
+  let char_nth_bit c n = ((Char.to_int c lsl n) land 1) = 1
+
+  let bigstring_nth_bit t n =
+    char_nth_bit (Bigstring.get t (n / bits_per_char))
+      (n mod bits_per_char)
+
   module Unpacked = struct
     type var = Boolean.var list
     type value = Bigstring.t
 
     let spec : (var, value) Var_spec.t =
       let open Var_spec in
-      let nth_bit c n = ((Char.to_int c lsl n) land 1) = 1 in
       let store (t : value) : var Store.t =
         let open Store.Let_syntax in
         let rec go acc i =
           if i < 0
           then return acc
           else
-            let b = nth_bit (Bigstring.get t (i / bits_per_char)) (i mod bits_per_char) in
+            let b = bigstring_nth_bit t i in
             let%bind b = Boolean.spec.store b in
             go (b :: acc) (i - 1)
         in
@@ -185,14 +256,13 @@ struct
 
       let spec =
         let open Var_spec in
-        let nth_bit c n = ((Char.to_int c lsl n) land 1) = 1 in
         let store (t : value) : var Store.t =
           let open Store.Let_syntax in
           let rec go acc i =
             if i < 0
             then return acc
             else
-              let b = nth_bit (Bigstring.get t (i / bits_per_char)) (i mod bits_per_char) in
+              let b = bigstring_nth_bit t i in
               let%bind b = Boolean.spec.store b in
               go (b :: acc) (i - 1)
           in
@@ -254,6 +324,24 @@ struct
       let check _ = Checked.return () in
       { store; read; alloc; check }
     ;;
+
+    (* Someday: make efficient by unrolling the iteration over bytes *)
+    let fold (t : value) ~init ~f =
+      let rec go acc i =
+        if i = bit_length
+        then acc
+        else go (f acc (bigstring_nth_bit t i)) (i + 1)
+      in
+      go init 0
+    ;;
+
+    let iter (t : value) ~f =
+      for i = 0 to bit_length - 1 do
+        f (bigstring_nth_bit t i)
+      done
+    ;;
+
+    let to_bits : Unpacked.value -> bool list = to_bool_list ~length:bit_length
   end
 
   module Checked = struct
@@ -272,6 +360,8 @@ struct
       List.concat bss @ bs
     ;;
   end
+
+  let unpack : Packed.value -> Unpacked.value = Fn.id
 end
 
 module Make_unpacked
@@ -313,10 +403,36 @@ module Small0
     let assert_equal = assert_equal
   end
 
-  module Unpacked = Make_unpacked(Impl)(struct
-      include M
-      let element_length = 1
-    end)
+  module Unpacked = struct
+    type var = Boolean.var list
+    type value = Field.t
+
+    let spec : (var, value) Var_spec.t =
+      Var_spec.transport (Var_spec.list ~length:bit_length Boolean.spec)
+        ~there:(unpack_field Field.unpack ~bit_length)
+        ~back:Field.pack
+    ;;
+
+    let fold (t : value) ~init ~f =
+      let n = Bigint.of_field t in
+      let rec go acc i =
+        if i = bit_length
+        then acc
+        else
+          go (f acc (Bigint.test_bit n i)) (i + 1)
+      in
+      go init 0
+    ;;
+
+    let iter (t : value) ~f =
+      let n = Bigint.of_field t in
+      for i = 0 to bit_length - 1 do
+        f (Bigint.test_bit n i)
+      done
+
+    let to_bits : value -> bool list =
+      unpack_field Field.unpack ~bit_length
+  end
 
   module Checked = struct
     let unpack : Packed.var -> (Unpacked.var, _) Checked.t =
@@ -327,6 +443,8 @@ module Small0
 
     let pad x = x @ padding
   end
+
+  let unpack : Packed.value -> Unpacked.value = Fn.id
 end
 
 module Field_element (Impl : Camlsnark.Snark_intf.S) =

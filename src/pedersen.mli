@@ -23,7 +23,17 @@ module type S = sig
 
     val create : Params.t ->  t
 
-    val update : t -> Bigstring.t -> unit
+    val update_bitstring : t -> Bigstring.t -> unit
+
+    val update_fold
+      : t
+      -> (init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int)
+      -> unit
+
+    val update_iter
+      : t
+      -> (f:(bool -> unit) -> unit)
+      -> unit
 
     val digest : t -> Digest.t
   end

@@ -131,7 +131,28 @@ struct
     let ith_bit_int n i =
       ((n lsr i) land 1) = 1
 
-    let update (t : t) s =
+    let update_fold (t : t) (fold : init:'acc -> f:('acc -> bool -> 'acc) -> 'acc) =
+      let params = t.params in
+      let (acc, i) =
+        fold ~init:(t.acc, t.i) ~f:(fun (acc, i) b ->
+          if b then (Curve.add acc params.(i), i + 1) else (acc, i + 1))
+      in
+      t.acc <- acc;
+      t.i <- i
+    ;;
+
+    let update_iter (t : t) (iter : f:(bool -> unit) -> unit) =
+      let i = ref t.i in
+      let acc = ref t.acc in
+      let params = t.params in
+      iter ~f:(fun b ->
+        (if b then acc := Curve.add !acc params.(!i));
+        incr i);
+      t.acc <- !acc;
+      t.i <- !i
+    ;;
+
+    let update_bigstring (t : t) (s : Bigstring.t) =
       let byte_length = Bigstring.length s in
       let bit_length = 8 * byte_length in
       assert (bit_length <= Params.max_input_length t.params - t.i);

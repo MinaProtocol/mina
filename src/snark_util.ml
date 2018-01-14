@@ -29,7 +29,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
       | (p, [l]) -> (p, l)
       | _ -> failwith "compare: Invalid alpha"
     in
-    let%bind not_all_zeros = Checked.any prefix in
+    let%bind not_all_zeros = Boolean.any prefix in
     let%map less = Boolean.(less_or_equal && not_all_zeros) in
     { less; less_or_equal }
   ;;
@@ -98,7 +98,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
       let%bind { less_or_equal; _ } =
         compare ~bit_length:length_bit_length (Cvar.constant (Field.of_int y)) x
       in
-      Boolean.assert_ less_or_equal
+      Boolean.Assert.is_true less_or_equal
     in
     let (`Less_equal le, `Greater_equal ge) = median_split length in
     let index = le - 1 in
@@ -111,13 +111,13 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     let%bind cs = Checked.all (List.map ~f:(compare ~bit_length m) xs) in
     let le_count = Cvar.sum (List.map cs ~f:(fun c -> (c.less_or_equal :> Cvar.t))) in
     let ge_count = Cvar.sum (List.map cs ~f:(fun c -> (Boolean.not c.less :> Cvar.t))) in
-    let eq_count =
+    let%bind () =
       (* TODO: I think we can compute this more efficiently from the comparison results *)
-      Checked.Assert.any
-        (Checked.all (List.map xs ~f:(fun c -> Boolean.(c.less_or_equal 
+      Checked.all (List.map xs ~f:(fun x -> Checked.equal x m))
+      >>= Checked.Assert.any
+    in
     let%map () = assert_gte le_count le
     and () = assert_gte ge_count ge
-    and () = 
     in
     m
   ;;
