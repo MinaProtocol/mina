@@ -206,7 +206,7 @@ module Make_transition_system (M : sig
     Verifier.All_in_one.result v
   ;;
 
-  let step top_hash =
+  let main top_hash =
     let%bind wrap_vk =
       get_witness wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
         Verifier.Verification_key.to_bool_list wrap_vk)
@@ -276,12 +276,6 @@ module Step = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-    let to_bits ({ difficulty_info; block_hash } : value) : bool list =
-      List.concat_map difficulty_info
-        ~f:(fun (x, y) -> Time.Unpacked.to_bits x @ Target.Unpacked.to_bits y)
-      @ Digest.(Unpacked.to_bits (unpack block_hash))
-    ;;
-
     let base_state : value =
       let time = Block_time.of_time Core.Time.epoch in
       let target : Target.Unpacked.value =
@@ -292,24 +286,22 @@ module Step = struct
       ; block_hash = Block0.(hash genesis)
       }
 
-    let hash t =
-      let s = Pedersen0.State.create Pedersen0.params in
-      Pedersen0.State.update_fold s (fold_bits t);
-      Pedersen0.State.digest s
-    ;;
-
-    let base_hash = Cvar.constant (hash base_state)
+    let base_hash =
+      let hash t =
+        let s = Pedersen0.State.create Pedersen0.params in
+        Pedersen0.State.update_fold s (fold_bits t);
+        Pedersen0.State.digest s
+      in
+      Cvar.constant (hash base_state)
 
     let is_base_hash h = Checked.equal base_hash h
 
-    module Checked = struct
-      let to_bits { difficulty_info; block_hash } =
-        let%map bs = Digest.Checked.unpack block_hash in
-        List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info @ bs
+    let to_bits { difficulty_info; block_hash } =
+      let%map bs = Digest.Checked.unpack block_hash in
+      List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info
+      @ bs
 
-      let hash (t : var) = to_bits t >>= hash_digest 
-    end
-
+    let hash (t : var) = to_bits t >>= hash_digest 
   end
 
   module Update = struct
@@ -323,11 +315,8 @@ module Step = struct
     let compute_target _ =
       return (Cvar.constant Field.(negate one))
 
-    let () = assert
-      (Target.bit_length = Digest.bit_length)
-
     let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
-      let%map { less } = Util.compare ~bit_length:Target.bit_length target hash in
+      let%map { less } = Util.compare ~bit_length:Field.size_in_bits target hash in
       less
     ;;
 
@@ -350,7 +339,7 @@ end
 
 module Transition = Make_transition_system(Step)
 
-let step_keys = Main.generate_keypair (Transition.input ()) Transition.step
+let step_keys = Main.generate_keypair (Transition.input ()) Transition.main
 let step_vk = Main.Keypair.vk step_keys
 
 module Wrap = Make_wrap(struct let verification_key = step_vk end)

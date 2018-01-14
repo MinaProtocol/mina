@@ -1,11 +1,7 @@
 open Core
 open Async
 
-let verification_key =
-  Snark_params.Main.generate_keypair
-    (Snark.Transition.input ())
-    Snark.Transition.main
-
+module Snark = Snark
 (*
 module Rpcs = struct
   module Get_strongest_block = struct
