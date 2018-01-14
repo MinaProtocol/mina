@@ -186,7 +186,7 @@ module Make_transition_system (M : sig
 
   let input = step_input
 
-  let wrap_vk_length = 0
+  let wrap_vk_length = 11324
 
   let wrap_vk_spec =
     Var_spec.list ~length:wrap_vk_length Boolean.spec
@@ -286,15 +286,14 @@ module Step = struct
       ; block_hash = Block0.(hash genesis)
       }
 
-    let base_hash =
-      let hash t =
-        let s = Pedersen0.State.create Pedersen0.params in
-        Pedersen0.State.update_fold s (fold_bits t);
-        Pedersen0.State.digest s
-      in
-      Cvar.constant (hash base_state)
+    let hash_unchecked t =
+      let s = Pedersen0.State.create Pedersen0.params in
+      Pedersen0.State.update_fold s (fold_bits t);
+      Pedersen0.State.digest s
 
-    let is_base_hash h = Checked.equal base_hash h
+    let base_hash = hash_unchecked base_state
+
+    let is_base_hash h = Checked.equal (Cvar.constant base_hash) h
 
     let to_bits { difficulty_info; block_hash } =
       let%map bs = Digest.Checked.unpack block_hash in
@@ -315,6 +314,8 @@ module Step = struct
     let compute_target _ =
       return (Cvar.constant Field.(negate one))
 
+    let compute_target_unchecked _ = Field.(negate one)
+
     let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
       let%map { less } = Util.compare ~bit_length:Field.size_in_bits target hash in
       less
@@ -334,6 +335,15 @@ module Step = struct
       , `Success meets_target
       )
     ;;
+
+    let apply_unchecked (block : Block0.t) (state : State.value) : State.value =
+      let target = compute_target_unchecked state.difficulty_info in
+      let block_hash = Block0.hash block in
+      { State.difficulty_info =
+          (block.header.time, target)
+          :: all_but_last_exn state.difficulty_info
+      ; block_hash
+      }
   end
 end
 
@@ -341,8 +351,68 @@ module Transition = Make_transition_system(Step)
 
 let step_keys = Main.generate_keypair (Transition.input ()) Transition.main
 let step_vk = Main.Keypair.vk step_keys
+let step_pk = Main.Keypair.pk step_keys
 
 module Wrap = Make_wrap(struct let verification_key = step_vk end)
 
 let wrap_keys = Other.generate_keypair (Wrap.input ()) Wrap.main
+let wrap_vk = Other.Keypair.vk wrap_keys
+let wrap_pk = Other.Keypair.pk wrap_keys
+
+let base_proof =
+  let dummy_proof =
+    let open Other in
+    let input = Data_spec.[] in
+    let main =
+      let one = Cvar.constant Field.one in
+      assert_equal one one
+    in
+    let keypair = generate_keypair input main in
+    prove (Keypair.pk keypair) input () main
+  in
+  Main.prove step_pk (Transition.input ())
+    { Transition.Prover_state.prev_proof = dummy_proof
+    ; wrap_vk 
+    ; prev_state = Step.State.base_state
+    ; update = Block.genesis
+    }
+    Transition.main
+    Step.State.base_hash
+;;
+
+let embed (x : Main.Field.t) : Other.Field.t =
+  let n = Main.Bigint.of_field x in
+  let rec go pt acc i =
+    if i = Main.Field.size_in_bits
+    then acc
+    else
+      go (Other.Field.add pt pt)
+        (if Main.Bigint.test_bit n i
+         then Other.Field.add pt acc
+         else acc)
+        (i + 1)
+  in
+  go Other.Field.one Other.Field.zero 0
+;;
+
+let wrap (hash : Pedersen.Main.Digest.t) proof =
+  Other.prove wrap_pk (Wrap.input ())
+    { Wrap.Prover_state.proof }
+    Wrap.main
+    (embed hash)
+;;
+
+let step ~prev_proof ~prev_state block =
+  let prev_hash = Step.State.hash_unchecked prev_state in
+  let prev_proof = wrap prev_hash prev_proof in
+  Main.prove step_pk (Transition.input ())
+    { Transition.Prover_state.prev_proof
+    ; wrap_vk
+    ; prev_state
+    ; update = block
+    }
+    Transition.main
+    (Step.State.hash_unchecked
+       (Step.Update.apply_unchecked block prev_state))
+;;
 
