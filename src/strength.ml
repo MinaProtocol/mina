@@ -1,11 +1,11 @@
 open Core_kernel
 
-type t = Bigstring.t
+type t = Snark_params.Main.Field.t
 [@@deriving bin_io]
 
-let byte_length = 16
+let zero = Snark_params.Main.Field.zero
 
-let zero = Bigstring.create byte_length
+module Snarkable = Bits.Snarkable.Field
 
-module Snarkable (Impl : Camlsnark.Snark_intf.S) =
-  Bits.Make_bigstring(Impl)(struct let byte_length = byte_length end)
+module Bits = Bits.Make_field(Snark_params.Main.Field)(Snark_params.Main.Bigint)
+

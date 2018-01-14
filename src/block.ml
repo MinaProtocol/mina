@@ -23,11 +23,20 @@ module Header = struct
     let open H_list in
     fun [ previous_block_hash; time; nonce; strength ] ->
       { previous_block_hash; time; nonce; strength }
+
+  let fold_bits { previous_block_hash; time; nonce; strength } ~init ~f =
+    let init = Pedersen.Digest.Bits.fold previous_block_hash ~init ~f in
+    let init = Block_time.Bits.fold time ~init ~f in
+    let init = Nonce.Bits.fold nonce ~init ~f in
+    let init = Strength.Bits.fold strength ~init ~f in
+    init
 end
 
 module Body = struct
   type t = Int64.t
   [@@deriving bin_io]
+
+  module Bits = Bits.Int64
 end
 
 type ('header, 'body) t_ =
@@ -36,12 +45,17 @@ type ('header, 'body) t_ =
   }
 [@@deriving bin_io]
 
+let fold_bits { header; body } ~init ~f =
+  let init = Header.fold_bits header ~init ~f in
+  let init = Body.Bits.fold body ~init ~f in
+  init
+;;
+
 type t = (Header.t, Body.t) t_ [@@deriving bin_io]
 
 let hash t =
-  let buf = Bigstring.create (bin_size_t t) in
   let s = Pedersen.State.create Pedersen.params in
-  Pedersen.State.update_bitstring s buf;
+  Pedersen.State.update_fold s (fold_bits t);
   Pedersen.State.digest s
 
 let genesis : t =
@@ -97,7 +111,6 @@ module Snarkable
     module Packed = Make(Hash.Packed)(Time.Packed)(Nonce.Packed)(Strength.Packed)
     module Unpacked = struct
       include Make(Hash.Unpacked)(Time.Unpacked)(Nonce.Unpacked)(Strength.Unpacked)
-      module Padded = Make(Hash.Unpacked.Padded)(Time.Unpacked.Padded)(Nonce.Unpacked.Padded)(Strength.Unpacked.Padded)
 
       let to_bits { previous_block_hash; time; nonce; strength } =
         previous_block_hash @ time @  nonce @ strength
@@ -119,7 +132,7 @@ module Snarkable
 
   end
 
-  module Body = Bits.Make_Int64(Impl)
+  module Body = Bits.Snarkable.Int64(Impl)
 
   let to_hlist { header; body } = H_list.([ header; body ])
   let of_hlist = H_list.(fun [ header; body ] -> { header; body })
@@ -139,7 +152,6 @@ module Snarkable
   module Packed = Make(Header.Packed)(Body.Packed)
   module Unpacked = struct
     include Make(Header.Unpacked)(Body.Unpacked)
-    module Padded = Make(Header.Unpacked.Padded)(Body.Unpacked.Padded)
 
     let to_bits { header; body } =
       Header.Unpacked.to_bits header @ body

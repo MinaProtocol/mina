@@ -6,10 +6,13 @@ module type S = sig
   module Digest : sig
     type t [@@deriving bin_io]
 
+    module Bits : Bits_intf.S with type t := t
+
     module Snarkable : functor (Impl : Snark_intf.S) ->
       Impl.Snarkable.Bits.S
       with type Packed.var = Impl.Cvar.t
        and type Packed.value = Impl.Field.t
+       and type Unpacked.value = Impl.Field.t
   end
 
   module Params : sig
@@ -23,7 +26,17 @@ module type S = sig
 
     val create : Params.t ->  t
 
-    val update : t -> Bigstring.t -> unit
+    val update_bigstring : t -> Bigstring.t -> unit
+
+    val update_fold
+      : t
+      -> (init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int)
+      -> unit
+
+    val update_iter
+      : t
+      -> (f:(bool -> unit) -> unit)
+      -> unit
 
     val digest : t -> Digest.t
   end
@@ -34,63 +47,16 @@ module Make
     (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
     (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
-  let (/^) x y = Float.(to_int (round_up (x // y)))
-
-  let field_size_in_bytes = Field.size_in_bits /^ 8
-
-(* Someday: There should be a more efficient way of doing
-    this since bigints are backed by a char[] *)
-  let field_to_bigstring x =
-    let n = Bigint.of_field x in
-    let b i j =
-      if Bigint.test_bit n (i + j)
-      then 1 lsl j
-      else 0
-    in
-    Bigstring.init field_size_in_bytes ~f:(fun i ->
-      Char.of_int_exn (
-        b i 0
-        lor b i 1
-        lor b i 2
-        lor b i 3
-        lor b i 4
-        lor b i 5
-        lor b i 6
-        lor b i 7))
-
-  (* Someday:
-     This/the reader can definitely be made more efficient as well.
-     bin_read should probably be in C. *)
-  let bigstring_to_field s =
-    Bigstring.to_string ~len:field_size_in_bytes ~pos:0 s
-    |> Bigint.of_numeral ~base:256
-    |> Bigint.to_field
-
   (* TODO: Unit tests for field_to_bigstring/bigstring_to_field *)
 
   module Digest = struct
     type t = Field.t
 
-    let ({ Bin_prot.Type_class.
-           reader = bin_reader_t
-         ; writer = bin_writer_t
-         ; shape = bin_shape_t
-         } as bin_t) =
-      Bin_prot.Type_class.cnv Fn.id
-        field_to_bigstring
-        bigstring_to_field
-        Bigstring.bin_t
+    include Field_bin.Make(Field)(Bigint)
 
-    let { Bin_prot.Type_class.read = bin_read_t; vtag_read = __bin_read_t__ } = bin_reader_t
-    let { Bin_prot.Type_class.write = bin_write_t; size = bin_size_t } = bin_writer_t
+    module Snarkable = Bits.Snarkable.Field
 
-    (* TODO: Assert that main_curve modulus is smaller than other_curve *)
-    let () = 
-      let open Snark_params in
-      assert
-        (Main_curve.Field.size_in_bits = Other_curve.Field.size_in_bits)
-
-    module Snarkable = Bits.Field_element
+    module Bits = Bits.Make_field(Field)(Bigint)
   end
 
   module Params = struct
@@ -203,11 +169,11 @@ module Main = struct
 
   let params = Pedersen_params.t
 
-  let hash x : Digest.t =
+  let hash_bigstring x : Digest.t =
     let s = State.create params in
-    State.update s x;
+    State.update_bigstring s x;
     State.digest s
   ;;
 
-  let zero_hash = hash (Bigstring.create 0)
+  let zero_hash = hash_bigstring (Bigstring.create 0)
 end

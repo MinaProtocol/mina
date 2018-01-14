@@ -9,6 +9,14 @@ module type S = sig
     end
 
     module Bits : sig
+      module type S = Bits_intf.Snarkable
+        with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
+         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type boolean_var := Boolean.var
+    end
+
+    (* TODO: Delete
+    module Bits : sig
       module type S = sig
         val bit_length : int
 
@@ -42,6 +50,7 @@ module type S = sig
 
         val unpack : Packed.value -> Unpacked.value
       end
-    end
+    end *)
+
   end
 end

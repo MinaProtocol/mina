@@ -13,40 +13,13 @@ module Extend (Impl : Camlsnark.Snark_intf.S) = struct
     end
 
     module Bits = struct
-      module type S = sig
-        val bit_length : int
-
-        module Packed : sig
-          type var
-          type value
-          val spec : (var, value) Var_spec.t
-        end
-
-        module Unpacked : sig
-          type var = Boolean.var list
-          type value
-          val spec : (var, value) Var_spec.t
-
-          module Padded : sig
-            type var = private Boolean.var list
-            type value
-            val spec : (var, value) Var_spec.t
-          end
-        end
-
-        module Checked : sig
-          val pad : Unpacked.var -> Unpacked.Padded.var
-          val unpack : Packed.var -> (Unpacked.var, _) Checked.t
-        end
-
-        val unpack : Packed.value -> Unpacked.value
-        val to_bits : Unpacked.value -> bool list
-      end
+      module type S = Bits_intf.Snarkable
+        with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
+         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type boolean_var := Boolean.var
     end
   end
 end
-
-let hash_unchecked = Pedersen.Main.hash
 
 module Make_types (Impl : Snark_intf.S) = struct
   module Digest = Pedersen.Main.Digest.Snarkable(Impl)
@@ -258,6 +231,8 @@ module Make_transition_system (M : sig
 end
 
 module Step = struct
+  module Pedersen0 = Pedersen.Main
+
   open Main
   open Let_syntax
 
@@ -270,6 +245,17 @@ module Step = struct
       { difficulty_info : ('time * 'target) list
       ; block_hash      : 'digest
       }
+
+    let fold_bits { difficulty_info; block_hash } ~init ~f =
+      let init =
+        List.fold difficulty_info ~init ~f:(fun init (time, target) -> 
+          let init = Time.Unpacked.fold time ~init ~f in
+          let init = Target.Unpacked.fold target ~init ~f in
+          init)
+      in
+      Digest.Unpacked.fold block_hash ~init ~f
+    ;;
+
 
 (* Someday: It may well be worth using bitcoin's compact nbits for target values since
    targets are quite chunky *)
@@ -290,18 +276,10 @@ module Step = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-    module Checked = struct
-      let to_bits { difficulty_info; block_hash } =
-        let%map bs = Digest.Checked.unpack block_hash in
-        List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info @ bs
-
-      let hash (t : var) = to_bits t >>= hash_digest 
-    end
-
     let to_bits ({ difficulty_info; block_hash } : value) : bool list =
       List.concat_map difficulty_info
-        ~f:(fun (x, y) -> Time.to_bits x @ Target.to_bits y)
-      @ Digest.(to_bits (unpack block_hash))
+        ~f:(fun (x, y) -> Time.Unpacked.to_bits x @ Target.Unpacked.to_bits y)
+      @ Digest.(Unpacked.to_bits (unpack block_hash))
     ;;
 
     let base_state : value =
@@ -314,10 +292,24 @@ module Step = struct
       ; block_hash = Block0.(hash genesis)
       }
 
-    let base_hash =
-      hash_digest (to_bits base_state)
+    let hash t =
+      let s = Pedersen0.State.create Pedersen0.params in
+      Pedersen0.State.update_fold s (fold_bits t);
+      Pedersen0.State.digest s
+    ;;
+
+    let base_hash = Cvar.constant (hash base_state)
 
     let is_base_hash h = Checked.equal base_hash h
+
+    module Checked = struct
+      let to_bits { difficulty_info; block_hash } =
+        let%map bs = Digest.Checked.unpack block_hash in
+        List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info @ bs
+
+      let hash (t : var) = to_bits t >>= hash_digest 
+    end
+
   end
 
   module Update = struct

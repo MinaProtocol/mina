@@ -6,10 +6,13 @@ module type S = sig
   module Digest : sig
     type t [@@deriving bin_io]
 
+    module Bits : Bits_intf.S with type t := t
+
     module Snarkable : functor (Impl : Snark_intf.S) ->
       Impl.Snarkable.Bits.S
       with type Packed.var = Impl.Cvar.t
        and type Packed.value = Impl.Field.t
+       and type Unpacked.value = Impl.Field.t
   end
 
   module Params : sig
@@ -23,7 +26,7 @@ module type S = sig
 
     val create : Params.t ->  t
 
-    val update_bitstring : t -> Bigstring.t -> unit
+    val update_bigstring : t -> Bigstring.t -> unit
 
     val update_fold
       : t
@@ -64,7 +67,7 @@ module Main : sig
     with type curve := Curve.t
      and type Digest.t = Snark_params.Main.Field.t
 
-  val hash : Bigstring.t -> Digest.t
+  val hash_bigstring : Bigstring.t -> Digest.t
 
   val zero_hash : Digest.t
 

@@ -1,8 +1,23 @@
 open Core_kernel
 
 module Main_curve = Camlsnark.Backends.Mnt4
+module Other_curve = Camlsnark.Backends.Mnt6
+
 module Main = struct
-  include Camlsnark.Snark.Make(Main_curve)
+  module T = Camlsnark.Snark.Make(Main_curve)
+
+  include (T : module type of T with module Field := T.Field)
+
+  module Field = struct
+    include T.Field
+
+    include Field_bin.Make(T.Field)(Main_curve.Bigint.R)
+
+    (* TODO: Assert that main_curve modulus is smaller than other_curve *)
+    let () = 
+      assert
+        (Main_curve.Field.size_in_bits = Other_curve.Field.size_in_bits)
+  end
 
   module Hash_curve = struct
     (* someday: Compute this from the number inside of ocaml *)
@@ -25,6 +40,5 @@ cardinality = 475922286169261325753349249653048451545124878135421791758205297448
   end
 end
 
-module Other_curve = Camlsnark.Backends.Mnt6
 module Other = Camlsnark.Snark.Make(Other_curve)
 

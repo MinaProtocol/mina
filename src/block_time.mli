@@ -2,10 +2,11 @@ open Core_kernel
 
 type t [@@deriving bin_io]
 
+module Bits : Bits_intf.S with type t := t
+
 module Snarkable : functor (Impl : Snark_intf.S) ->
   Impl.Snarkable.Bits.S
   with type Unpacked.value = t
-   and type Unpacked.Padded.value = t
    and type Packed.value = t
 
 module Span : sig
@@ -14,7 +15,6 @@ module Span : sig
   module Snarkable : functor (Impl : Snark_intf.S) ->
     Impl.Snarkable.Bits.S
     with type Unpacked.value = t
-    and type Unpacked.Padded.value = t
     and type Packed.value = t
 
   val of_time_span : Time.Span.t -> t
