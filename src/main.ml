@@ -161,7 +161,10 @@ let () =
             ~doc:"Run the miner" (required bool)
         and port =
           flag "port"
-            ~doc:"server port" (required int16)
+            ~doc:"Server port for other to connect" (required int16)
+        and ip =
+          flag "ip"
+            ~doc:"External IP address for others to connect" (required string)
         in
         fun () ->
           let open Deferred.Let_syntax in
@@ -173,8 +176,7 @@ let () =
             Reader.load_sexps_exn conf_dir Host_and_port.t_of_sexp
           in
           Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
-            (* TODO: This should be inside the config_dir right? *)
-            (Host_and_port.create ~host:"127.0.0.1" ~port:8884)
+            (Host_and_port.create ~host:ip ~port)
       ]
     end
   |> Command.run
