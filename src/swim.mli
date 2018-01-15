@@ -18,7 +18,7 @@ module type S = sig
   type t
 
   val connect
-    : config:Config.t -> initial_peers:Peer.t list -> me:Peer.t -> t Deferred.t
+    : config:Config.t -> initial_peers:Peer.t list -> me:Peer.t -> t
 
   val peers : t -> Peer.t list
 
