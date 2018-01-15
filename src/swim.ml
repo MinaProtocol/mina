@@ -37,7 +37,7 @@ end
 module type S = sig
   type t
 
-  val connect : config:Config.t -> initial_peers:Peer.t list -> me:Peer.t -> t Deferred.t
+  val connect : config:Config.t -> initial_peers:Peer.t list -> me:Peer.t -> t
 
   val peers : t -> Peer.t list
 
@@ -306,7 +306,7 @@ module type Transport_intf =
     val create : logger -> port:int -> t
 
     val send : t -> recipient:Peer.t -> Message.t -> unit Or_error.t Deferred.t
-    val listen : t -> Message.t Linear_pipe.Reader.t Deferred.t
+    val listen : t -> Message.t Linear_pipe.Reader.t
 
     val stop_listening : t -> unit
 
@@ -348,7 +348,7 @@ end) = struct
     | (_, None) -> return (Ok ())
     | (_, Some fn) -> fn ~recipient msg
 
-  let listen (t: t) : Message.t Linear_pipe.Reader.t Deferred.t =
+  let listen (t: t) : Message.t Linear_pipe.Reader.t =
     let (r,w) = Linear_pipe.create () in
     Host_and_port.Table.add_exn network.connected
       ~key:(me t)
@@ -356,7 +356,7 @@ end) = struct
         let%bind () = Pipe.write w msg in
         return (Ok ())
       );
-    return r
+    r
 
   let stop_listening t =
     Host_and_port.Table.remove network.connected (me t)
@@ -429,7 +429,7 @@ end) = struct
         Ok ()
     | Error _ as e -> Deferred.return e
 
-  let listen : t -> Message.t Linear_pipe.Reader.t Deferred.t =
+  let listen : t -> Message.t Linear_pipe.Reader.t =
     fun t ->
       let socket_addr =
         Socket.Address.Inet.create
@@ -437,7 +437,7 @@ end) = struct
           ~port:t.port
       in
       let open Deferred.Let_syntax in
-      let%map socket = Udp.bind socket_addr in
+      let socket = Udp.bind socket_addr in
       let (r,w) = Linear_pipe.create () in
       let max_ready = 64 in
       let capacity = 8192 in
@@ -546,7 +546,7 @@ module Make (Transport : Transport_intf) = struct
   let connect ~config ~initial_peers ~me =
     let logger = new Log.logger (Printf.sprintf "Swim:%s" (me |> Host_and_port.port |> string_of_int)) in
     let net = Net.create ~port:(Host_and_port.port me) logger in
-    let%map incoming = Net.listen net in
+    let incoming = Net.listen net in
     let net_state = Network_state.create logger in
     let rec handle_msg messager = function
       | (Payload.Ping, _) -> Deferred.return `Want_ack

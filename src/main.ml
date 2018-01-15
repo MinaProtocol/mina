@@ -59,7 +59,7 @@ struct
       ; target_peer_count = 8
       }
     in
-    let%bind swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
+    let swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
     let%bind gossip_net = Gossip_net.create (Swim.changes swim) params in
     let%map initial_blockchain =
       match%map Storage.load storage_location with
@@ -114,7 +114,7 @@ module Main = Make(Swim.Udp)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
 
 let () =
   let open Command.Let_syntax in
-  Command.async'
+  Command.async
     ~summary:"Current daemon"
     begin
       [%map_open
