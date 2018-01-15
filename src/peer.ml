@@ -1,6 +1,11 @@
 open Core_kernel
 
-type t = Host_and_port.t [@@deriving bin_io, sexp, compare]
+module T = struct 
+  type t = Host_and_port.Stable.V1.t [@@deriving bin_io, sexp, compare, hash]
+end
+
+include T 
+include Hashable.Make(T)
 
 module Event = struct
   type nonrec t =

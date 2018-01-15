@@ -16,6 +16,13 @@ val create : unit -> 'a Reader.t * 'a Writer.t
 
 val wrap_reader : 'a Pipe.Reader.t -> 'a Reader.t
 
+val write_or_drop
+  : capacity : int
+  -> 'a Writer.t 
+  -> 'a Reader.t 
+  -> 'a 
+  -> unit
+
 val iter
   :  ?consumer          : Pipe.Consumer.t
   -> ?continue_on_error : bool  (** default is [false] *)

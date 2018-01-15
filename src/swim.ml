@@ -449,9 +449,7 @@ end) = struct
             let msg = Iobuf.Consume.bin_prot Message.bin_reader_t buf in
             t.logger#logf Debug "Got msg %s on socket" (msg |> Message.sexp_of_t |> Sexp.to_string);
             (* TODO need to check to make sure this is the correct side to drain from once > capacity *)
-            if Pipe.length r.Linear_pipe.Reader.pipe > capacity
-            then ignore (Pipe.read_now r.Linear_pipe.Reader.pipe);
-            Pipe.write_without_pushback w msg
+            Linear_pipe.write_or_drop ~capacity w r msg
         )
       end;
       r
