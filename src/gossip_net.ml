@@ -117,7 +117,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
       Rpc.Implementations.add_exn 
         implementations 
         (Rpc.One_way.implement broadcast_rpc (fun () m -> 
-          Linear_pipe.write_with_capacity 
+          Linear_pipe.write_or_drop
             ~capacity:broadcast_received_capacity 
             received_writer received_reader m
         ))

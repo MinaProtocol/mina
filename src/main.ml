@@ -34,16 +34,16 @@ struct
     =
     let from_new_peers_reader, from_new_peers_writer = Linear_pipe.create () in
     let fetch_period = Time.Span.of_min 10. in
-    let fetch_peers = 4 in
+    let fetch_peer_count = 4 in
     let rec timer () = 
       let%bind () = after fetch_period in
       let%bind () = 
         Deferred.List.iter
           ~how:`Parallel
-          (Gossip_net.query_random_peers gossip_net fetch_peers Rpcs.Get_strongest_block.rpc ())
+          (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.rpc ())
           ~f:(fun x -> match%bind x with
             | Ok b -> Pipe.write from_new_peers_writer (Blockchain.Update.New_block b)
-            | Error _ -> return ())
+            | Error e -> printf "%s\n" (Error.to_string_hum e); return ())
       in
       timer ()
     in
