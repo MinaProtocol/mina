@@ -43,7 +43,7 @@ struct
           (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.rpc ())
           ~f:(fun x -> match%bind x with
             | Ok b -> Pipe.write from_new_peers_writer (Blockchain.Update.New_block b)
-            | Error e -> printf "%s\n" (Error.to_string_hum e); return ())
+            | Error e -> eprintf "%s\n" (Error.to_string_hum e); return ())
       in
       timer ()
     in

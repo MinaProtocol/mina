@@ -80,7 +80,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
     let selected_peers = random_sublist (Hash_set.to_list peers) n in
     let send peer = 
       Tcp.with_connection
-        (Tcp.to_host_and_port (Host_and_port.host peer) (Host_and_port.port peer))
+        (Tcp.Where_to_connect.of_host_and_port peer)
         ~timeout:timeout
         (fun _ r w ->
            match%map Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
@@ -90,7 +90,9 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
     Deferred.List.iter 
       ~how:`Parallel 
       selected_peers
-      ~f:(fun p -> Deferred.ignore (send p))
+      ~f:(fun p -> match%map (send p) with
+        | Ok () -> ()
+        | Error e -> eprintf "%s\n" (Error.to_string_hum e))
   ;;
 
   let create (peer_events : Peer.Event.t Linear_pipe.Reader.t) (params : Params.t) implementations = 
@@ -132,7 +134,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
     end;
     ignore begin
       Tcp.Server.create 
-        ~on_handler_error:(`Call (fun net exn -> printf "%s\n" (Exn.to_string_mach exn)))
+        ~on_handler_error:(`Call (fun net exn -> eprintf "%s\n" (Exn.to_string_mach exn)))
         (Tcp.Where_to_listen.create 
            ~socket_type:Socket.Type.tcp 
            ~address:(`Inet (Unix.Inet_addr.of_string (Host_and_port.host params.address), Host_and_port.port params.address))
@@ -154,11 +156,11 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
 
   let query_peer t (peer : Peer.t) rpc query = 
     Tcp.with_connection
-      (Tcp.to_host_and_port (Host_and_port.host peer) (Host_and_port.port peer))
+      (Tcp.Where_to_connect.of_host_and_port peer)
       ~timeout:t.timeout
       (fun _ r w ->
          match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
-         | Error exn -> return (Or_error.error_string (Exn.to_string exn))
+         | Error exn -> return (Or_error.of_exn exn)
          | Ok conn -> Rpc.Rpc.dispatch rpc conn query)
 
   let query_random_peers t n rpc query = 
