@@ -70,10 +70,6 @@ module Vector = struct
   end
 end
 
-module Bigstring0
-    (M : sig val bit_length : int end)
-  = Vector.Make(Vector.Bigstring(M))
-
 module Int64 : Bits_intf.S with type t := Int64.t = Vector.Make(Vector.Int64)
 
 module Make_field0
@@ -302,39 +298,6 @@ module Snarkable = struct
         let alloc = Alloc.all (List.init bit_length ~f:(fun _ -> Boolean.spec.alloc)) in
         { store; read; check; alloc }
       ;;
-
-      (*
-      module Padded = struct
-        type var = Boolean.var list
-        type value = Bigstring.t
-
-        let padding =
-          List.init (element_length * Field.size_in_bits - bit_length)
-            ~f:(fun _ -> Boolean.false_)
-
-        let spec =
-          let open Var_spec in
-          let store (t : value) : var Store.t =
-            let open Store.Let_syntax in
-            let rec go acc i =
-              if i < 0
-              then return acc
-              else
-                let b = bigstring_nth_bit t i in
-                let%bind b = Boolean.spec.store b in
-                go (b :: acc) (i - 1)
-            in
-            go padding (bits_per_char * Bigstring.length t)
-          in
-          let read bs =
-            Read.map (Read.all (List.map ~f:Boolean.spec.read (List.take bs bit_length)))
-              ~f:of_bool_list
-          in
-          let check bs = Checked.all_ignore (List.map ~f:Boolean.spec.check bs) in
-          let alloc = Alloc.all (List.init (element_length * Field.size_in_bits) ~f:(fun _ -> Boolean.spec.alloc)) in
-          { store; read; check; alloc }
-        ;;
-      end *)
     end
 
     let bits_in_final_elt = bit_length mod bits_per_element
@@ -420,7 +383,7 @@ module Snarkable = struct
     let unpack : Packed.value -> Unpacked.value = Fn.id
   end
 
-  module Small0
+  module Field_backed
       (Impl : Camlsnark.Snark_intf.S)
       (M : sig val bit_length : int end)
     : Bits_intf.Snarkable
@@ -473,14 +436,14 @@ module Snarkable = struct
   end
 
   module Field (Impl : Camlsnark.Snark_intf.S) =
-    Small0(Impl)(struct let bit_length = Impl.Field.size_in_bits end)
+    Field_backed(Impl)(struct let bit_length = Impl.Field.size_in_bits end)
 
   module Small
       (Impl : Camlsnark.Snark_intf.S)
       (M : sig val bit_length : int end) = struct
     let () = assert (M.bit_length < Impl.Field.size_in_bits)
 
-    include Small0(Impl)(M)
+    include Field_backed(Impl)(M)
   end
 end
 
@@ -507,77 +470,3 @@ module Make_unpacked
         Boolean.spec
   end
 end
-
-(*
-module Make0
-    (Impl : Camlsnark.Snark_intf.S)
-    (M : sig
-      val bit_length : int
-(* Someday: Just make this [val kind : [`Arbitary | `Field_element]] *)
-      val bits_per_element : int
-    end) = struct
-  open Impl
-
-  include M
-
-  let element_length =
-    Float.(to_int (round_up (of_int bit_length / of_int bits_per_element)))
-
-  module Packed = struct
-    type var = Cvar.t list
-    type value = Field.t list
-    let spec = Var_spec.(list field ~length:element_length )
-  end
-
-  module Unpacked = Make_unpacked(Impl)(struct
-      let bit_length = bit_length
-      let element_length = element_length
-    end)
-
-  module Checked = struct
-    let unpack : Packed.var -> (Unpacked.var, _) Checked.t =
-      let open Let_syntax in
-      let rec go remaining acc = function
-        | x :: xs ->
-          let to_unpack = min remaining bits_per_element in
-          let%bind bs = Checked.unpack x ~length:to_unpack in
-          go (remaining - to_unpack) (List.rev_append bs acc) xs
-        | [] ->
-          assert (remaining = 0);
-          return (List.rev acc)
-      in
-      fun xs -> go bit_length [] xs
-
-    let padding =
-      List.init (element_length * Field.size_in_bits - bit_length)
-        ~f:(fun _ -> Boolean.false_)
-
-    let pad x = x @ padding
-  end
-
-  (* Someday: Would be nice to write this code only once. *)
-  let unpack : Packed.value -> Unpacked.value =
-    let rec go remaining acc = function
-      | x :: xs ->
-        let to_unpack = min remaining bits_per_element in
-        let bs = List.take (Field.unpack x) to_unpack in
-        go (remaining - to_unpack) (List.rev_append bs acc) xs
-      | [] ->
-        assert (remaining = 0);
-        List.rev acc
-    in
-    fun xs -> go bit_length [] xs
-
-  let padding =
-    List.init (element_length * Field.size_in_bits - bit_length)
-      ~f:(fun _ -> false)
-
-  let pad x = x @ padding
-end
-
-module Make(Impl : Camlsnark.Snark_intf.S)(M : sig val bit_length : int end) =
-  Make0(Impl)(struct
-    include M
-    let bits_per_element = Impl.Field.size_in_bits - 1
-  end)
- *)

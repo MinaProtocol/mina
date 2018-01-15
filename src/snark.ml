@@ -76,14 +76,6 @@ let step_input () =
 
 let step_input_size = Main.Data_spec.size (step_input ())
 
-
-(*
-let step_vk_size = 38
-
-let step_vk_spec =
-  Other.(Var_spec.list ~length:step_vk_size Var_spec.field)
-   *)
-
 (* TODO: Important that a digest can fit into an Other.Field.t *)
 let wrap_input () =
   let open Other in
