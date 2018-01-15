@@ -121,28 +121,4 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     in
     m
   ;;
-
-(* (#<=) >= n/2
-   (#>=) >= n/2 *)
-  let median
-        ~bit_length
-        (xs : Cvar.t list)
-    =
-    let length = List.length xs in
-    let index = length / 2 in
-    let _m =
-      store Var_spec.field As_prover.(Let_syntax.(
-        let%map xs = read Var_spec.(list ~length field) xs in
-        let xs = List.sort ~cmp:compare_field xs in
-        List.nth_exn xs index))
-    in
-    return (failwith "TODO")
-(*
-    let%bind () =
-      List.map xs ~f:(fun 
-*)
-
-  ;;
 end
-
-

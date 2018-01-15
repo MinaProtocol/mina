@@ -3,6 +3,8 @@ open Core_kernel
 module Main_curve = Camlsnark.Backends.Mnt4
 module Other_curve = Camlsnark.Backends.Mnt6
 
+module Other = Camlsnark.Snark.Make(Other_curve)
+
 module Main = struct
   module T = Camlsnark.Snark.Make(Main_curve)
 
@@ -13,10 +15,18 @@ module Main = struct
 
     include Field_bin.Make(T.Field)(Main_curve.Bigint.R)
 
-    (* TODO: Assert that main_curve modulus is smaller than other_curve *)
+    let rec compare_bitstring xs0 ys0 =
+      match xs0, ys0 with
+      | true :: xs, true :: ys | false :: xs, false :: ys -> compare_bitstring xs ys
+      | false :: xs, true :: ys -> `LT
+      | true :: xs, false :: ys -> `GT
+      | [], [] -> `EQ
+      | _ :: _, [] | [], _ :: _ -> failwith "compare_bitstrings: Different lengths"
+
     let () = 
-      assert
-        (Main_curve.Field.size_in_bits = Other_curve.Field.size_in_bits)
+      let main_size_proxy = List.rev (unpack (negate one)) in
+      let other_size_proxy = List.rev (unpack (negate one)) in
+      assert (compare_bitstring main_size_proxy other_size_proxy = `LT)
   end
 
   module Hash_curve = struct
@@ -39,6 +49,4 @@ cardinality = 475922286169261325753349249653048451545124878135421791758205297448
       end)
   end
 end
-
-module Other = Camlsnark.Snark.Make(Other_curve)
 

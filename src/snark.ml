@@ -76,7 +76,6 @@ let step_input () =
 
 let step_input_size = Main.Data_spec.size (step_input ())
 
-(* TODO: Important that a digest can fit into an Other.Field.t *)
 let wrap_input () =
   let open Other in
   let open Data_spec in
@@ -86,8 +85,6 @@ module Make_wrap (M : sig
     val verification_key : Main.Verification_key.t
   end)
 = struct
-  (* TODO: Important to assert that main field is smaller than other field *)
-
   let input = wrap_input
 
   open Other
@@ -229,7 +226,7 @@ module Step = struct
   open Let_syntax
 
   module State = struct
-    let difficulty_window = 10
+    let difficulty_window = 17
 
     type ('time, 'target, 'digest) t =
       (* Someday: To avoid hashing a big list it might be better to make this a blockchain
@@ -302,7 +299,7 @@ module Step = struct
 
     let all_but_last_exn xs = fst (split_last_exn xs)
 
-    (* TODO *)
+    (* TODO: A subsequent PR will replace this with the actual difficulty calculation *)
     let compute_target _ =
       return (Cvar.constant Field.(negate one))
 
