@@ -37,7 +37,7 @@ struct
     let from_new_peers =
       Linear_pipe.filter_map_unordered ~max_concurrency:64 (Gossip_net.new_peers gossip_net) ~f:(fun peer ->
         Deferred.map ~f:(function
-          | Ok b -> Some (Blockchain.Update.New_block b)
+          | Ok b -> Some (Blockchain.Update.New_chain b)
           | Error _ -> None)
           (Gossip_net.query_peer gossip_net peer
               Rpcs.Get_strongest_block.rpc ()))
@@ -45,7 +45,7 @@ struct
     let broadcasts =
       Linear_pipe.filter_map (Gossip_net.received gossip_net)
         ~f:(function
-          | New_strongest_block b -> Some (Blockchain.Update.New_block b))
+          | New_strongest_block b -> Some (Blockchain.Update.New_chain b))
     in
     Linear_pipe.merge_unordered
       [ from_new_peers
@@ -84,7 +84,7 @@ struct
         Linear_pipe.iter gossip_net_strongest_block_reader
           ~f:(fun b ->
             Pipe.write body_changes_writer
-              (Miner.Update.Change_body (Int64.(b.block.body + Int64.one))))
+              (Miner.Update.Change_body (Int64.succ b.state.number)))
       end
     in
     let mined_blocks =
@@ -92,7 +92,7 @@ struct
       then
         Miner_impl.mine
           ~previous:initial_blockchain
-          ~body:(Int64.succ initial_blockchain.block.body)
+          ~body:(Int64.succ initial_blockchain.state.number)
           (Linear_pipe.merge_unordered
             [ Linear_pipe.map body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
             ; body_changes_reader
@@ -103,11 +103,11 @@ struct
       (Linear_pipe.map storage_strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain.accumulate
       ~init:initial_blockchain
-      ~strongest_block:strongest_block_writer
+      ~strongest_chain:strongest_block_writer
       ~updates:(
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
-          ; Linear_pipe.map mined_blocks ~f:(fun b -> Blockchain.Update.New_block b)
+          ; Linear_pipe.map mined_blocks ~f:(fun b -> Blockchain.Update.New_chain b)
           ])
   ;;
 end

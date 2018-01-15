@@ -1,13 +1,20 @@
 open Core_kernel
+open Snark_params
 
-type t = Snark_params.Main.Field.t
+type t = Tick.Field.t
 [@@deriving bin_io]
 
-let zero = Snark_params.Main.Field.zero
+let zero = Tick.Field.zero
 
-(* TODO: Should assert that the field in the input impl is at
-   least as large as Main.Field *)
-module Snarkable = Bits.Snarkable.Field
+include Bits.Snarkable.Field(Tick)
 
-module Bits = Bits.Make_field(Snark_params.Main.Field)(Snark_params.Main.Bigint)
+module Bits = Bits.Make_field(Tick.Field)(Tick.Bigint)
 
+let compare x y =
+  Tick.Bigint.(compare (of_field x) (of_field y))
+
+let (<) x y = compare x y < 0
+let (>) x y = compare x y > 0
+let (=) x y = compare x y = 0
+let (>=) x y = not (x < y)
+let (<=) x y = not (x > y)

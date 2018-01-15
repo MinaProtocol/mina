@@ -1,23 +1,22 @@
 open Core_kernel
+open Snark_params
 
-type t [@@deriving bin_io]
+type t [@@deriving sexp, bin_io]
 
 module Bits : Bits_intf.S with type t := t
 
-module Snarkable : functor (Impl : Snark_intf.S) ->
-  Impl.Snarkable.Bits.S
+include Tick.Snarkable.Bits.S
   with type Unpacked.value = t
    and type Packed.value = t
 
 module Span : sig
   type t [@@deriving bin_io]
 
-  module Snarkable : functor (Impl : Snark_intf.S) ->
-    Impl.Snarkable.Bits.S
+  val of_time_span : Time.Span.t -> t
+
+  include Tick.Snarkable.Bits.S
     with type Unpacked.value = t
     and type Packed.value = t
-
-  val of_time_span : Time.Span.t -> t
 end
 
 val diff : t -> t -> Span.t

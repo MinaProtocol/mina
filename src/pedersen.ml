@@ -26,17 +26,17 @@ module type S = sig
 
     val create : Params.t ->  t
 
-    val update_bigstring : t -> Bigstring.t -> unit
+    val update_bigstring : t -> Bigstring.t -> t
 
     val update_fold
       : t
       -> (init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int)
-      -> unit
+      -> t
 
     val update_iter
       : t
       -> (f:(bool -> unit) -> unit)
-      -> unit
+      -> t
 
     val digest : t -> Digest.t
   end
@@ -47,8 +47,6 @@ module Make
     (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
     (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
-  (* TODO: Unit tests for field_to_bigstring/bigstring_to_field *)
-
   module Digest = struct
     type t = Field.t
 
@@ -65,16 +63,16 @@ struct
     let random_elt () =
       let x = Field.random () in
       let n = Bigint.of_field x in
-      let rec go pt i acc =
+      let rec go two_to_the_i i acc =
         if i = Field.size_in_bits
         then acc
         else
           let acc =
             if Bigint.test_bit n i
-            then Curve.add acc pt
+            then Curve.add acc two_to_the_i
             else acc
           in
-          go (Curve.double pt) (i + 1) acc
+          go (Curve.double two_to_the_i) (i + 1) acc
       in
       go Curve.generator 0 Curve.identity
     ;;
@@ -87,9 +85,9 @@ struct
 
   module State = struct
     type t =
-      { mutable acc : Curve.t
-      ; mutable i   : int
-      ; params      : Params.t
+      { acc    : Curve.t
+      ; i      : int
+      ; params : Params.t
       }
 
     let create params = { acc = Curve.identity; i = 0; params }
@@ -101,10 +99,11 @@ struct
       let params = t.params in
       let (acc, i) =
         fold ~init:(t.acc, t.i) ~f:(fun (acc, i) b ->
-          if b then (Curve.add acc params.(i), i + 1) else (acc, i + 1))
+          if b
+          then (Curve.add acc params.(i), i + 1)
+          else (acc, i + 1))
       in
-      t.acc <- acc;
-      t.i <- i
+      { t with acc; i }
     ;;
 
     let update_iter (t : t) (iter : f:(bool -> unit) -> unit) =
@@ -114,8 +113,7 @@ struct
       iter ~f:(fun b ->
         (if b then acc := Curve.add !acc params.(!i));
         incr i);
-      t.acc <- !acc;
-      t.i <- !i
+      { t with acc = !acc; i = !i }
     ;;
 
     let update_bigstring (t : t) (s : Bigstring.t) =
@@ -141,39 +139,9 @@ struct
           |> cond_add 6
           |> cond_add 7
       done;
-      t.acc <- !acc;
-      t.i   <- t.i + bit_length
+      { t with acc = !acc; i = t.i + bit_length }
     ;;
 
     let digest t = let (x, _y) = t.acc in x
   end
-end
-
-module Main = struct
-  module Curve = struct
-    include Snark_params.Main.Hash_curve
-
-    module Scalar (Impl : Camlsnark.Snark_intf.S) = struct
-      (* Someday: Make more efficient *)
-      open Impl
-      type var = Boolean.var list
-      type value = bool list
-
-      let length = bit_length
-      let spec : (var, value) Var_spec.t = Var_spec.list ~length Boolean.spec
-      let assert_equal = Checked.Assert.equal_bitstrings
-    end
-  end
-
-  include Make(Snark_params.Main.Field)(Snark_params.Main_curve.Bigint.R)(Curve)
-
-  let params = Pedersen_params.t
-
-  let hash_bigstring x : Digest.t =
-    let s = State.create params in
-    State.update_bigstring s x;
-    State.digest s
-  ;;
-
-  let zero_hash = hash_bigstring (Bigstring.create 0)
 end

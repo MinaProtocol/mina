@@ -1,14 +1,16 @@
 open Core_kernel
+open Snark_params
 
 (* Milliseconds since epoch *)
 type t = Int64.t
-[@@deriving bin_io]
+[@@deriving bin_io, sexp]
 
-module Snarkable = Bits.Snarkable.Int64
+include Bits.Snarkable.Int64(Tick)
 
 module Span = struct
-  module Snarkable = Bits.Snarkable.Int64
   type t = Int64.t [@@deriving bin_io]
+
+  include Bits.Snarkable.Int64(Tick)
 
   let of_time_span s =
     Int64.of_float (Time.Span.to_ms s)
