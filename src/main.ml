@@ -67,11 +67,16 @@ struct
       ; address = me
       }
     in
-    let strongest_block_reader, strongest_block_writer = Pipe.create () in
+    let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
+    let gossip_net_strongest_block_reader, 
+        body_changes_strongest_block_reader,
+        storage_strongest_block_reader,
+        latest_strongest_block_reader = 
+      Linear_pipe.fork4 strongest_block_reader in
     let latest_strongest_block = ref Blockchain.genesis in
     let () =
       don't_wait_for begin
-        Pipe.iter strongest_block_reader
+        Linear_pipe.iter latest_strongest_block_reader
           ~f:(fun b -> return (latest_strongest_block := b))
       end
     in
@@ -93,11 +98,6 @@ struct
       | Some x -> x
       | None -> genesis_block
     in
-    (* Are peers bi-directional? *)
-    let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
-    let gossip_net_strongest_block_reader, 
-        body_changes_strongest_block_reader,
-        storage_strongest_block_reader = Linear_pipe.fork3 strongest_block_reader in
     don't_wait_for begin
       Linear_pipe.transfer ~f:(fun b -> New_strongest_block b)
         gossip_net_strongest_block_reader 
