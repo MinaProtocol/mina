@@ -74,6 +74,34 @@ struct
         latest_strongest_block_reader = 
       Linear_pipe.fork4 strongest_block_reader in
     let latest_strongest_block = ref Blockchain.genesis in
+    let latest_mined_block = ref Blockchain.genesis in
+    let%map initial_blockchain =
+      match%map Storage.load storage_location with
+      | Some x -> x
+      | None -> genesis_block
+    in
+    let body_changes_reader, body_changes_writer = Linear_pipe.create () in
+    let mined_blocks_reader =
+      if should_mine
+      then
+        Miner_impl.mine
+          ~previous:initial_blockchain
+          ~body:(Int64.succ initial_blockchain.block.body)
+          (Linear_pipe.merge_unordered
+            [ Linear_pipe.map body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
+            ; body_changes_reader
+            ])
+      else Linear_pipe.of_list []
+    in
+    let blockchain_mined_blocks_reader,
+        latest_mined_blocks_reader = 
+      Linear_pipe.fork2 mined_blocks_reader in
+    let () =
+      don't_wait_for begin
+        Linear_pipe.iter latest_mined_blocks_reader 
+          ~f:(fun b -> return (latest_mined_block := b))
+      end
+    in
     let () =
       don't_wait_for begin
         Linear_pipe.iter latest_strongest_block_reader
@@ -91,19 +119,24 @@ struct
         ~implementations: (List.map handlers ~f:(fun (rpc, cb) -> (Rpc.Rpc.implement rpc cb)))
         ~on_unknown_rpc:`Close_connection
     in
+    let rebroadcast_period = Time.Span.of_sec 10. in
     let swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
     let gossip_net = Gossip_net.create (Swim.changes swim) params implementations in
-    let%map initial_blockchain =
-      match%map Storage.load storage_location with
-      | Some x -> x
-      | None -> genesis_block
+    (* someday this could be much more sophisticated *)
+    let rec rebroadcast_timer () = 
+      let%bind () = after rebroadcast_period in
+      if Blockchain.(!latest_mined_block.block = !latest_strongest_block.block)
+      then 
+        let%bind () = Pipe.write (Gossip_net.broadcast gossip_net) (New_strongest_block !latest_mined_block) in
+        rebroadcast_timer ()
+      else rebroadcast_timer ()
     in
+    don't_wait_for (rebroadcast_timer ());
     don't_wait_for begin
       Linear_pipe.transfer ~f:(fun b -> New_strongest_block b)
         gossip_net_strongest_block_reader 
         (Gossip_net.broadcast gossip_net);
     end;
-    let body_changes_reader, body_changes_writer = Linear_pipe.create () in
     let () =
       don't_wait_for begin
         Linear_pipe.iter gossip_net_strongest_block_reader
@@ -111,18 +144,6 @@ struct
             Pipe.write body_changes_writer
               (Miner.Update.Change_body (Int64.(b.block.body + Int64.one))))
       end
-    in
-    let mined_blocks =
-      if should_mine
-      then
-        Miner_impl.mine
-          ~previous:initial_blockchain
-          ~body:(Int64.succ initial_blockchain.block.body)
-          (Linear_pipe.merge_unordered
-            [ Linear_pipe.map body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
-            ; body_changes_reader
-            ])
-      else Linear_pipe.of_list []
     in
     Storage.persist storage_location
       (Linear_pipe.map storage_strongest_block_reader ~f:(fun b -> `Change_head b));
@@ -132,7 +153,7 @@ struct
       ~updates:(
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
-          ; Linear_pipe.map mined_blocks ~f:(fun b -> Blockchain.Update.New_block b)
+          ; Linear_pipe.map blockchain_mined_blocks_reader ~f:(fun b -> Blockchain.Update.New_block b)
           ])
   ;;
 end
