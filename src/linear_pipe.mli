@@ -59,6 +59,8 @@ val fork2 : 'a Reader.t -> 'a Reader.t * 'a Reader.t
 
 val fork3 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t
 
+val fork4 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t
+
 val partition_map2 : 'a Reader.t -> f:('a -> [ `Fst of 'b  | `Snd of 'c ]) -> 'b Reader.t * 'c Reader.t
 
 val partition_map3 : 'a Reader.t -> f:('a -> [ `Fst of 'b  | `Snd of 'c | `Trd of 'd ]) -> 'b Reader.t * 'c Reader.t * 'd Reader.t

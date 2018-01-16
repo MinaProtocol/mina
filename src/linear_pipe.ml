@@ -133,6 +133,12 @@ let fork3 reader =
   | _ -> assert false
 ;;
 
+let fork4 reader = 
+  match fork reader 4 with
+  | [x; y; z; w] -> (x, y, z, w)
+  | _ -> assert false
+;;
+
 let partition_map2 reader ~f =
   let ((reader_a, writer_a), (reader_b, writer_b)) = (create (), create ()) in
   don't_wait_for begin
