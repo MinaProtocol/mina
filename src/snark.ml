@@ -195,6 +195,10 @@ module Make_transition_system (M : sig
     Verifier.All_in_one.result v
   ;;
 
+  let print_bool ~label (b : Boolean.var) =
+    as_prover
+      As_prover.(map (read Boolean.spec b) ~f:(fun b -> printf "%s: %b\n%!" label b))
+
   let main top_hash =
     let%bind wrap_vk =
       get_witness wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
@@ -204,13 +208,17 @@ module Make_transition_system (M : sig
     and update          = get_witness Update.spec ~f:Prover_state.update
     in
     let%bind (next_state, `Success success) = Update.apply update prev_state in
+    let%bind () = print_bool ~label:"success" success in
     let%bind state_hash = State.hash next_state in
     let%bind () =
       let%bind sh = Main.Digest.Checked.unpack state_hash in
       hash_digest (wrap_vk @ sh) >>= assert_equal top_hash
     in
     let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
+    printf "TEST\n%!";
+    let%bind () = print_bool ~label:"prev_state_valid" prev_state_valid in
     let%bind inductive_case_passed = Boolean.(prev_state_valid && success) in
+    let%bind () = print_bool ~label:"inductive_case_passed" inductive_case_passed in
     let%bind is_base_case = State.is_base_hash state_hash in
     Boolean.Assert.any
       [ is_base_case
@@ -366,7 +374,8 @@ let base_proof =
     ; update = Block.genesis
     }
     Transition.main
-    Step.State.base_hash
+    (Main.Field.of_int 2323)
+    (* Step.State.base_hash *) (* This shouldn't have worked. This should be H(self, base_hash) *)
 ;;
 
 let embed (x : Main.Field.t) : Other.Field.t =
@@ -394,6 +403,7 @@ let wrap (hash : Pedersen.Main.Digest.t) proof =
 let step ~prev_proof ~prev_state block =
   let prev_hash = Step.State.hash_unchecked prev_state in
   let prev_proof = wrap prev_hash prev_proof in
+  let next_state = Step.Update.apply_unchecked block prev_state in
   Main.prove step_pk (Transition.input ())
     { Transition.Prover_state.prev_proof
     ; wrap_vk
@@ -401,7 +411,8 @@ let step ~prev_proof ~prev_state block =
     ; update = block
     }
     Transition.main
-    (Step.State.hash_unchecked
-       (Step.Update.apply_unchecked block prev_state))
+    (Step.State.hash_unchecked next_state)
 ;;
 
+let proof =
+  step ~prev_proof:base_proof ~prev_state:Step.State.base_state

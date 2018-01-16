@@ -23,9 +23,13 @@ module Main = struct
       | [], [] -> `EQ
       | _ :: _, [] | [], _ :: _ -> failwith "compare_bitstrings: Different lengths"
 
+    let bitsring bs =
+      String.of_char_list
+        (List.map ~f:(fun b -> if b then '1' else '0') bs)
+
     let () = 
       let main_size_proxy = List.rev (unpack (negate one)) in
-      let other_size_proxy = List.rev (unpack (negate one)) in
+      let other_size_proxy = List.rev Other.Field.(unpack (negate one)) in
       assert (compare_bitstring main_size_proxy other_size_proxy = `LT)
   end
 
