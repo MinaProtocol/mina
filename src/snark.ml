@@ -2,6 +2,9 @@ open Core_kernel
 open Util
 open Snark_params
 
+let bitstring xs =
+  String.of_char_list (List.map xs ~f:(fun b -> if b then '1' else '0'))
+
 module Extend (Impl : Camlsnark.Snark_intf.S) = struct
   include Impl
 
@@ -211,8 +214,13 @@ module Make_transition_system (M : sig
     let%bind () = print_bool ~label:"success" success in
     let%bind state_hash = State.hash next_state in
     let%bind () =
+      let%bind () =
+        as_prover As_prover.(map (read_var state_hash) ~f:(fun x ->
+          printf "in proof, state_hash\n%!";
+          Field.print x))
+      in
       let%bind sh = Main.Digest.Checked.unpack state_hash in
-      hash_digest (wrap_vk @ sh) >>= assert_equal top_hash
+      hash_digest (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
     in
     let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
     printf "TEST\n%!";
@@ -232,6 +240,11 @@ module Step = struct
 
   open Main
   open Let_syntax
+
+
+  let compute_target_unchecked _ = Field.(negate one)
+
+  let all_but_last_exn xs = fst (split_last_exn xs)
 
   module State = struct
     let difficulty_window = 17
@@ -253,7 +266,6 @@ module Step = struct
       Digest.Unpacked.fold block_hash ~init ~f
     ;;
 
-
 (* Someday: It may well be worth using bitcoin's compact nbits for target values since
    targets are quite chunky *)
     type var = (Time.Unpacked.var, Target.Unpacked.var, Digest.Packed.var) t
@@ -273,7 +285,16 @@ module Step = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-    let base_state : value =
+    let apply_unchecked (block : Block0.t) state =
+      let target = compute_target_unchecked state.difficulty_info in
+      let block_hash = Block0.hash block in
+      { difficulty_info =
+          (block.header.time, target)
+          :: all_but_last_exn state.difficulty_info
+      ; block_hash
+      }
+
+    let state_negative_one : value =
       let time = Block_time.of_time Core.Time.epoch in
       let target : Target.Unpacked.value =
         Target.unpack (Field.of_int (-1))
@@ -283,12 +304,15 @@ module Step = struct
       ; block_hash = Block0.(hash genesis)
       }
 
+    let state_zero  =
+      apply_unchecked Block0.genesis state_negative_one
+
     let hash_unchecked t =
       let s = Pedersen0.State.create Pedersen0.params in
       Pedersen0.State.update_fold s (fold_bits t);
       Pedersen0.State.digest s
 
-    let base_hash = hash_unchecked base_state
+    let base_hash = hash_unchecked state_zero
 
     let is_base_hash h = Checked.equal (Cvar.constant base_hash) h
 
@@ -305,13 +329,11 @@ module Step = struct
     type value = Block.Packed.value
     let spec : (var, value) Var_spec.t = Block.Packed.spec
 
-    let all_but_last_exn xs = fst (split_last_exn xs)
-
     (* TODO: A subsequent PR will replace this with the actual difficulty calculation *)
     let compute_target _ =
       return (Cvar.constant Field.(negate one))
 
-    let compute_target_unchecked _ = Field.(negate one)
+    let apply_unchecked = State.apply_unchecked
 
     let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
       let%map { less } = Util.compare ~bit_length:Field.size_in_bits target hash in
@@ -332,23 +354,95 @@ module Step = struct
       , `Success meets_target
       )
     ;;
-
-    let apply_unchecked (block : Block0.t) (state : State.value) : State.value =
-      let target = compute_target_unchecked state.difficulty_info in
-      let block_hash = Block0.hash block in
-      { State.difficulty_info =
-          (block.header.time, target)
-          :: all_but_last_exn state.difficulty_info
-      ; block_hash
-      }
   end
 end
 
 module Transition = Make_transition_system(Step)
 
-let step_keys = Main.generate_keypair (Transition.input ()) Transition.main
-let step_vk = Main.Keypair.vk step_keys
-let step_pk = Main.Keypair.pk step_keys
+module Step_keys = struct
+  type t =
+    { vk : Main.Verification_key.t
+    ; pk : Main.Proving_key.t
+    }
+
+  let to_string { vk; pk } =
+    let ss =
+      [ Main.Verification_key.to_string vk
+      ; Main.Proving_key.to_string pk
+      ]
+    in
+    Sexp.to_string ([%sexp_of: string list] ss)
+  ;;
+
+  let of_string s =
+    match Sexp.of_string_conv_exn s [%of_sexp: string list] with
+    | [ vk; pk ] ->
+      { vk = Main.Verification_key.of_string vk
+      ; pk = Main.Proving_key.of_string pk
+      }
+    | _ -> failwith "Step_keys.of_string"
+end
+
+(*
+module Keys = struct
+  type t =
+    { wrap_vk : Other.Verification_key.t
+    ; wrap_pk : Other.Proving_key.t
+    ; step_vk : Main.Verification_key.t
+    ; step_pk : Main.Proving_key.t
+    }
+
+  let to_string { wrap_vk; wrap_pk; step_vk; step_pk } =
+    let ss =
+      [ Other.Verification_key.to_string wrap_vk
+      ; Other.Proving_key.to_string wrap_pk
+      ; Main.Verification_key.to_string step_vk
+      ; Main.Proving_key.to_string step_pk
+      ]
+    in
+    Sexp.to_string ([%sexp_of: string list] ss)
+  ;;
+
+  let of_string s =
+    match Sexp.of_string_conv_exn s [%of_sexp: string list] with
+    | [ wrap_vk; wrap_pk; step_vk; step_pk ] ->
+      { wrap_vk = Other.Verification_key.of_string wrap_vk
+      ; wrap_pk = Other.Proving_key.of_string wrap_pk
+      ; step_vk = Main.Verification_key.of_string step_vk
+      ; step_pk = Main.Proving_key.of_string step_pk
+      }
+    | _ -> failwith "Keys.of_string"
+end *)
+
+let load_keys_start = Time.now ()
+
+let { Step_keys.vk=step_vk; pk=step_pk } =
+  let maybe_read path k =
+    if Sys.file_exists path
+    then
+      let s = In_channel.read_all path in
+      printf "Read file\n%!";
+      Some (k s)
+    else None
+  in
+  let path = "step_keys" in
+  (*
+  match maybe_read path Step_keys.of_string with
+  | Some keys -> keys
+  | None -> *)
+    let kp = Main.generate_keypair (Transition.input ()) Transition.main in
+    let keys =
+      { Step_keys.vk = Main.Keypair.vk kp
+      ; pk = Main.Keypair.pk kp
+      }
+    in
+(*     Out_channel.write_all path ~data:(Step_keys.to_string keys); *)
+    keys
+;;
+
+let () =
+  printf "Loaded keys (%s)\n%!"
+    (Time.Span.to_string_hum (Time.diff (Time.now ()) load_keys_start))
 
 module Wrap = Make_wrap(struct let verification_key = step_vk end)
 
@@ -367,15 +461,28 @@ let base_proof =
     let keypair = generate_keypair input main in
     prove (Keypair.pk keypair) input () main
   in
+  let base_hash =
+    let open Pedersen.Main in
+    let self = Transition.Verifier.Verification_key.to_bool_list wrap_vk in
+    let s = State.create params in
+    State.update_fold s (List.fold self);
+    State.update_fold s (List.fold (Digest.Bits.to_bits Step.State.base_hash));
+    State.digest s
+  in
+  let () =
+    printf "state-base-hash\n%!";
+    Main.Field.print Step.State.base_hash;
+    printf "top-base-hash\n%!";
+    Main.Field.print base_hash;
+  in
   Main.prove step_pk (Transition.input ())
     { Transition.Prover_state.prev_proof = dummy_proof
     ; wrap_vk 
-    ; prev_state = Step.State.base_state
+    ; prev_state = Step.State.state_negative_one
     ; update = Block.genesis
     }
     Transition.main
-    (Main.Field.of_int 2323)
-    (* Step.State.base_hash *) (* This shouldn't have worked. This should be H(self, base_hash) *)
+    base_hash (* This shouldn't have worked. This should be H(self, base_hash) *)
 ;;
 
 let embed (x : Main.Field.t) : Other.Field.t =
@@ -415,4 +522,4 @@ let step ~prev_proof ~prev_state block =
 ;;
 
 let proof =
-  step ~prev_proof:base_proof ~prev_state:Step.State.base_state
+  step ~prev_proof:base_proof ~prev_state:Step.State.state_zero
