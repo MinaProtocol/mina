@@ -11,7 +11,6 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
       else go Field.Infix.(acc + acc) (i - 1)
     in
     go Field.one n
-  ;;
 
   type comparison_result =
     { less : Boolean.var
@@ -19,20 +18,21 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     }
 
   let compare ~bit_length a b =
-    let alpha_packed =
-      let open Cvar.Infix in
-      Cvar.constant (two_to_the bit_length) + b - a
-    in
-    let%bind alpha = Checked.unpack alpha_packed ~length:(bit_length + 1) in
-    let (prefix, less_or_equal) =
-      match List.split_n alpha bit_length with
-      | (p, [l]) -> (p, l)
-      | _ -> failwith "compare: Invalid alpha"
-    in
-    let%bind not_all_zeros = Boolean.any prefix in
-    let%map less = Boolean.(less_or_equal && not_all_zeros) in
-    { less; less_or_equal }
-  ;;
+    with_label "Snark_uttil.compare" begin
+      let alpha_packed =
+        let open Cvar.Infix in
+        Cvar.constant (two_to_the bit_length) + b - a
+      in
+      let%bind alpha = Checked.unpack alpha_packed ~length:(bit_length + 1) in
+      let (prefix, less_or_equal) =
+        match List.split_n alpha bit_length with
+        | (p, [l]) -> (p, l)
+        | _ -> failwith "compare: Invalid alpha"
+      in
+      let%bind not_all_zeros = Boolean.any prefix in
+      let%map less = Boolean.(less_or_equal && not_all_zeros) in
+      { less; less_or_equal }
+    end
 
   module Assert = struct
     let mem x xs =
@@ -52,7 +52,6 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
         Checked.all (List.map2_exn ~f:(fun x b -> Checked.mul x (b :> Cvar.t)) xs bs)
       in
       assert_equal (Cvar.sum ys) x
-    ;;
   end
 
   let pow b (e : Boolean.var list) = failwith "TODO"

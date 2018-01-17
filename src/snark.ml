@@ -107,15 +107,19 @@ module Make_wrap (M : sig
 
   let main (input : Cvar.t) =
     let open Let_syntax in
-    let%bind v =
-      let%bind input = Checked.unpack ~length:Main_curve.Field.size_in_bits input in
-      let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
-      Verifier.All_in_one.create ~verification_key ~input
-        As_prover.(map get_state ~f:(fun {Prover_state.proof} ->
-          { Verifier.All_in_one.verification_key=M.verification_key; proof }))
-    in
-    Boolean.Assert.is_true (Verifier.All_in_one.result v)
-  ;;
+    with_label "Wrap.main" begin
+      let%bind v =
+        let%bind input =
+          Checked.unpack ~length:Main_curve.Field.size_in_bits input
+        in
+        let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
+        Verifier.All_in_one.create ~verification_key ~input
+          As_prover.(map get_state ~f:(fun {Prover_state.proof} ->
+            { Verifier.All_in_one.verification_key=M.verification_key; proof }))
+      in
+      with_label "verifier_result"
+        (Boolean.Assert.is_true (Verifier.All_in_one.result v))
+    end
 end
 
 module Block0 = Block
@@ -184,18 +188,20 @@ module Make_transition_system (M : sig
     Var_spec.list ~length:wrap_vk_length Boolean.spec
 
   let prev_state_valid wrap_vk prev_state =
-    let%bind prev_state_hash =
-      State.hash prev_state >>= Main.Digest.Checked.unpack
-    in
-    let%bind prev_top_hash =
-      hash_digest (wrap_vk @ prev_state_hash) >>= Main.Digest.Checked.unpack
-    in
-    let%map v =
-      Verifier.All_in_one.create ~verification_key:wrap_vk ~input:prev_top_hash
-        As_prover.(map get_state ~f:(fun { Prover_state.prev_proof; wrap_vk } ->
-          { Verifier.All_in_one.verification_key=wrap_vk; proof=prev_proof }))
-    in
-    Verifier.All_in_one.result v
+    with_label "prev_state_valid" begin
+      let%bind prev_state_hash =
+        State.hash prev_state >>= Main.Digest.Checked.unpack
+      in
+      let%bind prev_top_hash =
+        hash_digest (wrap_vk @ prev_state_hash) >>= Main.Digest.Checked.unpack
+      in
+      let%map v =
+        Verifier.All_in_one.create ~verification_key:wrap_vk ~input:prev_top_hash
+          As_prover.(map get_state ~f:(fun { Prover_state.prev_proof; wrap_vk } ->
+            { Verifier.All_in_one.verification_key=wrap_vk; proof=prev_proof }))
+      in
+      Verifier.All_in_one.result v
+    end
   ;;
 
   let main top_hash =
@@ -215,11 +221,13 @@ module Make_transition_system (M : sig
           Field.print x))
       in
       let%bind sh = Main.Digest.Checked.unpack state_hash in
-      hash_digest (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
+      hash_digest (wrap_vk @ sh)
+      >>= assert_equal ~label:"equal_to_top_hash" top_hash
     in
     let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
-    printf "TEST\n%!";
-    let%bind inductive_case_passed = Boolean.(prev_state_valid && success) in
+    let%bind inductive_case_passed =
+      with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
+    in
     let%bind is_base_case = State.is_base_hash state_hash in
     Boolean.Assert.any
       [ is_base_case
@@ -350,27 +358,34 @@ module Step = struct
     let apply_unchecked = State.apply_unchecked
 
     let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
-      let%map { less } = Util.compare ~bit_length:Field.size_in_bits target hash in
-      less
+      with_label "meets_target" begin
+        let%map { less } = Util.compare ~bit_length:Field.size_in_bits target hash in
+        less
+      end
     ;;
 
-    (* TODO: Check the previous block hash ! *)
     let apply (block : var) (state : State.var) =
-      let%bind target = compute_target state.difficulty_info in
-      let%bind block_unpacked = Block.Checked.unpack block in
-      let%bind block_hash =
-        let bits = Block.Unpacked.to_bits block_unpacked in
-        hash_digest bits
-      in
-      let%bind meets_target = meets_target target block_hash in
-      let%map target_unpacked = Target.Checked.unpack target in
-      ( { State.difficulty_info =
-            (block_unpacked.header.time, target_unpacked)
-            :: all_but_last_exn state.difficulty_info
-        ; block_hash
-        }
-      , `Success meets_target
-      )
+      with_label "apply" begin
+        let%bind () =
+          assert_equal ~label:"previous_block_hash"
+            block.header.previous_block_hash state.block_hash
+        in
+        let%bind target = compute_target state.difficulty_info in
+        let%bind block_unpacked = Block.Checked.unpack block in
+        let%bind block_hash =
+          let bits = Block.Unpacked.to_bits block_unpacked in
+          hash_digest bits
+        in
+        let%bind meets_target = meets_target target block_hash in
+        let%map target_unpacked = Target.Checked.unpack target in
+        ( { State.difficulty_info =
+              (block_unpacked.header.time, target_unpacked)
+              :: all_but_last_exn state.difficulty_info
+          ; block_hash
+          }
+        , `Success meets_target
+        )
+      end
     ;;
   end
 end
@@ -468,15 +483,18 @@ let wrap_keys = Other.generate_keypair (Wrap.input ()) Wrap.main
 let wrap_vk = Other.Keypair.vk wrap_keys
 let wrap_pk = Other.Keypair.pk wrap_keys
 
-let base_hash =
-  let open Pedersen.Main in
+let top_hash =
   let self = Transition.Verifier.Verification_key.to_bool_list wrap_vk in
-  let s = State.create params in
-  State.update_fold s (List.fold self);
-  State.update_fold s
-    (List.fold (Digest.Bits.to_bits Step.State.base_hash));
-  State.digest s
+  fun state_hash ->
+    let open Pedersen.Main in
+    let s = State.create params in
+    State.update_fold s (List.fold self);
+    State.update_fold s
+      (List.fold (Digest.Bits.to_bits state_hash));
+    State.digest s
 ;;
+
+let base_hash = top_hash Step.State.base_hash
 
 let base_proof =
   let dummy_proof =
@@ -528,7 +546,7 @@ let wrap (hash : Pedersen.Main.Digest.t) proof =
 
 let step ~prev_proof ~prev_state block =
   let prev_hash = Step.State.hash_unchecked prev_state in
-  let prev_proof = wrap prev_hash prev_proof in
+  let prev_proof = wrap (top_hash prev_hash) prev_proof in
   let next_state = Step.Update.apply_unchecked block prev_state in
   Main.prove step_pk (Transition.input ())
     { Transition.Prover_state.prev_proof
@@ -537,8 +555,9 @@ let step ~prev_proof ~prev_state block =
     ; update = block
     }
     Transition.main
-    (Step.State.hash_unchecked next_state)
+    (top_hash (Step.State.hash_unchecked next_state))
 ;;
 
 let proof =
   step ~prev_proof:base_proof ~prev_state:Step.State.state_zero
+    Block.genesis
