@@ -202,7 +202,6 @@ module Make_transition_system (M : sig
       in
       Verifier.All_in_one.result v
     end
-  ;;
 
   let main top_hash =
     let%bind wrap_vk =
@@ -215,11 +214,6 @@ module Make_transition_system (M : sig
     let%bind (next_state, `Success success) = Update.apply update prev_state in
     let%bind state_hash = State.hash next_state in
     let%bind () =
-      let%bind () =
-        as_prover As_prover.(map (read_var state_hash) ~f:(fun x ->
-          printf "in proof, state_hash\n%!";
-          Field.print x))
-      in
       let%bind sh = Main.Digest.Checked.unpack state_hash in
       hash_digest (wrap_vk @ sh)
       >>= assert_equal ~label:"equal_to_top_hash" top_hash
@@ -233,7 +227,6 @@ module Make_transition_system (M : sig
       [ is_base_case
       ; inductive_case_passed
       ]
-  ;;
 end
 
 module Step = struct
@@ -242,13 +235,12 @@ module Step = struct
   open Main
   open Let_syntax
 
-
   let compute_target_unchecked _ = Field.(negate one)
 
   let all_but_last_exn xs = fst (split_last_exn xs)
 
   module State = struct
-    let difficulty_window = 1
+    let difficulty_window = 17
 
     type ('time, 'target, 'digest) t =
       (* Someday: To avoid hashing a big list it might be better to make this a blockchain
@@ -416,66 +408,9 @@ module Step_keys = struct
     | _ -> failwith "Step_keys.of_string"
 end
 
-(*
-module Keys = struct
-  type t =
-    { wrap_vk : Other.Verification_key.t
-    ; wrap_pk : Other.Proving_key.t
-    ; step_vk : Main.Verification_key.t
-    ; step_pk : Main.Proving_key.t
-    }
-
-  let to_string { wrap_vk; wrap_pk; step_vk; step_pk } =
-    let ss =
-      [ Other.Verification_key.to_string wrap_vk
-      ; Other.Proving_key.to_string wrap_pk
-      ; Main.Verification_key.to_string step_vk
-      ; Main.Proving_key.to_string step_pk
-      ]
-    in
-    Sexp.to_string ([%sexp_of: string list] ss)
-  ;;
-
-  let of_string s =
-    match Sexp.of_string_conv_exn s [%of_sexp: string list] with
-    | [ wrap_vk; wrap_pk; step_vk; step_pk ] ->
-      { wrap_vk = Other.Verification_key.of_string wrap_vk
-      ; wrap_pk = Other.Proving_key.of_string wrap_pk
-      ; step_vk = Main.Verification_key.of_string step_vk
-      ; step_pk = Main.Proving_key.of_string step_pk
-      }
-    | _ -> failwith "Keys.of_string"
-end *)
-
-let load_keys_start = Time.now ()
-
-let { Step_keys.vk=step_vk; pk=step_pk } =
-  let maybe_read path k =
-    if Sys.file_exists path
-    then
-      let s = In_channel.read_all path in
-      printf "Read file\n%!";
-      Some (k s)
-    else None
-  in
-  let path = "step_keys" in
-  (*
-  match maybe_read path Step_keys.of_string with
-  | Some keys -> keys
-  | None -> *)
-    let kp = Main.generate_keypair (Transition.input ()) Transition.main in
-    let keys =
-      { Step_keys.vk = Main.Keypair.vk kp
-      ; pk = Main.Keypair.pk kp
-      }
-    in
-(*     Out_channel.write_all path ~data:(Step_keys.to_string keys); *)
-    keys
-;;
-
-let () =
-  printf "Loaded keys (%s)\n%!"
-    (Time.Span.to_string_hum (Time.diff (Time.now ()) load_keys_start))
+let step_vk, step_pk =
+  let kp = Main.generate_keypair (Transition.input ()) Transition.main in
+  Main.Keypair.vk kp, Main.Keypair.pk kp
 
 module Wrap = Make_wrap(struct let verification_key = step_vk end)
 
@@ -483,18 +418,17 @@ let wrap_keys = Other.generate_keypair (Wrap.input ()) Wrap.main
 let wrap_vk = Other.Keypair.vk wrap_keys
 let wrap_pk = Other.Keypair.pk wrap_keys
 
-let top_hash =
+let instance_hash =
   let self = Transition.Verifier.Verification_key.to_bool_list wrap_vk in
-  fun state_hash ->
+  fun state ->
     let open Pedersen.Main in
     let s = State.create params in
     State.update_fold s (List.fold self);
     State.update_fold s
-      (List.fold (Digest.Bits.to_bits state_hash));
+      (List.fold (Digest.Bits.to_bits (Step.State.hash_unchecked state)));
     State.digest s
-;;
 
-let base_hash = top_hash Step.State.base_hash
+let base_hash = instance_hash Step.State.state_zero
 
 let base_proof =
   let dummy_proof =
@@ -515,7 +449,6 @@ let base_proof =
     }
     Transition.main
     base_hash
-;;
 
 let () =
   printf "verified: %b\n%!"
@@ -535,18 +468,15 @@ let embed (x : Main.Field.t) : Other.Field.t =
         (i + 1)
   in
   go Other.Field.one Other.Field.zero 0
-;;
 
 let wrap (hash : Pedersen.Main.Digest.t) proof =
   Other.prove wrap_pk (Wrap.input ())
     { Wrap.Prover_state.proof }
     Wrap.main
     (embed hash)
-;;
 
 let step ~prev_proof ~prev_state block =
-  let prev_hash = Step.State.hash_unchecked prev_state in
-  let prev_proof = wrap (top_hash prev_hash) prev_proof in
+  let prev_proof = wrap (instance_hash prev_state) prev_proof in
   let next_state = Step.Update.apply_unchecked block prev_state in
   Main.prove step_pk (Transition.input ())
     { Transition.Prover_state.prev_proof
@@ -555,9 +485,9 @@ let step ~prev_proof ~prev_state block =
     ; update = block
     }
     Transition.main
-    (top_hash (Step.State.hash_unchecked next_state))
-;;
+    (instance_hash next_state)
 
 let proof =
   step ~prev_proof:base_proof ~prev_state:Step.State.state_zero
     Block.genesis
+
