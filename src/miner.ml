@@ -15,17 +15,19 @@ module type S = sig
     -> Blockchain.t Linear_pipe.Reader.t
 end
 
+module Pedersen = Snark_params.Main.Pedersen
+
 module Cpu = struct
-  let find_block (previous : Pedersen.Main.Digest.t) (body : Block.Body.t)
-    : (Blockchain.t * Pedersen.Main.Digest.t) option Deferred.t =
+  let find_block (previous : Pedersen.Digest.t) (body : Block.Body.t)
+    : (Blockchain.t * Pedersen.Digest.t) option Deferred.t =
     failwith "TODO"
   ;;
 
   module State = struct
     type t =
-      { mutable previous_block_hash : Pedersen.Main.Digest.t
-      ; mutable body                 : Block.Body.t
-      ; mutable id                   : int
+      { mutable previous_block_hash : Pedersen.Digest.t
+      ; mutable body                : Block.Body.t
+      ; mutable id                  : int
       }
   end
 

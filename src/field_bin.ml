@@ -4,6 +4,8 @@ module Make
     (Field : Camlsnark.Field_intf.S)
     (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
 = struct
+  (* TODO: Unit tests for field_to_bigstring/bigstring_to_field *)
+
   let (/^) x y = Float.(to_int (round_up (x // y)))
 
   let size_in_bytes = Field.size_in_bits /^ 8

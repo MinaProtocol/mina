@@ -1,6 +1,6 @@
 open Core_kernel
 
-module Pedersen = Pedersen.Main
+module Pedersen = Snark_params.Main.Pedersen
 
 module Header = struct
   (* TODO: Is there some reason [target] should be in here? *)

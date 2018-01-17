@@ -47,8 +47,6 @@ module Make
     (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
     (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
-  (* TODO: Unit tests for field_to_bigstring/bigstring_to_field *)
-
   module Digest = struct
     type t = Field.t
 
@@ -149,33 +147,4 @@ struct
 
     let digest t = let (x, _y) = t.acc in x
   end
-end
-
-module Main = struct
-  module Curve = struct
-    include Snark_params.Main.Hash_curve
-
-    module Scalar (Impl : Camlsnark.Snark_intf.S) = struct
-      (* Someday: Make more efficient *)
-      open Impl
-      type var = Boolean.var list
-      type value = bool list
-
-      let length = bit_length
-      let spec : (var, value) Var_spec.t = Var_spec.list ~length Boolean.spec
-      let assert_equal = Checked.Assert.equal_bitstrings
-    end
-  end
-
-  include Make(Snark_params.Main.Field)(Snark_params.Main_curve.Bigint.R)(Curve)
-
-  let params = Pedersen_params.t
-
-  let hash_bigstring x : Digest.t =
-    let s = State.create params in
-    State.update_bigstring s x;
-    State.digest s
-  ;;
-
-  let zero_hash = hash_bigstring (Bigstring.create 0)
 end

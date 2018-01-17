@@ -5,71 +5,48 @@ open Snark_params
 let bitstring xs =
   String.of_char_list (List.map xs ~f:(fun b -> if b then '1' else '0'))
 
-module Extend (Impl : Camlsnark.Snark_intf.S) = struct
-  include Impl
-
-  module Snarkable = struct
-    module type S = sig
-      type var
-      type value
-      val spec : (var, value) Var_spec.t
-    end
-
-    module Bits = struct
-      module type S = Bits_intf.Snarkable
-        with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
-         and type ('a, 'b) checked := ('a, 'b) Checked.t
-         and type boolean_var := Boolean.var
-    end
-  end
-end
-
 module Make_types (Impl : Snark_intf.S) = struct
-  module Digest = Pedersen.Main.Digest.Snarkable(Impl)
+  module Digest = Snark_params.Main.Pedersen.Digest.Snarkable(Impl)
   module Time = Block_time.Snarkable(Impl)
   module Target = Digest
   module Nonce = Nonce.Snarkable(Impl)
   module Strength = Strength.Snarkable(Impl)
   module Block = Block.Snarkable(Impl)(Digest)(Time)(Nonce)(Strength)
 
-  module Scalar = Pedersen.Main.Curve.Scalar(Impl)
+  module Scalar = Snark_params.Main.Pedersen.Curve.Scalar(Impl)
 end
 
 module Main = struct
-  module T = Extend(Snark_params.Main)
-
-  include T
-  include Make_types(T)
+  include Snark_params.Main
+  include Make_types(Snark_params.Main)
 
   module Hash_curve =
     Camlsnark.Curves.Edwards.Extend
-      (T)
+      (Snark_params.Main)
       (Scalar)
-      (Pedersen.Main.Curve)
+      (Snark_params.Main.Pedersen.Curve)
 
-  module Pedersen = Camlsnark.Pedersen.Make(T)(struct
+  module Pedersen_hash = Camlsnark.Pedersen.Make(Snark_params.Main)(struct
       include Hash_curve
       let cond_add = Checked.cond_add
     end)
 
-  module Util = Snark_util.Make(T)
+  module Util = Snark_util.Make(Snark_params.Main)
 
   let hash_digest x =
     let open Checked in
-    Pedersen.hash x
-      ~params:Pedersen_params.t
+    Pedersen_hash.hash x
+      ~params:Pedersen.params
       ~init:Hash_curve.Checked.identity
-    >>| Pedersen.digest
+    >>| Pedersen_hash.digest
 
 end
+
 module Other = struct
   module T = Extend(Snark_params.Other)
   include T
   include Make_types(T)
 end
-
-
-let () = assert (Main.Field.size_in_bits = Other.Field.size_in_bits)
 
 let step_input () =
   let open Main in
@@ -82,7 +59,8 @@ let step_input_size = Main.Data_spec.size (step_input ())
 let wrap_input () =
   let open Other in
   let open Data_spec in
-  [ Var_spec.field ]
+  [ Var_spec.field
+  ]
 
 module Make_wrap (M : sig
     val verification_key : Main.Verification_key.t
@@ -230,8 +208,6 @@ module Make_transition_system (M : sig
 end
 
 module Step = struct
-  module Pedersen0 = Pedersen.Main
-
   open Main
   open Let_syntax
 
@@ -326,10 +302,10 @@ module Step = struct
       @ bs
 
     let hash_unchecked t =
-      let s = Pedersen0.State.create Pedersen0.params in
-      Pedersen0.State.update_fold s
+      let s = Pedersen.State.create Pedersen.params in
+      Pedersen.State.update_fold s
         (List.fold_left (to_bits_unchecked t));
-      Pedersen0.State.digest s
+      Pedersen.State.digest s
 
     let base_hash = hash_unchecked state_zero
 
@@ -421,7 +397,7 @@ let wrap_pk = Other.Keypair.pk wrap_keys
 let instance_hash =
   let self = Transition.Verifier.Verification_key.to_bool_list wrap_vk in
   fun state ->
-    let open Pedersen.Main in
+    let open Main.Pedersen in
     let s = State.create params in
     State.update_fold s (List.fold self);
     State.update_fold s
@@ -451,8 +427,7 @@ let base_proof =
     base_hash
 
 let () =
-  printf "verified: %b\n%!"
-    (Main.verify base_proof step_vk (Transition.input ()) base_hash)
+  assert (Main.verify base_proof step_vk (Transition.input ()) base_hash)
 ;;
 
 let embed (x : Main.Field.t) : Other.Field.t =
@@ -469,7 +444,7 @@ let embed (x : Main.Field.t) : Other.Field.t =
   in
   go Other.Field.one Other.Field.zero 0
 
-let wrap (hash : Pedersen.Main.Digest.t) proof =
+let wrap (hash : Main.Pedersen.Digest.t) proof =
   Other.prove wrap_pk (Wrap.input ())
     { Wrap.Prover_state.proof }
     Wrap.main
@@ -486,8 +461,3 @@ let step ~prev_proof ~prev_state block =
     }
     Transition.main
     (instance_hash next_state)
-
-let proof =
-  step ~prev_proof:base_proof ~prev_state:Step.State.state_zero
-    Block.genesis
-
