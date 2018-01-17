@@ -1,6 +1,6 @@
 open Core_kernel
 
-type t [@@deriving bin_io]
+type t [@@deriving sexp, bin_io]
 
 module Bits : Bits_intf.S with type t := t
 

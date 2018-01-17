@@ -101,7 +101,9 @@ struct
       let params = t.params in
       let (acc, i) =
         fold ~init:(t.acc, t.i) ~f:(fun (acc, i) b ->
-          if b then (Curve.add acc params.(i), i + 1) else (acc, i + 1))
+          if b
+          then (Curve.add acc params.(i), i + 1)
+          else (acc, i + 1))
       in
       t.acc <- acc;
       t.i <- i

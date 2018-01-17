@@ -2,7 +2,7 @@ open Core_kernel
 
 (* Milliseconds since epoch *)
 type t = Int64.t
-[@@deriving bin_io]
+[@@deriving bin_io, sexp]
 
 module Snarkable = Bits.Snarkable.Int64
 

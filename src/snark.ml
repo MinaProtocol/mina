@@ -198,10 +198,6 @@ module Make_transition_system (M : sig
     Verifier.All_in_one.result v
   ;;
 
-  let print_bool ~label (b : Boolean.var) =
-    as_prover
-      As_prover.(map (read Boolean.spec b) ~f:(fun b -> printf "%s: %b\n%!" label b))
-
   let main top_hash =
     let%bind wrap_vk =
       get_witness wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
@@ -211,7 +207,6 @@ module Make_transition_system (M : sig
     and update          = get_witness Update.spec ~f:Prover_state.update
     in
     let%bind (next_state, `Success success) = Update.apply update prev_state in
-    let%bind () = print_bool ~label:"success" success in
     let%bind state_hash = State.hash next_state in
     let%bind () =
       let%bind () =
@@ -224,9 +219,7 @@ module Make_transition_system (M : sig
     in
     let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
     printf "TEST\n%!";
-    let%bind () = print_bool ~label:"prev_state_valid" prev_state_valid in
     let%bind inductive_case_passed = Boolean.(prev_state_valid && success) in
-    let%bind () = print_bool ~label:"inductive_case_passed" inductive_case_passed in
     let%bind is_base_case = State.is_base_hash state_hash in
     Boolean.Assert.any
       [ is_base_case
@@ -247,7 +240,7 @@ module Step = struct
   let all_but_last_exn xs = fst (split_last_exn xs)
 
   module State = struct
-    let difficulty_window = 17
+    let difficulty_window = 1
 
     type ('time, 'target, 'digest) t =
       (* Someday: To avoid hashing a big list it might be better to make this a blockchain
@@ -270,6 +263,20 @@ module Step = struct
    targets are quite chunky *)
     type var = (Time.Unpacked.var, Target.Unpacked.var, Digest.Packed.var) t
     type value = (Time.Unpacked.value, Target.Unpacked.value, Digest.Packed.value) t
+
+    let sexp_of_value ({ difficulty_info; block_hash } : value) : Sexp.t =
+      let field_to_string x = bitstring (Field.unpack x) in
+      List
+        [ List
+            [ Atom "difficulty_info"
+            ; [%sexp_of: (Block_time.t * string) list]
+                (List.map difficulty_info ~f:(fun (x, y) -> (x, field_to_string y)))
+            ]
+        ; List [ Atom "block_hash"; [%sexp_of: string] (field_to_string block_hash) ]
+        ]
+    ;;
+
+    let value_to_string v = Sexp.to_string_hum (sexp_of_value v)
 
     let to_hlist { difficulty_info; block_hash } = H_list.([ difficulty_info; block_hash ])
     let of_hlist = H_list.(fun [ difficulty_info; block_hash ] -> { difficulty_info; block_hash })
@@ -307,21 +314,28 @@ module Step = struct
     let state_zero  =
       apply_unchecked Block0.genesis state_negative_one
 
+    let to_bits { difficulty_info; block_hash } =
+      let%map bs = Digest.Checked.unpack block_hash in
+      List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info
+      @ bs
+
+    let to_bits_unchecked ({ difficulty_info; block_hash } : value) =
+      let bs = Digest.Unpacked.to_bits (Digest.unpack block_hash) in
+      List.concat_map difficulty_info ~f:(fun (x, y) ->
+        Block_time.Bits.to_bits x @ Target.Unpacked.to_bits y)
+      @ bs
+
     let hash_unchecked t =
       let s = Pedersen0.State.create Pedersen0.params in
-      Pedersen0.State.update_fold s (fold_bits t);
+      Pedersen0.State.update_fold s
+        (List.fold_left (to_bits_unchecked t));
       Pedersen0.State.digest s
 
     let base_hash = hash_unchecked state_zero
 
     let is_base_hash h = Checked.equal (Cvar.constant base_hash) h
 
-    let to_bits { difficulty_info; block_hash } =
-      let%map bs = Digest.Checked.unpack block_hash in
-      List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info
-      @ bs
-
-    let hash (t : var) = to_bits t >>= hash_digest 
+    let hash (t : var) = to_bits t >>= hash_digest
   end
 
   module Update = struct
@@ -340,10 +354,14 @@ module Step = struct
       less
     ;;
 
+    (* TODO: Check the previous block hash ! *)
     let apply (block : var) (state : State.var) =
       let%bind target = compute_target state.difficulty_info in
       let%bind block_unpacked = Block.Checked.unpack block in
-      let%bind block_hash = hash_digest (Block.Unpacked.to_bits block_unpacked) in
+      let%bind block_hash =
+        let bits = Block.Unpacked.to_bits block_unpacked in
+        hash_digest bits
+      in
       let%bind meets_target = meets_target target block_hash in
       let%map target_unpacked = Target.Checked.unpack target in
       ( { State.difficulty_info =
@@ -450,6 +468,16 @@ let wrap_keys = Other.generate_keypair (Wrap.input ()) Wrap.main
 let wrap_vk = Other.Keypair.vk wrap_keys
 let wrap_pk = Other.Keypair.pk wrap_keys
 
+let base_hash =
+  let open Pedersen.Main in
+  let self = Transition.Verifier.Verification_key.to_bool_list wrap_vk in
+  let s = State.create params in
+  State.update_fold s (List.fold self);
+  State.update_fold s
+    (List.fold (Digest.Bits.to_bits Step.State.base_hash));
+  State.digest s
+;;
+
 let base_proof =
   let dummy_proof =
     let open Other in
@@ -461,20 +489,6 @@ let base_proof =
     let keypair = generate_keypair input main in
     prove (Keypair.pk keypair) input () main
   in
-  let base_hash =
-    let open Pedersen.Main in
-    let self = Transition.Verifier.Verification_key.to_bool_list wrap_vk in
-    let s = State.create params in
-    State.update_fold s (List.fold self);
-    State.update_fold s (List.fold (Digest.Bits.to_bits Step.State.base_hash));
-    State.digest s
-  in
-  let () =
-    printf "state-base-hash\n%!";
-    Main.Field.print Step.State.base_hash;
-    printf "top-base-hash\n%!";
-    Main.Field.print base_hash;
-  in
   Main.prove step_pk (Transition.input ())
     { Transition.Prover_state.prev_proof = dummy_proof
     ; wrap_vk 
@@ -482,7 +496,12 @@ let base_proof =
     ; update = Block.genesis
     }
     Transition.main
-    base_hash (* This shouldn't have worked. This should be H(self, base_hash) *)
+    base_hash
+;;
+
+let () =
+  printf "verified: %b\n%!"
+    (Main.verify base_proof step_vk (Transition.input ()) base_hash)
 ;;
 
 let embed (x : Main.Field.t) : Other.Field.t =
