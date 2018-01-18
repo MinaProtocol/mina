@@ -48,166 +48,9 @@ module Other = struct
   include Make_types(T)
 end
 
-let step_input () =
-  let open Main in
-  let open Data_spec in
-  [ Digest.Packed.spec (* H(wrap_vk, H(state)) *)
-  ]
-
-let step_input_size = Main.Data_spec.size (step_input ())
-
-let wrap_input () =
-  let open Other in
-  let open Data_spec in
-  [ Var_spec.field
-  ]
-
-module Make_wrap (M : sig
-    val verification_key : Main.Verification_key.t
-  end)
-= struct
-  let input = wrap_input
-
-  open Other
-
-  module Verifier =
-    Camlsnark.Verifier_gadget.Make(Other)(Other_curve)(Main_curve)
-      (struct let input_size = step_input_size end)
-
-  module Prover_state = struct
-    type t =
-      { proof : Main_curve.Proof.t
-      }
-  end
-
-  let vk_bits =
-    Verifier.Verification_key.to_bool_list M.verification_key
-
-  let main (input : Cvar.t) =
-    let open Let_syntax in
-    with_label "Wrap.main" begin
-      let%bind v =
-        let%bind input =
-          Checked.unpack ~length:Main_curve.Field.size_in_bits input
-        in
-        let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
-        Verifier.All_in_one.create ~verification_key ~input
-          As_prover.(map get_state ~f:(fun {Prover_state.proof} ->
-            { Verifier.All_in_one.verification_key=M.verification_key; proof }))
-      in
-      with_label "verifier_result"
-        (Boolean.Assert.is_true (Verifier.All_in_one.result v))
-    end
-end
-
 module Block0 = Block
 
-let get_witness spec ~f =
-  let open Main in
-  store spec As_prover.(map get_state ~f)
-;;
-
-let unhash ~spec ~f ~to_bits h =
-  let open Main in let open Let_syntax in
-  let%bind b = get_witness spec ~f in
-  let%bind h' = hash_digest (to_bits b) in
-  let%map () = assert_equal h h' in
-  b
-;;
-
-module Make_transition_system (M : sig
-    open Main
-
-    module State : sig
-      type var
-      type value
-      val spec : (var, value) Var_spec.t
-
-      val is_base_hash : Digest.Packed.var -> (Boolean.var, _) Checked.t
-      val hash : var -> (Digest.Packed.var, _) Checked.t
-    end
-
-    module Update : sig
-      type var
-      type value
-      val spec : (var, value) Var_spec.t
-
-      val apply
-        : var
-        -> State.var
-        -> (State.var * [ `Success of Boolean.var ], _) Checked.t
-    end
-  end)
-= struct
-  open M
-
-  module Prover_state = struct
-    type t =
-      { wrap_vk    : Other_curve.Verification_key.t
-      ; prev_proof : Other_curve.Proof.t
-      ; prev_state : State.value
-      ; update     : Update.value
-      }
-    [@@deriving fields]
-  end
-
-  open Main
-  open Let_syntax
-
-  module Verifier =
-    Camlsnark.Verifier_gadget.Make(Main)(Main_curve)(Other_curve)
-      (struct let input_size = Other.Data_spec.size (wrap_input ()) end)
-
-  let input = step_input
-
-  let wrap_vk_length = 11324
-
-  let wrap_vk_spec =
-    Var_spec.list ~length:wrap_vk_length Boolean.spec
-
-  let prev_state_valid wrap_vk prev_state =
-    with_label "prev_state_valid" begin
-      let%bind prev_state_hash =
-        State.hash prev_state >>= Main.Digest.Checked.unpack
-      in
-      let%bind prev_top_hash =
-        hash_digest (wrap_vk @ prev_state_hash) >>= Main.Digest.Checked.unpack
-      in
-      let%map v =
-        Verifier.All_in_one.create ~verification_key:wrap_vk ~input:prev_top_hash
-          As_prover.(map get_state ~f:(fun { Prover_state.prev_proof; wrap_vk } ->
-            { Verifier.All_in_one.verification_key=wrap_vk; proof=prev_proof }))
-      in
-      Verifier.All_in_one.result v
-    end
-
-  let main top_hash =
-    let%bind wrap_vk =
-      get_witness wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
-        Verifier.Verification_key.to_bool_list wrap_vk)
-    in
-    let%bind prev_state = get_witness State.spec ~f:Prover_state.prev_state
-    and update          = get_witness Update.spec ~f:Prover_state.update
-    in
-    let%bind (next_state, `Success success) = Update.apply update prev_state in
-    let%bind state_hash = State.hash next_state in
-    let%bind () =
-      let%bind sh = Main.Digest.Checked.unpack state_hash in
-      hash_digest (wrap_vk @ sh)
-      >>= assert_equal ~label:"equal_to_top_hash" top_hash
-    in
-    let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
-    let%bind inductive_case_passed =
-      with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
-    in
-    let%bind is_base_case = State.is_base_hash state_hash in
-    Boolean.Assert.any
-      [ is_base_case
-      ; inductive_case_passed
-      ]
-end
-
-module Step = struct
+module System = struct
   open Main
   open Let_syntax
 
@@ -330,7 +173,6 @@ module Step = struct
         let%map { less } = Util.compare ~bit_length:Field.size_in_bits target hash in
         less
       end
-    ;;
 
     let apply (block : var) (state : State.var) =
       with_label "apply" begin
@@ -354,57 +196,23 @@ module Step = struct
         , `Success meets_target
         )
       end
-    ;;
   end
 end
 
-module Transition = Make_transition_system(Step)
+module Transition =
+  Transition_system.Make
+    (struct
+      module Main = Main.Digest
+      module Other = Other.Digest
+    end)
+    (struct let hash = Main.hash_digest end)
+    (System)
 
-module Step_keys = struct
-  type t =
-    { vk : Main.Verification_key.t
-    ; pk : Main.Proving_key.t
-    }
+module Step = Transition.Step
+module Wrap = Transition.Wrap
 
-  let to_string { vk; pk } =
-    let ss =
-      [ Main.Verification_key.to_string vk
-      ; Main.Proving_key.to_string pk
-      ]
-    in
-    Sexp.to_string ([%sexp_of: string list] ss)
-  ;;
-
-  let of_string s =
-    match Sexp.of_string_conv_exn s [%of_sexp: string list] with
-    | [ vk; pk ] ->
-      { vk = Main.Verification_key.of_string vk
-      ; pk = Main.Proving_key.of_string pk
-      }
-    | _ -> failwith "Step_keys.of_string"
-end
-
-let step_vk, step_pk =
-  let kp = Main.generate_keypair (Transition.input ()) Transition.main in
-  Main.Keypair.vk kp, Main.Keypair.pk kp
-
-module Wrap = Make_wrap(struct let verification_key = step_vk end)
-
-let wrap_keys = Other.generate_keypair (Wrap.input ()) Wrap.main
-let wrap_vk = Other.Keypair.vk wrap_keys
-let wrap_pk = Other.Keypair.pk wrap_keys
-
-let instance_hash =
-  let self = Transition.Verifier.Verification_key.to_bool_list wrap_vk in
-  fun state ->
-    let open Main.Pedersen in
-    let s = State.create params in
-    State.update_fold s (List.fold self);
-    State.update_fold s
-      (List.fold (Digest.Bits.to_bits (Step.State.hash_unchecked state)));
-    State.digest s
-
-let base_hash = instance_hash Step.State.state_zero
+let base_hash =
+  Transition.instance_hash System.State.state_zero
 
 let base_proof =
   let dummy_proof =
@@ -417,47 +225,18 @@ let base_proof =
     let keypair = generate_keypair input main in
     prove (Keypair.pk keypair) input () main
   in
-  Main.prove step_pk (Transition.input ())
-    { Transition.Prover_state.prev_proof = dummy_proof
-    ; wrap_vk 
-    ; prev_state = Step.State.state_negative_one
+  Main.prove Step.proving_key (Step.input ())
+    { Step.Prover_state.prev_proof = dummy_proof
+    ; wrap_vk  = Wrap.verification_key
+    ; prev_state = System.State.state_negative_one
     ; update = Block.genesis
     }
-    Transition.main
+    Step.main
     base_hash
 
 let () =
-  assert (Main.verify base_proof step_vk (Transition.input ()) base_hash)
+  assert
+    (Main.verify base_proof Step.verification_key
+       (Step.input ()) base_hash)
 ;;
 
-let embed (x : Main.Field.t) : Other.Field.t =
-  let n = Main.Bigint.of_field x in
-  let rec go pt acc i =
-    if i = Main.Field.size_in_bits
-    then acc
-    else
-      go (Other.Field.add pt pt)
-        (if Main.Bigint.test_bit n i
-         then Other.Field.add pt acc
-         else acc)
-        (i + 1)
-  in
-  go Other.Field.one Other.Field.zero 0
-
-let wrap (hash : Main.Pedersen.Digest.t) proof =
-  Other.prove wrap_pk (Wrap.input ())
-    { Wrap.Prover_state.proof }
-    Wrap.main
-    (embed hash)
-
-let step ~prev_proof ~prev_state block =
-  let prev_proof = wrap (instance_hash prev_state) prev_proof in
-  let next_state = Step.Update.apply_unchecked block prev_state in
-  Main.prove step_pk (Transition.input ())
-    { Transition.Prover_state.prev_proof
-    ; wrap_vk
-    ; prev_state
-    ; update = block
-    }
-    Transition.main
-    (instance_hash next_state)
