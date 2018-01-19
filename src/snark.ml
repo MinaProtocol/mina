@@ -13,6 +13,8 @@ module Make_types (Impl : Snark_intf.S) = struct
   module Strength = Strength.Snarkable(Impl)
   module Block = Block.Snarkable(Impl)(Digest)(Time)(Nonce)(Strength)
 
+  module Number = Bits.Snarkable.Int64(Impl)
+
   module Scalar = Snark_params.Main.Pedersen.Curve.Scalar(Impl)
 end
 
@@ -61,27 +63,30 @@ module System = struct
   module State = struct
     let difficulty_window = 17
 
-    type ('time, 'target, 'digest) t =
+    type ('time, 'target, 'digest, 'number) t =
       (* Someday: To avoid hashing a big list it might be better to make this a blockchain
          (that is verified as things go). *)
       { difficulty_info : ('time * 'target) list
       ; block_hash      : 'digest
+      ; number          : 'number
       }
 
-    let fold_bits { difficulty_info; block_hash } ~init ~f =
+    let fold_bits { difficulty_info; block_hash; number } ~init ~f =
       let init =
         List.fold difficulty_info ~init ~f:(fun init (time, target) -> 
           let init = Time.Unpacked.fold time ~init ~f in
           let init = Target.Unpacked.fold target ~init ~f in
           init)
       in
-      Digest.Unpacked.fold block_hash ~init ~f
+      let init = Digest.Unpacked.fold block_hash ~init ~f in
+      let init = Number.Unpacked.fold number ~init ~f in
+      init
     ;;
 
 (* Someday: It may well be worth using bitcoin's compact nbits for target values since
    targets are quite chunky *)
-    type var = (Time.Unpacked.var, Target.Unpacked.var, Digest.Packed.var) t
-    type value = (Time.Unpacked.value, Target.Unpacked.value, Digest.Packed.value) t
+    type var = (Time.Unpacked.var, Target.Unpacked.var, Digest.Packed.var, Number.Packed.var) t
+    type value = (Time.Unpacked.value, Target.Unpacked.value, Digest.Packed.value, Number.Packed.value) t
 
     let sexp_of_value ({ difficulty_info; block_hash } : value) : Sexp.t =
       let field_to_string x = bitstring (Field.unpack x) in
@@ -97,13 +102,14 @@ module System = struct
 
     let value_to_string v = Sexp.to_string_hum (sexp_of_value v)
 
-    let to_hlist { difficulty_info; block_hash } = H_list.([ difficulty_info; block_hash ])
-    let of_hlist = H_list.(fun [ difficulty_info; block_hash ] -> { difficulty_info; block_hash })
+    let to_hlist { difficulty_info; block_hash; number } = H_list.([ difficulty_info; block_hash; number ])
+    let of_hlist = H_list.(fun [ difficulty_info; block_hash; number ] -> { difficulty_info; block_hash; number })
 
     let data_spec =
       let open Data_spec in
       [ Var_spec.(list ~length:difficulty_window (tuple2 Time.Unpacked.spec Target.Unpacked.spec))
       ; Digest.Packed.spec
+      ; Number.Packed.spec
       ]
 
     let spec : (var, value) Var_spec.t =
@@ -111,13 +117,16 @@ module System = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
+    (* TODO: Don't call it unchecked *)
     let apply_unchecked (block : Block0.t) state =
       let target = compute_target_unchecked state.difficulty_info in
       let block_hash = Block0.hash block in
+      assert Int64.(block.body > state.number);
       { difficulty_info =
           (block.header.time, target)
           :: all_but_last_exn state.difficulty_info
       ; block_hash
+      ; number = block.body
       }
 
     let state_negative_one : value =
@@ -128,6 +137,7 @@ module System = struct
       { difficulty_info =
           List.init difficulty_window ~f:(fun _ -> (time, target))
       ; block_hash = Block0.(hash genesis)
+      ; number = Int64.of_int (-1)
       }
 
     let state_zero  =
@@ -174,12 +184,19 @@ module System = struct
         less
       end
 
+    let valid_body ~prev body =
+      (* Someday: Have Block.Body.size *)
+      let%bind { less } = Util.compare ~bit_length:64 prev body in
+      Boolean.Assert.is_true less
+    ;;
+
     let apply (block : var) (state : State.var) =
       with_label "apply" begin
         let%bind () =
           assert_equal ~label:"previous_block_hash"
             block.header.previous_block_hash state.block_hash
         in
+        let%bind () = valid_body ~prev:state.number block.body in
         let%bind target = compute_target state.difficulty_info in
         let%bind block_unpacked = Block.Checked.unpack block in
         let%bind block_hash =
@@ -192,6 +209,7 @@ module System = struct
               (block_unpacked.header.time, target_unpacked)
               :: all_but_last_exn state.difficulty_info
           ; block_hash
+          ; number = block.body
           }
         , `Success meets_target
         )
