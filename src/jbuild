@@ -2,11 +2,16 @@
 
 (executable
   ((name main)
-   (libraries (core async async_extra))
-   (preprocess (pps (ppx_jane)))
+   (libraries (core async async_extra ppx_inline_test.runtime-lib))
+   (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib main))))
    (flags (-w -40 -g))
    (modes (native))
   ))
+
+(alias
+  ((name runtest)
+   (deps (main.exe))
+   (action (run ${<} inline-test-runner main))))
 
 (install
  ((section bin)
