@@ -57,7 +57,80 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
   let pow b (e : Boolean.var list) = failwith "TODO"
   ;;
 
-  let log2_upper_bound (v : Cvar.t) = failwith "TODO"
+  let pack_int bs =
+    assert (List.length bs < 62);
+    let rec go pt acc = function
+      | [] -> acc
+      | b :: bs ->
+        if b
+        then go (2 * pt) (pt + acc) bs
+        else go (2 * pt) acc bs
+    in
+    go 1 0 bs
+  ;;
+
+  let assert_decreasing : Boolean.var list -> (unit, _) Checked.t =
+    let rec go prev (bs0 : Boolean.var list) =
+      match bs0 with
+      | [] -> return ()
+      | b :: bs ->
+        let b = (b :> Cvar.t) in
+        let%bind () =
+          (*
+             b <= prev
+             prev == 1 or b = 0
+            (prev - 1) * b = 0
+          *)
+          assert_r1cs
+            Cvar.(sub prev (constant Field.one))
+            b
+            (Cvar.constant Field.zero)
+        in
+        go b bs
+    in
+    function
+    | [] -> return ()
+    | b :: bs -> go (b :> Cvar.t) bs
+  ;;
+
+  let num_bits_int =
+    let rec go acc n =
+      if n = 0
+      then acc
+      else go (1 + acc) (n lsr 1)
+    in
+    go 0
+  ;;
+
+  let apply_mask mask bs =
+    Checked.all (List.map2_exn mask bs ~f:Boolean.(&&))
+
+  let bit_length_bit_length = num_bits_int Field.size_in_bits
+  ;;
+
+  (* Someday: this could definitely be made more efficient *)
+  let num_bits : Cvar.t -> (Cvar.t, _) Checked.t =
+    let max = Field.size_in_bits in
+    let rec n_ones n =
+      let%bind bs =
+        store (Var_spec.list ~length:max Boolean.spec)
+          As_prover.(map (all (List.map ~f:(read Boolean.spec) n)) ~f:(fun n ->
+            let n = pack_int n in
+            List.init max ~f:(fun i -> i < n)))
+      in
+      let%map () = assert_equal (Cvar.sum (bs :> Cvar.t list)) (Checked.pack n)
+      and () = assert_decreasing bs in
+      bs
+    in
+    fun x ->
+      let%bind res =
+        store (Var_spec.list ~length:bit_length_bit_length Boolean.spec) (failwith "TODO")
+      in
+      let%bind mask = n_ones res in
+      let%bind x_unpacked = Checked.unpack x ~length:Field.size_in_bits in
+      let%bind masked = apply_mask mask x_unpacked in
+      let%map () = assert_equal (Checked.pack masked) x in
+      Checked.pack res
   ;;
 
   let compare_field x y =

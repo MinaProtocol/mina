@@ -9,29 +9,30 @@ module type S = sig
   open Snark_params.Main
   type digest_var
 
-  module State : sig
-    type var
-    type value
-    val spec : (var, value) Var_spec.t
-
-    val is_base_hash : digest_var -> (Boolean.var, _) Checked.t
-    val hash : var -> (digest_var, _) Checked.t
-
-    val hash_unchecked : value -> Pedersen.Digest.t
-  end
-
-  module Update : sig
-    type var
-    type value
-    val spec : (var, value) Var_spec.t
-
-    val apply_unchecked
-      : value -> State.value -> State.value
+  module Update : Snarkable.S
+(*
 
     val apply
       : var
       -> State.var
       -> (State.var * [ `Success of Boolean.var ], _) Checked.t
+*)
+
+  module State : sig
+    type var
+    type value
+    val spec : (var, value) Var_spec.t
+
+    val hash : value -> Pedersen.Digest.t
+
+    val update_exn : value -> Update.value -> value
+
+    module Checked : sig
+      val hash : var -> (digest_var, _) Checked.t
+      val is_base_hash : digest_var -> (Boolean.var, _) Checked.t
+
+      val update : var -> Update.var -> (var * [ `Success of Boolean.var ], _) Checked.t
+    end
   end
 end
 
@@ -93,13 +94,17 @@ struct
     let prev_state_valid wrap_vk prev_state =
       with_label "prev_state_valid" begin
         let%bind prev_state_hash =
-          State.hash prev_state >>= Digest.Main.Checked.unpack
+          State.Checked.hash prev_state
+          >>= Digest.Main.Checked.unpack
+          >>| Digest.Main.Checked.to_bits
         in
         let%bind prev_top_hash =
-          Hash.hash (wrap_vk @ prev_state_hash) >>= Digest.Main.Checked.unpack
+          Hash.hash (wrap_vk @ prev_state_hash)
+          >>= Digest.Main.Checked.unpack
         in
         let%map v =
-          Verifier.All_in_one.create ~verification_key:wrap_vk ~input:prev_top_hash
+          Verifier.All_in_one.create
+            ~verification_key:wrap_vk ~input:(Digest.Main.Checked.to_bits prev_top_hash)
             As_prover.(map get_state ~f:(fun { Prover_state.prev_proof; wrap_vk } ->
               { Verifier.All_in_one.verification_key=wrap_vk; proof=prev_proof }))
         in
@@ -116,18 +121,17 @@ struct
       let%bind prev_state = get_witness State.spec ~f:Prover_state.prev_state
       and update          = get_witness Update.spec ~f:Prover_state.update
       in
-      let%bind (next_state, `Success success) = Update.apply update prev_state in
-      let%bind state_hash = State.hash next_state in
+      let%bind (next_state, `Success success) = State.Checked.update prev_state update in
+      let%bind state_hash = State.Checked.hash next_state in
       let%bind () =
-        let%bind sh = Digest.Main.Checked.unpack state_hash in
-        Hash.hash (wrap_vk @ sh)
-        >>= assert_equal ~label:"equal_to_top_hash" top_hash
+        let%bind sh = Digest.Main.Checked.(unpack state_hash >>| to_bits) in
+        Hash.hash (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
       in
       let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
       let%bind inductive_case_passed =
         with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
       in
-      let%bind is_base_case = State.is_base_hash state_hash in
+      let%bind is_base_case = State.Checked.is_base_hash state_hash in
       Boolean.Assert.any
         [ is_base_case
         ; inductive_case_passed
@@ -160,7 +164,7 @@ struct
       let open Let_syntax in
       with_label "Wrap.main" begin
         let%bind v =
-          let%bind input = Digest.Other.Checked.unpack input in
+          let%bind input = Digest.Other.Checked.(unpack input >>| to_bits) in
           let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
           Verifier.All_in_one.create ~verification_key ~input
             As_prover.(map get_state ~f:(fun {Prover_state.proof} ->
@@ -186,7 +190,7 @@ struct
       State.update_fold s
         (List.fold
            (Digest.Bits.to_bits
-              (System.State.hash_unchecked state)));
+              (System.State.hash state)));
       State.digest s
 
   let wrap : Main.Pedersen.Digest.t -> Main.Proof.t -> Other.Proof.t =
@@ -212,7 +216,7 @@ struct
 
   let step ~prev_proof ~prev_state block =
     let prev_proof = wrap (instance_hash prev_state) prev_proof in
-    let next_state = System.Update.apply_unchecked block prev_state in
+    let next_state = System.State.update_exn prev_state block in
     Main.prove Step.proving_key (Step.input ())
       { Step.Prover_state.prev_proof
       ; wrap_vk = Wrap.verification_key

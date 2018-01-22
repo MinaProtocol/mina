@@ -211,6 +211,8 @@ module Snarkable = struct
     end
 
     module Checked = struct
+      let to_bits = Fn.id
+
       let padding =
         List.init (Field.size_in_bits - bit_length)
           ~f:(fun _ -> Boolean.false_)
@@ -364,6 +366,8 @@ module Snarkable = struct
     end
 
     module Checked = struct
+      let to_bits = Fn.id
+
       let padding =
         List.init (element_length * Field.size_in_bits - bit_length) ~f:(fun _ -> Boolean.false_)
 
@@ -430,6 +434,8 @@ module Snarkable = struct
         List.init (Field.size_in_bits - bit_length) ~f:(fun _ -> Boolean.false_)
 
       let pad x = x @ padding
+
+      let to_bits = Fn.id
     end
 
     let unpack : Packed.value -> Unpacked.value = Fn.id

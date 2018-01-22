@@ -4,11 +4,12 @@ open Core_kernel
 type t = Int64.t
 [@@deriving bin_io, sexp]
 
-module Snarkable = Bits.Snarkable.Int64
+include Bits.Snarkable.Int64(Snark_params.Main)
 
 module Span = struct
-  module Snarkable = Bits.Snarkable.Int64
   type t = Int64.t [@@deriving bin_io]
+
+  include Bits.Snarkable.Int64(Snark_params.Main)
 
   let of_time_span s =
     Int64.of_float (Time.Span.to_ms s)

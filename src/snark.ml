@@ -2,52 +2,11 @@ open Core_kernel
 open Util
 open Snark_params
 
-let bitstring xs =
-  String.of_char_list (List.map xs ~f:(fun b -> if b then '1' else '0'))
-
-module Make_types (Impl : Snark_intf.S) = struct
-  module Digest = Snark_params.Main.Pedersen.Digest.Snarkable(Impl)
-  module Time = Block_time.Snarkable(Impl)
-  module Target = Digest
-  module Nonce = Nonce.Snarkable(Impl)
-  module Strength = Strength.Snarkable(Impl)
-  module Block = Block.Snarkable(Impl)(Digest)(Time)(Nonce)(Strength)
-
-  module Number = Bits.Snarkable.Int64(Impl)
-
-  module Scalar = Snark_params.Main.Pedersen.Curve.Scalar(Impl)
-end
+module Digest = Snark_params.Main.Pedersen.Digest
 
 module Main = struct
   include Snark_params.Main
-  include Make_types(Snark_params.Main)
 
-  module Hash_curve =
-    Camlsnark.Curves.Edwards.Extend
-      (Snark_params.Main)
-      (Scalar)
-      (Snark_params.Main.Pedersen.Curve)
-
-  module Pedersen_hash = Camlsnark.Pedersen.Make(Snark_params.Main)(struct
-      include Hash_curve
-      let cond_add = Checked.cond_add
-    end)
-
-  module Util = Snark_util.Make(Snark_params.Main)
-
-  let hash_digest x =
-    let open Checked in
-    Pedersen_hash.hash x
-      ~params:Pedersen.params
-      ~init:Hash_curve.Checked.identity
-    >>| Pedersen_hash.digest
-
-end
-
-module Other = struct
-  module T = Extend(Snark_params.Other)
-  include T
-  include Make_types(T)
 end
 
 module Block0 = Block
@@ -56,172 +15,15 @@ module System = struct
   open Main
   open Let_syntax
 
-  let compute_target_unchecked _ = Field.(negate one)
-
-  let all_but_last_exn xs = fst (split_last_exn xs)
-
-  module State = struct
-    let difficulty_window = 17
-
-    type ('time, 'target, 'digest, 'number) t =
-      (* Someday: To avoid hashing a big list it might be better to make this a blockchain
-         (that is verified as things go). *)
-      { difficulty_info : ('time * 'target) list
-      ; block_hash      : 'digest
-      ; number          : 'number
-      }
-
-    let fold_bits { difficulty_info; block_hash; number } ~init ~f =
-      let init =
-        List.fold difficulty_info ~init ~f:(fun init (time, target) -> 
-          let init = Time.Unpacked.fold time ~init ~f in
-          let init = Target.Unpacked.fold target ~init ~f in
-          init)
-      in
-      let init = Digest.Unpacked.fold block_hash ~init ~f in
-      let init = Number.Unpacked.fold number ~init ~f in
-      init
-    ;;
-
-(* Someday: It may well be worth using bitcoin's compact nbits for target values since
-   targets are quite chunky *)
-    type var = (Time.Unpacked.var, Target.Unpacked.var, Digest.Packed.var, Number.Packed.var) t
-    type value = (Time.Unpacked.value, Target.Unpacked.value, Digest.Packed.value, Number.Packed.value) t
-
-    let sexp_of_value ({ difficulty_info; block_hash } : value) : Sexp.t =
-      let field_to_string x = bitstring (Field.unpack x) in
-      List
-        [ List
-            [ Atom "difficulty_info"
-            ; [%sexp_of: (Block_time.t * string) list]
-                (List.map difficulty_info ~f:(fun (x, y) -> (x, field_to_string y)))
-            ]
-        ; List [ Atom "block_hash"; [%sexp_of: string] (field_to_string block_hash) ]
-        ]
-    ;;
-
-    let value_to_string v = Sexp.to_string_hum (sexp_of_value v)
-
-    let to_hlist { difficulty_info; block_hash; number } = H_list.([ difficulty_info; block_hash; number ])
-    let of_hlist = H_list.(fun [ difficulty_info; block_hash; number ] -> { difficulty_info; block_hash; number })
-
-    let data_spec =
-      let open Data_spec in
-      [ Var_spec.(list ~length:difficulty_window (tuple2 Time.Unpacked.spec Target.Unpacked.spec))
-      ; Digest.Packed.spec
-      ; Number.Packed.spec
-      ]
-
-    let spec : (var, value) Var_spec.t =
-      Var_spec.of_hlistable data_spec
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-    (* TODO: Don't call it unchecked *)
-    let apply_unchecked (block : Block0.t) state =
-      let target = compute_target_unchecked state.difficulty_info in
-      let block_hash = Block0.hash block in
-      assert Int64.(block.body > state.number);
-      { difficulty_info =
-          (block.header.time, target)
-          :: all_but_last_exn state.difficulty_info
-      ; block_hash
-      ; number = block.body
-      }
-
-    let state_negative_one : value =
-      let time = Block_time.of_time Core.Time.epoch in
-      let target : Target.Unpacked.value =
-        Target.unpack (Field.of_int (-1))
-      in
-      { difficulty_info =
-          List.init difficulty_window ~f:(fun _ -> (time, target))
-      ; block_hash = Block0.(hash genesis)
-      ; number = Int64.of_int (-1)
-      }
-
-    let state_zero  =
-      apply_unchecked Block0.genesis state_negative_one
-
-    let to_bits { difficulty_info; block_hash } =
-      let%map bs = Digest.Checked.unpack block_hash in
-      List.concat_map ~f:(fun (x, y) -> x @ y) difficulty_info
-      @ bs
-
-    let to_bits_unchecked ({ difficulty_info; block_hash } : value) =
-      let bs = Digest.Unpacked.to_bits (Digest.unpack block_hash) in
-      List.concat_map difficulty_info ~f:(fun (x, y) ->
-        Block_time.Bits.to_bits x @ Target.Unpacked.to_bits y)
-      @ bs
-
-    let hash_unchecked t =
-      let s = Pedersen.State.create Pedersen.params in
-      Pedersen.State.update_fold s
-        (List.fold_left (to_bits_unchecked t));
-      Pedersen.State.digest s
-
-    let base_hash = hash_unchecked state_zero
-
-    let is_base_hash h = Checked.equal (Cvar.constant base_hash) h
-
-    let hash (t : var) = to_bits t >>= hash_digest
-  end
-
-  module Update = struct
-    type var = Block.Packed.var
-    type value = Block.Packed.value
-    let spec : (var, value) Var_spec.t = Block.Packed.spec
-
-    (* TODO: A subsequent PR will replace this with the actual difficulty calculation *)
-    let compute_target _ =
-      return (Cvar.constant Field.(negate one))
-
-    let apply_unchecked = State.apply_unchecked
-
-    let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
-      with_label "meets_target" begin
-        let%map { less } = Util.compare ~bit_length:Field.size_in_bits target hash in
-        less
-      end
-
-    let valid_body ~prev body =
-      (* Someday: Have Block.Body.size *)
-      let%bind { less } = Util.compare ~bit_length:64 prev body in
-      Boolean.Assert.is_true less
-    ;;
-
-    let apply (block : var) (state : State.var) =
-      with_label "apply" begin
-        let%bind () =
-          assert_equal ~label:"previous_block_hash"
-            block.header.previous_block_hash state.block_hash
-        in
-        let%bind () = valid_body ~prev:state.number block.body in
-        let%bind target = compute_target state.difficulty_info in
-        let%bind block_unpacked = Block.Checked.unpack block in
-        let%bind block_hash =
-          let bits = Block.Unpacked.to_bits block_unpacked in
-          hash_digest bits
-        in
-        let%bind meets_target = meets_target target block_hash in
-        let%map target_unpacked = Target.Checked.unpack target in
-        ( { State.difficulty_info =
-              (block_unpacked.header.time, target_unpacked)
-              :: all_but_last_exn state.difficulty_info
-          ; block_hash
-          ; number = block.body
-          }
-        , `Success meets_target
-        )
-      end
-  end
+  module State = Blockchain.State
+  module Update = Block.Packed
 end
 
 module Transition =
   Transition_system.Make
     (struct
-      module Main = Main.Digest
-      module Other = Other.Digest
+      module Main = Digest
+      module Other = Bits.Snarkable.Field(Other)
     end)
     (struct let hash = Main.hash_digest end)
     (System)
@@ -230,7 +32,7 @@ module Step = Transition.Step
 module Wrap = Transition.Wrap
 
 let base_hash =
-  Transition.instance_hash System.State.state_zero
+  Transition.instance_hash System.State.zero
 
 let base_proof =
   let dummy_proof =
@@ -246,7 +48,7 @@ let base_proof =
   Main.prove Step.proving_key (Step.input ())
     { Step.Prover_state.prev_proof = dummy_proof
     ; wrap_vk  = Wrap.verification_key
-    ; prev_state = System.State.state_negative_one
+    ; prev_state = System.State.negative_one
     ; update = Block.genesis
     }
     Step.main

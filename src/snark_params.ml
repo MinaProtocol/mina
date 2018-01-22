@@ -80,12 +80,16 @@ module Main = struct
       end
     end
 
-    include Pedersen.Make(Field)(Main_curve.Bigint.R)(Curve)
+    module P = Pedersen.Make(Field)(Main_curve.Bigint.R)(Curve)
+    include (P : module type of P with module Digest := P.Digest)
+    module Digest = struct
+      include P.Digest
+      include Snarkable(Main0)
+    end
 
     let params =
       let f s =
-        Main_curve.Bigint.R.(
-          to_field (of_decimal_string s))
+        Main_curve.Bigint.R.(to_field (of_decimal_string s))
       in
       Array.map Pedersen_params.t ~f:(fun (x, y) -> (f x, f y))
 
@@ -97,4 +101,26 @@ module Main = struct
 
     let zero_hash = hash_bigstring (Bigstring.create 0)
   end
+
+  module Scalar = Pedersen.Curve.Scalar(Main0)
+
+  module Hash_curve =
+    Camlsnark.Curves.Edwards.Extend
+      (Main0)
+      (Scalar)
+      (Pedersen.Curve)
+
+  module Pedersen_hash = Camlsnark.Pedersen.Make(Main0)(struct
+      include Hash_curve
+      let cond_add = Checked.cond_add
+    end)
+
+  let hash_digest x =
+    let open Checked in
+    Pedersen_hash.hash x
+      ~params:Pedersen.params
+      ~init:Hash_curve.Checked.identity
+    >>| Pedersen_hash.digest
+
+  module Util = Snark_util.Make(Main0)
 end

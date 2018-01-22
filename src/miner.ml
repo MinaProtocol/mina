@@ -20,26 +20,7 @@ module Pedersen = Snark_params.Main.Pedersen
 module Cpu = struct
   let find_block (previous_block_hash : Pedersen.Digest.t) (body : Block.Body.t)
     : (Blockchain.t * Pedersen.Digest.t) option Deferred.t =
-    let iterations = 10 in
-    let block0 : Block.t =
-      { header =
-          { previous_block_hash
-          ; time = Block_time.of_time (Time.now ())
-          ; target
-          }
-      ; body
-      }
-    in
-    let rec go i =
-      if i = iterations
-      then ()
-      else
-        let block : Block.t = in
-        n
-    in
-    schedule' (fun () ->
-      return None
-    )
+    failwith "TODO"
   ;;
 
   module State = struct

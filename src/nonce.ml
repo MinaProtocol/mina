@@ -5,6 +5,6 @@ type t = Int64.t
 
 let zero = Int64.zero
 
-module Snarkable = Bits.Snarkable.Int64
+include Bits.Snarkable.Int64(Snark_params.Main)
 
 module Bits = Bits.Int64

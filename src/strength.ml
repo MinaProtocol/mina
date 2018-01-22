@@ -5,9 +5,7 @@ type t = Snark_params.Main.Field.t
 
 let zero = Snark_params.Main.Field.zero
 
-(* TODO: Should assert that the field in the input impl is at
-   least as large as Main.Field *)
-module Snarkable = Bits.Snarkable.Field
+include Bits.Snarkable.Field(Snark_params.Main)
 
 module Bits = Bits.Make_field(Snark_params.Main.Field)(Snark_params.Main.Bigint)
 
