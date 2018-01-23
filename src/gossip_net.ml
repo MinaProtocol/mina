@@ -31,6 +31,9 @@ module type S =
 
     val broadcast : t -> Message.t Linear_pipe.Writer.t
 
+    val broadcast_all : t -> Message.t -> 
+      (unit -> bool Deferred.t)
+
     val query_peer
       : t
       -> Peer.t
@@ -76,8 +79,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
       ~bin_msg:Message.bin_t 
   ;;
 
-  let broadcast_random timeout peers n msg = 
-    let selected_peers = random_sublist (Hash_set.to_list peers) n in
+  let broadcast_selected timeout peers msg =
     let send peer = 
       Tcp.with_connection
         (Tcp.Where_to_connect.of_host_and_port peer)
@@ -89,10 +91,15 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
     in
     Deferred.List.iter 
       ~how:`Parallel 
-      selected_peers
+      peers
       ~f:(fun p -> match%map (send p) with
         | Ok () -> ()
         | Error e -> eprintf "%s\n" (Error.to_string_hum e))
+  ;;
+
+  let broadcast_random timeout peers n msg = 
+    let selected_peers = random_sublist (Hash_set.to_list peers) n in
+    broadcast_selected timeout selected_peers msg
   ;;
 
   let create (peer_events : Peer.Event.t Linear_pipe.Reader.t) (params : Params.t) implementations = 
@@ -153,6 +160,14 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
   let broadcast t = t.broadcast_writer
 
   let new_peers t = t.new_peer_reader
+
+  let broadcast_all t msg = 
+    let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in
+    fun () -> 
+      let selected = List.take !to_broadcast t.target_peer_count in
+      to_broadcast := List.drop !to_broadcast t.target_peer_count;
+      let%map () = broadcast_selected t.timeout selected msg in
+      List.length !to_broadcast > 0
 
   let query_peer t (peer : Peer.t) rpc query = 
     Tcp.with_connection
