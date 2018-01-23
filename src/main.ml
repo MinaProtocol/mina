@@ -123,36 +123,29 @@ struct
     let swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
     let gossip_net = Gossip_net.create (Swim.changes swim) params implementations in
     (* someday this could be much more sophisticated *)
-    let rebroadcast_continue = ref None in
-    let rec rebroadcast_timer latest_broadcast finished = 
+    let rec rebroadcast_timer () = 
+      let rec rebroadcast_loop block continue = 
+        let is_latest = Blockchain.(block = !latest_strongest_block.block) in
+        if is_latest
+        then 
+          let%bind finished = continue () in
+          if finished
+          then return ()
+          else rebroadcast_loop block continue
+        else return ()
+      in
       let%bind () = after rebroadcast_period in
       let is_latest = Blockchain.(!latest_mined_block.block = !latest_strongest_block.block) in
-      let reset = 
-        match is_latest, !rebroadcast_continue, latest_broadcast, finished with
-        | true, None, _, false -> true
-        | true, Some continue, Some latest_broadcast, _ -> latest_broadcast <> !latest_mined_block
-        | _ -> false
+      let%bind () = 
+        if is_latest
+        then rebroadcast_loop 
+               !latest_mined_block.block 
+               (Gossip_net.broadcast_all gossip_net (Message.New_strongest_block !latest_mined_block))
+        else return ()
       in
-      let%bind new_latest_broadcast, finished = 
-        match is_latest, !rebroadcast_continue, reset with
-        | true, _, true -> 
-          let continue = Gossip_net.broadcast_all gossip_net (Message.New_strongest_block !latest_mined_block) in
-          rebroadcast_continue := Some continue;
-          let%map finished = continue () in
-          Some !latest_mined_block, finished
-        | true, Some continue, false -> 
-          let%map finished = continue () in
-          latest_broadcast, finished
-        | _ -> 
-          rebroadcast_continue := None; 
-          let%map () = Deferred.unit in
-          None, false
-      in
-      if finished 
-      then rebroadcast_continue := None;
-      rebroadcast_timer new_latest_broadcast finished
+      rebroadcast_timer  ()
     in
-    don't_wait_for (rebroadcast_timer None false);
+    don't_wait_for (rebroadcast_timer ());
     don't_wait_for begin
       Linear_pipe.transfer ~f:(fun b -> New_strongest_block b)
         gossip_net_strongest_block_reader 
