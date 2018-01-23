@@ -31,6 +31,9 @@ module type S =
 
     val broadcast : t -> Message.t Linear_pipe.Writer.t
 
+    val broadcast_all : t -> Message.t -> 
+      (unit -> bool Deferred.t)
+
     val query_peer
       : t
       -> Peer.t

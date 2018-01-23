@@ -123,15 +123,36 @@ struct
     let swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
     let gossip_net = Gossip_net.create (Swim.changes swim) params implementations in
     (* someday this could be much more sophisticated *)
-    let rec rebroadcast_timer () = 
+    let rebroadcast_continue = ref None in
+    let rec rebroadcast_timer latest_broadcast finished = 
       let%bind () = after rebroadcast_period in
-      if Blockchain.(!latest_mined_block.block = !latest_strongest_block.block)
-      then 
-        let%bind () = Pipe.write (Gossip_net.broadcast gossip_net) (New_strongest_block !latest_mined_block) in
-        rebroadcast_timer ()
-      else rebroadcast_timer ()
+      let is_latest = Blockchain.(!latest_mined_block.block = !latest_strongest_block.block) in
+      let reset = 
+        match is_latest, !rebroadcast_continue, latest_broadcast, finished with
+        | true, None, _, false -> true
+        | true, Some continue, Some latest_broadcast, _ -> latest_broadcast <> !latest_mined_block
+        | _ -> false
+      in
+      let%bind new_latest_broadcast, finished = 
+        match is_latest, !rebroadcast_continue, reset with
+        | true, _, true -> 
+          let continue = Gossip_net.broadcast_all gossip_net (Message.New_strongest_block !latest_mined_block) in
+          rebroadcast_continue := Some continue;
+          let%map finished = continue () in
+          Some !latest_mined_block, finished
+        | true, Some continue, false -> 
+          let%map finished = continue () in
+          latest_broadcast, finished
+        | _ -> 
+          rebroadcast_continue := None; 
+          let%map () = Deferred.unit in
+          None, false
+      in
+      if finished 
+      then rebroadcast_continue := None;
+      rebroadcast_timer new_latest_broadcast finished
     in
-    don't_wait_for (rebroadcast_timer ());
+    don't_wait_for (rebroadcast_timer None false);
     don't_wait_for begin
       Linear_pipe.transfer ~f:(fun b -> New_strongest_block b)
         gossip_net_strongest_block_reader 
