@@ -122,7 +122,11 @@ struct
     let rebroadcast_period = Time.Span.of_sec 10. in
     let swim = Swim.connect ~config:(SwimConfig.create ()) ~initial_peers ~me in
     let gossip_net = Gossip_net.create (Swim.changes swim) params implementations in
-    (* someday this could be much more sophisticated *)
+    (* someday this could be much more sophisticated 
+     *   don't wait for each target_peer group to finish
+     *   stop sending once everyone seems to have the message
+     *   send to # > target_peers simultaenously based on machine capacity
+     * *)
     let rec rebroadcast_timer () = 
       let rec rebroadcast_loop block continue = 
         let is_latest = Blockchain.(block = !latest_strongest_block.block) in
