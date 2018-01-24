@@ -1,0 +1,21 @@
+(jbuild_version 1)
+
+;(executable
+;  ((name main)
+;   (libraries (core async async_extra yojson))
+;   (preprocess (pps (ppx_jane)))
+;   (flags (-w -40 -g))
+;   (modes (native))
+;  ))
+;
+;(install
+; ((section bin)
+;  (files ((main.exe as main)))))
+
+(library
+ ((name testbridge)
+  (public_name testbridge)
+  (libraries (core async async_extra yojson))
+  (preprocess (pps (ppx_jane)))
+  (flags (:standard -safe-string -w -40 -g))
+ ))
