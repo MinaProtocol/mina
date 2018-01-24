@@ -10,7 +10,6 @@ module Rpcs = struct
     type query = unit [@@deriving bin_io]
     type response = unit [@@deriving bin_io]
 
-    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Ping" ~version:0
         ~bin_query ~bin_response
@@ -20,7 +19,6 @@ module Rpcs = struct
     type query = String.t * String.t list [@@deriving bin_io]
     type response = String.t [@@deriving bin_io]
 
-    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Run" ~version:0
         ~bin_query ~bin_response
@@ -31,7 +29,6 @@ module Rpcs = struct
     type query = cmd * String.t [@@deriving bin_io]
     type response = String.t [@@deriving bin_io]
 
-    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Init" ~version:0
         ~bin_query ~bin_response
@@ -42,10 +39,6 @@ end
 let run _ (prog, args) = 
   let%map stdout = Process.run_exn ~prog ~args () in
   stdout
-;;
-
-let exit _ () = 
-  exit 0
 ;;
 
 let ping _ () = return ()

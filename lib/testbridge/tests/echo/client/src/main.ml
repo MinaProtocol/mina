@@ -23,7 +23,6 @@ module Rpcs = struct
     type query = unit [@@deriving bin_io]
     type response = unit [@@deriving bin_io]
 
-    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Ping" ~version:0
         ~bin_query ~bin_response
@@ -33,7 +32,6 @@ module Rpcs = struct
     type query = String.t [@@deriving bin_io]
     type response = String.t [@@deriving bin_io]
 
-    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Echo" ~version:0
         ~bin_query ~bin_response

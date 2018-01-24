@@ -78,7 +78,7 @@ let get_pods () =
           | "Running" -> `Running
           | "Pending" -> `Pending
           | "Terminating" -> `Terminating
-          | s -> raise (Failure ("Unknown pod phase " ^ s))
+          | s -> failwith ("Unknown pod phase " ^ s)
       in
       let container_name = container |> member "name" |> to_string in
       let pod_name = item |> member "metadata" |> member "name" |> to_string in
@@ -87,7 +87,7 @@ let get_pods () =
   in
   pods
 
-let run_pod pod_name pod_image node_hostname tcp_ports udp_ports = 
+let run_pod ~pod_name ~pod_image ~node_hostname ~tcp_ports ~udp_ports = 
   let wrap_assoc name json = (`Assoc [ (name, json) ] ) in
   let wrap_assocs names json = 
     List.fold 
@@ -193,7 +193,7 @@ let forward_ports pods ports =
       let%map line = 
         match%map (Reader.read_line stdout) with
         | `Ok l -> l
-        | `Eof -> raise (Failure "no line returned")
+        | `Eof -> failwith "no line returned"
       in
       let hostport_token = List.nth_exn (String.split line ~on:' ') 2 in
       let port_token = List.nth_exn (String.split hostport_token ~on:':') 1 in
@@ -214,7 +214,7 @@ let call_exn rpc port query =
   in
   match res with
   | Ok msg -> msg
-  | Error e -> raise (Failure (Error.to_string_hum e))
+  | Error e -> failwith (Error.to_string_hum e)
 
 
 let call_retry rpc port query ~retries ~wait = 
@@ -229,6 +229,6 @@ let call_retry rpc port query ~retries ~wait =
         let%bind () = after wait in
         go (remaining_tries - 1)
       else 
-        raise (Failure (Error.to_string_hum e))
+        failwith (Error.to_string_hum e)
   in
   go retries

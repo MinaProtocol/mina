@@ -18,7 +18,7 @@ let get_pods
     let available_slots_count = List.length available_slots in
     let new_containers_count = container_count - (List.length pods) in
     if new_containers_count > available_slots_count 
-    then raise (Failure "not enough slots available")
+    then failwith "not enough slots available"
     else 
       let new_containers = List.take available_slots container_count in
       let rand_char () = Char.of_int_exn (Char.to_int 'a' + Random.int 26) in
@@ -26,11 +26,11 @@ let get_pods
       Deferred.all_ignore
         (List.map new_containers ~f:(fun node -> 
            Kubernetes.run_pod 
-             ("testbridge-" ^ (rand_name ())) 
-             "localhost:5000/testbridge" 
-             node.hostname  
-             (List.concat [ external_tcp_ports; internal_tcp_ports ])
-             internal_udp_ports
+             ~pod_name:("testbridge-" ^ (rand_name ())) 
+             ~pod_image:"localhost:5000/testbridge" 
+             ~node_hostname:node.hostname  
+             ~tcp_ports:(List.concat [ external_tcp_ports; internal_tcp_ports ])
+             ~udp_ports:internal_udp_ports
          ))
   in
   let nodes_needed = 
@@ -55,15 +55,13 @@ let get_pods
     else return ()
   in
   let%map all_pods = Kubernetes.wait_for_pods container_count in
-  let pods = List.take all_pods container_count in
-  pods
+  List.take all_pods container_count
 
 module Rpcs = struct
   module Ping = struct
     type query = unit [@@deriving bin_io]
     type response = unit [@@deriving bin_io]
 
-    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Ping" ~version:0
         ~bin_query ~bin_response
@@ -73,7 +71,6 @@ module Rpcs = struct
     type query = String.t * String.t list [@@deriving bin_io]
     type response = String.t [@@deriving bin_io]
 
-    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Run" ~version:0
         ~bin_query ~bin_response
@@ -84,7 +81,6 @@ module Rpcs = struct
     type query = cmd * String.t [@@deriving bin_io]
     type response = String.t [@@deriving bin_io]
 
-    (* TODO: Use stable types. *)
     let rpc : (query, response) Rpc.Rpc.t =
       Rpc.Rpc.create ~name:"Init" ~version:0
         ~bin_query ~bin_response
@@ -92,7 +88,14 @@ module Rpcs = struct
 end
 
 
-let create project_dir container_count containers_per_machine external_tcp_ports internal_tcp_ports internal_udp_ports = 
+let create 
+      ~project_dir 
+      ~container_count 
+      ~containers_per_machine 
+      ~external_tcp_ports 
+      ~internal_tcp_ports 
+      ~internal_udp_ports 
+  = 
   let%bind pods = 
     get_pods 
       container_count 
