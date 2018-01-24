@@ -132,38 +132,6 @@ let run_pod ~pod_name ~pod_image ~node_hostname ~tcp_ports ~udp_ports =
   let args = [ "expose"; "deployment"; pod_name; "--type=NodePort" ]  in
   Deferred.ignore (Process.run_exn ~prog ~args ())
 
-  (*spec: {
-    template: {
-      spec: {
-        containers: [
-          {
-            (*env: [
-              { name: "ADDR", value: "unused" },
-              {
-                name: "MASTER_PUBLIC_KEY",
-                value: masterPublicKey.toString("base64")
-              },
-              {
-                name: "MASTER_ADDR",
-                value: HostAndPort.toString(masterAddr)
-              },
-              { name: "PRIVATE_KEY", value: privateKey.toString("base64") }
-            ],*)
-            image: pod_image,
-            name: instance_name,
-            (*ports: [
-              { containerPort: 14812, protocol: "TCP" },
-              { containerPort: 14813, protocol: "UDP" },
-              { containerPort: 14912, protocol: "TCP" }
-            ]*)
-          }
-        ],
-        (*nodeSelector: { "kubernetes.io/hostname": hostname }*)
-      }
-    }
-  }*)
-
-
 let wait_for_pods pods_needed = 
   let rec go () = 
     let%bind pods = get_pods () in
