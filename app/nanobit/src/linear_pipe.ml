@@ -139,6 +139,12 @@ let fork4 reader =
   | _ -> assert false
 ;;
 
+let fork5 reader = 
+  match fork reader 5 with
+  | [x; y; z; w; v] -> (x, y, z, w, v)
+  | _ -> assert false
+;;
+
 let partition_map2 reader ~f =
   let ((reader_a, writer_a), (reader_b, writer_b)) = (create (), create ()) in
   don't_wait_for begin
@@ -186,3 +192,11 @@ let filter_map_unordered ~max_concurrency t ~f =
   end;
   reader
 ;;
+
+let latest_ref t ~initial =
+  set_has_reader t;
+  let cell = ref initial in
+  don't_wait_for begin
+    iter t ~f:(fun a -> return (cell := a))
+  end;
+  cell

@@ -61,6 +61,8 @@ val fork3 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t
 
 val fork4 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t
 
+val fork5 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t
+
 val partition_map2 : 'a Reader.t -> f:('a -> [ `Fst of 'b  | `Snd of 'c ]) -> 'b Reader.t * 'c Reader.t
 
 val partition_map3 : 'a Reader.t -> f:('a -> [ `Fst of 'b  | `Snd of 'c | `Trd of 'd ]) -> 'b Reader.t * 'c Reader.t * 'd Reader.t
@@ -70,3 +72,5 @@ val filter_map_unordered
   -> 'a Reader.t 
   -> f:('a -> 'b option Deferred.t) 
   -> 'b Reader.t
+
+val latest_ref : 'a Reader.t -> initial:'a -> 'a ref
