@@ -1,6 +1,8 @@
 open Core
 open Async
 
+module Snark = Snark
+
 module Rpcs = struct
   module Get_strongest_block = struct
     type query = unit [@@deriving bin_io]
@@ -42,7 +44,7 @@ struct
           ~how:`Parallel
           (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.rpc ())
           ~f:(fun x -> match%bind x with
-            | Ok b -> Pipe.write from_new_peers_writer (Blockchain.Update.New_block b)
+            | Ok b -> Pipe.write from_new_peers_writer (Blockchain.Update.New_chain b)
             | Error e -> eprintf "%s\n" (Error.to_string_hum e); return ())
       in
       timer ()
@@ -51,7 +53,7 @@ struct
     let broadcasts =
       Linear_pipe.filter_map (Gossip_net.received gossip_net)
         ~f:(function
-          | New_strongest_block b -> Some (Blockchain.Update.New_block b))
+          | New_strongest_block b -> Some (Blockchain.Update.New_chain b))
     in
     Linear_pipe.merge_unordered
       [ from_new_peers_reader
@@ -86,7 +88,7 @@ struct
       then
         Miner_impl.mine
           ~previous:initial_blockchain
-          ~body:(Int64.succ initial_blockchain.block.body)
+          ~body:(Int64.succ initial_blockchain.state.number)
           (Linear_pipe.merge_unordered
             [ Linear_pipe.map body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
             ; body_changes_reader
@@ -128,22 +130,25 @@ struct
      *   send to # > target_peers simultaenously based on machine capacity
      * *)
     let rec rebroadcast_timer () = 
-      let rec rebroadcast_loop block continue = 
-        let is_latest = Blockchain.(block = !latest_strongest_block.block) in
+      let rec rebroadcast_loop blockchain continue = 
+        (* TODO: This is an error: Should compare blockchains instead of blocks and also not
+           use polymorphic compare *)
+        let is_latest = Blockchain.(blockchain = !latest_strongest_block) in
         if is_latest
         then 
           let%bind finished = continue () in
           if finished
           then return ()
-          else rebroadcast_loop block continue
+          else rebroadcast_loop blockchain continue
         else return ()
       in
       let%bind () = after rebroadcast_period in
-      let is_latest = Blockchain.(!latest_mined_block.block = !latest_strongest_block.block) in
+      (* TODO: Same error *)
+      let is_latest = Blockchain.(!latest_mined_block = !latest_strongest_block) in
       let%bind () = 
         if is_latest
         then rebroadcast_loop 
-               !latest_mined_block.block 
+               !latest_mined_block
                (Gossip_net.broadcast_all gossip_net (Message.New_strongest_block !latest_mined_block))
         else return ()
       in
@@ -160,18 +165,18 @@ struct
         Linear_pipe.iter gossip_net_strongest_block_reader
           ~f:(fun b ->
             Pipe.write body_changes_writer
-              (Miner.Update.Change_body (Int64.(b.block.body + Int64.one))))
+              (Miner.Update.Change_body (Int64.succ b.state.number)))
       end
     in
     Storage.persist storage_location
       (Linear_pipe.map storage_strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain.accumulate
       ~init:initial_blockchain
-      ~strongest_block:strongest_block_writer
+      ~strongest_chain:strongest_block_writer
       ~updates:(
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
-          ; Linear_pipe.map blockchain_mined_blocks_reader ~f:(fun b -> Blockchain.Update.New_block b)
+          ; Linear_pipe.map blockchain_mined_blocks_reader ~f:(fun b -> Blockchain.Update.New_chain b)
           ])
   ;;
 end
