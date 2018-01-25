@@ -14,6 +14,7 @@ module type S = sig
 end
 
 module With_checksum = struct
+  open Core
   open Async
 
   type 'a t = 
@@ -22,7 +23,7 @@ module With_checksum = struct
     }
   [@@deriving bin_io]
 
-  (* TODO: test speed *)
+  (* TODO: test speed / switch to sha256? *)
   let md5 data (writer : 'a Bin_prot.Type_class.writer) = 
     let buf = Bigstring.create (writer.size data) in
     ignore (writer.write buf ~pos:0 data);
@@ -34,17 +35,26 @@ module With_checksum = struct
 
   let read_data location data_bin_reader_t data_bin_writer_t =
     match%map Reader.load_bin_prot location (bin_reader_t data_bin_reader_t) with
-    | Ok t -> 
+    | Ok t ->
       if valid t data_bin_writer_t
       then Ok t.data
       else Or_error.error_string "checksum did not match"
     | Error e -> Error e
+
+  let read_unchecked location data_bin_reader_t =
+    Reader.load_bin_prot location (bin_reader_t data_bin_reader_t)
 
   let write_data location data_bin_writer_t data = 
     Writer.save_bin_prot 
       location 
       (bin_writer_t data_bin_writer_t)
       (wrap data data_bin_writer_t)
+
+  let write location data_bin_writer_t t = 
+    Writer.save_bin_prot 
+      location 
+      (bin_writer_t data_bin_writer_t)
+      t
 end
 
 module Filesystem : S with type location = string = struct

@@ -1,5 +1,6 @@
 open Core
 open Async
+open Nanobit_base
 
 module Update = struct
   type t =

@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Nanobit_base
 
 module Update : sig
   type t =

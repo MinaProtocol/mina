@@ -1,5 +1,4 @@
 open Core_kernel
-open Nanobit_base
 open Snark_params
 
 type t [@@deriving sexp, bin_io]

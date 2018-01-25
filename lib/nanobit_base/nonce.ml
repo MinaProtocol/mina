@@ -1,5 +1,4 @@
 open Core_kernel
-open Nanobit_base
 
 type t = Int64.t
 [@@deriving bin_io]
