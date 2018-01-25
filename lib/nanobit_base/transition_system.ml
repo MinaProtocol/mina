@@ -25,6 +25,14 @@ module type S = sig
   end
 end
 
+module type Tick_keypair_intf = sig
+  val kp : Tick.Keypair.t
+end
+
+module type Tock_keypair_intf = sig
+  val kp : Tock.Keypair.t
+end
+
 (* Someday:
    Tighten this up. Doing this with all these equalities is kind of a hack, but
    doing it right required an annoying change to the bits intf. *)
@@ -53,7 +61,7 @@ struct
   let wrap_input () =
     Tock.Data_spec.([ Digest.Tock.Packed.spec ])
 
-  module Step = struct
+  module Step_base = struct
     open System
 
     module Prover_state = struct
@@ -81,6 +89,7 @@ struct
         (struct let input_size = Tock.Data_spec.size (wrap_input ()) end)
 
     let prev_state_valid wrap_vk prev_state =
+      let open Let_syntax in
       with_label "prev_state_valid" begin
         let%bind prev_state_hash =
           State.Checked.hash prev_state
@@ -103,6 +112,7 @@ struct
     let exists' spec ~f = exists spec As_prover.(map get_state ~f)
 
     let main (top_hash : Digest.Tick.Packed.var) =
+      let open Let_syntax in
       let%bind wrap_vk =
         exists' wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
           Verifier.Verification_key.to_bool_list wrap_vk)
@@ -125,13 +135,35 @@ struct
         [ is_base_case
         ; inductive_case_passed
         ]
-
-    let verification_key, proving_key =
-      let kp = Tick.generate_keypair (input ()) main in
-      Tick.Keypair.vk kp, Tick.Keypair.pk kp
   end
 
-  module Wrap = struct
+  module type Step_intf = sig
+    val main : Digest.Tick.Packed.var -> ('a, _) State.Checked.t
+    val input : unit -> ('a, 'b, Digest.Tick.Packed.var -> 'a, Digest.Tick.Packed.value -> 'b) Tick.Data_spec.t
+    val verification_key : Tick.Verification_key.t
+    val proving_key : Tick.Proving_key.t
+    module Prover_state : sig
+      type t =
+        { wrap_vk    : Tock_curve.Verification_key.t
+        ; prev_proof : Tock_curve.Proof.t
+        ; prev_state : State.value
+        ; update     : Update.value
+        }
+      [@@deriving fields]
+    end
+  end
+
+  module Step (Tick_keypair : Tick_keypair_intf) : Step_intf = struct
+    include Step_base
+
+    let verification_key, proving_key =
+      (*let kp = Tick.generate_keypair (input ()) main in*)
+      Tick.Keypair.vk Tick_keypair.kp, Tick.Keypair.pk Tick_keypair.kp
+  end
+
+  module type Step_vk_intf = sig val verification_key : Tick.Verification_key.t end
+
+  module Wrap_base (Step_vk : Step_vk_intf) = struct
     let input = wrap_input
 
     open Tock
@@ -147,7 +179,7 @@ struct
     end
 
     let vk_bits =
-      Verifier.Verification_key.to_bool_list Step.verification_key
+      Verifier.Verification_key.to_bool_list Step_vk.verification_key
 
     let main (input : Digest.Tock.Packed.var) =
       let open Let_syntax in
@@ -157,63 +189,81 @@ struct
           let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
           Verifier.All_in_one.create ~verification_key ~input
             As_prover.(map get_state ~f:(fun {Prover_state.proof} ->
-              { Verifier.All_in_one.verification_key=Step.verification_key; proof }))
+              { Verifier.All_in_one.verification_key=Step_vk.verification_key; proof }))
         in
         with_label "verifier_result"
           (Boolean.Assert.is_true (Verifier.All_in_one.result v))
       end
-
-    let verification_key, proving_key =
-      let kp = Tock.generate_keypair (input ()) main in
-      Tock.Keypair.vk kp, Tock.Keypair.pk kp
   end
 
-  let instance_hash =
-    let self =
-      Step.Verifier.Verification_key.to_bool_list Wrap.verification_key
-    in
-    fun state ->
-      let open Tick.Pedersen in
-      let s = State.create params in
-      let s = State.update_fold s (List.fold self) in
-      let s =
-        State.update_fold s
-          (List.fold
-            (Digest.Bits.to_bits
-               (System.State.hash state)))
-      in
-      State.digest s
+  module type Wrap_intf = sig
+    val main : Digest.Tock.Packed.var -> ('a, _) State.Checked.t
+    val input : (unit -> 'a, 'b, Digest.Tock.Packed.var -> 'a, Digest.Tock.Packed.value -> 'b) Tock.Data_spec.t
+    val verification_key : Tock.Verification_key.t
+    val proving_key : Tock.Proving_key.t
+    module Prover_state : sig
+      type t =
+        { proof : Tick_curve.Proof.t
+        }
+    end
+  end
 
-  let wrap : Tick.Pedersen.Digest.t -> Tick.Proof.t -> Tock.Proof.t =
-    let embed (x : Tick.Field.t) : Tock.Field.t =
-      let n = Tick.Bigint.of_field x in
-      let rec go pt acc i =
-        if i = Tick.Field.size_in_bits
-        then acc
-        else
-          go (Tock.Field.add pt pt)
-            (if Tick.Bigint.test_bit n i
-            then Tock.Field.add pt acc
-            else acc)
-            (i + 1)
-      in
-      go Tock.Field.one Tock.Field.zero 0
-    in
-    fun hash proof ->
-      Tock.prove Wrap.proving_key (Wrap.input ())
-        { Wrap.Prover_state.proof }
-        Wrap.main
-        (embed hash)
+  module Wrap (Step_vk : Step_vk_intf) (Tock_keypair : Tock_keypair_intf) : Wrap_intf = struct
+    include Wrap_base(Step_vk)
 
-  let step ~prev_proof ~prev_state block =
-    let prev_proof = wrap (instance_hash prev_state) prev_proof in
-    let next_state = System.State.update_exn prev_state block in
-    Tick.prove Step.proving_key (Step.input ())
-      { Step.Prover_state.prev_proof
-      ; wrap_vk = Wrap.verification_key
-      ; prev_state
-      ; update = block
-      }
-      Step.main
-      (instance_hash next_state)
+    let verification_key, proving_key =
+      (*let kp = Tock.generate_keypair (input ()) main in*)
+      Tock.Keypair.vk Tock_keypair.kp, Tock.Keypair.pk Tock_keypair.kp
+  end
+
+  module Machine (Wrap : Wrap_intf) (Step : Step_intf) = struct
+    let instance_hash =
+      let self =
+        Step.Verifier.Verification_key.to_bool_list Wrap.verification_key
+      in
+      fun state ->
+        let open Tick.Pedersen in
+        let s = State.create params in
+        let s = State.update_fold s (List.fold self) in
+        let s =
+          State.update_fold s
+            (List.fold
+              (Digest.Bits.to_bits
+                 (System.State.hash state)))
+        in
+        State.digest s
+
+    let wrap : Tick.Pedersen.Digest.t -> Tick.Proof.t -> Tock.Proof.t =
+      let embed (x : Tick.Field.t) : Tock.Field.t =
+        let n = Tick.Bigint.of_field x in
+        let rec go pt acc i =
+          if i = Tick.Field.size_in_bits
+          then acc
+          else
+            go (Tock.Field.add pt pt)
+              (if Tick.Bigint.test_bit n i
+              then Tock.Field.add pt acc
+              else acc)
+              (i + 1)
+        in
+        go Tock.Field.one Tock.Field.zero 0
+      in
+      fun hash proof ->
+        Tock.prove Wrap.proving_key (Wrap.input ())
+          { Wrap.Prover_state.proof }
+          Wrap.main
+          (embed hash)
+
+    let step ~prev_proof ~prev_state block =
+      let prev_proof = wrap (instance_hash prev_state) prev_proof in
+      let next_state = System.State.update_exn prev_state block in
+      Tick.prove Step.proving_key (Step.input ())
+        { Step.Prover_state.prev_proof
+        ; wrap_vk = Wrap.verification_key
+        ; prev_state
+        ; update = block
+        }
+        Step.main
+        (instance_hash next_state)
+  end
 end
