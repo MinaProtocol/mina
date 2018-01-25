@@ -215,6 +215,7 @@ let int16 =
     else failwithf "Port not between 0 and %d" max_port ())
 
 let () =
+  let _ = Keys.foo () in
   let open Command.Let_syntax in
   Command.async
     ~summary:"Current daemon"

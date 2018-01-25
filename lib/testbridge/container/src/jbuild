@@ -8,7 +8,7 @@
    (modes (native))
   ))
 
-(install
- ((section bin)
-  (files ((main.exe as main)))))
+;(install
+; ((section bin)
+; (files ((main.exe as main)))))
 

@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Nanobit_base
 open Snark_params
 
 module State : sig
