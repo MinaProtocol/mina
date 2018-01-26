@@ -68,7 +68,7 @@ let () =
         in
         fun () ->
           let open Deferred.Let_syntax in
-          let%bind ports = 
+          let%bind external_ports, internal_ports = 
             Testbridge.Main.create 
               ~project_dir:"../client" 
               ~container_count:container_count 
@@ -77,7 +77,7 @@ let () =
               ~internal_tcp_ports:[] 
               ~internal_udp_ports:[] 
           in
-          main ports
+          main external_ports
       ]
     end
   |> Command.run
