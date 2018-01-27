@@ -25,6 +25,20 @@ module Pod = struct
   [@@deriving sexp]
 end
 
+module Service = struct
+
+  type protocol = [ `TCP | `UDP ]
+  [@@deriving sexp]
+
+  type t =
+    { name : string
+    ; node_port : int
+    ; port : int
+    ; protocol : protocol
+    }
+  [@@deriving sexp]
+end
+
 let get_nodes () = 
   let%map stdout = Process.run_exn ~prog:"kubectl" ~args:[ "get"; "nodes"; "-o"; "json" ] () in
   let json = Yojson.Basic.from_string stdout in
@@ -146,10 +160,53 @@ let wait_for_pods pods_needed =
   go ()
 ;;
 
-let forward_port pod port target_port = 
-  let prog = "kubectl" in
-  let args = [ "port-forward"; pod.Pod.pod_name; (Int.to_string target_port) ^ ":" ^ (Int.to_string port) ] in
-  Deferred.ignore (Process.run_exn ~prog ~args ())
+let get_services pods =
+  let%map stdout = Process.run_exn ~prog:"kubectl" ~args:[ "get"; "services"; "-o"; "json" ] () in
+  let json = Yojson.Basic.from_string stdout in
+  let open Yojson.Basic.Util in
+  let items = json |> member "items" |> to_list in
+  let pod_items =
+    List.map pods ~f:(fun pod -> 
+      List.find_exn items ~f:(fun item -> 
+        let name = item |> member "metadata" |> member "name" |> to_string in
+        name = pod.Pod.container_name))
+  in
+  let pod_specs = 
+    List.map pod_items ~f:(fun item -> item |> member "spec")
+  in
+  List.map pod_specs ~f:(fun spec -> 
+    let services = 
+      List.map 
+        (spec |> member "ports" |> to_list)
+        ~f:(fun port_spec -> 
+          let name = port_spec |> member "name" |> to_string in
+          let node_port = port_spec |> member "nodePort" |> to_int in
+          let port = port_spec |> member "port" |> to_int in
+          let protocol = 
+            (port_spec |> member "protocol" |> to_string)
+            |> function 
+            | "TCP" -> `TCP
+            | "UDP" -> `UDP
+            | s -> failwith ("Unknown protocol " ^ s)
+          in
+          { Service.name; node_port; port; protocol })
+    in
+    let ip = spec |> member "clusterIP" |> to_string in
+    (services, ip))
+
+let get_internal_ports pods ports =
+  let%map pod_services = get_services pods in
+  let pod_internal_ports =
+    List.map pod_services ~f:(fun (services, ip) -> 
+      List.map ports ~f:(fun port -> 
+        let service = 
+          List.find_exn
+            services
+            ~f:(fun service -> service.port = port)
+        in
+        Host_and_port.create ~host:ip ~port:service.port))
+  in
+  pod_internal_ports
 
 let forward_ports pods ports = 
   let prog = "kubectl" in
