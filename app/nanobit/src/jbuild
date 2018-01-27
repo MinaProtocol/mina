@@ -2,11 +2,16 @@
 
 (executable
   ((name main)
-   (libraries (core camlsnark async async_extra ppx_inline_test.runtime-lib))
+   (libraries (core nanobit_base camlsnark async async_extra ppx_inline_test.runtime-lib))
    (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib main))))
    (flags (-w -40 -g))
    (modes (native))
   ))
+
+(rule
+ ((targets (keys.ml))
+  (deps    (gen/genkeys.exe))
+  (action  (run ${<} ${@}))))
 
 (alias
   ((name runtest)

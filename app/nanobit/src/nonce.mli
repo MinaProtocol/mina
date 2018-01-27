@@ -1,4 +1,5 @@
 open Core_kernel
+open Nanobit_base
 
 type t = private Int64.t
 [@@deriving bin_io]
