@@ -1,27 +1,27 @@
 #!/bin/bash
 
+#example: from lib/testbridge, 
+#./test.sh ./tests/echo/host ../../_build/install/default/bin/echo_host 
 
-if [ $# -eq 0 ]
+
+if [ ! $# -eq 2 ]
 then
-  echo "missing argument: test directory"
+  echo "missing argument"
   exit 1
 fi
 
-test=$1
+loc=$1
+bin=$2
 
 set -e
 
-cd bridge
-jbuilder build
-opam upgrade testbridge
-
-cd ..
-
-cd $test/client
+cd ../../
 jbuilder build
 
-cd ../host
-jbuilder build
-_build/install/default/bin/main \
+cd lib/testbridge/$loc
+
+../../../$bin \
   -container-count 2 \
   -containers-per-machine 2
+
+

@@ -2,6 +2,7 @@
 
 (executable
   ((name main)
+   (public_name main)
    (libraries (core nanobit_base camlsnark async async_extra ppx_inline_test.runtime-lib))
    (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib main))))
    (flags (-w -40 -g))
@@ -17,8 +18,4 @@
   ((name runtest)
    (deps (main.exe))
    (action (run ${<} inline-test-runner main))))
-
-(install
- ((section bin)
-  (files ((main.exe as main)))))
 

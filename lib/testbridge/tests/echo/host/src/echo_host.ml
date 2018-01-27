@@ -45,7 +45,7 @@ let main ports =
         Testbridge.Kubernetes.call_exn
           Rpcs.Echo.rpc
           port
-          "hi1235"
+          "hi1234"
       in
       printf "%s\n" res
     end);
