@@ -100,10 +100,6 @@ let internal_implementations =
 
 Tcp.Server.create 
   ~on_handler_error:(`Call (fun net exn -> eprintf "%s\n" (Exn.to_string_mach exn)))
-  (*(Tcp.Where_to_listen.create 
-     ~socket_type:Socket.Type.tcp 
-     ~address:(`Inet (Unix.Inet_addr.of_string "127.0.0.1", 8000))
-     ~listening_on:(fun x -> Fn.id))*)
   (Tcp.Where_to_listen.of_port 8000)
   (fun address reader writer -> 
      Rpc.Connection.server_with_close 
@@ -115,10 +111,6 @@ Tcp.Server.create
 
 Tcp.Server.create 
   ~on_handler_error:(`Call (fun net exn -> eprintf "%s\n" (Exn.to_string_mach exn)))
-  (*(Tcp.Where_to_listen.create 
-     ~socket_type:Socket.Type.tcp 
-     ~address:(`Inet (Unix.Inet_addr.of_string "127.0.0.1", 8001))
-     ~listening_on:(fun x -> Fn.id))*)
   (Tcp.Where_to_listen.of_port 8001)
   (fun address reader writer -> 
      Rpc.Connection.server_with_close 
