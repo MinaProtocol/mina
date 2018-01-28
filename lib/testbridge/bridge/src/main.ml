@@ -104,9 +104,9 @@ let create
       internal_tcp_ports 
       internal_udp_ports in
   let testbridge_port = 8100 in
-  let client_ports = external_tcp_ports in
-  let%bind ports = Kubernetes.forward_ports pods (List.concat [ [ testbridge_port ]; client_ports ]) in
-  let testbridge_ports = List.map ports ~f:(fun pod_ports -> (List.nth_exn pod_ports 0)) in
+  let%bind external_ports = Kubernetes.forward_ports pods (List.concat [ [ testbridge_port ]; external_tcp_ports ]) in
+  let%bind internal_ports = Kubernetes.get_internal_ports pods internal_tcp_ports in
+  let testbridge_ports = List.map external_ports ~f:(fun pod_ports -> (List.nth_exn pod_ports 0)) in
   let%bind tar_string = 
     Process.run_exn ~working_dir:project_dir ~prog:"tar" ~args:[ "czvf"; "-"; "." ] () 
   in
@@ -137,8 +137,7 @@ let create
             (("bash", [ "/app/testbridge-launch.sh"]), tar_string)
         in
         ())
-        (*printf "got %s\n" out)*)
   in
-  let client_ports = List.map ports ~f:(fun pod_ports -> (List.drop pod_ports 1)) in
-  client_ports
+  let external_tcp_ports = List.map external_ports ~f:(fun pod_ports -> (List.drop pod_ports 1)) in
+  external_tcp_ports, internal_ports
 ;;
