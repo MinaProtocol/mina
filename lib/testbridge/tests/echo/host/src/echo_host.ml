@@ -65,11 +65,15 @@ let () =
         and containers_per_machine =
           flag "containers-per-machine"
             ~doc:"containers per machine" (required int)
+        and image_host =
+          flag "image-host"
+            ~doc:"location of docker repository" (required string)
         in
         fun () ->
           let open Deferred.Let_syntax in
           let%bind external_ports, internal_ports = 
             Testbridge.Main.create 
+              ~image_host
               ~project_dir:"../client" 
               ~container_count:container_count 
               ~containers_per_machine:containers_per_machine 
