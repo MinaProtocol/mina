@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(executable
+  ((name stdout_host)
+   (public_name stdout_host)
+   (package testbridge)
+   (libraries (core async async_extra testbridge))
+   (preprocess (pps (ppx_jane)))
+   (flags (-w -40 -g))
+   (modes (native))
+  ))
+
