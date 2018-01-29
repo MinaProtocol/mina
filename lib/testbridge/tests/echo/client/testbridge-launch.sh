@@ -5,4 +5,4 @@ cd "$(dirname "$0")"
 cp /testbridge/testbridge.opam /app/echo.opam
 
 eval `opam config env` && jbuilder build
-_build/install/default/bin/echo_client
+_build/install/default/bin/echo_client > /app/logs 2>&1

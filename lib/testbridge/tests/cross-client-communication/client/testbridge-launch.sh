@@ -7,4 +7,4 @@ cd "$(dirname "$0")"
 cp /testbridge/testbridge.opam /app/ccc.opam
 
 eval `opam config env` && jbuilder build
-_build/install/default/bin/ccc_client
+_build/install/default/bin/ccc_client > /app/logs 2>&1
