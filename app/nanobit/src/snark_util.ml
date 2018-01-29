@@ -93,6 +93,41 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     | b :: bs -> go (b :> Cvar.t) bs
   ;;
 
+  let nth_bit x ~n = (x lsr n) land 1 = 1
+
+  let apply_mask mask bs =
+    Checked.all (List.map2_exn mask bs ~f:Boolean.(&&))
+
+  let pack_unsafe (bs0 : Boolean.var list) =
+    let n = List.length bs0 in
+    assert (n <= Field.size_in_bits);
+    let rec go acc two_to_the_i = function
+      | b :: bs ->
+        go Cvar.(add acc (scale b two_to_the_i))
+          (Field.add two_to_the_i two_to_the_i)
+          bs
+      | [] -> acc
+    in
+    go (Cvar.constant Field.zero) Field.one (bs0 :> Cvar.t list)
+  ;;
+
+  let rec n_ones n =
+    let max = Field.size_in_bits in
+    let%bind bs =
+      exists (Var_spec.list ~length:max Boolean.spec)
+        As_prover.(map (all (List.map ~f:(read Boolean.spec) n)) ~f:(fun n ->
+          let n = pack_int n in
+          List.init max ~f:(fun i -> i < n)))
+    in
+    let%map () = assert_equal (Cvar.sum (bs :> Cvar.t list)) (Checked.pack n)
+    and () = assert_decreasing bs in
+    bs
+
+  let assert_num_bits_upper_bound bs u =
+    let%bind mask = n_ones u in
+    let%bind masked = apply_mask mask bs in
+    assert_equal (pack_unsafe masked) (pack_unsafe bs)
+
   let num_bits_int =
     let rec go acc n =
       if n = 0
@@ -102,34 +137,28 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     go 0
   ;;
 
-  let apply_mask mask bs =
-    Checked.all (List.map2_exn mask bs ~f:Boolean.(&&))
-
-  let bit_length_bit_length = num_bits_int Field.size_in_bits
-  ;;
+  let size_in_bits_size_in_bits = num_bits_int Field.size_in_bits
 
   (* Someday: this could definitely be made more efficient *)
-  let num_bits : Cvar.t -> (Cvar.t, _) Checked.t =
-    let max = Field.size_in_bits in
-    let rec n_ones n =
-      let%bind bs =
-        exists (Var_spec.list ~length:max Boolean.spec)
-          As_prover.(map (all (List.map ~f:(read Boolean.spec) n)) ~f:(fun n ->
-            let n = pack_int n in
-            List.init max ~f:(fun i -> i < n)))
+  let num_bits_upper_bound : Cvar.t -> (Cvar.t, _) Checked.t =
+    let num_bits_upper_bound x =
+      let num_bits =
+        match
+          List.find_mapi (List.rev (Field.unpack x)) ~f:(fun i x ->
+            if x then Some i else None)
+        with
+        | Some leading_zeroes -> Field.size_in_bits - leading_zeroes
+        | None -> 0
       in
-      let%map () = assert_equal (Cvar.sum (bs :> Cvar.t list)) (Checked.pack n)
-      and () = assert_decreasing bs in
-      bs
+      List.init size_in_bits_size_in_bits ~f:(fun i -> nth_bit num_bits ~n:i)
     in
     fun x ->
       let%bind res =
-        exists (Var_spec.list ~length:bit_length_bit_length Boolean.spec) (failwith "TODO")
+        exists (Var_spec.list ~length:size_in_bits_size_in_bits Boolean.spec)
+          (As_prover.(map (read_var x) ~f:num_bits_upper_bound))
       in
-      let%bind mask = n_ones res in
       let%bind x_unpacked = Checked.unpack x ~length:Field.size_in_bits in
-      let%bind masked = apply_mask mask x_unpacked in
-      let%map () = assert_equal (Checked.pack masked) x in
+      let%map () = assert_num_bits_upper_bound x_unpacked res in
       Checked.pack res
   ;;
 
