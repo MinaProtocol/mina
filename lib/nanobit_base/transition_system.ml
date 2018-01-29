@@ -153,6 +153,8 @@ struct
       let open Let_syntax in
       with_label "Wrap.main" begin
         let%bind v =
+          (* The use of unpack here is justified since we feed it to the verifier, which doesn't
+             depend on which unpacking is provided. *)
           let%bind input = Digest.Tock.Checked.(unpack input >>| to_bits) in
           let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
           Verifier.All_in_one.create ~verification_key ~input
