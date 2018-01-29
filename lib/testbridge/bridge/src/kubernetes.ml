@@ -31,8 +31,7 @@ module Service = struct
   [@@deriving sexp]
 
   type t =
-    { name : string
-    ; node_port : int
+    { node_port : int
     ; port : int
     ; protocol : protocol
     }
@@ -179,7 +178,6 @@ let get_services pods =
       List.map 
         (spec |> member "ports" |> to_list)
         ~f:(fun port_spec -> 
-          let name = port_spec |> member "name" |> to_string in
           let node_port = port_spec |> member "nodePort" |> to_int in
           let port = port_spec |> member "port" |> to_int in
           let protocol = 
@@ -189,7 +187,7 @@ let get_services pods =
             | "UDP" -> `UDP
             | s -> failwith ("Unknown protocol " ^ s)
           in
-          { Service.name; node_port; port; protocol })
+          { Service.node_port; port; protocol })
     in
     let ip = spec |> member "clusterIP" |> to_string in
     (services, ip))

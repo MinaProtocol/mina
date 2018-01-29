@@ -1,7 +1,9 @@
 (jbuild_version 1)
 
 (executable
-  ((name main)
+  ((name container)
+   (public_name container)
+   (package testbridge)
    (libraries (core async async_extra))
    (preprocess (pps (ppx_jane)))
    (flags (-w -40 -g))
