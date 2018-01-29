@@ -2,13 +2,14 @@ open Core
 open Async
 
 let get_pods 
+      image_host
       container_count 
       containers_per_machine 
       external_tcp_ports 
       internal_tcp_ports 
       internal_udp_ports
   = 
-  let start_pods nodes pods container_count containers_per_machine = 
+  let start_pods image_host nodes pods container_count containers_per_machine =
     let available_slots = 
       List.map nodes ~f:(fun node -> 
         let containers = List.count pods ~f:(fun pod -> String.(pod.Kubernetes.Pod.hostname = node.Kubernetes.Node.hostname)) in
@@ -27,7 +28,7 @@ let get_pods
         (List.map new_containers ~f:(fun node -> 
            Kubernetes.run_pod 
              ~pod_name:("testbridge-" ^ (rand_name ())) 
-             ~pod_image:"localhost:5000/testbridge" 
+             ~pod_image:(image_host ^ "/testbridge:latest")
              ~node_hostname:node.hostname  
              ~tcp_ports:(List.concat [ external_tcp_ports; internal_tcp_ports ])
              ~udp_ports:internal_udp_ports
@@ -49,7 +50,7 @@ let get_pods
     if container_count > List.length pods
     then 
       begin
-        let%map () = start_pods nodes pods container_count containers_per_machine in
+        let%map () = start_pods image_host nodes pods container_count containers_per_machine in
         printf "starting pods\n"
       end
     else return ()
@@ -89,6 +90,7 @@ end
 
 
 let create 
+      ~image_host
       ~project_dir 
       ~container_count 
       ~containers_per_machine 
@@ -98,6 +100,7 @@ let create
   = 
   let%bind pods = 
     get_pods 
+      image_host
       container_count 
       containers_per_machine 
       external_tcp_ports 
