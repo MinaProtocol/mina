@@ -1,6 +1,5 @@
 open Core
 open Async
-open Nanobit
 
 let int16 =
   let max_port = 1 lsl 16 in
