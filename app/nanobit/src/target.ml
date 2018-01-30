@@ -103,27 +103,9 @@ let strength
       (y_unpacked : Unpacked.var)
   =
   with_label "Target.strength" begin
-    let%bind z =
-      exists Var_spec.field
-        As_prover.(map (read_var y) ~f:strength_unchecked)
-    in
-    let%bind () =
-      let%bind k = Util.num_bits_upper_bound z in
-      let%bind m =
-        Tick.Checked.unpack ~length:Util.size_in_bits_size_in_bits
   (* TODO: Critical.
-    This may actually be incorrect. Specifically, with 1 + size_in_bits, you may be
-    able to wrap around twice. *)
-          Cvar.(sub (constant Field.(of_int (1 + size_in_bits))) k)
-      in
-      Util.assert_num_bits_upper_bound y_unpacked m
-    in
-    let%bind zy = Tick.Checked.mul z y in
-    let%bind zy_bits = bits_msb zy in
-    let%bind zy_plus_y_bits = bits_msb Cvar.Infix.(zy + y) in
-    let%map () =
-      lt_bitstrings_msb zy_plus_y_bits zy_bits >>= Boolean.Assert.is_true 
-    in
-    z
+    This computation is totally unchecked. *)
+    exists Var_spec.field
+      As_prover.(map (read_var y) ~f:strength_unchecked)
   end
 ;;
