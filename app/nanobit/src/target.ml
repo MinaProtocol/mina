@@ -7,12 +7,11 @@ type t = Tick.Field.t
 
 let of_field = Fn.id
 
-let meets_target t ~hash =
-  let module B = Tick_curve.Bigint.R in
-  B.compare (B.of_field t) (B.of_field hash) < 0
-;;
+module Bigint = Tick_curve.Bigint.R
 
-include Bits.Snarkable.Field(Tick)
+let meets_target t ~hash =
+  Bigint.(compare (of_field hash) (of_field t)) < 0
+;;
 
 let assert_mem x xs =
   let open Tick in
@@ -27,32 +26,90 @@ let assert_mem x xs =
 ;;
 
 let strength_unchecked (target : t) =
-  failwith "TODO"
+  Bigint.(to_field (div Tick_curve.field_size (of_field target)))
 ;;
 
-(* floor(size of field / target) *)
-let strength (target : Packed.var) =
+open Tick
+open Let_syntax
+
+let boolean_compare (x : Tick.Boolean.var) (y : Tick.Boolean.var) =
+  let x = (x :> Cvar.t) in
+  let y = (y :> Cvar.t) in
+  let%map xy = Checked.mul x y in
+  let open Cvar.Infix in
+  let lt = y - xy in
+  let gt = x - xy in
+  let eq = Cvar.constant Field.one - (lt + gt) in
+  Boolean.Unsafe.(of_cvar lt, of_cvar eq, of_cvar gt)
+
+let boolean_compare_to_value (x : Tick.Boolean.var) (y : Tick.Boolean.value) =
+  let open Boolean in
+  if y
+  then (not x, x, false_)
+  else (false_, not x, x)
+
+let rec lt_bitstrings_msb =
+  let open Boolean in
+  fun (xs : Boolean.var list) (ys : Boolean.var list) ->
+    match xs, ys with
+    | [], [] -> return false_
+    | [ x ], [ y ] -> not x && y
+    | x :: xs, y :: ys ->
+      let%bind tail_lt = lt_bitstrings_msb xs ys
+      and (lt, eq, gt) = boolean_compare x y in
+      let%bind r = eq && tail_lt in
+      lt || r
+    | _::_, [] | [], _::_ ->
+      failwith "lt_bitstrings_msb: Got unequal length strings"
+
+(* Someday: This could be made more efficient by simply skipping some
+   bits in the disjunction. *)
+let rec lt_bitstring_value_msb =
   let open Tick in
   let open Let_syntax in
-  let%bind z = exists Var_spec.field As_prover.(map (read_var target) ~f:strength_unchecked) in
-  (* numbits(z) + numbits(target) = Field.size_in_bits or Field.size_in_bits - 1 or ?
-     and 
-     (z + 1) * target < target
-  *)
-  (* num_bits unpacks. This is wasteful since target gets unpacked elsewhere *)
-  let%bind target_bit_size = Util.num_bits target in
-  let%bind z_bit_size = Util.num_bits z in
-  let b = Cvar.Infix.(target_bit_size + z_bit_size) in
-  let%bind () =
-    assert_mem b
-      [ Cvar.constant Field.(of_int size_in_bits)
-      ; Cvar.constant Field.(of_int (size_in_bits - 1))
-      ]
-  in
-  let%map () =
-    let%bind prod = Checked.mul Cvar.(Infix.(z + constant Field.one)) target in
-    let%bind { less } = Util.compare ~bit_length:Field.size_in_bits prod target in
-    Boolean.Assert.is_true less
-  in
-  z
+  let open Boolean in
+  fun (xs : Boolean.var list) (ys : Boolean.value list) ->
+    match xs, ys with
+    | [], [] -> return false_
+    | [ x ], [ y ] ->
+      let (lt, _, _) = boolean_compare_to_value x y in
+      return lt
+    | x :: xs, y :: ys ->
+      let (lt, eq, gt) = boolean_compare_to_value x y in
+      let%bind tail_lt = lt_bitstring_value_msb xs ys in
+      let%bind r = eq && tail_lt in
+      lt || r
+    | _::_, [] | [], _::_ ->
+      failwith "lt_bitstrings_msb: Got unequal length strings"
+
+let field_size_bits_msb =
+  List.init Field.size_in_bits ~f:(fun i ->
+    Bigint.test_bit Tick_curve.field_size
+      (Field.size_in_bits - 1 - i))
+
+let bits_msb =
+  fun x ->
+    let%bind bs = Checked.unpack ~length:Field.size_in_bits x >>| List.rev in
+    let%map () =
+      lt_bitstring_value_msb bs field_size_bits_msb >>= Boolean.Assert.is_true
+    in
+    bs
+
+include Bits.Snarkable.Field(Tick)
+
+(* floor(size of field / y) *)
+let strength
+      (y : Packed.var)
+      (y_unpacked : Unpacked.var)
+  =
+  with_label "Target.strength" begin
+  (* TODO: Critical.
+    This computation is totally unchecked. *)
+    if Snark_params.insecure_mode
+    then
+      exists Var_spec.field
+        As_prover.(map (read_var y) ~f:strength_unchecked)
+    else
+      failwith "TODO"
+  end
 ;;

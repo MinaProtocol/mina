@@ -87,8 +87,8 @@ module State = struct
     in
     { difficulty_info =
         List.init difficulty_window ~f:(fun _ -> (time, target))
-    ; block_hash = Block.(hash genesis)
-    ; number = Int64.of_int (-1)
+    ; block_hash = Block.genesis.header.previous_block_hash
+    ; number = Int64.of_int 0
     ; strength = Strength.zero
     }
 
@@ -140,8 +140,10 @@ module State = struct
       end
 
     let valid_body ~prev body =
-      let%bind { less } = Util.compare ~bit_length:Block.Body.bit_length prev body in
-      Boolean.Assert.is_true less
+      with_label "valid_body" begin
+        let%bind { less } = Util.compare ~bit_length:Block.Body.bit_length prev body in
+        Boolean.Assert.is_true less
+      end
     ;;
 
     let update (state : var) (block : Block.Packed.var) =
@@ -152,14 +154,14 @@ module State = struct
         in
         let%bind () = valid_body ~prev:state.number block.body in
         let%bind target = compute_target state.difficulty_info in
-        let%bind strength = Target.strength target in
+        let%bind target_unpacked = Target.Checked.unpack target in
+        let%bind strength = Target.strength target target_unpacked in
         let%bind block_unpacked = Block.Checked.unpack block in
         let%bind block_hash =
           let bits = Block.Checked.to_bits block_unpacked in
           hash_digest bits
         in
-        let%bind meets_target = meets_target target block_hash in
-        let%map target_unpacked = Target.Checked.unpack target in
+        let%map meets_target = meets_target target block_hash in
         ( { difficulty_info =
               (block_unpacked.header.time, target_unpacked)
               :: all_but_last_exn state.difficulty_info
@@ -184,7 +186,10 @@ module Update = struct
     | New_chain of t
 end
 
-let valid t = failwith "TODO"
+let valid t =
+  if Snark_params.insecure_mode
+  then true
+  else failwith "TODO"
 
 let accumulate ~init ~updates ~strongest_chain =
   don't_wait_for begin
@@ -219,38 +224,43 @@ module Transition =
     (System)
 
 let base_hash =
-  Transition.instance_hash System.State.zero
+  if Snark_params.insecure_mode
+  then Tick.Field.zero
+  else Transition.instance_hash System.State.zero
 
 module Step = Transition.Step
 module Wrap = Transition.Wrap
 
 let base_proof =
-  let dummy_proof =
-    let open Tock in
-    let input = Data_spec.[] in
-    let main =
-      let one = Cvar.constant Field.one in
-      assert_equal one one
+  if Snark_params.insecure_mode
+  then begin
+    let s = "0H\150A)W\135\192\t5\202\159\194\193\195s)w\1808o\1578\015zK\1278\234\152\226\020\204\237\204SUo\002\000\00010\226<\229]\252_\198\001$\174\166o\225\189i\230\255F\"\251\214\197\004\224\190nI\181c\174\210\156\140)\160\204z\003\000\00000\144\021\255\207\024\183P\1670\200Fyk\131\191\015\140e]v\\\022\218MHJ\028\213bO:1)\137\242\130C\001\000\000\128\151\000H\135\019;/B\186\152\204\254f\131\179\018\156=$\243\211\140\166\217\011r4]\240_K\144\158;\000\177\002\000\00010\149\208\232\188W\200\191\253Q\023\151M\215\024\149E\237s\185\187j\219\224d\146\147l>\201\152\021s\140\240\152\168\006\002\000\00000\224e]n`\245U\002\207\198\170(0\217\247j.`\144\"\169\221\161\241\162.\226\002N+\231K\185\137}:\007\001\000\00010\249V\197\226\201\202\173\146\196\178\168\005\198p\163B\166\020H\
+             \nE\022\250\252\151\140\253\242a|\162t\220\179\227\213p\001\000\00010e#^E\133n\177\2216sl\020\244\170\004\139\219\228\139\227Oft\231\144\184\127\001\1689a?\184\0232\021\131\002\000\00010\133e\197Lm\204\180\193\232\237[\193\195\175%\226\247\024z\132\144=\022\230\228\019}\145(QN\160mE\235V\238\000\000\0001"
     in
-    let keypair = generate_keypair input main in
-    prove (Keypair.pk keypair) input () main
-  in
-  Tick.prove Step.proving_key (Step.input ())
-    { Step.Prover_state.prev_proof = dummy_proof
-    ; wrap_vk  = Wrap.verification_key
-    ; prev_state = System.State.negative_one
-    ; update = Block.genesis
-    }
-    Step.main
-    base_hash
+    Tick_curve.Proof.of_string s
+  end else begin
+    let dummy_proof =
+      let open Tock in
+      let input = Data_spec.[] in
+      let main =
+        let one = Cvar.constant Field.one in
+        assert_equal one one
+      in
+      let keypair = generate_keypair input main in
+      prove (Keypair.pk keypair) input () main
+    in
+    Tick.prove (Lazy.force Step.proving_key) (Step.input ())
+      { Step.Prover_state.prev_proof = dummy_proof
+      ; wrap_vk  = Lazy.force Wrap.verification_key
+      ; prev_state = System.State.negative_one
+      ; update = Block.genesis
+      }
+      Step.main
+      base_hash
+  end
+;;
 
 let genesis = { state = State.zero; proof = base_proof }
-
-let () =
-  assert
-    (Tick.verify base_proof Step.verification_key
-       (Step.input ()) base_hash)
-;;
 
 let extend_exn { state=prev_state; proof=prev_proof } block =
   let proof = Transition.step ~prev_proof ~prev_state block in

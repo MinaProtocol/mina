@@ -1,5 +1,7 @@
 open Core_kernel
 
+let insecure_mode = true
+
 module Tick_curve = Camlsnark.Backends.Mnt4
 module Tock_curve = Camlsnark.Backends.Mnt6
 
