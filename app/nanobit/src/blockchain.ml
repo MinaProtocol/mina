@@ -186,10 +186,8 @@ module Update = struct
     | New_chain of t
 end
 
-let insecure_mode = true
-
 let valid t =
-  if insecure_mode
+  if Snark_params.insecure_mode
   then true
   else failwith "TODO"
 
@@ -226,7 +224,7 @@ module Transition =
     (System)
 
 let base_hash =
-  if insecure_mode
+  if Snark_params.insecure_mode
   then Tick.Field.zero
   else Transition.instance_hash System.State.zero
 
@@ -234,7 +232,7 @@ module Step = Transition.Step
 module Wrap = Transition.Wrap
 
 let base_proof =
-  if insecure_mode
+  if Snark_params.insecure_mode
   then begin
     let open Tick in
     let input = Data_spec.[] in

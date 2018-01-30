@@ -105,7 +105,11 @@ let strength
   with_label "Target.strength" begin
   (* TODO: Critical.
     This computation is totally unchecked. *)
-    exists Var_spec.field
-      As_prover.(map (read_var y) ~f:strength_unchecked)
+    if Snark_params.insecure_mode
+    then
+      exists Var_spec.field
+        As_prover.(map (read_var y) ~f:strength_unchecked)
+    else
+      failwith "TODO"
   end
 ;;
