@@ -87,8 +87,8 @@ module State = struct
     in
     { difficulty_info =
         List.init difficulty_window ~f:(fun _ -> (time, target))
-    ; block_hash = Block.(hash genesis)
-    ; number = Int64.of_int (-1)
+    ; block_hash = Block.genesis.header.previous_block_hash
+    ; number = Int64.of_int 0
     ; strength = Strength.zero
     }
 
@@ -140,8 +140,18 @@ module State = struct
       end
 
     let valid_body ~prev body =
-      let%bind { less } = Util.compare ~bit_length:Block.Body.bit_length prev body in
-      Boolean.Assert.is_true less
+      with_label "valid_body" begin
+        let%bind () =
+          as_prover As_prover.(Let_syntax.(
+            let%map p = read Block.Body.Packed.spec prev
+            and b = read Block.Body.Packed.spec body
+            in
+            printf "prev=%s, body=%s\n%!"
+              (Int64.to_string_hum p) (Int64.to_string_hum b)))
+        in
+        let%bind { less } = Util.compare ~bit_length:Block.Body.bit_length prev body in
+        Boolean.Assert.is_true less
+      end
     ;;
 
     let update (state : var) (block : Block.Packed.var) =
@@ -152,14 +162,14 @@ module State = struct
         in
         let%bind () = valid_body ~prev:state.number block.body in
         let%bind target = compute_target state.difficulty_info in
-        let%bind strength = Target.strength target in
+        let%bind target_unpacked = Target.Checked.unpack target in
+        let%bind strength = Target.strength target target_unpacked in
         let%bind block_unpacked = Block.Checked.unpack block in
         let%bind block_hash =
           let bits = Block.Checked.to_bits block_unpacked in
           hash_digest bits
         in
-        let%bind meets_target = meets_target target block_hash in
-        let%map target_unpacked = Target.Checked.unpack target in
+        let%map meets_target = meets_target target block_hash in
         ( { difficulty_info =
               (block_unpacked.header.time, target_unpacked)
               :: all_but_last_exn state.difficulty_info

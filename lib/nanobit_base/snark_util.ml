@@ -126,7 +126,8 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
   let assert_num_bits_upper_bound bs u =
     let%bind mask = n_ones u in
     let%bind masked = apply_mask mask bs in
-    assert_equal (pack_unsafe masked) (pack_unsafe bs)
+    assert_equal ~label:"Snark_util.assert_num_bits_upper_bound"
+      (pack_unsafe masked) (pack_unsafe bs)
 
   let num_bits_int =
     let rec go acc n =
