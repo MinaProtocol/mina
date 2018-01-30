@@ -126,9 +126,9 @@ struct
         ; inductive_case_passed
         ]
 
-    let verification_key, proving_key =
-      let kp = Tick.generate_keypair (input ()) main in
-      Tick.Keypair.vk kp, Tick.Keypair.pk kp
+    let keypair = lazy (Tick.generate_keypair (input ()) main)
+    let verification_key = Lazy.map ~f:Tick.Keypair.vk keypair
+    let proving_key = Lazy.map ~f:Tick.Keypair.pk keypair
   end
 
   module Wrap = struct
@@ -146,8 +146,7 @@ struct
         }
     end
 
-    let vk_bits =
-      Verifier.Verification_key.to_bool_list Step.verification_key
+    let vk_bits = Lazy.map ~f:Verifier.Verification_key.to_bool_list Step.verification_key
 
     let main (input : Digest.Tock.Packed.var) =
       let open Let_syntax in
@@ -156,28 +155,28 @@ struct
           (* The use of unpack here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)
           let%bind input = Digest.Tock.Checked.(unpack input >>| to_bits) in
-          let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
+          let verification_key = List.map (Lazy.force vk_bits) ~f:Boolean.var_of_value in
           Verifier.All_in_one.create ~verification_key ~input
             As_prover.(map get_state ~f:(fun {Prover_state.proof} ->
-              { Verifier.All_in_one.verification_key=Step.verification_key; proof }))
+              { Verifier.All_in_one.verification_key=Lazy.force Step.verification_key; proof }))
         in
         with_label "verifier_result"
           (Boolean.Assert.is_true (Verifier.All_in_one.result v))
       end
 
-    let verification_key, proving_key =
-      let kp = Tock.generate_keypair (input ()) main in
-      Tock.Keypair.vk kp, Tock.Keypair.pk kp
+    let keypair = lazy (Tock.generate_keypair (input ()) main)
+    let verification_key = Lazy.map ~f:Tock.Keypair.vk keypair
+    let proving_key = Lazy.map ~f:Tock.Keypair.pk keypair
   end
 
   let instance_hash =
     let self =
-      Step.Verifier.Verification_key.to_bool_list Wrap.verification_key
+      Lazy.map ~f:Step.Verifier.Verification_key.to_bool_list Wrap.verification_key
     in
     fun state ->
       let open Tick.Pedersen in
       let s = State.create params in
-      let s = State.update_fold s (List.fold self) in
+      let s = State.update_fold s (List.fold (Lazy.force self)) in
       let s =
         State.update_fold s
           (List.fold
@@ -202,7 +201,7 @@ struct
       go Tock.Field.one Tock.Field.zero 0
     in
     fun hash proof ->
-      Tock.prove Wrap.proving_key (Wrap.input ())
+      Tock.prove (Lazy.force Wrap.proving_key) (Wrap.input ())
         { Wrap.Prover_state.proof }
         Wrap.main
         (embed hash)
@@ -210,9 +209,9 @@ struct
   let step ~prev_proof ~prev_state block =
     let prev_proof = wrap (instance_hash prev_state) prev_proof in
     let next_state = System.State.update_exn prev_state block in
-    Tick.prove Step.proving_key (Step.input ())
+    Tick.prove (Lazy.force Step.proving_key) (Step.input ())
       { Step.Prover_state.prev_proof
-      ; wrap_vk = Wrap.verification_key
+      ; wrap_vk = Lazy.force Wrap.verification_key
       ; prev_state
       ; update = block
       }
