@@ -140,14 +140,6 @@ module State = struct
 
     let valid_body ~prev body =
       with_label "valid_body" begin
-        let%bind () =
-          as_prover As_prover.(Let_syntax.(
-            let%map p = read Block.Body.Packed.spec prev
-            and b = read Block.Body.Packed.spec body
-            in
-            printf "prev=%s, body=%s\n%!"
-              (Int64.to_string_hum p) (Int64.to_string_hum b)))
-        in
         let%bind { less } = Util.compare ~bit_length:Block.Body.bit_length prev body in
         Boolean.Assert.is_true less
       end
