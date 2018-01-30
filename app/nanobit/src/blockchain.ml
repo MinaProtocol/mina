@@ -186,9 +186,12 @@ module Update = struct
     | New_chain of t
 end
 
+let insecure_mode = true
+
 let valid t =
-  let _ = "Test version do_not_release\n%!" in
-  true
+  if insecure_mode
+  then true
+  else failwith "TODO"
 
 let accumulate ~init ~updates ~strongest_chain =
   don't_wait_for begin
@@ -223,16 +226,17 @@ module Transition =
     (System)
 
 let base_hash =
-  let _actual () = Transition.instance_hash System.State.zero in
-  let fake_do_not_release = Tick.Field.zero in
-  fake_do_not_release
+  if insecure_mode
+  then Tick.Field.zero
+  else Transition.instance_hash System.State.zero
 
 module Step = Transition.Step
 module Wrap = Transition.Wrap
 
-let base_proof () =
-  let dummy_proof =
-    let open Tock in
+let base_proof =
+  if insecure_mode
+  then begin
+    let open Tick in
     let input = Data_spec.[] in
     let main =
       let one = Cvar.constant Field.one in
@@ -240,28 +244,29 @@ let base_proof () =
     in
     let keypair = generate_keypair input main in
     prove (Keypair.pk keypair) input () main
-  in
-  Tick.prove (Lazy.force Step.proving_key) (Step.input ())
-    { Step.Prover_state.prev_proof = dummy_proof
-    ; wrap_vk  = Lazy.force Wrap.verification_key
-    ; prev_state = System.State.negative_one
-    ; update = Block.genesis
-    }
-    Step.main
-    base_hash
-
-let fake_base_proof_do_not_release =
-  let open Tick in
-  let input = Data_spec.[] in
-  let main =
-    let one = Cvar.constant Field.one in
-    assert_equal one one
-  in
-  let keypair = generate_keypair input main in
-  prove (Keypair.pk keypair) input () main
+  end else begin
+    let dummy_proof =
+      let open Tock in
+      let input = Data_spec.[] in
+      let main =
+        let one = Cvar.constant Field.one in
+        assert_equal one one
+      in
+      let keypair = generate_keypair input main in
+      prove (Keypair.pk keypair) input () main
+    in
+    Tick.prove (Lazy.force Step.proving_key) (Step.input ())
+      { Step.Prover_state.prev_proof = dummy_proof
+      ; wrap_vk  = Lazy.force Wrap.verification_key
+      ; prev_state = System.State.negative_one
+      ; update = Block.genesis
+      }
+      Step.main
+      base_hash
+  end
 ;;
 
-let genesis = { state = State.zero; proof = fake_base_proof_do_not_release }
+let genesis = { state = State.zero; proof = base_proof }
 
 let extend_exn { state=prev_state; proof=prev_proof } block =
   let proof = Transition.step ~prev_proof ~prev_state block in
