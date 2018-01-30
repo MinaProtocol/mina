@@ -118,7 +118,7 @@ let genesis : t =
       ; nonce = Nonce.zero
       ; time = Block_time.of_time Time.epoch
       }
-  ; body = Int64.zero
+  ; body = Int64.one
   }
 
 let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"

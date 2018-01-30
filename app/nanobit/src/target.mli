@@ -19,5 +19,9 @@ include Snarkable.Bits.S
 
 val strength_unchecked : t -> Strength.t
 
+(* Someday: Have a dual variable type so I don't have to pass both packed and unpacked
+   versions. *)
 val strength
-  : Packed.var -> (Strength.Packed.var, _) Tick.Checked.t
+  : Packed.var
+  -> Unpacked.var
+  -> (Strength.Packed.var, _) Tick.Checked.t
