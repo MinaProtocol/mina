@@ -3,9 +3,10 @@
 (library
  ((name nanobit_base)
   (public_name nanobit_base)
+  (modules (:standard \ test_runner))
   (library_flags (-linkall))
   (libraries (core camlsnark async async_extra ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib main))))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib nanobit_base))))
   (synopsis "Snarks and friends necessary for keypair generation")))
 
 (executable

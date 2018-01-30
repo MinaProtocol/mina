@@ -63,8 +63,7 @@ module Test (Swim : Swim.S) = struct
 
   let create_with_delay_in_between ~delay ~count : (int * Swim.t) list Deferred.t =
     Deferred.List.init count (fun i ->
-      let (idx, c_deferred) = swim_client i in
-      let%bind c = c_deferred in
+      let (idx, c) = swim_client i in
       let%map () = Async.after delay in
       (idx, c)
     )
