@@ -1,13 +1,29 @@
 (jbuild_version 1)
 
+(library
+ ((name nanobit)
+  (modules (:standard \ (main_test_runner cli)))
+  (library_flags (-linkall))
+  (libraries (core nanobit_base camlsnark async async_extra))
+  (preprocess (pps (ppx_jane ppx_inline_test ppx_driver.runner (-inline-test-lib nanobit))))
+  (flags (-w -40 -g))
+  )
+ )
+
 (executable
-  ((name main)
-   (public_name main)
-   (libraries (core nanobit_base camlsnark async async_extra ppx_inline_test.runtime-lib))
-   (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib main))))
+  ((name cli)
+   (public_name cli)
+   (modules (cli))
+   (libraries (core async nanobit))
+   (preprocess (pps (ppx_jane)))
    (flags (-w -40 -g))
    (modes (native))
   ))
+
+(executable
+  ((name main_test_runner)
+   (modules (main_test_runner))
+   (libraries (nanobit ppx_inline_test.runner.lib))))
 
 (rule
  ((targets (keys.ml))
@@ -16,6 +32,6 @@
 
 (alias
   ((name runtest)
-   (deps (main.exe))
-   (action (run ${<} inline-test-runner main))))
+   (deps (main_test_runner.exe))
+   (action (run ${<} inline-test-runner nanobit))))
 

@@ -162,6 +162,7 @@ struct
     Linear_pipe.fork2 mined_blocks_reader
 
   let main storage_location genesis_block initial_peers should_mine me =
+    let _ = Keys.foo () in
     let open Let_syntax in
     let%map initial_blockchain =
       match%map Storage.load storage_location with
@@ -205,48 +206,8 @@ struct
   ;;
 end
 
-module Main = Make(Swim.Udp)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
+(* Make sure tests work *)
+let%test "trivial" = true
 
-let int16 =
-  let max_port = 1 lsl 16 in
-  Command.Arg_type.map Command.Param.int ~f:(fun x ->
-    if 0 <= x && x < max_port
-    then x
-    else failwithf "Port not between 0 and %d" max_port ())
+include Make(Swim.Udp)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
 
-let () =
-  let _ = Keys.foo () in
-  let open Command.Let_syntax in
-  Command.async
-    ~summary:"Current daemon"
-    begin
-      [%map_open
-        let conf_dir =
-          flag "config directory"
-            ~doc:"Configuration directory"
-            (optional file)
-        and should_mine =
-          flag "mine"
-            ~doc:"Run the miner" (required bool)
-        and port =
-          flag "port"
-            ~doc:"Server port for other to connect" (required int16)
-        and ip =
-          flag "ip"
-            ~doc:"External IP address for others to connect" (required string)
-        in
-        fun () ->
-          let open Deferred.Let_syntax in
-          let%bind home = Sys.home_directory () in
-          let conf_dir =
-            Option.value ~default:(home ^/ ".current-config") conf_dir
-          in
-          let%bind initial_peers =
-            Reader.load_sexps_exn conf_dir Host_and_port.t_of_sexp
-          in
-          Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
-            (Host_and_port.create ~host:ip ~port)
-      ]
-    end
-  |> Command.run
-;;
