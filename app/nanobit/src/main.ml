@@ -164,7 +164,7 @@ struct
   let main storage_location genesis_block initial_peers should_mine me =
     let _ = Keys.foo () in
     let open Let_syntax in
-    let%map initial_blockchain =
+    let%bind initial_blockchain =
       match%map Storage.load storage_location with
       | Some x -> x
       | None -> genesis_block
@@ -202,7 +202,8 @@ struct
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b -> Blockchain.Update.New_chain b)
-          ])
+          ]);
+    Async.never ()
   ;;
 end
 
