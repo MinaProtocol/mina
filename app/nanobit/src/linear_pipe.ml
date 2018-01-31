@@ -64,7 +64,6 @@ let iter_unordered ?consumer ~max_concurrency reader ~f =
 
 let of_list xs = 
   let reader = wrap_reader (Pipe.of_list xs) in
-  set_has_reader reader;
   reader
 ;;
 
@@ -194,7 +193,6 @@ let filter_map_unordered ~max_concurrency t ~f =
 ;;
 
 let latest_ref t ~initial =
-  set_has_reader t;
   let cell = ref initial in
   don't_wait_for begin
     iter t ~f:(fun a -> return (cell := a))
