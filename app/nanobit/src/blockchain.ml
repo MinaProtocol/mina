@@ -263,7 +263,11 @@ let base_proof =
 let genesis = { state = State.zero; proof = base_proof }
 
 let extend_exn { state=prev_state; proof=prev_proof } block =
-  let proof = Transition.step ~prev_proof ~prev_state block in
+  let proof =
+    if insecure_mode
+    then base_proof
+    else Transition.step ~prev_proof ~prev_state block
+  in
   { proof; state = State.update_exn prev_state block }
 ;;
 
