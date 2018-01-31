@@ -39,7 +39,8 @@ let () =
             | Ok ls -> return ls
             | Error e -> 
               begin
-                let%map () = Writer.save_sexp conf_dir ([%sexp_of: Host_and_port.t list] []) in
+                let default_initial_peers = [] in
+                let%map () = Writer.save_sexp conf_dir ([%sexp_of: Host_and_port.t list] default_initial_peers) in
                 []
               end
           in
