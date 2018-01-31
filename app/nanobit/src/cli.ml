@@ -35,7 +35,13 @@ let () =
             Option.value ~default:(home ^/ ".current-config") conf_dir
           in
           let%bind initial_peers =
-            Reader.load_sexps_exn conf_dir Host_and_port.t_of_sexp
+            match%bind Reader.load_sexp conf_dir [%of_sexp: Host_and_port.t list] with
+            | Ok ls -> return ls
+            | Error e -> 
+              begin
+                let%map () = Writer.save_sexp conf_dir ([%sexp_of: Host_and_port.t list] []) in
+                []
+              end
           in
           Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
             (Host_and_port.create ~host:ip ~port)
