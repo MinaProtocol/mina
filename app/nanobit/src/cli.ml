@@ -50,3 +50,6 @@ let () =
     end
   |> Command.run
 ;;
+
+let () = never_returns (Scheduler.go ())
+;;
