@@ -34,13 +34,15 @@ let () =
           let conf_dir =
             Option.value ~default:(home ^/ ".current-config") conf_dir
           in
+          let%bind () = Unix.mkdir ~p:() conf_dir in
           let%bind initial_peers =
-            match%bind Reader.load_sexp conf_dir [%of_sexp: Host_and_port.t list] with
+            let peers_path = conf_dir ^/ "peers" in
+            match%bind Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list] with
             | Ok ls -> return ls
             | Error e -> 
               begin
                 let default_initial_peers = [] in
-                let%map () = Writer.save_sexp conf_dir ([%sexp_of: Host_and_port.t list] default_initial_peers) in
+                let%map () = Writer.save_sexp peers_path ([%sexp_of: Host_and_port.t list] default_initial_peers) in
                 []
               end
           in
