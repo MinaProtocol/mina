@@ -24,6 +24,15 @@ module type Snarkable = sig
     val spec : (var, value) var_spec
   end
 
+  type var
+  type value
+
+  val spec : (var, value) var_spec
+
+  val packed : var -> Packed.var
+  val to_bits : var -> boolean_var list
+
+  (* TODO: Delete
   module Unpacked : sig
     type var
     type value
@@ -31,13 +40,13 @@ module type Snarkable = sig
     include S with type t := value
 
     val spec : (var, value) var_spec
+
+    val to_bits : var -> boolean_var list
   end
 
   module Checked : sig
     val unpack : Packed.var -> (Unpacked.var, _) checked
-
-    val to_bits : Unpacked.var -> boolean_var list
   end
 
-  val unpack : Packed.value -> Unpacked.value
+  val unpack : Packed.value -> Unpacked.value *)
 end

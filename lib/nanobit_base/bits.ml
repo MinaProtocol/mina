@@ -134,8 +134,6 @@ module Snarkable = struct
         and type boolean_var := Impl.Boolean.var
         and type Packed.var = Impl.Cvar.t
         and type Packed.value = V.t
-        and type Unpacked.var = Impl.Boolean.var list
-        and type Unpacked.value = V.t
     =
   struct
     open Impl
@@ -182,6 +180,8 @@ module Snarkable = struct
         { read; store; alloc; check }
     end
 
+    type var = (Packed.var, Boolean.var list) Dual.t
+
     let v_to_list n v =
       List.init n ~f:(fun i -> if i < V.length then V.get v i else false)
 
@@ -199,15 +199,6 @@ module Snarkable = struct
         Var_spec.transport (Var_spec.list ~length:V.length Boolean.spec)
           ~there:(v_to_list V.length)
           ~back:v_of_list
-
-      module Padded = struct
-        type var = Boolean.var list
-        type value = V.t
-        let spec : (var, value) Var_spec.t =
-          Var_spec.transport (Var_spec.list ~length:Field.size_in_bits Boolean.spec)
-            ~there:(v_to_list Field.size_in_bits)
-            ~back:v_of_list
-      end
     end
 
     module Checked = struct
