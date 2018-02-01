@@ -56,8 +56,10 @@ module Filesystem : S with type location = string = struct
   let load location = 
     match%map With_checksum.read_data location Blockchain.bin_reader_t Blockchain.bin_writer_t with
     | Ok blockchain -> Some blockchain
-    | Error e -> (eprintf "%s\n" (Error.to_string_hum e); None)
-
+    | Error e ->
+      eprintf "%s\n"
+        (Error.to_string_hum (Error.tag ~tag:"Could not load blockchain" e));
+      None
 
   let persist location block_stream =
     don't_wait_for begin
