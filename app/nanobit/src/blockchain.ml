@@ -69,7 +69,7 @@ module State = struct
   let update_exn (state : value) (block : Block.t) =
     let target = compute_target_unchecked state.difficulty_info in
     let block_hash = Block.hash block in
-    assert (Target.meets_target target ~hash:block_hash);
+    assert (Target.meets_target_unchecked target ~hash:block_hash);
     let strength = Target.strength_unchecked target in
     assert Int64.(block.body > state.number);
     { difficulty_info =
@@ -124,20 +124,21 @@ module State = struct
   let zero_hash = hash zero
 
   module Checked = struct
-    let is_base_hash h = Checked.equal (Cvar.constant zero_hash) h
+    let is_base_hash h =
+      with_label "State.is_base_hash"
+        (Checked.equal (Cvar.constant zero_hash) h)
 
-    let hash (t : var) = to_bits t >>= hash_digest
+    let hash (t : var) =
+      with_label "State.hash" (to_bits t >>= hash_digest)
 
     (* TODO: A subsequent PR will replace this with the actual difficulty calculation *)
     let compute_target _ = return (Cvar.constant Field.(negate one))
 
     let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
-      with_label "meets_target" begin
-        let%map { less } =
-          Util.compare ~bit_length:Field.size_in_bits hash (target :> Cvar.t)
-        in
-        less
-      end
+      if Snark_params.insecure_functionalities.check_target
+      then return Boolean.true_
+      else
+        failwith "TODO"
 
     let valid_body ~prev body =
       with_label "valid_body" begin
@@ -187,7 +188,7 @@ module Update = struct
 end
 
 let valid t =
-  if Snark_params.insecure_mode
+  if Snark_params.insecure_functionalities.verify_blockchain
   then true
   else failwith "TODO"
 
@@ -220,11 +221,13 @@ module Transition =
       module Tick = Digest
       module Tock = Bits.Snarkable.Field(Tock)
     end)
-    (struct let hash = Tick.hash_digest end)
+    (struct
+      let hash bs = Tick.with_label "Hash.hash" (Tick.hash_digest bs)
+    end)
     (System)
 
 let base_hash =
-  if Snark_params.insecure_mode
+  if Snark_params.insecure_functionalities.compute_base_hash
   then Tick.Field.zero
   else Transition.instance_hash System.State.zero
 
@@ -232,7 +235,7 @@ module Step = Transition.Step
 module Wrap = Transition.Wrap
 
 let base_proof =
-  if Snark_params.insecure_mode
+  if Snark_params.insecure_functionalities.compute_base_proof
   then begin
     let s = "0H\150A)W\135\192\t5\202\159\194\193\195s)w\1808o\1578\015zK\1278\234\152\226\020\204\237\204SUo\002\000\00010\226<\229]\252_\198\001$\174\166o\225\189i\230\255F\"\251\214\197\004\224\190nI\181c\174\210\156\140)\160\204z\003\000\00000\144\021\255\207\024\183P\1670\200Fyk\131\191\015\140e]v\\\022\218MHJ\028\213bO:1)\137\242\130C\001\000\000\128\151\000H\135\019;/B\186\152\204\254f\131\179\018\156=$\243\211\140\166\217\011r4]\240_K\144\158;\000\177\002\000\00010\149\208\232\188W\200\191\253Q\023\151M\215\024\149E\237s\185\187j\219\224d\146\147l>\201\152\021s\140\240\152\168\006\002\000\00000\224e]n`\245U\002\207\198\170(0\217\247j.`\144\"\169\221\161\241\162.\226\002N+\231K\185\137}:\007\001\000\00010\249V\197\226\201\202\173\146\196\178\168\005\198p\163B\166\020H\
              \nE\022\250\252\151\140\253\242a|\162t\220\179\227\213p\001\000\00010e#^E\133n\177\2216sl\020\244\170\004\139\219\228\139\227Oft\231\144\184\127\001\1689a?\184\0232\021\131\002\000\00010\133e\197Lm\204\180\193\232\237[\193\195\175%\226\247\024z\132\144=\022\230\228\019}\145(QN\160mE\235V\238\000\000\0001"
@@ -264,7 +267,7 @@ let genesis = { state = State.zero; proof = base_proof }
 
 let extend_exn { state=prev_state; proof=prev_proof } block =
   let proof =
-    if Snark_params.insecure_mode
+    if Snark_params.insecure_functionalities.extend_blockchain
     then base_proof
     else Transition.step ~prev_proof ~prev_state block
   in

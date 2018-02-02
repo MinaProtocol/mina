@@ -36,9 +36,11 @@ module Cpu = struct
       if i = iterations
       then None
       else
-        let block : Block.t = { block0 with header = { header0 with nonce } } in
+        let block : Block.t =
+          { block0 with header = { header0 with nonce } }
+        in
         let hash = Block.hash block in
-        if Target.meets_target target ~hash
+        if Target.meets_target_unchecked target ~hash
         then Some (block, hash)
         else go (Nonce.succ nonce) (i + 1)
     in
@@ -61,6 +63,8 @@ module Cpu = struct
       }
     in
     let mined_blocks_reader, mined_blocks_writer = Linear_pipe.create () in
+    (* There is a race condition, this sometimes gets executed before the change
+       previous message gets in? *)
     let rec go () =
       let id = state.id in
       match%bind find_block state.previous.state state.body with

@@ -9,7 +9,7 @@ let of_field = Fn.id
 
 module Bigint = Tick_curve.Bigint.R
 
-let meets_target t ~hash =
+let meets_target_unchecked t ~hash =
   Bigint.(compare (of_field hash) (of_field t)) < 0
 ;;
 
@@ -105,7 +105,7 @@ let strength
   with_label "Target.strength" begin
   (* TODO: Critical.
     This computation is totally unchecked. *)
-    if Snark_params.insecure_mode
+    if Snark_params.insecure_functionalities.strength_calculation
     then
       exists Var_spec.field
         As_prover.(map (read_var y) ~f:strength_unchecked)

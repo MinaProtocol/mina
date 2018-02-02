@@ -106,28 +106,55 @@ struct
     let exists' spec ~f = exists spec As_prover.(map get_state ~f)
 
     let main (top_hash : Digest.Tick.Packed.var) =
-      let%bind wrap_vk =
-        exists' wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
-          Verifier.Verification_key.to_bool_list wrap_vk)
-      in
-      let%bind prev_state = exists' State.spec ~f:Prover_state.prev_state
-      and update          = exists' Update.spec ~f:Prover_state.update
-      in
-      let%bind (next_state, `Success success) = State.Checked.update prev_state update in
-      let%bind state_hash = State.Checked.hash next_state in
-      let%bind () =
-        let%bind sh = Digest.Tick.Checked.(unpack state_hash >>| to_bits) in
-        Hash.hash (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
-      in
-      let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
-      let%bind inductive_case_passed =
-        with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
-      in
-      let%bind is_base_case = State.Checked.is_base_hash state_hash in
-      Boolean.Assert.any
-        [ is_base_case
-        ; inductive_case_passed
-        ]
+      with_label "Step.main" begin
+        let%bind wrap_vk =
+          exists' wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
+            Verifier.Verification_key.to_bool_list wrap_vk)
+        in
+        let%bind prev_state = exists' State.spec ~f:Prover_state.prev_state
+        and update          = exists' Update.spec ~f:Prover_state.update
+        in
+        let%bind (next_state, `Success success) =
+          with_label "update" (State.Checked.update prev_state update)
+        in
+        let%bind state_hash =
+          with_label "hash_state" (State.Checked.hash next_state)
+        in
+        let%bind () =
+          with_label "check_top_hash" begin
+            let%bind sh = Digest.Tick.Checked.(unpack state_hash >>| to_bits) in
+            Hash.hash (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
+          end
+        in
+        let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
+        let%bind inductive_case_passed =
+          with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
+        in
+        let%bind is_base_case = State.Checked.is_base_hash state_hash in
+        let%bind () =
+          as_prover As_prover.(
+            let open Let_syntax in
+            let%map state_hash = read_var state_hash
+            and prev_state_valid = read Boolean.spec prev_state_valid
+            and inductive_case_passed = read Boolean.spec inductive_case_passed
+            and success = read Boolean.spec success
+            and is_base_case = read Boolean.spec is_base_case
+            in
+            printf "state_hash:\n%!";
+            Field.print state_hash;
+            printf "prev_state_valid=%b\n inductive_case_passed=%b\n success=%b\n is_base_case=%b\n%!"
+              prev_state_valid
+              inductive_case_passed
+              success
+              is_base_case)
+        in
+        with_label "result" begin
+          Boolean.Assert.any
+            [ is_base_case
+            ; inductive_case_passed
+            ]
+        end
+      end
 
     let keypair = lazy (Tick.generate_keypair (input ()) main)
     let verification_key = Lazy.map ~f:Tick.Keypair.vk keypair
