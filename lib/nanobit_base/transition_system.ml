@@ -32,6 +32,7 @@ end
    Tighten this up. Doing this with all these equalities is kind of a hack, but
    doing it right required an annoying change to the bits intf. *)
 module Make
+    (How : sig val how : How_to_obtain_keys.t end)
     (Digest : sig
        module Tick
          : (Tick.Snarkable.Bits.S
@@ -156,9 +157,12 @@ struct
         end
       end
 
-    let keypair = lazy (Tick.generate_keypair (input ()) main)
-    let verification_key = Lazy.map ~f:Tick.Keypair.vk keypair
-    let proving_key = Lazy.map ~f:Tick.Keypair.pk keypair
+    let keypair =
+      How_to_obtain_keys.obtain_keys (module Tick) How.how
+        (fun () -> Tick.generate_keypair (input ()) main)
+
+    let verification_key = Lazy.map ~f:fst keypair
+    let proving_key = Lazy.map ~f:snd keypair
   end
 
   module Wrap = struct
@@ -194,9 +198,12 @@ struct
           (Boolean.Assert.is_true (Verifier.All_in_one.result v))
       end
 
-    let keypair = lazy (Tock.generate_keypair (input ()) main)
-    let verification_key = Lazy.map ~f:Tock.Keypair.vk keypair
-    let proving_key = Lazy.map ~f:Tock.Keypair.pk keypair
+    let keypair =
+      How_to_obtain_keys.obtain_keys (module Tock) How.how
+        (fun () -> Tock.generate_keypair (input ()) main)
+
+    let verification_key = Lazy.map ~f:fst keypair
+    let proving_key = Lazy.map ~f:snd keypair
   end
 
   let instance_hash =

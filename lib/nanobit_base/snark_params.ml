@@ -13,9 +13,9 @@ type functionalities =
 let insecure_functionalities =
   { strength_calculation = true
   ; verify_blockchain = true
-  ; compute_base_hash = false
-  ; compute_base_proof = false
-  ; extend_blockchain = false
+  ; compute_base_hash = (* false *) true
+  ; compute_base_proof = (* false *) true
+  ; extend_blockchain = (* false *) true
   ; check_target = true
   }
 

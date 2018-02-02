@@ -11,7 +11,8 @@ end
 
 module type S = sig
   val mine
-    : previous:Blockchain.t
+    : prover:Prover.t
+    -> previous:Blockchain.t
     -> body:Block.Body.t
     -> Update.t Linear_pipe.Reader.t
     -> Blockchain.t Linear_pipe.Reader.t
@@ -21,7 +22,7 @@ module Pedersen = Tick.Pedersen
 
 module Cpu = struct
   let find_block (previous : Blockchain.State.t) (body : Block.Body.t)
-    : (Block.t * Pedersen.Digest.t) option Deferred.t =
+    : (Block.t * Pedersen.Digest.t) option =
     let iterations = 10 in
     let target = Blockchain.State.compute_target previous in
     let nonce0 = Nonce.random () in
@@ -44,7 +45,7 @@ module Cpu = struct
         then Some (block, hash)
         else go (Nonce.succ nonce) (i + 1)
     in
-    schedule' (fun () -> return (go nonce0 0))
+    go nonce0 0
   ;;
 
   module State = struct
@@ -55,7 +56,12 @@ module Cpu = struct
       }
   end
 
-  let mine ~(previous : Blockchain.t) ~body (updates : Update.t Linear_pipe.Reader.t) =
+  let mine
+        ~(prover : Prover.t)
+        ~(previous : Blockchain.t)
+        ~body
+        (updates : Update.t Linear_pipe.Reader.t)
+    =
     let state =
       { State.previous
       ; body
@@ -67,16 +73,20 @@ module Cpu = struct
        previous message gets in? *)
     let rec go () =
       let id = state.id in
-      match%bind find_block state.previous.state state.body with
+      match%bind schedule' (fun () -> return (find_block state.previous.state state.body)) with
       | None -> go ()
       | Some (block, header_hash) ->
         if id = state.id
         then begin
-          let chain = Blockchain.extend_exn previous block in
-          let%bind () = Pipe.write mined_blocks_writer chain in
-          state.previous <- chain;
-          state.id <- state.id + 1;
-          go ()
+          match%bind Prover.extend_blockchain prover previous block with
+          | Ok chain ->
+            let%bind () = Pipe.write mined_blocks_writer chain in
+            state.previous <- chain;
+            state.id <- state.id + 1;
+            go ()
+          | Error e ->
+            eprintf "%s\n" Error.(to_string_hum (tag e ~tag:"Blockchain extend error"));
+            go ()
         end else
           go ()
     in

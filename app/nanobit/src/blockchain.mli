@@ -12,6 +12,7 @@ module State : sig
     ; number          : 'number
     ; strength        : 'strength
     }
+  [@@deriving bin_io]
 
   type t =
     ( Block_time.t
@@ -75,7 +76,8 @@ val accumulate
 
 val valid : t -> bool
 
+(*
 val genesis : t
 
-val extend_exn : t -> Block.t -> t
+val extend_exn : t -> Block.t -> t *)
 

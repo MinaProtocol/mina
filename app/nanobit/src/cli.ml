@@ -1,14 +1,9 @@
 open Core
 open Async
+open Nanobit_base
+open Cli_common
 
-let int16 =
-  let max_port = 1 lsl 16 in
-  Command.Arg_type.map Command.Param.int ~f:(fun x ->
-    if 0 <= x && x < max_port
-    then x
-    else failwithf "Port not between 0 and %d" max_port ())
-
-let () =
+let daemon =
   let open Command.Let_syntax in
   Command.async
     ~summary:"Current daemon"
@@ -46,10 +41,23 @@ let () =
                 []
               end
           in
-          Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
+          let%bind prover = Prover.create ~debug:() How_to_obtain_keys.Generate_both in
+          let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
+          Main.main
+            prover
+            (conf_dir ^/ "storage")
+            { Blockchain.state = Blockchain.State.zero; proof = genesis_proof }
+            initial_peers should_mine
             (Host_and_port.create ~host:ip ~port)
       ]
     end
+;;
+
+let () =
+  Command.group ~summary:"Current"
+    [ "daemon", daemon
+    ; "prover", Prover.command
+    ]
   |> Command.run
 ;;
 

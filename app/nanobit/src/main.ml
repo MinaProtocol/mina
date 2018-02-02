@@ -149,9 +149,9 @@ struct
     end;
     gossip_net
 
-  let start_mining ~pipes ~genesis_block ~initial_blockchain =
+  let start_mining ~prover ~pipes ~genesis_block ~initial_blockchain =
     let mined_blocks_reader =
-      Miner_impl.mine
+      Miner_impl.mine ~prover
         ~previous:initial_blockchain
         ~body:(Int64.succ initial_blockchain.state.number)
         (Linear_pipe.merge_unordered
@@ -161,7 +161,7 @@ struct
     in
     Linear_pipe.fork2 mined_blocks_reader
 
-  let main storage_location genesis_block initial_peers should_mine me =
+  let main prover storage_location genesis_block initial_peers should_mine me =
     let _ = Keys.foo () in
     let open Let_syntax in
     let%bind initial_blockchain =
@@ -170,9 +170,10 @@ struct
       | None -> genesis_block
     in
     let pipes = init_pipes () in
+    (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
       if should_mine then
-        start_mining ~pipes ~genesis_block ~initial_blockchain
+        start_mining ~prover ~pipes ~genesis_block ~initial_blockchain
       else
         (Linear_pipe.of_list [], Linear_pipe.of_list [])
     in

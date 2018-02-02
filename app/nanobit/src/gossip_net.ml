@@ -124,7 +124,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
     let broadcast_received_capacity = 64 in
     let implementations = 
       Rpc.Implementations.add_exn 
-        implementations 
+        implementations
         (Rpc.One_way.implement broadcast_rpc (fun () m -> 
           Linear_pipe.write_or_drop
             ~capacity:broadcast_received_capacity 
@@ -140,7 +140,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
       )
     end;
     ignore begin
-      Tcp.Server.create 
+      Tcp.Server.create
         ~on_handler_error:(`Call (fun net exn -> eprintf "%s\n" (Exn.to_string_mach exn)))
         (Tcp.Where_to_listen.create 
            ~socket_type:Socket.Type.tcp 
