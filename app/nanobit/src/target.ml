@@ -96,6 +96,7 @@ let bits_msb =
     bs
 
 include Bits.Snarkable.Field(Tick)
+include Bits.Snarkable.Field_backed(Tick)(struct let bit_length = Field.size_in_bits - 3 end)
 
 (* floor(size of field / y) *)
 let strength
@@ -110,6 +111,36 @@ let strength
       exists Var_spec.field
         As_prover.(map (read_var y) ~f:strength_unchecked)
     else
-      failwith "TODO"
+      let%bind quotient = 
+        exists 
+          Var_spec.field
+          As_prover.(map (read_var y) ~f:strength_unchecked)
+      in
+      let%bind product = 
+        Tick.Checked.mul quotient y
+      in
+      let pow_2 k =
+        Field.pack (List.init (k+1) ~f:(fun x -> if x = k then true else false))
+      in
+      let assert_lt a b ~bit_length = 
+        let%bind { less } = Util.compare a b ~bit_length in
+        Boolean.Assert.is_true less
+      in
+      let assert_lt_pow_2 unpacked_y packed_y k =
+        assert_equal
+          (Tick.Checked.pack (List.rev (List.drop (List.rev unpacked_y) k)))
+          packed_y
+      in
+      let max_target = pow_2 (Field.size_in_bits - 3) in
+      let remainder = 
+        Cvar.sub (Cvar.constant max_target) product
+      in
+      let computed_y = Cvar.add product remainder in
+      (* TODO: 3? *)
+      let%bind () = assert_lt remainder y ~bit_length:(Field.size_in_bits - 3) in
+      let%bind () = assert_lt_pow_2 y_unpacked y (Field.size_in_bits - 3) in
+      (* TODO: bit sum *)
+      let%map () = assert_equal computed_y y in
+      quotient
   end
 ;;
