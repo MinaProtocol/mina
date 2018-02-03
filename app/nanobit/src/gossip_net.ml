@@ -167,7 +167,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
       let selected = List.take !to_broadcast t.target_peer_count in
       to_broadcast := List.drop !to_broadcast t.target_peer_count;
       let%map () = broadcast_selected t.timeout selected msg in
-      List.length !to_broadcast > 0
+      List.length !to_broadcast = 0
 
   let query_peer t (peer : Peer.t) rpc query = 
     Tcp.with_connection
