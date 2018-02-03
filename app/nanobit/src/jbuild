@@ -10,7 +10,7 @@
   ))
 
 (rule
- ((targets (keys.ml))
+ ((targets (transition_keys.ml))
   (deps    (gen/genkeys.exe))
   (action  (run ${<} ${@}))))
 

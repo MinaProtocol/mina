@@ -162,7 +162,6 @@ struct
     Linear_pipe.fork2 mined_blocks_reader
 
   let main storage_location genesis_block initial_peers should_mine me =
-    let _ = Keys.foo () in
     let open Let_syntax in
     let%bind initial_blockchain =
       match%map Storage.load storage_location with

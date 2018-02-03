@@ -29,11 +29,13 @@ module type S = sig
 end
 
 module type Tick_keypair_intf = sig
-  val kp : Tick.Keypair.t
+  val verification_key : Tick.Verification_key.t
+  val proving_key : Tick.Proving_key.t
 end
 
 module type Tock_keypair_intf = sig
-  val kp : Tock.Keypair.t
+  val verification_key : Tock.Verification_key.t
+  val proving_key : Tock.Proving_key.t
 end
 
 (* Someday:
@@ -142,10 +144,7 @@ struct
 
   module Step (Tick_keypair : Tick_keypair_intf) = struct
     include Step_base
-
-    let verification_key, proving_key =
-      (*let kp = Tick.generate_keypair (input ()) main in*)
-      Tick.Keypair.vk Tick_keypair.kp, Tick.Keypair.pk Tick_keypair.kp
+    include Tick_keypair
   end
 
   module type Step_vk_intf = sig
@@ -189,10 +188,7 @@ struct
 
   module Wrap (Step_vk : Step_vk_intf) (Tock_keypair : Tock_keypair_intf) = struct
     include Wrap_base(Step_vk)
-
-    let verification_key, proving_key =
-      (*let kp = Tock.generate_keypair (input ()) main in*)
-      Tock.Keypair.vk Tock_keypair.kp, Tock.Keypair.pk Tock_keypair.kp
+    include Tock_keypair
   end
 end
 

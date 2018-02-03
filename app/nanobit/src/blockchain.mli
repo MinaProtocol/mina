@@ -3,6 +3,7 @@ open Async_kernel
 open Nanobit_base
 open Snark_params
 
+(* TODO: How do you pull the sig from the Blockchain_state mli in Nanobit_base? This code is duplicated *)
 module State : sig
   open Tick
 
