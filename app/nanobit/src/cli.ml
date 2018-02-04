@@ -43,7 +43,7 @@ let () =
               begin
                 let default_initial_peers = [] in
                 let%map () = Writer.save_sexp peers_path ([%sexp_of: Host_and_port.t list] default_initial_peers) in
-                []
+                [ Host_and_port.create "127.0.0.1" 8901 ]
               end
           in
           Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
