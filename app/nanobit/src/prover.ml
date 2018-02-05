@@ -4,8 +4,7 @@ open Nanobit_base
 open Cli_common
 
 type t =
-  { process : Process.t
-  ; host_and_port : Host_and_port.t
+  { host_and_port : Host_and_port.t
   ; connection : Persistent_connection.Rpc.t
   }
 
@@ -17,38 +16,12 @@ let dispatch t rpc q =
   Rpc.Rpc.dispatch rpc conn q
 ;;
 
-let create ?debug how =
-  (* This channel should be authenticated somehow *)
-  let port = get_open_port () in
-  let%bind process =
-    Process.create_exn
-      ~prog:Sys.argv.(0)
-      ~args:["prover"; "-how"; How_to_obtain_keys.to_string how; "-port"; Int.to_string port ]
-      ()
-  in
-  Option.iter debug ~f:(fun () ->
-    let stderr = Lazy.force Writer.stderr  in
-    let transfer_to_stderr r =
-      ignore (Writer.transfer stderr (Reader.pipe r) (Writer.write stderr))
-    in
-    transfer_to_stderr (Process.stdout process);
-    transfer_to_stderr (Process.stderr process)
-  );
-  let localhost = "127.0.0.1" in
-  let host_and_port = { Host_and_port.port; host = localhost } in
-  let connection =
-    Persistent_connection.Rpc.create' ~server_name:"prover"
-      (fun () -> Deferred.Or_error.return host_and_port)
-  in
-  return { process; host_and_port; connection }
-;;
-
 module Rpcs = struct
   module Initialized = struct
     let name      = "initialized"
     let version   = 0
-    type query    = unit [@@deriving bin_io]
-    type response = Initialized [@@deriving bin_io]
+    type query    = unit [@@deriving bin_io, sexp]
+    type response = Initialized [@@deriving bin_io, sexp]
 
     let rpc = Rpc.Rpc.create ~name ~version ~bin_query ~bin_response
   end
@@ -70,6 +43,44 @@ module Rpcs = struct
     let rpc = Rpc.Rpc.create ~name ~version ~bin_query ~bin_response
   end
 end
+
+let connect host_and_port =
+  let connection =
+    Persistent_connection.Rpc.create'
+      ~handshake_timeout:(Time.Span.of_min 10.)
+      ~server_name:"prover"
+      (fun () -> Deferred.Or_error.return host_and_port)
+  in
+(*
+  let%bind conn = Persistent_connection.Rpc.connected connection in
+  let%bind res = Rpc.Rpc.dispatch Rpcs.Genesis_proof.rpc conn () in
+  printf "yo: %s\n%!"
+    (Sexp.to_string_hum ([%sexp_of: Rpcs.Genesis_proof.response sexp_opaque Or_error.t] res));
+*)
+  return { host_and_port; connection }
+;;
+
+let create ?debug how =
+  (* This channel should be authenticated somehow *)
+  let port = get_open_port () in
+  let%bind process =
+    Process.create_exn
+      ~prog:Sys.argv.(0)
+      ~args:["prover"; "-how"; How_to_obtain_keys.to_string how; "-port"; Int.to_string port ]
+      ()
+  in
+  Option.iter debug ~f:(fun () ->
+    let stderr = Lazy.force Writer.stderr  in
+    let transfer_to_stderr r =
+      ignore (Writer.transfer stderr (Reader.pipe r) (Writer.write stderr))
+    in
+    transfer_to_stderr (Process.stdout process);
+    transfer_to_stderr (Process.stderr process)
+  );
+  let localhost = "127.0.0.1" in
+  let host_and_port = { Host_and_port.port; host = localhost } in
+  connect host_and_port
+;;
 
 let extend_blockchain t chain block =
   dispatch t Rpcs.Extend_blockchain.rpc (chain, block)
@@ -130,6 +141,7 @@ module Main (Params : Params_intf) = struct
         in
         Tick_curve.Proof.of_string s
       end else begin
+        printf "Hi\n%!";
         let dummy_proof =
           let open Tock in
           let input = Data_spec.[] in
@@ -152,6 +164,8 @@ module Main (Params : Params_intf) = struct
     end
   ;;
 
+  let initialize () = ignore (Lazy.force base_proof)
+
   let extend_blockchain_exn { Blockchain.state=prev_state; proof=prev_proof } block =
     let proof =
       if Snark_params.insecure_functionalities.extend_blockchain
@@ -170,6 +184,8 @@ module Main (Params : Params_intf) = struct
                  (fun () -> extend_blockchain_exn chain block))
         ; Rpc.Rpc.implement Rpcs.Initialized.rpc
             (fun s () ->
+               printf "Calling initialize:\n%!";
+               initialize ();
                return Rpcs.Initialized.Initialized)
         ; Rpc.Rpc.implement Rpcs.Genesis_proof.rpc
             (fun s () -> 

@@ -22,6 +22,11 @@ let daemon =
         and ip =
           flag "ip"
             ~doc:"External IP address for others to connect" (required string)
+        and start_prover =
+          flag "start-prover"
+        and prover =
+          flag "prover"
+            ~doc:"Prover port. If not given, a prover process will be started"
         in
         fun () ->
           let open Deferred.Let_syntax in
@@ -41,7 +46,9 @@ let daemon =
                 []
               end
           in
-          let%bind prover = Prover.create ~debug:() How_to_obtain_keys.Generate_both in
+          let%bind prover =
+            Prover.create ~debug:() How_to_obtain_keys.Generate_both
+          in
           let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
           Main.main
             prover

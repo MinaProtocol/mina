@@ -14,8 +14,8 @@ let insecure_functionalities =
   { strength_calculation = true
   ; verify_blockchain = true
   ; compute_base_hash = (* false *) true
-  ; compute_base_proof = (* false *) true
-  ; extend_blockchain = (* false *) true
+  ; compute_base_proof = (* false *) false
+  ; extend_blockchain = (* false *) false
   ; check_target = true
   }
 
