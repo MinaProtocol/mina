@@ -210,3 +210,6 @@ module Make
   ;;
 
 end
+
+let%test "trivial" = false
+;;
