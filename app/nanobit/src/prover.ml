@@ -8,8 +8,7 @@ type t =
   ; connection : Persistent_connection.Rpc.t
   }
 
-(* TODO: Implement correctly *)
-let get_open_port () = 8300
+let default_port = 8300
 
 let dispatch t rpc q =
   let%bind conn = Persistent_connection.Rpc.connected t.connection in
@@ -60,9 +59,8 @@ let connect host_and_port =
   return { host_and_port; connection }
 ;;
 
-let create ?debug how =
+let create ?debug ~port how =
   (* This channel should be authenticated somehow *)
-  let port = get_open_port () in
   let%bind process =
     Process.create_exn
       ~prog:Sys.argv.(0)
@@ -141,7 +139,6 @@ module Main (Params : Params_intf) = struct
         in
         Tick_curve.Proof.of_string s
       end else begin
-        printf "Hi\n%!";
         let dummy_proof =
           let open Tock in
           let input = Data_spec.[] in
@@ -167,6 +164,7 @@ module Main (Params : Params_intf) = struct
   let initialize () = ignore (Lazy.force base_proof)
 
   let extend_blockchain_exn { Blockchain.state=prev_state; proof=prev_proof } block =
+    printf "Extending blockchain!\n%!";
     let proof =
       if Snark_params.insecure_functionalities.extend_blockchain
       then Lazy.force base_proof
@@ -196,6 +194,7 @@ module Main (Params : Params_intf) = struct
         `Continue))
 
   let main () =
+    initialize ();
     let%bind server =
       Tcp.Server.create
         ~on_handler_error:(`Call (fun net exn -> eprintf "%s\n" (Exn.to_string_mach exn)))
