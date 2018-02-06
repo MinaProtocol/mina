@@ -138,14 +138,14 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
         ))
     in
     don't_wait_for begin
-      Linear_pipe.iter_unordered ~max_concurrency:64 peer_events ~f:(fun p -> 
-        printf "got peer %s\n" (Sexp.to_string_hum ([%sexp_of: Peer.Event.t] p));
-        match p with
-        | Connect peers -> 
-          List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer); return ()
-        | Disconnect peers -> 
-          List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer); return ()
-      )
+      Linear_pipe.iter_unordered 
+        ~max_concurrency:64 
+        peer_events ~f:(function
+          | Connect peers -> 
+            List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer); return ()
+          | Disconnect peers -> 
+            List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer); return ()
+        )
     end;
     ignore begin
       Tcp.Server.create 

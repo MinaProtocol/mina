@@ -12,7 +12,7 @@ let ord lvl =
   | Info -> 30
   | Debug -> 20
 
-let current_level = ref (ord Debug)
+let current_level = ref (ord Warn)
 
 let logf name lvl =
   let do_log str =

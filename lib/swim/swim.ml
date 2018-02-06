@@ -555,9 +555,7 @@ module Make (Transport : Transport_intf) = struct
     let net = Net.create ~port:(Host_and_port.port me) logger in
     let incoming = Net.listen net in
     let net_state = Network_state.create logger in
-    let rec handle_msg messager = 
-      printf "got message!\n";
-      fun x -> match x with
+    let rec handle_msg messager = function
       | (Payload.Ping, _) -> Deferred.return `Want_ack
       | (Payload.Ping_req addr_i, seq_no) ->
           match%map Messager.send messager [(addr_i, Payload.Ping)] ~seq_no:seq_no ~timeout:(Config.round_trip_time config) with
