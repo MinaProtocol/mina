@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name linear_pipe)
+  (public_name linear_pipe)
+  (library_flags (-linkall))
+  (libraries (core async async_extra ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib nanobit_base))))
+  (synopsis "Linear pipes are like pipes, but they're linear (enforced at runtime)")))
+

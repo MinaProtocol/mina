@@ -601,3 +601,5 @@ end
 
 module Udp : S = Make(Udp_transport)
 module Test : S = Make(Fake_transport)
+
+let%test "trivial" = true

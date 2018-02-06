@@ -1,0 +1,9 @@
+(jbuild_version 1)
+
+(executable
+  ((name swimtest)
+   (package swimlib)
+   (public_name swimtest)
+   (libraries (swimlib ppx_inline_test.runner.lib))
+  ))
+
