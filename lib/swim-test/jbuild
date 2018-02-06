@@ -7,3 +7,8 @@
    (libraries (swimlib ppx_inline_test.runner.lib))
   ))
 
+(alias
+  ((name runtest)
+   (deps (swimtest.exe))
+   (action (run ${<} inline-test-runner swimlib))))
+

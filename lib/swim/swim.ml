@@ -596,10 +596,122 @@ module Make (Transport : Transport_intf) = struct
 
     let network_partition_remove ~from ~to_ =
       Net.TestOnly.network_partition_remove ~from:from ~to_:to_
+
   end
 end
 
 module Udp : S = Make(Udp_transport)
 module Test : S = Make(Fake_transport)
 
-let%test "trivial" = true
+let%test_module "Network tests" = (module struct
+    module Swim = Test
+
+    let shutdown clients =
+      List.iter clients ~f:(fun (_, c) -> Swim.stop c)
+
+    let assert_equal ~msg x x' equal =
+        if not (equal x x') then
+          failwith ("Assertion Failure: " ^ msg)
+        else
+          ()
+
+    let addr port =
+      Host_and_port.of_string (sprintf "127.0.0.1:%d" (port + 8000))
+
+    let swim_client idx =
+      (idx, Swim.connect
+          ~config:(Config.create
+            ~expected_latency:(Time.Span.of_ms 5.)
+            ()
+          )
+          ~initial_peers:(List.init idx addr)
+          ~me:(addr idx))
+
+    let live_nodes_str client =
+      let nodes = Swim.peers client in
+      let strs =
+        List.map nodes ~f:(fun node -> node
+          |> Host_and_port.sexp_of_t
+          |> Sexp.to_string)
+      in
+      String.concat ~sep:"," strs
+
+    let peers_and_self (idx, swim) =
+      (addr idx) :: (Swim.peers swim)
+
+    let same (ps : Host_and_port.t list) (ps' : Host_and_port.t list) : bool =
+      Set.Poly.equal (Set.Poly.of_list ps) (Set.Poly.of_list ps')
+
+    let wait_stabalize () =
+      Async.after (Time.Span.of_sec 0.5)
+
+    let assert_stable (clients : (int * Swim.t) list) : unit =
+      match clients with
+      | [] -> ()
+      | (idx, c)::xs ->
+          List.iter xs ~f:(fun (idx', c') ->
+            assert_equal ~msg:(Printf.sprintf "Same? %d and %d" idx idx')
+              (peers_and_self (idx, c))
+              (peers_and_self (idx', c'))
+              same;
+          )
+
+    let create_with_delay_in_between ~delay ~count : (int * Swim.t) list Deferred.t =
+      Deferred.List.init count (fun i ->
+        let (idx, c) = swim_client i in
+        let%map () = Async.after delay in
+        (idx, c)
+      )
+
+  let test_kill_first_node ~count : unit Deferred.t =
+    let%bind clients =
+      create_with_delay_in_between
+        ~delay:(Time.Span.of_sec 0.1)
+        ~count:count
+    in
+    let%bind () = wait_stabalize () in
+    (* Full network *)
+    assert_stable clients;
+    match clients with
+    | [] ->
+      return (failwith "unreachable")
+    | x::xs ->
+      shutdown [x];
+      let%bind () = wait_stabalize () in
+      let%bind () = wait_stabalize () in
+      (* Node0 dead *)
+      assert_stable xs;
+      let%bind c0::_ = create_with_delay_in_between
+        ~delay:(Time.Span.of_sec 0.1)
+        ~count:1 in
+      let%map () = wait_stabalize () in
+      (* Node0 revived *)
+      assert_stable (c0::xs);
+      shutdown (c0::xs)
+
+  let%test_unit "kill_first_node_4" = Async.Thread_safe.block_on_async_exn (fun () -> test_kill_first_node ~count:4)
+  let%test_unit "kill_first_node_20" = Async.Thread_safe.block_on_async_exn (fun () -> test_kill_first_node ~count:20)
+
+  let test_network_partition ~count : unit Deferred.t =
+    let xs : int list = List.init count (fun i -> i) in
+    match xs with
+    | [] -> return ()
+    | x::xs ->
+      (* Partition node 0 from everything except node 1 *)
+      List.iter xs (fun x' ->
+        Swim.TestOnly.network_partition_add ~from:(addr x) ~to_:(addr x')
+      );
+      Swim.TestOnly.network_partition_remove ~from:(addr x) ~to_:(addr (List.nth_exn xs 0));
+      let%bind clients =
+        create_with_delay_in_between
+          ~delay:(Time.Span.of_sec 0.1)
+          ~count:count
+      in
+      let%map () = wait_stabalize () in
+      assert_stable clients;
+      shutdown clients
+
+  let%test_unit "network_partition_4" = Async.Thread_safe.block_on_async_exn (fun () -> test_network_partition ~count:4)
+  let%test_unit "network_partition_20" = Async.Thread_safe.block_on_async_exn (fun () -> test_network_partition ~count:20)
+end)
+
