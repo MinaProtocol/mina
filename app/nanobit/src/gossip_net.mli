@@ -1,5 +1,6 @@
 open Core
 open Async
+open Swimlib
 
 module type S =
   functor (Message : sig type t [@@deriving bin_io] end) -> sig

@@ -1,5 +1,6 @@
 open Core
 open Async
+open Swimlib
 
 module Snark = Snark
 
