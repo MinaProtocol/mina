@@ -2,8 +2,14 @@ open Core_kernel
 open Nanobit_base
 open Snark_params
 
-type t = Tick.Field.t
-[@@deriving bin_io, sexp]
+module Stable = struct
+  module V1 = struct
+    type t = Tick.Field.t
+    [@@deriving bin_io, sexp]
+  end
+end
+
+include Stable.V1
 
 let zero = Tick.Field.zero
 

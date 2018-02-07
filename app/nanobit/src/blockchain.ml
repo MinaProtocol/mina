@@ -16,16 +16,28 @@ module State = struct
 
   (* Someday: It may well be worth using bitcoin's compact nbits for target values since
     targets are quite chunky *)
-  type ('time, 'target, 'digest, 'number, 'strength) t_ =
-    { difficulty_info : ('time * 'target) list
-    ; block_hash      : 'digest
-    ; number          : 'number
-    ; strength        : 'strength
-    }
-  [@@deriving bin_io, sexp]
+  module Stable = struct
+    module V1 = struct
+      type ('time, 'target, 'digest, 'number, 'strength) t_ =
+        { difficulty_info : ('time * 'target) list
+        ; block_hash      : 'digest
+        ; number          : 'number
+        ; strength        : 'strength
+        }
+      [@@deriving bin_io, sexp]
 
-  type t = (Block_time.t, Target.t, Digest.t, Block.Body.t, Strength.t) t_
-  [@@deriving bin_io, sexp]
+      type t =
+        ( Block_time.Stable.V1.t
+        , Target.Stable.V1.t
+        (* TODO: Make Digest stable. *)
+        , Digest.t
+        , Block.Body.Stable.V1.t
+        , Strength.Stable.V1.t) t_
+      [@@deriving bin_io, sexp]
+    end
+  end
+
+  include Stable.V1
 
   type var =
     ( Block_time.Unpacked.var
@@ -176,8 +188,14 @@ module State = struct
   end
 end
 
-type t =
-  { state : State.t
-  ; proof : Proof.t
-  }
-[@@deriving bin_io]
+module Stable = struct
+  module V1 = struct
+    type t =
+      { state : State.Stable.V1.t
+      ; proof : Proof.Stable.V1.t
+      }
+    [@@deriving bin_io]
+  end
+end
+
+include Stable.V1

@@ -23,6 +23,24 @@ module State : sig
     ) t_
   [@@deriving bin_io, sexp]
 
+  module Stable : sig
+    module V1 : sig
+      type nonrec ('a, 'b, 'c, 'd, 'e) t_ = ('a, 'b, 'c, 'd, 'e) t_ =
+        { difficulty_info : ('a * 'b) list
+        ; block_hash      : 'c
+        ; number          : 'd
+        ; strength        : 'e
+        }
+      type nonrec t =
+        ( Block_time.Stable.V1.t
+        , Target.Stable.V1.t
+        , Pedersen.Digest.t
+        , Block.Body.Stable.V1.t
+        , Strength.Stable.V1.t
+        ) t_
+    end
+  end
+
   include Snarkable.S
     with
       type var =
@@ -62,4 +80,13 @@ type t =
   { state : State.t
   ; proof : Proof.t
   }
-[@@deriving bin_io]
+
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t =
+      { state : State.Stable.V1.t
+      ; proof : Proof.Stable.V1.t
+      }
+    [@@deriving bin_io]
+  end
+end

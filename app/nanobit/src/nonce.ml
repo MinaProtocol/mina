@@ -1,8 +1,14 @@
 open Core_kernel
 open Nanobit_base
 
-type t = Int64.t
-[@@deriving bin_io]
+module Stable = struct
+  module V1 = struct
+    type t = Int64.t
+    [@@deriving bin_io]
+  end
+end
+
+include Stable.V1
 
 let succ = Int64.succ
 

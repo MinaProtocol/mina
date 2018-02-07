@@ -1,5 +1,10 @@
 open Nanobit_base.Snark_params
 
 type t = Tick.Proof.t
-[@@deriving bin_io]
 
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t
+    [@@deriving bin_io]
+  end
+end
