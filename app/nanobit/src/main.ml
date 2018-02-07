@@ -124,10 +124,10 @@ struct
         let is_latest = Blockchain.(blockchain = !latest_strongest_block) in
         if is_latest
         then 
-          let%bind finished = continue () in
-          if finished
-          then return ()
-          else rebroadcast_loop blockchain continue
+          match%bind continue () with
+          | `Done -> return ()
+          | `Continue ->
+            rebroadcast_loop blockchain continue
         else return ()
       in
       let%bind () = after rebroadcast_period in
@@ -137,7 +137,9 @@ struct
         if is_latest
         then rebroadcast_loop 
                !latest_mined_block
-               (Gossip_net.broadcast_all gossip_net (Message.New_strongest_block !latest_mined_block))
+               (unstage
+                  (Gossip_net.broadcast_all
+                     gossip_net (Message.New_strongest_block !latest_mined_block)))
         else return ()
       in
       rebroadcast_timer  ()
