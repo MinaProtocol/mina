@@ -11,4 +11,5 @@ module Event = struct
   type nonrec t =
     | Connect of t list
     | Disconnect of t list
+  [@@deriving sexp]
 end
