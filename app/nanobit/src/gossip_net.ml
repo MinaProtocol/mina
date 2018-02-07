@@ -80,20 +80,25 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
       ~bin_msg:Message.bin_t 
   ;;
 
+  let try_call_rpc peer timeout rpc query dispatch =
+    try_with (fun () ->
+      Tcp.with_connection
+        (Tcp.Where_to_connect.of_host_and_port peer)
+        ~timeout
+        (fun _ r w ->
+           match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
+           | Error exn -> return (Or_error.of_exn exn)
+           | Ok conn -> dispatch rpc conn query)
+    ) >>| function
+    | Ok Ok result -> Ok result
+    | Ok Error exn -> Error exn
+    | Error exn -> Or_error.of_exn exn
+
   let broadcast_selected timeout peers msg =
     let send peer = 
-      try_with (fun () ->
-        Tcp.with_connection
-          (Tcp.Where_to_connect.of_host_and_port peer)
-          ~timeout:timeout
-          (fun _ r w ->
-             match%map Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
-             | Error exn -> Or_error.error_string (Exn.to_string exn)
-             | Ok conn -> Rpc.One_way.dispatch broadcast_rpc conn msg)
-      ) >>| function
-      | Ok Ok result -> Ok result
-      | Ok Error exn -> Error exn
-      | Error exn -> Or_error.of_exn exn
+      try_call_rpc 
+        peer timeout broadcast_rpc msg 
+        (fun rpc conn query -> return (Rpc.One_way.dispatch rpc conn query))
     in
     Deferred.List.iter 
       ~how:`Parallel 
@@ -181,18 +186,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
       List.length !to_broadcast = 0
 
   let query_peer t (peer : Peer.t) rpc query = 
-    try_with (fun () ->
-      Tcp.with_connection
-        (Tcp.Where_to_connect.of_host_and_port peer)
-        ~timeout:t.timeout
-        (fun _ r w ->
-           match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
-           | Error exn -> return (Or_error.of_exn exn)
-           | Ok conn -> Rpc.Rpc.dispatch rpc conn query)
-    ) >>| function
-    | Ok Ok result -> Ok result
-    | Ok Error exn -> Error exn
-    | Error exn -> Or_error.of_exn exn
+    try_call_rpc peer t.timeout rpc query Rpc.Rpc.dispatch
 
   let query_random_peers t n rpc query = 
     let peers = random_sublist (Hash_set.to_list t.peers) n in
