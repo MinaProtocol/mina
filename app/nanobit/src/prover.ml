@@ -15,6 +15,8 @@ let dispatch t rpc q =
   Rpc.Rpc.dispatch rpc conn q
 ;;
 
+(* Someday: Use janestreet's rpc_parallel library for this *)
+
 module Rpcs = struct
   module Initialized = struct
     let name      = "initialized"
@@ -41,6 +43,15 @@ module Rpcs = struct
 
     let rpc = Rpc.Rpc.create ~name ~version ~bin_query ~bin_response
   end
+
+  module Verify = struct
+    let name      = "verify"
+    let version   = 0
+    type query    = Blockchain.t [@@deriving bin_io]
+    type response = bool [@@deriving bin_io]
+
+    let rpc = Rpc.Rpc.create ~name ~version ~bin_query ~bin_response
+  end
 end
 
 let connect host_and_port =
@@ -50,17 +61,11 @@ let connect host_and_port =
       ~server_name:"prover"
       (fun () -> Deferred.Or_error.return host_and_port)
   in
-(*
-  let%bind conn = Persistent_connection.Rpc.connected connection in
-  let%bind res = Rpc.Rpc.dispatch Rpcs.Genesis_proof.rpc conn () in
-  printf "yo: %s\n%!"
-    (Sexp.to_string_hum ([%sexp_of: Rpcs.Genesis_proof.response sexp_opaque Or_error.t] res));
-*)
   return { host_and_port; connection }
 ;;
 
 let create ?debug ~port how =
-  (* This channel should be authenticated somehow *)
+  (* Soon: This channel should be authenticated somehow *)
   let%bind process =
     Process.create_exn
       ~prog:Sys.argv.(0)
@@ -82,7 +87,8 @@ let create ?debug ~port how =
 
 let extend_blockchain t chain block =
   dispatch t Rpcs.Extend_blockchain.rpc (chain, block)
-;;
+
+let verify t chain = dispatch t Rpcs.Verify.rpc chain
 
 let initialized t =
   let open Deferred.Or_error.Let_syntax in
@@ -90,9 +96,7 @@ let initialized t =
   | Initialized -> ()
 ;;
 
-let genesis_proof t =
-  dispatch t Rpcs.Genesis_proof.rpc ()
-;;
+let genesis_proof t = dispatch t Rpcs.Genesis_proof.rpc ()
 
 module type Params_intf = sig
   val how : How_to_obtain_keys.t
@@ -164,7 +168,6 @@ module Main (Params : Params_intf) = struct
   let initialize () = ignore (Lazy.force base_proof)
 
   let extend_blockchain_exn { Blockchain.state=prev_state; proof=prev_proof } block =
-    printf "Extending blockchain!\n%!";
     let proof =
       if Snark_params.insecure_functionalities.extend_blockchain
       then Lazy.force base_proof
@@ -182,12 +185,14 @@ module Main (Params : Params_intf) = struct
                  (fun () -> extend_blockchain_exn chain block))
         ; Rpc.Rpc.implement Rpcs.Initialized.rpc
             (fun s () ->
-               printf "Calling initialize:\n%!";
                initialize ();
                return Rpcs.Initialized.Initialized)
         ; Rpc.Rpc.implement Rpcs.Genesis_proof.rpc
             (fun s () -> 
                return (Lazy.force base_proof))
+        ; Rpc.Rpc.implement Rpcs.Verify.rpc
+            (fun s ({ Blockchain.state; proof }) ->
+               return (Transition.verify state proof))
         ]
       ~on_unknown_rpc:(`Call (fun () ~rpc_tag ~version ->
         Out_channel.write_all "/home/izzy/junk" ~data:(sprintf "unknown rpc: %s %d" rpc_tag version);

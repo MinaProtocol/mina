@@ -25,4 +25,7 @@ val extend_blockchain
 val genesis_proof
   : t -> Proof.t Deferred.Or_error.t
 
+val verify
+  : t -> Blockchain.t -> bool Deferred.Or_error.t
+
 val command : Command.t

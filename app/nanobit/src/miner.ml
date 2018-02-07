@@ -69,15 +69,17 @@ module Cpu = struct
       }
     in
     let mined_blocks_reader, mined_blocks_writer = Linear_pipe.create () in
-    (* There is a race condition, this sometimes gets executed before the change
-       previous message gets in? *)
     let rec go () =
       let id = state.id in
-      match%bind schedule' (fun () -> return (find_block state.previous.state state.body)) with
+      match%bind schedule' (fun () -> return (find_block previous.state state.body)) with
       | None -> go ()
       | Some (block, header_hash) ->
         if id = state.id
         then begin
+          (* Soon: Make this poll instead of waiting so that a miner waiting on
+             can be pre-empted by a new block coming in off the network. Or come up
+             with some other way for this to get interrupted.
+          *)
           match%bind Prover.extend_blockchain prover previous block with
           | Ok chain ->
             let%bind () = Pipe.write mined_blocks_writer chain in
