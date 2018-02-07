@@ -58,12 +58,9 @@ module Filesystem : S with type location = string = struct
     | Ok blockchain -> Some blockchain
     | Error e -> (eprintf "%s\n" (Error.to_string_hum e); None)
 
-
   let persist location block_stream =
     don't_wait_for begin
       Linear_pipe.iter block_stream ~f:(fun (`Change_head block) ->
         With_checksum.write_data location Blockchain.bin_writer_t block)
     end
-
 end
-

@@ -33,7 +33,7 @@ struct
   module Gossip_net = Gossip_net(Message)
 
   let peer_strongest_blocks gossip_net
-    : Blockchain.Update.t Linear_pipe.Reader.t
+    : Blockchain_accumulator.Update.t Linear_pipe.Reader.t
     =
     let from_new_peers_reader, from_new_peers_writer = Linear_pipe.create () in
     let fetch_period = Time.Span.of_min 10. in
@@ -45,7 +45,7 @@ struct
           ~how:`Parallel
           (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.rpc ())
           ~f:(fun x -> match%bind x with
-            | Ok b -> Pipe.write from_new_peers_writer (Blockchain.Update.New_chain b)
+            | Ok b -> Pipe.write from_new_peers_writer (Blockchain_accumulator.Update.New_chain b)
             | Error e -> eprintf "%s\n" (Error.to_string_hum e); return ())
       in
       timer ()
@@ -54,7 +54,7 @@ struct
     let broadcasts =
       Linear_pipe.filter_map (Gossip_net.received gossip_net)
         ~f:(function
-          | New_strongest_block b -> Some (Blockchain.Update.New_chain b))
+          | New_strongest_block b -> Some (Blockchain_accumulator.Update.New_chain b))
     in
     Linear_pipe.merge_unordered
       [ from_new_peers_reader
@@ -152,9 +152,9 @@ struct
     end;
     gossip_net
 
-  let start_mining ~pipes ~genesis_block ~initial_blockchain =
+  let start_mining ~prover ~pipes ~initial_blockchain =
     let mined_blocks_reader =
-      Miner_impl.mine
+      Miner_impl.mine ~prover
         ~previous:initial_blockchain
         ~body:(Int64.succ initial_blockchain.state.number)
         (Linear_pipe.merge_unordered
@@ -164,18 +164,19 @@ struct
     in
     Linear_pipe.fork2 mined_blocks_reader
 
-  let main storage_location genesis_block initial_peers should_mine me =
+  let main prover storage_location genesis_blockchain initial_peers should_mine me =
     let _ = Keys.foo () in
     let open Let_syntax in
     let%bind initial_blockchain =
       match%map Storage.load storage_location with
       | Some x -> x
-      | None -> genesis_block
+      | None -> genesis_blockchain
     in
     let pipes = init_pipes () in
+    (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
       if should_mine then
-        start_mining ~pipes ~genesis_block ~initial_blockchain
+        start_mining ~prover ~pipes ~initial_blockchain
       else
         (Linear_pipe.of_list [], Linear_pipe.of_list [])
     in
@@ -184,8 +185,10 @@ struct
       init_gossip_net
         ~me
         ~pipes
-        ~latest_strongest_block:(Linear_pipe.latest_ref ~initial:genesis_block pipes.latest_strongest_block_reader)
-        ~latest_mined_block:(Linear_pipe.latest_ref ~initial:genesis_block latest_mined_blocks_reader)
+        ~latest_strongest_block:(
+          Linear_pipe.latest_ref ~initial:genesis_blockchain pipes.latest_strongest_block_reader)
+        ~latest_mined_block:(
+          Linear_pipe.latest_ref ~initial:genesis_blockchain latest_mined_blocks_reader)
         ~swim
     in
     don't_wait_for begin
@@ -198,13 +201,15 @@ struct
     (* Store and accumulate updates *)
     Storage.persist storage_location
       (Linear_pipe.map pipes.storage_strongest_block_reader ~f:(fun b -> `Change_head b));
-    Blockchain.accumulate
+    Blockchain_accumulator.accumulate
+      ~prover
       ~init:initial_blockchain
       ~strongest_chain:pipes.strongest_block_writer
       ~updates:(
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
-          ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b -> Blockchain.Update.New_chain b)
+          ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
+              Blockchain_accumulator.Update.New_chain b)
           ]);
     Async.never ()
   ;;

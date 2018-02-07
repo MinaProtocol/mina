@@ -32,6 +32,7 @@ end
    Tighten this up. Doing this with all these equalities is kind of a hack, but
    doing it right required an annoying change to the bits intf. *)
 module Make
+    (How : sig val how : How_to_obtain_keys.t end)
     (Digest : sig
        module Tick
          : (Tick.Snarkable.Bits.S
@@ -106,32 +107,45 @@ struct
     let exists' spec ~f = exists spec As_prover.(map get_state ~f)
 
     let main (top_hash : Digest.Tick.Packed.var) =
-      let%bind wrap_vk =
-        exists' wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
-          Verifier.Verification_key.to_bool_list wrap_vk)
-      in
-      let%bind prev_state = exists' State.spec ~f:Prover_state.prev_state
-      and update          = exists' Update.spec ~f:Prover_state.update
-      in
-      let%bind (next_state, `Success success) = State.Checked.update prev_state update in
-      let%bind state_hash = State.Checked.hash next_state in
-      let%bind () =
-        let%bind sh = Digest.Tick.Checked.(unpack state_hash >>| to_bits) in
-        Hash.hash (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
-      in
-      let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
-      let%bind inductive_case_passed =
-        with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
-      in
-      let%bind is_base_case = State.Checked.is_base_hash state_hash in
-      Boolean.Assert.any
-        [ is_base_case
-        ; inductive_case_passed
-        ]
+      with_label "Step.main" begin
+        let%bind wrap_vk =
+          exists' wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
+            Verifier.Verification_key.to_bool_list wrap_vk)
+        in
+        let%bind prev_state = exists' State.spec ~f:Prover_state.prev_state
+        and update          = exists' Update.spec ~f:Prover_state.update
+        in
+        let%bind (next_state, `Success success) =
+          with_label "update" (State.Checked.update prev_state update)
+        in
+        let%bind state_hash =
+          with_label "hash_state" (State.Checked.hash next_state)
+        in
+        let%bind () =
+          with_label "check_top_hash" begin
+            let%bind sh = Digest.Tick.Checked.(unpack state_hash >>| to_bits) in
+            Hash.hash (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
+          end
+        in
+        let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
+        let%bind inductive_case_passed =
+          with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
+        in
+        let%bind is_base_case = State.Checked.is_base_hash state_hash in
+        with_label "result" begin
+          Boolean.Assert.any
+            [ is_base_case
+            ; inductive_case_passed
+            ]
+        end
+      end
 
-    let keypair = lazy (Tick.generate_keypair (input ()) main)
-    let verification_key = Lazy.map ~f:Tick.Keypair.vk keypair
-    let proving_key = Lazy.map ~f:Tick.Keypair.pk keypair
+    let keypair =
+      How_to_obtain_keys.obtain_keys (module Tick) How.how
+        (fun () -> Tick.generate_keypair (input ()) main)
+
+    let verification_key = Lazy.map ~f:fst keypair
+    let proving_key = Lazy.map ~f:snd keypair
   end
 
   module Wrap = struct
@@ -167,9 +181,12 @@ struct
           (Boolean.Assert.is_true (Verifier.All_in_one.result v))
       end
 
-    let keypair = lazy (Tock.generate_keypair (input ()) main)
-    let verification_key = Lazy.map ~f:Tock.Keypair.vk keypair
-    let proving_key = Lazy.map ~f:Tock.Keypair.pk keypair
+    let keypair =
+      How_to_obtain_keys.obtain_keys (module Tock) How.how
+        (fun () -> Tock.generate_keypair (input ()) main)
+
+    let verification_key = Lazy.map ~f:fst keypair
+    let proving_key = Lazy.map ~f:snd keypair
   end
 
   let instance_hash =
@@ -220,4 +237,8 @@ struct
       }
       Step.main
       (instance_hash next_state)
+
+  let verify state proof =
+    Tick.verify proof
+      (Lazy.force Step.verification_key) (Step.input ()) (instance_hash state)
 end

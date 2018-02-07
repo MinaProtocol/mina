@@ -1,14 +1,14 @@
 open Core
 open Async
+open Nanobit_base
+open Cli_common
 
-let int16 =
-  let max_port = 1 lsl 16 in
-  Command.Arg_type.map Command.Param.int ~f:(fun x ->
-    if 0 <= x && x < max_port
-    then x
-    else failwithf "Port not between 0 and %d" max_port ())
+let assert_chain_verifies prover chain =
+  let%map b = Prover.verify prover chain >>| Or_error.ok_exn in
+  if not b then failwith "Chain did not verify"
+;;
 
-let () =
+let daemon =
   let open Command.Let_syntax in
   Command.async
     ~summary:"Current daemon"
@@ -27,6 +27,12 @@ let () =
         and ip =
           flag "ip"
             ~doc:"External IP address for others to connect" (required string)
+        and start_prover =
+          flag "start-prover" no_arg
+            ~doc:"Start a new prover process"
+        and prover_port =
+          flag "prover-port" (optional_with_default Prover.default_port int16)
+            ~doc:"Port for prover to listen on" 
         in
         fun () ->
           let open Deferred.Let_syntax in
@@ -46,10 +52,29 @@ let () =
                 []
               end
           in
-          Main.main (conf_dir ^/ "storage") Blockchain.genesis initial_peers should_mine
+          let%bind prover =
+            if start_prover
+            then Prover.create ~port:prover_port ~debug:() How_to_obtain_keys.Generate_both
+            else Prover.connect { host = "0.0.0.0"; port = prover_port }
+          in
+          let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
+          let genesis_chain = { Blockchain.state = Blockchain.State.zero; proof = genesis_proof } in
+          let%bind () = assert_chain_verifies prover genesis_chain in
+          Main.main
+            prover
+            (conf_dir ^/ "storage")
+            { Blockchain.state = Blockchain.State.zero; proof = genesis_proof }
+            initial_peers should_mine
             (Host_and_port.create ~host:ip ~port)
       ]
     end
+;;
+
+let () =
+  Command.group ~summary:"Current"
+    [ "daemon", daemon
+    ; "prover", Prover.command
+    ]
   |> Command.run
 ;;
 

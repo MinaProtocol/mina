@@ -9,7 +9,8 @@ end
 
 module type S = sig
   val mine
-    : previous:Blockchain.t
+    : prover:Prover.t
+    -> previous:Blockchain.t
     -> body:Block.Body.t
     -> Update.t Linear_pipe.Reader.t
     -> Blockchain.t Linear_pipe.Reader.t

@@ -12,6 +12,7 @@ module State : sig
     ; number          : 'number
     ; strength        : 'strength
     }
+  [@@deriving bin_io, sexp]
 
   type t =
     ( Block_time.t
@@ -20,6 +21,7 @@ module State : sig
     , Block.Body.t
     , Strength.t
     ) t_
+  [@@deriving bin_io, sexp]
 
   include Snarkable.S
     with
@@ -61,21 +63,3 @@ type t =
   ; proof : Proof.t
   }
 [@@deriving bin_io]
-
-module Update : sig
-  type nonrec t =
-    | New_chain of t
-end
-
-val accumulate
-  :  init:t
-  -> updates:Update.t Linear_pipe.Reader.t
-  -> strongest_chain:t Linear_pipe.Writer.t
-  -> unit
-
-val valid : t -> bool
-
-val genesis : t
-
-val extend_exn : t -> Block.t -> t
-
