@@ -195,7 +195,7 @@ module Main (Params : Params_intf) = struct
                return (Transition.verify state proof))
         ]
       ~on_unknown_rpc:(`Call (fun () ~rpc_tag ~version ->
-        Out_channel.write_all "/home/izzy/junk" ~data:(sprintf "unknown rpc: %s %d" rpc_tag version);
+        eprintf "prover: unknown rpc: %s %d\n" rpc_tag version;
         `Continue))
 
   let main () =
