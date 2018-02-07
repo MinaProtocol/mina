@@ -147,9 +147,9 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
         ~max_concurrency:64 
         peer_events ~f:(function
           | Connect peers -> 
-            List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer); return ()
+            List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer); Deferred.unit
           | Disconnect peers -> 
-            List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer); return ()
+            List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer); Deferred.unit 
         )
     end;
     ignore begin
@@ -167,7 +167,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
              ~on_handshake_error:
                (`Call (fun exn -> 
                   eprintf "%s\n" (Exn.to_string_mach exn);
-                return ())))
+                Deferred.unit)))
     end;
     t
 
