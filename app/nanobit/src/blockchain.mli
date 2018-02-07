@@ -12,7 +12,7 @@ module State : sig
     ; number          : 'number
     ; strength        : 'strength
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp]
 
   type t =
     ( Block_time.t
@@ -21,6 +21,7 @@ module State : sig
     , Block.Body.t
     , Strength.t
     ) t_
+  [@@deriving bin_io, sexp]
 
   include Snarkable.S
     with

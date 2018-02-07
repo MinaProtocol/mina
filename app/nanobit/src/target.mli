@@ -4,7 +4,7 @@ open Snark_params
 open Tick
 
 type t = private Field.t
-[@@deriving bin_io]
+[@@deriving bin_io, sexp]
 
 val of_field : Field.t -> t
 

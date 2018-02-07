@@ -22,10 +22,10 @@ module State = struct
     ; number          : 'number
     ; strength        : 'strength
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp]
 
   type t = (Block_time.t, Target.t, Digest.t, Block.Body.t, Strength.t) t_
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp]
 
   type var =
     ( Block_time.Unpacked.var

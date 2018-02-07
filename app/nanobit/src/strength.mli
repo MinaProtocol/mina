@@ -3,7 +3,7 @@ open Nanobit_base
 open Snark_params
 
 type t = Tick.Field.t
-[@@deriving bin_io]
+[@@deriving bin_io, sexp]
 
 val zero : t
 

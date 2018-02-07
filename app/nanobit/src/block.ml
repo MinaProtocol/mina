@@ -85,7 +85,7 @@ end
 
 module Body = struct
   type t = Int64.t
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp]
 
   let bit_length = 64
 
