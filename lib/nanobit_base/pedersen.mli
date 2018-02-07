@@ -4,7 +4,7 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
 
     module Bits : Bits_intf.S with type t := t
 
@@ -44,7 +44,7 @@ end
 
 module Make
   : functor
-    (Field : Camlsnark.Field_intf.S)
+    (Field : sig include Camlsnark.Field_intf.S include Sexpable.S with type t := t end)
     (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
     (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) ->
     S with type curve := Curve.t
