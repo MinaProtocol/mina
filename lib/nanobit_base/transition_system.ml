@@ -132,23 +132,6 @@ struct
           with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
         in
         let%bind is_base_case = State.Checked.is_base_hash state_hash in
-        let%bind () =
-          as_prover As_prover.(
-            let open Let_syntax in
-            let%map state_hash = read_var state_hash
-            and prev_state_valid = read Boolean.spec prev_state_valid
-            and inductive_case_passed = read Boolean.spec inductive_case_passed
-            and success = read Boolean.spec success
-            and is_base_case = read Boolean.spec is_base_case
-            in
-            printf "state_hash:\n%!";
-            Field.print state_hash;
-            printf "prev_state_valid=%b\n inductive_case_passed=%b\n success=%b\n is_base_case=%b\n%!"
-              prev_state_valid
-              inductive_case_passed
-              success
-              is_base_case)
-        in
         with_label "result" begin
           Boolean.Assert.any
             [ is_base_case
@@ -254,4 +237,8 @@ struct
       }
       Step.main
       (instance_hash next_state)
+
+  let verify state proof =
+    Tick.verify proof
+      (Lazy.force Step.verification_key) (Step.input ()) (instance_hash state)
 end
