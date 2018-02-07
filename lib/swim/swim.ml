@@ -340,19 +340,25 @@ end) = struct
       Host_and_port.create ~host:"127.0.0.1" ~port:t.port
 
   let send (t : t) ~recipient msg =
+    t.logger#logf Info "Sending a msg %s" (msg |> Message.sexp_of_t |> Sexp.to_string);
     match (
       Host_and_port.Table.find network.partition_key_to_val (me t),
       Host_and_port.Table.find network.connected recipient
     ) with
     | (Some xs, _) when List.mem xs recipient ~equal:Host_and_port.equal -> return (Ok ())
-    | (_, None) -> return (Ok ())
-    | (_, Some fn) -> fn ~recipient msg
+    | (_, None) ->
+        t.logger#logf Info "Couldn't send %s" (msg |> Message.sexp_of_t |> Sexp.to_string);
+        return (Ok ())
+    | (_, Some fn) ->
+        t.logger#logf Info "Can send %s" (msg |> Message.sexp_of_t |> Sexp.to_string);
+        fn ~recipient msg
 
   let listen (t: t) : Message.t Linear_pipe.Reader.t =
     let (r,w) = Linear_pipe.create () in
     Host_and_port.Table.add_exn network.connected
       ~key:(me t)
       ~data:(fun ~recipient msg ->
+        t.logger#logf Info "Listened to a msg %s" (msg |> Message.sexp_of_t |> Sexp.to_string);
         let%bind () = Pipe.write w msg in
         return (Ok ())
       );
@@ -482,7 +488,7 @@ module Make (Transport : Transport_intf) = struct
     t.seq_no <- t.seq_no + 1;
     seq_no
 
-  let prob_node t (m_i : Node.t) =
+  let probe_node t (m_i : Node.t) =
     let sample_nodes xs k exclude =
       xs |> Set.Poly.to_list
       |> List.filter ~f:(fun n -> n <> exclude)
@@ -491,20 +497,21 @@ module Make (Transport : Transport_intf) = struct
     in
 
     let seq_no = fresh_seq_no t in
-    t.logger#logf Info "Begin round %d probing node %s" t.seq_no (m_i |> Node.sexp_of_t |> Sexp.to_string);
+    let node_to_string m = m |> Node.sexp_of_t |> Sexp.to_string in
+    t.logger#logf Info "Begin round %d probing node %s" t.seq_no (node_to_string m_i);
     match%bind Messager.send t.messager [ (m_i.peer, Ping) ] ~seq_no ~timeout:(Config.round_trip_time t.config) with
     | `Acked ->
-        t.logger#logf Info "Round %d acked" t.seq_no;
+        t.logger#logf Info "Round %d %s acked" t.seq_no (node_to_string m_i);
         return ()
     | `Timeout ->
-        t.logger#logf Info "Round %d timeout" t.seq_no;
+        t.logger#logf Info "Round %d %s timeout" t.seq_no (node_to_string m_i);
         let m_ks = sample_nodes (Network_state.live_nodes t.net_state) (Config.indirect_ping_count t.config) m_i.peer in
         match%map Messager.send t.messager (List.map m_ks ~f:(fun m_k -> (m_k, Payload.Ping_req m_i.peer))) ~seq_no ~timeout:Time.Span.((Config.protocol_period t.config) - (Config.round_trip_time t.config)) with
         | `Acked ->
-            t.logger#logf Info "Round %d secondary acked" t.seq_no
+            t.logger#logf Info "Round %d %s secondary acked" t.seq_no (node_to_string m_i)
         | `Timeout ->
             m_i.state <- `Dead;
-            t.logger#logf Info "Round %d m_i died" t.seq_no
+            t.logger#logf Info "Round %d %s died" t.seq_no (node_to_string m_i)
 
   (* TODO: Round-Robin extension *)
   (* Use Random_iterer here *)
@@ -518,9 +525,11 @@ module Make (Transport : Transport_intf) = struct
         let choose xs =
           Option.value_exn (List.nth xs (Random.int (List.length xs)))
         in
-        let m_i = choose (Network_state.live_nodes t.net_state |> Set.Poly.to_list) in
-        let%map () = prob_node t {peer=m_i;state=`Alive}
+        let n_i = choose (Network_state.live_nodes t.net_state |> Set.Poly.to_list) in
+        let m_i : Node.t = {peer=n_i;state=`Alive} in
+        let%map () = probe_node t m_i
         and () = Async.after (Config.protocol_period t.config) in
+        Network_state.add_slice t.net_state [m_i];
         ()
     in
     if not t.stop then
@@ -605,9 +614,13 @@ module Test : S = Make(Fake_transport)
 
 let%test_module "Network tests" = (module struct
     module Swim = Test
-
-    let shutdown clients =
-      List.iter clients ~f:(fun (_, c) -> Swim.stop c)
+    (*Log.current_level := Log.ord Log.Info*)
+    let with_fixed_random_seed (f : 'a -> 'b) : 'b =
+      let old_default_state = Random.State.default in
+      Bracket.bracket
+        ~acquire:(fun () -> Random.set_state (Random.State.make [|1;1;1;1|]))
+        ~release:(fun () -> Random.set_state old_default_state)
+        f
 
     let assert_equal ~msg x x' equal =
         if not (equal x x') then
@@ -645,16 +658,37 @@ let%test_module "Network tests" = (module struct
     let wait_stabalize () =
       Async.after (Time.Span.of_sec 0.5)
 
+    let shutdown clients =
+      List.iter clients ~f:(fun (_, c) -> Swim.stop c);
+      wait_stabalize ()
+
+    let peers_to_string peers =
+      (List.sexp_of_t Peer.sexp_of_t (peers |> List.sort ~cmp:Peer.compare)) |> Sexp.to_string
+
     let assert_stable (clients : (int * Swim.t) list) : unit =
+      (*printf "\n";*)
+      (*List.iter clients ~f:(fun (idx, c) ->*)
+        (*printf "%d:%s\n" idx ((idx, c) |> peers_and_self |> peers_to_string)*)
+      (* ); *)
+      (*printf "\n";*)
       match clients with
       | [] -> ()
       | (idx, c)::xs ->
+          let peers = (peers_and_self (idx, c)) in
           List.iter xs ~f:(fun (idx', c') ->
-            assert_equal ~msg:(Printf.sprintf "Same? %d and %d" idx idx')
-              (peers_and_self (idx, c))
-              (peers_and_self (idx', c'))
+            let peers' = (peers_and_self (idx', c')) in
+            assert_equal ~msg:(Printf.sprintf "There exists some difference in the live nodes between \n%d:%s\n%d:%s\n" idx (peers_to_string peers) idx' (peers_to_string peers'))
+              (peers)
+              (peers')
               same;
           )
+
+    let assert_no_live (client : int * Swim.t) : unit =
+      let (idx, c) = client in
+      let peers = Swim.peers c in
+      assert_equal ~msg:(
+        Printf.sprintf "There exists a live node: %s" (peers_to_string peers)
+      ) (peers) [] same
 
     let create_with_delay_in_between ~delay ~count : (int * Swim.t) list Deferred.t =
       Deferred.List.init count (fun i ->
@@ -664,33 +698,45 @@ let%test_module "Network tests" = (module struct
       )
 
   let test_kill_first_node ~count : unit Deferred.t =
-    let%bind clients =
-      create_with_delay_in_between
-        ~delay:(Time.Span.of_sec 0.1)
-        ~count:count
-    in
-    let%bind () = wait_stabalize () in
-    (* Full network *)
-    assert_stable clients;
-    match clients with
-    | [] ->
-      return (failwith "unreachable")
-    | x::xs ->
-      shutdown [x];
+    with_fixed_random_seed (fun () ->
+      let%bind clients =
+        create_with_delay_in_between
+          ~delay:(Time.Span.of_sec 0.1)
+          ~count:count
+      in
       let%bind () = wait_stabalize () in
-      let%bind () = wait_stabalize () in
-      (* Node0 dead *)
-      assert_stable xs;
-      let%bind c0::_ = create_with_delay_in_between
-        ~delay:(Time.Span.of_sec 0.1)
-        ~count:1 in
-      let%map () = wait_stabalize () in
-      (* Node0 revived *)
-      assert_stable (c0::xs);
-      shutdown (c0::xs)
+      (* Full network *)
+      assert_stable clients;
+      match clients with
+      | [] ->
+        return (failwith "unreachable")
+      | x::xs ->
+        let%bind () = shutdown [x] in
+        let%bind () = wait_stabalize () in
+        let%bind () = wait_stabalize () in
+        (* Node0 dead *)
+        assert_stable xs;
+        (* Re-create Node0, but make sure he can reach Node1 at least *)
+        let c0 = (0, Swim.connect
+          ~config:(Config.create
+            ~expected_latency:(Time.Span.of_ms 5.)
+            ()
+          )
+          ~initial_peers:[addr 1]
+          ~me:(addr 0)) in
+        let%bind () = wait_stabalize () in
+        let%bind () = wait_stabalize () in
+        let%bind () = wait_stabalize () in
+        (* Node0 revived *)
+        assert_stable (c0::xs);
+        shutdown (c0::xs)
+    )
 
-  let%test_unit "kill_first_node_4" = Async.Thread_safe.block_on_async_exn (fun () -> test_kill_first_node ~count:4)
-  let%test_unit "kill_first_node_20" = Async.Thread_safe.block_on_async_exn (fun () -> test_kill_first_node ~count:20)
+  let wait_with_random_seed (f : unit -> 'a Deferred.t) : 'a = with_fixed_random_seed (fun () -> Async.Thread_safe.block_on_async_exn f)
+
+  let%test_unit "kill_first_node_2" = wait_with_random_seed (fun () -> test_kill_first_node ~count:2)
+  let%test_unit "kill_first_node_4" = wait_with_random_seed (fun () -> test_kill_first_node ~count:4)
+  let%test_unit "kill_first_node_8" = wait_with_random_seed (fun () -> test_kill_first_node ~count:8)
 
   let test_network_partition ~count : unit Deferred.t =
     let xs : int list = List.init count (fun i -> i) in
@@ -707,11 +753,27 @@ let%test_module "Network tests" = (module struct
           ~delay:(Time.Span.of_sec 0.1)
           ~count:count
       in
-      let%map () = wait_stabalize () in
+      let%bind () = wait_stabalize () in
+      let%bind () = wait_stabalize () in
       assert_stable clients;
       shutdown clients
 
-  let%test_unit "network_partition_4" = Async.Thread_safe.block_on_async_exn (fun () -> test_network_partition ~count:4)
-  let%test_unit "network_partition_20" = Async.Thread_safe.block_on_async_exn (fun () -> test_network_partition ~count:20)
+  let%test_unit "network_partition_4" = wait_with_random_seed (fun () -> test_network_partition ~count:4)
+  let%test_unit "network_partition_8" = wait_with_random_seed (fun () -> test_network_partition ~count:8)
+
+  let%test_unit "bad_initial_peer" =
+    wait_with_random_seed (fun () ->
+      let client = (0, Swim.connect
+          ~config:(Config.create
+            ~expected_latency:(Time.Span.of_ms 5.)
+            ()
+            )
+          ~initial_peers:[addr 1]
+          ~me:(addr 0))
+      in
+      let%bind () = wait_stabalize () in
+      assert_no_live client;
+      shutdown [client]
+    )
 end)
 
