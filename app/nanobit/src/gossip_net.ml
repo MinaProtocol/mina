@@ -33,7 +33,7 @@ module type S =
     val broadcast : t -> Message.t Linear_pipe.Writer.t
 
     val broadcast_all : t -> Message.t -> 
-      (unit -> bool Deferred.t)
+      (unit -> [`Done | `Continue] Deferred.t) Staged.t
 
     val query_peer
       : t
@@ -179,11 +179,12 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
 
   let broadcast_all t msg = 
     let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in
-    fun () -> 
-      let selected = List.take !to_broadcast t.target_peer_count in
-      to_broadcast := List.drop !to_broadcast t.target_peer_count;
-      let%map () = broadcast_selected t.timeout selected msg in
-      List.length !to_broadcast = 0
+    stage (
+      fun () -> 
+        let selected = List.take !to_broadcast t.target_peer_count in
+        to_broadcast := List.drop !to_broadcast t.target_peer_count;
+        let%map () = broadcast_selected t.timeout selected msg in
+        if List.length !to_broadcast = 0 then `Done else `Continue)
 
   let query_peer t (peer : Peer.t) rpc query = 
     try_call_rpc peer t.timeout rpc query Rpc.Rpc.dispatch
