@@ -181,31 +181,3 @@ type t =
   ; proof : Proof.t
   }
 [@@deriving bin_io]
-
-module Update = struct
-  type nonrec t =
-    | New_chain of t
-end
-
-let valid t =
-  if Snark_params.insecure_functionalities.verify_blockchain
-  then true
-  else failwith "TODO"
-
-let accumulate ~init ~updates ~strongest_chain =
-  don't_wait_for begin
-    let%map _last_block =
-      Linear_pipe.fold updates ~init ~f:(fun chain (Update.New_chain new_chain) ->
-        if not (valid new_chain)
-        then return chain
-        else if Strength.(new_chain.state.strength > chain.state.strength)
-        then 
-          let%map () = Pipe.write strongest_chain new_chain in
-          new_chain
-        else
-          return chain)
-    in
-    ()
-  end
-
-(* TODO: Delete let genesis = { state = State.zero; proof = base_proof } *)

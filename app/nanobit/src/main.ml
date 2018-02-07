@@ -32,7 +32,7 @@ struct
   module Gossip_net = Gossip_net(Message)
 
   let peer_strongest_blocks gossip_net
-    : Blockchain.Update.t Linear_pipe.Reader.t
+    : Blockchain_accumulator.Update.t Linear_pipe.Reader.t
     =
     let from_new_peers_reader, from_new_peers_writer = Linear_pipe.create () in
     let fetch_period = Time.Span.of_min 10. in
@@ -44,7 +44,7 @@ struct
           ~how:`Parallel
           (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.rpc ())
           ~f:(fun x -> match%bind x with
-            | Ok b -> Pipe.write from_new_peers_writer (Blockchain.Update.New_chain b)
+            | Ok b -> Pipe.write from_new_peers_writer (Blockchain_accumulator.Update.New_chain b)
             | Error e -> eprintf "%s\n" (Error.to_string_hum e); return ())
       in
       timer ()
@@ -53,7 +53,7 @@ struct
     let broadcasts =
       Linear_pipe.filter_map (Gossip_net.received gossip_net)
         ~f:(function
-          | New_strongest_block b -> Some (Blockchain.Update.New_chain b))
+          | New_strongest_block b -> Some (Blockchain_accumulator.Update.New_chain b))
     in
     Linear_pipe.merge_unordered
       [ from_new_peers_reader
@@ -198,13 +198,15 @@ struct
     (* Store and accumulate updates *)
     Storage.persist storage_location
       (Linear_pipe.map pipes.storage_strongest_block_reader ~f:(fun b -> `Change_head b));
-    Blockchain.accumulate
+    Blockchain_accumulator.accumulate
+      ~prover
       ~init:initial_blockchain
       ~strongest_chain:pipes.strongest_block_writer
       ~updates:(
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
-          ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b -> Blockchain.Update.New_chain b)
+          ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
+              Blockchain_accumulator.Update.New_chain b)
           ]);
     Async.never ()
   ;;
