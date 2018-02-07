@@ -149,7 +149,7 @@ struct
     end;
     gossip_net
 
-  let start_mining ~prover ~pipes ~genesis_block ~initial_blockchain =
+  let start_mining ~prover ~pipes ~initial_blockchain =
     let mined_blocks_reader =
       Miner_impl.mine ~prover
         ~previous:initial_blockchain
@@ -161,19 +161,19 @@ struct
     in
     Linear_pipe.fork2 mined_blocks_reader
 
-  let main prover storage_location genesis_block initial_peers should_mine me =
+  let main prover storage_location genesis_blockchain initial_peers should_mine me =
     let _ = Keys.foo () in
     let open Let_syntax in
     let%bind initial_blockchain =
       match%map Storage.load storage_location with
       | Some x -> x
-      | None -> genesis_block
+      | None -> genesis_blockchain
     in
     let pipes = init_pipes () in
     (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
       if should_mine then
-        start_mining ~prover ~pipes ~genesis_block ~initial_blockchain
+        start_mining ~prover ~pipes ~initial_blockchain
       else
         (Linear_pipe.of_list [], Linear_pipe.of_list [])
     in
@@ -182,8 +182,10 @@ struct
       init_gossip_net
         ~me
         ~pipes
-        ~latest_strongest_block:(Linear_pipe.latest_ref ~initial:genesis_block pipes.latest_strongest_block_reader)
-        ~latest_mined_block:(Linear_pipe.latest_ref ~initial:genesis_block latest_mined_blocks_reader)
+        ~latest_strongest_block:(
+          Linear_pipe.latest_ref ~initial:genesis_blockchain pipes.latest_strongest_block_reader)
+        ~latest_mined_block:(
+          Linear_pipe.latest_ref ~initial:genesis_blockchain latest_mined_blocks_reader)
         ~swim
     in
     don't_wait_for begin
