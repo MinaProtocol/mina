@@ -28,7 +28,7 @@ let get_pods
         (List.map new_containers ~f:(fun node -> 
            Kubernetes.run_pod 
              ~pod_name:("testbridge-" ^ (rand_name ())) 
-             ~pod_image:(image_host ^ "/testbridge:latest")
+             ~pod_image:image_host
              ~node_hostname:node.hostname  
              ~tcp_ports:(List.concat [ external_tcp_ports; internal_tcp_ports ])
              ~udp_ports:internal_udp_ports
@@ -79,7 +79,11 @@ module Rpcs = struct
 
   module Init = struct
     type cmd = String.t * String.t list [@@deriving bin_io]
-    type query = cmd * String.t [@@deriving bin_io]
+    type query = { launch_cmd : cmd 
+                 ; tar_string : String.t
+                 ; pre_cmds : cmd list
+                 ; post_cmds : cmd list } 
+    [@@deriving bin_io]
     type response = String.t [@@deriving bin_io]
 
     let rpc : (query, response) Rpc.Rpc.t =
@@ -92,6 +96,10 @@ end
 let create 
       ~image_host
       ~project_dir 
+      ~to_tar
+      ~pre_cmds
+      ~post_cmds
+      ~launch_cmd
       ~container_count 
       ~containers_per_machine 
       ~external_tcp_ports 
@@ -108,10 +116,11 @@ let create
       internal_udp_ports in
   let testbridge_port = 8100 in
   let%bind external_ports = Kubernetes.forward_ports pods (List.concat [ [ testbridge_port ]; external_tcp_ports ]) in
-  let%bind internal_ports = Kubernetes.get_internal_ports pods internal_tcp_ports in
+  let%bind internal_tcp_ports = Kubernetes.get_internal_ports pods internal_tcp_ports in
+  let%bind internal_udp_ports = Kubernetes.get_internal_ports pods internal_udp_ports in
   let testbridge_ports = List.map external_ports ~f:(fun pod_ports -> (List.nth_exn pod_ports 0)) in
   let%bind tar_string = 
-    Process.run_exn ~working_dir:project_dir ~prog:"tar" ~args:[ "czvf"; "-"; "." ] () 
+    Process.run_exn ~working_dir:project_dir ~prog:"tar" ~args:(List.concat [ [ "czvf"; "-";  ]; to_tar ]) () 
   in
   printf "waiting for pods...\n";
   let%bind () = 
@@ -137,10 +146,10 @@ let create
           Kubernetes.call_exn
             Rpcs.Init.rpc 
             port 
-            (("bash", [ "/app/testbridge-launch.sh"]), tar_string)
+            { launch_cmd; tar_string; pre_cmds; post_cmds; }
         in
         ())
   in
   let external_tcp_ports = List.map external_ports ~f:(fun pod_ports -> (List.drop pod_ports 1)) in
-  external_tcp_ports, internal_ports
+  external_tcp_ports, internal_tcp_ports, internal_udp_ports
 ;;

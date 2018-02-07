@@ -22,6 +22,11 @@ module Message = struct
   [@@deriving bin_io]
 end
 
+let assert_chain_verifies prover chain =
+  let%map b = Prover.verify prover chain >>| Or_error.ok_exn in
+  if not b then failwith "Chain did not verify"
+;;
+
 module Swim_config = Swim.Config
 module Make
     (Swim       : Swim.S)
@@ -31,6 +36,7 @@ module Make
   =
 struct
   module Gossip_net = Gossip_net(Message)
+  module Swim = Swim
 
   let peer_strongest_blocks gossip_net
     : Blockchain_accumulator.Update.t Linear_pipe.Reader.t
@@ -92,11 +98,18 @@ struct
     ; body_changes_writer
     }
 
-  let init_gossip_net ~me ~pipes:{gossip_net_strongest_block_reader} ~swim ~latest_strongest_block ~latest_mined_block =
+  let init_gossip_net 
+        ~me 
+        ~pipes:{gossip_net_strongest_block_reader} 
+        ~swim 
+        ~latest_strongest_block 
+        ~latest_mined_block 
+        ~remap_addr_port
+    =
     let params : Gossip_net.Params.t =
       { timeout = Time.Span.of_sec 1.
       ; target_peer_count = 8
-      ; address = me
+      ; address = remap_addr_port me
       }
     in
     let get_strongest_block_handler _ _ = 
@@ -111,7 +124,20 @@ struct
         ~on_unknown_rpc:`Close_connection
     in
     let rebroadcast_period = Time.Span.of_sec 10. in
-    let gossip_net = Gossip_net.create (Swim.changes swim) params implementations in
+    let remap_ports peers = 
+      List.map peers ~f:(fun peer -> remap_addr_port peer)
+    in
+    let gossip_net = 
+      Gossip_net.create 
+        (Linear_pipe.map 
+           (Swim.changes swim) 
+           ~f:(function
+             | Connect peers -> Peer.Event.Connect (remap_ports peers)
+             | Disconnect peers -> Disconnect (remap_ports peers)
+           ))
+        params 
+        implementations 
+    in
     (* someday this could be much more sophisticated 
      *   don't wait for each target_peer group to finish
      *   stop sending once everyone seems to have the message
@@ -164,10 +190,18 @@ struct
     in
     Linear_pipe.fork2 mined_blocks_reader
 
-  let main prover storage_location genesis_blockchain initial_peers should_mine me =
+  let main_nowait 
+        prover
+        storage_location 
+        genesis_blockchain
+        initial_peers 
+        should_mine 
+        me 
+        remap_addr_port
+    =
     let _ = Keys.foo () in
     let open Let_syntax in
-    let%bind initial_blockchain =
+    let%map initial_blockchain =
       match%map Storage.load storage_location with
       | Some x -> x
       | None -> genesis_blockchain
@@ -190,6 +224,7 @@ struct
         ~latest_mined_block:(
           Linear_pipe.latest_ref ~initial:genesis_blockchain latest_mined_blocks_reader)
         ~swim
+        ~remap_addr_port
     in
     don't_wait_for begin
       Linear_pipe.transfer
@@ -211,6 +246,28 @@ struct
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
               Blockchain_accumulator.Update.New_chain b)
           ]);
+    swim
+
+  let main 
+        prover
+        storage_location 
+        genesis_blockchain
+        initial_peers 
+        should_mine 
+        me 
+        ?(remap_addr_port=(fun addr -> addr))
+        ()
+    =
+    let%bind _ = 
+      main_nowait 
+        prover
+        storage_location 
+        genesis_blockchain
+        initial_peers 
+        should_mine 
+        me 
+        remap_addr_port 
+    in
     Async.never ()
   ;;
 end

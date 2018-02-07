@@ -3,11 +3,6 @@ open Async
 open Nanobit_base
 open Cli_common
 
-let assert_chain_verifies prover chain =
-  let%map b = Prover.verify prover chain >>| Or_error.ok_exn in
-  if not b then failwith "Chain did not verify"
-;;
-
 let daemon =
   let open Command.Let_syntax in
   Command.async
@@ -59,21 +54,24 @@ let daemon =
           in
           let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
           let genesis_chain = { Blockchain.state = Blockchain.State.zero; proof = genesis_proof } in
-          let%bind () = assert_chain_verifies prover genesis_chain in
+          let%bind () = Main.assert_chain_verifies prover genesis_chain in
           Main.main
             prover
             (conf_dir ^/ "storage")
             { Blockchain.state = Blockchain.State.zero; proof = genesis_proof }
-            initial_peers should_mine
+            initial_peers 
+            should_mine
             (Host_and_port.create ~host:ip ~port)
+            ()
       ]
     end
 ;;
 
-let () =
+  let () = 
   Command.group ~summary:"Current"
     [ "daemon", daemon
     ; "prover", Prover.command
+    ; "rpc", Main_rpc.command
     ]
   |> Command.run
 ;;

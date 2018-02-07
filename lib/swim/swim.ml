@@ -439,7 +439,7 @@ end) = struct
     fun t ->
       let socket_addr =
         Socket.Address.Inet.create
-          (Unix.Inet_addr.of_string "127.0.0.1")
+          Unix.Inet_addr.bind_any
           ~port:t.port
       in
       let open Deferred.Let_syntax in

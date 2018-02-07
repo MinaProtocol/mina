@@ -107,17 +107,21 @@ let () =
         in
         fun () ->
           let open Deferred.Let_syntax in
-          let%bind external_ports, internal_ports = 
+          let%bind external_ports, internal_tcp_ports, internal_udp_ports = 
             Testbridge.Main.create 
               ~image_host
               ~project_dir:"../client" 
+              ~to_tar:[ "." ]
+              ~pre_cmds:[]
+              ~post_cmds:[]
+              ~launch_cmd:("bash", [ "/app/testbridge-launch.sh"])
               ~container_count
               ~containers_per_machine
               ~external_tcp_ports:[ 8000 ] 
               ~internal_tcp_ports:[ 8001 ] 
               ~internal_udp_ports:[] 
           in
-          main external_ports internal_ports
+          main external_ports internal_tcp_ports
       ]
     end
   |> Command.run

@@ -1,7 +1,8 @@
 #!/bin/bash
 
 #example: from lib/testbridge, 
-#./test.sh ./tests/echo/host ../../_build/install/default/bin/echo_host localhost:5000
+#./test.sh ./tests/echo/host ../../_build/install/default/bin/echo_host localhost:5000/testbridge:latest
+#./test.sh ./tests/nanobit/host/ ../../_build/install/default/bin/nanobit_host gcr.io/$(gcloud config get-value project)/testbridge-camlsnark:latest
 
 if [ ! $# -eq 2 ] && [ ! $# -eq 3 ];
 then
@@ -11,7 +12,7 @@ fi
 
 if [ $# -eq 2 ]
 then
-  host=gcr.io/$(gcloud config get-value project)
+  host=gcr.io/$(gcloud config get-value project)/testbridge:latest
 else
   host=$3
 fi
