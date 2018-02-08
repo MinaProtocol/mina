@@ -17,6 +17,15 @@ module Attribute : sig
   val (:=) : string -> Sexp.t -> t
 end
 
+module Message : sig
+  type t =
+    { attributes : Sexp.t String.Map.t
+    ; level      : Level.t
+    ; time       : Time.t
+    ; pid        : Pid.t
+    }
+end
+
 val create : unit -> t
 
 val log
