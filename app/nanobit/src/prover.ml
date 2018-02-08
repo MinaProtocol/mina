@@ -192,7 +192,9 @@ module Main (Params : Params_intf) = struct
                return (Lazy.force base_proof))
         ; Rpc.Rpc.implement Rpcs.Verify.rpc
             (fun s ({ Blockchain.state; proof }) ->
-               return (Transition.verify state proof))
+               if Snark_params.insecure_functionalities.verify_blockchain
+               then return true
+               else return (Transition.verify state proof))
         ]
       ~on_unknown_rpc:(`Call (fun () ~rpc_tag ~version ->
         eprintf "prover: unknown rpc: %s %d\n" rpc_tag version;
