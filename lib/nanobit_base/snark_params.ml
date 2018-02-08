@@ -14,9 +14,9 @@ let insecure_functionalities =
   { strength_calculation = true
   ; verify_blockchain    = true
   ; check_target         = true
-  ; compute_base_hash    = false
-  ; compute_base_proof   = false
-  ; extend_blockchain    = false
+  ; compute_base_hash    = true
+  ; compute_base_proof   = true
+  ; extend_blockchain    = true
   }
 
 module Tick_curve = Camlsnark.Backends.Mnt4
