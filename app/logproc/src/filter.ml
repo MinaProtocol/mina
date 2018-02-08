@@ -5,7 +5,11 @@ type sexp_expr =
   | Int of int
   | String of string
   | Sexp of Sexp.t
+  | Level_literal of Logger.Level.t
   | Null
+  | Host
+  | Pid
+  | Level
 
 type t =
   | And of t * t
@@ -22,6 +26,10 @@ let eval_sexp_expr e (m : Logger.Message.t) =
   | Int n -> Some ([%sexp_of: int] n)
   | String s -> Some ([%sexp_of: string] s)
   | Sexp s -> Some s
+  | Host -> Some ([%sexp_of: string] m.host)
+  | Pid -> Some ([%sexp_of: Pid.t] m.pid)
+  | Level -> Some ([%sexp_of: Logger.Level.t] m.level)
+  | Level_literal l -> Some ([%sexp_of: Logger.Level.t] l)
 
 let rec eval t (m : Logger.Message.t) =
   match t with

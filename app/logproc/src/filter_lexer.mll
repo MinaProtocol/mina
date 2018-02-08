@@ -24,6 +24,13 @@ rule read =
   | int      { INT (int_of_string (Lexing.lexeme lexbuf)) }
   | "="      { EQUAL }
   | "<>"     { NOT_EQUAL }
+  | "info"   { LEVEL_LITERAL Logger.Level.Info }
+  | "trace"  { LEVEL_LITERAL Logger.Level.Trace }
+  | "debug"  { LEVEL_LITERAL Logger.Level.Debug }
+  | "error"  { LEVEL_LITERAL Logger.Level.Error }
+  | "fatal"  { LEVEL_LITERAL Logger.Level.Fatal }
+  | "warn"   { LEVEL_LITERAL Logger.Level.Warn }
+  | "level"  { LEVEL }
   | "pid"    { PID}
   | "host"   { HOST }
   | "true"   { TRUE }
@@ -31,7 +38,8 @@ rule read =
   | "null"   { NULL }
   | "&&"     { AND }
   | "||"     { OR }
-  | '"'      { read_string (Buffer.create 17) lexbuf }
+  | '''      { read_string_single_quote (Buffer.create 128) lexbuf }
+  | '"'      { read_string (Buffer.create 128) lexbuf }
   | '('      { LEFT_PAREN }
   | ')'      { RIGHT_PAREN }
   | '^'      { CARET }
@@ -39,7 +47,23 @@ rule read =
   | _ { raise (SyntaxError ("Unexpected char: " ^ Lexing.lexeme lexbuf)) }
   | eof      { EOF }
 
-(* part 5 *)
+and read_string_single_quote buf =
+  parse
+  | '\''       { STRING (Buffer.contents buf) }
+  | '\\' '/'  { Buffer.add_char buf '/'; read_string_single_quote buf lexbuf }
+  | '\\' '\\' { Buffer.add_char buf '\\'; read_string_single_quote buf lexbuf }
+  | '\\' 'b'  { Buffer.add_char buf '\b'; read_string_single_quote buf lexbuf }
+  | '\\' 'f'  { Buffer.add_char buf '\012'; read_string_single_quote buf lexbuf }
+  | '\\' 'n'  { Buffer.add_char buf '\n'; read_string_single_quote buf lexbuf }
+  | '\\' 'r'  { Buffer.add_char buf '\r'; read_string_single_quote buf lexbuf }
+  | '\\' 't'  { Buffer.add_char buf '\t'; read_string_single_quote buf lexbuf }
+  | [^ '\'' '\\']+
+    { Buffer.add_string buf (Lexing.lexeme lexbuf);
+      read_string_single_quote buf lexbuf
+    }
+  | _ { raise (SyntaxError ("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
+| eof { raise (SyntaxError ("String is not terminated")) }
+
 and read_string buf =
   parse
   | '"'       { STRING (Buffer.contents buf) }
@@ -55,5 +79,4 @@ and read_string buf =
       read_string buf lexbuf
     }
   | _ { raise (SyntaxError ("Illegal string character: " ^ Lexing.lexeme lexbuf)) }
-| eof { raise (SyntaxError ("String is not terminated"))
-}
+| eof { raise (SyntaxError ("String is not terminated")) }

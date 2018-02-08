@@ -1,5 +1,6 @@
 %token <int> INT
 %token <string> STRING
+%token <Logger.Level.t> LEVEL_LITERAL
 %token TRUE
 %token FALSE
 %token NULL
@@ -46,4 +47,8 @@ sexp_expr:
   | s = STRING { Filter.String s }
   | n = INT { Filter.Int n }
   | NULL { Filter.Null }
+  | HOST { Filter.Host }
+  | PID { Filter.Pid }
+  | LEVEL { Filter.Level }
+  | l = LEVEL_LITERAL { Filter.Level_literal l }
   ;
