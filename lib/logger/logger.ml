@@ -62,7 +62,7 @@ let log ~level ?loc ?(attrs=[]) t fmt =
          ; location = loc
          }
        in
-       printf !"%{sexp:Message.t}\n" m)
+       printf !"%s\n" (Sexp.to_string_mach (Message.sexp_of_t m)))
   fmt
 ;;
 
