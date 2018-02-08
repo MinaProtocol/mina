@@ -23,6 +23,8 @@ module Message : sig
     ; level      : Level.t
     ; time       : Time.t
     ; pid        : Pid.t
+    ; host       : string
+    ; message    : string
     }
 end
 
@@ -33,3 +35,4 @@ val log
   -> ?attrs:Attribute.t list
   -> ('b, unit, string, unit) format4
   -> 'b
+
