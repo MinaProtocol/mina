@@ -4,15 +4,17 @@ type t
 
 module Level : sig
   type t =
-    | Warn
-    | Log
+    | Trace
     | Debug
+    | Info
+    | Warn
     | Error
-  [@@deriving sexp, bin_io]
+    | Fatal
+  [@@deriving sexp, bin_io, compare]
 end
 
 module Attribute : sig
-  type t
+  type t = string * Sexp.t
 
   val (^=) : string -> Sexp.t -> t
 end
@@ -20,24 +22,32 @@ end
 module Message : sig
   type t =
     { attributes : Sexp.t String.Map.t
+    ; path       : string list
     ; level      : Level.t
     ; pid        : Pid.t
     ; host       : string
     ; time       : Time.t
+    ; location   : string option
     ; message    : string
     }
   [@@deriving sexp, bin_io]
 end
 
-val create
-  : ?level:Level.t
-  -> unit
-  -> t
-
-val log
-  : ?level:Level.t
+type 'a logger =
+  ?loc:string
   -> ?attrs:Attribute.t list
   -> t
-  -> ('b, unit, string, unit) format4
-  -> 'b
+  -> ('a, unit, string, unit) format4
+  -> 'a
 
+val create : unit -> t
+
+val trace : _ logger
+val debug : _ logger
+val info  : _ logger
+val warn  : _ logger
+val error : _ logger
+val fatal : _ logger
+
+val extend : t -> Attribute.t list -> t
+val child : t -> string -> t
