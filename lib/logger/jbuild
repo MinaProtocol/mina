@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name logger)
+  (public_name logger)
+  (library_flags (-linkall))
+  (libraries (core async ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib logger))))
+  (synopsis "Logging library")))
+
