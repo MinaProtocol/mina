@@ -2,10 +2,14 @@
 
 set -e
 
-if [[ $# -ne 1 ]]; then
+if [ ! $# -eq 1 ] && [ ! $# -eq 2 ];
+then
   echo "Usage: $0 image-name"
   exit 1
 fi
 
-docker build -t $1:latest .
+img=$1:latest
+file=${2:Dockerfile}
+
+docker build -f $file -t $img .
 

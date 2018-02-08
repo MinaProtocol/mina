@@ -155,10 +155,7 @@ module Make (Message : sig type t [@@deriving bin_io] end) = struct
     ignore begin
       Tcp.Server.create
         ~on_handler_error:(`Call (fun net exn -> eprintf "%s\n" (Exn.to_string_mach exn)))
-        (Tcp.Where_to_listen.create 
-           ~socket_type:Socket.Type.tcp 
-           ~address:(`Inet (Unix.Inet_addr.of_string (Host_and_port.host params.address), Host_and_port.port params.address))
-           ~listening_on:(fun x -> Fn.id))
+        (Tcp.Where_to_listen.of_port (Host_and_port.port params.address))
         (fun address reader writer -> 
            Rpc.Connection.server_with_close 
              reader writer

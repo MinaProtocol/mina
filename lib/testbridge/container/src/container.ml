@@ -2,9 +2,6 @@ open Core;;
 open Async;;
 open Unix;;
 
-let () = printf "hi from ocaml\n"
-;;
-
 module Rpcs = struct
   module Ping = struct
     type query = unit [@@deriving bin_io]
@@ -26,7 +23,11 @@ module Rpcs = struct
 
   module Init = struct
     type cmd = String.t * String.t list [@@deriving bin_io]
-    type query = cmd * String.t [@@deriving bin_io]
+    type query = { launch_cmd : cmd 
+                 ; tar_string : String.t
+                 ; pre_cmds : cmd list
+                 ; post_cmds : cmd list } 
+    [@@deriving bin_io]
     type response = String.t [@@deriving bin_io]
 
     let rpc : (query, response) Rpc.Rpc.t =
@@ -46,7 +47,7 @@ let ping _ () = return ()
 
 let current_process = ref None
 
-let init _ (cmd, tar_string) = 
+let init _ { Rpcs.Init.launch_cmd; tar_string; pre_cmds; post_cmds } = 
   let () = 
     match !current_process with
     | None -> ()
@@ -55,18 +56,25 @@ let init _ (cmd, tar_string) =
       ignore (Signal.send Signal.term (`Pid pid))
   in
   let pre_cmds = 
-    [ ("rm",    [ "-rf"; "/app/*" ]) ]
+    List.concat
+      [ pre_cmds
+      ; [ ("rm",    [ "-rf"; "/app/*" ]) ]
+      ]
   in
   let%bind pre_cmd_outs = 
     Deferred.List.map ~how:`Sequential pre_cmds ~f:(fun (prog, args) -> 
-      Process.run_exn ~prog ~args ())
+      Process.run ~prog ~args ())
   in
   let%bind tar = Process.create_exn ~working_dir:"/app" ~prog:"tar" ~args:[ "zxf"; "-" ] () in
   let tar_stdin = Process.stdin tar in
   Writer.write tar_stdin tar_string;
   let%bind () = Writer.close tar_stdin in
   let%bind _res = Process.wait tar in
-  let prog, args = cmd in
+  let%bind post_cmd_outs = 
+    Deferred.List.map ~how:`Sequential post_cmds ~f:(fun (prog, args) -> 
+      Process.run ~prog ~args ())
+  in
+  let prog, args = launch_cmd in
   let%map process = Process.create_exn ~working_dir:"/app" ~prog ~args () in
   current_process := Some process;
   ""
