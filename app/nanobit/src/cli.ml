@@ -21,7 +21,7 @@ let daemon =
             ~doc:"Server port for other to connect" (required int16)
         and ip =
           flag "ip"
-            ~doc:"External IP address for others to connect" (required string)
+            ~doc:"External IP address for others to connect" (optional string)
         and start_prover =
           flag "start-prover" no_arg
             ~doc:"Start a new prover process"
@@ -55,6 +55,11 @@ let daemon =
           let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
           let genesis_chain = { Blockchain.state = Blockchain.State.zero; proof = genesis_proof } in
           let%bind () = Main.assert_chain_verifies prover genesis_chain in
+          let%bind ip =
+            match ip with
+            | None -> Find_ip.find ()
+            | Some ip -> return ip
+          in
           Main.main
             prover
             (conf_dir ^/ "storage")
