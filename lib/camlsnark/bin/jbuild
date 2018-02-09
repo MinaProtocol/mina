@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(executables
+ ((names (tutorial))
+  (modes (native))
+  (preprocess (pps (ppx_jane ppx_driver.runner)))
+  (libraries (camlsnark core))))
+
+;(install
+;  ((section bin)
+;    (files ((tutorial.exe as tutorial)))))
