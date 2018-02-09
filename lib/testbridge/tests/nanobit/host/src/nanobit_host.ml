@@ -80,7 +80,7 @@ let main ports internal_tcp_ports internal_udp_ports =
         else { Rpcs.Init.start_prover = true
              ; prover_port = 8002
              ; storage_location = "/app/block-storage"
-             ; initial_peers = []
+             ; initial_peers = List.take nanobit_udp_ports 1
              ; should_mine = false
              ; me = udp_port }
       in
