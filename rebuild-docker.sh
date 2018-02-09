@@ -9,7 +9,7 @@ then
 fi
 
 img=$1:latest
-file=${2:Dockerfile}
+file=${2:-Dockerfile}
 
 docker build -f $file -t $img .
 

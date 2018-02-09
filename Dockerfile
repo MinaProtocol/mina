@@ -1,7 +1,6 @@
 FROM ocaml-camlsnark:latest
 
 RUN opam install merlin
-RUN opam install utop
 RUN opam install ocp-indent
 
 ENV PATH "/home/opam/.opam/4.05.0/bin:$PATH"

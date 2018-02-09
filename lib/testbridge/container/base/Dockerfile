@@ -26,4 +26,5 @@ RUN mkdir .ssh && \
 
 RUN opam depext -i jbuilder
 RUN opam install core async
+RUN opam install yojson menhir
 
