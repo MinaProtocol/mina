@@ -63,6 +63,81 @@ module Node = struct
   let dead peer = { peer ; state = `Dead }
 end
 
+module Shuffled_sequence = struct
+  (* Invariant:
+     [to_pop] is empty iff [queue] is empty. *)
+  type 'a t =
+    { queue  : 'a Doubly_linked.t
+    ; to_pop : ('a, 'a Doubly_linked.Elt.t) Hashtbl.t
+    ; popped : 'a Hash_set.t
+    }
+
+  let create
+        ~create_hashset
+        ~create_hashtbl
+    =
+    { queue = Doubly_linked.create ()
+    ; popped = create_hashset ()
+    ; to_pop = create_hashtbl ()
+    }
+
+(* At some point it may make sense to make this O(1) instead
+   of O(n) as it is now. *)
+  let add (t : 'a t) (x : 'a) =
+    if not (Hash_set.mem t.popped x || Hashtbl.mem t.to_pop x)
+    then begin
+      let q = t.queue in
+      let n = Doubly_linked.length q in
+      (* There are n + 1 positions to insert into. *)
+      let k = Random.int (n + 1) in
+      let rec go i elt =
+        if i = k
+        then Doubly_linked.insert_before q elt x
+        else
+          match Doubly_linked.next q elt with
+          | None -> Doubly_linked.insert_after q elt x
+          | Some elt -> go (i + 1) elt
+      in
+      let elt =
+        match Doubly_linked.first_elt q with
+        | None -> Doubly_linked.insert_first q x
+        | Some elt -> go 0 elt
+      in
+      Hashtbl.set t.to_pop ~key:x ~data:elt
+    end
+  ;;
+
+  let maybe_reshuffle t =
+    if Doubly_linked.is_empty t.queue
+    then begin
+      assert (Hashtbl.is_empty t.to_pop);
+      let xs = List.permute (Hash_set.to_list t.popped) in
+      Hash_set.clear t.popped;
+      List.iter xs ~f:(fun x ->
+        let elt = Doubly_linked.insert_last t.queue x in
+        Hashtbl.set t.to_pop ~key:x ~data:elt);
+    end
+  ;;
+
+  let remove t x =
+    match Hashtbl.find_and_remove t.to_pop x with
+    | None -> ()
+    | Some elt ->
+      Doubly_linked.remove t.queue elt;
+      maybe_reshuffle t
+  ;;
+
+  let pop t =
+    match Doubly_linked.remove_first t.queue with
+    | None -> None
+    | Some x ->
+      Hashtbl.remove t.to_pop x;
+      Hash_set.add t.popped x;
+      maybe_reshuffle t;
+      Some x
+  ;;
+end
+
 module type Network_state_intf = sig
   type t
 
@@ -74,6 +149,8 @@ module type Network_state_intf = sig
   val add_slice : t -> slice -> unit
 
   val changes : t -> Peer.Event.t Linear_pipe.Reader.t
+
+  val shuffled_live_nodes : t -> Peer.t Shuffled_sequence.t
 
   (* Pure getter for live_nodes *)
   val live_nodes : t -> Peer.t Set.Poly.t
@@ -104,23 +181,36 @@ module Network_state : Network_state_intf = struct
     { mutable broadcast_list : broadcast_list
     ; mutable live_nodes : Peer.t Set.Poly.t
     ; logger : Log.logger
-    ; changes : Peer.Event.t Linear_pipe.Reader.t * Peer.Event.t Linear_pipe.Writer.t
+    ; shuffled_live_nodes : Peer.t Shuffled_sequence.t
+    ; changes_reader : Peer.Event.t Linear_pipe.Reader.t
+    ; changes_writer : Peer.Event.t Linear_pipe.Writer.t
     }
+
+  let shuffled_live_nodes = failwith "TODO"
 
   type slice = Node.t list [@@deriving bin_io, sexp]
 
   let create logger : t =
+    let (changes_reader, changes_writer) = Linear_pipe.create () in
     { broadcast_list = []
     ; live_nodes = Set.Poly.empty
+    ; shuffled_live_nodes =
+        Shuffled_sequence.create
+          ~create_hashset:Peer.Hash_set.create
+          ~create_hashtbl:Peer.Table.create
     ; logger
-    ; changes = Linear_pipe.create ()
+    ; changes_reader
+    ; changes_writer
     }
 
   let update_live t (node : E.t) =
-    if node.state = `Alive then
-      t.live_nodes <- Set.Poly.add t.live_nodes node.peer
-    else
-      t.live_nodes <- Set.Poly.remove t.live_nodes node.peer
+    if node.state = `Alive then begin
+      t.live_nodes <- Set.Poly.add t.live_nodes node.peer;
+      Shuffled_sequence.add t.shuffled_live_nodes node.peer;
+    end else begin
+      t.live_nodes <- Set.Poly.remove t.live_nodes node.peer;
+      Shuffled_sequence.remove t.shuffled_live_nodes node.peer;
+    end
 
   let add (t : t) (node : E.t) =
     update_live t node;
@@ -130,7 +220,7 @@ module Network_state : Network_state_intf = struct
     end
 
   let push_changes t slice =
-    let (_, w) = t.changes in
+    let w = t.changes_writer in
     let (connected, disconnected) =
       slice
       |> List.filter ~f:(fun (node : Node.t) ->
@@ -159,9 +249,7 @@ module Network_state : Network_state_intf = struct
 
   let live_nodes t = t.live_nodes
 
-  let changes t =
-    let (r, _) = t.changes in
-    r
+  let changes t = t.changes_reader
 
   let extract (t : t) ~transmit_limit addr =
     let select memo elem =
@@ -483,6 +571,9 @@ module Make (Transport : Transport_intf) = struct
     ; mutable stop : bool
     }
 
+  let changes t =
+    Network_state.changes t.net_state
+
   let fresh_seq_no t =
     let seq_no = t.seq_no in
     t.seq_no <- t.seq_no + 1;
@@ -522,15 +613,16 @@ module Make (Transport : Transport_intf) = struct
       | 0 ->
         Async.after (Config.protocol_period t.config)
       | _ ->
-        let choose xs =
-          Option.value_exn (List.nth xs (Random.int (List.length xs)))
-        in
-        let n_i = choose (Network_state.live_nodes t.net_state |> Set.Poly.to_list) in
-        let m_i : Node.t = {peer=n_i;state=`Alive} in
-        let%map () = probe_node t m_i
-        and () = Async.after (Config.protocol_period t.config) in
-        Network_state.add_slice t.net_state [m_i];
-        ()
+        match Shuffled_sequence.pop (Network_state.shuffled_live_nodes t.net_state) with
+        | Some n_i ->
+          let m_i : Node.t = {peer=n_i;state=`Alive} in
+          let%map () = probe_node t m_i
+          and () = Async.after (Config.protocol_period t.config) in
+          Network_state.add_slice t.net_state [m_i];
+          ()
+        | None ->
+          t.logger#logf Debug "No live peers";
+          Deferred.unit
     in
     if not t.stop then
       failure_detect t
@@ -591,9 +683,6 @@ module Make (Transport : Transport_intf) = struct
     t
 
   let peers t = Network_state.live_nodes t.net_state |> Set.Poly.to_list
-
-  let changes t =
-    Network_state.changes t.net_state
 
   let stop t =
     Net.stop_listening t.net;
