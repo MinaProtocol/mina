@@ -64,8 +64,9 @@ module Node = struct
 end
 
 module Shuffled_sequence = struct
-  (* Invariant:
-     [to_pop] is empty iff [queue] is empty. *)
+  (* Invariants:
+     - [to_pop] and [popped] are disjoint.
+     - [to_pop] and [queue] have the same elements. *)
   type 'a t =
     { queue  : 'a Doubly_linked.t
     ; to_pop : ('a, 'a Doubly_linked.Elt.t) Hashtbl.t
