@@ -2,7 +2,7 @@
 
 #example: from lib/testbridge, 
 #./test.sh ./tests/echo/host ../../_build/install/default/bin/echo_host localhost:5000/testbridge:latest
-#./test.sh ./tests/nanobit/host/ ../../_build/install/default/bin/nanobit_host gcr.io/$(gcloud config get-value project)/testbridge-camlsnark:latest
+#./test.sh ./tests/nanobit/host/ ../../_build/install/default/bin/nanobit_host gcr.io/$(gcloud config get-value project)/testbridge-nanobit:latest
 
 if [ ! $# -eq 2 ] && [ ! $# -eq 3 ];
 then
