@@ -74,12 +74,13 @@ module Shuffled_sequence = struct
     }
 
   let create
-        ~create_hashset
-        ~create_hashtbl
+    (type a)
+    (h : (module Base.Hashtbl_intf.Key with type t = a))
+    : a t
     =
     { queue = Doubly_linked.create ()
-    ; popped = create_hashset ()
-    ; to_pop = create_hashtbl ()
+    ; popped = Hash_set.create h ()
+    ; to_pop = Hashtbl.create h ()
     }
 
 (* At some point it may make sense to make this O(1) instead
@@ -195,10 +196,7 @@ module Network_state : Network_state_intf = struct
     let (changes_reader, changes_writer) = Linear_pipe.create () in
     { broadcast_list = []
     ; live_nodes = Set.Poly.empty
-    ; shuffled_live_nodes =
-        Shuffled_sequence.create
-          ~create_hashset:Peer.Hash_set.create
-          ~create_hashtbl:Peer.Table.create
+    ; shuffled_live_nodes = Shuffled_sequence.create (module Peer)
     ; logger
     ; changes_reader
     ; changes_writer
