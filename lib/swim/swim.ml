@@ -110,7 +110,7 @@ module Shuffled_sequence = struct
   ;;
 
   let maybe_reshuffle t =
-    if Doubly_linked.is_empty t.queue
+    if Doubly_linked.is_empty t.queue && not (Hash_set.is_empty t.popped)
     then begin
       assert (Hashtbl.is_empty t.to_pop);
       let xs = List.permute (Hash_set.to_list t.popped) in
@@ -608,20 +608,15 @@ module Make (Transport : Transport_intf) = struct
   let rec failure_detect (t : t) : unit Deferred.t =
     t.logger#logf Debug "Start failure_detect";
     let%bind () =
-      match Set.Poly.length (Network_state.live_nodes t.net_state) with
-      | 0 ->
+      match Shuffled_sequence.pop (Network_state.shuffled_live_nodes t.net_state) with
+      | None ->
         Async.after (Config.protocol_period t.config)
-      | _ ->
-        match Shuffled_sequence.pop (Network_state.shuffled_live_nodes t.net_state) with
-        | Some n_i ->
-          let m_i : Node.t = {peer=n_i;state=`Alive} in
-          let%map () = probe_node t m_i
-          and () = Async.after (Config.protocol_period t.config) in
-          Network_state.add_slice t.net_state [m_i];
-          ()
-        | None ->
-          t.logger#logf Debug "No live peers";
-          Deferred.unit
+      | Some n_i ->
+        let m_i : Node.t = {peer=n_i;state=`Alive} in
+        let%map () = probe_node t m_i
+        and () = Async.after (Config.protocol_period t.config) in
+        Network_state.add_slice t.net_state [m_i];
+        ()
     in
     if not t.stop then
       failure_detect t
