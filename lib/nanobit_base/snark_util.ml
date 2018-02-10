@@ -163,6 +163,11 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
       Checked.pack res
   ;;
 
+  let divide ~numerator:(`Two_to_the b) y y_unpacked =
+    assert (b <= Field.size_in_bits - 2);
+    let%bind k = num_bits_upper_bound
+  ;;
+
   let compare_field x y =
     let nx = Bigint.of_field x in
     let ny = Bigint.of_field y in
