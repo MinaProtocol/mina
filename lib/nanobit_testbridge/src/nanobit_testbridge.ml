@@ -13,7 +13,7 @@ module Rpcs = struct
         ~bin_query ~bin_response
   end
 
-  module Init = struct
+  module Main = struct
     type query = 
       { start_prover: bool
       ; prover_port: int
@@ -23,10 +23,11 @@ module Rpcs = struct
       ; me: Host_and_port.t
       }
     [@@deriving bin_io, sexp]
+
     type response = unit [@@deriving bin_io]
 
     let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Init" ~version:0
+      Rpc.Rpc.create ~name:"Main" ~version:0
         ~bin_query ~bin_response
   end
 
@@ -59,7 +60,7 @@ let wait_up ?(secs=120) nanobit =
 ;;
 
 let make_args nanobit ?(should_mine=false) initial_peers =
-  { Rpcs.Init.start_prover = true
+  { Rpcs.Main.start_prover = true
   ; prover_port = 8002
   ; storage_location = "/app/block-storage"
   ; initial_peers
@@ -74,9 +75,9 @@ let get_peers nanobit =
     ()
 
 
-let init nanobit args =
+let main nanobit args =
   Testbridge.Kubernetes.call_exn
-    Rpcs.Init.rpc
+    Rpcs.Main.rpc
     nanobit.Nanobit.bridge_port
     args
 
@@ -95,7 +96,7 @@ let start nanobit =
   wait_up nanobit
 ;;
 
-let init_all_connected nanobits =
+let run_main_fully_connected nanobits =
   let swim_addrs = List.map nanobits ~f:(fun nanobit -> nanobit.Nanobit.swim_addr) in
   let args = 
     List.mapi nanobits
@@ -104,7 +105,7 @@ let init_all_connected nanobits =
   let%map () = 
     Deferred.List.iter ~how:`Parallel 
       (List.zip_exn nanobits args)
-      ~f:(fun (nanobit, args) -> init nanobit args )
+      ~f:(fun (nanobit, args) -> main nanobit args )
   in
   args
 ;;
