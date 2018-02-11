@@ -1,6 +1,24 @@
 open Core
 open Async
 
+module Client = struct
+  type t =
+    { testbridge_port: int
+    ; exposed_tcp_ports: int list
+    ; internal_tcp_addrs: Host_and_port.t list
+    ; internal_udp_addrs: Host_and_port.t list
+    ; launch_cmd: string * string list
+    }
+  [@@deriving sexp]
+end
+
+let rec zip4_exn xs ys zs ws =
+  match (xs, ys, zs, ws) with
+  | ([], [], [], []) -> []
+  | (x::xs, y::ys, z::zs, w::ws) -> (x, y, z, w)::zip4_exn xs ys zs ws
+  | _ -> failwith "lists not same length"
+;;
+
 let get_pods 
       image_host
       container_count 
@@ -112,17 +130,21 @@ module Rpcs = struct
 end
 
 
-let stop port = 
+let stop client = 
   Kubernetes.call_exn
     Rpcs.Stop.rpc
-    port
+    client.Client.testbridge_port
     ()
 
-let start port cmd =
+let start client =
   Kubernetes.call_exn
     Rpcs.Start.rpc 
-    port 
-    cmd
+    client.Client.testbridge_port
+    client.Client.launch_cmd
+
+let restart client =
+  let%bind () = stop client in
+  start client
 
 let create 
       ~image_host
@@ -182,5 +204,14 @@ let create
         ())
   in
   let external_tcp_ports = List.map external_ports ~f:(fun pod_ports -> (List.drop pod_ports 1)) in
-  testbridge_ports, external_tcp_ports, internal_tcp_ports, internal_udp_ports
+  List.map 
+    (zip4_exn testbridge_ports external_tcp_ports internal_tcp_ports internal_udp_ports)
+    ~f:(fun (testbridge_port, exposed_tcp_ports, internal_tcp_addrs, internal_udp_addrs) ->
+      { Client.launch_cmd = launch_cmd
+      ; testbridge_port
+      ; exposed_tcp_ports
+      ; internal_tcp_addrs
+      ; internal_udp_addrs
+      }
+    )
 ;;
