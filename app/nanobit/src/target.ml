@@ -108,7 +108,7 @@ let bits_msb =
     in
     bs
 
-let divide
+let floor_divide
       ~numerator:(`Two_to_the b)
       y y_unpacked
   =
@@ -132,12 +132,11 @@ let divide
     Util.assert_num_bits_upper_bound z_unpacked m_unpacked
   in
   let%bind zy = Checked.mul z y in
+  let numerator = Cvar.constant (Util.two_to_the b) in
   let%map () =
-    Util.Assert.lte ~bit_length:(b + 1)
-      zy (Cvar.constant (Util.two_to_the b))
+    Util.Assert.lte ~bit_length:(b + 1) zy numerator
   and () =
-    Util.Assert.gt ~bit_length:(b + 1)
-      (Cvar.add zy y) (Cvar.constant (Util.two_to_the b))
+    Util.Assert.lt ~bit_length:(b + 1) numerator Cvar.Infix.(zy + y)
   in
   z
 ;;
@@ -156,6 +155,6 @@ let strength
     then
       exists Var_spec.field
         As_prover.(map (read_var y) ~f:strength_unchecked)
-    else divide ~numerator:(`Two_to_the bit_length) y y_unpacked
+    else floor_divide ~numerator:(`Two_to_the bit_length) y y_unpacked
   end
 ;;
