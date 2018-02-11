@@ -18,6 +18,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     }
 
   let compare ~bit_length a b =
+    assert (bit_length < Field.size_in_bits);
     with_label "Snark_util.compare" begin
       let alpha_packed =
         let open Cvar.Infix in
@@ -35,6 +36,17 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     end
 
   module Assert = struct
+    let lt ~bit_length x y =
+      let%bind { less; _ } = compare ~bit_length x y in
+      Boolean.Assert.is_true less
+
+    let lte ~bit_length x y =
+      let%bind { less_or_equal; _ } = compare ~bit_length x y in
+      Boolean.Assert.is_true less_or_equal
+
+    let gt ~bit_length x y = lt ~bit_length y x
+    let gte ~bit_length x y = lte ~bit_length y x
+
     let mem x xs =
       let length = List.length xs in
       let%bind bs =
@@ -111,20 +123,22 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     go (Cvar.constant Field.zero) Field.one (bs0 :> Cvar.t list)
   ;;
 
-  let rec n_ones n =
-    let max = Field.size_in_bits in
+  let rec n_ones ~total_length n =
     let%bind bs =
-      exists (Var_spec.list ~length:max Boolean.spec)
+      exists (Var_spec.list ~length:total_length Boolean.spec)
         As_prover.(map (all (List.map ~f:(read Boolean.spec) n)) ~f:(fun n ->
           let n = pack_int n in
-          List.init max ~f:(fun i -> i < n)))
+          List.init total_length ~f:(fun i -> i < n)))
     in
-    let%map () = assert_equal (Cvar.sum (bs :> Cvar.t list)) (Checked.pack n)
+    let%map () =
+      assert_equal
+        (Cvar.sum (bs :> Cvar.t list)) (* This can't overflow since the field is huge *)
+        (Checked.pack n)
     and () = assert_decreasing bs in
     bs
 
   let assert_num_bits_upper_bound bs u =
-    let%bind mask = n_ones u in
+    let%bind mask = n_ones ~total_length:(List.length bs) u in
     let%bind masked = apply_mask mask bs in
     assert_equal ~label:"Snark_util.assert_num_bits_upper_bound"
       (pack_unsafe masked) (pack_unsafe bs)
@@ -138,10 +152,16 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     go 0
   ;;
 
+  let%test_unit "num_bits_int" =
+    assert (num_bits_int 1 = 1);
+    assert (num_bits_int 5 = 3);
+    assert (num_bits_int 17 = 5);
+  ;;
+
   let size_in_bits_size_in_bits = num_bits_int Field.size_in_bits
 
   (* Someday: this could definitely be made more efficient *)
-  let num_bits_upper_bound : Cvar.t -> (Cvar.t, _) Checked.t =
+  let num_bits_upper_bound_unpacked : Boolean.var list -> (Cvar.t, _) Checked.t =
     let num_bits_upper_bound x =
       let num_bits =
         match
@@ -153,19 +173,18 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
       in
       List.init size_in_bits_size_in_bits ~f:(fun i -> nth_bit num_bits ~n:i)
     in
-    fun x ->
+    fun x_unpacked ->
       let%bind res =
         exists (Var_spec.list ~length:size_in_bits_size_in_bits Boolean.spec)
-          (As_prover.(map (read_var x) ~f:num_bits_upper_bound))
+          (As_prover.(map (read_var (Checked.pack x_unpacked)) ~f:num_bits_upper_bound))
       in
-      let%bind x_unpacked = Checked.unpack x ~length:Field.size_in_bits in
       let%map () = assert_num_bits_upper_bound x_unpacked res in
       Checked.pack res
   ;;
 
-  let divide ~numerator:(`Two_to_the b) y y_unpacked =
-    assert (b <= Field.size_in_bits - 2);
-    let%bind k = num_bits_upper_bound
+  let num_bits_upper_bound (x : Cvar.t) : (Cvar.t, _) Checked.t =
+    Checked.unpack x ~length:Field.size_in_bits
+    >>= num_bits_upper_bound_unpacked
   ;;
 
   let compare_field x y =

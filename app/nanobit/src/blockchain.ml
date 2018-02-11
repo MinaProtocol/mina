@@ -61,8 +61,7 @@ module State = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let compute_target_unchecked _ : Target.t = 
-    Target.of_field Field.(negate one)
+  let compute_target_unchecked _ : Target.t = Target.max
 
   let compute_target = compute_target_unchecked
 
@@ -82,9 +81,7 @@ module State = struct
 
   let negative_one : value =
     let time = Block_time.of_time Core.Time.epoch in
-    let target : Target.Unpacked.value =
-      Target.(unpack (of_field (Field.of_int (-1))))
-    in
+    let target : Target.Unpacked.value = Target.max in
     { difficulty_info =
         List.init difficulty_window ~f:(fun _ -> (time, target))
     ; block_hash = Block.genesis.header.previous_block_hash
@@ -92,7 +89,7 @@ module State = struct
     ; strength = Strength.zero
     }
 
-  let zero = update_exn negative_one Block.genesis 
+  let zero = update_exn negative_one Block.genesis
 
   let to_bits ({ difficulty_info; block_hash; number; strength } : var) =
     let%map h = Digest.Checked.(unpack block_hash >>| to_bits)
@@ -132,7 +129,7 @@ module State = struct
       with_label "State.hash" (to_bits t >>= hash_digest)
 
     (* TODO: A subsequent PR will replace this with the actual difficulty calculation *)
-    let compute_target _ = return (Cvar.constant Field.(negate one))
+    let compute_target _ = return Target.(constant max)
 
     let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
       if Snark_params.insecure_functionalities.check_target

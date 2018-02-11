@@ -248,7 +248,7 @@ struct
           ]);
     swim
 
-  let main 
+  let main
         prover
         storage_location 
         genesis_blockchain

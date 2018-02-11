@@ -11,12 +11,12 @@ type functionalities =
 
 (* These should all be false. *)
 let insecure_functionalities =
-  { strength_calculation = true
+  { strength_calculation = false
   ; verify_blockchain    = true
   ; check_target         = true
-  ; compute_base_hash    = true
-  ; compute_base_proof   = true
-  ; extend_blockchain    = true
+  ; compute_base_hash    = false
+  ; compute_base_proof   = false
+  ; extend_blockchain    = false
   }
 
 module Tick_curve = Camlsnark.Backends.Mnt4
