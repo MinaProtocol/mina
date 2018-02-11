@@ -90,8 +90,39 @@ module Rpcs = struct
       Rpc.Rpc.create ~name:"Init" ~version:0
         ~bin_query ~bin_response
   end
+
+  module Stop = struct
+    type query = unit [@@deriving bin_io]
+    type response = unit [@@deriving bin_io]
+
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Stop" ~version:0
+        ~bin_query ~bin_response
+  end
+
+  module Start = struct
+    type cmd = String.t * String.t list [@@deriving bin_io]
+    type query = cmd [@@deriving bin_io]
+    type response = unit [@@deriving bin_io]
+
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Start" ~version:0
+        ~bin_query ~bin_response
+  end
 end
 
+
+let stop port = 
+  Kubernetes.call_exn
+    Rpcs.Stop.rpc
+    port
+    ()
+
+let start port cmd =
+  Kubernetes.call_exn
+    Rpcs.Start.rpc 
+    port 
+    cmd
 
 let create 
       ~image_host
@@ -151,5 +182,5 @@ let create
         ())
   in
   let external_tcp_ports = List.map external_ports ~f:(fun pod_ports -> (List.drop pod_ports 1)) in
-  external_tcp_ports, internal_tcp_ports, internal_udp_ports
+  testbridge_ports, external_tcp_ports, internal_tcp_ports, internal_udp_ports
 ;;

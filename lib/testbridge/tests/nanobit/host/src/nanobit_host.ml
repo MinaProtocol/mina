@@ -38,13 +38,22 @@ module Rpcs = struct
   end
 end
 
+let launch_cmd = ("bash", [ "/app/lib/testbridge/tests/nanobit/testbridge-launch.sh"])
+;;
+
 let rec zip3_exn xs ys zs =
   match (xs, ys, zs) with
   | ([], [], []) -> []
   | (x::xs, y::ys, z::zs) -> (x, y, z)::zip3_exn xs ys zs
   | _ -> failwith "lists not same length"
 
-let main ports internal_tcp_ports internal_udp_ports = 
+let rec zip4_exn xs ys zs ws =
+  match (xs, ys, zs, ws) with
+  | ([], [], [], []) -> []
+  | (x::xs, y::ys, z::zs, w::ws) -> (x, y, z, w)::zip4_exn xs ys zs ws
+  | _ -> failwith "lists not same length"
+
+let main testbridge_ports ports internal_tcp_ports internal_udp_ports = 
   let echo_ports = List.map ports ~f:(fun pod_ports -> List.nth_exn pod_ports 0) in
   let nanobit_ports = List.map internal_tcp_ports ~f:(fun pod_ports -> List.nth_exn pod_ports 0) in
   let nanobit_udp_ports = List.map internal_udp_ports ~f:(fun pod_ports -> List.nth_exn pod_ports 0) in
@@ -67,33 +76,40 @@ let main ports internal_tcp_ports internal_udp_ports =
              ~wait:(sec 5.0)
            )
   in
-  List.iteri (zip3_exn echo_ports nanobit_ports nanobit_udp_ports) ~f:(fun i (port, self_port, udp_port) -> 
-    don't_wait_for begin
-      let args = 
-        if i = 0 
-        then { Rpcs.Init.start_prover = true
-             ; prover_port = 8002
-             ; storage_location = "/app/block-storage"
-             ; initial_peers = List.drop nanobit_udp_ports 1
-             ; should_mine = false
-             ; me = udp_port }
-        else { Rpcs.Init.start_prover = true
-             ; prover_port = 8002
-             ; storage_location = "/app/block-storage"
-             ; initial_peers = List.take nanobit_udp_ports 1
-             ; should_mine = false
-             ; me = udp_port }
-      in
-      printf "init: %s\n" 
-        (Sexp.to_string_hum ([%sexp_of: Rpcs.Init.query] args));
-      let%bind res = 
+  let args = 
+    List.mapi (zip3_exn echo_ports nanobit_ports nanobit_udp_ports)
+      ~f:(fun i (port, self_port, udp_port) ->
+          if i = 0 
+          then { Rpcs.Init.start_prover = true
+               ; prover_port = 8002
+               ; storage_location = "/app/block-storage"
+               ; initial_peers = List.drop nanobit_udp_ports 1
+
+               ; should_mine = false
+               ; me = udp_port }
+          else { Rpcs.Init.start_prover = true
+               ; prover_port = 8002
+               ; storage_location = "/app/block-storage"
+               ; initial_peers = List.take nanobit_udp_ports 1
+               ; should_mine = false
+               ; me = udp_port }
+      )
+  in
+  let%bind () = 
+    Deferred.List.iteri ~how:`Parallel (zip4_exn echo_ports nanobit_ports nanobit_udp_ports args)
+      ~f:(fun i (port, self_port, udp_port, args) -> 
+        printf "init: %s\n" 
+          (Sexp.to_string_hum ([%sexp_of: Rpcs.Init.query] args));
         Testbridge.Kubernetes.call_exn
           Rpcs.Init.rpc
           port
           args
-      in
-      printf "started!\n";
-      let%bind () = after (sec 5.0) in
+      )
+  in
+  printf "started!\n";
+  let%bind () = after (sec 5.0) in
+  let%bind () = 
+    Deferred.List.iter echo_ports ~f:(fun port -> 
       let%map peers = 
         Testbridge.Kubernetes.call_exn
           Rpcs.Get_peers.rpc
@@ -102,7 +118,49 @@ let main ports internal_tcp_ports internal_udp_ports =
       in
       printf "peers: %s\n" 
         (Sexp.to_string_hum ([%sexp_of: Host_and_port.t list option] peers));
-    end);
+    )
+  in
+  let%bind () = 
+    Testbridge.Main.stop (List.nth_exn testbridge_ports 1)
+  in
+  let%bind () = after (sec 5.0) in
+  let%bind () = 
+    let%map peers = 
+      Testbridge.Kubernetes.call_exn
+        Rpcs.Get_peers.rpc
+        (List.nth_exn echo_ports 0)
+        ()
+    in
+    printf "new peers: %s\n" 
+      (Sexp.to_string_hum ([%sexp_of: Host_and_port.t list option] peers));
+  in
+  let%bind () = Testbridge.Main.start (List.nth_exn testbridge_ports 1) launch_cmd in
+  let%bind () =
+    Testbridge.Kubernetes.call_retry
+      Rpcs.Ping.rpc 
+      (List.nth_exn echo_ports 1)
+      () 
+      ~retries:30
+      ~wait:(sec 5.0)
+  in
+  let%bind () = 
+    Testbridge.Kubernetes.call_exn
+      Rpcs.Init.rpc
+      (List.nth_exn echo_ports 1)
+      (List.nth_exn args 1)
+  in
+  let%bind () = after (sec 5.0) in
+  let%bind () = 
+    let%map peers = 
+      Testbridge.Kubernetes.call_exn
+        Rpcs.Get_peers.rpc
+        (List.nth_exn echo_ports 0)
+        ()
+    in
+    printf "new peers: %s\n" 
+      (Sexp.to_string_hum ([%sexp_of: Host_and_port.t list option] peers));
+  in
+  printf "done\n";
   Async.never ()
 ;;
 
@@ -125,7 +183,7 @@ let () =
         in
         fun () ->
           let open Deferred.Let_syntax in
-          let%bind external_ports, internal_tcp_ports, internal_udp_ports = 
+          let%bind testbridge_ports, external_ports, internal_tcp_ports, internal_udp_ports = 
             Testbridge.Main.create 
               ~image_host
               ~project_dir:"../../../../../" 
@@ -140,7 +198,7 @@ let () =
                       ; "stdout.opam"
                       ; "lib/testbridge/tests/nanobit/testbridge-launch.sh" 
                       ]
-              ~launch_cmd:("bash", [ "/app/lib/testbridge/tests/nanobit/testbridge-launch.sh"])
+              ~launch_cmd
               ~pre_cmds:[ ("mv", [ "/app/_build"; "/testbridge/app_build" ]) ]
               ~post_cmds:[ ("mv", [ "/testbridge/app_build"; "/app/_build" ]) ]
               ~container_count:container_count 
@@ -149,7 +207,7 @@ let () =
               ~internal_tcp_ports:[ 8001 ] 
               ~internal_udp_ports:[ 8000 ] 
           in
-          main external_ports internal_tcp_ports internal_udp_ports
+          main testbridge_ports external_ports internal_tcp_ports internal_udp_ports
       ]
     end
   |> Command.run

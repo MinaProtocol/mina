@@ -35,6 +35,24 @@ module Rpcs = struct
         ~bin_query ~bin_response
   end
 
+  module Stop = struct
+    type query = unit [@@deriving bin_io]
+    type response = unit [@@deriving bin_io]
+
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Stop" ~version:0
+        ~bin_query ~bin_response
+  end
+
+  module Start = struct
+    type cmd = String.t * String.t list [@@deriving bin_io]
+    type query = cmd [@@deriving bin_io]
+    type response = unit [@@deriving bin_io]
+
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Start" ~version:0
+        ~bin_query ~bin_response
+  end
 end
 
 let run _ (prog, args) = 
@@ -47,7 +65,7 @@ let ping _ () = return ()
 
 let current_process = ref None
 
-let init _ { Rpcs.Init.launch_cmd; tar_string; pre_cmds; post_cmds } = 
+let stop _ () = 
   let () = 
     match !current_process with
     | None -> ()
@@ -55,6 +73,11 @@ let init _ { Rpcs.Init.launch_cmd; tar_string; pre_cmds; post_cmds } =
       let pid = Process.pid process in
       ignore (Signal.send Signal.term (`Pid pid))
   in
+  current_process := None;
+  Deferred.unit
+
+let init _ { Rpcs.Init.launch_cmd; tar_string; pre_cmds; post_cmds } = 
+  let%bind () = stop () () in
   let pre_cmds = 
     List.concat
       [ pre_cmds
@@ -80,9 +103,17 @@ let init _ { Rpcs.Init.launch_cmd; tar_string; pre_cmds; post_cmds } =
   ""
 ;;
 
+let start _ launch_cmd = 
+  let%bind () = stop () () in
+  let prog, args = launch_cmd in
+  let%map process = Process.create_exn ~working_dir:"/app" ~prog ~args () in
+  current_process := Some process
+
 let implementations = 
   [ Rpc.Rpc.implement Rpcs.Run.rpc run
   ; Rpc.Rpc.implement Rpcs.Init.rpc init
+  ; Rpc.Rpc.implement Rpcs.Stop.rpc stop
+  ; Rpc.Rpc.implement Rpcs.Start.rpc start
   ; Rpc.Rpc.implement Rpcs.Ping.rpc ping
   ]
 ;;

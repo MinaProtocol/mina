@@ -107,7 +107,7 @@ let () =
         in
         fun () ->
           let open Deferred.Let_syntax in
-          let%bind external_ports, internal_tcp_ports, internal_udp_ports = 
+          let%bind testbridge_ports, external_ports, internal_tcp_ports, internal_udp_ports = 
             Testbridge.Main.create 
               ~image_host
               ~project_dir:"../client" 
