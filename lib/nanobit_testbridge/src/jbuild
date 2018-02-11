@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name nanobit_testbridge)
+  (public_name nanobit_testbridge)
+  (library_flags (-linkall))
+  (libraries (core async async_extra ppx_inline_test.runtime-lib testbridge))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib swimlib))))
+  (synopsis "Nanobit Testbridge")))
+

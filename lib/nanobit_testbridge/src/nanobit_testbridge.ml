@@ -131,19 +131,20 @@ let cmd main =
           let%bind clients = 
             Testbridge.Main.create 
               ~image_host
-              ~project_dir:"../../../../../" 
+              ~project_dir:"../../../" 
               ~to_tar:[ "app/"
                       ; "lib/"
                       ; "swimlib.opam"
                       ; "nanobit_base.opam"
+                      ; "nanobit_testbridge.opam"
                       ; "linear_pipe.opam"
                       ; "testbridge.opam"
                       ; "ccc.opam"
                       ; "echo.opam"
                       ; "stdout.opam"
-                      ; "lib/testbridge/tests/nanobit/testbridge-launch.sh" 
+                      ; "lib/nanobit_testbridge/testbridge-launch.sh" 
                       ]
-              ~launch_cmd:("bash", [ "/app/lib/testbridge/tests/nanobit/testbridge-launch.sh"])
+              ~launch_cmd:("bash", [ "lib/nanobit_testbridge/testbridge-launch.sh"])
               ~pre_cmds:[ ("mv", [ "/app/_build"; "/testbridge/app_build" ]) ]
               ~post_cmds:[ ("mv", [ "/testbridge/app_build"; "/app/_build" ]) ]
               ~container_count:container_count 
