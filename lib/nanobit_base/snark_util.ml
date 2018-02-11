@@ -182,8 +182,8 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
       Checked.pack res
   ;;
 
-  let num_bits_upper_bound (x : Cvar.t) : (Cvar.t, _) Checked.t =
-    Checked.unpack x ~length:Field.size_in_bits
+  let num_bits_upper_bound ~max_length (x : Cvar.t) : (Cvar.t, _) Checked.t =
+    Checked.unpack x ~length:max_length
     >>= num_bits_upper_bound_unpacked
   ;;
 
