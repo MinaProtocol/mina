@@ -5,9 +5,22 @@ open Snark_params
 type t = Tick.Field.t
 [@@deriving bin_io, sexp]
 
-let of_field = Fn.id
-
+module Field = Tick.Field
 module Bigint = Tick_curve.Bigint.R
+
+let bit_length = Field.size_in_bits - 2
+
+let max =
+  Field.(sub (Tick.Util.two_to_the bit_length) (of_int 1))
+
+let max_bigint = Bigint.of_field max
+
+let constant = Tick.Cvar.constant
+
+let of_field x =
+  assert (Bigint.compare (Bigint.of_field x) max_bigint <= 0);
+  x
+;;
 
 let meets_target_unchecked t ~hash =
   Bigint.(compare (of_field hash) (of_field t)) < 0
@@ -26,7 +39,7 @@ let assert_mem x xs =
 ;;
 
 let strength_unchecked (target : t) =
-  Bigint.(to_field (div Tick_curve.field_size (of_field target)))
+  Bigint.(to_field (div max_bigint (of_field target)))
 ;;
 
 open Tick
@@ -95,7 +108,42 @@ let bits_msb =
     in
     bs
 
-include Bits.Snarkable.Field(Tick)
+let floor_divide
+      ~numerator:(`Two_to_the b)
+      y y_unpacked
+  =
+  assert (b <= Field.size_in_bits - 2);
+  assert (List.length y_unpacked <= b);
+  let%bind z =
+    exists Var_spec.field
+      As_prover.(map (read_var y) ~f:(fun y ->
+        Bigint.to_field
+          (Tick_curve.Bigint.R.div (Bigint.of_field (Util.two_to_the b))
+            (Bigint.of_field y))))
+  in
+  (* This block checks that z * y does not overflow. *)
+  let%bind () =
+    let%bind z_unpacked = Checked.unpack z ~length:b in
+    let%bind k = Util.num_bits_upper_bound_unpacked y_unpacked in
+    let m = Cvar.(sub (constant (Field.of_int (b + 1))) k) in
+    (* TODO: This implicitly checks that k <= b + 1 (since it unpacks (b+1 - k) into
+        a small number) but it would be good for it to be more explicit *)
+    let%bind m_unpacked = Checked.unpack m ~length:Util.size_in_bits_size_in_bits in
+    Util.assert_num_bits_upper_bound z_unpacked m_unpacked
+  in
+  let%bind zy = Checked.mul z y in
+  let numerator = Cvar.constant (Util.two_to_the b) in
+  let%map () =
+    Util.Assert.lte ~bit_length:(b + 1) zy numerator
+  and () =
+    Util.Assert.lt ~bit_length:(b + 1) numerator Cvar.Infix.(zy + y)
+  in
+  z
+;;
+
+(* TODO: Use a "dual" variable to ensure the bit_length constraint is actually always
+   enforced. *)
+include Bits.Snarkable.Field_backed(Tick)(struct let bit_length = bit_length end)
 
 (* floor(size of field / y) *)
 let strength
@@ -103,13 +151,10 @@ let strength
       (y_unpacked : Unpacked.var)
   =
   with_label "Target.strength" begin
-  (* TODO: Critical.
-    This computation is totally unchecked. *)
     if Snark_params.insecure_functionalities.strength_calculation
     then
       exists Var_spec.field
         As_prover.(map (read_var y) ~f:strength_unchecked)
-    else
-      failwith "TODO"
+    else floor_divide ~numerator:(`Two_to_the bit_length) y y_unpacked
   end
 ;;

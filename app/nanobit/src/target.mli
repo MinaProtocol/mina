@@ -6,6 +6,8 @@ open Tick
 type t = private Field.t
 [@@deriving bin_io, sexp]
 
+val max : t
+
 val of_field : Field.t -> t
 
 val meets_target_unchecked
@@ -16,7 +18,9 @@ val meets_target_unchecked
 include Snarkable.Bits.S
   with type Unpacked.value = t
    and type Packed.value = t
-   and type Packed.var = Cvar.t
+   and type Packed.var = private Cvar.t
+
+val constant : Packed.value -> Packed.var
 
 val strength_unchecked : t -> Strength.t
 
