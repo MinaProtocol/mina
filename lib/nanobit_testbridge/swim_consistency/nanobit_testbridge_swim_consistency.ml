@@ -70,10 +70,12 @@ let start_nanobits n alive_nanobits dead_nanobits =
 let check alive_nanobits = 
   let%bind () = after (sec 10.0) in
   let%map pass = check_alive_nanobits alive_nanobits in
+  assert pass;
   printf "pass %b\n" pass
 ;;
 
 let pattern n = 
+  assert (n%4 = 0);
   [ `Kill 2
   ; `Start 1
   ; `Start 1
