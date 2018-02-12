@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(executable
+  ((name nanobit_testbridge_swim_consistency)
+   (public_name nanobit_testbridge_swim_consistency)
+   (package nanobit_testbridge)
+   (libraries (core async async_extra testbridge nanobit_testbridge))
+   (preprocess (pps (ppx_jane)))
+   (flags (-w -40 -g))
+   (modes (native))
+  ))
+
