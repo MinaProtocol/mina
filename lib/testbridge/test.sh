@@ -28,6 +28,6 @@ jbuilder build
 cd lib/testbridge/$loc
 
 ../../../$bin \
-  -container-count 2 \
+  -container-count 4 \
   -containers-per-machine 2 \
   -image-host $host

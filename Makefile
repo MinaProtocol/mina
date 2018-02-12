@@ -13,6 +13,14 @@ dev : docker
 	@echo "****"
 
 
+nanobit-docker :
+	./rebuild-docker.sh nanobit nanobit-Dockerfile
+
+nanobit-minikube :
+	./rebuild-minikube.sh nanobit nanobit-Dockerfile
+
+nanobit-googlecloud :
+	./rebuild-googlecloud.sh nanobit nanobit-Dockerfile
 
 testbridge-docker :
 	./rebuild-docker.sh testbridge-nanobit testbridge-Dockerfile

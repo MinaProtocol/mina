@@ -1,14 +1,9 @@
-FROM ocaml-camlsnark:latest
+FROM nanobit:latest
 
 WORKDIR /testbridge
 ADD ./lib/testbridge/container/ /testbridge
 ADD ./lib/testbridge/container/testbridge.opam.in /testbridge/testbridge.opam
 RUN sudo chown -R opam /testbridge
-RUN eval `opam config env` && jbuilder build
-
-WORKDIR /app
-ADD ./ /app
-RUN sudo chown -R opam /app
 RUN eval `opam config env` && jbuilder build
 
 CMD bash -c "while true; do ./_build/install/default/bin/container; sleep 1; done"

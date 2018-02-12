@@ -21,9 +21,13 @@ module Rpcs = struct
   end
 end
 
-let main ports = 
-  let echo_ports = List.map ports ~f:(fun pod_ports -> List.nth_exn pod_ports 0) in
-  printf "starting host: %s\n" (Sexp.to_string_hum ([%sexp_of: int list list] ports));
+let main clients = 
+  let echo_ports = 
+    List.map 
+      clients 
+      ~f:(fun client -> List.nth_exn client.Testbridge.Main.Client.exposed_tcp_ports 0)
+  in
+  printf "starting host: %s\n" (Sexp.to_string_hum ([%sexp_of: Testbridge.Main.Client.t list] clients));
   printf "waiting for clients...\n";
   let%bind () = 
     Deferred.List.iter 
@@ -71,7 +75,7 @@ let () =
         in
         fun () ->
           let open Deferred.Let_syntax in
-          let%bind external_ports, internal_tcp_ports, internal_udp_ports = 
+          let%bind clients = 
             Testbridge.Main.create 
               ~image_host
               ~project_dir:"../client" 
@@ -85,7 +89,7 @@ let () =
               ~internal_tcp_ports:[] 
               ~internal_udp_ports:[] 
           in
-          main external_ports
+          main clients
       ]
     end
   |> Command.run

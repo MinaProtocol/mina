@@ -1,6 +1,24 @@
 open Core
 open Async
 
+module Client = struct
+  type t =
+    { testbridge_port: int
+    ; exposed_tcp_ports: int list
+    ; internal_tcp_addrs: Host_and_port.t list
+    ; internal_udp_addrs: Host_and_port.t list
+    ; launch_cmd: string * string list
+    }
+  [@@deriving sexp]
+end
+
+let rec zip4_exn xs ys zs ws =
+  match (xs, ys, zs, ws) with
+  | ([], [], [], []) -> []
+  | (x::xs, y::ys, z::zs, w::ws) -> (x, y, z, w)::zip4_exn xs ys zs ws
+  | _ -> failwith "lists not same length"
+;;
+
 let get_pods 
       image_host
       container_count 
@@ -77,7 +95,7 @@ module Rpcs = struct
         ~bin_query ~bin_response
   end
 
-  module Init = struct
+  module Setup_and_start = struct
     type cmd = String.t * String.t list [@@deriving bin_io]
     type query = { launch_cmd : cmd 
                  ; tar_string : String.t
@@ -87,11 +105,46 @@ module Rpcs = struct
     type response = String.t [@@deriving bin_io]
 
     let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Init" ~version:0
+      Rpc.Rpc.create ~name:"Setup_and_start" ~version:0
+        ~bin_query ~bin_response
+  end
+
+  module Stop = struct
+    type query = unit [@@deriving bin_io]
+    type response = unit [@@deriving bin_io]
+
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Stop" ~version:0
+        ~bin_query ~bin_response
+  end
+
+  module Start = struct
+    type cmd = String.t * String.t list [@@deriving bin_io]
+    type query = cmd [@@deriving bin_io]
+    type response = unit [@@deriving bin_io]
+
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Start" ~version:0
         ~bin_query ~bin_response
   end
 end
 
+
+let stop client = 
+  Kubernetes.call_exn
+    Rpcs.Stop.rpc
+    client.Client.testbridge_port
+    ()
+
+let start client =
+  Kubernetes.call_exn
+    Rpcs.Start.rpc 
+    client.Client.testbridge_port
+    client.Client.launch_cmd
+
+let restart client =
+  let%bind () = stop client in
+  start client
 
 let create 
       ~image_host
@@ -144,12 +197,21 @@ let create
       ~f:(fun port -> 
         let%map out =
           Kubernetes.call_exn
-            Rpcs.Init.rpc 
+            Rpcs.Setup_and_start.rpc 
             port 
             { launch_cmd; tar_string; pre_cmds; post_cmds; }
         in
         ())
   in
   let external_tcp_ports = List.map external_ports ~f:(fun pod_ports -> (List.drop pod_ports 1)) in
-  external_tcp_ports, internal_tcp_ports, internal_udp_ports
+  List.map 
+    (zip4_exn testbridge_ports external_tcp_ports internal_tcp_ports internal_udp_ports)
+    ~f:(fun (testbridge_port, exposed_tcp_ports, internal_tcp_addrs, internal_udp_addrs) ->
+      { Client.launch_cmd = launch_cmd
+      ; testbridge_port
+      ; exposed_tcp_ports
+      ; internal_tcp_addrs
+      ; internal_udp_addrs
+      }
+    )
 ;;

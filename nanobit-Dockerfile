@@ -1,0 +1,7 @@
+FROM ocaml-camlsnark:latest
+
+WORKDIR /app
+ADD ./ /app
+RUN sudo chown -R opam /app
+RUN eval `opam config env` && jbuilder build
+

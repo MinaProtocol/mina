@@ -13,7 +13,7 @@ module Rpcs = struct
         ~bin_query ~bin_response
   end
 
-  module Init = struct
+  module Main = struct
     type query = 
       { start_prover: bool
       ; prover_port: int
@@ -27,7 +27,7 @@ module Rpcs = struct
     type response = unit [@@deriving bin_io]
 
     let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Init" ~version:0
+      Rpc.Rpc.create ~name:"Main" ~version:0
         ~bin_query ~bin_response
   end
 
@@ -57,7 +57,7 @@ let main () =
 
   let swim_ref = ref None in
 
-  let init _ { Rpcs.Init.start_prover; prover_port; storage_location; initial_peers; should_mine; me } = 
+  let run_main _ { Rpcs.Main.start_prover; prover_port; storage_location; initial_peers; should_mine; me } = 
     let%map swim = 
       let%bind prover =
         if start_prover
@@ -84,7 +84,7 @@ let main () =
   in
 
   let implementations = 
-    [ Rpc.Rpc.implement Rpcs.Init.rpc init
+    [ Rpc.Rpc.implement Rpcs.Main.rpc run_main
     ; Rpc.Rpc.implement Rpcs.Ping.rpc (fun _ () -> return ())
     ; Rpc.Rpc.implement Rpcs.Get_peers.rpc get_peers
     ]
