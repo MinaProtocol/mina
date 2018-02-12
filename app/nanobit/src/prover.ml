@@ -31,15 +31,15 @@ module Rpcs = struct
     let name      = "genesis_proof"
     let version   = 0
     type query    = unit [@@deriving bin_io]
-    type response = Proof.t [@@deriving bin_io]
+    type response = Proof.Stable.V1.t [@@deriving bin_io]
     let rpc = Rpc.Rpc.create ~name ~version ~bin_query ~bin_response
   end
 
   module Extend_blockchain = struct
     let name      = "extend_blockchain"
     let version   = 0
-    type query    = Blockchain.t * Block.t [@@deriving bin_io]
-    type response = Blockchain.t [@@deriving bin_io]
+    type query    = Blockchain.Stable.V1.t * Block.Stable.V1.t [@@deriving bin_io]
+    type response = Blockchain.Stable.V1.t [@@deriving bin_io]
 
     let rpc = Rpc.Rpc.create ~name ~version ~bin_query ~bin_response
   end
@@ -47,7 +47,7 @@ module Rpcs = struct
   module Verify = struct
     let name      = "verify"
     let version   = 0
-    type query    = Blockchain.t [@@deriving bin_io]
+    type query    = Blockchain.Stable.V1.t [@@deriving bin_io]
     type response = bool [@@deriving bin_io]
 
     let rpc = Rpc.Rpc.create ~name ~version ~bin_query ~bin_response

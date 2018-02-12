@@ -2,14 +2,27 @@ open Core_kernel
 open Nanobit_base
 open Snark_params
 
-(* Milliseconds since epoch *)
-type t = Int64.t
-[@@deriving bin_io, sexp]
+module Stable = struct
+  module V1 = struct
+    (* TODO: This should be stable. *)
+    (* Milliseconds since epoch *)
+    type t = Int64.t
+    [@@deriving bin_io, sexp]
+  end
+end
+
+include Stable.V1
 
 include Bits.Snarkable.Int64(Tick)
 
 module Span = struct
-  type t = Int64.t [@@deriving bin_io]
+  module Stable = struct
+    module V1 = struct
+      type t = Int64.t [@@deriving bin_io, sexp]
+    end
+  end
+
+  include Stable.V1
 
   include Bits.Snarkable.Int64(Tick)
 

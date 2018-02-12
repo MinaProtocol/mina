@@ -54,13 +54,17 @@ module Filesystem : S with type location = string = struct
   type location = string
 
   let load location = 
-    match%map With_checksum.read_data location Blockchain.bin_reader_t Blockchain.bin_writer_t with
+    match%map
+      With_checksum.read_data location
+        Blockchain.Stable.V1.bin_reader_t
+        Blockchain.Stable.V1.bin_writer_t
+    with
     | Ok blockchain -> Some blockchain
     | Error e -> (eprintf "%s\n" (Error.to_string_hum e); None)
 
   let persist location block_stream =
     don't_wait_for begin
       Linear_pipe.iter block_stream ~f:(fun (`Change_head block) ->
-        With_checksum.write_data location Blockchain.bin_writer_t block)
+        With_checksum.write_data location Blockchain.Stable.V1.bin_writer_t block)
     end
 end

@@ -2,15 +2,25 @@ open Core
 open Async
 open Swimlib
 
+type ('q, 'r) dispatch =
+  Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
+
+module type Message_intf = sig
+  type msg
+  include Versioned_rpc.Both_convert.One_way.S
+    with type callee_msg := msg
+    and type caller_msg := msg
+end
+
 module type S =
-  functor (Message : sig type t [@@deriving bin_io] end) -> sig
+  functor (Message : Message_intf) -> sig
 
     type t =
       { timeout : Time.Span.t
       ; target_peer_count : int
       ; new_peer_reader : Peer.t Linear_pipe.Reader.t
-      ; broadcast_writer : Message.t Linear_pipe.Writer.t
-      ; received_reader : Message.t Linear_pipe.Reader.t
+      ; broadcast_writer : Message.msg Linear_pipe.Writer.t
+      ; received_reader : Message.msg Linear_pipe.Reader.t
       ; peers : Peer.Hash_set.t
       }
 
@@ -25,27 +35,27 @@ module type S =
     val create
       :  Peer.Event.t Linear_pipe.Reader.t
       -> Params.t
-      -> unit Rpc.Implementations.t
+      -> unit Rpc.Implementation.t list
       -> t
 
-    val received : t -> Message.t Linear_pipe.Reader.t
+    val received : t -> Message.msg Linear_pipe.Reader.t
 
-    val broadcast : t -> Message.t Linear_pipe.Writer.t
+    val broadcast : t -> Message.msg Linear_pipe.Writer.t
 
-    val broadcast_all : t -> Message.t -> 
+    val broadcast_all : t -> Message.msg -> 
       (unit -> [`Done | `Continue] Deferred.t) Staged.t
 
     val query_peer
       : t
       -> Peer.t
-      -> ('q, 'r) Rpc.Rpc.t
+      -> ('q, 'r) dispatch
       -> 'q
       -> 'r Or_error.t Deferred.t 
 
     val query_random_peers
       : t
       -> int
-      -> ('q, 'r) Rpc.Rpc.t
+      -> ('q, 'r) dispatch
       -> 'q
       -> 'r Or_error.t Deferred.t List.t
   end

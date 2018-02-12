@@ -2,7 +2,13 @@ open Core_kernel
 open Nanobit_base
 
 type t = private Int64.t
-[@@deriving bin_io]
+
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t
+    [@@deriving bin_io]
+  end
+end
 
 val zero : t
 
@@ -17,3 +23,4 @@ module Bits : Bits_intf.S with type t := t
 include Snark_params.Tick.Snarkable.Bits.S
   with type Unpacked.value = t
    and type Packed.value = t
+
