@@ -95,7 +95,7 @@ module Rpcs = struct
         ~bin_query ~bin_response
   end
 
-  module Init = struct
+  module Setup_and_start = struct
     type cmd = String.t * String.t list [@@deriving bin_io]
     type query = { launch_cmd : cmd 
                  ; tar_string : String.t
@@ -105,7 +105,7 @@ module Rpcs = struct
     type response = String.t [@@deriving bin_io]
 
     let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Init" ~version:0
+      Rpc.Rpc.create ~name:"Setup_and_start" ~version:0
         ~bin_query ~bin_response
   end
 
@@ -197,7 +197,7 @@ let create
       ~f:(fun port -> 
         let%map out =
           Kubernetes.call_exn
-            Rpcs.Init.rpc 
+            Rpcs.Setup_and_start.rpc 
             port 
             { launch_cmd; tar_string; pre_cmds; post_cmds; }
         in

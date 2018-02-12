@@ -21,7 +21,7 @@ module Rpcs = struct
         ~bin_query ~bin_response
   end
 
-  module Init = struct
+  module Setup_and_start = struct
     type cmd = String.t * String.t list [@@deriving bin_io]
     type query = { launch_cmd : cmd 
                  ; tar_string : String.t
@@ -31,7 +31,7 @@ module Rpcs = struct
     type response = String.t [@@deriving bin_io]
 
     let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Init" ~version:0
+      Rpc.Rpc.create ~name:"Setup_and_start" ~version:0
         ~bin_query ~bin_response
   end
 
@@ -76,7 +76,7 @@ let stop _ () =
   current_process := None;
   Deferred.unit
 
-let init _ { Rpcs.Init.launch_cmd; tar_string; pre_cmds; post_cmds } = 
+let setup_and_start _ { Rpcs.Setup_and_start.launch_cmd; tar_string; pre_cmds; post_cmds } = 
   let%bind () = stop () () in
   let pre_cmds = 
     List.concat
@@ -111,7 +111,7 @@ let start _ launch_cmd =
 
 let implementations = 
   [ Rpc.Rpc.implement Rpcs.Run.rpc run
-  ; Rpc.Rpc.implement Rpcs.Init.rpc init
+  ; Rpc.Rpc.implement Rpcs.Setup_and_start.rpc setup_and_start
   ; Rpc.Rpc.implement Rpcs.Stop.rpc stop
   ; Rpc.Rpc.implement Rpcs.Start.rpc start
   ; Rpc.Rpc.implement Rpcs.Ping.rpc ping
