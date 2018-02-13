@@ -225,6 +225,24 @@ let forward_ports pods ports =
       let port = Int.of_string port_token in
       port))
 
+let call_pipe rpc port query ~f = 
+  Tcp.with_connection
+    (Tcp.Where_to_connect.of_host_and_port (Host_and_port.of_string ("127.0.0.1:" ^ (Int.to_string port))))
+    (fun _ r w ->
+       match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
+       | Error exn -> return (Or_error.of_exn exn)
+       | Ok conn -> 
+         let%bind res = Rpc.Pipe_rpc.dispatch rpc conn query in
+         f res
+    )
+
+let call_pipe_exn rpc port query ~f = 
+  call_pipe rpc port query 
+    ~f:(fun res -> 
+      let res = Option.value_exn (Result.ok res) in
+      let pipe, _id = Option.value_exn (Result.ok res) in
+      f (pipe, _id))
+
 let call rpc port query = 
   Tcp.with_connection
     (Tcp.Where_to_connect.of_host_and_port (Host_and_port.of_string ("127.0.0.1:" ^ (Int.to_string port))))

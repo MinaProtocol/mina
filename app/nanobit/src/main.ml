@@ -198,6 +198,7 @@ struct
         should_mine 
         me 
         remap_addr_port
+        pipes
     =
     let open Let_syntax in
     let%map initial_blockchain =
@@ -205,7 +206,6 @@ struct
       | Some x -> x
       | None -> genesis_blockchain
     in
-    let pipes = init_pipes () in
     (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
       if should_mine then
@@ -266,6 +266,7 @@ struct
         should_mine 
         me 
         remap_addr_port 
+        (init_pipes ())
     in
     Async.never ()
   ;;

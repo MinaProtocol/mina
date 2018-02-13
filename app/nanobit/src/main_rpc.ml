@@ -39,6 +39,16 @@ module Rpcs = struct
       Rpc.Rpc.create ~name:"Get_peers" ~version:0
         ~bin_query ~bin_response
   end
+
+  module Get_strongest_blocks = struct
+    type query = unit [@@deriving bin_io]
+    type response = unit [@@deriving bin_io]
+    type error = unit [@@deriving bin_io]
+
+    let rpc : (query, response, error) Rpc.Pipe_rpc.t =
+      Rpc.Pipe_rpc.create ~name:"Get_strongest_blocks" ~version:0
+        ~bin_query ~bin_response ~bin_error ()
+  end
 end
 
 let main () =
@@ -56,8 +66,40 @@ let main () =
   Swimlib.Log.current_level := Log.ord Swimlib.Log.Debug;
 
   let swim_ref = ref None in
+  let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
+
+  let init_pipes () =
+    let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
+    let gossip_net_strongest_block_reader,
+        gossip_net_strongest_block_propagator,
+        body_changes_strongest_block_reader,
+        storage_strongest_block_reader,
+        latest_strongest_block_reader,
+        rpc_strongest_block_reader =
+      Linear_pipe.fork6 strongest_block_reader in
+    let body_changes_reader, body_changes_writer = Linear_pipe.create () in
+    { Main.strongest_block_writer
+    ; gossip_net_strongest_block_reader
+    ; gossip_net_strongest_block_propagator
+    ; body_changes_strongest_block_reader
+    ; storage_strongest_block_reader
+    ; latest_strongest_block_reader
+    ; body_changes_reader
+    ; body_changes_writer
+    }
+   , rpc_strongest_block_reader 
+  in
 
   let run_main _ { Rpcs.Main.start_prover; prover_port; storage_location; initial_peers; should_mine; me } = 
+    let pipes, rpc_strongest_block_reader = init_pipes () in
+    don't_wait_for begin
+      Linear_pipe.iter 
+        rpc_strongest_block_reader 
+        ~f:(fun x -> 
+          Pipe.write_without_pushback strongest_block_writer (); 
+          Deferred.unit
+        );
+    end;
     let%map swim = 
       let%bind prover =
         if start_prover
@@ -75,6 +117,7 @@ let main () =
         should_mine
         me
         (fun addr -> Host_and_port.create ~port:(Host_and_port.port addr + 1) ~host:(Host_and_port.host addr))
+        pipes
     in
     swim_ref := Some swim
   in
@@ -83,10 +126,15 @@ let main () =
     return (Option.map !swim_ref ~f:(fun swim -> Main.Swim.peers swim))
   in
 
+  let get_strongest_blocks _ () = 
+    return (Result.Ok strongest_block_reader.Linear_pipe.Reader.pipe)
+  in
+
   let implementations = 
     [ Rpc.Rpc.implement Rpcs.Main.rpc run_main
     ; Rpc.Rpc.implement Rpcs.Ping.rpc (fun _ () -> return ())
     ; Rpc.Rpc.implement Rpcs.Get_peers.rpc get_peers
+    ; Rpc.Pipe_rpc.implement Rpcs.Get_strongest_blocks.rpc get_strongest_blocks
     ]
   in
 

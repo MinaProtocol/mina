@@ -3,6 +3,7 @@
 #example: from lib/nanobit_testbridge, 
 #./run.sh swim_example/ ../../_build/install/default/bin/nanobit_testbridge_swim_example 4
 #./run.sh swim_consistency/ ../../_build/install/default/bin/nanobit_testbridge_swim_consistency 4
+#./run.sh recent_lca/ ../../_build/install/default/bin/nanobit_testbridge_recent_lca 4
 
 if [ ! $# -eq 3 ] && [ ! $# -eq 4 ];
 then
