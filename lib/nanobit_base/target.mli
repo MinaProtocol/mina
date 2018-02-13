@@ -5,6 +5,8 @@ open Tick
 type t = private Field.t
 [@@deriving bin_io, sexp]
 
+val bit_length : int
+
 val max : t
 
 val of_field : Field.t -> t
@@ -18,6 +20,12 @@ include Snarkable.Bits.S
   with type Unpacked.value = t
    and type Packed.value = t
    and type Packed.var = private Cvar.t
+
+val passes : Unpacked.var -> Pedersen.Digest.Packed.var -> (Boolean.var, _) Tick.Checked.t
+
+val pack : Unpacked.var -> Packed.var
+
+val var_to_unpacked : Cvar.t -> (Unpacked.var, _) Tick.Checked.t
 
 val constant : Packed.value -> Packed.var
 

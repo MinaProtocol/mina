@@ -1105,6 +1105,24 @@ module Checked = struct
     end
   end
 
+  let if_ (b : Boolean.var) ~then_ ~else_ =
+    let open Let_syntax in
+    (* r = e + b (t - e)
+       r - e = b (t - e)
+    *)
+    let%bind r =
+      exists Var_spec.field As_prover.(Let_syntax.(
+        let%bind b = read Boolean.spec b in
+        read Var_spec.field (if b then then_ else else_)))
+    in
+    let%map () =
+      assert_r1cs
+        (b :> Cvar.t) Cvar.Infix.(then_ - else_)
+        Cvar.Infix.(r - else_)
+    in
+    r
+  ;;
+
   let unpack (v : Cvar.t) ~length
     : (Boolean.var list, 's) t
     =

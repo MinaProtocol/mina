@@ -185,6 +185,8 @@ module type S = sig
 
     val inv : Cvar.t -> (Cvar.t, _) t
 
+    val if_ : Boolean.var -> then_:Cvar.t -> else_:Cvar.t -> (Cvar.t, _) t
+
     val equal
       : Cvar.t
       -> Cvar.t

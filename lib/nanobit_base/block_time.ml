@@ -20,6 +20,11 @@ module Bits = Bits.Int64
 
 let diff x y = Int64.(x - y)
 
+let diff_checked x y =
+  let pack = Tick.Checked.pack in
+  Span.Checked.unpack Tick.Cvar.Infix.(pack x - pack y)
+;;
+
 let of_time t =
   Int64.of_float
     (Time.Span.to_ms
