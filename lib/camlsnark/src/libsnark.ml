@@ -488,7 +488,7 @@ module Make (M : sig val prefix : string end) = struct
         let char_star = Ctypes.bigarray_start Ctypes.array1 bs in
         let str = Cpp_string.of_char_pointer_don't_delete char_star (Bigstring.length bs) in
         let t = stub str in
-        Caml.Gc.finalise (fun _ -> Cpp_string.delete str) t;
+        Caml.Gc.finalise (fun _ -> delete t) t;
         t
     ;;
   end
@@ -555,7 +555,7 @@ module Make (M : sig val prefix : string end) = struct
         let char_star = Ctypes.bigarray_start Ctypes.array1 bs in
         let str = Cpp_string.of_char_pointer_don't_delete char_star (Bigstring.length bs) in
         let t = stub str in
-        Caml.Gc.finalise (fun _ -> Cpp_string.delete str) t;
+        Caml.Gc.finalise (fun _ -> delete t) t;
         t
     ;;
   end
