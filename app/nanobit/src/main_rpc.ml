@@ -61,7 +61,7 @@ let main () =
     let%map swim = 
       let%bind prover =
         if start_prover
-        then Prover.create ~port:prover_port ~debug:() How_to_obtain_keys.Generate_both
+        then Prover.create ~port:prover_port ~debug:()
         else Prover.connect { host = "0.0.0.0"; port = prover_port }
       in
       let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in

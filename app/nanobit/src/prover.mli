@@ -9,7 +9,6 @@ val default_port : int
 val create
   : ?debug:unit
   -> port:int
-  -> How_to_obtain_keys.t
   -> t Deferred.t
 
 val connect : Host_and_port.t -> t Deferred.t

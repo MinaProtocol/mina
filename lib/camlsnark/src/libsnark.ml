@@ -429,6 +429,8 @@ module Make (M : sig val prefix : string end) = struct
     val delete : t -> unit
     val to_string : t -> string
     val of_string : string -> t
+    val to_bigstring : t -> Bigstring.t
+    val of_bigstring : Bigstring.t -> t
     val size_in_bits : t -> int
   end = struct
     type t = unit ptr
@@ -464,6 +466,31 @@ module Make (M : sig val prefix : string end) = struct
         Cpp_string.delete str;
         t
     ;;
+
+    let to_bigstring : t -> Bigstring.t =
+      let stub =
+        foreign (func_name "to_string") (typ @-> returning Cpp_string.typ)
+      in
+      fun t ->
+        let str = stub t in
+        let length = Cpp_string.length str in
+        let char_star = Cpp_string.to_char_pointer str in
+        let bs = Ctypes.bigarray_of_ptr Ctypes.array1 length Bigarray.Char char_star in
+        Caml.Gc.finalise (fun _ -> Cpp_string.delete str) bs;
+        bs
+    ;;
+
+    let of_bigstring : Bigstring.t -> t =
+      let stub =
+        foreign (func_name "of_string") (Cpp_string.typ @-> returning typ)
+      in
+      fun bs ->
+        let char_star = Ctypes.bigarray_start Ctypes.array1 bs in
+        let str = Cpp_string.of_char_pointer_don't_delete char_star (Bigstring.length bs) in
+        let t = stub str in
+        Caml.Gc.finalise (fun _ -> delete t) t;
+        t
+    ;;
   end
 
   module Proving_key0 : sig
@@ -473,6 +500,8 @@ module Make (M : sig val prefix : string end) = struct
     val delete : t -> unit
     val to_string : t -> string
     val of_string : string -> t
+    val to_bigstring : t -> Bigstring.t
+    val of_bigstring : Bigstring.t -> t
   end = struct
     type t = unit ptr
 
@@ -502,6 +531,31 @@ module Make (M : sig val prefix : string end) = struct
         let str = Cpp_string.of_string_don't_delete s in
         let t = stub str in
         Cpp_string.delete str;
+        t
+    ;;
+
+    let to_bigstring : t -> Bigstring.t =
+      let stub =
+        foreign (func_name "to_string") (typ @-> returning Cpp_string.typ)
+      in
+      fun t ->
+        let str = stub t in
+        let length = Cpp_string.length str in
+        let char_star = Cpp_string.to_char_pointer str in
+        let bs = Ctypes.bigarray_of_ptr Ctypes.array1 length Bigarray.Char char_star in
+        Caml.Gc.finalise (fun _ -> Cpp_string.delete str) bs;
+        bs
+    ;;
+
+    let of_bigstring : Bigstring.t -> t =
+      let stub =
+        foreign (func_name "of_string") (Cpp_string.typ @-> returning typ)
+      in
+      fun bs ->
+        let char_star = Ctypes.bigarray_start Ctypes.array1 bs in
+        let str = Cpp_string.of_char_pointer_don't_delete char_star (Bigstring.length bs) in
+        let t = stub str in
+        Caml.Gc.finalise (fun _ -> delete t) t;
         t
     ;;
   end

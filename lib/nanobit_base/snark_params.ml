@@ -1,24 +1,5 @@
 open Core_kernel
 
-type functionalities =
-  { strength_calculation : bool
-  ; verify_blockchain    : bool
-  ; compute_base_hash    : bool
-  ; compute_base_proof   : bool
-  ; extend_blockchain    : bool
-  ; check_target         : bool
-  }
-
-(* These should all be false. *)
-let insecure_functionalities =
-  { strength_calculation = true
-  ; verify_blockchain    = true
-  ; check_target         = true
-  ; compute_base_hash    = true
-  ; compute_base_proof   = true
-  ; extend_blockchain    = true
-  }
-
 module Tick_curve = Camlsnark.Backends.Mnt4
 module Tock_curve = Camlsnark.Backends.Mnt6
 

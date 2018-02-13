@@ -1,5 +1,4 @@
 open Core_kernel
-open Nanobit_base
 open Snark_params
 
 (* Milliseconds since epoch *)

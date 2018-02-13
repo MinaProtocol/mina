@@ -31,6 +31,10 @@ let of_string_stub : string -> int -> t =
   foreign (func_name "of_char_pointer")
     (string @-> int @-> returning typ)
 
+let of_char_pointer_don't_delete : char ptr -> int -> t =
+  foreign (func_name "of_char_pointer")
+    ((ptr char) @-> int @-> returning typ)
+
 let of_string_don't_delete (s : string) : t =
   let length = String.length s in
   of_string_stub s length

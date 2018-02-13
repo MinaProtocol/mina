@@ -220,12 +220,16 @@ module type S = sig
     type t
     val to_string : t -> string
     val of_string : string -> t
+    val to_bigstring : t -> Bigstring.t
+    val of_bigstring : Bigstring.t -> t
   end
 
   module Verification_key : sig
     type t
     val to_string : t -> string
     val of_string : string -> t
+    val to_bigstring : t -> Bigstring.t
+    val of_bigstring : Bigstring.t -> t
   end
 
   module Keypair : sig

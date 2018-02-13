@@ -1,5 +1,4 @@
 open Core_kernel
-open Nanobit_base
 open Snark_params
 
 type t = Tick.Field.t
@@ -151,7 +150,7 @@ let strength
       (y_unpacked : Unpacked.var)
   =
   with_label "Target.strength" begin
-    if Snark_params.insecure_functionalities.strength_calculation
+    if Insecure.strength_calculation
     then
       exists Var_spec.field
         As_prover.(map (read_var y) ~f:strength_unchecked)

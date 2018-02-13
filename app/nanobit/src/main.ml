@@ -199,7 +199,6 @@ struct
         me 
         remap_addr_port
     =
-    let _ = Keys.foo () in
     let open Let_syntax in
     let%map initial_blockchain =
       match%map Storage.load storage_location with
