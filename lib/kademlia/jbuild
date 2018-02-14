@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name kademlia)
+  (public_name kademlia)
+  (library_flags (-linkall))
+  (libraries (core linear_pipe async async_extra ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib kademlia))))
+  (synopsis "Kademlia -- a Byzantine fault-tolerant membership protocol")))
+
