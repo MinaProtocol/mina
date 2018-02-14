@@ -116,7 +116,7 @@ let genesis : t =
   { header =
       { previous_block_hash = Pedersen.zero_hash
       ; nonce = Nonce.zero
-      ; time = Block_time.of_time Time.epoch
+      ; time = Block_time.of_time Time.(add epoch Span.hour)
       }
   ; body = Int64.one
   }

@@ -23,7 +23,7 @@ pwd
 pushd libsnark-caml
   mkdir -p build
   pushd build
-    cmake ..
+    cmake -DUSE_PT_COMPRESSION=OFF ..
     make
 
     mkdir _stubs_build

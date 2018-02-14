@@ -1,7 +1,7 @@
 open Core_kernel
 open Snark_params
 
-type t [@@deriving sexp, bin_io]
+type t [@@deriving sexp, bin_io, compare]
 
 module Bits : Bits_intf.S with type t := t
 
@@ -11,13 +11,15 @@ include Tick.Snarkable.Bits.S
    and type Packed.var = private Tick.Cvar.t
 
 module Span : sig
-  type t [@@deriving bin_io]
+  type t [@@deriving bin_io, compare]
 
   val of_time_span : Time.Span.t -> t
 
   include Tick.Snarkable.Bits.S
     with type Unpacked.value = t
     and type Packed.value = t
+
+  val to_ms : t -> Int64.t
 end
 
 val diff_checked

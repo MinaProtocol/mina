@@ -24,7 +24,7 @@ module Cpu = struct
   let find_block (previous : Blockchain.State.t) (body : Block.Body.t)
     : (Block.t * Pedersen.Digest.t) option =
     let iterations = 10 in
-    let target = Blockchain.State.compute_target previous in
+    let target = previous.target in
     let nonce0 = Nonce.random () in
     let header0 : Block.Header.t =
       { previous_block_hash = previous.block_hash

@@ -3,10 +3,11 @@ open Snark_params
 open Tick
 
 type ('time, 'target, 'digest, 'number, 'strength) t_ =
-  { difficulty_info : ('time * 'target) list
-  ; block_hash      : 'digest
-  ; number          : 'number
-  ; strength        : 'strength
+  { previous_time : 'time
+  ; target        : 'target
+  ; block_hash    : 'digest
+  ; number        : 'number
+  ; strength      : 'strength
   }
 [@@deriving bin_io, sexp]
 
@@ -51,5 +52,5 @@ module Checked : sig
   val update : var -> Block.Packed.var -> (var * [ `Success of Boolean.var ], _) Checked.t
 end
 
-val compute_target : t -> Target.t
+val compute_target : Block_time.t -> Target.t -> Block_time.t -> Target.t
 

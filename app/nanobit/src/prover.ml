@@ -111,7 +111,10 @@ module Main (Params : Params_intf) = struct
 
   module Transition = Nanobit_base.Blockchain_transition
 
+  let () = Core.printf "loading keys\n%!"
   module Keys = Transition_keys.Make(struct end)
+
+  let () = Core.printf "keys loaded\n%!"
 
   module Transition_utils = struct
     open Keys
@@ -162,7 +165,7 @@ module Main (Params : Params_intf) = struct
         ; prev_state
         ; update = block
         }
-        Step.main
+        (fun x -> Tick.with_label "FOO" (Step.main x))
         (instance_hash next_state)
 
     let verify state proof =

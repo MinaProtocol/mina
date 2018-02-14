@@ -3,17 +3,19 @@ open Snark_params
 
 (* Milliseconds since epoch *)
 type t = Int64.t
-[@@deriving bin_io, sexp]
+[@@deriving bin_io, sexp, compare]
 
 include Bits.Snarkable.Int64(Tick)
 
 module Span = struct
-  type t = Int64.t [@@deriving bin_io]
+  type t = Int64.t [@@deriving bin_io, compare]
 
   include Bits.Snarkable.Int64(Tick)
 
   let of_time_span s =
     Int64.of_float (Time.Span.to_ms s)
+
+  let to_ms t = t
 end
 
 module Bits = Bits.Int64
