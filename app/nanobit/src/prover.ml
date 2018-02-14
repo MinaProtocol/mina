@@ -14,6 +14,10 @@ let default_port = 8300
 
 let dispatch t rpc q =
   let%bind conn = Persistent_connection.Rpc.connected t.connection in
+  don't_wait_for begin
+    let%map info = Rpc.Connection.close_reason ~on_close:`started conn in
+    printf "%s\n%!" (Info.to_string_hum info);
+  end;
   Rpc.Rpc.dispatch rpc conn q
 ;;
 
@@ -56,9 +60,16 @@ module Rpcs = struct
   end
 end
 
+let heartbeat_config =
+  Rpc.Connection.Heartbeat_config.create
+    ~send_every:(Time_ns.Span.of_sec 10.)
+    ~timeout:(Time_ns.Span.of_min 5.)
+
 let connect host_and_port =
   let connection =
     Persistent_connection.Rpc.create'
+      ~retry_delay:(fun () -> Time.Span.of_min 10.)
+      ~heartbeat_config
       ~handshake_timeout:(Time.Span.of_min 10.)
       ~server_name:"prover"
       (fun () -> Deferred.Or_error.return host_and_port)
@@ -257,6 +268,7 @@ module Main (Params : Params_intf) = struct
         (fun address reader writer -> 
           Rpc.Connection.server_with_close
             reader writer
+            ~heartbeat_config
             ~implementations
             ~connection_state:(fun _ -> ())
             ~on_handshake_error:`Ignore)

@@ -12,7 +12,7 @@ end
 module type S = sig
   val mine
     : prover:Prover.t
-    -> previous:Blockchain.t
+    -> initial:Blockchain.t
     -> body:Block.Body.t
     -> Update.t Linear_pipe.Reader.t
     -> Blockchain.t Linear_pipe.Reader.t
@@ -58,12 +58,12 @@ module Cpu = struct
 
   let mine
         ~(prover : Prover.t)
-        ~(previous : Blockchain.t)
+        ~(initial : Blockchain.t)
         ~body
         (updates : Update.t Linear_pipe.Reader.t)
     =
     let state =
-      { State.previous
+      { State.previous = initial
       ; body
       ; id = 0
       }
@@ -71,23 +71,29 @@ module Cpu = struct
     let mined_blocks_reader, mined_blocks_writer = Linear_pipe.create () in
     let rec go () =
       let id = state.id in
+      let%bind () = after (Time_ns.Span.of_sec 0.1) in
+      let previous = state.previous in
       match%bind schedule' (fun () -> return (find_block previous.state state.body)) with
       | None -> go ()
       | Some (block, header_hash) ->
+        printf !"found block: id: %d\nstate:\n%{sexp:Blockchain_state.t}\n%!" state.id state.previous.state;
         if id = state.id
         then begin
           (* Soon: Make this poll instead of waiting so that a miner waiting on
              can be pre-empted by a new block coming in off the network. Or come up
              with some other way for this to get interrupted.
           *)
+          printf !"calling_prover-id: %d\ncalling_prover-state:\n%{sexp:Blockchain_state.t}\n%!"
+            id previous.state;
           match%bind Prover.extend_blockchain prover previous block with
           | Ok chain ->
+            printf !"Prover returned a chain with state:\n%{sexp:Blockchain_state.t}\n%!" chain.state;
             let%bind () = Pipe.write mined_blocks_writer chain in
             state.previous <- chain;
             state.id <- state.id + 1;
             go ()
           | Error e ->
-            eprintf "%s\n" Error.(to_string_hum (tag e ~tag:"Blockchain extend error"));
+            eprintf "%s\n%!" Error.(to_string_hum (tag e ~tag:"Blockchain extend error"));
             go ()
         end else
           go ()

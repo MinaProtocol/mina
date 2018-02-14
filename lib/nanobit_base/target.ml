@@ -146,7 +146,7 @@ include Bits.Snarkable.Field_backed(Tick)(struct let bit_length = bit_length end
 
 let passes t h =
   (* TODO: Make sure h is actually small *)
-  let%map { less_or_equal; _ } = Tick.Util.compare ~bit_length t h in
+  let%map { less_or_equal; _ } = Tick.Util.compare ~bit_length h t in
   less_or_equal
 
 let pack : Unpacked.var -> Packed.var = Tick.Checked.pack

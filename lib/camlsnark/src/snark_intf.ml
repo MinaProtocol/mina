@@ -333,5 +333,7 @@ module type S = sig
     -> Verification_key.t
     -> (_, bool, _, 'k_value) Data_spec.t
     -> 'k_value
+
+  val run_unchecked : ('a, 's) Checked.t -> 's -> 's * 'a
 end
 

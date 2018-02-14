@@ -92,6 +92,8 @@ let compute_target previous_time (previous_target : Target.t) time =
   end
 ;;
 
+let compute_target_unchecked = compute_target
+
 let update_exn (state : value) (block : Block.t) =
   let block_hash = Block.hash block in
   assert (Target.meets_target_unchecked state.target ~hash:block_hash);
@@ -99,6 +101,8 @@ let update_exn (state : value) (block : Block.t) =
   let new_target =
     compute_target state.previous_time state.target block.header.time
   in
+  printf "new_target (in update_exn)\n%!";
+  Field.print (new_target :> Field.t);
   let strength = Target.strength_unchecked state.target in
   { previous_time = block.header.time
   ; target = new_target
@@ -482,13 +486,20 @@ module Checked = struct
     end
   ;;
 
-  let compute_target _ _ _ = Target.var_to_unpacked (Cvar.constant (Target.max :> Field.t))
+  (*
+  let () =
+    let test previous_time previous_target time =
+      let x = compute_target_unchecked previous_time previous_target time in
+      let y = compute_target (Tick.Var_spec.Store.
+    in
+    Tick.run_unchecked (compute_target *)
+
+(*   let compute_target _ _ _ = Target.var_to_unpacked (Cvar.constant (Target.max :> Field.t)) *)
 
   let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
     if Insecure.check_target
     then return Boolean.true_
-    else
-      failwith "TODO"
+    else Target.passes target hash
 
   let valid_body ~prev body =
     with_label "valid_body" begin
@@ -511,15 +522,27 @@ module Checked = struct
         let bits = Block.Checked.to_bits block_unpacked in
         hash_digest bits
       in
-      let%bind meets_target = Target.passes target_packed block_hash in
+      let%bind meets_target = meets_target target_packed block_hash in
       let time_unpacked = block_unpacked.header.time in
-      let%map new_target = compute_target state.previous_time state.target time_unpacked in
-      ( { previous_time = time_unpacked
+      let%bind new_target = compute_target state.previous_time state.target time_unpacked in
+      let state' =
+        { previous_time = time_unpacked
         ; target = new_target
         ; block_hash
         ; number = block.body
         ; strength = Cvar.Infix.(strength + state.strength)
         }
+      in
+      let%map () =
+        as_prover begin
+          let open As_prover in let open Let_syntax in
+          let%map state' = read spec state'
+          and state = read spec state
+          in
+          printf !"original_state\n%{sexp:t}\nnew_state\n%{sexp:t}\n%!" state state'
+        end
+      in
+      ( state'
       , `Success meets_target
       )
     end
