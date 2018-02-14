@@ -37,3 +37,6 @@ val strength
   : Packed.var
   -> Unpacked.var
   -> (Strength.Packed.var, _) Tick.Checked.t
+
+val to_bigint : t -> Bignum.Bigint.t
+val of_bigint : Bignum.Bigint.t -> t

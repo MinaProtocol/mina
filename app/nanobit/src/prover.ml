@@ -14,10 +14,6 @@ let default_port = 8300
 
 let dispatch t rpc q =
   let%bind conn = Persistent_connection.Rpc.connected t.connection in
-  don't_wait_for begin
-    let%map info = Rpc.Connection.close_reason ~on_close:`started conn in
-    printf "%s\n%!" (Info.to_string_hum info);
-  end;
   Rpc.Rpc.dispatch rpc conn q
 ;;
 
@@ -122,10 +118,7 @@ module Main (Params : Params_intf) = struct
 
   module Transition = Nanobit_base.Blockchain_transition
 
-  let () = Core.printf "loading keys\n%!"
   module Keys = Transition_keys.Make(struct end)
-
-  let () = Core.printf "keys loaded\n%!"
 
   module Transition_utils = struct
     open Keys
@@ -176,7 +169,7 @@ module Main (Params : Params_intf) = struct
         ; prev_state
         ; update = block
         }
-        (fun x -> Tick.with_label "FOO" (Step.main x))
+        Step.main
         (instance_hash next_state)
 
     let verify state proof =

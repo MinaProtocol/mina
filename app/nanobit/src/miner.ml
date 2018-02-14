@@ -76,18 +76,14 @@ module Cpu = struct
       match%bind schedule' (fun () -> return (find_block previous.state state.body)) with
       | None -> go ()
       | Some (block, header_hash) ->
-        printf !"found block: id: %d\nstate:\n%{sexp:Blockchain_state.t}\n%!" state.id state.previous.state;
         if id = state.id
         then begin
           (* Soon: Make this poll instead of waiting so that a miner waiting on
              can be pre-empted by a new block coming in off the network. Or come up
              with some other way for this to get interrupted.
           *)
-          printf !"calling_prover-id: %d\ncalling_prover-state:\n%{sexp:Blockchain_state.t}\n%!"
-            id previous.state;
           match%bind Prover.extend_blockchain prover previous block with
           | Ok chain ->
-            printf !"Prover returned a chain with state:\n%{sexp:Blockchain_state.t}\n%!" chain.state;
             let%bind () = Pipe.write mined_blocks_writer chain in
             state.previous <- chain;
             state.id <- state.id + 1;

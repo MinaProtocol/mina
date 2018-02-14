@@ -21,6 +21,12 @@ let of_field x =
   x
 ;;
 
+let to_bigint x = Snark_params.bigint_of_tick_bigint (Bigint.of_field x)
+let of_bigint n =
+  let x = Snark_params.tick_bigint_of_bigint n in
+  assert (Bigint.compare x max_bigint <= 0);
+  Bigint.to_field x
+
 let meets_target_unchecked t ~hash =
   Bigint.(compare (of_field hash) (of_field t)) < 0
 ;;
