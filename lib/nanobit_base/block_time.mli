@@ -1,7 +1,13 @@
 open Core_kernel
 open Snark_params
 
-type t [@@deriving sexp, bin_io, compare]
+type t [@@deriving sexp]
+
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t [@@deriving sexp, bin_io, compare]
+  end
+end
 
 module Bits : Bits_intf.S with type t := t
 
@@ -11,7 +17,13 @@ include Tick.Snarkable.Bits.S
    and type Packed.var = private Tick.Cvar.t
 
 module Span : sig
-  type t [@@deriving bin_io, compare]
+  type t [@@deriving sexp]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving bin_io, sexp, compare]
+    end
+  end
 
   val of_time_span : Time.Span.t -> t
 

@@ -5,16 +5,22 @@ module Pedersen = Tick.Pedersen
 
 module Header = struct
   (* TODO: Is there some reason [target] should be in here? *)
-  type ('hash, 'time, 'nonce) t_ =
-    { previous_block_hash : 'hash
-    ; time                : 'time
-    ; nonce               : 'nonce
-    }
-  [@@deriving bin_io, fields]
+  module Stable = struct
+    module V1 = struct
+      type ('hash, 'time, 'nonce) t_ =
+        { previous_block_hash : 'hash
+        ; time                : 'time
+        ; nonce               : 'nonce
+        }
+      [@@deriving bin_io, fields]
 
-  type t =
-    (Pedersen.Digest.t, Block_time.t, Nonce.t) t_
-  [@@deriving bin_io]
+      type t =
+        (Pedersen.Digest.t, Block_time.Stable.V1.t, Nonce.Stable.V1.t) t_
+      [@@deriving bin_io]
+    end
+  end
+
+  include Stable.V1
 
   let to_hlist { previous_block_hash; time; nonce } =
       H_list.([ previous_block_hash; time; nonce ])
@@ -83,8 +89,14 @@ module Header = struct
 end
 
 module Body = struct
-  type t = Int64.t
-  [@@deriving bin_io, sexp]
+  module Stable = struct
+    module V1 = struct
+      type t = Int64.t
+      [@@deriving bin_io, sexp]
+    end
+  end
+
+  include Stable.V1
 
   let bit_length = 64
 
@@ -105,7 +117,13 @@ let fold_bits { header; body } ~init ~f =
   init
 ;;
 
-type t = (Header.t, Body.t) t_ [@@deriving bin_io]
+module Stable = struct
+  module V1 = struct
+    type t = (Header.Stable.V1.t, Body.Stable.V1.t) t_ [@@deriving bin_io]
+  end
+end
+
+include Stable.V1
 
 let hash t =
   let s = Pedersen.State.create Pedersen.params in

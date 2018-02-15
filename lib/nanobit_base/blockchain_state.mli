@@ -9,7 +9,6 @@ type ('time, 'target, 'digest, 'number, 'strength) t_ =
   ; number        : 'number
   ; strength      : 'strength
   }
-[@@deriving bin_io, sexp]
 
 type t =
   ( Block_time.t
@@ -18,7 +17,29 @@ type t =
   , Block.Body.t
   , Strength.t
   ) t_
-[@@deriving bin_io, sexp]
+[@@deriving sexp]
+
+module Stable : sig
+  module V1 : sig
+    type nonrec ('a, 'b, 'c, 'd, 'e) t_ = ('a, 'b, 'c, 'd, 'e) t_ =
+      { previous_time : 'a
+      ; target        : 'b
+      ; block_hash    : 'c
+      ; number        : 'd
+      ; strength      : 'e
+      }
+    [@@deriving bin_io, sexp]
+
+    type nonrec t =
+      ( Block_time.Stable.V1.t
+      , Target.Stable.V1.t
+      , Pedersen.Digest.t
+      , Block.Body.Stable.V1.t
+      , Strength.Stable.V1.t
+      ) t_
+    [@@deriving bin_io, sexp]
+  end
+end
 
 include Snarkable.S
   with

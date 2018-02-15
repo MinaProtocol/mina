@@ -2,13 +2,25 @@ open Core_kernel
 open Snark_params
 
 (* Milliseconds since epoch *)
-type t = Int64.t
-[@@deriving bin_io, sexp, compare]
+module Stable = struct
+  module V1 = struct
+    type t = Int64.t
+    [@@deriving bin_io, sexp, compare]
+  end
+end
+
+include Stable.V1
 
 include Bits.Snarkable.Int64(Tick)
 
 module Span = struct
-  type t = Int64.t [@@deriving bin_io, compare]
+  module Stable = struct
+    module V1 = struct
+      type t = Int64.t [@@deriving bin_io, sexp, compare]
+    end
+  end
+
+  include Stable.V1
 
   include Bits.Snarkable.Int64(Tick)
 

@@ -42,7 +42,7 @@ module Rpcs = struct
 
   module Get_strongest_blocks = struct
     type query = unit [@@deriving bin_io]
-    type response = Blockchain.t [@@deriving bin_io]
+    type response = Blockchain.Stable.V1.t [@@deriving bin_io]
     type error = unit [@@deriving bin_io]
 
     let rpc : (query, response, error) Rpc.Pipe_rpc.t =

@@ -1,8 +1,14 @@
 open Core_kernel
 open Snark_params
 
-type t = Tick.Field.t
-[@@deriving bin_io, sexp]
+module Stable = struct
+  module V1 = struct
+    type t = Tick.Field.t
+    [@@deriving bin_io, sexp]
+  end
+end
+
+include Stable.V1
 
 module Field = Tick.Field
 module Bigint = Tick_curve.Bigint.R
