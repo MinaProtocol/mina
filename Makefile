@@ -39,3 +39,9 @@ base-minikube :
 
 base-googlecloud :
 	./rebuild-googlecloud.sh ocaml-base base-Dockerfile
+
+ocaml405-googlecloud:
+	./rebuild-googlecloud.sh ocaml405 ocaml405-Dockerfile
+
+ci-base-docker:
+	./rebuild-docker.sh o1labs/ci-base ci-base-Dockerfile

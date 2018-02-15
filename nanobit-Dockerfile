@@ -1,4 +1,4 @@
-FROM ocaml-camlsnark:latest
+FROM ocaml-base:latest
 
 WORKDIR /app
 ADD ./ /app
