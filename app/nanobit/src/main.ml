@@ -1,6 +1,7 @@
 open Core
 open Async
 open Swimlib
+open Nanobit_base
 
 module Snark = Snark
 
@@ -57,6 +58,7 @@ struct
       timer ()
     in
     don't_wait_for (timer ());
+
     let broadcasts =
       Linear_pipe.filter_map (Gossip_net.received gossip_net)
         ~f:(function
@@ -184,7 +186,7 @@ struct
         ~initial:initial_blockchain
         ~body:(Int64.succ initial_blockchain.state.number)
         (Linear_pipe.merge_unordered
-          [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
+           [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
           ; pipes.body_changes_reader
           ])
     in
@@ -198,6 +200,7 @@ struct
         should_mine 
         me 
         remap_addr_port
+        pipes
     =
     let open Let_syntax in
     let%map initial_blockchain =
@@ -205,7 +208,6 @@ struct
       | Some x -> x
       | None -> genesis_blockchain
     in
-    let pipes = init_pipes () in
     (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
       if should_mine then
@@ -266,6 +268,7 @@ struct
         should_mine 
         me 
         remap_addr_port 
+        (init_pipes ())
     in
     Async.never ()
   ;;

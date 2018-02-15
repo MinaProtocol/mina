@@ -33,3 +33,7 @@ RUN DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libffi-dev
 RUN opam install yojson menhir 
 RUN opam install async_ssl cohttp cohttp-async
 
+RUN DEBIAN_FRONTEND=noninteractive sudo apt-get -y install libgmp3-dev
+
+RUN opam install bignum
+

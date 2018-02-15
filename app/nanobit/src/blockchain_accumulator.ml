@@ -18,9 +18,10 @@ let accumulate ~init ~prover ~updates ~strongest_chain =
         | Ok false -> return chain
         | Ok true ->
           if Strength.(new_chain.state.strength > chain.Blockchain.state.strength)
-          then 
+          then begin
             let%map () = Pipe.write strongest_chain new_chain in
             new_chain
+          end
           else
             return chain)
     in

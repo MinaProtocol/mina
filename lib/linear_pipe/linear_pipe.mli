@@ -36,6 +36,8 @@ val iter_unordered
   -> 'a Reader.t
   -> f                  : ('a -> unit Deferred.t)
   -> unit Deferred.t
+
+val length : 'a Reader.t -> int
                                     
 val fold : 'a Reader.t -> init:'accum -> f:('accum -> 'a -> 'accum Deferred.t) -> 'accum Deferred.t
 
@@ -62,6 +64,8 @@ val fork3 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t
 val fork4 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t
 
 val fork5 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t
+
+val fork6 : 'a Reader.t -> 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t * 'a Reader.t
 
 val partition_map2 : 'a Reader.t -> f:('a -> [ `Fst of 'b  | `Snd of 'c ]) -> 'b Reader.t * 'c Reader.t
 

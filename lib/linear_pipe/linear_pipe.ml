@@ -62,6 +62,10 @@ let iter_unordered ?consumer ~max_concurrency reader ~f =
        (List.init max_concurrency ~f:(fun _ -> run_reader ())))
 ;;
 
+let length reader =
+  Pipe.length reader.Reader.pipe
+;;
+
 let of_list xs = 
   let reader = wrap_reader (Pipe.of_list xs) in
   reader
@@ -141,6 +145,12 @@ let fork4 reader =
 let fork5 reader = 
   match fork reader 5 with
   | [x; y; z; w; v] -> (x, y, z, w, v)
+  | _ -> assert false
+;;
+
+let fork6 reader = 
+  match fork reader 6 with
+  | [x; y; z; w; v; u] -> (x, y, z, w, v, u)
   | _ -> assert false
 ;;
 
