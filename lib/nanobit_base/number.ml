@@ -136,7 +136,7 @@ let ( * ) x y =
     then
       let%map var = Checked.mul x.var y.var in
       { upper_bound
-      ; lower_bound = x.lower_bound + y.lower_bound
+      ; lower_bound = x.lower_bound * y.lower_bound
       ; var 
       ; bits = None
       }
