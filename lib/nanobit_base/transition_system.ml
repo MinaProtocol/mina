@@ -114,16 +114,16 @@ struct
         Verifier.All_in_one.result v
       end
 
-    let exists' spec ~f = exists spec As_prover.(map get_state ~f)
+    let testify' spec ~f = testify spec As_prover.(map get_state ~f)
 
     let main (top_hash : Digest.Tick.Packed.var) =
       with_label "Step.main" begin
         let%bind wrap_vk =
-          exists' wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
+          testify' wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
             Verifier.Verification_key.to_bool_list wrap_vk)
         in
-        let%bind prev_state = exists' State.spec ~f:Prover_state.prev_state
-        and update          = exists' Update.spec ~f:Prover_state.update
+        let%bind prev_state = testify' State.spec ~f:Prover_state.prev_state
+        and update          = testify' Update.spec ~f:Prover_state.update
         in
         let%bind (next_state, `Success success) =
           with_label "update" (State.Checked.update prev_state update)

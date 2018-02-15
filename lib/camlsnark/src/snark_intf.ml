@@ -293,16 +293,6 @@ module type S = sig
 
   val as_prover : (unit, 's) As_prover.t -> (unit, 's) Checked.t
 
-  val exists
-    : ('var, 'value) Var_spec.t
-    -> ('value, 's) As_prover.t
-    -> ('var, 's) Checked.t
-
-  val exists_with_handle
-    : ('var, 'value) Var_spec.t
-    -> ('value, 's) As_prover.t
-    -> (('var, 'value) Handle.t, 's) Checked.t
-
   val with_state
     : ?and_then:('s1 -> (unit, 's) As_prover.t)
     -> ('s1, 's) As_prover.t
@@ -310,6 +300,22 @@ module type S = sig
     -> ('a, 's) Checked.t
 
   val next_auxiliary : (int, 's) Checked.t
+
+  val can_i_get_a_witness
+    : ('var, 'value) Var_spec.t
+    -> 'value Request.t
+    -> ('var, 's) Checked.t
+
+  val testify
+    : ('var, 'value) Var_spec.t
+    -> ('value, 's) As_prover.t
+    -> ('var, 's) Checked.t
+
+  val exists
+    : ?request:'value Request.t
+    -> ?as_prover:('value, 's) As_prover.t
+    -> ('var, 'value) Var_spec.t
+    -> ('var, 's) Checked.t
 
   val with_label : string -> ('a, 's) Checked.t -> ('a, 's) Checked.t
 

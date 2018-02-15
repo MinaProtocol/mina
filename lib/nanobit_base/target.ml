@@ -126,7 +126,7 @@ let floor_divide
   assert (b <= Field.size_in_bits - 2);
   assert (List.length y_unpacked <= b);
   let%bind z =
-    exists Var_spec.field
+    testify Var_spec.field
       As_prover.(map (read_var y) ~f:(fun y ->
         Bigint.to_field
           (Tick_curve.Bigint.R.div (Bigint.of_field (Util.two_to_the b))
@@ -172,7 +172,7 @@ let strength
   with_label "Target.strength" begin
     if Insecure.strength_calculation
     then
-      exists Var_spec.field
+      testify Var_spec.field
         As_prover.(map (read_var y) ~f:strength_unchecked)
     else floor_divide ~numerator:(`Two_to_the bit_length) y y_unpacked
   end
