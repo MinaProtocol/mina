@@ -186,7 +186,7 @@ struct
         ~initial:initial_blockchain
         ~body:(Int64.succ initial_blockchain.state.number)
         (Linear_pipe.merge_unordered
-           [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> printf "got new strongest block\n"; Miner.Update.Change_previous b)
+           [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
           ; pipes.body_changes_reader
           ])
     in
@@ -245,7 +245,6 @@ struct
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
-              printf "mined block!\n";
               Blockchain_accumulator.Update.New_chain b)
           ]);
     swim
