@@ -119,18 +119,23 @@ let bits_msb =
     in
     bs
 
+type _ Camlsnark.Request.t +=
+  | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Camlsnark.Request.t
+
 let floor_divide
-      ~numerator:(`Two_to_the b)
+      ~numerator:(`Two_to_the b as numerator)
       y y_unpacked
   =
   assert (b <= Field.size_in_bits - 2);
   assert (List.length y_unpacked <= b);
   let%bind z =
-    testify Var_spec.field
-      As_prover.(map (read_var y) ~f:(fun y ->
-        Bigint.to_field
-          (Tick_curve.Bigint.R.div (Bigint.of_field (Util.two_to_the b))
-            (Bigint.of_field y))))
+    exists Var_spec.field
+      ~request:As_prover.(map (read_var y) ~f:(fun y -> Floor_divide (numerator, y)))
+      ~compute:
+        As_prover.(map (read_var y) ~f:(fun y ->
+          Bigint.to_field
+            (Tick_curve.Bigint.R.div (Bigint.of_field (Util.two_to_the b))
+              (Bigint.of_field y))))
   in
   (* This block checks that z * y does not overflow. *)
   let%bind () =

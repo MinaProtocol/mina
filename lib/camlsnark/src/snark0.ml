@@ -277,9 +277,9 @@ end
 
 module Provider0 = struct
   type ('a, 's) t =
-    | Request of 'a Request.t
-    | As_prover of ('a, 's) As_prover0.t
-    | Both of 'a Request.t * ('a, 's) As_prover0.t
+    | Request of ('a Request.t, 's) As_prover0.t
+    | Compute of ('a, 's) As_prover0.t
+    | Both of ('a Request.t, 's) As_prover0.t * ('a, 's) As_prover0.t
 end
 
 module rec Var_spec0 : sig
@@ -774,8 +774,10 @@ module Provider = struct
 
   let run t tbl s (handler : Request.Handler.t) =
     match t with
-    | Request r -> (s, handler.handle r)
-    | As_prover c -> As_prover.run c tbl s
+    | Request rc ->
+      let (s', r) = As_prover.run rc tbl s in
+      (s', handler.handle r)
+    | Compute c -> As_prover.run c tbl s
     | Both (r, c) -> failwith "TODO"
 end
 
@@ -796,22 +798,22 @@ module Checked = struct
         (spec : ('var, 'value) Var_spec.t)
         (r : 'value Request.t)
     =
-    Exists (spec, Provider.Request r, fun h -> return (Handle.var h))
+    Exists (spec, Request (As_prover.return r), fun h -> return (Handle.var h))
 
   let testify
         (spec : ('var, 'value) Var_spec.t)
         (c : ('value, 's) As_prover.t)
     =
-    Exists (spec, Provider.As_prover c, fun h -> return (Handle.var h))
+    Exists (spec, Compute c, fun h -> return (Handle.var h))
 
   let exists
         ?request
-        ?as_prover
+        ?compute
         spec
     =
     let provider =
-      let request = Option.value request ~default:Request.Fail in
-      match as_prover with
+      let request = Option.value request ~default:(As_prover.return Request.Fail) in
+      match compute with
       | None -> Provider.Request request
       | Some c -> Provider.Both (request, c)
     in

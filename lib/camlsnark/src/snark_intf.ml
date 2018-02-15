@@ -312,8 +312,8 @@ module type S = sig
     -> ('var, 's) Checked.t
 
   val exists
-    : ?request:'value Request.t
-    -> ?as_prover:('value, 's) As_prover.t
+    : ?request:('value Request.t, 's) As_prover.t
+    -> ?compute:('value, 's) As_prover.t
     -> ('var, 'value) Var_spec.t
     -> ('var, 's) Checked.t
 
