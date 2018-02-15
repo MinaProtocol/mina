@@ -181,7 +181,7 @@ struct
   let start_mining ~prover ~pipes ~initial_blockchain =
     let mined_blocks_reader =
       Miner_impl.mine ~prover
-        ~previous:initial_blockchain
+        ~initial:initial_blockchain
         ~body:(Int64.succ initial_blockchain.state.number)
         (Linear_pipe.merge_unordered
           [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)

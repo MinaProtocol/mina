@@ -56,9 +56,16 @@ module Rpcs = struct
   end
 end
 
+let heartbeat_config =
+  Rpc.Connection.Heartbeat_config.create
+    ~send_every:(Time_ns.Span.of_sec 10.)
+    ~timeout:(Time_ns.Span.of_min 5.)
+
 let connect host_and_port =
   let connection =
     Persistent_connection.Rpc.create'
+      ~retry_delay:(fun () -> Time.Span.of_min 10.)
+      ~heartbeat_config
       ~handshake_timeout:(Time.Span.of_min 10.)
       ~server_name:"prover"
       (fun () -> Deferred.Or_error.return host_and_port)
@@ -254,6 +261,7 @@ module Main (Params : Params_intf) = struct
         (fun address reader writer -> 
           Rpc.Connection.server_with_close
             reader writer
+            ~heartbeat_config
             ~implementations
             ~connection_state:(fun _ -> ())
             ~on_handshake_error:`Ignore)

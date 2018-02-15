@@ -5,6 +5,8 @@ open Tick
 type t = private Field.t
 [@@deriving bin_io, sexp]
 
+val bit_length : int
+
 val max : t
 
 val of_field : Field.t -> t
@@ -19,6 +21,12 @@ include Snarkable.Bits.S
    and type Packed.value = t
    and type Packed.var = private Cvar.t
 
+val passes : Packed.var -> Pedersen.Digest.Packed.var -> (Boolean.var, _) Tick.Checked.t
+
+val pack : Unpacked.var -> Packed.var
+
+val var_to_unpacked : Cvar.t -> (Unpacked.var, _) Tick.Checked.t
+
 val constant : Packed.value -> Packed.var
 
 val strength_unchecked : t -> Strength.t
@@ -29,3 +37,6 @@ val strength
   : Packed.var
   -> Unpacked.var
   -> (Strength.Packed.var, _) Tick.Checked.t
+
+val to_bigint : t -> Bignum.Bigint.t
+val of_bigint : Bignum.Bigint.t -> t

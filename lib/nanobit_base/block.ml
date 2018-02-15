@@ -113,10 +113,15 @@ let hash t =
   |> Pedersen.State.digest
 
 let genesis : t =
+  let time =
+    Time.of_date_ofday ~zone:Time.Zone.utc (Date.create_exn ~y:2018 ~m:Month.Feb ~d:1)
+      Time.Ofday.start_of_day
+    |> Block_time.of_time
+  in
   { header =
       { previous_block_hash = Pedersen.zero_hash
       ; nonce = Nonce.zero
-      ; time = Block_time.of_time Time.epoch
+      ; time
       }
   ; body = Int64.one
   }

@@ -21,6 +21,12 @@ let of_field x =
   x
 ;;
 
+let to_bigint x = Snark_params.bigint_of_tick_bigint (Bigint.of_field x)
+let of_bigint n =
+  let x = Snark_params.tick_bigint_of_bigint n in
+  assert (Bigint.compare x max_bigint <= 0);
+  Bigint.to_field x
+
 let meets_target_unchecked t ~hash =
   Bigint.(compare (of_field hash) (of_field t)) < 0
 ;;
@@ -143,6 +149,14 @@ let floor_divide
 (* TODO: Use a "dual" variable to ensure the bit_length constraint is actually always
    enforced. *)
 include Bits.Snarkable.Field_backed(Tick)(struct let bit_length = bit_length end)
+
+let passes t h =
+  let%map { less_or_equal; _ } = Tick.Util.compare ~bit_length h t in
+  less_or_equal
+
+let pack : Unpacked.var -> Packed.var = Tick.Checked.pack
+
+let var_to_unpacked (x : Cvar.t) = Checked.unpack x
 
 (* floor(size of field / y) *)
 let strength

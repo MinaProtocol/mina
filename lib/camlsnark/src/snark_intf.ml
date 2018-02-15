@@ -185,6 +185,8 @@ module type S = sig
 
     val inv : Cvar.t -> (Cvar.t, _) t
 
+    val if_ : Boolean.var -> then_:Cvar.t -> else_:Cvar.t -> (Cvar.t, _) t
+
     val equal
       : Cvar.t
       -> Cvar.t
@@ -331,5 +333,7 @@ module type S = sig
     -> Verification_key.t
     -> (_, bool, _, 'k_value) Data_spec.t
     -> 'k_value
+
+  val run_unchecked : ('a, 's) Checked.t -> 's -> 's * 'a
 end
 

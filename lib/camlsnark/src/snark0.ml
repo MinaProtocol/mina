@@ -919,6 +919,54 @@ module Checked = struct
     aux
   ;;
 
+  let run_unchecked (type a) (type s)
+        (t0 : (a, s) t)
+        (s0 : s)
+    : s * a =
+    let next_auxiliary = ref 0 in
+    let aux = Field.Vector.create () in
+    let get_value : Cvar.t -> Field.t =
+      let get_one v = Field.Vector.get aux (Backend.Var.index v) in
+      Cvar.eval get_one
+    in
+    let store_field_elt x =
+      let v = Backend.Var.create (!next_auxiliary) in
+      incr next_auxiliary;
+      Field.Vector.emplace_back aux x;
+      v
+    in
+    let rec go : type a s. (a, s) t -> s -> s * a =
+      fun t s ->
+        match t with
+        | Pure x -> (s, x)
+        | With_constraint_system (_, k) ->
+          go k s
+        | With_label (_, t, k) ->
+          let (s', y) = go t s in
+          go (k y) s'
+        | As_prover (x, k) ->
+          let (s', ()) = As_prover.run x get_value s in
+          go k s'
+        | Add_constraint (_c, t) ->
+          go t s
+        | With_state (p, and_then, t_sub, k) ->
+          let (s, s_sub) = As_prover.run p get_value s in
+          let (s_sub, y) = go t_sub s_sub in
+          let (s, ()) = As_prover.run (and_then s_sub) get_value s in
+          go (k y) s
+        | Store ({ store; check; _ }, c, k) ->
+          let (s', value) = As_prover.run c get_value s in
+          let var =
+            Var_spec.Store.run (store value) store_field_elt
+          in
+          let ((), ()) = go (check var) () in
+          go (k { Handle.var; value = Some value }) s'
+        | Next_auxiliary k ->
+          go (k !next_auxiliary) s
+    in
+    go t0 s0
+  ;;
+
   let equal (x : Cvar.t) (y : Cvar.t) : (Cvar.t, _) t =
     let open Let_syntax in
     let%bind inv = exists Var_spec.field begin
@@ -1104,6 +1152,26 @@ module Checked = struct
       let all xs   = And xs
     end
   end
+
+  let if_ (b : Boolean.var) ~then_ ~else_ =
+    with_label "if_" begin
+      let open Let_syntax in
+      (* r = e + b (t - e)
+        r - e = b (t - e)
+      *)
+      let%bind r =
+        exists Var_spec.field As_prover.(Let_syntax.(
+          let%bind b = read Boolean.spec b in
+          read Var_spec.field (if b then then_ else else_)))
+      in
+      let%map () =
+        assert_r1cs
+          (b :> Cvar.t) Cvar.Infix.(then_ - else_)
+          Cvar.Infix.(r - else_)
+      in
+      r
+    end
+  ;;
 
   let unpack (v : Cvar.t) ~length
     : (Boolean.var list, 's) t

@@ -13,10 +13,11 @@ let all_but_last_exn xs = fst (split_last_exn xs)
 (* Someday: It may well be worth using bitcoin's compact nbits for target values since
   targets are quite chunky *)
 type ('time, 'target, 'digest, 'number, 'strength) t_ =
-  { difficulty_info : ('time * 'target) list
-  ; block_hash      : 'digest
-  ; number          : 'number
-  ; strength        : 'strength
+  { previous_time : 'time
+  ; target        : 'target
+  ; block_hash    : 'digest
+  ; number        : 'number
+  ; strength      : 'strength
   }
 [@@deriving bin_io, sexp]
 
@@ -39,14 +40,13 @@ type value =
   , Strength.Packed.value
   ) t_
 
-let to_hlist { difficulty_info; block_hash; number; strength } = H_list.([ difficulty_info; block_hash; number; strength ])
-let of_hlist = H_list.(fun [ difficulty_info; block_hash; number; strength ] -> { difficulty_info; block_hash; number; strength })
+let to_hlist { previous_time; target; block_hash; number; strength } = H_list.([ previous_time; target; block_hash; number; strength ])
+let of_hlist = H_list.(fun [ previous_time; target; block_hash; number; strength ] -> { previous_time; target; block_hash; number; strength })
 
 let data_spec =
   let open Data_spec in
-  [ Var_spec.(
-      list ~length:difficulty_window
-        (tuple2 Block_time.Unpacked.spec Target.Unpacked.spec))
+  [ Block_time.Unpacked.spec
+  ; Target.Unpacked.spec
   ; Digest.Packed.spec
   ; Block.Body.Packed.spec
   ; Strength.Packed.spec
@@ -57,29 +57,73 @@ let spec : (var, value) Var_spec.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let compute_target_unchecked _ : Target.t = Target.max
+let bound_divisor = `Two_to_the 11
+let delta_minus_one_max_bits = 7
+let target_time_ms = `Two_to_the 13 (* 8.192 seconds *)
 
-let compute_target = compute_target_unchecked
+let compute_target previous_time (previous_target : Target.t) time =
+  let target_time_ms =
+    let `Two_to_the k = target_time_ms in
+    Bignum.Bigint.(pow (of_int 2) (of_int k))
+  in
+  let target_max = Target.(to_bigint max) in
+  let delta_minus_one_max =
+    Bignum.Bigint.(pow (of_int 2) (of_int delta_minus_one_max_bits) - one)
+  in
+  let div_pow_2 x (`Two_to_the k) = Bignum.Bigint.shift_right x k in
+  let previous_target = Target.to_bigint previous_target in
+  assert Block_time.(time > previous_time);
+  let rate_multiplier = div_pow_2 Bignum.Bigint.(target_max - previous_target) bound_divisor in
+  let delta =
+    Bignum.Bigint.(
+      of_int64 Block_time.(Span.to_ms (diff time previous_time)) / target_time_ms)
+  in
+  let open Bignum.Bigint in
+  Target.of_bigint begin
+    if delta = zero
+    then begin
+      if previous_target < rate_multiplier
+      then one
+      else previous_target - rate_multiplier
+    end else begin
+      let gamma =
+        min (delta - one) delta_minus_one_max
+      in
+      previous_target + rate_multiplier * gamma
+    end
+  end
+;;
 
-let update_exn (state : value) (block : Block.t) =
-  let target = compute_target_unchecked state.difficulty_info in
-  let block_hash = Block.hash block in
-  assert (Target.meets_target_unchecked target ~hash:block_hash);
-  let strength = Target.strength_unchecked target in
-  assert Int64.(block.body > state.number);
-  { difficulty_info =
-      (block.header.time, target)
-      :: all_but_last_exn state.difficulty_info
-  ; block_hash
-  ; number = block.body
-  ; strength = Field.add strength state.strength
-  }
+let update_exn : value -> Block.t -> value =
+  let genesis_hash = Block.(hash genesis) in
+  fun state block ->
+    let block_hash = Block.hash block in
+    (if not Field.(equal block_hash genesis_hash)
+    then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
+    assert Int64.(block.body > state.number);
+    let new_target =
+      compute_target state.previous_time state.target block.header.time
+    in
+    let strength = Target.strength_unchecked state.target in
+    { previous_time = block.header.time
+    ; target = new_target
+    ; block_hash
+    ; number = block.body
+    ; strength = Field.add strength state.strength
+    }
 
 let negative_one : value =
-  let time = Block_time.of_time Core.Time.epoch in
-  let target : Target.Unpacked.value = Target.max in
-  { difficulty_info =
-      List.init difficulty_window ~f:(fun _ -> (time, target))
+  let previous_time =
+    Block_time.of_time
+      (Time.sub (Block_time.to_time Block.genesis.header.time) (Time.Span.second))
+  in
+  let target : Target.Unpacked.value =
+    Target.of_bigint
+      Bignum.Bigint.(
+        Target.(to_bigint max) / pow (of_int 2) (of_int 5))
+  in
+  { previous_time
+  ; target
   ; block_hash = Block.genesis.header.previous_block_hash
   ; number = Int64.of_int 0
   ; strength = Strength.zero
@@ -87,23 +131,23 @@ let negative_one : value =
 
 let zero = update_exn negative_one Block.genesis
 
-let to_bits ({ difficulty_info; block_hash; number; strength } : var) =
+let to_bits ({ previous_time; target; block_hash; number; strength } : var) =
   let%map h = Digest.Checked.(unpack block_hash >>| to_bits)
   and n = Block.Body.Checked.(unpack number >>| to_bits)
   and s = Strength.Checked.(unpack strength >>| to_bits)
   in
-  List.concat_map difficulty_info ~f:(fun (x, y) ->
-    Block_time.Checked.to_bits x @ Target.Checked.to_bits y)
+  Block_time.Checked.to_bits previous_time
+  @ Target.Checked.to_bits target
   @ h
   @ n
   @ s
 
-let to_bits_unchecked ({ difficulty_info; block_hash; number; strength } : value) =
+let to_bits_unchecked ({ previous_time; target; block_hash; number; strength } : value) =
   let h = Digest.(Unpacked.to_bits (unpack block_hash)) in
   let n = Block.Body.(Unpacked.to_bits (unpack number)) in
   let s = Strength.(Unpacked.to_bits (unpack strength)) in
-  List.concat_map difficulty_info ~f:(fun (x, y) ->
-    Block_time.Bits.to_bits x @ Target.Unpacked.to_bits y)
+  Block_time.Bits.to_bits previous_time
+  @ Target.Unpacked.to_bits target
   @ h
   @ n
   @ s
@@ -124,14 +168,78 @@ module Checked = struct
   let hash (t : var) =
     with_label "State.hash" (to_bits t >>= hash_digest)
 
-  (* TODO: A subsequent PR will replace this with the actual difficulty calculation *)
-  let compute_target _ = return Target.(constant max)
+  let compute_target prev_time prev_target time =
+    let div_pow_2 bits (`Two_to_the k) = List.drop bits k in
+    let delta_minus_one_max_bits = 7 in
+    with_label "compute_target" begin
+      let prev_target_n = Number.of_bits (Target.Checked.to_bits prev_target) in
+      let%bind rate_multiplier =
+        with_label "rate_multiplier" begin
+          let%map distance_to_max_target =
+            let open Number in
+            to_bits (constant (Target.max :> Field.t) - prev_target_n)
+          in
+          Number.of_bits (div_pow_2 distance_to_max_target bound_divisor)
+        end
+      in
+      let%bind delta =
+        with_label "delta" begin
+          (* This also checks that time >= prev_time *)
+          let%map d = Block_time.diff_checked time prev_time in
+          div_pow_2 (Block_time.Span.Checked.to_bits d) target_time_ms
+        end
+      in
+      let%bind delta_is_zero, delta_minus_one =
+        with_label "delta_is_nonzero, delta_minus_one" begin
+          (* There used to be a trickier version of this code that did this in 2 fewer constraints,
+             might be worth going back to if there is ever a reason. *)
+          let n = List.length delta in
+          let d = Checked.pack delta in
+          let%bind delta_is_zero = Checked.equal d (Cvar.constant Field.zero) in
+          let%map delta_minus_one =
+            Checked.if_ delta_is_zero
+              ~then_:(Cvar.constant Field.zero)
+              ~else_:Cvar.(Infix.(d - constant Field.one))
+            (* We convert to bits here because we will in [clamp_to_n_bits] anyway, and
+               this gives us the upper bound we need for multiplying with [rate_multiplier]. *)
+            >>= Checked.unpack ~length:n
+            >>| Number.of_bits
+          in
+          delta_is_zero, delta_minus_one
+        end
+      in
+      let%bind nonzero_case =
+        with_label "nonzero_case" begin
+          let open Number in
+          let%bind gamma = clamp_to_n_bits delta_minus_one delta_minus_one_max_bits in
+          let%map rg = rate_multiplier * gamma in
+          prev_target_n + rg
+        end
+      in
+      let%bind zero_case =
+        (* This could be more efficient *)
+        with_label "zero_case" begin
+          let%bind less = Number.(prev_target_n < rate_multiplier) in
+          Checked.if_ less
+            ~then_:(Cvar.constant Field.one)
+            ~else_:(Cvar.sub (Number.to_var prev_target_n) (Number.to_var rate_multiplier))
+        end
+      in
+      let%bind res =
+        with_label "res" begin
+          Checked.if_ delta_is_zero
+            ~then_:zero_case
+            ~else_:(Number.to_var nonzero_case)
+        end
+      in
+      Target.var_to_unpacked res
+    end
+  ;;
 
   let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
     if Insecure.check_target
     then return Boolean.true_
-    else
-      failwith "TODO"
+    else Target.passes target hash
 
   let valid_body ~prev body =
     with_label "valid_body" begin
@@ -147,18 +255,18 @@ module Checked = struct
           block.header.previous_block_hash state.block_hash
       in
       let%bind () = valid_body ~prev:state.number block.body in
-      let%bind target = compute_target state.difficulty_info in
-      let%bind target_unpacked = Target.Checked.unpack target in
-      let%bind strength = Target.strength target target_unpacked in
+      let target_packed = Target.pack state.target in
+      let%bind strength = Target.strength target_packed state.target in
       let%bind block_unpacked = Block.Checked.unpack block in
       let%bind block_hash =
         let bits = Block.Checked.to_bits block_unpacked in
         hash_digest bits
       in
-      let%map meets_target = meets_target target block_hash in
-      ( { difficulty_info =
-            (block_unpacked.header.time, target_unpacked)
-            :: all_but_last_exn state.difficulty_info
+      let%bind meets_target = meets_target target_packed block_hash in
+      let time_unpacked = block_unpacked.header.time in
+      let%map new_target = compute_target state.previous_time state.target time_unpacked in
+      ( { previous_time = time_unpacked
+        ; target = new_target
         ; block_hash
         ; number = block.body
         ; strength = Cvar.Infix.(strength + state.strength)
