@@ -189,20 +189,23 @@ module Checked = struct
           div_pow_2 (Block_time.Span.Checked.to_bits d) target_time_ms
         end
       in
-      let%bind delta_is_nonzero, delta_minus_one =
+      let%bind delta_is_zero, delta_minus_one =
         with_label "delta_is_nonzero, delta_minus_one" begin
+          (* There used to be a trickier version of this code that did this in 2 fewer constraints,
+             might be worth going back to if there is ever a reason. *)
           let n = List.length delta in
-          assert (n < Field.size_in_bits);
           let d = Checked.pack delta in
-          let d_minus_one = Cvar.Infix.(d - Cvar.constant Field.one) in
-          let%bind d_minus_one_bits =
-            exists (Var_spec.list ~length:n Boolean.spec)
-              As_prover.(map (read_var d_minus_one) ~f:(fun x ->
-                List.init n ~f:(Bigint.test_bit (Bigint.of_field x))))
+          let%bind delta_is_zero = Checked.equal d (Cvar.constant Field.zero) in
+          let%map delta_minus_one =
+            Checked.if_ delta_is_zero
+              ~then_:(Cvar.constant Field.zero)
+              ~else_:Cvar.(Infix.(d - constant Field.one))
+            (* We convert to bits here because we will in [clamp_to_n_bits] anyway, and
+               this gives us the upper bound we need for multiplying with [rate_multiplier]. *)
+            >>= Checked.unpack ~length:n
+            >>| Number.of_bits
           in
-          let d_minus_one' = Number.of_bits d_minus_one_bits in
-          let%map is_non_zero = Checked.equal d_minus_one (Number.to_var d_minus_one') in
-          is_non_zero, d_minus_one'
+          delta_is_zero, delta_minus_one
         end
       in
       let%bind nonzero_case =
@@ -224,9 +227,9 @@ module Checked = struct
       in
       let%bind res =
         with_label "res" begin
-          Checked.if_ delta_is_nonzero
-            ~then_:(Number.to_var nonzero_case)
-            ~else_:zero_case
+          Checked.if_ delta_is_zero
+            ~then_:zero_case
+            ~else_:(Number.to_var nonzero_case)
         end
       in
       Target.var_to_unpacked res
