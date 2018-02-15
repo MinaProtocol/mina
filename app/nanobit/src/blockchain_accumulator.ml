@@ -15,11 +15,10 @@ let accumulate ~init ~prover ~updates ~strongest_chain =
         | Error e ->
           eprintf "%s\n" (Error.to_string_hum (Error.tag e ~tag:"prover verify failed"));
           return chain
-        | Ok false -> printf "not stronger\n"; return chain
+        | Ok false -> return chain
         | Ok true ->
           if Strength.(new_chain.state.strength > chain.Blockchain.state.strength)
           then begin
-            printf "stronger\n";
             let%map () = Pipe.write strongest_chain new_chain in
             new_chain
           end

@@ -41,7 +41,7 @@ module Cpu = struct
           { block0 with header = { header0 with nonce } }
         in
         let hash = Block.hash block in
-        if Target.meets_target_unchecked target ~hash && Random.int 1000 < 10
+        if Target.meets_target_unchecked target ~hash
         then Some (block, hash)
         else go (Nonce.succ nonce) (i + 1)
     in
@@ -62,19 +62,16 @@ module Cpu = struct
         ~body
         (updates : Update.t Linear_pipe.Reader.t)
     =
-    printf "mine0000s\n";
     let state =
       { State.previous = initial
       ; body
       ; id = 0
       }
     in
-    printf "mining\n";
     let mined_blocks_reader, mined_blocks_writer = Linear_pipe.create () in
     let rec go () =
       let%bind () = after (sec 0.01) in
       let id = state.id in
-      let%bind () = after (Time_ns.Span.of_sec 0.1) in
       let previous = state.previous in
       match%bind schedule' (fun () -> return (find_block previous.state state.body)) with
       | None -> go ()
