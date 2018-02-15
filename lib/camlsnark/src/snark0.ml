@@ -986,36 +986,42 @@ module Checked = struct
       Field.Vector.emplace_back aux x;
       v
     in
-    let rec go : type a s. (a, s) t -> s -> s * a =
-      fun t s ->
+    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
+      fun t handler s ->
         match t with
         | Pure x -> (s, x)
         | With_constraint_system (_, k) ->
-          go k s
+          go k handler s
         | With_label (_, t, k) ->
-          let (s', y) = go t s in
-          go (k y) s'
+          let (s', y) = go t handler s in
+          go (k y) handler s'
         | As_prover (x, k) ->
           let (s', ()) = As_prover.run x get_value s in
-          go k s'
+          go k handler s'
         | Add_constraint (_c, t) ->
-          go t s
+          go t handler s
         | With_state (p, and_then, t_sub, k) ->
           let (s, s_sub) = As_prover.run p get_value s in
-          let (s_sub, y) = go t_sub s_sub in
+          let (s_sub, y) = go t_sub handler s_sub in
           let (s, ()) = As_prover.run (and_then s_sub) get_value s in
-          go (k y) s
-        | Store ({ store; check; _ }, c, k) ->
-          let (s', value) = As_prover.run c get_value s in
+          go (k y) handler s
+        | With_handler (h, t, k) ->
+          let (s', y) = go t (Request.Handler.extend handler h) s in
+          go (k y) handler s'
+        | Clear_handler (t, k) ->
+          let (s', y) = go t Request.Handler.fail s in
+          go (k y) handler s'
+        | Exists ({ store; check; _ }, p, k) ->
+          let (s', value) = Provider.run p get_value s handler in
           let var =
             Var_spec.Store.run (store value) store_field_elt
           in
-          let ((), ()) = go (check var) () in
-          go (k { Handle.var; value = Some value }) s'
+          let ((), ()) = go (check var) handler () in
+          go (k { Handle.var; value = Some value }) handler s'
         | Next_auxiliary k ->
-          go (k !next_auxiliary) s
+          go (k !next_auxiliary) handler s
     in
-    go t0 s0
+    go t0 Request.Handler.fail s0
   ;;
 
   let equal (x : Cvar.t) (y : Cvar.t) : (Cvar.t, _) t =
@@ -1211,7 +1217,7 @@ module Checked = struct
         r - e = b (t - e)
       *)
       let%bind r =
-        exists Var_spec.field As_prover.(Let_syntax.(
+        testify Var_spec.field As_prover.(Let_syntax.(
           let%bind b = read Boolean.spec b in
           read Var_spec.field (if b then then_ else else_)))
       in
@@ -1224,18 +1230,23 @@ module Checked = struct
     end
   ;;
 
+  type _ Request.t +=
+    | Unpack : Field.t * int -> bool list Request.t
+
   let unpack (v : Cvar.t) ~length
     : (Boolean.var list, 's) t
     =
     let open Let_syntax in
     let%bind res =
-      testify (Var_spec.list Boolean.spec ~length) begin
-        let open As_prover.Let_syntax in
-        let%map x = As_prover.read_var v in
-        let x = Bigint.of_field x in
-        List.init length ~f:(fun i ->
-          Bigint.test_bit x i)
-      end
+      exists (Var_spec.list Boolean.spec ~length)
+        ~request:As_prover.(map (read_var v) ~f:(fun x -> Unpack (x, length)))
+        ~compute:begin
+          let open As_prover.Let_syntax in
+          let%map x = As_prover.read_var v in
+          let x = Bigint.of_field x in
+          List.init length ~f:(fun i ->
+            Bigint.test_bit x i)
+        end
     in
     let lc =
       let ts, _ =

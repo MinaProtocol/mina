@@ -18,7 +18,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     }
 
   let compare ~bit_length a b =
-    assert (bit_length < Field.size_in_bits);
+    assert (bit_length < Field.size_in_bits - 1);
     with_label "Snark_util.compare" begin
       let alpha_packed =
         let open Cvar.Infix in

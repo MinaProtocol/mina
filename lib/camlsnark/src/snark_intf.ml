@@ -194,10 +194,10 @@ module type S = sig
 
     val pack : Boolean.var list -> Cvar.t
 
+    type _ Request.t +=
+      | Unpack : Field.t * int -> bool list Request.t
     val unpack
-      : Cvar.t
-      -> length:int
-      -> (Boolean.var list, _) t
+      : Cvar.t -> length:int -> (Boolean.var list, _) t
 
     module Assert : sig
       val equal_bitstrings
@@ -341,5 +341,8 @@ module type S = sig
     -> 'k_value
 
   val run_unchecked : ('a, 's) Checked.t -> 's -> 's * 'a
+
+  val run_and_check
+    : ('a, 's) Checked.t -> 's -> 's * 'a * bool
 end
 
