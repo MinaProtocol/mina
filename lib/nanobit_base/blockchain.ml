@@ -5,8 +5,14 @@ open Snark_params
 
 module State = Blockchain_state
 
-type t =
-  { state : State.t
-  ; proof : Proof.t
-  }
-[@@deriving bin_io]
+module Stable = struct
+  module V1 = struct
+    type t =
+      { state : State.Stable.V1.t
+      ; proof : Proof.Stable.V1.t
+      }
+    [@@deriving bin_io]
+  end
+end
+
+include Stable.V1

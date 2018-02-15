@@ -8,4 +8,13 @@ type t =
   { state : State.t
   ; proof : Proof.t
   }
-[@@deriving bin_io]
+
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t =
+      { state : State.Stable.V1.t
+      ; proof : Proof.Stable.V1.t
+      }
+    [@@deriving bin_io]
+  end
+end

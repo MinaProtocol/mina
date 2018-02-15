@@ -3,7 +3,14 @@ open Snark_params
 open Tick
 
 type t = private Field.t
-[@@deriving bin_io, sexp]
+[@@deriving sexp]
+
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t
+    [@@deriving bin_io, sexp]
+  end
+end
 
 val bit_length : int
 

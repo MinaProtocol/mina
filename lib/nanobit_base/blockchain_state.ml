@@ -10,19 +10,25 @@ let difficulty_window = 17
 
 let all_but_last_exn xs = fst (split_last_exn xs)
 
-(* Someday: It may well be worth using bitcoin's compact nbits for target values since
-  targets are quite chunky *)
-type ('time, 'target, 'digest, 'number, 'strength) t_ =
-  { previous_time : 'time
-  ; target        : 'target
-  ; block_hash    : 'digest
-  ; number        : 'number
-  ; strength      : 'strength
-  }
-[@@deriving bin_io, sexp]
+module Stable = struct
+  module V1 = struct
+    (* Someday: It may well be worth using bitcoin's compact nbits for target values since
+      targets are quite chunky *)
+    type ('time, 'target, 'digest, 'number, 'strength) t_ =
+      { previous_time : 'time
+      ; target        : 'target
+      ; block_hash    : 'digest
+      ; number        : 'number
+      ; strength      : 'strength
+      }
+    [@@deriving bin_io, sexp]
 
-type t = (Block_time.t, Target.t, Digest.t, Block.Body.t, Strength.t) t_
-[@@deriving bin_io, sexp]
+    type t = (Block_time.Stable.V1.t, Target.Stable.V1.t, Digest.t, Block.Body.Stable.V1.t, Strength.Stable.V1.t) t_
+    [@@deriving bin_io, sexp]
+  end
+end
+
+include Stable.V1
 
 type var =
   ( Block_time.Unpacked.var
