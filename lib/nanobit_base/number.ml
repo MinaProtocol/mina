@@ -102,6 +102,15 @@ let constant x =
 
 let field_size = Snark_params.bigint_of_tick_bigint Tick_curve.field_size
 
+let if_ b ~then_ ~else_ =
+  let%map var = Checked.if_ b ~then_:then_.var ~else_:else_.var in
+  let open Bignum.Bigint in
+  { upper_bound = max then_.upper_bound else_.upper_bound
+  ; lower_bound = min then_.lower_bound else_.lower_bound
+  ; var
+  ; bits = None
+  }
+
 let (+) x y =
   let open Bignum.Bigint in
   let upper_bound = x.upper_bound + y.upper_bound in

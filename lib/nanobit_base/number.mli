@@ -7,6 +7,8 @@ val (-)      : t -> t -> t
 val ( * )    : t -> t -> (t, _) Checked.t
 val constant : Field.t -> t
 
+val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
+
 val (<) : t -> t -> (Boolean.var, _) Checked.t
 
 val to_var : t -> Cvar.t
