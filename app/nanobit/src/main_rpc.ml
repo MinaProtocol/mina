@@ -22,7 +22,7 @@ module Rpcs = struct
       ; should_mine: bool
       ; me: Host_and_port.t
       }
-    [@@deriving bin_io]
+    [@@deriving bin_io, sexp]
 
     type response = unit [@@deriving bin_io]
 
@@ -92,13 +92,30 @@ let main () =
 
   let run_main _ { Rpcs.Main.start_prover; prover_port; storage_location; initial_peers; should_mine; me } = 
     let pipes, rpc_strongest_block_reader = init_pipes () in
-    don't_wait_for begin
-      Linear_pipe.iter 
+    (*don't_wait_for begin
+      Linear_pipe.iter
         rpc_strongest_block_reader 
         ~f:(fun x -> 
+          printf "write sbw\n";
           Pipe.write_without_pushback strongest_block_writer (); 
           Deferred.unit
         );
+    end;*)
+    don't_wait_for begin
+      Linear_pipe.iter
+        rpc_strongest_block_reader 
+        ~f:(fun x -> 
+          printf "got sbw\n";
+          Deferred.unit
+        )
+    end;
+    don't_wait_for begin
+      let rec go () =
+        let%bind () = after (sec 1.0) in
+        Pipe.write_without_pushback strongest_block_writer ();
+        go ()
+      in
+      go ()
     end;
     let%map swim = 
       let%bind prover =

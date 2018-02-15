@@ -1,6 +1,7 @@
 open Core
 open Async
 open Swimlib
+open Nanobit_base
 
 module Snark = Snark
 
@@ -57,6 +58,15 @@ struct
       timer ()
     in
     don't_wait_for (timer ());
+
+    let fetch_period = Time.Span.of_sec 0.1 in
+    let rec timer () = 
+      let%bind () = after fetch_period in
+      printf "X\n";
+      timer ()
+    in
+    don't_wait_for (timer ());
+
     let broadcasts =
       Linear_pipe.filter_map (Gossip_net.received gossip_net)
         ~f:(function
@@ -87,6 +97,7 @@ struct
         storage_strongest_block_reader,
         latest_strongest_block_reader =
       Linear_pipe.fork5 strongest_block_reader in
+    let body_changes_strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
     let body_changes_reader, body_changes_writer = Linear_pipe.create () in
     { strongest_block_writer
     ; gossip_net_strongest_block_reader
@@ -180,12 +191,13 @@ struct
 
   let start_mining ~prover ~pipes ~initial_blockchain =
     let mined_blocks_reader =
+      printf "mining time\n";
       Miner_impl.mine ~prover
         ~initial:initial_blockchain
         ~body:(Int64.succ initial_blockchain.state.number)
         (Linear_pipe.merge_unordered
-          [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
-          ; pipes.body_changes_reader
+           [ (*Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> printf "got new strongest block\n"; Miner.Update.Change_previous b)
+          ;*) pipes.body_changes_reader
           ])
     in
     Linear_pipe.fork2 mined_blocks_reader
@@ -232,6 +244,25 @@ struct
         ~f:(fun b -> Miner.Update.Change_body (Int64.succ b.state.number))
     end;
 
+    let fetch_period = Time.Span.of_sec 0.1 in
+    let rec timer () = 
+      let%bind () = after fetch_period in
+      printf "%d %d %d %d %d\n"
+              (Linear_pipe.length pipes.gossip_net_strongest_block_reader)
+              (Linear_pipe.length pipes.gossip_net_strongest_block_propagator)
+              (Linear_pipe.length pipes.body_changes_strongest_block_reader)
+              (Linear_pipe.length pipes.storage_strongest_block_reader)
+              (Linear_pipe.length pipes.latest_strongest_block_reader);
+      timer ()
+    in
+    don't_wait_for (timer ());
+
+    don't_wait_for begin
+      Linear_pipe.iter
+        pipes.body_changes_strongest_block_reader
+        ~f:(fun x -> printf "got strongest block\n"; Deferred.unit);
+    end;
+
     (* Store and accumulate updates *)
     Storage.persist storage_location
       (Linear_pipe.map pipes.storage_strongest_block_reader ~f:(fun b -> `Change_head b));
@@ -243,6 +274,7 @@ struct
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
+              printf "mined block!\n";
               Blockchain_accumulator.Update.New_chain b)
           ]);
     swim

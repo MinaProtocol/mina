@@ -62,6 +62,10 @@ let iter_unordered ?consumer ~max_concurrency reader ~f =
        (List.init max_concurrency ~f:(fun _ -> run_reader ())))
 ;;
 
+let length reader =
+  Pipe.length reader.Reader.pipe
+;;
+
 let of_list xs = 
   let reader = wrap_reader (Pipe.of_list xs) in
   reader

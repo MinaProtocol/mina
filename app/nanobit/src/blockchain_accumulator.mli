@@ -1,3 +1,5 @@
+open Nanobit_base
+
 module Update : sig
   type t =
     | New_chain of Blockchain.t

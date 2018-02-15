@@ -1,7 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Util
-open Nanobit_base
 open Snark_params
 
 module State = Blockchain_state

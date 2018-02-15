@@ -1,5 +1,5 @@
 open Core
-open Nanobit_base.Snark_params
+open Snark_params
 
 type t = Tick.Proof.t
 
