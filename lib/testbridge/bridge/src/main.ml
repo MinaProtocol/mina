@@ -191,17 +191,18 @@ let create
   in
   printf "starting clients...\n";
   let%map () = 
-    Deferred.List.iter
+    Deferred.List.iteri
       ~how:`Parallel
       testbridge_ports
-      ~f:(fun port -> 
+      ~f:(fun i port -> 
         let%map out =
           Kubernetes.call_exn
             Rpcs.Setup_and_start.rpc 
             port 
             { launch_cmd; tar_string; pre_cmds; post_cmds; }
         in
-        ())
+        printf "results %d:%s\n" i out
+      )
   in
   let external_tcp_ports = List.map external_ports ~f:(fun pod_ports -> (List.drop pod_ports 1)) in
   List.map 

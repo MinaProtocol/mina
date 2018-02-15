@@ -81,7 +81,7 @@ let setup_and_start _ { Rpcs.Setup_and_start.launch_cmd; tar_string; pre_cmds; p
   let pre_cmds = 
     List.concat
       [ pre_cmds
-      ; [ ("rm",    [ "-rf"; "/app/*" ]) ]
+      ; [ ("bash", [ "-c"; "rm -rf /app/*" ]) ]
       ]
   in
   let%bind pre_cmd_outs = 
@@ -100,7 +100,13 @@ let setup_and_start _ { Rpcs.Setup_and_start.launch_cmd; tar_string; pre_cmds; p
   let prog, args = launch_cmd in
   let%map process = Process.create_exn ~working_dir:"/app" ~prog ~args () in
   current_process := Some process;
-  ""
+  let cmd_outs outs = 
+    List.map outs ~f:(function
+      | Ok ss -> ss
+      | Error e -> Core.Error.to_string_hum e
+    )
+  in
+  String.concat ~sep:"\n" (List.concat [ cmd_outs pre_cmd_outs; cmd_outs post_cmd_outs ])
 ;;
 
 let start _ launch_cmd = 
