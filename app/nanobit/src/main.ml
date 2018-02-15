@@ -7,22 +7,59 @@ module Snark = Snark
 
 module Rpcs = struct
   module Get_strongest_block = struct
-    type query = unit [@@deriving bin_io]
-    type response = Blockchain.t [@@deriving bin_io]
+    module T = struct
+      let name = "get_strongest_block"
+      module T = struct
+        type query = unit
+        type response = Blockchain.t
+      end
+      module Caller = T
+      module Callee = T
+    end
+    include T.T
+    include Versioned_rpc.Both_convert.Plain.Make(T)
 
-    (* TODO: Use stable types. *)
-    let rpc : (query, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Get_strongest_block" ~version:0
-        ~bin_query ~bin_response
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io]
+        type response = Blockchain.Stable.V1.t [@@deriving bin_io]
+        let version = 1
+        let query_of_caller_model = Fn.id
+        let callee_model_of_query = Fn.id
+        let response_of_callee_model = Fn.id
+        let caller_model_of_response = Fn.id
+      end
+      include T
+      include Register(T)
+    end
   end
 end
-
+ 
 module Message = struct
-  type t =
-    | New_strongest_block of Blockchain.t
-  [@@deriving bin_io]
-end
+  module T = struct
+    module T = struct
+      type msg =
+        | New_strongest_block of Blockchain.Stable.V1.t
+      [@@deriving bin_io]
+    end
+    let name = "message"
+    module Caller = T
+    module Callee = T
+  end
+  include T.T
+  include Versioned_rpc.Both_convert.One_way.Make(T)
 
+  module V1 = struct
+    module T = struct
+      include T.T
+      let version = 1
+      let callee_model_of_msg = Fn.id
+      let msg_of_caller_model = Fn.id
+    end
+    include Register(T)
+  end
+end
+ 
 let assert_chain_verifies prover chain =
   let%map b = Prover.verify prover chain >>| Or_error.ok_exn in
   if not b then failwith "Chain did not verify"
@@ -50,7 +87,7 @@ struct
       let%bind () = 
         Deferred.List.iter
           ~how:`Parallel
-          (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.rpc ())
+          (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.dispatch_multi ())
           ~f:(fun x -> match%bind x with
             | Ok b -> Pipe.write from_new_peers_writer (Blockchain_accumulator.Update.New_chain b)
             | Error e -> eprintf "%s\n" (Error.to_string_hum e); return ())
@@ -114,16 +151,11 @@ struct
       ; address = remap_addr_port me
       }
     in
-    let get_strongest_block_handler _ _ = 
+    let get_strongest_block_handler () ~version () = 
       return !latest_strongest_block
     in
-    let handlers = [
-      (Rpcs.Get_strongest_block.rpc, get_strongest_block_handler)
-    ] in
     let implementations = 
-      Rpc.Implementations.create_exn 
-        ~implementations: (List.map handlers ~f:(fun (rpc, cb) -> (Rpc.Rpc.implement rpc cb)))
-        ~on_unknown_rpc:`Close_connection
+      Rpcs.Get_strongest_block.implement_multi get_strongest_block_handler
     in
     let rebroadcast_period = Time.Span.of_sec 10. in
     let remap_ports peers = 
