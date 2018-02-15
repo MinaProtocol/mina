@@ -1,5 +1,6 @@
 open Core
 open Async
+open Nanobit_base
 
 let remove_nth xs n = List.concat [ List.take xs n; List.drop xs (n+1) ]
 
@@ -42,7 +43,7 @@ module Rpcs = struct
 
   module Get_strongest_blocks = struct
     type query = unit [@@deriving bin_io]
-    type response = unit [@@deriving bin_io]
+    type response = Blockchain.t [@@deriving bin_io]
     type error = unit [@@deriving bin_io]
 
     let rpc : (query, response, error) Rpc.Pipe_rpc.t =
@@ -70,7 +71,7 @@ let wait_up ?(secs=120) nanobit =
 ;;
 
 let make_args nanobit ?(should_mine=false) initial_peers =
-  { Rpcs.Main.start_prover = true
+  { Rpcs.Main.start_prover = false
   ; prover_port = 8002
   ; storage_location = "/app/block-storage"
   ; initial_peers
@@ -156,15 +157,17 @@ let cmd main =
               ~project_dir:"../../../" 
               ~to_tar:[ "app/"
                       ; "lib/"
-                      ; "swimlib.opam"
-                      ; "nanobit_base.opam"
-                      ; "nanobit_testbridge.opam"
+                      ; "lib/nanobit_testbridge/testbridge-launch.sh" 
+                      ; "camlsnark.opam"
                       ; "linear_pipe.opam"
+                      ; "nanobit_testbridge.opam"
                       ; "testbridge.opam"
                       ; "ccc.opam"
-                      ; "echo.opam"
+                      ; "logger.opam"
                       ; "stdout.opam"
-                      ; "lib/nanobit_testbridge/testbridge-launch.sh" 
+                      ; "echo.opam"
+                      ; "nanobit_base.opam"
+                      ; "swimlib.opam"
                       ]
               ~launch_cmd:("bash", [ "lib/nanobit_testbridge/testbridge-launch.sh"])
               ~pre_cmds:[ ("mv", [ "/app/_build"; "/testbridge/app_build" ]) ]
@@ -181,3 +184,4 @@ let cmd main =
       ]
     end
   |> Command.run
+

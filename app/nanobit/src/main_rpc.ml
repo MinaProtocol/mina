@@ -42,7 +42,7 @@ module Rpcs = struct
 
   module Get_strongest_blocks = struct
     type query = unit [@@deriving bin_io]
-    type response = unit [@@deriving bin_io]
+    type response = Blockchain.t [@@deriving bin_io]
     type error = unit [@@deriving bin_io]
 
     let rpc : (query, response, error) Rpc.Pipe_rpc.t =
@@ -92,30 +92,13 @@ let main () =
 
   let run_main _ { Rpcs.Main.start_prover; prover_port; storage_location; initial_peers; should_mine; me } = 
     let pipes, rpc_strongest_block_reader = init_pipes () in
-    (*don't_wait_for begin
+    don't_wait_for begin
       Linear_pipe.iter
         rpc_strongest_block_reader 
-        ~f:(fun x -> 
-          printf "write sbw\n";
-          Pipe.write_without_pushback strongest_block_writer (); 
+        ~f:(fun blockchain -> 
+          Pipe.write_without_pushback strongest_block_writer blockchain;
           Deferred.unit
         );
-    end;*)
-    don't_wait_for begin
-      Linear_pipe.iter
-        rpc_strongest_block_reader 
-        ~f:(fun x -> 
-          printf "got sbw\n";
-          Deferred.unit
-        )
-    end;
-    don't_wait_for begin
-      let rec go () =
-        let%bind () = after (sec 1.0) in
-        Pipe.write_without_pushback strongest_block_writer ();
-        go ()
-      in
-      go ()
     end;
     let%map swim = 
       let%bind prover =

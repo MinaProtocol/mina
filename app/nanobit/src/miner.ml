@@ -41,7 +41,7 @@ module Cpu = struct
           { block0 with header = { header0 with nonce } }
         in
         let hash = Block.hash block in
-        if Target.meets_target_unchecked target ~hash
+        if Target.meets_target_unchecked target ~hash && Random.int 1000 < 10
         then Some (block, hash)
         else go (Nonce.succ nonce) (i + 1)
     in
