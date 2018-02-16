@@ -91,6 +91,7 @@ let main () =
   in
 
   let run_main _ { Rpcs.Main.start_prover; prover_port; storage_location; initial_peers; should_mine; me } = 
+    let log = Logger.create () in
     let pipes, rpc_strongest_block_reader = init_pipes () in
     don't_wait_for begin
       Linear_pipe.iter
@@ -110,6 +111,7 @@ let main () =
       let genesis_chain = { Blockchain.state = Blockchain.State.zero; proof = genesis_proof } in
       let%bind () = Main.assert_chain_verifies prover genesis_chain in
       Main.main_nowait
+        log
         prover
         storage_location
         { Blockchain.state = Blockchain.State.zero; proof = genesis_proof }

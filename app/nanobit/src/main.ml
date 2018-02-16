@@ -137,6 +137,60 @@ struct
     ; body_changes_writer
     }
 
+  let init_pipes_with_log log : pipes =
+    let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
+    let gossip_net_strongest_block_reader,
+        gossip_net_strongest_block_propagator,
+        body_changes_strongest_block_reader,
+        storage_strongest_block_reader,
+        latest_strongest_block_reader,
+        log_strongest_block_reader
+      = Linear_pipe.fork6 strongest_block_reader in
+    let body_changes_reader, body_changes_writer = Linear_pipe.create () in
+    let body_changes_reader, log_body_changes_reader = Linear_pipe.fork2 body_changes_reader in
+    don't_wait_for begin
+      let last_time = ref None in
+      Linear_pipe.iter 
+        log_strongest_block_reader 
+        ~f:(fun blockchain ->
+          let state = blockchain.Blockchain.state in
+          let number = state.Blockchain_state.number in
+          let time = state.Blockchain_state.previous_time in
+          let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.target) in
+          let strength = Bignum.Bigint.((Nanobit_base.Target.to_bigint Nanobit_base.Target.max) / target) in
+          let diff = 
+            match !last_time with
+            | None -> ""
+            | Some previous_time -> 
+              let a = Block_time.to_time time in
+              let b = Block_time.to_time previous_time in
+              Time.Span.to_string (Time.diff a b)
+          in
+          Logger.info log ~attrs:[ ("number", [%sexp_of: Int64.t] number )
+                                 ; ("strength", [%sexp_of: Bignum.Bigint.t] strength)
+                                 ; ("mining time", [%sexp_of: String.t] diff) ]
+            "new strongest blockchain";
+          last_time := Some time;
+          Deferred.unit)
+    end;
+    don't_wait_for begin
+      Linear_pipe.iter 
+        log_body_changes_reader 
+        ~f:(function
+          | Miner.Update.Change_body body -> 
+            Logger.debug log "new block body %s" (Int64.to_string body); 
+          Deferred.unit)
+    end;
+    { strongest_block_writer
+    ; gossip_net_strongest_block_reader
+    ; gossip_net_strongest_block_propagator
+    ; body_changes_strongest_block_reader
+    ; storage_strongest_block_reader
+    ; latest_strongest_block_reader
+    ; body_changes_reader
+    ; body_changes_writer
+    }
+
   let init_gossip_net 
         ~me 
         ~pipes:{gossip_net_strongest_block_reader} 
@@ -225,6 +279,7 @@ struct
     Linear_pipe.fork2 mined_blocks_reader
 
   let main_nowait 
+        log
         prover
         storage_location 
         genesis_blockchain
@@ -282,6 +337,7 @@ struct
     swim
 
   let main
+        log
         prover
         storage_location 
         genesis_blockchain
@@ -291,8 +347,10 @@ struct
         ?(remap_addr_port=(fun addr -> addr))
         ()
     =
+    Logger.info log "starting nanobit";
     let%bind _ = 
       main_nowait 
+        log
         prover
         storage_location 
         genesis_blockchain
@@ -300,7 +358,7 @@ struct
         should_mine 
         me 
         remap_addr_port 
-        (init_pipes ())
+        (init_pipes_with_log log)
     in
     Async.never ()
   ;;

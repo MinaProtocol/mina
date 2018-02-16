@@ -60,7 +60,9 @@ let daemon =
             | None -> Find_ip.find ()
             | Some ip -> return ip
           in
+          let log = Logger.create () in
           Main.main
+            log
             prover
             (conf_dir ^/ "storage")
             { Blockchain.state = Blockchain.State.zero; proof = genesis_proof }
