@@ -1,0 +1,28 @@
+#ifndef crypto_core_aes128encrypt_H
+#define crypto_core_aes128encrypt_H
+
+#define crypto_core_aes128encrypt_openssl_OUTPUTBYTES 16
+#define crypto_core_aes128encrypt_openssl_INPUTBYTES 16
+#define crypto_core_aes128encrypt_openssl_KEYBYTES 16
+#define crypto_core_aes128encrypt_openssl_CONSTBYTES 0
+ 
+#ifdef __cplusplus
+extern "C" {
+#endif
+extern int crypto_core_aes128encrypt_openssl(unsigned char *,const unsigned char *,const unsigned char *,const unsigned char *);
+#ifdef __cplusplus
+}
+#endif
+
+#define crypto_core_aes128encrypt crypto_core_aes128encrypt_openssl
+#define crypto_core_aes128encrypt_OUTPUTBYTES crypto_core_aes128encrypt_openssl_OUTPUTBYTES
+#define crypto_core_aes128encrypt_INPUTBYTES crypto_core_aes128encrypt_openssl_INPUTBYTES
+#define crypto_core_aes128encrypt_KEYBYTES crypto_core_aes128encrypt_openssl_KEYBYTES
+#define crypto_core_aes128encrypt_CONSTBYTES crypto_core_aes128encrypt_openssl_CONSTBYTES
+#define crypto_core_aes128encrypt_IMPLEMENTATION "crypto_core/aes128encrypt/openssl"
+#ifndef crypto_core_aes128encrypt_openssl_VERSION
+#define crypto_core_aes128encrypt_openssl_VERSION "-"
+#endif
+#define crypto_core_aes128encrypt_VERSION crypto_core_aes128encrypt_openssl_VERSION
+
+#endif

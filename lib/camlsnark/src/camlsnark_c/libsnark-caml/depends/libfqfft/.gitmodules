@@ -1,0 +1,12 @@
+[submodule "depends/gtest"]
+	path = depends/gtest
+	url = https://github.com/google/googletest.git
+[submodule "depends/ate-pairing"]
+	path = depends/ate-pairing
+	url = https://github.com/herumi/ate-pairing.git
+[submodule "depends/xbyak"]
+	path = depends/xbyak
+	url = https://github.com/herumi/xbyak.git
+[submodule "depends/libff"]
+	path = depends/libff
+	url = https://github.com/scipr-lab/libff.git
