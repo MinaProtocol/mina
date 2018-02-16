@@ -12,6 +12,7 @@ end
 module type S = sig
   val mine
     : prover:Prover.t
+    -> parent_log:Logger.t
     -> initial:Blockchain.t
     -> body:Block.Body.t
     -> Update.t Linear_pipe.Reader.t
@@ -58,10 +59,12 @@ module Cpu = struct
 
   let mine
         ~(prover : Prover.t)
+        ~(parent_log : Logger.t)
         ~(initial : Blockchain.t)
         ~body
         (updates : Update.t Linear_pipe.Reader.t)
     =
+    let log = Logger.child parent_log "miner" in
     let state =
       { State.previous = initial
       ; body
@@ -89,7 +92,7 @@ module Cpu = struct
             state.id <- state.id + 1;
             go ()
           | Error e ->
-            eprintf "%s\n%!" Error.(to_string_hum (tag e ~tag:"Blockchain extend error"));
+            Logger.error log "%s" Error.(to_string_hum (tag e ~tag:"Blockchain extend error"));
             go ()
         end else
           go ()

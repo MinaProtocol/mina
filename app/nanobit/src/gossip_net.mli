@@ -17,6 +17,7 @@ module type S =
 
     type t = 
       { timeout : Time.Span.t
+      ; log : Logger.t
       ; target_peer_count : int
       ; new_peer_reader : Peer.t Linear_pipe.Reader.t
       ; broadcast_writer : Message.msg Linear_pipe.Writer.t
@@ -35,6 +36,7 @@ module type S =
     val create
       :  Peer.Event.t Linear_pipe.Reader.t
       -> Params.t
+      -> Logger.t
       -> unit Rpc.Implementation.t list
       -> t
 

@@ -76,7 +76,7 @@ struct
   module Gossip_net = Gossip_net(Message)
   module Swim = Swim
 
-  let peer_strongest_blocks gossip_net
+  let peer_strongest_blocks gossip_net log
     : Blockchain_accumulator.Update.t Linear_pipe.Reader.t
     =
     let from_new_peers_reader, from_new_peers_writer = Linear_pipe.create () in
@@ -90,7 +90,7 @@ struct
           (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.dispatch_multi ())
           ~f:(fun x -> match%bind x with
             | Ok b -> Pipe.write from_new_peers_writer (Blockchain_accumulator.Update.New_chain b)
-            | Error e -> eprintf "%s\n" (Error.to_string_hum e); return ())
+            | Error e -> Logger.error log "%s" (Error.to_string_hum e); return ())
       in
       timer ()
     in
@@ -194,6 +194,7 @@ struct
   let init_gossip_net 
         ~me 
         ~pipes:{gossip_net_strongest_block_reader} 
+        ~log
         ~swim 
         ~latest_strongest_block 
         ~latest_mined_block 
@@ -224,6 +225,7 @@ struct
              | Disconnect peers -> Disconnect (remap_ports peers)
            ))
         params 
+        log
         implementations 
     in
     (* someday this could be much more sophisticated 
@@ -266,10 +268,11 @@ struct
     end;
     gossip_net
 
-  let start_mining ~prover ~pipes ~initial_blockchain =
+  let start_mining ~prover ~parent_log ~pipes ~initial_blockchain =
     let mined_blocks_reader =
       Miner_impl.mine ~prover
         ~initial:initial_blockchain
+        ~parent_log
         ~body:(Int64.succ initial_blockchain.state.number)
         (Linear_pipe.merge_unordered
            [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
@@ -291,14 +294,14 @@ struct
     =
     let open Let_syntax in
     let%map initial_blockchain =
-      match%map Storage.load storage_location with
+      match%map Storage.load storage_location log with
       | Some x -> x
       | None -> genesis_blockchain
     in
     (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
       if should_mine then
-        start_mining ~prover ~pipes ~initial_blockchain
+        start_mining ~prover ~parent_log:log ~pipes ~initial_blockchain
       else
         (Linear_pipe.of_list [], Linear_pipe.of_list [])
     in
@@ -306,6 +309,7 @@ struct
     let gossip_net =
       init_gossip_net
         ~me
+        ~log
         ~pipes
         ~latest_strongest_block:(
           Linear_pipe.latest_ref ~initial:genesis_blockchain pipes.latest_strongest_block_reader)
@@ -326,11 +330,12 @@ struct
       (Linear_pipe.map pipes.storage_strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain_accumulator.accumulate
       ~prover
+      ~parent_log:log
       ~init:initial_blockchain
       ~strongest_chain:pipes.strongest_block_writer
       ~updates:(
         Linear_pipe.merge_unordered
-          [ peer_strongest_blocks gossip_net
+          [ peer_strongest_blocks gossip_net log
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
               Blockchain_accumulator.Update.New_chain b)
           ]);

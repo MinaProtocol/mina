@@ -6,7 +6,9 @@ module type S = sig
   type location
 
   val load
-    : location -> Blockchain.t option Deferred.t
+    : location 
+    -> Logger.t
+    -> Blockchain.t option Deferred.t
 
   val persist
     : location
@@ -64,10 +66,11 @@ module Filesystem : S with type location = string = struct
 
   type location = string
 
-  let load location = 
+  let load location parent_log = 
+    let log = Logger.child parent_log "storage" in
     match%map With_checksum.read_data location Blockchain.Stable.V1.bin_reader_t Blockchain.Stable.V1.bin_writer_t with
     | Ok blockchain -> Some blockchain
-    | Error e -> (eprintf "%s\n" (Error.to_string_hum e); None)
+    | Error e -> (Logger.error log "%s" (Error.to_string_hum e); None)
 
   let persist location block_stream =
     don't_wait_for begin

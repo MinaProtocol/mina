@@ -17,6 +17,7 @@ module type S =
 
     type t = 
       { timeout : Time.Span.t
+      ; log : Logger.t
       ; target_peer_count : int
       ; new_peer_reader : Peer.t Linear_pipe.Reader.t
       ; broadcast_writer : Message.msg Linear_pipe.Writer.t
@@ -35,6 +36,7 @@ module type S =
     val create
       :  Peer.Event.t Linear_pipe.Reader.t
       -> Params.t
+      -> Logger.t
       -> unit Rpc.Implementation.t list
       -> t
 
@@ -64,6 +66,7 @@ module Make (Message : Message_intf) = struct
 
   type t = 
     { timeout : Time.Span.t
+    ; log : Logger.t
     ; target_peer_count : int
     ; new_peer_reader : Peer.t Linear_pipe.Reader.t
     ; broadcast_writer : Message.msg Linear_pipe.Writer.t
@@ -102,30 +105,32 @@ module Make (Message : Message_intf) = struct
     | Ok Error exn -> Error exn
     | Error exn -> Or_error.of_exn exn
 
-  let broadcast_selected timeout peers msg =
+  let broadcast_selected t peers msg =
     let send peer = 
       try_call_rpc 
-        peer timeout (fun conn m -> return (Message.dispatch_multi conn m)) msg 
+        peer t.timeout (fun conn m -> return (Message.dispatch_multi conn m)) msg 
     in
     Deferred.List.iter 
       ~how:`Parallel 
       peers
       ~f:(fun p -> match%map (send p) with
         | Ok () -> ()
-        | Error e -> eprintf "%s\n" (Error.to_string_hum e))
+        | Error e -> Logger.error t.log "%s" (Error.to_string_hum e))
   ;;
 
-  let broadcast_random timeout peers n msg = 
-    let selected_peers = random_sublist (Hash_set.to_list peers) n in
-    broadcast_selected timeout selected_peers msg
+  let broadcast_random t n msg = 
+    let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
+    broadcast_selected t selected_peers msg
   ;;
 
-  let create (peer_events : Peer.Event.t Linear_pipe.Reader.t) (params : Params.t) implementations = 
+  let create (peer_events : Peer.Event.t Linear_pipe.Reader.t) (params : Params.t) parent_log implementations = 
+    let log = Logger.child parent_log "gossip_net" in
     let new_peer_reader, new_peer_writer = Linear_pipe.create () in
     let broadcast_reader, broadcast_writer = Linear_pipe.create () in
     let received_reader, received_writer = Linear_pipe.create () in
     let t = 
       { timeout = params.timeout
+      ; log
       ; target_peer_count = params.target_peer_count 
       ; new_peer_reader
       ; broadcast_writer
@@ -137,7 +142,9 @@ module Make (Message : Message_intf) = struct
       Linear_pipe.iter_unordered 
         ~max_concurrency:64 
         broadcast_reader 
-        ~f:(fun m -> broadcast_random t.timeout t.peers t.target_peer_count m)
+        ~f:(fun m -> 
+          Logger.trace log "broadcasting message";
+          broadcast_random t t.target_peer_count m)
     end;
     let broadcast_received_capacity = 64 in
     let implementations = 
@@ -166,7 +173,7 @@ module Make (Message : Message_intf) = struct
     end;
     ignore begin
       Tcp.Server.create
-        ~on_handler_error:(`Call (fun net exn -> eprintf "%s\n" (Exn.to_string_mach exn)))
+        ~on_handler_error:(`Call (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
         (Tcp.Where_to_listen.of_port (Host_and_port.port params.address))
         (fun address reader writer -> 
            Rpc.Connection.server_with_close 
@@ -175,7 +182,7 @@ module Make (Message : Message_intf) = struct
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:
                (`Call (fun exn -> 
-                  eprintf "%s\n" (Exn.to_string_mach exn);
+                  Logger.error log "%s" (Exn.to_string_mach exn);
                 Deferred.unit)))
     end;
     t
@@ -192,10 +199,11 @@ module Make (Message : Message_intf) = struct
       fun () -> 
         let selected = List.take !to_broadcast t.target_peer_count in
         to_broadcast := List.drop !to_broadcast t.target_peer_count;
-        let%map () = broadcast_selected t.timeout selected msg in
+        let%map () = broadcast_selected t selected msg in
         if List.length !to_broadcast = 0 then `Done else `Continue)
 
   let query_peer t (peer : Peer.t) rpc query = 
+    Logger.trace t.log "querying peer" ~attrs:[ ("peer", [%sexp_of: Peer.t] peer) ];
     try_call_rpc peer t.timeout rpc query
 
   let query_random_peers t n rpc query = 

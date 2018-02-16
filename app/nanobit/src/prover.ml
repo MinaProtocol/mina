@@ -228,7 +228,7 @@ module Main (Params : Params_intf) = struct
     { Blockchain.proof; state = Blockchain.State.update_exn prev_state block }
   ;;
 
-  let implementations =
+  let implementations log =
     Rpc.Implementations.create_exn
       ~implementations:
         [ Rpc.Rpc.implement Rpcs.Extend_blockchain.rpc
@@ -249,20 +249,21 @@ module Main (Params : Params_intf) = struct
                else return (Transition_utils.verify state proof))
         ]
       ~on_unknown_rpc:(`Call (fun () ~rpc_tag ~version ->
-        eprintf "prover: unknown rpc: %s %d\n" rpc_tag version;
+        Logger.error log "prover: unknown rpc: %s %d" rpc_tag version;
         `Continue))
 
   let main () =
+    let log = Logger.create () in
     initialize ();
     let%bind server =
       Tcp.Server.create
-        ~on_handler_error:(`Call (fun net exn -> eprintf "%s\n" (Exn.to_string_mach exn)))
+        ~on_handler_error:(`Call (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
         (Tcp.Where_to_listen.of_port Params.port)
         (fun address reader writer -> 
           Rpc.Connection.server_with_close
             reader writer
             ~heartbeat_config
-            ~implementations
+            ~implementations:(implementations log)
             ~connection_state:(fun _ -> ())
             ~on_handshake_error:`Ignore)
     in
