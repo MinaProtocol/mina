@@ -1,4 +1,4 @@
-FROM ocaml-base:latest
+FROM gcr.io/o1labs-192920/ocaml-base:d6eecbf879e7badc4faa83f1b3c8421abd146621
 
 WORKDIR /app
 ADD ./ /app
