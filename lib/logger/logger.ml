@@ -1,4 +1,5 @@
 open Core
+open Async
 
 module Level = struct
   type t =

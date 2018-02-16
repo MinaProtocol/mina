@@ -76,7 +76,7 @@ struct
   module Gossip_net = Gossip_net(Message)
   module Swim = Swim
 
-  let peer_strongest_blocks gossip_net
+  let peer_strongest_blocks gossip_net log
     : Blockchain_accumulator.Update.t Linear_pipe.Reader.t
     =
     let from_new_peers_reader, from_new_peers_writer = Linear_pipe.create () in
@@ -90,7 +90,7 @@ struct
           (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.dispatch_multi ())
           ~f:(fun x -> match%bind x with
             | Ok b -> Pipe.write from_new_peers_writer (Blockchain_accumulator.Update.New_chain b)
-            | Error e -> eprintf "%s\n" (Error.to_string_hum e); return ())
+            | Error e -> Logger.error log "%s" (Error.to_string_hum e); return ())
       in
       timer ()
     in
@@ -137,9 +137,64 @@ struct
     ; body_changes_writer
     }
 
+  let init_pipes_with_log log : pipes =
+    let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
+    let gossip_net_strongest_block_reader,
+        gossip_net_strongest_block_propagator,
+        body_changes_strongest_block_reader,
+        storage_strongest_block_reader,
+        latest_strongest_block_reader,
+        log_strongest_block_reader
+      = Linear_pipe.fork6 strongest_block_reader in
+    let body_changes_reader, body_changes_writer = Linear_pipe.create () in
+    let body_changes_reader, log_body_changes_reader = Linear_pipe.fork2 body_changes_reader in
+    don't_wait_for begin
+      let last_time = ref None in
+      Linear_pipe.iter 
+        log_strongest_block_reader 
+        ~f:(fun blockchain ->
+          let state = blockchain.Blockchain.state in
+          let number = state.Blockchain_state.number in
+          let time = state.Blockchain_state.previous_time in
+          let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.target) in
+          let strength = Bignum.Bigint.((Nanobit_base.Target.to_bigint Nanobit_base.Target.max) / target) in
+          let diff = 
+            match !last_time with
+            | None -> ""
+            | Some previous_time -> 
+              let a = Block_time.to_time time in
+              let b = Block_time.to_time previous_time in
+              Time.Span.to_string (Time.diff a b)
+          in
+          Logger.info log ~attrs:[ ("number", [%sexp_of: Int64.t] number )
+                                 ; ("strength", [%sexp_of: Bignum.Bigint.t] strength)
+                                 ; ("mining time", [%sexp_of: String.t] diff) ]
+            "new strongest blockchain";
+          last_time := Some time;
+          Deferred.unit)
+    end;
+    don't_wait_for begin
+      Linear_pipe.iter 
+        log_body_changes_reader 
+        ~f:(function
+          | Miner.Update.Change_body body -> 
+            Logger.debug log "new block body %s" (Int64.to_string body); 
+          Deferred.unit)
+    end;
+    { strongest_block_writer
+    ; gossip_net_strongest_block_reader
+    ; gossip_net_strongest_block_propagator
+    ; body_changes_strongest_block_reader
+    ; storage_strongest_block_reader
+    ; latest_strongest_block_reader
+    ; body_changes_reader
+    ; body_changes_writer
+    }
+
   let init_gossip_net 
         ~me 
         ~pipes:{gossip_net_strongest_block_reader} 
+        ~log
         ~swim 
         ~latest_strongest_block 
         ~latest_mined_block 
@@ -170,6 +225,7 @@ struct
              | Disconnect peers -> Disconnect (remap_ports peers)
            ))
         params 
+        log
         implementations 
     in
     (* someday this could be much more sophisticated 
@@ -212,10 +268,11 @@ struct
     end;
     gossip_net
 
-  let start_mining ~prover ~pipes ~initial_blockchain =
+  let start_mining ~prover ~parent_log ~pipes ~initial_blockchain =
     let mined_blocks_reader =
       Miner_impl.mine ~prover
         ~initial:initial_blockchain
+        ~parent_log
         ~body:(Int64.succ initial_blockchain.state.number)
         (Linear_pipe.merge_unordered
            [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
@@ -225,6 +282,7 @@ struct
     Linear_pipe.fork2 mined_blocks_reader
 
   let main_nowait 
+        log
         prover
         storage_location 
         genesis_blockchain
@@ -236,14 +294,14 @@ struct
     =
     let open Let_syntax in
     let%map initial_blockchain =
-      match%map Storage.load storage_location with
+      match%map Storage.load storage_location log with
       | Some x -> x
       | None -> genesis_blockchain
     in
     (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
       if should_mine then
-        start_mining ~prover ~pipes ~initial_blockchain
+        start_mining ~prover ~parent_log:log ~pipes ~initial_blockchain
       else
         (Linear_pipe.of_list [], Linear_pipe.of_list [])
     in
@@ -251,6 +309,7 @@ struct
     let gossip_net =
       init_gossip_net
         ~me
+        ~log
         ~pipes
         ~latest_strongest_block:(
           Linear_pipe.latest_ref ~initial:genesis_blockchain pipes.latest_strongest_block_reader)
@@ -271,17 +330,19 @@ struct
       (Linear_pipe.map pipes.storage_strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain_accumulator.accumulate
       ~prover
+      ~parent_log:log
       ~init:initial_blockchain
       ~strongest_chain:pipes.strongest_block_writer
       ~updates:(
         Linear_pipe.merge_unordered
-          [ peer_strongest_blocks gossip_net
+          [ peer_strongest_blocks gossip_net log
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
               Blockchain_accumulator.Update.New_chain b)
           ]);
     swim
 
   let main
+        log
         prover
         storage_location 
         genesis_blockchain
@@ -291,8 +352,10 @@ struct
         ?(remap_addr_port=(fun addr -> addr))
         ()
     =
+    Logger.info log "starting nanobit";
     let%bind _ = 
       main_nowait 
+        log
         prover
         storage_location 
         genesis_blockchain
@@ -300,7 +363,7 @@ struct
         should_mine 
         me 
         remap_addr_port 
-        (init_pipes ())
+        (init_pipes_with_log log)
     in
     Async.never ()
   ;;

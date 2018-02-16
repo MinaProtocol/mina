@@ -6,7 +6,9 @@ module type S = sig
   type location
 
   val load
-    : location -> Blockchain.t option Deferred.t
+    : location 
+    -> Logger.t
+    -> Blockchain.t option Deferred.t
 
   val persist
     : location

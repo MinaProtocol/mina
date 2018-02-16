@@ -9,6 +9,7 @@
       swimlib
       nanobit_base
       camlsnark
+      logger
       async
       async_extra
       async_ssl

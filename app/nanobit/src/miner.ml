@@ -12,6 +12,7 @@ end
 module type S = sig
   val mine
     : prover:Prover.t
+    -> parent_log:Logger.t
     -> initial:Blockchain.t
     -> body:Block.Body.t
     -> Update.t Linear_pipe.Reader.t
@@ -41,7 +42,7 @@ module Cpu = struct
           { block0 with header = { header0 with nonce } }
         in
         let hash = Block.hash block in
-        if Target.meets_target_unchecked target ~hash && Random.int 1000 < 10
+        if Target.meets_target_unchecked target ~hash
         then Some (block, hash)
         else go (Nonce.succ nonce) (i + 1)
     in
@@ -58,10 +59,12 @@ module Cpu = struct
 
   let mine
         ~(prover : Prover.t)
+        ~(parent_log : Logger.t)
         ~(initial : Blockchain.t)
         ~body
         (updates : Update.t Linear_pipe.Reader.t)
     =
+    let log = Logger.child parent_log "miner" in
     let state =
       { State.previous = initial
       ; body
@@ -89,7 +92,7 @@ module Cpu = struct
             state.id <- state.id + 1;
             go ()
           | Error e ->
-            eprintf "%s\n%!" Error.(to_string_hum (tag e ~tag:"Blockchain extend error"));
+            Logger.error log "%s" Error.(to_string_hum (tag e ~tag:"Blockchain extend error"));
             go ()
         end else
           go ()
