@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(executable
+  ((name nanobit_testbridge_difficulty_adjustment)
+   (public_name nanobit_testbridge_difficulty_adjustment)
+   (package nanobit_testbridge)
+   (libraries (core async async_extra testbridge nanobit_testbridge))
+   (preprocess (pps (ppx_jane)))
+   (flags (-w -40 -g))
+   (modes (native))
+  ))
+

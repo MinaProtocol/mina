@@ -43,30 +43,6 @@ let check_alive_nanobits alive_nanobits =
     )
 ;;
 
-module Nanobit_args = struct
-  type t = 
-    { nanobit: Nanobit_testbridge.Nanobit.t
-    ; args: Nanobit_testbridge.Rpcs.Main.query
-    }
-end
-
-let kill_nanobits n alive_nanobits dead_nanobits =
-  let nanobits = List.permute alive_nanobits in
-  let to_kill = List.take nanobits n in
-  let%map () = Deferred.List.iter to_kill ~f:(fun na -> Nanobit_testbridge.stop na.Nanobit_args.nanobit) in
-  (List.drop nanobits n, List.concat [ to_kill; dead_nanobits ])
-
-let start_nanobits n alive_nanobits dead_nanobits =
-  let nanobits = List.permute dead_nanobits in
-  let to_start = List.take nanobits n in
-  let%map () = 
-    Deferred.List.iter to_start ~f:(fun na -> 
-      let%bind () = Nanobit_testbridge.start na.Nanobit_args.nanobit in
-      Nanobit_testbridge.main na.nanobit na.args
-    )
-  in
-  (List.concat [ to_start; alive_nanobits ], List.drop nanobits n)
-
 let check alive_nanobits = 
   let%bind () = after (sec 10.0) in
   let%map pass = check_alive_nanobits alive_nanobits in
@@ -92,27 +68,25 @@ let main nanobits =
   let%bind args = Nanobit_testbridge.run_main_fully_connected nanobits in
   printf "init'd nanobits: %s\n" (Sexp.to_string_hum ([%sexp_of: Nanobit_testbridge.Rpcs.Main.query list] args));
   printf "starting test\n";
-  let alive_nanobits, dead_nanobits = 
-    List.map2_exn nanobits args ~f:(fun nanobit args -> { Nanobit_args.nanobit; args }), [] 
-  in
+  let nanobits_state = Nanobit_testbridge.init_alive_dead_nanobits nanobits args in
 
-  let%bind () = check (List.map alive_nanobits ~f:(fun na -> na.nanobit)) in
+  let%bind () = check (List.map (fst nanobits_state) ~f:(fun na -> na.nanobit)) in
 
   let%bind _ = 
     Deferred.List.fold
-      ~init:(alive_nanobits, dead_nanobits)
-      (pattern (List.length nanobits)) ~f:(fun (alive_nanobits, dead_nanobits) cmd ->
+      ~init:nanobits_state
+      (pattern (List.length nanobits)) ~f:(fun nanobits_state cmd ->
         match cmd with
         | `Kill n -> 
           printf "kill %d\n" n;
-          let%bind (alive_nanobits, dead_nanobits) = kill_nanobits n alive_nanobits dead_nanobits in
-          let%map () = check (List.map alive_nanobits ~f:(fun na -> na.nanobit)) in
-          (alive_nanobits, dead_nanobits)
+          let%bind nanobits_state = Nanobit_testbridge.kill_nanobits n nanobits_state in
+          let%map () = check (List.map (fst nanobits_state) ~f:(fun na -> na.nanobit)) in
+          nanobits_state
         | `Start n -> 
           printf "start %d\n" n;
-          let%bind (alive_nanobits, dead_nanobits) = start_nanobits n alive_nanobits dead_nanobits in
-          let%map () = check (List.map alive_nanobits ~f:(fun na -> na.nanobit)) in
-          (alive_nanobits, dead_nanobits)
+          let%bind nanobits_state = Nanobit_testbridge.start_nanobits n nanobits_state in
+          let%map () = check (List.map (fst nanobits_state) ~f:(fun na -> na.nanobit)) in
+          nanobits_state
       )
   in
 

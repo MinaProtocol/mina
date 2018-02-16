@@ -132,6 +132,35 @@ let run_main_fully_connected ?(should_mine=false) nanobits =
   args
 ;;
 
+module Nanobit_args = struct
+  type t = 
+    { nanobit: Nanobit.t
+    ; args: Rpcs.Main.query
+    }
+end
+
+let kill_nanobits n (alive_nanobits, dead_nanobits) =
+  let nanobits = List.permute alive_nanobits in
+  let to_kill = List.take nanobits n in
+  let%map () = Deferred.List.iter to_kill ~f:(fun na -> stop na.Nanobit_args.nanobit) in
+  (List.drop nanobits n, List.concat [ to_kill; dead_nanobits ])
+;;
+
+let start_nanobits n (alive_nanobits, dead_nanobits) =
+  let nanobits = List.permute dead_nanobits in
+  let to_start = List.take nanobits n in
+  let%map () = 
+    Deferred.List.iter to_start ~f:(fun na -> 
+      let%bind () = start na.Nanobit_args.nanobit in
+      main na.nanobit na.args
+    )
+  in
+  (List.concat [ to_start; alive_nanobits ], List.drop nanobits n)
+;;
+
+let init_alive_dead_nanobits nanobits args =
+  List.map2_exn nanobits args ~f:(fun nanobit args -> { Nanobit_args.nanobit; args }), [] 
+
 let cmd main = 
   let open Command.Let_syntax in
   Command.async
