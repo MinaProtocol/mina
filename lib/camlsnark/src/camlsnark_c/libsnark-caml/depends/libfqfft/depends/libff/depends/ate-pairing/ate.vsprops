@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="shift_jis"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="ate"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="$(SolutionDir)../xbyak;$(SolutionDir)src;$(SolutionDir)include;$(SolutionDir)test"
+		PreprocessorDefinitions="WIN32;NOMINMAX;WIN32_LEAN_AND_MEAN"
+		WarningLevel="4"
+		DisableSpecificWarnings="4996"
+	/>
+</VisualStudioPropertySheet>

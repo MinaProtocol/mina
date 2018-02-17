@@ -1,7 +1,4 @@
-FROM ocaml-camlsnark:latest
-
-RUN opam install merlin
-RUN opam install ocp-indent
+FROM gcr.io/o1labs-192920/ocaml-base:d6eecbf879e7badc4faa83f1b3c8421abd146621
 
 ENV PATH "/home/opam/.opam/4.05.0/bin:$PATH"
 ENV CAML_LD_LIBRARY_PATH "/home/opam/.opam/4.05.0/lib/stublibs"

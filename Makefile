@@ -12,7 +12,6 @@ dev : docker
 	@echo "** Talk to bkase to help you setup your vimrc"
 	@echo "****"
 
-
 nanobit-docker :
 	./rebuild-docker.sh nanobit nanobit-Dockerfile
 
@@ -38,4 +37,13 @@ base-minikube :
 	./rebuild-minikube.sh ocaml-base base-Dockerfile
 
 base-googlecloud :
-	./rebuild-googlecloud.sh ocaml-base base-Dockerfile
+	./rebuild-googlecloud.sh ocaml-base base-Dockerfile $(shell git rev-parse HEAD)
+
+ocaml405-googlecloud:
+	./rebuild-googlecloud.sh ocaml405 ocaml405-Dockerfile
+
+ci-base-docker:
+	./rebuild-docker.sh o1labs/ci-base ci-base-Dockerfile
+
+update-deps: base-googlecloud
+	./rewrite-from-dockerfile.sh ocaml-base $(shell git rev-parse HEAD)

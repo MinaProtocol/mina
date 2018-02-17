@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="shift_jis"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="release"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		Optimization="3"
+		InlineFunctionExpansion="2"
+		EnableIntrinsicFunctions="true"
+		FavorSizeOrSpeed="1"
+		OmitFramePointers="true"
+		PreprocessorDefinitions="NDEBUG;_SECURE_SCL=0"
+		BufferSecurityCheck="false"
+		FloatingPointModel="2"
+		BrowseInformation="1"
+	/>
+	<Tool
+		Name="VCLinkerTool"
+		GenerateDebugInformation="true"
+		LinkTimeCodeGeneration="1"
+	/>
+</VisualStudioPropertySheet>

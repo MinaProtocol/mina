@@ -1,0 +1,33 @@
+language: cpp
+sudo: required
+dist: trusty
+compiler:
+  - gcc
+os:
+  - linux
+
+addons:
+  apt:
+    sources:
+      - ubuntu-toolchain-r-test
+    packages:
+      - gcc-5
+      - g++-5
+
+before_install:
+  - sudo apt-get install build-essential cmake git libboost-all-dev cmake libgmp3-dev libssl-dev libprocps3-dev pkg-config gnuplot-x11 python-markdown
+
+before_script:
+  - git submodule init && git submodule update
+  - mkdir build
+  - cd build
+  - cmake ..
+
+script:
+  - make
+  # TODO (howardwu): Resolve runtime on targets:
+  # gadgetlib1_fooram_test, zk_proof_systems_r1cs_mp_ppzkpcd_test, zk_proof_systems_r1cs_sp_ppzkpcd_test, zk_proof_systems_ram_zksnark_test
+  - make check
+
+notifications:
+  email: false
