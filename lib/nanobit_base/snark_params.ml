@@ -14,7 +14,12 @@ module Extend (Impl : Camlsnark.Snark_intf.S) = struct
     end
 
     module Bits = struct
-      module type S = Bits_intf.Snarkable
+      module type Lossy = Bits_intf.Snarkable.Lossy
+        with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
+         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type boolean_var := Boolean.var
+
+      module type Faithful = Bits_intf.Snarkable.Faithful
         with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
@@ -145,3 +150,4 @@ let bigint_of_tick_bigint n =
   in
   go 0 Bignum.Bigint.one Bignum.Bigint.zero
 
+let target_bit_length = Tick.Field.size_in_bits - 3

@@ -20,6 +20,6 @@ val random : unit -> t
 
 module Bits : Bits_intf.S with type t := t
 
-include Snark_params.Tick.Snarkable.Bits.S
+include Snark_params.Tick.Snarkable.Bits.Faithful
   with type Unpacked.value = t
    and type Packed.value = t

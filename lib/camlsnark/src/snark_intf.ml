@@ -15,7 +15,7 @@ module type S = sig
     include Sexpable.S with type t := t
 
     val unpack : t -> bool list
-    val pack : bool list -> t
+    val project : bool list -> t
   end
 
   module Bigint : Bigint_intf.Extended with type field := Field.t
@@ -192,12 +192,15 @@ module type S = sig
       -> Cvar.t
       -> (Boolean.var, 's) t
 
+    val project : Boolean.var list -> Cvar.t
     val pack : Boolean.var list -> Cvar.t
 
     type _ Request.t +=
-      | Unpack : Field.t * int -> bool list Request.t
-    val unpack
+      | Choose_preimage : Field.t * int -> bool list Request.t
+    val choose_preimage
       : Cvar.t -> length:int -> (Boolean.var list, _) t
+
+    val unpack : Cvar.t -> length:int -> (Boolean.var list, _) t
 
     module Assert : sig
       val equal_bitstrings
@@ -317,6 +320,11 @@ module type S = sig
     -> ('var, 'value) Var_spec.t
     -> ('var, 's) Checked.t
 
+  type empty = Request.empty
+  type request = Request.request = Request : 'a Request.t * ('a -> empty) -> request
+
+  val handle : ('a, 's) Checked.t -> (request -> empty) -> ('a, 's) Checked.t
+
   val with_label : string -> ('a, 's) Checked.t -> ('a, 's) Checked.t
 
   val with_constraint_system
@@ -343,6 +351,8 @@ module type S = sig
   val run_unchecked : ('a, 's) Checked.t -> 's -> 's * 'a
 
   val run_and_check
-    : ('a, 's) Checked.t -> 's -> 's * 'a * bool
+    : (('a, 's) As_prover.t, 's) Checked.t -> 's -> 's * 'a * bool
+
+  val check : ('a, 's) Checked.t -> 's -> bool
 end
 

@@ -6,7 +6,7 @@ module Digest = Tick.Pedersen.Digest
 
 module System = struct
   module State = Blockchain_state
-  module Update = Block.Packed
+  module Update = Block
 end
 
 include Transition_system.Make

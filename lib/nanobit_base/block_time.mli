@@ -11,7 +11,7 @@ end
 
 module Bits : Bits_intf.S with type t := t
 
-include Tick.Snarkable.Bits.S
+include Tick.Snarkable.Bits.Faithful
   with type Unpacked.value = t
    and type Packed.value = t
    and type Packed.var = private Tick.Cvar.t
@@ -27,7 +27,7 @@ module Span : sig
 
   val of_time_span : Time.Span.t -> t
 
-  include Tick.Snarkable.Bits.S
+  include Tick.Snarkable.Bits.Faithful
     with type Unpacked.value = t
     and type Packed.value = t
 

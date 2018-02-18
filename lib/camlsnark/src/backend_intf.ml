@@ -73,5 +73,7 @@ module type S = sig
     val get_auxiliary_input_size : t -> int
     val create_keypair : t -> Keypair.t
     val check_exn : t -> unit
+    val is_satisfied
+      : t -> primary_input:Field.Vector.t -> auxiliary_input:Field.Vector.t -> bool
   end
 end

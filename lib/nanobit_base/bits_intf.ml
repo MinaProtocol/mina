@@ -13,31 +13,47 @@ module type S = sig
   val to_bits : t -> bool list
 end
 
-module type Snarkable = sig
-  type (_, _) var_spec
-  type (_, _) checked
-  type boolean_var
+module Snarkable = struct
+  module type Basic = sig
+    type (_, _) var_spec
+    type (_, _) checked
+    type boolean_var
 
-  module Packed : sig
-    type var
-    type value
-    val spec : (var, value) var_spec
+(*     module Bits : S *)
+
+    module Packed : sig
+      type var
+      type value
+      val spec : (var, value) var_spec
+    end
+
+    module Unpacked : sig
+      type var
+      type value
+
+      val spec : (var, value) var_spec
+
+      val var_to_bits : var -> boolean_var list
+    end
   end
 
-  module Unpacked : sig
-    type var
-    type value
+  module type Lossy = sig
+    include Basic
 
-    include S with type t := value
+    val project_value : Unpacked.value -> Packed.value
+    val unpack_value : Packed.value -> Unpacked.value
 
-    val spec : (var, value) var_spec
+    val project_var : Unpacked.var -> Packed.var
+    val choose_preimage_var : Packed.var -> (Unpacked.var, _) checked
   end
 
-  module Checked : sig
-    val unpack : Packed.var -> (Unpacked.var, _) checked
+  module type Faithful = sig
+    include Basic
 
-    val to_bits : Unpacked.var -> boolean_var list
+    val pack_value : Unpacked.value -> Packed.value
+    val unpack_value : Packed.value -> Unpacked.value
+
+    val pack_var : Unpacked.var -> Packed.var
+    val unpack_var : Packed.var -> (Unpacked.var, _) checked
   end
-
-  val unpack : Packed.value -> Unpacked.value
 end

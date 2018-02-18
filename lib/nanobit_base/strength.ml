@@ -12,7 +12,9 @@ include Stable.V1
 
 let zero = Tick.Field.zero
 
-include Bits.Snarkable.Field(Tick)
+let bit_length = Target.bit_length + 1
+
+include Bits.Snarkable.Small(Tick)(struct let bit_length = bit_length end)
 
 module Bits = Bits.Make_field(Tick.Field)(Tick.Bigint)
 
