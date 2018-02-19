@@ -11,19 +11,19 @@ type empty += Unhandled
 let unhandled = Unhandled
 
 type request =
-  | Request : 'a r * ('a -> empty) -> request
+  | With : { request :'a t; respond : ('a -> empty) } -> request
 
 module Handler = struct
   type nonrec t = { with_ : 'a. 'a t -> 'a }
 
   let create (handler : request -> empty) =
     let f : type a. a r -> a =
-      fun r ->
+      fun request ->
         let module T = struct
           type empty += T of a
         end
         in
-        match handler (Request (r, fun x -> T.T x)) with
+        match handler (With { request; respond = fun x -> T.T x}) with
         | T.T x -> x
         | _ -> failwith "Unhandled request"
     in

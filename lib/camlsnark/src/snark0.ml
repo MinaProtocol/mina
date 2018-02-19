@@ -278,7 +278,9 @@ module As_prover0 = struct
   ;;
 end
 
-module Handler = Request.Handler
+module Handler = struct
+  type t = Request.request -> Request.empty
+end
 
 module Provider = struct
   type ('a, 's) t =
@@ -286,7 +288,7 @@ module Provider = struct
     | Compute of ('a, 's) As_prover0.t
     | Both of ('a Request.t, 's) As_prover0.t * ('a, 's) As_prover0.t
 
-  let run t tbl s (handler : Handler.t) =
+  let run t tbl s (handler : Request.Handler.t) =
     match t with
     | Request rc ->
       let (s', r) = As_prover0.run rc tbl s in
@@ -323,7 +325,7 @@ and Checked0 : sig
         * ('s1 -> (unit, 's) As_prover0.t)
         * ('b, 's1) t
         * ('b -> ('a, 's) t) -> ('a, 's) t
-    | With_handler : Handler.t * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
+    | With_handler : Request.Handler.t * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
     | Clear_handler : ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
     | Exists
       : ('var, 'value) Var_spec0.t
@@ -766,7 +768,8 @@ module Checked = struct
 
   type empty = Request.empty
   let unhandled = Request.unhandled
-  type request = Request.request = Request : 'a Request.t * ('a -> empty) -> request
+  type request = Request.request
+  = With : { request :'a Request.t; respond : ('a -> empty) } -> request
 
   let handle t k = With_handler (Request.Handler.create k, t, return)
 
@@ -883,7 +886,7 @@ module Checked = struct
       Field.Vector.emplace_back aux x;
       v
     in
-    let rec go : type a s. (a, s) t -> Handler.t -> s -> s * a =
+    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
       fun t handler s ->
         match t with
         | Pure x -> (s, x)
@@ -939,7 +942,7 @@ module Checked = struct
       Field.Vector.emplace_back aux x;
       v
     in
-    let rec go : type a s. (a, s) t -> Handler.t -> s -> s * a =
+    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
       fun t handler s ->
         match t with
         | Pure x -> (s, x)
@@ -995,7 +998,7 @@ module Checked = struct
     in
     let system = R1CS_constraint_system.create () in
     R1CS_constraint_system.set_primary_input_size system 0;
-    let rec go : type a s. (a, s) t -> Handler.t -> s -> s * a =
+    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
       fun t handler s ->
         match t with
         | Pure x -> (s, x)

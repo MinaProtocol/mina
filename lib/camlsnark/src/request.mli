@@ -7,7 +7,7 @@ type empty
 val unhandled : empty
 
 type request =
-  | Request : 'a t * ('a -> empty) -> request
+  | With : { request :'a t; respond : ('a -> empty) } -> request
 
 module Handler : sig
   type nonrec t = { with_ : 'a. 'a t -> 'a }

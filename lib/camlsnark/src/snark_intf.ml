@@ -322,9 +322,15 @@ module type S = sig
 
   type empty = Request.empty
   val unhandled : empty
-  type request = Request.request = Request : 'a Request.t * ('a -> empty) -> request
+  type request
+    = Request.request
+    = With : { request :'a Request.t; respond : ('a -> empty) } -> request
 
-  val handle : ('a, 's) Checked.t -> (request -> empty) -> ('a, 's) Checked.t
+  module Handler : sig
+    type t = request -> empty
+  end
+
+  val handle : ('a, 's) Checked.t -> Handler.t -> ('a, 's) Checked.t
 
   val with_label : string -> ('a, 's) Checked.t -> ('a, 's) Checked.t
 
