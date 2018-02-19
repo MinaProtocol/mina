@@ -180,7 +180,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
         handle t (fun (Request (r, k)) ->
           match r with
           | N_ones -> k resp
-          | _ -> failwith "Unhandled")
+          | _ -> unhandled)
       in
       let correct = Int.pow 2 n - 1 in
       let to_bits k = List.init total_length ~f:(fun i -> (k lsr i) land 1 = 1) in
@@ -272,7 +272,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
           (fun (Request (r, k)) ->
              match r with
              | Num_bits_upper_bound -> k (Field.of_int resp)
-             | _ -> failwith "unhandled")
+             | _ -> unhandled)
       in
       let true_answer = num_bits_upper_bound_unchecked x in
       for i = 0 to true_answer - 1 do

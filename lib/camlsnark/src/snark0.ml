@@ -272,14 +272,31 @@ module Handle0 = struct
 end
 
 module As_prover0 = struct
-  type ('a, 's) t = (Cvar.t -> Field.t) -> 's -> ('s * 'a)
+  include As_prover.Make(struct type t = (Cvar.t -> Field.t) end)
+
+  let read_var (v : Cvar.t) : (Field.t, 's) t = fun tbl s -> (s, tbl v)
+  ;;
 end
 
-module Provider0 = struct
+module Handler = Request.Handler
+
+module Provider = struct
   type ('a, 's) t =
     | Request of ('a Request.t, 's) As_prover0.t
     | Compute of ('a, 's) As_prover0.t
     | Both of ('a Request.t, 's) As_prover0.t * ('a, 's) As_prover0.t
+
+  let run t tbl s (handler : Handler.t) =
+    match t with
+    | Request rc ->
+      let (s', r) = As_prover0.run rc tbl s in
+      (s', handler.with_ r)
+    | Compute c -> As_prover0.run c tbl s
+    | Both (rc, c) ->
+      let (s', r) = As_prover0.run rc tbl s in
+      match handler.with_ r with
+      | exception _ -> As_prover0.run c tbl s
+      | x -> (s', x)
 end
 
 module rec Var_spec0 : sig
@@ -306,11 +323,11 @@ and Checked0 : sig
         * ('s1 -> (unit, 's) As_prover0.t)
         * ('b, 's1) t
         * ('b -> ('a, 's) t) -> ('a, 's) t
-    | With_handler : Request.Handler.t * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
+    | With_handler : Handler.t * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
     | Clear_handler : ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
     | Exists
       : ('var, 'value) Var_spec0.t
-        * ('value, 's) Provider0.t
+        * ('value, 's) Provider.t
         * (('var, 'value) Handle0.t -> ('a, 's) t)
       -> ('a, 's) t
     | Next_auxiliary : (int -> ('a, 's) t) -> ('a, 's) t
@@ -678,44 +695,7 @@ end
 module As_prover = struct
   include As_prover0
 
-  let run (t : ('a, 's) t) tbl s : ('s * 'a) = t tbl s
-
-  let map (t : ('a, 's) t) ~(f : 'a -> 'b) : ('b, 's) t =
-    fun tbl s ->
-      let (s', x) = t tbl s in
-      (s', f x)
-  ;;
-
-  let bind (t : ('a, 's) t) ~(f : 'a -> ('b, 's) t) : ('b, 's) t =
-    fun tbl s ->
-      let (s', x) = t tbl s in
-      f x tbl s'
-  ;;
-
-  let return (x : 'a) : ('a, 's) t =
-    fun _ s -> (s, x)
-  ;;
-
-  module T = struct
-    type nonrec ('a, 's) t = ('a, 's) t
-    let map = `Custom map
-    let bind = bind
-    let return = return
-  end
-  include Monad.Make2(T)
-
-  let get_state : ('s, 's) t = fun _tbl s -> (s, s)
-  ;;
-
-  let read_var (v : Cvar.t) : (Field.t, 's) t = fun tbl s -> (s, tbl v)
-  ;;
-
-  let set_state (s : 's) : (unit, 's) t = fun tbl _ -> (s, ())
-  ;;
-
-  let modify_state f =
-    fun _tbl s -> (f s, ())
-  ;;
+  type ('a, 'prover_state) as_prover = ('a, 'prover_state) t
 
   let read
         ({ read; _ } : ('var, 'value) Var_spec.t)
@@ -725,24 +705,6 @@ module As_prover = struct
     fun tbl s ->
       (s, Var_spec.Read.run (read var) tbl)
   ;;
-
-  type ('a, 'prover_state) as_prover = ('a, 'prover_state) t
-
-  module Array = struct
-    include Array
-
-    let map (t : 'a array) ~(f : 'a -> ('b, 's) as_prover) : ('b array, 's) as_prover =
-      fun tbl s0 ->
-        let s = ref s0 in
-        let res =
-          Array.map t ~f:(fun x ->
-            let (s', y) = f x tbl !s in
-            s := s';
-            y)
-        in
-        (!s, res)
-    ;;
-  end
 
   module Ref = struct
     type 'a t = 'a option ref
@@ -762,26 +724,6 @@ module As_prover = struct
       fun _tbl s -> (s, (r := Some x))
     ;;
   end
-
-  let map2 x y ~f =
-    let open Let_syntax in
-    let%map x = x and y = y in f x y
-  ;;
-end
-
-module Provider = struct
-  include Provider0
-
-  let run t tbl s (handler : Request.Handler.t) =
-    match t with
-    | Request rc ->
-      let (s', r) = As_prover.run rc tbl s in
-      (s', handler.with_ r)
-    | Compute c -> As_prover.run c tbl s
-    | Both (rc, c) ->
-      let (s', r) = As_prover.run rc tbl s in
-      try (s', handler.with_ r) with
-      | _ -> As_prover.run c tbl s
 end
 
 module Handle = struct
@@ -799,9 +741,9 @@ module Checked = struct
 
   let can_i_get_a_witness
         (spec : ('var, 'value) Var_spec.t)
-        (r : 'value Request.t)
+        (r : ('value Request.t, 's) As_prover.t)
     =
-    Exists (spec, Request (As_prover.return r), fun h -> return (Handle.var h))
+    Exists (spec, Request r, fun h -> return (Handle.var h))
 
   let testify
         (spec : ('var, 'value) Var_spec.t)
@@ -823,6 +765,7 @@ module Checked = struct
     Exists (spec, provider, fun h -> return (Handle.var h))
 
   type empty = Request.empty
+  let unhandled = Request.unhandled
   type request = Request.request = Request : 'a Request.t * ('a -> empty) -> request
 
   let handle t k = With_handler (Request.Handler.create k, t, return)
@@ -940,7 +883,7 @@ module Checked = struct
       Field.Vector.emplace_back aux x;
       v
     in
-    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
+    let rec go : type a s. (a, s) t -> Handler.t -> s -> s * a =
       fun t handler s ->
         match t with
         | Pure x -> (s, x)
@@ -996,7 +939,7 @@ module Checked = struct
       Field.Vector.emplace_back aux x;
       v
     in
-    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
+    let rec go : type a s. (a, s) t -> Handler.t -> s -> s * a =
       fun t handler s ->
         match t with
         | Pure x -> (s, x)
@@ -1052,7 +995,7 @@ module Checked = struct
     in
     let system = R1CS_constraint_system.create () in
     R1CS_constraint_system.set_primary_input_size system 0;
-    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
+    let rec go : type a s. (a, s) t -> Handler.t -> s -> s * a =
       fun t handler s ->
         match t with
         | Pure x -> (s, x)

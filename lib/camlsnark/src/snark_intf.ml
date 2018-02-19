@@ -306,7 +306,7 @@ module type S = sig
 
   val can_i_get_a_witness
     : ('var, 'value) Var_spec.t
-    -> 'value Request.t
+    -> ('value Request.t, 's) As_prover.t
     -> ('var, 's) Checked.t
 
   val testify
@@ -321,6 +321,7 @@ module type S = sig
     -> ('var, 's) Checked.t
 
   type empty = Request.empty
+  val unhandled : empty
   type request = Request.request = Request : 'a Request.t * ('a -> empty) -> request
 
   val handle : ('a, 's) Checked.t -> (request -> empty) -> ('a, 's) Checked.t

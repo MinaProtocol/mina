@@ -4,6 +4,8 @@ type _ t += Fail : 'a t
 
 type empty
 
+val unhandled : empty
+
 type request =
   | Request : 'a t * ('a -> empty) -> request
 

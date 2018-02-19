@@ -6,6 +6,10 @@ type 'a r = 'a t
 
 type empty = ..
 
+type empty += Unhandled
+
+let unhandled = Unhandled
+
 type request =
   | Request : 'a r * ('a -> empty) -> request
 
@@ -34,26 +38,3 @@ module Handler = struct
           with _ -> t2.with_ r
     }
 end
-
-(*
-open Core
-
-type _ t = ..
-
-type _ t += Fail : 'a t
-
-type empty =
-
-type request =
-  | Request : 'a t * ('a -> empty) -> request
-
-let _ =
-  handle (return ()) (fun (Request (r, k)) ->
-    match r with
-    | Fuck ->
-      k result
-
-    | _ -> failwith "Not found"
-
-module Handler = struct
-  type t = request -> Nothing.t *)
