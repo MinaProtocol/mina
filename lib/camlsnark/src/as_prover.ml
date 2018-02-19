@@ -69,27 +69,6 @@ module Make (Env : sig type t end) = struct
     let return = return
   end
   include Monad.Make2(T)
-
-  (* TODO: Delete
-  type ('a, 'prover_state) as_prover = ('a, 'prover_state) t
-
-  module Array = struct
-    include Array
-
-    let map (t : 'a array) ~(f : 'a -> ('b, 's) as_prover) : ('b array, 's) as_prover =
-      fun tbl s0 ->
-        let s = ref s0 in
-        let res =
-          Array.map t ~f:(fun x ->
-            let (s', y) = f x tbl !s in
-            s := s';
-            y)
-        in
-        (!s, res)
-    ;;
-  end
-
-  *)
 end
 
 include T
