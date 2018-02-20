@@ -50,7 +50,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     let mem x xs =
       let length = List.length xs in
       let%bind bs =
-        exists (Var_spec.list ~length Boolean.spec) As_prover.(Let_syntax.(
+        testify (Var_spec.list ~length Boolean.spec) As_prover.(Let_syntax.(
           let%map x = read_var x
           and xs = As_prover.all (List.map ~f:read_var xs)
           in
@@ -123,12 +123,17 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     go (Cvar.constant Field.zero) Field.one (bs0 :> Cvar.t list)
   ;;
 
+  type _ Camlsnark.Request.t +=
+    | N_ones : bool list Camlsnark.Request.t
+
   let rec n_ones ~total_length n =
     let%bind bs =
       exists (Var_spec.list ~length:total_length Boolean.spec)
-        As_prover.(map (all (List.map ~f:(read Boolean.spec) n)) ~f:(fun n ->
-          let n = pack_int n in
-          List.init total_length ~f:(fun i -> i < n)))
+        ~request:(As_prover.return N_ones)
+        ~compute:
+          As_prover.(map (all (List.map ~f:(read Boolean.spec) n)) ~f:(fun n ->
+            let n = pack_int n in
+            List.init total_length ~f:(fun i -> i < n)))
     in
     let%map () =
       assert_equal
@@ -160,6 +165,9 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
 
   let size_in_bits_size_in_bits = num_bits_int Field.size_in_bits
 
+  type _ Camlsnark.Request.t +=
+    | Num_bits_upper_bound : bool list Camlsnark.Request.t
+
   (* Someday: this could definitely be made more efficient *)
   let num_bits_upper_bound_unpacked : Boolean.var list -> (Cvar.t, _) Checked.t =
     let num_bits_upper_bound x =
@@ -175,7 +183,8 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     in
     fun x_unpacked ->
       let%bind res =
-        exists (Var_spec.list ~length:size_in_bits_size_in_bits Boolean.spec)
+        testify
+          (Var_spec.list ~length:size_in_bits_size_in_bits Boolean.spec)
           (As_prover.(map (read_var (Checked.pack x_unpacked)) ~f:num_bits_upper_bound))
       in
       let%map () = assert_num_bits_upper_bound x_unpacked res in
@@ -229,7 +238,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     let (`Less_equal le, `Greater_equal ge) = median_split length in
     let index = le - 1 in
     let%bind m =
-      exists Var_spec.field As_prover.(Let_syntax.(
+      testify Var_spec.field As_prover.(Let_syntax.(
         let%map xs = read Var_spec.(list ~length field) xs in
         let xs = List.sort ~cmp:compare_field xs in
         List.nth_exn xs index))
