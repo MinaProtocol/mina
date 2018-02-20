@@ -41,7 +41,7 @@ module Field = struct
     List.init size_in_bits ~f:(fun i -> Bigint.test_bit n i)
   ;;
 
-  let pack =
+  let project =
     let rec go x acc = function
       | [] -> acc
       | b :: bs ->
@@ -272,7 +272,33 @@ module Handle0 = struct
 end
 
 module As_prover0 = struct
-  type ('a, 's) t = (Cvar.t -> Field.t) -> 's -> ('s * 'a)
+  include As_prover.Make(struct type t = (Cvar.t -> Field.t) end)
+
+  let read_var (v : Cvar.t) : (Field.t, 's) t = fun tbl s -> (s, tbl v)
+  ;;
+end
+
+module Handler = struct
+  type t = Request.request -> Request.empty
+end
+
+module Provider = struct
+  type ('a, 's) t =
+    | Request of ('a Request.t, 's) As_prover0.t
+    | Compute of ('a, 's) As_prover0.t
+    | Both of ('a Request.t, 's) As_prover0.t * ('a, 's) As_prover0.t
+
+  let run t tbl s (handler : Request.Handler.t) =
+    match t with
+    | Request rc ->
+      let (s', r) = As_prover0.run rc tbl s in
+      (s', handler.with_ r)
+    | Compute c -> As_prover0.run c tbl s
+    | Both (rc, c) ->
+      let (s', r) = As_prover0.run rc tbl s in
+      match handler.with_ r with
+      | exception _ -> As_prover0.run c tbl s
+      | x -> (s', x)
 end
 
 module rec Var_spec0 : sig
@@ -292,16 +318,20 @@ and Checked0 : sig
     | Pure : 'a -> ('a, 's) t
     | Add_constraint : Constraint.t * ('a, 's) t -> ('a, 's) t
     | With_constraint_system : (R1CS_constraint_system.t -> unit) * ('a, 's) t -> ('a, 's) t
+    | As_prover : (unit, 's) As_prover0.t  * ('a, 's) t -> ('a, 's) t
     | With_label : string * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
     | With_state
       : ('s1, 's) As_prover0.t
         * ('s1 -> (unit, 's) As_prover0.t)
         * ('b, 's1) t
         * ('b -> ('a, 's) t) -> ('a, 's) t
-    | As_prover : (unit, 's) As_prover0.t  * ('a, 's) t -> ('a, 's) t
-    | Store
-      : ('var, 'value) Var_spec0.t * ('value, 's) As_prover0.t
-        * (('var, 'value) Handle0.t -> ('a, 's) t) -> ('a, 's) t
+    | With_handler : Request.Handler.t * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
+    | Clear_handler : ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
+    | Exists
+      : ('var, 'value) Var_spec0.t
+        * ('value, 's) Provider.t
+        * (('var, 'value) Handle0.t -> ('a, 's) t)
+      -> ('a, 's) t
     | Next_auxiliary : (int -> ('a, 's) t) -> ('a, 's) t
 end = Checked0
 
@@ -321,7 +351,9 @@ module Checked1 = struct
         | As_prover (x, k) -> As_prover (x, map k ~f)
         | Add_constraint (c, t1) -> Add_constraint (c, map t1 ~f)
         | With_state (p, and_then, t_sub, k) -> With_state (p, and_then, t_sub, fun b -> map (k b) ~f)
-        | Store (spec, c, k) -> Store (spec, c, fun v -> map (k v) ~f)
+        | With_handler (h, t, k) -> With_handler (h, t, fun b -> map (k b) ~f)
+        | Clear_handler (t, k) -> Clear_handler (t, fun b -> map (k b) ~f)
+        | Exists (spec, c, k) -> Exists (spec, c, fun v -> map (k v) ~f)
         | Next_auxiliary k -> Next_auxiliary (fun x -> map (k x) ~f)
     ;;
 
@@ -337,7 +369,9 @@ module Checked1 = struct
         (* Someday: This case is probably a performance bug *)
         | Add_constraint (c, t1) -> Add_constraint (c, bind t1 ~f)
         | With_state (p, and_then, t_sub, k) -> With_state (p, and_then, t_sub, fun b -> bind (k b) ~f)
-        | Store (spec, c, k) -> Store (spec, c, fun v -> bind (k v) ~f)
+        | With_handler (h, t, k) -> With_handler (h, t, fun b -> bind (k b) ~f)
+        | Clear_handler (t, k) -> Clear_handler (t, fun b -> bind (k b) ~f)
+        | Exists (spec, c, k) -> Exists (spec, c, fun v -> bind (k v) ~f)
         | Next_auxiliary k -> Next_auxiliary (fun x -> bind (k x) ~f)
     ;;
   end
@@ -663,44 +697,7 @@ end
 module As_prover = struct
   include As_prover0
 
-  let run (t : ('a, 's) t) tbl s : ('s * 'a) = t tbl s
-
-  let map (t : ('a, 's) t) ~(f : 'a -> 'b) : ('b, 's) t =
-    fun tbl s ->
-      let (s', x) = t tbl s in
-      (s', f x)
-  ;;
-
-  let bind (t : ('a, 's) t) ~(f : 'a -> ('b, 's) t) : ('b, 's) t =
-    fun tbl s ->
-      let (s', x) = t tbl s in
-      f x tbl s'
-  ;;
-
-  let return (x : 'a) : ('a, 's) t =
-    fun _ s -> (s, x)
-  ;;
-
-  module T = struct
-    type nonrec ('a, 's) t = ('a, 's) t
-    let map = `Custom map
-    let bind = bind
-    let return = return
-  end
-  include Monad.Make2(T)
-
-  let get_state : ('s, 's) t = fun _tbl s -> (s, s)
-  ;;
-
-  let read_var (v : Cvar.t) : (Field.t, 's) t = fun tbl s -> (s, tbl v)
-  ;;
-
-  let set_state (s : 's) : (unit, 's) t = fun tbl _ -> (s, ())
-  ;;
-
-  let modify_state f =
-    fun _tbl s -> (f s, ())
-  ;;
+  type ('a, 'prover_state) as_prover = ('a, 'prover_state) t
 
   let read
         ({ read; _ } : ('var, 'value) Var_spec.t)
@@ -710,24 +707,6 @@ module As_prover = struct
     fun tbl s ->
       (s, Var_spec.Read.run (read var) tbl)
   ;;
-
-  type ('a, 'prover_state) as_prover = ('a, 'prover_state) t
-
-  module Array = struct
-    include Array
-
-    let map (t : 'a array) ~(f : 'a -> ('b, 's) as_prover) : ('b array, 's) as_prover =
-      fun tbl s0 ->
-        let s = ref s0 in
-        let res =
-          Array.map t ~f:(fun x ->
-            let (s', y) = f x tbl !s in
-            s := s';
-            y)
-        in
-        (!s, res)
-    ;;
-  end
 
   module Ref = struct
     type 'a t = 'a option ref
@@ -747,11 +726,6 @@ module As_prover = struct
       fun _tbl s -> (s, (r := Some x))
     ;;
   end
-
-  let map2 x y ~f =
-    let open Let_syntax in
-    let%map x = x and y = y in f x y
-  ;;
 end
 
 module Handle = struct
@@ -766,17 +740,40 @@ end
 
 module Checked = struct
   include Checked1
-  let exists_with_handle
-        (spec : ('var, 'value) Var_spec.t)
-        (c : ('value, 's) As_prover0.t)
-    : (('var, 'value) Handle.t, 's) t
-    =
-    Store (spec, c, return)
-  ;;
 
-  let exists spec c =
-    map (exists_with_handle spec c) ~f:Handle.var
-  ;;
+  let can_i_get_a_witness
+        (spec : ('var, 'value) Var_spec.t)
+        (r : ('value Request.t, 's) As_prover.t)
+    =
+    Exists (spec, Request r, fun h -> return (Handle.var h))
+
+  let testify
+        (spec : ('var, 'value) Var_spec.t)
+        (c : ('value, 's) As_prover.t)
+    =
+    Exists (spec, Compute c, fun h -> return (Handle.var h))
+
+  let exists
+        ?request
+        ?compute
+        spec
+    =
+    let provider =
+      let request = Option.value request ~default:(As_prover.return Request.Fail) in
+      match compute with
+      | None -> Provider.Request request
+      | Some c -> Provider.Both (request, c)
+    in
+    Exists (spec, provider, fun h -> return (Handle.var h))
+
+  type empty = Request.empty
+  let unhandled = Request.unhandled
+  type request = Request.request
+  = With : { request :'a Request.t; respond : ('a -> empty) } -> request
+
+  let handle t k = With_handler (Request.Handler.create k, t, return)
+
+  (* let handle t h = With_handler (h, t, return) *)
 
   let next_auxiliary = Next_auxiliary return
 
@@ -845,15 +842,19 @@ module Checked = struct
         | Next_auxiliary k ->
           go stack (k !next_auxiliary)
         | With_label (s, t, k) ->
-          let y = go (s :: stack) t in (* TODO: Not a tail call! *)
+          let y = go (s :: stack) t in
           go stack (k y)
         | With_state (_p, _and_then, t_sub, k) ->
-          let y = go stack t_sub in (* TODO: Not a tail call! *)
+          let y = go stack t_sub in
           go stack (k y)
-        | Store ({ alloc; check; _ }, _c, k) ->
+        | With_handler (_h, t, k) ->
+          go stack (k (go stack t))
+        | Clear_handler (t, k) ->
+          go stack (k (go stack t))
+        | Exists ({ alloc; check; _ }, _c, k) ->
           let var = Var_spec.Alloc.run alloc alloc_var in
           (* TODO: Push a label onto the stack here *)
-          let () = go stack (check var) in (* TODO: Not a tail call! *)
+          let () = go stack (check var) in
           go stack (k { Handle.var; value = None })
     in
     time "constraint_system" (fun () ->
@@ -885,48 +886,54 @@ module Checked = struct
       Field.Vector.emplace_back aux x;
       v
     in
-    let rec go : type a s. (a, s) t -> s -> s * a =
-      fun t s ->
+    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
+      fun t handler s ->
         match t with
         | Pure x -> (s, x)
         | With_constraint_system (_, k) ->
-          go k s
+          go k handler s
         | With_label (_, t, k) ->
-          let (s', y) = go t s in
-          go (k y) s'
+          let (s', y) = go t handler s in
+          go (k y) handler s'
         | As_prover (x, k) ->
           let (s', ()) = As_prover.run x get_value s in
-          go k s'
+          go k handler s'
         | Add_constraint (_c, t) ->
-          go t s
+          go t handler s
         | With_state (p, and_then, t_sub, k) ->
           let (s, s_sub) = As_prover.run p get_value s in
-          let (s_sub, y) = go t_sub s_sub in
+          let (s_sub, y) = go t_sub handler s_sub in
           let (s, ()) = As_prover.run (and_then s_sub) get_value s in
-          go (k y) s
-        | Store ({ store; check; _ }, c, k) ->
-          let (s', value) = As_prover.run c get_value s in
+          go (k y) handler s
+        | With_handler (h, t, k) ->
+          let (s', y) = go t (Request.Handler.extend handler h) s in
+          go (k y) handler s'
+        | Clear_handler (t, k) ->
+          let (s', y) = go t Request.Handler.fail s in
+          go (k y) handler s'
+        | Exists ({ store; check; _ }, c, k) ->
+          let (s', value) = Provider.run c get_value s handler in
           let var =
             Var_spec.Store.run (store value) store_field_elt
           in
-          let ((), ()) = go (check var) () in
-          go (k { Handle.var; value = Some value }) s'
+          let ((), ()) = go (check var) handler () in
+          go (k { Handle.var; value = Some value }) handler s'
         | Next_auxiliary k ->
-          go (k !next_auxiliary) s
+          go (k !next_auxiliary) handler s
     in
     time "auxiliary_input" (fun () ->
-      ignore (go t0 s0));
+      ignore (go t0 Request.Handler.fail s0));
     aux
   ;;
 
   let run_unchecked (type a) (type s)
         (t0 : (a, s) t)
         (s0 : s)
-    : s * a =
-    let next_auxiliary = ref 0 in
+    =
+    let next_auxiliary = ref 1 in
     let aux = Field.Vector.create () in
     let get_value : Cvar.t -> Field.t =
-      let get_one v = Field.Vector.get aux (Backend.Var.index v) in
+      let get_one v = Field.Vector.get aux (Backend.Var.index v - 1) in
       Cvar.eval get_one
     in
     let store_field_elt x =
@@ -935,48 +942,123 @@ module Checked = struct
       Field.Vector.emplace_back aux x;
       v
     in
-    let rec go : type a s. (a, s) t -> s -> s * a =
-      fun t s ->
+    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
+      fun t handler s ->
         match t with
         | Pure x -> (s, x)
         | With_constraint_system (_, k) ->
-          go k s
+          go k handler s
         | With_label (_, t, k) ->
-          let (s', y) = go t s in
-          go (k y) s'
+          let (s', y) = go t handler s in
+          go (k y) handler s'
         | As_prover (x, k) ->
           let (s', ()) = As_prover.run x get_value s in
-          go k s'
+          go k handler s'
         | Add_constraint (_c, t) ->
-          go t s
+          go t handler s
         | With_state (p, and_then, t_sub, k) ->
           let (s, s_sub) = As_prover.run p get_value s in
-          let (s_sub, y) = go t_sub s_sub in
+          let (s_sub, y) = go t_sub handler s_sub in
           let (s, ()) = As_prover.run (and_then s_sub) get_value s in
-          go (k y) s
-        | Store ({ store; check; _ }, c, k) ->
-          let (s', value) = As_prover.run c get_value s in
+          go (k y) handler s
+        | With_handler (h, t, k) ->
+          let (s', y) = go t (Request.Handler.extend handler h) s in
+          go (k y) handler s'
+        | Clear_handler (t, k) ->
+          let (s', y) = go t Request.Handler.fail s in
+          go (k y) handler s'
+        | Exists ({ store; check; _ }, p, k) ->
+          let (s', value) = Provider.run p get_value s handler in
           let var =
             Var_spec.Store.run (store value) store_field_elt
           in
-          let ((), ()) = go (check var) () in
-          go (k { Handle.var; value = Some value }) s'
+          let ((), ()) = go (check var) handler () in
+          go (k { Handle.var; value = Some value }) handler s'
         | Next_auxiliary k ->
-          go (k !next_auxiliary) s
+          go (k !next_auxiliary) handler s
     in
-    go t0 s0
+    go t0 Request.Handler.fail s0
   ;;
+
+  let run_and_check' (type a) (type s)
+        (t0 : (a, s) t)
+        (s0 : s)
+    =
+    let next_auxiliary = ref 1 in
+    let aux = Field.Vector.create () in
+    let get_value : Cvar.t -> Field.t =
+      let get_one v = Field.Vector.get aux (Backend.Var.index v - 1) in
+      Cvar.eval get_one
+    in
+    let store_field_elt x =
+      let v = Backend.Var.create (!next_auxiliary) in
+      incr next_auxiliary;
+      Field.Vector.emplace_back aux x;
+      v
+    in
+    let system = R1CS_constraint_system.create () in
+    R1CS_constraint_system.set_primary_input_size system 0;
+    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
+      fun t handler s ->
+        match t with
+        | Pure x -> (s, x)
+        | With_constraint_system (f, k) ->
+          f system;
+          go k handler s
+        | With_label (_, t, k) ->
+          let (s', y) = go t handler s in
+          go (k y) handler s'
+        | As_prover (x, k) ->
+          let (s', ()) = As_prover.run x get_value s in
+          go k handler s'
+        | Add_constraint (c, t) ->
+          Constraint.add ~stack:[] c system;
+          go t handler s
+        | With_state (p, and_then, t_sub, k) ->
+          let (s, s_sub) = As_prover.run p get_value s in
+          let (s_sub, y) = go t_sub handler s_sub in
+          let (s, ()) = As_prover.run (and_then s_sub) get_value s in
+          go (k y) handler s
+        | With_handler (h, t, k) ->
+          let (s', y) = go t (Request.Handler.extend handler h) s in
+          go (k y) handler s'
+        | Clear_handler (t, k) ->
+          let (s', y) = go t Request.Handler.fail s in
+          go (k y) handler s'
+        | Exists ({ store; check; _ }, p, k) ->
+          let (s', value) = Provider.run p get_value s handler in
+          let var =
+            Var_spec.Store.run (store value) store_field_elt
+          in
+          let ((), ()) = go (check var) handler () in
+          go (k { Handle.var; value = Some value }) handler s'
+        | Next_auxiliary k ->
+          go (k !next_auxiliary) handler s
+    in
+    let (s, x) = go t0 Request.Handler.fail s0 in
+    let primary_input = Field.Vector.create () in
+    R1CS_constraint_system.set_auxiliary_input_size system (!next_auxiliary - 1);
+    s, x, get_value, R1CS_constraint_system.is_satisfied system ~primary_input ~auxiliary_input:aux
+  ;;
+
+  let run_and_check t s =
+    let (s, x, get_value, b) = run_and_check' t s in
+    let (s', x) = As_prover.run x get_value s in
+    s', x, b
+  ;;
+
+  let check t s = let (_, _, _, b) = run_and_check' t s in b
 
   let equal (x : Cvar.t) (y : Cvar.t) : (Cvar.t, _) t =
     let open Let_syntax in
-    let%bind inv = exists Var_spec.field begin
+    let%bind inv = testify Var_spec.field begin
       let open As_prover.Let_syntax in
       let%map x = As_prover.read_var x
       and y     = As_prover.read_var y
       in
       if Field.equal x y then Field.zero else Field.inv (Field.sub x y)
     end
-    and r = exists Var_spec.field begin
+    and r = testify Var_spec.field begin
       let open As_prover.Let_syntax in
       let%map x = As_prover.read_var x
       and y     = As_prover.read_var y
@@ -1005,7 +1087,7 @@ module Checked = struct
     with_label "Checked.mul" begin
       let open Let_syntax in
       let%bind z =
-        exists Var_spec.field begin
+        testify Var_spec.field begin
           let open As_prover.Let_syntax in
           let%map x = As_prover.read_var x
           and y     = As_prover.read_var y
@@ -1022,7 +1104,7 @@ module Checked = struct
     with_label "Checked.div" begin
       let open Let_syntax in
       let%bind z =
-        exists Var_spec.field begin
+        testify Var_spec.field begin
           let open As_prover.Let_syntax in
           let%map x = As_prover.read_var x
           and y     = As_prover.read_var y
@@ -1038,7 +1120,7 @@ module Checked = struct
   let inv x =
     with_label "Checked.inv" begin
       let open Let_syntax in
-      let%bind x_inv = exists Var_spec.field As_prover.(map ~f:Field.inv (read_var x)) in
+      let%bind x_inv = testify Var_spec.field As_prover.(map ~f:Field.inv (read_var x)) in
       let%map () = assert_r1cs ~label:"field_inverse" x x_inv (Cvar.constant Field.one) in
       x_inv
     end
@@ -1160,7 +1242,7 @@ module Checked = struct
         r - e = b (t - e)
       *)
       let%bind r =
-        exists Var_spec.field As_prover.(Let_syntax.(
+        testify Var_spec.field As_prover.(Let_syntax.(
           let%bind b = read Boolean.spec b in
           read Var_spec.field (if b then then_ else else_)))
       in
@@ -1173,18 +1255,23 @@ module Checked = struct
     end
   ;;
 
-  let unpack (v : Cvar.t) ~length
+  type _ Request.t +=
+    | Choose_preimage : Field.t * int -> bool list Request.t
+
+  let choose_preimage (v : Cvar.t) ~length
     : (Boolean.var list, 's) t
     =
     let open Let_syntax in
     let%bind res =
-      exists (Var_spec.list Boolean.spec ~length) begin
-        let open As_prover.Let_syntax in
-        let%map x = As_prover.read_var v in
-        let x = Bigint.of_field x in
-        List.init length ~f:(fun i ->
-          Bigint.test_bit x i)
-      end
+      exists (Var_spec.list Boolean.spec ~length)
+        ~request:As_prover.(map (read_var v) ~f:(fun x -> Choose_preimage (x, length)))
+        ~compute:begin
+          let open As_prover.Let_syntax in
+          let%map x = As_prover.read_var v in
+          let x = Bigint.of_field x in
+          List.init length ~f:(fun i ->
+            Bigint.test_bit x i)
+        end
     in
     let lc =
       let ts, _ =
@@ -1193,18 +1280,26 @@ module Checked = struct
       in
       Cvar.linear_combination ts
     in
-    let%map () = assert_r1cs ~label:"unpack" lc (Cvar.constant Field.one) v in
+    let%map () = assert_r1cs ~label:"Choose_preimage" lc (Cvar.constant Field.one) v in
     res
   ;;
 
-  let pack (vars : Boolean.var list) =
-    (* TODO: Can this be <= ? *)
-    assert (List.length vars < Field.size_in_bits);
+  let unpack v ~length =
+    assert (length < Field.size_in_bits);
+    choose_preimage v ~length
+  ;;
+
+  let project (vars : Boolean.var list) =
     let rec go c acc = function
       | [] -> List.rev acc
       | v :: vs -> go (Field.add c c) ((c, v) :: acc) vs
     in
     Cvar.linear_combination (go Field.one [] vars)
+  ;;
+
+  let pack vars =
+    assert (List.length vars < Field.size_in_bits);
+    project vars
   ;;
 
   module Assert = struct

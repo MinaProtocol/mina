@@ -15,7 +15,7 @@ module type S = sig
     include Sexpable.S with type t := t
 
     val unpack : t -> bool list
-    val pack : bool list -> t
+    val project : bool list -> t
   end
 
   module Bigint : Bigint_intf.Extended with type field := Field.t
@@ -192,12 +192,15 @@ module type S = sig
       -> Cvar.t
       -> (Boolean.var, 's) t
 
+    val project : Boolean.var list -> Cvar.t
     val pack : Boolean.var list -> Cvar.t
 
-    val unpack
-      : Cvar.t
-      -> length:int
-      -> (Boolean.var list, _) t
+    type _ Request.t +=
+      | Choose_preimage : Field.t * int -> bool list Request.t
+    val choose_preimage
+      : Cvar.t -> length:int -> (Boolean.var list, _) t
+
+    val unpack : Cvar.t -> length:int -> (Boolean.var list, _) t
 
     module Assert : sig
       val equal_bitstrings
@@ -293,16 +296,6 @@ module type S = sig
 
   val as_prover : (unit, 's) As_prover.t -> (unit, 's) Checked.t
 
-  val exists
-    : ('var, 'value) Var_spec.t
-    -> ('value, 's) As_prover.t
-    -> ('var, 's) Checked.t
-
-  val exists_with_handle
-    : ('var, 'value) Var_spec.t
-    -> ('value, 's) As_prover.t
-    -> (('var, 'value) Handle.t, 's) Checked.t
-
   val with_state
     : ?and_then:('s1 -> (unit, 's) As_prover.t)
     -> ('s1, 's) As_prover.t
@@ -310,6 +303,34 @@ module type S = sig
     -> ('a, 's) Checked.t
 
   val next_auxiliary : (int, 's) Checked.t
+
+  val can_i_get_a_witness
+    : ('var, 'value) Var_spec.t
+    -> ('value Request.t, 's) As_prover.t
+    -> ('var, 's) Checked.t
+
+  val testify
+    : ('var, 'value) Var_spec.t
+    -> ('value, 's) As_prover.t
+    -> ('var, 's) Checked.t
+
+  val exists
+    : ?request:('value Request.t, 's) As_prover.t
+    -> ?compute:('value, 's) As_prover.t
+    -> ('var, 'value) Var_spec.t
+    -> ('var, 's) Checked.t
+
+  type empty = Request.empty
+  val unhandled : empty
+  type request
+    = Request.request
+    = With : { request :'a Request.t; respond : ('a -> empty) } -> request
+
+  module Handler : sig
+    type t = request -> empty
+  end
+
+  val handle : ('a, 's) Checked.t -> Handler.t -> ('a, 's) Checked.t
 
   val with_label : string -> ('a, 's) Checked.t -> ('a, 's) Checked.t
 
@@ -335,5 +356,10 @@ module type S = sig
     -> 'k_value
 
   val run_unchecked : ('a, 's) Checked.t -> 's -> 's * 'a
+
+  val run_and_check
+    : (('a, 's) As_prover.t, 's) Checked.t -> 's -> 's * 'a * bool
+
+  val check : ('a, 's) Checked.t -> 's -> bool
 end
 
