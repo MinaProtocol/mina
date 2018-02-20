@@ -53,7 +53,12 @@ let daemon =
             else Prover.connect { host = "0.0.0.0"; port = prover_port }
           in
           let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
-          let genesis_chain = { Blockchain.state = Blockchain.State.zero; proof = genesis_proof } in
+          let genesis_chain =
+            { Blockchain.state = Blockchain.State.zero
+            ; proof = genesis_proof
+            ; most_recent_block = Block.genesis
+            }
+          in
           let%bind () = Main.assert_chain_verifies prover genesis_chain in
           let%bind ip =
             match ip with
@@ -65,7 +70,7 @@ let daemon =
             log
             prover
             (conf_dir ^/ "storage")
-            { Blockchain.state = Blockchain.State.zero; proof = genesis_proof }
+            genesis_chain
             initial_peers 
             should_mine
             (Host_and_port.create ~host:ip ~port)
