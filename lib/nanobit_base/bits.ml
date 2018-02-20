@@ -150,12 +150,9 @@ module Snarkable = struct
         and type Packed.value = V.t
         and type Unpacked.var = Impl.Boolean.var list
         and type Unpacked.value = V.t
-(*         and type Bits.t = V.t *)
     =
   struct
     open Impl
-
-    (* TODO: DELETE module Bits = Vector.Make(V) *)
 
     let bit_length = V.length
 
@@ -242,13 +239,9 @@ module Snarkable = struct
   module Field_backed
       (Impl : Camlsnark.Snark_intf.S)
       (M : sig val bit_length : int end)
-(*         TODO: DElete and type Bits.t = Impl.Field.t *)
   = struct
     open Impl
     include M
-
-    (* TODO: Delete *)
-(*     module Bits = Make_field0(Impl.Field)(Impl.Bigint)(M) *)
 
     module Packed = struct
       type var = Cvar.t
