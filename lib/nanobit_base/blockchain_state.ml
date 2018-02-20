@@ -254,7 +254,8 @@ module Checked = struct
     with_label "Blockchain.State.update" begin
       let%bind () =
         assert_equal ~label:"previous_block_hash"
-          (* TODO: Is the use of project ok here *)
+(* TODO-soon: There should be a "proof-of-work" var type which is a Target.bit_length
+   long string so we can use pack rather than project here. *)
           (Digest.project_var block.header.previous_block_hash)
           (Digest.project_var state.block_hash)
       in
