@@ -1,11 +1,11 @@
 
 (* These should all be false! *)
-let strength_calculation = false
-let verify_blockchain    = false
-let check_target         = false
-let compute_base_hash    = false
-let compute_base_proof   = false
-let extend_blockchain    = false
+let strength_calculation = true
+let verify_blockchain    = true
+let check_target         = true
+let compute_base_hash    = true
+let compute_base_proof   = true
+let extend_blockchain    = true
 (* Enabling this will SPEED UP builds as keys are generated at compile-time *)
-let key_generation       = false
+let key_generation       = true
 
