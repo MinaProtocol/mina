@@ -177,10 +177,10 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     let test n =
       let t = n_ones ~total_length (Cvar.constant (Field.of_int n)) in
       let handle_with (resp : bool list) = 
-        handle t (fun (Request (r, k)) ->
-          match r with
-          | N_ones -> k resp
-          | _ -> failwith "Unhandled")
+        handle t (fun (With {request; respond}) ->
+          match request with
+          | N_ones -> respond resp
+          | _ -> unhandled)
       in
       let correct = Int.pow 2 n - 1 in
       let to_bits k = List.init total_length ~f:(fun i -> (k lsr i) land 1 = 1) in
@@ -269,10 +269,10 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
       let handle_with resp =
         handle
           (num_bits_upper_bound ~max_length (Cvar.constant x))
-          (fun (Request (r, k)) ->
-             match r with
-             | Num_bits_upper_bound -> k (Field.of_int resp)
-             | _ -> failwith "unhandled")
+          (fun (With {request; respond}) ->
+             match request with
+             | Num_bits_upper_bound -> respond (Field.of_int resp)
+             | _ -> unhandled)
       in
       let true_answer = num_bits_upper_bound_unchecked x in
       for i = 0 to true_answer - 1 do

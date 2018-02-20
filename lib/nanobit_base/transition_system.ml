@@ -1,9 +1,6 @@
 open Core_kernel
 open Snark_params
 
-(* Make sure tests work *)
-let%test "trivial" = true
-
 module type S = sig
   open Tick
   type digest_var
