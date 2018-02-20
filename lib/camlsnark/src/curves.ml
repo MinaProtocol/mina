@@ -295,7 +295,7 @@ module Edwards = struct
         fun b ~then_ ~else_ ->
           with_label "Edwards.Checked.if_" begin
             let%bind r =
-              testify spec As_prover.(Let_syntax.(
+              provide_witness spec As_prover.(Let_syntax.(
                 let%bind b = read Boolean.spec b in
                 read spec (if b then then_ else else_)))
             in
@@ -348,7 +348,7 @@ module Edwards = struct
           let open Cvar.Infix in
           let res a1 a3 =
             let%bind a =
-              testify Var_spec.field begin
+              provide_witness Var_spec.field begin
                 let open As_prover in
                 let open As_prover.Let_syntax in
                 let open Field.Infix in
@@ -500,7 +500,7 @@ module Checked = struct
       let%bind denom = Checked.inv Cvar.Infix.(bx - ax) in
       let%bind lambda = Checked.mul Cvar.Infix.(by - ay) denom in
       let%bind cx =
-        testify Var_spec.field begin
+        provide_witness Var_spec.field begin
           let open As_prover in let open Let_syntax in
           let%map ax = read_var ax
           and bx = read_var bx
@@ -515,7 +515,7 @@ module Checked = struct
           Cvar.Infix.(cx + ax + bx)
       in
       let%bind cy =
-        testify Var_spec.field begin
+        provide_witness Var_spec.field begin
           let open As_prover in let open Let_syntax in
           let%map ax = read_var ax
           and ay = read_var ay
@@ -539,21 +539,21 @@ module Checked = struct
       let open Let_syntax in
       let%bind x_squared = Checked.mul ax ax in
       let%bind lambda =
-        testify Var_spec.field begin
+        provide_witness Var_spec.field begin
           let open As_prover in
           map2 (read_var x_squared) (read_var ay) ~f:(fun x_squared ay ->
             Field.(Infix.((of_int 3 * x_squared + Coefficients.a) * inv (of_int 2 * ay))))
         end
       in
       let%bind bx =
-        testify Var_spec.field begin
+        provide_witness Var_spec.field begin
           let open As_prover in
           map2 (read_var lambda) (read_var ax) ~f:(fun lambda ax ->
             Field.(Infix.(square lambda - of_int 2 * ax)))
         end
       in
       let%bind by =
-        testify Var_spec.field begin
+        provide_witness Var_spec.field begin
           let open As_prover in let open Let_syntax in
           let%map lambda = read_var lambda
           and ax = read_var ax
@@ -594,7 +594,7 @@ module Checked = struct
     fun b ~then_ ~else_ ->
       let open Let_syntax in
       let%bind r =
-        testify spec As_prover.(Let_syntax.(
+        provide_witness spec As_prover.(Let_syntax.(
           let%bind b = read Boolean.spec b in
           read spec (if b then then_ else else_)))
       in

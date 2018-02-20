@@ -741,13 +741,13 @@ end
 module Checked = struct
   include Checked1
 
-  let can_i_get_a_witness
+  let request_witness
         (spec : ('var, 'value) Var_spec.t)
         (r : ('value Request.t, 's) As_prover.t)
     =
     Exists (spec, Request r, fun h -> return (Handle.var h))
 
-  let testify
+  let provide_witness
         (spec : ('var, 'value) Var_spec.t)
         (c : ('value, 's) As_prover.t)
     =
@@ -1051,14 +1051,14 @@ module Checked = struct
 
   let equal (x : Cvar.t) (y : Cvar.t) : (Cvar.t, _) t =
     let open Let_syntax in
-    let%bind inv = testify Var_spec.field begin
+    let%bind inv = provide_witness Var_spec.field begin
       let open As_prover.Let_syntax in
       let%map x = As_prover.read_var x
       and y     = As_prover.read_var y
       in
       if Field.equal x y then Field.zero else Field.inv (Field.sub x y)
     end
-    and r = testify Var_spec.field begin
+    and r = provide_witness Var_spec.field begin
       let open As_prover.Let_syntax in
       let%map x = As_prover.read_var x
       and y     = As_prover.read_var y
@@ -1087,7 +1087,7 @@ module Checked = struct
     with_label "Checked.mul" begin
       let open Let_syntax in
       let%bind z =
-        testify Var_spec.field begin
+        provide_witness Var_spec.field begin
           let open As_prover.Let_syntax in
           let%map x = As_prover.read_var x
           and y     = As_prover.read_var y
@@ -1104,7 +1104,7 @@ module Checked = struct
     with_label "Checked.div" begin
       let open Let_syntax in
       let%bind z =
-        testify Var_spec.field begin
+        provide_witness Var_spec.field begin
           let open As_prover.Let_syntax in
           let%map x = As_prover.read_var x
           and y     = As_prover.read_var y
@@ -1120,7 +1120,7 @@ module Checked = struct
   let inv x =
     with_label "Checked.inv" begin
       let open Let_syntax in
-      let%bind x_inv = testify Var_spec.field As_prover.(map ~f:Field.inv (read_var x)) in
+      let%bind x_inv = provide_witness Var_spec.field As_prover.(map ~f:Field.inv (read_var x)) in
       let%map () = assert_r1cs ~label:"field_inverse" x x_inv (Cvar.constant Field.one) in
       x_inv
     end
@@ -1242,7 +1242,7 @@ module Checked = struct
         r - e = b (t - e)
       *)
       let%bind r =
-        testify Var_spec.field As_prover.(Let_syntax.(
+        provide_witness Var_spec.field As_prover.(Let_syntax.(
           let%bind b = read Boolean.spec b in
           read Var_spec.field (if b then then_ else else_)))
       in

@@ -95,7 +95,7 @@ module Make
           then return ()
           else begin
             let%bind _ =
-              testify Var_spec.field
+              provide_witness Var_spec.field
                 As_prover.(map get_state ~f:(fun v ->
                   Field.Vector.get v i))
             in

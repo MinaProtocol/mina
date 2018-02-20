@@ -304,12 +304,12 @@ module type S = sig
 
   val next_auxiliary : (int, 's) Checked.t
 
-  val can_i_get_a_witness
+  val request_witness
     : ('var, 'value) Var_spec.t
     -> ('value Request.t, 's) As_prover.t
     -> ('var, 's) Checked.t
 
-  val testify
+  val provide_witness
     : ('var, 'value) Var_spec.t
     -> ('value, 's) As_prover.t
     -> ('var, 's) Checked.t

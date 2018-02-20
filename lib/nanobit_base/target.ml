@@ -185,7 +185,7 @@ let strength
   with_label "Target.strength" begin
     if Insecure.strength_calculation
     then
-      testify Var_spec.field
+      provide_witness Var_spec.field
         As_prover.(map (read_var y) ~f:strength_unchecked)
     else floor_divide ~numerator:(`Two_to_the bit_length) y y_unpacked
   end
