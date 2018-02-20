@@ -9,7 +9,12 @@ module type S = sig
     end
 
     module Bits : sig
-      module type S = Bits_intf.Snarkable
+      module type Faithful = Bits_intf.Snarkable.Faithful
+        with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
+         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type boolean_var := Boolean.var
+
+      module type Lossy = Bits_intf.Snarkable.Lossy
         with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var

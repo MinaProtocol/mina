@@ -37,8 +37,10 @@ module Vector = struct
   end
 
   module Make (V : Basic)
-    : Bits_intf.S with type t := V.t =
+    : Bits_intf.S with type t = V.t =
   struct
+    type t = V.t
+
     let fold t ~init ~f =
       let rec go acc i =
         if i = V.length
@@ -118,6 +120,18 @@ module Make_field
   : Bits_intf.S with type t = Field.t
 = Make_field0(Field)(Bigint)(struct let bit_length = Field.size_in_bits end)
 
+module Small
+    (Field : Camlsnark.Field_intf.S)
+    (Bigint : Camlsnark.Bigint_intf.S with type field := Field.t)
+    (M : sig val bit_length : int end)
+  : Bits_intf.S with type t = Field.t
+  = struct
+    let () = assert (M.bit_length < Field.size_in_bits)
+
+    include Make_field0(Field)(Bigint)(M)
+  end
+
+
 module Snarkable = struct
   module Small_bit_vector
     (Impl : Camlsnark.Snark_intf.S)
@@ -128,7 +142,7 @@ module Snarkable = struct
        val get : t -> int -> bool
        val set : t -> int -> bool -> t
      end)
-    : Bits_intf.Snarkable
+    : Bits_intf.Snarkable.Faithful
        with type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
         and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
         and type boolean_var := Impl.Boolean.var
@@ -136,9 +150,12 @@ module Snarkable = struct
         and type Packed.value = V.t
         and type Unpacked.var = Impl.Boolean.var list
         and type Unpacked.value = V.t
+(*         and type Bits.t = V.t *)
     =
   struct
     open Impl
+
+    (* TODO: DELETE module Bits = Vector.Make(V) *)
 
     let bit_length = V.length
 
@@ -190,8 +207,6 @@ module Snarkable = struct
         ~f:(fun i acc b -> if i < V.length then V.set acc i b else acc)
 
     module Unpacked = struct
-      include Vector.Make(V)
-
       type var = Boolean.var list
       type value = V.t
 
@@ -208,201 +223,32 @@ module Snarkable = struct
             ~there:(v_to_list Field.size_in_bits)
             ~back:v_of_list
       end
+
+      let var_to_bits = Fn.id
     end
 
-    module Checked = struct
-      let to_bits = Fn.id
+    let pack_var = Checked.project
 
-      let padding =
-        List.init (Field.size_in_bits - bit_length)
-          ~f:(fun _ -> Boolean.false_)
+    let pack_value = Fn.id
 
-      let pad x = x @ padding
+    let unpack_var x = Impl.Checked.unpack x ~length:bit_length
 
-      let unpack x = Checked.unpack x ~length:bit_length
-    end
-
-    let unpack (x : Packed.value) : Unpacked.value = x
+    let unpack_value (x : Packed.value) : Unpacked.value = x
   end
 
   module Int64 (Impl : Camlsnark.Snark_intf.S) =
     Small_bit_vector(Impl)(Vector.Int64)
 
-  module Bitstring
-      (Impl : Camlsnark.Snark_intf.S)
-      (M : sig val bit_length : int end)
-    : Bits_intf.Snarkable
-       with type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
-        and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-        and type boolean_var := Impl.Boolean.var
-        and type Packed.var = Impl.Cvar.t list
-        and type Packed.value = Bigstring.t
-        and type Unpacked.var = Impl.Boolean.var list
-        and type Unpacked.value = Bigstring.t
-    =
-  struct
-    open Impl
-
-    include M
-
-    let bits_per_element = Field.size_in_bits - 1
-
-    let int_nth_bit c n = ((c lsr n) land 1) = 1
-
-    let chunks_of n xs =
-      List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
-
-    let of_bool_list bs =
-      let n = Float.(to_int (round_up (of_int (List.length bs) /. 8.))) in
-      let t = Bigstring.create n in
-      let bits_to_char bs =
-        List.foldi bs ~init:0 ~f:(fun i acc b ->
-          if b then acc + (1 lsl i) else acc)
-        |> Char.of_int_exn
-      in
-      List.iteri (chunks_of bits_per_char bs) ~f:(fun i b ->
-        Bigstring.set t i (bits_to_char b));
-      t
-    ;;
-
-    let element_length =
-      Float.to_int
-        (Float.round_up (Float.of_int bit_length /. Float.of_int bits_per_element))
-
-    module V = Vector.Bigstring(M)
-    module Bits = Vector.Make(V)
-
-    module Unpacked = struct
-      include Bits
-
-      type var = Boolean.var list
-      type value = Bigstring.t
-
-      let spec : (var, value) Var_spec.t =
-        let open Var_spec in
-        let store (t : value) : var Store.t =
-          let open Store.Let_syntax in
-          let rec go acc i =
-            if i < 0
-            then return acc
-            else
-              let b = V.get t i in
-              let%bind b = Boolean.spec.store b in
-              go (b :: acc) (i - 1)
-          in
-          go [] (bits_per_char * Bigstring.length t)
-        in
-        let read bs =
-          Read.map (Read.all (List.map ~f:Boolean.spec.read bs))
-            ~f:of_bool_list
-        in
-        let check bs = Checked.all_ignore (List.map ~f:Boolean.spec.check bs) in
-        let alloc = Alloc.all (List.init bit_length ~f:(fun _ -> Boolean.spec.alloc)) in
-        { store; read; check; alloc }
-      ;;
-    end
-
-    let bits_in_final_elt = bit_length mod bits_per_element
-
-    module Packed = struct
-      type var = Cvar.t list
-      type value = Bigstring.t
-
-      let char_to_field c =
-        let n = Char.to_int c in
-        let rec go two_to_the_i acc i =
-          if i = bits_per_char
-          then acc
-          else
-            let acc =
-              if int_nth_bit n i
-              then Field.add acc two_to_the_i
-              else acc
-            in
-            go (Field.add two_to_the_i two_to_the_i) acc (i + 1)
-        in
-        go Field.one Field.zero 0
-      ;;
-
-      let bits_to_field bs =
-        let rec go acc pt = function
-          | [] -> acc
-          | b :: bs ->
-            go (if b then Field.add acc pt else acc) (Field.add pt pt) bs
-        in
-        go Field.zero Field.one bs
-      ;;
-
-      let spec =
-        let open Var_spec in
-        (* someday: make efficient *)
-        let store t =
-          Bits.to_bits t
-          |> chunks_of bits_per_element
-          |> List.map ~f:(fun bs -> field.store (bits_to_field bs))
-          |> Store.all
-        in
-        let read vs = failwith "TODO" in
-        let alloc = Alloc.all (List.init element_length ~f:(fun _ -> field.alloc)) in
-        let check _ = Checked.return () in
-        { store; read; alloc; check }
-      ;;
-
-      (* Someday: make efficient by unrolling the iteration over bytes *)
-      let fold (t : value) ~init ~f =
-        let rec go acc i =
-          if i = bit_length
-          then acc
-          else go (f acc (V.get t i)) (i + 1)
-        in
-        go init 0
-      ;;
-
-      let iter (t : value) ~f =
-        for i = 0 to bit_length - 1 do
-          f (V.get t i)
-        done
-      ;;
-    end
-
-    module Checked = struct
-      let to_bits = Fn.id
-
-      let padding =
-        List.init (element_length * Field.size_in_bits - bit_length) ~f:(fun _ -> Boolean.false_)
-
-      let pad x = x @ padding
-
-      let unpack vs0 =
-        let vs, v = split_last_exn vs0 in
-        let open Let_syntax in
-        let%map bss =
-          Checked.all (List.map vs ~f:(Checked.unpack ~length:bits_per_element))
-        and bs = Checked.unpack ~length:bits_in_final_elt v
-        in
-        List.concat bss @ bs
-      ;;
-    end
-
-    let unpack : Packed.value -> Unpacked.value = Fn.id
-  end
-
   module Field_backed
       (Impl : Camlsnark.Snark_intf.S)
       (M : sig val bit_length : int end)
-    : Bits_intf.Snarkable
-       with type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
-        and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-        and type boolean_var := Impl.Boolean.var
-        and type Packed.var = Impl.Cvar.t
-        and type Packed.value = Impl.Field.t
-        and type Unpacked.var = Impl.Boolean.var list
-        and type Unpacked.value = Impl.Field.t
+(*         TODO: DElete and type Bits.t = Impl.Field.t *)
   = struct
     open Impl
     include M
 
-    module Bits = Make_field0(Impl.Field)(Impl.Bigint)(M)
+    (* TODO: Delete *)
+(*     module Bits = Make_field0(Impl.Field)(Impl.Bigint)(M) *)
 
     module Packed = struct
       type var = Cvar.t
@@ -414,42 +260,61 @@ module Snarkable = struct
     end
 
     module Unpacked = struct
-      include Bits
-
       type var = Boolean.var list
       type value = Field.t
 
       let spec : (var, value) Var_spec.t =
         Var_spec.transport (Var_spec.list ~length:bit_length Boolean.spec)
           ~there:(unpack_field Field.unpack ~bit_length)
-          ~back:Field.pack
+          ~back:Field.project
       ;;
+
+      let var_to_bits = Fn.id
     end
 
-    module Checked = struct
-      let unpack : Packed.var -> (Unpacked.var, _) Checked.t =
-        Checked.unpack ~length:bit_length
+    let project_value = Fn.id
+    let project_var = Checked.project
 
-      let padding =
-        List.init (Field.size_in_bits - bit_length) ~f:(fun _ -> Boolean.false_)
+    let choose_preimage_var : Packed.var -> (Unpacked.var, _) Checked.t =
+      Checked.choose_preimage ~length:bit_length
 
-      let pad x = x @ padding
-
-      let to_bits = Fn.id
-    end
-
-    let unpack : Packed.value -> Unpacked.value = Fn.id
+    let unpack_value = Fn.id
   end
 
-  module Field (Impl : Camlsnark.Snark_intf.S) =
+  module Field (Impl : Camlsnark.Snark_intf.S)
+    : Bits_intf.Snarkable.Lossy
+       with type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
+        and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
+        and type boolean_var := Impl.Boolean.var
+        and type Packed.var = Impl.Cvar.t
+        and type Packed.value = Impl.Field.t
+        and type Unpacked.var = Impl.Boolean.var list
+        and type Unpacked.value = Impl.Field.t
+    =
     Field_backed(Impl)(struct let bit_length = Impl.Field.size_in_bits end)
 
   module Small
       (Impl : Camlsnark.Snark_intf.S)
-      (M : sig val bit_length : int end) = struct
+      (M : sig val bit_length : int end)
+    : Bits_intf.Snarkable.Faithful
+       with type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
+        and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
+        and type boolean_var := Impl.Boolean.var
+        and type Packed.var = Impl.Cvar.t
+        and type Packed.value = Impl.Field.t
+        and type Unpacked.var = Impl.Boolean.var list
+        and type Unpacked.value = Impl.Field.t
+  = struct
     let () = assert (M.bit_length < Impl.Field.size_in_bits)
 
     include Field_backed(Impl)(M)
+    let pack_var bs =
+      assert (List.length bs = M.bit_length);
+      project_var bs
+
+    let pack_value = Fn.id
+
+    let unpack_var = Impl.Checked.unpack ~length:M.bit_length
   end
 end
 

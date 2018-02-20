@@ -15,7 +15,7 @@ val zero : t
 
 module Bits : Bits_intf.S with type t := t
 
-include Tick.Snarkable.Bits.S
+include Tick.Snarkable.Bits.Faithful
   with type Packed.value = t
    and type Unpacked.value = t
    and type Packed.var = Tick.Cvar.t

@@ -23,14 +23,14 @@ val meets_target_unchecked
   -> hash:Pedersen.Digest.t
   -> bool
 
-include Snarkable.Bits.S
+module Bits : Bits_intf.S with type t := t
+
+include Snarkable.Bits.Faithful
   with type Unpacked.value = t
    and type Packed.value = t
    and type Packed.var = private Cvar.t
 
 val passes : Packed.var -> Pedersen.Digest.Packed.var -> (Boolean.var, _) Tick.Checked.t
-
-val pack : Unpacked.var -> Packed.var
 
 val var_to_unpacked : Cvar.t -> (Unpacked.var, _) Tick.Checked.t
 

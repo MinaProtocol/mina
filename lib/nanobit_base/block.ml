@@ -36,56 +36,30 @@ module Header = struct
     let init = Nonce.Bits.fold nonce ~init ~f in
     init
 
-  module Snarkable
-    (Hash : Tick.Snarkable.S)
-    (Time : Tick.Snarkable.S)
-    (Nonce : Tick.Snarkable.S)
-  = struct
-    open Tick
+  let data_spec =
+    Tick.Data_spec.(
+      [ Pedersen.Digest.Unpacked.spec
+      ; Block_time.Unpacked.spec
+      ; Nonce.Unpacked.spec
+      ])
 
-    type var = (Hash.var, Time.var, Nonce.var) t_
-    type value = (Hash.value, Time.value, Nonce.value) t_
+  type var = (Pedersen.Digest.Unpacked.var, Block_time.Unpacked.var, Nonce.Unpacked.var) t_
+  type value = (Pedersen.Digest.Unpacked.value, Block_time.Unpacked.value, Nonce.Unpacked.value) t_
 
-    let data_spec =
-      Data_spec.(
-        [ Hash.spec
-        ; Time.spec
-        ; Nonce.spec
-        ])
+  let to_bits ({ previous_block_hash; time; nonce } : t) =
+    Pedersen.Digest.Bits.to_bits previous_block_hash
+    @ Block_time.Bits.to_bits time
+    @ Nonce.Bits.to_bits nonce
 
-    let spec : (var, value) Var_spec.t =
-      Var_spec.of_hlistable data_spec
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-  end
+  let var_to_bits { previous_block_hash; time; nonce } =
+    Pedersen.Digest.Unpacked.var_to_bits previous_block_hash
+    @ Block_time.Unpacked.var_to_bits time
+    @ Nonce.Unpacked.var_to_bits nonce
 
-  module Packed = Snarkable(Pedersen.Digest.Packed)(Block_time.Packed)(Nonce.Packed)
-
-  module Unpacked = struct
-    include Snarkable(Pedersen.Digest.Unpacked)(Block_time.Unpacked)(Nonce.Unpacked)
-
-    let to_bits ({ previous_block_hash; time; nonce } : value) =
-      Pedersen.Digest.Unpacked.to_bits previous_block_hash
-      @ Block_time.Unpacked.to_bits time
-      @ Nonce.Unpacked.to_bits nonce
-  end
-
-  module Checked = struct
-    let unpack ({ previous_block_hash; time; nonce } : Packed.var)
-      =
-      let open Tick.Let_syntax in
-      let%map previous_block_hash = Pedersen.Digest.Checked.unpack previous_block_hash
-      and time = Block_time.Checked.unpack time
-      and nonce = Nonce.Checked.unpack nonce
-      in
-      { previous_block_hash; time; nonce }
-    ;;
-
-    let to_bits { previous_block_hash; time; nonce } =
-      Pedersen.Digest.Checked.to_bits previous_block_hash
-      @ Block_time.Checked.to_bits time
-      @ Nonce.Checked.to_bits nonce
-  end
+  let spec : (var, value) Tick.Var_spec.t =
+    Tick.Var_spec.of_hlistable data_spec
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
 
 module Body = struct
@@ -152,38 +126,19 @@ let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"
 let to_hlist { header; body } = H_list.([ header; body ])
 let of_hlist = H_list.(fun [ header; body ] -> { header; body })
 
-module Snarkable(Header : Tick.Snarkable.S)(Body : Tick.Snarkable.S) = struct
-  open Tick
+type var = (Header.var, Body.Unpacked.var) t_
+type value = (Header.value, Body.Unpacked.value) t_
 
-  type var = (Header.var, Body.var) t_
-  type value = (Header.value, Body.value) t_
+let data_spec = Tick.Data_spec.([ Header.spec; Body.Unpacked.spec ])
 
-  let data_spec = Data_spec.([ Header.spec; Body.spec ])
+let spec : (var, value) Tick.Var_spec.t =
+  Tick.Var_spec.of_hlistable data_spec
+    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let spec : (var, value) Var_spec.t =
-    Var_spec.of_hlistable data_spec
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-end
+let to_bits ({ header; body } : value) =
+  Header.to_bits header @ Body.Bits.to_bits body
 
-module Packed = Snarkable(Header.Packed)(Body.Packed)
-
-module Unpacked = struct
-  include Snarkable(Header.Unpacked)(Body.Unpacked)
-
-  let to_bits ({ header; body } : value) =
-    Header.Unpacked.to_bits header @ Body.Unpacked.to_bits body
-end
-
-module Checked = struct
-  let unpack ({ header; body } : Packed.var) : (Unpacked.var, _) Tick.Checked.t =
-    let open Tick.Let_syntax in
-    let%map header = Header.Checked.unpack header
-    and body = Body.Checked.unpack body
-    in
-    { header; body }
-
-  let to_bits { header; body } =
-    Header.Checked.to_bits header
-    @ Body.Checked.to_bits body
-end
+let var_to_bits { header; body } =
+  Header.var_to_bits header
+  @ Body.Unpacked.var_to_bits body
