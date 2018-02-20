@@ -11,7 +11,10 @@ end
 
 include Stable.V1
 
-include Bits.Snarkable.Int64(Tick)
+module B = Bits
+
+module Bits = Bits.Int64
+include B.Snarkable.Int64(Tick)
 
 module Span = struct
   module Stable = struct
@@ -22,7 +25,8 @@ module Span = struct
 
   include Stable.V1
 
-  include Bits.Snarkable.Int64(Tick)
+  module Bits = B.Int64
+  include B.Snarkable.Int64(Tick)
 
   let of_time_span s =
     Int64.of_float (Time.Span.to_ms s)
@@ -30,13 +34,11 @@ module Span = struct
   let to_ms t = t
 end
 
-module Bits = Bits.Int64
-
 let diff x y = Int64.(x - y)
 
 let diff_checked x y =
-  let pack = Tick.Checked.pack in
-  Span.Checked.unpack Tick.Cvar.Infix.(pack x - pack y)
+  let pack = Tick.Checked.project in
+  Span.unpack_var Tick.Cvar.Infix.(pack x - pack y)
 ;;
 
 let of_time t =

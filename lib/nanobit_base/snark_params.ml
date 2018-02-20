@@ -14,7 +14,12 @@ module Extend (Impl : Camlsnark.Snark_intf.S) = struct
     end
 
     module Bits = struct
-      module type S = Bits_intf.Snarkable
+      module type Lossy = Bits_intf.Snarkable.Lossy
+        with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
+         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type boolean_var := Boolean.var
+
+      module type Faithful = Bits_intf.Snarkable.Faithful
         with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
@@ -145,3 +150,10 @@ let bigint_of_tick_bigint n =
   in
   go 0 Bignum.Bigint.one Bignum.Bigint.zero
 
+(* Let n = Tick.Field.size_in_bits.
+   Let k = n - 3.
+   The reason k = n - 3 is as follows. Inside [meets_target], we compare
+   a value against 2^k. 2^k requires k + 1 bits. The comparison then unpacks
+   a (k + 1) + 1 bit number. This number cannot overflow so it is important that
+   k + 1 + 1 < n. Thus k < n - 2. *)
+let target_bit_length = Tick.Field.size_in_bits - 3

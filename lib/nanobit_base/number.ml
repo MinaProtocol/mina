@@ -35,7 +35,7 @@ let of_bits bs =
   assert (n < Field.size_in_bits);
   { upper_bound = Bignum.Bigint.(pow2 n - one)
   ; lower_bound = Bignum.Bigint.zero
-  ; var = Checked.pack bs
+  ; var = Checked.project bs
   ; bits = Some bs
   }
 
@@ -48,7 +48,7 @@ let clamp_to_n_bits t n =
     else
       let%bind bs = to_bits t in
       let bs' = List.take bs n in
-      let g = Checked.pack bs' in
+      let g = Checked.project bs' in
       let%bind fits = Checked.equal t.var g in
       let%map r =
         Checked.if_ fits

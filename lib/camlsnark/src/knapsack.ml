@@ -95,7 +95,7 @@ module Hash
   let if_ (b : Boolean.var) ~then_:ys ~else_:xs : (var, _) Impl.Checked.t =
     let open Impl.Let_syntax in
     let%bind res =
-      exists spec_unchecked begin
+      provide_witness spec_unchecked begin
         let open As_prover.Let_syntax in
         match%bind As_prover.read Boolean.spec b with
         | false -> As_prover.read spec xs

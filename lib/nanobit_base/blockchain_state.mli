@@ -46,16 +46,16 @@ include Snarkable.S
     type var =
       ( Block_time.Unpacked.var
       , Target.Unpacked.var
-      , Pedersen.Digest.Packed.var
-      , Block.Body.Packed.var
-      , Strength.Packed.var
+      , Pedersen.Digest.Unpacked.var
+      , Block.Body.Unpacked.var
+      , Strength.Unpacked.var
       ) t_
     and type value =
       ( Block_time.Unpacked.value
       , Target.Unpacked.value
-      , Pedersen.Digest.Packed.value
-      , Block.Body.Packed.value
-      , Strength.Packed.value
+      , Pedersen.Digest.Unpacked.value
+      , Block.Body.Unpacked.value
+      , Strength.Unpacked.value
       ) t_
 
 val update_exn : value -> Block.t -> value
@@ -70,7 +70,7 @@ module Checked : sig
   val hash : var -> (Pedersen.Digest.Packed.var, _) Checked.t
   val is_base_hash : Pedersen.Digest.Packed.var -> (Boolean.var, _) Checked.t
 
-  val update : var -> Block.Packed.var -> (var * [ `Success of Boolean.var ], _) Checked.t
+  val update : var -> Block.var -> (var * [ `Success of Boolean.var ], _) Checked.t
 end
 
 val compute_target : Block_time.t -> Target.t -> Block_time.t -> Target.t

@@ -33,17 +33,17 @@ include Stable.V1
 type var =
   ( Block_time.Unpacked.var
   , Target.Unpacked.var
-  , Digest.Packed.var
-  , Block.Body.Packed.var
-  , Strength.Packed.var
+  , Digest.Unpacked.var
+  , Block.Body.Unpacked.var
+  , Strength.Unpacked.var
   ) t_
 
 type value =
   ( Block_time.Unpacked.value
   , Target.Unpacked.value
-  , Digest.Packed.value
-  , Block.Body.Packed.value
-  , Strength.Packed.value
+  , Digest.Unpacked.value
+  , Block.Body.Unpacked.value
+  , Strength.Unpacked.value
   ) t_
 
 let to_hlist { previous_time; target; block_hash; number; strength } = H_list.([ previous_time; target; block_hash; number; strength ])
@@ -53,9 +53,9 @@ let data_spec =
   let open Data_spec in
   [ Block_time.Unpacked.spec
   ; Target.Unpacked.spec
-  ; Digest.Packed.spec
-  ; Block.Body.Packed.spec
-  ; Strength.Packed.spec
+  ; Digest.Unpacked.spec
+  ; Block.Body.Unpacked.spec
+  ; Strength.Unpacked.spec
   ]
 
 let spec : (var, value) Var_spec.t =
@@ -138,25 +138,18 @@ let negative_one : value =
 let zero = update_exn negative_one Block.genesis
 
 let to_bits ({ previous_time; target; block_hash; number; strength } : var) =
-  let%map h = Digest.Checked.(unpack block_hash >>| to_bits)
-  and n = Block.Body.Checked.(unpack number >>| to_bits)
-  and s = Strength.Checked.(unpack strength >>| to_bits)
-  in
-  Block_time.Checked.to_bits previous_time
-  @ Target.Checked.to_bits target
-  @ h
-  @ n
-  @ s
+  Block_time.Unpacked.var_to_bits previous_time
+  @ Target.Unpacked.var_to_bits target
+  @ Digest.Unpacked.var_to_bits block_hash
+  @ Block.Body.Unpacked.var_to_bits number
+  @ Strength.Unpacked.var_to_bits strength
 
 let to_bits_unchecked ({ previous_time; target; block_hash; number; strength } : value) =
-  let h = Digest.(Unpacked.to_bits (unpack block_hash)) in
-  let n = Block.Body.(Unpacked.to_bits (unpack number)) in
-  let s = Strength.(Unpacked.to_bits (unpack strength)) in
   Block_time.Bits.to_bits previous_time
-  @ Target.Unpacked.to_bits target
-  @ h
-  @ n
-  @ s
+  @ Target.Bits.to_bits target
+  @ Digest.Bits.to_bits block_hash
+  @ Block.Body.Bits.to_bits number
+  @ Strength.Bits.to_bits strength
 
 let hash t =
   let s = Pedersen.State.create Pedersen.params in
@@ -172,13 +165,13 @@ module Checked = struct
       (Checked.equal (Cvar.constant zero_hash) h)
 
   let hash (t : var) =
-    with_label "State.hash" (to_bits t >>= hash_digest)
+    with_label "State.hash" (hash_digest (to_bits t))
 
   let compute_target prev_time prev_target time =
     let div_pow_2 bits (`Two_to_the k) = List.drop bits k in
     let delta_minus_one_max_bits = 7 in
     with_label "compute_target" begin
-      let prev_target_n = Number.of_bits (Target.Checked.to_bits prev_target) in
+      let prev_target_n = Number.of_bits (Target.Unpacked.var_to_bits prev_target) in
       let%bind rate_multiplier =
         with_label "rate_multiplier" begin
           let%map distance_to_max_target =
@@ -192,7 +185,7 @@ module Checked = struct
         with_label "delta" begin
           (* This also checks that time >= prev_time *)
           let%map d = Block_time.diff_checked time prev_time in
-          div_pow_2 (Block_time.Span.Checked.to_bits d) target_time_ms
+          div_pow_2 (Block_time.Span.Unpacked.var_to_bits d) target_time_ms
         end
       in
       let%bind delta_is_zero, delta_minus_one =
@@ -249,33 +242,42 @@ module Checked = struct
 
   let valid_body ~prev body =
     with_label "valid_body" begin
-      let%bind { less } = Util.compare ~bit_length:Block.Body.bit_length prev body in
+      let%bind { less } =
+        Util.compare ~bit_length:Block.Body.bit_length
+          (Block.Body.pack_var prev) (Block.Body.pack_var body)
+      in
       Boolean.Assert.is_true less
     end
   ;;
 
-  let update (state : var) (block : Block.Packed.var) =
+  let update (state : var) (block : Block.var) =
     with_label "Blockchain.State.update" begin
       let%bind () =
         assert_equal ~label:"previous_block_hash"
-          block.header.previous_block_hash state.block_hash
+(* TODO-soon: There should be a "proof-of-work" var type which is a Target.bit_length
+   long string so we can use pack rather than project here. *)
+          (Digest.project_var block.header.previous_block_hash)
+          (Digest.project_var state.block_hash)
       in
       let%bind () = valid_body ~prev:state.number block.body in
-      let target_packed = Target.pack state.target in
+      let target_packed = Target.pack_var state.target in
       let%bind strength = Target.strength target_packed state.target in
-      let%bind block_unpacked = Block.Checked.unpack block in
       let%bind block_hash =
-        let bits = Block.Checked.to_bits block_unpacked in
+        let bits = Block.var_to_bits block in
         hash_digest bits
       in
+      let%bind block_hash_bits = Digest.choose_preimage_var block_hash in
       let%bind meets_target = meets_target target_packed block_hash in
-      let time_unpacked = block_unpacked.header.time in
-      let%map new_target = compute_target state.previous_time state.target time_unpacked in
-      ( { previous_time = time_unpacked
+      let time = block.header.time in
+      let%bind new_target = compute_target state.previous_time state.target time in
+      let%map strength' =
+        Strength.unpack_var Cvar.Infix.(strength + Strength.pack_var state.strength)
+      in
+      ( { previous_time = time
         ; target = new_target
-        ; block_hash
+        ; block_hash = block_hash_bits
         ; number = block.body
-        ; strength = Cvar.Infix.(strength + state.strength)
+        ; strength = strength'
         }
       , `Success meets_target
       )

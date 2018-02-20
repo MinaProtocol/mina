@@ -9,7 +9,7 @@ module type S = sig
     module Bits : Bits_intf.S with type t := t
 
     module Snarkable : functor (Impl : Snark_intf.S) ->
-      Impl.Snarkable.Bits.S
+      Impl.Snarkable.Bits.Lossy
       with type Packed.var = Impl.Cvar.t
        and type Packed.value = Impl.Field.t
        and type Unpacked.value = Impl.Field.t

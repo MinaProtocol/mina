@@ -617,6 +617,8 @@ module Make (M : sig val prefix : string end) = struct
     val get_auxiliary_input_size : t -> int
     val create_keypair : t -> Keypair.t
     val check_exn : t -> unit
+    val is_satisfied
+      : t -> primary_input:Field.Vector.t -> auxiliary_input:Field.Vector.t -> bool
   end = struct
     type t = unit ptr
 
@@ -686,6 +688,13 @@ module Make (M : sig val prefix : string end) = struct
         (typ @-> returning int)
     ;;
 
+    let is_satisfied =
+      let stub =
+        foreign (func_name "is_satisfied")
+          (typ @-> Field.Vector.typ @-> Field.Vector.typ @-> returning Ctypes.bool)
+      in
+      fun t ~primary_input ~auxiliary_input ->
+        stub t primary_input auxiliary_input
 
     let create_keypair =
       let stub =

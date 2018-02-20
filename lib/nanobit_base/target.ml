@@ -13,7 +13,7 @@ include Stable.V1
 module Field = Tick.Field
 module Bigint = Tick_curve.Bigint.R
 
-let bit_length = Field.size_in_bits - 2
+let bit_length = Snark_params.target_bit_length
 
 let max =
   Field.(sub (Tick.Util.two_to_the bit_length) (of_int 1))
@@ -23,7 +23,7 @@ let max_bigint = Bigint.of_field max
 let constant = Tick.Cvar.constant
 
 let of_field x =
-  assert (Bigint.compare (Bigint.of_field x) max_bigint <= 0);
+  assert (Bigint.compare (Bigint.of_field x) max_bigint < 0);
   x
 ;;
 
@@ -119,28 +119,41 @@ let bits_msb =
     in
     bs
 
+type _ Camlsnark.Request.t +=
+  | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Camlsnark.Request.t
+
 let floor_divide
-      ~numerator:(`Two_to_the b)
+      ~numerator:(`Two_to_the b as numerator)
       y y_unpacked
   =
   assert (b <= Field.size_in_bits - 2);
   assert (List.length y_unpacked <= b);
   let%bind z =
     exists Var_spec.field
-      As_prover.(map (read_var y) ~f:(fun y ->
-        Bigint.to_field
-          (Tick_curve.Bigint.R.div (Bigint.of_field (Util.two_to_the b))
-            (Bigint.of_field y))))
+      ~request:As_prover.(map (read_var y) ~f:(fun y -> Floor_divide (numerator, y)))
+      ~compute:
+        As_prover.(map (read_var y) ~f:(fun y ->
+          Bigint.to_field
+            (Tick_curve.Bigint.R.div (Bigint.of_field (Util.two_to_the b))
+              (Bigint.of_field y))))
   in
   (* This block checks that z * y does not overflow. *)
   let%bind () =
-    let%bind z_unpacked = Checked.unpack z ~length:b in
+    (* The total number of bits in z and y must be less than the field size in bits essentially
+       to prevent overflow. *)
     let%bind k = Util.num_bits_upper_bound_unpacked y_unpacked in
+    (* We have to check that k <= b.
+       The call to [num_bits_upper_bound_unpacked] actually guarantees that k
+       is <= [List.length z_unpacked = b], since it asserts that [k] is
+       equal to a sum of [b] booleans, but we add an explicit check here since it
+       is relatively cheap and the internals of that function might change. *)
+    let%bind () =
+      Util.Assert.lte ~bit_length:(Util.num_bits_int b)
+        k (Cvar.constant (Field.of_int b))
+    in
     let m = Cvar.(sub (constant (Field.of_int (b + 1))) k) in
-    (* TODO: This implicitly checks that k <= b + 1 (since it unpacks (b+1 - k) into
-        a small number) but it would be good for it to be more explicit *)
-    let%bind m_unpacked = Checked.unpack m ~length:Util.size_in_bits_size_in_bits in
-    Util.assert_num_bits_upper_bound z_unpacked m_unpacked
+    let%bind z_unpacked = Checked.unpack z ~length:b in
+    Util.assert_num_bits_upper_bound z_unpacked m
   in
   let%bind zy = Checked.mul z y in
   let numerator = Cvar.constant (Util.two_to_the b) in
@@ -154,17 +167,17 @@ let floor_divide
 
 (* TODO: Use a "dual" variable to ensure the bit_length constraint is actually always
    enforced. *)
-include Bits.Snarkable.Field_backed(Tick)(struct let bit_length = bit_length end)
+include Bits.Snarkable.Small(Tick)(struct let bit_length = bit_length end)
+
+module Bits = Bits.Small(Tick.Field)(Tick.Bigint)(struct let bit_length = bit_length end)
 
 let passes t h =
-  let%map { less_or_equal; _ } = Tick.Util.compare ~bit_length h t in
-  less_or_equal
+  let%map { less; _ } = Tick.Util.compare ~bit_length h t in
+  less
 
-let pack : Unpacked.var -> Packed.var = Tick.Checked.pack
+let var_to_unpacked (x : Cvar.t) = Checked.unpack ~length:bit_length x
 
-let var_to_unpacked (x : Cvar.t) = Checked.unpack x
-
-(* floor(size of field / y) *)
+(* floor(two_to_the bit_length / y) *)
 let strength
       (y : Packed.var)
       (y_unpacked : Unpacked.var)
@@ -172,7 +185,7 @@ let strength
   with_label "Target.strength" begin
     if Insecure.strength_calculation
     then
-      exists Var_spec.field
+      provide_witness Var_spec.field
         As_prover.(map (read_var y) ~f:strength_unchecked)
     else floor_divide ~numerator:(`Two_to_the bit_length) y y_unpacked
   end

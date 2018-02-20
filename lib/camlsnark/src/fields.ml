@@ -95,11 +95,11 @@ module Fp2 = struct
       let mul (a_c0, a_c1) (b_c0, b_c1) =
         let open Let_syntax in
         let%bind v1 =
-          exists Var_spec.field
+          provide_witness Var_spec.field
             As_prover.(map2 ~f:Field.mul (read_var a_c1) (read_var b_c1))
         in
         let%bind ((r0, r1) as result) =
-          exists spec begin
+          provide_witness spec begin
             let open As_prover in let open Let_syntax in
             let%map v1 = read_var v1
             and a0     = read_var a_c0
@@ -132,7 +132,7 @@ module Fp2 = struct
       let sqr ((a_c0, a_c1) as t) =
         let open Let_syntax in
         let%bind ((r0, r1) as result) =
-          exists spec
+          provide_witness spec
             As_prover.(map (read spec t) ~f:(fun (a, b) ->
               let open Field.Infix in
               ( (a + b) * (a + (non_residue * b)) - (a * b) - (non_residue * a * b) ,
@@ -262,10 +262,10 @@ module Fp3 = struct
         let (r0, r1, r2) = result in
         let open Let_syntax in
         let%bind v0 =
-          exists Var_spec.field
+          provide_witness Var_spec.field
             As_prover.(map2 (read_var a0) (read_var b0) ~f:Field.mul)
         and v4 =
-          exists Var_spec.field
+          provide_witness Var_spec.field
             As_prover.(map2 (read_var a2) (read_var b2) ~f:Field.mul)
         in
         let open Field.Infix in
@@ -297,7 +297,7 @@ module Fp3 = struct
       let mul a b =
         let open Let_syntax in
         let%bind result =
-          exists spec
+          provide_witness spec
             As_prover.(map2 (read spec a) (read spec b) ~f:mul)
         in
         let%map () = assert_mul a b ~result in
@@ -398,7 +398,7 @@ module Fp6_2_over_3 = struct
       let mul_by_2345 (((a0_0, a0_1, a0_2) as a0), a1) (((_, _, b0_2) as b0), b1) =
         let open Let_syntax in
         let%bind v0 =
-          exists Fp3.spec As_prover.(map2 ~f:Fp3.mul (read Fp3.spec a0) (read Fp3.spec b0))
+          provide_witness Fp3.spec As_prover.(map2 ~f:Fp3.mul (read Fp3.spec a0) (read Fp3.spec b0))
         in
         let%bind ((v1_0, v1_1, v1_2) as v1) = Fp3.Checked.mul a1 b1 in
         let%bind r1_plus_v0_plus_v1 =
@@ -466,7 +466,7 @@ module Fp6_2_over_3 = struct
          when the unification optimization is implemented. *)
       let inv t =
         let open Let_syntax in
-        let%bind t_inv = exists spec As_prover.(map ~f:inv (read spec t)) in
+        let%bind t_inv = provide_witness spec As_prover.(map ~f:inv (read spec t)) in
         let%bind product = mul t t_inv in
         let%map () = assert_equal product one in
         t_inv
