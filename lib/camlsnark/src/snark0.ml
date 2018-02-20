@@ -279,7 +279,7 @@ module As_prover0 = struct
 end
 
 module Handler = struct
-  type t = Request.request -> Request.empty
+  type t = Request.request -> Request.response
 end
 
 module Provider = struct
@@ -766,10 +766,10 @@ module Checked = struct
     in
     Exists (spec, provider, fun h -> return (Handle.var h))
 
-  type empty = Request.empty
+  type response = Request.response
   let unhandled = Request.unhandled
   type request = Request.request
-  = With : { request :'a Request.t; respond : ('a -> empty) } -> request
+  = With : { request :'a Request.t; respond : ('a -> response) } -> request
 
   let handle t k = With_handler (Request.Handler.create k, t, return)
 

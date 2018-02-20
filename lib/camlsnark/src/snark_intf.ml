@@ -320,14 +320,14 @@ module type S = sig
     -> ('var, 'value) Var_spec.t
     -> ('var, 's) Checked.t
 
-  type empty = Request.empty
-  val unhandled : empty
+  type response = Request.response
+  val unhandled : response
   type request
     = Request.request
-    = With : { request :'a Request.t; respond : ('a -> empty) } -> request
+    = With : { request :'a Request.t; respond : ('a -> response) } -> request
 
   module Handler : sig
-    type t = request -> empty
+    type t = request -> response
   end
 
   val handle : ('a, 's) Checked.t -> Handler.t -> ('a, 's) Checked.t

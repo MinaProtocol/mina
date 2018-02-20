@@ -4,23 +4,23 @@ type _ t += Fail : 'a t
 
 type 'a r = 'a t
 
-type empty = ..
+type response = ..
 
-type empty += Unhandled
+type response += Unhandled
 
 let unhandled = Unhandled
 
 type request =
-  | With : { request :'a t; respond : ('a -> empty) } -> request
+  | With : { request :'a t; respond : ('a -> response) } -> request
 
 module Handler = struct
   type nonrec t = { with_ : 'a. 'a t -> 'a }
 
-  let create (handler : request -> empty) =
+  let create (handler : request -> response) =
     let f : type a. a r -> a =
       fun request ->
         let module T = struct
-          type empty += T of a
+          type response += T of a
         end
         in
         match handler (With { request; respond = fun x -> T.T x}) with
