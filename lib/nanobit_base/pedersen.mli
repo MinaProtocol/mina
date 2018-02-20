@@ -6,6 +6,8 @@ module type S = sig
   module Digest : sig
     type t [@@deriving bin_io, sexp]
 
+    val (=) : t -> t -> bool
+
     module Bits : Bits_intf.S with type t := t
 
     module Snarkable : functor (Impl : Snark_intf.S) ->

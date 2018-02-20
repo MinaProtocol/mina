@@ -225,7 +225,10 @@ module Main (Params : Params_intf) = struct
       then Lazy.force base_proof
       else Transition_utils.step ~prev_proof ~prev_state block
     in
-    { Blockchain.proof; state = Blockchain.State.update_exn prev_state block }
+    { Blockchain.proof
+    ; state = Blockchain.State.update_exn prev_state block 
+    ; most_recent_block = block
+    }
   ;;
 
   let implementations log =
@@ -243,10 +246,15 @@ module Main (Params : Params_intf) = struct
             (fun s () -> 
                return (Lazy.force base_proof))
         ; Rpc.Rpc.implement Rpcs.Verify.rpc
-            (fun s ({ Blockchain.state; proof }) ->
+            (fun s ({ Blockchain.state; proof; most_recent_block }) ->
                if Insecure.verify_blockchain
                then return true
-               else return (Transition_utils.verify state proof))
+               else
+                 let consistent_block_hash =
+                   Digest.(=) state.block_hash (Block.hash most_recent_block)
+                 in
+                 let proof_verifies = Transition_utils.verify state proof in
+                 return (consistent_block_hash && proof_verifies))
         ]
       ~on_unknown_rpc:(`Call (fun () ~rpc_tag ~version ->
         Logger.error log "prover: unknown rpc: %s %d" rpc_tag version;
