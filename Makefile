@@ -42,6 +42,9 @@ base-googlecloud :
 ocaml405-googlecloud:
 	./rebuild-googlecloud.sh ocaml405 ocaml405-Dockerfile
 
+pull-ocaml405-googlecloud:
+	gcloud docker -- pull gcr.io/o1labs-192920/ocaml405:latest
+
 ci-base-docker:
 	./rebuild-docker.sh o1labs/ci-base ci-base-Dockerfile
 
