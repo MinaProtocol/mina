@@ -171,6 +171,26 @@ include Bits.Snarkable.Small(Tick)(struct let bit_length = bit_length end)
 
 module Bits = Bits.Small(Tick.Field)(Tick.Bigint)(struct let bit_length = bit_length end)
 
+let%test_unit "floor_divide" =
+  let numerator = `Two_to_the bit_length in
+  let eq x y = Bigint.compare x y = 0 in
+  let test y =
+    let ((), res, success) =
+      let y = Cvar.constant y in
+      run_and_check (
+        let%bind y_unpacked = unpack_var y in
+        let%map z = floor_divide ~numerator y y_unpacked in
+        As_prover.read Packed.spec z) ()
+    in
+    assert success;
+    assert (
+      eq (Bigint.of_field res)
+        Tick_curve.Bigint.R.(
+          div (of_field (Util.two_to_the bit_length)) (Bigint.of_field y)))
+  in
+  test (Util.random_n_bit_field_elt bit_length)
+;;
+
 let passes t h =
   let%map { less; _ } = Tick.Util.compare ~bit_length h t in
   less

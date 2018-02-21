@@ -173,11 +173,11 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     >>= num_bits_upper_bound_unpacked
   ;;
 
+  let random_n_bit_field_elt n =
+    Field.project (List.init n ~f:(fun _ -> Random.bool ()))
+
   let%test_module "Snark_util" = (module struct
     let () = Random.init 123456789
-
-    let random_n_bit_field_elt n =
-      Field.project (List.init n ~f:(fun _ -> Random.bool ()))
 
     let%test_unit "compare" =
       let bit_length = Field.size_in_bits - 2 in
