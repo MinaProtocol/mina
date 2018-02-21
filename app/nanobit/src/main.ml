@@ -176,9 +176,14 @@ struct
     don't_wait_for begin
       Linear_pipe.iter 
         log_body_changes_reader 
-        ~f:(function
+        ~f:(fun u ->
+          begin match u with
           | Miner.Update.Change_body body -> 
-            Logger.debug log "new block body %s" (Int64.to_string body); 
+            Logger.debug log "new block body %s" (Int64.to_string body) 
+          | Change_previous prev ->
+            Logger.debug log !"new previous chain %{sexp:Blockchain_state.t}"
+              prev.state
+          end;
           Deferred.unit)
     end;
     { strongest_block_writer
