@@ -111,6 +111,26 @@ module type Params_intf = sig
   val port : int
 end
 
+let prover_main implementations port =
+  let log = Logger.create () in
+  let%bind server =
+    Tcp.Server.create
+      ~on_handler_error:(`Call (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+      (Tcp.Where_to_listen.of_port port)
+      (fun address reader writer -> 
+        Rpc.Connection.server_with_close
+          reader writer
+          ~heartbeat_config
+          ~implementations:(implementations log)
+          ~connection_state:(fun _ -> ())
+          ~on_handshake_error:`Ignore)
+  in
+  never ()
+;;
+
+let dummy_proof_string = "0H\150A)W\135\192\t5\202\159\194\193\195s)w\1808o\1578\015zK\1278\234\152\226\020\204\237\204SUo\002\000\00010\226<\229]\252_\198\001$\174\166o\225\189i\230\255F\"\251\214\197\004\224\190nI\181c\174\210\156\140)\160\204z\003\000\00000\144\021\255\207\024\183P\1670\200Fyk\131\191\015\140e]v\\\022\218MHJ\028\213bO:1)\137\242\130C\001\000\000\128\151\000H\135\019;/B\186\152\204\254f\131\179\018\156=$\243\211\140\166\217\011r4]\240_K\144\158;\000\177\002\000\00010\149\208\232\188W\200\191\253Q\023\151M\215\024\149E\237s\185\187j\219\224d\146\147l>\201\152\021s\140\240\152\168\006\002\000\00000\224e]n`\245U\002\207\198\170(0\217\247j.`\144\"\169\221\161\241\162.\226\002N+\231K\185\137}:\007\001\000\00010\249V\197\226\201\202\173\146\196\178\168\005\198p\163B\166\020H\
+        \nE\022\250\252\151\140\253\242a|\162t\220\179\227\213p\001\000\00010e#^E\133n\177\2216sl\020\244\170\004\139\219\228\139\227Oft\231\144\184\127\001\1689a?\184\0232\021\131\002\000\00010\133e\197Lm\204\180\193\232\237[\193\195\175%\226\247\024z\132\144=\022\230\228\019}\145(QN\160mE\235V\238\000\000\0001"
+
 module Main (Params : Params_intf) = struct
   open Snark_params
 
@@ -190,10 +210,7 @@ module Main (Params : Params_intf) = struct
     lazy begin
       if Insecure.compute_base_proof
       then begin
-        let s = "0H\150A)W\135\192\t5\202\159\194\193\195s)w\1808o\1578\015zK\1278\234\152\226\020\204\237\204SUo\002\000\00010\226<\229]\252_\198\001$\174\166o\225\189i\230\255F\"\251\214\197\004\224\190nI\181c\174\210\156\140)\160\204z\003\000\00000\144\021\255\207\024\183P\1670\200Fyk\131\191\015\140e]v\\\022\218MHJ\028\213bO:1)\137\242\130C\001\000\000\128\151\000H\135\019;/B\186\152\204\254f\131\179\018\156=$\243\211\140\166\217\011r4]\240_K\144\158;\000\177\002\000\00010\149\208\232\188W\200\191\253Q\023\151M\215\024\149E\237s\185\187j\219\224d\146\147l>\201\152\021s\140\240\152\168\006\002\000\00000\224e]n`\245U\002\207\198\170(0\217\247j.`\144\"\169\221\161\241\162.\226\002N+\231K\185\137}:\007\001\000\00010\249V\197\226\201\202\173\146\196\178\168\005\198p\163B\166\020H\
-                \nE\022\250\252\151\140\253\242a|\162t\220\179\227\213p\001\000\00010e#^E\133n\177\2216sl\020\244\170\004\139\219\228\139\227Oft\231\144\184\127\001\1689a?\184\0232\021\131\002\000\00010\133e\197Lm\204\180\193\232\237[\193\195\175%\226\247\024z\132\144=\022\230\228\019}\145(QN\160mE\235V\238\000\000\0001"
-        in
-        Tick_curve.Proof.of_string s
+        Tick_curve.Proof.of_string dummy_proof_string
       end else begin
         let dummy_proof =
           let open Tock in
@@ -261,22 +278,48 @@ module Main (Params : Params_intf) = struct
         `Continue))
 
   let main () =
-    let log = Logger.create () in
     initialize ();
-    let%bind server =
-      Tcp.Server.create
-        ~on_handler_error:(`Call (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-        (Tcp.Where_to_listen.of_port Params.port)
-        (fun address reader writer -> 
-          Rpc.Connection.server_with_close
-            reader writer
-            ~heartbeat_config
-            ~implementations:(implementations log)
-            ~connection_state:(fun _ -> ())
-            ~on_handshake_error:`Ignore)
-    in
-    never ()
+    prover_main implementations Params.port
   ;;
+end
+
+module Malicious = struct
+  let garbage_proof () =
+    Snark_params.Tick_curve.Proof.of_string
+      (String.init (String.length dummy_proof_string)
+        ~f:(fun _ -> Char.of_int_exn (Random.int 256)))
+
+  let extend_blockchain =
+    let same_chain s (chain, _block) = return chain in
+    let chain_with_garbage_proof s (chain, _block) =
+      return { chain with Blockchain.proof = garbage_proof () }
+    in
+    let choose arr = arr.(Random.int (Array.length arr)) in
+    fun s cb ->
+      choose [| same_chain; chain_with_garbage_proof |]
+        s cb
+  ;;
+
+  let verify s b = return (Random.bool ())
+
+  let implementations log =
+    Rpc.Implementations.create_exn
+      ~implementations:
+        [ Rpc.Rpc.implement Rpcs.Extend_blockchain.rpc
+            extend_blockchain
+        ; Rpc.Rpc.implement Rpcs.Initialized.rpc
+            (fun s () -> return Rpcs.Initialized.Initialized)
+        ; Rpc.Rpc.implement Rpcs.Genesis_proof.rpc
+            (fun s () -> return (garbage_proof ()))
+        ; Rpc.Rpc.implement Rpcs.Verify.rpc
+            verify
+        ]
+      ~on_unknown_rpc:(`Call (fun () ~rpc_tag ~version ->
+        Logger.error log "prover: unknown rpc: %s %d" rpc_tag version;
+        `Continue))
+
+  let main port =
+    prover_main implementations port
 end
 
 let command : Command.t =
@@ -284,8 +327,13 @@ let command : Command.t =
     let open Command.Let_syntax in
     let%map_open port =
       flag "port" ~doc:"port to listen on" (required int16)
+    and malicious =
+      flag "malicious" ~doc:"Whether to start the prover in malicious mode" no_arg
     in
     fun () -> 
-      let module M = Main(struct let port = port end) in
-      M.main ()
+      if malicious
+      then Malicious.main port
+      else
+        let module M = Main(struct let port = port end) in
+        M.main ()
   end
