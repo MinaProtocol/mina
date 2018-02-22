@@ -111,6 +111,9 @@ module type Basic = sig
     (* synonym for tuple2 *)
     val ( * ) : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var1 * 'var2, 'value1 * 'value2) t
 
+    (* synonym for tuple2 *)
+    val ( * ) : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var1 * 'var2, 'value1 * 'value2) t
+
     val transport
       : ('var, 'value1) t
       -> there:('value2 -> 'value1)

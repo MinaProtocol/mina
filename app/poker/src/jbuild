@@ -1,0 +1,25 @@
+(jbuild_version 1)
+
+(executable
+  ((name election)
+   (public_name election)
+   (libraries
+    ( core
+      camlsnark
+      async
+      async_extra
+      async_ssl
+      cohttp
+      bignum
+      nanobit_base
+      cohttp-async))
+   (preprocess (pps (ppx_jane ppx_deriving.enum ppx_inline_test ppx_driver.runner (-inline-test-lib election))))
+   (flags (-w -40 -g))
+   (modes (native))
+  ))
+
+(alias
+  ((name runtest)
+   (deps (election.exe))
+   (action (run ${<} inline-test-runner election))))
+
