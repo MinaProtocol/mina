@@ -161,7 +161,7 @@ let bigint_of_tick_bigint n =
    a (k + 1) + 1 bit number. This number cannot overflow so it is important that
    k + 1 + 1 < n. Thus k < n - 2.
 
-   However, instead of using `Field.size_in_bits - 3` we choose `Field.size_in_bits - 6`
+   However, instead of using `Field.size_in_bits - 3` we choose `Field.size_in_bits - 8`
    to clamp the easiness. To something not-to-quick on a personal laptop from mid 2010s.
 *)
 let target_bit_length = Tick.Field.size_in_bits - 8

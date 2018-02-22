@@ -26,5 +26,3 @@ let (>) x y = compare x y > 0
 let (=) x y = compare x y = 0
 let (>=) x y = not (x < y)
 let (<=) x y = not (x > y)
-let (+) = Tick.Field.add
-let (-) = Tick.Field.sub
