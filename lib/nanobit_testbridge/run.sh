@@ -32,7 +32,7 @@ jbuilder build
 
 cd lib/nanobit_testbridge/$loc
 
-../$bin \
+PATH=$PATH:~/google-cloud-sdk/bin ../$bin \
   -container-count $containers \
   -containers-per-machine 2 \
   -image-host $host

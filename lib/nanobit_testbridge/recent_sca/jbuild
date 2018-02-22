@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (executable
-  ((name nanobit_testbridge_recent_lca)
-   (public_name nanobit_testbridge_recent_lca)
+  ((name nanobit_testbridge_recent_sca)
+   (public_name nanobit_testbridge_recent_sca)
    (package nanobit_testbridge)
    (libraries (core async async_extra testbridge nanobit_testbridge))
    (preprocess (pps (ppx_jane)))
