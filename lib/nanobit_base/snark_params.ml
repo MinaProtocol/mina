@@ -88,6 +88,10 @@ module Tick = struct
     module P = Pedersen.Make(Field)(Tick_curve.Bigint.R)(Curve)
     include (P : module type of P with module Digest := P.Digest)
     module Digest = struct
+      include Hashable.Make(struct
+        type t = bool list [@@deriving compare, hash, sexp]
+      end)
+
       include P.Digest
       include Snarkable(Tick0)
     end
@@ -155,5 +159,9 @@ let bigint_of_tick_bigint n =
    The reason k = n - 3 is as follows. Inside [meets_target], we compare
    a value against 2^k. 2^k requires k + 1 bits. The comparison then unpacks
    a (k + 1) + 1 bit number. This number cannot overflow so it is important that
-   k + 1 + 1 < n. Thus k < n - 2. *)
-let target_bit_length = Tick.Field.size_in_bits - 3
+   k + 1 + 1 < n. Thus k < n - 2.
+
+   However, instead of using `Field.size_in_bits - 3` we choose `Field.size_in_bits - 6`
+   to clamp the easiness. To something not-to-quick on a personal laptop from mid 2010s.
+*)
+let target_bit_length = Tick.Field.size_in_bits - 8
