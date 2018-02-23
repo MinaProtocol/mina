@@ -63,7 +63,7 @@ module Checked
     (Hash : sig
       type var
       type value
-      val spec : (var, value) Impl.Var_spec.t
+      val typ : (var, value) Impl.Typ.t
       val hash : var -> var -> (var, _) Impl.Checked.t
       val if_ : Impl.Boolean.var -> then_:var -> else_:var -> (var, _) Impl.Checked.t
       val assert_equal : var -> var -> (unit, _) Impl.Checked.t
@@ -71,7 +71,7 @@ module Checked
     (Elt : sig
       type var
       type value
-      val spec : (var, value) Impl.Var_spec.t
+      val typ : (var, value) Impl.Typ.t
       val hash : var -> (Hash.var, _) Impl.Checked.t
     end)
   : sig
@@ -82,7 +82,7 @@ module Checked
     type var = Boolean.var t
     type value = bool t [@@deriving sexp]
     val value_of_int : depth:int -> int -> value
-    val spec : depth:int -> (var, value) Var_spec.t
+    val typ : depth:int -> (var, value) Typ.t
   end
 
   (* TODO: Change [prev] to be [prev_hash : Hash.var] since there may be no need

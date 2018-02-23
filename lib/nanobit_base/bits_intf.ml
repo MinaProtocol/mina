@@ -15,7 +15,7 @@ end
 
 module Snarkable = struct
   module type Basic = sig
-    type (_, _) var_spec
+    type (_, _) typ
     type (_, _) checked
     type boolean_var
 
@@ -24,14 +24,14 @@ module Snarkable = struct
     module Packed : sig
       type var
       type value
-      val spec : (var, value) var_spec
+      val typ : (var, value) typ
     end
 
     module Unpacked : sig
       type var
       type value
 
-      val spec : (var, value) var_spec
+      val typ : (var, value) typ
 
       val var_to_bits : var -> boolean_var list
     end

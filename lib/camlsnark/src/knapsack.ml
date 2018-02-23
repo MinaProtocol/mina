@@ -83,11 +83,11 @@ module Hash
 
   type var = Boolean.var list
   let length = knapsack.dimension * Field.size_in_bits
-  let spec : (var, value) Var_spec.t =
-    Var_spec.list ~length Boolean.spec
+  let typ : (var, value) Typ.t =
+    Typ.list ~length Boolean.typ
 
-  let spec_unchecked : (var, value) Var_spec.t =
-    Var_spec.(list ~length Boolean.spec_unchecked)
+  let typ_unchecked : (var, value) Typ.t =
+    Typ.(list ~length Boolean.typ_unchecked)
 
   (* res = (1 - b) * xs + b * ys
      res - xs = b * (ys - xs)
@@ -95,11 +95,11 @@ module Hash
   let if_ (b : Boolean.var) ~then_:ys ~else_:xs : (var, _) Impl.Checked.t =
     let open Impl.Let_syntax in
     let%bind res =
-      provide_witness spec_unchecked begin
+      provide_witness typ_unchecked begin
         let open As_prover.Let_syntax in
-        match%bind As_prover.read Boolean.spec b with
-        | false -> As_prover.read spec xs
-        | true -> As_prover.read spec ys
+        match%bind As_prover.read Boolean.typ b with
+        | false -> As_prover.read typ xs
+        | true -> As_prover.read typ ys
       end
     in
     let%map () =

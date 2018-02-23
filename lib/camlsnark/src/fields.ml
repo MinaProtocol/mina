@@ -9,7 +9,7 @@ module type Base_field = sig
   type value = t
   type var
 
-  val spec : (var, value) Var_spec.t
+  val typ : (var, value) Typ.t
 
   module Checked : sig
   end
@@ -71,7 +71,7 @@ module Fp2 = struct
     type var = Cvar.t t
     type value = Field.t t
     val non_residue : Field.t
-    val spec : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
 
     module Checked : sig
       val mul : var -> var -> (var, _) Checked.t
@@ -86,7 +86,7 @@ module Fp2 = struct
     type var = Cvar.t t
     type value = Field.t t
 
-    let spec = Var_spec.(tuple2 field field)
+    let typ = Typ.(tuple2 field field)
     ;;
 
     (* See gadgetlib1/gadgets/fields/fp2_gadgets.tcc for explanation of these. *)
@@ -95,11 +95,11 @@ module Fp2 = struct
       let mul (a_c0, a_c1) (b_c0, b_c1) =
         let open Let_syntax in
         let%bind v1 =
-          provide_witness Var_spec.field
+          provide_witness Typ.field
             As_prover.(map2 ~f:Field.mul (read_var a_c1) (read_var b_c1))
         in
         let%bind ((r0, r1) as result) =
-          provide_witness spec begin
+          provide_witness typ begin
             let open As_prover in let open Let_syntax in
             let%map v1 = read_var v1
             and a0     = read_var a_c0
@@ -132,8 +132,8 @@ module Fp2 = struct
       let sqr ((a_c0, a_c1) as t) =
         let open Let_syntax in
         let%bind ((r0, r1) as result) =
-          provide_witness spec
-            As_prover.(map (read spec t) ~f:(fun (a, b) ->
+          provide_witness typ
+            As_prover.(map (read typ t) ~f:(fun (a, b) ->
               let open Field.Infix in
               ( (a + b) * (a + (non_residue * b)) - (a * b) - (non_residue * a * b) ,
                 Field.of_int 2 * a * b)))
@@ -159,7 +159,7 @@ module Fp3 = struct
     type var = Cvar.t t
     type value = Field.t t
     val non_residue : Field.t
-    val spec : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
 
     val negate : value -> value
     val sub : value -> value -> value
@@ -191,7 +191,7 @@ module Fp3 = struct
     type var = Cvar.t t
     type value = Field.t t
 
-    let spec = Var_spec.(tuple3 field field field)
+    let typ = Typ.(tuple3 field field field)
 
     let sub (a0, a1, a2) (b0, b1, b2) = Field.Infix.(a0 - b0, a1 - b1, a2 - b2)
 
@@ -262,10 +262,10 @@ module Fp3 = struct
         let (r0, r1, r2) = result in
         let open Let_syntax in
         let%bind v0 =
-          provide_witness Var_spec.field
+          provide_witness Typ.field
             As_prover.(map2 (read_var a0) (read_var b0) ~f:Field.mul)
         and v4 =
-          provide_witness Var_spec.field
+          provide_witness Typ.field
             As_prover.(map2 (read_var a2) (read_var b2) ~f:Field.mul)
         in
         let open Field.Infix in
@@ -297,8 +297,8 @@ module Fp3 = struct
       let mul a b =
         let open Let_syntax in
         let%bind result =
-          provide_witness spec
-            As_prover.(map2 (read spec a) (read spec b) ~f:mul)
+          provide_witness typ
+            As_prover.(map2 (read typ a) (read typ b) ~f:mul)
         in
         let%map () = assert_mul a b ~result in
         result
@@ -341,7 +341,7 @@ module Fp6_2_over_3 = struct
     type var = Cvar.t t
     type value = Field.t t
 
-    val spec : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
 
     module Checked : sig
       val one : var
@@ -362,7 +362,7 @@ module Fp6_2_over_3 = struct
     type var = Cvar.t t
     type value = Field.t t
 
-    let spec = Var_spec.tuple2 Fp3.spec Fp3.spec
+    let typ = Typ.tuple2 Fp3.typ Fp3.typ
 
     let mul_by_non_residue (c0, c1, c2)= (Field.mul non_residue c2, c0, c1)
 
@@ -398,7 +398,7 @@ module Fp6_2_over_3 = struct
       let mul_by_2345 (((a0_0, a0_1, a0_2) as a0), a1) (((_, _, b0_2) as b0), b1) =
         let open Let_syntax in
         let%bind v0 =
-          provide_witness Fp3.spec As_prover.(map2 ~f:Fp3.mul (read Fp3.spec a0) (read Fp3.spec b0))
+          provide_witness Fp3.typ As_prover.(map2 ~f:Fp3.mul (read Fp3.typ a0) (read Fp3.typ b0))
         in
         let%bind ((v1_0, v1_1, v1_2) as v1) = Fp3.Checked.mul a1 b1 in
         let%bind r1_plus_v0_plus_v1 =
@@ -466,7 +466,7 @@ module Fp6_2_over_3 = struct
          when the unification optimization is implemented. *)
       let inv t =
         let open Let_syntax in
-        let%bind t_inv = provide_witness spec As_prover.(map ~f:inv (read spec t)) in
+        let%bind t_inv = provide_witness typ As_prover.(map ~f:inv (read typ t)) in
         let%bind product = mul t t_inv in
         let%map () = assert_equal product one in
         t_inv

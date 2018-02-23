@@ -48,9 +48,9 @@ module Value = struct
   type var = Boolean.var list
   type value = bool list
 
-  (* This "spec" tells camlsnark how to store a [Value.value] as R1CS variables,
+  (* This "typ" tells camlsnark how to store a [Value.value] as R1CS variables,
     as well as any constraints to put on the values (in this case boolean constraints.) *)
-  let spec : (var, value) Var_spec.t = Var_spec.list ~length Boolean.spec
+  let typ : (var, value) Typ.t = Typ.list ~length Boolean.typ
 
   let random () = List.init length ~f:(fun _ -> Random.bool ())
 
@@ -63,15 +63,15 @@ module Merkle_tree_checked = Merkle_tree.Checked(Snark)(Hash)(Value)
 let num_pairs = 5
 let depth = 10
 
-let address_spec = Merkle_tree_checked.Address.spec ~depth
+let address_typ = Merkle_tree_checked.Address.typ ~depth
 
 let input () =
   let open Data_spec in
-  [ Hash.spec
+  [ Hash.typ
       (* [root_start] *)
-  ; Var_spec.(list ~length:num_pairs (tuple2 Value.spec address_spec))
+  ; Typ.(list ~length:num_pairs (tuple2 Value.typ address_typ))
       (* [(x_1, addr_1), ..., (x_n, addr_n)]  *)
-  ; Hash.spec
+  ; Hash.typ
       (* [root_end] *)
   ]
 ;;
@@ -103,8 +103,8 @@ let update_many
         let%bind prev_value =
           (* Here we look up the previously stored value in the Merkle tree so that we can use
             it in authenticating the update. *)
-          exists Value.spec
-            As_prover.(map2 ~f:Merkle_tree.get_exn get_state (read address_spec addr))
+          exists Value.typ
+            As_prover.(map2 ~f:Merkle_tree.get_exn get_state (read address_typ addr))
         in
         Merkle_tree_checked.update addr
           ~depth

@@ -19,7 +19,7 @@ module Schnorr
     (Curve : Curves.Edwards.S
      with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
       and type Scalar.value = Scalar.Bigint.t
-      and type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
+      and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
       and type boolean_var := Impl.Boolean.var
       and type var = Impl.Cvar.t * Impl.Cvar.t
       and type field := Impl.Field.t)
@@ -35,9 +35,9 @@ struct
     type 'a t = 'a * 'a
     type var = Curve.Scalar.var t
     type value = Curve.Scalar.value t
-    let spec : (var, value) Var_spec.t =
-      let spec = Curve.Scalar.spec in
-      Var_spec.tuple2 spec spec
+    let typ : (var, value) Typ.t =
+      let typ = Curve.Scalar.typ in
+      Typ.tuple2 typ typ
   end
 
   module Private_key = struct
@@ -49,7 +49,7 @@ struct
   module Public_key : sig
     type var = Curve.var
     type value = Curve.value
-    val spec : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
   end = Curve
 
   let scale (x : Curve.value) (s : Scalar.Bigint.t) =
@@ -175,7 +175,7 @@ struct
     type 'a t = 'a Curve.t
     type var = Cvar.t t
     type value = Field.t t
-    let spec = Curve.spec
+    let typ = Curve.typ
 
     let equal = Curve.equal
 
@@ -247,8 +247,8 @@ struct
     type 'a t = 'a * 'a
     type var = Curve.Scalar.var t
     type value = Curve.Scalar.value t
-    let spec : (var, value) Var_spec.t =
-      Var_spec.tuple2 Curve.Scalar.spec Curve.Scalar.spec
+    let typ : (var, value) Typ.t =
+      Typ.tuple2 Curve.Scalar.typ Curve.Scalar.typ
   end
 
   let sign sk m : Signature.value =

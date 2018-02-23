@@ -129,7 +129,7 @@ let floor_divide
   assert (b <= Field.size_in_bits - 2);
   assert (List.length y_unpacked <= b);
   let%bind z =
-    exists Var_spec.field
+    exists Typ.field
       ~request:As_prover.(map (read_var y) ~f:(fun y -> Floor_divide (numerator, y)))
       ~compute:
         As_prover.(map (read_var y) ~f:(fun y ->
@@ -185,7 +185,7 @@ let strength
   with_label "Target.strength" begin
     if Insecure.strength_calculation
     then
-      provide_witness Var_spec.field
+      provide_witness Typ.field
         As_prover.(map (read_var y) ~f:strength_unchecked)
     else floor_divide ~numerator:(`Two_to_the bit_length) y y_unpacked
   end

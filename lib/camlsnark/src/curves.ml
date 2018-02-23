@@ -18,7 +18,7 @@ module Make_intf (Impl : Snark_intf.S) = struct
     module Scalar : sig
       type var
       type value
-      val spec : (var, value) Var_spec.t
+      val typ : (var, value) Typ.t
       val assert_equal : var -> var -> (unit, _) Checked.t
     end
 
@@ -29,7 +29,7 @@ module Make_intf (Impl : Snark_intf.S) = struct
 
     val value_to_var : value -> var
 
-    val spec : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
 
     val add : value -> value -> value
     val double : value -> value
@@ -119,7 +119,7 @@ module Edwards = struct
 
   module type S = sig
     type (_, _) checked
-    type (_, _) var_spec
+    type (_, _) typ
 
     type boolean_var
     type field
@@ -129,14 +129,14 @@ module Edwards = struct
     module Scalar : sig
       type var
       type value
-      val spec : (var, value) var_spec
+      val typ : (var, value) typ
       val assert_equal : var -> var -> (unit, _) checked
     end
 
     type var
     type value = t
 
-    val spec : (var, value) var_spec
+    val typ : (var, value) typ
     val add : value -> value -> value
 
     val equal : value -> value -> bool
@@ -170,12 +170,12 @@ module Edwards = struct
         type var = Impl.Boolean.var list
         type value
         val length : int
-        val spec : (var, value) Impl.Var_spec.t
+        val typ : (var, value) Impl.Typ.t
         val assert_equal : var -> var -> (unit, _) Impl.Checked.t
       end)
       (Basic : Basic.S with type field := Impl.Field.t)
     : S with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-         and type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
+         and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
          and type boolean_var := Impl.Boolean.var
          and type field := Impl.Field.t
          and type var = Impl.Cvar.t * Impl.Cvar.t
@@ -219,12 +219,12 @@ module Edwards = struct
         (x2 + y2 - Cvar.constant Field.one)
     ;;
 
-    let spec_unchecked : (var, value) Var_spec.t =
-      Var_spec.(tuple2 field field)
+    let typ_unchecked : (var, value) Typ.t =
+      Typ.(tuple2 field field)
 
-    let spec : (var, value) Var_spec.t =
+    let typ : (var, value) Typ.t =
       (* TODO: Check if in subgroup? *)
-      { spec_unchecked with check = assert_on_curve }
+      { typ_unchecked with check = assert_on_curve }
     ;;
 
     let double_value = double
@@ -295,9 +295,9 @@ module Edwards = struct
         fun b ~then_ ~else_ ->
           with_label "Edwards.Checked.if_" begin
             let%bind r =
-              provide_witness spec As_prover.(Let_syntax.(
-                let%bind b = read Boolean.spec b in
-                read spec (if b then then_ else else_)))
+              provide_witness typ As_prover.(Let_syntax.(
+                let%bind b = read Boolean.typ b in
+                read typ (if b then then_ else else_)))
             in
           (*     r - e = b (t - e) *)
             let%map () =
@@ -348,7 +348,7 @@ module Edwards = struct
           let open Cvar.Infix in
           let res a1 a3 =
             let%bind a =
-              provide_witness Var_spec.field begin
+              provide_witness Typ.field begin
                 let open As_prover in
                 let open As_prover.Let_syntax in
                 let open Field.Infix in
@@ -407,14 +407,14 @@ module Edwards = struct
         type var = Impl.Boolean.var list
         type value
         val length : int
-        val spec : (var, value) Impl.Var_spec.t
+        val typ : (var, value) Impl.Typ.t
         val assert_equal : var -> var -> (unit, _) Impl.Checked.t
       end)
       (Params : Params_intf with type field := Impl.Field.t)
     : S
       with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
         and type Scalar.value = Scalar.value
-        and type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
+        and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
         and type boolean_var := Impl.Boolean.var
         and type field := Impl.Field.t
         and type var = Impl.Cvar.t * Impl.Cvar.t
@@ -430,7 +430,7 @@ module Make
       type var = Impl.Boolean.var list
       type value
       val length : int
-      val spec : (var, value) Impl.Var_spec.t
+      val typ : (var, value) Impl.Typ.t
     end)
 = struct
 open Impl
@@ -440,7 +440,7 @@ type var = Cvar.t t
 type value = Field.t t
 
 (* TODO: Check if point is on curve! *)
-let spec : (var, value) Var_spec.t = Var_spec.(tuple2 field field)
+let typ : (var, value) Typ.t = Typ.(tuple2 field field)
 
 include Params
 
@@ -500,7 +500,7 @@ module Checked = struct
       let%bind denom = Checked.inv Cvar.Infix.(bx - ax) in
       let%bind lambda = Checked.mul Cvar.Infix.(by - ay) denom in
       let%bind cx =
-        provide_witness Var_spec.field begin
+        provide_witness Typ.field begin
           let open As_prover in let open Let_syntax in
           let%map ax = read_var ax
           and bx = read_var bx
@@ -515,7 +515,7 @@ module Checked = struct
           Cvar.Infix.(cx + ax + bx)
       in
       let%bind cy =
-        provide_witness Var_spec.field begin
+        provide_witness Typ.field begin
           let open As_prover in let open Let_syntax in
           let%map ax = read_var ax
           and ay = read_var ay
@@ -539,21 +539,21 @@ module Checked = struct
       let open Let_syntax in
       let%bind x_squared = Checked.mul ax ax in
       let%bind lambda =
-        provide_witness Var_spec.field begin
+        provide_witness Typ.field begin
           let open As_prover in
           map2 (read_var x_squared) (read_var ay) ~f:(fun x_squared ay ->
             Field.(Infix.((of_int 3 * x_squared + Coefficients.a) * inv (of_int 2 * ay))))
         end
       in
       let%bind bx =
-        provide_witness Var_spec.field begin
+        provide_witness Typ.field begin
           let open As_prover in
           map2 (read_var lambda) (read_var ax) ~f:(fun lambda ax ->
             Field.(Infix.(square lambda - of_int 2 * ax)))
         end
       in
       let%bind by =
-        provide_witness Var_spec.field begin
+        provide_witness Typ.field begin
           let open As_prover in let open Let_syntax in
           let%map lambda = read_var lambda
           and ax = read_var ax
@@ -594,9 +594,9 @@ module Checked = struct
     fun b ~then_ ~else_ ->
       let open Let_syntax in
       let%bind r =
-        provide_witness spec As_prover.(Let_syntax.(
-          let%bind b = read Boolean.spec b in
-          read spec (if b then then_ else else_)))
+        provide_witness typ As_prover.(Let_syntax.(
+          let%bind b = read Boolean.typ b in
+          read typ (if b then then_ else else_)))
       in
     (*     r - e = b (t - e) *)
       let%map () =

@@ -5,7 +5,7 @@ module Make
     (Curve : sig
       type var = Impl.Cvar.t * Impl.Cvar.t
       type value
-      val spec : (var, value) Impl.Var_spec.t
+      val typ : (var, value) Impl.Typ.t
       val cond_add : value -> to_:var -> if_:Impl.Boolean.var -> (var, _) Impl.Checked.t
     end)
   : sig
@@ -15,12 +15,12 @@ module Make
       module Unpacked : sig
         type var = Boolean.var list
         type value
-        val spec : (var, value) Var_spec.t
+        val typ : (var, value) Typ.t
       end
 
       type var = Cvar.t
       type value = Field.t
-      val spec : (var, value) Var_spec.t
+      val typ : (var, value) Typ.t
 
       val unpack : var -> (Unpacked.var, _) Checked.t
     end
@@ -38,12 +38,12 @@ struct
     module Unpacked = struct
       type var = Boolean.var list
       type value = bool list
-      let spec : (var, value) Var_spec.t = Var_spec.list Boolean.spec ~length:hash_length
+      let typ : (var, value) Typ.t = Typ.list Boolean.typ ~length:hash_length
     end
 
     type var = Cvar.t
     type value = Field.t
-    let spec = Var_spec.field
+    let typ = Typ.field
 
     let unpack x = Checked.unpack ~length:Field.size_in_bits x
   end

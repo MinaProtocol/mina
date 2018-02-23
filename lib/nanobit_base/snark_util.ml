@@ -107,7 +107,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
 
   let n_ones ~total_length n =
     let%bind bs =
-      exists (Var_spec.list ~length:total_length Boolean.spec)
+      exists (Typ.list ~length:total_length Boolean.typ)
         ~request:(As_prover.return N_ones)
         ~compute:
           As_prover.(map (read_var n) ~f:(fun n ->
@@ -158,7 +158,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
   let num_bits_upper_bound_unpacked : Boolean.var list -> (Cvar.t, _) Checked.t =
     fun x_unpacked ->
       let%bind res =
-        exists Var_spec.field
+        exists Typ.field
           ~request:(As_prover.return Num_bits_upper_bound)
           ~compute:As_prover.(
             map (read_var (Checked.project x_unpacked))
@@ -191,7 +191,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
               compare ~bit_length (Cvar.constant x) (Cvar.constant y)
             in
             As_prover.(
-              map2 (read Boolean.spec less) (read Boolean.spec less_or_equal)
+              map2 (read Boolean.typ less) (read Boolean.typ less_or_equal)
                 ~f:Tuple2.create))
             ()
         in

@@ -61,14 +61,14 @@ module type S = sig
   module rec Data_spec : sig
     type ('r_var, 'r_value, 'k_var, 'k_value) t =
       | (::)
-        : ('var, 'value) Var_spec.t
+        : ('var, 'value) Typ.t
           * ('r_var, 'r_value, 'k_var, 'k_value) t
         -> ('r_var, 'r_value, 'var -> 'k_var, 'value -> 'k_value) t
       | [] : ('r_var, 'r_value, 'r_var, 'r_value) t
 
     val size : (_, _, _, _) t -> int
   end
-  and Var_spec : sig
+  and Typ : sig
     module Store : sig
       include Monad.S
 
@@ -109,6 +109,9 @@ module type S = sig
       -> ((unit, 'k_var) H_list.t, (unit, 'k_value) H_list.t) t
     val list  : length:int -> ('var, 'value) t -> ('var list, 'value list) t
     val array : length:int -> ('var, 'value) t -> ('var array, 'value array) t
+ 
+    (* synonym for tuple2 *)
+    val ( * ) : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var1 * 'var2, 'value1 * 'value2) t
 
     val transport
       : ('var, 'value1) t
@@ -125,7 +128,7 @@ module type S = sig
       -> ('var, 'value) t
 
     module Of_traversable (T : Traversable.S) : sig
-      val spec : template:unit T.t -> ('var, 'value) t -> ('var T.t, 'value T.t) t
+      val typ : template:unit T.t -> ('var, 'value) t -> ('var T.t, 'value T.t) t
     end
   end
   and Boolean : sig
@@ -147,8 +150,8 @@ module type S = sig
 
     val var_of_value : value -> var
 
-    val spec : (var, value) Var_spec.t
-    val spec_unchecked : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
+    val typ_unchecked : (var, value) Typ.t
 
     module Expr : sig
       type t
@@ -271,7 +274,7 @@ module type S = sig
     val set_state : 'prover_state -> (unit, 'prover_state) t
     val modify_state : ('prover_state -> 'prover_state) -> (unit, 'prover_state) t
     val read
-      : ('var, 'value) Var_spec.t
+      : ('var, 'value) Typ.t
       -> 'var
       -> ('value, 'prover_state) t
   end
@@ -305,19 +308,19 @@ module type S = sig
   val next_auxiliary : (int, 's) Checked.t
 
   val request_witness
-    : ('var, 'value) Var_spec.t
+    : ('var, 'value) Typ.t
     -> ('value Request.t, 's) As_prover.t
     -> ('var, 's) Checked.t
 
   val provide_witness
-    : ('var, 'value) Var_spec.t
+    : ('var, 'value) Typ.t
     -> ('value, 's) As_prover.t
     -> ('var, 's) Checked.t
 
   val exists
     : ?request:('value Request.t, 's) As_prover.t
     -> ?compute:('value, 's) As_prover.t
-    -> ('var, 'value) Var_spec.t
+    -> ('var, 'value) Typ.t
     -> ('var, 's) Checked.t
 
   type response = Request.response

@@ -10,7 +10,7 @@ module type S = sig
   module State : sig
     type var
     type value
-    val spec : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
 
     val hash : value -> Pedersen.Digest.t
 
@@ -55,13 +55,13 @@ module Make
 struct
   let step_input () =
     Tick.Data_spec.(
-      [ Digest.Tick.Packed.spec (* H(wrap_vk, H(state)) *)
+      [ Digest.Tick.Packed.typ (* H(wrap_vk, H(state)) *)
       ])
 
   let step_input_size = Tick.Data_spec.size (step_input ())
 
   let wrap_input () =
-    Tock.Data_spec.([ Digest.Tock.Packed.spec ])
+    Tock.Data_spec.([ Digest.Tock.Packed.typ ])
 
   module Step_base = struct
     open System
@@ -83,8 +83,8 @@ struct
 
     let wrap_vk_length = 11324
 
-    let wrap_vk_spec =
-      Var_spec.list ~length:wrap_vk_length Boolean.spec
+    let wrap_vk_typ =
+      Typ.list ~length:wrap_vk_length Boolean.typ
 
     module Verifier =
       Camlsnark.Verifier_gadget.Make(Tick)(Tick_curve)(Tock_curve)
@@ -112,16 +112,16 @@ struct
         Verifier.All_in_one.result v
       end
 
-    let provide_witness' spec ~f = provide_witness spec As_prover.(map get_state ~f)
+    let provide_witness' typ ~f = provide_witness typ As_prover.(map get_state ~f)
 
     let main (top_hash : Digest.Tick.Packed.var) =
       with_label "Step.main" begin
         let%bind wrap_vk =
-          provide_witness' wrap_vk_spec ~f:(fun { Prover_state.wrap_vk } ->
+          provide_witness' wrap_vk_typ ~f:(fun { Prover_state.wrap_vk } ->
             Verifier.Verification_key.to_bool_list wrap_vk)
         in
-        let%bind prev_state = provide_witness' State.spec ~f:Prover_state.prev_state
-        and update          = provide_witness' Update.spec ~f:Prover_state.update
+        let%bind prev_state = provide_witness' State.typ ~f:Prover_state.prev_state
+        and update          = provide_witness' Update.typ ~f:Prover_state.update
         in
         let%bind (next_state, `Success success) =
           with_label "update" (State.Checked.update prev_state update)
