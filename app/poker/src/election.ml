@@ -12,7 +12,7 @@ module Vote = struct
     [@@deriving enum]
   end
   include T
-  include Enumerable.Make(T)
+  include Enumerable(T)
 end
 
 module Ballot = struct
@@ -21,7 +21,7 @@ module Ballot = struct
 
     type t = Nonce.t * Vote.t
     type var = Nonce.var * Vote.var
-    let typ = Var_spec.(Nonce.typ * Vote.typ)
+    let typ = Typ.(Nonce.typ * Vote.typ)
 
     let to_bits (nonce, candidate) =
       Nonce.to_bits nonce @ Vote.to_bits candidate
@@ -95,11 +95,11 @@ let number_of_voters = 11
 
 let check_winner commitments claimed_winner =
   let%bind p = pepperoni_wins commitments in
-  Boolean.assert_equal p claimed_winner
+  Boolean.Assert.(p = claimed_winner)
 
 let exposed () =
   let open Data_spec in
-  [ Var_spec.list ~length:number_of_voters Ballot.Closed.typ
+  [ Typ.list ~length:number_of_voters Ballot.Closed.typ
   ; Boolean.typ
   ]
 
@@ -127,7 +127,7 @@ let tally_and_prove (ballots : Ballot.Opened.t array) =
   in
   ( commitments
   , pepperoni_wins
-  , generate_proof (Keypair.pk keypair) (exposed ()) () handled_check
+  , prove (Keypair.pk keypair) (exposed ()) () handled_check
       commitments pepperoni_wins
   )
 

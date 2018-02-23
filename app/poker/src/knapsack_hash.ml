@@ -6,7 +6,7 @@ let dimension = 1
 
 type var = Cvar.t list
 type t = Field.t list
-let typ = Var_spec.(list ~length:dimension field)
+let typ = Typ.(list ~length:dimension field)
 
 let to_bits xs = List.concat_map ~f:Field.unpack xs
 let var_to_bits xs =

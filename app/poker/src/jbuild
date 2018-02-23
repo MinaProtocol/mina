@@ -12,6 +12,8 @@
       cohttp
       bignum
       nanobit_base
+      ppx_deriving
+      ppx_deriving.enum
       cohttp-async))
    (preprocess (pps (ppx_jane ppx_deriving.enum ppx_inline_test ppx_driver.runner (-inline-test-lib election))))
    (flags (-w -40 -g))
