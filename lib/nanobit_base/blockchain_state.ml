@@ -135,6 +135,34 @@ let negative_one : value =
   ; strength = Strength.zero
   }
 
+let get_strength target = 
+  let target = (Target.to_bigint target) in
+  let strength = Bignum.Bigint.((Target.to_bigint Target.max) / target) in
+  strength
+
+let%test "compute_target_stable" = 
+  let init = negative_one.target in
+  let time = Block_time.to_time Block.genesis.header.time in
+  let seq = List.init 1000 ~f:(fun i -> (1.)) in
+  printf "\n";
+  let result = List.fold_until ~init:(time, init) seq ~f:(fun (time, target) diff ->
+    let new_time = Time.add time (sec diff) in
+    let new_target = compute_target (Block_time.of_time time) target (Block_time.of_time new_time) in
+    let strength_float = Float.of_int (Bignum.Bigint.to_int_exn (get_strength target)) in
+    let new_strength_float = Float.of_int (Bignum.Bigint.to_int_exn (get_strength new_target)) in
+    let diff = Float.max (strength_float /. new_strength_float) (new_strength_float /. strength_float) in
+    printf "%s %s %f\n" 
+      (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] (Target.to_bigint new_target)))
+      (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] (get_strength new_target)))
+      diff;
+    if diff > 1.1
+    then Stop "target unstable"
+    else Continue (new_time, new_target))
+  in
+  match result with 
+  | Stopped_early _ -> false
+  | Finished _ -> true
+
 let zero = update_exn negative_one Block.genesis
 
 let to_bits ({ previous_time; target; block_hash; number; strength } : var) =
