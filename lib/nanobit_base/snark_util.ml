@@ -4,49 +4,6 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
   open Impl
   open Let_syntax
 
-  let two_to_the n =
-    let rec go acc i =
-      if i = 0
-      then acc
-      else go Field.Infix.(acc + acc) (i - 1)
-    in
-    go Field.one n
-
-  type comparison_result =
-    { less : Boolean.var
-    ; less_or_equal : Boolean.var
-    }
-
-  let compare ~bit_length a b =
-    with_label "Snark_util.compare" begin
-      let alpha_packed =
-        let open Cvar.Infix in
-        Cvar.constant (two_to_the bit_length) + b - a
-      in
-      let%bind alpha = Checked.unpack alpha_packed ~length:(bit_length + 1) in
-      let (prefix, less_or_equal) =
-        match List.split_n alpha bit_length with
-        | (p, [l]) -> (p, l)
-        | _ -> failwith "compare: Invalid alpha"
-      in
-      let%bind not_all_zeros = Boolean.any prefix in
-      let%map less = Boolean.(less_or_equal && not_all_zeros) in
-      { less; less_or_equal }
-    end
-
-  module Assert = struct
-    let lt ~bit_length x y =
-      let%bind { less; _ } = compare ~bit_length x y in
-      Boolean.Assert.is_true less
-
-    let lte ~bit_length x y =
-      let%bind { less_or_equal; _ } = compare ~bit_length x y in
-      Boolean.Assert.is_true less_or_equal
-
-    let gt ~bit_length x y = lt ~bit_length y x
-    let gte ~bit_length x y = lte ~bit_length y x
-  end
-
   let pack_int bs =
     assert (List.length bs < 62);
     let rec go pt acc = function
@@ -188,7 +145,7 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
         let ((), (less, less_or_equal), passed) =
           run_and_check
             (let%map { less; less_or_equal } =
-              compare ~bit_length (Cvar.constant x) (Cvar.constant y)
+              Checked.compare ~bit_length (Cvar.constant x) (Cvar.constant y)
             in
             As_prover.(
               map2 (read Boolean.typ less) (read Boolean.typ less_or_equal)

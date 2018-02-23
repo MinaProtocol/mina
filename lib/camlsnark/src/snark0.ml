@@ -19,15 +19,37 @@ module Restrict_monad2 (M : Monad.S2)(T : sig type t end)
   include Monad_infix
 end
 
-module Make (Backend : Backend_intf.S) = struct
+module Make_basic (Backend : Backend_intf.S) = struct
 open Backend
 
 module R1CS_constraint_system = R1CS_constraint_system
 
-module Bigint = Bigint.R
+module Bigint = struct
+  include Bigint.R
+
+  let of_bignum_bigint n =
+    of_decimal_string (Bignum.Bigint.to_string n)
+
+  let to_bignum_bigint n =
+    let rec go i two_to_the_i acc =
+      if i = Field.size_in_bits
+      then acc
+      else
+        let acc' =
+          if test_bit n i
+          then Bignum.Bigint.(acc + two_to_the_i)
+          else acc
+        in
+        go (i + 1) Bignum.Bigint.(two_to_the_i + two_to_the_i) acc'
+    in
+    go 0 Bignum.Bigint.one Bignum.Bigint.zero
+end
 
 module Field = struct
   include Field
+
+  let size =
+    Bigint.to_bignum_bigint Backend.field_size
 
   let inv x = if equal x zero then failwith "Field.inv: zero" else inv x
 
@@ -1257,6 +1279,14 @@ module Checked = struct
     end
   ;;
 
+  let two_to_the n =
+    let rec go acc i =
+      if i = 0
+      then acc
+      else go Field.Infix.(acc + acc) (i - 1)
+    in
+    go Field.one n
+
   type _ Request.t +=
     | Choose_preimage : Field.t * int -> bool list Request.t
 
@@ -1304,7 +1334,43 @@ module Checked = struct
     project vars
   ;;
 
+  type comparison_result =
+    { less : Boolean.var
+    ; less_or_equal : Boolean.var
+    }
+
+  let compare ~bit_length a b =
+    let open Let_syntax in
+    with_label "Snark_util.compare" begin
+      let alpha_packed =
+        let open Cvar.Infix in
+        Cvar.constant (two_to_the bit_length) + b - a
+      in
+      let%bind alpha = unpack alpha_packed ~length:(bit_length + 1) in
+      let (prefix, less_or_equal) =
+        match List.split_n alpha bit_length with
+        | (p, [l]) -> (p, l)
+        | _ -> failwith "compare: Invalid alpha"
+      in
+      let%bind not_all_zeros = Boolean.any prefix in
+      let%map less = Boolean.(less_or_equal && not_all_zeros) in
+      { less; less_or_equal }
+    end
+
   module Assert = struct
+    let lt ~bit_length x y =
+      let open Let_syntax in
+      let%bind { less; _ } = compare ~bit_length x y in
+      Boolean.Assert.is_true less
+
+    let lte ~bit_length x y =
+      let open Let_syntax in
+      let%bind { less_or_equal; _ } = compare ~bit_length x y in
+      Boolean.Assert.is_true less_or_equal
+
+    let gt ~bit_length x y = lt ~bit_length y x
+    let gte ~bit_length x y = lte ~bit_length y x
+
     let equal_bitstrings (t1 : Boolean.var list) (t2 : Boolean.var list) =
       let chunk_size = Field.size_in_bits - 1 in
       let rec go acc t1 t2 =
@@ -1481,4 +1547,10 @@ let generate_keypair = Run.generate_keypair
 let prove = Run.prove
 let verify = Run.verify
 
+end
+
+module Make (Backend : Backend_intf.S) = struct
+  module Basic = Make_basic(Backend)
+  include Basic
+  module Number = Number.Make(Basic)
 end

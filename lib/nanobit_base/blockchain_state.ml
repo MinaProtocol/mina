@@ -244,7 +244,7 @@ module Checked = struct
   let valid_body ~prev body =
     with_label "valid_body" begin
       let%bind { less } =
-        Util.compare ~bit_length:Block.Body.bit_length
+        Checked.compare ~bit_length:Block.Body.bit_length
           (Block.Body.pack_var prev) (Block.Body.pack_var body)
       in
       Boolean.Assert.is_true less

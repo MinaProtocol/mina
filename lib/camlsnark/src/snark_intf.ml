@@ -1,6 +1,6 @@
 open Core
 
-module type S = sig
+module type Basic = sig
   module R1CS_constraint_system : sig
     type t
   end
@@ -14,11 +14,16 @@ module type S = sig
     include Field_intf.Extended
     include Sexpable.S with type t := t
 
+    val size : Bignum.Bigint.t
     val unpack : t -> bool list
     val project : bool list -> t
   end
 
-  module Bigint : Bigint_intf.Extended with type field := Field.t
+  module Bigint : sig
+    include Bigint_intf.Extended with type field := Field.t
+    val of_bignum_bigint : Bignum.Bigint.t -> t
+    val to_bignum_bigint : t -> Bignum.Bigint.t
+  end
 
   module Cvar : sig
     type t
@@ -205,7 +210,19 @@ module type S = sig
 
     val unpack : Cvar.t -> length:int -> (Boolean.var list, _) t
 
+    type comparison_result =
+      { less : Boolean.var
+      ; less_or_equal : Boolean.var
+      }
+
+    val compare : bit_length:int -> Cvar.t -> Cvar.t -> (comparison_result, _) t
+
     module Assert : sig
+      val lte : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
+      val gte : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
+      val lt : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
+      val gt : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
+
       val equal_bitstrings
         : Boolean.var list
         -> Boolean.var list
@@ -364,5 +381,14 @@ module type S = sig
     : (('a, 's) As_prover.t, 's) Checked.t -> 's -> 's * 'a * bool
 
   val check : ('a, 's) Checked.t -> 's -> bool
+end
+
+module type S = sig
+  include Basic
+  module Number : Number_intf.S
+    with type ('a, 'b) checked := ('a, 'b) Checked.t
+     and type field := Field.t
+     and type field_var := Cvar.t
+     and type bool_var := Boolean.var
 end
 
