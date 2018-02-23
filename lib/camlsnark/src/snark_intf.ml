@@ -10,17 +10,10 @@ module type Basic = sig
     val create : int -> t
   end
 
-  module Field : sig
-    include Field_intf.Extended
-    include Sexpable.S with type t := t
-
-    val size : Bignum.Bigint.t
-    val unpack : t -> bool list
-    val project : bool list -> t
-  end
+  type field
 
   module Bigint : sig
-    include Bigint_intf.Extended with type field := Field.t
+    include Bigint_intf.Extended with type field := field
     val of_bignum_bigint : Bignum.Bigint.t -> t
     val to_bignum_bigint : t -> Bignum.Bigint.t
   end
@@ -31,20 +24,20 @@ module type Basic = sig
     (* For debug purposes *)
     val length : t -> int
     val var_indices : t -> int list
-    val to_constant_and_terms : t -> Field.t option * (Field.t * Var.t) list
+    val to_constant_and_terms : t -> field option * (field * Var.t) list
 
-    val constant : Field.t -> t
+    val constant : field -> t
 
-    val linear_combination : (Field.t * t) list -> t
+    val linear_combination : (field * t) list -> t
     val sum : t list -> t
     val add : t -> t -> t
     val sub : t -> t -> t
-    val scale : t -> Field.t -> t
+    val scale : t -> field -> t
 
     module Infix : sig
       val (+) : t -> t -> t
       val (-) : t -> t -> t
-      val ( * ) : Field.t -> t -> t
+      val ( * ) : field -> t -> t
     end
 
     module Unsafe : sig
@@ -77,7 +70,7 @@ module type Basic = sig
     module Store : sig
       include Monad.S
 
-      val store : Field.t -> Cvar.t t
+      val store : field -> Cvar.t t
     end
 
     module Alloc : sig
@@ -89,7 +82,7 @@ module type Basic = sig
     module Read : sig
       include Monad.S
 
-      val read : Cvar.t -> Field.t t
+      val read : Cvar.t -> field t
     end
 
     type ('var, 'value) t =
@@ -104,7 +97,7 @@ module type Basic = sig
     val alloc : ('var, 'value) t -> 'var Alloc.t
     val check : ('var, 'value) t -> 'var -> (unit, _) Checked.t
 
-    val field  : (Cvar.t, Field.t) t
+    val field  : (Cvar.t, field) t
     val tuple2 : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var1 * 'var2, 'value1 * 'value2) t
     val tuple3
       : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var3, 'value3) t
@@ -177,6 +170,8 @@ module type Basic = sig
     end
 
     module Assert : sig
+      val (=) : Boolean.var -> Boolean.var -> (unit, _) Checked.t
+
       val is_true : Boolean.var -> (unit, _) Checked.t
 
       val any : var list -> (unit, _) Checked.t
@@ -204,7 +199,7 @@ module type Basic = sig
     val pack : Boolean.var list -> Cvar.t
 
     type _ Request.t +=
-      | Choose_preimage : Field.t * int -> bool list Request.t
+      | Choose_preimage : field * int -> bool list Request.t
     val choose_preimage
       : Cvar.t -> length:int -> (Boolean.var list, _) t
 
@@ -237,6 +232,19 @@ module type Basic = sig
 
       val exactly_one : Boolean.var list -> (unit, _) t
     end
+  end
+
+  module Field : sig
+    include Field_intf.Extended with type t = field
+    include Sexpable.S with type t := t
+
+    type var = Cvar.t
+
+    val typ : (var, t) Typ.t
+
+    val size : Bignum.Bigint.t
+    val unpack : t -> bool list
+    val project : bool list -> t
   end
 
   include Monad.Syntax2 with type ('a, 's) t := ('a, 's) Checked.t
@@ -286,7 +294,7 @@ module type Basic = sig
 
     val map2 : ('a, 's) t -> ('b, 's) t -> f:('a -> 'b -> 'c) -> ('c, 's) t
 
-    val read_var  : Cvar.t -> (Field.t, 'prover_state) t
+    val read_var  : Cvar.t -> (field, 'prover_state) t
     val get_state : ('prover_state, 'prover_state) t
     val set_state : 'prover_state -> (unit, 'prover_state) t
     val modify_state : ('prover_state -> 'prover_state) -> (unit, 'prover_state) t
@@ -329,6 +337,12 @@ module type Basic = sig
     -> ('value Request.t, 's) As_prover.t
     -> ('var, 's) Checked.t
 
+  (* TODO: Come up with a better name for this in relation to the above *)
+  val request
+    : ('var, 'value) Typ.t
+    -> 'value Request.t
+    -> ('var, 's) Checked.t
+
   val provide_witness
     : ('var, 'value) Typ.t
     -> ('value, 's) As_prover.t
@@ -358,7 +372,7 @@ module type Basic = sig
     : (R1CS_constraint_system.t -> unit) -> (unit, _) Checked.t
 
   val generate_keypair
-    : ((unit, 's) Checked.t, _, 'k_var, _) Data_spec.t
+    : exposing:((unit, 's) Checked.t, _, 'k_var, _) Data_spec.t
     -> 'k_var
     -> Keypair.t
 
@@ -387,7 +401,7 @@ module type S = sig
   include Basic
   module Number : Number_intf.S
     with type ('a, 'b) checked := ('a, 'b) Checked.t
-     and type field := Field.t
+     and type field := field
      and type field_var := Cvar.t
      and type bool_var := Boolean.var
 end

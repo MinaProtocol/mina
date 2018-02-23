@@ -22,6 +22,8 @@ end
 module Make_basic (Backend : Backend_intf.S) = struct
 open Backend
 
+type field = Field.t
+
 module R1CS_constraint_system = R1CS_constraint_system
 
 module Bigint = struct
@@ -45,58 +47,6 @@ module Bigint = struct
     go 0 Bignum.Bigint.one Bignum.Bigint.zero
 end
 
-module Field = struct
-  include Field
-
-  let size =
-    Bigint.to_bignum_bigint Backend.field_size
-
-  let inv x = if equal x zero then failwith "Field.inv: zero" else inv x
-
-  (* TODO: Optimize *)
-  let div x y = mul x (inv y)
-
-  let negate x = sub zero x
-
-  let unpack x =
-    let n = Bigint.of_field x in
-    List.init size_in_bits ~f:(fun i -> Bigint.test_bit n i)
-  ;;
-
-  let project =
-    let rec go x acc = function
-      | [] -> acc
-      | b :: bs ->
-        go (Field.add x x) (if b then Field.add acc x else acc) bs
-    in
-    fun bs -> go Field.one Field.zero bs
-
-  let to_string x =
-    let n = Bigint.of_field x in
-    String.init Field.size_in_bits ~f:(fun i ->
-      if Bigint.test_bit n i then '1' else '0')
-
-  let of_string_exn s =
-    let (_two_to_the_n, acc) =
-      String.fold s ~init:(one, zero)  ~f:(fun (two_to_the_i, acc) c ->
-        let pt = add two_to_the_i two_to_the_i in
-        match c with
-        | '0' -> (pt, acc)
-        | '1' -> (pt, add acc two_to_the_i)
-        | _ -> failwith "Field.of_string_exn: Got non 0-1 character.")
-    in
-    acc
-
-  let sexp_of_t x = String.sexp_of_t (to_string x)
-  let t_of_sexp s = of_string_exn (String.t_of_sexp s)
-
-  module Infix = struct
-    let (+) = add
-    let ( * ) = mul
-    let (-) = sub
-    let (/) = div
-  end
-end
 module Proof = Proof
 module Keypair = Keypair
 module Verification_key = Verification_key
@@ -718,6 +668,63 @@ module Typ = struct
   ;;
 end
 
+module Field = struct
+  include Field
+
+  type var = Cvar.t
+
+  let typ = Typ.field
+
+  let size =
+    Bigint.to_bignum_bigint Backend.field_size
+
+  let inv x = if equal x zero then failwith "Field.inv: zero" else inv x
+
+  (* TODO: Optimize *)
+  let div x y = mul x (inv y)
+
+  let negate x = sub zero x
+
+  let unpack x =
+    let n = Bigint.of_field x in
+    List.init size_in_bits ~f:(fun i -> Bigint.test_bit n i)
+  ;;
+
+  let project =
+    let rec go x acc = function
+      | [] -> acc
+      | b :: bs ->
+        go (Field.add x x) (if b then Field.add acc x else acc) bs
+    in
+    fun bs -> go Field.one Field.zero bs
+
+  let to_string x =
+    let n = Bigint.of_field x in
+    String.init Field.size_in_bits ~f:(fun i ->
+      if Bigint.test_bit n i then '1' else '0')
+
+  let of_string_exn s =
+    let (_two_to_the_n, acc) =
+      String.fold s ~init:(one, zero)  ~f:(fun (two_to_the_i, acc) c ->
+        let pt = add two_to_the_i two_to_the_i in
+        match c with
+        | '0' -> (pt, acc)
+        | '1' -> (pt, add acc two_to_the_i)
+        | _ -> failwith "Field.of_string_exn: Got non 0-1 character.")
+    in
+    acc
+
+  let sexp_of_t x = String.sexp_of_t (to_string x)
+  let t_of_sexp s = of_string_exn (String.t_of_sexp s)
+
+  module Infix = struct
+    let (+) = add
+    let ( * ) = mul
+    let (-) = sub
+    let (/) = div
+  end
+end
+
 module As_prover = struct
   include As_prover0
 
@@ -770,6 +777,8 @@ module Checked = struct
         (r : ('value Request.t, 's) As_prover.t)
     =
     Exists (typ, Request r, fun h -> return (Handle.var h))
+
+  let request typ r = request_witness typ (As_prover.return r)
 
   let provide_witness
         (typ : ('var, 'value) Typ.t)
@@ -1221,6 +1230,8 @@ module Checked = struct
     ;;
 
     module Assert = struct
+      let (=) x y = assert_equal x y
+
       let is_true (v : var) = assert_equal v true_
 
       (* Someday: Make more efficient *)
@@ -1451,11 +1462,11 @@ module Run = struct
   ;;
 
   let generate_keypair
-    : ((unit, 's) Checked.t, _, 'k_var, _) t
+    : exposing:((unit, 's) Checked.t, _, 'k_var, _) t
       -> 'k_var
       -> Keypair.t
     =
-    fun t k ->
+    fun ~exposing:t k ->
       Backend.R1CS_constraint_system.create_keypair (constraint_system t k)
 
   let verify

@@ -256,7 +256,7 @@ end
 
 module Mnt4
     (Impl : Snark_intf.S
-     with type Field.t = Libsnark.Mnt4.Field.t
+     with type field = Libsnark.Mnt4.Field.t
       and type Var.t = Libsnark.Mnt4.Var.t
       and type Field.Vector.t = Libsnark.Mnt4.Field.Vector.t
       and type R1CS_constraint_system.t = Libsnark.Mnt4.R1CS_constraint_system.t)
@@ -266,7 +266,7 @@ module Mnt4
 
 module Mnt6
     (Impl : Snark_intf.S
-     with type Field.t = Libsnark.Mnt6.Field.t
+     with type field = Libsnark.Mnt6.Field.t
       and type Var.t = Libsnark.Mnt6.Var.t
       and type Field.Vector.t = Libsnark.Mnt6.Field.Vector.t
       and type R1CS_constraint_system.t = Libsnark.Mnt6.R1CS_constraint_system.t)
