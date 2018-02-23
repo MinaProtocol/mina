@@ -25,7 +25,7 @@ module Header = struct
   let to_hlist { previous_block_hash; time; nonce } =
       H_list.([ previous_block_hash; time; nonce ])
 
-  let of_hlist =
+  let of_hlist : (unit, 'h -> 't -> 'n -> unit) H_list.t -> ('h, 't, 'n) t_ =
     let open H_list in
     fun [ previous_block_hash; time; nonce ] ->
       { previous_block_hash; time; nonce }
@@ -124,7 +124,8 @@ let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"
   Or maybe it's worth writing a deriving plugin.
 *)
 let to_hlist { header; body } = H_list.([ header; body ])
-let of_hlist = H_list.(fun [ header; body ] -> { header; body })
+let of_hlist : (unit, 'h -> 'b -> unit) H_list.t -> ('h, 'b) t_ =
+  H_list.(fun [ header; body ] -> { header; body })
 
 type var = (Header.var, Body.Unpacked.var) t_
 type value = (Header.value, Body.Unpacked.value) t_

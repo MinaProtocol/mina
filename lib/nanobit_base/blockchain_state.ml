@@ -47,7 +47,8 @@ type value =
   ) t_
 
 let to_hlist { previous_time; target; block_hash; number; strength } = H_list.([ previous_time; target; block_hash; number; strength ])
-let of_hlist = H_list.(fun [ previous_time; target; block_hash; number; strength ] -> { previous_time; target; block_hash; number; strength })
+let of_hlist : (unit, 'ti -> 'ta -> 'd -> 'n -> 's -> unit) H_list.t -> ('ti, 'ta, 'd, 'n, 's) t_ =
+  H_list.(fun [ previous_time; target; block_hash; number; strength ] -> { previous_time; target; block_hash; number; strength })
 
 let data_spec =
   let open Data_spec in
