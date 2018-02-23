@@ -1564,4 +1564,5 @@ module Make (Backend : Backend_intf.S) = struct
   module Basic = Make_basic(Backend)
   include Basic
   module Number = Number.Make(Basic)
+  module Enumerable = Enumerable.Make(Basic)
 end

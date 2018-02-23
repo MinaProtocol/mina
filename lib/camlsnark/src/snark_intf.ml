@@ -404,5 +404,14 @@ module type S = sig
      and type field := field
      and type field_var := Cvar.t
      and type bool_var := Boolean.var
+
+  module Enumerable
+    : functor (M : sig type t [@@deriving enum] end) ->
+      Enumerable_intf.S
+      with type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type ('a, 'b) typ := ('a, 'b) Typ.t
+       and type bool_var := Boolean.var
+       and type var = Field.var
+       and type t := M.t
 end
 
