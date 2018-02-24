@@ -4,7 +4,6 @@ open Snark_params
 module Pedersen = Tick.Pedersen
 
 module Header = struct
-  (* TODO: Is there some reason [target] should be in here? *)
   module Stable = struct
     module V1 = struct
       type ('hash, 'time, 'nonce) t_ =
@@ -117,8 +116,6 @@ let genesis : t =
       }
   ; body = Int64.one
   }
-
-let strongest (a : t) (b : t) : [ `First | `Second ] = failwith "TODO"
 
 (* TODO: Come up with a cleaner way to do this. Maybe use a function instead of functor?
   Or maybe it's worth writing a deriving plugin.
