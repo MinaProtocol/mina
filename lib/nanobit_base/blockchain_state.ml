@@ -64,6 +64,35 @@ let typ : (var, value) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
+let target_time_ms = `Two_to_the 13 (* 8.192 seconds *);;
+let max_difficulty_drop = `Two_to_the 7 (* 128 *) ;;
+let difficulty_adjustment_rate = `Two_to_the 11 (* 2048 *) ;;
+
+let compute_target previous_time previous_target time = 
+  let previous_target = Target.to_bigint previous_target in
+  let target_time_ms =
+    let `Two_to_the k = target_time_ms in
+    Bignum.Bigint.(pow (of_int 2) (of_int k))
+  in
+  let max_difficulty_drop = 
+    let `Two_to_the k = max_difficulty_drop in
+    Bignum.Bigint.(pow (of_int 2) (of_int k))
+  in
+  let difficulty_adjustment_rate = 
+    let `Two_to_the k = difficulty_adjustment_rate in
+    Bignum.Bigint.(pow (of_int 2) (of_int k))
+  in
+  let time = Block_time.to_time time in
+  let previous_time = Block_time.to_time previous_time in
+  let time_diff = Time.diff time previous_time in
+  let time_diff_ms = Bignum.Bigint.of_int (Int.of_float (Time.Span.to_ms time_diff)) in
+  let scale = Bignum.Bigint.(Bignum.Bigint.one - (time_diff_ms / target_time_ms)) in
+  printf "%s\n" (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] scale));
+  let scale = Bignum.Bigint.max scale Bignum.Bigint.(-max_difficulty_drop) in
+  let diff = Bignum.Bigint.(previous_target / difficulty_adjustment_rate * scale) in
+  Target.of_bigint (Bignum.Bigint.(previous_target + diff))
+
+(*
 let bound_divisor = `Two_to_the 11
 let delta_minus_one_max_bits = 7
 let target_time_ms = `Two_to_the 13 (* 8.192 seconds *)
@@ -99,7 +128,7 @@ let compute_target previous_time (previous_target : Target.t) time =
       previous_target + rate_multiplier * gamma
     end
   end
-;;
+;;*)
 
 let update_exn : value -> Block.t -> value =
   let genesis_hash = Block.(hash genesis) in
@@ -109,7 +138,7 @@ let update_exn : value -> Block.t -> value =
     then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
     assert Int64.(block.body > state.number);
     let new_target =
-      compute_target state.previous_time state.target block.header.time
+      state.target (*compute_target state.previous_time state.target block.header.time*)
     in
     let strength = Target.strength_unchecked state.target in
     { previous_time = block.header.time
@@ -137,24 +166,61 @@ let negative_one : value =
   }
 
 let get_strength target = 
-  let target = (Target.to_bigint target) in
   let strength = Bignum.Bigint.((Target.to_bigint Target.max) / target) in
   strength
 
-let%test "compute_target_stable" = 
-  let init = negative_one.target in
+let get_target strength = 
+  let target = Bignum.Bigint.((Target.to_bigint Target.max) / strength) in
+  Target.of_bigint target
+
+(* homestead difficulty calculation
+ * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2.md
+ * block_target = parent_target + parent_target //_ceil difficulty_adjustment_rate * max(1 - (block_timestamp_ms - parent_timestamp_ms) //_floor target_time_ms, -max_difficulty_drop)
+ *)
+
+let target_time_ms = `Two_to_the 13 (* 8.192 seconds *);;
+let max_difficulty_drop = `Two_to_the 7 (* 128 *) ;;
+let difficulty_adjustment_rate = `Two_to_the 11 (* 2048 *) ;;
+
+let compute_difficulty previous_time previous_difficulty time = 
+  let target_time_ms =
+    let `Two_to_the k = target_time_ms in
+    Bignum.Bigint.(pow (of_int 2) (of_int k))
+  in
+  let max_difficulty_drop = 
+    let `Two_to_the k = max_difficulty_drop in
+    Bignum.Bigint.(pow (of_int 2) (of_int k))
+  in
+  let difficulty_adjustment_rate = 
+    let `Two_to_the k = difficulty_adjustment_rate in
+    Bignum.Bigint.(pow (of_int 2) (of_int k))
+  in
+  let time = Block_time.to_time time in
+  let previous_time = Block_time.to_time previous_time in
+  let time_diff = Time.diff time previous_time in
+  let time_diff_ms = Bignum.Bigint.of_int (Int.of_float (Time.Span.to_ms time_diff)) in
+  let scale = Bignum.Bigint.(Bignum.Bigint.one - (time_diff_ms / target_time_ms)) in
+  printf "%s\n" (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] scale));
+  let scale = Bignum.Bigint.max scale Bignum.Bigint.(-max_difficulty_drop) in
+  let div_ceil n d = Bignum.Bigint.((n + d - Bignum.Bigint.one) / d) in
+  let rate = div_ceil previous_difficulty difficulty_adjustment_rate in
+  let diff = Bignum.Bigint.(rate * scale) in
+  Bignum.Bigint.(previous_difficulty + diff)
+
+let%test "compute_difficulty_stable" = 
+  let init = get_target (Bignum.Bigint.of_int 1024) in
   let time = Block_time.to_time Block.genesis.header.time in
-  let seq = List.init 1000 ~f:(fun i -> (1.)) in
+  let seq = List.concat [ (List.init 1000 ~f:(fun i -> (1.))); (List.init 500 ~f:(fun i -> (20.))) ] in
   printf "\n";
   let result = List.fold_until ~init:(time, init) seq ~f:(fun (time, target) diff ->
     let new_time = Time.add time (sec diff) in
-    let new_target = compute_target (Block_time.of_time time) target (Block_time.of_time new_time) in
-    let strength_float = Float.of_int (Bignum.Bigint.to_int_exn (get_strength target)) in
-    let new_strength_float = Float.of_int (Bignum.Bigint.to_int_exn (get_strength new_target)) in
+    let new_target = get_target (compute_difficulty (Block_time.of_time time) (get_strength (Target.to_bigint target)) (Block_time.of_time new_time)) in
+    let strength_float = Float.of_int (Bignum.Bigint.to_int_exn (get_strength (Target.to_bigint target))) in
+    let new_strength_float = Float.of_int (Bignum.Bigint.to_int_exn (get_strength (Target.to_bigint new_target))) in
     let diff = Float.max (strength_float /. new_strength_float) (new_strength_float /. strength_float) in
     printf "%s %s %f\n" 
       (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] (Target.to_bigint new_target)))
-      (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] (get_strength new_target)))
+      (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] (get_strength (Target.to_bigint new_target))))
       diff;
     if diff > 1.1
     then Stop "target unstable"
@@ -207,7 +273,7 @@ module Checked = struct
             let open Number in
             to_bits (constant (Target.max :> Field.t) - prev_target_n)
           in
-          Number.of_bits (div_pow_2 distance_to_max_target bound_divisor)
+          Number.of_bits (div_pow_2 distance_to_max_target max_difficulty_drop)
         end
       in
       let%bind delta =
