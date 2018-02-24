@@ -81,22 +81,16 @@ let max_difficulty_drop = `Two_to_the 7 (* 128 *) ;;
 let difficulty_adjustment_rate = `Two_to_the 11 (* 2048 *) ;;
 
 let compute_difficulty previous_time previous_difficulty time = 
-  let target_time_ms =
-    let `Two_to_the k = target_time_ms in
+  let pow2_bigint n =
+    let `Two_to_the k = n in
     Bignum.Bigint.(pow (of_int 2) (of_int k))
   in
-  let max_difficulty_drop = 
-    let `Two_to_the k = max_difficulty_drop in
-    Bignum.Bigint.(pow (of_int 2) (of_int k))
-  in
-  let difficulty_adjustment_rate = 
-    let `Two_to_the k = difficulty_adjustment_rate in
-    Bignum.Bigint.(pow (of_int 2) (of_int k))
-  in
-  let time = Block_time.to_time time in
-  let previous_time = Block_time.to_time previous_time in
-  let time_diff = Time.diff time previous_time in
+  let target_time_ms = pow2_bigint target_time_ms in
+  let max_difficulty_drop = pow2_bigint max_difficulty_drop in
+  let difficulty_adjustment_rate = pow2_bigint difficulty_adjustment_rate in
+  let time_diff = Time.diff (Block_time.to_time time) (Block_time.to_time previous_time) in
   let time_diff_ms = Bignum.Bigint.of_int (Int.of_float (Time.Span.to_ms time_diff)) in
+
   let scale = Bignum.Bigint.(Bignum.Bigint.one - (time_diff_ms / target_time_ms)) in
   printf "%s\n" (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] scale));
   let scale = Bignum.Bigint.max scale Bignum.Bigint.(-max_difficulty_drop) in
