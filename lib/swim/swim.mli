@@ -26,6 +26,8 @@ module type S = sig
 
   val stop : t -> unit
 
+  val first_peers : t -> Peer.t list Deferred.t
+
   module TestOnly : sig
     val network_partition_add : from:Peer.t -> to_:Peer.t -> unit
     val network_partition_remove : from:Peer.t -> to_:Peer.t -> unit

@@ -68,8 +68,7 @@ let main () =
   let swim_ref = ref None in
   let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
 
-  let init_pipes () =
-    let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
+  let init_pipes () : (Main.pipes * Blockchain.t Linear_pipe.Reader.t) =
     let gossip_net_strongest_block_reader,
         gossip_net_strongest_block_propagator,
         body_changes_strongest_block_reader,
@@ -78,7 +77,7 @@ let main () =
         rpc_strongest_block_reader =
       Linear_pipe.fork6 strongest_block_reader in
     let body_changes_reader, body_changes_writer = Linear_pipe.create () in
-    { Main.strongest_block_writer
+    { strongest_block_writer
     ; gossip_net_strongest_block_reader
     ; gossip_net_strongest_block_propagator
     ; body_changes_strongest_block_reader
