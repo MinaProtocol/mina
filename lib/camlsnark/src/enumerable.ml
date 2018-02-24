@@ -31,8 +31,16 @@ module Make (Impl : Snark_intf.Basic) (M : sig type t [@@deriving enum] end) = s
   let assert_equal x y = assert_equal x y
 
   let typ : (var, t) Typ.t =
-    Typ.transport Field.typ
-      ~there:to_field ~back:of_field
+    let check =
+      if M.max = 1
+      then fun x -> assert_ (Constraint.boolean x)
+      else fun x ->
+        Checked.Assert.lte ~bit_length x (Cvar.constant (Field.of_int M.max))
+    in
+    { (Typ.transport Field.typ
+        ~there:to_field ~back:of_field)
+      with check
+    }
 
   let var_to_bits : var -> (Boolean.var list, _) Checked.t =
     Checked.unpack ~length:bit_length

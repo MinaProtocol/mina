@@ -67,12 +67,6 @@ let boolean_compare (x : Tick.Boolean.var) (y : Tick.Boolean.var) =
   let eq = Cvar.constant Field.one - (lt + gt) in
   Boolean.Unsafe.(of_cvar lt, of_cvar eq, of_cvar gt)
 
-let boolean_compare_to_value (x : Tick.Boolean.var) (y : Tick.Boolean.value) =
-  let open Boolean in
-  if y
-  then (not x, x, false_)
-  else (false_, not x, x)
-
 let rec lt_bitstrings_msb =
   let open Boolean in
   fun (xs : Boolean.var list) (ys : Boolean.var list) ->
@@ -96,14 +90,16 @@ let rec lt_bitstring_value_msb =
   fun (xs : Boolean.var list) (ys : Boolean.value list) ->
     match xs, ys with
     | [], [] -> return false_
-    | [ x ], [ y ] ->
-      let (lt, _, _) = boolean_compare_to_value x y in
-      return lt
-    | x :: xs, y :: ys ->
-      let (lt, eq, gt) = boolean_compare_to_value x y in
-      let%bind tail_lt = lt_bitstring_value_msb xs ys in
-      let%bind r = eq && tail_lt in
-      lt || r
+    | [ x ], [ false ] -> return false_
+    | [ x ], [ true ] -> return (not x)
+    | [ x1; x2 ], [ true; false ] -> return (not x1)
+    | [ x1; x2 ], [ false; false ] -> return false_
+    | x :: xs, false :: ys ->
+      let%bind r = lt_bitstring_value_msb xs ys in
+      not x && r
+    | x :: xs, true :: ys ->
+      let%bind r = lt_bitstring_value_msb xs ys in
+      not x || r
     | _::_, [] | [], _::_ ->
       failwith "lt_bitstrings_msb: Got unequal length strings"
 
