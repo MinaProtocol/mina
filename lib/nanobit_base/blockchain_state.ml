@@ -64,112 +64,11 @@ let typ : (var, value) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let target_time_ms = `Two_to_the 13 (* 8.192 seconds *);;
-let max_difficulty_drop = `Two_to_the 7 (* 128 *) ;;
-let difficulty_adjustment_rate = `Two_to_the 11 (* 2048 *) ;;
-
-let compute_target previous_time previous_target time = 
-  let previous_target = Target.to_bigint previous_target in
-  let target_time_ms =
-    let `Two_to_the k = target_time_ms in
-    Bignum.Bigint.(pow (of_int 2) (of_int k))
-  in
-  let max_difficulty_drop = 
-    let `Two_to_the k = max_difficulty_drop in
-    Bignum.Bigint.(pow (of_int 2) (of_int k))
-  in
-  let difficulty_adjustment_rate = 
-    let `Two_to_the k = difficulty_adjustment_rate in
-    Bignum.Bigint.(pow (of_int 2) (of_int k))
-  in
-  let time = Block_time.to_time time in
-  let previous_time = Block_time.to_time previous_time in
-  let time_diff = Time.diff time previous_time in
-  let time_diff_ms = Bignum.Bigint.of_int (Int.of_float (Time.Span.to_ms time_diff)) in
-  let scale = Bignum.Bigint.(Bignum.Bigint.one - (time_diff_ms / target_time_ms)) in
-  printf "%s\n" (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] scale));
-  let scale = Bignum.Bigint.max scale Bignum.Bigint.(-max_difficulty_drop) in
-  let diff = Bignum.Bigint.(previous_target / difficulty_adjustment_rate * scale) in
-  Target.of_bigint (Bignum.Bigint.(previous_target + diff))
-
-(*
-let bound_divisor = `Two_to_the 11
-let delta_minus_one_max_bits = 7
-let target_time_ms = `Two_to_the 13 (* 8.192 seconds *)
-
-let compute_target previous_time (previous_target : Target.t) time =
-  let target_time_ms =
-    let `Two_to_the k = target_time_ms in
-    Bignum.Bigint.(pow (of_int 2) (of_int k))
-  in
-  let target_max = Target.(to_bigint max) in
-  let delta_minus_one_max =
-    Bignum.Bigint.(pow (of_int 2) (of_int delta_minus_one_max_bits) - one)
-  in
-  let div_pow_2 x (`Two_to_the k) = Bignum.Bigint.shift_right x k in
-  let previous_target = Target.to_bigint previous_target in
-  assert Block_time.(time > previous_time);
-  let rate_multiplier = div_pow_2 Bignum.Bigint.(target_max - previous_target) bound_divisor in
-  let delta =
-    Bignum.Bigint.(
-      of_int64 Block_time.(Span.to_ms (diff time previous_time)) / target_time_ms)
-  in
-  let open Bignum.Bigint in
-  Target.of_bigint begin
-    if delta = zero
-    then begin
-      if previous_target < rate_multiplier
-      then one
-      else previous_target - rate_multiplier
-    end else begin
-      let gamma =
-        min (delta - one) delta_minus_one_max
-      in
-      previous_target + rate_multiplier * gamma
-    end
-  end
-;;*)
-
-let update_exn : value -> Block.t -> value =
-  let genesis_hash = Block.(hash genesis) in
-  fun state block ->
-    let block_hash = Block.hash block in
-    (if not Field.(equal block_hash genesis_hash)
-    then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
-    assert Int64.(block.body > state.number);
-    let new_target =
-      state.target (*compute_target state.previous_time state.target block.header.time*)
-    in
-    let strength = Target.strength_unchecked state.target in
-    { previous_time = block.header.time
-    ; target = new_target
-    ; block_hash
-    ; number = block.body
-    ; strength = Field.add strength state.strength
-    }
-
-let negative_one : value =
-  let previous_time =
-    Block_time.of_time
-      (Time.sub (Block_time.to_time Block.genesis.header.time) (Time.Span.second))
-  in
-  let target : Target.Unpacked.value =
-    Target.of_bigint
-      Bignum.Bigint.(
-        Target.(to_bigint max) / pow (of_int 2) (of_int 5))
-  in
-  { previous_time
-  ; target
-  ; block_hash = Block.genesis.header.previous_block_hash
-  ; number = Int64.of_int 0
-  ; strength = Strength.zero
-  }
-
-let get_strength target = 
+let target_to_strength target = 
   let strength = Bignum.Bigint.((Target.to_bigint Target.max) / target) in
   strength
 
-let get_target strength = 
+let strength_to_target strength = 
   let target = Bignum.Bigint.((Target.to_bigint Target.max) / strength) in
   Target.of_bigint target
 
@@ -207,20 +106,58 @@ let compute_difficulty previous_time previous_difficulty time =
   let diff = Bignum.Bigint.(rate * scale) in
   Bignum.Bigint.(previous_difficulty + diff)
 
+let compute_target previous_time previous_target time = 
+  strength_to_target (compute_difficulty previous_time (target_to_strength (Target.to_bigint previous_target)) time)
+
+let update_exn : value -> Block.t -> value =
+  let genesis_hash = Block.(hash genesis) in
+  fun state block ->
+    let block_hash = Block.hash block in
+    (if not Field.(equal block_hash genesis_hash)
+    then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
+    assert Int64.(block.body > state.number);
+    let new_target =
+      state.target (*compute_target state.previous_time state.target block.header.time*)
+    in
+    let strength = Target.strength_unchecked state.target in
+    { previous_time = block.header.time
+    ; target = new_target
+    ; block_hash
+    ; number = block.body
+    ; strength = Field.add strength state.strength
+    }
+
+let negative_one : value =
+  let previous_time =
+    Block_time.of_time
+      (Time.sub (Block_time.to_time Block.genesis.header.time) (Time.Span.second))
+  in
+  let target : Target.Unpacked.value =
+    Target.of_bigint
+      Bignum.Bigint.(
+        Target.(to_bigint max) / pow (of_int 2) (of_int 5))
+  in
+  { previous_time
+  ; target
+  ; block_hash = Block.genesis.header.previous_block_hash
+  ; number = Int64.of_int 0
+  ; strength = Strength.zero
+  }
+
 let%test "compute_difficulty_stable" = 
-  let init = get_target (Bignum.Bigint.of_int 1024) in
+  let init = strength_to_target (Bignum.Bigint.of_int 1024) in
   let time = Block_time.to_time Block.genesis.header.time in
   let seq = List.concat [ (List.init 1000 ~f:(fun i -> (1.))); (List.init 500 ~f:(fun i -> (20.))) ] in
   printf "\n";
   let result = List.fold_until ~init:(time, init) seq ~f:(fun (time, target) diff ->
     let new_time = Time.add time (sec diff) in
-    let new_target = get_target (compute_difficulty (Block_time.of_time time) (get_strength (Target.to_bigint target)) (Block_time.of_time new_time)) in
-    let strength_float = Float.of_int (Bignum.Bigint.to_int_exn (get_strength (Target.to_bigint target))) in
-    let new_strength_float = Float.of_int (Bignum.Bigint.to_int_exn (get_strength (Target.to_bigint new_target))) in
+    let new_target = strength_to_target (compute_difficulty (Block_time.of_time time) (target_to_strength (Target.to_bigint target)) (Block_time.of_time new_time)) in
+    let strength_float = Float.of_int (Bignum.Bigint.to_int_exn (target_to_strength (Target.to_bigint target))) in
+    let new_strength_float = Float.of_int (Bignum.Bigint.to_int_exn (target_to_strength (Target.to_bigint new_target))) in
     let diff = Float.max (strength_float /. new_strength_float) (new_strength_float /. strength_float) in
     printf "%s %s %f\n" 
       (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] (Target.to_bigint new_target)))
-      (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] (get_strength (Target.to_bigint new_target))))
+      (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] (target_to_strength (Target.to_bigint new_target))))
       diff;
     if diff > 1.1
     then Stop "target unstable"
