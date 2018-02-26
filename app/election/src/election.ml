@@ -13,7 +13,7 @@ open Let_syntax
    that the election results should be accompanied by a proof of their correctness.
    The scheme is as follows:
 
-   Let $H$ be a hash function and say there are $n$ voters.
+   Let $H$ be a hash function and say there are $n$ voters who must all vote.
    - Each voter $i$ will provide the government with their vote $v_i$ along with
      a random nonce $x_i$ for a commitment $h_i = H(x_i, v_i)$.
    - The government will compute the result of the election, either pepperoni or mushroom.
@@ -26,6 +26,8 @@ open Let_syntax
 
    In plain English, they'll prove "I know votes corresponding to the commitments $h_i$
    such that taking the majority of those votes results in winner $w$".
+
+   TODO: Say they can check if their vote was in there with commitment.
 *)
 
 (* First we declare the type of "votes" and call a library functor [Enumerable] to
@@ -38,6 +40,7 @@ module Vote = struct
     [@@deriving enum]
   end
   include T
+      (* TODO: SnarkImpl.Enumerable? *)
   include Enumerable(T)
 end
 
@@ -84,31 +87,37 @@ let close_ballot (ballot : Ballot.Opened.t) =
   Hash.hash (Ballot.Opened.to_bits ballot)
 
 (* Checked computations in Snarky are allowed to ask for help.
-   This adds a new kind of request a checked computation can make: [Open_ballot i]
-   is a request for the opened ballot corresponding to voter [i].
+   This adds a new kind of "help request" a checked computation can make:
+   [Open_ballot i] is a request for the opened ballot corresponding to voter [i].
 *)
 type _ Request.t +=
   | Open_ballot : int -> Ballot.Opened.t Request.t
 
+let request ?such_that typ req =
+  let%bind x = request typ req in
+  match such_that with
+  | None -> return x
+  | Some p ->
+    let%map () = p x in
+    x
+
 (* Here we write a checked function [open_ballot], which given a voter index [i]
    and a closed ballot (i.e., a commitment) [closed], produces the corresponding
    opened ballot (i.e., the value committed to).
-   
+
    This seems odd, since commitments are supposed to be hiding. That is, there should
    be no way to compute the committed value from the commitment which this checked function
    is supposed to do. The trick is that checked computations are allowed to ask for help
    and then verify that the help was useful. In this case, we [request] for someone out there
    to provide us with an opening to our commitment, and then check that it is indeed a
    correct opening of our closed ballot, before returning it as the result of the function. *)
-let open_ballot i (closed : Ballot.Closed.var) =
-  let%bind ((_, vote) as opened) =
-    request Ballot.Opened.typ (Open_ballot i)
+let open_ballot i (commitment : Ballot.Closed.var) =
+  let%map (_, vote) =
+    request Ballot.Opened.typ (Open_ballot i) ~such_that:(fun opened ->
+      let%bind implied = close_ballot_var opened in
+      Ballot.Closed.assert_equal commitment implied)
   in
-  let%bind () =
-    let%bind implied_closed = close_ballot_var opened in
-    Ballot.Closed.assert_equal implied_closed closed
-  in
-  return vote
+  vote
 
 (* Now we write a simple checked function counting up all the votes for pepperoni in a
    given list of votes. *)
@@ -206,4 +215,6 @@ let () =
   assert
     (verify proof (Keypair.vk keypair) (exposed ())
        commitments winner)
+
+(* Have an individual checking that their commitment is in the commitments. *)
 
