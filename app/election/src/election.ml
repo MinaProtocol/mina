@@ -53,8 +53,7 @@ module Ballot = struct
     type var = Nonce.var * Vote.var
     (* A [typ] is a kind of specification of a type of data which makes it possible
        to use values of that type inside checked computations. In a future version of
-       the library, [typ]s will be derived automatically with a ppx extension.
-    *)
+       the library, [typ]s will be derived automatically with a ppx extension. *)
     let typ = Typ.(Nonce.typ * Vote.typ)
 
     let to_bits (nonce, vote) =
@@ -121,6 +120,17 @@ let open_ballot i (commitment : Ballot.Closed.var) =
 
 (* Now we write a simple checked function counting up all the votes for pepperoni in a
    given list of votes. *)
+let count_pepperoni_votes vs =
+  let open Number in
+  let sum = List.reduce_exn ~f:(+) in
+  Checked.map ~f:sum
+    (Checked.all
+       (List.map vs ~f:(fun v ->
+          let%bind pepperoni_vote = Vote.(v = var Pepperoni) in
+          Number.if_ pepperoni_vote
+            ~then_:(constant Field.one)
+            ~else_:(constant Field.zero))))
+
 let count_pepperoni_votes vs =
   let open Number in
   let rec go pepperoni_total vs =
