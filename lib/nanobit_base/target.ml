@@ -177,7 +177,7 @@ let passes t h =
   let%map { less; _ } = Checked.compare ~bit_length h t in
   less
 
-let var_to_unpacked (x : Cvar.t) = Checked.unpack ~length:bit_length x
+let field_var_to_unpacked (x : Cvar.t) = Checked.unpack ~length:bit_length x
 
 (* floor(two_to_the bit_length / y) *)
 let strength

@@ -95,8 +95,8 @@ let compute_difficulty previous_time previous_difficulty time =
   let scale = Bignum.Bigint.(Bignum.Bigint.one - (time_diff_ms / target_time_ms)) in
   printf "%s\n" (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] scale));
   let scale = Bignum.Bigint.max scale Bignum.Bigint.(-max_difficulty_drop) in
-  let div_ceil n d = Bignum.Bigint.((n + d - Bignum.Bigint.one) / d) in
-  let rate = div_ceil previous_difficulty difficulty_adjustment_rate in
+  let rate = Bignum.Bigint.(previous_difficulty / difficulty_adjustment_rate) in
+  let rate = Bignum.Bigint.max rate Bignum.Bigint.one in
   let diff = Bignum.Bigint.(rate * scale) in
   Bignum.Bigint.(previous_difficulty + diff)
 
@@ -111,7 +111,7 @@ let update_exn : value -> Block.t -> value =
     then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
     assert Int64.(block.body > state.number);
     let new_target =
-      state.target (*compute_target state.previous_time state.target block.header.time*)
+      compute_target state.previous_time state.target block.header.time
     in
     let strength = Target.strength_unchecked state.target in
     { previous_time = block.header.time
@@ -196,72 +196,64 @@ module Checked = struct
 
   let hash (t : var) =
     with_label "State.hash" (hash_digest (to_bits t))
+  ;;
 
-  let compute_target prev_time prev_target time =
+  let compute_difficulty prev_time prev_strength time =
     let div_pow_2 bits (`Two_to_the k) = List.drop bits k in
-    let delta_minus_one_max_bits = 7 in
-    with_label "compute_target" begin
-      let prev_target_n = Number.of_bits (Target.Unpacked.var_to_bits prev_target) in
-      let%bind rate_multiplier =
-        with_label "rate_multiplier" begin
-          let%map distance_to_max_target =
-            let open Number in
-            to_bits (constant (Target.max :> Field.t) - prev_target_n)
-          in
-          Number.of_bits (div_pow_2 distance_to_max_target max_difficulty_drop)
-        end
-      in
+    with_label "compute_difficulty" begin
       let%bind delta =
         with_label "delta" begin
           (* This also checks that time >= prev_time *)
           let%map d = Block_time.diff_checked time prev_time in
-          div_pow_2 (Block_time.Span.Unpacked.var_to_bits d) target_time_ms
+          let unpacked = div_pow_2 (Block_time.Span.Unpacked.var_to_bits d) target_time_ms in
+          Number.of_bits unpacked
         end
+      in 
+      let `Two_to_the max_difficulty_drop = max_difficulty_drop in
+      let max_difficulty_drop = Number.constant (Field.of_int (Int.pow 2 max_difficulty_drop)) in
+      let max_difficulty_drop_plus_one = Number.(max_difficulty_drop + Number.constant (Field.one)) in
+      let%bind neg_scale_plus_one = 
+        let%bind less = Number.(delta < max_difficulty_drop_plus_one) in
+        Number.if_ less
+          ~then_:delta
+          ~else_:max_difficulty_drop_plus_one
       in
-      let%bind delta_is_zero, delta_minus_one =
-        with_label "delta_is_nonzero, delta_minus_one" begin
-          (* There used to be a trickier version of this code that did this in 2 fewer constraints,
-             might be worth going back to if there is ever a reason. *)
-          let n = List.length delta in
-          let d = Checked.pack delta in
-          let%bind delta_is_zero = Checked.equal d (Cvar.constant Field.zero) in
-          let%map delta_minus_one =
-            Checked.if_ delta_is_zero
-              ~then_:(Cvar.constant Field.zero)
-              ~else_:Cvar.(Infix.(d - constant Field.one))
-            (* We convert to bits here because we will in [clamp_to_n_bits] anyway, and
-               this gives us the upper bound we need for multiplying with [rate_multiplier]. *)
-            >>= Checked.unpack ~length:n
-            >>| Number.of_bits
-          in
-          delta_is_zero, delta_minus_one
-        end
+      let%bind prev_strength_unpacked = Strength.unpack_var prev_strength in
+      let prev_strength_num = Number.of_bits (Strength.Unpacked.var_to_bits prev_strength_unpacked) in
+      let rate_floor = div_pow_2 (Strength.Unpacked.var_to_bits prev_strength_unpacked) difficulty_adjustment_rate in
+      let rate_floor = Number.of_bits rate_floor in
+      let%bind rate = 
+        let%bind is_zero = Number.(rate_floor = (Number.constant Field.zero)) in
+        Number.if_ is_zero
+          ~then_:(Number.constant Field.one)
+          ~else_:rate_floor
       in
-      let%bind nonzero_case =
-        with_label "nonzero_case" begin
-          let open Number in
-          let%bind gamma = clamp_to_n_bits delta_minus_one delta_minus_one_max_bits in
-          let%map rg = rate_multiplier * gamma in
-          prev_target_n + rg
-        end
+      let%bind diff_nonzero = Number.(rate * (neg_scale_plus_one - (constant Field.one))) in
+      let%bind new_strength_num =
+        let%bind is_zero = Number.(neg_scale_plus_one = (Number.constant Field.zero)) in
+        Number.if_ is_zero
+          ~then_:Number.(prev_strength_num + rate)
+          ~else_:Number.(prev_strength_num - diff_nonzero)
       in
-      let%bind zero_case =
-        (* This could be more efficient *)
-        with_label "zero_case" begin
-          let%bind less = Number.(prev_target_n < rate_multiplier) in
-          Checked.if_ less
-            ~then_:(Cvar.constant Field.one)
-            ~else_:(Cvar.sub (Number.to_var prev_target_n) (Number.to_var rate_multiplier))
-        end
-      in
-      let%bind res =
-        with_label "res" begin
-          Checked.if_ delta_is_zero
-            ~then_:zero_case
-            ~else_:(Number.to_var nonzero_case)
-        end
-      in
-      Target.var_to_unpacked res
+      let%map new_strength_unpacked = Strength.field_var_to_unpacked (Number.to_var new_strength_num) in
+      Strength.pack_var new_strength_unpacked
+    end
+  ;;
+
+  let compute_target prev_time prev_target time =
+    with_label "compute_target" begin
+      let prev_target_packed = Target.pack_var prev_target in
+      let%bind prev_strength_packed = Target.strength prev_target_packed prev_target in
+      let%bind new_strength_packed = compute_difficulty prev_time prev_strength_packed time in
+      let%bind new_strength_unpacked = Strength.unpack_var new_strength_packed in
+      let new_strength_unpacked = Strength.Unpacked.var_to_bits new_strength_unpacked in
+      let%bind new_target = 
+        Util.floor_divide 
+          ~numerator:(`Two_to_the Target.bit_length) 
+          new_strength_packed
+          new_strength_unpacked
+      in 
+      Target.field_var_to_unpacked new_target
     end
   ;;
 

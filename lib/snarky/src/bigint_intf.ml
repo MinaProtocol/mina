@@ -12,4 +12,5 @@ module type Extended = sig
   val of_decimal_string : string -> t
   val of_numeral : string -> base:int -> t
   val compare    : t -> t -> int
+  val div : t -> t -> t
 end

@@ -14,6 +14,8 @@ let zero = Tick.Field.zero
 
 let bit_length = Target.bit_length + 1
 
+let field_var_to_unpacked (x : Tick.Cvar.t) = Tick.Checked.unpack ~length:bit_length x
+
 include Bits.Snarkable.Small(Tick)(struct let bit_length = bit_length end)
 
 module Bits = Bits.Make_field(Tick.Field)(Tick.Bigint)

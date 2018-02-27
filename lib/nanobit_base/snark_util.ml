@@ -130,6 +130,58 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     >>= num_bits_upper_bound_unpacked
   ;;
 
+  type _ Camlsnark.Request.t +=
+    | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Camlsnark.Request.t
+
+  let two_to_the i =
+    Bignum.Bigint.(pow (of_int 2) (of_int i))
+    |> Bigint.of_bignum_bigint
+    |> Bigint.to_field
+
+  let floor_divide
+        ~numerator:(`Two_to_the b as numerator)
+        y y_unpacked
+    =
+    assert (b <= Field.size_in_bits - 2);
+    assert (List.length y_unpacked <= b);
+    let%bind z =
+      exists Typ.field
+        ~request:As_prover.(map (read_var y) ~f:(fun y -> Floor_divide (numerator, y)))
+        ~compute:
+          As_prover.(map (read_var y) ~f:(fun y ->
+            Bigint.to_field
+              (Bigint.div (Bigint.of_field (two_to_the b))
+                (Bigint.of_field y))))
+    in
+    (* This block checks that z * y does not overflow. *)
+    let%bind () =
+      (* The total number of bits in z and y must be less than the field size in bits essentially
+         to prevent overflow. *)
+      let%bind k = num_bits_upper_bound_unpacked y_unpacked in
+      (* We have to check that k <= b.
+         The call to [num_bits_upper_bound_unpacked] actually guarantees that k
+         is <= [List.length z_unpacked = b], since it asserts that [k] is
+         equal to a sum of [b] booleans, but we add an explicit check here since it
+         is relatively cheap and the internals of that function might change. *)
+      let%bind () =
+        Checked.Assert.lte ~bit_length:(num_bits_int b)
+          k (Cvar.constant (Field.of_int b))
+      in
+      let m = Cvar.(sub (constant (Field.of_int (b + 1))) k) in
+      let%bind z_unpacked = Checked.unpack z ~length:b in
+      assert_num_bits_upper_bound z_unpacked m
+    in
+    let%bind zy = Checked.mul z y in
+    let numerator = Cvar.constant (two_to_the b) in
+    let%map () =
+      Checked.Assert.lte ~bit_length:(b + 1) zy numerator
+    and () =
+      Checked.Assert.lt ~bit_length:(b + 1) numerator Cvar.Infix.(zy + y)
+    in
+    z
+  ;;
+
+
   let%test_module "Snark_util" = (module struct
     let () = Random.init 123456789
 
