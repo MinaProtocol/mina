@@ -1,7 +1,7 @@
 (library
  ((name camlsnark)
   (public_name camlsnark)
-  (libraries (core_kernel ppx_deriving bignum camlsnark_c))
+  (libraries (core_kernel bignum camlsnark_c))
   (c_library_flags (:standard -lstdc++ -lpthread))
   (flags (:standard -safe-string))
   (cxx_flags
