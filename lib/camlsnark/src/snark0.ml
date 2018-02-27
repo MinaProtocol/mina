@@ -1170,36 +1170,30 @@ module Checked = struct
 
     let (&&) : var -> var -> (var, _) t = mul
 
-    let any : var list -> (var, _) Checked1.t = function
-      | [] -> return false_
-      | bs ->
-        with_label "Checked.any" begin
-          let open Let_syntax in
-          let%map all_zero =
-            equal (Cvar.sum (bs :> Cvar.t list)) (Cvar.constant Field.zero)
-          in
-          not all_zero
-        end
-    ;;
-
     let (||) x y =
       let open Let_syntax in
       let%map both_false = not x && not y in
       not both_false
     ;;
 
-    let all =
-      let open Let_syntax in
-      let rec go acc = function
-        | [] -> return acc
-        | b :: bs ->
-          let%bind acc = b && acc in
-          go acc bs
-      in
-      function
+    let any = function
+      | [] -> return false_
+      | [ b1 ] -> return b1
+      | [ b1; b2 ] -> b1 || b2
+      | bs ->
+        let open Let_syntax in
+        let%map all_zero =
+          equal (Cvar.sum (bs :> Cvar.t list)) (Cvar.constant Field.zero)
+        in
+        not all_zero
+
+    let all = function
       | [] -> return true_
-      | b :: bs -> with_label "Checked.all" (go b bs)
-    ;;
+      | [ b1 ] -> return b1
+      | [ b1; b2 ] -> b1 && b2
+      | bs ->
+        equal (Cvar.constant (Field.of_int (List.length bs)))
+          (Cvar.sum bs)
 
     let var_of_value b =
       if b then true_ else false_
@@ -1237,8 +1231,7 @@ module Checked = struct
       (* Someday: Make more efficient *)
       let any vs = any vs >>= is_true
 
-      let all vs =
-        assert_all (List.map vs ~f:(fun v -> Constraint.equal v true_))
+      let all vs = all vs >>= is_true
     end
 
     module Expr = struct
@@ -1412,6 +1405,8 @@ module Checked = struct
         (assert_equal (Cvar.sum bs) (Cvar.constant Field.one))
     ;;
   end
+
+  module List = Monad_sequence.List(Checked1)(struct type t = Boolean.var include Boolean end)
 end
 
 module Data_spec = Typ.Data_spec

@@ -183,6 +183,11 @@ module type Basic = sig
   Checked : sig
     include Monad.S2
 
+    module List : Monad_sequence.S
+      with type ('a, 's) monad := ('a, 's) t
+       and type 'a t = 'a list
+       and type boolean := Boolean.var
+
     val mul : Cvar.t -> Cvar.t -> (Cvar.t, _) t
     val div : Cvar.t -> Cvar.t -> (Cvar.t, _) t
 
