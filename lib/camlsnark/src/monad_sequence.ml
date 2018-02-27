@@ -18,8 +18,8 @@ module type S = sig
   val exists  : 'a t -> f:(       'a -> (boolean      , 's) monad) -> (boolean, 's) monad
   val existsi : 'a t -> f:(int -> 'a -> (boolean      , 's) monad) -> (boolean, 's) monad
   val for_all : 'a t -> f:(       'a -> (boolean      , 's) monad) -> (boolean, 's) monad
-  val for_alli: 'a t -> f:(int -> 'a -> (boolean      , 's) monad) -> (boolean, 's) monad 
-  
+  val for_alli: 'a t -> f:(int -> 'a -> (boolean      , 's) monad) -> (boolean, 's) monad
+
   val all      : ('a, 's) monad t -> ('a t, 's) monad
   val all_unit : (unit, 's) monad t -> (unit, 's) monad
 

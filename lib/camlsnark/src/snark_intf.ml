@@ -344,7 +344,8 @@ module type Basic = sig
 
   (* TODO: Come up with a better name for this in relation to the above *)
   val request
-    : ('var, 'value) Typ.t
+    : ?such_that:('var -> (unit, 's) Checked.t)
+    -> ('var, 'value) Typ.t
     -> 'value Request.t
     -> ('var, 's) Checked.t
 

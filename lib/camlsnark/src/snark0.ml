@@ -778,7 +778,14 @@ module Checked = struct
     =
     Exists (typ, Request r, fun h -> return (Handle.var h))
 
-  let request typ r = request_witness typ (As_prover.return r)
+  let request ?such_that typ r =
+    match such_that with
+    | None -> request_witness typ (As_prover.return r)
+    | Some such_that ->
+      let open Let_syntax in
+      let%bind x = request_witness typ (As_prover.return r) in
+      let%map () = such_that x in
+      x
 
   let provide_witness
         (typ : ('var, 'value) Typ.t)
