@@ -18,7 +18,7 @@ module Make (M : Snark_intf.S) : sig
     type value = bool list [@@deriving sexp]
     type var = Boolean.var list
     val length : int
-    val spec : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 

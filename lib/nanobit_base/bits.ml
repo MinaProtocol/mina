@@ -143,7 +143,7 @@ module Snarkable = struct
        val set : t -> int -> bool -> t
      end)
     : Bits_intf.Snarkable.Faithful
-       with type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
+       with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
         and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
         and type boolean_var := Impl.Boolean.var
         and type Packed.var = Impl.Cvar.t
@@ -170,8 +170,8 @@ module Snarkable = struct
       type var = Cvar.t
       type value = V.t
 
-      let spec : (var, value) Var_spec.t =
-        let open Var_spec in
+      let typ : (var, value) Typ.t =
+        let open Typ in
         let read v =
           let open Read.Let_syntax in
           let%map x = Read.read v in
@@ -207,16 +207,16 @@ module Snarkable = struct
       type var = Boolean.var list
       type value = V.t
 
-      let spec : (var, value) Var_spec.t =
-        Var_spec.transport (Var_spec.list ~length:V.length Boolean.spec)
+      let typ : (var, value) Typ.t =
+        Typ.transport (Typ.list ~length:V.length Boolean.typ)
           ~there:(v_to_list V.length)
           ~back:v_of_list
 
       module Padded = struct
         type var = Boolean.var list
         type value = V.t
-        let spec : (var, value) Var_spec.t =
-          Var_spec.transport (Var_spec.list ~length:Field.size_in_bits Boolean.spec)
+        let typ : (var, value) Typ.t =
+          Typ.transport (Typ.list ~length:Field.size_in_bits Boolean.typ)
             ~there:(v_to_list Field.size_in_bits)
             ~back:v_of_list
       end
@@ -247,7 +247,7 @@ module Snarkable = struct
       type var = Cvar.t
       type value = Field.t
 
-      let spec = Var_spec.field
+      let typ = Typ.field
 
       let assert_equal = assert_equal
     end
@@ -256,8 +256,8 @@ module Snarkable = struct
       type var = Boolean.var list
       type value = Field.t
 
-      let spec : (var, value) Var_spec.t =
-        Var_spec.transport (Var_spec.list ~length:bit_length Boolean.spec)
+      let typ : (var, value) Typ.t =
+        Typ.transport (Typ.list ~length:bit_length Boolean.typ)
           ~there:(unpack_field Field.unpack ~bit_length)
           ~back:Field.project
       ;;
@@ -276,7 +276,7 @@ module Snarkable = struct
 
   module Field (Impl : Camlsnark.Snark_intf.S)
     : Bits_intf.Snarkable.Lossy
-       with type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
+       with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
         and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
         and type boolean_var := Impl.Boolean.var
         and type Packed.var = Impl.Cvar.t
@@ -290,7 +290,7 @@ module Snarkable = struct
       (Impl : Camlsnark.Snark_intf.S)
       (M : sig val bit_length : int end)
     : Bits_intf.Snarkable.Faithful
-       with type ('a, 'b) var_spec := ('a, 'b) Impl.Var_spec.t
+       with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
         and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
         and type boolean_var := Impl.Boolean.var
         and type Packed.var = Impl.Cvar.t
@@ -323,14 +323,14 @@ module Make_unpacked
   end
 
   include T
-  let spec : (var, value) Var_spec.t =
-    Var_spec.list ~length:M.bit_length Boolean.spec
+  let typ : (var, value) Typ.t =
+    Typ.list ~length:M.bit_length Boolean.typ
 
   module Padded = struct
     include T
 
-    let spec : (var, value) Var_spec.t =
-      Var_spec.list ~length:(M.element_length * Field.size_in_bits)
-        Boolean.spec
+    let typ : (var, value) Typ.t =
+      Typ.list ~length:(M.element_length * Field.size_in_bits)
+        Boolean.typ
   end
 end

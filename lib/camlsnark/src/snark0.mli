@@ -2,7 +2,7 @@ open Core
 
 module Make (Backend : Backend_intf.S)
   : Snark_intf.S
-    with type Field.t = Backend.Field.t
+    with type field = Backend.Field.t
      and type Bigint.t = Backend.Bigint.R.t
      and type R1CS_constraint_system.t = Backend.R1CS_constraint_system.t
      and type Var.t = Backend.Var.t

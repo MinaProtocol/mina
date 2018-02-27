@@ -15,10 +15,11 @@ module Bigint = Tick_curve.Bigint.R
 
 let bit_length = Snark_params.target_bit_length
 
-let max =
-  Field.(sub (Tick.Util.two_to_the bit_length) (of_int 1))
+let max_bigint =
+  Tick.Bigint.of_bignum_bigint
+    Bignum.Bigint.(pow (of_int 2) (of_int bit_length) - one)
 
-let max_bigint = Bigint.of_field max
+let max = Bigint.to_field max_bigint
 
 let constant = Tick.Cvar.constant
 
@@ -27,9 +28,9 @@ let of_field x =
   x
 ;;
 
-let to_bigint x = Snark_params.bigint_of_tick_bigint (Bigint.of_field x)
+let to_bigint x = Tick.Bigint.to_bignum_bigint (Bigint.of_field x)
 let of_bigint n =
-  let x = Snark_params.tick_bigint_of_bigint n in
+  let x = Tick.Bigint.of_bignum_bigint n in
   assert (Bigint.compare x max_bigint <= 0);
   Bigint.to_field x
 
@@ -66,12 +67,6 @@ let boolean_compare (x : Tick.Boolean.var) (y : Tick.Boolean.var) =
   let eq = Cvar.constant Field.one - (lt + gt) in
   Boolean.Unsafe.(of_cvar lt, of_cvar eq, of_cvar gt)
 
-let boolean_compare_to_value (x : Tick.Boolean.var) (y : Tick.Boolean.value) =
-  let open Boolean in
-  if y
-  then (not x, x, false_)
-  else (false_, not x, x)
-
 let rec lt_bitstrings_msb =
   let open Boolean in
   fun (xs : Boolean.var list) (ys : Boolean.var list) ->
@@ -95,14 +90,16 @@ let rec lt_bitstring_value_msb =
   fun (xs : Boolean.var list) (ys : Boolean.value list) ->
     match xs, ys with
     | [], [] -> return false_
-    | [ x ], [ y ] ->
-      let (lt, _, _) = boolean_compare_to_value x y in
-      return lt
-    | x :: xs, y :: ys ->
-      let (lt, eq, gt) = boolean_compare_to_value x y in
-      let%bind tail_lt = lt_bitstring_value_msb xs ys in
-      let%bind r = eq && tail_lt in
-      lt || r
+    | [ x ], [ false ] -> return false_
+    | [ x ], [ true ] -> return (not x)
+    | [ x1; x2 ], [ true; false ] -> return (not x1)
+    | [ x1; x2 ], [ false; false ] -> return false_
+    | x :: xs, false :: ys ->
+      let%bind r = lt_bitstring_value_msb xs ys in
+      not x && r
+    | x :: xs, true :: ys ->
+      let%bind r = lt_bitstring_value_msb xs ys in
+      not x || r
     | _::_, [] | [], _::_ ->
       failwith "lt_bitstrings_msb: Got unequal length strings"
 
@@ -122,6 +119,11 @@ let bits_msb =
 type _ Camlsnark.Request.t +=
   | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Camlsnark.Request.t
 
+let two_to_the i =
+  Bignum.Bigint.(pow (of_int 2) (of_int i))
+  |> Bigint.of_bignum_bigint
+  |> Bigint.to_field
+
 let floor_divide
       ~numerator:(`Two_to_the b as numerator)
       y y_unpacked
@@ -129,12 +131,12 @@ let floor_divide
   assert (b <= Field.size_in_bits - 2);
   assert (List.length y_unpacked <= b);
   let%bind z =
-    exists Var_spec.field
+    exists Typ.field
       ~request:As_prover.(map (read_var y) ~f:(fun y -> Floor_divide (numerator, y)))
       ~compute:
         As_prover.(map (read_var y) ~f:(fun y ->
           Bigint.to_field
-            (Tick_curve.Bigint.R.div (Bigint.of_field (Util.two_to_the b))
+            (Tick_curve.Bigint.R.div (Bigint.of_field (two_to_the b))
               (Bigint.of_field y))))
   in
   (* This block checks that z * y does not overflow. *)
@@ -148,7 +150,7 @@ let floor_divide
        equal to a sum of [b] booleans, but we add an explicit check here since it
        is relatively cheap and the internals of that function might change. *)
     let%bind () =
-      Util.Assert.lte ~bit_length:(Util.num_bits_int b)
+      Checked.Assert.lte ~bit_length:(Util.num_bits_int b)
         k (Cvar.constant (Field.of_int b))
     in
     let m = Cvar.(sub (constant (Field.of_int (b + 1))) k) in
@@ -156,11 +158,11 @@ let floor_divide
     Util.assert_num_bits_upper_bound z_unpacked m
   in
   let%bind zy = Checked.mul z y in
-  let numerator = Cvar.constant (Util.two_to_the b) in
+  let numerator = Cvar.constant (two_to_the b) in
   let%map () =
-    Util.Assert.lte ~bit_length:(b + 1) zy numerator
+    Checked.Assert.lte ~bit_length:(b + 1) zy numerator
   and () =
-    Util.Assert.lt ~bit_length:(b + 1) numerator Cvar.Infix.(zy + y)
+    Checked.Assert.lt ~bit_length:(b + 1) numerator Cvar.Infix.(zy + y)
   in
   z
 ;;
@@ -172,7 +174,7 @@ include Bits.Snarkable.Small(Tick)(struct let bit_length = bit_length end)
 module Bits = Bits.Small(Tick.Field)(Tick.Bigint)(struct let bit_length = bit_length end)
 
 let passes t h =
-  let%map { less; _ } = Tick.Util.compare ~bit_length h t in
+  let%map { less; _ } = Checked.compare ~bit_length h t in
   less
 
 let var_to_unpacked (x : Cvar.t) = Checked.unpack ~length:bit_length x
@@ -185,7 +187,7 @@ let strength
   with_label "Target.strength" begin
     if Insecure.strength_calculation
     then
-      provide_witness Var_spec.field
+      provide_witness Typ.field
         As_prover.(map (read_var y) ~f:strength_unchecked)
     else floor_divide ~numerator:(`Two_to_the bit_length) y y_unpacked
   end

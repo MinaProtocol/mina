@@ -10,17 +10,17 @@ module Extend (Impl : Camlsnark.Snark_intf.S) = struct
     module type S = sig
       type var
       type value
-      val spec : (var, value) Var_spec.t
+      val typ : (var, value) Typ.t
     end
 
     module Bits = struct
       module type Lossy = Bits_intf.Snarkable.Lossy
-        with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
+        with type ('a, 'b) typ := ('a, 'b) Typ.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
 
       module type Faithful = Bits_intf.Snarkable.Faithful
-        with type ('a, 'b) var_spec := ('a, 'b) Var_spec.t
+        with type ('a, 'b) typ := ('a, 'b) Typ.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
     end
@@ -80,7 +80,7 @@ module Tick = struct
         type value = bool list
 
         let length = bit_length
-        let spec : (var, value) Var_spec.t = Var_spec.list ~length Boolean.spec
+        let typ : (var, value) Typ.t = Typ.list ~length Boolean.typ
         let assert_equal = Checked.Assert.equal_bitstrings
       end
     end
@@ -133,26 +133,6 @@ module Tick = struct
 
   module Util = Snark_util.Make(Tick0)
 end
-
-let tick_bigint_of_bigint n =
-  Tick_curve.Bigint.R.of_decimal_string
-    (Bignum.Bigint.to_string n)
-;;
-
-let bigint_of_tick_bigint n =
-  let open Tick in
-  let rec go i two_to_the_i acc =
-    if i = Field.size_in_bits
-    then acc
-    else
-      let acc' =
-        if Bigint.test_bit n i
-        then Bignum.Bigint.(acc + two_to_the_i)
-        else acc
-      in
-      go (i + 1) Bignum.Bigint.(two_to_the_i + two_to_the_i) acc'
-  in
-  go 0 Bignum.Bigint.one Bignum.Bigint.zero
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

@@ -10,7 +10,7 @@ RUN sudo apt-get install --yes libboost-dev
 RUN sudo apt-get install --yes libboost-program-options-dev
 
 RUN opam depext -i jbuilder
-RUN opam install core async
+RUN opam install core async ppx_deriving
 
 RUN opam install merlin ocp-indent
 RUN opam install ctypes-foreign

@@ -52,15 +52,15 @@ let of_hlist : (unit, 'ti -> 'ta -> 'd -> 'n -> 's -> unit) H_list.t -> ('ti, 't
 
 let data_spec =
   let open Data_spec in
-  [ Block_time.Unpacked.spec
-  ; Target.Unpacked.spec
-  ; Digest.Unpacked.spec
-  ; Block.Body.Unpacked.spec
-  ; Strength.Unpacked.spec
+  [ Block_time.Unpacked.typ
+  ; Target.Unpacked.typ
+  ; Digest.Unpacked.typ
+  ; Block.Body.Unpacked.typ
+  ; Strength.Unpacked.typ
   ]
 
-let spec : (var, value) Var_spec.t =
-  Var_spec.of_hlistable data_spec
+let typ : (var, value) Typ.t =
+  Typ.of_hlistable data_spec
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
@@ -244,7 +244,7 @@ module Checked = struct
   let valid_body ~prev body =
     with_label "valid_body" begin
       let%bind { less } =
-        Util.compare ~bit_length:Block.Body.bit_length
+        Checked.compare ~bit_length:Block.Body.bit_length
           (Block.Body.pack_var prev) (Block.Body.pack_var body)
       in
       Boolean.Assert.is_true less

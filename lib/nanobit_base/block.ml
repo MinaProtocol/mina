@@ -37,9 +37,9 @@ module Header = struct
 
   let data_spec =
     Tick.Data_spec.(
-      [ Pedersen.Digest.Unpacked.spec
-      ; Block_time.Unpacked.spec
-      ; Nonce.Unpacked.spec
+      [ Pedersen.Digest.Unpacked.typ
+      ; Block_time.Unpacked.typ
+      ; Nonce.Unpacked.typ
       ])
 
   type var = (Pedersen.Digest.Unpacked.var, Block_time.Unpacked.var, Nonce.Unpacked.var) t_
@@ -55,8 +55,8 @@ module Header = struct
     @ Block_time.Unpacked.var_to_bits time
     @ Nonce.Unpacked.var_to_bits nonce
 
-  let spec : (var, value) Tick.Var_spec.t =
-    Tick.Var_spec.of_hlistable data_spec
+  let typ : (var, value) Tick.Typ.t =
+    Tick.Typ.of_hlistable data_spec
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
@@ -127,10 +127,10 @@ let of_hlist : (unit, 'h -> 'b -> unit) H_list.t -> ('h, 'b) t_ =
 type var = (Header.var, Body.Unpacked.var) t_
 type value = (Header.value, Body.Unpacked.value) t_
 
-let data_spec = Tick.Data_spec.([ Header.spec; Body.Unpacked.spec ])
+let data_spec = Tick.Data_spec.([ Header.typ; Body.Unpacked.typ ])
 
-let spec : (var, value) Tick.Var_spec.t =
-  Tick.Var_spec.of_hlistable data_spec
+let typ : (var, value) Tick.Typ.t =
+  Tick.Typ.of_hlistable data_spec
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 

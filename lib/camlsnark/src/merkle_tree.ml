@@ -379,7 +379,7 @@ module Checked
     (Hash : sig
        type var
        type value
-       val spec : (var, value) Impl.Var_spec.t
+       val typ : (var, value) Impl.Typ.t
        val hash : var -> var -> (var, _) Impl.Checked.t
        val if_ : Impl.Boolean.var -> then_:var -> else_:var -> (var, _) Impl.Checked.t
        val assert_equal : var -> var -> (unit, _) Impl.Checked.t
@@ -387,7 +387,7 @@ module Checked
     (Elt : sig
        type var
        type value
-       val spec : (var, value) Impl.Var_spec.t
+       val typ : (var, value) Impl.Typ.t
        val hash : var -> (Hash.var, _) Impl.Checked.t
      end)
 = struct
@@ -402,16 +402,16 @@ module Checked
 
     let value_of_int = address_of_int
 
-    let spec ~depth : (var, value) Var_spec.t =
-      Var_spec.list ~length:depth Boolean.spec
+    let typ ~depth : (var, value) Typ.t =
+      Typ.list ~length:depth Boolean.typ
     ;;
   end
 
   module Path = struct
     type value = Hash.value list
     type var = Hash.var list
-    let spec ~depth : (var, value) Var_spec.t =
-      Var_spec.(list ~length:depth Hash.spec)
+    let typ ~depth : (var, value) Typ.t =
+      Typ.(list ~length:depth Hash.typ)
   end
 
   let implied_root entry_hash addr0 path0 =
@@ -439,15 +439,15 @@ module Checked
       let%bind prev_entry_hash = Elt.hash prev
       and next_entry_hash = Elt.hash next
       and prev_path =
-        provide_witness (Path.spec ~depth)
-          As_prover.(map2 ~f:get_path get_state (read (Address.spec ~depth) addr0))
+        provide_witness (Path.typ ~depth)
+          As_prover.(map2 ~f:get_path get_state (read (Address.typ ~depth) addr0))
       in
       let%bind prev_root_hash = implied_root prev_entry_hash addr0 prev_path in
       let%bind () = Hash.assert_equal root prev_root_hash
       and () =
         as_prover As_prover.(Let_syntax.(
-          let%bind addr = read (Address.spec ~depth) addr0
-          and next = read Elt.spec next
+          let%bind addr = read (Address.typ ~depth) addr0
+          and next = read Elt.typ next
           in
           modify_state (fun t -> update t addr next)))
       in

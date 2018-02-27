@@ -1,6 +1,6 @@
 open Core
 
-module type S = sig
+module type Basic = sig
   module R1CS_constraint_system : sig
     type t
   end
@@ -10,15 +10,13 @@ module type S = sig
     val create : int -> t
   end
 
-  module Field : sig
-    include Field_intf.Extended
-    include Sexpable.S with type t := t
+  type field
 
-    val unpack : t -> bool list
-    val project : bool list -> t
+  module Bigint : sig
+    include Bigint_intf.Extended with type field := field
+    val of_bignum_bigint : Bignum.Bigint.t -> t
+    val to_bignum_bigint : t -> Bignum.Bigint.t
   end
-
-  module Bigint : Bigint_intf.Extended with type field := Field.t
 
   module Cvar : sig
     type t
@@ -26,20 +24,20 @@ module type S = sig
     (* For debug purposes *)
     val length : t -> int
     val var_indices : t -> int list
-    val to_constant_and_terms : t -> Field.t option * (Field.t * Var.t) list
+    val to_constant_and_terms : t -> field option * (field * Var.t) list
 
-    val constant : Field.t -> t
+    val constant : field -> t
 
-    val linear_combination : (Field.t * t) list -> t
+    val linear_combination : (field * t) list -> t
     val sum : t list -> t
     val add : t -> t -> t
     val sub : t -> t -> t
-    val scale : t -> Field.t -> t
+    val scale : t -> field -> t
 
     module Infix : sig
       val (+) : t -> t -> t
       val (-) : t -> t -> t
-      val ( * ) : Field.t -> t -> t
+      val ( * ) : field -> t -> t
     end
 
     module Unsafe : sig
@@ -61,18 +59,18 @@ module type S = sig
   module rec Data_spec : sig
     type ('r_var, 'r_value, 'k_var, 'k_value) t =
       | (::)
-        : ('var, 'value) Var_spec.t
+        : ('var, 'value) Typ.t
           * ('r_var, 'r_value, 'k_var, 'k_value) t
         -> ('r_var, 'r_value, 'var -> 'k_var, 'value -> 'k_value) t
       | [] : ('r_var, 'r_value, 'r_var, 'r_value) t
 
     val size : (_, _, _, _) t -> int
   end
-  and Var_spec : sig
+  and Typ : sig
     module Store : sig
       include Monad.S
 
-      val store : Field.t -> Cvar.t t
+      val store : field -> Cvar.t t
     end
 
     module Alloc : sig
@@ -84,7 +82,7 @@ module type S = sig
     module Read : sig
       include Monad.S
 
-      val read : Cvar.t -> Field.t t
+      val read : Cvar.t -> field t
     end
 
     type ('var, 'value) t =
@@ -99,7 +97,7 @@ module type S = sig
     val alloc : ('var, 'value) t -> 'var Alloc.t
     val check : ('var, 'value) t -> 'var -> (unit, _) Checked.t
 
-    val field  : (Cvar.t, Field.t) t
+    val field  : (Cvar.t, field) t
     val tuple2 : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var1 * 'var2, 'value1 * 'value2) t
     val tuple3
       : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var3, 'value3) t
@@ -109,6 +107,9 @@ module type S = sig
       -> ((unit, 'k_var) H_list.t, (unit, 'k_value) H_list.t) t
     val list  : length:int -> ('var, 'value) t -> ('var list, 'value list) t
     val array : length:int -> ('var, 'value) t -> ('var array, 'value array) t
+ 
+    (* synonym for tuple2 *)
+    val ( * ) : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var1 * 'var2, 'value1 * 'value2) t
 
     val transport
       : ('var, 'value1) t
@@ -125,7 +126,7 @@ module type S = sig
       -> ('var, 'value) t
 
     module Of_traversable (T : Traversable.S) : sig
-      val spec : template:unit T.t -> ('var, 'value) t -> ('var T.t, 'value T.t) t
+      val typ : template:unit T.t -> ('var, 'value) t -> ('var T.t, 'value T.t) t
     end
   end
   and Boolean : sig
@@ -147,8 +148,8 @@ module type S = sig
 
     val var_of_value : value -> var
 
-    val spec : (var, value) Var_spec.t
-    val spec_unchecked : (var, value) Var_spec.t
+    val typ : (var, value) Typ.t
+    val typ_unchecked : (var, value) Typ.t
 
     module Expr : sig
       type t
@@ -169,6 +170,8 @@ module type S = sig
     end
 
     module Assert : sig
+      val (=) : Boolean.var -> Boolean.var -> (unit, _) Checked.t
+
       val is_true : Boolean.var -> (unit, _) Checked.t
 
       val any : var list -> (unit, _) Checked.t
@@ -196,13 +199,25 @@ module type S = sig
     val pack : Boolean.var list -> Cvar.t
 
     type _ Request.t +=
-      | Choose_preimage : Field.t * int -> bool list Request.t
+      | Choose_preimage : field * int -> bool list Request.t
     val choose_preimage
       : Cvar.t -> length:int -> (Boolean.var list, _) t
 
     val unpack : Cvar.t -> length:int -> (Boolean.var list, _) t
 
+    type comparison_result =
+      { less : Boolean.var
+      ; less_or_equal : Boolean.var
+      }
+
+    val compare : bit_length:int -> Cvar.t -> Cvar.t -> (comparison_result, _) t
+
     module Assert : sig
+      val lte : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
+      val gte : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
+      val lt : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
+      val gt : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
+
       val equal_bitstrings
         : Boolean.var list
         -> Boolean.var list
@@ -217,6 +232,19 @@ module type S = sig
 
       val exactly_one : Boolean.var list -> (unit, _) t
     end
+  end
+
+  module Field : sig
+    include Field_intf.Extended with type t = field
+    include Sexpable.S with type t := t
+
+    type var = Cvar.t
+
+    val typ : (var, t) Typ.t
+
+    val size : Bignum.Bigint.t
+    val unpack : t -> bool list
+    val project : bool list -> t
   end
 
   include Monad.Syntax2 with type ('a, 's) t := ('a, 's) Checked.t
@@ -266,12 +294,12 @@ module type S = sig
 
     val map2 : ('a, 's) t -> ('b, 's) t -> f:('a -> 'b -> 'c) -> ('c, 's) t
 
-    val read_var  : Cvar.t -> (Field.t, 'prover_state) t
+    val read_var  : Cvar.t -> (field, 'prover_state) t
     val get_state : ('prover_state, 'prover_state) t
     val set_state : 'prover_state -> (unit, 'prover_state) t
     val modify_state : ('prover_state -> 'prover_state) -> (unit, 'prover_state) t
     val read
-      : ('var, 'value) Var_spec.t
+      : ('var, 'value) Typ.t
       -> 'var
       -> ('value, 'prover_state) t
   end
@@ -305,19 +333,25 @@ module type S = sig
   val next_auxiliary : (int, 's) Checked.t
 
   val request_witness
-    : ('var, 'value) Var_spec.t
+    : ('var, 'value) Typ.t
     -> ('value Request.t, 's) As_prover.t
     -> ('var, 's) Checked.t
 
+  (* TODO: Come up with a better name for this in relation to the above *)
+  val request
+    : ('var, 'value) Typ.t
+    -> 'value Request.t
+    -> ('var, 's) Checked.t
+
   val provide_witness
-    : ('var, 'value) Var_spec.t
+    : ('var, 'value) Typ.t
     -> ('value, 's) As_prover.t
     -> ('var, 's) Checked.t
 
   val exists
     : ?request:('value Request.t, 's) As_prover.t
     -> ?compute:('value, 's) As_prover.t
-    -> ('var, 'value) Var_spec.t
+    -> ('var, 'value) Typ.t
     -> ('var, 's) Checked.t
 
   type response = Request.response
@@ -338,7 +372,7 @@ module type S = sig
     : (R1CS_constraint_system.t -> unit) -> (unit, _) Checked.t
 
   val generate_keypair
-    : ((unit, 's) Checked.t, _, 'k_var, _) Data_spec.t
+    : exposing:((unit, 's) Checked.t, _, 'k_var, _) Data_spec.t
     -> 'k_var
     -> Keypair.t
 
@@ -361,5 +395,23 @@ module type S = sig
     : (('a, 's) As_prover.t, 's) Checked.t -> 's -> 's * 'a * bool
 
   val check : ('a, 's) Checked.t -> 's -> bool
+end
+
+module type S = sig
+  include Basic
+  module Number : Number_intf.S
+    with type ('a, 'b) checked := ('a, 'b) Checked.t
+     and type field := field
+     and type field_var := Cvar.t
+     and type bool_var := Boolean.var
+
+  module Enumerable
+    : functor (M : sig type t [@@deriving enum] end) ->
+      Enumerable_intf.S
+      with type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type ('a, 'b) typ := ('a, 'b) Typ.t
+       and type bool_var := Boolean.var
+       and type var = Field.var
+       and type t := M.t
 end
 

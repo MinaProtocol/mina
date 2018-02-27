@@ -10,7 +10,7 @@ let real_tick_vk, tick_vk, tick_pk =
   if Insecure.key_generation then
     let kp =
       let open Tick in
-      generate_keypair Data_spec.[Boolean.spec] (fun b -> Boolean.Assert.is_true b)
+      generate_keypair Data_spec.[Boolean.typ] (fun b -> Boolean.Assert.is_true b)
     in
     `Insecure,
     Tick.Verification_key.to_bigstring (Tick.Keypair.vk kp),
@@ -30,7 +30,7 @@ let tock_vk, tock_pk =
   | `Insecure ->
     let kp =
       let open Tock in
-      generate_keypair Data_spec.[Boolean.spec] (fun b -> Boolean.Assert.is_true b)
+      generate_keypair Data_spec.[Boolean.typ] (fun b -> Boolean.Assert.is_true b)
     in
     Tock.Verification_key.to_bigstring (Tock.Keypair.vk kp),
     Tock.Proving_key.to_bigstring (Tock.Keypair.pk kp)

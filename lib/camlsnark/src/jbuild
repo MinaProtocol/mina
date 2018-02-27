@@ -1,7 +1,7 @@
 (library
  ((name camlsnark)
   (public_name camlsnark)
-  (libraries (core_kernel camlsnark_c))
+  (libraries (core_kernel ppx_deriving bignum camlsnark_c))
   (c_library_flags (:standard -lstdc++ -lpthread))
   (flags (:standard -safe-string))
   (cxx_flags
@@ -9,7 +9,7 @@
       (:standard "\\" -pedantic)
       (-I re2_c/libre2)
       ))
-  (preprocess (pps (ppx_jane ppx_driver.runner)))))
+  (preprocess (pps (ppx_jane ppx_deriving.enum ppx_driver.runner)))))
 
 (jbuild_version 1)
 
