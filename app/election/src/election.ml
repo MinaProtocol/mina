@@ -92,14 +92,6 @@ let close_ballot (ballot : Ballot.Opened.t) =
 type _ Request.t +=
   | Open_ballot : int -> Ballot.Opened.t Request.t
 
-let request ?such_that typ req =
-  let%bind x = request typ req in
-  match such_that with
-  | None -> return x
-  | Some p ->
-    let%map () = p x in
-    x
-
 (* Here we write a checked function [open_ballot], which given a voter index [i]
    and a closed ballot (i.e., a commitment) [closed], produces the corresponding
    opened ballot (i.e., the value committed to).
@@ -122,31 +114,11 @@ let open_ballot i (commitment : Ballot.Closed.var) =
    given list of votes. *)
 let count_pepperoni_votes vs =
   let open Number in
-  let sum = List.reduce_exn ~f:(+) in
-  Checked.map ~f:sum
-    (Checked.all
-       (List.map vs ~f:(fun v ->
-          let%bind pepperoni_vote = Vote.(v = var Pepperoni) in
-          Number.if_ pepperoni_vote
-            ~then_:(constant Field.one)
-            ~else_:(constant Field.zero))))
-
-let count_pepperoni_votes vs =
-  let open Number in
-  let rec go pepperoni_total vs =
-    match vs with
-    | [] -> return pepperoni_total
-    | v :: vs' ->
-      let%bind new_total =
-        let%bind pepperoni_vote = Vote.(v = var Pepperoni) in
-        if_ pepperoni_vote
-          ~then_:(pepperoni_total + constant Field.one)
-          ~else_:pepperoni_total
-      in
-      go new_total vs'
-  in
-  go (constant Field.zero) vs
-;;
+  Checked.List.fold vs ~init:(constant Field.zero) ~f:(fun acc v ->
+    let%bind pepperoni_vote = Vote.(v = var Pepperoni) in
+    Number.if_ pepperoni_vote
+      ~then_:(acc + constant Field.one)
+      ~else_:(acc + constant Field.zero))
 (* Aside for experts: This function could be much more efficient since a Candidate
    is just a bool which can be coerced to a cvar (thus requiring literally no constraints
    to just sum up). It's written this way for pedagogical purposes. *)
@@ -154,10 +126,9 @@ let count_pepperoni_votes vs =
 (* Now we can put it all together to compute the winner: *)
 let winner ballots =
   let open Number in
-  let total_votes = List.length ballots in
-  let half = constant (Field.of_int (total_votes / 2)) in
+  let half = constant (Field.of_int (List.length ballots / 2)) in
   (* First we open all the ballots *)
-  let%bind votes = Checked.all (List.mapi ~f:open_ballot ballots) in
+  let%bind votes = Checked.List.mapi ~f:open_ballot ballots in
   (* Then we sum up all the votes (we only have to sum up the pepperoni votes
      since the mushroom votes are N - pepperoni votes)
   *)
