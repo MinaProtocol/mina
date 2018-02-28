@@ -158,7 +158,7 @@ let cmd main =
               ~to_tar:[ "app/"
                       ; "lib/"
                       ; "lib/nanobit_testbridge/testbridge-launch.sh" 
-                      ; "camlsnark.opam"
+                      ; "snarky.opam"
                       ; "linear_pipe.opam"
                       ; "nanobit_testbridge.opam"
                       ; "testbridge.opam"

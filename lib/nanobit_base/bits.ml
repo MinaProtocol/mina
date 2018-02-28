@@ -75,8 +75,8 @@ end
 module Int64 : Bits_intf.S with type t := Int64.t = Vector.Make(Vector.Int64)
 
 module Make_field0
-    (Field : Camlsnark.Field_intf.S)
-    (Bigint : Camlsnark.Bigint_intf.S with type field := Field.t)
+    (Field : Snarky.Field_intf.S)
+    (Bigint : Snarky.Bigint_intf.S with type field := Field.t)
     (M : sig val bit_length : int end)
   : Bits_intf.S with type t = Field.t
 =
@@ -115,14 +115,14 @@ struct
 end
 
 module Make_field
-    (Field : Camlsnark.Field_intf.S)
-    (Bigint : Camlsnark.Bigint_intf.S with type field := Field.t)
+    (Field : Snarky.Field_intf.S)
+    (Bigint : Snarky.Bigint_intf.S with type field := Field.t)
   : Bits_intf.S with type t = Field.t
 = Make_field0(Field)(Bigint)(struct let bit_length = Field.size_in_bits end)
 
 module Small
-    (Field : Camlsnark.Field_intf.S)
-    (Bigint : Camlsnark.Bigint_intf.S with type field := Field.t)
+    (Field : Snarky.Field_intf.S)
+    (Bigint : Snarky.Bigint_intf.S with type field := Field.t)
     (M : sig val bit_length : int end)
   : Bits_intf.S with type t = Field.t
   = struct
@@ -134,7 +134,7 @@ module Small
 
 module Snarkable = struct
   module Small_bit_vector
-    (Impl : Camlsnark.Snark_intf.S)
+    (Impl : Snarky.Snark_intf.S)
     (V : sig
        type t
        val empty : t
@@ -233,11 +233,11 @@ module Snarkable = struct
     let unpack_value (x : Packed.value) : Unpacked.value = x
   end
 
-  module Int64 (Impl : Camlsnark.Snark_intf.S) =
+  module Int64 (Impl : Snarky.Snark_intf.S) =
     Small_bit_vector(Impl)(Vector.Int64)
 
   module Field_backed
-      (Impl : Camlsnark.Snark_intf.S)
+      (Impl : Snarky.Snark_intf.S)
       (M : sig val bit_length : int end)
   = struct
     open Impl
@@ -274,7 +274,7 @@ module Snarkable = struct
     let unpack_value = Fn.id
   end
 
-  module Field (Impl : Camlsnark.Snark_intf.S)
+  module Field (Impl : Snarky.Snark_intf.S)
     : Bits_intf.Snarkable.Lossy
        with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
         and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
@@ -287,7 +287,7 @@ module Snarkable = struct
     Field_backed(Impl)(struct let bit_length = Impl.Field.size_in_bits end)
 
   module Small
-      (Impl : Camlsnark.Snark_intf.S)
+      (Impl : Snarky.Snark_intf.S)
       (M : sig val bit_length : int end)
     : Bits_intf.Snarkable.Faithful
        with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
@@ -312,7 +312,7 @@ module Snarkable = struct
 end
 
 module Make_unpacked
-    (Impl : Camlsnark.Snark_intf.S)
+    (Impl : Snarky.Snark_intf.S)
     (M : sig val bit_length : int val element_length : int end)
 = struct
   open Impl

@@ -116,8 +116,8 @@ let bits_msb =
     in
     bs
 
-type _ Camlsnark.Request.t +=
-  | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Camlsnark.Request.t
+type _ Snarky.Request.t +=
+  | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Snarky.Request.t
 
 let two_to_the i =
   Bignum.Bigint.(pow (of_int 2) (of_int i))

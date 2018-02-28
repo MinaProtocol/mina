@@ -8,7 +8,7 @@
       linear_pipe
       swimlib
       nanobit_base
-      camlsnark
+      snarky
       logger
       async
       async_extra

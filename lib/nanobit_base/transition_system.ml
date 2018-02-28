@@ -87,7 +87,7 @@ struct
       Typ.list ~length:wrap_vk_length Boolean.typ
 
     module Verifier =
-      Camlsnark.Verifier_gadget.Make(Tick)(Tick_curve)(Tock_curve)
+      Snarky.Verifier_gadget.Make(Tick)(Tick_curve)(Tock_curve)
         (struct let input_size = Tock.Data_spec.size (wrap_input ()) end)
 
     let prev_state_valid wrap_vk prev_state =
@@ -164,7 +164,7 @@ struct
     open Tock
 
     module Verifier =
-      Camlsnark.Verifier_gadget.Make(Tock)(Tock_curve)(Tick_curve)
+      Snarky.Verifier_gadget.Make(Tock)(Tock_curve)(Tick_curve)
         (struct let input_size = step_input_size end)
 
     module Prover_state = struct

@@ -8,7 +8,7 @@
   (libraries (core ctypes ctypes.foreign))
   (no_dynlink)
   (modes (native))
-  (public_name camlsnark.c)
+  (public_name snarky.c)
   (preprocess no_preprocessing)
   (flags (:standard -safe-string))
   (c_library_flags (:standard -Wl,-E -Wl,-whole-archive -lcamlsnark_c_stubs -Wl,-no-whole-archive -lssl -lcrypto -lprocps -lgmp -lstdc++ 
