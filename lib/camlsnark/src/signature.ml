@@ -143,7 +143,7 @@ module Schnorr
      end)
 =
 struct
-  (* TODO: There is a very subtle issue to be sorted out around doing multi-sums.
+  (* There is a subtle issue to be aware of around doing multi-sums.
      A signature is a pair (s, e) and to verify we compute
 
      s * generator + e * public_key.
@@ -160,15 +160,8 @@ struct
 
      s * generator + e * public_key + init
 
-     is = identity. I.e., the notaries should reject any signature that has that property.
-     This is pretty tricky to check in practice, since it means sacrificing shamir's trick.
-
-     This is bad since an adversary chooses s, e, and the public-key. Hmm, though they don't
-     choose the generator. Actually it's easy to make happen. Just take public_key to be
-     -init and set the first bit of e to 1.
-
-     Plan is to follow this up with an implementation using an edwards curve so that this
-     issue can be avoided entirely (since edwards curves have a total multiplication).
+     is = identity. This can be avoided by considering as invalid any signature that has that property.
+     This is annoying to check in practice, since it means sacrificing shamir's trick.
   *)
 
   module Public_key = struct

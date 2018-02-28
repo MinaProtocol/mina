@@ -183,6 +183,11 @@ module type Basic = sig
   Checked : sig
     include Monad.S2
 
+    module List : Monad_sequence.S
+      with type ('a, 's) monad := ('a, 's) t
+       and type 'a t = 'a list
+       and type boolean := Boolean.var
+
     val mul : Cvar.t -> Cvar.t -> (Cvar.t, _) t
     val div : Cvar.t -> Cvar.t -> (Cvar.t, _) t
 
@@ -339,7 +344,8 @@ module type Basic = sig
 
   (* TODO: Come up with a better name for this in relation to the above *)
   val request
-    : ('var, 'value) Typ.t
+    : ?such_that:('var -> (unit, 's) Checked.t)
+    -> ('var, 'value) Typ.t
     -> 'value Request.t
     -> ('var, 's) Checked.t
 
