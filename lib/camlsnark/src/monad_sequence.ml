@@ -8,13 +8,6 @@ module type S = sig
   val foldi : 'a t -> init:'b -> f:(int -> 'b -> 'a -> ('b, 's) monad) -> ('b, 's) monad
   val fold  : 'a t -> init:'b -> f:(       'b -> 'a -> ('b, 's) monad) -> ('b, 's) monad
 
-(*
-  val find     : 'a t -> f:(       'a -> (boolean     , 's) monad) -> ('a option, 's) monad
-  val findi    : 'a t -> f:(int -> 'a -> (boolean     , 's) monad) -> ((int * 'a) option, 's) monad
-  val find_map : 'a t -> f:(       'a -> ('b option, 's) monad) -> ('b option, 's) monad
-  val find_mapi: 'a t -> f:(int -> 'a -> ('b option, 's) monad) -> ('b option, 's) monad
-
-*)
   val exists  : 'a t -> f:(       'a -> (boolean      , 's) monad) -> (boolean, 's) monad
   val existsi : 'a t -> f:(int -> 'a -> (boolean      , 's) monad) -> (boolean, 's) monad
   val for_all : 'a t -> f:(       'a -> (boolean      , 's) monad) -> (boolean, 's) monad
