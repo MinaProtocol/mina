@@ -1,10 +1,10 @@
 (jbuild_version 1)
 
-(executable
+(library
  ((name merkle_ledger)
   (public_name merkle_ledger)
-  (package merkle_ledger)
+  (library_flags (-linkall))
   (libraries (core ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib merkle_ledger))))))
-
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib merkle_ledger))))
+  (synopsis "Merkle Ledger implementation")))
 
