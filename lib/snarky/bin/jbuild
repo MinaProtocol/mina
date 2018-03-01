@@ -5,7 +5,3 @@
   (modes (native))
   (preprocess (pps (ppx_jane ppx_driver.runner)))
   (libraries (snarky core))))
-
-;(install
-;  ((section bin)
-;    (files ((tutorial.exe as tutorial)))))

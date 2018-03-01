@@ -2,7 +2,10 @@
 
 `snarky` is an OCaml front-end for writing R1CS SNARKs.
 It is modular over the backend SNARK library, and comes with backends
-from [libsnark](https://github.com/scipr-lab/libsnark), 
+from [libsnark](https://github.com/scipr-lab/libsnark).
+
+Disclaimer: This code has not been thoroughly audited and should not
+be used in production systems.
 
 ## Getting started
 First run

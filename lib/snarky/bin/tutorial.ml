@@ -104,7 +104,7 @@ let update_many
           (* Here we look up the previously stored value in the Merkle tree so that we can use
             it in authenticating the update. *)
           exists Value.typ
-            As_prover.(map2 ~f:Merkle_tree.get_exn get_state (read address_typ addr))
+            ~compute:As_prover.(map2 ~f:Merkle_tree.get_exn get_state (read address_typ addr))
         in
         Merkle_tree_checked.update addr
           ~depth
