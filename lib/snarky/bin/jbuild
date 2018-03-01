@@ -4,7 +4,7 @@
  ((names (tutorial))
   (modes (native))
   (preprocess (pps (ppx_jane ppx_driver.runner)))
-  (libraries (camlsnark core))))
+  (libraries (snarky core))))
 
 ;(install
 ;  ((section bin)

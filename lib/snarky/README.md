@@ -1,6 +1,6 @@
-# camlsnark
+# snarky
 
-`camlsnark` is an OCaml front-end for writing R1CS SNARKs.
+`snarky` is an OCaml front-end for writing R1CS SNARKs.
 It is modular over the backend SNARK library, and comes with backends
 from [libsnark](https://github.com/scipr-lab/libsnark), 
 

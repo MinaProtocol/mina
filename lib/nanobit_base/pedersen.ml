@@ -45,9 +45,9 @@ module type S = sig
 end
 
 module Make
-    (Field : sig include Camlsnark.Field_intf.S include Sexpable.S with type t := t end)
-    (Bigint : Camlsnark.Bigint_intf.Extended with type field := Field.t)
-    (Curve : Camlsnark.Curves.Edwards.Basic.S with type field := Field.t) =
+    (Field : sig include Snarky.Field_intf.S include Sexpable.S with type t := t end)
+    (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t)
+    (Curve : Snarky.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
   module Digest = struct
     type t = Field.t [@@deriving sexp]

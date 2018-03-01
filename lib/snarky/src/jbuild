@@ -1,6 +1,6 @@
 (library
- ((name camlsnark)
-  (public_name camlsnark)
+ ((name snarky)
+  (public_name snarky)
   (libraries (core_kernel bignum camlsnark_c))
   (c_library_flags (:standard -lstdc++ -lpthread))
   (flags (:standard -safe-string))

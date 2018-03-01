@@ -1,5 +1,5 @@
 module type S = sig
-  include Camlsnark.Snark_intf.S
+  include Snarky.Snark_intf.S
 
   module Snarkable : sig
     module type S = sig

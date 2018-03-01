@@ -1,6 +1,6 @@
 open Core_kernel
 
-module Make (Impl : Camlsnark.Snark_intf.S) = struct
+module Make (Impl : Snarky.Snark_intf.S) = struct
   open Impl
   open Let_syntax
 
@@ -59,8 +59,8 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
     go (Cvar.constant Field.zero) Field.one (bs0 :> Cvar.t list)
   ;;
 
-  type _ Camlsnark.Request.t +=
-    | N_ones : bool list Camlsnark.Request.t
+  type _ Snarky.Request.t +=
+    | N_ones : bool list Snarky.Request.t
 
   let n_ones ~total_length n =
     let%bind bs =
@@ -97,8 +97,8 @@ module Make (Impl : Camlsnark.Snark_intf.S) = struct
 
   let size_in_bits_size_in_bits = num_bits_int Field.size_in_bits
 
-  type _ Camlsnark.Request.t +=
-    | Num_bits_upper_bound : Field.t Camlsnark.Request.t
+  type _ Snarky.Request.t +=
+    | Num_bits_upper_bound : Field.t Snarky.Request.t
 
   let num_bits_upper_bound_unchecked x =
     let num_bits =

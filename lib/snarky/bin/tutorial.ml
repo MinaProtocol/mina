@@ -4,7 +4,7 @@
 (* First we bring [Core] and the [Snark] module into scope, selecting
    the Bn128-based snark. *)
 open Core
-open Camlsnark
+open Snarky
 module Snark = Snark.Make(Snark.Backends.Bn128)
 module Knapsack = Knapsack.Make(Snark)
 open Snark

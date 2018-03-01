@@ -1,9 +1,9 @@
 open Core_kernel
 
-module Tick_curve = Camlsnark.Backends.Mnt4
-module Tock_curve = Camlsnark.Backends.Mnt6
+module Tick_curve = Snarky.Backends.Mnt4
+module Tock_curve = Snarky.Backends.Mnt6
 
-module Extend (Impl : Camlsnark.Snark_intf.S) = struct
+module Extend (Impl : Snarky.Snark_intf.S) = struct
   include Impl
 
   module Snarkable = struct
@@ -27,10 +27,10 @@ module Extend (Impl : Camlsnark.Snark_intf.S) = struct
   end
 end
 
-module Tock = Extend(Camlsnark.Snark.Make(Tock_curve))
+module Tock = Extend(Snarky.Snark.Make(Tock_curve))
 
 module Tick = struct
-  module Tick0 = Extend(Camlsnark.Snark.Make(Tick_curve))
+  module Tick0 = Extend(Snarky.Snark.Make(Tick_curve))
 
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
@@ -58,7 +58,7 @@ module Tick = struct
       (* someday: Compute this from the number inside of ocaml *)
       let bit_length = 262
 
-      include Camlsnark.Curves.Edwards.Basic.Make(Field)(struct
+      include Snarky.Curves.Edwards.Basic.Make(Field)(struct
           (*
   Curve params:
   d = 20
@@ -73,7 +73,7 @@ module Tick = struct
             f "269570906944652130755537879906638127626718348459103982395416666003851617088183934285066554"
         end)
 
-      module Scalar (Impl : Camlsnark.Snark_intf.S) = struct
+      module Scalar (Impl : Snarky.Snark_intf.S) = struct
         (* Someday: Make more efficient *)
         open Impl
         type var = Boolean.var list
@@ -114,12 +114,12 @@ module Tick = struct
   module Scalar = Pedersen.Curve.Scalar(Tick0)
 
   module Hash_curve =
-    Camlsnark.Curves.Edwards.Extend
+    Snarky.Curves.Edwards.Extend
       (Tick0)
       (Scalar)
       (Pedersen.Curve)
 
-  module Pedersen_hash = Camlsnark.Pedersen.Make(Tick0)(struct
+  module Pedersen_hash = Snarky.Pedersen.Make(Tick0)(struct
       include Hash_curve
       let cond_add = Checked.cond_add
     end)
