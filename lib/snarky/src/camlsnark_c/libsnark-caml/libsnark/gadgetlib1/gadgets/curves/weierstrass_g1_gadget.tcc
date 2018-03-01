@@ -244,7 +244,6 @@ G1_multiscalar_mul_gadget<ppT>::G1_multiscalar_mul_gadget(protoboard<FieldT> &pb
     scalar_size(scalars.size())
 {
     assert(num_points >= 1);
-    printf("foojunk: num_points * elt_size (%d) vs scalar_size (%d)\n", num_points * elt_size, scalar_size);
     assert(num_points * elt_size == scalar_size);
 
     for (size_t i = 0; i < num_points; ++i)
