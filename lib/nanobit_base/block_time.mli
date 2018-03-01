@@ -34,6 +34,8 @@ module Span : sig
   val to_ms : t -> Int64.t
 end
 
+val field_var_to_unpacked : Tick.Cvar.t -> (Unpacked.var, _) Tick.Checked.t
+
 val diff_checked
   : Unpacked.var -> Unpacked.var -> (Span.Unpacked.var, _) Tick.Checked.t
 

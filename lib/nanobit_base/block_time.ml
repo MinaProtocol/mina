@@ -34,6 +34,8 @@ module Span = struct
   let to_ms t = t
 end
 
+let field_var_to_unpacked (x : Tick.Cvar.t) = Tick.Checked.unpack ~length:64 x
+
 let diff x y = Int64.(x - y)
 
 let diff_checked x y =
