@@ -111,7 +111,6 @@ r1cs_ppzksnark_verification_key_variable<ppT>::r1cs_ppzksnark_verification_key_v
     const size_t num_G1 = 2 + (input_size + 1);
     const size_t num_G2 = 5;
 
-    printf("foojunk: all_bits=%d, implied=%d\n", all_bits.size(),(G1_variable<ppT>::size_in_bits() * num_G1 + G2_variable<ppT>::size_in_bits() * num_G2));
     assert(all_bits.size() == (G1_variable<ppT>::size_in_bits() * num_G1 + G2_variable<ppT>::size_in_bits() * num_G2));
 
     this->alphaA_g2.reset(new G2_variable<ppT>(pb, FMT(annotation_prefix, " alphaA_g2")));
