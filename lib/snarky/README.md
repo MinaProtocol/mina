@@ -8,25 +8,15 @@ Disclaimer: This code has not been thoroughly audited and should not
 be used in production systems.
 
 ## Getting started
-First run
+- First install libsnark's dependencies as specified [here](https://github.com/scipr-lab/libsnark#dependencies)
+- Then, make sure you have [opam](https://opam.ocaml.org/doc/Install.html) installed.
+- Then, install `snarky` by running
 ```bash
-./init.sh
+opam pin add snarky git@github.com:o1-labs/snarky.git
 ```
-to fetch and build libsnark. If this fails, make sure to install libsnark's dependencies,
-detailed [here](https://github.com/scipr-lab/libsnark#build-instructions).
+and answering yes to the prompts.
 
-Then, make sure you have the ocaml dependencies installed with
-```bash
-opam install core ctypes-foreign ctypes
-```
-
-Finally, run
-```bash
-cd caml && oasis setup && make
-```
-to build the library and the examples.
-
-The best place to get started learning how to use the library is the [tutorial](caml/test/tutorial.ml),
+The best place to get started learning how to use the library is the [tutorial](bin/tutorial.ml),
 which shows a complete sample usage, heavily annotated.
 
 ## Design
@@ -69,7 +59,7 @@ computation for computing the implied Merkle root:
 
 The type of this function is
 ```ocaml
-val implied_root : Hash.var -> Var.t list -> Hash.var list -> (Hash.var, 'prover_state) Checked.t
+val implied_root : Hash.var -> Boolean.var list -> Hash.var list -> (Hash.var, 'prover_state) Checked.t
 ```
 The return type `(Hash.var, 'prover_state) Checked.t` indicates that the function
 returns a "checked computation" producing a variable containing a hash, and can be
