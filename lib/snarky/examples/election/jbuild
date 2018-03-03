@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
 (executables
- ((names (election))
+ ((names (election_main))
   (modes (native))
   (preprocess (pps (ppx_jane ppx_deriving.enum ppx_driver.runner)))
   (libraries (snarky core))))

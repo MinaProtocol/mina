@@ -4,32 +4,6 @@ open Impl
 open Import
 open Let_syntax
 
-(* Election day! The time has come for citizens to cast their ballots for
-   pizza toppings: will it be pepperoni? Or will mushroom win the day?
-
-   But there is a slight problem:
-   Reports suggest that there have been attempts to hack the software that
-   tabulates votes and determines the winner. As such, the government has decided
-   that the election results should be accompanied by a proof of their correctness.
-   The scheme is as follows:
-
-   Let $H$ be a hash function and say there are $n$ voters who must all vote.
-   - Each voter $i$ will provide the government with their vote $v_i$ along with
-     a random nonce $x_i$ for a commitment $h_i = H(x_i, v_i)$.
-   - The government will compute the result of the election, either pepperoni or mushroom.
-   - The government will prove in zero knowledge the following statement:
-      Exposing the commitments $h_1, \dots, h_n$ and the winner $w$,
-      there exist $(x_1, v_1), \dots, (x_n, v_n)$ such that
-      - For each $i$, $H(x_i, v_i) = h_i$.
-      - if the number of votes for Pepperoni is greater than n / 2, $w$ is Pepperoni,
-        otherwise, $w$ is Mushroom.
-
-   In plain English, they'll prove "I know votes corresponding to the commitments $h_i$
-   such that taking the majority of those votes results in winner $w$".
-
-   TODO: Say they can check if their vote was in there with commitment.
-*)
-
 (* First we declare the type of "votes" and call a library functor [Enumerable] to
    make it possible to refer to values of type [Vote.t] in checked computations. *)
 module Vote = struct
@@ -40,7 +14,6 @@ module Vote = struct
     [@@deriving enum]
   end
   include T
-      (* TODO: SnarkImpl.Enumerable? *)
   include Enumerable(T)
 end
 
@@ -123,7 +96,7 @@ let count_pepperoni_votes vs =
    is just a bool which can be coerced to a cvar (thus requiring literally no constraints
    to just sum up). It's written this way for pedagogical purposes. *)
 
-(* Now we can put it all together to compute the winner: *)
+(* Now we can put it all together to write a verifiable computation computing the winner: *)
 let winner ballots =
   let open Number in
   let half = constant (Field.of_int (List.length ballots / 2)) in
@@ -183,19 +156,3 @@ let tally_and_prove (ballots : Ballot.Opened.t array) =
   , prove (Keypair.pk keypair) (exposed ()) () handled_check
       commitments winner
   )
-
-(* Now let's try it out: *)
-let () =
-  (* Mock data *)
-  let received_ballots =
-    Array.init number_of_voters ~f:(fun _ ->
-      (Ballot.Opened.create
-        (if Random.bool () then Pepperoni else Mushroom)))
-  in
-  let (commitments, winner, proof) = tally_and_prove received_ballots in
-  assert
-    (verify proof (Keypair.vk keypair) (exposed ())
-       commitments winner)
-
-(* Have an individual checking that their commitment is in the commitments. *)
-
