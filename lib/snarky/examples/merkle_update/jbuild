@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
 (executables
- ((names (tutorial))
+ ((names (merkle_update))
   (modes (native))
   (preprocess (pps (ppx_jane ppx_driver.runner)))
   (libraries (snarky core))))
