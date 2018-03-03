@@ -1,5 +1,5 @@
 open Core
-open Camlsnark
+open Snarky
 open Impl
 open Import
 open Let_syntax

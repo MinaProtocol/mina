@@ -1,7 +1,7 @@
 open Core
 open Impl
 
-module M = Camlsnark.Knapsack.Make(Impl)
+module M = Snarky.Knapsack.Make(Impl)
 let dimension = 1
 
 type var = Cvar.t list

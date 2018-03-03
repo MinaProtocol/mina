@@ -3,5 +3,6 @@
 (executables
  ((names (election))
   (modes (native))
-  (preprocess (pps (ppx_jane ppx_driver.runner)))
+  (preprocess (pps (ppx_jane ppx_deriving.enum ppx_driver.runner)))
   (libraries (snarky core))))
+

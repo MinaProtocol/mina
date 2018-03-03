@@ -1,8 +1,7 @@
-open Camlsnark
+open Snarky
 module Backend = Backends.Bn128
 module M = Snark.Make(Backend)
 include M
-module Util = Nanobit_base.Snark_util.Make(M)
 
 let backend_bigint_of_bigint n =
   Backend.Bigint.R.of_decimal_string
