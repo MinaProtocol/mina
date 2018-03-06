@@ -39,6 +39,14 @@ module Make (Impl : Snark_intf.Basic) = struct
     end
   ;;
 
+  let to_bits_unsafe { var; bits; upper_bound; lower_bound = _ } length =
+    with_label "Number.to_bits_unsafe" begin
+      match bits with
+      | Some bs -> return (List.take bs length)
+      | None -> Checked.unpack var ~length
+    end
+  ;;
+
   let of_bits bs =
     let n = List.length bs in
     assert (n < Field.size_in_bits);
@@ -158,7 +166,8 @@ module Make (Impl : Snark_intf.Basic) = struct
       ; var = Cvar.add x.var y.var
       ; bits = None
       }
-    else failwith "Number.+: Potential overflow: "
+    else failwithf "Number.+: Potential overflow: (%s + %s > Field.size)"
+        (to_string x.upper_bound) (to_string y.upper_bound) ()
 
   let (-) x y =
     let open Bignum.Bigint in
@@ -186,7 +195,37 @@ module Make (Impl : Snark_intf.Basic) = struct
         ; var 
         ; bits = None
         }
-      else failwith "Number.+: Potential overflow"
+      else failwithf "Number.*: Potential overflow: (%s * %s > Field.size)"
+        (to_string x.upper_bound) (to_string y.upper_bound) ()
     end
+
+  let mul_unsafe x y =
+    let open Bignum.Bigint in
+    let upper_bound = x.upper_bound * y.upper_bound in
+    let%map var = Checked.mul x.var y.var in
+    { upper_bound
+    ; lower_bound = x.lower_bound * y.lower_bound
+    ; var 
+    ; bits = None
+    }
+  ;;
+
+  let sum_unsafe x y =
+    let open Bignum.Bigint in
+    let upper_bound = x.upper_bound + y.upper_bound in
+    { upper_bound
+    ; lower_bound = x.lower_bound + y.lower_bound
+    ; var = Cvar.add x.var y.var
+    ; bits = None
+    }
+  ;;
+
+  let minus_unsafe x y =
+    let open Bignum.Bigint in
+    { upper_bound = x.upper_bound - y.lower_bound
+    ; lower_bound = x.lower_bound - y.upper_bound
+    ; var = Cvar.sub x.var y.var
+    ; bits = None
+    }
 end
 

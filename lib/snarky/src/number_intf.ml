@@ -11,6 +11,10 @@ module type S = sig
   val ( * )    : t -> t -> (t, _) checked
   val constant : field -> t
 
+  val minus_unsafe : t -> t -> t
+  val sum_unsafe : t -> t -> t
+  val mul_unsafe : t -> t -> (t, _) checked
+
   val if_ : bool_var -> then_:t -> else_:t -> (t, _) checked
 
   val (<) : t -> t -> (bool_var, _) checked
@@ -23,6 +27,8 @@ module type S = sig
 
   val of_bits : bool_var list -> t
   val to_bits : t -> (bool_var list, _) checked
+
+  val to_bits_unsafe : t -> int -> (bool_var list, _) checked
 
   val clamp_to_n_bits : t -> int -> (t, _) checked
 end

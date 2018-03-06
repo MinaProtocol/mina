@@ -93,12 +93,11 @@ let compute_difficulty previous_time previous_difficulty time =
   let time_diff_ms = Bignum.Bigint.of_int (Int.of_float (Time.Span.to_ms time_diff)) in
 
   let scale = Bignum.Bigint.(Bignum.Bigint.one - (time_diff_ms / target_time_ms)) in
-  printf "%s\n" (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] scale));
   let scale = Bignum.Bigint.max scale Bignum.Bigint.(-max_difficulty_drop) in
   let rate = Bignum.Bigint.(previous_difficulty / difficulty_adjustment_rate) in
   let rate = Bignum.Bigint.max rate Bignum.Bigint.one in
   let diff = Bignum.Bigint.(rate * scale) in
-  Bignum.Bigint.(previous_difficulty + diff)
+  Bignum.Bigint.max Bignum.Bigint.(previous_difficulty + diff) (Bignum.Bigint.of_int 32)
 
 let compute_difficulty_x = compute_difficulty
 
@@ -200,6 +199,10 @@ module Checked = struct
     with_label "State.hash" (hash_digest (to_bits t))
   ;;
 
+  (*block_target = parent_target 
+   *                    + max(parent_target // difficulty_adjustment_rate, 1)  
+   *                        * max(1 - (block_timestamp_ms - parent_timestamp_ms) // target_time_ms, 
+   *                              -max_difficulty_drop)*)
   let compute_difficulty prev_time prev_strength time =
     let div_pow_2 bits (`Two_to_the k) = List.drop bits k in
     with_label "compute_difficulty" begin
@@ -225,17 +228,41 @@ module Checked = struct
       let rate_floor = div_pow_2 (Strength.Unpacked.var_to_bits prev_strength_unpacked) difficulty_adjustment_rate in
       let rate_floor = Number.of_bits rate_floor in
       let%bind rate = 
-        let%bind is_zero = Number.(rate_floor = (Number.constant Field.zero)) in
+        let%bind is_zero = Number.(rate_floor = constant Field.zero) in
         Number.if_ is_zero
           ~then_:(Number.constant Field.one)
           ~else_:rate_floor
       in
-      let%bind diff_nonzero = Number.(rate * (neg_scale_plus_one - (constant Field.one))) in
-      let%bind new_strength_num =
-        let%bind is_zero = Number.(neg_scale_plus_one = (Number.constant Field.zero)) in
+      let%bind rate_scalar = 
+        let%bind is_zero = Number.(neg_scale_plus_one = constant Field.zero) in
         Number.if_ is_zero
-          ~then_:Number.(prev_strength_num + rate)
-          ~else_:Number.(prev_strength_num - diff_nonzero)
+          ~then_:(Number.constant Field.one)
+          ~else_:(Number.minus_unsafe neg_scale_plus_one Number.(constant Field.one))
+      in
+      let%bind diff = Number.mul_unsafe rate rate_scalar in
+      let%bind diff = 
+        (* TODO need to do this else Number.< throws, how to properly fix that? *)
+        let%map diff = Number.to_bits_unsafe diff 64 in
+        let diff = List.take diff 64 in
+        Number.of_bits diff
+      in
+      let%bind diff_minus =
+        let%bind less = Number.(diff < prev_strength_num) in
+        Number.if_ less 
+          ~then_:diff
+          ~else_:prev_strength_num
+      in
+      let%bind new_strength_num =
+        let%bind is_zero = Number.(neg_scale_plus_one = constant Field.zero) in
+        Number.if_ is_zero
+          ~then_:(Number.sum_unsafe prev_strength_num diff)
+          ~else_:(Number.minus_unsafe prev_strength_num diff_minus)
+      in
+      let%bind new_strength_num =
+        let%bind less = Number.(new_strength_num < constant (Field.of_int 32)) in
+        Number.if_ less
+          ~then_:Number.(constant (Field.of_int 32))
+          ~else_:new_strength_num
       in
       let%map new_strength_unpacked = Strength.field_var_to_unpacked (Number.to_var new_strength_num) in
       Strength.pack_var new_strength_unpacked
@@ -246,13 +273,15 @@ module Checked = struct
     Field.project (List.init n ~f:(fun _ -> Random.bool ()))
   ;;
 
+
+
   let%test_unit "compute_difficulty" = 
     let test prev_strength secs =
       let prev_time =  Block.genesis.header.time in
       let time = Block_time.of_time (Time.add (Block_time.to_time prev_time) (sec secs)) in
       let time_to_field t = Field.of_int (Int64.to_int_exn (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))) in
       let prev_time_field = time_to_field (Block_time.to_time prev_time) in
-      let time_field = time_to_field (Block_time.to_time prev_time) in
+      let time_field = time_to_field (Block_time.to_time time) in
 
       let ((), new_strength, passed) =
         run_and_check
@@ -263,10 +292,15 @@ module Checked = struct
            As_prover.(read Strength.Packed.typ new_strength))
           ()
       in
-      assert passed;
       let new_strength = Bigint.to_bignum_bigint (Bigint.of_field new_strength) in
-      let prev_strength = Bignum.Bigint.of_int_exn 50 in
-      let new_strength_unchecked = compute_difficulty_x prev_time prev_strength time in
+      let prev_strength_bigint = Bignum.Bigint.of_int_exn prev_strength in
+      let new_strength_unchecked = compute_difficulty_x prev_time prev_strength_bigint time in
+      printf "%d %f %s %s\n"
+        prev_strength
+        secs
+        (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] new_strength_unchecked))
+        (Sexp.to_string_hum ([%sexp_of: Bignum.Bigint.t] new_strength));
+      assert passed;
       assert Bignum.Bigint.(new_strength_unchecked = new_strength)
     in
     let strengths = [ 50; 500; 5000 ] in

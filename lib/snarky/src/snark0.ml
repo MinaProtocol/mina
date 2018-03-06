@@ -1357,6 +1357,7 @@ module Checked = struct
         let open Cvar.Infix in
         Cvar.constant (two_to_the bit_length) + b - a
       in
+      (* TODO won't this throw unexpectedly if bit_length = Field.size_in_bits? *)
       let%bind alpha = unpack alpha_packed ~length:(bit_length + 1) in
       let (prefix, less_or_equal) =
         match List.split_n alpha bit_length with
