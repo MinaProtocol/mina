@@ -38,6 +38,8 @@ val constant : Packed.value -> Packed.var
 
 val strength_unchecked : t -> Strength.t
 
+val expected_hash_attempts : t -> Bignum.Bigint.t
+
 (* Someday: Have a dual variable type so I don't have to pass both packed and unpacked
    versions. *)
 val strength

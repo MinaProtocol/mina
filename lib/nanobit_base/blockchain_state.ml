@@ -97,7 +97,7 @@ let compute_difficulty previous_time previous_difficulty time =
   let rate = Bignum.Bigint.(previous_difficulty / difficulty_adjustment_rate) in
   let rate = Bignum.Bigint.max rate Bignum.Bigint.one in
   let diff = Bignum.Bigint.(rate * scale) in
-  Bignum.Bigint.max Bignum.Bigint.(previous_difficulty + diff) (Bignum.Bigint.of_int 32)
+  Bignum.Bigint.max Bignum.Bigint.(previous_difficulty + diff) (Bignum.Bigint.of_int 1)
 
 let compute_difficulty_x = compute_difficulty
 
@@ -130,7 +130,7 @@ let negative_one : value =
   let target : Target.Unpacked.value =
     Target.of_bigint
       Bignum.Bigint.(
-        Target.(to_bigint max) / pow (of_int 2) (of_int 5))
+        Target.(to_bigint max) / pow (of_int 2) (of_int 1))
   in
   { previous_time
   ; target
@@ -139,7 +139,7 @@ let negative_one : value =
   ; strength = Strength.zero
   }
 
-(*let%test "compute_difficulty_stable" = 
+let%test "compute_difficulty_stable" = 
   let init = strength_to_target (Bignum.Bigint.of_int 1024) in
   let time = Block_time.to_time Block.genesis.header.time in
   let seq = 
@@ -164,7 +164,7 @@ let negative_one : value =
   in
   match result with 
   | Stopped_early _ -> false
-  | Finished _ -> true*)
+  | Finished _ -> true
 
 let zero = update_exn negative_one Block.genesis
 
@@ -259,9 +259,9 @@ module Checked = struct
           ~else_:(Number.minus_unsafe prev_strength_num diff_minus)
       in
       let%bind new_strength_num =
-        let%bind less = Number.(new_strength_num < constant (Field.of_int 32)) in
+        let%bind less = Number.(new_strength_num < constant (Field.of_int 1)) in
         Number.if_ less
-          ~then_:Number.(constant (Field.of_int 32))
+          ~then_:Number.(constant (Field.of_int 1))
           ~else_:new_strength_num
       in
       let%map new_strength_unpacked = Strength.field_var_to_unpacked (Number.to_var new_strength_num) in

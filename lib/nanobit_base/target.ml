@@ -54,6 +54,11 @@ let strength_unchecked (target : t) =
   Bigint.(to_field (div max_bigint (of_field target)))
 ;;
 
+let expected_hash_attempts target = 
+  let target = to_bigint target in
+  Bignum.Bigint.((pow (of_int 2) (of_int Snark_params.Tick.Field.size_in_bits) - one) / target)
+;;
+
 open Tick
 open Let_syntax
 

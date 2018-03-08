@@ -158,6 +158,7 @@ struct
           let time = state.Blockchain_state.previous_time in
           let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.target) in
           let strength = Bignum.Bigint.((Nanobit_base.Target.to_bigint Nanobit_base.Target.max) / target) in
+          let expected_hash_attempts = Nanobit_base.Target.expected_hash_attempts state.Blockchain_state.target in
           let diff = 
             match !last_time with
             | None -> ""
@@ -168,7 +169,8 @@ struct
           in
           Logger.info log ~attrs:[ ("number", [%sexp_of: Int64.t] number )
                                  ; ("strength", [%sexp_of: Bignum.Bigint.t] strength)
-                                 ; ("mining time", [%sexp_of: String.t] diff) ]
+                                 ; ("expected hash attempts", [%sexp_of: Bignum.Bigint.t] expected_hash_attempts)
+                                 ; ("block time", [%sexp_of: String.t] diff) ]
             "new strongest blockchain";
           last_time := Some time;
           Deferred.unit)
@@ -319,7 +321,7 @@ struct
         ~latest_strongest_block:(
           Linear_pipe.latest_ref ~initial:genesis_blockchain pipes.latest_strongest_block_reader)
         ~latest_mined_block:(
-          Linear_pipe.latest_ref ~initial:genesis_blockchain latest_mined_blocks_reader)
+          Linear_pipe.latest_ref ~initial:genesis_blockchain (Linear_pipe.map latest_mined_blocks_reader ~f:(fun (b, _) -> b)))
         ~swim
         ~remap_addr_port
     in
@@ -341,7 +343,7 @@ struct
       ~updates:(
         Linear_pipe.merge_unordered
           [ peer_strongest_blocks gossip_net log
-          ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
+          ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun (b, _) ->
               Blockchain_accumulator.Update.New_chain b)
           ]);
     swim
