@@ -45,6 +45,8 @@ module type S = sig
 
   val stop : t -> unit
 
+  val first_peers : t -> Peer.t list Deferred.t
+
   module TestOnly : TestOnly_intf
 end
 
@@ -164,10 +166,10 @@ module Network_state : Network_state_intf = struct
     (* We need this iter to be fast so rest of protocol doesn't build up *)
     (* Implicit contract with change pipe consumer to keep up with events *)
     don't_wait_for (
-      push_changes t slice
-    );
-    t.logger#logf Debug "Adding slice %s" (slice |> sexp_of_slice |> Sexp.to_string);
-    List.iter slice (add t)
+      let%map () = push_changes t slice in
+      t.logger#logf Debug "Adding slice %s" (slice |> sexp_of_slice |> Sexp.to_string);
+      List.iter slice (add t)
+    )
 
   let live_nodes t = t.live_nodes
 
@@ -491,10 +493,11 @@ module Make (Transport : Transport_intf) = struct
     ; net : Net.t
     ; config : Config.t
     ; mutable stop : bool
+    ; out_changes : Peer.Event.t Linear_pipe.Reader.t
+    ; first_peers : Peer.t list Deferred.t
     }
 
-  let changes t =
-    Network_state.changes t.net_state
+  let changes t = t.out_changes
 
   let fresh_seq_no t =
     let seq_no = t.seq_no in
@@ -580,6 +583,16 @@ module Make (Transport : Transport_intf) = struct
         ~handle_msg
         ~me
     in
+    let (out_changes, first_changes) = Linear_pipe.fork2 (Network_state.changes net_state) in
+    (* TODO: This is inefficient since we only care about the first update, but we're replacing this with kademlia really really soon *)
+    let first_peers = Deferred.create (fun ivar ->
+      don't_wait_for begin
+        Linear_pipe.iter first_changes ~f:(function
+          | Peer.Event.Connect peers -> return (Ivar.fill_if_empty ivar peers)
+          | Peer.Event.Disconnect _ -> return ()
+        )
+      end
+    ) in
     let t =
       { messager = make_messager ()
       ; net_state
@@ -589,6 +602,8 @@ module Make (Transport : Transport_intf) = struct
       ; net
       ; config
       ; stop = false
+      ; out_changes
+      ; first_peers
       }
     in
     (* Assume initial peers are alive *)
@@ -604,6 +619,8 @@ module Make (Transport : Transport_intf) = struct
   let stop t =
     Net.stop_listening t.net;
     t.stop <- true
+
+  let first_peers t = t.first_peers
 
   module TestOnly = struct
     let network_partition_add ~from ~to_ =

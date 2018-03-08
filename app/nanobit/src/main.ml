@@ -4,6 +4,7 @@ open Swimlib
 open Nanobit_base
 
 module Snark = Snark
+module Digest = Snark_params.Tick.Pedersen.Digest
 
 module Rpcs = struct
   module Get_strongest_block = struct
@@ -76,25 +77,31 @@ struct
   module Gossip_net = Gossip_net(Message)
   module Swim = Swim
 
-  let peer_strongest_blocks gossip_net log
+  let peer_strongest_blocks first_peers gossip_net log
     : Blockchain_accumulator.Update.t Linear_pipe.Reader.t
     =
     let from_new_peers_reader, from_new_peers_writer = Linear_pipe.create () in
     let fetch_period = Time.Span.of_min 10. in
     let fetch_peer_count = 4 in
     let rec timer () = 
-      let%bind () = after fetch_period in
       let%bind () = 
         Deferred.List.iter
           ~how:`Parallel
           (Gossip_net.query_random_peers gossip_net fetch_peer_count Rpcs.Get_strongest_block.dispatch_multi ())
           ~f:(fun x -> match%bind x with
-            | Ok b -> Pipe.write from_new_peers_writer (Blockchain_accumulator.Update.New_chain b)
+            | Ok b ->
+                Pipe.write from_new_peers_writer (Blockchain_accumulator.Update.New_chain b)
             | Error e -> Logger.error log "%s" (Error.to_string_hum e); return ())
       in
+      (* After a query, wait the fetch_period before re-requesting *)
+      let%bind () = after fetch_period in
       timer ()
     in
-    don't_wait_for (timer ());
+    don't_wait_for (
+      (* Except the first time, wait for peers to exist before querying random people *)
+      let%bind _ = first_peers in
+      timer ()
+    );
 
     let broadcasts =
       Linear_pipe.filter_map (Gossip_net.received gossip_net)
@@ -239,10 +246,8 @@ struct
      *   send to # > target_peers simultaenously based on machine capacity
      * *)
     let rec rebroadcast_timer () = 
-      let rec rebroadcast_loop blockchain continue = 
-        (* TODO: This is an error: Should compare blockchains instead of blocks and also not
-           use polymorphic compare *)
-        let is_latest = Blockchain.(blockchain = !latest_strongest_block) in
+      let rec rebroadcast_loop (blockchain : Blockchain.t) continue = 
+        let is_latest = Digest.(blockchain.state.block_hash = !latest_strongest_block.state.block_hash) in
         if is_latest
         then 
           match%bind continue () with
@@ -252,8 +257,8 @@ struct
         else return ()
       in
       let%bind () = after rebroadcast_period in
-      (* TODO: Same error *)
-      let is_latest = Blockchain.(!latest_mined_block = !latest_strongest_block) in
+      let mined_block : Blockchain.t = !latest_mined_block in
+      let is_latest = Digest.(mined_block.state.block_hash = !latest_strongest_block.state.block_hash) in
       let%bind () = 
         if is_latest
         then rebroadcast_loop 
@@ -340,7 +345,7 @@ struct
       ~strongest_chain:pipes.strongest_block_writer
       ~updates:(
         Linear_pipe.merge_unordered
-          [ peer_strongest_blocks gossip_net log
+          [ peer_strongest_blocks (Swim.first_peers swim) gossip_net log
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
               Blockchain_accumulator.Update.New_chain b)
           ]);
