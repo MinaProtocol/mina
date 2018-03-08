@@ -14,13 +14,13 @@
 ### Kubernetes related setup
 
 1. Get kubectl to work: `gcloud container clusters get-credentials testbridge-n1-standard-2 --zone us-west1-a`
-3. Check to see if any pods are "Running": `kubectl get pods`
-4. If they are all "Pending", it is possible you need to cleanup `./lib/testbridge/cleanup.sh` (goto 2)
+2. Check to see if any pods are "Running": `kubectl get pods`
+3. If they are all "Pending", it is possible you need to cleanup `./lib/testbridge/cleanup.sh` (goto 2)
    Else they are missing, you may need to resize the cluster:
    `kubectl get nodes` (you should see 2), otherwise: `gcloud container clusters resize testbridge-n1-standard-2 --size=2 --zone us-west1-a`
-5. Now you can run a testbridge: (ex) `run-in-docker lib/nanobit_testbridge/run.sh recent_sca/ ../../_build/install/default/bin/nanobit_testbridge_recent_sca 4 gcr.io/o1labs-192920/testbridge-nanobit:latest`
-6. If you see `have (x/4) pods`, just wait until it's `(4/4)`. Keep restarting whenever it times out.
-7. Finally, things may work.
+4. Now you can run a testbridge: (ex) `run-in-docker lib/nanobit_testbridge/run.sh recent_sca/ ../../_build/install/default/bin/nanobit_testbridge_recent_sca 4 gcr.io/o1labs-192920/testbridge-nanobit:latest`
+5. If you see `have (x/4) pods`, just wait until it's `(4/4)`. Keep restarting whenever it times out.
+6. Finally, things may work.
 
 ### Cleaning up
 
