@@ -135,7 +135,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
 
     let random_n_bit_field_elt n =
       Field.project (List.init n ~f:(fun _ -> Random.bool ()))
-
+    printf
     let%test_unit "compare" =
       let bit_length = Field.size_in_bits - 2 in
       let random () = random_n_bit_field_elt bit_length in
