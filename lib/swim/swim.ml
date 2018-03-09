@@ -635,7 +635,7 @@ end
 module Udp : S = Make(Udp_transport)
 module Test : S = Make(Fake_transport)
 
-let%test_module "Network tests" = (module struct
+(*let%test_module "Network tests" = (module struct
     module Swim = Test
     (*Log.current_level := Log.ord Log.Info*)
     let with_fixed_random_seed (f : 'a -> 'b) : 'b =
@@ -799,4 +799,4 @@ let%test_module "Network tests" = (module struct
       shutdown [client]
     )
 end)
-
+*)

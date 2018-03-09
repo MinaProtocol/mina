@@ -223,7 +223,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
       f 5 [true; false; true; false; true]
     ;;
 
-    let%test_unit "num_bits_upper_bound" =
+    (*let%test_unit "num_bits_upper_bound" =
       let max_length = Field.size_in_bits - 1 in
       let test x =
         let handle_with resp =
@@ -246,7 +246,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         done;
         assert (check (handle_with true_answer) ())
       in
-      test (random_n_bit_field_elt max_length)
+      test (random_n_bit_field_elt max_length)*)
     ;;
   end)
 end
