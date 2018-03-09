@@ -72,10 +72,7 @@ let strength_to_target strength =
   let target = Bignum.Bigint.((Target.to_bigint Target.max) / strength) in
   Target.of_bigint target
 
-(* homestead difficulty calculation
- * https://github.com/ethereum/EIPs/blob/master/EIPS/eip-2.md
- * block_target = parent_target + parent_target //_ceil difficulty_adjustment_rate * max(1 - (block_timestamp_ms - parent_timestamp_ms) //_floor target_time_ms, -max_difficulty_drop)
- *)
+(* d_{i+1} = max(d_i + max(\frac{d_i}{r}, 1)max(1 - \frac{t_i - t_{i-1}}{\Delta_{target}}, scale_{min}), 1) *)
 
 let target_time_ms = `Two_to_the 13 (* 8.192 seconds *);;
 let max_difficulty_drop = `Two_to_the 7 (* 128 *) ;;
