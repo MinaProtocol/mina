@@ -1,3 +1,12 @@
+# How to setup development docker
+
+1. install gcloud
+2. run `gcloud auth login`
+3. run `gcloud set project <o1labs-project-id>`
+4. run `gcloud docker -a`
+5. run `make docker`
+6. talk to Brandon to setup `make dev`
+
 # How to Testbridge
 
 ### Docker image related setup
