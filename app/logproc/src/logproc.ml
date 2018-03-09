@@ -84,9 +84,14 @@ let filter_arg = Command.Arg_type.create parse_filter_exn
 
 let main filter () =
   Pipe.iter_without_pushback (Reader.lines (Lazy.force Reader.stdin)) ~f:(fun l ->
-    let m = Sexp.of_string_conv_exn l Logger.Message.t_of_sexp in
-    if Filter.eval filter m
-    then pretty_print_message m)
+    try begin
+      (* trying with _exn on purpose, there are other things in this block that throw *)
+      let m = Sexp.of_string_conv_exn l Logger.Message.t_of_sexp in
+      if Filter.eval filter m
+      then pretty_print_message m
+    end with
+    | _ -> printf !"%s\n" l
+  )
 
 let () =
   Command.async ~summary:"Pretty print logs" begin
