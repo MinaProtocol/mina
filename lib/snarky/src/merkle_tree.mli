@@ -97,6 +97,15 @@ module Checked
 
   (* TODO: Change [prev] to be [prev_hash : Hash.var] since there may be no need
     to certify that the hash of the element is a particular value. *)
+  val modify_req
+    : depth:int
+    -> Hash.var
+    -> Address.var
+    -> f:(Elt.var -> (Elt.var, 's) Checked.t)
+    -> (Hash.var, 's) Checked.t
+
+  (* TODO: Change [prev] to be [prev_hash : Hash.var] since there may be no need
+    to certify that the hash of the element is a particular value. *)
   val update_req
     : depth:int
     -> root:Hash.var
