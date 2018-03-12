@@ -264,11 +264,11 @@ module Provider = struct
     match t with
     | Request rc ->
       let (s', r) = As_prover0.run rc tbl s in
-      (s', handler.with_ r)
+      (s', Request.Handler.run handler r)
     | Compute c -> As_prover0.run c tbl s
     | Both (rc, c) ->
       let (s', r) = As_prover0.run rc tbl s in
-      match handler.with_ r with
+      match Request.Handler.run handler r with
       | exception _ -> As_prover0.run c tbl s
       | x -> (s', x)
 end
@@ -297,7 +297,7 @@ and Checked0 : sig
         * ('s1 -> (unit, 's) As_prover0.t)
         * ('b, 's1) t
         * ('b -> ('a, 's) t) -> ('a, 's) t
-    | With_handler : Request.Handler.t * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
+    | With_handler : Request.Handler.single * ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
     | Clear_handler : ('a, 's) t * ('a -> ('b, 's) t) -> ('b, 's) t
     | Exists
       : ('var, 'value) Typ0.t
@@ -808,12 +808,11 @@ module Checked = struct
 
   type response = Request.response
   let unhandled = Request.unhandled
-  type request = Request.request
-  = With : { request :'a Request.t; respond : ('a -> response) } -> request
+  type request
+    = Request.request
+    = With : { request :'a Request.t; respond : ('a Request.Response.t -> response) } -> request
 
-  let handle t k = With_handler (Request.Handler.create k, t, return)
-
-  (* let handle t h = With_handler (h, t, return) *)
+  let handle t k = With_handler (Request.Handler.create_single k, t, return)
 
   let next_auxiliary = Next_auxiliary return
 
@@ -946,7 +945,7 @@ module Checked = struct
           let (s, ()) = As_prover.run (and_then s_sub) get_value s in
           go (k y) handler s
         | With_handler (h, t, k) ->
-          let (s', y) = go t (Request.Handler.extend handler h) s in
+          let (s', y) = go t (Request.Handler.push handler h) s in
           go (k y) handler s'
         | Clear_handler (t, k) ->
           let (s', y) = go t Request.Handler.fail s in
@@ -1002,7 +1001,7 @@ module Checked = struct
           let (s, ()) = As_prover.run (and_then s_sub) get_value s in
           go (k y) handler s
         | With_handler (h, t, k) ->
-          let (s', y) = go t (Request.Handler.extend handler h) s in
+          let (s', y) = go t (Request.Handler.push handler h) s in
           go (k y) handler s'
         | Clear_handler (t, k) ->
           let (s', y) = go t Request.Handler.fail s in
@@ -1060,7 +1059,7 @@ module Checked = struct
           let (s, ()) = As_prover.run (and_then s_sub) get_value s in
           go (k y) handler s
         | With_handler (h, t, k) ->
-          let (s', y) = go t (Request.Handler.extend handler h) s in
+          let (s', y) = go t (Request.Handler.push handler h) s in
           go (k y) handler s'
         | Clear_handler (t, k) ->
           let (s', y) = go t Request.Handler.fail s in
