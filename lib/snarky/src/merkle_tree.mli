@@ -85,8 +85,26 @@ module Checked
     val typ : depth:int -> (var, value) Typ.t
   end
 
+  module Path : sig
+    type value = Hash.value list
+    type var = Hash.var list
+    val typ : depth:int -> (var, value) Typ.t
+  end
+
+  type _ Request.t +=
+    | Get_path : Address.value -> Path.value Request.t
+    | Set : Address.value * Elt.value -> unit Request.t
+
   (* TODO: Change [prev] to be [prev_hash : Hash.var] since there may be no need
     to certify that the hash of the element is a particular value. *)
+  val update_req
+    : depth:int
+    -> root:Hash.var
+    -> prev:Elt.var
+    -> next:Elt.var
+    -> Address.var
+    -> (Hash.var, _) Checked.t
+
   val update
     : depth:int
     -> root:Hash.var
@@ -94,6 +112,5 @@ module Checked
     -> next:Elt.var
     -> Address.var
     -> (Hash.var, (Hash.value, Elt.value) merkle_tree) Checked.t
-
 end
 
