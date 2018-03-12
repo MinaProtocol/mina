@@ -1,91 +1,138 @@
 open Core;;
+module type Key_intf = sig
+  type key
+end
+
+(* SOMEDAY: handle empty wallets *)
 
 module type S =
   functor (Hash : sig 
-       val hash_account : 'account -> 'hash 
-       val hash_unit : unit -> 'hash
-       val merge : 'hash -> 'hash -> 'hash
+       type hash [@@deriving sexp]
+       type account [@@deriving sexp]
+       val hash_account : account -> hash 
+       val hash_unit : unit -> hash
+       val merge : hash -> hash -> hash
+     end)
+    (Key : sig 
+        type key [@@deriving sexp]
+        include Hashable.S with type t = key
      end) -> sig
 
-  type 'account entry = 
+  type entry = 
     { merkle_index : int
-    ; account : 'account }
+    ; account : Hash.account }
 
-  type ('key, 'account) accounts = ('key, 'account entry) Hashtbl.t
+  type key = Key.key
 
-  type 'key leafs = 'key array
+  type accounts = (key, entry) Hashtbl.t
 
-  type 'hash nodes = 'hash array list
+  type leafs = key array
 
-  type ('key, 'hash) tree = 
-    { mutable leafs : 'key leafs
-    ; mutable nodes : 'hash nodes
+  type nodes = Hash.hash array list
+
+  type tree = 
+    { mutable leafs : leafs
+    ; mutable nodes : nodes
     ; mutable dirty_indices : int list }
 
-  type ('hash, 'key, 'account) t = 
-    { accounts : ('key, 'account) accounts
-    ; tree : ('key, 'hash) tree
+  type t = 
+    { accounts : accounts
+    ; tree : tree 
     }
+  [@@deriving sexp]
 
-  type 'hash path_elem = 
-    | Left of 'hash
-    | Right of 'hash
+  type path_elem = 
+    | Left of Hash.hash
+    | Right of Hash.hash
 
-  type 'hash path = 'hash path_elem list
+  type path = path_elem list [@@deriving sexp]
+
+  val create : unit -> t
+
+  val accounts : t -> int
 
   val get
-    : ('hash, 'key, 'account) t
-    -> 'key
-    -> 'account option
+    : t
+    -> key
+    -> Hash.account option
 
   val update
-    : ('hash, 'key, 'account) t
-    -> 'key
-    -> 'account
+    : t
+    -> key
+    -> Hash.account
     -> unit
 
   val merkle_root
-    : ('hash, 'key, 'account) t
-    -> 'hash
+    : t
+    -> Hash.hash
 
   val merkle_path
-    : ('hash, 'key, 'account) t
-    -> 'key
-    -> 'hash path option
+    : t
+    -> key
+    -> path option
 end
 
 module Make 
     (Hash : sig 
-       val hash_account : 'account -> 'hash 
-       val hash_unit : unit -> 'hash
-       val merge : 'hash -> 'hash -> 'hash
+       type hash [@@deriving sexp]
+       type account [@@deriving sexp]
+       val hash_account : account -> hash 
+       val hash_unit : unit -> hash
+       val merge : hash -> hash -> hash
+     end)
+    (Key : sig 
+        type key [@@deriving sexp]
+        include Hashable.S with type t = key
      end) = struct
 
-  type 'account entry = 
+  type key = Key.key [@@deriving sexp]
+
+  type entry = 
     { merkle_index : int
-    ; account : 'account }
+    ; account : Hash.account }
+  [@@deriving sexp]
 
-  type ('key, 'account) accounts = ('key, 'account entry) Hashtbl.t
+  type accounts = (key, entry) Hashtbl.t
 
-  type 'key leafs = 'key array
+  let accounts_of_sexp accounts = failwith "nyi"
+  ;;
 
-  type 'hash nodes = 'hash array list
+  let sexp_of_accounts accounts = Sexp.of_string "()"
+  ;;
 
-  type ('key, 'hash) tree = 
-    { mutable leafs : 'key leafs
-    ; mutable nodes : 'hash nodes
+  type leafs = key array [@@deriving sexp]
+
+  type nodes = Hash.hash array list [@@deriving sexp]
+
+  type tree = 
+    { mutable leafs : leafs
+    ; mutable nodes : nodes
     ; mutable dirty_indices : int list }
+  [@@deriving sexp]
 
-  type ('hash, 'key, 'account) t = 
-    { accounts : ('key, 'account) accounts
-    ; tree : ('key, 'hash) tree 
+  type t = 
+    { accounts : accounts
+    ; tree : tree 
     }
+  [@@deriving sexp]
 
-  type 'hash path_elem = 
-    | Left of 'hash
-    | Right of 'hash
+  type path_elem = 
+    | Left of Hash.hash
+    | Right of Hash.hash
+  [@@deriving sexp]
 
-  type 'hash path = 'hash path_elem list
+  type path = path_elem list [@@deriving sexp]
+
+  let create_account_table () = Key.Table.create ()
+  ;;
+
+  let create () = { accounts = create_account_table ()
+                  ; tree = { leafs = [||]
+                           ; nodes = []
+                           ; dirty_indices = [] } }
+  ;;
+
+  let accounts t = Key.Table.length t.accounts
 
   let get t key = 
     Option.map
@@ -108,47 +155,54 @@ module Make
 
   let extend_tree tree = 
     let leafs = Array.length tree.leafs in
-    let tgt_node_sets = Int.ceil_log2 leafs in
-    let cur_node_sets = List.length tree.nodes in
-    let new_node_sets = tgt_node_sets - cur_node_sets in
-    tree.nodes <- List.concat [ tree.nodes; (List.init new_node_sets ~f:(fun _ -> [||])) ];
-    let target_lengths = 
-      List.rev
-        (List.init
-          (List.length tree.nodes)
-          ~f:(fun i -> Int.pow 2 i))
-    in
-    tree.nodes <-
-      List.map2_exn
-        tree.nodes
-        target_lengths
-        ~f:(fun nodes length -> 
-          let new_elems = length - (Array.length nodes) in
-          Array.concat [ nodes; Array.init new_elems ~f:(fun x -> Hash.hash_unit ()) ])
+    if leafs = 0 then ()
+    else begin
+      let tgt_node_sets = Int.max 1 (Int.ceil_log2 leafs) in
+      let cur_node_sets = List.length tree.nodes in
+      let new_node_sets = tgt_node_sets - cur_node_sets in
+      tree.nodes <- List.concat [ tree.nodes; (List.init new_node_sets ~f:(fun _ -> [||])) ];
+      let target_lengths = 
+        List.rev
+          (List.init
+            (List.length tree.nodes)
+            ~f:(fun i -> Int.pow 2 i))
+      in
+      tree.nodes <-
+        List.map2_exn
+          tree.nodes
+          target_lengths
+          ~f:(fun nodes length -> 
+            let new_elems = length - (Array.length nodes) in
+            Array.concat [ nodes; Array.init new_elems ~f:(fun x -> Hash.hash_unit ()) ])
+    end
+  ;;
 
   let rec recompute_layer prev_layer_hashes layers dirty_indices =
     let updates = List.zip_exn prev_layer_hashes dirty_indices in
-    let head = List.nth_exn layers 0 in
-    let tail = List.drop layers 1 in
-    List.iter
-      updates
-      ~f:(fun ((left, right), idx) -> Array.set head idx (Hash.merge left right));
-    let next_layer_dirty_indices = 
-      Int.Set.to_list (Int.Set.of_list (List.map dirty_indices ~f:(fun x -> x / 2)))
-    in
-    let get_head_hash i = 
-      if i < Array.length head
-      then Array.get head i
-      else Hash.hash_unit ()
-    in
-    let next_layer_prev_layer_hashes = 
-      List.zip_exn
-        (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i)))
-        (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i + 1)))
-    in
-    if List.length tail > 0
-    then recompute_layer next_layer_prev_layer_hashes tail next_layer_dirty_indices
-    else ()
+    if List.length layers = 0 then ()
+    else 
+      let head = List.nth_exn layers 0 in
+      let tail = List.drop layers 1 in
+      List.iter
+        updates
+        ~f:(fun ((left, right), idx) -> Array.set head idx (Hash.merge left right));
+      let next_layer_dirty_indices = 
+        Int.Set.to_list (Int.Set.of_list (List.map dirty_indices ~f:(fun x -> x / 2)))
+      in
+      let get_head_hash i = 
+        if i < Array.length head
+        then Array.get head i
+        else Hash.hash_unit ()
+      in
+      let next_layer_prev_layer_hashes = 
+        List.zip_exn
+          (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i)))
+          (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i + 1)))
+      in
+      if List.length tail > 0
+      then recompute_layer next_layer_prev_layer_hashes tail next_layer_dirty_indices
+      else ()
+  ;;
 
   let recompute_tree t =
     extend_tree t.tree;
@@ -157,7 +211,7 @@ module Make
     in
     let get_leaf_hash i = 
       if i < Array.length t.tree.leafs
-      then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs i))
+      then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs i)).account
       else Hash.hash_unit ()
     in
     let prev_layer_hashes =
@@ -188,17 +242,36 @@ module Make
              ((List.length t.tree.nodes) + 1)
              ~f:(fun i -> merkle_index/(Int.pow 2 i))
          in
+         let parent_indices = List.drop indices 1 in
+         let drop_last ls = List.take ls (List.length ls - 1) in
          let directions = 
            List.map 
-             (List.take indices ((List.length indices) - 1))
+             (drop_last indices)
              ~f:(fun i -> if i % 2 = 0 then `Left else `Right)
          in
-         let hashes = 
+         let tail_hashes = 
            List.map2_exn
-             (List.drop indices 1)
-             t.tree.nodes
-             ~f:(fun i nodes -> Array.get nodes i)
+             (drop_last parent_indices)
+             (drop_last t.tree.nodes)
+             ~f:(fun i nodes -> 
+               let idx = 
+                 if i % 2 = 0
+                 then i + 1
+                 else i - 1
+               in
+               Array.get nodes idx)
          in
+         let leaf_hash_idx = 
+           if merkle_index % 2 = 0
+           then merkle_index + 1
+           else merkle_index - 1
+         in
+         let leaf_hash = 
+           if leaf_hash_idx < Array.length t.tree.leafs
+           then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs leaf_hash_idx)).account
+           else (Hash.hash_unit ())
+         in
+         let hashes = leaf_hash::tail_hashes in
          List.map2_exn 
            directions
            hashes
@@ -208,8 +281,4 @@ module Make
              | `Right -> Right hash)
       )
   ;;
-
 end
-
-let%test "trivial" = false
-;;

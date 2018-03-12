@@ -1,57 +1,74 @@
 open Core
 
+module type Key_intf = sig
+  type key
+end
+
 module type S =
   functor (Hash : sig 
-       val hash_account : 'account -> 'hash 
-       val hash_unit : unit -> 'hash
-       val merge : 'hash -> 'hash -> 'hash
+       type hash [@@deriving sexp]
+       type account [@@deriving sexp]
+       val hash_account : account -> hash 
+       val hash_unit : unit -> hash
+       val merge : hash -> hash -> hash
+     end)
+    (Key : sig 
+        type key [@@deriving sexp]
+        include Hashable.S with type t = key
      end) -> sig
 
-  type 'account entry = 
+  type entry = 
     { merkle_index : int
-    ; account : 'account }
+    ; account : Hash.account }
 
-  type ('key, 'account) accounts = ('key, 'account entry) Hashtbl.t
+  type key = Key.key
 
-  type 'key leafs = 'key array
+  type accounts = (key, entry) Hashtbl.t
 
-  type 'hash nodes = 'hash array list
+  type leafs = key array
 
-  type ('key, 'hash) tree = 
-    { mutable leafs : 'key leafs
-    ; mutable nodes : 'hash nodes
+  type nodes = Hash.hash array list
+
+  type tree = 
+    { mutable leafs : leafs
+    ; mutable nodes : nodes
     ; mutable dirty_indices : int list }
 
-  type ('hash, 'key, 'account) t = 
-    { accounts : ('key, 'account) accounts
-    ; tree : ('key, 'hash) tree 
-    }
+  type t = 
+    { accounts : accounts
+    ; tree : tree 
+    } 
+  [@@deriving sexp]
 
-  type 'hash path_elem = 
-    | Left of 'hash
-    | Right of 'hash
+  type path_elem = 
+    | Left of Hash.hash
+    | Right of Hash.hash
 
-  type 'hash path = 'hash path_elem list
+  type path = path_elem list [@@deriving sexp]
+
+  val create : unit -> t
+
+  val accounts : t -> int
 
   val get
-    : ('hash, 'key, 'account) t
-    -> 'key
-    -> 'account option
+    : t
+    -> key
+    -> Hash.account option
 
   val update
-    : ('hash, 'key, 'account) t
-    -> 'key
-    -> 'account
+    : t
+    -> key
+    -> Hash.account
     -> unit
 
   val merkle_root
-    : ('hash, 'key, 'account) t
-    -> 'hash
+    : t
+    -> Hash.hash
 
   val merkle_path
-    : ('hash, 'key, 'account) t
-    -> 'key
-    -> 'hash path option
+    : t
+    -> key
+    -> path option
 end
 
 module Make : S
