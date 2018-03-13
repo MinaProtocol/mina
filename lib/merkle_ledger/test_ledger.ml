@@ -6,7 +6,10 @@ module Hash = struct
   type hash = Md5.t [@@deriving sexp]
   type account = int [@@deriving sexp]
 
-  let hash_account account = Md5.digest_string (Sexp.to_string ([%sexp_of: account] account))
+  (* to prevent pre-image attack,
+   * important impossible to create an account such that (merge a b = hash_account account) *)
+
+  let hash_account account = Md5.digest_string ("0" ^ (Sexp.to_string ([%sexp_of: account] account)))
   ;;
 
   let hash_unit () = Md5.digest_string ""
