@@ -95,6 +95,8 @@ module Checked
     | Get_path : Address.value -> Path.value Request.t
     | Set : Address.value * Elt.value -> unit Request.t
 
+  val implied_root : Hash.var -> Address.var -> Path.var -> (Hash.var, _) Checked.t
+
   (* TODO: Change [prev] to be [prev_hash : Hash.var] since there may be no need
     to certify that the hash of the element is a particular value. *)
   val modify_req
