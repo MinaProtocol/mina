@@ -364,7 +364,7 @@ module type Basic = sig
   val unhandled : response
   type request
     = Request.request
-    = With : { request :'a Request.t; respond : ('a -> response) } -> request
+    = With : { request :'a Request.t; respond : ('a Request.Response.t -> response) } -> request
 
   module Handler : sig
     type t = request -> response

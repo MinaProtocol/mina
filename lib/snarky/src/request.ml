@@ -2,7 +2,7 @@ type _ t = ..
 
 type _ t += Fail : 'a t
 
-type 'a r = 'a t
+type 'a req = 'a t
 
 type response = ..
 
@@ -10,31 +10,48 @@ type response += Unhandled
 
 let unhandled = Unhandled
 
+module Response = struct
+  type 'a t =
+    | Provide of 'a
+    | Reraise of 'a req
+    | Unhandled
+end
+
 type request =
-  | With : { request :'a t; respond : ('a -> response) } -> request
+  | With : { request : 'a t; respond : ('a Response.t -> response) } -> request
 
 module Handler = struct
-  type nonrec t = { with_ : 'a. 'a t -> 'a }
+  type single =
+    { handle : 'a. 'a t -> 'a Response.t }
 
-  let create (handler : request -> response) =
-    let f : type a. a r -> a =
+  type t = single list
+
+  let fail = []
+
+  let run : t -> 'a req -> 'a =
+    fun stack0 req0 ->
+      let rec go req = function
+        | [] -> failwith "Unhandled request"
+        | { handle } :: hs ->
+          match handle req with
+          | Provide x -> x
+          | Reraise req' -> go req' hs
+          | Unhandled -> go req hs
+      in
+      go req0 stack0
+
+  let create_single (handler : request -> response) : single =
+    let handle : type a. a req -> a Response.t =
       fun request ->
         let module T = struct
-          type response += T of a
+          type response += T of a Response.t
         end
         in
-        match handler (With { request; respond = fun x -> T.T x}) with
+        match handler (With { request; respond = fun x -> T.T x }) with
         | T.T x -> x
-        | _ -> failwith "Unhandled request"
+        | _ -> Response.Unhandled
     in
-    { with_ = f }
+    { handle }
 
-  let fail = { with_ = fun _ -> failwith "Request.Handler.fail" }
-
-  let extend t1 t2 =
-    { with_ =
-        fun r ->
-          try t1.with_ r
-          with _ -> t2.with_ r
-    }
+  let push (t : t) (single : single) : t = single :: t
 end

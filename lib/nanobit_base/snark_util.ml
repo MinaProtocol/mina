@@ -191,7 +191,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         let handle_with (resp : bool list) = 
           handle t (fun (With {request; respond}) ->
             match request with
-            | N_ones -> respond resp
+            | N_ones -> respond (Provide resp)
             | _ -> unhandled)
         in
         let correct = Int.pow 2 n - 1 in
