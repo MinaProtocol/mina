@@ -393,6 +393,16 @@ module Typ = struct
     Checked1.With_state (do_nothing, (fun () -> do_nothing), check v, Checked1.return)
   ;;
 
+  let unit : (unit, unit) t =
+    let s = Store.return () in
+    let r = Read.return () in
+    let c = Checked1.return () in
+    { store = (fun () -> s)
+    ; read = (fun () -> r)
+    ; check = (fun () -> c)
+    ; alloc = Alloc.return ()
+    }
+
   let field : (Cvar.t, Field.t) t =
     { store = Store.store
     ; read = Read.read
@@ -777,6 +787,8 @@ module Checked = struct
         (r : ('value Request.t, 's) As_prover.t)
     =
     Exists (typ, Request r, fun h -> return (Handle.var h))
+
+  let perform req = request_witness Typ.unit req
 
   let request ?such_that typ r =
     match such_that with
