@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(executable
+  ((name distributed_dsl_test)
+   (package distributed_dsl)
+   (public_name distributed_dsl_test)
+   (libraries (distributed_dsl ppx_inline_test.runner.lib))
+  ))
+
+(alias
+  ((name runtest)
+   (deps (distributed_dsl_test.exe))
+   (action (run ${<} inline-test-runner distributed_dsl))))
+
