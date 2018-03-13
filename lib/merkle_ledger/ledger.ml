@@ -92,13 +92,7 @@ module Make
     ; account : Hash.account }
   [@@deriving sexp]
 
-  type accounts = (key, entry) Hashtbl.t
-
-  let accounts_of_sexp accounts = failwith "nyi"
-  ;;
-
-  let sexp_of_accounts accounts = Sexp.of_string "()"
-  ;;
+  type accounts = entry Key.Table.t [@@deriving sexp]
 
   type leafs = key array [@@deriving sexp]
 
