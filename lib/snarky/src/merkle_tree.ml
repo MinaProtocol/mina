@@ -404,7 +404,6 @@ module Checked
 
     let typ ~depth : (var, value) Typ.t =
       Typ.list ~length:depth Boolean.typ
-    ;;
   end
 
   module Path = struct
@@ -428,6 +427,64 @@ module Checked
       | _, _ -> failwith "Merkle_tree.Checked.implied_root: address, path length mismatch"
     in
     go entry_hash addr0 path0
+  ;;
+
+  type _ Request.t +=
+    | Get_element : Address.value -> (Elt.value * Path.value) Request.t
+    | Get_path : Address.value -> Path.value Request.t
+    | Set : Address.value * Elt.value -> unit Request.t
+
+  (* addr0 should have least significant bit first *)
+  let modify_req ~(depth : int) root addr0 ~f
+      : (Hash.var, 's) Checked.t
+    =
+    let open Let_syntax in
+    with_label "Merkle_tree.Checked.update_req" begin
+      let%bind (prev, prev_path) =
+        request_witness Typ.(Elt.typ * Path.typ ~depth)
+          As_prover.(map (read (Address.typ ~depth) addr0) ~f:(fun a -> Get_element a))
+      in
+      let%bind () =
+        let%bind prev_entry_hash = Elt.hash prev in
+        implied_root prev_entry_hash addr0 prev_path >>= Hash.assert_equal root
+      in
+      let%bind next = f prev in
+      let%bind next_entry_hash = Elt.hash next in
+      let%bind () =
+        perform As_prover.(Let_syntax.(
+          let%map addr = read (Address.typ ~depth) addr0
+          and next = read Elt.typ next
+          in
+          Set (addr, next)))
+      in
+      implied_root next_entry_hash addr0 prev_path
+    end
+  ;;
+
+  (* addr0 should have least significant bit first *)
+  let update_req ~(depth : int) ~root ~prev ~next addr0
+      : (Hash.var, _) Checked.t
+    =
+    let open Let_syntax in
+    with_label "Merkle_tree.Checked.update_req" begin
+      let%bind prev_entry_hash = Elt.hash prev
+      and next_entry_hash = Elt.hash next
+      and prev_path =
+        request_witness (Path.typ ~depth)
+          As_prover.(map (read (Address.typ ~depth) addr0) ~f:(fun a -> Get_path a))
+      in
+      let%bind () =
+        implied_root prev_entry_hash addr0 prev_path >>= Hash.assert_equal root
+      in
+      let%bind () =
+        perform As_prover.(Let_syntax.(
+          let%map addr = read (Address.typ ~depth) addr0
+          and next = read Elt.typ next
+          in
+          Set (addr, next)))
+      in
+      implied_root next_entry_hash addr0 prev_path
+    end
   ;;
 
   (* addr0 should have least significant bit first *)

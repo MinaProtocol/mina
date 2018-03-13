@@ -57,8 +57,9 @@ module Edwards = struct
   module type Params_intf = sig
     type field
     val d : field
-    val cofactor : int
+    val cofactor : Bignum.Bigint.t
     val generator : field * field
+    val order : Bignum.Bigint.t
   end
 
   module Basic = struct
@@ -180,7 +181,7 @@ module Edwards = struct
          and type field := Impl.Field.t
          and type var = Impl.Cvar.t * Impl.Cvar.t
          and type value = Impl.Field.t * Impl.Field.t
-         and type Scalar.value = Scalar.value
+         and module Scalar = Scalar
   =
   struct
     open Impl
