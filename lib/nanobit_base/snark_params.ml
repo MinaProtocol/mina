@@ -78,10 +78,25 @@ module Tick = struct
         (* Someday: Make more efficient *)
         open Impl
         type var = Boolean.var list
-        type value = bool list
+        type value = Bignum.Bigint.t
+
+        let pack bs =
+          let pack_char bs =
+            Char.of_int_exn
+              (List.foldi bs ~init:0
+                  ~f:(fun i acc b -> if b then acc lor (1 lsl i) else acc))
+          in
+          String.of_char_list (List.map ~f:pack_char (List.chunks_of ~length:8 bs))
+          |> Z.of_bits
+          |> Bignum.Bigint.of_zarith_bigint
 
         let length = bit_length
-        let typ : (var, value) Typ.t = Typ.list ~length Boolean.typ
+        let typ : (var, value) Typ.t =
+          Typ.(
+            transport (list ~length Boolean.typ)
+              ~there:(fun n -> List.init length ~f:(Z.testbit (Bignum.Bigint.to_zarith_bigint n)))
+              ~back:pack)
+
         let assert_equal = Checked.Assert.equal_bitstrings
       end
     end
@@ -133,6 +148,17 @@ module Tick = struct
     >>| Pedersen_hash.digest
 
   module Util = Snark_util.Make(Tick0)
+
+  module Signature = Snarky.Signature.Schnorr(Tick0)(Hash_curve)(struct
+      let hash_checked bs =
+        let open Checked in
+        hash_digest bs >>= choose_preimage ~length:Scalar.length
+
+      let hash bs =
+        let s = Pedersen.(State.create params) in
+        let s = Pedersen.State.update_fold s (List.fold bs) in
+        Scalar.pack (Field.unpack (Pedersen.State.digest s))
+    end)
 end
 
 (* Let n = Tick.Field.size_in_bits.
