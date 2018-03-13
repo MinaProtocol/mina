@@ -97,6 +97,7 @@ module type Basic = sig
     val alloc : ('var, 'value) t -> 'var Alloc.t
     val check : ('var, 'value) t -> 'var -> (unit, _) Checked.t
 
+    val unit : (unit, unit) t
     val field  : (Cvar.t, field) t
     val tuple2 : ('var1, 'value1) t -> ('var2, 'value2) t -> ('var1 * 'var2, 'value1 * 'value2) t
     val tuple3
@@ -341,6 +342,8 @@ module type Basic = sig
     : ('var, 'value) Typ.t
     -> ('value Request.t, 's) As_prover.t
     -> ('var, 's) Checked.t
+
+  val perform : (unit Request.t, 's) As_prover.t -> (unit, 's) Checked.t
 
   (* TODO: Come up with a better name for this in relation to the above *)
   val request
