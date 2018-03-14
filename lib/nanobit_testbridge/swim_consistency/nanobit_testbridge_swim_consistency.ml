@@ -25,20 +25,20 @@ let check_alive_nanobits alive_nanobits =
     Deferred.List.map ~how:`Parallel alive_nanobits ~f:(fun nanobit -> 
       let%map peers = Nanobit_testbridge.get_peers nanobit in
       printf "\t%s %s\n" 
-        (Sexp.to_string_hum ([%sexp_of: Host_and_port.t] nanobit.Nanobit_testbridge.Nanobit.swim_addr))
+        (Sexp.to_string_hum ([%sexp_of: Host_and_port.t] nanobit.Nanobit_testbridge.Nanobit.membership_addr))
         (Sexp.to_string_hum ([%sexp_of: Host_and_port.t list option] peers));
       peers
     )
   in
   let peers = 
     List.map2_exn alive_nanobits peers 
-      ~f:(fun alive_peer peers -> alive_peer.Nanobit_testbridge.Nanobit.swim_addr::(Option.value_exn peers))
+      ~f:(fun alive_peer peers -> alive_peer.Nanobit_testbridge.Nanobit.membership_addr::(Option.value_exn peers))
   in
   List.for_all
     peers
     ~f:(fun peers -> 
       lists_same 
-        (List.map alive_nanobits ~f:(fun nanobit -> nanobit.Nanobit_testbridge.Nanobit.swim_addr))
+        (List.map alive_nanobits ~f:(fun nanobit -> nanobit.Nanobit_testbridge.Nanobit.membership_addr))
         peers
     )
 ;;
@@ -98,7 +98,7 @@ let main nanobits =
 
   let%bind () = check (List.map alive_nanobits ~f:(fun na -> na.nanobit)) in
 
-  let%bind _ = 
+  let%bind (alive_nanobits, dead_nanobits) = 
     Deferred.List.fold
       ~init:(alive_nanobits, dead_nanobits)
       (pattern (List.length nanobits)) ~f:(fun (alive_nanobits, dead_nanobits) cmd ->
@@ -116,7 +116,10 @@ let main nanobits =
       )
   in
 
-  printf "done\n";
+  printf "done, killing now\n";
+  let%bind _ = kill_nanobits (List.length alive_nanobits) alive_nanobits dead_nanobits in
+  printf "done killing\n";
+
   Async.never ()
 ;;
 
