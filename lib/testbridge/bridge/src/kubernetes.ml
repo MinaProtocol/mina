@@ -26,6 +26,16 @@ module Pod = struct
   [@@deriving sexp]
 end
 
+module Endpoint_port = struct
+  type protocol = [ `TCP | `UDP ]
+  [@@deriving sexp]
+
+  type t =
+    { port : int
+    ; protocol : protocol
+    }
+end
+
 module Service = struct
 
   type protocol = [ `TCP | `UDP ]
@@ -163,8 +173,8 @@ let wait_for_pods pods_needed =
   go ()
 ;;
 
-let get_services pods =
-  let%map stdout = Process.run_exn ~prog:"kubectl" ~args:[ "get"; "services"; "-o"; "json" ] () in
+let get_endpoints pods =
+  let%map stdout = Process.run_exn ~prog:"kubectl" ~args:[ "get"; "endpoints"; "-o"; "json" ] () in
   let json = Yojson.Basic.from_string stdout in
   let open Yojson.Basic.Util in
   let items = json |> member "items" |> to_list in
@@ -174,15 +184,14 @@ let get_services pods =
         let name = item |> member "metadata" |> member "name" |> to_string in
         name = pod.Pod.container_name))
   in
-  let pod_specs = 
-    List.map pod_items ~f:(fun item -> item |> member "spec")
+  let pod_subsets = 
+    List.bind pod_items ~f:(fun item -> item |> member "subsets" |> to_list)
   in
-  List.map pod_specs ~f:(fun spec -> 
-    let services = 
+  List.map pod_subsets ~f:(fun spec -> 
+    let endpoint_ports = 
       List.map 
         (spec |> member "ports" |> to_list)
         ~f:(fun port_spec -> 
-          let node_port = port_spec |> member "nodePort" |> to_int in
           let port = port_spec |> member "port" |> to_int in
           let protocol = 
             (port_spec |> member "protocol" |> to_string)
@@ -191,13 +200,16 @@ let get_services pods =
             | "UDP" -> `UDP
             | s -> failwith ("Unknown protocol " ^ s)
           in
-          { Service.node_port; port; protocol })
+          { Endpoint_port.port; protocol })
     in
-    let ip = spec |> member "clusterIP" |> to_string in
-    (services, ip))
+    let ip =
+      let addrs = spec |> member "addresses" |> to_list in
+      (List.hd_exn addrs) |> member "ip" |> to_string
+    in
+    (endpoint_ports, ip))
 
 let get_internal_ports pods ports =
-  let%map pod_services = get_services pods in
+  let%map pod_services = get_endpoints pods in
   let pod_internal_ports =
     List.map pod_services ~f:(fun (services, ip) -> 
       List.map ports ~f:(fun port -> 

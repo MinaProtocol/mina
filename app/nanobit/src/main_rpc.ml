@@ -1,6 +1,6 @@
 open Core
 open Async
-open Swimlib
+open Kademlia
 open Nanobit_base
 
 module Rpcs = struct
@@ -63,9 +63,8 @@ let main () =
   in
 
   printf "name: %s\n" name;
-  Swimlib.Log.current_level := Log.ord Swimlib.Log.Debug;
 
-  let swim_ref = ref None in
+  let membership_ref = ref None in
   let strongest_block_reader, strongest_block_writer = Linear_pipe.create () in
 
   let init_pipes () : (Main.pipes * Blockchain.t Linear_pipe.Reader.t) =
@@ -100,7 +99,7 @@ let main () =
           Deferred.unit
         );
     end;
-    let%map swim = 
+    let%map membership = 
       let%bind prover =
         if start_prover
         then Prover.create ~port:prover_port ~debug:()
@@ -120,11 +119,11 @@ let main () =
         (fun addr -> Host_and_port.create ~port:(Host_and_port.port addr + 1) ~host:(Host_and_port.host addr))
         pipes
     in
-    swim_ref := Some swim
+    membership_ref := Some membership
   in
 
   let get_peers _ () = 
-    return (Option.map !swim_ref ~f:(fun swim -> Main.Swim.peers swim))
+    return (Option.map !membership_ref ~f:(fun membership -> Membership.Haskell.peers membership))
   in
 
   let get_strongest_blocks _ () = 

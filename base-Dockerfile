@@ -1,5 +1,13 @@
 FROM gcr.io/o1labs-192920/ocaml405:latest
 
+# Install nix for our haskell deps
+RUN sudo mkdir -p /nix
+RUN sudo chown opam /nix
+RUN sudo mkdir -p /etc/nix
+RUN sudo bash  -c 'echo "build-users-group =" > /etc/nix/nix.conf'
+ENV USER opam
+RUN cd /home/opam && curl https://nixos.org/nix/install | sh
+
 RUN sudo apt-get install --yes cmake
 RUN sudo apt-get install --yes libssl-dev
 RUN sudo apt-get install --yes libffi-dev
@@ -19,4 +27,8 @@ RUN opam install jbuilder
 RUN opam install yojson menhir
 RUN opam install async_ssl cohttp cohttp-async
 RUN opam install bignum
+
+ADD ./app/kademlia-haskell/prefetch /prefetch
+RUN sudo chown -R opam /prefetch
+RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix
 

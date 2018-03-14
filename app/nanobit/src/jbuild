@@ -6,7 +6,7 @@
    (libraries
     ( core
       linear_pipe
-      swimlib
+      kademlia
       nanobit_base
       snarky
       logger

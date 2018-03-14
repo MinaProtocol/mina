@@ -7,6 +7,27 @@
 5. run `make docker`
 6. talk to Brandon to setup `make dev`
 
+# How to make dev
+
+1. Run this in your shell. REMEMBER to change the directory of the repo to your directory
+
+```bash
+export PATH=~/coins/nanobit/hackbin:$PATH
+```
+
+2. Put this in your vimrc. REMEMBER to change the HOME directory to your directory
+
+```bash
+let s:ocamlmerlin="/Users/bkase/.opam/4.06.0/share/merlin"
+execute "set rtp+=".s:ocamlmerlin."/vim"
+execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
+let g:syntastic_ocaml_checkers=['merlin']
+```
+
+3. In your home directory `opam init`
+4. In this shell, `eval \`opam config env\``
+5. Now `opam install merlin`
+
 # How to Testbridge
 
 ### Docker image related setup

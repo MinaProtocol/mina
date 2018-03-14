@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:f1db9a46932c092deee291da8f91dbd4430398f7
+      - image: gcr.io/o1labs-192920/ocaml-base:fb2f55f93caa1e48023908b8ae830f723637baef
         # ENV variable is located in circleci
         auth:
           username: _json_key
@@ -11,9 +11,12 @@ jobs:
       - checkout
 
       # - setup_remote_docker
+      - run:
+          name: Build Haskell
+          command: source ~/.profile && cd app/kademlia-haskell && nix-build release2.nix
 
       - run:
-          name: Build All
+          name: Build OCaml
           command: eval `opam config env` && jbuilder build
 
       - run:
