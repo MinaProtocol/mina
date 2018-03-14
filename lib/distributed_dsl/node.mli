@@ -15,16 +15,35 @@ module type S = sig
   type state
   module Condition_label : Hashable.S
 
-  type condition = 
-    | Interval of Time.Span.t
-    | Timeout of Time.Span.t
-    | Message of (message -> bool)
-    | Predicate of (state -> bool)
+  module Condition : sig
+    type t
+    type timer_tok
+
+    type condition
+
+    val timeout : Time.Span.t -> t
+    val msg : (state -> message -> bool) -> t
+    val predicate : (state -> bool) -> t
+
+    (* or *)
+    val ( + ) : t -> t -> t
+    (* additive identity *)
+    val never : t
+
+    (* and *)
+    val ( * ) : t -> t -> t
+    (* multiplicative identity *)
+    val always : t
+
+    val check : t -> state -> message -> timer_tok list -> bool
+
+    val wait_timers : t -> timer_tok Deferred.t
+  end
 
   type t = 
     { state : state
     ; last_state : state
-    ; conditions : (condition * transition) Condition_label.Table.t
+    ; conditions : (Condition.t * transition) Condition_label.Table.t
     ; message_pipe : message Linear_pipe.Reader.t
     ; work : transition Linear_pipe.Reader.t
     }
@@ -32,12 +51,12 @@ module type S = sig
   and override_transition = t -> original:transition -> state -> state
 
   type command =
-    | On of Condition_label.t * condition * transition
+    | On of Condition_label.t * Condition.t * transition
     | Override of Condition_label.t * transition
 
   val on
     : Condition_label.t
-    -> condition
+    -> Condition.t
     -> f:transition
     -> command
 
