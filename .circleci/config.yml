@@ -2,24 +2,20 @@ version: 2
 jobs:
   build:
     docker:
-      - image: o1labs/ci-base:latest
+      - image: gcr.io/o1labs-192920/ocaml-base:f1db9a46932c092deee291da8f91dbd4430398f7
+        # ENV variable is located in circleci
+        auth:
+          username: _json_key
+          password: $JSON_GCLOUD_CREDENTIALS
     steps:
       - checkout
 
-      - setup_remote_docker
-
-      - run: echo $GCLOUD_SERVICE_KEY | base64 --decode --ignore-garbage > ${HOME}/gcloud-service-key.json
-
-      - run: /root/google-cloud-sdk/bin/gcloud --quiet components update
-      - run: /root/google-cloud-sdk/bin/gcloud auth activate-service-account --key-file=${HOME}/gcloud-service-key.json
-      - run: /root/google-cloud-sdk/bin/gcloud config set project o1labs-192920
-
-      - run: /root/google-cloud-sdk/bin/gcloud docker -- pull gcr.io/o1labs-192920/ocaml-base:f1db9a46932c092deee291da8f91dbd4430398f7
+      # - setup_remote_docker
 
       - run:
-          name: Nanobit docker
-          command: make nanobit-docker
+          name: Build All
+          command: eval `opam config env` && jbuilder build
 
       - run:
-          name: Testbridge docker
-          command: make testbridge-docker
+          name: Run All Tests
+          command: eval `opam config env` && jbuilder runtest --verbose

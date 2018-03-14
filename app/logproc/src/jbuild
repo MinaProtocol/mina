@@ -13,8 +13,3 @@
   ((modules (filter_parser))))
 (ocamllex (filter_lexer))
 
-(alias
-  ((name runtest)
-   (deps (logproc.exe))
-   (action (run ${<} inline-test-runner logproc))))
-

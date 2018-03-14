@@ -4,7 +4,7 @@ open Async_kernel
 
 let%test "trivial" = true
 
-let%test "paxos" = 
+(*let%test "paxos" = 
   let r, w = Linear_pipe.create () in
   let open Test_node in
   let _node = 
@@ -25,4 +25,4 @@ let%test "paxos" =
           ~f:(fun t s -> s)
       ]
   in
-  true
+  true*)
