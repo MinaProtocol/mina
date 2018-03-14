@@ -18,22 +18,23 @@ module type S = sig
   type condition = 
     | Interval of Time.Span.t
     | Timeout of Time.Span.t
-    | Message of (message -> bool)
+    | Message of (state -> message -> bool)
     | Predicate of (state -> bool)
 
   type t = 
     { state : state
-    ; last_state : state
+    ; last_state : state option
     ; conditions : (condition * transition) Condition_label.Table.t
     ; message_pipe : message Linear_pipe.Reader.t
-    ; work : transition Linear_pipe.Reader.t
+    ; work_reader : transition Linear_pipe.Reader.t
+    ; work_writer : transition Linear_pipe.Writer.t
     }
-  and transition = t -> state -> state
-  and override_transition = t -> original:transition -> state -> state
+  and transition = t -> state -> state Deferred.t
+  and override_transition = t -> original:transition -> state -> state Deferred.t
 
   type command =
     | On of Condition_label.t * condition * transition
-    | Override of Condition_label.t * transition
+    | Override of Condition_label.t * override_transition
 
   val on
     : Condition_label.t

@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
 
-
 let%test "trivial" = true
 
 (*let%test "paxos" = 
@@ -14,15 +13,15 @@ let%test "trivial" = true
       [ on 
           Condition_label.Todo
           (Predicate (fun s -> true))
-          ~f:(fun t s -> s)
+          ~f:(fun t s -> return s)
       ; on 
           Condition_label.Todo
           (Interval (Time.Span.of_sec 4.0))
-          ~f:(fun t s -> s)
+          ~f:(fun t s -> return s)
       ; on 
           Condition_label.Todo
-          (Message (fun m -> true))
-          ~f:(fun t s -> s)
+          (Message (fun s m -> true))
+          ~f:(fun t s -> return s)
       ]
   in
   true*)
