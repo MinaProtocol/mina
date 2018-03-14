@@ -21,6 +21,7 @@ module Pod = struct
     ; pod_name : string
     ; status : status
     ; hostname : string
+    ; node_selector : string
     }
   [@@deriving sexp]
 end
@@ -105,9 +106,10 @@ let get_pods () =
       in
       let container_name = container |> member "name" |> to_string in
       let pod_name = item |> member "metadata" |> member "name" |> to_string in
+      let node_selector = item |> member "spec" |> member "nodeSelector" |> member "kubernetes.io/hostname" |> to_string in
       match item |> member "spec" |> member "nodeName" |> to_string_option with
-      | None -> { Pod.container_name; Pod.pod_name; status = phase; hostname = "" }
-      | Some hostname -> { Pod.container_name; Pod.pod_name; status = phase; hostname }
+      | None -> { Pod.container_name; Pod.pod_name; status = phase; hostname = ""; node_selector }
+      | Some hostname -> { Pod.container_name; Pod.pod_name; status = phase; hostname; node_selector }
       )
   in
   pods
