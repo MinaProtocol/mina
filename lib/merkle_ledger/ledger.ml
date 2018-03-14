@@ -1,7 +1,4 @@
 open Core;;
-module type Key_intf = sig
-  type key
-end
 
 (* SOMEDAY: handle empty wallets *)
 
@@ -49,7 +46,7 @@ module type S =
 
   val create : unit -> t
 
-  val accounts : t -> int
+  val length : t -> int
 
   val get
     : t
@@ -89,7 +86,8 @@ module Make
 
   type entry = 
     { merkle_index : int
-    ; account : Hash.account }
+    ; account : Hash.account 
+    }
   [@@deriving sexp]
 
   type accounts = entry Key.Table.t [@@deriving sexp]
@@ -120,40 +118,41 @@ module Make
   let create_account_table () = Key.Table.create ()
   ;;
 
-  let create () = { accounts = create_account_table ()
-                  ; tree = { leafs = [||]
-                           ; nodes = []
-                           ; dirty_indices = [] } }
+  let create () = 
+    { accounts = create_account_table ()
+    ; tree = { leafs = [||]
+             ; nodes = []
+             ; dirty_indices = [] 
+             } 
+    }
   ;;
 
-  let accounts t = Key.Table.length t.accounts
+  let length t = Key.Table.length t.accounts
 
   let get t key = 
     Option.map
       (Hashtbl.find t.accounts key)
-      (fun entry -> entry.account)
+      ~f:(fun entry -> entry.account)
   ;;
 
   let update t key account = 
     match Hashtbl.find t.accounts key with
     | None -> 
-      let _hash = Hash.hash_account account in
       let merkle_index = Array.length t.tree.leafs in
-      Hashtbl.set t.accounts ~key ~data:{ merkle_index = merkle_index; account };
+      Hashtbl.set t.accounts ~key ~data:{ merkle_index; account };
       t.tree.leafs <- Array.append t.tree.leafs [| key |];
-      t.tree.dirty_indices <- List.append t.tree.dirty_indices [ merkle_index ];
+      t.tree.dirty_indices <-  merkle_index::t.tree.dirty_indices;
     | Some entry -> 
       Hashtbl.set t.accounts ~key ~data:{ merkle_index = entry.merkle_index; account };
-      t.tree.dirty_indices <- List.append t.tree.dirty_indices [ entry.merkle_index ];
+      t.tree.dirty_indices <- entry.merkle_index::t.tree.dirty_indices;
   ;;
 
   let extend_tree tree = 
     let leafs = Array.length tree.leafs in
-    if leafs = 0 then ()
-    else begin
-      let tgt_node_sets = Int.max 1 (Int.ceil_log2 leafs) in
+    if leafs <> 0 then begin
+      let target_node_sets = Int.max 1 (Int.ceil_log2 leafs) in
       let cur_node_sets = List.length tree.nodes in
-      let new_node_sets = tgt_node_sets - cur_node_sets in
+      let new_node_sets = target_node_sets - cur_node_sets in
       tree.nodes <- List.concat [ tree.nodes; (List.init new_node_sets ~f:(fun _ -> [||])) ];
       let target_lengths = 
         List.rev

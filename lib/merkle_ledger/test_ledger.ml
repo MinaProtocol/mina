@@ -1,5 +1,5 @@
-open Core;;
-open Ledger;;
+open Core
+open Ledger
 
 module Hash = struct
 

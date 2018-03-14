@@ -1,4 +1,4 @@
-open Core;;
+open Core
 
 let load_ledger n b = 
   let ledger = Test_ledger.create () in
@@ -8,14 +8,14 @@ let load_ledger n b =
 
 let%test "empty_length" = 
   let ledger = Test_ledger.create () in
-  Test_ledger.accounts ledger = 0
+  Test_ledger.length ledger = 0
 ;;
 
 let%test "length" = 
   let n = 10 in
   let b = 100 in
   let ledger, keys = load_ledger n b in
-  Test_ledger.accounts ledger = n
+  Test_ledger.length ledger = n
 ;;
 
 let%test "key_retrieval" = 

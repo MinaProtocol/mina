@@ -1,9 +1,5 @@
 open Core
 
-module type Key_intf = sig
-  type key
-end
-
 module type S =
   functor (Hash : sig 
        type hash [@@deriving sexp]
@@ -21,7 +17,7 @@ module type S =
     { merkle_index : int
     ; account : Hash.account }
 
-  type key = Key.key
+  type key = Key.t
 
   type accounts = (key, entry) Hashtbl.t
 
@@ -48,7 +44,7 @@ module type S =
 
   val create : unit -> t
 
-  val accounts : t -> int
+  val length : t -> int
 
   val get
     : t
