@@ -21,14 +21,15 @@ let rec zip4_exn xs ys zs ws =
 
 let get_old_pods (nodes: Kubernetes.Node.t List.t) (pods: Kubernetes.Pod.t List.t) =
   let old_pods =
-    List.map pods ~f:(fun pod ->
-      if not (List.exists nodes ~f:(fun node -> node.hostname = pod.node_selector))
-      then Some (pod.container_name ^ " -> " ^ pod.node_selector)
-      else None
-    ) |> List.filter_opt
+    List.filter_map pods ~f:(fun pod ->
+      if List.exists nodes ~f:(fun node -> node.hostname = pod.node_selector)
+      then None
+      else Some (pod.container_name ^ " -> " ^ pod.node_selector)
+    )
   in
-    if not (List.is_empty old_pods) then Some ("Old Pods:\n" ^ String.concat ~sep:"\n" old_pods)
-    else None
+    match old_pods with
+    | [] -> None
+    | _ -> Some ("Old Pods:\n" ^ String.concat ~sep:"\n" old_pods)
 
 let get_pods 
       image_host
