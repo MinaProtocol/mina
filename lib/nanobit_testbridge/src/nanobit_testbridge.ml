@@ -174,6 +174,7 @@ let cmd main =
                       ; "echo.opam"
                       ; "nanobit_base.opam"
                       ; "kademlia.opam"
+                      ; "distributed_dsl.opam"
                       ]
               ~launch_cmd:("bash", [ "lib/nanobit_testbridge/testbridge-launch.sh"])
               ~pre_cmds:
