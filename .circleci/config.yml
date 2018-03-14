@@ -11,9 +11,12 @@ jobs:
       - checkout
 
       # - setup_remote_docker
+      - run:
+          name: Build Haskell
+          command: source ~/.profile && cd app/kademlia-haskell && nix-build release2.nix
 
       - run:
-          name: Build All
+          name: Build OCaml
           command: eval `opam config env` && jbuilder build
 
       - run:

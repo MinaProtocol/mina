@@ -16,6 +16,11 @@ module type S = sig
   val stop : t -> unit Deferred.t
 end
 
+(* Unfortunately, `jbuilder runtest` runs in a pwd deep inside the build
+ * directory, this prefix normalizes it to working-dir *)
+let test_prefix = "../../../../"
+
+
 module Haskell_process = struct
   open Async
   type t = Process.t
@@ -44,13 +49,24 @@ module Haskell_process = struct
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr) (Host_and_port.port addr)
 
   let create ~initial_peers ~me ~log =
+    let run_kademlia () =
+      let args = ["test"; cli_format me] @ (List.map initial_peers ~f:cli_format) in
+      Logger.debug log "Args: %s\n" (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum);
+      (* This is where nix dumps the haskell artifact *)
+      let kademlia_binary = "app/kademlia-haskell/result/bin/kademlia" in
+
+      let open Deferred.Let_syntax in
+      (* Try kademlia, then prepend test_prefix if it's missing *)
+      match%bind Process.create ~prog:kademlia_binary ~args () with
+      | Ok p -> return (Or_error.return p)
+      | Error _ -> Process.create ~prog:(test_prefix ^ kademlia_binary) ~args ()
+    in
+
     let open Deferred.Or_error.Let_syntax in
     let args = ["test"; cli_format me] @ (List.map initial_peers ~f:cli_format) in
     Logger.debug log "Args: %s\n" (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum);
     let%bind () = kill_kademlias () in
-    (* This is where nix dumps the haskell artifact *)
-    let kademlia_binary = "app/kademlia-haskell/result/bin/kademlia" in
-    let%map p = Process.create ~prog:kademlia_binary ~args () in
+    let%map p = run_kademlia () in
     don't_wait_for begin
       Pipe.iter_without_pushback (Reader.pipe (Process.stderr p)) ~f:(fun str ->
         Logger.error log "%s" str
@@ -212,10 +228,11 @@ let%test_module "Tests" = (module struct
       ()
 
     let create ~initial_peers ~me ~log =
-      Process.create
-        ~prog:"./dummy.sh"
-        ~args:[]
-        ()
+      let open Deferred.Let_syntax in
+      (* Try kademlia, then prepend test_prefix if it's missing *)
+      match%bind Process.create ~prog:"./dummy.sh" ~args:[] () with
+      | Ok p -> return (Or_error.return p)
+      | Error _ -> Process.create ~prog:(test_prefix ^ "./dummy.sh") ~args:[] ()
 
     let output t ~log:_log = Pipe.map (Reader.pipe (Process.stdout t)) ~f:String.split_lines
   end
