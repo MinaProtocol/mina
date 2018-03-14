@@ -43,11 +43,17 @@ let%test_unit "modify_account" =
   assert (Some 50 = Test_ledger.get ledger key);
 ;;
 
+let rec compose_hash i hash =
+  let hash = Test_ledger.Hash.merge hash Test_ledger.Hash.hash_unit in
+  if i = 0
+  then hash
+  else compose_hash (i-1) hash
+
 let%test "merkle_root" =
   let d = 16 in
   let ledger = Test_ledger.create d in
   let root = Test_ledger.merkle_root ledger in
-  Test_ledger.Hash.hash_unit = root
+  (compose_hash (d - 1) Test_ledger.Hash.hash_unit) = root
 ;;
 
 let%test "merkle_root_nonempty" =
@@ -103,6 +109,7 @@ let%test_unit "merkle_path" =
       let path = Test_ledger.merkle_path ledger key |> Option.value_exn in
       let account = Test_ledger.get ledger key |> Option.value_exn in
       let root = Test_ledger.merkle_root ledger in
+      assert (List.length path = d);
       assert (check_path account path root)
     );
 ;;

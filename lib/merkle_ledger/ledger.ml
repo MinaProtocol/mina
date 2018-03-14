@@ -121,6 +121,7 @@ module Make
   let create_account_table () = Key.Table.create ()
   ;;
 
+  (* if depth = N, leafs = 2^N *)
   let create depth = 
     { accounts = create_account_table ()
     ; tree = { leafs = [||]
@@ -222,6 +223,7 @@ module Make
     t.tree.dirty_indices <- []
   ;;
 
+
   let merkle_root t = 
     recompute_tree t;
     let depth = List.length t.tree.nodes in
@@ -231,59 +233,70 @@ module Make
       | Some a -> Array.get a 0
     in
     let rec go i hash =
-      Hash.merge hash Hash.hash_unit
-    in 
-    go (t.depth - depth) base_root
+      let hash = Hash.merge hash Hash.hash_unit in
+      if i = 0
+      then hash
+      else go (i-1) hash
+    in
+    go (t.depth - depth - 1) base_root
   ;;
 
   let merkle_path t key = 
     recompute_tree t;
-    Option.map
-      (Hashtbl.find t.accounts key)
-      (fun entry -> 
-         let merkle_index = entry.merkle_index in
-         let indices = 
-           List.init 
-             ((List.length t.tree.nodes) + 1)
-             ~f:(fun i -> merkle_index/(Int.pow 2 i))
-         in
-         let parent_indices = List.drop indices 1 in
-         let drop_last ls = List.take ls (List.length ls - 1) in
-         let directions = 
-           List.map 
-             (drop_last indices)
-             ~f:(fun i -> if i % 2 = 0 then `Left else `Right)
-         in
-         let tail_hashes = 
-           List.map2_exn
-             (drop_last parent_indices)
-             (drop_last t.tree.nodes)
-             ~f:(fun i nodes -> 
-               let idx = 
-                 if i % 2 = 0
-                 then i + 1
-                 else i - 1
-               in
-               Array.get nodes idx)
-         in
-         let leaf_hash_idx = 
-           if merkle_index % 2 = 0
-           then merkle_index + 1
-           else merkle_index - 1
-         in
-         let leaf_hash = 
-           if leaf_hash_idx < Array.length t.tree.leafs
-           then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs leaf_hash_idx)).account
-           else (Hash.hash_unit)
-         in
-         let hashes = leaf_hash::tail_hashes in
-         List.map2_exn 
-           directions
-           hashes
-           ~f:(fun dir hash -> 
-             match dir with
-             | `Left -> Left hash
-             | `Right -> Right hash)
+    let base_path = 
+      Option.map
+        (Hashtbl.find t.accounts key)
+        (fun entry -> 
+           let merkle_index = entry.merkle_index in
+           let indices = 
+             List.init 
+               ((List.length t.tree.nodes) + 1)
+               ~f:(fun i -> merkle_index/(Int.pow 2 i))
+           in
+           let parent_indices = List.drop indices 1 in
+           let drop_last ls = List.take ls (List.length ls - 1) in
+           let directions = 
+             List.map 
+               (drop_last indices)
+               ~f:(fun i -> if i % 2 = 0 then `Left else `Right)
+           in
+           let tail_hashes = 
+             List.map2_exn
+               (drop_last parent_indices)
+               (drop_last t.tree.nodes)
+               ~f:(fun i nodes -> 
+                 let idx = 
+                   if i % 2 = 0
+                   then i + 1
+                   else i - 1
+                 in
+                 Array.get nodes idx)
+           in
+           let leaf_hash_idx = 
+             if merkle_index % 2 = 0
+             then merkle_index + 1
+             else merkle_index - 1
+           in
+           let leaf_hash = 
+             if leaf_hash_idx < Array.length t.tree.leafs
+             then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs leaf_hash_idx)).account
+             else (Hash.hash_unit)
+           in
+           let hashes = leaf_hash::tail_hashes in
+           List.map2_exn 
+             directions
+             hashes
+             ~f:(fun dir hash -> 
+               match dir with
+               | `Left -> Left hash
+               | `Right -> Right hash)
+        )
+    in 
+    Option.map 
+      base_path
+      (fun base_path -> 
+         let base_path_depth = List.length base_path in
+         base_path @ (List.init (t.depth - base_path_depth) ~f:(fun _ -> Left Hash.hash_unit))
       )
   ;;
 end
