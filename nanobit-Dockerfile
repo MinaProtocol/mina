@@ -1,7 +1,10 @@
-FROM gcr.io/o1labs-192920/ocaml-base:f1db9a46932c092deee291da8f91dbd4430398f7
+FROM gcr.io/o1labs-192920/ocaml-base:fb2f55f93caa1e48023908b8ae830f723637baef
 
 WORKDIR /app
 ADD ./ /app
 RUN sudo chown -R opam /app
+
+RUN cd app/kademlia-haskell && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build release2.nix
+
 RUN eval `opam config env` && jbuilder build
 
