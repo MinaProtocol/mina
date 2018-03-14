@@ -12,7 +12,7 @@ module Hash = struct
   let hash_account account = Md5.digest_string ("0" ^ (Sexp.to_string ([%sexp_of: account] account)))
   ;;
 
-  let hash_unit () = Md5.digest_string ""
+  let hash_unit = Md5.digest_string ""
   ;;
 
   let merge a b =  Md5.digest_string ((Md5.to_hex a) ^ (Md5.to_hex b))

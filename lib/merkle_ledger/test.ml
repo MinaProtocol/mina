@@ -42,13 +42,13 @@ let%test_unit "modify_account" =
 let%test "merkle_root" =
   let ledger = Test_ledger.create () in
   let root = Test_ledger.merkle_root ledger in
-  Test_ledger.Hash.hash_unit () = root
+  Test_ledger.Hash.hash_unit = root
 ;;
 
 let%test "merkle_root_nonempty" =
   let ledger, keys = load_ledger 1 10 in
   let root = Test_ledger.merkle_root ledger in
-  Test_ledger.Hash.hash_unit () <> root
+  Test_ledger.Hash.hash_unit <> root
 ;;
 
 let%test_unit "merkle_root_edit" =
@@ -58,7 +58,7 @@ let%test_unit "merkle_root_edit" =
   let ledger, keys = load_ledger n b1 in
   let key = List.nth_exn keys 0 in
   let root0 = Test_ledger.merkle_root ledger in
-  assert (Test_ledger.Hash.hash_unit () <> root0);
+  assert (Test_ledger.Hash.hash_unit <> root0);
 
   Test_ledger.update ledger key b2;
   let root1 = Test_ledger.merkle_root ledger in

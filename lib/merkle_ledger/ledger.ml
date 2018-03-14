@@ -7,7 +7,7 @@ module type S =
        type hash [@@deriving sexp]
        type account [@@deriving sexp]
        val hash_account : account -> hash 
-       val hash_unit : unit -> hash
+       val hash_unit : hash
        val merge : hash -> hash -> hash
      end)
     (Key : sig 
@@ -30,7 +30,8 @@ module type S =
   type tree = 
     { mutable leafs : leafs
     ; mutable nodes : nodes
-    ; mutable dirty_indices : int list }
+    ; mutable dirty_indices : int list 
+    }
 
   type t = 
     { accounts : accounts
@@ -74,7 +75,7 @@ module Make
        type hash [@@deriving sexp]
        type account [@@deriving sexp]
        val hash_account : account -> hash 
-       val hash_unit : unit -> hash
+       val hash_unit : hash
        val merge : hash -> hash -> hash
      end)
     (Key : sig 
@@ -141,24 +142,22 @@ module Make
       let merkle_index = Array.length t.tree.leafs in
       Hashtbl.set t.accounts ~key ~data:{ merkle_index; account };
       t.tree.leafs <- Array.append t.tree.leafs [| key |];
-      t.tree.dirty_indices <-  merkle_index::t.tree.dirty_indices;
+      t.tree.dirty_indices <-  merkle_index :: t.tree.dirty_indices;
     | Some entry -> 
       Hashtbl.set t.accounts ~key ~data:{ merkle_index = entry.merkle_index; account };
-      t.tree.dirty_indices <- entry.merkle_index::t.tree.dirty_indices;
+      t.tree.dirty_indices <- entry.merkle_index :: t.tree.dirty_indices;
   ;;
 
   let extend_tree tree = 
     let leafs = Array.length tree.leafs in
     if leafs <> 0 then begin
-      let target_node_sets = Int.max 1 (Int.ceil_log2 leafs) in
-      let cur_node_sets = List.length tree.nodes in
-      let new_node_sets = target_node_sets - cur_node_sets in
-      tree.nodes <- List.concat [ tree.nodes; (List.init new_node_sets ~f:(fun _ -> [||])) ];
+      let target_depth = Int.max 1 (Int.ceil_log2 leafs) in
+      let current_depth = List.length tree.nodes in
+      let additional_depth = target_depth - current_depth in
+      tree.nodes <- List.concat [ tree.nodes; (List.init additional_depth ~f:(fun _ -> [||])) ];
       let target_lengths = 
-        List.rev
-          (List.init
-            (List.length tree.nodes)
-            ~f:(fun i -> Int.pow 2 i))
+        let n = List.length tree.nodes in
+        List.init n ~f:(fun i -> Int.pow 2 (n - 1 - i))
       in
       tree.nodes <-
         List.map2_exn
@@ -166,7 +165,7 @@ module Make
           target_lengths
           ~f:(fun nodes length -> 
             let new_elems = length - (Array.length nodes) in
-            Array.concat [ nodes; Array.init new_elems ~f:(fun x -> Hash.hash_unit ()) ])
+            Array.concat [ nodes; Array.init new_elems ~f:(fun x -> Hash.hash_unit) ])
     end
   ;;
 
@@ -174,27 +173,30 @@ module Make
     let updates = List.zip_exn prev_layer_hashes dirty_indices in
     if List.length layers = 0 then ()
     else 
-      let head = List.nth_exn layers 0 in
-      let tail = List.drop layers 1 in
-      List.iter
-        updates
-        ~f:(fun ((left, right), idx) -> Array.set head idx (Hash.merge left right));
-      let next_layer_dirty_indices = 
-        Int.Set.to_list (Int.Set.of_list (List.map dirty_indices ~f:(fun x -> x / 2)))
-      in
-      let get_head_hash i = 
-        if i < Array.length head
-        then Array.get head i
-        else Hash.hash_unit ()
-      in
-      let next_layer_prev_layer_hashes = 
-        List.zip_exn
-          (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i)))
-          (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i + 1)))
-      in
-      if List.length tail > 0
-      then recompute_layer next_layer_prev_layer_hashes tail next_layer_dirty_indices
-      else ()
+      match layers with
+      | [] -> failwith "Merkle_tree: Empty layers"
+      | head :: tail -> 
+        List.iter
+          updates
+          ~f:(fun ((left, right), idx) -> head.(idx) <- Hash.merge left right);
+        let next_layer_dirty_indices = 
+          List.dedup_and_sort
+            (List.map dirty_indices ~f:(fun x -> x  lsr 1))
+            ~compare:Int.compare
+        in
+        let get_head_hash i = 
+          if i < Array.length head
+          then head.(i)
+          else Hash.hash_unit
+        in
+        let next_layer_prev_layer_hashes = 
+          List.zip_exn
+            (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i)))
+            (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i + 1)))
+        in
+        match tail with 
+        | _ :: _ -> recompute_layer next_layer_prev_layer_hashes tail next_layer_dirty_indices
+        | [] -> ()
   ;;
 
   let recompute_tree t =
@@ -205,7 +207,7 @@ module Make
     let get_leaf_hash i = 
       if i < Array.length t.tree.leafs
       then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs i)).account
-      else Hash.hash_unit ()
+      else Hash.hash_unit
     in
     let prev_layer_hashes =
       List.zip_exn
@@ -220,7 +222,7 @@ module Make
   let merkle_root t = 
     recompute_tree t;
     match List.last t.tree.nodes with
-    | None -> Hash.hash_unit ()
+    | None -> Hash.hash_unit
     | Some a -> Array.get a 0
   ;;
 
@@ -262,7 +264,7 @@ module Make
          let leaf_hash = 
            if leaf_hash_idx < Array.length t.tree.leafs
            then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs leaf_hash_idx)).account
-           else (Hash.hash_unit ())
+           else (Hash.hash_unit)
          in
          let hashes = leaf_hash::tail_hashes in
          List.map2_exn 
