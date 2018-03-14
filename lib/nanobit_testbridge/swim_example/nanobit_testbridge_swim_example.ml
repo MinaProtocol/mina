@@ -15,7 +15,7 @@ let main nanobits =
   let%bind args = Nanobit_testbridge.run_main_fully_connected nanobits in
   printf "init'd nanobits: %s\n" (Sexp.to_string_hum ([%sexp_of: Nanobit_testbridge.Rpcs.Main.query list] args));
   printf "starting test\n";
-  let%bind () = after (sec 5.0) in
+  let%bind () = after (sec 10.0) in
   let%bind () = print_peerss nanobits in
   let%bind () = Nanobit_testbridge.stop (List.nth_exn nanobits 1) in
   let%bind () = after (sec 5.0) in

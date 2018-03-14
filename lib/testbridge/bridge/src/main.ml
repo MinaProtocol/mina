@@ -173,7 +173,7 @@ let create
   let%bind internal_udp_ports = Kubernetes.get_internal_ports pods internal_udp_ports in
   let testbridge_ports = List.map external_ports ~f:(fun pod_ports -> (List.nth_exn pod_ports 0)) in
   let%bind tar_string = 
-    Process.run_exn ~working_dir:project_dir ~prog:"tar" ~args:(List.concat [ [ "czvf"; "-";  ]; to_tar ]) () 
+    Process.run_exn ~working_dir:project_dir ~prog:"tar" ~args:(List.concat [ [ "czvfh"; "-";  ]; to_tar ]) () 
   in
   printf "waiting for pods...\n";
   let%bind () = 

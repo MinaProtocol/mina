@@ -127,7 +127,7 @@ let kill_nanobit0 alive_nanobits dead_nanobits =
   printf "** Killing %s\n"
     (Sexp.to_string_hum
       ([%sexp_of: Host_and_port.t list]
-        (List.map to_kill ~f:(fun n -> n.Nanobit_args.nanobit.Nanobit_testbridge.Nanobit.swim_addr))));
+        (List.map to_kill ~f:(fun n -> n.Nanobit_args.nanobit.Nanobit_testbridge.Nanobit.membership_addr))));
   let%map () = Deferred.List.iter to_kill ~f:(fun na -> Nanobit_testbridge.stop na.Nanobit_args.nanobit) in
   (List.drop nanobits 1, List.concat [ to_kill; dead_nanobits ])
 
@@ -137,7 +137,7 @@ let start_nanobit0 alive_nanobits dead_nanobits =
   printf "** Starting %s\n"
     (Sexp.to_string_hum
       ([%sexp_of: Host_and_port.t list]
-        (List.map to_start ~f:(fun n -> n.Nanobit_args.nanobit.Nanobit_testbridge.Nanobit.swim_addr))));
+        (List.map to_start ~f:(fun n -> n.Nanobit_args.nanobit.Nanobit_testbridge.Nanobit.membership_addr))));
   let%map () =
     Deferred.List.iter to_start ~f:(fun na -> 
       let%bind () = Nanobit_testbridge.start na.Nanobit_args.nanobit in
@@ -295,7 +295,7 @@ let main nanobits =
     in
     printf "got blockchain idx:%d %s %s %s\n"
       i
-      (Sexp.to_string_hum ([%sexp_of: Host_and_port.t] nanobit.Nanobit_testbridge.Nanobit.swim_addr))
+      (Sexp.to_string_hum ([%sexp_of: Host_and_port.t] nanobit.Nanobit_testbridge.Nanobit.membership_addr))
       (Sexp.to_string_hum ([%sexp_of: Int64.t] blockchain.most_recent_block.body))
       (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: Digest.t] blockchain.state.block_hash))));
     let lb = List.nth_exn states i in

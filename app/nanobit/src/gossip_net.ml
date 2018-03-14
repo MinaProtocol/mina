@@ -1,6 +1,6 @@
 open Core
 open Async
-open Swimlib
+open Kademlia
 
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
@@ -166,8 +166,12 @@ module Make (Message : Message_intf) = struct
         ~max_concurrency:64 
         peer_events ~f:(function
           | Connect peers -> 
+            Logger.info log "Some peers connected %s"
+              (List.sexp_of_t Host_and_port.sexp_of_t peers |> Sexp.to_string_hum);
             List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer); Deferred.unit
           | Disconnect peers -> 
+            Logger.info log "Some peers disconnected %s"
+              (List.sexp_of_t Host_and_port.sexp_of_t peers |> Sexp.to_string_hum);
             List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer); Deferred.unit 
         )
     end;

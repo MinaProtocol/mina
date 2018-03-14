@@ -56,7 +56,7 @@ module Nanobit = struct
   type t =
     { testbridge_client: Testbridge.Main.Client.t
     ; bridge_port: int
-    ; swim_addr: Host_and_port.t
+    ; membership_addr: Host_and_port.t
     }
   [@@deriving sexp]
 end
@@ -77,7 +77,7 @@ let make_args nanobit ?(should_mine=false) initial_peers =
   ; initial_peers
   
   ; should_mine
-  ; me = nanobit.Nanobit.swim_addr }
+  ; me = nanobit.Nanobit.membership_addr }
 ;;
 
 let get_peers nanobit =
@@ -105,7 +105,7 @@ let main nanobit args =
 let make_nanobit client =
   { Nanobit.testbridge_client = client
   ; bridge_port = List.nth_exn client.Testbridge.Main.Client.exposed_tcp_ports 0
-  ; swim_addr = List.nth_exn client.Testbridge.Main.Client.internal_udp_addrs 0
+  ; membership_addr = List.nth_exn client.Testbridge.Main.Client.internal_udp_addrs 0
   }
 ;;
 
@@ -119,17 +119,23 @@ let start nanobit =
 ;;
 
 let run_main_fully_connected ?(should_mine=false) nanobits =
-  let swim_addrs = List.map nanobits ~f:(fun nanobit -> nanobit.Nanobit.swim_addr) in
-  let args = 
+  let membership_addrs = List.map nanobits ~f:(fun nanobit -> nanobit.Nanobit.membership_addr) in
+  (* These are the args that other people will use *)
+  let next_args =
     List.mapi nanobits
-      ~f:(fun i nanobit -> make_args ~should_mine nanobit (remove_nth swim_addrs i))
+      ~f:(fun i nanobit -> make_args ~should_mine nanobit (remove_nth membership_addrs i))
   in
-  let%map () = 
-    Deferred.List.iter ~how:`Parallel 
-      (List.zip_exn nanobits args)
-      ~f:(fun (nanobit, args) -> main nanobit args )
-  in
-  args
+  match next_args with
+  | [] -> return []
+  | first_args::rest_args ->
+    let initial_node_args = make_args ~should_mine (List.hd_exn nanobits) [] in
+    let full_args = initial_node_args::rest_args in
+    let%map () = 
+      Deferred.List.iter ~how:`Parallel 
+        (List.zip_exn nanobits full_args)
+        ~f:(fun (nanobit, args) -> main nanobit args)
+    in
+    next_args
 ;;
 
 let cmd main = 
@@ -167,11 +173,22 @@ let cmd main =
                       ; "stdout.opam"
                       ; "echo.opam"
                       ; "nanobit_base.opam"
-                      ; "swimlib.opam"
+                      ; "kademlia.opam"
+                      ; "distributed_dsl.opam"
                       ]
               ~launch_cmd:("bash", [ "lib/nanobit_testbridge/testbridge-launch.sh"])
-              ~pre_cmds:[ ("mv", [ "/app/_build"; "/testbridge/app_build" ]) ]
-              ~post_cmds:[ ("mv", [ "/testbridge/app_build"; "/app/_build" ]) ]
+              ~pre_cmds:
+                [ ("mv", [ "/app/_build"; "/testbridge/app_build" ])
+                (* We need to remove any nix artifacts BEFORE we untar that happen to be in this directory *)
+                ; ("chmod", [ "-R" ; "+w" ; "/app/app/kademlia-haskell" ])
+                ; ("rm", [ "-rf"; "/app/app/kademlia-haskell/result" ])
+                ]
+              ~post_cmds:
+                [ ("mv", [ "/testbridge/app_build"; "/app/_build" ])
+                (* We need to make sure we remove nix artifacts that may have been tarred, or else the build fails *)
+                ; ("chmod", [ "-R" ; "+w" ; "/app/app/kademlia-haskell" ])
+                ; ("rm", [ "-rf"; "/app/app/kademlia-haskell/result" ])
+                ]
               ~container_count:container_count 
               ~containers_per_machine:containers_per_machine 
               ~external_tcp_ports:[ 8010 ] 

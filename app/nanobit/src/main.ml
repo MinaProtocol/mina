@@ -1,6 +1,6 @@
 open Core
 open Async
-open Swimlib
+open Kademlia
 open Nanobit_base
 
 module Snark = Snark
@@ -66,16 +66,14 @@ let assert_chain_verifies prover chain =
   if not b then failwith "Chain did not verify"
 ;;
 
-module Swim_config = Swim.Config
 module Make
-    (Swim       : Swim.S)
+    (Membership       : Membership.S)
     (Gossip_net : Gossip_net.S)
     (Miner_impl : Miner.S)
     (Storage    : Storage.S)
   =
 struct
   module Gossip_net = Gossip_net(Message)
-  module Swim = Swim
 
   let peer_strongest_blocks first_peers gossip_net log
     : Blockchain_accumulator.Update.t Linear_pipe.Reader.t
@@ -207,7 +205,7 @@ struct
         ~me 
         ~pipes:{gossip_net_strongest_block_reader} 
         ~log
-        ~swim 
+        ~membership 
         ~latest_strongest_block 
         ~latest_mined_block 
         ~remap_addr_port
@@ -231,7 +229,7 @@ struct
     let gossip_net = 
       Gossip_net.create 
         (Linear_pipe.map 
-           (Swim.changes swim) 
+           (Membership.changes membership) 
            ~f:(function
              | Connect peers -> Peer.Event.Connect (remap_ports peers)
              | Disconnect peers -> Disconnect (remap_ports peers)
@@ -303,7 +301,7 @@ struct
         pipes
     =
     let open Let_syntax in
-    let%map initial_blockchain =
+    let%bind initial_blockchain =
       match%map Storage.load storage_location log with
       | Some x -> x
       | None -> genesis_blockchain
@@ -315,7 +313,11 @@ struct
       else
         (Linear_pipe.of_list [], Linear_pipe.of_list [])
     in
-    let swim = Swim.connect ~config:(Swim_config.create ()) ~initial_peers ~me in
+    let%map membership =
+      match%map (Membership.connect ~initial_peers ~me ~parent_log:log) with
+      | Ok membership -> membership
+      | Error e -> failwith (Printf.sprintf "Failed to connect to kademlia process: %s\n" (Error.to_string_hum e))
+    in
     let gossip_net =
       init_gossip_net
         ~me
@@ -325,7 +327,7 @@ struct
           Linear_pipe.latest_ref ~initial:genesis_blockchain pipes.latest_strongest_block_reader)
         ~latest_mined_block:(
           Linear_pipe.latest_ref ~initial:genesis_blockchain latest_mined_blocks_reader)
-        ~swim
+        ~membership
         ~remap_addr_port
     in
     don't_wait_for begin
@@ -345,11 +347,11 @@ struct
       ~strongest_chain:pipes.strongest_block_writer
       ~updates:(
         Linear_pipe.merge_unordered
-          [ peer_strongest_blocks (Swim.first_peers swim) gossip_net log
+          [ peer_strongest_blocks (Membership.first_peers membership) gossip_net log
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
               Blockchain_accumulator.Update.New_chain b)
           ]);
-    swim
+    membership
 
   let main
         log
@@ -382,5 +384,5 @@ end
 (* Make sure tests work *)
 let%test "trivial" = true
 
-include Make(Swim.Udp)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
+include Make(Membership.Haskell)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
 
