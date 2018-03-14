@@ -196,45 +196,23 @@ module Checked = struct
     with_label "State.hash" (hash_digest (to_bits t))
   ;;
 
-  (*block_target = parent_target 
-   *                    + max(parent_target // difficulty_adjustment_rate, 1)  
-   *                        * max(1 - (block_timestamp_ms - parent_timestamp_ms) // target_time_ms, 
-   *                              -max_difficulty_drop)*)
   let compute_difficulty prev_time prev_strength time =
-    let div_pow_2 bits (`Two_to_the k) = List.drop bits k in
     with_label "compute_difficulty" begin
       let%bind delta =
-        with_label "delta" begin
-          (* This also checks that time >= prev_time *)
-          let%map d = Block_time.diff_checked time prev_time in
-          let unpacked = div_pow_2 (Block_time.Span.Unpacked.var_to_bits d) target_time_ms in
-          Number.of_bits unpacked
-        end
+        let%bind diff = Block_time.diff_number time prev_time in
+        Number.div_pow_2 diff target_time_ms
       in 
-      let `Two_to_the max_difficulty_drop = max_difficulty_drop in
-      let max_difficulty_drop = Number.constant (Field.of_int (Int.pow 2 max_difficulty_drop)) in
-      let max_difficulty_drop_plus_one = Number.(max_difficulty_drop + Number.constant (Field.one)) in
-      let%bind neg_scale_plus_one = 
-        let%bind less = Number.(delta < max_difficulty_drop_plus_one) in
-        Number.if_ less
-          ~then_:delta
-          ~else_:max_difficulty_drop_plus_one
-      in
-      let%bind prev_strength_unpacked = Strength.unpack_var prev_strength in
-      let prev_strength_num = Number.of_bits (Strength.Unpacked.var_to_bits prev_strength_unpacked) in
-      let rate_floor = div_pow_2 (Strength.Unpacked.var_to_bits prev_strength_unpacked) difficulty_adjustment_rate in
-      let rate_floor = Number.of_bits rate_floor in
-      let%bind rate = 
-        let%bind is_zero = Number.(rate_floor = constant Field.zero) in
-        Number.if_ is_zero
-          ~then_:(Number.constant Field.one)
-          ~else_:rate_floor
-      in
+      let max_difficulty_drop = Number.of_pow_2 max_difficulty_drop in
+      let max_difficulty_drop_plus_one = Number.(max_difficulty_drop + one) in
+      let%bind neg_scale_plus_one = Number.min delta max_difficulty_drop_plus_one in
+      let%bind prev_strength_num = Strength.packed_to_number prev_strength in
+      let%bind rate_floor = Number.div_pow_2 prev_strength_num difficulty_adjustment_rate in
+      let%bind rate = Number.max rate_floor Number.one in
       let%bind rate_scalar = 
-        let%bind is_zero = Number.(neg_scale_plus_one = constant Field.zero) in
+        let%bind is_zero = Number.(neg_scale_plus_one = zero) in
         Number.if_ is_zero
-          ~then_:(Number.constant Field.one)
-          ~else_:(Number.minus_unsafe neg_scale_plus_one Number.(constant Field.one))
+          ~then_:Number.one
+          ~else_:(Number.minus_unsafe neg_scale_plus_one Number.one)
       in
       let%bind diff = Number.mul_unsafe rate rate_scalar in
       let%bind diff = 
@@ -243,26 +221,15 @@ module Checked = struct
         let diff = List.take diff 64 in
         Number.of_bits diff
       in
-      let%bind diff_minus =
-        let%bind less = Number.(diff < prev_strength_num) in
-        Number.if_ less 
-          ~then_:diff
-          ~else_:prev_strength_num
-      in
+      let%bind diff_minus = Number.min diff prev_strength_num in
       let%bind new_strength_num =
-        let%bind is_zero = Number.(neg_scale_plus_one = constant Field.zero) in
+        let%bind is_zero = Number.(neg_scale_plus_one = zero) in
         Number.if_ is_zero
           ~then_:(Number.sum_unsafe prev_strength_num diff)
           ~else_:(Number.minus_unsafe prev_strength_num diff_minus)
       in
-      let%bind new_strength_num =
-        let%bind less = Number.(new_strength_num < constant (Field.of_int 1)) in
-        Number.if_ less
-          ~then_:Number.(constant (Field.of_int 1))
-          ~else_:new_strength_num
-      in
-      let%map new_strength_unpacked = Strength.field_var_to_unpacked (Number.to_var new_strength_num) in
-      Strength.pack_var new_strength_unpacked
+      let%bind new_strength_num = Number.max new_strength_num Number.one in
+      Strength.packed_of_number new_strength_num
     end
   ;;
 

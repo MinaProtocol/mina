@@ -56,6 +56,11 @@ module Make (Impl : Snark_intf.Basic) = struct
     ; bits = Some bs
     }
 
+  let div_pow_2 n (`Two_to_the k) = 
+    let%map bits = to_bits n in
+    let divided = List.drop bits k in
+    of_bits divided
+
   let clamp_to_n_bits t n =
     assert (n < Field.size_in_bits);
     with_label "Number.clamp_to_n_bits" begin
@@ -147,6 +152,12 @@ module Make (Impl : Snark_intf.Basic) = struct
             Boolean.var_of_value (Bigint.test_bit tick_n i)))
     }
 
+  let one = constant Field.one
+  let zero = constant Field.zero
+
+  let of_pow_2 (`Two_to_the k) =
+    constant (Field.of_int (Int.pow 2 k))
+
   let if_ b ~then_ ~else_ =
     let%map var = Checked.if_ b ~then_:then_.var ~else_:else_.var in
     let open Bignum.Bigint in
@@ -198,6 +209,18 @@ module Make (Impl : Snark_intf.Basic) = struct
       else failwithf "Number.*: Potential overflow: (%s * %s > Field.size)"
         (to_string x.upper_bound) (to_string y.upper_bound) ()
     end
+
+  let min x y =
+    let%bind less = x < y in
+    if_ less
+      ~then_:x
+      ~else_:y
+
+  let max x y =
+    let%bind less = x < y in
+    if_ less
+      ~then_:y
+      ~else_:x
 
   let mul_unsafe x y =
     let open Bignum.Bigint in

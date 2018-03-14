@@ -1,4 +1,4 @@
-open Core_kernel
+(*open Core_kernel
 open Util
 open Snark_params
 open Tick
@@ -59,4 +59,4 @@ let dream_compute_difficulty prev_time prev_strength time =
   let%bind diff = Number.Signed.(rate_scalar * rate) in
   let%bind new_strength_signed = Number.Signed.max Number.Signed.(prev_strength + diff) Number.Signed.one in
   let%bind new_strength : Number.t = Number.Signed.assert_positive new_strength_signed in
-  Strength.of_number new_strength
+  Strength.of_number new_strength*)
