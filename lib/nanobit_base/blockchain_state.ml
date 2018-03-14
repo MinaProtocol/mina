@@ -127,7 +127,7 @@ let negative_one : value =
   let target : Target.Unpacked.value =
     Target.of_bigint
       Bignum.Bigint.(
-        Target.(to_bigint max) / pow (of_int 2) (of_int 5))
+        Target.(to_bigint max) / pow (of_int 2) (of_int 4))
   in
   { previous_time
   ; target

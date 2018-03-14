@@ -46,7 +46,7 @@ module Haskell_process = struct
   let create ~initial_peers ~me ~log =
     let open Deferred.Or_error.Let_syntax in
     let args = ["test"; cli_format me] @ (List.map initial_peers ~f:cli_format) in
-    printf "Args: %s\n" (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum);
+    Logger.debug log "Args: %s\n" (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum);
     let%bind () = kill_kademlias () in
     (* This is where nix dumps the haskell artifact *)
     let kademlia_binary = "app/kademlia-haskell/result/bin/kademlia" in
@@ -59,7 +59,6 @@ module Haskell_process = struct
     p
 
   let output t ~log =
-    printf "trying to get output\n";
     Pipe.map (Reader.pipe (Process.stdout t)) ~f:(fun str ->
       List.filter_map (String.split_lines str) ~f:(fun line ->
         let prefix_name_size = 4 in
@@ -139,7 +138,6 @@ end) : S = struct
           | [addr; kademliaKey; "off"] ->
             `Snd (Host_and_port.of_string addr)
           | _ ->
-            (* TODO: Should we just print an error instead of dieing here? *)
             failwith (Printf.sprintf "Unexpected line %s\n" line)
         )
         in

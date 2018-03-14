@@ -9,7 +9,7 @@
 
 # How to make dev
 
-1. Run this in your shell.
+1. Run this in your shell. REMEMBER to change the directory of the repo to your directory
 
 ```bash
 export PATH=~/coins/nanobit/hackbin:$PATH
