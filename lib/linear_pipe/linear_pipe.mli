@@ -38,6 +38,8 @@ val iter_unordered
   -> unit Deferred.t
 
 val length : 'a Reader.t -> int
+
+val read_now : 'a Reader.t -> [ `Eof | `Nothing_available | `Ok of 'a ]
                                     
 val fold : 'a Reader.t -> init:'accum -> f:('accum -> 'a -> 'accum Deferred.t) -> 'accum Deferred.t
 

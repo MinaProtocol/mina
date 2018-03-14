@@ -42,6 +42,11 @@ let set_has_reader (reader : 'a Reader.t) =
   then failwith "Linear_pipe.bracket: had reader"
   else reader.has_reader <- true
 
+let release_has_reader (reader : 'a Reader.t) =
+  if not reader.has_reader
+  then failwith "Linear_pipe.bracket: did not have reader"
+  else reader.has_reader <- false
+
 let iter ?consumer ?continue_on_error reader ~f =
   bracket reader 
     (Pipe.iter 
@@ -65,6 +70,12 @@ let iter_unordered ?consumer ~max_concurrency reader ~f =
 let length reader =
   Pipe.length reader.Reader.pipe
 ;;
+
+let read_now reader = 
+  set_has_reader reader;
+  let res = Pipe.read_now reader.pipe in
+  release_has_reader reader;
+  res
 
 let of_list xs = 
   let reader = wrap_reader (Pipe.of_list xs) in
