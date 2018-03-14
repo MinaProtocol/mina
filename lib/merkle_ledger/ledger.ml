@@ -36,6 +36,7 @@ module type S =
   type t = 
     { accounts : accounts
     ; tree : tree 
+    ; depth : int
     }
   [@@deriving sexp]
 
@@ -45,7 +46,7 @@ module type S =
 
   type path = path_elem list [@@deriving sexp]
 
-  val create : unit -> t
+  val create : int -> t
 
   val length : t -> int
 
@@ -106,6 +107,7 @@ module Make
   type t = 
     { accounts : accounts
     ; tree : tree 
+    ; depth : int
     }
   [@@deriving sexp]
 
@@ -119,12 +121,13 @@ module Make
   let create_account_table () = Key.Table.create ()
   ;;
 
-  let create () = 
+  let create depth = 
     { accounts = create_account_table ()
     ; tree = { leafs = [||]
              ; nodes = []
              ; dirty_indices = [] 
              } 
+    ; depth
     }
   ;;
 
@@ -221,9 +224,16 @@ module Make
 
   let merkle_root t = 
     recompute_tree t;
-    match List.last t.tree.nodes with
-    | None -> Hash.hash_unit
-    | Some a -> Array.get a 0
+    let depth = List.length t.tree.nodes in
+    let base_root =
+      match List.last t.tree.nodes with
+      | None -> Hash.hash_unit
+      | Some a -> Array.get a 0
+    in
+    let rec go i hash =
+      Hash.merge hash Hash.hash_unit
+    in 
+    go (t.depth - depth) base_root
   ;;
 
   let merkle_path t key = 

@@ -33,6 +33,7 @@ module type S =
   type t = 
     { accounts : accounts
     ; tree : tree 
+    ; depth : int
     } 
   [@@deriving sexp]
 
@@ -42,7 +43,7 @@ module type S =
 
   type path = path_elem list [@@deriving sexp]
 
-  val create : unit -> t
+  val create : int -> t
 
   val length : t -> int
 
