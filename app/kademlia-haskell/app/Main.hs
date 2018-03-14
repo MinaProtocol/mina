@@ -39,6 +39,11 @@ instance Binary Pong where
         then pure Pong
         else fail "no parse pong"
 
+{- The nonce for the HashId is 14 bytes as described in
+ - https://cardanodocs.com/technical/protocols/p2p/ -}
+nonceSize :: Int
+nonceSize = 14
+
 makeSeed :: (H.Hashable h, Integral a) => h -> a
 makeSeed h = fromIntegral (H.hash h)
 
@@ -76,19 +81,23 @@ hasPeers inst = do
   peers <- K.dumpPeers inst
   return $ length peers > 0
 
+formatAddress :: (Show a, Show b) => a -> b -> B.ByteString -> String
+formatAddress ip port key = show ip ++ ":" ++ show port ++ ", " ++ show (B64.encode key)
+
 {- Usage: ./$0 test '("127.0.0.1", 3000)' '("127.0.0.1", 3001)' -}
 main :: IO ()
 main = do
     (state : rest) <- getArgs
-    {- TODO: For no test mode:
+    {- TODO: When we implement (state == "prod"):
      -  1. Don't just cycle through all the peers in order
      -  2. Make sure that nonces are securely randomly generated
-     -  3. Make the ping time WAY slower (use the kDefaultConfig raw -- ala Cardano)
+     -  3. Make the ping time WAY slower (use the kDefaultConfig raw -- ala
+     -    Cardano) ~1hour heartbeats
      -}
     when (state == "test") $ do
       let ((externalIp, myPort) : peers) = map read rest
       let
-          nonceGen  = \x -> KH.Nonce $ evalRand (generateByteString 14) (mkStdGen $ makeSeed x)
+          nonceGen  = \x -> KH.Nonce $ evalRand (generateByteString nonceSize) (mkStdGen $ makeSeed x)
           myKey     = KH.hashAddress $ nonceGen (externalIp, myPort)
           peerKeys  = (KH.hashAddress . nonceGen) <$> peers
           config = K.defaultConfig { K.pingTime = 2, K.storeValues = False }
@@ -104,18 +113,20 @@ main = do
       _ <- if length peers == 0 then return () else do
         {- Try to join one of the peers in the peer list -}
         r <- foldM (\acc -> \((peerIp,peerPort), peerKey) ->
-          if (acc == K.JoinSuccess) then return acc else do
-            let KH.HashId peerKeyBytes = peerKey
-            when (BOOL.not $ KH.verifyAddress peerKeyBytes) $ do
-              die $ "Invalid address: " ++ show peerIp ++ ":" ++ show peerPort ++ ", " ++ show (B64.encode peerKeyBytes) ++ "; check your initial peers list"
-            logInfo $ "Attempting to connecting to peer: " ++ show peerIp ++ ":" ++ show peerPort ++ "; " ++ show peerKey
-            r' <- connectToPeer kInstance peerIp (fromIntegral peerPort) peerKey
-            didGetPeers <- hasPeers kInstance
-            {- If someone connected to us, while we were in the process of handshaking we're in the network -}
-            let r = if didGetPeers then K.JoinSuccess else r'
-            when (r /= K.JoinSuccess) $
-                logError . ("Connection to peer failed "++) . show $ r
-            return r) K.NodeDown (zip peers peerKeys)
+          case acc of
+            K.JoinSuccess -> return acc
+            _ -> do
+              let KH.HashId peerKeyBytes = peerKey
+              when (BOOL.not $ KH.verifyAddress peerKeyBytes) $ do
+                die $ "Invalid address on initial peer: " ++ formatAddress peerIp peerPort peerKeyBytes
+              logInfo $ "Attempting to connecting to peer: " ++ formatAddress peerIp peerPort peerKeyBytes
+              r' <- connectToPeer kInstance peerIp (fromIntegral peerPort) peerKey
+              didGetPeers <- hasPeers kInstance
+              {- If someone connected to us, while we were in the process of handshaking we're in the network -}
+              let r = if didGetPeers then K.JoinSuccess else r'
+              when (r /= K.JoinSuccess) $
+                  logError . ("Connection to peer failed "++) . show $ r
+              return r) K.NodeDown (zip peers peerKeys)
 
         hFlush stdout
 
