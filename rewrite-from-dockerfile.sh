@@ -12,4 +12,4 @@ project=$(gcloud config get-value project)
 
 perl -i -p -e 's,FROM.*,FROM gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/Dockerfile
 perl -i -p -e 's,FROM.*,FROM gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/nanobit-Dockerfile
-perl -i -p -e 's,docker.*ocaml-base.*$,docker -- pull gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/.circleci/config.yml
+perl -i -p -e 's,image:.*,image: gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/.circleci/config.yml
