@@ -146,7 +146,6 @@ main = do
       {- Forever, once a second, check to see if anything changed, and dump it -}
       foreverM (\oldPeers -> do
         _ <- threadDelay 1000000
-        logInfo $ "Trying next dump"
         currDump <- K.dumpPeers kInstance
         let currPeers = peersFromDump currDump
         let (newLives, newDeads) = (currPeers \\ oldPeers, oldPeers \\ currPeers)

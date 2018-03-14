@@ -3,7 +3,7 @@ all : docker dev
 .PHONY : all
 
 kademlia:
-	bash -c 'cd app/kademlia-haskell && source ~/.profile && nix-build release2.nix'
+	bash -c 'cd app/kademlia-haskell && nix-build release2.nix'
 
 docker :
 	./rebuild-docker.sh nanotest
