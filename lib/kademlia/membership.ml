@@ -298,7 +298,7 @@ let%test_unit "connect" =
     let%bind n1_peers =
       Deferred.any
         [ Haskell.first_peers n1
-        ; Deferred.map (wait_sec 1.) ~f:(fun () -> [])
+        ; Deferred.map (wait_sec 5.) ~f:(fun () -> [])
         ]
     in
     assert (List.length n1_peers <> 0);
