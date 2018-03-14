@@ -11,15 +11,15 @@ module type S =
        val merge : hash -> hash -> hash
      end)
     (Key : sig 
-        type key [@@deriving sexp]
-        include Hashable.S with type t = key
+        type t [@@deriving sexp]
+        include Hashable.S with type t := t
      end) -> sig
 
   type entry = 
     { merkle_index : int
     ; account : Hash.account }
 
-  type key = Key.key
+  type key = Key.t
 
   type accounts = (key, entry) Hashtbl.t
 
@@ -78,11 +78,11 @@ module Make
        val merge : hash -> hash -> hash
      end)
     (Key : sig 
-        type key [@@deriving sexp]
-        include Hashable.S with type t = key
+        type t [@@deriving sexp]
+        include Hashable.S with type t := t
      end) = struct
 
-  type key = Key.key [@@deriving sexp]
+  type key = Key.t [@@deriving sexp]
 
   type entry = 
     { merkle_index : int

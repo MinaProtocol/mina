@@ -9,8 +9,8 @@ module type S =
        val merge : hash -> hash -> hash
      end)
     (Key : sig 
-        type key [@@deriving sexp]
-        include Hashable.S with type t = key
+        type t [@@deriving sexp]
+        include Hashable.S with type t := t
      end) -> sig
 
   type entry = 
