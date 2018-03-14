@@ -1,5 +1,7 @@
 open Core_kernel
 open Snark_params
+open Tick
+open Let_syntax
 
 (* Milliseconds since epoch *)
 module Stable = struct
@@ -34,11 +36,19 @@ module Span = struct
   let to_ms t = t
 end
 
+let field_var_to_unpacked (x : Tick.Cvar.t) = Tick.Checked.unpack ~length:64 x
+
 let diff x y = Int64.(x - y)
 
 let diff_checked x y =
   let pack = Tick.Checked.project in
   Span.unpack_var Tick.Cvar.Infix.(pack x - pack y)
+;;
+
+let diff_number x y =
+  let%map diff = diff_checked x y in
+  let bits = Span.Unpacked.var_to_bits diff in
+  Number.of_bits bits
 ;;
 
 let of_time t =
