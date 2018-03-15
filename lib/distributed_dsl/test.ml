@@ -13,15 +13,15 @@ let%test "trivial" = true
       ~initial_state:4
       [ on 
           Condition_label.Todo
-          (Predicate (fun s -> true))
+          (predicate (fun s -> true))
           ~f:(fun t s -> s)
       ; on 
           Condition_label.Todo
-          (Interval (Time.Span.of_sec 4.0))
+          (timeout (Time.Span.of_sec 4.0))
           ~f:(fun t s -> s)
       ; on 
           Condition_label.Todo
-          (Message (fun m -> true))
+          (msg (fun s m -> true))
           ~f:(fun t s -> s)
       ]
   in
