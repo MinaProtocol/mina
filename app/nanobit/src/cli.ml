@@ -84,6 +84,7 @@ let daemon =
     [ "daemon", daemon
     ; "prover", Prover.command
     ; "rpc", Main_rpc.command
+    ; "client", Client.command
     ]
   |> Command.run
 ;;

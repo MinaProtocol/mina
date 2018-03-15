@@ -7,3 +7,15 @@ let int16 =
     then x
     else failwithf "Port not between 0 and %d" max_port ())
 
+let public_key =
+  let open Nanobit_base in
+  Command.Arg_type.map Command.Param.string ~f:(fun s ->
+    let public_key_maybe =
+      s |> B64.decode
+        |> Bigstring.of_string
+        |> Public_key.of_bigstring
+    in
+    match public_key_maybe with
+    | Ok key -> key
+    | Error e -> failwithf "Couldn't read public key %s" (Error.to_string_hum e) ()
+  )
