@@ -4,7 +4,7 @@
  ((name client_lib)
   (public_name client_lib)
   (library_flags (-linkall))
-  (libraries (core async ppx_inline_test.runtime-lib))
+  (libraries (core async nanobit_base ppx_inline_test.runtime-lib))
   (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib client_lib))))
   (synopsis "Lib powering the client interactions with the daemon")))
 

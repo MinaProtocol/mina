@@ -118,13 +118,18 @@ let assert_equal ((x1, y1) : var) ((x2, y2) : var) : (unit, _) Checked.t =
   in
   ()
 
+(* TODO: THIS IS NOT CORRECT, just want to test *)
+let compress (x, y) : Compressed.t =
+  printf "COMPRESSING PUBLIC KEY IMPROPERLY, FIXME\n";
+  x
+
 let of_bigstring bs =
   let open Or_error.Let_syntax in
   let%map elem, _ = Bigstring.read_bin_prot bs bin_reader_t in
   elem
 
 let to_bigstring elem =
-  let bs = Bigstring.create (bin_size_t elem) in
+  let bs = Bigstring.create (Tick.Field.size_in_bits * 2) in
   let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
   bs
 

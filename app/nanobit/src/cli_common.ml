@@ -17,5 +17,25 @@ let public_key =
     in
     match public_key_maybe with
     | Ok key -> key
-    | Error e -> failwithf "Couldn't read public key %s" (Error.to_string_hum e) ()
+    | Error e ->
+        failwithf "Couldn't read public key %s ;; here's a sample one: %s"
+          (Error.to_string_hum e)
+          (
+            let (pub, _) = Transaction.Signature.Keypair.create () in
+            pub |> Public_key.to_bigstring |> Bigstring.to_string |> B64.encode
+          )
+          ()
   )
+
+let txn_fee =
+  let open Nanobit_base in
+  Command.Arg_type.map Command.Param.string ~f:(fun s ->
+    Transaction.Fee.of_unsigned_string s
+  )
+
+let txn_amount =
+  let open Nanobit_base in
+  Command.Arg_type.map Command.Param.string ~f:(fun s ->
+   Transaction.Amount.of_unsigned_string s
+  )
+

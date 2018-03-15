@@ -6,6 +6,7 @@
    (libraries
     ( base64
       core
+      client_lib
       linear_pipe
       kademlia
       nanobit_base
