@@ -4,7 +4,8 @@
   ((name cli)
    (public_name cli)
    (libraries
-    ( core
+    ( base64
+      core
       linear_pipe
       kademlia
       nanobit_base
