@@ -878,38 +878,42 @@ module Checked = struct
       v
     in
     R1CS_constraint_system.set_primary_input_size system num_inputs;
-    let rec go : type a s. string list -> (a, s) t -> a =
-      fun stack t0 ->
+    let rec go
+      : type a s r. string list -> (a, s) t -> (a -> r) -> r =
+      fun stack t0 cont ->
         match t0 with
-        | Pure x -> x
+        | Pure x -> cont x
         | With_constraint_system (f, k) ->
           f system;
-          go stack k
+          go stack k cont
         | As_prover (_x, k) ->
-          go stack k
+          go stack k cont
         | Add_constraint (c, t) ->
           Constraint.add ~stack c system;
-          go stack t
+          go stack t cont
         | Next_auxiliary k ->
-          go stack (k !next_auxiliary)
+          go stack (k !next_auxiliary) cont
         | With_label (s, t, k) ->
-          let y = go (s :: stack) t in
-          go stack (k y)
+          go (s :: stack) t
+            (fun y -> go stack (k y) cont)
         | With_state (_p, _and_then, t_sub, k) ->
-          let y = go stack t_sub in
-          go stack (k y)
+          go stack t_sub
+            (fun y -> go stack (k y) cont)
         | With_handler (_h, t, k) ->
-          go stack (k (go stack t))
+          go stack t
+            (fun x -> go stack (k x) cont)
         | Clear_handler (t, k) ->
-          go stack (k (go stack t))
+          go stack t
+            (fun x -> go stack (k x) cont)
         | Exists ({ alloc; check; _ }, _c, k) ->
           let var = Typ.Alloc.run alloc alloc_var in
           (* TODO: Push a label onto the stack here *)
-          let () = go stack (check var) in
-          go stack (k { Handle.var; value = None })
+          go stack (check var)
+            (fun () ->
+              go stack (k { Handle.var; value = None }) cont)
     in
     time "constraint_system" (fun () ->
-      go [] t);
+      go [] t Fn.id);
     let auxiliary_input_size = !next_auxiliary - (1 + num_inputs) in
     R1CS_constraint_system.set_auxiliary_input_size system auxiliary_input_size;
     system
