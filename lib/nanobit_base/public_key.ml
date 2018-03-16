@@ -24,9 +24,17 @@ module Compressed = struct
     Checked.choose_preimage pk ~length:Field.size_in_bits
 end
 
-let compress_var : var -> Compressed.var = fun _ -> failwith "TODO"
+(* TODO: Redo *)
+let compress_var : var -> Compressed.var = fun (x, _) -> x
 let decompress_var : Compressed.var -> var = fun _ -> failwith "TODO"
-let assert_equal : var -> var -> (unit, _) Tick.Checked.t = fun _ _ -> failwith "TODO"
+
+let assert_equal : var -> var -> (unit, _) Tick.Checked.t =
+  fun (x1, y1) (x2, y2) ->
+    let open Tick in let open Let_syntax in
+    let%map () = assert_equal x1 x2
+    and () = assert_equal y1 y2
+    in
+    ()
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in
