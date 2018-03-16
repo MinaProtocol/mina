@@ -39,8 +39,8 @@ val field_var_to_unpacked : Tick.Cvar.t -> (Unpacked.var, _) Tick.Checked.t
 val diff_checked
   : Unpacked.var -> Unpacked.var -> (Span.Unpacked.var, _) Tick.Checked.t
 
-val diff_number
-  : Unpacked.var -> Unpacked.var -> (Tick.Number.t, _) Tick.Checked.t
+val unpack_to_number 
+  : Span.Unpacked.var -> Tick.Number.t
 
 val diff : t -> t -> Span.t
 

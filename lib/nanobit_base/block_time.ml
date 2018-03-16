@@ -45,6 +45,11 @@ let diff_checked x y =
   Span.unpack_var Tick.Cvar.Infix.(pack x - pack y)
 ;;
 
+let unpack_to_number var =
+  let bits = Span.Unpacked.var_to_bits var in
+  Number.of_bits bits
+;;
+
 let diff_number x y =
   let%map diff = diff_checked x y in
   let bits = Span.Unpacked.var_to_bits diff in
