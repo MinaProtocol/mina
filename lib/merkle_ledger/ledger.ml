@@ -23,15 +23,19 @@ module type S =
 
   type accounts = (key, entry) Hashtbl.t
 
-  type leafs = key array
+  module DynArray : sig
+    type 'a t
+  end
 
-  type nodes = Hash.hash array list
+  type leafs = key DynArray.t [@@deriving sexp]
+
+  type nodes = Hash.hash DynArray.t list [@@deriving sexp]
 
   type tree = 
-    { mutable leafs : leafs
+    { leafs : leafs
     ; mutable nodes : nodes
-    ; mutable dirty_indices : int list 
-    }
+    ; mutable dirty_indices : int list }
+  [@@deriving sexp]
 
   type t = 
     { accounts : accounts
@@ -94,12 +98,18 @@ module Make
 
   type accounts = entry Key.Table.t [@@deriving sexp]
 
-  type leafs = key array [@@deriving sexp]
+  module DynArray = struct
+    include DynArray
+    let sexp_of_t sexp_of_a t = [%sexp_of: a list] (DynArray.to_list t)
+    let t_of_sexp a_of_sexp ls = DynArray.of_list ([%of_sexp: a list] ls)
+  end
 
-  type nodes = Hash.hash array list [@@deriving sexp]
+  type leafs = key DynArray.t [@@deriving sexp]
+
+  type nodes = Hash.hash DynArray.t list [@@deriving sexp]
 
   type tree = 
-    { mutable leafs : leafs
+    { leafs : leafs
     ; mutable nodes : nodes
     ; mutable dirty_indices : int list }
   [@@deriving sexp]
@@ -124,7 +134,7 @@ module Make
   (* if depth = N, leafs = 2^N *)
   let create depth = 
     { accounts = create_account_table ()
-    ; tree = { leafs = [||]
+    ; tree = { leafs = DynArray.create ()
              ; nodes = []
              ; dirty_indices = [] 
              } 
@@ -143,9 +153,9 @@ module Make
   let update t key account = 
     match Hashtbl.find t.accounts key with
     | None -> 
-      let merkle_index = Array.length t.tree.leafs in
+      let merkle_index = DynArray.length t.tree.leafs in
       Hashtbl.set t.accounts ~key ~data:{ merkle_index; account };
-      t.tree.leafs <- Array.append t.tree.leafs [| key |];
+      DynArray.add t.tree.leafs key;
       t.tree.dirty_indices <-  merkle_index :: t.tree.dirty_indices;
     | Some entry -> 
       Hashtbl.set t.accounts ~key ~data:{ merkle_index = entry.merkle_index; account };
@@ -153,23 +163,23 @@ module Make
   ;;
 
   let extend_tree tree = 
-    let leafs = Array.length tree.leafs in
+    let leafs = DynArray.length tree.leafs in
     if leafs <> 0 then begin
       let target_depth = Int.max 1 (Int.ceil_log2 leafs) in
       let current_depth = List.length tree.nodes in
       let additional_depth = target_depth - current_depth in
-      tree.nodes <- List.concat [ tree.nodes; (List.init additional_depth ~f:(fun _ -> [||])) ];
+      tree.nodes <- List.concat [ tree.nodes; (List.init additional_depth ~f:(fun _ -> DynArray.create ())) ];
       let target_lengths = 
         let n = List.length tree.nodes in
         List.init n ~f:(fun i -> Int.pow 2 (n - 1 - i))
       in
-      tree.nodes <-
-        List.map2_exn
-          tree.nodes
-          target_lengths
-          ~f:(fun nodes length -> 
-            let new_elems = length - (Array.length nodes) in
-            Array.concat [ nodes; Array.init new_elems ~f:(fun x -> Hash.hash_unit) ])
+      List.iter2_exn
+        tree.nodes
+        target_lengths
+        ~f:(fun nodes length -> 
+          let new_elems = length - (DynArray.length nodes) in
+          DynArray.append (DynArray.init new_elems (fun x -> Hash.hash_unit)) nodes;
+        )
     end
   ;;
 
@@ -182,15 +192,15 @@ module Make
       | head :: tail -> 
         List.iter
           updates
-          ~f:(fun ((left, right), idx) -> head.(idx) <- Hash.merge left right);
+          ~f:(fun ((left, right), idx) -> DynArray.set head idx (Hash.merge left right));
         let next_layer_dirty_indices = 
           List.dedup_and_sort
             (List.map dirty_indices ~f:(fun x -> x  lsr 1))
             ~compare:Int.compare
         in
         let get_head_hash i = 
-          if i < Array.length head
-          then head.(i)
+          if i < DynArray.length head
+          then DynArray.get head i 
           else Hash.hash_unit
         in
         let next_layer_prev_layer_hashes = 
@@ -209,8 +219,8 @@ module Make
       Int.Set.to_list (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
     in
     let get_leaf_hash i = 
-      if i < Array.length t.tree.leafs
-      then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs i)).account
+      if i < DynArray.length t.tree.leafs
+      then Hash.hash_account (Hashtbl.find_exn t.accounts (DynArray.get t.tree.leafs i)).account
       else Hash.hash_unit
     in
     let prev_layer_hashes =
@@ -230,7 +240,7 @@ module Make
     let base_root =
       match List.last t.tree.nodes with
       | None -> Hash.hash_unit
-      | Some a -> Array.get a 0
+      | Some a -> DynArray.get a 0
     in
     let rec go i hash =
       let hash = Hash.merge hash Hash.hash_unit in
@@ -270,7 +280,7 @@ module Make
                    then i + 1
                    else i - 1
                  in
-                 Array.get nodes idx)
+                 DynArray.get nodes idx)
            in
            let leaf_hash_idx = 
              if merkle_index % 2 = 0
@@ -278,8 +288,8 @@ module Make
              else merkle_index - 1
            in
            let leaf_hash = 
-             if leaf_hash_idx < Array.length t.tree.leafs
-             then Hash.hash_account (Hashtbl.find_exn t.accounts (Array.get t.tree.leafs leaf_hash_idx)).account
+             if leaf_hash_idx < DynArray.length t.tree.leafs
+             then Hash.hash_account (Hashtbl.find_exn t.accounts (DynArray.get t.tree.leafs leaf_hash_idx)).account
              else (Hash.hash_unit)
            in
            let hashes = leaf_hash::tail_hashes in

@@ -20,15 +20,20 @@ module type S =
   type key = Key.t
 
   type accounts = (key, entry) Hashtbl.t
+                 
+  module DynArray : sig
+    type 'a t
+  end
 
-  type leafs = key array
+  type leafs = key DynArray.t [@@deriving sexp]
 
-  type nodes = Hash.hash array list
+  type nodes = Hash.hash DynArray.t list [@@deriving sexp]
 
   type tree = 
-    { mutable leafs : leafs
+    { leafs : leafs
     ; mutable nodes : nodes
     ; mutable dirty_indices : int list }
+  [@@deriving sexp]
 
   type t = 
     { accounts : accounts
