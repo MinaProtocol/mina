@@ -11,8 +11,8 @@ module type Transport_intf = sig
 end
 
 module type Timer_intf = sig
-  type tok
-  val wait : Time.Span.t -> tok * unit Deferred.t
+  type tok [@@deriving eq]
+  val wait : Time.Span.t -> tok * [`Cancelled | `Finished] Deferred.t
   val cancel : tok -> unit
 end
 
@@ -30,16 +30,7 @@ module type S = sig
 
   type transition = t -> state -> state Deferred.t
   and message_transition = t -> message -> state -> state Deferred.t
-  and t =
-    { state : state
-    ; last_state : state option
-    ; conditions : (condition * transition) Condition_label.Table.t
-    ; message_pipe : message Linear_pipe.Reader.t
-    ; message_handlers : ((message -> state -> bool) * (t -> message -> state -> state Deferred.t)) Message_label.Table.t
-    ; triggered_timers_r : transition Linear_pipe.Reader.t
-    ; triggered_timers_w : transition Linear_pipe.Writer.t
-    ; timers : unit Deferred.t Timer_label.Table.t
-    }
+  and t
 
   type handle_command = Condition_label.t * condition * transition
   type message_command = Message_label.t * message_condition * message_transition
@@ -55,6 +46,12 @@ module type S = sig
     -> message_condition
     -> f:message_transition
     -> message_command
+
+  val cancel
+    : t
+    -> Timer_label.t
+    -> ?tok:Timer.tok option
+    -> unit
 
   val timeout
     : t
@@ -134,10 +131,10 @@ module Make
       ; last_state : State.t option
       ; conditions : (condition * transition) Condition_label.Table.t
       ; message_pipe : Message.t Linear_pipe.Reader.t
-      ; message_handlers : ((Message.t -> State.t -> bool) * (t -> Message.t -> State.t -> State.t Deferred.t)) Message_label.Table.t
+      ; message_handlers : (message_condition * message_transition) Message_label.Table.t
       ; triggered_timers_r : transition Linear_pipe.Reader.t
       ; triggered_timers_w : transition Linear_pipe.Writer.t
-      ; timers : unit Deferred.t Timer_label.Table.t
+      ; timers : Timer.tok list Timer_label.Table.t
       }
 
     type handle_command = Condition_label.t * condition * transition
@@ -149,14 +146,48 @@ module Make
     let msg label condition ~f =
       (label, condition, f)
 
+    let add_back_timers t ~key ~data =
+      if List.length data > 0 then
+        let _ = Timer_label.Table.add t.timers ~key ~data in
+        ()
+      else
+        Timer_label.Table.remove t.timers key
+
+    let cancel t label ?tok:(tok=None) =
+      let l = Timer_label.Table.find_multi t.timers label in
+      let (to_cancel, to_put_back) =
+        List.partition_map l ~f:(fun tok' ->
+          match tok with
+          | None -> `Fst tok'
+          | Some tok ->
+              if tok = tok' then
+                `Fst tok'
+              else
+                `Snd tok'
+        )
+      in
+      List.iter to_cancel ~f:(fun tok' ->
+        Timer.cancel tok'
+      );
+      add_back_timers t ~key:label ~data:to_put_back
+
     let timeout t label ts ~(f:transition) =
+      let remove_tok tok =
+        let l = Timer_label.Table.find_multi t.timers label in
+        let l' = List.filter l ~f:(fun tok' -> not (Timer.equal_tok tok tok')) in
+        add_back_timers t ~key:label ~data:l'
+      in
+
       let tok, waited = Timer.wait ts in
+      let _ = Timer_label.Table.add_multi t.timers ~key:label ~data:tok  in
       don't_wait_for begin
-        let%map () = waited in
-        Timer_label.Table.remove t.timers label;
-        Linear_pipe.write_or_drop ~capacity:500 t.triggered_timers_w t.triggered_timers_r f
+        match%map waited with
+        | `Cancelled ->
+          remove_tok tok
+        | `Finished ->
+          remove_tok tok;
+          Linear_pipe.write_or_exn ~capacity:1024 t.triggered_timers_w t.triggered_timers_r f
       end;
-      let _ = Timer_label.Table.add t.timers ~key:label ~data:waited in
       tok
 
     let state_changed t =
@@ -176,11 +207,19 @@ module Make
     let make_node ~messages ?parent ~initial_state message_conditions handle_conditions =
       let conditions = Condition_label.Table.create () in
       List.iter handle_conditions ~f:(fun (l, c, h) ->
-        let _ = Condition_label.Table.add conditions ~key:l ~data:(c,h) in ()
+        match Condition_label.Table.add conditions ~key:l ~data:(c,h) with
+        | `Duplicate ->
+            failwithf "You specified the same condition twice! %s"
+              (Condition_label.sexp_of_label l |> Sexp.to_string_hum) ()
+        | `Ok -> ()
       );
       let message_handlers = Message_label.Table.create () in
       List.iter message_conditions ~f:(fun (l, c, h) ->
-        let _ = Message_label.Table.add message_handlers ~key:l ~data:(c,h) in ()
+        match Message_label.Table.add message_handlers ~key:l ~data:(c,h) with
+        | `Duplicate ->
+            failwithf "You specified the same message handler twice! %s"
+              (Message_label.sexp_of_label l |> Sexp.to_string_hum) ()
+        | `Ok -> ()
       );
       let timers = Timer_label.Table.create () in
       let triggered_timers_r, triggered_timers_w = Linear_pipe.create () in
@@ -221,10 +260,11 @@ module Make
           | _::_::xs as l ->
             failwithf "Multiple conditions matched current state: %s"
               (List.map l ~f:(fun (label, _) -> label) |> List.sexp_of_t Condition_label.sexp_of_label |> Sexp.to_string_hum) ())
-      | _, Some transition, _ ->
+      | false, Some transition, _ ->
           let _ = Linear_pipe.read_now t.triggered_timers_r in
           (transition t t.state) >>| (with_new_state t)
-      | _, _, Some msg ->
+      | false, None, Some msg ->
+          let _ = Linear_pipe.read_now t.message_pipe in
           let checks = Message_label.Table.to_alist t.message_handlers in
           let matches = List.filter checks ~f:(fun (_, (cond, _)) ->
             cond msg t.state
@@ -237,7 +277,7 @@ module Make
           | _::_::xs as l ->
             failwithf "Multiple conditions matched current state: %s"
               (List.map l ~f:(fun (label, _) -> label) |> List.sexp_of_t Message_label.sexp_of_label |> Sexp.to_string_hum) ())
-      | _, _, _ ->
+      | false, None, None ->
           return (with_new_state t (t.state))
 end
 

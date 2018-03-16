@@ -22,6 +22,13 @@ let write_or_drop ~capacity writer reader x =
   then ignore (Pipe.read_now reader.Reader.pipe);
   Pipe.write_without_pushback writer x
 
+exception Overflow
+let write_or_exn ~capacity writer reader x =
+  if Pipe.length reader.Reader.pipe > capacity then
+    raise Overflow
+  else
+    Pipe.write_without_pushback writer x
+
 let close_read (reader : 'a Reader.t) = Pipe.close_read reader.pipe
 
 let closed (reader : 'a Reader.t) = Pipe.closed reader.pipe

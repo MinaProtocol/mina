@@ -23,6 +23,13 @@ val write_or_drop
   -> 'a 
   -> unit
 
+val write_or_exn
+  : capacity : int
+  -> 'a Writer.t 
+  -> 'a Reader.t 
+  -> 'a 
+  -> unit
+
 val iter
   :  ?consumer          : Pipe.Consumer.t
   -> ?continue_on_error : bool  (** default is [false] *)

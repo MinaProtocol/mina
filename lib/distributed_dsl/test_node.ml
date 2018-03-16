@@ -15,7 +15,7 @@ module I = struct
   end
 
   module Timer = struct
-    type tok = int
+    type tok = int [@@deriving eq]
     let cancel tok = failwith "nyi"
     let wait ts = failwith "nyi"
   end

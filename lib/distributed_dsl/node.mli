@@ -11,8 +11,8 @@ module type Transport_intf = sig
 end
 
 module type Timer_intf = sig
-  type tok
-  val wait : Time.Span.t -> tok * unit Deferred.t
+  type tok [@@deriving eq]
+  val wait : Time.Span.t -> tok * [`Cancelled | `Finished] Deferred.t
   val cancel : tok -> unit
 end
 
@@ -30,16 +30,7 @@ module type S = sig
 
   type transition = t -> state -> state Deferred.t
   and message_transition = t -> message -> state -> state Deferred.t
-  and t =
-    { state : state
-    ; last_state : state option
-    ; conditions : (condition * transition) Condition_label.Table.t
-    ; message_pipe : message Linear_pipe.Reader.t
-    ; message_handlers : (message_condition * message_transition) Message_label.Table.t
-    ; triggered_timers_r : transition Linear_pipe.Reader.t
-    ; triggered_timers_w : transition Linear_pipe.Writer.t
-    ; timers : unit Deferred.t Timer_label.Table.t
-    }
+  and t
 
   type handle_command = Condition_label.t * condition * transition
   type message_command = Message_label.t * message_condition * message_transition
@@ -55,6 +46,12 @@ module type S = sig
     -> message_condition
     -> f:message_transition
     -> message_command
+
+  val cancel
+    : t
+    -> Timer_label.t
+    -> ?tok:Timer.tok option
+    -> unit
 
   val timeout
     : t
