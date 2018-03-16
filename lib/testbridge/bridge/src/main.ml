@@ -19,17 +19,17 @@ let rec zip4_exn xs ys zs ws =
   | _ -> failwith "lists not same length"
 ;;
 
-let get_old_pods (nodes: Kubernetes.Node.t List.t) (pods: Kubernetes.Pod.t List.t) =
-  let old_pods =
+let get_misassigned_pods (nodes: Kubernetes.Node.t List.t) (pods: Kubernetes.Pod.t List.t) =
+  let misassigned_pods =
     List.filter_map pods ~f:(fun pod ->
       if List.exists nodes ~f:(fun node -> node.hostname = pod.node_selector)
       then None
       else Some (pod.container_name ^ " -> " ^ pod.node_selector)
     )
   in
-    match old_pods with
+    match misassigned_pods with
     | [] -> None
-    | _ -> Some ("Old Pods:\n" ^ String.concat ~sep:"\n" old_pods)
+    | _ -> Some ("Old Pods:\n" ^ String.concat ~sep:"\n" misassigned_pods)
 
 let get_pods 
       image_host
@@ -76,8 +76,8 @@ let get_pods
   printf "%s\n" (String.concat ~sep:", "  (List.map pods ~f:(fun pod -> 
     Sexp.to_string_hum ([%sexp_of: Kubernetes.Pod.t] pod))));*)
   let () =
-    match get_old_pods nodes pods with
-    | Some err -> printf "%s\n" err; failwith "Pods are old run cleanup.sh";
+    match get_misassigned_pods nodes pods with
+    | Some err -> printf "%s\n" err; failwith "Pods are old/misassigned... run cleanup.sh";
     | None -> printf "F R E S H pods, good to go.\n"
   in
 
