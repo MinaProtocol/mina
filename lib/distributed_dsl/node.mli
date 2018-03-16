@@ -10,66 +10,67 @@ module type Transport_intf = sig
   val listen : t -> message Linear_pipe.Reader.t
 end
 
+module type Timer_intf = sig
+  type tok
+  val wait : Time.Span.t -> tok * unit Deferred.t
+  val cancel : tok -> unit
+end
+
 module type S = sig
   type message
   type state
+  module Message_label : Hashable.S
+  module Timer_label : Hashable.S
   module Condition_label : Hashable.S
+  module Timer : Timer_intf
 
-  module Condition : sig
-    type t
-    type timer_tok
+  type condition = state -> bool
 
-    type condition
+  type message_condition = message -> condition
 
-    val timeout : Time.Span.t -> t
-    val msg : (state -> message -> bool) -> t
-    val predicate : (state -> bool) -> t
-
-    (* or *)
-    val ( + ) : t -> t -> t
-    (* additive identity *)
-    val never : t
-
-    (* and *)
-    val ( * ) : t -> t -> t
-    (* multiplicative identity *)
-    val always : t
-
-    val check : t -> state -> message -> timer_tok list -> bool
-
-    val wait_timers : t -> timer_tok Deferred.t
-  end
-
-  type t = 
+  type transition = t -> state -> state Deferred.t
+  and message_transition = t -> message -> state -> state Deferred.t
+  and t =
     { state : state
-    ; last_state : state
-    ; conditions : (Condition.t * transition) Condition_label.Table.t
+    ; last_state : state option
+    ; conditions : (condition * transition) Condition_label.Table.t
     ; message_pipe : message Linear_pipe.Reader.t
-    ; work : transition Linear_pipe.Reader.t
+    ; message_handlers : (message_condition * message_transition) Message_label.Table.t
+    ; triggered_timers_r : transition Linear_pipe.Reader.t
+    ; triggered_timers_w : transition Linear_pipe.Writer.t
+    ; timers : unit Deferred.t Timer_label.Table.t
     }
-  and transition = t -> state -> state
-  and override_transition = t -> original:transition -> state -> state
 
-  type command =
-    | On of Condition_label.t * Condition.t * transition
-    | Override of Condition_label.t * transition
+  type handle_command = Condition_label.t * condition * transition
+  type message_command = Message_label.t * message_condition * message_transition
 
   val on
     : Condition_label.t
-    -> Condition.t
+    -> condition
     -> f:transition
-    -> command
+    -> handle_command
 
-  val override
-    : Condition_label.t
-    -> f:override_transition
-    -> command
+  val msg
+    : Message_label.t
+    -> message_condition
+    -> f:message_transition
+    -> message_command
+
+  val timeout
+    : t
+    -> Timer_label.t
+    -> Time.Span.t
+    -> f:transition
+    -> Timer.tok
+
+  val next_ready : t -> unit Deferred.t
 
   val make_node 
     : messages : message Linear_pipe.Reader.t
     -> ?parent : t
     -> initial_state : state
-    -> command list 
+    -> message_command list 
+    -> handle_command list 
     -> t
 
   val step : t -> t Deferred.t
@@ -80,15 +81,26 @@ module type F =
     (State : sig type t [@@deriving eq] end)
     (Message : sig type t end)
     (Peer : sig type t end)
-    (Timer : sig val wait : Time.Span.t -> unit Deferred.t end)
+    (Timer : Timer_intf)
+    (Message_label : sig 
+       type label [@@deriving enum, sexp]
+       include Hashable.S with type t = label
+     end)
+    (Timer_label : sig 
+       type label [@@deriving enum, sexp]
+       include Hashable.S with type t = label
+     end)
     (Condition_label : sig 
-       type label [@@deriving enum]
+       type label [@@deriving enum, sexp]
        include Hashable.S with type t = label
      end)
     (Transport : Transport_intf with type message := Message.t 
                                  and type peer := Peer.t) 
     -> S with type message := Message.t
           and type state := State.t
+          and module Timer := Timer
+          and module Message_label := Message_label
+          and module Timer_label := Timer_label
           and module Condition_label := Condition_label
 
 module Make : F

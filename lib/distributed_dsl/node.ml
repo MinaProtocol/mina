@@ -10,66 +10,67 @@ module type Transport_intf = sig
   val listen : t -> message Linear_pipe.Reader.t
 end
 
+module type Timer_intf = sig
+  type tok
+  val wait : Time.Span.t -> tok * unit Deferred.t
+  val cancel : tok -> unit
+end
+
 module type S = sig
   type message
   type state
+  module Message_label : Hashable.S
+  module Timer_label : Hashable.S
   module Condition_label : Hashable.S
+  module Timer : Timer_intf
 
-  module Condition : sig
-    type t
-    type timer_tok
+  type condition = state -> bool
 
-    type condition
+  type message_condition = message -> condition
 
-    val timeout : Time.Span.t -> t
-    val msg : (state -> message -> bool) -> t
-    val predicate : (state -> bool) -> t
-
-    (* or *)
-    val ( + ) : t -> t -> t
-    (* additive identity *)
-    val never : t
-
-    (* and *)
-    val ( * ) : t -> t -> t
-    (* multiplicative identity *)
-    val always : t
-
-    val check : t -> state -> message -> timer_tok list -> bool
-
-    val wait_timers : t -> timer_tok Deferred.t
-  end
-
-  type t = 
+  type transition = t -> state -> state Deferred.t
+  and message_transition = t -> message -> state -> state Deferred.t
+  and t =
     { state : state
-    ; last_state : state
-    ; conditions : (Condition.t * transition) Condition_label.Table.t
+    ; last_state : state option
+    ; conditions : (condition * transition) Condition_label.Table.t
     ; message_pipe : message Linear_pipe.Reader.t
-    ; work : transition Linear_pipe.Reader.t
+    ; message_handlers : ((message -> state -> bool) * (t -> message -> state -> state Deferred.t)) Message_label.Table.t
+    ; triggered_timers_r : transition Linear_pipe.Reader.t
+    ; triggered_timers_w : transition Linear_pipe.Writer.t
+    ; timers : unit Deferred.t Timer_label.Table.t
     }
-  and transition = t -> state -> state
-  and override_transition = t -> original:transition -> state -> state
 
-  type command =
-    | On of Condition_label.t * Condition.t * transition
-    | Override of Condition_label.t * transition
+  type handle_command = Condition_label.t * condition * transition
+  type message_command = Message_label.t * message_condition * message_transition
 
   val on
     : Condition_label.t
-    -> Condition.t
+    -> condition
     -> f:transition
-    -> command
+    -> handle_command
 
-  val override
-    : Condition_label.t
-    -> f:override_transition
-    -> command
+  val msg
+    : Message_label.t
+    -> message_condition
+    -> f:message_transition
+    -> message_command
+
+  val timeout
+    : t
+    -> Timer_label.t
+    -> Time.Span.t
+    -> f:transition
+    -> Timer.tok
+
+  val next_ready : t -> unit Deferred.t
 
   val make_node 
     : messages : message Linear_pipe.Reader.t
     -> ?parent : t
     -> initial_state : state
-    -> command list 
+    -> message_command list 
+    -> handle_command list 
     -> t
 
   val step : t -> t Deferred.t
@@ -80,117 +81,163 @@ module type F =
     (State : sig type t [@@deriving eq] end)
     (Message : sig type t end)
     (Peer : sig type t end)
-    (Timer : sig val wait : Time.Span.t -> unit Deferred.t end)
+    (Timer : Timer_intf)
+    (Message_label : sig 
+       type label [@@deriving enum, sexp]
+       include Hashable.S with type t = label
+     end)
+    (Timer_label : sig 
+       type label [@@deriving enum, sexp]
+       include Hashable.S with type t = label
+     end)
     (Condition_label : sig 
-       type label [@@deriving enum]
+       type label [@@deriving enum, sexp]
        include Hashable.S with type t = label
      end)
     (Transport : Transport_intf with type message := Message.t 
                                  and type peer := Peer.t) 
     -> S with type message := Message.t
           and type state := State.t
+          and module Timer := Timer
+          and module Message_label := Message_label
+          and module Timer_label := Timer_label
           and module Condition_label := Condition_label
 
 module Make 
     (State : sig type t [@@deriving eq] end)
     (Message : sig type t end)
     (Peer : sig type t end)
-    (Timer : sig val wait : Time.Span.t -> unit Deferred.t end)
+    (Timer : Timer_intf)
+    (Message_label : sig 
+       type label [@@deriving enum, sexp]
+       include Hashable.S with type t = label
+     end)
+    (Timer_label : sig 
+       type label [@@deriving enum, sexp]
+       include Hashable.S with type t = label
+     end)
     (Condition_label : sig 
-       type label [@@deriving enum]
+       type label [@@deriving enum, sexp]
        include Hashable.S with type t = label
      end)
     (Transport : Transport_intf with type message := Message.t 
-                                 and type peer := Peer.t) 
+                                 and type peer := Peer.t)
 = struct
+    type condition = State.t -> bool
 
-    module Condition = struct
-      type timer_tok = int [@@deriving eq]
-      type t =
-        { pred : State.t -> Message.t -> timer_tok list -> bool
-        ; timers : timer_tok Deferred.t list
-        }
+    type message_condition = Message.t -> condition
 
-      type condition =
-        | Timeout of Time.Span.t
-        | Message of (State.t -> Message.t -> bool)
-        | Predicate of (State.t -> bool)
-
-      let curr_tok = ref 0
-      let next_tok () =
-        let tok = !curr_tok in
-        curr_tok := tok + 1;
-        tok
-
-      let single : condition -> t = function
-        | Timeout ts ->
-          let new_tok = next_tok () in
-          let timeout ts = Deferred.map (Timer.wait ts) (fun () -> new_tok) in
-          { pred = (fun _ _ toks -> List.exists toks ~f:(fun tok -> equal_timer_tok tok new_tok))
-          ; timers = [ timeout ts ]
-          }
-        | Message f ->
-          { pred = (fun s m _ -> f s m)
-          ; timers = []
-          }
-        | Predicate f ->
-          { pred = (fun s _ _ -> f s)
-          ; timers = []
-          }
-
-      let timeout ts = single (Timeout ts)
-      let msg f = single (Message f)
-      let predicate f = single (Predicate f)
-
-      let ( + ) x y =
-        { pred = (fun s m toks -> x.pred s m toks || y.pred s m toks)
-        ; timers = x.timers @ y.timers
-        }
-
-      let never =
-        { pred = (fun _ _ _ -> false)
-        ; timers = []
-        }
-
-      let ( * ) x y =
-        { pred = (fun s m toks -> x.pred s m toks && y.pred s m toks)
-        ; timers = x.timers @ y.timers
-        }
-
-      let always =
-        { pred = (fun _ _ _ -> true)
-        ; timers = []
-        }
-
-      let check {pred} = pred
-
-      let wait_timers {timers} = Deferred.any timers
-    end
-
-    type t = 
+    type transition = t -> State.t -> State.t Deferred.t
+    and message_transition = t -> Message.t -> State.t -> State.t Deferred.t
+    and t =
       { state : State.t
-      ; last_state : State.t
-      ; conditions : (Condition.t * transition) Condition_label.Table.t
+      ; last_state : State.t option
+      ; conditions : (condition * transition) Condition_label.Table.t
       ; message_pipe : Message.t Linear_pipe.Reader.t
-      ; work : transition Linear_pipe.Reader.t
+      ; message_handlers : ((Message.t -> State.t -> bool) * (t -> Message.t -> State.t -> State.t Deferred.t)) Message_label.Table.t
+      ; triggered_timers_r : transition Linear_pipe.Reader.t
+      ; triggered_timers_w : transition Linear_pipe.Writer.t
+      ; timers : unit Deferred.t Timer_label.Table.t
       }
-    and transition = t -> State.t -> State.t
-    and override_transition = t -> original:transition -> State.t -> State.t
 
-    type command =
-      | On of Condition_label.t * Condition.t * transition
-      | Override of Condition_label.t * transition
+    type handle_command = Condition_label.t * condition * transition
+    type message_command = Message_label.t * message_condition * message_transition
 
-    let on label condition ~f = failwith "nyi"
+    let on label condition ~f =
+      (label, condition, f)
 
-    let override label ~f = failwith "nyi"
+    let msg label condition ~f =
+      (label, condition, f)
 
-    let make_node ~messages ?parent ~initial_state conditions = failwith "nyi"
+    let timeout t label ts ~(f:transition) =
+      let tok, waited = Timer.wait ts in
+      don't_wait_for begin
+        let%map () = waited in
+        Timer_label.Table.remove t.timers label;
+        Linear_pipe.write_or_drop ~capacity:500 t.triggered_timers_w t.triggered_timers_r f
+      end;
+      let _ = Timer_label.Table.add t.timers ~key:label ~data:waited in
+      tok
 
-    let step t = failwith "nyi"
-      (* if we called a transition recently, check all the conditions *)
-      (* else if a timeout/interval is up, call the relevant transition *)
-      (* else if message queue not empty, check all message conditions *)
+    let state_changed t =
+      not (Option.equal State.equal (Some t.state) t.last_state)
 
+    let next_ready t : unit Deferred.t =
+      let ready p = Linear_pipe.values_available p >>= (fun _ -> return ()) in
+      Deferred.any
+      [ ready t.message_pipe
+      ; ready t.triggered_timers_r
+      ; if state_changed t then
+          return ()
+        else
+          Deferred.never ()
+      ]
+
+    let make_node ~messages ?parent ~initial_state message_conditions handle_conditions =
+      let conditions = Condition_label.Table.create () in
+      List.iter handle_conditions ~f:(fun (l, c, h) ->
+        let _ = Condition_label.Table.add conditions ~key:l ~data:(c,h) in ()
+      );
+      let message_handlers = Message_label.Table.create () in
+      List.iter message_conditions ~f:(fun (l, c, h) ->
+        let _ = Message_label.Table.add message_handlers ~key:l ~data:(c,h) in ()
+      );
+      let timers = Timer_label.Table.create () in
+      let triggered_timers_r, triggered_timers_w = Linear_pipe.create () in
+      let t =
+        { state = initial_state
+        ; last_state = None
+        ; conditions
+        ; message_pipe = messages
+        ; message_handlers
+        ; triggered_timers_r
+        ; triggered_timers_w
+        ; timers
+        }
+      in
+      t
+
+    let with_new_state t state : t =
+      { t with last_state = Some (t.state)
+      ; state
+      }
+
+    let step t : t Deferred.t =
+      match (
+        state_changed t,
+        Linear_pipe.peek t.triggered_timers_r,
+        Linear_pipe.peek t.message_pipe
+      ) with
+      | true, _, _ ->
+          let checks = Condition_label.Table.to_alist t.conditions in
+          let matches = List.filter checks ~f:(fun (_, (cond, _)) ->
+            cond t.state
+          ) in
+          (match matches with
+          | [] ->
+              return (with_new_state t (t.state))
+          | (_,(_,transition))::[] ->
+              (transition t t.state) >>| (with_new_state t)
+          | _::_::xs as l ->
+            failwithf "Multiple conditions matched current state: %s"
+              (List.map l ~f:(fun (label, _) -> label) |> List.sexp_of_t Condition_label.sexp_of_label |> Sexp.to_string_hum) ())
+      | _, Some transition, _ ->
+          let _ = Linear_pipe.read_now t.triggered_timers_r in
+          (transition t t.state) >>| (with_new_state t)
+      | _, _, Some msg ->
+          let checks = Message_label.Table.to_alist t.message_handlers in
+          let matches = List.filter checks ~f:(fun (_, (cond, _)) ->
+            cond msg t.state
+          ) in
+          (match matches with
+          | [] ->
+              return (with_new_state t (t.state))
+          | (_,(_,transition))::[] ->
+              (transition t msg t.state) >>| (with_new_state t)
+          | _::_::xs as l ->
+            failwithf "Multiple conditions matched current state: %s"
+              (List.map l ~f:(fun (label, _) -> label) |> List.sexp_of_t Message_label.sexp_of_label |> Sexp.to_string_hum) ())
+      | _, _, _ ->
+          return (with_new_state t (t.state))
 end
 

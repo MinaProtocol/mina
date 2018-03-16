@@ -208,3 +208,21 @@ let latest_ref t ~initial =
     iter t ~f:(fun a -> return (cell := a))
   end;
   cell
+
+let values_available ({pipe} : 'a Reader.t) =
+  Pipe.values_available pipe
+
+let peek ({pipe} : 'a Reader.t) =
+  Pipe.peek pipe
+
+let release_has_reader (reader : 'a Reader.t) =
+  if not reader.has_reader
+  then failwith "Linear_pipe.bracket: did not have reader"
+  else reader.has_reader <- false
+
+let read_now reader =
+  set_has_reader reader;
+  let res = Pipe.read_now reader.pipe in
+  release_has_reader reader;
+  res
+
