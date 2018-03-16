@@ -31,6 +31,12 @@ end
 
 type var = Pedersen.Digest.Packed.var
 
+let typ = Pedersen.Digest.Packed.typ
+
+let var_to_bits t = Pedersen.Digest.choose_preimage_var t >>| Pedersen.Digest.Unpacked.var_to_bits
+
+let assert_equal x y = assert_equal x y
+
 include Stable.V1
 
 type path = Pedersen.Digest.t list
