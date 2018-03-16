@@ -51,7 +51,12 @@ module Make (Impl : Snark_intf.Basic) = struct
   let div_pow_2 n (`Two_to_the k) = 
     let%map bits = to_bits n in
     let divided = List.drop bits k in
-    of_bits divided
+    let divided_of_bits = of_bits divided in
+    { upper_bound = Bignum.Bigint.(divided_of_bits.upper_bound / (pow (of_int 2) (of_int k)))
+    ; lower_bound = Bignum.Bigint.(divided_of_bits.lower_bound / (pow (of_int 2) (of_int k)))
+    ; var = divided_of_bits.var
+    ; bits = divided_of_bits.bits
+    }
 
   let clamp_to_n_bits t n =
     assert (n < Field.size_in_bits);
