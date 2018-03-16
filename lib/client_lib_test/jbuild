@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(executable
+  ((name client_lib_test)
+   (package client_lib)
+   (public_name client_lib_test)
+   (libraries (client_lib ppx_inline_test.runner.lib))
+  ))
+
+(alias
+  ((name runtest)
+   (deps (client_lib_test.exe))
+   (action (run ${<} inline-test-runner client_lib))))
+
