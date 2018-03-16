@@ -23,6 +23,13 @@ val write_or_drop
   -> 'a 
   -> unit
 
+val write_or_exn
+  : capacity : int
+  -> 'a Writer.t 
+  -> 'a Reader.t 
+  -> 'a 
+  -> unit
+
 val iter
   :  ?consumer          : Pipe.Consumer.t
   -> ?continue_on_error : bool  (** default is [false] *)
@@ -78,3 +85,10 @@ val filter_map_unordered
   -> 'b Reader.t
 
 val latest_ref : 'a Reader.t -> initial:'a -> 'a ref
+
+val values_available : 'a Reader.t -> [`Eof | `Ok] Deferred.t
+
+val peek : 'a Reader.t -> 'a option
+
+val read_now : 'a Reader.t -> [ `Eof | `Nothing_available | `Ok of 'a ]
+

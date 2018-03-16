@@ -22,6 +22,13 @@ let write_or_drop ~capacity writer reader x =
   then ignore (Pipe.read_now reader.Reader.pipe);
   Pipe.write_without_pushback writer x
 
+exception Overflow
+let write_or_exn ~capacity writer reader x =
+  if Pipe.length reader.Reader.pipe > capacity then
+    raise Overflow
+  else
+    Pipe.write_without_pushback writer x
+
 let close_read (reader : 'a Reader.t) = Pipe.close_read reader.pipe
 
 let closed (reader : 'a Reader.t) = Pipe.closed reader.pipe
@@ -208,3 +215,21 @@ let latest_ref t ~initial =
     iter t ~f:(fun a -> return (cell := a))
   end;
   cell
+
+let values_available ({pipe} : 'a Reader.t) =
+  Pipe.values_available pipe
+
+let peek ({pipe} : 'a Reader.t) =
+  Pipe.peek pipe
+
+let release_has_reader (reader : 'a Reader.t) =
+  if not reader.has_reader
+  then failwith "Linear_pipe.bracket: did not have reader"
+  else reader.has_reader <- false
+
+let read_now reader =
+  set_has_reader reader;
+  let res = Pipe.read_now reader.pipe in
+  release_has_reader reader;
+  res
+
