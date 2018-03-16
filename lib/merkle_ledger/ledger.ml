@@ -8,6 +8,7 @@ module type S =
        type account [@@deriving sexp]
        val hash_account : account -> hash 
        val hash_unit : hash
+       val hash_unit_tree_depth : int -> hash
        val merge : hash -> hash -> hash
      end)
     (Key : sig 
@@ -81,6 +82,7 @@ module Make
        type account [@@deriving sexp]
        val hash_account : account -> hash 
        val hash_unit : hash
+       val hash_unit_tree_depth : int -> hash
        val merge : hash -> hash -> hash
      end)
     (Key : sig 
@@ -243,7 +245,7 @@ module Make
       | Some a -> DynArray.get a 0
     in
     let rec go i hash =
-      let hash = Hash.merge hash Hash.hash_unit in
+      let hash = Hash.merge hash (Hash.hash_unit_tree_depth (t.depth - i - 1)) in
       if i = 0
       then hash
       else go (i-1) hash
@@ -306,7 +308,9 @@ module Make
       base_path
       (fun base_path -> 
          let base_path_depth = List.length base_path in
-         base_path @ (List.init (t.depth - base_path_depth) ~f:(fun _ -> Left Hash.hash_unit))
+         base_path @ (List.init 
+                        (t.depth - base_path_depth) 
+                        ~f:(fun i -> Left (Hash.hash_unit_tree_depth (i + base_path_depth))))
       )
   ;;
 end

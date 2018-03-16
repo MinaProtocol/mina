@@ -6,6 +6,7 @@ module type S =
        type account [@@deriving sexp]
        val hash_account : account -> hash 
        val hash_unit : hash
+       val hash_unit_tree_depth : int -> hash
        val merge : hash -> hash -> hash
      end)
     (Key : sig 

@@ -44,7 +44,7 @@ let%test_unit "modify_account" =
 ;;
 
 let rec compose_hash i hash =
-  let hash = Test_ledger.Hash.merge hash Test_ledger.Hash.hash_unit in
+  let hash = Test_ledger.Hash.merge hash hash in
   if i = 0
   then hash
   else compose_hash (i-1) hash
@@ -130,4 +130,3 @@ let%test_unit "merkle_path_edits" =
       assert (check_path account path root)
     );
 ;;
-

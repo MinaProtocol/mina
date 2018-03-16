@@ -15,7 +15,17 @@ module Hash = struct
   let hash_unit = Md5.digest_string ""
   ;;
 
+
   let merge a b =  Md5.digest_string ((Md5.to_hex a) ^ (Md5.to_hex b))
+  ;;
+
+  let hash_unit_tree_depth i = 
+    let rec go i hash = 
+      if i = 0
+      then hash 
+      else go (i-1) (merge hash hash)
+    in
+    go i hash_unit
   ;;
   
 end
