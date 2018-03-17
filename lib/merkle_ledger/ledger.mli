@@ -5,42 +5,16 @@ module type S =
        type hash [@@deriving sexp]
        type account [@@deriving sexp]
        val hash_account : account -> hash 
-       val hash_unit : hash
-       val hash_unit_tree_depth : int -> hash
+       val empty_hash : hash
        val merge : hash -> hash -> hash
      end)
+    (Max_depth : sig val max_depth : int end)
     (Key : sig 
         type t [@@deriving sexp]
         include Hashable.S with type t := t
      end) -> sig
 
-  type entry = 
-    { merkle_index : int
-    ; account : Hash.account }
-
-  type key = Key.t
-
-  type accounts = (key, entry) Hashtbl.t
-                 
-  module DynArray : sig
-    type 'a t
-  end
-
-  type leafs = key DynArray.t [@@deriving sexp]
-
-  type nodes = Hash.hash DynArray.t list [@@deriving sexp]
-
-  type tree = 
-    { leafs : leafs
-    ; mutable nodes : nodes
-    ; mutable dirty_indices : int list }
-  [@@deriving sexp]
-
-  type t = 
-    { accounts : accounts
-    ; tree : tree 
-    ; depth : int
-    } 
+  type t
   [@@deriving sexp]
 
   type path_elem = 
@@ -55,12 +29,12 @@ module type S =
 
   val get
     : t
-    -> key
+    -> Key.t
     -> Hash.account option
 
   val update
     : t
-    -> key
+    -> Key.t
     -> Hash.account
     -> unit
 
@@ -70,7 +44,7 @@ module type S =
 
   val merkle_path
     : t
-    -> key
+    -> Key.t
     -> path option
 end
 

@@ -7,42 +7,16 @@ module type S =
        type hash [@@deriving sexp]
        type account [@@deriving sexp]
        val hash_account : account -> hash 
-       val hash_unit : hash
-       val hash_unit_tree_depth : int -> hash
+       val empty_hash : hash
        val merge : hash -> hash -> hash
      end)
+    (Max_depth : sig val max_depth : int end)
     (Key : sig 
         type t [@@deriving sexp]
         include Hashable.S with type t := t
      end) -> sig
 
-  type entry = 
-    { merkle_index : int
-    ; account : Hash.account }
-
-  type key = Key.t
-
-  type accounts = (key, entry) Hashtbl.t
-
-  module DynArray : sig
-    type 'a t
-  end
-
-  type leafs = key DynArray.t [@@deriving sexp]
-
-  type nodes = Hash.hash DynArray.t list [@@deriving sexp]
-
-  type tree = 
-    { leafs : leafs
-    ; mutable nodes : nodes
-    ; mutable dirty_indices : int list }
-  [@@deriving sexp]
-
-  type t = 
-    { accounts : accounts
-    ; tree : tree 
-    ; depth : int
-    }
+  type t
   [@@deriving sexp]
 
   type path_elem = 
@@ -57,12 +31,12 @@ module type S =
 
   val get
     : t
-    -> key
+    -> Key.t
     -> Hash.account option
 
   val update
     : t
-    -> key
+    -> Key.t
     -> Hash.account
     -> unit
 
@@ -72,7 +46,7 @@ module type S =
 
   val merkle_path
     : t
-    -> key
+    -> Key.t
     -> path option
 end
 
@@ -81,10 +55,10 @@ module Make
        type hash [@@deriving sexp]
        type account [@@deriving sexp]
        val hash_account : account -> hash 
-       val hash_unit : hash
-       val hash_unit_tree_depth : int -> hash
+       val empty_hash : hash
        val merge : hash -> hash -> hash
      end)
+    (Max_depth : sig val max_depth : int end)
     (Key : sig 
         type t [@@deriving sexp]
         include Hashable.S with type t := t
@@ -133,16 +107,37 @@ module Make
   let create_account_table () = Key.Table.create ()
   ;;
 
+  let empty_hash_at_heights depth =
+    let empty_hash_at_heights = Array.create depth Hash.empty_hash in
+    let rec go i =
+      if i < depth
+      then begin
+        let h = empty_hash_at_heights.(i - 1) in
+        empty_hash_at_heights.(i) <- Hash.merge h h;
+        go (i + 1)
+      end
+    in
+    go 1;
+    empty_hash_at_heights
+  ;;
+
+  let memoized_empty_hash_at_height = empty_hash_at_heights Max_depth.max_depth
+
+  let empty_hash_at_height d = 
+    memoized_empty_hash_at_height.(d)
+
   (* if depth = N, leafs = 2^N *)
   let create depth = 
+    assert (depth < Max_depth.max_depth);
     { accounts = create_account_table ()
     ; tree = { leafs = DynArray.create ()
              ; nodes = []
              ; dirty_indices = [] 
-             } 
+             }
     ; depth
     }
   ;;
+
 
   let length t = Key.Table.length t.accounts
 
@@ -180,72 +175,64 @@ module Make
         target_lengths
         ~f:(fun nodes length -> 
           let new_elems = length - (DynArray.length nodes) in
-          DynArray.append (DynArray.init new_elems (fun x -> Hash.hash_unit)) nodes;
+          DynArray.append (DynArray.init new_elems (fun x -> Hash.empty_hash)) nodes;
         )
     end
   ;;
 
-  let rec recompute_layer prev_layer_hashes layers dirty_indices =
-    let updates = List.zip_exn prev_layer_hashes dirty_indices in
-    if List.length layers = 0 then ()
-    else 
-      match layers with
-      | [] -> failwith "Merkle_tree: Empty layers"
-      | head :: tail -> 
-        List.iter
-          updates
-          ~f:(fun ((left, right), idx) -> DynArray.set head idx (Hash.merge left right));
-        let next_layer_dirty_indices = 
-          List.dedup_and_sort
-            (List.map dirty_indices ~f:(fun x -> x  lsr 1))
-            ~compare:Int.compare
-        in
-        let get_head_hash i = 
-          if i < DynArray.length head
-          then DynArray.get head i 
-          else Hash.hash_unit
-        in
-        let next_layer_prev_layer_hashes = 
-          List.zip_exn
-            (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i)))
-            (List.map next_layer_dirty_indices ~f:(fun i -> get_head_hash (2 * i + 1)))
-        in
-        match tail with 
-        | _ :: _ -> recompute_layer next_layer_prev_layer_hashes tail next_layer_dirty_indices
-        | [] -> ()
-  ;;
+  let rec recompute_layers curr_height get_prev_hash layers dirty_indices =
+    match layers with
+    | [] -> ()
+    | curr :: layers ->
+      let get_curr_hash =
+        let n = DynArray.length curr in
+        fun i ->
+          if i < n
+          then DynArray.get curr i
+          else empty_hash_at_height curr_height
+      in
+      List.iter dirty_indices ~f:(fun i ->
+        DynArray.set curr i
+          (Hash.merge
+             (get_prev_hash (2 * i))
+             (get_prev_hash (2 * i + 1))));
+      let dirty_indices =
+        List.dedup_and_sort ~compare:Int.compare
+          (List.map dirty_indices ~f:(fun x -> x lsr 1))
+      in
+      recompute_layers
+        (curr_height + 1)
+        get_curr_hash
+        layers
+        dirty_indices
 
   let recompute_tree t =
-    extend_tree t.tree;
-    let layer_dirty_indices = 
-      Int.Set.to_list (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
-    in
-    let get_leaf_hash i = 
-      if i < DynArray.length t.tree.leafs
-      then Hash.hash_account (Hashtbl.find_exn t.accounts (DynArray.get t.tree.leafs i)).account
-      else Hash.hash_unit
-    in
-    let prev_layer_hashes =
-      List.zip_exn
-        (List.map layer_dirty_indices ~f:(fun i -> get_leaf_hash (2 * i)))
-        (List.map layer_dirty_indices ~f:(fun i -> get_leaf_hash (2 * i + 1)))
-    in
-    recompute_layer 
-      prev_layer_hashes t.tree.nodes layer_dirty_indices;
-    t.tree.dirty_indices <- []
+    if not (List.is_empty t.tree.dirty_indices) then begin
+      extend_tree t.tree;
+      let layer_dirty_indices = 
+        Int.Set.to_list (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
+      in
+      let get_leaf_hash i = 
+        if i < DynArray.length t.tree.leafs
+        then Hash.hash_account (Hashtbl.find_exn t.accounts (DynArray.get t.tree.leafs i)).account
+        else Hash.empty_hash
+      in
+      recompute_layers 
+        1 get_leaf_hash t.tree.nodes layer_dirty_indices;
+      t.tree.dirty_indices <- []
+    end
   ;;
-
 
   let merkle_root t = 
     recompute_tree t;
     let depth = List.length t.tree.nodes in
     let base_root =
       match List.last t.tree.nodes with
-      | None -> Hash.hash_unit
+      | None -> Hash.empty_hash
       | Some a -> DynArray.get a 0
     in
     let rec go i hash =
-      let hash = Hash.merge hash (Hash.hash_unit_tree_depth (t.depth - i - 1)) in
+      let hash = Hash.merge hash (empty_hash_at_height (t.depth - i - 1)) in
       if i = 0
       then hash
       else go (i-1) hash
@@ -255,62 +242,34 @@ module Make
 
   let merkle_path t key = 
     recompute_tree t;
-    let base_path = 
-      Option.map
-        (Hashtbl.find t.accounts key)
-        (fun entry -> 
-           let merkle_index = entry.merkle_index in
-           let indices = 
-             List.init 
-               ((List.length t.tree.nodes) + 1)
-               ~f:(fun i -> merkle_index/(Int.pow 2 i))
-           in
-           let parent_indices = List.drop indices 1 in
-           let drop_last ls = List.take ls (List.length ls - 1) in
-           let directions = 
-             List.map 
-               (drop_last indices)
-               ~f:(fun i -> if i % 2 = 0 then `Left else `Right)
-           in
-           let tail_hashes = 
-             List.map2_exn
-               (drop_last parent_indices)
-               (drop_last t.tree.nodes)
-               ~f:(fun i nodes -> 
-                 let idx = 
-                   if i % 2 = 0
-                   then i + 1
-                   else i - 1
-                 in
-                 DynArray.get nodes idx)
-           in
-           let leaf_hash_idx = 
-             if merkle_index % 2 = 0
-             then merkle_index + 1
-             else merkle_index - 1
-           in
-           let leaf_hash = 
-             if leaf_hash_idx < DynArray.length t.tree.leafs
-             then Hash.hash_account (Hashtbl.find_exn t.accounts (DynArray.get t.tree.leafs leaf_hash_idx)).account
-             else (Hash.hash_unit)
-           in
-           let hashes = leaf_hash::tail_hashes in
-           List.map2_exn 
-             directions
-             hashes
-             ~f:(fun dir hash -> 
-               match dir with
-               | `Left -> Left hash
-               | `Right -> Right hash)
-        )
-    in 
-    Option.map 
-      base_path
-      (fun base_path -> 
-         let base_path_depth = List.length base_path in
-         base_path @ (List.init 
-                        (t.depth - base_path_depth) 
-                        ~f:(fun i -> Left (Hash.hash_unit_tree_depth (i + base_path_depth))))
-      )
+    Option.map (Hashtbl.find t.accounts key) ~f:(fun entry ->
+      let addr0 = entry.merkle_index in
+      let rec go height addr layers acc =
+        match layers with
+        | [] -> List.rev acc, height
+        | curr :: layers ->
+          let is_left = addr mod 2 = 0 in
+          let hash =
+            let sibling = addr lxor 1 in
+            if sibling < DynArray.length curr
+            then DynArray.get curr sibling
+            else empty_hash_at_height height
+          in
+          go (height + 1) (addr lsr 1) layers ((if is_left then Left hash else Right hash) :: acc)
+      in
+      let leaf_hash_idx = addr0 lxor 1 in
+      let leaf_hash = 
+        if leaf_hash_idx >= DynArray.length t.tree.leafs
+        then Hash.empty_hash
+        else (Hash.hash_account (Hashtbl.find_exn t.accounts (DynArray.get t.tree.leafs leaf_hash_idx)).account)  
+      in
+      let is_left = addr0 mod 2 = 0 in
+      let base_path, base_path_height = 
+        go 1 (addr0 lsr 1) t.tree.nodes [ if is_left then Left leaf_hash else Right leaf_hash ]
+      in
+      base_path @ (List.init 
+                     (t.depth - base_path_height) 
+                     ~f:(fun i -> Left (empty_hash_at_height (i + base_path_height))))
+    )
   ;;
 end

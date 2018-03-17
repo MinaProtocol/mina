@@ -12,22 +12,17 @@ module Hash = struct
   let hash_account account = Md5.digest_string ("0" ^ (Sexp.to_string ([%sexp_of: account] account)))
   ;;
 
-  let hash_unit = Md5.digest_string ""
+  let empty_hash = Md5.digest_string ""
   ;;
 
 
   let merge a b =  Md5.digest_string ((Md5.to_hex a) ^ (Md5.to_hex b))
   ;;
 
-  let hash_unit_tree_depth i = 
-    let rec go i hash = 
-      if i = 0
-      then hash 
-      else go (i-1) (merge hash hash)
-    in
-    go i hash_unit
-  ;;
-  
+end
+
+module Max_depth = struct
+  let max_depth = 64
 end
 
 module Key = struct
@@ -39,4 +34,4 @@ module Key = struct
   include Hashable.Make(T)
 end
 
-include Ledger.Make(Hash)(Key)
+include Ledger.Make(Hash)(Max_depth)(Key)
