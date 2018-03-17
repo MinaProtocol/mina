@@ -86,6 +86,7 @@ module Make
 
   type tree = 
     { leafs : leafs
+    ; mutable nodes_height : int
     ; mutable nodes : nodes
     ; mutable dirty_indices : int list }
   [@@deriving sexp]
@@ -131,6 +132,7 @@ module Make
     assert (depth < Max_depth.max_depth);
     { accounts = create_account_table ()
     ; tree = { leafs = DynArray.create ()
+             ; nodes_height = 0
              ; nodes = []
              ; dirty_indices = [] 
              }
@@ -163,11 +165,12 @@ module Make
     let leafs = DynArray.length tree.leafs in
     if leafs <> 0 then begin
       let target_depth = Int.max 1 (Int.ceil_log2 leafs) in
-      let current_depth = List.length tree.nodes in
+      let current_depth = tree.nodes_height in
       let additional_depth = target_depth - current_depth in
+      tree.nodes_height <- tree.nodes_height + additional_depth;
       tree.nodes <- List.concat [ tree.nodes; (List.init additional_depth ~f:(fun _ -> DynArray.create ())) ];
       let target_lengths = 
-        let n = List.length tree.nodes in
+        let n = tree.nodes_height in
         List.init n ~f:(fun i -> Int.pow 2 (n - 1 - i))
       in
       List.iter2_exn
@@ -225,7 +228,7 @@ module Make
 
   let merkle_root t = 
     recompute_tree t;
-    let depth = List.length t.tree.nodes in
+    let height = t.tree.nodes_height in
     let base_root =
       match List.last t.tree.nodes with
       | None -> Hash.empty_hash
@@ -237,7 +240,7 @@ module Make
       then hash
       else go (i-1) hash
     in
-    go (t.depth - depth - 1) base_root
+    go (t.depth - height - 1) base_root
   ;;
 
   let merkle_path t key = 
