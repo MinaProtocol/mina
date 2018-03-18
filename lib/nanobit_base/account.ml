@@ -54,6 +54,11 @@ let var_to_bits { public_key; balance } =
   let balance = Balance.Unpacked.var_to_bits balance in
   public_key @ balance
 
+let fold_bits ({ public_key; balance } : t) =
+  fun ~init ~f ->
+    let init = Public_key.Compressed.fold public_key ~init ~f in
+    Balance.fold balance ~init ~f
+
 let hash t =
   var_to_bits t
   >>= hash_digest
