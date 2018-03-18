@@ -1,0 +1,17 @@
+FROM gcr.io/o1labs-192920/ocaml-base:db2ba069028f44d3b18b9c2367988ff0a25db8fe
+
+WORKDIR /app-lib
+RUN sudo chown -R opam /app-lib
+
+RUN git clone https://github.com/scipr-lab/ecfactory.git
+
+RUN sudo apt-get -y update && \
+  DEBIAN_FRONTEND=noninteractive sudo apt-get -y install sagemath
+
+WORKDIR /app
+RUN sudo chown -R opam /app
+
+ENV SAGE_PATH "/app-lib/ecfactory/:$SAGE_PATH"
+
+CMD python /app-lib/ecfactory/ecfactory/mnt_cycles/mnt_cycles_examples.py
+

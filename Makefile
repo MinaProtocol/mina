@@ -24,6 +24,24 @@ nanobit-minikube :
 nanobit-googlecloud :
 	./rebuild-googlecloud.sh nanobit nanobit-Dockerfile
 
+mnt-cycle-search-docker :
+	./rebuild-docker.sh mnt-cycle-search mnt-cycle-search-Dockerfile
+
+mnt-cycle-search-minikube :
+	./rebuild-minikube.sh mnt-cycle-search mnt-cycle-search-Dockerfile
+
+mnt-cycle-search-googlecloud :
+	./rebuild-googlecloud.sh mnt-cycle-search mnt-cycle-search-Dockerfile
+
+mnt-cycle-search-testbridge-docker :
+	./rebuild-docker.sh mnt-cycle-search-testbridge mnt-cycle-search-testbridge-Dockerfile
+
+mnt-cycle-search-testbridge-minikube :
+	./rebuild-minikube.sh mnt-cycle-search-testbridge mnt-cycle-search-testbridge-Dockerfile
+
+mnt-cycle-search-testbridge-googlecloud :
+	./rebuild-googlecloud.sh mnt-cycle-search-testbridge mnt-cycle-search-testbridge-Dockerfile
+
 testbridge-docker :
 	./rebuild-docker.sh testbridge-nanobit testbridge-Dockerfile
 

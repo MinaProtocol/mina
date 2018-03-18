@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name mnt_cycle_search_testbridge)
+  (public_name mnt_cycle_search_testbridge)
+  (library_flags (-linkall))
+  (libraries (core async async_extra ppx_inline_test.runtime-lib testbridge))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib swimlib))))
+  (synopsis "MNT Cycle Search Testbridge")))
+
