@@ -27,7 +27,96 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
   end
 end
 
-module Tock = Extend(Snarky.Snark.Make(Tock_curve))
+module Tock = struct
+  module Tock0 = Extend(Snarky.Snark.Make(Tock_curve))
+  include Tock0
+
+    (*
+  module Pedersen = struct
+    module Curve = struct
+      (* Used:
+        d = 202
+        cardinality = 475922286169261325753349249653048451545124879857690710220419002300318659092251128872896376
+        2^3 * 11 * 5408207797377969610833514200602823313012782725655576252504761389776348398775581009919277 *)
+
+      (* Alt:
+        d = 101
+        cardinality = 475922286169261325753349249653048451545124879908729468718742449458127168907974268754103088
+        2^4 * 7 * 4249306126511261837083475443330789745938614999185084542131629013018992579535484542447349 *)
+
+      (* someday: Compute this from the number inside of ocaml *)
+      let bit_length = failwith "TODO"
+
+      module type Params_intf = Snarky.Curves.Edwards.Params_intf with type field := Field.t
+      include Snarky.Curves.Edwards.Basic.Make(Field)((val (failwith "TODO") : Params_intf))
+
+      module Scalar (Impl : Snarky.Snark_intf.S) = struct
+        (* Someday: Make more efficient *)
+        open Impl
+        type var = Boolean.var list
+        type value = Bignum.Bigint.t
+
+        let pack bs =
+          let pack_char bs =
+            Char.of_int_exn
+              (List.foldi bs ~init:0
+                  ~f:(fun i acc b -> if b then acc lor (1 lsl i) else acc))
+          in
+          String.of_char_list (List.map ~f:pack_char (List.chunks_of ~length:8 bs))
+          |> Z.of_bits
+          |> Bignum.Bigint.of_zarith_bigint
+
+        let length = bit_length
+        let typ : (var, value) Typ.t =
+          Typ.(
+            transport (list ~length Boolean.typ)
+              ~there:(fun n -> List.init length ~f:(Z.testbit (Bignum.Bigint.to_zarith_bigint n)))
+              ~back:pack)
+
+        let assert_equal = Checked.Assert.equal_bitstrings
+      end
+    end
+
+    module P = Pedersen.Make(Field)(Tock_curve.Bigint.R)(Curve)
+    include (P : module type of P with module Digest := P.Digest)
+    module Digest = struct
+      include Hashable.Make(struct
+        type t = bool list [@@deriving compare, hash, sexp]
+      end)
+
+      include P.Digest
+      include Snarkable(Tock0)
+    end
+
+    let params =
+      let f s =
+        Tock_curve.Bigint.R.(to_field (of_decimal_string s))
+      in
+      Array.map Pedersen_params.t ~f:(fun (x, y) -> (f x, f y))
+  end
+
+  module Scalar = Pedersen.Curve.Scalar(Tock0)
+
+  module Hash_curve =
+    Snarky.Curves.Edwards.Extend
+      (Tock0)
+      (Scalar)
+      (Pedersen.Curve)
+
+  module Pedersen_hash = Snarky.Pedersen.Make(Tock0)(struct
+      include Hash_curve
+      let cond_add = Checked.cond_add
+    end)
+
+  let hash_digest x =
+    let open Checked in
+    Pedersen_hash.hash x
+      ~params:Pedersen.params
+      ~init:Hash_curve.Checked.identity
+    >>| Pedersen_hash.digest
+ *)
+end
+
 
 module Tick = struct
   module Tick0 = Extend(Snarky.Snark.Make(Tick_curve))
