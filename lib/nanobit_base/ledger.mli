@@ -6,6 +6,8 @@ open Tick
 type t = private Pedersen.Digest.t
 [@@deriving sexp]
 
+val of_hash : Pedersen.Digest.t -> t
+
 module Stable : sig
   module V1 : sig
     type nonrec t = t

@@ -39,6 +39,8 @@ let assert_equal x y = assert_equal x y
 
 include Stable.V1
 
+let of_hash = Fn.id
+
 type path = Pedersen.Digest.t list
 
 type _ Request.t +=
