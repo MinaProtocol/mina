@@ -11,12 +11,17 @@ let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 (* TODO: We can move it onto the subgroup during account creation. No need to check with
   every transaction *)
 
+let of_private_key pk =
+  Tick.Signature.scale Tick.Hash_curve.generator pk
+
 module Compressed = struct
   open Tick
   type t = Field.t [@@deriving bin_io]
   type var = Field.var
   let typ : (var, t) Typ.t = Typ.field
   let assert_equal (x : var) (y : var) = assert_equal x y
+
+  include (Bits.Make_field(Field)(Bigint) : Bits_intf.S with type t := t)
 
 (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
