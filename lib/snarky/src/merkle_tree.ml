@@ -1,8 +1,5 @@
 open Core
 
-let%test "foomerkle" = false
-
-
 module Address = struct
   type t = int
 end
