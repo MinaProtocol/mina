@@ -8,16 +8,19 @@ module Balance = Currency.T64
 module Index = struct
   type t = int
 
-  include Bits.Snarkable.Small_bit_vector(Tick)(struct
-      include Int
-      let length = Snark_params.ledger_depth
-      let empty = zero
-      let get t i = (t lsr i) land 1 = 1
-      let set v i b =
-        if b
-        then v lor (one lsl i)
-        else v land (lnot (one lsl i))
-    end)
+  module Vector = struct
+    include Int
+    let length = Snark_params.ledger_depth
+    let empty = zero
+    let get t i = (t lsr i) land 1 = 1
+    let set v i b =
+      if b
+      then v lor (one lsl i)
+      else v land (lnot (one lsl i))
+  end
+
+  include (Bits.Vector.Make(Vector) : Bits_intf.S with type t := t)
+  include Bits.Snarkable.Small_bit_vector(Tick)(Vector)
 
   module Stack = Hash_stack.Make(struct
       include Unpacked
