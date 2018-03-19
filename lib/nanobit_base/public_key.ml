@@ -12,7 +12,7 @@ let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
   every transaction *)
 
 let of_private_key pk =
-  Tick.Signature.scale Tick.Hash_curve.generator pk
+  Tick.Hash_curve.scale Tick.Hash_curve.generator pk
 
 module Compressed = struct
   open Tick
@@ -26,7 +26,8 @@ module Compressed = struct
 (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
   let var_to_bits (pk : var) =
-    Checked.choose_preimage pk ~length:Field.size_in_bits
+    with_label "Public_key.Compressed.var_to_bits"
+      (Checked.choose_preimage pk ~length:Field.size_in_bits)
 end
 
 (* TODO: Redo *)
