@@ -1395,6 +1395,8 @@ module Checked = struct
 
     let equal_bitstrings (t1 : Boolean.var list) (t2 : Boolean.var list) =
       let chunk_size = Field.size_in_bits - 1 in
+      (if List.length t1 <> List.length t2
+       then failwith "Checked.equal_bitstrings: Unequal lengths");
       let rec go acc t1 t2 =
         match t1, t2 with
         | [], [] -> acc
