@@ -33,7 +33,11 @@ type var = Pedersen.Digest.Packed.var
 
 let typ = Pedersen.Digest.Packed.typ
 
-let var_to_bits t = Pedersen.Digest.choose_preimage_var t >>| Pedersen.Digest.Unpacked.var_to_bits
+let var_to_bits t =
+  with_label "Ledger.var_to_bits"
+    (Pedersen.Digest.choose_preimage_var t >>| Pedersen.Digest.Unpacked.var_to_bits)
+
+include Pedersen.Digest.Bits
 
 let assert_equal x y = assert_equal x y
 
@@ -45,6 +49,7 @@ type path = Pedersen.Digest.t list
 
 type _ Request.t +=
   | Get_path    : Account.Index.t -> path Request.t
+  | Get_element : Account.Index.t -> (Account.t * path) Request.t
   | Set         : Account.Index.t * Account.t -> unit Request.t
   | Empty_entry : (Account.Index.t * path) Request.t
   | Find_index  : Public_key.Compressed.t -> Account.Index.t Request.t
@@ -52,9 +57,11 @@ type _ Request.t +=
 let reraise_merkle_requests (With { request; respond }) =
   match request with
   | Merkle_tree.Get_path addr ->
-    respond (Reraise (Get_path (failwith "TODO")))
+    respond (Reraise (Get_path addr))
   | Merkle_tree.Set (addr, account) ->
-    respond (Reraise (Set (failwith "TODO", account)))
+    respond (Reraise (Set (addr, account)))
+  | Merkle_tree.Get_element addr ->
+    respond (Reraise (Get_element addr))
   | _ -> unhandled
 
 let modify_account t pk ~f =
