@@ -6,6 +6,7 @@ let check_target         = true
 let compute_base_hash    = true
 let compute_base_proof   = true
 let extend_blockchain    = true
+let transaction_replay   = true
 (* Enabling this will SPEED UP builds as keys are generated at compile-time *)
 let key_generation       = true
 
