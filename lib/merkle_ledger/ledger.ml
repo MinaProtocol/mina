@@ -109,9 +109,9 @@ module Make
   ;;
 
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights = Array.create depth Hash.empty_hash in
+    let empty_hash_at_heights = Array.create (depth+1) Hash.empty_hash in
     let rec go i =
-      if i < depth
+      if i <= depth
       then begin
         let h = empty_hash_at_heights.(i - 1) in
         empty_hash_at_heights.(i) <- Hash.merge h h;
@@ -129,7 +129,7 @@ module Make
 
   (* if depth = N, leafs = 2^N *)
   let create depth = 
-    assert (depth < Max_depth.max_depth);
+    assert (depth <= Max_depth.max_depth);
     { accounts = create_account_table ()
     ; tree = { leafs = DynArray.create ()
              ; nodes_height = 0
@@ -169,14 +169,10 @@ module Make
       let additional_depth = target_depth - current_depth in
       tree.nodes_height <- tree.nodes_height + additional_depth;
       tree.nodes <- List.concat [ tree.nodes; (List.init additional_depth ~f:(fun _ -> DynArray.create ())) ];
-      let target_lengths = 
-        let n = tree.nodes_height in
-        List.init n ~f:(fun i -> Int.pow 2 (n - 1 - i))
-      in
-      List.iter2_exn
+      List.iteri
         tree.nodes
-        target_lengths
-        ~f:(fun nodes length -> 
+        ~f:(fun i nodes -> 
+          let length = Int.pow 2 (tree.nodes_height - 1 - i) in
           let new_elems = length - (DynArray.length nodes) in
           DynArray.append (DynArray.init new_elems (fun x -> Hash.empty_hash)) nodes;
         )
@@ -249,7 +245,7 @@ module Make
       let addr0 = entry.merkle_index in
       let rec go height addr layers acc =
         match layers with
-        | [] -> List.rev acc, height
+        | [] -> acc, height
         | curr :: layers ->
           let is_left = addr mod 2 = 0 in
           let hash =
@@ -270,9 +266,11 @@ module Make
       let base_path, base_path_height = 
         go 1 (addr0 lsr 1) t.tree.nodes [ if is_left then Left leaf_hash else Right leaf_hash ]
       in
-      base_path @ (List.init 
-                     (t.depth - base_path_height) 
-                     ~f:(fun i -> Left (empty_hash_at_height (i + base_path_height))))
+      List.rev_append 
+        base_path
+        (List.init 
+          (t.depth - base_path_height) 
+          ~f:(fun i -> Left (empty_hash_at_height (i + base_path_height))))
     )
   ;;
 end
