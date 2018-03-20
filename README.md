@@ -1,3 +1,11 @@
+# How to configure Mac Docker
+
+1. Install docker for mac
+2. Click the whale dude in your tray and go to preferences
+3. Change the disk space to >=128GB
+4. Change the RAM to >=8GB
+5. Change the cores to more (so your builds are faster)
+
 # How to setup development docker
 
 1. install gcloud
@@ -26,7 +34,9 @@ let g:syntastic_ocaml_checkers=['merlin']
 
 3. In your home directory `opam init`
 4. In this shell, `eval \`opam config env\``
-5. Now `opam install merlin`
+5. Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
+6. Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
+7. Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
 
 # How to Testbridge
 
