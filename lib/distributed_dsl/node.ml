@@ -1,28 +1,37 @@
 open Core_kernel
 open Async_kernel
 
+module type Peer_intf = sig
+  type t [@@deriving eq, hash, compare, sexp]
+  include Hashable.S with type t := t
+end
+
 module type Transport_intf = sig
   type t
   type message
   type peer
 
   val send : t -> recipient:peer -> message -> unit Or_error.t Deferred.t
-  val listen : t -> message Linear_pipe.Reader.t
+  val listen : t -> me:peer -> message Linear_pipe.Reader.t
 end
 
 module type Timer_intf = sig
+  type t
   type tok [@@deriving eq]
-  val wait : Time.Span.t -> tok * [`Cancelled | `Finished] Deferred.t
-  val cancel : tok -> unit
+  val wait : t -> Time.Span.t -> tok * [`Cancelled | `Finished] Deferred.t
+  (* No-ops if already cancelled *)
+  val cancel : t -> tok -> unit
 end
 
 module type S = sig
   type message
   type state
+  type transport
   module Message_label : Hashable.S
   module Timer_label : Hashable.S
   module Condition_label : Hashable.S
   module Timer : Timer_intf
+  module Identifier : Hashable.S
 
   type condition = state -> bool
 
@@ -61,23 +70,31 @@ module type S = sig
     -> Timer.tok
 
   val next_ready : t -> unit Deferred.t
+  val is_ready : t -> bool
 
   val make_node 
-    : messages : message Linear_pipe.Reader.t
+    : transport : transport
+    -> me : Identifier.t
+    -> messages : message Linear_pipe.Reader.t
     -> ?parent : t
     -> initial_state : state
+    -> timer : Timer.t
     -> message_command list 
     -> handle_command list 
     -> t
 
   val step : t -> t Deferred.t
+
+  val ident : t -> Identifier.t
+
+  val send : t -> recipient:Identifier.t -> message -> unit Or_error.t Deferred.t
 end
 
 module type F =
   functor 
     (State : sig type t [@@deriving eq] end)
     (Message : sig type t end)
-    (Peer : sig type t end)
+    (Peer : Peer_intf)
     (Timer : Timer_intf)
     (Message_label : sig 
        type label [@@deriving enum, sexp]
@@ -91,19 +108,20 @@ module type F =
        type label [@@deriving enum, sexp]
        include Hashable.S with type t = label
      end)
-    (Transport : Transport_intf with type message := Message.t 
-                                 and type peer := Peer.t) 
+    (Transport : Transport_intf with type message := Message.t
+                                 and type peer := Peer.t)
     -> S with type message := Message.t
           and type state := State.t
-          and module Timer := Timer
+          and type transport := Transport.t
           and module Message_label := Message_label
           and module Timer_label := Timer_label
           and module Condition_label := Condition_label
+          and module Timer := Timer
 
 module Make 
     (State : sig type t [@@deriving eq] end)
     (Message : sig type t end)
-    (Peer : sig type t end)
+    (Peer : Peer_intf)
     (Timer : Timer_intf)
     (Message_label : sig 
        type label [@@deriving enum, sexp]
@@ -120,6 +138,8 @@ module Make
     (Transport : Transport_intf with type message := Message.t 
                                  and type peer := Peer.t)
 = struct
+    module Identifier = Peer
+
     type condition = State.t -> bool
 
     type message_condition = Message.t -> condition
@@ -134,7 +154,10 @@ module Make
       ; message_handlers : (message_condition * message_transition) Message_label.Table.t
       ; triggered_timers_r : transition Linear_pipe.Reader.t
       ; triggered_timers_w : transition Linear_pipe.Writer.t
+      ; timer : Timer.t
       ; timers : Timer.tok list Timer_label.Table.t
+      ; ident : Identifier.t
+      ; transport : Transport.t
       }
 
     type handle_command = Condition_label.t * condition * transition
@@ -167,7 +190,7 @@ module Make
         )
       in
       List.iter to_cancel ~f:(fun tok' ->
-        Timer.cancel tok'
+        Timer.cancel t.timer tok'
       );
       add_back_timers t ~key:label ~data:to_put_back
 
@@ -178,7 +201,7 @@ module Make
         add_back_timers t ~key:label ~data:l'
       in
 
-      let tok, waited = Timer.wait ts in
+      let tok, waited = Timer.wait t.timer ts in
       let _ = Timer_label.Table.add_multi t.timers ~key:label ~data:tok  in
       don't_wait_for begin
         match%map waited with
@@ -204,7 +227,12 @@ module Make
           Deferred.never ()
       ]
 
-    let make_node ~messages ?parent ~initial_state message_conditions handle_conditions =
+    let is_ready t : bool =
+      Linear_pipe.peek t.message_pipe |> Option.is_some ||
+      Linear_pipe.peek t.triggered_timers_r |> Option.is_some ||
+      state_changed t
+
+    let make_node ~transport ~me ~messages ?parent ~initial_state ~timer message_conditions handle_conditions =
       let conditions = Condition_label.Table.create () in
       List.iter handle_conditions ~f:(fun (l, c, h) ->
         match Condition_label.Table.add conditions ~key:l ~data:(c,h) with
@@ -231,7 +259,10 @@ module Make
         ; message_handlers
         ; triggered_timers_r
         ; triggered_timers_w
+        ; timer
         ; timers
+        ; ident = me
+        ; transport
         }
       in
       t
@@ -279,5 +310,9 @@ module Make
               (List.map l ~f:(fun (label, _) -> label) |> List.sexp_of_t Message_label.sexp_of_label |> Sexp.to_string_hum) ())
       | false, None, None ->
           return (with_new_state t (t.state))
+
+      let ident {ident} = ident
+
+      let send {transport} = Transport.send transport
 end
 
