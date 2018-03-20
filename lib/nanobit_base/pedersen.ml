@@ -3,6 +3,8 @@ open Core_kernel
 module type S = sig
   type curve
 
+  type fold = init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int
+
   module Digest : sig
     type t [@@deriving bin_io, sexp]
 
@@ -32,7 +34,7 @@ module type S = sig
 
     val update_fold
       : t
-      -> (init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int)
+      -> fold
       -> t
 
     val update_iter
@@ -42,6 +44,8 @@ module type S = sig
 
     val digest : t -> Digest.t
   end
+
+  val hash_fold : Params.t -> fold -> Digest.t
 end
 
 module Make
@@ -60,6 +64,8 @@ struct
 
     module Bits = Bits.Make_field(Field)(Bigint)
   end
+
+  type fold = init:(Curve.t * int) -> f:((Curve.t * int) -> bool -> (Curve.t * int)) -> Curve.t * int
 
   module Params = struct
     type t = Curve.t array
@@ -148,4 +154,8 @@ struct
 
     let digest t = let (x, _y) = t.acc in x
   end
+
+  let hash_fold params fold =
+    let open State in
+    digest (update_fold (create params) fold)
 end
