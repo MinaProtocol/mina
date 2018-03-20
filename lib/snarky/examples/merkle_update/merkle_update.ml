@@ -142,7 +142,7 @@ let tree_start =
 ;;
 
 let updates =
-  let random_addr () = List.init depth ~f:(fun _ -> Random.bool ()) in
+  let random_addr () = Random.int (Int.pow 2 depth) in
   List.init num_pairs ~f:(fun _ -> (Value.random (), random_addr ()))
 ;;
 
