@@ -2,7 +2,7 @@ version: 2
 jobs:
   build:
     docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:fb2f55f93caa1e48023908b8ae830f723637baef
+      - image: gcr.io/o1labs-192920/ocaml-base:db2ba069028f44d3b18b9c2367988ff0a25db8fe
         # ENV variable is located in circleci
         auth:
           username: _json_key
