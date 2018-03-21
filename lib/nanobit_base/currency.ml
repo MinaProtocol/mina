@@ -37,6 +37,8 @@ module Make
 
   type t = Unsigned.t
 
+  include Sexpable.Of_stringable(Unsigned)
+
   include Make_bin_io(struct
       type v = Unsigned.t
       type t = Signed.t [@@deriving bin_io]
