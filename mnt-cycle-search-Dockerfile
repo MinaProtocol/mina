@@ -5,13 +5,11 @@ RUN sudo chown -R opam /app-lib
 
 RUN git clone https://github.com/scipr-lab/ecfactory.git
 
-RUN sudo apt-get -y update && \
-  DEBIAN_FRONTEND=noninteractive sudo apt-get -y install sagemath
-
 WORKDIR /app
 RUN sudo chown -R opam /app
+ADD ./sage.nix /app/sage.nix
+RUN ["/bin/bash", "-c", "source ~/.profile && nix-shell sage.nix --command 'sage --version'"]
 
-ENV SAGE_PATH "/app-lib/ecfactory/:$SAGE_PATH"
-
-CMD python /app-lib/ecfactory/ecfactory/mnt_cycles/mnt_cycles_examples.py
+WORKDIR /app-lib/ecfactory
+CMD ["/bin/bash", "-c", "source ~/.profile && nix-shell /app/sage.nix --command 'sage ecfactory/mnt_cycles/mnt_cycles_examples.py'"]
 

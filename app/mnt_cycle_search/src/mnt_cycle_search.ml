@@ -34,17 +34,44 @@ let main () =
 
   printf "name: %s\n" name;
 
+  let%bind proc = 
+    Process.create_exn
+      ~prog:"/bin/bash" 
+      ~args:
+        [ "-c"
+        ; "/app/lib/mnt_cycle_search_testbridge/search.sh"
+        ] 
+      () 
+  in
+  let stdout = Process.stdout proc in
+  let stderr = Process.stderr proc in
+  let stdin = Process.stdin proc in
+
+  don't_wait_for begin
+    let rec go () = 
+      let%bind line = Reader.read_line stderr in
+      let line = 
+        match line with
+        | `Ok s -> s
+        | `Eof -> "EoF"
+      in
+      printf "err: %s\n" line;
+      go ()
+    in 
+    go ()
+  end;
+
   let get_cycle n = 
-    let%map stdout = 
-      Process.run ~prog:"python" ~args:[ "/app-lib/ecfactory/ecfactory/mnt_cycles/mnt_cycles_examples.py" ] () 
-    in
+    printf "writing %d\n" n;
+    Writer.write_line stdin (Int.to_string n);
+    let%map stdout = Reader.read_line stdout in
     match stdout with
-    | Ok s -> (n, s)
-    | Error s -> (n, Error.to_string_hum s)
+    | `Ok s -> (printf "output: %s\n" s; (n, s))
+    | `Eof -> (n, "process exited")
   in
 
   let get_cycles _ (low, high) = 
-    Deferred.List.all (List.map (List.range low high) ~f:get_cycle)
+    Deferred.List.map ~how:`Sequential (List.range low high) ~f:get_cycle
   in
 
   let implementations = 
