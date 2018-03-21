@@ -139,6 +139,8 @@ module Tick = struct
       (Scalar)
       (Pedersen.Curve)
 
+  module Signature_curve = Hash_curve
+
   let%test "generator-order-match" =
     let open Hash_curve in
     equal
@@ -159,7 +161,7 @@ module Tick = struct
 
   module Util = Snark_util.Make(Tick0)
 
-  module Signature = Snarky.Signature.Schnorr(Tick0)(Hash_curve)(struct
+  module Signature = Snarky.Signature.Schnorr(Tick0)(Signature_curve)(struct
       (* TODO: This hash function is NOT secure *)
       let hash_checked bs =
         let open Checked.Let_syntax in
