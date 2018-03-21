@@ -36,10 +36,26 @@ module Payload = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let var_to_bits { receiver; amount; fee } =
-    let%map receiver = Public_key.Compressed.var_to_bits receiver in
-    let amount = Amount.Unpacked.var_to_bits amount in
-    let fee = Fee.Unpacked.var_to_bits fee in
-    receiver @ amount @ fee
+    with_label "Transaction.Payload.var_to_bits" begin
+      let%map receiver = Public_key.Compressed.var_to_bits receiver in
+      let amount = Amount.Unpacked.var_to_bits amount in
+      let fee = Fee.Unpacked.var_to_bits fee in
+      receiver @ amount @ fee
+    end
+
+  let to_bits { receiver; amount; fee } =
+    Public_key.Compressed.to_bits receiver
+    @ Amount.to_bits amount
+    @ Fee.to_bits fee
+
+  let%test_unit "to_bits" =
+    let open Test_util in
+    let length = Field.size_in_bits + 64 + 32 in
+    test_equal typ (Typ.list ~length Boolean.typ) var_to_bits to_bits
+      { receiver = Field.random ()
+      ; amount = Unsigned.UInt64.of_int (Random.int Int.max_value)
+      ; fee = Unsigned.UInt32.of_int32 (Random.int32 Int32.max_value)
+      }
 end
 
 type ('payload, 'pk, 'signature) t_ =

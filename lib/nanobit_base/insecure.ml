@@ -7,6 +7,7 @@ let compute_base_hash         = true
 let compute_base_proof        = true
 let extend_blockchain         = true
 let incorrect_key_compression = true
+let private_key_generation    = true
 (* Enabling this will SPEED UP builds as keys are generated at compile-time *)
 let key_generation       = true
 
