@@ -50,12 +50,14 @@ module Payload = struct
 
   let%test_unit "to_bits" =
     let open Test_util in
-    let length = Field.size_in_bits + 64 + 32 in
-    test_equal typ (Typ.list ~length Boolean.typ) var_to_bits to_bits
-      { receiver = Field.random ()
-      ; amount = Unsigned.UInt64.of_int (Random.int Int.max_value)
-      ; fee = Unsigned.UInt32.of_int32 (Random.int32 Int32.max_value)
-      }
+    let () = Random.init 12345678 in
+    with_randomness 123456789 (fun () ->
+      let length = Field.size_in_bits + 64 + 32 in
+      test_equal typ (Typ.list ~length Boolean.typ) var_to_bits to_bits
+        { receiver = Field.random ()
+        ; amount = Unsigned.UInt64.of_int (Random.int Int.max_value)
+        ; fee = Unsigned.UInt32.of_int32 (Random.int32 Int32.max_value)
+        })
 end
 
 type ('payload, 'pk, 'signature) t_ =
