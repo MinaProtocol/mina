@@ -67,37 +67,34 @@ open Let_syntax
 let parity y = Bigint.(test_bit (of_field y) 0)
 
 let decompress ({ x; is_odd } : Compressed.t) =
-  let y = Hash_curve.find_y x in
-  let y_parity = parity y in
-  let y =
-    if is_odd = y_parity then y else Field.negate y
-  in
-  (x, y)
+  Option.map (Hash_curve.find_y x) ~f:(fun y ->
+    let y_parity = parity y in
+    let y =
+      if is_odd = y_parity then y else Field.negate y
+    in
+    (x, y))
 
-let assert_parity parity x =
-  Checked.return ()
+let decompress_exn t = Option.value_exn (decompress t)
+
+let parity_var y = Util.unpack_field_var y >>| List.hd_exn
 
 let decompress_var ({ x; is_odd } as c : Compressed.var) =
   let%bind y =
     provide_witness Typ.field
-      As_prover.(map (read Compressed.typ c) ~f:decompress)
+      As_prover.(
+        map (read Compressed.typ c) ~f:(fun c ->
+          snd (decompress_exn c)))
   in
   let%map () = Snark_params.Tick.Hash_curve.Checked.Assert.on_curve (x, y)
-  and () = assert_parity is_odd y
+  and () = parity_var y >>= Boolean.Assert.((=) is_odd)
   in
   (x, y)
-
-let parity_var y =
-  let%bind is_odd =
-    provide_witness Boolean.typ
-      As_prover.(map (read_var y) ~f:parity)
-  in
-  let%map () = assert_parity is_odd y in
-  is_odd
 
 let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   let%map is_odd = parity_var y in
   { Compressed.x; is_odd }
+
+let assert_equal : var -> var -> (unit, _) Tick.Checked.t = fun _ _ -> failwith "TODO"
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in
