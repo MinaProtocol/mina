@@ -21,11 +21,6 @@ module Index = struct
 
   include (Bits.Vector.Make(Vector) : Bits_intf.S with type t := t)
   include Bits.Snarkable.Small_bit_vector(Tick)(Vector)
-
-  module Stack = Hash_stack.Make(struct
-      include Unpacked
-      let var_to_bits x = return (var_to_bits x)
-    end)
 end
 
 type ('pk, 'amount) t_ =
