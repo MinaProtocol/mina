@@ -20,43 +20,84 @@ let () =
 
 module Compressed = struct
   open Tick
-  module T = struct
-    type t = Field.t [@@deriving bin_io, sexp]
-    (* Someday: All this conversion is wasteful, could be a source of performance problems *)
-    let compare x y = Bigint.(compare (of_field x) (of_field y))
-    let to_bigint x = Bigint.(to_bignum_bigint (of_field x))
-    let hash x = Bignum.Bigint.hash (to_bigint x)
-    let hash_fold_t s x =
-      Bignum.Bigint.hash_fold_t s (to_bigint x)
-  end
 
-  include T
+  type ('field, 'boolean) t_ =
+    { x      : 'field
+    ; is_odd : 'boolean
+    }
+  [@@deriving bin_io]
 
-  include Hashable.Make(T)
+  type t = (Field.t, bool) t_
+  [@@deriving bin_io]
 
-  type var = Field.var
-  let typ : (var, t) Typ.t = Typ.field
-  let assert_equal (x : var) (y : var) = assert_equal x y
+  type var = (Field.var, Boolean.var) t_
+
+  let to_hlist { x; is_odd } = H_list.([ x; is_odd ])
+  let of_hlist : (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
+    let open H_list in
+    fun [ x; is_odd ] -> { x; is_odd }
+
+  let typ : (var, t) Typ.t =
+    Typ.of_hlistable Data_spec.([ Field.typ; Boolean.typ ])
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let assert_equal (t1 : var) (t2 : var) =
+    let open Let_syntax in
+    let%map () = assert_equal t1.x t2.x
+    and () = Boolean.Assert.(t1.is_odd = t2.is_odd)
+    in
+    ()
 
   include (Bits.Make_field(Field)(Bigint) : Bits_intf.S with type t := t)
 
 (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
-  let var_to_bits (pk : var) =
-    with_label "Public_key.Compressed.var_to_bits"
-      (Checked.choose_preimage pk ~length:Field.size_in_bits)
+  let var_to_bits ({ x; is_odd } : var) =
+    let open Let_syntax in
+    let%map x_bits = Checked.choose_preimage x ~length:Field.size_in_bits in
+    is_odd :: x_bits
 end
 
-let compress_var : var -> Compressed.var = fun (x, _) -> x
-let decompress_var : Compressed.var -> var = fun _ -> failwith "TODO"
+open Tick
+open Let_syntax
 
-let assert_equal : var -> var -> (unit, _) Tick.Checked.t =
-  fun (x1, y1) (x2, y2) ->
-    let open Tick in let open Let_syntax in
-    let%map () = assert_equal x1 x2
-    and () = assert_equal y1 y2
-    in
-    ()
+(* TODO: Have Signature_curve *)
+
+let parity y = Bigint.(test_bit (of_field y) 0)
+
+let decompress ({ x; is_odd } : Compressed.t) =
+  let y = Hash_curve.find_y x in
+  let y_parity = parity y in
+  let y =
+    if is_odd = y_parity then y else Field.negate y
+  in
+  (x, y)
+
+let assert_parity parity x =
+  Checked.return ()
+
+let decompress_var ({ x; is_odd } as c : Compressed.var) =
+  let%bind y =
+    provide_witness Typ.field
+      As_prover.(map (read Compressed.typ c) ~f:decompress)
+  in
+  let%map () = Snark_params.Tick.Hash_curve.Checked.Assert.on_curve (x, y)
+  and () = assert_parity is_odd y
+  in
+  (x, y)
+
+let parity_var y =
+  let%bind is_odd =
+    provide_witness Boolean.typ
+      As_prover.(map (read_var y) ~f:parity)
+  in
+  let%map () = assert_parity is_odd y in
+  is_odd
+
+let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
+  let%map is_odd = parity_var y in
+  { Compressed.x; is_odd }
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in
