@@ -14,6 +14,10 @@ let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 let of_private_key pk =
   Tick.Hash_curve.scale Tick.Hash_curve.generator pk
 
+let () =
+  (if not Insecure.incorrect_key_compression
+  then failwith "incorrect_key_compression")
+
 module Compressed = struct
   open Tick
   type t = Field.t [@@deriving bin_io]
