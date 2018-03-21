@@ -1,5 +1,8 @@
 open Core
 
+let%test "foomerkle" = false
+
+
 module Address = struct
   type t = int
 end
@@ -330,13 +333,12 @@ let get_path { tree; hash; depth; _ } addr0 =
 
 let implied_root ~compress addr0 entry_hash path0 =
   let rec go acc i path =
-    match i < 0, path with
-    | true, [] -> acc
-    | false, h :: hs ->
-      go (if ith_bit addr0 i then compress h acc else compress acc h)
+    match path with
+    | [] -> acc
+    | h :: hs ->
+      go
+        (if ith_bit addr0 i then compress h acc else compress acc h)
         (i + 1) hs
-    | _, _ ->
-      failwith "Merkle_tree.implied_root"
   in
   go entry_hash 0 path0
 ;;
