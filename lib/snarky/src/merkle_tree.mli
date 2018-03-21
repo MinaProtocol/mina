@@ -1,6 +1,10 @@
 type ('hash, 'a) t [@@deriving sexp]
 type ('hash, 'a) merkle_tree = ('hash, 'a) t
 
+module Address : sig
+  type t = int
+end
+
 module Free_hash : sig
   type 'a t =
     | Hash_value of 'a
@@ -33,24 +37,24 @@ val add
 val add_many
   : ('hash, 'a) t -> 'a list -> ('hash, 'a) t
 
-val update : ('hash, 'a) t -> bool list -> 'a -> ('hash, 'a) t
+val update : ('hash, 'a) t -> Address.t -> 'a -> ('hash, 'a) t
 
-val get     : (_, 'a) t -> bool list -> 'a option
-val get_exn : (_, 'a) t -> bool list -> 'a
+val get     : (_, 'a) t -> Address.t -> 'a option
+val get_exn : (_, 'a) t -> Address.t -> 'a
 
 val get_path
-  : ('hash, 'a) t -> bool list -> 'hash list
+  : ('hash, 'a) t -> Address.t -> 'hash list
 
 val implied_root
-  : compress:('hash -> 'hash -> 'hash) ->  bool list -> 'hash -> 'hash list -> 'hash
+  : compress:('hash -> 'hash -> 'hash) ->  Address.t -> 'hash -> 'hash list -> 'hash
 
 val get_free_path
-  : (_, 'a) t -> bool list -> 'a Free_hash.t list
+  : (_, 'a) t -> Address.t -> 'a Free_hash.t list
 
 val free_root : (_, 'a) t -> 'a Free_hash.t
 
 val implied_free_root
-  : bool list -> 'a -> 'a Free_hash.t list -> 'a Free_hash.t
+  : Address.t -> 'a -> 'a Free_hash.t list -> 'a Free_hash.t
 
 val root : ('hash, 'a) t -> 'hash
 
@@ -78,10 +82,8 @@ module Checked
   open Impl
 
   module Address : sig
-    type 'a t = 'a list [@@deriving sexp]
-    type var = Boolean.var t
-    type value = bool t [@@deriving sexp]
-    val value_of_int : depth:int -> int -> value
+    type var = Boolean.var list
+    type value = int
     val typ : depth:int -> (var, value) Typ.t
   end
 
@@ -92,8 +94,9 @@ module Checked
   end
 
   type _ Request.t +=
-    | Get_path : Address.value -> Path.value Request.t
-    | Set : Address.value * Elt.value -> unit Request.t
+    | Get_element : Address.value -> (Elt.value * Path.value) Request.t
+    | Get_path    : Address.value -> Path.value Request.t
+    | Set         : Address.value * Elt.value -> unit Request.t
 
   val implied_root : Hash.var -> Address.var -> Path.var -> (Hash.var, _) Checked.t
 
