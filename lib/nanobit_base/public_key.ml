@@ -62,12 +62,10 @@ end
 open Tick
 open Let_syntax
 
-(* TODO: Have Signature_curve *)
-
 let parity y = Bigint.(test_bit (of_field y) 0)
 
 let decompress ({ x; is_odd } : Compressed.t) =
-  Option.map (Hash_curve.find_y x) ~f:(fun y ->
+  Option.map (Signature_curve.find_y x) ~f:(fun y ->
     let y_parity = parity y in
     let y =
       if is_odd = y_parity then y else Field.negate y
@@ -85,7 +83,7 @@ let decompress_var ({ x; is_odd } as c : Compressed.var) =
         map (read Compressed.typ c) ~f:(fun c ->
           snd (decompress_exn c)))
   in
-  let%map () = Snark_params.Tick.Hash_curve.Checked.Assert.on_curve (x, y)
+  let%map () = Signature_curve.Checked.Assert.on_curve (x, y)
   and () = parity_var y >>= Boolean.Assert.((=) is_odd)
   in
   (x, y)
