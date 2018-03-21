@@ -48,6 +48,16 @@ module Make (Impl : Snark_intf.Basic) = struct
     ; bits = Some bs
     }
 
+  let div_pow_2 n (`Two_to_the k) = 
+    let%map bits = to_bits n in
+    let divided = List.drop bits k in
+    let divided_of_bits = of_bits divided in
+    { upper_bound = Bignum.Bigint.(divided_of_bits.upper_bound / (pow (of_int 2) (of_int k)))
+    ; lower_bound = Bignum.Bigint.(divided_of_bits.lower_bound / (pow (of_int 2) (of_int k)))
+    ; var = divided_of_bits.var
+    ; bits = divided_of_bits.bits
+    }
+
   let clamp_to_n_bits t n =
     assert (n < Field.size_in_bits);
     with_label "Number.clamp_to_n_bits" begin
@@ -139,6 +149,12 @@ module Make (Impl : Snark_intf.Basic) = struct
             Boolean.var_of_value (Bigint.test_bit tick_n i)))
     }
 
+  let one = constant Field.one
+  let zero = constant Field.zero
+
+  let of_pow_2 (`Two_to_the k) =
+    constant (Field.of_int (Int.pow 2 k))
+
   let if_ b ~then_ ~else_ =
     let%map var = Checked.if_ b ~then_:then_.var ~else_:else_.var in
     let open Bignum.Bigint in
@@ -158,7 +174,8 @@ module Make (Impl : Snark_intf.Basic) = struct
       ; var = Cvar.add x.var y.var
       ; bits = None
       }
-    else failwith "Number.+: Potential overflow: "
+    else failwithf "Number.+: Potential overflow: (%s + %s > Field.size)"
+        (to_string x.upper_bound) (to_string y.upper_bound) ()
 
   let (-) x y =
     let open Bignum.Bigint in
@@ -186,7 +203,21 @@ module Make (Impl : Snark_intf.Basic) = struct
         ; var 
         ; bits = None
         }
-      else failwith "Number.+: Potential overflow"
+      else failwithf "Number.*: Potential overflow: (%s * %s > Field.size)"
+        (to_string x.upper_bound) (to_string y.upper_bound) ()
     end
+
+  let min x y =
+    let%bind less = x < y in
+    if_ less
+      ~then_:x
+      ~else_:y
+
+  let max x y =
+    let%bind less = x < y in
+    if_ less
+      ~then_:y
+      ~else_:x
+
 end
 
