@@ -1,0 +1,210 @@
+
+
+Protocol
+
+node_state: {
+  transaction_snarks : snark list
+  identity_snark     : snark
+}
+
+identity_state : {
+  proof             : snark
+  notaries          : identity list
+  epoch             : count
+  epoch_randomness  : string
+  slot              : index
+  length            : count
+  ledger_length     : count
+  ledger_hash       : hash
+}
+
+identity_transition : {
+  notary            : identity
+  slot              : index
+  ledger_transitions: { ledger_snark, ledger_length, ledger_hash } list
+  epoch_transition  : { epoch, epoch_randomness } option
+  new_proof         : snark
+  public_key        : public_key
+}
+
+snark_ledger_state : {
+  proof             : snark
+  ledger_hash       : hash
+  length            : count
+  notaries          : identity list
+  notary_coinbases  : (identity, count) map
+}
+
+snark_ledger_transition : 
+  | snark_transaction_transition : {
+    new_ledger_hash : hash
+    new_coinbases   : (identity, count) map
+    new_proof       : snark
+  }
+  | snark_identity_transition : {
+    new_length      : count
+    new_notaries    : identity list
+    identity_proof  : snark
+    new_proof       : snark
+  }
+
+ledger_transition : {
+  | transaction_transition : {
+    transactions    : transaction list
+    new_ledger_hash : hash
+  }
+  | identity_transition : {
+    new_length      : count
+    new_notaries    : identity list
+    identity_proof  : snark
+  }
+}
+
+full_ledger_transition : {
+  | identity_transition : {     …
+    new_length      : count
+    new_notaries    : identity list
+    identity_proof  : snark
+  }
+  | buffer_state_transition : {
+    | finished
+  }
+}
+
+work_dependency_graph : {
+  leafs  : ledger_transitions
+  output : snark_ledger_transition
+}
+
+transaction_buffer : {
+  work              : work_dependency_graph option
+  queue             : ledger_transition list
+  work_balance      : (identity, count) map
+}
+
+full_ledger_state : {
+  snark_ledger_state
+  transaction_buffer
+  permissioned_notaries : (identity, index) map
+  active_notaries       : (identity, index) map
+}
+
+==========================================
+
+get_slot 
+  : epoch:count 
+  -> epoch_randomness:string 
+  -> ledger 
+  -> slot:index 
+  -> account
+
+submit_slot 
+  : old:identity_state 
+  -> transition
+
+update_identity_state 
+  : old:identity_state 
+  -> identity_transition 
+  -> new:identity_state
+
+consensus_verify 
+  : full_ledger_state 
+  -> ledger_transition 
+  -> bool
+
+process_consensus_output 
+  : transaction_buffer 
+  -> ledger_transition 
+  -> unit
+
+update_snark_transaction_state 
+  : old:snark_ledger_state 
+  -> snark_ledger_transition 
+  -> new:snark_ledger_state
+
+update_transaction_state 
+  : old:full_ledger_state 
+  -> full_ledger_transition 
+  -> new:full_ledger_state
+
+==========================================
+
+get_slot 
+  epoch 
+  epoch_randomness 
+  ledger 
+  slot 
+  account 
+  = 
+    let r = get random between 0 and 1 from epoch, epoch_randomness, slot in
+    let account = get account at position r in ledger in
+    account
+
+#TODO
+#  include transitions if exist
+#  spec out snark (including that public key signed message correctly)
+#  include epoch transition? Research ouroboros first
+submit_slot
+  old_identity_state
+  transition
+  =
+    let proof = proof that public key owns successor to old_identity_state
+    { 
+      notary = self
+      ledger_transitions : []
+      epoch_transition   : None
+      proof
+      public_key
+    }
+
+#TODO
+#  write out what verify_transition means
+#  write out what apply means
+update_identity_state
+  old_identity_state
+  transition
+  = 
+    verify_transition (old_identity_state, transition);
+    apply (old_identity_state, transition)
+
+#TODO
+#  write out what transition_valid means
+#  write out what submittor_has_enough_work_balance means
+consensus_verify 
+  full_ledger_state 
+  ledger_transition 
+  = 
+    transition_valid (ledger_transition) &&
+    submittor_has_enough_work_balance (ledger_transition)
+
+#TODO
+#  write out add to transaction queue
+#  write out apply to ledger
+#  write out deduct from submittor's work balance
+process_consensus_output 
+  transaction_buffer 
+  ledger_transition 
+  = 
+    add to transaction queue
+    apply to ledger
+    deduct from submittor's work balance
+
+#TODO
+#  write out what verify_transition means
+#  write out what apply means
+update_snark_transaction_state 
+  old_snark_ledger_state 
+  snark_ledger_transition 
+  = 
+    verify_transition (old_snark_ledger_state, snark_ledger_transition);
+    apply (old_snark_ledger_state, snark_ledger_transition)
+
+#TODO
+#  write out what verify_transition means
+#  write out what apply means
+update_transaction_state 
+  old_full_ledger_state 
+  full_ledger_transition 
+  =
+    verify_transition (old_full_ledger_state, full_ledger_transition);
+    apply (old_full_ledger_state, full_ledger_transition)
