@@ -6,10 +6,10 @@ module Ident = struct
 
   let state = ref 0
 
-  let next ~f =
+  let next () =
     let old = !state in
     state := old + 1;
-    f old
+    old
 end
 
 module type Message_delay_intf = sig
@@ -41,8 +41,6 @@ module Time_queue = struct
             let (action, _) = Heap.pop_exn t.pending_actions in
             f action;
             go ()
-          else
-            ()
     in
     go ()
 
@@ -136,7 +134,7 @@ module Fake_timer : Fake_timer_intf = struct
     )
 
   let wait t ts =
-    let tok = Ident.next ~f:Fn.id in
+    let tok = Ident.next () in
     let ivar = Ivar.create () in
     Time_queue.handle_in_future t.q ~after:ts ivar;
     Token.Table.add_exn t.timer_stoppers ~key:tok ~data:ivar;
