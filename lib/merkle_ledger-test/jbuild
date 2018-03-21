@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(executable
+  ((name merkle_ledger_test)
+   (package merkle_ledger)
+   (public_name merkle_ledger_test)
+   (libraries (merkle_ledger ppx_inline_test.runner.lib))
+  ))
+
+(alias
+  ((name runtest)
+   (deps (merkle_ledger_test.exe))
+   (action (run ${<} inline-test-runner nanobit_base))))
+

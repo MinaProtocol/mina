@@ -44,16 +44,20 @@ module Make
       let back = M.of_signed
     end)
 
-  include Bits.Snarkable.Small_bit_vector(Tick)(struct
-      include M
-      include Unsigned
-      let empty = zero
-      let get t i = Infix.((t lsr i) land one = one)
-      let set v i b =
-        if b
-        then Infix.(v lor (one lsl i))
-        else Infix.(v land (lognot (one lsl i)))
-    end)
+  module Vector = struct
+    include M
+    include Unsigned
+    let empty = zero
+    let get t i = Infix.((t lsr i) land one = one)
+    let set v i b =
+      if b
+      then Infix.(v lor (one lsl i))
+      else Infix.(v land (lognot (one lsl i)))
+  end
+
+  include (Bits.Vector.Make(Vector) : Bits_intf.S with type t := t)
+
+  include Bits.Snarkable.Small_bit_vector(Tick)(Vector)
 
   let zero : Unpacked.var =
     List.init M.length ~f:(fun _ -> Boolean.false_)

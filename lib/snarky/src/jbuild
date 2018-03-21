@@ -1,7 +1,7 @@
 (library
  ((name snarky)
   (public_name snarky)
-  (libraries (core_kernel bignum camlsnark_c))
+  (libraries (core_kernel bignum camlsnark_c ppx_inline_test.runtime-lib))
   (c_library_flags (:standard -lstdc++ -lpthread))
   (flags (:standard -safe-string))
   (cxx_flags
@@ -9,7 +9,7 @@
       (:standard "\\" -pedantic)
       (-I re2_c/libre2)
       ))
-  (preprocess (pps (ppx_jane ppx_deriving.enum ppx_driver.runner)))))
+  (preprocess (pps (ppx_jane ppx_deriving.enum ppx_driver.runner (-inline-test-lib snarky))))))
 
 (jbuild_version 1)
 

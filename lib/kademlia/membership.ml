@@ -285,7 +285,7 @@ let%test_unit "connect" =
   in
   Async.Thread_safe.block_on_async_exn (fun () ->
     let open Deferred.Let_syntax in
-    let%bind _n0 = node (addr 0) [addr 1]
+    let%bind _n0 = node (addr 0) []
          and _n1 = node (addr 1) [addr 0] in
     let n0, n1 = Or_error.ok_exn _n0, Or_error.ok_exn _n1 in
     let%bind n0_peers =
