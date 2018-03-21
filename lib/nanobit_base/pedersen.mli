@@ -3,6 +3,8 @@ open Core_kernel
 module type S = sig
   type curve
 
+  type fold = init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int
+
   module Digest : sig
     type t [@@deriving bin_io, sexp]
 
@@ -31,9 +33,7 @@ module type S = sig
     val update_bigstring : t -> Bigstring.t -> t
 
     val update_fold
-      : t
-      -> (init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int)
-      -> t
+      : t -> fold -> t
 
     val update_iter
       : t
@@ -42,6 +42,8 @@ module type S = sig
 
     val digest : t -> Digest.t
   end
+
+  val hash_fold : Params.t -> fold -> Digest.t
 end
 
 module Make

@@ -40,32 +40,9 @@ struct
     val typ : (var, value) Typ.t
   end = Curve
 
-  let bigint_ceil_log2 =
-    let rec go acc n =
-      if Bignum.Bigint.(n = zero)
-      then acc
-      else go (acc + 1) (Bignum.Bigint.shift_right n 1)
-    in
-    go 0
-
-  let bigint_ith_bit n i = Z.testbit (Bignum.Bigint.to_zarith_bigint n) i
-
-  let scalar_size_in_bits = Z.numbits (Bignum.Bigint.to_zarith_bigint Curve.Params.order)
-
-  let scale (x : Curve.value) (s : Scalar.t) =
-    let rec go i pt acc =
-      if i >= scalar_size_in_bits
-      then acc
-      else
-        go (i + 1) (Curve.add pt pt)
-          (if bigint_ith_bit s i then Curve.add acc pt else acc)
-    in
-    go 0 x Curve.identity
-  ;;
-
   let sign (k : Private_key.t) m =
     let e_r = Scalar.random Curve.Params.order in
-    let r = compress (scale Curve.generator e_r) in
+    let r = compress (Curve.scale Curve.generator e_r) in
     let h = Hash.hash (r @ m) in
     let s = Scalar.((e_r - (k * h)) % Curve.Params.order) in
     (s, h)
@@ -84,7 +61,7 @@ struct
       else
         let acc = Curve.add acc acc in
         let acc =
-          match bigint_ith_bit sp i, bigint_ith_bit sq i with
+          match Curve.Scalar.test_bit sp i, Curve.Scalar.test_bit sq i with
           | true, false -> Curve.add p acc
           | false, true -> Curve.add q acc
           | true, true -> Curve.add pq acc
@@ -92,21 +69,21 @@ struct
         in
         go (i - 1) acc
     in
-    go (scalar_size_in_bits - 1) Curve.identity
+    go (Curve.Scalar.length - 1) Curve.identity
 
   let verify
         ((s, h) : Signature.value)
         (pk : Public_key.value)
         (m : bool list)
     =
-    let r =
-      compress (shamir_sum (s, Curve.generator) (h, pk))
-    in
-    Scalar.equal (Hash.hash (r @ m)) h
+    let r = compress (shamir_sum (s, Curve.generator) (h, pk)) in
+    let h' = Hash.hash (r @ m) in
+    Scalar.equal h' h
   ;;
 
   module Checked = struct
-    let compress ((x, _) : Curve.var) = Checked.unpack x ~length:Field.size_in_bits
+    let compress ((x, _) : Curve.var) =
+      Checked.choose_preimage x ~length:Field.size_in_bits
 
     let assert_verifies
           ((s, h) : Signature.var)

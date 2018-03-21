@@ -67,7 +67,8 @@ module Tick = struct
 
           let d = Field.of_int 20
           let cofactor = Bignum.Bigint.(of_int 8 * of_int 5 * of_int 7 * of_int 399699743)
-          let order = Bignum.Bigint.of_string "475922286169261325753349249653048451545124878135421791758205297448378458996221426427165320"
+          let order = Bignum.Bigint.of_string "4252498232415687930110553454452223399041429939925660931491171303058234989338533"
+
           let generator = 
             let f s = Tick_curve.Bigint.R.(to_field (of_decimal_string s)) in
             f "327139552581206216694048482879340715614392408122535065054918285794885302348678908604813232",
@@ -79,6 +80,9 @@ module Tick = struct
         open Impl
         type var = Boolean.var list
         type value = Bignum.Bigint.t
+
+        let test_bit t i =
+          Bignum.Bigint.(shift_right t i land one = one)
 
         let pack bs =
           let pack_char bs =
@@ -135,6 +139,14 @@ module Tick = struct
       (Scalar)
       (Pedersen.Curve)
 
+  module Signature_curve = Hash_curve
+
+  let%test "generator-order-match" =
+    let open Hash_curve in
+    equal
+      (scale Params.generator Params.order)
+      identity
+
   module Pedersen_hash = Snarky.Pedersen.Make(Tick0)(struct
       include Hash_curve
       let cond_add = Checked.cond_add
@@ -144,22 +156,30 @@ module Tick = struct
     let open Checked in
     Pedersen_hash.hash x
       ~params:Pedersen.params
-      ~init:Hash_curve.Checked.identity
+      ~init:(0, Hash_curve.Checked.identity)
     >>| Pedersen_hash.digest
 
   module Util = Snark_util.Make(Tick0)
 
-  module Signature = Snarky.Signature.Schnorr(Tick0)(Hash_curve)(struct
+  module Signature = Snarky.Signature.Schnorr(Tick0)(Signature_curve)(struct
+      (* TODO: This hash function is NOT secure *)
       let hash_checked bs =
-        let open Checked in
-        hash_digest bs >>= choose_preimage ~length:Scalar.length
+        let open Checked.Let_syntax in
+        with_label "Signature.hash_checked" begin
+          let%map h = hash_digest bs >>= Pedersen.Digest.choose_preimage_var in
+          List.take (Pedersen.Digest.Unpacked.var_to_bits h) Scalar.length
+        end
+
 
       let hash bs =
         let s = Pedersen.(State.create params) in
         let s = Pedersen.State.update_fold s (List.fold bs) in
-        Scalar.pack (Field.unpack (Pedersen.State.digest s))
+        Scalar.pack 
+          (List.take (Field.unpack (Pedersen.State.digest s)) Scalar.length)
     end)
 end
+
+let ledger_depth = 3
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.
