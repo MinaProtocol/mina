@@ -20,7 +20,20 @@ let () =
 
 module Compressed = struct
   open Tick
-  type t = Field.t [@@deriving bin_io]
+  module T = struct
+    type t = Field.t [@@deriving bin_io, sexp]
+    (* Someday: All this conversion is wasteful, could be a source of performance problems *)
+    let compare x y = Bigint.(compare (of_field x) (of_field y))
+    let to_bigint x = Bigint.(to_bignum_bigint (of_field x))
+    let hash x = Bignum.Bigint.hash (to_bigint x)
+    let hash_fold_t s x =
+      Bignum.Bigint.hash_fold_t s (to_bigint x)
+  end
+
+  include T
+
+  include Hashable.Make(T)
+
   type var = Field.var
   let typ : (var, t) Typ.t = Typ.field
   let assert_equal (x : var) (y : var) = assert_equal x y

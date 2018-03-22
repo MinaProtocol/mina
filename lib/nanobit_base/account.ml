@@ -27,9 +27,13 @@ type ('pk, 'amount) t_ =
   { public_key : 'pk
   ; balance : 'amount
   }
+[@@deriving sexp]
+
 type var = (Public_key.Compressed.var, Balance.Unpacked.var) t_
-type value = (Public_key.Compressed.t, Balance.Unpacked.value) t_
+type value = (Public_key.Compressed.t, Balance.t) t_
+[@@deriving sexp]
 type t = value
+[@@deriving sexp]
 
 let empty_hash =
   Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
