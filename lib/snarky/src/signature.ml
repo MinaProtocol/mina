@@ -82,13 +82,17 @@ struct
   ;;
 
   module Keypair = struct
-    type t = Public_key.value * Private_key.t
+    type t =
+      { public : Public_key.value
+      ; secret : Private_key.t
+      }
 
     let create () =
       (* TODO: More secure random *)
       let x = Bignum.Bigint.random Curve.Params.order in
-      let g_to_the_x = scale Curve.generator x in
-      (g_to_the_x, x)
+      { public = Curve.scale Curve.generator x
+      ; secret = x
+      }
   end
 
   module Checked = struct

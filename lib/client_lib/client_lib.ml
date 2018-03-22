@@ -2,13 +2,15 @@ open Core
 open Async
 open Nanobit_base
 
-module Send_txn = struct
+module Send_transaction = struct
+  (* Only has payload because full transaction needs your private key (held
+   * only by the daemon to minimize risk) *)
   type query = Transaction.Payload.t [@@deriving bin_io]
   type response = unit [@@deriving bin_io]
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Send_txn" ~version:0
+    Rpc.Rpc.create ~name:"Send_transaction" ~version:0
       ~bin_query ~bin_response
 end
 

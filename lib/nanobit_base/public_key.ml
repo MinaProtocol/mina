@@ -129,7 +129,7 @@ let of_bigstring bs =
   elem
 
 let to_bigstring elem =
-  let bs = Bigstring.create (Tick.Field.size_in_bits * 2) in
+  let bs = Bigstring.create ((bin_size_t elem) + Bin_prot.Utils.size_header_length) in
   let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
   bs
 

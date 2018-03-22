@@ -6,9 +6,9 @@ open Nanobit_base
 (* TODO: Fill out this implementations properly *)
 let send_txn_impl _ payload =
   printf "Starting keypair create\n";
-  let (pub, priv) = Transaction.Signature.Keypair.create () in
+  let kp = Transaction.Signature.Keypair.create () in
   printf "Ending keypair create\n";
-  let _txn : Transaction.t = Transaction.sign (pub, priv) payload in
+  let _txn : Transaction.t = Transaction.sign kp payload in
   printf "Created a real transaction!\n";
   return ()
 
@@ -26,7 +26,7 @@ let init_server ~parent_log ~port =
              reader writer
              ~implementations:(Rpc.Implementations.create_exn 
                ~implementations:
-                 [ Rpc.Rpc.implement Client_lib.Send_txn.rpc send_txn_impl
+                 [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc send_txn_impl
                  ; Rpc.Rpc.implement Client_lib.Get_balance.rpc get_balance_impl
                  ]
                ~on_unknown_rpc:`Raise
@@ -72,7 +72,7 @@ let send_txn =
       let address =
         flag "receiver" ~doc:"Public-key address to which you want to send money" (required public_key)
       and fee =
-        flag "fee" ~doc:"Transaction fee you're willing to part with" (required txn_fee)
+        flag "fee" ~doc:"Transaction fee you're willing to pay" (required txn_fee)
       and amount =
         flag "amount" ~doc:"Transaction amount you want to send" (required txn_amount)
       and port =
@@ -87,7 +87,7 @@ let send_txn =
           ; fee
           }
         in
-        match%map (dispatch Client_lib.Send_txn.rpc payload port) with
+        match%map (dispatch Client_lib.Send_transaction.rpc payload port) with
         | Ok () -> printf "Successfully sent txn\n"
         | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)
     ]

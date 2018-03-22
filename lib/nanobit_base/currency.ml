@@ -48,6 +48,9 @@ module Make
   end
 
   include Stable.V1
+  include Sexpable.Of_stringable(Unsigned)
+  let of_unsigned_string = Unsigned.of_string
+  let to_string = Unsigned.to_string
 
   include Sexpable.Of_stringable(Unsigned)
 

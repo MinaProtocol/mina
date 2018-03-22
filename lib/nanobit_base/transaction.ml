@@ -26,12 +26,6 @@ module Payload = struct
 
   include Stable.V1
 
-  (* Any better way to generate to compute this? *)
-  let bit_length0 = Tick.Field.size_in_bits + 32 + 64
-  module Bits = Bits.Vector.Make(Bits.Vector.Bigstring(struct
-    let bit_length = bit_length0
-  end))
-
   type value = t
   type var = (Public_key.Compressed.var, Amount.Unpacked.var, Fee.Unpacked.var) t_
   let typ : (var, t) Tick.Typ.t =
@@ -81,12 +75,10 @@ type t = (Payload.t, Public_key.t, Signature.Signature.value) t_
 type value = t
 type var = (Payload.var, Public_key.var, Signature.Signature.var) t_
 
-let sign (pub, priv) (payload : Payload.t): t =
-  let bs = Bigstring.create Payload.bit_length0 in
-  let _x : int = Bigstring.write_bin_prot bs Payload.bin_writer_t payload in
+let sign (kp : Signature.Keypair.t) (payload : Payload.t): t =
   { payload
-  ; sender = pub
-  ; signature = Signature.sign priv (Payload.Bits.to_bits bs)
+  ; sender = kp.public
+  ; signature = Signature.sign kp.secret (Payload.to_bits payload)
   }
 
 let typ : (var, t) Tick.Typ.t =
