@@ -2,8 +2,9 @@ open Core_kernel
 open Snark_params
 
 type t = Tick.Field.t * Tick.Field.t
-[@@deriving bin_io]
-let equal (x,y) (x',y') = Tick.Field.equal x y && Tick.Field.equal x' y'
+[@@deriving bin_io, sexp]
+let equal (x1,y1) (x2,y2) = Tick.Field.equal x1 x2 && Tick.Field.equal y1 y2
+let (=) = equal
 
 type var = Tick.Field.var * Tick.Field.var
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
@@ -84,7 +85,7 @@ let decompress ({ x; is_odd } : Compressed.t) =
   Option.map (Signature_curve.find_y x) ~f:(fun y ->
     let y_parity = parity y in
     let y =
-      if is_odd = y_parity then y else Field.negate y
+      if Bool.(is_odd = y_parity) then y else Field.negate y
     in
     (x, y))
 
@@ -128,3 +129,23 @@ let to_bigstring elem =
   let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
   bs
 
+let%test_module "point-compression" =
+  (module struct
+    let s = Caml.Random.get_state ()
+    let () = Random.init 123456789
+
+    let%test_unit "decompress . compress = id" =
+      let test () =
+        let pk = of_private_key (Private_key.create ()) in
+        let compressed = compress pk in
+        let decompressed = decompress_exn compressed in
+        printf !"og=%{sexp:t}\ncompressed=%{sexp:Compressed.t}\ndecompressed=%{sexp:t}%!"
+          pk compressed decompressed;
+        printf !"other y: %{sexp:Field.t}\n%!"
+          (Field.negate (snd (decompressed)));
+        assert (decompressed = pk)
+      in
+      for i = 0 to 100 do test () done
+
+    let () = Caml.Random.set_state s
+  end)
