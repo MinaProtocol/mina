@@ -25,7 +25,7 @@ let provide_witness' typ ~f = provide_witness typ As_prover.(map get_state ~f)
 module Base = struct
   let apply_transaction root ({ sender; signature; payload } : Transaction.var) =
     (if not Insecure.transaction_replay
-    then failwith "Insecure.transaction_replay false");
+     then failwith "Insecure.transaction_replay false");
     let { Transaction.Payload.receiver; amount; fee } = payload in
     let%bind () =
       let%bind bs = Transaction.Payload.var_to_bits payload in
@@ -89,37 +89,29 @@ module Base = struct
         respond (Provide (Ledger.index_of_key_exn ledger pk))
       | _ -> unhandled
 
-  let apply_transaction public_key_to_index tree (transaction : Transaction.t) =
-    let receiver = public_key_to_index transaction.payload.receiver in
-    let sender = public_key_to_index (fst transaction.sender) in
-    let modify addr tree ~f =
-      let x = Merkle_tree.get_exn tree addr in
-      Merkle_tree.update tree addr (f x)
-    in
-    modify sender tree ~f:(fun (acct : Account.t) ->
-      { acct with
-        balance = Unsigned.UInt64.sub acct.balance transaction.payload.amount
-      })
-    |> modify receiver ~f:(fun (acct : Account.t) ->
-      { acct with
-        balance = Unsigned.UInt64.add acct.balance transaction.payload.amount
-      })
-
-  let apply_transaction ledger
+  let root_after_transaction ledger
         (transaction : Transaction.t) =
-    let sender_pre =
-      Option.value_exn (Ledger.get ledger (Public_key.compress transaction.sender)
-    in
+    let get_exn pk = Option.value_exn (Ledger.get ledger pk) in
+    let sender = Public_key.compress transaction.sender in
+    let receiver = transaction.payload.receiver in
+    let sender_pre = get_exn sender in
+    let receiver_pre = get_exn receiver in
+    Ledger.update ledger sender
+      { sender_pre with
+        balance = Unsigned.UInt64.sub sender_pre.balance transaction.payload.amount
+      };
+    Ledger.update ledger transaction.payload.receiver
+      { receiver_pre with
+        balance = Unsigned.UInt64.add receiver_pre.balance transaction.payload.amount
+      };
+    let root = Ledger.merkle_root ledger in
+    Ledger.update ledger sender sender_pre;
+    Ledger.update ledger receiver receiver_pre;
+    root
 
-
-  let bundle public_key_to_index ledger1 transaction =
-    let ledger2 = apply_transaction public_key_to_index ledger1 transaction in
-    let state1 = Ledger_hash.of_hash (Merkle_tree.root ledger1) in
-
-    let state2 = Ledger_hash.of_hash (Merkle_tree.root ledger2) in
-
-    let 
-
+  let bundle public_key_to_index ledger transaction =
+    let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
+    let state2 = Ledger_hash.of_hash (root_after_transaction ledger transaction) in
     let prover_state : Prover_state.t =
       { state1; state2; transactions = [ transaction ] }
     in
@@ -129,9 +121,8 @@ module Base = struct
     in
     let main top_hash =
       handle (main top_hash)
-        (handler public_key_to_index (ref ledger1))
+        (handler ledger)
     in
-    ledger2,
     top_hash,
     prove pk (tick_input ()) prover_state main top_hash
 end
