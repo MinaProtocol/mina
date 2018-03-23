@@ -63,7 +63,9 @@ let main () =
 
   let get_cycle n = 
     printf "writing %d\n" n;
-    Writer.write_line stdin (Int.to_string n);
+    Writer.write stdin ((Int.to_string n) ^ "\n");
+    let%bind () = Writer.flushed stdin in
+    printf "flushed!\n";
     let%map stdout = Reader.read_line stdout in
     match stdout with
     | `Ok s -> (printf "output: %s\n" s; (n, s))
