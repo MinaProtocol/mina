@@ -31,16 +31,17 @@ module Time_queue = struct
     ; pending_actions = Heap.create ~cmp:(fun (_, ts) (_, ts') -> Time.Span.compare ts ts') ()
     }
 
-  let tick_forwards t ~by ~f =
-    t.curr_time <- Time.Span.(t.curr_time + by);
+  let tick_forwards t ~f =
     let rec go () =
       match Heap.top t.pending_actions with
       | None -> ()
       | Some (_, at) ->
+          let (action, _) = Heap.pop_exn t.pending_actions in
+          f action;
           if Time.Span.(t.curr_time >= at) then
-            let (action, _) = Heap.pop_exn t.pending_actions in
-            f action;
             go ()
+          else
+            t.curr_time <- at
     in
     go ()
 
@@ -49,7 +50,7 @@ end
 module type Temporal_intf = sig
   type t
   val create : now:Time.Span.t -> t
-  val tick_forwards : t -> by:Time.Span.t -> unit
+  val tick_forwards : t -> unit
 end
 
 module type Fake_transport_intf = sig
@@ -84,8 +85,8 @@ module Fake_transport
     ; pending_messages = Time_queue.create ~now
     }
 
-  let tick_forwards t ~by =
-    Time_queue.tick_forwards t.pending_messages ~by ~f:(fun (m, p) ->
+  let tick_forwards t =
+    Time_queue.tick_forwards t.pending_messages ~f:(fun (m, p) ->
       match Peer.Table.find t.network p with
       | None -> failwithf "Unknown recipient %s" (Peer.sexp_of_t p |> Sexp.to_string_hum) ()
       | Some (r, w) ->
@@ -128,8 +129,8 @@ module Fake_timer : Fake_timer_intf = struct
     ; timer_stoppers = Token.Table.create ()
     }
 
-  let tick_forwards t ~by =
-    Time_queue.tick_forwards t.q ~by ~f:(fun ivar ->
+  let tick_forwards t =
+    Time_queue.tick_forwards t.q ~f:(fun ivar ->
       Ivar.fill_if_empty ivar `Finished
     )
 
@@ -246,8 +247,8 @@ module Make
         let _ = Identifier.Table.add t.nodes ~key:(MyNode.ident n) ~data:n' in
         loop t ~stop
       | None, None ->
-        Fake_timer.tick_forwards t.timer ~by:(Time.Span.of_ms 100.);
-        Transport.tick_forwards t.transport ~by:(Time.Span.of_ms 100.);
+        Fake_timer.tick_forwards t.timer;
+        Transport.tick_forwards t.transport;
         loop t ~stop
 end
 

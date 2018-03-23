@@ -9,7 +9,7 @@ end
 module type Temporal_intf = sig
   type t
   val create : now:Time.Span.t -> t
-  val tick_forwards : t -> by:Time.Span.t -> unit
+  val tick_forwards : t -> unit
 end
 
 module type Fake_transport_intf = sig
