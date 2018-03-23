@@ -193,10 +193,10 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
       Impl.Checked.choose_preimage x ~length:Field.size_in_bits
     in
     let%map () =
-      lt_bitstring_value_msb res field_size_bits_msb
+      lt_bitstring_value_msb (List.rev res) field_size_bits_msb
       >>= Boolean.Assert.is_true
     in
-    List.rev res
+    res
 
   let%test_module "Snark_util" = (module struct
     let () = Random.init 123456789
