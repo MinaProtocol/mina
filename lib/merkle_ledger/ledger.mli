@@ -33,7 +33,7 @@ module type S =
     val implied_root : t -> Hash.hash -> Hash.hash
   end
 
-  val create : int -> t
+  val create : depth:int -> t
 
   val length : t -> int
 

@@ -35,7 +35,7 @@ module type S =
     val implied_root : t -> Hash.hash -> Hash.hash
   end
 
-  val create : int -> t
+  val create : depth:int -> t
 
   val length : t -> int
 
@@ -181,7 +181,7 @@ module Make
     memoized_empty_hash_at_height.(d)
 
   (* if depth = N, leafs = 2^N *)
-  let create depth = 
+  let create ~depth = 
     assert (depth <= Max_depth.max_depth);
     { accounts = create_account_table ()
     ; tree = { leafs = DynArray.create ()
