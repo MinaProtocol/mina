@@ -25,10 +25,23 @@ module Compressed = struct
     { x      : 'field
     ; is_odd : 'boolean
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp, compare]
 
-  type t = (Field.t, bool) t_
-  [@@deriving bin_io]
+  module T = struct
+    type t = (Field.t, bool) t_
+    [@@deriving bin_io, sexp]
+
+    let compare =
+      compare_t_ (fun x y -> Bigint.(compare (of_field x) (of_field y))) Bool.compare
+
+    let hash_fold_t s { x; is_odd } =
+      Bignum.Bigint.hash_fold_t (Bool.hash_fold_t s is_odd)
+        Bigint.(to_bignum_bigint (of_field x))
+
+    let hash = Hash.of_fold hash_fold_t
+  end
+  include T
+  include Hashable.Make(T)
 
   type var = (Field.var, Boolean.var) t_
 
@@ -49,7 +62,8 @@ module Compressed = struct
     in
     ()
 
-  include (Bits.Make_field(Field)(Bigint) : Bits_intf.S with type t := t)
+  let fold { is_odd; x } ~init ~f = Field.Bits.fold x ~init:(f init is_odd) ~f
+  let to_bits t = List.rev (fold t ~init:[] ~f:(fun acc x -> x :: acc))
 
 (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
