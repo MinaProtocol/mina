@@ -2,8 +2,7 @@ open Core_kernel
 open Snark_params
 
 type t = Tick.Field.t * Tick.Field.t
-[@@deriving bin_io, sexp]
-let equal (x1,y1) (x2,y2) = Tick.Field.equal x1 x2 && Tick.Field.equal y1 y2
+[@@deriving bin_io, sexp, eq]
 let (=) = equal
 
 type var = Tick.Field.var * Tick.Field.var
@@ -129,23 +128,11 @@ let to_bigstring elem =
   let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
   bs
 
-let%test_module "point-compression" =
-  (module struct
-    let s = Caml.Random.get_state ()
-    let () = Random.init 123456789
+let%test_unit "point-compression: decompress . compress = id" =
+  Test_util.with_randomness 123456789 (fun () ->
+    let test () =
+      let pk = of_private_key (Private_key.create ()) in
+      assert (decompress_exn (compress pk) = pk)
+    in
+    for i = 0 to 100 do test () done)
 
-    let%test_unit "decompress . compress = id" =
-      let test () =
-        let pk = of_private_key (Private_key.create ()) in
-        let compressed = compress pk in
-        let decompressed = decompress_exn compressed in
-        printf !"og=%{sexp:t}\ncompressed=%{sexp:Compressed.t}\ndecompressed=%{sexp:t}%!"
-          pk compressed decompressed;
-        printf !"other y: %{sexp:Field.t}\n%!"
-          (Field.negate (snd (decompressed)));
-        assert (decompressed = pk)
-      in
-      for i = 0 to 100 do test () done
-
-    let () = Caml.Random.set_state s
-  end)
