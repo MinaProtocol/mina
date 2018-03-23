@@ -29,6 +29,8 @@ module Stable = struct
   end
 end
 
+let (=) = Pedersen.Digest.(=)
+
 type var = Pedersen.Digest.Packed.var
 
 let typ = Pedersen.Digest.Packed.typ

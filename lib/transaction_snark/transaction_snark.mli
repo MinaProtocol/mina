@@ -6,8 +6,8 @@ type t
 val proof : t -> Tock.Proof.t
 
 val of_transaction
-  : (Public_key.Compressed.t -> Account.Index.t)
+  : Ledger.t
   -> Transaction.t
-  -> Ledger.t
+  -> t
 
 val merge : t -> t -> t
