@@ -86,7 +86,7 @@ let%test_unit "merkle_root_edit" =
   assert (root3 = root1);
 ;;
 
-let check_path account (path : Test_ledger.path) root =
+let check_path account (path : Test_ledger.Path.t) root =
   let path_root = 
     List.fold 
       ~init:(Test_ledger.Hash.hash_account account)
