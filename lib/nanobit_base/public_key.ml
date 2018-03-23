@@ -106,7 +106,11 @@ let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   let%map is_odd = parity_var y in
   { Compressed.x; is_odd }
 
-let assert_equal : var -> var -> (unit, _) Tick.Checked.t = fun _ _ -> failwith "TODO"
+let assert_equal ((x1, y1) : var) ((x2, y2) : var) : (unit, _) Checked.t =
+  let%map () = assert_equal x1 x2
+  and () = assert_equal y1 y2
+  in
+  ()
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in
