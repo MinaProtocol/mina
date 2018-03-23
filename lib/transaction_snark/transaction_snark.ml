@@ -110,7 +110,8 @@ module Base = struct
     Ledger.update ledger receiver receiver_pre;
     root
 
-  let bundle public_key_to_index ledger transaction =
+  let bundle ledger transaction
+    =
     let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
     let state2 = Ledger_hash.of_hash (root_after_transaction ledger transaction) in
     let prover_state : Prover_state.t =
@@ -124,6 +125,7 @@ module Base = struct
       handle (main top_hash)
         (handler ledger)
     in
+    state1, state2,
     top_hash,
     prove pk (tick_input ()) prover_state main top_hash
 end
@@ -281,23 +283,26 @@ module Wrap = struct
   let pk = Keypair.pk keypair
 end
 
+let embed (x : Tick.Field.t) : Tock.Field.t =
+  Tock.Field.project (Tick.Field.unpack x)
+
 let wrap proof_type proof input =
   Tock.prove Wrap.pk (wrap_input ())
     { Wrap.Prover_state.proof; proof_type }
     Wrap.main
-    (Tock.Field.project (Tick.Field.unpack input))
+    (embed input)
 
 let top_hash s1 s2 =
   let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list Wrap.vk in
   Pedersen.hash_fold Pedersen.params
     (fun ~init ~f ->
-       let init = Pedersen.Digest.Bits.fold ~init ~f s1 in
-       let init = Pedersen.Digest.Bits.fold ~init ~f s2 in
+       let init = Ledger_hash.fold ~init ~f s1 in
+       let init = Ledger_hash.fold ~init ~f s2 in
        List.fold ~init ~f wrap_vk_bits)
 
 let merge_proof input1 input2 input3 proof12 proof23 =
   let top_hash = top_hash input1 input3 in
-  let to_bits = Pedersen.Digest.Bits.to_bits in
+  let to_bits = Ledger_hash.to_bits in
   top_hash,
   Tick.prove Merge.pk (tick_input ())
     { Merge.Prover_state.input1 = to_bits input1
@@ -311,17 +316,29 @@ let merge_proof input1 input2 input3 proof12 proof23 =
     top_hash
 
 type t =
-  { source     : Pedersen.Digest.t
-  ; target     : Pedersen.Digest.t
+  { source     : Ledger_hash.t
+  ; target     : Ledger_hash.t
   ; proof      : Tock.Proof.t
   ; proof_type : Proof_type.t
   }
+[@@deriving fields]
+
+let of_transaction ledger transaction =
+  let source, target, top_hash, proof =
+    Base.bundle ledger transaction
+  in
+  let proof_type = Proof_type.Base in
+  { source
+  ; target
+  ; proof_type
+  ; proof = wrap proof_type proof top_hash
+  }
 
 let merge t1 t2 =
-  (if not (Pedersen.Digest.(=) t1.target  t2.source)
+  (if not (Ledger_hash.(=) t1.target t2.source)
    then
      failwithf
-       !"Transaction_snark.merge: t1.target <> t2.source (%{sexp:Pedersen.Digest.t} vs %{sexp:Pedersen.Digest.t})"
+       !"Transaction_snark.merge: t1.target <> t2.source (%{sexp:Ledger_hash.t} vs %{sexp:Ledger_hash.t})"
        t1.target
        t2.source ());
   let input, proof =
@@ -329,10 +346,11 @@ let merge t1 t2 =
       (t1.proof_type, t1.proof)
       (t2.proof_type, t2.proof)
   in
+  let proof_type = Proof_type.Merge in
   { source = t1.source
   ; target = t2.target
-  ; proof_type = Merge
-  ; proof = wrap Merge proof input
+  ; proof_type
+  ; proof = wrap proof_type proof input
   }
 
 let%test_module "transaction_snark" =
@@ -377,43 +395,18 @@ let%test_module "transaction_snark" =
 
     let%test "base_and_merge" =
       let wallets = random_wallets () in
-      let fold_field_bits_todo = Public_key.Compressed.fold in
       let ledger =
-        Merkle_tree.create
-          ~hash:(function
-            | None -> Pedersen.zero_hash
-            | Some account ->
-              Pedersen.hash_fold Pedersen.params (Account.fold_bits account))
-          ~compress:(fun x y ->
-            Pedersen.hash_fold Pedersen.params
-              (fun ~init ~f ->
-                let init = fold_field_bits_todo ~init ~f x in
-                fold_field_bits_todo ~init ~f y))
-          wallets.(0).account
-        |> ref
+        Ledger.create ~depth:ledger_depth
       in
-      ledger :=
-        Merkle_tree.add_many !ledger
-          (List.init (Array.length wallets - 1) ~f:(fun i -> wallets.(i + 1).account));
-      let public_keys = Array.map wallets ~f:(fun w -> w.account.public_key) in
+      Array.iter wallets ~f:(fun { account } ->
+        Ledger.update ledger account.public_key account);
       let t1 = transaction wallets 0 1 8 in
       let t2 = transaction wallets 1 2 3 in
-      let ledger1 = !ledger in
-      let ledger2, top_hash12, proof12 =
-        Base.bundle (find_index public_keys) ledger1 t1
-      in
-      let proof12 = wrap Base proof12 top_hash12 in
-      let ledger3, top_hash23, proof23 =
-        Base.bundle (find_index public_keys) ledger2 t2
-      in
-      let proof23 = wrap Base proof23 top_hash23 in
-      let ledger_bits l = Pedersen.Digest.Bits.to_bits (Merkle_tree.root l) in
-      let state1 = ledger_bits ledger1 in
-      let state3 = ledger_bits ledger3 in
-      let proof13 =
-        merge state1 (ledger_bits ledger2) state3
-          (Base, proof12)
-          (Base, proof23)
-      in
-      verify proof13 Merge.vk (tick_input ()) (top_hash state1 state3)
+      let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
+      let proof12 = of_transaction ledger t1 in
+      let proof23 = of_transaction ledger t2 in
+      let state3 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
+      let proof13 = merge proof12 proof23 in
+      Tock.verify proof13.proof Wrap.vk (wrap_input ())
+        (embed (top_hash state1 state3))
   end)
