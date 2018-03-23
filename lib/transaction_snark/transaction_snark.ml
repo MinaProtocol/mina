@@ -32,7 +32,8 @@ module Base = struct
       Signature.Checked.assert_verifies signature sender bs
     in
     let%bind root =
-      Ledger_hash.modify_account root (Public_key.compress_var sender) ~f:(fun account ->
+      let%bind sender_compressed = Public_key.compress_var sender in
+      Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
         let%map balance = Transaction.Amount.(account.balance - amount) in (* TODO: Fee *)
         { account with balance })
     in
@@ -343,7 +344,7 @@ let%test_module "transaction_snark" =
         let private_key = Private_key.create () in
         { private_key
         ; account =
-            { public_key = fst (Public_key.of_private_key private_key)
+            { public_key = Public_key.compress (Public_key.of_private_key private_key)
             ; balance = Unsigned.UInt64.of_int (10 + Random.int 100)
             }
         }
