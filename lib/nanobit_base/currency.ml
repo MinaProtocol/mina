@@ -35,16 +35,21 @@ module Make
 = struct
   assert (M.length < Tick.Field.size_in_bits - 1)
 
-  type t = Unsigned.t
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned.t
+      include Make_bin_io(struct
+          type v = Unsigned.t
+          type t = Signed.t [@@deriving bin_io]
+          let there = M.to_signed
+          let back = M.of_signed
+        end)
+    end
+  end
+
+  include Stable.V1
 
   include Sexpable.Of_stringable(Unsigned)
-
-  include Make_bin_io(struct
-      type v = Unsigned.t
-      type t = Signed.t [@@deriving bin_io]
-      let there = M.to_signed
-      let back = M.of_signed
-    end)
 
   module Vector = struct
     include M

@@ -81,41 +81,6 @@ let rec lt_bitstrings_msb =
     | _::_, [] | [], _::_ ->
       failwith "lt_bitstrings_msb: Got unequal length strings"
 
-(* Someday: This could be made more efficient by simply skipping some
-   bits in the disjunction. *)
-let rec lt_bitstring_value_msb =
-  let open Tick in
-  let open Let_syntax in
-  let open Boolean in
-  fun (xs : Boolean.var list) (ys : Boolean.value list) ->
-    match xs, ys with
-    | [], [] -> return false_
-    | [ x ], [ false ] -> return false_
-    | [ x ], [ true ] -> return (not x)
-    | [ x1; x2 ], [ true; false ] -> return (not x1)
-    | [ x1; x2 ], [ false; false ] -> return false_
-    | x :: xs, false :: ys ->
-      let%bind r = lt_bitstring_value_msb xs ys in
-      not x && r
-    | x :: xs, true :: ys ->
-      let%bind r = lt_bitstring_value_msb xs ys in
-      not x || r
-    | _::_, [] | [], _::_ ->
-      failwith "lt_bitstrings_msb: Got unequal length strings"
-
-let field_size_bits_msb =
-  List.init Field.size_in_bits ~f:(fun i ->
-    Bigint.test_bit Tick_curve.field_size
-      (Field.size_in_bits - 1 - i))
-
-let bits_msb =
-  fun x ->
-    let%bind bs = Checked.unpack ~length:Field.size_in_bits x >>| List.rev in
-    let%map () =
-      lt_bitstring_value_msb bs field_size_bits_msb >>= Boolean.Assert.is_true
-    in
-    bs
-
 type _ Snarky.Request.t +=
   | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Snarky.Request.t
 

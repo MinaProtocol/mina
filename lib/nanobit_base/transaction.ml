@@ -17,8 +17,14 @@ module Payload = struct
     }
   [@@deriving bin_io]
 
-  type t = (Public_key.Compressed.t, Amount.t, Fee.t) t_
-  [@@deriving bin_io]
+  module Stable = struct
+    module V1 = struct
+      type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t) t_
+      [@@deriving bin_io]
+    end
+  end
+
+  include Stable.V1
 
   type value = t
   type var = (Public_key.Compressed.var, Amount.Unpacked.var, Fee.Unpacked.var) t_
@@ -53,7 +59,7 @@ module Payload = struct
     with_randomness 123456789 (fun () ->
       let length = Field.size_in_bits + 64 + 32 in
       test_equal typ (Typ.list ~length Boolean.typ) var_to_bits to_bits
-        { receiver = Field.random ()
+        { receiver = { x = Field.random (); is_odd = Random.bool () }
         ; amount = Unsigned.UInt64.of_int (Random.int Int.max_value)
         ; fee = Unsigned.UInt32.of_int32 (Random.int32 Int32.max_value)
         })
