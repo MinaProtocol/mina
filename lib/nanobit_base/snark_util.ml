@@ -130,7 +130,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     >>= num_bits_upper_bound_unpacked
   ;;
 
-  let lt_bitstring_value_msb =
+  let lt_bitstring_value =
     let module Expr = struct
       module Binary = struct
         type 'a t =
@@ -177,23 +177,28 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
       | x :: xs, true :: ys ->
         Or (Boolean.not x, lt_binary xs ys)
       | _::_, [] | [], _::_ ->
-        failwith "lt_bitstring_value_msb: Got unequal length strings"
+        failwith "lt_bitstring_value: Got unequal length strings"
     in
-    fun xs ys ->
-      Expr.Nary.(eval (of_binary (lt_binary xs ys)))
+    fun (xs : Boolean.var Bitstring.Msb_first.t) (ys : bool Bitstring.Msb_first.t) ->
+      Expr.Nary.(
+        eval (of_binary (lt_binary (xs :> Boolean.var list) (ys :> bool list))))
 
-  let field_size_bits_msb =
+  let field_size_bits =
     let testbit n i = Bignum.Bigint.((shift_right n i) land one = one) in
     List.init Field.size_in_bits ~f:(fun i ->
       testbit Impl.Field.size
         (Field.size_in_bits - 1 - i))
+    |> Bitstring.Msb_first.of_list
 
   let unpack_field_var x =
     let%bind res =
       Impl.Checked.choose_preimage x ~length:Field.size_in_bits
+      >>| Bitstring.Lsb_first.of_list
     in
     let%map () =
-      lt_bitstring_value_msb (List.rev res) field_size_bits_msb
+      lt_bitstring_value
+        (Bitstring.Msb_first.of_lsb_first res)
+        field_size_bits
       >>= Boolean.Assert.is_true
     in
     res
@@ -205,23 +210,33 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
 
     let random_n_bit_field_elt n = Field.project (random_bitstring n)
 
-    let%test_unit "lt_bitstring_value_msb" =
+    let random_biased_bitstring p length =
+      List.init length ~f:(fun _ -> if Random.float 1. < p then false else true)
+
+    let%test_unit "lt_bitstring_value" =
       let length = Field.size_in_bits + 5 in
-      let test () =
-        let value = random_bitstring length in
+      let test p =
+        let value = random_biased_bitstring p length in
         let var = random_bitstring length in
         let correct_answer = var < value in
         let ((), lt, passed) = 
           run_and_check
             (Checked.map ~f:(As_prover.read Boolean.typ)
-               (lt_bitstring_value_msb
-                  (List.map ~f:Boolean.var_of_value var) value))
+               (lt_bitstring_value
+                  (Bitstring.Msb_first.of_list
+                     (List.map ~f:Boolean.var_of_value var))
+                  (Bitstring.Msb_first.of_list value)))
             ()
         in
         assert passed;
         assert (lt = correct_answer)
       in
-      for _ = 1 to 10 do test () done
+      for _ = 1 to 50 do test 0.5 done;
+      for _ = 1 to 50 do test 0.1 done;
+      for _ = 1 to 50 do test 0.9 done;
+      for _ = 1 to 50 do test 0.02 done;
+      for _ = 1 to 50 do test 0.98 done
+    ;;
 
     let%test_unit "compare" =
       let bit_length = Field.size_in_bits - 2 in

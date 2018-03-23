@@ -90,7 +90,9 @@ let decompress ({ x; is_odd } : Compressed.t) =
 
 let decompress_exn t = Option.value_exn (decompress t)
 
-let parity_var y = Util.unpack_field_var y >>| List.hd_exn
+let parity_var y =
+  let%map bs = Util.unpack_field_var y in
+  List.hd_exn (bs :> Boolean.var list)
 
 let decompress_var ({ x; is_odd } as c : Compressed.var) =
   let%bind y =
