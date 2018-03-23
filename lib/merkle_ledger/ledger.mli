@@ -14,14 +14,24 @@ module type S =
         include Hashable.S with type t := t
      end) -> sig
 
+  type index = int
+
   type t
   [@@deriving sexp]
 
-  type path_elem = 
-    | Left of Hash.hash
-    | Right of Hash.hash
+  module Path : sig
+    type elem =
+      | Left of Hash.hash
+      | Right of Hash.hash
+    [@@deriving sexp]
 
-  type path = path_elem list [@@deriving sexp]
+    val elem_hash : elem -> Hash.hash
+
+    type t = elem list
+    [@@deriving sexp]
+
+    val implied_root : t -> Hash.hash -> Hash.hash
+  end
 
   val create : int -> t
 
@@ -45,7 +55,37 @@ module type S =
   val merkle_path
     : t
     -> Key.t
-    -> path option
+    -> Path.t option
+
+  val key_of_index
+    : t -> index -> Key.t option
+
+  val index_of_key
+    : t -> Key.t -> index option
+
+  val key_of_index_exn
+    : t -> index -> Key.t
+
+  val index_of_key_exn
+    : t -> Key.t -> index
+
+  val get_at_index
+    : t -> index -> [ `Ok of Hash.account | `Index_not_found ]
+
+  val update_at_index
+    : t -> index -> Hash.account -> [ `Ok | `Index_not_found ]
+
+  val merkle_path_at_index
+    : t -> index -> [ `Ok of Path.t | `Index_not_found ]
+
+  val get_at_index_exn
+    : t -> index -> Hash.account
+
+  val update_at_index_exn
+    : t -> index -> Hash.account -> unit
+
+  val merkle_path_at_index_exn
+    : t -> index -> Path.t
 end
 
 module Make : S
