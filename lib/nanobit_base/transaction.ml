@@ -17,8 +17,14 @@ module Payload = struct
     }
   [@@deriving bin_io]
 
-  type t = (Public_key.Compressed.t, Amount.t, Fee.t) t_
-  [@@deriving bin_io]
+  module Stable = struct
+    module V1 = struct
+      type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t) t_
+      [@@deriving bin_io]
+    end
+  end
+
+  include Stable.V1
 
   type value = t
   type var = (Public_key.Compressed.var, Amount.Unpacked.var, Fee.Unpacked.var) t_

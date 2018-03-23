@@ -14,10 +14,6 @@ let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 let of_private_key pk =
   Tick.Hash_curve.scale Tick.Hash_curve.generator pk
 
-let () =
-  (if not Insecure.incorrect_key_compression
-  then failwith "incorrect_key_compression")
-
 module Compressed = struct
   open Tick
 
@@ -27,9 +23,15 @@ module Compressed = struct
     }
   [@@deriving bin_io, sexp, compare]
 
+  module Stable = struct
+    module V1 = struct
+      type t = (Field.t, bool) t_
+      [@@deriving bin_io, sexp]
+    end
+  end
+
   module T = struct
-    type t = (Field.t, bool) t_
-    [@@deriving bin_io, sexp]
+    include Stable.V1
 
     let compare =
       compare_t_ (fun x y -> Bigint.(compare (of_field x) (of_field y))) Bool.compare
@@ -63,7 +65,7 @@ module Compressed = struct
     ()
 
   let fold { is_odd; x } ~init ~f = Field.Bits.fold x ~init:(f init is_odd) ~f
-  let to_bits t = List.rev (fold t ~init:[] ~f:(fun acc x -> x :: acc))
+  let to_bits { is_odd; x } = is_odd :: Field.Bits.to_bits x
 
 (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
@@ -101,6 +103,8 @@ let decompress_var ({ x; is_odd } as c : Compressed.var) =
   and () = parity_var y >>= Boolean.Assert.((=) is_odd)
   in
   (x, y)
+
+let compress ((x, y) : t) : Compressed.t = { x; is_odd = parity y }
 
 let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   let%map is_odd = parity_var y in
