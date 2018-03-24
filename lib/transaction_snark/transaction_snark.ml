@@ -292,8 +292,9 @@ let wrap proof_type proof input =
     Wrap.main
     (embed input)
 
+let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list Wrap.vk
+
 let top_hash s1 s2 =
-  let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list Wrap.vk in
   Pedersen.hash_fold Pedersen.params
     (fun ~init ~f ->
        let init = Ledger_hash.fold ~init ~f s1 in
@@ -314,6 +315,33 @@ let merge_proof input1 input2 input3 proof12 proof23 =
     }
     Merge.main
     top_hash
+
+let verify_merge =
+  (* TODO: Explain this *)
+  let vk_curve_pt =
+    let s =
+      Pedersen.State.create
+        ~bits_consumed:(Pedersen.Digest.size_in_bits * 2)
+        Pedersen.params
+    in
+    (Pedersen.State.update_fold s (List.fold wrap_vk_bits)).acc
+  in
+  fun s1 s2 get_proof ->
+    let open Tick in
+    let open Let_syntax in
+    let%bind top_hash =
+      let (vx, vy) = vk_curve_pt in
+      Pedersen_hash.hash ~params:Pedersen.params
+        ~init:(0, (Cvar.constant vx, Cvar.constant vy))
+        (s1 @ s2)
+      >>| Pedersen_hash.digest
+      >>= Pedersen.Digest.choose_preimage_var
+      >>| Pedersen.Digest.Unpacked.var_to_bits
+    in
+    Merge.Verifier.All_in_one.create ~input:top_hash
+      ~verification_key:(List.map ~f:Boolean.var_of_value wrap_vk_bits)
+      get_proof
+;;
 
 type t =
   { source     : Ledger_hash.t

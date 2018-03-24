@@ -14,16 +14,16 @@ module Stable = struct
   module V1 = struct
     (* Someday: It may well be worth using bitcoin's compact nbits for target values since
       targets are quite chunky *)
-    type ('time, 'target, 'digest, 'number, 'strength) t_ =
+    type ('time, 'target, 'digest, 'ledger_hash, 'strength) t_ =
       { previous_time : 'time
       ; target        : 'target
       ; block_hash    : 'digest
-      ; number        : 'number
+      ; ledger_hash   : 'ledger_hash
       ; strength      : 'strength
       }
     [@@deriving bin_io, sexp]
 
-    type t = (Block_time.Stable.V1.t, Target.Stable.V1.t, Digest.t, Block.Body.Stable.V1.t, Strength.Stable.V1.t) t_
+    type t = (Block_time.Stable.V1.t, Target.Stable.V1.t, Digest.t, Ledger_hash.Stable.V1.t, Strength.Stable.V1.t) t_
     [@@deriving bin_io, sexp]
   end
 end
@@ -34,7 +34,7 @@ type var =
   ( Block_time.Unpacked.var
   , Target.Unpacked.var
   , Digest.Unpacked.var
-  , Block.Body.Unpacked.var
+  , Ledger_hash.var
   , Strength.Unpacked.var
   ) t_
 
@@ -42,20 +42,20 @@ type value =
   ( Block_time.Unpacked.value
   , Target.Unpacked.value
   , Digest.Unpacked.value
-  , Block.Body.Unpacked.value
+  , Ledger_hash.t
   , Strength.Unpacked.value
   ) t_
 
-let to_hlist { previous_time; target; block_hash; number; strength } = H_list.([ previous_time; target; block_hash; number; strength ])
+let to_hlist { previous_time; target; block_hash; ledger_hash; strength } = H_list.([ previous_time; target; block_hash; ledger_hash; strength ])
 let of_hlist : (unit, 'ti -> 'ta -> 'd -> 'n -> 's -> unit) H_list.t -> ('ti, 'ta, 'd, 'n, 's) t_ =
-  H_list.(fun [ previous_time; target; block_hash; number; strength ] -> { previous_time; target; block_hash; number; strength })
+  H_list.(fun [ previous_time; target; block_hash; ledger_hash; strength ] -> { previous_time; target; block_hash; ledger_hash; strength })
 
 let data_spec =
   let open Data_spec in
   [ Block_time.Unpacked.typ
   ; Target.Unpacked.typ
   ; Digest.Unpacked.typ
-  ; Block.Body.Unpacked.typ
+  ; Ledger_hash.typ
   ; Strength.Unpacked.typ
   ]
 
@@ -251,7 +251,7 @@ module Checked = struct
     end
   ;;
 
-  let update (state : var) (block : Block.var) =
+  let update (state : var) (block : (Block.Header.var, 'b) Block.t_) =
     with_label "Blockchain.State.update" begin
       let%bind () =
         assert_equal ~label:"previous_block_hash"
@@ -260,7 +260,9 @@ module Checked = struct
           (Digest.project_var block.header.previous_block_hash)
           (Digest.project_var state.block_hash)
       in
-      let%bind () = valid_body ~prev:state.number block.body in
+
+      let%bind () = valid_body ~prev:state.ledger_hash block.body in
+
       let target_packed = Target.pack_var state.target in
       let%bind strength = Target.strength target_packed state.target in
       let%bind block_hash =

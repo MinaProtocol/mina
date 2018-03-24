@@ -64,8 +64,16 @@ end
 module Body = struct
   module Stable = struct
     module V1 = struct
-      type t = Int64.t
+      (* Logically this really should have the proof in it, but right now we
+         just pass that off to libsnark's verifier gadget separately. In the
+         future when we reimplement the verifier gadget for the groth snark,
+         we should have the proof in here. *)
+      type 'ledger_hash t_ =
+        { target_ledger_hash : 'ledger_hash
+        }
       [@@deriving bin_io, sexp]
+
+      type t = Ledger_hash.Stable.V1.t t_ [@@deriving bin_io, sexp]
     end
   end
 
@@ -73,9 +81,7 @@ module Body = struct
 
   let bit_length = 64
 
-  include Bits.Snarkable.Int64(Tick)
-
-  module Bits = Bits.Int64
+  type var = Ledger_hash.var t_
 end
 
 type ('header, 'body) t_ =
