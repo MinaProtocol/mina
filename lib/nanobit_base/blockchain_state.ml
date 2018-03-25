@@ -106,16 +106,22 @@ let update_exn : value -> Block.t -> value =
   fun state block ->
     let block_hash = Block.hash block in
     (if not Field.(equal block_hash genesis_hash)
-    then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
-    assert Int64.(block.body > state.number);
+     then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
+    (* TODO
+    assert Transaction_snark.(
+      verify (
+        create ~source:state.ledger_hash ~target:block.body.target_hash
+          ~proof_type:Merge ~proof:block.body.proof));
+       *)
     let new_target =
-      compute_target state.previous_time state.target block.header.time
+      compute_target state.previous_time state.target
+        block.header.time
     in
     let strength = Target.strength_unchecked state.target in
     { previous_time = block.header.time
     ; target = new_target
     ; block_hash
-    ; number = block.body
+    ; ledger_hash = block.body.target_hash
     ; strength = Field.add strength state.strength
     }
 
@@ -132,24 +138,27 @@ let negative_one : value =
   { previous_time
   ; target
   ; block_hash = Block.genesis.header.previous_block_hash
-  ; number = Int64.of_int 0
+  ; ledger_hash =
+      Ledger_hash.of_hash
+        Ledger.(merkle_root (create ~depth:ledger_depth))
   ; strength = Strength.zero
   }
 
 let zero = update_exn negative_one Block.genesis
 
-let to_bits ({ previous_time; target; block_hash; number; strength } : var) =
+let to_bits ({ previous_time; target; block_hash; ledger_hash; strength } : var) =
+  let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash in
   Block_time.Unpacked.var_to_bits previous_time
   @ Target.Unpacked.var_to_bits target
   @ Digest.Unpacked.var_to_bits block_hash
-  @ Block.Body.Unpacked.var_to_bits number
+  @ ledger_hash_bits
   @ Strength.Unpacked.var_to_bits strength
 
-let to_bits_unchecked ({ previous_time; target; block_hash; number; strength } : value) =
+let to_bits_unchecked ({ previous_time; target; block_hash; ledger_hash; strength } : value) =
   Block_time.Bits.to_bits previous_time
   @ Target.Bits.to_bits target
   @ Digest.Bits.to_bits block_hash
-  @ Block.Body.Bits.to_bits number
+  @ Ledger_hash.to_bits ledger_hash
   @ Strength.Bits.to_bits strength
 
 let hash t =
@@ -166,7 +175,7 @@ module Checked = struct
       (Checked.equal (Cvar.constant zero_hash) h)
 
   let hash (t : var) =
-    with_label "State.hash" (hash_digest (to_bits t))
+    with_label "State.hash" (to_bits t >>= hash_digest)
 
   let compute_target prev_time prev_target time =
     let div_pow_2 bits (`Two_to_the k) = List.drop bits k in
@@ -241,17 +250,16 @@ module Checked = struct
     then return Boolean.true_
     else Target.passes target hash
 
-  let valid_body ~prev body =
-    with_label "valid_body" begin
-      let%bind { less } =
-        Checked.compare ~bit_length:Block.Body.bit_length
-          (Block.Body.pack_var prev) (Block.Body.pack_var body)
-      in
-      Boolean.Assert.is_true less
-    end
-  ;;
+  module Prover_state = struct
+    type t =
+      { transaction_snark : Tock.Proof.t
+      }
+    [@@deriving fields]
+  end
 
-  let update (state : var) (block : (Block.Header.var, 'b) Block.t_) =
+  let update (state : var) (block : Block.var)
+    : ( var * [ `Success of Boolean.var ], _) Checked.t
+    =
     with_label "Blockchain.State.update" begin
       let%bind () =
         assert_equal ~label:"previous_block_hash"
@@ -260,14 +268,15 @@ module Checked = struct
           (Digest.project_var block.header.previous_block_hash)
           (Digest.project_var state.block_hash)
       in
-
-      let%bind () = valid_body ~prev:state.ledger_hash block.body in
-
+      let%bind good_body =
+        Transaction_snark.verify_merge
+          state.ledger_hash block.body.target_hash
+          (As_prover.return block.body.proof)
+      in
       let target_packed = Target.pack_var state.target in
       let%bind strength = Target.strength target_packed state.target in
       let%bind block_hash =
-        let bits = Block.var_to_bits block in
-        hash_digest bits
+        Block.var_to_bits block >>= hash_digest
       in
       let%bind block_hash_bits = Digest.choose_preimage_var block_hash in
       let%bind meets_target = meets_target target_packed block_hash in
@@ -275,14 +284,15 @@ module Checked = struct
       let%bind new_target = compute_target state.previous_time state.target time in
       let%map strength' =
         Strength.unpack_var Cvar.Infix.(strength + Strength.pack_var state.strength)
+      and success = Boolean.(good_body && meets_target)
       in
       ( { previous_time = time
         ; target = new_target
         ; block_hash = block_hash_bits
-        ; number = block.body
+        ; ledger_hash = block.body.target_hash
         ; strength = strength'
         }
-      , `Success meets_target
+      , `Success success
       )
     end
 end
