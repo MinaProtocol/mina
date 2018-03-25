@@ -1,8 +1,15 @@
 open Core_kernel
 open Snark_params
 
-type t = Tick.Field.t * Tick.Field.t
-[@@deriving bin_io, sexp, eq]
+module Stable = struct
+  module V1 = struct
+    type t = Tick.Field.t * Tick.Field.t
+    [@@deriving bin_io, sexp, eq]
+  end
+end
+
+include Stable.V1
+
 let (=) = equal
 
 type var = Tick.Field.var * Tick.Field.var

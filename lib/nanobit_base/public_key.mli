@@ -3,6 +3,14 @@ open Snark_params
 open Tick
 
 type t = Field.t * Field.t
+
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t
+    [@@deriving bin_io, sexp]
+  end
+end
+
 type var = Field.var * Field.var
 val typ : (var, t) Typ.t
 
