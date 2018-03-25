@@ -1,10 +1,7 @@
 open Core
 open Snark_params
-open Snarky
 open Tick
 open Let_syntax
-
-module Signature = Tick.Signature
 
 module Amount = Currency.T64
 module Fee = Currency.T32
@@ -15,12 +12,12 @@ module Payload = struct
     ; amount   : 'amount
     ; fee      : 'fee
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp]
 
   module Stable = struct
     module V1 = struct
       type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t) t_
-      [@@deriving bin_io]
+      [@@deriving bin_io, sexp]
     end
   end
 
@@ -65,20 +62,29 @@ module Payload = struct
         })
 end
 
-type ('payload, 'pk, 'signature) t_ =
-  { payload   : 'payload
-  ; sender    : 'pk
-  ; signature : 'signature
-  }
+module Stable = struct
+  module V1 = struct
+    type ('payload, 'pk, 'signature) t_ =
+      { payload   : 'payload
+      ; sender    : 'pk
+      ; signature : 'signature
+      }
+    [@@deriving bin_io, sexp]
 
-type t = (Payload.t, Public_key.t, Signature.Signature.value) t_
+    type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
+    [@@deriving bin_io, sexp]
+  end
+end
+
+include Stable.V1
+
 type value = t
-type var = (Payload.var, Public_key.var, Signature.Signature.var) t_
+type var = (Payload.var, Public_key.var, Signature.var) t_
 
 let typ : (var, t) Tick.Typ.t =
   let spec =
     Data_spec.(
-      [ Payload.typ; Public_key.typ; Signature.Signature.typ ])
+      [ Payload.typ; Public_key.typ; Signature.typ ])
   in
   let of_hlist : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
     H_list.(fun [ payload; sender; signature ] -> { payload; sender; signature })
