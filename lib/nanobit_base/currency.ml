@@ -44,12 +44,11 @@ module Make
           let there = M.to_signed
           let back = M.of_signed
         end)
+      include Sexpable.Of_stringable(Unsigned)
     end
   end
 
   include Stable.V1
-
-  include Sexpable.Of_stringable(Unsigned)
 
   module Vector = struct
     include M
