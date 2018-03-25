@@ -1,11 +1,8 @@
 open Core
-open Nanobit_base
 open Snark_params
 open Snarky
 open Tick
 open Let_syntax
-
-module Signature = Tick.Signature
 
 let depth = Snark_params.ledger_depth
 
@@ -29,7 +26,7 @@ module Base = struct
     let { Transaction.Payload.receiver; amount; fee } = payload in
     let%bind () =
       let%bind bs = Transaction.Payload.var_to_bits payload in
-      Signature.Checked.assert_verifies signature sender bs
+      Schnorr.Checked.assert_verifies signature sender bs
     in
     let%bind root =
       let%bind sender_compressed = Public_key.compress_var sender in
@@ -110,6 +107,12 @@ module Base = struct
     Ledger.update ledger receiver receiver_pre;
     root
 
+  let top_hash s1 s2 =
+    Pedersen.hash_fold Pedersen.params
+      (fun ~init ~f ->
+         let init = Ledger_hash.fold s1 ~init ~f in
+         Ledger_hash.fold s2 ~init ~f)
+
   let bundle ledger transaction
     =
     let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
@@ -117,14 +120,11 @@ module Base = struct
     let prover_state : Prover_state.t =
       { state1; state2; transactions = [ transaction ] }
     in
-    let top_hash =
-      Pedersen.hash_fold Pedersen.params
-        (List.fold (Ledger_hash.to_bits state1 @ Ledger_hash.to_bits state2))
-    in
     let main top_hash =
       handle (main top_hash)
         (handler ledger)
     in
+    let top_hash = top_hash state1 state2 in
     state1, state2,
     top_hash,
     prove pk (tick_input ()) prover_state main top_hash
@@ -294,7 +294,7 @@ let wrap proof_type proof input =
 
 let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list Wrap.vk
 
-let top_hash s1 s2 =
+let merge_top_hash s1 s2 =
   Pedersen.hash_fold Pedersen.params
     (fun ~init ~f ->
        let init = Ledger_hash.fold ~init ~f s1 in
@@ -302,7 +302,7 @@ let top_hash s1 s2 =
        List.fold ~init ~f wrap_vk_bits)
 
 let merge_proof input1 input2 input3 proof12 proof23 =
-  let top_hash = top_hash input1 input3 in
+  let top_hash = merge_top_hash input1 input3 in
   let to_bits = Ledger_hash.to_bits in
   top_hash,
   Tick.prove Merge.pk (tick_input ())
@@ -316,40 +316,54 @@ let merge_proof input1 input2 input3 proof12 proof23 =
     Merge.main
     top_hash
 
-let verify_merge =
-  (* TODO: Explain this *)
-  let vk_curve_pt =
-    let s =
-      Pedersen.State.create
-        ~bits_consumed:(Pedersen.Digest.size_in_bits * 2)
-        Pedersen.params
-    in
-    (Pedersen.State.update_fold s (List.fold wrap_vk_bits)).acc
+let vk_curve_pt =
+  let s =
+    Pedersen.State.create
+      ~bits_consumed:(Pedersen.Digest.size_in_bits * 2)
+      Pedersen.params
   in
-  fun s1 s2 get_proof ->
-    let open Tick in
-    let open Let_syntax in
-    let%bind top_hash =
-      let (vx, vy) = vk_curve_pt in
-      Pedersen_hash.hash ~params:Pedersen.params
-        ~init:(0, (Cvar.constant vx, Cvar.constant vy))
-        (s1 @ s2)
-      >>| Pedersen_hash.digest
-      >>= Pedersen.Digest.choose_preimage_var
-      >>| Pedersen.Digest.Unpacked.var_to_bits
-    in
-    Merge.Verifier.All_in_one.create ~input:top_hash
-      ~verification_key:(List.map ~f:Boolean.var_of_value wrap_vk_bits)
-      get_proof
+  (Pedersen.State.update_fold s (List.fold wrap_vk_bits)).acc
+
+(* TODO: Explain this *)
+let verify_merge s1 s2 get_proof =
+  let open Tick in
+  let open Let_syntax in
+  let%bind s1 = Ledger_hash.var_to_bits s1
+  and s2 = Ledger_hash.var_to_bits s2
+  in
+  let%bind top_hash =
+    let (vx, vy) = vk_curve_pt in
+    Pedersen_hash.hash ~params:Pedersen.params
+      ~init:(0, (Cvar.constant vx, Cvar.constant vy))
+      (s1 @ s2)
+    >>| Pedersen_hash.digest
+    >>= Pedersen.Digest.choose_preimage_var
+    >>| Pedersen.Digest.Unpacked.var_to_bits
+  in
+  Merge.Verifier.All_in_one.create ~input:top_hash
+    ~verification_key:(List.map ~f:Boolean.var_of_value wrap_vk_bits)
+    (As_prover.map get_proof ~f:(fun proof ->
+       { Merge.Verifier.All_in_one.proof; verification_key = Wrap.vk }))
+  >>| Merge.Verifier.All_in_one.result
 ;;
 
 type t =
   { source     : Ledger_hash.t
   ; target     : Ledger_hash.t
-  ; proof      : Tock.Proof.t
   ; proof_type : Proof_type.t
+  ; proof      : Tock.Proof.t
   }
 [@@deriving fields]
+
+let create = Fields.create
+
+let verify { source; target; proof; proof_type } =
+  let input =
+    match proof_type with
+    | Base -> Base.top_hash source target
+    | Merge -> merge_top_hash source target
+  in
+  Tock.verify proof Wrap.vk (wrap_input ()) (embed input)
 
 let of_transaction ledger transaction =
   let source, target, top_hash, proof =
@@ -409,10 +423,10 @@ let%test_module "transaction_snark" =
         }
       in
       let signature =
-        Signature.sign sender.private_key
+        Schnorr.sign sender.private_key
           (Transaction.Payload.to_bits payload)
       in
-      assert (Signature.verify signature (Public_key.of_private_key sender.private_key) (Transaction.Payload.to_bits payload));
+      assert (Schnorr.verify signature (Public_key.of_private_key sender.private_key) (Transaction.Payload.to_bits payload));
       { Transaction.payload
       ; sender = Public_key.of_private_key sender.private_key
       ; signature
@@ -436,5 +450,5 @@ let%test_module "transaction_snark" =
       let state3 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
       let proof13 = merge proof12 proof23 in
       Tock.verify proof13.proof Wrap.vk (wrap_input ())
-        (embed (top_hash state1 state3))
+        (embed (merge_top_hash state1 state3))
   end)

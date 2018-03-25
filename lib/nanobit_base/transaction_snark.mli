@@ -1,9 +1,21 @@
-open Nanobit_base
 open Snark_params
+
+module Proof_type : sig
+  type t = Base | Merge
+end
 
 type t
 
 val proof : t -> Tock.Proof.t
+
+val create
+  : source:Ledger_hash.t
+  -> target:Ledger_hash.t
+  -> proof_type:Proof_type.t
+  -> proof:Tock.Proof.t
+  -> t
+
+val verify : t -> bool
 
 val of_transaction
   : Ledger.t
