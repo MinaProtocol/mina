@@ -6,7 +6,7 @@ open Let_syntax
 module Balance = Currency.T64
 
 module Index = struct
-  type t = int
+  type t = int [@@deriving bin_io]
 
   module Vector = struct
     include Int
@@ -23,20 +23,26 @@ module Index = struct
   include Bits.Snarkable.Small_bit_vector(Tick)(Vector)
 end
 
-type ('pk, 'amount) t_ =
-  { public_key : 'pk
-  ; balance : 'amount
-  }
-[@@deriving sexp]
+module Stable = struct
+  module V1 = struct
+    type ('pk, 'amount) t_ =
+      { public_key : 'pk
+      ; balance : 'amount
+      }
+    [@@deriving sexp, bin_io, eq]
+
+    type t = (Public_key.Compressed.Stable.V1.t, Balance.Stable.V1.t) t_
+    [@@deriving sexp, bin_io, eq]
+  end
+end
+
+include Stable.V1
 
 type var = (Public_key.Compressed.var, Balance.Unpacked.var) t_
 type value = (Public_key.Compressed.t, Balance.t) t_
 [@@deriving sexp]
-type t = value
-[@@deriving sexp]
 
-let empty_hash =
-  Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
+let empty_hash = Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
 
 let typ : (var, value) Typ.t =
   let spec =
