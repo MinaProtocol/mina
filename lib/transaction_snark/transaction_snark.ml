@@ -390,23 +390,21 @@ let%test_module "transaction_snark" =
       ; signature
       }
 
-    let find_index xs x =
-      fst (Array.findi_exn xs ~f:(fun _ y -> Field.equal y x))
-
     let%test "base_and_merge" =
-      let wallets = random_wallets () in
-      let ledger =
-        Ledger.create ~depth:ledger_depth
-      in
-      Array.iter wallets ~f:(fun { account } ->
-        Ledger.update ledger account.public_key account);
-      let t1 = transaction wallets 0 1 8 in
-      let t2 = transaction wallets 1 2 3 in
-      let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
-      let proof12 = of_transaction ledger t1 in
-      let proof23 = of_transaction ledger t2 in
-      let state3 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
-      let proof13 = merge proof12 proof23 in
-      Tock.verify proof13.proof Wrap.vk (wrap_input ())
-        (embed (top_hash state1 state3))
+      Test_util.with_randomness 123456789 (fun () ->
+        let wallets = random_wallets () in
+        let ledger =
+          Ledger.create ~depth:ledger_depth
+        in
+        Array.iter wallets ~f:(fun { account } ->
+          Ledger.update ledger account.public_key account);
+        let t1 = transaction wallets 0 1 8 in
+        let t2 = transaction wallets 1 2 3 in
+        let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
+        let proof12 = of_transaction ledger t1 in
+        let proof23 = of_transaction ledger t2 in
+        let state3 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
+        let proof13 = merge proof12 proof23 in
+        Tock.verify proof13.proof Wrap.vk (wrap_input ())
+          (embed (top_hash state1 state3)))
   end)
