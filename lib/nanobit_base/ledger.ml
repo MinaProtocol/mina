@@ -21,3 +21,27 @@ include Merkle_ledger.Ledger.Make
     end)
     (struct let max_depth = ledger_depth end)
     (Public_key.Compressed)
+
+let apply_transaction ledger (transaction : Transaction.t) =
+  let error s = Or_error.errorf "Ledger.apply_transaction: %s" s in
+  if Transaction.check_signature transaction
+  then begin
+    let sender = Public_key.compress transaction.sender in
+    let { Transaction.Payload.fee=_; amount; receiver } = transaction.payload in
+    begin match get ledger sender, get ledger receiver with
+    | None, Some _ -> error "sender not found"
+    | Some _, None -> error "receiver not found"
+    | None, None -> error "neither sender nor receiver found"
+    | Some sender_account, Some receiver_account ->
+      update ledger sender
+        { sender_account with
+          balance = Unsigned.UInt64.sub sender_account.balance amount
+        };
+      update ledger receiver
+        { receiver_account with
+          balance = Unsigned.UInt64.add receiver_account.balance amount
+        };
+      Ok ()
+    end
+  end
+  else error "bad signature"
