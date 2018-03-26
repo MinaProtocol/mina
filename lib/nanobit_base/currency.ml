@@ -38,6 +38,10 @@ module Make
   module Stable = struct
     module V1 = struct
       type t = Unsigned.t
+
+      let compare = Unsigned.compare
+      let equal t1 t2 = compare t1 t2 = 0
+
       include Make_bin_io(struct
           type v = Unsigned.t
           type t = Signed.t [@@deriving bin_io]
