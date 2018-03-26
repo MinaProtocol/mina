@@ -1,18 +1,17 @@
 open Core
 open Snark_params
 open Snarky
-open Tick
-open Let_syntax
 
 let depth = Snark_params.ledger_depth
 
 let bundle_length = 1
 
-let tick_input () = Data_spec.([ Field.typ ])
+let tick_input () = Tick.(Data_spec.([ Field.typ ]))
 let tick_input_size = Tick.Data_spec.size (tick_input ())
-let wrap_input () = Tock.Data_spec.([ Tock.Field.typ ])
+let wrap_input () = Tock.(Data_spec.([ Field.typ ]))
 
-let provide_witness' typ ~f = provide_witness typ As_prover.(map get_state ~f)
+let provide_witness' typ ~f =
+  Tick.(provide_witness typ As_prover.(map get_state ~f))
 
 (* Staging:
    first make tick base.
@@ -20,6 +19,9 @@ let provide_witness' typ ~f = provide_witness typ As_prover.(map get_state ~f)
    then make tock wrap (which branches on the tick vk) *)
 
 module Base = struct
+  open Tick
+  open Let_syntax
+
   let apply_transaction root ({ sender; signature; payload } : Transaction.var) =
     (if not Insecure.transaction_replay
      then failwith "Insecure.transaction_replay false");
@@ -132,6 +134,7 @@ end
 
 module Proof_type = struct
   type t = Base | Merge
+  [@@deriving bin_io]
 
   let is_base = function
     | Base -> true
@@ -139,6 +142,8 @@ module Proof_type = struct
 end
 
 module Merge = struct
+  open Tick
+  open Let_syntax
 
   module Prover_state = struct
     type t =
@@ -295,7 +300,7 @@ let wrap proof_type proof input =
 let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list Wrap.vk
 
 let merge_top_hash s1 s2 =
-  Pedersen.hash_fold Pedersen.params
+  Tick.Pedersen.hash_fold Tick.Pedersen.params
     (fun ~init ~f ->
        let init = Ledger_hash.fold ~init ~f s1 in
        let init = Ledger_hash.fold ~init ~f s2 in
@@ -317,6 +322,7 @@ let merge_proof input1 input2 input3 proof12 proof23 =
     top_hash
 
 let vk_curve_pt =
+  let open Tick in
   let s =
     Pedersen.State.create
       ~bits_consumed:(Pedersen.Digest.size_in_bits * 2)
@@ -348,12 +354,12 @@ let verify_merge s1 s2 get_proof =
 ;;
 
 type t =
-  { source     : Ledger_hash.t
-  ; target     : Ledger_hash.t
+  { source     : Ledger_hash.Stable.V1.t
+  ; target     : Ledger_hash.Stable.V1.t
   ; proof_type : Proof_type.t
-  ; proof      : Tock.Proof.t
+  ; proof      : Proof.Stable.V1.t
   }
-[@@deriving fields]
+[@@deriving fields, bin_io]
 
 let create = Fields.create
 
@@ -423,17 +429,17 @@ let%test_module "transaction_snark" =
         }
       in
       let signature =
-        Schnorr.sign sender.private_key
+        Tick.Schnorr.sign sender.private_key
           (Transaction.Payload.to_bits payload)
       in
-      assert (Schnorr.verify signature (Public_key.of_private_key sender.private_key) (Transaction.Payload.to_bits payload));
+      assert (Tick.Schnorr.verify signature (Public_key.of_private_key sender.private_key) (Transaction.Payload.to_bits payload));
       { Transaction.payload
       ; sender = Public_key.of_private_key sender.private_key
       ; signature
       }
 
     let find_index xs x =
-      fst (Array.findi_exn xs ~f:(fun _ y -> Field.equal y x))
+      fst (Array.findi_exn xs ~f:(fun _ y -> Tick.Field.equal y x))
 
     let%test "base_and_merge" =
       let wallets = random_wallets () in

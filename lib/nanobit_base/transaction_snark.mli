@@ -2,9 +2,11 @@ open Snark_params
 
 module Proof_type : sig
   type t = Base | Merge
+  [@@deriving bin_io]
 end
 
 type t
+[@@deriving bin_io]
 
 val proof : t -> Tock.Proof.t
 
