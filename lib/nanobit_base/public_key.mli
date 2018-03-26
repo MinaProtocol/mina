@@ -3,11 +3,12 @@ open Snark_params
 open Tick
 
 type t = Field.t * Field.t
+[@@deriving sexp, eq, compare]
 
 module Stable : sig
   module V1 : sig
     type nonrec t = t
-    [@@deriving bin_io, sexp]
+    [@@deriving bin_io, sexp, compare, eq]
   end
 end
 
@@ -22,12 +23,12 @@ module Compressed : sig
     ; is_odd : 'boolean
     }
 
-  type t = (Field.t, bool) t_ [@@deriving sexp]
+  type t = (Field.t, bool) t_ [@@deriving sexp, eq, compare]
 
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving sexp, bin_io]
+      [@@deriving sexp, bin_io, eq, compare]
     end
   end
 

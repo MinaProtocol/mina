@@ -4,7 +4,7 @@ open Snark_params
 module Stable = struct
   module V1 = struct
     type t = Tick.Field.t * Tick.Field.t
-    [@@deriving bin_io, sexp, eq]
+    [@@deriving bin_io, sexp, eq, compare]
   end
 end
 
@@ -28,12 +28,12 @@ module Compressed = struct
     { x      : 'field
     ; is_odd : 'boolean
     }
-  [@@deriving bin_io, sexp, compare]
+  [@@deriving bin_io, sexp, compare, eq]
 
   module Stable = struct
     module V1 = struct
       type t = (Field.t, bool) t_
-      [@@deriving bin_io, sexp]
+      [@@deriving bin_io, sexp, eq, compare]
     end
   end
 
