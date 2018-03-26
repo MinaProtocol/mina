@@ -51,6 +51,8 @@ module Tick = struct
   module Field = struct
     include Tick0.Field
 
+    let compare t1 t2 = Bigint.(compare (of_field t1) (of_field t2))
+
     include Field_bin.Make(Tick0.Field)(Tick_curve.Bigint.R)
 
     module Bits = Bits.Make_field(Tick0.Field)(Tick0.Bigint)
