@@ -13,7 +13,10 @@ module type S = sig
     : prover:Prover.t
     -> parent_log:Logger.t
     -> initial:Blockchain.t
-    -> body:Block.Body.t
+    -> transactions:Transaction.t Linear_pipe.Reader.t
+    -> ledger:Ledger.t
+
+    -> body:Block.With_transactions.t
     -> Update.t Linear_pipe.Reader.t
     -> Blockchain.t Linear_pipe.Reader.t
 end

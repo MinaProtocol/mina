@@ -159,9 +159,9 @@ struct
         log_strongest_block_reader 
         ~f:(fun blockchain ->
           let state = blockchain.Blockchain.state in
-          let number = state.Blockchain_state.number in
-          let time = state.Blockchain_state.previous_time in
-          let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.target) in
+          let ledger_hash = state.ledger_hash in
+          let time = state.previous_time in
+          let target = (Nanobit_base.Target.to_bigint state.target) in
           let strength = Bignum.Bigint.((Nanobit_base.Target.to_bigint Nanobit_base.Target.max) / target) in
           let diff = 
             match !last_time with
@@ -171,7 +171,7 @@ struct
               let b = Block_time.to_time previous_time in
               Time.Span.to_string (Time.diff a b)
           in
-          Logger.info log ~attrs:[ ("number", [%sexp_of: Int64.t] number )
+          Logger.info log ~attrs:[ ("number", [%sexp_of: Ledger_hash.t] ledger_hash )
                                  ; ("strength", [%sexp_of: Bignum.Bigint.t] strength)
                                  ; ("mining time", [%sexp_of: String.t] diff) ]
             "new strongest blockchain";
@@ -184,7 +184,7 @@ struct
         ~f:(fun u ->
           begin match u with
           | Miner.Update.Change_body body -> 
-            Logger.debug log "new block body %s" (Int64.to_string body) 
+            Logger.debug log !"new block body %{sexp:Ledger_hash.t}" body.target_hash
           | Change_previous prev ->
             Logger.debug log !"new previous chain %{sexp:Blockchain_state.t}"
               prev.state
