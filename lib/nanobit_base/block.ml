@@ -184,6 +184,8 @@ module With_transactions = struct
         [@@deriving bin_io, sexp]
       end
     end
+
+    include Stable.V1
   end
 
   module Stable = struct
@@ -192,4 +194,6 @@ module With_transactions = struct
       [@@deriving bin_io, sexp]
     end
   end
+
+  include Stable.V1
 end
