@@ -10,5 +10,5 @@
 (alias
   ((name runtest)
    (deps (transaction_snark_test.exe))
-   (action (run ${<} inline-test-runner nanobit_base))))
+   (action (run ${<} inline-test-runner transaction_snark_test))))
 
