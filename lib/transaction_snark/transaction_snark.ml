@@ -201,10 +201,6 @@ module Base = struct
       Pedersen.hash_fold Pedersen.params
         (List.fold (Ledger_hash.to_bits state1 @ Ledger_hash.to_bits state2))
     in
-    let main top_hash =
-      handle (main top_hash)
-        (handler ledger)
-    in
     state1, state2,
     top_hash,
     prove keys.base_pk (tick_input ()) prover_state main top_hash
