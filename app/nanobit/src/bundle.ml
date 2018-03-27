@@ -138,6 +138,7 @@ module Input = struct
   type t =
     { transaction : Transaction.t
     ; ledger : Sparse_ledger.t
+    ; target_hash : Ledger_hash.Stable.V1.t
     }
   [@@deriving bin_io]
 end
@@ -180,24 +181,25 @@ let create ledger transactions : t =
     Map_reduce.Config.create ~redirect_stderr:`Dev_null ~redirect_stdout:`Dev_null ()
   in
   let inputs =
-    (* TODO: Bad transactions should probably get thrown away earlier? *)
-    List.filter_map transactions ~f:(fun transaction ->
-      let t =
-        { Input.transaction
-        ; ledger =
-            Sparse_ledger.of_ledger_subset ledger
-              [ Public_key.compress transaction.sender; transaction.payload.receiver ]
-        }
+    List.filter_map transactions ~f:(fun (transaction : Transaction.t) ->
+      let sparse_ledger =
+        Sparse_ledger.of_ledger_subset ledger
+          [ Public_key.compress transaction.sender; transaction.payload.receiver ]
       in
+      (* TODO: Bad transactions should probably get thrown away earlier? *)
       match Ledger.apply_transaction ledger transaction with
       | Ok () ->
-        let undo () = Ledger.reverse 
+        let target_hash = Ledger.merkle_root ledger in
+        let t = { Input.transaction; ledger = sparse_ledger; target_hash } in
         Some t
       | Error _s -> None)
   in
+  List.iter (List.rev inputs) ~f:(fun { transaction } ->
+    Or_error.ok_exn (Ledger.undo_transaction ledger transaction));
   { snark =
       Map_reduce.map_reduce config
         (Pipe.of_list inputs)
         ~m:(module M)
         ~param:()
   }
+
