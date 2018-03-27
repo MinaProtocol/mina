@@ -2,8 +2,7 @@ open Core
 open Snark_params
 open Tick
 open Let_syntax
-
-module Balance = Currency.T64
+open Currency
 
 module Index = struct
   type t = int [@@deriving bin_io]
@@ -38,7 +37,7 @@ end
 
 include Stable.V1
 
-type var = (Public_key.Compressed.var, Balance.Unpacked.var) t_
+type var = (Public_key.Compressed.var, Balance.var) t_
 type value = (Public_key.Compressed.t, Balance.t) t_
 [@@deriving sexp]
 
@@ -47,7 +46,7 @@ let empty_hash = Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sle
 let typ : (var, value) Typ.t =
   let spec =
     Data_spec.(
-      [ Public_key.Compressed.typ; Balance.Unpacked.typ ])
+      [ Public_key.Compressed.typ; Balance.typ ])
   in
   let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
     H_list.(fun [ public_key; balance ] -> { public_key; balance })
@@ -59,7 +58,7 @@ let typ : (var, value) Typ.t =
 
 let var_to_bits { public_key; balance } =
   let%map public_key = Public_key.Compressed.var_to_bits public_key in
-  let balance = Balance.Unpacked.var_to_bits balance in
+  let balance = Balance.var_to_bits balance in
   public_key @ balance
 
 let fold_bits ({ public_key; balance } : t) =

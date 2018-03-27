@@ -1,5 +1,6 @@
 open Core
 open Snark_params
+open Currency
 
 include Merkle_ledger.Ledger.Make
     (struct
@@ -22,26 +23,44 @@ include Merkle_ledger.Ledger.Make
     (struct let max_depth = ledger_depth end)
     (Public_key.Compressed)
 
-let apply_transaction ledger (transaction : Transaction.t) =
-  let error s = Or_error.errorf "Ledger.apply_transaction: %s" s in
+let merkle_root t = Ledger_hash.of_hash (merkle_root t)
+
+let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
+
+let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
+
+let get' ledger tag key = error_opt (sprintf "%s not found" tag) (get ledger key)
+
+let add_amount balance amount = error_opt "overflow" (Balance.add_amount balance amount)
+let sub_amount balance amount = error_opt "insufficient funds" (Balance.add_amount balance amount)
+
+let apply_transaction_unchecked ledger (transaction : Transaction.t) =
+  let sender = Public_key.compress transaction.sender in
+  let { Transaction.Payload.fee=_; amount; receiver } = transaction.payload in
+  let open Or_error.Let_syntax in
+  let%bind sender_account = get' ledger "sender" sender
+  and receiver_account = get' ledger "receiver" receiver
+  in
+  let%map sender_balance' = sub_amount sender_account.balance amount
+  and receiver_balance' = add_amount receiver_account.balance amount
+  in
+  update ledger sender { sender_account with balance = sender_balance' };
+  update ledger receiver { receiver_account with balance = receiver_balance' }
+
+let apply_transaction ledger transaction =
   if Transaction.check_signature transaction
-  then begin
-    let sender = Public_key.compress transaction.sender in
-    let { Transaction.Payload.fee=_; amount; receiver } = transaction.payload in
-    begin match get ledger sender, get ledger receiver with
-    | None, Some _ -> error "sender not found"
-    | Some _, None -> error "receiver not found"
-    | None, None -> error "neither sender nor receiver found"
-    | Some sender_account, Some receiver_account ->
-      update ledger sender
-        { sender_account with
-          balance = Unsigned.UInt64.sub sender_account.balance amount
-        };
-      update ledger receiver
-        { receiver_account with
-          balance = Unsigned.UInt64.add receiver_account.balance amount
-        };
-      Ok ()
-    end
-  end
+  then apply_transaction_unchecked ledger transaction
   else error "bad signature"
+
+let undo_transaction ledger (transaction : Transaction.t) =
+  let open Or_error.Let_syntax in
+  let sender = Public_key.compress transaction.sender in
+  let { Transaction.Payload.fee=_; amount; receiver } = transaction.payload in
+  let%bind sender_account = get' ledger "sender" sender
+  and receiver_account = get' ledger "receiver" receiver
+  in
+  let%map sender_balance' = add_amount sender_account.balance amount
+  and receiver_balance' = sub_amount receiver_account.balance amount
+  in
+  update ledger sender { sender_account with balance = sender_balance' };
+  update ledger receiver { receiver_account with balance = receiver_balance' }
