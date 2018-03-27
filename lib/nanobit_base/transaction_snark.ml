@@ -1,6 +1,7 @@
 open Core
 open Snark_params
 open Snarky
+open Currency
 
 let depth = Snark_params.ledger_depth
 
@@ -33,11 +34,11 @@ module Base = struct
     let%bind root =
       let%bind sender_compressed = Public_key.compress_var sender in
       Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
-        let%map balance = Transaction.Amount.(account.balance - amount) in (* TODO: Fee *)
+        let%map balance = Balance.Checked.(account.balance - amount) in (* TODO: Fee *)
         { account with balance })
     in
     Ledger_hash.modify_account root receiver ~f:(fun account ->
-      let%map balance = Transaction.Amount.(account.balance + amount) in
+      let%map balance = Balance.Checked.(account.balance + amount) in
       { account with balance })
 
   let apply_transactions root ts =
@@ -89,45 +90,23 @@ module Base = struct
         respond (Provide (Ledger.index_of_key_exn ledger pk))
       | _ -> unhandled
 
-  let root_after_transaction ledger
-        (transaction : Transaction.t) =
-    let get_exn pk = Option.value_exn (Ledger.get ledger pk) in
-    let sender = Public_key.compress transaction.sender in
-    let receiver = transaction.payload.receiver in
-    let sender_pre = get_exn sender in
-    let receiver_pre = get_exn receiver in
-    Ledger.update ledger sender
-      { sender_pre with
-        balance = Unsigned.UInt64.sub sender_pre.balance transaction.payload.amount
-      };
-    Ledger.update ledger transaction.payload.receiver
-      { receiver_pre with
-        balance = Unsigned.UInt64.add receiver_pre.balance transaction.payload.amount
-      };
-    let root = Ledger.merkle_root ledger in
-    Ledger.update ledger sender sender_pre;
-    Ledger.update ledger receiver receiver_pre;
-    root
-
   let top_hash s1 s2 =
     Pedersen.hash_fold Pedersen.params
       (fun ~init ~f ->
          let init = Ledger_hash.fold s1 ~init ~f in
          Ledger_hash.fold s2 ~init ~f)
 
-  let bundle ledger transaction
+  let bundle
+        state1
+        state2
+        transaction
+        handler
     =
-    let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
-    let state2 = Ledger_hash.of_hash (root_after_transaction ledger transaction) in
     let prover_state : Prover_state.t =
       { state1; state2; transactions = [ transaction ] }
     in
-    let main top_hash =
-      handle (main top_hash)
-        (handler ledger)
-    in
+    let main top_hash = handle (main top_hash) handler in
     let top_hash = top_hash state1 state2 in
-    state1, state2,
     top_hash,
     prove pk (tick_input ()) prover_state main top_hash
 end
@@ -371,10 +350,8 @@ let verify { source; target; proof; proof_type } =
   in
   Tock.verify proof Wrap.vk (wrap_input ()) (embed input)
 
-let of_transaction ledger transaction =
-  let source, target, top_hash, proof =
-    Base.bundle ledger transaction
-  in
+let of_transaction source target transaction handler =
+  let top_hash, proof = Base.bundle source target transaction handler in
   let proof_type = Proof_type.Base in
   { source
   ; target
@@ -411,7 +388,7 @@ let%test_module "transaction_snark" =
         { private_key
         ; account =
             { public_key = Public_key.compress (Public_key.of_private_key private_key)
-            ; balance = Unsigned.UInt64.of_int (10 + Random.int 100)
+            ; balance = Balance.of_int (10 + Random.int 100)
             }
         }
       in
@@ -424,8 +401,8 @@ let%test_module "transaction_snark" =
       let receiver = wallets.(j) in
       let payload : Transaction.Payload.t =
         { receiver = receiver.account.public_key
-        ; fee = Unsigned.UInt32.zero
-        ; amount = Unsigned.UInt64.of_int amt
+        ; fee = Fee.zero
+        ; amount = Amount.of_int amt
         }
       in
       let signature =
@@ -441,6 +418,17 @@ let%test_module "transaction_snark" =
     let find_index xs x =
       fst (Array.findi_exn xs ~f:(fun _ y -> Tick.Field.equal y x))
 
+    let root_after_transaction ledger transaction =
+      Or_error.ok_exn (Ledger.apply_transaction_unchecked ledger transaction);
+      let root = Ledger.merkle_root ledger in
+      Or_error.ok_exn (Ledger.undo_transaction ledger transaction);
+      root
+
+    let of_transaction' ledger transaction =
+      let source = Ledger.merkle_root ledger in
+      let target = root_after_transaction ledger transaction in
+      of_transaction source target transaction (Base.handler ledger)
+
     let%test "base_and_merge" =
       let wallets = random_wallets () in
       let ledger =
@@ -450,10 +438,10 @@ let%test_module "transaction_snark" =
         Ledger.update ledger account.public_key account);
       let t1 = transaction wallets 0 1 8 in
       let t2 = transaction wallets 1 2 3 in
-      let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
-      let proof12 = of_transaction ledger t1 in
-      let proof23 = of_transaction ledger t2 in
-      let state3 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
+      let state1 = Ledger.merkle_root ledger in
+      let proof12 = of_transaction' ledger t1 in
+      let proof23 = of_transaction' ledger t2 in
+      let state3 = Ledger.merkle_root ledger in
       let proof13 = merge proof12 proof23 in
       Tock.verify proof13.proof Wrap.vk (wrap_input ())
         (embed (merge_top_hash state1 state3))

@@ -20,8 +20,10 @@ val create
 val verify : t -> bool
 
 val of_transaction
-  : Ledger.t
+  : Ledger_hash.t
+  -> Ledger_hash.t
   -> Transaction.t
+  -> Tick.Handler.t
   -> t
 
 val merge : t -> t -> t
