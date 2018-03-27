@@ -138,9 +138,7 @@ let negative_one : value =
   { previous_time
   ; target
   ; block_hash = Block.genesis.header.previous_block_hash
-  ; ledger_hash =
-      Ledger_hash.of_hash
-        Ledger.(merkle_root (create ~depth:ledger_depth))
+  ; ledger_hash = Ledger.(merkle_root (create ~depth:ledger_depth))
   ; strength = Strength.zero
   }
 
