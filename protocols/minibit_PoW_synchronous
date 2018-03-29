@@ -45,7 +45,7 @@ apply_transition state transition
       body_hash = hash(body)
     header_hash = hash(new_state.header)
     proof = 
-      SNARK proving that, for new_state:
+      SNARK "zk_state_valid" proving that, for new_state:
         - all old values came from a chain_state with valid proof
         - new_ledger_hash was obtained via a valid sequence of transactions
         - prev_timestamp is the old state.header.timestamp
@@ -64,4 +64,21 @@ apply_transition state transition
       proof
     }
 
-
+check_state old_state new_state
+  = 
+    new_strength = new_state.header.most_recent_strength
+    old_strength = old_state.header.most_recent_strength
+    new_state.proof zk_state_valid verifies new_state
+      &&
+    new_strength > old_strength
+    
+on_event event
+  = 
+    match event with
+    | Found transition -> 
+      try
+        state := apply_transition state transition
+        broadcast State state
+    | State new_state ->
+      if check_state state new_state
+      then state := new_state
