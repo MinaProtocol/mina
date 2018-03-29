@@ -9,36 +9,36 @@ end
 module type Temporal_intf = sig
   type t
   val create : now:Time.Span.t -> t
-  val tick_forwards : t -> unit
+  val tick_forwards : t -> unit Deferred.t
 end
 
-module type Fake_transport_intf = sig
+module type Fake_timer_transport_intf = sig
   include Node.Transport_intf
+  include Node.Timer_intf with type t := t
   include Temporal_intf with type t := t
 
   val stop_listening : t -> me:peer -> unit
 end
 
-module type Fake_timer_intf = sig
-  include Node.Timer_intf
-  include Temporal_intf with type t := t
-end
-
-module Fake_timer : Fake_timer_intf
-
-module type Fake_transport_s =
+module type Fake_timer_transport_s =
   functor
     (Message : sig type t end)
     (Message_delay : Message_delay_intf with type message := Message.t)
-    (Peer : Node.Peer_intf) -> Fake_transport_intf with type message := Message.t
-                                                    and type peer := Peer.t
+    (Peer : Node.Peer_intf) -> Fake_timer_transport_intf with type message := Message.t
+                                                          and type peer := Peer.t
+
+module type Trivial_peer_intf = sig
+  type t = int [@@deriving eq, hash, compare, sexp]
+  include Hashable.S with type t := t
+end
+
+module Trivial_peer : Trivial_peer_intf
 
 module type S =
   functor 
-    (State : sig type t [@@deriving eq] end)
+    (State : sig type t [@@deriving eq, sexp] end)
     (Message : sig type t end)
     (Message_delay : Message_delay_intf with type message := Message.t)
-    (Peer : Node.Peer_intf)
     (Message_label : sig 
        type label [@@deriving enum, sexp]
        include Hashable.S with type t = label
@@ -51,19 +51,21 @@ module type S =
        type label [@@deriving enum, sexp]
        include Hashable.S with type t = label
      end)
-    (Transport : Fake_transport_intf with type message := Message.t
-                                      and type peer := Peer.t)
     -> sig
 
     type t
 
+    module Timer_transport : Fake_timer_transport_intf with type message := Message.t
+                                                        and type peer := Trivial_peer.t
+
     module MyNode : Node.S with type message := Message.t
                             and type state := State.t
-                            and type transport := Transport.t
+                            and type transport := Timer_transport.t
+                            and type peer := Trivial_peer.t
                             and module Message_label := Message_label
                             and module Timer_label := Timer_label
                             and module Condition_label := Condition_label
-                            and module Timer := Fake_timer
+                            and module Timer := Timer_transport
 
     module Identifier : sig type t end
 
@@ -74,8 +76,11 @@ module type S =
     val loop : t -> stop : unit Deferred.t -> unit Deferred.t
 
     val change : t -> change list -> unit
+
+    val create : count:int -> initial_state : State.t -> (int -> MyNode.message_command list * MyNode.handle_command list) -> stop : unit Deferred.t -> t
   end
 
 module Make : S
 
-module Fake_transport : Fake_transport_s
+module Fake_timer_transport : Fake_timer_transport_s
+
