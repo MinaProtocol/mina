@@ -1,4 +1,3 @@
-
 Synchronous Minibit PoW
 
 chain_state: {
@@ -29,17 +28,19 @@ apply_transition state transition
     old_ledger = get_matching(state.body.ledger_hash)
     new_ledger = apply(old_ledger, transition.transactions)
     new_ledger_hash = root_hash(new_ledger)
+    difficulty = 
+      compute_next_difficulty(
+        state.header.most_recent_difficulty, 
+        state.header.timestamp,
+        state.header.new_timestamp)
     new_body = 
       ledger_hash = new_ledger_hash
     new_header =
       prev_timestamp = state.timestamp
       timestamp = transition.timestamp
       length = state.length + 1
-      most_recent_strength = state.header.most_recent_strength + get_strength(state.header)
-      most_recent_difficulty 
-        = compute_new_difficulty(state.header.most_recent_difficulty, 
-                                 state.header.timestamp,
-                                 state.header.new_timestamp)
+      most_recent_strength = state.header.most_recent_strength + difficulty
+      most_recent_difficulty = difficulty
       nonce = transition.nonce
       body_hash = hash(body)
     header_hash = hash(new_state.header)
@@ -50,7 +51,7 @@ apply_transition state transition
         - prev_timestamp is the old state.header.timestamp
         - timestamp is a newer timestamp than the prev timestamp
         - length is one greater than the old length
-        - a "current difficulty" is computed correctly from as a function of (most_recent_difficulty, timestamp, new_timestamp)
+        - a "current difficulty" is computed correctly from (most_recent_difficulty, timestamp, new_timestamp)
         - the most recent strength is computed correctly from the most_recent_strength and the "current difficulty"
         - most_recent_difficulty is current difficulty
         - body hash is a hash of the new body
@@ -62,4 +63,5 @@ apply_transition state transition
       header_hash
       proof
     }
+
 
