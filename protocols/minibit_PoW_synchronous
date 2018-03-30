@@ -11,6 +11,7 @@ chain_state: {
     most_recent_strength
     most_recent_difficulty
     nonce
+    prev_header_hash
     body_hash
   }
   header_hash
@@ -42,6 +43,7 @@ apply_transition state transition
       most_recent_strength = state.header.most_recent_strength + difficulty
       most_recent_difficulty = difficulty
       nonce = transition.nonce
+      prev_header_hash = state.header_hash
       body_hash = hash(body)
     header_hash = hash(new_state.header)
     proof = 
@@ -55,6 +57,7 @@ apply_transition state transition
         - the most recent strength is computed correctly from the most_recent_strength and the "current difficulty"
         - most_recent_difficulty is current difficulty
         - body hash is a hash of the new body
+        - prev_header_hash is the old state.header_hash
         - header_hash is a hash of the new header
         - header_hash meets current difficulty
     {
