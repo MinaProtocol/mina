@@ -97,6 +97,9 @@ module type S = sig
   val state : t -> state
 
   val send : t -> recipient:peer -> message -> unit Or_error.t Deferred.t
+  val send_exn : t -> recipient:peer -> message -> unit Deferred.t
+  val send_multi : t -> recipients:peer list -> message -> unit Or_error.t list Deferred.t
+  val send_multi_exn : t -> recipients:peer list -> message -> unit Deferred.t
 end
 
 module type F =

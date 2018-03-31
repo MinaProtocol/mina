@@ -67,13 +67,13 @@ module type S =
                             and module Condition_label := Condition_label
                             and module Timer := Timer_transport
 
-    module Identifier : sig type t end
+    module Identifier : sig type t = Trivial_peer.t end
 
     type change =
       | Delete of Identifier.t
       | Add of MyNode.t
 
-    val loop : t -> stop : unit Deferred.t -> unit Deferred.t
+    val loop : t -> stop : unit Deferred.t -> max_iters : int option -> unit Deferred.t
 
     val change : t -> change list -> unit
 

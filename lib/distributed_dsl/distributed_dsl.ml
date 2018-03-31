@@ -246,13 +246,13 @@ module type S =
                             and module Condition_label := Condition_label
                             and module Timer := Timer_transport
 
-    module Identifier : sig type t end
+    module Identifier : sig type t = Trivial_peer.t end
 
     type change =
       | Delete of Identifier.t
       | Add of MyNode.t
 
-    val loop : t -> stop : unit Deferred.t -> unit Deferred.t
+    val loop : t -> stop : unit Deferred.t -> max_iters : int option -> unit Deferred.t
 
     val change : t -> change list -> unit
 
@@ -282,7 +282,7 @@ module Make
     module MyNode = Node.Make(State)(Message)(Trivial_peer)(Timer_transport)(Message_label)(Timer_label)(Condition_label)(Timer_transport)
 
     module Identifier = struct
-      type t = Trivial_peer.t
+      type t = Trivial_peer.t [@@deriving eq]
       include MyNode.Identifier
     end
 
@@ -301,7 +301,11 @@ module Make
         | Add n -> Identifier.Table.add_exn t.nodes ~key:(MyNode.ident n) ~data:n
       )
 
-    let rec loop t ~stop =
+    let rec loop t ~stop ~max_iters =
+      match max_iters with
+      | Some iters when iters <= 0 -> return ()
+      | _ ->
+
       let merge : 'a. 'a option -> 'a option -> 'a option = fun a b ->
         match a, b with
         | None, None -> None
@@ -361,11 +365,11 @@ module Make
         (*printf "There's a transition at peer %d\n%!" (MyNode.ident n);*)
         let%bind n' = MyNode.step n in
         let () = Identifier.Table.set t.nodes ~key:(MyNode.ident n) ~data:n' in
-        loop t ~stop
+        loop t ~stop ~max_iters:(Option.map max_iters ~f:(fun i -> i - 1))
       | None, None, Some () ->
         (*printf "There's an event since no stuff for peers\n%!";*)
         let%bind () = Timer_transport.tick_forwards t.timer in
-        loop t ~stop
+        loop t ~stop ~max_iters:(Option.map max_iters ~f:(fun i -> i - 1))
       | None, None, None ->
         failwith "Something is ready"
 
@@ -409,25 +413,13 @@ module Make
 end
 
 let%test_module "Distributed_dsl" = (module struct
-  let expect_before_timeout ts f =
+  let expect f =
     Async.Thread_safe.block_on_async_exn (fun () ->
-        let ivar = Ivar.create () in
-        let timeout = Async.after ts in
-        let stop =
-          Deferred.any
-            [ Ivar.read ivar
-            ; timeout
-            ]
-        in
-        let%map ev =
-          Deferred.any
-            [ timeout >>| Fn.const `Timeout
-            ; Deferred.create (fun ivar -> f ivar stop) >>| Fn.const `Success
-            ]
-        in
-        match ev with
-        | `Timeout -> failwith "Timeout"
-        | `Success -> ()
+      match%map
+        Deferred.create f
+      with
+      | `Success -> ()
+      | `Failure s -> failwith s
     )
 
   module State = struct
@@ -477,7 +469,7 @@ let%test_module "Distributed_dsl" = (module struct
   module Machine = Make(State)(Message)(Message_delay)(Message_label)(Timer_label)(Condition_label)
 
   let%test_unit "run_machine" =
-    expect_before_timeout (Time.Span.of_sec 2.) (fun ivar stop ->
+    expect (fun finish_ivar ->
       let open State in
       let open Message_label in
       let open Condition_label in
@@ -492,16 +484,9 @@ let%test_module "Distributed_dsl" = (module struct
           )
           ~f:(fun t state ->
             timeout' t Spawn_msg (Time.Span.of_sec 10.) ~f:(fun t state ->
-              (* Should we have a broadcast method in Node? *)
-              (* What should the semantics of the broadcast be? return list of successes/failures? *)
-              let sends =
-                List.init (count-1) ~f:(fun i ->
-                  match%map send t ~recipient:(i+1) (Msg 10) with
-                  | Ok x -> ()
-                  | Error e -> failwithf "Error! %s" (Error.to_string_hum e) ()
-                )
+              let%map () =
+                send_multi_exn t ~recipients:(List.init (count-1) ~f:(fun i -> i+1)) (Msg 10)
               in
-              let%map all_sends = Deferred.List.all sends in
               Sent_msg
             );
             return Wait_msg
@@ -549,7 +534,7 @@ let%test_module "Distributed_dsl" = (module struct
           )
           ~f:(fun t state ->
             cancel t Timeout_message;
-            Ivar.fill_if_empty ivar ();
+            Ivar.fill_if_empty finish_ivar `Success;
             return state
           )
         ]
@@ -558,12 +543,13 @@ let%test_module "Distributed_dsl" = (module struct
         Machine.create
           ~count
           ~initial_state:Start
-          ~stop
+          ~stop:(Deferred.never ())
           (fun i -> if i = 0 then spec0 else specRest)
       in
 
       don't_wait_for begin
-        Machine.loop machine ~stop
+        let%map () = Machine.loop machine ~stop:(Deferred.never ()) ~max_iters:(Some 10000) in
+        Ivar.fill_if_empty finish_ivar (`Failure "Stopped looping without getting to success state")
       end
     )
 end)

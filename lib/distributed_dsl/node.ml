@@ -98,6 +98,9 @@ module type S = sig
   val state : t -> state
 
   val send : t -> recipient:peer -> message -> unit Or_error.t Deferred.t
+  val send_exn : t -> recipient:peer -> message -> unit Deferred.t
+  val send_multi : t -> recipients:peer list -> message -> unit Or_error.t list Deferred.t
+  val send_multi_exn : t -> recipients:peer list -> message -> unit Deferred.t
 end
 
 module type F =
@@ -341,5 +344,23 @@ module Make
       let state {state} = state
 
       let send {transport} = Transport.send transport
+      let send_exn t ~recipient msg =
+        match%map send t ~recipient msg with
+        | Ok () -> ()
+        | Error e -> failwithf "Send failed %s" (Error.to_string_hum e) ()
+
+      let send_multi t ~recipients msg =
+        Deferred.List.all begin
+          List.map recipients ~f:(fun r ->
+            send t ~recipient:r msg
+          )
+        end
+
+      let send_multi_exn t ~recipients msg =
+        Deferred.List.all begin
+          List.map recipients ~f:(fun r ->
+            send_exn t ~recipient:r msg
+          )
+        end >>| (Fn.const ())
 end
 
