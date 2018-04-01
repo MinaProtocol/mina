@@ -6,7 +6,7 @@ open Snark_params
 module Update = struct
   type t =
     | Change_previous of Blockchain.t
-    | Change_body of Block.Body.t
+    | Change_body of Block.With_transactions.Body.t
 end
 
 module type S = sig
@@ -14,7 +14,7 @@ module type S = sig
     : prover:Prover.t
     -> parent_log:Logger.t
     -> initial:Blockchain.t
-    -> body:Block.Body.t
+    -> body:Block.With_transactions.Body.t
     -> Update.t Linear_pipe.Reader.t
     -> Blockchain.t Linear_pipe.Reader.t
 end
@@ -22,8 +22,8 @@ end
 module Pedersen = Tick.Pedersen
 
 module Cpu = struct
-  let find_block (previous : Blockchain.State.t) (body : Block.Body.t)
-    : (Block.t * Pedersen.Digest.t) option =
+  let find_block (previous : Blockchain.State.t) (body : Block.With_transactions.Body.t)
+    : (Block.With_transactions.t * Pedersen.Digest.t) option =
     let iterations = 10 in
     let target = previous.target in
     let nonce0 = Nonce.random () in
@@ -33,15 +33,15 @@ module Cpu = struct
       ; nonce = nonce0
       }
     in
-    let block0 : Block.t = { header = header0; body } in
+    let block0 : Block.With_transactions.t = { header = header0; body } in
     let rec go nonce i =
       if i = iterations
       then None
       else
-        let block : Block.t =
+        let block : Block.With_transactions.t =
           { block0 with header = { header0 with nonce } }
         in
-        let hash = Block.hash block in
+        let hash = Block.With_transactions.hash block in
         if Target.meets_target_unchecked target ~hash
         then Some (block, hash)
         else go (Nonce.succ nonce) (i + 1)
@@ -52,7 +52,7 @@ module Cpu = struct
   module State = struct
     type t =
       { mutable previous : Blockchain.t
-      ; mutable body     : Block.Body.t
+      ; mutable body     : Block.With_transactions.Body.t
       ; mutable id       : int
       }
   end
@@ -85,7 +85,7 @@ module Cpu = struct
              can be pre-empted by a new block coming in off the network. Or come up
              with some other way for this to get interrupted.
           *)
-          match%bind Prover.extend_blockchain prover previous block with
+          match%bind Prover.extend_blockchain prover previous (Block.With_transactions.forget block) with
           | Ok chain ->
             let%bind () = Pipe.write mined_blocks_writer chain in
             state.previous <- chain;
