@@ -3,8 +3,10 @@ open Nanobit_base
 
 type t
 
-val empty : t
+val create : unit -> t
 
-val add : t -> Transaction.t -> t
+val add : t -> Transaction.t -> unit
 
-val pop : t -> (Transaction.t * t) option
+val pop : t -> Transaction.t option
+
+val remove : t -> Transaction.t -> unit

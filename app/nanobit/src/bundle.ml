@@ -71,9 +71,10 @@ module Sparse_ledger = struct
 
   let of_ledger_subset ledger keys =
     let tree =
-      List.fold keys ~init:(Hash (Ledger.merkle_root ledger)) ~f:(fun tree pk ->
-        add_path tree (Option.value_exn (Ledger.merkle_path ledger pk))
-          (Option.value_exn (Ledger.get ledger pk)))
+      List.fold keys ~init:(Hash (Ledger.merkle_root ledger :> Tick.Pedersen.Digest.t))
+        ~f:(fun tree pk ->
+          add_path tree (Option.value_exn (Ledger.merkle_path ledger pk))
+            (Option.value_exn (Ledger.get ledger pk)))
     in
     { depth = Ledger.depth ledger
     ; tree
@@ -131,6 +132,7 @@ end
 
 type t =
   { snark : Transaction_snark.t option Deferred.t
+  ; target_hash : Ledger_hash.t
   }
 [@@deriving fields]
 
@@ -194,6 +196,7 @@ let create ledger transactions : t =
         Some t
       | Error _s -> None)
   in
+  let target_hash = Ledger.merkle_root ledger in
   List.iter (List.rev inputs) ~f:(fun { transaction } ->
     Or_error.ok_exn (Ledger.undo_transaction ledger transaction));
   { snark =
@@ -201,5 +204,8 @@ let create ledger transactions : t =
         (Pipe.of_list inputs)
         ~m:(module M)
         ~param:()
+  ; target_hash
   }
 
+let cancel t =
+  printf "Bundle.cancel: todo\n%!"

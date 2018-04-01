@@ -13,4 +13,6 @@ val cancel : t -> unit
    account. *)
 val create : Ledger.t -> Transaction.t list -> t
 
+val target_hash : t -> Ledger_hash.t
+
 val snark : t -> Transaction_snark.t option Deferred.t
