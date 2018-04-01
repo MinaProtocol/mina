@@ -2,11 +2,11 @@ open Core_kernel
 open Snark_params
 open Tick
 
-type ('time, 'target, 'digest, 'number, 'strength) t_ =
+type ('time, 'target, 'digest, 'ledger_hash, 'strength) t_ =
   { previous_time : 'time
   ; target        : 'target
   ; block_hash    : 'digest
-  ; number        : 'number
+  ; ledger_hash   : 'ledger_hash
   ; strength      : 'strength
   }
 
@@ -14,7 +14,7 @@ type t =
   ( Block_time.t
   , Target.t
   , Pedersen.Digest.t
-  , Block.Body.t
+  , Ledger_hash.t
   , Strength.t
   ) t_
 [@@deriving sexp]
@@ -25,7 +25,7 @@ module Stable : sig
       { previous_time : 'a
       ; target        : 'b
       ; block_hash    : 'c
-      ; number        : 'd
+      ; ledger_hash   : 'd
       ; strength      : 'e
       }
     [@@deriving bin_io, sexp]
@@ -34,7 +34,7 @@ module Stable : sig
       ( Block_time.Stable.V1.t
       , Target.Stable.V1.t
       , Pedersen.Digest.t
-      , Block.Body.Stable.V1.t
+      , Ledger_hash.Stable.V1.t
       , Strength.Stable.V1.t
       ) t_
     [@@deriving bin_io, sexp]
@@ -47,14 +47,14 @@ include Snarkable.S
       ( Block_time.Unpacked.var
       , Target.Unpacked.var
       , Pedersen.Digest.Unpacked.var
-      , Block.Body.Unpacked.var
+      , Ledger_hash.var
       , Strength.Unpacked.var
       ) t_
     and type value =
       ( Block_time.Unpacked.value
       , Target.Unpacked.value
       , Pedersen.Digest.Unpacked.value
-      , Block.Body.Unpacked.value
+      , Ledger_hash.t
       , Strength.Unpacked.value
       ) t_
 
