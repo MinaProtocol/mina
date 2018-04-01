@@ -1,28 +1,37 @@
 open Core_kernel
 open Async_kernel
 
+module type Peer_intf = sig
+  type t [@@deriving eq, hash, compare, sexp]
+  include Hashable.S with type t := t
+end
+
 module type Transport_intf = sig
   type t
   type message
   type peer
 
   val send : t -> recipient:peer -> message -> unit Or_error.t Deferred.t
-  val listen : t -> message Linear_pipe.Reader.t
+  val listen : t -> me:peer -> message Linear_pipe.Reader.t
 end
 
 module type Timer_intf = sig
+  type t
   type tok [@@deriving eq]
-  val wait : Time.Span.t -> tok * [`Cancelled | `Finished] Deferred.t
-  val cancel : tok -> unit
+  val wait : t -> Time.Span.t -> tok * [`Cancelled | `Finished] Deferred.t
+  val cancel : t -> tok -> unit
 end
 
 module type S = sig
   type message
   type state
+  type transport
+  type peer
   module Message_label : Hashable.S
   module Timer_label : Hashable.S
   module Condition_label : Hashable.S
   module Timer : Timer_intf
+  module Identifier : Hashable.S with type t := peer
 
   type condition = state -> bool
 
@@ -49,8 +58,8 @@ module type S = sig
 
   val cancel
     : t
-    -> Timer_label.t
     -> ?tok:Timer.tok option
+    -> Timer_label.t
     -> unit
 
   val timeout
@@ -60,24 +69,44 @@ module type S = sig
     -> f:transition
     -> Timer.tok
 
+  val timeout'
+    : t
+    -> Timer_label.t
+    -> Time.Span.t
+    -> f:transition
+    -> unit
+
   val next_ready : t -> unit Deferred.t
+  val is_ready : t -> bool
 
   val make_node 
-    : messages : message Linear_pipe.Reader.t
+    : transport : transport
+    -> parent_log : Logger.t
+    -> me : peer
+    -> messages : message Linear_pipe.Reader.t
     -> ?parent : t
     -> initial_state : state
+    -> timer : Timer.t
     -> message_command list 
     -> handle_command list 
     -> t
 
   val step : t -> t Deferred.t
+
+  val ident : t -> peer
+  val state : t -> state
+
+  val send : t -> recipient:peer -> message -> unit Or_error.t Deferred.t
+  val send_exn : t -> recipient:peer -> message -> unit Deferred.t
+  val send_multi : t -> recipients:peer list -> message -> unit Or_error.t list Deferred.t
+  val send_multi_exn : t -> recipients:peer list -> message -> unit Deferred.t
 end
 
 module type F =
   functor 
-    (State : sig type t [@@deriving eq] end)
+    (State : sig type t [@@deriving eq, sexp] end)
     (Message : sig type t end)
-    (Peer : sig type t end)
+    (Peer : Peer_intf)
     (Timer : Timer_intf)
     (Message_label : sig 
        type label [@@deriving enum, sexp]
@@ -91,14 +120,16 @@ module type F =
        type label [@@deriving enum, sexp]
        include Hashable.S with type t = label
      end)
-    (Transport : Transport_intf with type message := Message.t 
-                                 and type peer := Peer.t) 
+    (Transport : Transport_intf with type message := Message.t
+                                 and type peer := Peer.t)
     -> S with type message := Message.t
           and type state := State.t
-          and module Timer := Timer
+          and type transport := Transport.t
+          and type peer := Peer.t
           and module Message_label := Message_label
           and module Timer_label := Timer_label
           and module Condition_label := Condition_label
+          and module Timer := Timer
 
 module Make : F
 
