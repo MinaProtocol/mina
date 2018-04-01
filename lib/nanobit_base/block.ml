@@ -186,6 +186,9 @@ module With_transactions = struct
     end
 
     include Stable.V1
+
+    let forget ({ target_hash; proof; _ } : t) : Body.t =
+      { target_hash; proof }
   end
 
   module Stable = struct
@@ -195,5 +198,10 @@ module With_transactions = struct
     end
   end
 
+  type block = t
+
   include Stable.V1
+
+  let forget (t : t) : block =
+    { t with body = Body.forget t.body }
 end

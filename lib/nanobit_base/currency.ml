@@ -26,12 +26,12 @@ end
 
 module type Basic = sig
   type t
-  [@@deriving sexp, compare, eq]
+  [@@deriving sexp, compare, eq, hash]
 
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq]
+      [@@deriving bin_io, sexp, compare, eq, hash]
     end
   end
 
@@ -82,10 +82,18 @@ module Make
 
   module Stable = struct
     module V1 = struct
-      type t = Unsigned.t
+      module T = struct
+        include Sexpable.Of_stringable(Unsigned)
+        type t = Unsigned.t
 
-      let compare = Unsigned.compare
-      let equal t1 t2 = compare t1 t2 = 0
+        let compare = Unsigned.compare
+        let equal t1 t2 = compare t1 t2 = 0
+
+        let hash_fold_t s t = Int64.hash_fold_t s (Unsigned.to_int64 t)
+        let hash t = Int64.hash (Unsigned.to_int64 t)
+      end
+      include T
+      include Hashable.Make(T)
 
       include Make_bin_io(struct
           type v = Unsigned.t
@@ -93,7 +101,6 @@ module Make
           let there = M.to_signed
           let back = M.of_signed
         end)
-      include Sexpable.Of_stringable(Unsigned)
     end
   end
 

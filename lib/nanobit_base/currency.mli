@@ -3,12 +3,12 @@ open Snark_params.Tick
 
 module type Basic = sig
   type t
-  [@@deriving sexp, compare, eq]
+  [@@deriving sexp, compare, eq, hash]
 
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq]
+      [@@deriving bin_io, sexp, compare, eq, hash]
     end
   end
 

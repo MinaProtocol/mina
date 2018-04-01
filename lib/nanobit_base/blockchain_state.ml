@@ -107,12 +107,14 @@ let update_exn : value -> Block.t -> value =
     let block_hash = Block.hash block in
     (if not Field.(equal block_hash genesis_hash)
      then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
-    (* TODO
-    assert Transaction_snark.(
-      verify (
-        create ~source:state.ledger_hash ~target:block.body.target_hash
-          ~proof_type:Merge ~proof:block.body.proof));
-       *)
+    assert
+      Transaction_snark.(
+        create
+          ~source:state.ledger_hash
+          ~target:block.body.target_hash
+          ~proof_type:Merge
+          ~proof:block.body.proof
+        |> verify);
     let new_target =
       compute_target state.previous_time state.target
         block.header.time
