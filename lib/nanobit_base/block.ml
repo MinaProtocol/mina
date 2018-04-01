@@ -189,6 +189,13 @@ module With_transactions = struct
 
     let forget ({ target_hash; proof; _ } : t) : Body.t =
       { target_hash; proof }
+
+    (* TODO: Remove in PR implementing miner *)
+    let dummy : t =
+      { target_hash = Ledger_hash.of_hash Tick.Pedersen.zero_hash
+      ; proof = Tock.Proof.dummy
+      ; transactions = []
+      }
   end
 
   module Stable = struct
@@ -204,4 +211,6 @@ module With_transactions = struct
 
   let forget (t : t) : block =
     { t with body = Body.forget t.body }
+
+  let hash t = hash (forget t)
 end
