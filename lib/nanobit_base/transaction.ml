@@ -1,13 +1,10 @@
 open Core
 open Snark_params
-open Snarky
 open Tick
 open Let_syntax
 
-module Signature = Tick.Signature
-
-module Amount = Currency.T64
-module Fee = Currency.T32
+module Amount = Currency.Amount
+module Fee = Currency.Fee
 
 module Payload = struct
   type ('pk, 'amount, 'fee) t_ =
@@ -15,23 +12,23 @@ module Payload = struct
     ; amount   : 'amount
     ; fee      : 'fee
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp, compare, hash]
 
   module Stable = struct
     module V1 = struct
       type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t) t_
-      [@@deriving bin_io]
+      [@@deriving bin_io, sexp, compare, hash]
     end
   end
 
   include Stable.V1
 
   type value = t
-  type var = (Public_key.Compressed.var, Amount.Unpacked.var, Fee.Unpacked.var) t_
+  type var = (Public_key.Compressed.var, Amount.var, Fee.var) t_
   let typ : (var, t) Tick.Typ.t =
     let spec =
       Data_spec.(
-        [ Public_key.Compressed.typ; Amount.Unpacked.typ; Fee.Unpacked.typ ])
+        [ Public_key.Compressed.typ; Amount.typ; Fee.typ ])
     in
     let of_hlist : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
       H_list.(fun [ receiver; amount; fee ] -> { receiver; amount; fee })
@@ -44,8 +41,8 @@ module Payload = struct
   let var_to_bits { receiver; amount; fee } =
     with_label "Transaction.Payload.var_to_bits" begin
       let%map receiver = Public_key.Compressed.var_to_bits receiver in
-      let amount = Amount.Unpacked.var_to_bits amount in
-      let fee = Fee.Unpacked.var_to_bits fee in
+      let amount = Amount.var_to_bits amount in
+      let fee = Fee.var_to_bits fee in
       receiver @ amount @ fee
     end
 
@@ -60,25 +57,37 @@ module Payload = struct
       let length = Field.size_in_bits + 64 + 32 in
       test_equal typ (Typ.list ~length Boolean.typ) var_to_bits to_bits
         { receiver = { x = Field.random (); is_odd = Random.bool () }
-        ; amount = Unsigned.UInt64.of_int (Random.int Int.max_value)
-        ; fee = Unsigned.UInt32.of_int32 (Random.int32 Int32.max_value)
+        ; amount = Amount.of_int (Random.int Int.max_value)
+        ; fee = Fee.of_int (Random.int Int.max_value_30_bits)
         })
 end
 
-type ('payload, 'pk, 'signature) t_ =
-  { payload   : 'payload
-  ; sender    : 'pk
-  ; signature : 'signature
-  }
+module Stable = struct
+  module V1 = struct
+    type ('payload, 'pk, 'signature) t_ =
+      { payload   : 'payload
+      ; sender    : 'pk
+      ; signature : 'signature
+      }
+    [@@deriving bin_io, sexp, compare, hash]
 
-type t = (Payload.t, Public_key.t, Signature.Signature.value) t_
+    type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
+    [@@deriving bin_io, sexp, compare, hash]
+  end
+end
+
+include Stable.V1
+
 type value = t
-type var = (Payload.var, Public_key.var, Signature.Signature.var) t_
+type var = (Payload.var, Public_key.var, Signature.var) t_
+
+let check_signature ({ payload; sender; signature } : t) =
+  Tick.Schnorr.verify signature sender (Payload.to_bits payload)
 
 let typ : (var, t) Tick.Typ.t =
   let spec =
     Data_spec.(
-      [ Payload.typ; Public_key.typ; Signature.Signature.typ ])
+      [ Payload.typ; Public_key.typ; Signature.typ ])
   in
   let of_hlist : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
     H_list.(fun [ payload; sender; signature ] -> { payload; sender; signature })

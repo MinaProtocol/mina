@@ -11,11 +11,10 @@ module Header = struct
         ; time                : 'time
         ; nonce               : 'nonce
         }
-      [@@deriving bin_io, fields]
+      [@@deriving bin_io, sexp, fields]
 
-      type t =
-        (Pedersen.Digest.t, Block_time.Stable.V1.t, Nonce.Stable.V1.t) t_
-      [@@deriving bin_io]
+      type t = (Pedersen.Digest.t, Block_time.Stable.V1.t, Nonce.Stable.V1.t) t_
+      [@@deriving bin_io, sexp]
     end
   end
 
@@ -64,39 +63,72 @@ end
 module Body = struct
   module Stable = struct
     module V1 = struct
-      type t = Int64.t
+      type 'ledger_hash t_ =
+        { target_hash : 'ledger_hash
+        ; proof       : Proof.Stable.V1.t
+        }
+      [@@deriving bin_io, sexp]
+
+      type t = Ledger_hash.Stable.V1.t t_
       [@@deriving bin_io, sexp]
     end
   end
 
   include Stable.V1
 
-  let bit_length = 64
+  let fold { target_hash } ~init ~f = Ledger_hash.fold target_hash ~init ~f
 
-  include Bits.Snarkable.Int64(Tick)
+(* For now, the var does not track of the proof. This is due to
+   how the verifier gadget is currently structured and can be changed
+   once the verifier is reimplemented in snarky *)
+  type var = Ledger_hash.var t_
 
-  module Bits = Bits.Int64
+  let typ : (var, t) Tick.Typ.t =
+    let open Tick.Typ in
+    let typ = Ledger_hash.typ in
+    let store t =
+      Store.map (typ.store t.target_hash)
+        ~f:(fun target_hash -> { t with target_hash })
+    in
+    let read t =
+      Read.map (typ.read t.target_hash)
+        ~f:(fun target_hash -> { t with target_hash })
+    in
+    let alloc =
+      Alloc.map typ.alloc
+        ~f:(fun target_hash -> { target_hash; proof = Tock.Proof.dummy })
+    in
+    let check t = typ.check t.target_hash in
+    { store
+    ; read
+    ; alloc
+    ; check
+    }
+
+(*   let to_bits { target_hash } = Ledger_hash.to_bits target_hash *)
+  let var_to_bits ({ target_hash } : var) : (Tick.Boolean.var list, _) Tick.Checked.t =
+    Ledger_hash.var_to_bits target_hash
 end
-
-type ('header, 'body) t_ =
-  { header : 'header
-  ; body   : 'body
-  }
-[@@deriving bin_io]
-
-let fold_bits { header; body } ~init ~f =
-  let init = Header.fold_bits header ~init ~f in
-  let init = Body.Bits.fold body ~init ~f in
-  init
-;;
 
 module Stable = struct
   module V1 = struct
-    type t = (Header.Stable.V1.t, Body.Stable.V1.t) t_ [@@deriving bin_io]
+    type ('header, 'body) t_ =
+      { header : 'header
+      ; body   : 'body
+      }
+    [@@deriving bin_io, sexp]
+
+    type t = (Header.Stable.V1.t, Body.Stable.V1.t) t_ [@@deriving bin_io, sexp]
   end
 end
 
 include Stable.V1
+
+let fold_bits { header; body } ~init ~f =
+  let init = Header.fold_bits header ~init ~f in
+  let init = Body.fold body ~init ~f in
+  init
+;;
 
 let hash t =
   let s = Pedersen.State.create Pedersen.params in
@@ -114,29 +146,62 @@ let genesis : t =
       ; nonce = Nonce.zero
       ; time
       }
-  ; body = Int64.one
+  ; body =
+      (* TODO: Fix  *)
+      { proof = Tock.Proof.dummy
+      ; target_hash = Ledger_hash.of_hash Pedersen.zero_hash
+      }
   }
 
-(* TODO: Come up with a cleaner way to do this. Maybe use a function instead of functor?
-  Or maybe it's worth writing a deriving plugin.
-*)
 let to_hlist { header; body } = H_list.([ header; body ])
 let of_hlist : (unit, 'h -> 'b -> unit) H_list.t -> ('h, 'b) t_ =
   H_list.(fun [ header; body ] -> { header; body })
 
-type var = (Header.var, Body.Unpacked.var) t_
-type value = (Header.value, Body.Unpacked.value) t_
+type var = (Header.var, Body.var) t_
+type value = (Header.value, Body.t) t_
 
-let data_spec = Tick.Data_spec.([ Header.typ; Body.Unpacked.typ ])
+let data_spec = Tick.Data_spec.([ Header.typ; Body.typ ])
 
 let typ : (var, value) Tick.Typ.t =
   Tick.Typ.of_hlistable data_spec
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let to_bits ({ header; body } : value) =
-  Header.to_bits header @ Body.Bits.to_bits body
+let var_to_bits ({ header; body } : var) =
+  let open Tick.Let_syntax in
+  let%map body_bits = Body.var_to_bits body in
+  Header.var_to_bits header @ body_bits
 
-let var_to_bits { header; body } =
-  Header.var_to_bits header
-  @ Body.Unpacked.var_to_bits body
+module With_transactions = struct
+  module Body = struct
+    module Stable = struct
+      module V1 = struct
+        type t =
+          { target_hash  : Ledger_hash.Stable.V1.t
+          ; proof        : Proof.Stable.V1.t
+          ; transactions : Transaction.Stable.V1.t list
+          }
+        [@@deriving bin_io, sexp]
+      end
+    end
+
+    include Stable.V1
+
+    let forget ({ target_hash; proof; _ } : t) : Body.t =
+      { target_hash; proof }
+  end
+
+  module Stable = struct
+    module V1 = struct
+      type t = (Header.Stable.V1.t, Body.Stable.V1.t) Stable.V1.t_
+      [@@deriving bin_io, sexp]
+    end
+  end
+
+  type block = t
+
+  include Stable.V1
+
+  let forget (t : t) : block =
+    { t with body = Body.forget t.body }
+end
