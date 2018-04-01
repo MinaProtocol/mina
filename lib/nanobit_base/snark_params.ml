@@ -39,6 +39,8 @@ module Tick = struct
 
     include Field_bin.Make(Tick0.Field)(Tick_curve.Bigint.R)
 
+    module Bits = Bits.Make_field(Tick0.Field)(Tick0.Bigint)
+
     let rec compare_bitstring xs0 ys0 =
       match xs0, ys0 with
       | true :: xs, true :: ys | false :: xs, false :: ys -> compare_bitstring xs ys

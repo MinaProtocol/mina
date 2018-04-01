@@ -20,6 +20,11 @@ include Tick.Snarkable.Bits.Faithful
    and type Unpacked.value = t
    and type Packed.var = Tick.Cvar.t
 
+val field_var_to_unpacked : Tick.Cvar.t -> (Unpacked.var, _) Tick.Checked.t
+
+val packed_to_number : Packed.var -> (Tick.Number.t, _) Tick.Checked.t
+val packed_of_number : Tick.Number.t -> (Packed.var, _) Tick.Checked.t
+
 val compare : t -> t -> int
 val (=) : t -> t -> bool
 val (<) : t -> t -> bool

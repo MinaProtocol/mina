@@ -35,25 +35,36 @@ module Make
 = struct
   assert (M.length < Tick.Field.size_in_bits - 1)
 
-  type t = Unsigned.t
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned.t
+      include Make_bin_io(struct
+          type v = Unsigned.t
+          type t = Signed.t [@@deriving bin_io]
+          let there = M.to_signed
+          let back = M.of_signed
+        end)
+    end
+  end
 
-  include Make_bin_io(struct
-      type v = Unsigned.t
-      type t = Signed.t [@@deriving bin_io]
-      let there = M.to_signed
-      let back = M.of_signed
-    end)
+  include Stable.V1
 
-  include Bits.Snarkable.Small_bit_vector(Tick)(struct
-      include M
-      include Unsigned
-      let empty = zero
-      let get t i = Infix.((t lsr i) land one = one)
-      let set v i b =
-        if b
-        then Infix.(v lor (one lsl i))
-        else Infix.(v land (lognot (one lsl i)))
-    end)
+  include Sexpable.Of_stringable(Unsigned)
+
+  module Vector = struct
+    include M
+    include Unsigned
+    let empty = zero
+    let get t i = Infix.((t lsr i) land one = one)
+    let set v i b =
+      if b
+      then Infix.(v lor (one lsl i))
+      else Infix.(v land (lognot (one lsl i)))
+  end
+
+  include (Bits.Vector.Make(Vector) : Bits_intf.S with type t := t)
+
+  include Bits.Snarkable.Small_bit_vector(Tick)(Vector)
 
   let zero : Unpacked.var =
     List.init M.length ~f:(fun _ -> Boolean.false_)

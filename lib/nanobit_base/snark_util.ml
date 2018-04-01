@@ -130,11 +130,113 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     >>= num_bits_upper_bound_unpacked
   ;;
 
+  let lt_bitstring_value =
+    let module Expr = struct
+      module Binary = struct
+        type 'a t =
+          | Lit of 'a
+          | And of 'a * 'a t
+          | Or of 'a * 'a t
+      end
+
+      module Nary = struct
+        type 'a t =
+          | Lit of 'a
+          | And of 'a t list
+          | Or of 'a t list
+
+        let rec of_binary : 'a Binary.t -> 'a t = function
+          | Lit x -> Lit x
+          | And (x, And (y, t)) ->
+            And [Lit x; Lit y; of_binary t]
+          | Or (x, Or (y, t)) ->
+            Or [Lit x; Lit y; of_binary t]
+          | And (x, t) ->
+            And [Lit x; of_binary t]
+          | Or (x, t) ->
+            Or [Lit x; of_binary t]
+
+        let rec eval = function
+          | Lit x -> return x
+          | And xs ->
+            Checked.List.map xs ~f:eval >>= Boolean.all
+          | Or xs ->
+            Checked.List.map xs ~f:eval >>= Boolean.any
+      end
+    end
+    in
+    let rec lt_binary xs ys : Boolean.var Expr.Binary.t =
+      match xs, ys with
+      | [], [] -> Lit Boolean.false_
+      | [ x ], [ false ] -> Lit Boolean.false_
+      | [ x ], [ true ] -> Lit (Boolean.not x)
+      | [ x1; x2 ], [ true; false ] -> Lit (Boolean.not x1)
+      | [ x1; x2 ], [ false; false ] -> Lit Boolean.false_
+      | x :: xs, false :: ys ->
+        And (Boolean.not x, lt_binary xs ys)
+      | x :: xs, true :: ys ->
+        Or (Boolean.not x, lt_binary xs ys)
+      | _::_, [] | [], _::_ ->
+        failwith "lt_bitstring_value: Got unequal length strings"
+    in
+    fun (xs : Boolean.var Bitstring.Msb_first.t) (ys : bool Bitstring.Msb_first.t) ->
+      Expr.Nary.(
+        eval (of_binary (lt_binary (xs :> Boolean.var list) (ys :> bool list))))
+
+  let field_size_bits =
+    let testbit n i = Bignum.Bigint.((shift_right n i) land one = one) in
+    List.init Field.size_in_bits ~f:(fun i ->
+      testbit Impl.Field.size
+        (Field.size_in_bits - 1 - i))
+    |> Bitstring.Msb_first.of_list
+
+  let unpack_field_var x =
+    let%bind res =
+      Impl.Checked.choose_preimage x ~length:Field.size_in_bits
+      >>| Bitstring.Lsb_first.of_list
+    in
+    let%map () =
+      lt_bitstring_value
+        (Bitstring.Msb_first.of_lsb_first res)
+        field_size_bits
+      >>= Boolean.Assert.is_true
+    in
+    res
+
   let%test_module "Snark_util" = (module struct
     let () = Random.init 123456789
 
-    let random_n_bit_field_elt n =
-      Field.project (List.init n ~f:(fun _ -> Random.bool ()))
+    let random_bitstring length = List.init length ~f:(fun _ -> Random.bool ())
+
+    let random_n_bit_field_elt n = Field.project (random_bitstring n)
+
+    let random_biased_bitstring p length =
+      List.init length ~f:(fun _ -> if Random.float 1. < p then false else true)
+
+    let%test_unit "lt_bitstring_value" =
+      let length = Field.size_in_bits + 5 in
+      let test p =
+        let value = random_biased_bitstring p length in
+        let var = random_bitstring length in
+        let correct_answer = var < value in
+        let ((), lt, passed) = 
+          run_and_check
+            (Checked.map ~f:(As_prover.read Boolean.typ)
+               (lt_bitstring_value
+                  (Bitstring.Msb_first.of_list
+                     (List.map ~f:Boolean.var_of_value var))
+                  (Bitstring.Msb_first.of_list value)))
+            ()
+        in
+        assert passed;
+        assert (lt = correct_answer)
+      in
+      for _ = 1 to 50 do test 0.5 done;
+      for _ = 1 to 50 do test 0.1 done;
+      for _ = 1 to 50 do test 0.9 done;
+      for _ = 1 to 50 do test 0.02 done;
+      for _ = 1 to 50 do test 0.98 done
+    ;;
 
     let%test_unit "compare" =
       let bit_length = Field.size_in_bits - 2 in
