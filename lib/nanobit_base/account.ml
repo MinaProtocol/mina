@@ -2,11 +2,10 @@ open Core
 open Snark_params
 open Tick
 open Let_syntax
-
-module Balance = Currency.T64
+open Currency
 
 module Index = struct
-  type t = int
+  type t = int [@@deriving bin_io]
 
   module Vector = struct
     include Int
@@ -23,25 +22,31 @@ module Index = struct
   include Bits.Snarkable.Small_bit_vector(Tick)(Vector)
 end
 
-type ('pk, 'amount) t_ =
-  { public_key : 'pk
-  ; balance : 'amount
-  }
-[@@deriving sexp]
+module Stable = struct
+  module V1 = struct
+    type ('pk, 'amount) t_ =
+      { public_key : 'pk
+      ; balance : 'amount
+      }
+    [@@deriving sexp, bin_io, eq]
 
-type var = (Public_key.Compressed.var, Balance.Unpacked.var) t_
+    type t = (Public_key.Compressed.Stable.V1.t, Balance.Stable.V1.t) t_
+    [@@deriving sexp, bin_io, eq]
+  end
+end
+
+include Stable.V1
+
+type var = (Public_key.Compressed.var, Balance.var) t_
 type value = (Public_key.Compressed.t, Balance.t) t_
 [@@deriving sexp]
-type t = value
-[@@deriving sexp]
 
-let empty_hash =
-  Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
+let empty_hash = Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
 
 let typ : (var, value) Typ.t =
   let spec =
     Data_spec.(
-      [ Public_key.Compressed.typ; Balance.Unpacked.typ ])
+      [ Public_key.Compressed.typ; Balance.typ ])
   in
   let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
     H_list.(fun [ public_key; balance ] -> { public_key; balance })
@@ -53,7 +58,7 @@ let typ : (var, value) Typ.t =
 
 let var_to_bits { public_key; balance } =
   let%map public_key = Public_key.Compressed.var_to_bits public_key in
-  let balance = Balance.Unpacked.var_to_bits balance in
+  let balance = Balance.var_to_bits balance in
   public_key @ balance
 
 let fold_bits ({ public_key; balance } : t) =

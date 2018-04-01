@@ -27,7 +27,21 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
   end
 end
 
-module Tock = Extend(Snarky.Snark.Make(Tock_curve))
+module Tock = struct
+  module Tock0 = Extend(Snarky.Snark.Make(Tock_curve))
+  include (Tock0 : module type of Tock0 with module Proof := Tock0.Proof)
+
+  module Proof = struct
+    include Tock0.Proof
+
+    (* TODO: Do at compile time *)
+    let dummy =
+      let exposing = Data_spec.([ Typ.field ]) in
+      let main x = assert_equal x x in
+      let keypair = generate_keypair main ~exposing in
+      prove (Keypair.pk keypair) exposing () main Field.one
+  end
+end
 
 module Tick = struct
   module Tick0 = Extend(Snarky.Snark.Make(Tick_curve))
@@ -35,7 +49,18 @@ module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
   module Field = struct
-    include Tick0.Field
+    module T = struct
+      include Tick0.Field
+      let compare t1 t2 = Bigint.(compare (of_field t1) (of_field t2))
+
+      let hash_fold_t s x =
+        Bignum.Bigint.hash_fold_t s
+          Bigint.(to_bignum_bigint (of_field x))
+
+      let hash = Hash.of_fold hash_fold_t
+    end
+    include T
+    include Hashable.Make(T)
 
     include Field_bin.Make(Tick0.Field)(Tick_curve.Bigint.R)
 
@@ -163,7 +188,7 @@ module Tick = struct
 
   module Util = Snark_util.Make(Tick0)
 
-  module Signature = Snarky.Signature.Schnorr(Tick0)(Signature_curve)(struct
+  module Schnorr = Snarky.Signature.Schnorr(Tick0)(Signature_curve)(struct
       (* TODO: This hash function is NOT secure *)
       let hash_checked bs =
         let open Checked.Let_syntax in

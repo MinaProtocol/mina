@@ -8,6 +8,7 @@ let compute_base_proof        = true
 let extend_blockchain         = true
 let private_key_generation    = true
 let transaction_replay        = true
+let fee_collection            = true
 (* Enabling this will SPEED UP builds as keys are generated at compile-time *)
 let key_generation = true
 
