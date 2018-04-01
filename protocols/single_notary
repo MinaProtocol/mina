@@ -1,0 +1,141 @@
+Single Notary
+
+transaction_chain_state: {
+  buffer: {
+    work: work DAG -> tail w/ proof
+    queue: ledger_transition | identity_transition list
+  }
+  tail: {
+    body: {
+      ledger_hash
+      permissioned_identity
+    }
+    header: {
+      strength
+      body_hash
+      prev_header_hash
+    }
+    header_hash
+    proof
+  }
+}
+
+work_dag_state: {
+  ledger_hash
+  permissioned_identity
+  strength
+  unsealed_hash
+  sealed: bool
+  proof
+}
+
+work_dag_transition
+  new_state: {
+    ledger_hash
+    permissioned_identity
+    sealed
+  }
+  | Base_identity
+      proof there was 
+      - an identity_change from old -> new with a new permissioned identity + new strength
+      - old was sealed
+      - new is not sealed
+  | Base_transaction
+      proof there was 
+      - a valid sequence of transactions to a new ledger_hash
+      - unsealed if was sealed
+      - unsealed_hash was updated
+      - otherwise unchanged
+  | Seal
+      proof the permissioned identity signed the unsealed_hash
+  | Merge
+      proof there were (Base|Merge|Seal) proofs A,B from old -> A -> (B = new)
+
+transaction_transition: {
+  transactions
+  since_last_(begin|identity_transition)_signature
+}
+
+identity_transition: {
+  new_identity
+  new_strength
+  proof
+}
+
+work_transition: {
+  new_strength
+  new_ledger_hash
+  new_identity
+  proof
+}
+
+apply_work_dag_transition work_dag_state transition
+  =
+    work_dag_state = transition
+
+apply_work_transition state transition
+  =
+    new_body =
+      ledger_hash = transition.new_ledger_hash
+      permissioned_identity = transition.new_identity
+    new_header =
+      strength = transition.new_strength
+      body_hash = hash(new_body)
+      prev_header_hash = state.tail.header_hash
+    header_hash = hash(new_header)
+    proof =
+      SNARK "zk_state_valid" proving that, for new_state.tail:
+      - all old values came from a tail with a valid proof
+      - transition.proof is valid for transition (state.tail.body -> new_state.tail.body) and new_strength
+      - prev_header_hash is state.tail.header_hash
+      - body hash is a hash of the new body
+      - new_strength > old_strength
+      - header_hash is a hash of the new header
+    state with state.tail = 
+      {
+        body = new_body
+        header = new_header
+        header_hash
+        proof
+      }
+
+check_state old_state new_state
+  = 
+    new_tail_strength = new_state.tail.header.most_recent_strength
+    old_tail_strength = old_state.tail.header.most_recent_strength
+    new_buffer_strength = strength(new_state.buffer)
+    old_buffer_strength = strength(old_state.buffer)
+    new_strength = new_tail_strength + new_buffer_strength
+    new_strength = new_tail_strength + new_buffer_strength
+    new_state.tail.proof zk_state_valid verifies new_state.tail
+      &&
+    new_strength > old_strength
+      &&
+    valid(new_state.buffer.queue)
+      &&
+    valid(new_state.buffer.work)
+      &&
+    remaining_work(new_state.buffer.work) < available_work(new_state.buffer.queue)
+
+on_event event
+  = 
+    match event with
+    | Work_dag_complete transition -> 
+      try
+        state := apply_work_dag_transition state transition
+        broadcast State state
+    | Work_complete transition -> 
+      try
+        state := apply_work_transition state transition
+        broadcast State state
+    | Transaction_transition transition -> 
+      try
+        append state.buffer.queue transition
+        broadcast State state
+    | Identity_transition transition -> 
+      try
+        append state.buffer.queue transition
+        broadcast State state
+    | State new_state ->
+      if check_state state new_state
+      then state := new_state
