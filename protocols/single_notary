@@ -20,36 +20,47 @@ transaction_chain_state: {
   }
 }
 
-work_dag_state: {
-  ledger_hash
-  permissioned_identity
-  strength
-  unsealed_hash
-  sealed: bool
-  proof
+work_tree_state: {
+
+  type contents
+    =
+      ledger_hash
+      permissioned_identity
+      strength
+      unsealed_hash
+      sealed: bool
+  tree
+  | Merged
+    contents
+    proof: contents_proof option
+    left: node
+    right: node
+  | Leaf
+    contents
+    proof: contents_proof option
+    prev: contents
 }
 
-work_dag_transition
-  new_state: {
-    ledger_hash
-    permissioned_identity
-    sealed
-  }
-  | Base_identity
+
+work_tree_transition
+  node
+  | Identity
       proof there was 
       - an identity_change from old -> new with a new permissioned identity + new strength
       - old was sealed
       - new is not sealed
-  | Base_transaction
+  | Transaction
       proof there was 
       - a valid sequence of transactions to a new ledger_hash
       - unsealed if was sealed
       - unsealed_hash was updated
       - otherwise unchanged
   | Seal
-      proof the permissioned identity signed the unsealed_hash
+      proof that
+      - the permissioned identity signed the unsealed_hash
   | Merge
-      proof there were (Base|Merge|Seal) proofs A,B from old -> A -> (B = new)
+      proof that
+      - there were (Base|Merge|Seal) proofs A,B from old -> A -> (B = new)
 
 transaction_transition: {
   transactions
@@ -62,16 +73,48 @@ identity_transition: {
   proof
 }
 
+seal_transition: {
+  unsealed_hash_signature
+}
+
 work_transition: {
   new_strength
   new_ledger_hash
   new_identity
+  new_unsealed_hash
   proof
 }
 
-apply_work_dag_transition work_dag_state transition
+construct_work_tree state
   =
-    work_dag_state = transition
+    let queue_to_dag queue =
+      tail_prev = tail_to_work_tree_contents(state.tail)
+      leafs = 
+        map 
+          queue 
+          ~f:(e -> Leaf 
+            contents: elem_to_work_tree_contents(e)
+            prev: prev_q_or_tail_prev
+            proof: None
+      construct binary tree where:
+        apply merge to elems until root
+    in
+    state with
+      state.buffer = 
+        queue: []
+        work: queue_to_dag(state.buffer)
+
+apply_work_tree_transition work_tree_state transition
+  =
+    match transition.node with
+    | leaf -> add proof for verify(leaf.prev -> leaf.contents) to work_tree
+    | merged -> 
+      take proof [ node.left (0 -> 1) ] -> [ node.right (1 -> 2) ]
+      make proof [ verify(node.left -> node.right) (0 -> 2) ]
+      add proof to work_tree
+    if transition.node is root
+      emit Work_complete { contents, proof }
+      buffer.work = None
 
 apply_work_transition state transition
   =
@@ -120,9 +163,9 @@ check_state old_state new_state
 on_event event
   = 
     match event with
-    | Work_dag_complete transition -> 
+    | Work_tree_progress transition -> 
       try
-        state := apply_work_dag_transition state transition
+        state := apply_work_tree_transition state transition
         broadcast State state
     | Work_complete transition -> 
       try
@@ -131,10 +174,17 @@ on_event event
     | Transaction_transition transition -> 
       try
         append state.buffer.queue transition
+        assert !(state.buffer.queue full)
+        broadcast State state
+    | Seal_transition transition -> 
+      try
+        append state.buffer.queue transition
+        if state.buffer.queue full then construct_work_tree state
         broadcast State state
     | Identity_transition transition -> 
       try
         append state.buffer.queue transition
+        if state.buffer.queue full then construct_work_tree state
         broadcast State state
     | State new_state ->
       if check_state state new_state
