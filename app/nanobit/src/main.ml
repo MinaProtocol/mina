@@ -290,16 +290,18 @@ struct
     Linear_pipe.fork2 mined_blocks_reader
 
   let main_nowait 
-        log
-        prover
-        storage_location 
-        genesis_blockchain
-        initial_peers 
-        should_mine 
-        me 
-        remap_addr_port
-        pipes
+        ~log
+        ~prover
+        ~storage_location 
+        ~genesis_blockchain
+        ~initial_peers 
+        ~should_mine 
+        ~me 
+        ~remap_addr_port
+        ~client_port
+        ~pipes
     =
+      Logger.debug log "Starting with me %s; client_port %s" (Host_and_port.to_string me) (Int.to_string client_port);
     let open Let_syntax in
     let%bind initial_blockchain =
       match%map Storage.load storage_location log with
@@ -351,31 +353,40 @@ struct
           ; Linear_pipe.map blockchain_mined_block_reader ~f:(fun b ->
               Blockchain_accumulator.Update.New_chain b)
           ]);
+
+    (* Setup RPC server for client interactions *)
+    Client.init_server
+      ~parent_log:log
+      ~port:client_port;
+
     membership
 
+
   let main
-        log
-        prover
-        storage_location 
-        genesis_blockchain
-        initial_peers 
-        should_mine 
-        me 
+        ~log
+        ~prover
+        ~storage_location 
+        ~genesis_blockchain
+        ~initial_peers 
+        ~should_mine 
+        ~me 
         ?(remap_addr_port=(fun addr -> addr))
+        ?(client_port=(Host_and_port.port me) + 2)
         ()
     =
     Logger.info log "starting nanobit";
     let%bind _ = 
       main_nowait 
-        log
-        prover
-        storage_location 
-        genesis_blockchain
-        initial_peers 
-        should_mine 
-        me 
-        remap_addr_port 
-        (init_pipes_with_log log)
+        ~log
+        ~prover
+        ~storage_location 
+        ~genesis_blockchain
+        ~initial_peers 
+        ~should_mine 
+        ~me 
+        ~remap_addr_port 
+        ~client_port
+        ~pipes:(init_pipes_with_log log)
     in
     Async.never ()
   ;;

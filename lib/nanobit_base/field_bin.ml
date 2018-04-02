@@ -4,7 +4,6 @@ module Make
     (Field : Snarky.Field_intf.S)
     (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t)
 = struct
-  (* TODO: Unit tests for field_to_bigstring/bigstring_to_field *)
   (* TODO: Figure out what the right thing to do is for conversion failures *)
 
   let (/^) x y = Float.(to_int (round_up (x // y)))
@@ -51,4 +50,18 @@ module Make
 
   let { Bin_prot.Type_class.read = bin_read_t; vtag_read = __bin_read_t__ } = bin_reader_t
   let { Bin_prot.Type_class.write = bin_write_t; size = bin_size_t } = bin_writer_t
+
+  let%test_unit "field_bigstring_self_inverse" =
+    let assert_str b s =
+      if b then failwith s else ()
+    in
+    let rec go i =
+      if i = 0 then
+        ()
+      else
+        let x = Field.random () in
+        assert_str (x = of_bigstring (to_bigstring x)) (Printf.sprintf "Failed on iteration %d" i);
+        go (i - 1)
+    in
+    go 1000
 end

@@ -106,18 +106,19 @@ let main () =
         else Prover.connect { host = "0.0.0.0"; port = prover_port }
       in
       let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
-      let genesis_chain = { Blockchain.state = Blockchain.State.zero; proof = genesis_proof; most_recent_block = Block.genesis } in
-      let%bind () = Main.assert_chain_verifies prover genesis_chain in
+      let genesis_blockchain = { Blockchain.state = Blockchain.State.zero; proof = genesis_proof; most_recent_block = Block.genesis } in
+      let%bind () = Main.assert_chain_verifies prover genesis_blockchain in
       Main.main_nowait
-        log
-        prover
-        storage_location
-        genesis_chain
-        initial_peers 
-        should_mine
-        me
-        (fun addr -> Host_and_port.create ~port:(Host_and_port.port addr + 1) ~host:(Host_and_port.host addr))
-        pipes
+        ~log
+        ~prover
+        ~storage_location
+        ~genesis_blockchain
+        ~initial_peers 
+        ~should_mine
+        ~me
+        ~remap_addr_port:(fun addr -> Host_and_port.create ~port:(Host_and_port.port addr + 1) ~host:(Host_and_port.host addr))
+        ~client_port:((Host_and_port.port me) + 2)
+        ~pipes
     in
     membership_ref := Some membership
   in

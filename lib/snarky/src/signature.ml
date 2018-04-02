@@ -81,6 +81,20 @@ struct
     Scalar.equal h' h
   ;;
 
+  module Keypair = struct
+    type t =
+      { public : Public_key.value
+      ; secret : Private_key.t
+      }
+
+    let create () =
+      (* TODO: More secure random *)
+      let x = Bignum.Bigint.random Curve.Params.order in
+      { public = Curve.scale Curve.generator x
+      ; secret = x
+      }
+  end
+
   module Checked = struct
     let compress ((x, _) : Curve.var) =
       Checked.choose_preimage x ~length:Field.size_in_bits

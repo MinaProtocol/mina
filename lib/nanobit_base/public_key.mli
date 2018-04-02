@@ -2,7 +2,7 @@ open Core
 open Snark_params
 open Tick
 
-type t = Field.t * Field.t
+type t = Field.t * Field.t [@@deriving bin_io]
 type var = Field.var * Field.var
 val typ : (var, t) Typ.t
 
@@ -14,7 +14,7 @@ module Compressed : sig
     ; is_odd : 'boolean
     }
 
-  type t = (Field.t, bool) t_ [@@deriving sexp]
+  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp]
 
   module Stable : sig
     module V1 : sig
@@ -36,6 +36,7 @@ module Compressed : sig
 end
 
 val of_bigstring : Bigstring.t -> t Or_error.t
+val to_bigstring : t -> Bigstring.t
 
 val compress : t -> Compressed.t
 val decompress : Compressed.t -> t option

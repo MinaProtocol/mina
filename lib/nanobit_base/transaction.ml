@@ -75,6 +75,12 @@ type t = (Payload.t, Public_key.t, Signature.Signature.value) t_
 type value = t
 type var = (Payload.var, Public_key.var, Signature.Signature.var) t_
 
+let sign (kp : Signature.Keypair.t) (payload : Payload.t): t =
+  { payload
+  ; sender = kp.public
+  ; signature = Signature.sign kp.secret (Payload.to_bits payload)
+  }
+
 let typ : (var, t) Tick.Typ.t =
   let spec =
     Data_spec.(
