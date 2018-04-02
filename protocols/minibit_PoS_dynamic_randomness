@@ -1,3 +1,4 @@
+
 Minibit PoS, dynamic stake, injected randomness
 
 global: {
@@ -40,12 +41,12 @@ apply_transition state transition
     incr_epoch = (transition.slot# = global.epoch_slots-1)
     epoch_ledger_hash = 
       if incr_epoch 
-      then state.next_epoch_hash
+      then state.next_epoch_ledger_hash
       else state.epoch_ledger_hash
     next_epoch_hash = 
       if transition.slot# <= global.epoch_ledger_hash_cutoff
       then ledger_hash
-      else state.next_epoch_hash
+      else state.next_epoch_ledger_hash
     epoch_randomness =
       if incr_epoch
       then Option.value_exn state.next_epoch_randomness
@@ -76,8 +77,8 @@ apply_transition state transition
         - ledger_proof proves a valid sequence of transactions moved the ledger from state.body.ledger_hash to new_ledger_hash
         - length is one greater than the old length
         - "incr_epoch" computed correctly
-        - if incr_epoch, epoch_ledger_hash is state.next_epoch_hash, else state.epoch_ledger_hash
-        - if slot# < global.epoch_ledger_hash_cutoff, next_epoch_hash is new_ledger_hash, else state.next_epoch_hash
+        - if incr_epoch, epoch_ledger_hash is state.next_epoch_ledger_hash, else state.epoch_ledger_hash
+        - if slot# < global.epoch_ledger_hash_cutoff, next_epoch_ledger_hash is new_ledger_hash, else state.next_epoch_ledger_hash
         - epoch_randomness computed correctly (and if incr_epoch, there was a next_epoch_randomness to unpack)
         - next_epoch_randomness computed correctly
         - next_epoch_randomness was signed by all members of the epoch
