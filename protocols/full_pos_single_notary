@@ -1,14 +1,11 @@
 Full PoS, single notary
 
 (see single_notary for where this comes from
-  note additional 
-    body.permissioned_identity_block_hash
-    header.length)
+  note additional header.length)
 transaction_chain_tail_state: {
   body: {
     ledger_hash
     permissioned_identity
-    permissioned_identity_block_hash
   }
   header: {
     strength
@@ -31,7 +28,6 @@ chain_state: {
     transaction_chain_ledger_hash
     transaction_chain_strength
     transaction_chain_length
-    intermediate_blocks
   }
   header: {
     length
@@ -52,7 +48,7 @@ chain_state: {
 chain_transition: {
   signed_randomness maybe
   slot#
-  new_transaction_chain_tail_state option
+  { new_transaction_chain_tail_state, transaction_chain_transition_proof } option
 }
 
 apply_transition state transition
@@ -61,9 +57,7 @@ apply_transition state transition
       new_body = 
         transaction_chain_ledger_hash = new_transaction_chain_tail_state.body.new_ledger_hash
         transaction_chain_strength = new_transaction_chain_tail_state.header.strength
-        intermediate_blocks = []
-    else
-      new_body = state.body with intermediate_blocks += state.header_hash
+        transaction_chain_length = new_transaction_chain_tail_state.header.length
     incr_epoch = (transition.slot# = global.epoch_slots-1)
     epoch_ledger_hash = 
       if incr_epoch 
@@ -105,13 +99,10 @@ apply_transition state transition
             - transition.new_transaction_chain_tail_state has valid proof
             - transaction_chain_ledger_hash from transition.new_transaction_chain_tail_state
             - transaction_chain_strength from transition.new_transaction_chain_tail_state
-            - transaction_chain_length from transition.new_transaction_chain_length
             - transition.transaction_chain_strength greater than state.body.transaction_chain_strength
-            - intermediate_blocks empty
-            - new_transaction_chain_tail_state.permissioned_identity_block_hash in state.intermediate_blocks
+            - transaction_chain_transition_proof proves the transition from the previous ledger_hash to the new one
           - or
-            - intermediate_blocks contains state.header_hash
-            - body otherwise unchanged
+            - body unchanged
         - length is one greater than the old length
         - "incr_epoch" computed correctly
         - if incr_epoch, epoch_ledger_hash is state.next_epoch_hash, else state.epoch_ledger_hash
