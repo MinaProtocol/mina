@@ -49,15 +49,20 @@ work_tree_transition
       - an identity_change from old -> new with a new permissioned identity + new strength
       - old was sealed
       - new is not sealed
+      - otherwise unchanged
   | Transaction
       proof there was 
       - a valid sequence of transactions to a new ledger_hash
-      - unsealed if was sealed
+      - is unsealed
       - unsealed_hash was updated
       - otherwise unchanged
   | Seal
       proof that
       - the permissioned identity signed the unsealed_hash
+      - unsealed_hash is the "empty" hash
+      - sealed was false
+      - sealed is true
+      - otherwise unchanged
   | Merge
       proof that
       - there were (Base|Merge|Seal) proofs A,B from old -> A -> (B = new)
