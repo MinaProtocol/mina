@@ -230,6 +230,10 @@ module Merge = struct
     Snarky.Verifier_gadget.Make(Tick)(Tick_curve)(Tock_curve)
       (struct let input_size = wrap_input_size end)
 
+  (* spec for [verify_transition tock_vk proof_field s1 s2]:
+     returns a bool which is true iff
+     there is a snark proving making tock_vk
+     accept on one of [ H(s1, s2); H(s1, s2, tock_vk) ] *)
   let verify_transition tock_vk proof_field s1 s2 =
     let open Let_syntax in
     let get_proof s = let (_t, proof) = proof_field s in proof in
@@ -264,6 +268,13 @@ module Merge = struct
     >>| Verifier.All_in_one.result
   ;;
 
+  (* spec for [main top_hash]:
+     constraints pass iff
+     there exist s1, s3, tock_vk such that
+     H(s1, s3, tock_vk) = top_hash,
+     verify_transition tock_vk _ s1 s2 is true
+     verify_transition tock_vk _ s2 s3 is true
+  *)
   let main (top_hash : Pedersen.Digest.Packed.var) =
     let%bind tock_vk =
       provide_witness' tock_vk_typ ~f:(fun { Prover_state.tock_vk } ->
@@ -316,6 +327,10 @@ module Wrap (Vk : sig
 
   let provide_witness' typ ~f = provide_witness typ As_prover.(map get_state ~f)
 
+(* spec for [main input]:
+   constraints pass iff
+   (b1, b2, .., bn) = unpack input,
+   there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
   let main input =
     let open Let_syntax in
     let%bind input =
