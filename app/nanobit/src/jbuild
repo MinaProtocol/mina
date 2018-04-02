@@ -9,11 +9,13 @@
       linear_pipe
       kademlia
       nanobit_base
+      transaction_snark
       snarky
       logger
       async
       async_extra
       async_ssl
+      rpc_parallel
       cohttp
       cohttp-async))
    (preprocess (pps (ppx_jane ppx_inline_test ppx_driver.runner (-inline-test-lib cli))))
