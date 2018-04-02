@@ -45,6 +45,17 @@ let tock_vk, tock_pk =
       Tock.Verification_key.to_bigstring (Tock.Keypair.vk tock_kp),
       Tock.Proving_key.to_bigstring (Tock.Keypair.pk tock_kp)
 
+let transaction_snark_keys =
+  let keys =
+    if Insecure.key_generation
+    then Transaction_snark.Keys.dummy ()
+    else Transaction_snark.Keys.create ()
+  in
+  let size = Transaction_snark.Keys.bin_size_t keys in
+  let buf = Bigstring.create size in
+  assert (Transaction_snark.Keys.bin_write_t buf ~pos:0 keys = size);
+  buf
+
 let _ =
   let do_write name key =
     let%bind writer = Writer.open_file (Printf.sprintf "/tmp/nanobit_%s" name) in
@@ -59,12 +70,13 @@ let _ =
       and () = do_write "tick_vk" tick_vk
       and () = do_write "tock_pk" tock_pk
       and () = do_write "tock_vk" tock_vk
+      and () = do_write "transaction_snark_keys" transaction_snark_keys
   in
   (* TODO Sha *)
   let open Md5 in
-  let tick_pk_digest, tick_vk_digest, tock_pk_digest, tock_vk_digest =
+  let tick_pk_digest, tick_vk_digest, tock_pk_digest, tock_vk_digest, transaction_snark_keys_digest =
     let d b = digest_bytes (Bigstring.to_bytes b) in
-    (d tick_pk, d tick_vk, d tock_pk, d tock_vk)
+    (d tick_pk, d tick_vk, d tock_pk, d tock_vk, d transaction_snark_keys)
   in
   let code = Printf.sprintf
     "
@@ -111,10 +123,18 @@ let _ =
             let verification_key = Tock.Verification_key.of_bigstring tock_vk_bs
             let proving_key = Tock.Proving_key.of_bigstring tock_pk_bs
           end)
+
+      let transaction_snark_keys =
+        let b = Bigstring.of_string (In_channel.read_all \"/tmp/nanobit_transaction_snark_keys\") in
+        assert Md5.(Md5.digest_bytes (Bigstring.to_bytes b) = of_hex_exn \"%s\");
+        Transaction_snark.Keys.bin_read_t b ~pos_ref:(ref 0)
     end
     " tick_vk_size tick_pk_size tock_vk_size tock_pk_size
-      (to_hex tick_vk_digest) (to_hex tick_pk_digest) (to_hex tock_vk_digest) (to_hex tock_pk_digest)
-
+    (to_hex tick_vk_digest)
+    (to_hex tick_pk_digest)
+    (to_hex tock_vk_digest)
+    (to_hex tock_pk_digest)
+    (to_hex transaction_snark_keys_digest)
   in
 
   let%map _ = Process.run_exn ~prog:"/bin/bash" ~args:[ "-c"; Printf.sprintf "echo \'%s\' > %s" code Sys.argv.(1)  ] () in

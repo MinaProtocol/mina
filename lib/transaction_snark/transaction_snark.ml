@@ -17,6 +17,70 @@ let wrap_input () = Tock.Data_spec.([ Tock.Field.typ ])
 
 let provide_witness' typ ~f = provide_witness typ As_prover.(map get_state ~f)
 
+module Proof_type = struct
+  type t = Base | Merge
+
+  let is_base = function
+    | Base -> true
+    | Merge -> false
+end
+
+type t =
+  { source     : Ledger_hash.t
+  ; target     : Ledger_hash.t
+  ; proof      : Tock.Proof.t
+  ; proof_type : Proof_type.t
+  }
+[@@deriving fields]
+
+module Keys0 = struct
+  module Binable_of_bigstringable
+      (M : sig
+         type t
+         val to_bigstring : t -> Bigstring.t
+         val of_bigstring : Bigstring.t -> t
+       end)
+    = struct
+      type t = M.t
+      include Binable.Of_binable(Bigstring)(struct
+        type t = M.t
+        let to_binable = M.to_bigstring
+        let of_binable = M.of_bigstring
+      end)
+    end
+
+  module Tick_vk = Binable_of_bigstringable(Tick_curve.Verification_key)
+  module Tick_pk = Binable_of_bigstringable(Tick_curve.Proving_key)
+  module Tock_vk = Binable_of_bigstringable(Tock_curve.Verification_key)
+  module Tock_pk = Binable_of_bigstringable(Tock_curve.Proving_key)
+
+  type t =
+    { base_vk  : Tick_vk.t
+    ; base_pk  : Tick_pk.t
+    ; wrap_vk  : Tock_vk.t
+    ; wrap_pk  : Tock_pk.t
+    ; merge_vk : Tick_vk.t
+    ; merge_pk : Tick_pk.t
+    }
+  [@@deriving bin_io]
+
+  let dummy () =
+    let tick_keypair =
+      generate_keypair ~exposing:(tick_input ()) (fun x -> assert_equal x x)
+    in
+    let tock_keypair =
+      let open Tock in
+      generate_keypair ~exposing:(wrap_input ()) (fun x -> assert_equal x x)
+    in
+    { base_vk  = Tick.Keypair.vk tick_keypair
+    ; base_pk  = Tick.Keypair.pk tick_keypair
+    ; wrap_vk  = Tock.Keypair.vk tock_keypair
+    ; wrap_pk  = Tock.Keypair.pk tock_keypair
+    ; merge_vk = Tick.Keypair.vk tick_keypair
+    ; merge_pk = Tick.Keypair.pk tick_keypair
+    }
+end
+
 (* Staging:
    first make tick base.
    then make tick merge (which top_hashes in the tock wrap vk)
@@ -80,10 +144,6 @@ module Base = struct
     in
     apply_transactions l1 ts >>= Ledger_hash.assert_equal l2
 
-  let keypair = generate_keypair main ~exposing:(tick_input ())
-  let pk = Keypair.pk keypair
-  let vk = Keypair.vk keypair
-
   let handler (ledger : Ledger.t) =
     fun (With { request; respond }) ->
       let open Ledger_hash in
@@ -122,7 +182,9 @@ module Base = struct
     Ledger.update ledger receiver receiver_pre;
     root
 
-  let bundle ledger transaction
+  let create_keys () = generate_keypair main ~exposing:(tick_input ())
+
+  let bundle (keys : Keys0.t) ledger transaction
     =
     let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
     let state2 = Ledger_hash.of_hash (root_after_transaction ledger transaction) in
@@ -139,19 +201,10 @@ module Base = struct
     in
     state1, state2,
     top_hash,
-    prove pk (tick_input ()) prover_state main top_hash
-end
-
-module Proof_type = struct
-  type t = Base | Merge
-
-  let is_base = function
-    | Base -> true
-    | Merge -> false
+    prove keys.base_pk (tick_input ()) prover_state main top_hash
 end
 
 module Merge = struct
-
   module Prover_state = struct
     type t =
       { tock_vk : Tock_curve.Verification_key.t
@@ -225,14 +278,14 @@ module Merge = struct
     in
     Boolean.Assert.all [ verify_12; verify_23 ]
 
-  let keypair =
-    generate_keypair ~exposing:(input ()) main
-
-  let vk = Keypair.vk keypair
-  let pk = Keypair.pk keypair
+  let create_keys () = generate_keypair ~exposing:(input ()) main
 end
 
-module Wrap = struct
+module Wrap (Vk : sig
+    val merge : Tick.Verification_key.t
+    val base : Tick.Verification_key.t
+  end)
+= struct
   open Tock
 
   module Verifier =
@@ -240,10 +293,10 @@ module Wrap = struct
       (struct let input_size = tick_input_size end)
 
   let merge_vk_bits : bool list =
-    Verifier.Verification_key.to_bool_list Merge.vk
+    Verifier.Verification_key.to_bool_list Vk.merge
 
   let base_vk_bits : bool list =
-    Verifier.Verification_key.to_bool_list Base.vk
+    Verifier.Verification_key.to_bool_list Vk.base
 
   let if_ (choice : Boolean.var) ~then_ ~else_ =
     List.map2_exn then_ else_ ~f:(fun t e ->
@@ -281,89 +334,112 @@ module Wrap = struct
         As_prover.(map get_state ~f:(fun { Prover_state.proof_type; proof } ->
           let verification_key =
             match proof_type with
-            | Base -> Base.vk
-            | Merge -> Merge.vk
+            | Base -> Vk.base
+            | Merge -> Vk.merge
           in
           { Verifier.All_in_one.verification_key; proof }))
     in
     Boolean.Assert.is_true (Verifier.All_in_one.result v)
 
-  let keypair =
-    generate_keypair ~exposing:(wrap_input ()) main
-
-  let vk = Keypair.vk keypair
-  let pk = Keypair.pk keypair
+  let create_keys() = generate_keypair ~exposing:(wrap_input ()) main
 end
 
 let embed (x : Tick.Field.t) : Tock.Field.t =
   Tock.Field.project (Tick.Field.unpack x)
 
-let wrap proof_type proof input =
-  Tock.prove Wrap.pk (wrap_input ())
-    { Wrap.Prover_state.proof; proof_type }
-    Wrap.main
-    (embed input)
+module Make (K : sig val keys : Keys0.t end) = struct
+  open K
 
-let top_hash s1 s2 =
-  let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list Wrap.vk in
-  Pedersen.hash_fold Pedersen.params
-    (fun ~init ~f ->
-       let init = Ledger_hash.fold ~init ~f s1 in
-       let init = Ledger_hash.fold ~init ~f s2 in
-       List.fold ~init ~f wrap_vk_bits)
+  module Wrap = Wrap(struct
+      let merge = keys.merge_vk
+      let base = keys.base_vk
+    end)
 
-let merge_proof input1 input2 input3 proof12 proof23 =
-  let top_hash = top_hash input1 input3 in
-  let to_bits = Ledger_hash.to_bits in
-  top_hash,
-  Tick.prove Merge.pk (tick_input ())
-    { Merge.Prover_state.input1 = to_bits input1
-    ; input2 = to_bits input2
-    ; input3 = to_bits input3
-    ; proof12
-    ; proof23
-    ; tock_vk = Wrap.vk
+  let wrap proof_type proof input =
+    Tock.prove keys.wrap_pk (wrap_input ())
+      { Wrap.Prover_state.proof; proof_type }
+      Wrap.main
+      (embed input)
+
+  let top_hash s1 s2 =
+    let wrap_vk_bits =
+      Merge.Verifier.Verification_key.to_bool_list keys.wrap_vk
+    in
+    Pedersen.hash_fold Pedersen.params
+      (fun ~init ~f ->
+        let init = Ledger_hash.fold ~init ~f s1 in
+        let init = Ledger_hash.fold ~init ~f s2 in
+        List.fold ~init ~f wrap_vk_bits)
+
+  let merge_proof input1 input2 input3 proof12 proof23 =
+    let top_hash = top_hash input1 input3 in
+    let to_bits = Ledger_hash.to_bits in
+    top_hash,
+    Tick.prove keys.merge_pk (tick_input ())
+      { Merge.Prover_state.input1 = to_bits input1
+      ; input2 = to_bits input2
+      ; input3 = to_bits input3
+      ; proof12
+      ; proof23
+      ; tock_vk = keys.wrap_vk
+      }
+      Merge.main
+      top_hash
+
+  let of_transaction ledger transaction =
+    let source, target, top_hash, proof =
+      Base.bundle keys ledger transaction
+    in
+    let proof_type = Proof_type.Base in
+    { source
+    ; target
+    ; proof_type
+    ; proof = wrap proof_type proof top_hash
     }
-    Merge.main
-    top_hash
 
-type t =
-  { source     : Ledger_hash.t
-  ; target     : Ledger_hash.t
-  ; proof      : Tock.Proof.t
-  ; proof_type : Proof_type.t
-  }
-[@@deriving fields]
+  let merge t1 t2 =
+    (if not (Ledger_hash.(=) t1.target t2.source)
+    then
+      failwithf
+        !"Transaction_snark.merge: t1.target <> t2.source (%{sexp:Ledger_hash.t} vs %{sexp:Ledger_hash.t})"
+        t1.target
+        t2.source ());
+    let input, proof =
+      merge_proof t1.source t1.target t2.source
+        (t1.proof_type, t1.proof)
+        (t2.proof_type, t2.proof)
+    in
+    let proof_type = Proof_type.Merge in
+    { source = t1.source
+    ; target = t2.target
+    ; proof_type
+    ; proof = wrap proof_type proof input
+    }
+end
 
-let of_transaction ledger transaction =
-  let source, target, top_hash, proof =
-    Base.bundle ledger transaction
-  in
-  let proof_type = Proof_type.Base in
-  { source
-  ; target
-  ; proof_type
-  ; proof = wrap proof_type proof top_hash
-  }
+module Keys = struct
+  include Keys0
 
-let merge t1 t2 =
-  (if not (Ledger_hash.(=) t1.target t2.source)
-   then
-     failwithf
-       !"Transaction_snark.merge: t1.target <> t2.source (%{sexp:Ledger_hash.t} vs %{sexp:Ledger_hash.t})"
-       t1.target
-       t2.source ());
-  let input, proof =
-    merge_proof t1.source t1.target t2.source
-      (t1.proof_type, t1.proof)
-      (t2.proof_type, t2.proof)
-  in
-  let proof_type = Proof_type.Merge in
-  { source = t1.source
-  ; target = t2.target
-  ; proof_type
-  ; proof = wrap proof_type proof input
-  }
+  let create () =
+    let base = Base.create_keys () in
+    let merge = Merge.create_keys () in
+    let wrap =
+      let module Wrap =
+        Wrap(struct
+          let base = Tick.Keypair.vk base
+          let merge = Tick.Keypair.vk merge
+        end)
+      in
+      Wrap.create_keys ()
+    in
+    { base_vk = Tick.Keypair.vk base
+    ; base_pk = Tick.Keypair.pk base
+    ; merge_vk = Tick.Keypair.vk merge
+    ; merge_pk = Tick.Keypair.pk merge
+    ; wrap_vk = Tock.Keypair.vk wrap
+    ; wrap_pk = Tock.Keypair.pk wrap
+    }
+end
 
 let%test_module "transaction_snark" =
   (module struct
@@ -402,6 +478,10 @@ let%test_module "transaction_snark" =
       ; signature
       }
 
+    let keys = Keys.create ()
+
+    include Make(struct let keys = keys end)
+
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
         let wallets = random_wallets () in
@@ -417,6 +497,6 @@ let%test_module "transaction_snark" =
         let proof23 = of_transaction ledger t2 in
         let state3 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
         let proof13 = merge proof12 proof23 in
-        Tock.verify proof13.proof Wrap.vk (wrap_input ())
+        Tock.verify proof13.proof keys.wrap_vk (wrap_input ())
           (embed (top_hash state1 state3)))
   end)
