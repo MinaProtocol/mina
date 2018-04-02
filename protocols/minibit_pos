@@ -32,13 +32,14 @@ chain_transition: {
   ledger_proof
   signed_randomness maybe
   slot#
+  epoch#
 }
 
 apply_transition state transition
   = 
     new_body = 
       ledger_hash = new_ledger_hash
-    incr_epoch = (transition.slot# = global.epoch_slots-1)
+    incr_epoch = (transition.epoch# > state.header.epoch#)
     epoch_ledger_hash = 
       if incr_epoch 
       then state.next_epoch_ledger_hash
@@ -67,7 +68,7 @@ apply_transition state transition
       epoch_ledger_hash
       next_epoch_hash
       slot# = transition.slot# % global.epoch_slots
-      epoch# = state.epoch# + incr_epoch
+      epoch# = transition.epoch#
       body_hash = hash(body)
     header_hash = hash(new_state.header)
     header_signature = sign(header_hash, self_private_key)
@@ -83,7 +84,7 @@ apply_transition state transition
         - next_epoch_randomness computed correctly
         - next_epoch_randomness was signed by all members of the epoch
         - slot# is greater than the old slot#
-        - epoch# = state.epoch# + incr_epoch
+        - epoch# > state.epoch#
         - prev_header_hash is state.header_hash
         - body hash is a hash of the new body
         - header_signature is the signature of header_hash with self_private_key

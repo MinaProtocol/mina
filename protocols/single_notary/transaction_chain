@@ -1,5 +1,3 @@
-Single Notary
-
 transaction_chain_state: {
   buffer: {
     work: work DAG -> tail w/ proof
@@ -12,6 +10,7 @@ transaction_chain_state: {
     }
     header: {
       strength
+      length
       body_hash
       prev_header_hash
     }
@@ -128,6 +127,7 @@ apply_work_transition state transition
       permissioned_identity = transition.new_identity
     new_header =
       strength = transition.new_strength
+      length = state.length + 1
       body_hash = hash(new_body)
       prev_header_hash = state.tail.header_hash
     header_hash = hash(new_header)
@@ -138,6 +138,7 @@ apply_work_transition state transition
       - prev_header_hash is state.tail.header_hash
       - body hash is a hash of the new body
       - new_strength > old_strength
+      - length = state.length + 1
       - header_hash is a hash of the new header
     state with state.tail = 
       {

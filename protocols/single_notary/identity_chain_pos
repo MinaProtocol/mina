@@ -1,22 +1,5 @@
 
-Full PoS, single notary
-
-(see single_notary for where this comes from
-  note additional header.length)
-transaction_chain_tail_state: {
-  body: {
-    ledger_hash
-    permissioned_identity
-  }
-  header: {
-    strength
-    length
-    body_hash
-    prev_header_hash
-  }
-  header_hash
-  proof
-}
+transaction_chain_tail_state = transaction_chain.transaction_chain_state.tail
 
 global: {
   epoch_seed
@@ -49,6 +32,7 @@ chain_state: {
 chain_transition: {
   signed_randomness maybe
   slot#
+  epoch#
   { new_transaction_chain_tail_state, transaction_chain_transition_proof } option
 }
 
@@ -59,7 +43,7 @@ apply_transition state transition
         transaction_chain_ledger_hash = new_transaction_chain_tail_state.body.new_ledger_hash
         transaction_chain_strength = new_transaction_chain_tail_state.header.strength
         transaction_chain_length = new_transaction_chain_tail_state.header.length
-    incr_epoch = (transition.slot# = global.epoch_slots-1)
+    incr_epoch = (transition.epoch# > state.header.epoch#)
     epoch_ledger_hash = 
       if incr_epoch 
       then state.next_epoch_hash
@@ -88,7 +72,7 @@ apply_transition state transition
       epoch_ledger_hash
       next_epoch_hash
       slot# = transition.slot# % global.epoch_slots
-      epoch# = state.epoch# + incr_epoch
+      epoch# = transition.epoch#
       body_hash = hash(body)
     header_hash = hash(new_state.header)
     header_signature = sign(header_hash, self_private_key)
@@ -112,7 +96,7 @@ apply_transition state transition
         - next_epoch_randomness computed correctly
         - next_epoch_randomness was signed by all members of the epoch
         - slot# is greater than the old slot#
-        - epoch# = state.epoch# + incr_epoch
+        - epoch# > state.epoch#
         - prev_header_hash is state.header_hash
         - body hash is a hash of the new body
         - header_signature is the signature of header_hash with self_private_key
