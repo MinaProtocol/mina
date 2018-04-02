@@ -23,6 +23,11 @@ let provide_witness' typ ~f = provide_witness typ As_prover.(map get_state ~f)
    then make tock wrap (which branches on the tick vk) *)
 
 module Base = struct
+  (* spec for [apply_transaction root { sender; signature; payload }]:
+     - check that [signature] is a signature by [sender] of payload
+     - return the merkle tree [root'] where the sender balance is decremented by
+     [payload.amount] and the receiver balance is incremented by [payload.amount].
+  *)
   let apply_transaction root ({ sender; signature; payload } : Transaction.var) =
     (if not Insecure.transaction_replay
      then failwith "Insecure.transaction_replay false");
@@ -40,6 +45,13 @@ module Base = struct
     Ledger_hash.modify_account root receiver ~f:(fun account ->
       let%map balance = Transaction.Amount.(account.balance + amount) in
       { account with balance })
+
+(* Someday:
+   write the following soundness tests:
+   - apply a transaction where the signature is incorrect
+   - apply a transaction where the sender does not have enough money in their account
+   - apply a transaction and stuff in the wrong target hash
+*)
 
   let apply_transactions root ts =
     Checked.List.fold ~init:root ~f:apply_transaction ts
