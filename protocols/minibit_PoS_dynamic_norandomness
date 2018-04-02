@@ -1,190 +1,96 @@
-Single Notary
+Minibit PoS, dynamic stake, no injected randomness
 
-transaction_chain_state: {
-  buffer: {
-    work: work DAG -> tail w/ proof
-    queue: ledger_transition | identity_transition list
+global: {
+  epoch_seed
+  epoch_slots
+  epoch_ledger_hash_cutoff
+}
+
+chain_state: {
+  body: {
+    ledger_hash
   }
-  tail: {
-    body: {
-      ledger_hash
-      permissioned_identity
-    }
-    header: {
-      strength
-      body_hash
-      prev_header_hash
-    }
-    header_hash
-    proof
+  header: {
+    length
+    epoch_ledger_hash
+    next_epoch_ledger_hash
+    slot#
+    epoch#
+    body_hash
+    prev_header_hash
   }
-}
-
-work_tree_state: {
-
-  type contents
-    =
-      ledger_hash
-      permissioned_identity
-      strength
-      unsealed_hash
-      sealed: bool
-  tree
-  | Merged
-    contents
-    proof: contents_proof option
-    left: node
-    right: node
-  | Leaf
-    contents
-    proof: contents_proof option
-    prev: contents
-}
-
-
-work_tree_transition
-  node
-  | Identity
-      proof there was 
-      - an identity_change from old -> new with a new permissioned identity + new strength
-      - old was sealed
-      - new is not sealed
-  | Transaction
-      proof there was 
-      - a valid sequence of transactions to a new ledger_hash
-      - unsealed if was sealed
-      - unsealed_hash was updated
-      - otherwise unchanged
-  | Seal
-      proof that
-      - the permissioned identity signed the unsealed_hash
-  | Merge
-      proof that
-      - there were (Base|Merge|Seal) proofs A,B from old -> A -> (B = new)
-
-transaction_transition: {
-  transactions
-  since_last_(begin|identity_transition)_signature
-}
-
-identity_transition: {
-  new_identity
-  new_strength
+  header_hash
+  header_signature
   proof
 }
 
-seal_transition: {
-  unsealed_hash_signature
-}
-
-work_transition: {
-  new_strength
+chain_transition: {
   new_ledger_hash
-  new_identity
-  new_unsealed_hash
-  proof
+  ledger_proof
+  slot#
 }
 
-construct_work_tree state
-  =
-    let queue_to_dag queue =
-      tail_prev = tail_to_work_tree_contents(state.tail)
-      leafs = 
-        map 
-          queue 
-          ~f:(e -> Leaf 
-            contents: elem_to_work_tree_contents(e)
-            prev: prev_q_or_tail_prev
-            proof: None
-      construct binary tree where:
-        apply merge to elems until root
-    in
-    state with
-      state.buffer = 
-        queue: []
-        work: queue_to_dag(state.buffer)
-
-apply_work_tree_transition work_tree_state transition
-  =
-    match transition.node with
-    | leaf -> add proof for verify(leaf.prev -> leaf.contents) to work_tree
-    | merged -> 
-      take proof [ node.left (0 -> 1) ] -> [ node.right (1 -> 2) ]
-      make proof [ verify(node.left -> node.right) (0 -> 2) ]
-      add proof to work_tree
-    if transition.node is root
-      emit Work_complete { contents, proof }
-      buffer.work = None
-
-apply_work_transition state transition
-  =
-    new_body =
-      ledger_hash = transition.new_ledger_hash
-      permissioned_identity = transition.new_identity
+apply_transition state transition
+  = 
+    new_body = 
+      ledger_hash = new_ledger_hash
+    incr_epoch = (transition.slot# = global.epoch_slots-1)
+    epoch_ledger_hash = 
+      if incr_epoch 
+      then state.next_epoch_hash
+      else state.epoch_ledger_hash
+    next_epoch_hash = 
+      if transition.slot# <= global.epoch_ledger_hash_cutoff
+      then ledger_hash
+      else state.next_epoch_hash
     new_header =
-      strength = transition.new_strength
-      body_hash = hash(new_body)
-      prev_header_hash = state.tail.header_hash
-    header_hash = hash(new_header)
-    proof =
-      SNARK "zk_state_valid" proving that, for new_state.tail:
-      - all old values came from a tail with a valid proof
-      - transition.proof is valid for transition (state.tail.body -> new_state.tail.body) and new_strength
-      - prev_header_hash is state.tail.header_hash
-      - body hash is a hash of the new body
-      - new_strength > old_strength
-      - header_hash is a hash of the new header
-    state with state.tail = 
-      {
-        body = new_body
-        header = new_header
-        header_hash
-        proof
-      }
+      length = state.length + 1
+      epoch_ledger_hash
+      next_epoch_hash
+      slot# = transition.slot# % global.epoch_slots
+      epoch# = state.epoch# + incr_epoch
+      body_hash = hash(body)
+    header_hash = hash(new_state.header)
+    header_signature = sign(header_hash, self_private_key)
+    proof = 
+      SNARK "zk_state_valid" proving that, for new_state:
+        - all old values came from a chain_state with valid proof
+        - ledger_proof proves a valid sequence of transactions moved the ledger from state.body.ledger_hash to new_ledger_hash
+        - length is one greater than the old length
+        - "incr_epoch" computed correctly
+        - if incr_epoch, epoch_ledger_hash is state.next_epoch_hash, else state.epoch_ledger_hash
+        - if slot# < global.epoch_ledger_hash_cutoff, next_epoch_hash is new_ledger_hash, else state.next_epoch_hash
+        - slot# is greater than the old slot#
+        - epoch# = state.epoch# + incr_epoch
+        - prev_header_hash is state.header_hash
+        - body hash is a hash of the new body
+        - header_signature is the signature of header_hash with self_private_key
+        - self_private_key corresponds to a public_key that matches the public_key computed as winner for slot#, epoch# under global.epoch_seed and state.epoch_ledger_hash
+        - header_hash is a hash of the new header
+    {
+      body: new_body
+      header: new_header
+      header_hash
+      header_signature
+      proof
+    }
 
 check_state old_state new_state
   = 
-    new_tail_strength = new_state.tail.header.most_recent_strength
-    old_tail_strength = old_state.tail.header.most_recent_strength
-    new_buffer_strength = strength(new_state.buffer)
-    old_buffer_strength = strength(old_state.buffer)
-    new_strength = new_tail_strength + new_buffer_strength
-    new_strength = new_tail_strength + new_buffer_strength
-    new_state.tail.proof zk_state_valid verifies new_state.tail
+    new_length = new_state.header.most_recent_length
+    old_length = old_state.header.most_recent_length
+    new_state.proof zk_state_valid verifies new_state
       &&
-    new_strength > old_strength
+    new_length > old_length
       &&
-    valid(new_state.buffer.queue)
-      &&
-    valid(new_state.buffer.work)
-      &&
-    remaining_work(new_state.buffer.work) < available_work(new_state.buffer.queue)
-
+    is_time_for_slot(new_state.header.slot#, new_state.header.epoch#)
+    
 on_event event
   = 
     match event with
-    | Work_tree_progress transition -> 
+    | Time_for_slot_transition transition -> 
       try
-        state := apply_work_tree_transition state transition
-        broadcast State state
-    | Work_complete transition -> 
-      try
-        state := apply_work_transition state transition
-        broadcast State state
-    | Transaction_transition transition -> 
-      try
-        append state.buffer.queue transition
-        assert !(state.buffer.queue full)
-        broadcast State state
-    | Seal_transition transition -> 
-      try
-        append state.buffer.queue transition
-        if state.buffer.queue full then construct_work_tree state
-        broadcast State state
-    | Identity_transition transition -> 
-      try
-        append state.buffer.queue transition
-        if state.buffer.queue full then construct_work_tree state
+        state := apply_transition state transition
         broadcast State state
     | State new_state ->
       if check_state state new_state
