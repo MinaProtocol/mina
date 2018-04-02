@@ -1,4 +1,4 @@
-Synchronous Minibit PoW
+Minibit PoW
 
 chain_state: {
   body: {
@@ -19,23 +19,21 @@ chain_state: {
 }
 
 chain_transition: {
-  transactions
+  new_ledger_hash
+  ledger_proof
   new_timestamp
   nonce
 }
 
 apply_transition state transition
   = 
-    old_ledger = get_matching(state.body.ledger_hash)
-    new_ledger = apply(old_ledger, transition.transactions)
-    new_ledger_hash = root_hash(new_ledger)
     difficulty = 
       compute_next_difficulty(
         state.header.most_recent_difficulty, 
         state.header.timestamp,
         state.header.new_timestamp)
     new_body = 
-      ledger_hash = new_ledger_hash
+      ledger_hash = transition.new_ledger_hash
     new_header =
       prev_timestamp = state.timestamp
       timestamp = transition.timestamp
@@ -49,7 +47,7 @@ apply_transition state transition
     proof = 
       SNARK "zk_state_valid" proving that, for new_state:
         - all old values came from a chain_state with valid proof
-        - new_ledger_hash was obtained via a valid sequence of transactions
+        - transition.ledger_proof proves a valid sequence of transactions moved the ledger from state.body.ledger_hash to new_ledger_hash 
         - prev_timestamp is the old state.header.timestamp
         - timestamp is a newer timestamp than the prev timestamp
         - length is one greater than the old length
