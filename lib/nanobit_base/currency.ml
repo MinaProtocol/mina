@@ -33,7 +33,7 @@ module Make
        val length : int
      end)
 = struct
-  assert (M.length < Tick.Field.size_in_bits - 1)
+  assert (M.length < Tick.Field.size_in_bits - 3)
 
   module Stable = struct
     module V1 = struct
@@ -72,11 +72,59 @@ module Make
   let zero : Unpacked.var =
     List.init M.length ~f:(fun _ -> Boolean.false_)
 
+  (* Unpacking protects against underflow *)
   let (-) (x : Unpacked.var) (y : Unpacked.var) =
     unpack_var (Cvar.sub (pack_var x) (pack_var y))
 
+  (* Unpacking protects against overflow *)
   let (+) (x : Unpacked.var) (y : Unpacked.var) =
     unpack_var (Cvar.add (pack_var x) (pack_var y))
+
+  let%test_module "Currency_tests" =
+    (module struct
+      let of_t t = 
+        List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
+
+      let of_int = Fn.compose of_t Unsigned.of_int
+
+      let expect_failure c =
+        let ((), (), passed) =
+          run_and_check (Checked.map c ~f:(fun _ -> As_prover.return ())) ()
+        in
+        assert (not passed)
+
+      let%test_unit "currency_underflow" =
+        let generator =
+          let open Quickcheck.Generator.Let_syntax in
+          let%map x = Int.gen >>| Int.abs
+          and y = Int.gen >>| Int.abs
+          in
+          if x < y 
+          then (x, y)
+          else if x = y
+          then (x, Int.(y + 1))
+          else (y, x)
+        in
+        Quickcheck.test generator ~f:(fun (lo, hi) ->
+          expect_failure (of_int lo - of_int hi))
+
+      let%test_unit "currency_overflow" =
+        let generator =
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind x = Int64.gen >>| Unsigned.of_int64 in
+          let%map y =
+            Bignum.Bigint.gen_incl
+              (Bignum.Bigint.of_string
+                 Unsigned.(to_string (add (sub max_int x) one)))
+              (Bignum.Bigint.of_string Unsigned.(to_string max_int))
+            >>| Bignum.Bigint.to_string
+            >>| Unsigned.of_string
+          in
+          (x, y)
+        in
+        Quickcheck.test generator ~f:(fun (x, y) ->
+          expect_failure (of_t x + of_t y))
+    end)
 end
 
 module T64 = Make(Unsigned.UInt64)(Int64)(struct
