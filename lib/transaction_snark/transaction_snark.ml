@@ -168,24 +168,6 @@ module Base = struct
         respond (Provide (Ledger.index_of_key_exn ledger pk))
       | _ -> unhandled
 
-  let handler (ledger : Ledger.t) =
-    fun (With { request; respond }) ->
-      let open Ledger_hash in
-      match request with
-      | Get_element idx ->
-        let elt = Ledger.get_at_index_exn ledger idx in
-        let path = Ledger.merkle_path_at_index_exn ledger idx in
-        respond (Provide (elt, List.map ~f:Ledger.Path.elem_hash path))
-      | Get_path idx ->
-        let path = Ledger.merkle_path_at_index_exn ledger idx in
-        respond (Provide (List.map ~f:Ledger.Path.elem_hash path))
-      | Set (idx, account) ->
-        Ledger.update_at_index_exn ledger idx account;
-        respond (Provide ())
-      | Find_index pk ->
-        respond (Provide (Ledger.index_of_key_exn ledger pk))
-      | _ -> unhandled
-
   let root_after_transaction ledger
         (transaction : Transaction.t) =
     let get_exn pk = Option.value_exn (Ledger.get ledger pk) in
