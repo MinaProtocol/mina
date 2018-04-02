@@ -1,11 +1,9 @@
-open Core
+open Core_kernel
 open Async
 open Nanobit_base
 
 module Send_transaction = struct
-  (* Only has payload because full transaction needs your private key (held
-   * only by the daemon to minimize risk) *)
-  type query = Transaction.Payload.t [@@deriving bin_io]
+  type query = Public_key.t * Transaction.Payload.t [@@deriving bin_io]
   type response = unit [@@deriving bin_io]
   type error = unit [@@deriving bin_io]
 

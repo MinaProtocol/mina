@@ -29,9 +29,9 @@ let public_key =
 
 let txn_fee =
   let open Nanobit_base in
-  Command.Arg_type.map Command.Param.string ~f:Transaction.Fee.of_unsigned_string
+  Command.Arg_type.map Command.Param.string ~f:Transaction.Fee.of_string
 
 let txn_amount =
   let open Nanobit_base in
-  Command.Arg_type.map Command.Param.string ~f:Transaction.Amount.of_unsigned_string
+  Command.Arg_type.map Command.Param.string ~f:Transaction.Amount.of_string
 

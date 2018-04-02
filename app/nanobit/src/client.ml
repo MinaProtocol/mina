@@ -4,7 +4,7 @@ open Cli_common
 open Nanobit_base
 
 (* TODO: Fill out this implementations properly *)
-let send_txn_impl _ payload =
+let send_txn_impl _ (key, payload) =
   printf "Starting keypair create\n";
   let kp = Transaction.Signature.Keypair.create () in
   printf "Ending keypair create\n";
@@ -13,7 +13,7 @@ let send_txn_impl _ payload =
   return ()
 
 let get_balance_impl _ addr =
-  return (Balance.Amount.of_unsigned_string "1000")
+  return (Balance.Amount.of_string "1000")
 
 let init_server ~parent_log ~port =
   let log = Logger.child parent_log "client" in
@@ -71,6 +71,8 @@ let send_txn =
     [%map_open
       let address =
         flag "receiver" ~doc:"Public-key address to which you want to send money" (required public_key)
+      and from_account =
+        flag "from" ~doc:"Public-key address from which you would like to send money" (required public_key)
       and fee =
         flag "fee" ~doc:"Transaction fee you're willing to pay" (required txn_fee)
       and amount =
@@ -87,7 +89,7 @@ let send_txn =
           ; fee
           }
         in
-        match%map (dispatch Client_lib.Send_transaction.rpc payload port) with
+        match%map (dispatch Client_lib.Send_transaction.rpc (from_account, payload) port) with
         | Ok () -> printf "Successfully sent txn\n"
         | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)
     ]
