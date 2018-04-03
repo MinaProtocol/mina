@@ -33,13 +33,13 @@ module type S = sig
   module Timer : Timer_intf
   module Identifier : Hashable.S with type t := peer
 
-  type condition = state -> bool
+  type 'a condition = state -> 'a
 
-  type message_condition = message -> condition
+  type 'a message_condition = message -> 'a condition
 
-  type transition = t -> state -> state Deferred.t
-  and message_transition = t -> message -> state -> state Deferred.t
-  and t
+  type 'a transition = 'a t -> 'a -> state Deferred.t
+  and 'a message_transition = t -> 'a -> state Deferred.t
+  and 'a t
 
   type handle_command = Condition_label.t * condition * transition
   type message_command = Message_label.t * message_condition * message_transition

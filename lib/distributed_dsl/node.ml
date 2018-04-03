@@ -34,27 +34,26 @@ module type S = sig
   module Timer : Timer_intf
   module Identifier : Hashable.S with type t := peer
 
-  type condition = state -> bool
+  type 'a condition = state -> 'a option
 
-  type message_condition = message -> condition
+  type 'a message_condition = message -> 'a condition
 
-  type transition = t -> state -> state Deferred.t
-  and message_transition = t -> message -> state -> state Deferred.t
+  type 'a transition = t -> 'a -> state Deferred.t
   and t
 
-  type handle_command = Condition_label.t * condition * transition
-  type message_command = Message_label.t * message_condition * message_transition
+  type handle_command
+  type message_command
 
   val on
     : Condition_label.t
-    -> condition
-    -> f:transition
+    -> 'a condition
+    -> f:'a transition
     -> handle_command
 
   val msg
     : Message_label.t
-    -> message_condition
-    -> f:message_transition
+    -> 'a message_condition
+    -> f:'a transition
     -> message_command
 
   val cancel
@@ -67,14 +66,14 @@ module type S = sig
     : t
     -> Timer_label.t
     -> Time.Span.t
-    -> f:transition
+    -> f:state transition
     -> Timer.tok
 
   val timeout'
     : t
     -> Timer_label.t
     -> Time.Span.t
-    -> f:transition
+    -> f:state transition
     -> unit
 
   val next_ready : t -> unit Deferred.t
@@ -160,12 +159,14 @@ module Make
 
     type transition = t -> State.t -> State.t Deferred.t
     and message_transition = t -> Message.t -> State.t -> State.t Deferred.t
+    and handle_command = H : Condition_label.t * condition * transition -> handle_command
+    and message_command = M : Message_label.t * message_condition * message_transition -> message_command
     and t =
       { state : State.t
       ; last_state : State.t option
-      ; conditions : (condition * transition) Condition_label.Table.t
+      ; conditions : handle_command Condition_label.Table.t
       ; message_pipe : Message.t Linear_pipe.Reader.t
-      ; message_handlers : (message_condition * message_transition) Message_label.Table.t
+      ; message_handlers : message_command Message_label.Table.t
       ; triggered_timers_r : transition Linear_pipe.Reader.t
       ; triggered_timers_w : transition Linear_pipe.Writer.t
       ; timer : Timer.t
@@ -174,9 +175,6 @@ module Make
       ; transport : Transport.t
       ; logger : Logger.t
       }
-
-    type handle_command = Condition_label.t * condition * transition
-    type message_command = Message_label.t * message_condition * message_transition
 
     let on label condition ~f =
       (label, condition, f)
@@ -257,7 +255,7 @@ module Make
       let logger = Logger.child parent_log (Printf.sprintf !"dsl_node:%{sexp:Peer.t}" me) in
       let conditions = Condition_label.Table.create () in
       List.iter handle_conditions ~f:(fun (l, c, h) ->
-        match Condition_label.Table.add conditions ~key:l ~data:(c,h) with
+        match Condition_label.Table.add conditions ~key:l ~data:(H (l,c,h)) with
         | `Duplicate ->
             failwithf "You specified the same condition twice! %s"
               (Condition_label.sexp_of_label l |> Sexp.to_string_hum) ()
@@ -265,7 +263,7 @@ module Make
       );
       let message_handlers = Message_label.Table.create () in
       List.iter message_conditions ~f:(fun (l, c, h) ->
-        match Message_label.Table.add message_handlers ~key:l ~data:(c,h) with
+        match Message_label.Table.add message_handlers ~key:l ~data:(M (l,c,h)) with
         | `Duplicate ->
             failwithf "You specified the same message handler twice! %s"
               (Message_label.sexp_of_label l |> Sexp.to_string_hum) ()
@@ -303,13 +301,13 @@ module Make
       ) with
       | true, _, _ ->
           let checks = Condition_label.Table.to_alist t.conditions in
-          let matches = List.filter checks ~f:(fun (_, (cond, _)) ->
+          let matches = List.filter checks ~f:(fun (_, H (_, cond, _)) ->
             cond t.state
           ) in
           (match matches with
           | [] ->
               return (with_new_state t (t.state))
-          | (label,(_,transition))::[] ->
+          | (label,H (_, _,transition))::[] ->
               let%map t' = (transition t t.state) >>| (with_new_state t) in
               Logger.debug t.logger !"Making transition from %{sexp:State.t} to %{sexp:State.t} at %{sexp:Peer.t} label: %{sexp:Condition_label.label}\n%!" t.state t'.state t.ident label;
               t'
@@ -324,13 +322,13 @@ module Make
       | false, None, Some msg ->
           let _ = Linear_pipe.read_now t.message_pipe in
           let checks = Message_label.Table.to_alist t.message_handlers in
-          let matches = List.filter checks ~f:(fun (_, (cond, _)) ->
+          let matches = List.filter checks ~f:(fun (_, M (_, cond, _)) ->
             cond msg t.state
           ) in
           (match matches with
           | [] ->
               return (with_new_state t (t.state))
-          | (label,(_,transition))::[] ->
+          | (label,M (_, _,transition))::[] ->
               let%map t' = (transition t msg t.state) >>| (with_new_state t) in
               Logger.debug t.logger !"Making transition from %{sexp:State.t} to %{sexp:State.t} at %{sexp:Peer.t} label: %{sexp:Message_label.label}\n%!" t.state t'.state t.ident label;
               t'

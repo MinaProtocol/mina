@@ -412,7 +412,7 @@ module Make
       }
 end
 
-let%test_module "Distributed_dsl" = (module struct
+let%test_module "Basic machine test" = (module struct
   let expect f =
     Async.Thread_safe.block_on_async_exn (fun () ->
       match%map
