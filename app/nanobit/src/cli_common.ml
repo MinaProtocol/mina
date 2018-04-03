@@ -21,8 +21,8 @@ let public_key =
         failwithf "Couldn't read public key %s -- here's a sample one: %s"
           (Error.to_string_hum e)
           (
-            let kp = Transaction.Signature.Keypair.create () in
-            kp.public |> Public_key.to_bigstring |> Bigstring.to_string |> B64.encode
+            let pk = Public_key.of_private_key (Private_key.create ()) in
+            pk |> Public_key.to_bigstring |> Bigstring.to_string |> B64.encode
           )
           ()
   )

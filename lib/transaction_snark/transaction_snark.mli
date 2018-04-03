@@ -7,7 +7,13 @@ module Proof_type : sig
 end
 
 type t
-[@@deriving bin_io]
+
+val create
+  : source:Ledger_hash.t
+  -> target:Ledger_hash.t
+  -> proof_type:Proof_type.t
+  -> proof:Tock.Proof.t
+  -> t
 
 val proof : t -> Tock.Proof.t
 
@@ -21,13 +27,6 @@ module Keys : sig
 end
 
 module Make (K : sig val keys : Keys.t end) : sig
-  val create
-    : source:Ledger_hash.t
-    -> target:Ledger_hash.t
-    -> proof_type:Proof_type.t
-    -> proof:Tock.Proof.t
-    -> t
-
   val verify : t -> bool
 
   val of_transaction

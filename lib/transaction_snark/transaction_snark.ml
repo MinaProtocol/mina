@@ -17,6 +17,7 @@ let provide_witness' typ ~f =
 
 module Proof_type = struct
   type t = Base | Merge
+  [@@deriving bin_io]
 
   let is_base = function
     | Base -> true
@@ -26,8 +27,8 @@ end
 type t =
   { source     : Ledger_hash.t
   ; target     : Ledger_hash.t
-  ; proof      : Tock.Proof.t
   ; proof_type : Proof_type.t
+  ; proof      : Tock.Proof.t
   }
 [@@deriving fields]
 
@@ -66,6 +67,7 @@ module Keys0 = struct
 
   let dummy () =
     let tick_keypair =
+      let open Tick in
       generate_keypair ~exposing:(tick_input ()) (fun x -> assert_equal x x)
     in
     let tock_keypair =
@@ -194,15 +196,6 @@ module Base = struct
     let top_hash = top_hash state1 state2 in
     top_hash,
     prove keys.base_pk (tick_input ()) prover_state main top_hash
-end
-
-module Proof_type = struct
-  type t = Base | Merge
-  [@@deriving bin_io]
-
-  let is_base = function
-    | Base -> true
-    | Merge -> false
 end
 
 module Merge = struct
@@ -345,7 +338,7 @@ module Wrap (Vk : sig
       provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type} ->
         Proof_type.is_base proof_type)
     in
-    let verification_key = if_ is_base ~then_:(Lazy.force base_vk_bits) ~else_:(Lazy.force merge_vk_bits) in
+    let verification_key = if_ is_base ~then_:base_vk_bits ~else_:merge_vk_bits in
     let%bind v =
       (* someday: Probably an opportunity for optimization here since
           we are passing in one of two known verification keys. *)
@@ -430,9 +423,9 @@ module Make (K : sig val keys : Keys0.t end) = struct
       >>| Pedersen.Digest.Unpacked.var_to_bits
     in
     Merge.Verifier.All_in_one.create ~input:top_hash
-      ~verification_key:(List.map ~f:Boolean.var_of_value (Lazy.force wrap_vk_bits))
+      ~verification_key:(List.map ~f:Boolean.var_of_value wrap_vk_bits)
       (As_prover.map get_proof ~f:(fun proof ->
-        { Merge.Verifier.All_in_one.proof; verification_key = Lazy.force Wrap.vk }))
+        { Merge.Verifier.All_in_one.proof; verification_key = keys.wrap_vk }))
     >>| Merge.Verifier.All_in_one.result
   ;;
 
@@ -565,5 +558,5 @@ let%test_module "transaction_snark" =
         let state3 = Ledger.merkle_root ledger in
         let proof13 = merge proof12 proof23 in
         Tock.verify proof13.proof keys.wrap_vk (wrap_input ())
-          (embed (top_hash state1 state3)))
+          (embed (merge_top_hash state1 state3)))
   end)

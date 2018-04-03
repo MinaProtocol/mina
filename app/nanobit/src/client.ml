@@ -6,14 +6,14 @@ open Nanobit_base
 (* TODO: Fill out this implementations properly *)
 let send_txn_impl _ (key, payload) =
   printf "Starting keypair create\n";
-  let kp = Transaction.Signature.Keypair.create () in
+  let kp = Signature_keypair.create () in
   printf "Ending keypair create\n";
   let _txn : Transaction.t = Transaction.sign kp payload in
   printf "Created a real transaction!\n";
   return ()
 
 let get_balance_impl _ addr =
-  return (Balance.Amount.of_string "1000")
+  return (Currency.Balance.of_string "1000")
 
 let init_server ~parent_log ~port =
   let log = Logger.child parent_log "client" in
@@ -60,7 +60,7 @@ let get_balance =
     fun () ->
       let open Deferred.Let_syntax in
       match%map (dispatch Client_lib.Get_balance.rpc address port) with
-      | Ok b -> printf "%s\n" (Balance.Amount.to_string b)
+      | Ok b -> printf "%s\n" (Currency.Balance.to_string b)
       | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)
   end
 

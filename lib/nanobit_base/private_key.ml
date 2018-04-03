@@ -7,3 +7,4 @@ let create () =
       Snark_params.Tick.Hash_curve.Params.order
   else
     failwith "Insecure.private_key_generation"
+

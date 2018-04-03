@@ -84,10 +84,10 @@ type var = (Payload.var, Public_key.var, Signature.var) t_
 let check_signature ({ payload; sender; signature } : t) =
   Tick.Schnorr.verify signature sender (Payload.to_bits payload)
 
-let sign (kp : Signature.Keypair.t) (payload : Payload.t): t =
+let sign (kp : Signature_keypair.t) (payload : Payload.t): t =
   { payload
-  ; sender = kp.public
-  ; signature = Signature.sign kp.secret (Payload.to_bits payload)
+  ; sender = kp.public_key
+  ; signature = Schnorr.sign kp.private_key (Payload.to_bits payload)
   }
 
 let typ : (var, t) Tick.Typ.t =

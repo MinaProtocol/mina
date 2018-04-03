@@ -158,6 +158,10 @@ module Make
     let add (x : Unpacked.var) (y : Unpacked.var) =
       unpack_var (Cvar.add (pack_var x) (pack_var y))
 
+    let (-) = sub
+    let (+) = add
+
+    let%test_module "currency_test" = (module struct
       let check c =
         let ((), (), passed) =
           run_and_check (Checked.map c ~f:(fun _ -> As_prover.return ())) ()
@@ -187,7 +191,7 @@ module Make
         Quickcheck.test generator ~f:(fun (lo, hi) ->
           expect_success
             (sprintf !"subtraction: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-            (of_t lo - of_t hi))
+            (var_of_t lo - var_of_t hi))
 
       let%test_unit "subtraction_soundness" =
         let generator =
@@ -199,7 +203,7 @@ module Make
         Quickcheck.test generator ~f:(fun (lo, hi) ->
           expect_failure
             (sprintf !"underflow: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-            (of_t lo - of_t hi))
+            (var_of_t lo - var_of_t hi))
 
       let%test_unit "addition_completeness" =
         let generator =
@@ -211,7 +215,7 @@ module Make
         Quickcheck.test generator ~f:(fun (x, y) ->
           expect_success
             (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-            (of_t x + of_t y))
+            (var_of_t x + var_of_t y))
 
       let%test_unit "addition_soundness" =
         let generator =
@@ -223,8 +227,9 @@ module Make
         Quickcheck.test generator ~f:(fun (x, y) ->
           expect_failure
             (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-            (of_t x + of_t y))
+            (var_of_t x + var_of_t y))
     end)
+  end
 end
 
 module Amount = Make(Unsigned.UInt64)(Int64)(struct
