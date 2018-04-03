@@ -4,10 +4,14 @@ open Snark_params
 module Stable = struct
   module V1 = struct
     (* TODO: This should be stable. *)
-    type t = Tick.Proof.t
+    module T = struct
+      type t = Tock.Proof.t
 
-    let to_string = Tick_curve.Proof.to_string
-    let of_string = Tick_curve.Proof.of_string
+      let to_string = Tock_curve.Proof.to_string
+      let of_string = Tock_curve.Proof.of_string
+    end
+    include T
+    include Sexpable.Of_stringable(T)
 
       (* TODO: Figure out what the right thing to do is for conversion failures *)
     let ({ Bin_prot.Type_class.
@@ -25,4 +29,3 @@ module Stable = struct
 end
 
 include Stable.V1
-
