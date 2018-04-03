@@ -36,10 +36,12 @@ module Tock = struct
 
     (* TODO: Do at compile time *)
     let dummy =
-      let exposing = Data_spec.([ Typ.field ]) in
-      let main x = assert_equal x x in
-      let keypair = generate_keypair main ~exposing in
-      prove (Keypair.pk keypair) exposing () main Field.one
+      lazy begin
+        let exposing = Data_spec.([ Typ.field ]) in
+        let main x = assert_equal x x in
+        let keypair = generate_keypair main ~exposing in
+        prove (Keypair.pk keypair) exposing () main Field.one
+      end
   end
 end
 
