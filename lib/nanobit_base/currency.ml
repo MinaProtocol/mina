@@ -24,6 +24,50 @@ module Make_bin_io
   let { Bin_prot.Type_class.write = bin_write_t; size = bin_size_t } = bin_writer_t
 end
 
+module type Basic = sig
+  type t
+  [@@deriving sexp, compare, eq, hash]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t
+      [@@deriving bin_io, sexp, compare, eq, hash]
+    end
+  end
+
+  include Bits_intf.S with type t := t
+
+  val zero : t
+
+  val of_string : string -> t
+  val to_string : t -> string
+
+  type var
+  val typ : (var, t) Typ.t
+
+  val of_int : int -> t
+
+  val var_of_t : t -> var
+
+  val var_to_bits : var -> Boolean.var list
+end
+
+module type S = sig
+  include Basic
+
+  val add : t -> t -> t option
+  val sub : t -> t -> t option
+  val (+) : t -> t -> t option
+  val (-) : t -> t -> t option
+
+  module Checked : sig
+    val add : var -> var -> (var, _) Checked.t
+    val sub : var -> var -> (var, _) Checked.t
+    val (+) : var -> var -> (var, _) Checked.t
+    val (-) : var -> var -> (var, _) Checked.t
+  end
+end
+
 module Make
     (Unsigned : Unsigned.S)
     (Signed : sig type t [@@deriving bin_io] end)
@@ -32,12 +76,25 @@ module Make
        val of_signed : Signed.t -> Unsigned.t
        val length : int
      end)
+    : S with type t = Unsigned.t
 = struct
   assert (M.length < Tick.Field.size_in_bits - 3)
 
   module Stable = struct
     module V1 = struct
-      type t = Unsigned.t
+      module T = struct
+        include Sexpable.Of_stringable(Unsigned)
+        type t = Unsigned.t
+
+        let compare = Unsigned.compare
+        let equal t1 t2 = compare t1 t2 = 0
+
+        let hash_fold_t s t = Int64.hash_fold_t s (Unsigned.to_int64 t)
+        let hash t = Int64.hash (Unsigned.to_int64 t)
+      end
+      include T
+      include Hashable.Make(T)
+
       include Make_bin_io(struct
           type v = Unsigned.t
           type t = Signed.t [@@deriving bin_io]
@@ -52,7 +109,9 @@ module Make
   let of_string = Unsigned.of_string
   let to_string = Unsigned.to_string
 
-  include Sexpable.Of_stringable(Unsigned)
+  let of_int = Unsigned.of_int
+  let of_string = Unsigned.of_string
+  let to_string = Unsigned.to_string
 
   module Vector = struct
     include M
@@ -69,22 +128,40 @@ module Make
 
   include Bits.Snarkable.Small_bit_vector(Tick)(Vector)
 
-  let zero : Unpacked.var =
-    List.init M.length ~f:(fun _ -> Boolean.false_)
+  include Unpacked
 
-  (* Unpacking protects against underflow *)
-  let (-) (x : Unpacked.var) (y : Unpacked.var) =
-    unpack_var (Cvar.sub (pack_var x) (pack_var y))
+  let zero = Unsigned.zero
 
-  (* Unpacking protects against overflow *)
-  let (+) (x : Unpacked.var) (y : Unpacked.var) =
-    unpack_var (Cvar.add (pack_var x) (pack_var y))
+  let sub x y =
+    if compare x y < 0
+    then None
+    else Some (Unsigned.sub x y)
 
-  let%test_module "Currency_tests" =
-    (module struct
-      let of_t t = 
-        List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
+  let add x y =
+    let z = Unsigned.add x y in
+    if compare z x < 0
+    then None
+    else Some z
 
+  let (+) = add
+  let (-) = sub
+
+  let var_of_t t =
+    List.init (M.length) (fun i -> Boolean.var_of_value (Vector.get t i))
+
+  module Checked = struct
+    (* Unpacking protects against underflow *)
+    let sub (x : Unpacked.var) (y : Unpacked.var) =
+      unpack_var (Cvar.sub (pack_var x) (pack_var y))
+
+    (* Unpacking protects against overflow *)
+    let add (x : Unpacked.var) (y : Unpacked.var) =
+      unpack_var (Cvar.add (pack_var x) (pack_var y))
+
+    let (-) = sub
+    let (+) = add
+
+    let%test_module "currency_test" = (module struct
       let check c =
         let ((), (), passed) =
           run_and_check (Checked.map c ~f:(fun _ -> As_prover.return ())) ()
@@ -114,7 +191,7 @@ module Make
         Quickcheck.test generator ~f:(fun (lo, hi) ->
           expect_success
             (sprintf !"subtraction: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-            (of_t lo - of_t hi))
+            (var_of_t lo - var_of_t hi))
 
       let%test_unit "subtraction_soundness" =
         let generator =
@@ -126,7 +203,7 @@ module Make
         Quickcheck.test generator ~f:(fun (lo, hi) ->
           expect_failure
             (sprintf !"underflow: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
-            (of_t lo - of_t hi))
+            (var_of_t lo - var_of_t hi))
 
       let%test_unit "addition_completeness" =
         let generator =
@@ -138,7 +215,7 @@ module Make
         Quickcheck.test generator ~f:(fun (x, y) ->
           expect_success
             (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-            (of_t x + of_t y))
+            (var_of_t x + var_of_t y))
 
       let%test_unit "addition_soundness" =
         let generator =
@@ -150,18 +227,35 @@ module Make
         Quickcheck.test generator ~f:(fun (x, y) ->
           expect_failure
             (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
-            (of_t x + of_t y))
+            (var_of_t x + var_of_t y))
     end)
+  end
 end
 
-module T64 = Make(Unsigned.UInt64)(Int64)(struct
+module Amount = Make(Unsigned.UInt64)(Int64)(struct
     let length = 64
     let to_signed = Unsigned.UInt64.to_int64
     let of_signed = Unsigned.UInt64.of_int64
   end)
 
-module T32 = Make(Unsigned.UInt32)(Int32)(struct
+module Fee = Make(Unsigned.UInt32)(Int32)(struct
     let length = 32
     let to_signed = Unsigned.UInt32.to_int32
     let of_signed = Unsigned.UInt32.of_int32
   end)
+
+module Balance = struct
+  include (Amount : Basic with type t = Amount.t and type var = Amount.var)
+
+  let add_amount = Amount.add
+  let sub_amount = Amount.sub
+  let (+) = add_amount
+  let (-) = sub_amount
+
+  module Checked = struct
+    let add_amount = Amount.Checked.add
+    let sub_amount = Amount.Checked.sub
+    let (+) = add_amount
+    let (-) = sub_amount
+  end
+end

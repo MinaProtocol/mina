@@ -4,6 +4,7 @@ open Snark_params
 open Snarky
 open Tick
 open Let_syntax
+open Currency
 
 module Signature = Tick.Signature
 
@@ -103,11 +104,11 @@ module Base = struct
     let%bind root =
       let%bind sender_compressed = Public_key.compress_var sender in
       Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
-        let%map balance = Transaction.Amount.(account.balance - amount) in (* TODO: Fee *)
+        let%map balance = Balance.Checked.(account.balance - amount) in (* TODO: Fee *)
         { account with balance })
     in
     Ledger_hash.modify_account root receiver ~f:(fun account ->
-      let%map balance = Transaction.Amount.(account.balance + amount) in
+      let%map balance = Balance.Checked.(account.balance + amount) in
       { account with balance })
 
 (* Someday:
@@ -177,11 +178,11 @@ module Base = struct
     let receiver_pre = get_exn receiver in
     Ledger.update ledger sender
       { sender_pre with
-        balance = Unsigned.UInt64.sub sender_pre.balance transaction.payload.amount
+        balance = Option.value_exn (Balance.sub_amount sender_pre.balance transaction.payload.amount)
       };
     Ledger.update ledger transaction.payload.receiver
       { receiver_pre with
-        balance = Unsigned.UInt64.add receiver_pre.balance transaction.payload.amount
+        balance = Option.value_exn (Balance.add_amount receiver_pre.balance transaction.payload.amount)
       };
     let root = Ledger.merkle_root ledger in
     Ledger.update ledger sender sender_pre;
@@ -472,7 +473,7 @@ let%test_module "transaction_snark" =
         { private_key
         ; account =
             { public_key = Public_key.compress (Public_key.of_private_key private_key)
-            ; balance = Unsigned.UInt64.of_int (10 + Random.int 100)
+            ; balance = Balance.of_int (10 + Random.int 100)
             }
         }
       in
@@ -485,8 +486,8 @@ let%test_module "transaction_snark" =
       let receiver = wallets.(j) in
       let payload : Transaction.Payload.t =
         { receiver = receiver.account.public_key
-        ; fee = Unsigned.UInt32.zero
-        ; amount = Unsigned.UInt64.of_int amt
+        ; fee = Fee.zero
+        ; amount = Amount.of_int amt
         }
       in
       let signature =

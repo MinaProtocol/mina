@@ -3,6 +3,7 @@ open Snark_params
 open Snarky
 open Tick
 open Let_syntax
+open Currency
 
 module Merkle_tree = Snarky.Merkle_tree.Checked(Tick)(struct
     open Pedersen.Digest
@@ -106,7 +107,7 @@ let create_account t pk =
       path
     >>= assert_equal t
   in
-  let account : Account.var = { public_key = pk; balance = Account.Balance.zero } in
+  let account : Account.var = { public_key = pk; balance = Balance.(var_of_t zero) } in
   (* Could save some constraints applying Account.Balance.zero to the hash
      (since it's a no-op) *)
   let%bind account_hash = Account.hash account in
