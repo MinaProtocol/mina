@@ -2,7 +2,9 @@ open Core
 open Snark_params
 open Tick
 open Let_syntax
-open Currency
+
+module Amount = Currency.Amount
+module Fee = Currency.Fee
 
 module Payload = struct
   type ('pk, 'amount, 'fee) t_ =
@@ -56,7 +58,7 @@ module Payload = struct
       test_equal typ (Typ.list ~length Boolean.typ) var_to_bits to_bits
         { receiver = { x = Field.random (); is_odd = Random.bool () }
         ; amount = Amount.of_int (Random.int Int.max_value)
-        ; fee = Fee.of_int (Random.int Int32.(to_int_exn max_value))
+        ; fee = Fee.of_int (Random.int Int.max_value_30_bits)
         })
 end
 
