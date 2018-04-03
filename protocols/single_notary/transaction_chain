@@ -16,11 +16,11 @@ transaction_chain_state: {
     }
     header_hash
     proof
+    proofs_since_identity: proof_since_prev list
   }
 }
 
 work_tree_state: {
-
   type contents
     =
       ledger_hash
@@ -41,7 +41,7 @@ work_tree_state: {
 }
 
 
-work_tree_transition
+work_tree_transition: {
   node
   | Identity
       proof there was 
@@ -65,6 +65,16 @@ work_tree_transition
   | Merge
       proof that
       - there were (Base|Merge|Seal) proofs A,B from old -> A -> (B = new)
+  | Append
+      proof that, for the old state.tail and new_state.tail:
+      - all old values came from a tail with a valid proof
+      - transition.proof_from_genesis is valid for transition (state.tail.body -> new_state.tail.body) and new_strength
+      - prev_header_hash is state.tail.header_hash
+      - body hash is a hash of the new body
+      - new_strength > old_strength
+      - length = state.length + 1
+      - header_hash is a hash of the new header
+}
 
 transaction_transition: {
   transactions
@@ -86,7 +96,8 @@ work_transition: {
   new_ledger_hash
   new_identity
   new_unsealed_hash
-  proof
+  proof_since_genesis
+  proof_since_prev
 }
 
 construct_work_tree state
@@ -101,7 +112,8 @@ construct_work_tree state
             prev: prev_q_or_tail_prev
             proof: None
       construct binary tree where:
-        apply merge to elems until root
+        apply Merge to elems until root
+        at root apply Append
     in
     state with
       state.buffer = 
@@ -117,7 +129,9 @@ apply_work_tree_transition work_tree_state transition
       make proof [ verify(node.left -> node.right) (0 -> 2) ]
       add proof to work_tree
     if transition.node is root
-      emit Work_complete { contents, proof }
+      proof_since_genesis = root
+      proof_since_prev = root.right.proof
+      emit Work_complete { contents, proof_since_genesis, proof_since_prev }
       buffer.work = None
 
 apply_work_transition state transition
@@ -131,10 +145,10 @@ apply_work_transition state transition
       body_hash = hash(new_body)
       prev_header_hash = state.tail.header_hash
     header_hash = hash(new_header)
-    proof =
+    proof = transition.proof_since_genesis
       SNARK "zk_state_valid" proving that, for new_state.tail:
       - all old values came from a tail with a valid proof
-      - transition.proof is valid for transition (state.tail.body -> new_state.tail.body) and new_strength
+      - transition.proof_from_genesis is valid for transition (state.tail.body -> new_state.tail.body) and new_strength
       - prev_header_hash is state.tail.header_hash
       - body hash is a hash of the new body
       - new_strength > old_strength
@@ -146,6 +160,7 @@ apply_work_transition state transition
         header = new_header
         header_hash
         proof
+        proofs_since_identity = since_identity(state.proofs_since_identity)::transition.proof_since_prev
       }
 
 check_state old_state new_state
@@ -164,6 +179,7 @@ check_state old_state new_state
       &&
     valid(new_state.buffer.work)
       &&
+    have route from identity_chain_state.body.transaction_chain_ledger_hash to new_state.tail.body.ledger_hash
     remaining_work(new_state.buffer.work) < available_work(new_state.buffer.queue)
 
 on_event event
