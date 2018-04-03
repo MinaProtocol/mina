@@ -2,12 +2,13 @@
 transaction_chain_state: {
   buffer: {
     work: work DAG -> tail w/ proof
-    queue: ledger_transition | identity_transition | seal_transition list signed by latest permissioned_identity in (tail, queue)
+    queue: ledger_transition | identity_transition | seal_transition list signed by at least 2f+1 of latest permissioned_identities in (tail, queue)
+    balances: map from identity -> balance, signed by at least 2f+1 by latest permissioned_identities from (tail, queue)
   }
   tail: {
     body: {
       ledger_hash
-      permissioned_identity
+      permissioned_identities
     }
     header: {
       strength
@@ -25,7 +26,7 @@ work_tree_state: {
   type contents
     =
       ledger_hash
-      permissioned_identity
+      permissioned_identities
       strength
       unsealed_hash
       sealed: bool
@@ -46,7 +47,7 @@ work_tree_transition: {
   node
   | Identity
       proof there was 
-      - an identity_change from old -> new with a new permissioned identity + new strength
+      - an identity_update from old -> new with permissioned identities + new strength
       - old was sealed
       - new is not sealed
       - otherwise unchanged
@@ -58,7 +59,7 @@ work_tree_transition: {
       - otherwise unchanged
   | Seal
       proof that
-      - the permissioned identity signed the unsealed_hash
+      - at least 2f+1 of the permissioned identities signed the unsealed_hash
       - unsealed_hash is the "empty" hash
       - sealed was false
       - sealed is true
@@ -79,11 +80,11 @@ work_tree_transition: {
 
 transaction_transition: {
   transactions
-  since_last_(begin|identity_transition)_signature
+  since_last_(begin|identity_transition)_signatures
 }
 
 identity_transition: {
-  new_identity
+  new_identities
   new_strength
   proof
 }
@@ -95,7 +96,7 @@ seal_transition: {
 work_transition: {
   new_strength
   new_ledger_hash
-  new_identity
+  new_identities
   new_unsealed_hash
   proof_since_genesis
   proof_since_prev
@@ -139,7 +140,7 @@ apply_work_transition state transition
   =
     new_body =
       ledger_hash = transition.new_ledger_hash
-      permissioned_identity = transition.new_identity
+      permissioned_identities = transition.new_identities
     new_header =
       strength = transition.new_strength
       length = state.length + 1
@@ -183,6 +184,10 @@ check_state old_state new_state
     have route from identity_chain_state.body.transaction_chain_ledger_hash to new_state.tail.body.ledger_hash
       &&
     remaining_work(new_state.buffer.work) < available_work(new_state.buffer.queue)
+      &&
+    queue signed by at least 2f+1 of latest permissioned_identities from (tail, queue)
+      &&
+    balances signed by at least 2f+1 of latest permissioned_identities from (tail, queue)
 
 on_event event
   = 
@@ -213,3 +218,4 @@ on_event event
     | State new_state ->
       if check_state state new_state
       then state := new_state
+
