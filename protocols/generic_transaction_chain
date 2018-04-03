@@ -5,7 +5,6 @@ transaction_chain_state: {
   buffer: {
     work: work DAG -> tail w/ proof
     queue: ledger_transition | identity_transition | seal_transition list
-    balances: map from identity -> balance
     signatures
   }
   tail: {
@@ -186,7 +185,7 @@ check_state old_state new_state
       &&
     have route from identity_chain_state.body.transaction_chain_ledger_hash to new_state.tail.body.ledger_hash
       &&
-    remaining_work(new_state.buffer.work) + sum(new_state.buffer.balances) = available_work(new_state.buffer.queue)
+    remaining_work(new_state.buffer.work) <= available_work(new_state.buffer.queue)
       &&
     check_sign(new_state.buffer)
 
@@ -219,5 +218,4 @@ on_event event
     | State new_state ->
       if check_state state new_state
       then state := new_state
-
 
