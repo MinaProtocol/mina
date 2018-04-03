@@ -9,6 +9,7 @@ global: {
 
 chain_state: {
   body: {
+    identity
     transaction_chain_ledger_hash
     transaction_chain_strength
     transaction_chain_length
@@ -31,6 +32,7 @@ chain_state: {
 
 chain_transition: {
   signed_randomness maybe
+  identity
   slot#
   epoch#
   { new_transaction_chain_tail_state, transaction_chain_transition_proof } option
@@ -40,6 +42,7 @@ apply_transition state transition
   = 
     if transition.new_transaction_chain_tail_state is not None
       new_body = 
+        identity = transition.identity
         transaction_chain_ledger_hash = new_transaction_chain_tail_state.body.new_ledger_hash
         transaction_chain_strength = new_transaction_chain_tail_state.header.strength
         transaction_chain_length = new_transaction_chain_tail_state.header.length
@@ -79,6 +82,7 @@ apply_transition state transition
     proof = 
       SNARK "zk_state_valid" proving that, for new_state:
         - all old values came from a chain_state with valid proof
+        - body.identity valid
         - either
           - has transition.new_transaction_chain_tail_state
             - transition.new_transaction_chain_tail_state has valid proof
@@ -87,7 +91,7 @@ apply_transition state transition
             - transition.transaction_chain_strength greater than state.body.transaction_chain_strength
             - transaction_chain_transition_proof proves the transition from the previous ledger_hash to the new one
           - or
-            - body unchanged
+            - body transaction_chain fields unchanged
         - length is one greater than the old length
         - "incr_epoch" computed correctly
         - if incr_epoch, epoch_ledger_hash is state.next_epoch_ledger_hash, else state.epoch_ledger_hash
