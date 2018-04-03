@@ -10,6 +10,7 @@
       linear_pipe
       kademlia
       nanobit_base
+      transaction_snark
       snarky
       logger
       async

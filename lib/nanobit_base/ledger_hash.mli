@@ -6,6 +6,8 @@ open Tick
 type t = private Pedersen.Digest.t
 [@@deriving sexp]
 
+val (=) : t -> t -> bool
+
 val of_hash : Pedersen.Digest.t -> t
 
 module Stable : sig
@@ -25,7 +27,6 @@ type _ Request.t +=
   | Get_path    : Account.Index.t -> path Request.t
   | Get_element : Account.Index.t -> (Account.t * path) Request.t
   | Set         : Account.Index.t * Account.t -> unit Request.t
-  | Empty_entry : (Account.Index.t * path) Request.t
   | Find_index  : Public_key.Compressed.t -> Account.Index.t Request.t
 
 val assert_equal : var -> var -> (unit, _) Checked.t

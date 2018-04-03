@@ -29,6 +29,8 @@ module Stable = struct
   end
 end
 
+let (=) = Pedersen.Digest.(=)
+
 type var = Pedersen.Digest.Packed.var
 
 let typ = Pedersen.Digest.Packed.typ
@@ -64,6 +66,13 @@ let reraise_merkle_requests (With { request; respond }) =
     respond (Reraise (Get_element addr))
   | _ -> unhandled
 
+(* 
+   [modify_account t pk ~f] implements the following spec:
+
+   - finds an account [account] in [t] at path [addr] whose public key is [pk]
+   - returns a root [t'] of a tree of depth [depth]
+   which is [t] but with the account [f account] at path [addr].
+*)
 let modify_account t pk ~f =
   let%bind addr =
     request_witness Account.Index.Unpacked.typ
@@ -77,6 +86,14 @@ let modify_account t pk ~f =
       f account))
     reraise_merkle_requests
 
+(* [create_account t pk] implements the following spec:
+
+   - finds an address [addr] such that the account at path [addr] in [t] has
+   the same hash as [Account.empty_hash]
+   - returns the merkle tree [t'] which is [t] but with the account
+   [{ public_key = pk; balance = Account.Balance.zero }] at [addr] instead of
+   an account with the empty hash
+*)
 let create_account t pk =
   let%bind addr, path =
     request Typ.(Account.Index.Unpacked.typ * Merkle_tree.Path.typ ~depth)
@@ -101,3 +118,4 @@ let create_account t pk =
       Set (addr, account)))
   in
   Merkle_tree.implied_root account_hash addr path
+
