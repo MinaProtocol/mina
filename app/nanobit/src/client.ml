@@ -6,7 +6,7 @@ open Nanobit_base
 (* TODO: Fill out this implementations properly *)
 let send_txn_impl _ (key, payload) =
   printf "Starting keypair create\n";
-  let kp = Transaction.Signature.Keypair.create () in
+  let kp = Signature_keypair.create () in
   printf "Ending keypair create\n";
   let _txn : Transaction.t = Transaction.sign kp payload in
   printf "Created a real transaction!\n";
