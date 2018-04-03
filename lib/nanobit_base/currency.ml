@@ -132,7 +132,7 @@ module Make
         let generator =
           let open Quickcheck.Generator.Let_syntax in
           let%bind x = gen_incl Unsigned.zero Unsigned.max_int in
-          let%map y = gen_incl Unsigned.(sub max_int x) Unsigned.max_int in
+          let%map y = gen_incl Unsigned.zero Unsigned.(sub max_int x) in
           (x, y)
         in
         Quickcheck.test generator ~f:(fun (x, y) ->
