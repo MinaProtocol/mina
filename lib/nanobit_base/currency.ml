@@ -85,45 +85,56 @@ module Make
       let of_t t = 
         List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
 
-      let of_int = Fn.compose of_t Unsigned.of_int
-
-      let expect_failure c =
+      let expect_failure err c =
         let ((), (), passed) =
           run_and_check (Checked.map c ~f:(fun _ -> As_prover.return ())) ()
         in
-        assert (not passed)
+        (if passed
+         then failwith err)
+
+      let to_bigint x =
+        Bignum.Bigint.of_string (Unsigned.to_string x)
+
+      let of_bigint x =
+        Unsigned.of_string (Bignum.Bigint.to_string x)
+
+      let gen_incl x y =
+        Quickcheck.Generator.map ~f:of_bigint
+          (Bignum.Bigint.gen_incl (to_bigint x) (to_bigint y))
 
       let%test_unit "currency_underflow" =
         let generator =
           let open Quickcheck.Generator.Let_syntax in
-          let%map x = Int.gen >>| Int.abs
-          and y = Int.gen >>| Int.abs
-          in
-          if x < y 
-          then (x, y)
-          else if x = y
-          then (x, Int.(y + 1))
-          else (y, x)
+          let%bind x = gen_incl Unsigned.zero Unsigned.(sub max_int one) in
+          let%map y = gen_incl Unsigned.(add x one) Unsigned.max_int in
+          (x, y)
         in
         Quickcheck.test generator ~f:(fun (lo, hi) ->
-          expect_failure (of_int lo - of_int hi))
+          expect_failure
+            (sprintf !"underflow: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
+            (of_t lo - of_t hi))
 
       let%test_unit "currency_overflow" =
         let generator =
           let open Quickcheck.Generator.Let_syntax in
-          let%bind x = Int64.gen >>| Unsigned.of_int64 in
+          let%bind x =
+            Bignum.Bigint.gen_incl
+              Bignum.Bigint.one
+              (to_bigint Unsigned.max_int)
+            >>| of_bigint
+          in
           let%map y =
             Bignum.Bigint.gen_incl
-              (Bignum.Bigint.of_string
-                 Unsigned.(to_string (add (sub max_int x) one)))
-              (Bignum.Bigint.of_string Unsigned.(to_string max_int))
-            >>| Bignum.Bigint.to_string
-            >>| Unsigned.of_string
+              (to_bigint Unsigned.(add (sub max_int x) one))
+              (to_bigint Unsigned.max_int)
+            >>| of_bigint
           in
           (x, y)
         in
         Quickcheck.test generator ~f:(fun (x, y) ->
-          expect_failure (of_t x + of_t y))
+          expect_failure
+            (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
+            (of_t x + of_t y))
     end)
 end
 
