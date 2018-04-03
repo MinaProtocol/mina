@@ -129,6 +129,12 @@ module Base = struct
     [@@deriving fields]
   end
 
+(* spec for [main top_hash]:
+   constraints pass iff
+   there exist l1 : Ledger_hash.t, l2 : Ledger_hash.t, ts : Transaction.t list
+   such that
+   H(l1, l2) = top_hash,
+   applying ts to ledger with merkle hash l1 results in ledger with merkle hash l2. *)
   let main top_hash =
     let%bind l1 = provide_witness' Ledger_hash.typ ~f:Prover_state.state1 in
     let%bind l2 = provide_witness' Ledger_hash.typ ~f:Prover_state.state2 in
