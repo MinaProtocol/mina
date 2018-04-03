@@ -8,6 +8,8 @@ module type S = sig
   module Digest : sig
     type t [@@deriving bin_io, sexp]
 
+    val size_in_bits : int
+
     val (=) : t -> t -> bool
 
     module Bits : Bits_intf.S with type t := t
@@ -26,9 +28,14 @@ module type S = sig
   end
 
   module State : sig
-    type t
+    type t =
+      { bits_consumed : int
+      ; acc           : curve
+      ; params        : Params.t
+      }
 
-    val create : Params.t ->  t
+    val create
+      : ?bits_consumed:int -> ?init:curve -> Params.t -> t
 
     val update_bigstring : t -> Bigstring.t -> t
 
@@ -55,6 +62,8 @@ module Make
 struct
   module Digest = struct
     type t = Field.t [@@deriving sexp]
+
+    let size_in_bits = Field.size_in_bits
 
     let (=) = Field.equal
 
@@ -95,41 +104,42 @@ struct
 
   module State = struct
     type t =
-      { acc    : Curve.t
-      ; i      : int
-      ; params : Params.t
+      { bits_consumed : int
+      ; acc           : Curve.t
+      ; params        : Params.t
       }
 
-    let create params = { acc = Curve.identity; i = 0; params }
+    let create ?(bits_consumed=0) ?(init=Curve.identity) params =
+      { acc = init; bits_consumed; params }
 
     let ith_bit_int n i =
       ((n lsr i) land 1) = 1
 
     let update_fold (t : t) (fold : init:'acc -> f:('acc -> bool -> 'acc) -> 'acc) =
       let params = t.params in
-      let (acc, i) =
-        fold ~init:(t.acc, t.i) ~f:(fun (acc, i) b ->
+      let (acc, bits_consumed) =
+        fold ~init:(t.acc, t.bits_consumed) ~f:(fun (acc, i) b ->
           if b
           then (Curve.add acc params.(i), i + 1)
           else (acc, i + 1))
       in
-      { t with acc; i }
+      { t with acc; bits_consumed }
     ;;
 
     let update_iter (t : t) (iter : f:(bool -> unit) -> unit) =
-      let i = ref t.i in
+      let i = ref t.bits_consumed in
       let acc = ref t.acc in
       let params = t.params in
       iter ~f:(fun b ->
         (if b then acc := Curve.add !acc params.(!i));
         incr i);
-      { t with acc = !acc; i = !i }
+      { t with acc = !acc; bits_consumed = !i }
     ;;
 
     let update_bigstring (t : t) (s : Bigstring.t) =
       let byte_length = Bigstring.length s in
       let bit_length = 8 * byte_length in
-      assert (bit_length <= Params.max_input_length t.params - t.i);
+      assert (bit_length <= Params.max_input_length t.params - t.bits_consumed);
       let acc = ref t.acc in
       for i = 0 to byte_length - 1 do
         let c = Char.to_int (Bigstring.get s i) in
@@ -149,7 +159,7 @@ struct
           |> cond_add 6
           |> cond_add 7
       done;
-      { t with acc = !acc; i = t.i + bit_length }
+      { t with acc = !acc; bits_consumed = t.bits_consumed + bit_length }
     ;;
 
     let digest t = let (x, _y) = t.acc in x

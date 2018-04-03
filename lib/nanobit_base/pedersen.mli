@@ -8,6 +8,8 @@ module type S = sig
   module Digest : sig
     type t [@@deriving bin_io, sexp]
 
+    val size_in_bits : int
+
     val (=) : t -> t -> bool
 
     module Bits : Bits_intf.S with type t := t
@@ -26,9 +28,14 @@ module type S = sig
   end
 
   module State : sig
-    type t
+    type t =
+      { bits_consumed : int
+      ; acc           : curve
+      ; params        : Params.t
+      }
 
-    val create : Params.t ->  t
+    val create
+      : ?bits_consumed:int -> ?init:curve -> Params.t -> t
 
     val update_bigstring : t -> Bigstring.t -> t
 
