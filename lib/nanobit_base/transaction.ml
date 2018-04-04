@@ -10,12 +10,12 @@ module Payload = struct
     ; amount   : 'amount
     ; fee      : 'fee
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp, compare, hash]
 
   module Stable = struct
     module V1 = struct
       type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t) t_
-      [@@deriving bin_io]
+      [@@deriving bin_io, sexp, compare, hash]
     end
   end
 
@@ -60,15 +60,27 @@ module Payload = struct
         })
 end
 
-type ('payload, 'pk, 'signature) t_ =
-  { payload   : 'payload
-  ; sender    : 'pk
-  ; signature : 'signature
-  }
+module Stable = struct
+  module V1 = struct
+    type ('payload, 'pk, 'signature) t_ =
+      { payload   : 'payload
+      ; sender    : 'pk
+      ; signature : 'signature
+      }
+    [@@deriving bin_io, sexp, compare, hash]
 
-type t = (Payload.t, Public_key.t, Signature.t) t_
+    type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
+    [@@deriving bin_io, sexp, compare, hash]
+  end
+end
+
+include Stable.V1
+
 type value = t
 type var = (Payload.var, Public_key.var, Signature.var) t_
+
+let check_signature ({ payload; sender; signature } : t) =
+  Tick.Schnorr.verify signature sender (Payload.to_bits payload)
 
 let sign (kp : Signature_keypair.t) (payload : Payload.t): t =
   { payload

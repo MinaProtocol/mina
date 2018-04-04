@@ -2,7 +2,16 @@ open Core
 open Snark_params
 open Tick
 
-type t = Field.t * Field.t [@@deriving bin_io]
+type t = Field.t * Field.t
+[@@deriving sexp, eq, compare, hash]
+
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t
+    [@@deriving bin_io, sexp, compare, eq, hash]
+  end
+end
+
 type var = Field.var * Field.var
 val typ : (var, t) Typ.t
 
@@ -14,12 +23,12 @@ module Compressed : sig
     ; is_odd : 'boolean
     }
 
-  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp]
+  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, eq, compare, hash]
 
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving sexp, bin_io]
+      [@@deriving sexp, bin_io, eq, compare, hash]
     end
   end
 

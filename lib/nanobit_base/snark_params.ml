@@ -51,7 +51,18 @@ module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
   module Field = struct
-    include Tick0.Field
+    module T = struct
+      include Tick0.Field
+      let compare t1 t2 = Bigint.(compare (of_field t1) (of_field t2))
+
+      let hash_fold_t s x =
+        Bignum.Bigint.hash_fold_t s
+          Bigint.(to_bignum_bigint (of_field x))
+
+      let hash = Hash.of_fold hash_fold_t
+    end
+    include T
+    include Hashable.Make(T)
 
     include Field_bin.Make(Tick0.Field)(Tick_curve.Bigint.R)
 

@@ -1,8 +1,15 @@
 open Core_kernel
 open Snark_params
 
-type t = Tick.Field.t * Tick.Field.t
-[@@deriving bin_io, sexp, eq]
+module Stable = struct
+  module V1 = struct
+    type t = Tick.Field.t * Tick.Field.t
+    [@@deriving bin_io, sexp, eq, compare, hash]
+  end
+end
+
+include Stable.V1
+
 let (=) = equal
 
 type var = Tick.Field.var * Tick.Field.var
@@ -21,29 +28,17 @@ module Compressed = struct
     { x      : 'field
     ; is_odd : 'boolean
     }
-  [@@deriving bin_io, sexp, compare]
+  [@@deriving bin_io, sexp, compare, eq, hash]
 
   module Stable = struct
     module V1 = struct
       type t = (Field.t, bool) t_
-      [@@deriving bin_io, sexp]
+      [@@deriving bin_io, sexp, eq, compare, hash]
     end
   end
 
-  module T = struct
-    include Stable.V1
-
-    let compare =
-      compare_t_ (fun x y -> Bigint.(compare (of_field x) (of_field y))) Bool.compare
-
-    let hash_fold_t s { x; is_odd } =
-      Bignum.Bigint.hash_fold_t (Bool.hash_fold_t s is_odd)
-        Bigint.(to_bignum_bigint (of_field x))
-
-    let hash = Hash.of_fold hash_fold_t
-  end
-  include T
-  include Hashable.Make(T)
+  include Stable.V1
+  include Hashable.Make(Stable.V1)
 
   type var = (Field.var, Boolean.var) t_
 
