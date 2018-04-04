@@ -35,6 +35,8 @@ module type S =
 
   val create : depth:int -> t
 
+  val depth : t -> int
+
   val length : t -> int
 
   val get
