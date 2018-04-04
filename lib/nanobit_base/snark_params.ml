@@ -155,6 +155,16 @@ module Tick = struct
       |> State.digest
     ;;
 
+    let%test_unit "hash_observationally_injective" =
+      let gen =
+        let open Quickcheck.Generator in
+        let bits = list Bool.gen in
+        filter (both bits bits) ~f:(fun (x, y) -> x <> y)
+      in
+      let h bs = hash_fold params (List.fold bs) in
+      Quickcheck.test gen ~f:(fun (x, y) ->
+        assert (not (Digest.(=) (h x) (h y))))
+
     let zero_hash = hash_bigstring (Bigstring.create 0)
   end
 
