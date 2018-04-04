@@ -153,22 +153,19 @@ module Make
 = struct
     module Identifier = Peer
 
-    type condition = State.t -> bool
+    type ('input, 'a) condition = 'input -> 'a option
 
-    type message_condition = Message.t -> condition
-
-    type transition = t -> State.t -> State.t Deferred.t
-    and message_transition = t -> Message.t -> State.t -> State.t Deferred.t
-    and handle_command = H : Condition_label.t * condition * transition -> handle_command
-    and message_command = M : Message_label.t * message_condition * message_transition -> message_command
+    type 'a transition = t -> 'a -> State.t Deferred.t
+    and handle_command = H : Condition_label.t * (State.t, 'a) condition * 'a transition -> handle_command
+    and message_command = M : Message_label.t * (Message.t * State.t, 'a) condition * 'a transition -> message_command
     and t =
       { state : State.t
       ; last_state : State.t option
       ; conditions : handle_command Condition_label.Table.t
       ; message_pipe : Message.t Linear_pipe.Reader.t
       ; message_handlers : message_command Message_label.Table.t
-      ; triggered_timers_r : transition Linear_pipe.Reader.t
-      ; triggered_timers_w : transition Linear_pipe.Writer.t
+      ; triggered_timers_r : State.t transition Linear_pipe.Reader.t
+      ; triggered_timers_w : State.t transition Linear_pipe.Writer.t
       ; timer : Timer.t
       ; timers : Timer.tok list Timer_label.Table.t
       ; ident : Identifier.t
@@ -177,10 +174,10 @@ module Make
       }
 
     let on label condition ~f =
-      (label, condition, f)
+      H (label, condition, f)
 
     let msg label condition ~f =
-      (label, condition, f)
+      M (label, condition, f)
 
     let add_back_timers t ~key ~data =
       if List.length data > 0 then
@@ -207,7 +204,7 @@ module Make
       );
       add_back_timers t ~key:label ~data:to_put_back
 
-    let timeout t label ts ~(f:transition) =
+    let timeout t label ts ~(f:State.t transition) =
       let remove_tok tok =
         let l = Timer_label.Table.find_multi t.timers label in
         let l' = List.filter l ~f:(fun tok' -> not (Timer.equal_tok tok tok')) in
@@ -301,19 +298,21 @@ module Make
       ) with
       | true, _, _ ->
           let checks = Condition_label.Table.to_alist t.conditions in
-          let matches = List.filter checks ~f:(fun (_, H (_, cond, _)) ->
-            cond t.state
-          ) in
-          (match matches with
-          | [] ->
-              return (with_new_state t (t.state))
-          | (label,H (_, _,transition))::[] ->
-              let%map t' = (transition t t.state) >>| (with_new_state t) in
-              Logger.debug t.logger !"Making transition from %{sexp:State.t} to %{sexp:State.t} at %{sexp:Peer.t} label: %{sexp:Condition_label.label}\n%!" t.state t'.state t.ident label;
-              t'
-          | _::_::xs as l ->
-            failwithf "Multiple conditions matched current state: %s"
-              (List.map l ~f:(fun (label, _) -> label) |> List.sexp_of_t Condition_label.sexp_of_label |> Sexp.to_string_hum) ())
+          let possibly_transition =
+            Deferred.List.fold checks ~init:`Not_done ~f:(fun acc (label,H (_, cond,transition)) ->
+              match acc, cond t.state with
+              | _, None -> return acc
+              | `Not_done, Some a ->
+                let%map t' = (transition t a) >>| (with_new_state t) in
+                Logger.debug t.logger !"Making transition from %{sexp:State.t} to %{sexp:State.t} at %{sexp:Peer.t} label: %{sexp:Condition_label.label}\n%!" t.state t'.state t.ident label;
+                `Done (label, t')
+              | `Done (label', _), Some _ ->
+                  failwithf !"Multiple conditions matched current state (see: %{sexp:Label.t} and %{sexp:Label.t})" label label' ()
+            )
+          in
+          (match%map possibly_transition with
+          | `Not_done -> with_new_state t
+          | `Done (_, t')  -> t')
       | false, Some transition, _ ->
           let _ = Linear_pipe.read_now t.triggered_timers_r in
           let%map t' = (transition t t.state) >>| (with_new_state t) in
@@ -322,16 +321,17 @@ module Make
       | false, None, Some msg ->
           let _ = Linear_pipe.read_now t.message_pipe in
           let checks = Message_label.Table.to_alist t.message_handlers in
-          let matches = List.filter checks ~f:(fun (_, M (_, cond, _)) ->
-            cond msg t.state
-          ) in
-          (match matches with
+          (match checks with
           | [] ->
               return (with_new_state t (t.state))
-          | (label,M (_, _,transition))::[] ->
-              let%map t' = (transition t msg t.state) >>| (with_new_state t) in
-              Logger.debug t.logger !"Making transition from %{sexp:State.t} to %{sexp:State.t} at %{sexp:Peer.t} label: %{sexp:Message_label.label}\n%!" t.state t'.state t.ident label;
-              t'
+          | (label,M (_, cond,transition))::[] ->
+              (match cond msg t.state with
+              | None ->
+                return (with_new_state t (t.state))
+              | Some a ->
+                let%map t' = (transition t a) >>| (with_new_state t) in
+                Logger.debug t.logger !"Making transition from %{sexp:State.t} to %{sexp:State.t} at %{sexp:Peer.t} label: %{sexp:Message_label.label}\n%!" t.state t'.state t.ident label;
+                t')
           | _::_::xs as l ->
             failwithf "Multiple conditions matched current state: %s"
               (List.map l ~f:(fun (label, _) -> label) |> List.sexp_of_t Message_label.sexp_of_label |> Sexp.to_string_hum) ())

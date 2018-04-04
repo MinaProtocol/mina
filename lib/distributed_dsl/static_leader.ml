@@ -69,9 +69,10 @@ let spec i =
   let open Timer_label in
   let open Message in
   let open Machine.MyNode in
-  [ msg Got_new_round (fun m _ -> Message.is_new_round m) ~f:(fun t m state ->
-      match m with
-      | New_round 
-    )
+  ()
+  (*[ msg Got_new_round (fun m _ -> Message.is_new_round m) ~f:(fun t m state ->*)
+      (*match m with*)
+      (*| New_round *)
+    (*)*)
  
 
