@@ -158,7 +158,9 @@ module Tick = struct
     let%test_unit "hash_observationally_injective" =
       let gen =
         let open Quickcheck.Generator in
-        let bits = list Bool.gen in
+        let open Let_syntax in
+        let%bind length = small_positive_int in
+        let bits = list_with_length length Bool.gen in
         filter (both bits bits) ~f:(fun (x, y) -> x <> y)
       in
       let h bs = hash_fold params (List.fold bs) in
