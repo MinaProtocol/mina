@@ -106,8 +106,6 @@ module Make
 
   include Stable.V1
   include Sexpable.Of_stringable(Unsigned)
-  let of_string = Unsigned.of_string
-  let to_string = Unsigned.to_string
 
   let of_int = Unsigned.of_int
   let of_string = Unsigned.of_string
