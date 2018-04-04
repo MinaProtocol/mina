@@ -49,57 +49,45 @@ module type Difficulty_intf = sig
 end
 
 module type Header_intf  = sig
-  type t
   type 'a hash
   type nonce
   type strength
   type difficulty
   type body
-
-  val create : prev_timestamp : Time.t ->
-    timestamp : Time.t ->
-    length : int ->
-    most_recent_strength : strength ->
-    most_recent_difficulty : difficulty ->
-    nonce : nonce ->
-    prev_header_hash : t hash ->
-    body_hash : body hash ->
-    t
-
-  val prev_timestamp : t -> Time.t
-  val timestamp : t -> Time.t
-  val length : t -> int
-  val most_recent_strength : t -> strength
-  val most_recent_difficulty : t -> difficulty
-  val nonce : t -> nonce
-  val prev_header_hash : t -> t hash
-  val body_hash : t -> body hash
+  type t =
+    { prev_timestamp : Time.t
+    ; timestamp : Time.t
+    ; length : int
+    ; strength : strength
+    ; most_recent_difficulty : difficulty
+    ; nonce : nonce
+    ; prev_header_hash : t hash
+    ; body_hash : body hash
+    }
 end
 
 module type Chain_state_intf  = sig
-  type t
   type 'a hash
   type body
   type header
-
-  val create : body:body -> header:header -> header_hash:header hash -> t
-
-  val body : t -> body
-  val header : t -> header
-  val header_hash : t -> header hash
+  type t =
+    { body : body
+    ; header : header
+    ; header_hash : header hash
+    }
 end
 
 module type Chain_transition_intf  = sig
-  type t
   type 'a hash
   type ledger
   type proof
   type nonce
-
-  val new_ledger_hash : t -> ledger hash
-  val ledger_proof : t -> proof
-  val new_timestamp : t -> Time.t
-  val nonce : t -> nonce
+  type t =
+    { new_ledger_hash : ledger hash
+    ; ledger_proof : proof
+    ; new_timestamp : Time.t
+    ; nonce : nonce
+    }
 end
 
 module type Machine_intf  = sig
@@ -150,13 +138,13 @@ module Make
           }
 
         let create ~body ~header ~header_hash ~proof =
-          { state = State0.create ~body ~header ~header_hash
+          { state = { body ; header; header_hash }
           ; proof
           }
 
-        let body {state} = body state
-        let header {state} = header state
-        let header_hash {state} = header_hash state
+        let body {state} = state.body
+        let header {state} = state.header
+        let header_hash {state} = state.header_hash
       end
     end
 
@@ -183,34 +171,33 @@ module Make
         *)
     let zk_state_valid : ((* old *)State.With_proof.t * Transition.t, State.t) Proof.prog = failwith "zk_snark_proof"
 
-    let step t transition : t =
+    let step t (transition : Transition.t) : t =
       let header =
         t.state |> State.With_proof.header
       in
-      let difficulty = 
+      let new_difficulty = 
         Difficulty.next
-          (Header.most_recent_difficulty header)
-          ~last:(Header.timestamp header)
-          ~this:(Transition.new_timestamp transition)
+          header.most_recent_difficulty
+          ~last:header.timestamp
+          ~this:transition.new_timestamp
       in
-      let new_body = Body.create (Transition.new_ledger_hash transition) in
-      let new_header =
-        Header.create
-          ~prev_timestamp:(Header.timestamp header)
-          ~timestamp:(Transition.new_timestamp transition)
-          ~length:((Header.length header) + 1)
-          ~most_recent_strength:(Strength.increase (Header.most_recent_strength header) ~by:difficulty)
-          ~most_recent_difficulty:difficulty
-          ~nonce:(Transition.nonce transition)
-          ~prev_header_hash:(State.With_proof.header_hash t.state)
-          ~body_hash:(Hash.hash new_body)
+      let new_body = Body.create transition.new_ledger_hash in
+      let new_header : Header.t =
+        { prev_timestamp = header.timestamp
+        ; timestamp = transition.new_timestamp
+        ; length = header.length + 1
+        ; strength = Strength.increase header.strength ~by:new_difficulty
+        ; most_recent_difficulty = new_difficulty
+        ; nonce = transition.nonce
+        ; prev_header_hash = State.With_proof.header_hash t.state
+        ; body_hash = Hash.hash new_body
+        }
       in
-      let header_hash = Hash.hash new_header in
-      let new_state =
-        State.create
-          ~body:new_body
-          ~header:new_header
-          ~header_hash:header_hash
+      let new_state : State.t =
+        { body = new_body
+        ; header = new_header
+        ; header_hash = Hash.hash new_header
+        }
       in
       let proof = Proof.create zk_state_valid ((t.state, transition), new_state) in
       { state = State.With_proof.bind ~proof ~state:new_state }
@@ -219,8 +206,8 @@ module Make
       { state = initial }
 
     let check_state (old_state : State.With_proof.t) (new_state : State.With_proof.t) =
-      let new_strength = new_state.state |> State.header |> Header.most_recent_strength in
-      let old_strength = old_state.state |> State.header |> Header.most_recent_strength in
+      let new_strength = new_state.state.header.strength in
+      let old_strength = old_state.state.header.strength in
       new_strength > old_strength &&
       Proof.verify new_state.proof zk_state_valid new_state.state
 
