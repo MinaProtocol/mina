@@ -22,13 +22,11 @@ module type Ledger_intf = sig
 end
 
 module type Body_intf  = sig
-  type t
   type ledger
   type 'a hash
-
-  val create : ledger hash -> t
-
-  val ledger_hash : t -> ledger hash
+  type t =
+    { ledger_hash : ledger hash
+    }
 end
 
 module type Nonce_intf = sig
@@ -181,7 +179,7 @@ module Make
           ~last:header.timestamp
           ~this:transition.new_timestamp
       in
-      let new_body = Body.create transition.new_ledger_hash in
+      let new_body : Body.t = { ledger_hash = transition.new_ledger_hash } in
       let new_header : Header.t =
         { prev_timestamp = header.timestamp
         ; timestamp = transition.new_timestamp
