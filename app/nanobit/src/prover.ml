@@ -118,8 +118,6 @@ module Main (Params : Params_intf) = struct
 
   module Transition = Nanobit_base.Blockchain_transition
 
-  module Keys = Transition_keys.Make(struct end)
-
   module Transition_utils = struct
     open Keys
 

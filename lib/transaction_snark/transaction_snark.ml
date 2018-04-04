@@ -25,12 +25,12 @@ module Proof_type = struct
 end
 
 type t =
-  { source     : Ledger_hash.t
-  ; target     : Ledger_hash.t
+  { source     : Ledger_hash.Stable.V1.t
+  ; target     : Ledger_hash.Stable.V1.t
   ; proof_type : Proof_type.t
-  ; proof      : Tock.Proof.t
+  ; proof      : Proof.Stable.V1.t
   }
-[@@deriving fields]
+[@@deriving fields, bin_io]
 
 let create = Fields.create
 
