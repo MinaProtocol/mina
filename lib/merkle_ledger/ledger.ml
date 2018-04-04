@@ -37,6 +37,8 @@ module type S =
 
   val create : depth:int -> t
 
+  val depth : t -> int
+
   val length : t -> int
 
   val get
@@ -192,6 +194,8 @@ module Make
     ; depth
     }
   ;;
+
+  let depth t = t.depth
 
   let length t = Key.Table.length t.accounts
 
