@@ -190,25 +190,23 @@ module Main (Params : Params_intf) = struct
     end
 
   let base_proof =
-    lazy begin
-      if Insecure.compute_base_proof
-      then begin
-        Tock.Proof.dummy
-      end else begin
-        let dummy_proof = Tock.Proof.dummy in
-        let base_hash = Lazy.force base_hash in
-        let tick =
-          Tick.prove (Keys.Step.proving_key) (Keys.Step.input ())
-            { Keys.Step.Prover_state.prev_proof = dummy_proof
-            ; wrap_vk  = Keys.Wrap.verification_key
-            ; prev_state = Blockchain.State.negative_one
-            ; update = Block.genesis
-            }
-            Keys.Step.main
-            base_hash
-        in
-        Transition_utils.wrap base_hash tick
-      end
+    if Insecure.compute_base_proof
+    then begin
+      Tock.Proof.dummy
+    end else lazy begin
+      let dummy_proof = Lazy.force Tock.Proof.dummy in
+      let base_hash = Lazy.force base_hash in
+      let tick =
+        Tick.prove (Keys.Step.proving_key) (Keys.Step.input ())
+          { Keys.Step.Prover_state.prev_proof = dummy_proof
+          ; wrap_vk  = Keys.Wrap.verification_key
+          ; prev_state = Blockchain.State.negative_one
+          ; update = Block.genesis
+          }
+          Keys.Step.main
+          base_hash
+      in
+      Transition_utils.wrap base_hash tick
     end
   ;;
 
