@@ -1,4 +1,4 @@
-include Snark_params.Tick.Signature.Private_key
+include Snark_params.Tick.Schnorr.Private_key
 
 let create () =
   if Insecure.private_key_generation

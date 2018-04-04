@@ -6,8 +6,6 @@ open Tick
 open Let_syntax
 open Currency
 
-module Signature = Tick.Signature
-
 let depth = Snark_params.ledger_depth
 
 let bundle_length = 1
@@ -99,7 +97,7 @@ module Base = struct
     let { Transaction.Payload.receiver; amount; fee } = payload in
     let%bind () =
       let%bind bs = Transaction.Payload.var_to_bits payload in
-      Signature.Checked.assert_verifies signature sender bs
+      Schnorr.Checked.assert_verifies signature sender bs
     in
     let%bind root =
       let%bind sender_compressed = Public_key.compress_var sender in
@@ -491,10 +489,10 @@ let%test_module "transaction_snark" =
         }
       in
       let signature =
-        Signature.sign sender.private_key
+        Schnorr.sign sender.private_key
           (Transaction.Payload.to_bits payload)
       in
-      assert (Signature.verify signature (Public_key.of_private_key sender.private_key) (Transaction.Payload.to_bits payload));
+      assert (Schnorr.verify signature (Public_key.of_private_key sender.private_key) (Transaction.Payload.to_bits payload));
       { Transaction.payload
       ; sender = Public_key.of_private_key sender.private_key
       ; signature
