@@ -10,28 +10,35 @@ state: {
   locally_permissioned_identities = []
 }
 
-verify_block state transactions
-  =
-    map all
-      transactions
-      ~f:(function
-      | Transaction t -> 
-      | Seal t -> 
-      | Coinbase t -> 
-      | Claim_work t -> 
-      | Submit_work t -> add to balances
-      | Identity t -> add to permissioned_identities if not there already (comes with work)
-      )
+consensus_block: {
+  ledger_transactions
+    ledger_transaction (payment | coinbase) list
+    new_unsealed_hash
+    new_unsealed_hash_signatures
+    new_ledger_hash
+    new_ledger_hash_signature
+  new_permissioned_identities Option
+  claim_work: (work_id, identity) list
+  submit_work: (work_id, work) list
+}
 
-apply_transactions state transactions
+propose state
   =
-    assemble transactions into
-    - work_tree_progress
-    - transaction_transition
-    - seal_transition
-    - identity_transition
-    send off to transaction_chain
 
+apply state block
+  =
+    ledger_transactions ->
+      Transaction_transition
+      Seal
+    new_permissioned_identities ->
+      Identity_transition
+    claim_work ->
+      update claimed_work
+      start round based timer to blacklist identity
+    submit_work ->
+      update claimed_work
+      update balances
+      Work_tree_progress
 
 on_event event
   | Become_notary state identity (happens after notary added to permissioned identities)
@@ -39,8 +46,10 @@ on_event event
     add_transaction_to_next_consensus(claim_transaction_buffer_work)
   | Initial_work_claim_accepted state identity
     add_transaction_to_next_consensus(submit_transaction_buffer_work)
-  | Consensus state transactions
-    byzantine_consensus(state, transactions, verify_transactions, apply_transactions)
+  | Consensus_propose state
+    byzantine_consensus(propose state)
+  | Apply_Consensus state block
+    apply state block
   | New_notary state identity
     update(state.locally_permissioned_identities)
   | Add_coinbase state identity
