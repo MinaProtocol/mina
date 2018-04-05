@@ -105,7 +105,6 @@ module Body = struct
     ; check
     }
 
-(*   let to_bits { target_hash } = Ledger_hash.to_bits target_hash *)
   let var_to_bits ({ target_hash } : var) : (Tick.Boolean.var list, _) Tick.Checked.t =
     Ledger_hash.var_to_bits target_hash
 end
