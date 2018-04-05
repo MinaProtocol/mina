@@ -96,7 +96,7 @@ module Body = struct
     in
     let alloc =
       Alloc.map typ.alloc
-        ~f:(fun target_hash -> { target_hash; proof = Tock.Proof.dummy })
+        ~f:(fun target_hash -> { target_hash; proof = Lazy.force Tock.Proof.dummy })
     in
     let check t = typ.check t.target_hash in
     { store
@@ -147,7 +147,7 @@ let genesis : t =
       }
   ; body =
       (* TODO: Fix  *)
-      { proof = Tock.Proof.dummy
+      { proof = Lazy.force Tock.Proof.dummy
       ; target_hash = Ledger_hash.of_hash Pedersen.zero_hash
       }
   }
@@ -192,7 +192,7 @@ module With_transactions = struct
     (* TODO: Remove in PR implementing miner *)
     let dummy : t =
       { target_hash = Ledger_hash.of_hash Tick.Pedersen.zero_hash
-      ; proof = Tock.Proof.dummy
+      ; proof = Lazy.force Tock.Proof.dummy
       ; transactions = []
       }
   end
