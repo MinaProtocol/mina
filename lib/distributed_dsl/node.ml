@@ -307,11 +307,11 @@ module Make
                 Logger.debug t.logger !"Making transition from %{sexp:State.t} to %{sexp:State.t} at %{sexp:Peer.t} label: %{sexp:Condition_label.label}\n%!" t.state t'.state t.ident label;
                 `Done (label, t')
               | `Done (label', _), Some _ ->
-                  failwithf !"Multiple conditions matched current state (see: %{sexp:Label.t} and %{sexp:Label.t})" label label' ()
+                  failwithf !"Multiple conditions matched current state (see: %{sexp:Condition_label.label} and %{sexp:Condition_label.label})" label label' ()
             )
           in
           (match%map possibly_transition with
-          | `Not_done -> with_new_state t
+          | `Not_done -> with_new_state t t.state
           | `Done (_, t')  -> t')
       | false, Some transition, _ ->
           let _ = Linear_pipe.read_now t.triggered_timers_r in
