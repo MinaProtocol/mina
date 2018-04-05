@@ -191,8 +191,8 @@ module Base = struct
 
   let bundle (keys : Keys0.t) ledger transaction
     =
-    let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
-    let state2 = Ledger_hash.of_hash (root_after_transaction ledger transaction) in
+    let state1 = Ledger.merkle_root ledger in
+    let state2 = root_after_transaction ledger transaction in
     let prover_state : Prover_state.t =
       { state1; state2; transactions = [ transaction ] }
     in
@@ -512,10 +512,10 @@ let%test_module "transaction_snark" =
           Ledger.update ledger account.public_key account);
         let t1 = transaction wallets 0 1 8 in
         let t2 = transaction wallets 1 2 3 in
-        let state1 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
+        let state1 = Ledger.merkle_root ledger in
         let proof12 = of_transaction ledger t1 in
         let proof23 = of_transaction ledger t2 in
-        let state3 = Ledger_hash.of_hash (Ledger.merkle_root ledger) in
+        let state3 = Ledger.merkle_root ledger in
         let proof13 = merge proof12 proof23 in
         Tock.verify proof13.proof keys.wrap_vk (wrap_input ())
           (embed (top_hash state1 state3)))
