@@ -2,8 +2,9 @@ open Core
 open Async
 open Nanobit_base
 open Snark_params
+open Blockchain_snark
 
-module Transition = Nanobit_base.Blockchain_transition
+module Transition = Blockchain_snark.Blockchain_transition
 ;;
 
 let real_tick_vk, tick_vk, tick_pk =
@@ -83,6 +84,7 @@ let _ =
     module Make (Unit : sig end) = struct
       open Core
       open Nanobit_base
+      open Blockchain_snark
       open Blockchain_transition
       open Snark_params
 

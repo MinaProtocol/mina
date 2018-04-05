@@ -10,6 +10,7 @@
       linear_pipe
       kademlia
       nanobit_base
+      blockchain_snark
       transaction_snark
       snarky
       logger

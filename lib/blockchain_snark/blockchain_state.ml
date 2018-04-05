@@ -1,4 +1,5 @@
 open Core_kernel
+open Nanobit_base
 open Util
 open Snark_params
 open Tick

@@ -1,6 +1,7 @@
 open Core
 open Async
 open Nanobit_base
+open Blockchain_snark
 
 module Digest = Snark_params.Tick.Pedersen.Digest
 

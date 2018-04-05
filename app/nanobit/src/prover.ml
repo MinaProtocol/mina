@@ -1,6 +1,7 @@
 open Core
 open Async
 open Nanobit_base
+open Blockchain_snark
 open Cli_common
 
 module State = Blockchain_state
@@ -116,7 +117,7 @@ module Main (Params : Params_intf) = struct
 
   module Digest = Tick.Pedersen.Digest
 
-  module Transition = Nanobit_base.Blockchain_transition
+  module Transition = Blockchain_transition
 
   module Keys = Transition_keys.Make(struct end)
 

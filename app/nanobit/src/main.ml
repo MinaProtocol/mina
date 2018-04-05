@@ -2,6 +2,7 @@ open Core
 open Async
 open Kademlia
 open Nanobit_base
+open Blockchain_snark
 
 module Snark = Snark
 module Digest = Snark_params.Tick.Pedersen.Digest

@@ -1,6 +1,7 @@
 open Core
 open Async
 open Nanobit_base
+open Blockchain_snark
 
 let remove_nth xs n = List.concat [ List.take xs n; List.drop xs (n+1) ]
 
