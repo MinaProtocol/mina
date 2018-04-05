@@ -9,14 +9,11 @@ module Make (T : Transaction_snark.S) = struct
   module System = struct
     module U = Blockchain_state.Make_update(T)
     module State = struct
-      type var = Blockchain_state.var
-      type value = Blockchain_state.value
-      let typ = Blockchain_state.typ
-      let hash = Blockchain_state.hash
-      let update_exn = U.update_exn
+      include (Blockchain_state : module type of Blockchain_state with module Checked := Blockchain_state.Checked)
+      include (U : module type of U with module Checked := U.Checked)
       module Checked = struct
         include Blockchain_state.Checked
-        let update = U.update_var
+        include U.Checked
       end
     end
     module Update = Block

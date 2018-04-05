@@ -122,8 +122,13 @@ module Main (Params : Params_intf) = struct
   module Transaction_snark = Transaction_snark.Make(struct let keys = Keys.transaction_snark_keys end)
 
   module State = struct
-    include Blockchain_state
-    include Blockchain_state.Make_update(Transaction_snark)
+    include (Blockchain_state : module type of Blockchain_state with module Checked := Blockchain_state.Checked)
+    module U = Blockchain_state.Make_update(Transaction_snark)
+    include (U : module type of U with module Checked := U.Checked)
+    module Checked = struct
+      include Blockchain_state.Checked
+      include U.Checked
+    end
   end
 
   module Transition_utils = struct

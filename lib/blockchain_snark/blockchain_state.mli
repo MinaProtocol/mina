@@ -69,7 +69,9 @@ val compute_target : Block_time.t -> Target.t -> Block_time.t -> Target.t
 module Make_update (T : Transaction_snark.S) : sig
   val update_exn : value -> Block.t -> value
 
-  val update_var : var -> Block.var -> (var * [ `Success of Boolean.var ], _) Checked.t
+  module Checked : sig
+    val update : var -> Block.var -> (var * [ `Success of Boolean.var ], _) Checked.t
+  end
 end
 
 module Checked : sig
