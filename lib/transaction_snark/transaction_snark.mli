@@ -26,7 +26,7 @@ module Keys : sig
   val create : unit -> t
 end
 
-module Make (K : sig val keys : Keys.t end) : sig
+module type S = sig
   val verify : t -> bool
 
   val of_transaction
@@ -44,3 +44,5 @@ module Make (K : sig val keys : Keys.t end) : sig
     -> (Tock.Proof.t, 's) Tick.As_prover.t
     -> (Tick.Boolean.var, 's) Tick.Checked.t
 end
+
+module Make (K : sig val keys : Keys.t end) : S

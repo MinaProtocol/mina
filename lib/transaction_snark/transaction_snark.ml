@@ -359,6 +359,25 @@ end
 let embed (x : Tick.Field.t) : Tock.Field.t =
   Tock.Field.project (Tick.Field.unpack x)
 
+module type S = sig
+  val verify : t -> bool
+
+  val of_transaction
+    : Ledger_hash.t
+    -> Ledger_hash.t
+    -> Transaction.t
+    -> Tick.Handler.t
+    -> t
+
+  val merge : t -> t -> t
+
+  val verify_merge
+    : Ledger_hash.var
+    -> Ledger_hash.var
+    -> (Tock.Proof.t, 's) Tick.As_prover.t
+    -> (Tick.Boolean.var, 's) Tick.Checked.t
+end
+
 module Make (K : sig val keys : Keys0.t end) = struct
   open K
 

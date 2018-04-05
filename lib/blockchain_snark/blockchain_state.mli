@@ -59,20 +59,21 @@ include Snarkable.S
       , Strength.Unpacked.value
       ) t_
 
-val update_exn : value -> Block.t -> value
-
 val hash : value -> Pedersen.Digest.t
 
 val negative_one : value
 val zero : value
 val zero_hash : Pedersen.Digest.t
+val compute_target : Block_time.t -> Target.t -> Block_time.t -> Target.t
+
+module Make_update (T : Transaction_snark.S) : sig
+  val update_exn : value -> Block.t -> value
+
+  val update_var : var -> Block.var -> (var * [ `Success of Boolean.var ], _) Checked.t
+end
 
 module Checked : sig
   val hash : var -> (Pedersen.Digest.Packed.var, _) Checked.t
   val is_base_hash : Pedersen.Digest.Packed.var -> (Boolean.var, _) Checked.t
-
-  val update : var -> Block.var -> (var * [ `Success of Boolean.var ], _) Checked.t
 end
-
-val compute_target : Block_time.t -> Target.t -> Block_time.t -> Target.t
 

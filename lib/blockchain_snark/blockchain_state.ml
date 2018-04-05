@@ -102,21 +102,12 @@ let compute_target previous_time (previous_target : Target.t) time =
   end
 ;;
 
-let update_exn : value -> Block.t -> value =
+let update_unchecked : value -> Block.t -> value =
   let genesis_hash = Block.(hash genesis) in
   fun state block ->
     let block_hash = Block.hash block in
     (if not Field.(equal block_hash genesis_hash)
      then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
-    (* TODO: Uncomment
-    assert
-      Transaction_snark.(
-        create
-          ~source:state.ledger_hash
-          ~target:block.body.target_hash
-          ~proof_type:Merge
-          ~proof:block.body.proof
-        |> verify); *)
     let new_target =
       compute_target state.previous_time state.target
         block.header.time
@@ -146,7 +137,7 @@ let negative_one : value =
   ; strength = Strength.zero
   }
 
-let zero = update_exn negative_one Block.genesis
+let zero = update_unchecked negative_one Block.genesis
 
 let to_bits ({ previous_time; target; block_hash; ledger_hash; strength } : var) =
   let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash in
@@ -171,13 +162,16 @@ let hash t =
 
 let zero_hash = hash zero
 
-module Checked = struct
-  let is_base_hash h =
-    with_label "State.is_base_hash"
-      (Checked.equal (Cvar.constant zero_hash) h)
-
-  let hash (t : var) =
-    with_label "State.hash" (to_bits t >>= hash_digest)
+module Make_update (T : Transaction_snark.S) = struct
+  let update_exn state (block : Block.t) =
+    assert
+      (Transaction_snark.create
+        ~source:state.ledger_hash
+        ~target:block.body.target_hash
+        ~proof_type:Merge
+        ~proof:block.body.proof
+        |> T.verify);
+    update_unchecked state block
 
   let compute_target prev_time prev_target time =
     let div_pow_2 bits (`Two_to_the k) = List.drop bits k in
@@ -259,8 +253,8 @@ module Checked = struct
     [@@deriving fields]
   end
 
-  let update (state : var) (block : Block.var)
-    : ( var * [ `Success of Boolean.var ], _) Checked.t
+  let update_var (state : var) (block : Block.var)
+    : ( var * [ `Success of Boolean.var ], _) Tick.Checked.t
     =
     with_label "Blockchain.State.update" begin
       let%bind () =
@@ -271,11 +265,9 @@ module Checked = struct
           (Digest.project_var state.block_hash)
       in
       let%bind good_body =
-        failwith "TODO"
-        (* TODO: Uncomment
-        Transaction_snark.verify_merge
+        T.verify_merge
           state.ledger_hash block.body.target_hash
-          (As_prover.return block.body.proof) *)
+          (As_prover.return block.body.proof)
       in
       let target_packed = Target.pack_var state.target in
       let%bind strength = Target.strength target_packed state.target in
@@ -299,5 +291,14 @@ module Checked = struct
       , `Success success
       )
     end
+end
+
+module Checked = struct
+  let is_base_hash h =
+    with_label "State.is_base_hash"
+      (Checked.equal (Cvar.constant zero_hash) h)
+
+  let hash (t : var) =
+    with_label "State.hash" (to_bits t >>= hash_digest)
 end
 
