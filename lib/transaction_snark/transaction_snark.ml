@@ -406,7 +406,15 @@ module Make (K : sig val keys : Keys0.t end) = struct
     in
     (Pedersen.State.update_fold s (List.fold wrap_vk_bits)).acc
 
-  (* TODO: Explain this *)
+(* spec for [verify_merge s1 s2 _]:
+   Returns a boolean which is true if there exists a tock proof proving
+   (against the wrap verification key) H(s1, s2, wrap_vk).
+   This in turn should only happen if there exists a tick proof proving
+   (against the merge verification key) H(s1, s2, wrap_vk).
+
+   We precompute the part of the pedersen involving wrap_vk outside the SNARK
+   since this saves us many constraints.
+*)
   let verify_merge s1 s2 get_proof =
     let open Tick in
     let open Let_syntax in
