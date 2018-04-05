@@ -15,6 +15,7 @@ end
 
 module Get_balance = struct
   type query = Public_key.Stable.V1.t [@@deriving bin_io]
+
   type response = Balance.Stable.V1.t [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
