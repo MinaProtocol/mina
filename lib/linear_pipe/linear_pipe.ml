@@ -83,6 +83,28 @@ let fold reader ~init ~f =
     reader
     (Pipe.fold reader.Reader.pipe ~init ~f)
 
+(* Adapted from Async_kernel's fold impl *)
+let scan reader ~init ~f =
+  set_has_reader reader;
+  let (r,w) = Pipe.create () in
+  let rec loop b =
+    match Pipe.read_now reader.Reader.pipe with
+    | `Eof -> return (Pipe.close w)
+    | `Ok v ->
+        let%bind next = f b v in
+        let%bind () = Pipe.write w next in
+        loop next
+    | `Nothing_available ->
+        let%bind _ = Pipe.values_available reader.Reader.pipe in
+        loop b
+  in
+  don't_wait_for begin
+    (* Force async ala https://github.com/janestreet/async_kernel/blob/master/src/pipe.ml#L703 *)
+    return () >>= fun () ->
+    loop init
+  end;
+  wrap_reader r
+
 let map (reader : 'a Reader.t) ~f = 
   set_has_reader reader;
   wrap_reader (Pipe.map reader.Reader.pipe ~f)
@@ -96,6 +118,9 @@ let filter_map (reader : 'a Reader.t) ~f =
 let transfer reader writer ~f = 
   bracket reader (Pipe.transfer reader.Reader.pipe writer ~f)
 ;;
+
+let transfer_id reader writer =
+  bracket reader (Pipe.transfer_id reader.Reader.pipe writer)
 
 let merge_unordered rs = 
    let merged_reader, merged_writer = create () in

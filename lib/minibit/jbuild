@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name minibit)
+  (public_name minibit)
+  (library_flags (-linkall))
+  (libraries (core protocols linear_pipe async async_extra ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib minibit))))
+  (synopsis "Minibit gut layer")))
+
