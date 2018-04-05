@@ -60,7 +60,7 @@ module type Header_intf  = sig
     ; timestamp : Time.t
     ; length : int
     ; strength : strength
-    ; most_recent_difficulty : difficulty
+    ; difficulty : difficulty
     ; nonce : nonce
     ; prev_header_hash : t hash
     ; body_hash : body hash
@@ -197,7 +197,7 @@ module Make
       in
       let new_difficulty =
         Difficulty.next
-          header.most_recent_difficulty
+          header.difficulty
           ~last:header.timestamp
           ~this:transition.new_timestamp
       in
@@ -211,7 +211,7 @@ module Make
         ; timestamp = transition.new_timestamp
         ; length = header.length + 1
         ; strength = Strength.increase header.strength ~by:new_difficulty
-        ; most_recent_difficulty = new_difficulty
+        ; difficulty = new_difficulty
         ; nonce = transition.nonce
         ; prev_header_hash = t.state |> fst |> State.header_hash
         ; body_hash = Hash.hash new_body
@@ -237,8 +237,8 @@ module Make
       }
 
     let check_state (old_state, old_proof) (new_state, new_proof) =
-      let new_strength : Strength.t = new_state.State.header.strength in
-      let old_strength : Strength.t = old_state.State.header.strength in
+      let new_strength = new_state.State.header.strength in
+      let old_strength = old_state.State.header.strength in
       if Strength.(new_strength > old_strength) then
         State.Proof.verify new_proof new_state
       else
