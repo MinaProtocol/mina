@@ -157,7 +157,7 @@ module Make
     - the strength is computed correctly from the old_state.next_difficulty and the old_state.strength
     - new_state.next_difficulty is "next difficulty"
     - new_state.previous_state_hash is a hash of old_state
-    - hash(new_state||transition.ledger_hash||transition.nonce) meets old_state.next_difficulty
+    - hash(new_state||transition.nonce) meets old_state.next_difficulty
     as) meets old_state.next_difficulty
     *)
   (* TODO: Lift this out of the functor and inline it *)
