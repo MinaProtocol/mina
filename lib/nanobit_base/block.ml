@@ -147,11 +147,7 @@ let genesis : t =
       }
   ; body =
       (* TODO: Fix  *)
-<<<<<<< ac62bebb0364848653fe26a2055f7e0564f38515
       { proof = Lazy.force Tock.Proof.dummy
-=======
-      { proof = Tock.Proof.dummy
->>>>>>> switch block body to have proof and new ledger hash
       ; target_hash = Ledger_hash.of_hash Pedersen.zero_hash
       }
   }
@@ -196,11 +192,7 @@ module With_transactions = struct
     (* TODO: Remove in PR implementing miner *)
     let dummy : t =
       { target_hash = Ledger_hash.of_hash Tick.Pedersen.zero_hash
-<<<<<<< ac62bebb0364848653fe26a2055f7e0564f38515
       ; proof = Lazy.force Tock.Proof.dummy
-=======
-      ; proof = Tock.Proof.dummy
->>>>>>> switch block body to have proof and new ledger hash
       ; transactions = []
       }
   end
