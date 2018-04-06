@@ -75,6 +75,10 @@ module type Transition_intf  = sig
   [@@deriving fields]
 end
 
+module type Time_close_validator_intf = sig
+  val validate : Time.t -> bool
+end
+
 module type Machine_intf = sig
   type t
   type state
@@ -102,17 +106,7 @@ module type Block_state_transition_proof_intf = sig
     ; old_proof : proof
     ; transition : transition
     }
-  (* SNARK "zk_state_valid" proving that, for new_state:
-    - old_proof verifies old_state (Induction hypothesis)
-    - transition.ledger_proof verifies a valid sequence of transactions moved the ledger from old_state.ledger_hash to new_state.ledger_hash
-    - new_state.timestamp is newer than old_state.timestamp
-    - the "next difficulty" is computed correctly from (old_state.next_difficulty, old_state.timestamp, new_state.timetamp)
-    - the strength is computed correctly from the old_state.next_difficulty and the old_state.strength
-    - new_state.next_difficulty is "next difficulty"
-    - new_state.last_transition_hash is a hash of transition
-    - new_state.previous_state_hash is a hash of old_state
-    - hash(new_state) meets new_state.difficulty
-    *)
+
   val prove_zk_state_valid : witness -> new_state:state -> proof Deferred.t
 end
 
@@ -138,6 +132,7 @@ module type Inputs_intf = sig
                                        and type ledger := Ledger.t
                                        and type proof := Ledger_proof.t
                                        and type nonce := Nonce.t
+  module Time_close_validator : Time_close_validator_intf
   module State : sig
     include State_intf with type 'a hash := 'a Hash.t
                         and type difficulty := Difficulty.t
@@ -217,7 +212,8 @@ module Make
     let check_state (old_pcd : proof_carrying_data) (new_pcd : proof_carrying_data)  =
       let new_strength = new_pcd.data.strength in
       let old_strength = old_pcd.data.strength in
-      if Strength.(new_strength > old_strength) then
+      if Strength.(new_strength > old_strength) &&
+          Time_close_validator.validate(new_pcd.data.timestamp) then
         State.Proof.verify new_pcd.proof new_pcd.data
       else
         return false

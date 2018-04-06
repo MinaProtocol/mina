@@ -10,7 +10,7 @@ module type Ledger_fetcher_io_intf = sig
   val get_ledger_at_hash : t -> ledger hash -> ledger Deferred.Or_error.t
 end
 
-module type Miner_io_intf = sig
+module type State_io_intf = sig
   type t
   type 'a state_with_witness
 
@@ -20,7 +20,7 @@ module type Miner_io_intf = sig
 end
 
 module type Network_intf = sig
-  include Miner_io_intf
+  include State_io_intf
   include Ledger_fetcher_io_intf with type t := t
 end
 
@@ -107,7 +107,7 @@ module type Inputs_intf = sig
                                                        and type 'a transaction := 'a Transaction.t
   module Transition_with_witness : Transition_with_witness_intf with type 'a transaction := 'a Transaction.t
                                                                  and type transition := Transition.t
-  module Miner_io : Miner_io_intf with type 'a state_with_witness := 'a State_with_witness.t
+  module State_io : State_io_intf with type 'a state_with_witness := 'a State_with_witness.t
   module Ledger_fetcher : Ledger_fetcher_intf with type 'a hash := 'a Hash.t
                                                and type ledger := Ledger.t
                                                and type 'a transaction := 'a Transaction.t
@@ -136,7 +136,7 @@ module Make
 
   type 'a t =
     { miner : Miner.t
-    ; miner_remote : Miner_io.t
+    ; state_io : State_io.t
     ; miner_broadcast_writer : 'a State_with_witness.t Linear_pipe.Writer.t
     ; ledger_fetcher : Ledger_fetcher.t
     ; ledger_fetcher_transitions : (Ledger.t Hash.t * 'a Transaction.t list) Linear_pipe.Writer.t
@@ -149,17 +149,13 @@ module Make
     let (miner_transitions_protocol, miner_transitions_ledger_fetcher) =
       Linear_pipe.fork2 (Miner.transitions t.miner)
     in
-    let (miner_states_protocol, miner_states_ledger_fetcher) =
-      Linear_pipe.fork2 (Miner_io.new_states t.miner_remote)
-    in
-
     let protocol_events =
       Linear_pipe.merge_unordered
         [ Linear_pipe.map
             miner_transitions_protocol
             ~f:(fun transition -> `Local transition)
         ; Linear_pipe.filter_map
-            miner_states_protocol
+            (State_io.new_states t.state_io)
             ~f:(fun {state ; transactions} ->
               let open Option.Let_syntax in
               let%map valid_transactions = Option.all (List.map ~f:Transaction.check transactions) in
