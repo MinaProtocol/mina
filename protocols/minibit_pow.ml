@@ -18,22 +18,14 @@ module type Ledger_intf = sig
   type t
 end
 
-module type Body_intf  = sig
-  type ledger
-  type transaction
-  type 'a hash
-  type t =
-    { ledger_hash : ledger hash
-    ; transactions : transaction list
-    }
-end
-
 module type Nonce_intf = sig
   type t
 end
 
 module type Transaction_intf = sig
-  type t
+  type _ t
+
+  val check : _ t -> [> `Valid_signature ] t option
 end
 
 module type Strength_intf = sig
@@ -49,50 +41,38 @@ module type Difficulty_intf = sig
   val next : t -> last:Time.t -> this:Time.t -> t
 end
 
-module type Header_intf  = sig
+module type State_intf  = sig
   type 'a hash
-  type nonce
-  type strength
+  type transition
   type difficulty
-  type body
+  type strength
+  type ledger
+
   type t =
-    { prev_timestamp : Time.t
-    ; timestamp : Time.t
-    ; length : int
-    ; strength : strength
-    ; difficulty : difficulty
-    ; nonce : nonce
-    ; prev_header_hash : t hash
-    ; body_hash : body hash
+    { next_difficulty      : difficulty
+    ; last_transition_hash : transition hash
+    ; previous_state_hash  : t hash
+    ; ledger_hash          : ledger hash
+    ; strength             : strength
+    ; timestamp            : Time.t
     }
   [@@deriving fields]
 end
 
-module type Chain_state_intf  = sig
-  type 'a hash
-  type body
-  type header
-  type t =
-    { body : body
-    ; header : header
-    ; header_hash : header hash
-    }
-  [@@deriving fields]
-end
-
-module type Chain_transition_intf  = sig
+module type Transition_intf  = sig
   type 'a hash
   type ledger
   type proof
   type nonce
-  type transaction
+  type state
+
   type t =
-    { new_ledger_hash : ledger hash
-    ; transactions : transaction list
+    { ledger_hash : ledger hash
     ; ledger_proof : proof
-    ; new_timestamp : Time.t
+    ; timestamp : Time.t
     ; nonce : nonce
     }
+  [@@deriving fields]
 end
 
 module type Machine_intf = sig
@@ -120,24 +100,28 @@ module type Block_state_transition_proof_intf = sig
   type witness =
     { old_state : state
     ; old_proof : proof
-    ; new_state : state
     ; transition : transition
     }
   (* SNARK "zk_state_valid" proving that, for new_state:
-    - all old values came from a chain_state with valid proof
-    - transition.ledger_proof proves a valid sequence of transactions moved the ledger from state.body.ledger_hash to new_ledger_hash 
-    - prev_timestamp is the old state.header.timestamp
-    - timestamp is a newer timestamp than the prev timestamp
-    - length is one greater than the old length
-    - a "current difficulty" is computed correctly from (most_recent_difficulty, timestamp, new_timestamp)
-    - the most recent strength is computed correctly from the most_recent_strength and the "current difficulty"
-    - most_recent_difficulty is current difficulty
-    - body hash is a hash of the new body
-    - prev_header_hash is the old state.header_hash
-    - header_hash is a hash of the new header
-    - header_hash meets current difficulty
+    - old_proof verifies old_state (Induction hypothesis)
+    - transition.ledger_proof verifies a valid sequence of transactions moved the ledger from old_state.ledger_hash to new_state.ledger_hash
+    - new_state.timestamp is newer than old_state.timestamp
+    - the "next difficulty" is computed correctly from (old_state.next_difficulty, old_state.timestamp, new_state.timetamp)
+    - the strength is computed correctly from the old_state.next_difficulty and the old_state.strength
+    - new_state.next_difficulty is "next difficulty"
+    - new_state.last_transition_hash is a hash of transition
+    - new_state.previous_state_hash is a hash of old_state
+    - hash(new_state) meets new_state.difficulty
     *)
-  val prove_zk_state_valid : witness -> proof Deferred.t
+  val prove_zk_state_valid : witness -> new_state:state -> proof Deferred.t
+end
+
+module Proof_carrying_data = struct
+  type ('a, 'b) t =
+    { data : 'a
+    ; proof : 'b
+    }
+  [@@deriving fields]
 end
 
 module type Inputs_intf = sig
@@ -150,32 +134,36 @@ module type Inputs_intf = sig
   module Ledger : Ledger_intf
   module Ledger_proof : Proof_intf with type input = Ledger.t Hash.t
 
+  module Transition : Transition_intf with type 'a hash := 'a Hash.t
+                                       and type ledger := Ledger.t
+                                       and type proof := Ledger_proof.t
+                                       and type nonce := Nonce.t
   module State : sig
-    module Body : Body_intf with type ledger := Ledger.t
-                             and type transaction := Transaction.t
-                             and type 'a hash := 'a Hash.t
-    module Header : Header_intf with type 'a hash := 'a Hash.t
-                                 and type nonce := Nonce.t
-                                 and type strength := Strength.t
-                                 and type difficulty := Difficulty.t
-                                 and type body := Body.t
-
-    include Chain_state_intf with type 'a hash := 'a Hash.t
-                              and type body := Body.t
-                              and type header := Header.t
+    include State_intf with type 'a hash := 'a Hash.t
+                        and type difficulty := Difficulty.t
+                        and type strength := Strength.t
+                        and type transition := Transition.t
+                        and type ledger := Ledger.t
 
     module Proof : Proof_intf with type input = t
   end
-
-  module Transition : Chain_transition_intf with type 'a hash := 'a Hash.t
-                                       and type ledger := Ledger.t
-                                       and type proof := Ledger_proof.t
-                                       and type transaction := Transaction.t
-                                       and type nonce := Nonce.t
 end
 
 module Make
   (Inputs : Inputs_intf)
+  (* SNARK "zk_state_valid" proving that, for new_state:
+    - old_proof verifies old_state (Induction hypothesis)
+    - transition.ledger_proof verifies a valid sequence of transactions moved the ledger from old_state.ledger_hash to new_state.ledger_hash
+    - new_state.timestamp is transition.timestamp
+    - new_state.ledger_hash is transition.ledger_hash
+    - new_state.timestamp is newer than old_state.timestamp
+    - the "next difficulty" is computed correctly from (old_state.next_difficulty, old_state.timestamp, new_state.timestamp)
+    - the strength is computed correctly from the old_state.next_difficulty and the old_state.strength
+    - new_state.next_difficulty is "next difficulty"
+    - new_state.last_transition_hash is a hash of transition
+    - new_state.previous_state_hash is a hash of old_state
+    - hash(new_state) meets old_state.next_difficulty
+    *)
   (* TODO: Lift this out of the functor and inline it *)
   (Block_state_transition_proof : Block_state_transition_proof_intf with type state := Inputs.State.t
                                                                      and type proof := Inputs.State.Proof.t
@@ -183,72 +171,62 @@ module Make
   = struct
     open Inputs
 
+    type proof_carrying_data = (State.t, State.Proof.t) Proof_carrying_data.t
+
     type event =
       | Found of Transition.t
-      | New_state of State.t * State.Proof.t
+      | New_state of proof_carrying_data
+
     type t =
-      { state : State.t * State.Proof.t
-      }
+      { state : proof_carrying_data }
     [@@deriving fields]
 
     let step' t (transition : Transition.t) : t Deferred.t =
-      let header =
-        t.state |> fst |> State.header
-      in
-      let new_difficulty =
+      let state = t.state.data in
+      let proof = t.state.proof in
+
+      let next_difficulty =
         Difficulty.next
-          header.difficulty
-          ~last:header.timestamp
-          ~this:transition.new_timestamp
-      in
-      let new_body : State.Body.t =
-        { ledger_hash = transition.new_ledger_hash
-        ; transactions = transition.transactions
-        }
-      in
-      let new_header : State.Header.t =
-        { prev_timestamp = header.timestamp
-        ; timestamp = transition.new_timestamp
-        ; length = header.length + 1
-        ; strength = Strength.increase header.strength ~by:new_difficulty
-        ; difficulty = new_difficulty
-        ; nonce = transition.nonce
-        ; prev_header_hash = t.state |> fst |> State.header_hash
-        ; body_hash = Hash.hash new_body
-        }
+          state.next_difficulty
+          ~last:state.timestamp
+          ~this:transition.timestamp
       in
       let new_state : State.t =
-        { body = new_body
-        ; header = new_header
-        ; header_hash = Hash.hash new_header
+        { next_difficulty
+        ; last_transition_hash = Hash.hash transition
+        ; previous_state_hash  = Hash.hash state
+        ; ledger_hash          = transition.ledger_hash
+        ; strength             = Strength.increase state.strength ~by:state.next_difficulty
+        ; timestamp            = transition.timestamp
         }
       in
+
       let%map proof = Block_state_transition_proof.prove_zk_state_valid
-        { old_state = t.state |> fst
-        ; old_proof = t.state |> snd
-        ; new_state
+        { old_state = state
+        ; old_proof = proof
         ; transition
         }
+        ~new_state
       in
-      { state = (new_state, proof) }
+      { state = { data = new_state ; proof} }
 
     let create ~initial : t =
       { state = initial
       }
 
-    let check_state (old_state, old_proof) (new_state, new_proof) =
-      let new_strength = new_state.State.header.strength in
-      let old_strength = old_state.State.header.strength in
+    let check_state (old_pcd : proof_carrying_data) (new_pcd : proof_carrying_data)  =
+      let new_strength = new_pcd.data.strength in
+      let old_strength = old_pcd.data.strength in
       if Strength.(new_strength > old_strength) then
-        State.Proof.verify new_proof new_state
+        State.Proof.verify new_pcd.proof new_pcd.data
       else
         return false
 
     let step (t : t) = function
       | Found transition ->
           step' t transition
-      | New_state (state, proof) ->
-          match%map check_state t.state (state, proof) with
-          | true -> { state = (state, proof) }
+      | New_state pcd ->
+          match%map check_state t.state pcd with
+          | true -> { state = pcd }
           | false -> t
   end
