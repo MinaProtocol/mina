@@ -8,6 +8,7 @@
       core
       client_lib
       linear_pipe
+      gossip_net
       kademlia
       nanobit_base
       blockchain_snark
