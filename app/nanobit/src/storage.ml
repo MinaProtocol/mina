@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Nanobit_base
+open Blockchain_snark
 
 module type S = sig
   type location

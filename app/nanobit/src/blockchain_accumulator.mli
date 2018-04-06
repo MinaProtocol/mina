@@ -1,4 +1,5 @@
 open Nanobit_base
+open Blockchain_snark
 
 module Update : sig
   type t =

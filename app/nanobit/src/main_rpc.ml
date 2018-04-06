@@ -2,6 +2,7 @@ open Core
 open Async
 open Kademlia
 open Nanobit_base
+open Blockchain_snark
 
 module Rpcs = struct
   module Ping = struct

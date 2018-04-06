@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Nanobit_base
 open Snark_params
+open Blockchain_snark
 
 module Update = struct
   type t =
