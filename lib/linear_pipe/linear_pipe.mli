@@ -47,6 +47,7 @@ val iter_unordered
 val length : 'a Reader.t -> int
                                     
 val fold : 'a Reader.t -> init:'accum -> f:('accum -> 'a -> 'accum Deferred.t) -> 'accum Deferred.t
+val scan : 'a Reader.t -> init:'accum -> f:('accum -> 'a -> 'accum Deferred.t) -> 'accum Reader.t
 
 val of_list : 'a List.t -> 'a Reader.t
 
@@ -55,6 +56,7 @@ val map : 'a Reader.t -> f:('a -> 'b) -> 'b Reader.t
 val filter_map : 'a Reader.t -> f:('a -> 'b option) -> 'b Reader.t
 
 val transfer : 'a Reader.t -> 'b Writer.t -> f:('a -> 'b ) -> unit Deferred.t
+val transfer_id : 'a Reader.t -> 'a Writer.t -> unit Deferred.t
 
 val merge_unordered : 'a Reader.t List.t -> 'a Reader.t
 
