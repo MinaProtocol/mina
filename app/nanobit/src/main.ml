@@ -2,6 +2,7 @@ open Core
 open Async
 open Kademlia
 open Nanobit_base
+open Blockchain_snark
 
 module Snark = Snark
 module Digest = Snark_params.Tick.Pedersen.Digest
@@ -159,7 +160,7 @@ struct
         log_strongest_block_reader 
         ~f:(fun blockchain ->
           let state = blockchain.Blockchain.state in
-          let number = state.Blockchain_state.number in
+          let ledger_hash = state.Blockchain_state.ledger_hash in
           let time = state.Blockchain_state.previous_time in
           let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.target) in
           let strength = Bignum.Bigint.((Nanobit_base.Target.to_bigint Nanobit_base.Target.max) / target) in
@@ -171,7 +172,7 @@ struct
               let b = Block_time.to_time previous_time in
               Time.Span.to_string (Time.diff a b)
           in
-          Logger.info log ~attrs:[ ("number", [%sexp_of: Int64.t] number )
+          Logger.info log ~attrs:[ ("ledger_hash", [%sexp_of: Ledger_hash.t] ledger_hash )
                                  ; ("strength", [%sexp_of: Bignum.Bigint.t] strength)
                                  ; ("mining time", [%sexp_of: String.t] diff) ]
             "new strongest blockchain";
@@ -184,7 +185,7 @@ struct
         ~f:(fun u ->
           begin match u with
           | Miner.Update.Change_body body -> 
-            Logger.debug log "new block body %s" (Int64.to_string body) 
+            Logger.debug log !"new block body %{sexp:Block.With_transactions.Body.t}" body
           | Change_previous prev ->
             Logger.debug log !"new previous chain %{sexp:Blockchain_state.t}"
               prev.state
@@ -281,7 +282,7 @@ struct
       Miner_impl.mine ~prover
         ~initial:initial_blockchain
         ~parent_log
-        ~body:(Int64.succ initial_blockchain.state.number)
+        ~body:Block.With_transactions.Body.dummy
         (Linear_pipe.merge_unordered
            [ Linear_pipe.map pipes.body_changes_strongest_block_reader ~f:(fun b -> Miner.Update.Change_previous b)
           ; pipes.body_changes_reader
@@ -336,7 +337,7 @@ struct
       Linear_pipe.transfer
         pipes.gossip_net_strongest_block_propagator
         pipes.body_changes_writer
-        ~f:(fun b -> Miner.Update.Change_body (Int64.succ b.state.number))
+        ~f:(fun b -> Miner.Update.Change_body Block.With_transactions.Body.dummy)
     end;
 
     (* Store and accumulate updates *)

@@ -1,9 +1,8 @@
 open Core
 open Async
 open Nanobit_base
+open Blockchain_snark
 open Cli_common
-
-module State = Blockchain_state
 
 type t =
   { host_and_port : Host_and_port.t
@@ -116,9 +115,21 @@ module Main (Params : Params_intf) = struct
 
   module Digest = Tick.Pedersen.Digest
 
-  module Transition = Nanobit_base.Blockchain_transition
+  module Transition = Blockchain_transition
 
   module Keys = Transition_keys.Make(struct end)
+
+  module Transaction_snark = Transaction_snark.Make(struct let keys = Keys.transaction_snark_keys end)
+
+  module State = struct
+    include (Blockchain_state : module type of Blockchain_state with module Checked := Blockchain_state.Checked)
+    module U = Blockchain_state.Make_update(Transaction_snark)
+    include (U : module type of U with module Checked := U.Checked)
+    module Checked = struct
+      include Blockchain_state.Checked
+      include U.Checked
+    end
+  end
 
   module Transition_utils = struct
     open Keys
@@ -128,16 +139,16 @@ module Main (Params : Params_intf) = struct
         Step.Verifier.Verification_key.to_bool_list Wrap.verification_key
       in
       fun state ->
-        let open Tick.Pedersen in
-        let s = State.create params in
-        let s = State.update_fold s (List.fold self) in
+        let open Tick.Pedersen.State in
+        let s = create Tick.Pedersen.params in
+        let s = update_fold s (List.fold self) in
         let s =
-          State.update_fold s
+          update_fold s
             (List.fold
               (Digest.Bits.to_bits
                  (Blockchain_state.hash state)))
         in
-        State.digest s
+        digest s
 
     let embed (x : Tick.Field.t) : Tock.Field.t =
       let n = Tick.Bigint.of_field x in
@@ -219,7 +230,7 @@ module Main (Params : Params_intf) = struct
       else Transition_utils.step ~prev_proof ~prev_state block
     in
     { Blockchain.proof
-    ; state = Blockchain.State.update_exn prev_state block 
+    ; state = State.update_exn prev_state block 
     ; most_recent_block = block
     }
   ;;

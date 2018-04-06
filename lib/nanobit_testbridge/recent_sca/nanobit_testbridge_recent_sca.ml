@@ -1,6 +1,7 @@
 open Core
 open Async
 open Nanobit_base
+open Blockchain_snark
 
 module Digest = Snark_params.Tick.Pedersen.Digest
 
@@ -296,7 +297,7 @@ let main nanobits =
     printf "got blockchain idx:%d %s %s %s\n"
       i
       (Sexp.to_string_hum ([%sexp_of: Host_and_port.t] nanobit.Nanobit_testbridge.Nanobit.membership_addr))
-      (Sexp.to_string_hum ([%sexp_of: Int64.t] blockchain.most_recent_block.body))
+      (Sexp.to_string_hum ([%sexp_of: Block.Body.t] blockchain.most_recent_block.body))
       (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: Digest.t] blockchain.state.block_hash))));
     let lb = List.nth_exn states i in
     Linked_blockchain.add lb blockchain;
