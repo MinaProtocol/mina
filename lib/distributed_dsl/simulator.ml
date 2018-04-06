@@ -479,8 +479,8 @@ let%test_module "Basic machine test" = (module struct
         let open Machine.MyNode in
         [ ], (* no message handlers *)
         [ on Init (function
-          | Start -> true
-          | _ -> false
+          | Start -> Some Start
+          | _ -> None
           )
           ~f:(fun t state ->
             timeout' t Spawn_msg (Time.Span.of_sec 10.) ~f:(fun t state ->
@@ -496,46 +496,46 @@ let%test_module "Basic machine test" = (module struct
       let specRest =
         let open Machine.MyNode in
         [ msg Send_msg
-          (Fn.const (Fn.const true))
-          ~f:(fun t (Msg i) -> function
-            | Wait_msg -> return (Got_msg i)
-            | m -> return m
+          (fun (m, s) -> Some (m, s))
+          ~f:(fun t -> function
+            | (Msg i), Wait_msg -> return (Got_msg i)
+            | _, m -> return m
           )
         ],
         [ on Init (function
-          | Start -> true
-          | _ -> false
+          | Start -> Some Start
+          | _ -> None
           )
           ~f:(fun _ _ ->
             return Wait_msg
           )
         ; on Wait_timeout (function
-          | Wait_msg -> true
-          | _ -> false
+          | Wait_msg -> Some ()
+          | _ -> None
           )
-          ~f:(fun t state ->
+          ~f:(fun t () ->
             timeout' t Timeout_message (Time.Span.of_sec 20.) ~f:(fun t -> function
               | Got_msg _ as m -> return m
               | _ -> return Timeout
             );
-            return state
+            return Wait_msg
           )
         ; on Failure_case (function
-          | Timeout -> true
-          | Got_msg i when i <= 5 -> true
-          | _ -> false
+          | Timeout -> Some ()
+          | Got_msg i when i <= 5 -> Some ()
+          | _ -> None
           )
-          ~f:(fun _ _ ->
+          ~f:(fun _ () ->
             failwith "All nodes should have received a message containing a number more than five"
           )
         ; on Bigger_than_five (function
-          | Got_msg i -> i > 5
-          | _ -> false
+          | Got_msg i when i > 5 -> Some (Got_msg i)
+          | _ -> None
           )
-          ~f:(fun t state ->
+          ~f:(fun t m ->
             cancel t Timeout_message;
             Ivar.fill_if_empty finish_ivar `Success;
-            return state
+            return m
           )
         ]
       in

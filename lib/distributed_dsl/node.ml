@@ -34,25 +34,22 @@ module type S = sig
   module Timer : Timer_intf
   module Identifier : Hashable.S with type t := peer
 
-  type 'a condition = state -> 'a option
-
-  type 'a message_condition = message -> 'a condition
+  type ('input, 'a) condition = 'input -> 'a option
 
   type 'a transition = t -> 'a -> state Deferred.t
+  and handle_command
+  and message_command
   and t
-
-  type handle_command
-  type message_command
 
   val on
     : Condition_label.t
-    -> 'a condition
+    -> (state, 'a) condition
     -> f:'a transition
     -> handle_command
 
   val msg
     : Message_label.t
-    -> 'a message_condition
+    -> (message * state, 'a) condition
     -> f:'a transition
     -> message_command
 
@@ -251,16 +248,16 @@ module Make
     let make_node ~transport ~parent_log ~me ~messages ?parent ~initial_state ~timer message_conditions handle_conditions =
       let logger = Logger.child parent_log (Printf.sprintf !"dsl_node:%{sexp:Peer.t}" me) in
       let conditions = Condition_label.Table.create () in
-      List.iter handle_conditions ~f:(fun (l, c, h) ->
-        match Condition_label.Table.add conditions ~key:l ~data:(H (l,c,h)) with
+      List.iter handle_conditions ~f:(fun (H (l, c, h) as cmd) ->
+        match Condition_label.Table.add conditions ~key:l ~data:cmd with
         | `Duplicate ->
             failwithf "You specified the same condition twice! %s"
               (Condition_label.sexp_of_label l |> Sexp.to_string_hum) ()
         | `Ok -> ()
       );
       let message_handlers = Message_label.Table.create () in
-      List.iter message_conditions ~f:(fun (l, c, h) ->
-        match Message_label.Table.add message_handlers ~key:l ~data:(M (l,c,h)) with
+      List.iter message_conditions ~f:(fun (M (l, c, h) as cmd) ->
+        match Message_label.Table.add message_handlers ~key:l ~data:cmd with
         | `Duplicate ->
             failwithf "You specified the same message handler twice! %s"
               (Message_label.sexp_of_label l |> Sexp.to_string_hum) ()
@@ -321,20 +318,21 @@ module Make
       | false, None, Some msg ->
           let _ = Linear_pipe.read_now t.message_pipe in
           let checks = Message_label.Table.to_alist t.message_handlers in
-          (match checks with
-          | [] ->
-              return (with_new_state t (t.state))
-          | (label,M (_, cond,transition))::[] ->
-              (match cond msg t.state with
-              | None ->
-                return (with_new_state t (t.state))
-              | Some a ->
+          let possibly_transition =
+            Deferred.List.fold checks ~init:`Not_done ~f:(fun acc (label,M (_, cond,transition)) ->
+              match acc, cond (msg, t.state) with
+              | _, None -> return acc
+              | `Not_done, Some a ->
                 let%map t' = (transition t a) >>| (with_new_state t) in
                 Logger.debug t.logger !"Making transition from %{sexp:State.t} to %{sexp:State.t} at %{sexp:Peer.t} label: %{sexp:Message_label.label}\n%!" t.state t'.state t.ident label;
-                t')
-          | _::_::xs as l ->
-            failwithf "Multiple conditions matched current state: %s"
-              (List.map l ~f:(fun (label, _) -> label) |> List.sexp_of_t Message_label.sexp_of_label |> Sexp.to_string_hum) ())
+                `Done (label, t')
+              | `Done (label', _), Some _ ->
+                  failwithf !"Multiple conditions matched current state (see: %{sexp:Message_label.label} and %{sexp:Message_label.label})" label label' ()
+            )
+          in
+          (match%map possibly_transition with
+          | `Not_done -> with_new_state t t.state
+          | `Done (_, t')  -> t')
       | false, None, None ->
           return (with_new_state t (t.state))
 
