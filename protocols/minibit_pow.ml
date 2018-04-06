@@ -50,7 +50,6 @@ module type State_intf  = sig
 
   type t =
     { next_difficulty      : difficulty
-    ; last_transition_hash : transition hash
     ; previous_state_hash  : t hash
     ; ledger_hash          : ledger hash
     ; strength             : strength
@@ -64,7 +63,6 @@ module type Transition_intf  = sig
   type ledger
   type proof
   type nonce
-  type state
 
   type t =
     { ledger_hash : ledger hash
@@ -83,16 +81,17 @@ module type Machine_intf = sig
   type t
   type state
   type transition
-  type event =
-    | Found of transition
-    | New_state of state
-
+  module Event : sig
+    type t =
+      | Found of transition
+      | New_state of state
+  end
   val current_state : t -> state
 
   val create : initial:state -> t
   val step : t -> transition -> t
   val drive : t ->
-    scan:(init:t -> f:(t -> event -> t Deferred.t) -> t Linear_pipe.Reader.t) ->
+    scan:(init:t -> f:(t -> Event.t -> t Deferred.t) -> t Linear_pipe.Reader.t) ->
     t Linear_pipe.Reader.t
 end
 
@@ -101,13 +100,15 @@ module type Block_state_transition_proof_intf = sig
   type proof
   type transition
 
-  type witness =
-    { old_state : state
-    ; old_proof : proof
-    ; transition : transition
-    }
+  module Witness : sig
+    type t =
+      { old_state : state
+      ; old_proof : proof
+      ; transition : transition
+      }
+  end
 
-  val prove_zk_state_valid : witness -> new_state:state -> proof Deferred.t
+  val prove_zk_state_valid : Witness.t -> new_state:state -> proof Deferred.t
 end
 
 module Proof_carrying_data = struct
@@ -155,9 +156,9 @@ module Make
     - the "next difficulty" is computed correctly from (old_state.next_difficulty, old_state.timestamp, new_state.timestamp)
     - the strength is computed correctly from the old_state.next_difficulty and the old_state.strength
     - new_state.next_difficulty is "next difficulty"
-    - new_state.last_transition_hash is a hash of transition
     - new_state.previous_state_hash is a hash of old_state
-    - hash(new_state) meets old_state.next_difficulty
+    - hash(new_state||transition.ledger_hash||transition.nonce) meets old_state.next_difficulty
+    as) meets old_state.next_difficulty
     *)
   (* TODO: Lift this out of the functor and inline it *)
   (Block_state_transition_proof : Block_state_transition_proof_intf with type state := Inputs.State.t
@@ -166,14 +167,18 @@ module Make
   = struct
     open Inputs
 
-    type proof_carrying_data = (State.t, State.Proof.t) Proof_carrying_data.t
+    module Proof_carrying_state = struct
+      type t = (State.t, State.Proof.t) Proof_carrying_data.t
+    end
 
-    type event =
-      | Found of Transition.t
-      | New_state of proof_carrying_data
+    module Event = struct
+      type event =
+        | Found of Transition.t
+        | New_state of Proof_carrying_state.t
+    end
 
     type t =
-      { state : proof_carrying_data }
+      { state : Proof_carrying_state.t }
     [@@deriving fields]
 
     let step' t (transition : Transition.t) : t Deferred.t =
@@ -188,7 +193,6 @@ module Make
       in
       let new_state : State.t =
         { next_difficulty
-        ; last_transition_hash = Hash.hash transition
         ; previous_state_hash  = Hash.hash state
         ; ledger_hash          = transition.ledger_hash
         ; strength             = Strength.increase state.strength ~by:state.next_difficulty
@@ -209,7 +213,7 @@ module Make
       { state = initial
       }
 
-    let check_state (old_pcd : proof_carrying_data) (new_pcd : proof_carrying_data)  =
+    let check_state (old_pcd : Proof_carrying_state.t) (new_pcd : Proof_carrying_state.t)  =
       let new_strength = new_pcd.data.strength in
       let old_strength = old_pcd.data.strength in
       if Strength.(new_strength > old_strength) &&
@@ -219,9 +223,9 @@ module Make
         return false
 
     let step (t : t) = function
-      | Found transition ->
+      | Event.Found transition ->
           step' t transition
-      | New_state pcd ->
+      | Event.New_state pcd ->
           match%map check_state t.state pcd with
           | true -> { state = pcd }
           | false -> t

@@ -166,10 +166,10 @@ module Make
       Linear_pipe.fork2 begin
         Linear_pipe.scan protocol_events ~init:(p, []) ~f:(fun (p, _) -> function
           | `Local transition ->
-              let%map p' = Protocol.step p (Protocol.Found (Transition_with_witness.forget_witness transition)) in
+              let%map p' = Protocol.step p (Protocol.Event.Found (Transition_with_witness.forget_witness transition)) in
               (p', transition.transactions)
           | `Remote pcd ->
-              let%map p' = Protocol.step p (Protocol.New_state (State_with_witness.forget_witness pcd)) in
+              let%map p' = Protocol.step p (Protocol.Event.New_state (State_with_witness.forget_witness pcd)) in
               (p', pcd.transactions)
         )
         |> Linear_pipe.map
