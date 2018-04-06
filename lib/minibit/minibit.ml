@@ -46,7 +46,7 @@ end
 module type Miner_intf = sig
   type t
   type 'a hash
-  type 'a transition_with_witness
+  type _ transition_with_witness
   type state
   type transaction_pool
 
