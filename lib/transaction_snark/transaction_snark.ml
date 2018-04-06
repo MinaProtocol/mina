@@ -173,7 +173,6 @@ module Base = struct
         respond (Provide (Ledger.index_of_key_exn ledger pk))
       | _ -> unhandled
 
-
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
   let top_hash s1 s2 =

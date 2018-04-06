@@ -36,10 +36,12 @@ module Tock = struct
 
     (* TODO: Do at compile time *)
     let dummy =
-      let exposing = Data_spec.([ Typ.field ]) in
-      let main x = assert_equal x x in
-      let keypair = generate_keypair main ~exposing in
-      prove (Keypair.pk keypair) exposing () main Field.one
+      lazy begin
+        let exposing = Data_spec.([ Typ.field ]) in
+        let main x = assert_equal x x in
+        let keypair = generate_keypair main ~exposing in
+        prove (Keypair.pk keypair) exposing () main Field.one
+      end
   end
 end
 
@@ -154,6 +156,18 @@ module Tick = struct
       State.update_bigstring s x
       |> State.digest
     ;;
+
+    let%test_unit "hash_observationally_injective" =
+      let gen =
+        let open Quickcheck.Generator in
+        let open Let_syntax in
+        let%bind length = small_positive_int in
+        let bits = list_with_length length Bool.gen in
+        filter (both bits bits) ~f:(fun (x, y) -> x <> y)
+      in
+      let h bs = hash_fold params (List.fold bs) in
+      Quickcheck.test gen ~f:(fun (x, y) ->
+        assert (not (Digest.(=) (h x) (h y))))
 
     let zero_hash = hash_bigstring (Bigstring.create 0)
   end
