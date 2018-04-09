@@ -9,6 +9,7 @@
       client_lib
       linear_pipe
       kademlia
+      minibit
       nanobit_base
       blockchain_snark
       transaction_snark
