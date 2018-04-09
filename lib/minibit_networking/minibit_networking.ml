@@ -3,13 +3,17 @@ open Core_kernel
 open Async
 open Kademlia
 
-module Rpcs (Ledger : Protocols.Minibit_pow.Ledger_intf) (Hash : Protocols.Minibit_pow.Hash_intf) = struct
+module Rpcs
+  (Ledger : Protocols.Minibit_pow.Ledger_intf)
+  (Hash : Protocols.Minibit_pow.Hash_intf)
+  (State : Protocols.Minibit_pow.State_intf)
+= struct
   module Get_ledger_at_hash = struct
     module T = struct
       let name = "get_ledger_at_hash"
       module T = struct
         type query = Ledger.t Hash.t
-        type response = Ledger.t option
+        type response = (Ledger.t * State.t) option
       end
       module Caller = T
       module Callee = T
@@ -20,7 +24,7 @@ module Rpcs (Ledger : Protocols.Minibit_pow.Ledger_intf) (Hash : Protocols.Minib
     module V1 = struct
       module T = struct
         type query = Ledger.t Hash.t [@@deriving bin_io]
-        type response = Ledger.t option [@@deriving bin_io]
+        type response = (Ledger.t * State.t) option [@@deriving bin_io]
         let version = 1
         let query_of_caller_model = Fn.id
         let callee_model_of_query = Fn.id
@@ -91,6 +95,7 @@ module Make
   (State_with_witness : Minibit.State_with_witness_intf)
   (Hash : Protocols.Minibit_pow.Hash_intf)
   (Ledger : Protocols.Minibit_pow.Ledger_intf)
+  (State : Protocols.Minibit_pow.State_intf)
 = struct
 
   module Message = Message (State_with_witness)
@@ -106,7 +111,7 @@ module Make
       }
   end
 
-  module Rpcs = Rpcs (Ledger) (Hash)
+  module Rpcs = Rpcs(Ledger)(Hash)(State)
 
   module Membership = Membership.Haskell
 
@@ -154,7 +159,7 @@ module Make
   let create 
         (config : Config.t)
         check_ledger_at_hash 
-        get_ledger_at_hash 
+        (get_ledger_at_hash : Ledger.t Hash.t -> (Ledger.t * State.t) option Deferred.t)
     = 
     let log = Logger.child config.parent_log "minibit networking" in
     let check_ledger_at_hash_rpc () ~version hash = check_ledger_at_hash hash in
@@ -207,11 +212,10 @@ module Make
   end
 
   module Ledger_fetcher_io = struct
-    type net = t
-    type t
+    type nonrec t = t
 
-    let get_ledger_at_hash net t hash = 
-      let peers = Gossip_net.random_peers net.gossip_net 8 in
+    let get_ledger_at_hash t hash = 
+      let peers = Gossip_net.random_peers t.gossip_net 8 in
       let par_find_map xs ~f =
         Deferred.create
           (fun ivar -> 
@@ -236,7 +240,7 @@ module Make
           ~f:(fun peer -> 
             match%map
               Gossip_net.query_peer 
-                net.gossip_net 
+                t.gossip_net 
                 peer 
                 Rpcs.Check_ledger_at_hash.dispatch_multi 
                 hash 
@@ -248,15 +252,15 @@ module Make
       match ledger_peer with
       | None -> Deferred.Or_error.error_string "no ledger peer found"
       | Some ledger_peer -> 
-        let%bind ledger =
+        let%bind ledger_and_state =
           Gossip_net.query_peer
-            net.gossip_net
+            t.gossip_net
             ledger_peer
             Rpcs.Get_ledger_at_hash.dispatch_multi
             hash
         in
-        match ledger with
-        | Ok (Some ledger) -> Deferred.Or_error.return ledger
+        match ledger_and_state with
+        | Ok (Some ledger_and_state) -> Deferred.Or_error.return ledger_and_state
         | Ok None -> Deferred.Or_error.error_string "no ledger found"
         | Error s -> Deferred.Or_error.error_string (Error.to_string_mach s)
   end

@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name ledger_fetcher)
+  (public_name ledger_fetcher)
+  (library_flags (-linkall))
+  (libraries (core logger protocols minibit async async_extra ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib nanobit_base))))
+  (synopsis "Ledger fetcher fetches ledgers over the network")))
+

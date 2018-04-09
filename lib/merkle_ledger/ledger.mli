@@ -2,7 +2,7 @@ open Core
 
 module type S =
   functor (Hash : sig 
-       type hash [@@deriving sexp, bin_io]
+       type hash [@@deriving sexp, hash, compare, bin_io]
        type account [@@deriving sexp, bin_io]
        val hash_account : account -> hash 
        val empty_hash : hash
@@ -17,7 +17,9 @@ module type S =
   type index = int
 
   type t
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp, hash, compare, bin_io]
+
+  val copy : t -> t
 
   module Path : sig
     type elem =
@@ -53,6 +55,10 @@ module type S =
   val merkle_root
     : t
     -> Hash.hash
+
+  val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
+  val hash_fold_t : Ppx_hash_lib.Std.Hash.state -> t -> Ppx_hash_lib.Std.Hash.state
+  val compare : t -> t -> int
 
   val merkle_path
     : t

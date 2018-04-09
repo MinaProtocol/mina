@@ -5,7 +5,7 @@ open Currency
 include Merkle_ledger.Ledger.Make
     (struct
       type account = Account.t [@@deriving sexp, bin_io]
-      type hash = Tick.Pedersen.Digest.t [@@deriving sexp, bin_io]
+      type hash = Tick.Pedersen.Digest.t [@@deriving sexp, hash, compare, bin_io]
 
       let empty_hash =
         Tick.Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
