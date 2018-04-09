@@ -1,8 +1,12 @@
 open Core_kernel
 open Async_kernel
 
+module type Time_intf = sig
+  type t
+end
+
 module type Hash_intf = sig
-  type 'a t [@@deriving compare, hash, sexp]
+  type 'a t [@@deriving sexp]
 
   val hash : 'a -> 'a t
 end
@@ -37,8 +41,9 @@ end
 
 module type Difficulty_intf = sig
   type t
+  type time
 
-  val next : t -> last:Time.t -> this:Time.t -> t
+  val next : t -> last:time -> this:time -> t
 end
 
 module type State_intf  = sig
@@ -47,13 +52,14 @@ module type State_intf  = sig
   type difficulty
   type strength
   type ledger
+  type time
 
   type t =
     { next_difficulty      : difficulty
     ; previous_state_hash  : t hash
     ; ledger_hash          : ledger hash
     ; strength             : strength
-    ; timestamp            : Time.t
+    ; timestamp            : time
     }
   [@@deriving fields]
 end
@@ -63,18 +69,21 @@ module type Transition_intf  = sig
   type ledger
   type proof
   type nonce
+  type time
 
   type t =
     { ledger_hash : ledger hash
     ; ledger_proof : proof
-    ; timestamp : Time.t
+    ; timestamp : time
     ; nonce : nonce
     }
   [@@deriving fields]
 end
 
 module type Time_close_validator_intf = sig
-  val validate : Time.t -> bool
+  type time
+
+  val validate : time -> bool
 end
 
 module type Machine_intf = sig
@@ -120,10 +129,11 @@ module Proof_carrying_data = struct
 end
 
 module type Inputs_intf = sig
+  module Time : Time_intf
   module Hash : Hash_intf
   module Transaction : Transaction_intf
   module Nonce : Nonce_intf
-  module Difficulty : Difficulty_intf
+  module Difficulty : Difficulty_intf with type time := Time.t
   module Strength : Strength_intf with type difficulty := Difficulty.t
 
   module Ledger : Ledger_intf
@@ -133,13 +143,15 @@ module type Inputs_intf = sig
                                        and type ledger := Ledger.t
                                        and type proof := Ledger_proof.t
                                        and type nonce := Nonce.t
-  module Time_close_validator : Time_close_validator_intf
+                                       and type time := Time.t
+  module Time_close_validator : Time_close_validator_intf with type time := Time.t
   module State : sig
     include State_intf with type 'a hash := 'a Hash.t
                         and type difficulty := Difficulty.t
                         and type strength := Strength.t
                         and type transition := Transition.t
                         and type ledger := Ledger.t
+                        and type time := Time.t
 
     module Proof : Proof_intf with type input = t
   end

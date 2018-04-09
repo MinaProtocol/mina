@@ -10,6 +10,7 @@
       linear_pipe
       kademlia
       minibit
+      protocols
       nanobit_base
       blockchain_snark
       transaction_snark
