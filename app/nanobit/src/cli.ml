@@ -4,7 +4,7 @@ open Nanobit_base
 open Blockchain_snark
 open Cli_common
 
-module Inputs = struct
+module Inputs0 = struct
   module Time = Block_time
   module Hash = struct
     type 'a t = Snark_params.Tick.Pedersen.Digest.t
@@ -146,6 +146,10 @@ module Inputs = struct
     (* TODO same *)
     let add_witness transition transactions = Or_error.return {transition ; transactions}
   end
+
+end
+module Inputs = struct
+  include Inputs0
   module Net = Minibit_networking.Make(State_with_witness)(Hash)(Ledger)
   module Ledger_fetcher_io = Net.Ledger_fetcher_io
   module State_io = Net.State_io
@@ -164,17 +168,7 @@ module Inputs = struct
     let remove t valid_transactions = t
     let get t ~k  = []
   end
-  module Miner = struct
-    type t = ()
-    type change =
-      | Tip_change of State.t
-
-    let create ~change_feeder = ()
-
-    let transitions t =
-      let (r, w) = Linear_pipe.create () in
-      r
-  end
+  module Miner = Minibit_miner.Make(Inputs0)
   module Genesis = struct
     (* TODO actually do this right *)
     let state : State.t =
