@@ -14,6 +14,9 @@
 #include <libff/common/profiling.hpp>
 #include <libff/common/utils.hpp>
 
+#include <libff/algebra/curves/mnt/mnt4/mnt4_pp.hpp>
+#include <libff/algebra/curves/mnt/mnt6/mnt6_pp.hpp>
+
 #include <libsnark/common/default_types/r1cs_gg_ppzksnark_pp.hpp>
 #include <libsnark/relations/constraint_satisfaction_problems/r1cs/examples/r1cs_examples.hpp>
 #include <libsnark/zk_proof_systems/ppzksnark/r1cs_gg_ppzksnark/examples/run_r1cs_gg_ppzksnark.hpp>
@@ -36,8 +39,13 @@ void test_r1cs_gg_ppzksnark(size_t num_constraints,
 
 int main()
 {
-    default_r1cs_gg_ppzksnark_pp::init_public_params();
+    libff::mnt4_pp::init_public_params();
     libff::start_profiling();
 
-    test_r1cs_gg_ppzksnark<default_r1cs_gg_ppzksnark_pp>(1000, 100);
+    test_r1cs_gg_ppzksnark<libff::mnt4_pp>(1000, 100);
+
+    libff::mnt6_pp::init_public_params();
+    libff::start_profiling();
+
+    test_r1cs_gg_ppzksnark<libff::mnt6_pp>(1000, 100);
 }

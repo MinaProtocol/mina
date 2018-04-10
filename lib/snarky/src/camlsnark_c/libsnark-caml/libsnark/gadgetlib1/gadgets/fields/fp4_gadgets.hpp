@@ -32,6 +32,8 @@ public:
     Fp2_variable<Fp2T> c0;
     Fp2_variable<Fp2T> c1;
 
+    pb_linear_combination_array<FieldT> all_vars;
+
     Fp4_variable(protoboard<FieldT> &pb, const std::string &annotation_prefix);
     Fp4_variable(protoboard<FieldT> &pb, const Fp4T &el, const std::string &annotation_prefix);
     Fp4_variable(protoboard<FieldT> &pb, const Fp2_variable<Fp2T> &c0, const Fp2_variable<Fp2T> &c1, const std::string &annotation_prefix);
@@ -41,6 +43,9 @@ public:
 
     Fp4_variable<Fp4T> Frobenius_map(const size_t power) const;
     void evaluate() const;
+
+    static size_t __attribute__((noinline)) size_in_bits();
+    static size_t num_variables();
 };
 
 /**

@@ -20,6 +20,12 @@ template<typename Fp6T>
 Fp6_variable<Fp6T>::Fp6_variable(protoboard<FieldT> &pb, const std::string &annotation_prefix) :
     gadget<FieldT>(pb, annotation_prefix), c0(pb, FMT(annotation_prefix, " c0")), c1(pb, FMT(annotation_prefix, " c1"))
 {
+    all_vars.emplace_back(c0.c0);
+    all_vars.emplace_back(c0.c1);
+    all_vars.emplace_back(c0.c2);
+    all_vars.emplace_back(c1.c0);
+    all_vars.emplace_back(c1.c1);
+    all_vars.emplace_back(c1.c2);
 }
 
 template<typename Fp6T>
@@ -28,12 +34,24 @@ Fp6_variable<Fp6T>::Fp6_variable(protoboard<FieldT> &pb,
                                  const std::string &annotation_prefix) :
     gadget<FieldT>(pb, annotation_prefix), c0(pb, el.c0, FMT(annotation_prefix, " c0")), c1(pb, el.c1, FMT(annotation_prefix, " c1"))
 {
+    all_vars.emplace_back(c0.c0);
+    all_vars.emplace_back(c0.c1);
+    all_vars.emplace_back(c0.c2);
+    all_vars.emplace_back(c1.c0);
+    all_vars.emplace_back(c1.c1);
+    all_vars.emplace_back(c1.c2);
 }
 
 template<typename Fp6T>
 Fp6_variable<Fp6T>::Fp6_variable(protoboard<FieldT> &pb, const Fp3_variable<Fp3T> &c0, const Fp3_variable<Fp3T> &c1, const std::string &annotation_prefix) :
     gadget<FieldT>(pb, annotation_prefix), c0(c0), c1(c1)
 {
+    all_vars.emplace_back(c0.c0);
+    all_vars.emplace_back(c0.c1);
+    all_vars.emplace_back(c0.c2);
+    all_vars.emplace_back(c1.c0);
+    all_vars.emplace_back(c1.c1);
+    all_vars.emplace_back(c1.c2);
 }
 
 template<typename Fp6T>
@@ -57,6 +75,18 @@ Fp6T Fp6_variable<Fp6T>::get_element()
     el.c0 = c0.get_element();
     el.c1 = c1.get_element();
     return el;
+}
+
+template<typename Fp6T>
+size_t Fp6_variable<Fp6T>::size_in_bits()
+{
+    return 6 * FieldT::size_in_bits();
+}
+
+template<typename Fp6T>
+size_t Fp6_variable<Fp6T>::num_variables()
+{
+    return 6;
 }
 
 template<typename Fp6T>
