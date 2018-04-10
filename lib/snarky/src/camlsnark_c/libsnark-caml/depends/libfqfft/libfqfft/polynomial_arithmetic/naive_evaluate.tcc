@@ -4,7 +4,7 @@
  Implementation of interfaces for naive evaluation routines.
 
  See naive_evaluate.hpp .
- 
+
  *****************************************************************************
  * @author     This file is part of libfqfft, developed by SCIPR Lab
  *             and contributors (see AUTHORS).
@@ -25,7 +25,9 @@ FieldT evaluate_polynomial(const size_t &m, const std::vector<FieldT> &coeff, co
 
     FieldT result = FieldT::zero();
 
-    for (int i = m - 1; i >= 0; i--)
+    /* NB: unsigned reverse iteration: cannot do i >= 0, but can do i < m
+       because unsigned integers are guaranteed to wrap around */
+    for (size_t i = m - 1; i < m; i--)
     {
         result = (result * t) + coeff[i];
     }

@@ -41,7 +41,7 @@ public:
     integer_permutation slice(const size_t slice_min_element, const size_t slice_max_element) const;
 
     /* Similarly to std::next_permutation this transforms the current
-    integer permutation into the next lexicographically oredered
+    integer permutation into the next lexicographically ordered
     permutation; returns false if the last permutation was reached and
     this is now the identity permutation on [min_element .. max_element] */
     bool next_permutation();

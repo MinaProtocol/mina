@@ -7,14 +7,14 @@
  size bound, and time bound), the "RAM universal gadget" checks the correct
  execution of any RAM computation that fits the bounds.
 
- The implementaiton follows, extends, and optimizes the approach described
+ The implementation follows, extends, and optimizes the approach described
  in \[BCTV14] (itself building on \[BCGTV13]). The code is parameterized by
  the template parameter ramT, in order to support any RAM that fits certain
  abstract interfaces.
 
  Roughly, the gadget has three main components:
  - For each time step, a copy of a *execution checker* (which is the RAM CPU checker).
- - For each time step, a copy of a *memory checker* (which verifies memory consitency
+ - For each time step, a copy of a *memory checker* (which verifies memory consistency
    between two 'memory lines' that are adjacent in a memory sort).
  - A single *routing network* (specifically, an arbitrary-size Waksman network),
    which is used check that memory accesses are permutated according to some permutation.

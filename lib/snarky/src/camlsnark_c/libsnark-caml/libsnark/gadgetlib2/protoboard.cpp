@@ -43,7 +43,7 @@ FElem Protoboard::val(const LinearCombination& lc) const {
 
 void Protoboard::setValuesAsBitArray(const VariableArray& varArray, const size_t srcValue) {
     GADGETLIB_ASSERT(varArray.size() >= Log2ceil(srcValue),
-                 GADGETLIB2_FMT("Variable array of size %u to small to hold value %u. Array must be of size "
+                 GADGETLIB2_FMT("Variable array of size %u too small to hold value %u. Array must be of size "
                      "at least %u", varArray.size(), srcValue, Log2ceil(srcValue)));
     size_t i = 0;
     for(i = 0; i < Log2ceil(srcValue); ++i) {

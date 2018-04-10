@@ -34,25 +34,25 @@ void compute_subproduct_tree(const size_t &m, std::vector< std::vector < std::ve
      */
 
     /* Precompute the first row. */
-    T[0] = std::vector< std::vector<FieldT> >(pow(2, m));
-    for (int j = 0; j < pow(2, m); j++)
+    T[0] = std::vector< std::vector<FieldT> >(1u << m);
+    for (size_t j = 0; j < (1u << m); j++)
     {
         T[0][j] = std::vector<FieldT>(2, FieldT::one());
         T[0][j][0] = FieldT(-j);
     }
-    
+
     std::vector<FieldT> a;
     std::vector<FieldT> b;
 
     size_t index = 0;
-    for (int i = 1; i <= m; i++)
+    for (size_t i = 1; i <= m; i++)
     {
-        T[i] = std::vector<std::vector<FieldT> >(pow(2, m-i));
-        for (int j = 0; j < pow(2, m-i); j++)
+        T[i] = std::vector<std::vector<FieldT> >(1u << (m-i));
+        for (size_t j = 0; j < (1u << (m-i)); j++)
         {
             a = T[i-1][index];
             index++;
-            
+
             b = T[i-1][index];
             index++;
 
@@ -65,8 +65,8 @@ void compute_subproduct_tree(const size_t &m, std::vector< std::vector < std::ve
 template<typename FieldT>
 void monomial_to_newton_basis(std::vector<FieldT> &a, const std::vector<std::vector<std::vector<FieldT> > > &T, const size_t &n)
 {
-    int m = log2(n);
-    if (T.size() != m + 1) throw DomainSizeException("expected T.size() == m + 1");
+    size_t m = log2(n);
+    if (T.size() != m + 1u) throw DomainSizeException("expected T.size() == m + 1");
 
     /* MonomialToNewton */
     std::vector<FieldT> I(T[m][0]);
@@ -88,41 +88,51 @@ void monomial_to_newton_basis(std::vector<FieldT> &a, const std::vector<std::vec
 
     size_t row_length;
     size_t c_vec;
-    for (int i = m - 1; i >= 0; i--)
+    /* NB: unsigned reverse iteration: cannot do i >= 0, but can do i < m
+       because unsigned integers are guaranteed to wrap around */
+    for (size_t i = m - 1; i < m; i--)
     {
         row_length = T[i].size() - 1;
-        c_vec = pow(2, i);
+        c_vec = 1u << i;
 
-        for (int j = pow(2, m - i - 1) - 1; j >= 0; j--)
+        /* NB: unsigned reverse iteration */
+        for (size_t j = (1u << (m - i - 1)) - 1;
+             j < (1u << (m - i - 1));
+             j--)
         {
-            c[2*j+1] = _polynomial_multiplication_transpose(pow(2, i) - 1, T[i][row_length - 2*j], c[j]);
+            c[2*j+1] = _polynomial_multiplication_transpose(
+                (1u << i) - 1, T[i][row_length - 2*j], c[j]);
             c[2*j] = c[j];
             c[2*j].resize(c_vec);
         }
     }
 
     /* Store Computed Newton Basis Coefficients */
-    int j = 0;
-    for (int i = c.size() - 1; i >= 0; i--) a[j++] = c[i][0];
+    size_t j = 0;
+    /* NB: unsigned reverse iteration */
+    for (size_t i = c.size() - 1; i < c.size(); i--)
+    {
+        a[j++] = c[i][0];
+    }
 }
 
 template<typename FieldT>
 void newton_to_monomial_basis(std::vector<FieldT> &a, const std::vector<std::vector<std::vector<FieldT> > > &T, const size_t &n)
 {
-    int m = log2(n);
-    if (T.size() != m + 1) throw DomainSizeException("expected T.size() == m + 1");
+    size_t m = log2(n);
+    if (T.size() != m + 1u) throw DomainSizeException("expected T.size() == m + 1");
 
     std::vector < std::vector <FieldT> > f(n);
-    for (int i = 0; i < n; i++)
+    for (size_t i = 0; i < n; i++)
     {
         f[i] = std::vector<FieldT>(1, a[i]);
     }
-    
+
     /* NewtonToMonomial */
     std::vector<FieldT> temp(1, FieldT::zero());
-    for (int i = 0; i < m; i++)
+    for (size_t i = 0; i < m; i++)
     {
-        for (int j = 0; j < pow(2, m - i - 1); j++)
+        for (size_t j = 0; j < (1u << (m - i - 1)); j++)
         {
             _polynomial_multiplication(temp, T[i][2*j], f[2*j + 1]);
             _polynomial_addition(f[j], f[2*j], temp);

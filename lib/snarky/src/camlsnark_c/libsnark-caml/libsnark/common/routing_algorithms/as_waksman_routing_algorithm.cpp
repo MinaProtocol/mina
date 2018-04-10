@@ -147,7 +147,7 @@ void construct_as_waksman_inner(const size_t left,
             /**
              * Odd special case:
              * the last wire is not connected to any switch,
-             * and the the wire is mereley routed "straight".
+             * and the wire is merely routed "straight".
              */
             neighbors[left][hi].first = neighbors[left][hi].second = hi;
             neighbors[right][hi].first = neighbors[right][hi].second = rhs_dests[hi-lo];

@@ -76,7 +76,7 @@ The libsnark library currently provides a C++ implementation of:
        contribution of \[DFGK14]
     4. A preprocessing SNARK for a language of Boolean circuits, "TBCS"
        (_Two-input Boolean Circuit Satisfiability_). Internally, it reduces to USCS.
-       This is much more  efficient than going through R1CS.
+       This is much more efficient than going through R1CS.
     5. A simulation-extractable preprocessing SNARK for R1CS.
        This construction uses the approach described in \[GM17]. For arithmetic
        circuits, it is slower than the \[BCTV14a] approach, but produces shorter
@@ -272,7 +272,7 @@ Create the Makefile:
 
     $ mkdir build && cd build && cmake ..
 
-Then, to compile the library, tests, and profiling harness, run this within the `build directory:
+Then, to compile the library, tests, and profiling harness, run this within the `build` directory:
 
     $ make
 
@@ -298,7 +298,7 @@ This will install `libsnark.a` into `/install/path/lib`; so your application sho
 
 In addition, unless you use `WITH_SUPERCOP=OFF`, `libsnark_adsnark.a` will be installed and should be linked in using `-lsnark_adsnark`.
 
-When you use compile you application against `libsnark`, you must have the same conditional defines (`#define FOO` or `g++ -DFOO`) as when you compiled `libsnark`, due to the use of templates. One way to figure out the correct conditional defines is to look at `build/libsnark/CMakeFiles/snark.dir/flags.make` after running `cmake`. ([Issue #21](https://github.com/scipr-lab/libsnark/issues/21))
+When you use compile your application against `libsnark`, you must have the same conditional defines (`#define FOO` or `g++ -DFOO`) as when you compiled `libsnark`, due to the use of templates. One way to figure out the correct conditional defines is to look at `build/libsnark/CMakeFiles/snark.dir/flags.make` after running `cmake`. ([Issue #21](https://github.com/scipr-lab/libsnark/issues/21))
 
 ### Building on Windows using Cygwin
 
@@ -406,7 +406,22 @@ to control these (you can see the default at the top of CMakeLists.txt).
 
     Sets the dependency installation directory to the provided absolute path (default: installs dependencies in the respective submodule directories)
 
+*   `cmake -DUSE_LINKED_LIBRARIES=ON`
+
+    Setting this flag enables CMake to include installed `libfqfft` and `libff` libraries. This will tell the compiler to ignore the `libfqfft` and `libff` dependencies provided in the `depends` folder.
+
 Not all combinations are tested together or supported by every part of the codebase.
+
+--------------------------------------------------------------------------------
+Docker
+--------------------------------------------------------------------------------
+
+You can run `libsnark` on Docker:
+
+```
+$ docker build -t libsnark .
+$ docker run -ti libsnark /bin/bash
+```
 
 
 --------------------------------------------------------------------------------
@@ -514,13 +529,13 @@ The directory structure of the libsnark library is as follows:
         * [__ram_computations__](libsnark/relations/ram_computations): RAM computation languages
     * [__zk_proof_systems__](libsnark/zk_proof_systems): interfaces and implementations of the proof systems
     * [__reductions__](libsnark/reductions): reductions between languages (used internally, but contains many examples of building constraints)
-* [__depends__](libsnark/depends): external dependencies which are automatically fetched and compiled (overridable by `cmake -DDEPENDS_DIR=...`)
+* [__depends__](depends): external dependencies which are automatically fetched and compiled (overridable by `cmake -DDEPENDS_DIR=...`)
 
 Some of these module directories have the following subdirectories:
 
 * ...
-    * [__examples__](): example code and tutorials for this module
-    * [__tests__](): unit tests for this module
+    * __examples__: example code and tutorials for this module
+    * __tests__: unit tests for this module
 
 In particular, the top-level API examples are at `libsnark/r1cs_ppzksnark/examples/` and `libsnark/gadgetlib2/examples/`.
 

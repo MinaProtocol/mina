@@ -148,7 +148,7 @@ void profile()
             if (key < 3 && domain_type == 3) continue;
             if (system(("./profiler "
                         + std::to_string(key) + " "
-                        + std::to_string(pow(2, threads)) + " "
+                        + std::to_string(1u << threads) + " "
                         + datetime + " "
                         + "\"" + profile_type + "\" "
                         + "\"" + domains[domain_choice] + "\"").c_str()))

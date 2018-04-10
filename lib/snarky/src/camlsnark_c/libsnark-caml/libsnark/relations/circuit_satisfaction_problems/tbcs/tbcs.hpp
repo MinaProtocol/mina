@@ -113,7 +113,7 @@ public:
 typedef tbcs_variable_assignment tbcs_primary_input;
 
 /**
- * A TBCS auxiliary input is a TBCS variable assigment.
+ * A TBCS auxiliary input is a TBCS variable assignment.
  */
 typedef tbcs_variable_assignment tbcs_auxiliary_input;
 

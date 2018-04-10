@@ -4,7 +4,7 @@
  Declaration of interfaces for a USCS-to-SSP reduction, that is, constructing
  a SSP ("Square Span Program") from a USCS ("boolean circuit with 2-input gates").
 
- SSPs are defined in \[DFGK14], and construced for USCS also in \[DFGK14].
+ SSPs are defined in \[DFGK14], and constructed for USCS also in \[DFGK14].
 
  The implementation of the reduction adapts to \[DFGK14], extends, and optimizes
  the efficient QAP-based approach described in Appendix E of \[BCGTV13].

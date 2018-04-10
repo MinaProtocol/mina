@@ -67,7 +67,7 @@ This limitation is to prevent a logic bug that may occur if the variables used a
 The indices are assigned on the Variable constructor, using the global variable nextFreeIndex. Thus, creating two protoboards in the same program may cause
 unexpected behavior when converting.
 Moreover, the bug will create more variables than needed in the converted system, e.g. if variables 0,1,3,4 were used in the gadgetlib2
-generated system, than the conversion will create a new r1cs system with variables 0,1,2,3,4 and assign variable 2 the value zero
+generated system, then the conversion will create a new r1cs system with variables 0,1,2,3,4 and assign variable 2 the value zero
 (when converting the assignment).
 Everything should be fixed soon.
 If you are sure you know what you are doing, you can comment out the ASSERT line.

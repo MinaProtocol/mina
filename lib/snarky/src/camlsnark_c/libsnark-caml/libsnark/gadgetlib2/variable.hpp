@@ -213,8 +213,8 @@ public:
 /*************************************************************************************************/
 /*************************************************************************************************/
 /**
-    Holds elements of a prime characteristic field. Currently implemented using the gmp (linux) and
-    mpir (windows) libraries.
+    Holds elements of a prime characteristic field. Currently implemented using the gmp (Linux) and
+    mpir (Windows) libraries.
  */
 class R1P_Elem : public FElemInterface {
 private:
@@ -349,7 +349,7 @@ public:
 /*************************************************************************************************/
 /*************************************************************************************************/
 
-typedef Variable FlagVariable; ///< Holds variable whos purpose is to be populated with a boolean
+typedef Variable FlagVariable; ///< Holds variable whose purpose is to be populated with a boolean
                                ///< value, Field(0) or Field(1)
 typedef VariableArray FlagVariableArray;
 typedef Variable PackedWord;   ///< Represents a packed word that can fit in a field element.
@@ -357,7 +357,7 @@ typedef Variable PackedWord;   ///< Represents a packed word that can fit in a f
                                ///< means we require (int < fieldSize)
 typedef VariableArray PackedWordArray;
 
-/// Holds variables whos purpose is to be populated with the unpacked form of some word, bit by bit
+/// Holds variables whose purpose is to be populated with the unpacked form of some word, bit by bit
 class UnpackedWord : public VariableArray {
 public:
     UnpackedWord() : VariableArray() {}
@@ -366,7 +366,7 @@ public:
 
 typedef ::std::vector<UnpackedWord> UnpackedWordArray;
 
-/// Holds variables whos purpose is to be populated with the packed form of some word.
+/// Holds variables whose purpose is to be populated with the packed form of some word.
 /// word representation can be larger than a single field element in small enough fields
 class MultiPackedWord : public VariableArray {
 private:
@@ -400,7 +400,7 @@ public:
 
 class DualWordArray {
 private:
-    // kept as 2 seperate arrays because the more common usecase will be to request one of these,
+    // kept as 2 separate arrays because the more common usecase will be to request one of these,
     // and not dereference a specific DualWord
     MultiPackedWordArray multipackedContents_;
     UnpackedWordArray unpackedContents_;

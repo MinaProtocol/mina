@@ -484,7 +484,7 @@ GadgetPtr LooseMUX_Gadget::create(ProtoboardPtr pb,
     Compression Packing gadgets have two modes, which differ in the way the witness and constraints
     are created. In PACK mode  gerateWitness() will take the bits and create a packed element (or
     number of elements) while generateConstraints() will not enforce that bits are indeed Boolean.
-    In UNPACK mode generateWitness() will take the packed repreentation and unpack it to bits while
+    In UNPACK mode generateWitness() will take the packed representation and unpack it to bits while
     generateConstraints will in addition enforce that unpacked bits are indeed Boolean.
 */
 
@@ -562,7 +562,7 @@ void R1P_CompressionPacking_Gadget::generateWitness() {
     Arithmetic Packing gadgets have two modes, which differ in the way the witness and constraints
     are created. In PACK mode  gerateWitness() will take the bits and create a packed element (or
     number of elements) while generateConstraints() will not enforce that bits are indeed Boolean.
-    In UNPACK mode generateWitness() will take the packed repreentation and unpack it to bits while
+    In UNPACK mode generateWitness() will take the packed representation and unpack it to bits while
     generateConstraints will in addition enforce that unpacked bits are indeed Boolean.
 */
 

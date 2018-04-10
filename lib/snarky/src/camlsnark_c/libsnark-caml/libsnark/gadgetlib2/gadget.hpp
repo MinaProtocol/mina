@@ -57,7 +57,7 @@ namespace gadgetlib2 {
 
  Gadget hierarchy:
  (Here and elsewhere: R1P = Rank 1 constraints over a prime-characteristic field.)
- Gadgets have a somewhat cumbursome class heirarchy, for the sake of clean gadget construction.
+ Gadgets have a somewhat cumbersome class hierarchy, for the sake of clean gadget construction.
  (1) A field agnostic, concrete (as opposed to interface) gadget will derive from Gadget. For
      instance NAND needs only AND and NOT and does not care about the field, thus it derives from
      Gadget.
@@ -72,7 +72,7 @@ namespace gadgetlib2 {
  (4) These field specific gadgets will have a factory class with static method create, such as
      AND_Gadget::create(...) in order to agnostically create this gadget for use by a field
      agnostic gadget.
- (5) Concrete field dependant gadgets derive via multiple inheritance from two interfaces.
+ (5) Concrete field dependent gadgets derive via multiple inheritance from two interfaces.
      e.g. R1P_AND_Gadget derives from both AND_Gadget and R1P_Gadget. This was done to allow usage
      of AND_Gadget's field agnostic create() method and R1P_Gadget's field specific val() method.
 */

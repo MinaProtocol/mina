@@ -54,7 +54,7 @@ ram_universal_gadget<ramT>::ram_universal_gadget(ram_protoboard<ramT> &pb,
     libff::leave_block("Allocate boot lines");
 
     libff::enter_block("Allocate instruction fetch and execution lines");
-    load_instruction_lines.reserve(time_bound+1); /* the last line is NOT a memory line, but here just for uniform coding (i.e. the (unusued) result of next PC) */
+    load_instruction_lines.reserve(time_bound+1); /* the last line is NOT a memory line, but here just for uniform coding (i.e. the (unused) result of next PC) */
     for (size_t i = 0; i < time_bound; ++i)
     {
         load_instruction_lines.emplace_back(memory_line_variable_gadget<ramT>(pb, timestamp_size, pb.ap, FMT(annotation_prefix, " load_instruction_lines_%zu", i)));

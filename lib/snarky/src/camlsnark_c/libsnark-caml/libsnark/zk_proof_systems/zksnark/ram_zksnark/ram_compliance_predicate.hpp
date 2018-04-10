@@ -7,14 +7,14 @@
  in \[BCTV14].
 
  Essentially, the RAM's CPU, which is expressed as an R1CS constraint system,
- is augmented to obtain another R1CS constraint ssytem that implements a RAM
+ is augmented to obtain another R1CS constraint system that implements a RAM
  compliance predicate. This predicate is responsible for checking:
  (1) transitions from a CPU state to the next;
  (2) correct load/stores; and
  (3) corner cases such as the first and last steps of the machine.
  The first can be done by suitably embedding the RAM's CPU in the constraint
  system. The second can be done by verifying authentication paths for the values
- of memory. The third mostly consists of bookkeepng (with some subtleties arising
+ of memory. The third mostly consists of bookkeeping (with some subtleties arising
  from the need to not break zero knowledge).
 
  The laying out of R1CS constraints is done via gadgetlib1 (a minimalistic

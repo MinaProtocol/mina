@@ -48,23 +48,37 @@ add_library(
   relations/ram_computations/rams/fooram/fooram_aux.cpp
   relations/ram_computations/rams/tinyram/tinyram_aux.cpp
 )
-target_link_libraries(
-  snark
-  
-  ff
-  ${GMP_LIBRARIES}
-  ${GMPXX_LIBRARIES}
-  ${CRYPTO_LIBRARIES}
-  ${PROCPS_LIBRARIES}
-  ${SNARK_EXTRALIBS}
-)
-target_include_directories(
-  snark
+if("${USE_LINKED_LIBRARIES}")
+  target_link_libraries(
+    snark
+    
+    ff
+    ${GMP_LIBRARIES}
+    ${GMPXX_LIBRARIES}
+    ${CRYPTO_LIBRARIES}
+    ${PROCPS_LIBRARIES}
+    ${LIBFF_LIBRARIES}
+    ${SNARK_EXTRALIBS}
+  )
+else()
+  target_link_libraries(
+    snark
+    
+    ff
+    ${GMP_LIBRARIES}
+    ${GMPXX_LIBRARIES}
+    ${CRYPTO_LIBRARIES}
+    ${PROCPS_LIBRARIES}
+    ${SNARK_EXTRALIBS}
+  )
+  target_include_directories(
+    snark
 
-  PUBLIC
-  ${DEPENDS_DIR}/libff
-  ${DEPENDS_DIR}/libfqfft
-)
+    PUBLIC
+    ${DEPENDS_DIR}/libff
+    ${DEPENDS_DIR}/libfqfft
+  )
+endif()
 
 install(
   DIRECTORY "" DESTINATION "include/libsnark"

@@ -18,7 +18,7 @@
  In both cases, a method ("sample_randomness") allows to sample M.
 
  The parameter d (the dimension) is fixed at compile time in the struct
- knapsack_dimension below. The parameter m (the input lenght) can be chosen
+ knapsack_dimension below. The parameter m (the input length) can be chosen
  at run time (in either gadget).
 
 

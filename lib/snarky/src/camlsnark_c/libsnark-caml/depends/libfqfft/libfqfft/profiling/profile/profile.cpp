@@ -63,8 +63,8 @@ void profile(const std::string domain_sizes,
              const int key)
 {
   /* Determine domain sizes and precompute domain vectors */
-  int n;
-  std::vector<int> dom_sizes;
+  size_t n;
+  std::vector<size_t> dom_sizes;
   std::stringstream domain_stream(domain_sizes);
   while (domain_stream >> n) dom_sizes.push_back(n);
 
@@ -102,7 +102,7 @@ void profile(const std::string domain_sizes,
   printf("\n%s-%d\n", type[key].c_str(), num_threads);
 
   /* Assess on varying domain sizes */
-  for (int s = 0; s < domain.size(); s++) {
+  for (size_t s = 0; s < domain.size(); s++) {
     /* Initialization */
     std::vector<FieldT> a(domain[s]);
     const size_t n = a.size();

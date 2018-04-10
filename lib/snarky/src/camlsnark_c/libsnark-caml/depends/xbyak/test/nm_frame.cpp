@@ -1,4 +1,5 @@
 #include <stdio.h>
+#define XBYAK_NO_OP_NAMES
 #define XBYAK_ENABLE_OMITTED_OPERAND
 #include "xbyak/xbyak.h"
 
@@ -6,6 +7,7 @@ using namespace Xbyak;
 
 #ifdef _MSC_VER
 	#pragma warning(disable : 4245)
+	#pragma warning(disable : 4312)
 #endif
 class Sample : public CodeGenerator {
 	void operator=(const Sample&);
@@ -31,6 +33,10 @@ public:
 int main()
 	try
 {
+	size_t size = sizeof(Xbyak::Operand);
+	if (size != 4) {
+		printf("sizeof Operand %d\n", (int)size);
+	}
 	try {
 		Sample s;
 		s.gen();

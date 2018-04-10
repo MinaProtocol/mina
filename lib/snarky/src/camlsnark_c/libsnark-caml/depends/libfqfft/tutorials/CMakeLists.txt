@@ -8,7 +8,13 @@ add_executable(
 target_link_libraries(
   polynomial_multiplication
 
-  ${LIBFF_LIBRARIES}
+  ff
+)
+target_include_directories(
+  polynomial_multiplication
+
+  PUBLIC
+  ${DEPENDS_DIR}/libff/
 )
 
 add_executable(
@@ -20,7 +26,13 @@ add_executable(
 target_link_libraries(
   polynomial_evaluation
 
-  ${LIBFF_LIBRARIES}
+  ff
+)
+target_include_directories(
+  polynomial_evaluation
+
+  PUBLIC
+  ${DEPENDS_DIR}/libff/
 )
 
 add_executable(
@@ -32,5 +44,11 @@ add_executable(
 target_link_libraries(
   lagrange_polynomial_evaluation
 
-  ${LIBFF_LIBRARIES}
+  ff
+)
+target_include_directories(
+  lagrange_polynomial_evaluation
+
+  PUBLIC
+  ${DEPENDS_DIR}/libff/
 )

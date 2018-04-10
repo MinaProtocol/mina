@@ -30,11 +30,7 @@ get_root_of_unity(const size_t n)
 {
     const double PI = 3.141592653589793238460264338328L;
 
-#ifdef MULTICORE
-    return FieldT(std::complex<double>(cos(4 * PI / n), sin(4 * PI / n)));
-#else
     return FieldT(cos(2 * PI / n), sin(2 * PI / n));
-#endif
 }
 
 template<typename FieldT>
@@ -189,7 +185,7 @@ void batch_invert(std::vector<FieldT> &vec)
 
     FieldT acc_inverse = acc.inverse();
 
-    for (long i = vec.size()-1; i >= 0; --i)
+    for (long i = static_cast<long>(vec.size()-1); i >= 0; --i)
     {
         const FieldT old_el = vec[i];
         vec[i] = acc_inverse * prod[i];

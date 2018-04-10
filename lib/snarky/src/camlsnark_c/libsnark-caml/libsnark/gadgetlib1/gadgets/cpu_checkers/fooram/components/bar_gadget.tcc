@@ -1,7 +1,7 @@
 /** @file
  *****************************************************************************
 
- Implementation of interfaces for an auxiliarry gadget for the FOORAM CPU.
+ Implementation of interfaces for an auxiliary gadget for the FOORAM CPU.
 
  See bar_gadget.hpp .
 

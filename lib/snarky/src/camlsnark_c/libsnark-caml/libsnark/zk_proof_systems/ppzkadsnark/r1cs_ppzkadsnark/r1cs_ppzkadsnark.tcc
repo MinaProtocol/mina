@@ -512,7 +512,7 @@ r1cs_ppzkadsnark_keypair<ppT> r1cs_ppzkadsnark_generator(const r1cs_ppzkadsnark_
         gamma = libff::Fr<snark_pp<ppT>>::random_element();
     const libff::Fr<snark_pp<ppT>>      rC = rA * rB;
 
-    // consrtuct the same-coefficient-check query (must happen before zeroing out the prefix of At)
+    // construct the same-coefficient-check query (must happen before zeroing out the prefix of At)
     libff::Fr_vector<snark_pp<ppT>> Kt;
     Kt.reserve(qap_inst.num_variables()+4);
     for (size_t i = 0; i < qap_inst.num_variables()+1; ++i)

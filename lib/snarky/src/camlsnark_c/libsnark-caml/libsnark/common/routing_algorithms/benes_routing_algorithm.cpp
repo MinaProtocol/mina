@@ -265,7 +265,7 @@ benes_routing get_benes_routing(const integer_permutation &permutation)
     return routing;
 }
 
-/* auxuliary function that is used in valid_benes_routing below */
+/* auxiliary function that is used in valid_benes_routing below */
 template<typename T>
 std::vector<std::vector<T> > route_by_benes(const benes_routing &routing, const std::vector<T> &start)
 {

@@ -124,6 +124,7 @@ set(
   "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}"
 )
 
+# GMP
 find_path(GMP_INCLUDE_DIR NAMES gmp.h)
 find_library(GMP_LIBRARIES NAMES gmp libgmp)
 find_library(GMPXX_LIBRARIES NAMES gmpxx libgmpxx)
@@ -167,9 +168,9 @@ if(${CURVE} STREQUAL "BN128")
   )
 endif()
 
-#if("${DEBUG}")
+if("${DEBUG}")
   add_definitions(-DDEBUG=1)
-#endif()
+endif()
 
 if("${LOWMEM}")
   add_definitions(-DLOWMEM=1)
@@ -217,6 +218,18 @@ endif()
 
 if("${USE_ASM}")
   add_definitions(-DUSE_ASM)
+endif()
+
+if("${USE_LINKED_LIBRARIES}")
+  # libfqfft
+  find_path(LIBFQFFT_INCLUDE_DIR NAMES libfqfft)
+  set(LIBFQFFT_DIRECTORY ${LIBFQFFT_INCLUDE_DIR}/libfqfft)
+  include_directories(${LIBFQFFT_DIRECTORY})
+
+  # libff
+  find_path(LIBFF_INCLUDE_DIR NAMES libff)
+  include_directories(${LIBFF_INCLUDE_DIR}/libff)
+  find_library(LIBFF_LIBRARIES NAMES ff libff)
 endif()
 
 find_program(

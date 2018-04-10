@@ -53,7 +53,7 @@ long safeConvert(const int64_t num) {
 }
 
 /*****************************************************************************/
-/***********************  ErrorHandling********** ****************************/
+/***********************  Error Handling *************************************/
 /*****************************************************************************/
 
 /*
@@ -69,7 +69,7 @@ void ErrorHandling::fatalError(const ::std::string& msg) {
         throw ::std::runtime_error(msg);
 #   else // not DEBUG
         libff::UNUSED(msg);
-        const ::std::string releaseMsg("Fatal error encoutered. Run debug build for more"
+        const ::std::string releaseMsg("Fatal error encountered. Run debug build for more"
                                                                   " information and stack trace.");
         ::std::cerr << "ERROR:  " << releaseMsg << ::std::endl << ::std::endl;
         throw ::std::runtime_error(releaseMsg);

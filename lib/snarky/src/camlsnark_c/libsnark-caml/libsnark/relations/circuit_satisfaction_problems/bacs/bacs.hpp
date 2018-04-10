@@ -2,7 +2,7 @@
  *****************************************************************************
 
  Declaration of interfaces for:
- - a BACS variable assigment,
+ - a BACS variable assignment,
  - a BACS gate,
  - a BACS primary input,
  - a BACS auxiliary input,

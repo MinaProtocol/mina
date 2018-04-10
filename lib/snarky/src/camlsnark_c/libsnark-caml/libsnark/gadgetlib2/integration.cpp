@@ -39,8 +39,8 @@ r1cs_constraint_system<libff::Fr<libff::default_ec_pp> > get_constraint_system_f
                                                                 convert_gadgetlib2_linear_combination(std::get<1>(constr)),
                                                                 convert_gadgetlib2_linear_combination(std::get<2>(constr))));
     }
-    //The numbers of variables is the highest index created.
-    //TODO: If there are multiple protoboard, or variables not assigned to a protoboard, then getNextFreeIndex() is *not* the number of variables! See also in get_variable_assignment_from_gadgetlib2.
+    //The number of variables is the highest index created.
+    //TODO: If there are multiple protoboards, or variables not assigned to a protoboard, then getNextFreeIndex() is *not* the number of variables! See also in get_variable_assignment_from_gadgetlib2.
     const size_t num_variables = GLA::getNextFreeIndex();
     result.primary_input_size = pb.numInputs();
     result.auxiliary_input_size = num_variables - pb.numInputs();
@@ -52,8 +52,8 @@ r1cs_variable_assignment<libff::Fr<libff::default_ec_pp> > get_variable_assignme
     typedef libff::Fr<libff::default_ec_pp> FieldT;
     typedef gadgetlib2::GadgetLibAdapter GLA;
 
-    //The numbers of variables is the highest index created. This is also the required size for the assignment vector.
-    //TODO: If there are multiple protoboard, or variables not assigned to a protoboard, then getNextFreeIndex() is *not* the number of variables! See also in get_constraint_system_from_gadgetlib2.
+    //The number of variables is the highest index created. This is also the required size for the assignment vector.
+    //TODO: If there are multiple protoboards, or variables not assigned to a protoboard, then getNextFreeIndex() is *not* the number of variables! See also in get_constraint_system_from_gadgetlib2.
     const size_t num_vars = GLA::getNextFreeIndex();
     const GLA adapter;
     r1cs_variable_assignment<FieldT> result(num_vars, FieldT::zero());

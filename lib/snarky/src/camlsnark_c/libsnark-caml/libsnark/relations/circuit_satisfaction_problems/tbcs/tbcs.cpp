@@ -196,7 +196,7 @@ bool tbcs_circuit::is_valid() const
     {
         /**
          * The output wire of gates[i] must have index 1+num_inputs+i.
-         * (The '1+' accounts for the the index of the constant wire.)
+         * (The '1+' accounts for the index of the constant wire.)
          */
         if (gates[i].output != num_inputs()+i+1)
         {

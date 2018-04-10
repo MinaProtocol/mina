@@ -1,4 +1,5 @@
 #include <stdio.h>
+#define XBYAK_NO_OP_NAMES
 #include "xbyak/xbyak.h"
 #include "xbyak/xbyak_bin2hex.h"
 #include <stdlib.h>
@@ -112,6 +113,7 @@ const uint64 XMM_ER = 1ULL << 60;
 const uint64 M_xword = 1ULL << 61;
 const uint64 M_yword = 1ULL << 62;
 const uint64 MY_1to4 = 1ULL << 18;
+const uint64 BNDREG = 1ULL << 22;
 
 const uint64 NOPARA = 1ULL << (bitEnd - 1);
 
@@ -120,6 +122,15 @@ class Test {
 	void operator=(const Test&);
 	const bool isXbyak_;
 	int funcNum_;
+	/*
+		and_, or_, xor_, not_ => and, or, xor, not
+	*/
+	std::string removeUnderScore(std::string s) const
+	{
+		if (!isXbyak_ && s[s.size() - 1] == '_') s.resize(s.size() - 1);
+		return s;
+	}
+
 	// check all op1, op2, op3
 	void put(const std::string& nm, uint64 op1 = NOPARA, uint64 op2 = NOPARA, uint64 op3 = NOPARA, uint64 op4 = NOPARA) const
 	{
@@ -402,6 +413,13 @@ class Test {
 			}
 		case K2:
 			return isXbyak_ ? "k3 | k5" : "k3{k5}";
+		case BNDREG:
+			{
+				static const char tbl[][5] = {
+					"bnd0", "bnd1", "bnd2", "bnd3",
+				};
+				return tbl[idx % 4];
+			}
 #ifdef XBYAK64
 		case XMM_SAE:
 			return isXbyak_ ? "xmm25 | T_sae" : "xmm25, {sae}";
@@ -612,6 +630,7 @@ class Test {
 		put("prefetcht2", MEM);
 		put("prefetchnta", MEM);
 		put("prefetchwt1", MEM);
+		put("prefetchw", MEM);
 
 		// SSE2 misc
 		put("maskmovdqu", XMM, XMM);
@@ -942,15 +961,16 @@ class Test {
 			static const char tbl[][16] = {
 				"adc",
 				"add",
-				"and",
+				"and_",
 				"cmp",
-				"or",
+				"or_",
 				"sbb",
 				"sub",
-				"xor",
+				"xor_",
 			};
 			for (size_t i = 0; i < NUM_OF_ARRAY(tbl); i++) {
-				const char *p = tbl[i];
+				const std::string s = removeUnderScore(tbl[i]);
+				const char *p = s.c_str();
 				put(p, REG32, REG32|MEM);
 				put(p, REG64, REG64|MEM);
 				put(p, REG16, REG16|MEM);
@@ -1008,10 +1028,11 @@ class Test {
 			"imul",
 			"mul",
 			"neg",
-			"not",
+			"not_",
 		};
 		for (size_t i = 0; i < NUM_OF_ARRAY(tbl); i++) {
-			const char *p = tbl[i];
+			const std::string s = removeUnderScore(tbl[i]);
+			const char *p = s.c_str();
 			put(p, REG32e|REG16|REG8|REG8_3);
 			put(p, MEM32|MEM16|MEM8);
 		}
@@ -1328,6 +1349,47 @@ class Test {
 #ifdef XBYAK64
 		put("pextrq", REG64|MEM, XMM, IMM);
 		put("pinsrq", XMM, REG64|MEM, IMM);
+#endif
+	}
+	void putSHA() const
+	{
+		put("sha1rnds4", XMM, XMM|MEM, IMM);
+		put("sha1nexte", XMM, XMM|MEM);
+		put("sha1msg1", XMM, XMM|MEM);
+		put("sha1msg2", XMM, XMM|MEM);
+		put("sha256rnds2", XMM, XMM|MEM);
+		put("sha256msg1", XMM, XMM|MEM);
+		put("sha256msg2", XMM, XMM|MEM);
+	}
+	void putMPX() const
+	{
+#ifdef XBYAK64
+		const uint64 reg = REG64;
+#else
+		const uint64 reg = REG32;
+#endif
+		put("bndcl", BNDREG, reg|MEM);
+		put("bndcu", BNDREG, reg|MEM);
+		put("bndcn", BNDREG, reg|MEM);
+		put("bndldx", BNDREG, MEM);
+		put("bndmk", BNDREG, MEM);
+		put("bndmov", BNDREG, BNDREG|MEM);
+		put("bndstx", MEM, BNDREG);
+		put("bndstx", "ptr [eax]", "[eax]", BNDREG);
+		put("bndstx", "ptr [eax+5]", "[eax+5]", BNDREG);
+		put("bndstx", "ptr [eax+500]", "[eax+500]", BNDREG);
+		put("bndstx", "ptr [eax+ecx]", "[eax+ecx]", BNDREG);
+		put("bndstx", "ptr [ecx+eax]", "[ecx+eax]", BNDREG);
+		put("bndstx", "ptr [eax+esp]", "[eax+esp]", BNDREG);
+		put("bndstx", "ptr [esp+eax]", "[esp+eax]", BNDREG);
+		put("bndstx", "ptr [eax+ecx*2]", "[eax+ecx*2]", BNDREG);
+		put("bndstx", "ptr [ecx+ecx]", "[ecx+ecx]", BNDREG);
+		put("bndstx", "ptr [ecx*2]", "[ecx*2]", BNDREG);
+		put("bndstx", "ptr [eax+ecx*2+500]", "[eax+ecx*2+500]", BNDREG);
+#ifdef XBYAK64
+		put("bndstx", "ptr [rax+rcx*2]", "[rax+rcx*2]", BNDREG);
+		put("bndstx", "ptr [r9*2]", "[r9*2]", BNDREG);
+		put("bndstx", "ptr [r9*2+r15]", "[r9*2+r15]", BNDREG);
 #endif
 	}
 	void putFpuMem16_32() const
@@ -2318,6 +2380,7 @@ public:
 		putAVX_Y_XM();
 		separateFunc();
 		putFMA();
+		putSHA();
 #endif
 
 #else // USE_AVX
@@ -2368,6 +2431,7 @@ public:
 		putFpu();
 		putFpuFpu();
 		putCmp();
+		putMPX();
 #endif
 
 #ifdef XBYAK64
@@ -2620,7 +2684,7 @@ public:
 		};
 		for (size_t i = 0; i < NUM_OF_ARRAY(tbl); i++) {
 			const char *name = tbl[i];
-			put(name, MEM, ZMM);
+			put(name, MEM|MEM_K, ZMM|XMM|YMM);
 			put(name, ZMM, MEM);
 		}
 	}

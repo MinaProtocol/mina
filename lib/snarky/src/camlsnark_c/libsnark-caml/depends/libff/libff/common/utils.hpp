@@ -25,7 +25,7 @@ size_t get_power_of_two(size_t n);
 /// returns ceil(log2(n)), so 1ul<<log2(n) is the smallest power of 2, that is not less than n
 size_t log2(size_t n);
 
-inline size_t exp2(size_t k) { return 1ul << k; }
+inline size_t exp2(size_t k) { return size_t(1) << k; }
 
 size_t to_twos_complement(int i, size_t w);
 int from_twos_complement(size_t i, size_t w);

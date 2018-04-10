@@ -314,7 +314,7 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
      *
      * note: below, we pass full_variable_assignment into the .evaluate()
      * method of the R1CS constraints. however, these extra variables shouldn't
-     * be a problem, because .evaluate() only accessess the variables that are
+     * be a problem, because .evaluate() only accesses the variables that are
      * actually used in the constraint.
      */
     for (size_t i = 0; i < cs.num_constraints(); ++i)

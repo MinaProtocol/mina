@@ -148,6 +148,7 @@ void init_alt_bn128_params()
     alt_bn128_G1::G1_one = alt_bn128_G1(alt_bn128_Fq("1"),
                                     alt_bn128_Fq("2"),
                                     alt_bn128_Fq::one());
+    alt_bn128_G1::wnaf_window_table.resize(0);
     alt_bn128_G1::wnaf_window_table.push_back(11);
     alt_bn128_G1::wnaf_window_table.push_back(24);
     alt_bn128_G1::wnaf_window_table.push_back(60);
@@ -210,6 +211,7 @@ void init_alt_bn128_params()
                                     alt_bn128_Fq2(alt_bn128_Fq("8495653923123431417604973247489272438418190587263600148770280649306958101930"),
                                                 alt_bn128_Fq("4082367875863433681332203403145435568316851327593401208105741076214120093531")),
                                     alt_bn128_Fq2::one());
+    alt_bn128_G2::wnaf_window_table.resize(0);
     alt_bn128_G2::wnaf_window_table.push_back(5);
     alt_bn128_G2::wnaf_window_table.push_back(15);
     alt_bn128_G2::wnaf_window_table.push_back(39);

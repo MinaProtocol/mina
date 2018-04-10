@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 2.8)
 
 project (libff)
 
+# Default to RelWithDebInfo configuration if no configuration is explicitly specified.
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+  set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "Build type on single-configuration generators" FORCE)
+endif()
+
 set(
   CURVE
   "BN128"
@@ -81,14 +86,6 @@ option(
   ON
 )
 
-set(
-  OPT_FLAGS
-  ""
-  CACHE
-  STRING
-  "Override C++ compiler optimization flags"
-)
-
 if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   # Common compilation flags and warning configuration
   set(
@@ -98,33 +95,25 @@ if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   if("${MULTICORE}")
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fopenmp")
   endif()
-  # Default optimizations flags (to override, use -DOPT_FLAGS=...)
-  if("${OPT_FLAGS}" STREQUAL "")
-    set(
-      OPT_FLAGS
-      "-ggdb3 -O2 -march=native -mtune=native"
-    )
-  endif()
 endif()
 
-set(
-  CMAKE_CXX_FLAGS
-  "${CMAKE_CXX_FLAGS} ${OPT_FLAGS}"
-)
-
 find_path(GMP_INCLUDE_DIR NAMES gmp.h)
-find_library(GMP_LIBRARIES NAMES gmp libgmp)
-find_library(GMPXX_LIBRARIES NAMES gmpxx libgmpxx)
-
-include(FindPkgConfig)
-pkg_check_modules(
-  CRYPTO
-  REQUIRED
-
-  libcrypto
+find_library(GMP_LIBRARY gmp)
+if(GMP_LIBRARY MATCHES ${CMAKE_SHARED_LIBRARY_SUFFIX})
+  set(gmp_library_type SHARED)
+else()
+  set(gmp_library_type STATIC)
+endif()
+message(STATUS "GMP: ${GMP_LIBRARY}, ${GMP_INCLUDE_DIR}")
+add_library(GMP::gmp ${gmp_library_type} IMPORTED)
+set_target_properties(
+  GMP::gmp PROPERTIES
+  IMPORTED_LOCATION ${GMP_LIBRARY}
+  INTERFACE_INCLUDE_DIRECTORIES ${GMP_INCLUDE_DIR}
 )
 
 if("${WITH_PROCPS}")
+  include(FindPkgConfig)
   pkg_check_modules(
     PROCPS
     REQUIRED
@@ -137,17 +126,11 @@ else()
   )
 endif()
 
-# Enable Boost for program_options
-FIND_PACKAGE( Boost 1.40 COMPONENTS program_options REQUIRED )
-INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIR} )
-
 add_definitions(
   -DCURVE_${CURVE}
 )
 
 enable_testing()
-
-include_directories(.)
 
 if(${CURVE} STREQUAL "BN128")
   add_definitions(

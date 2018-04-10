@@ -23,7 +23,7 @@ using namespace gadgetlib2;
 
 /*
     This test gives the first example of a construction of a constraint system. We use the terms
-    'Constraint System' and 'Circuit' interchangeably rather loosly. It is easy to
+    'Constraint System' and 'Circuit' interchangeably rather loosely. It is easy to
     visualize a circuit with inputs and outputs. Each gate imposes some logic on the inputs and
     output wires. For instance, AND(inp1, inp2) will impose the 'constraint' (inp1 & inp2 = out)
     Thus, we can also think of this circuit as a system of constraints. Each gate is a mathematical
@@ -37,7 +37,7 @@ using namespace gadgetlib2;
         be very basic constraints which are defined over every field (e.g. x + y = 0).
     (2) All field specific examples in this library are for a prime characteristic field with the
         special form of 'quadratic rank 1 polynomials', or R1P. This is the only form used with the
-        current implementaition of SNARKs. The form for these constraints is
+        current implementation of SNARKs. The form for these constraints is
         (Linear Combination) * (Linear Combination) == (Linear Combination).
         The library has been designed to allow future addition of other characteristics/forms in
         the future by implementing only low level circuits for these forms.
@@ -53,7 +53,7 @@ TEST(Examples, ProtoboardUsage) {
     // We now create 3 input variables and one output
     VariableArray input(3, "input");
     Variable output("output");
-    // We can now add some constraints. The string is for debuging purposes and can be a textual
+    // We can now add some constraints. The string is for debugging purposes and can be a textual
     // description of the constraint
     pb->addRank1Constraint(input[0], 5 + input[2], output,
                            "Constraint 1: input[0] * (5 + input[2]) == output");
@@ -75,7 +75,7 @@ TEST(Examples, ProtoboardUsage) {
     // Notice the protoboard stores the assignment values.
     pb->val(input[0]) = pb->val(input[1]) = pb->val(input[2]) = pb->val(output) = 42;
     EXPECT_FALSE(pb->isSatisfied());
-    // The constraint system is not satisfied. Now lets try values which satisfy the two equations
+    // The constraint system is not satisfied. Now let's try values which satisfy the two equations
     // above:
     pb->val(input[0]) = 1;
     pb->val(input[1]) = pb->val(output) = 42; // input[1] - output == 0
@@ -87,7 +87,7 @@ TEST(Examples, ProtoboardUsage) {
     In the above example we explicitly wrote all constraints and assignments.
 
     In this example we will construct a very simple gadget, one that implements a NAND gate. This
-    gadget is field-agnostic as it only uses lower level gadgets and the field elments '0' and '1'.
+    gadget is field-agnostic as it only uses lower level gadgets and the field elements '0' & '1'.
 
     Gadgets are the framework which allow us to delegate construction of sophisticated circuitry
     to lower levels. Each gadget can construct a constraint system or a witness or both, by
@@ -97,7 +97,7 @@ TEST(Examples, ProtoboardUsage) {
 class NAND_Gadget : public Gadget {
 public:
     // This is a convention we use to always create gadgets as if from a factory class. This will
-    // be  needed later for gadgets which have different implementaions in different fields.
+    // be needed later for gadgets which have different implementations in different fields.
     static GadgetPtr create(ProtoboardPtr pb,
                             const FlagVariableArray& inputs,
                             const FlagVariable& output);
@@ -194,29 +194,29 @@ TEST(Examples, NAND_Gadget) {
     initPublicParamsFromDefaultPp();
     // create a protoboard for a system of rank 1 constraints over a prime field.
     ProtoboardPtr pb = Protoboard::create(R1P);
-    // create 5 variables inputs[0]...iputs[4]. The string "inputs" is used for debug messages
+    // create 5 variables inputs[0]...inputs[4]. The string "inputs" is used for debug messages
     FlagVariableArray inputs(5, "inputs");
     FlagVariable output("output");
     GadgetPtr nandGadget = NAND_Gadget::create(pb, inputs, output);
     // now we can generate a constraint system (or circuit)
     nandGadget->generateConstraints();
     // if we try to evaluate the circuit now, an exception will be thrown, because we will
-    // be attempting to evaluate unasigned variables.
+    // be attempting to evaluate unassigned variables.
     EXPECT_ANY_THROW(pb->isSatisfied());
-    // so lets assign the input variables for NAND and try again after creating the witness
+    // so let's assign the input variables for NAND and try again after creating the witness
     for (const auto& input : inputs) {
         pb->val(input) = 1;
     }
     nandGadget->generateWitness();
     EXPECT_TRUE(pb->isSatisfied());
     EXPECT_TRUE(pb->val(output) == 0);
-    // now lets try to ruin something and see what happens
+    // now let's try to ruin something and see what happens
     pb->val(inputs[2]) = 0;
     EXPECT_FALSE(pb->isSatisfied());
-    // now let try to cheat. If we hadn't enforced booleanity, this would have worked!
+    // now let's try to cheat. If we hadn't enforced booleanity, this would have worked!
     pb->val(inputs[1]) = 2;
     EXPECT_FALSE(pb->isSatisfied());
-    // now lets reset inputs[1] to a valid value
+    // now let's reset inputs[1] to a valid value
     pb->val(inputs[1]) = 1;
     // before, we set both the inputs and the output. Notice the output is still set to '0'
     EXPECT_TRUE(pb->val(output) == 0);
@@ -254,7 +254,7 @@ private:
     DualWord hashValue_;
     // This GadgetPtr will be a gadget to unpack hashValue_ from packed representation to bit
     // representation. Recall 'DualWord' holds both values, but only the packed version will be
-    // recieved as input to the constructor.
+    // received as input to the constructor.
     GadgetPtr hashValueUnpacker_;
 
     HashDifficultyEnforcer_Gadget(ProtoboardPtr pb,
@@ -278,7 +278,7 @@ void HashDifficultyEnforcer_Gadget::init() {
     // fits in the first element of a multipacked variable.
     GADGETLIB_ASSERT(hashValue_.multipacked().size() == 1, "multipacked word size too large");
     // A DualWord_Gadget's constraints assert that the unpacked and packed values represent the
-    // same integer element. The generateWitnes() method has two modes, one for packing (taking the
+    // same integer element. The generateWitness() method has two modes, one for packing (taking the
     // bit representation as input) and one for unpacking (creating the bit representation from
     // the packed representation)
     hashValueUnpacker_ = DualWord_Gadget::create(pb_, hashValue_, PackingMode::UNPACK);
@@ -338,8 +338,8 @@ TEST(Examples, HashDifficultyEnforcer_Gadget) {
 
 
 /*
-    In this exampe we will construct a gadget which builds a circuit for proof (witness) and
-    validation (constraints) that a bitcoin transaction's sum of inputs equals the the sum of
+    In this example we will construct a gadget which builds a circuit for proof (witness) and
+    validation (constraints) that a bitcoin transaction's sum of inputs equals the sum of
     outputs + miners fee. Construction of the proof will include finding the miners'
     fee. This fee can be thought of as an output of the circuit.
 
@@ -350,12 +350,12 @@ TEST(Examples, HashDifficultyEnforcer_Gadget) {
     integer values you would expect.
 
     The library design supports multiple field constructs due to different applied use cases. Some
-    cryptogragraphic applications may need extension fields while others may need prime fields
-    but with constraints which are not rank-1 and yet others may need boolean circuits. The library
+    cryptographic applications may need extension fields while others may need prime fields,
+    but with constraints which are not rank-1, and yet others may need boolean circuits. The library
     was designed so that high level gadgets can be reused by implementing only the low level for
     a new field or constraint structure.
 
-    Later we will supply a recipe for creation of such field specfic gadgets with agnostic
+    Later we will supply a recipe for creation of such field specific gadgets with agnostic
     interfaces. We use a few conventions here in order to ease the process by using macros.
 */
 
@@ -410,7 +410,7 @@ void R1P_VerifyTransactionAmounts_Gadget::generateConstraints() {
     // It would seem this is enough, but an adversary could cause an overflow of one side of the
     // equation over the field modulus. In fact, for every input/output sum we will always find a
     // miners' fee which will satisfy this constraint!
-    // It is left as an excercise for the reader to implement additional constraints (and witness)
+    // It is left as an exercise for the reader to implement additional constraints (and witness)
     // to check that each of the amounts (inputs, outputs, fee) are between 0 and 21,000,000 * 1E8
     // satoshis. Combine this with a maximum amount of inputs/outputs to disallow field overflow.
     //

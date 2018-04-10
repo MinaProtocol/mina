@@ -189,7 +189,7 @@ Fp4_model<n, modulus> Fp4_model<n,modulus>::cyclotomic_exp(const bigint<m> &expo
     bool found_nonzero = false;
     std::vector<long> NAF = find_wnaf(1, exponent);
 
-    for (long i = NAF.size() - 1; i >= 0; --i)
+    for (long i = static_cast<long>(NAF.size() - 1); i >= 0; --i)
     {
         if (found_nonzero)
         {

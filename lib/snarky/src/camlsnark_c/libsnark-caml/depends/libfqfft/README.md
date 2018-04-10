@@ -156,7 +156,13 @@ git submodule init && git submodule update
 To compile, starting at the project root directory, create the Makefile:
 
 ```
-mkdir build && cd build && cmake ..
+mkdir build && cd build
+cmake ..
+```
+
+For macOS compilation, as `libprocps` is not compatible, create the Makefile with:
+```
+cmake .. -DWITH_PROCPS=OFF
 ```
 
 #### Options
@@ -181,7 +187,7 @@ Links libprocps for usage in memory profiling. If this flag is turned off, memor
 * `cmake .. -DDEPENDS_DIR=...`
 Sets the dependency installation directory to the provided absolute path (default: installs dependencies in the respective submodule directories)
 
-Then, to compile the library and profiler, run:
+Then, to compile the library, run:
 
 ```
 make

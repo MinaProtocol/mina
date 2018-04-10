@@ -58,11 +58,12 @@
 # include <forward_list>  // NOLINT
 #endif
 
-namespace testing {
+// Disable MSVC2015 warning for std::pair: "decorated name length exceeded, name was truncated".
+#if defined(_MSC_VER) && (_MSC_VER == 1900)
+# pragma warning(disable:4503)
+#endif
 
-namespace internal {
-GTEST_API_ string JoinAsTuple(const Strings& fields);
-}  // namespace internal
+namespace testing {
 
 namespace gmock_matchers_test {
 
@@ -145,7 +146,6 @@ using testing::internal::ExplainMatchFailureTupleTo;
 using testing::internal::FloatingEqMatcher;
 using testing::internal::FormatMatcherDescription;
 using testing::internal::IsReadableTypeName;
-using testing::internal::JoinAsTuple;
 using testing::internal::linked_ptr;
 using testing::internal::MatchMatrix;
 using testing::internal::RE;
@@ -871,9 +871,9 @@ class Unprintable {
   char c_;
 };
 
-inline bool operator==(const Unprintable& /* lhs */, 
-                       const Unprintable& /* rhs */) { 
-    return true; 
+inline bool operator==(const Unprintable& /* lhs */,
+                       const Unprintable& /* rhs */) {
+    return true;
 }
 
 TEST(EqTest, CanDescribeSelf) {
@@ -914,7 +914,7 @@ TEST(TypedEqTest, CanDescribeSelf) {
 // Type<T>::IsTypeOf(v) compiles iff the type of value v is T, where T
 // is a "bare" type (i.e. not in the form of const U or U&).  If v's
 // type is not T, the compiler will generate a message about
-// "undefined referece".
+// "undefined reference".
 template <typename T>
 struct Type {
   static bool IsTypeOf(const T& /* v */) { return true; }
@@ -1423,7 +1423,7 @@ TEST(PairTest, MatchesCorrectly) {
   EXPECT_THAT(p, Pair(25, "foo"));
   EXPECT_THAT(p, Pair(Ge(20), HasSubstr("o")));
 
-  // 'first' doesnt' match, but 'second' matches.
+  // 'first' does not match, but 'second' matches.
   EXPECT_THAT(p, Not(Pair(42, "foo")));
   EXPECT_THAT(p, Not(Pair(Lt(25), "foo")));
 
@@ -3588,10 +3588,15 @@ class AClass {
   // A getter that returns a reference to const.
   const std::string& s() const { return s_; }
 
+#if GTEST_LANG_CXX11
+  const std::string& s_ref() const & { return s_; }
+#endif
+
   void set_s(const std::string& new_s) { s_ = new_s; }
 
   // A getter that returns a reference to non-const.
   double& x() const { return x_; }
+
  private:
   int n_;
   std::string s_;
@@ -3634,6 +3639,21 @@ TEST(PropertyTest, WorksForReferenceToConstProperty) {
   a.set_s("hole");
   EXPECT_FALSE(m.Matches(a));
 }
+
+#if GTEST_LANG_CXX11
+// Tests that Property(&Foo::property, ...) works when property() is
+// ref-qualified.
+TEST(PropertyTest, WorksForRefQualifiedProperty) {
+  Matcher<const AClass&> m = Property(&AClass::s_ref, StartsWith("hi"));
+
+  AClass a;
+  a.set_s("hill");
+  EXPECT_TRUE(m.Matches(a));
+
+  a.set_s("hole");
+  EXPECT_FALSE(m.Matches(a));
+}
+#endif
 
 // Tests that Property(&Foo::property, ...) works when property()
 // returns a reference to non-const.
@@ -3911,8 +3931,11 @@ TEST(ResultOfTest, WorksForFunctionReferences) {
 
 // Tests that ResultOf(f, ...) compiles and works as expected when f is a
 // function object.
-struct Functor : public ::std::unary_function<int, std::string> {
-  result_type operator()(argument_type input) const {
+struct Functor {
+  typedef std::string result_type;
+  typedef int argument_type;
+
+  std::string operator()(int input) const {
     return IntToStringFunction(input);
   }
 };
@@ -4239,7 +4262,7 @@ TYPED_TEST(ContainerEqTest, DuplicateDifference) {
 #endif  // GTEST_HAS_TYPED_TEST
 
 // Tests that mutliple missing values are reported.
-// Using just vector here, so order is predicatble.
+// Using just vector here, so order is predictable.
 TEST(ContainerEqExtraTest, MultipleValuesMissing) {
   static const int vals[] = {1, 1, 2, 3, 5, 8};
   static const int test_vals[] = {2, 1, 5};
@@ -4252,7 +4275,7 @@ TEST(ContainerEqExtraTest, MultipleValuesMissing) {
 }
 
 // Tests that added values are reported.
-// Using just vector here, so order is predicatble.
+// Using just vector here, so order is predictable.
 TEST(ContainerEqExtraTest, MultipleValuesAdded) {
   static const int vals[] = {1, 1, 2, 3, 5, 8};
   static const int test_vals[] = {1, 2, 92, 3, 5, 8, 46};
@@ -5242,28 +5265,6 @@ TEST(IsReadableTypeNameTest, ReturnsFalseForLongTemplateNames) {
 
 TEST(IsReadableTypeNameTest, ReturnsFalseForLongFunctionTypeNames) {
   EXPECT_FALSE(IsReadableTypeName("void (&)(int, bool, char, float)"));
-}
-
-// Tests JoinAsTuple().
-
-TEST(JoinAsTupleTest, JoinsEmptyTuple) {
-  EXPECT_EQ("", JoinAsTuple(Strings()));
-}
-
-TEST(JoinAsTupleTest, JoinsOneTuple) {
-  const char* fields[] = {"1"};
-  EXPECT_EQ("1", JoinAsTuple(Strings(fields, fields + 1)));
-}
-
-TEST(JoinAsTupleTest, JoinsTwoTuple) {
-  const char* fields[] = {"1", "a"};
-  EXPECT_EQ("(1, a)", JoinAsTuple(Strings(fields, fields + 2)));
-}
-
-TEST(JoinAsTupleTest, JoinsTenTuple) {
-  const char* fields[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"};
-  EXPECT_EQ("(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
-            JoinAsTuple(Strings(fields, fields + 10)));
 }
 
 // Tests FormatMatcherDescription().

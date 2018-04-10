@@ -54,11 +54,13 @@ add_library(
 target_link_libraries(
   ff
 
-  ${GMP_LIBRARIES}
-  ${GMPXX_LIBRARIES}
-  ${CRYPTO_LIBRARIES}
+  GMP::gmp
   ${PROCPS_LIBRARIES}
   ${FF_EXTRALIBS}
+)
+target_include_directories(
+  ff
+  PUBLIC ..
 )
 
 install(

@@ -227,7 +227,7 @@ void mp_compliance_step_pcd_circuit_maker<ppT>::generate_r1cs_constraints()
 
     libff::print_indent(); printf("* Compliance predicate arity: %zu\n", compliance_predicate.max_arity);
     libff::print_indent(); printf("* Compliance predicate outgoing payload length: %zu\n", compliance_predicate.outgoing_message_payload_length);
-    libff::print_indent(); printf("* Compliance predicate inncoming payload lengts:");
+    libff::print_indent(); printf("* Compliance predicate incoming payload lengths:");
     for (auto l : compliance_predicate.incoming_message_payload_lengths)
     {
         printf(" %zu", l);

@@ -53,7 +53,6 @@ The library has the following dependencies:
 * [Boost](http://www.boost.org/)
 * [CMake](http://cmake.org/)
 * [GMP](http://gmplib.org/)
-* libcrypto
 * [libprocps](http://packages.ubuntu.com/trusty/libprocps-dev)
 
 The library has been tested on Linux, but it is compatible with Windows and Mac OS X.

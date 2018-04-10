@@ -250,18 +250,6 @@ std::ostream& operator<<(std::ostream &out, const r1cs_constraint_system<FieldT>
         out << c;
     }
 
-#ifdef DEBUG
-    out << cs.constraint_annotations.size() << "\n";
-    for (std::pair<size_t, std::string> annot : cs.constraint_annotations) {
-        size_t c = annot.first;
-        out << c << "\n";
-
-        std::string word = annot.second;
-        out << word.size() << "\n";
-        out << word;
-    }
-#endif
-
     return out;
 }
 
@@ -287,27 +275,6 @@ std::istream& operator>>(std::istream &in, r1cs_constraint_system<FieldT> &cs)
         in >> c;
         cs.constraints.emplace_back(c);
     }
-#ifdef DEBUG
-    size_t num_constraint_annotations;
-    in >> num_constraint_annotations;
-    char bb;
-    in.read(&bb, 1);
-
-    for (size_t i = 0; i < num_constraint_annotations; ++i) {
-      size_t c;
-      in >> c;
-      in.read(&bb, 1);
-      size_t len;
-      in >> len;
-      in.read(&bb, 1);
-
-      std::vector<char> tmp(len);
-      std::string s;
-      in.read(tmp.data(), len);
-      s.assign(tmp.data(), len);
-      cs.constraint_annotations[c] = s;
-    }
-#endif
 
     return in;
 }

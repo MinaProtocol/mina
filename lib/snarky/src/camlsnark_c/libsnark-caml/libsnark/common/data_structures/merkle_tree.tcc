@@ -138,7 +138,7 @@ merkle_tree<HashT>::merkle_tree(const size_t depth,
                     }
                     else
                     {
-                        // typical case: this is the left child of the parent and adjecent to it there is a right child
+                        // typical case: this is the left child of the parent and adjacent to it there is a right child
                         hashes[(idx-1)/2] = two_to_one_CRH<HashT>(hash, std::next(it)->second);
                         ++it;
                     }

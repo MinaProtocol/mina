@@ -18,8 +18,9 @@ You must always put a mock method definition (`MOCK_METHOD*`) in a
 `public:` section of the mock class, regardless of the method being
 mocked being `public`, `protected`, or `private` in the base class.
 This allows `ON_CALL` and `EXPECT_CALL` to reference the mock function
-from outside of the mock class.  (Yes, C++ allows a subclass to change
-the access level of a virtual function in the base class.)  Example:
+from outside of the mock class.  (Yes, C++ allows a subclass to specify
+a different access level than the base class on a virtual function.)
+Example:
 
 ```
 class Foo {
@@ -147,7 +148,7 @@ Note that the mock class doesn't define `AppendPacket()`, unlike the
 real class. That's fine as long as the test doesn't need to call it.
 
 Next, you need a way to say that you want to use
-`ConcretePacketStream` in production code, and use `MockPacketStream`
+`ConcretePacketStream` in production code and to use `MockPacketStream`
 in tests.  Since the functions are not virtual and the two classes are
 unrelated, you must specify your choice at _compile time_ (as opposed
 to run time).
@@ -226,7 +227,7 @@ If a mock method has no `EXPECT_CALL` spec but is called, Google Mock
 will print a warning about the "uninteresting call". The rationale is:
 
   * New methods may be added to an interface after a test is written. We shouldn't fail a test just because a method it doesn't know about is called.
-  * However, this may also mean there's a bug in the test, so Google Mock shouldn't be silent either. If the user believes these calls are harmless, he can add an `EXPECT_CALL()` to suppress the warning.
+  * However, this may also mean there's a bug in the test, so Google Mock shouldn't be silent either. If the user believes these calls are harmless, they can add an `EXPECT_CALL()` to suppress the warning.
 
 However, sometimes you may want to suppress all "uninteresting call"
 warnings, while sometimes you may want the opposite, i.e. to treat all
@@ -705,7 +706,7 @@ type `m` accepts):
   1. When both `T` and `U` are built-in arithmetic types (`bool`, integers, and floating-point numbers), the conversion from `T` to `U` is not lossy (in other words, any value representable by `T` can also be represented by `U`); and
   1. When `U` is a reference, `T` must also be a reference (as the underlying matcher may be interested in the address of the `U` value).
 
-The code won't compile if any of these conditions isn't met.
+The code won't compile if any of these conditions aren't met.
 
 Here's one example:
 
@@ -1230,7 +1231,7 @@ that references the implementation object dies, the implementation
 object will be deleted.
 
 Therefore, if you have some complex matcher that you want to use again
-and again, there is no need to build it everytime. Just assign it to a
+and again, there is no need to build it every time. Just assign it to a
 matcher variable and use that variable repeatedly! For example,
 
 ```
@@ -1402,7 +1403,7 @@ edge from node A to node B wherever A must occur before B, we can get
 a DAG. We use the term "sequence" to mean a directed path in this
 DAG. Now, if we decompose the DAG into sequences, we just need to know
 which sequences each `EXPECT_CALL()` belongs to in order to be able to
-reconstruct the orginal DAG.
+reconstruct the original DAG.
 
 So, to specify the partial order on the expectations we need to do two
 things: first to define some `Sequence` objects, and then for each
@@ -1681,7 +1682,7 @@ This also works when the argument is an output iterator:
 
 ```
 using ::testing::_;
-using ::testing::SeArrayArgument;
+using ::testing::SetArrayArgument;
 
 class MockRolodex : public Rolodex {
  public:
@@ -2181,7 +2182,7 @@ the implementation object dies, the implementation object will be
 deleted.
 
 If you have some complex action that you want to use again and again,
-you may not have to build it from scratch everytime. If the action
+you may not have to build it from scratch every time. If the action
 doesn't have an internal state (i.e. if it always does the same thing
 no matter how many times it has been called), you can assign it to an
 action variable and use that variable repeatedly. For example:
@@ -2366,7 +2367,7 @@ Now there’s one topic we haven’t covered: how do you set expectations on `Sh
   // When one calls ShareBuzz() on the MockBuzzer like this, the call is
   // forwarded to DoShareBuzz(), which is mocked.  Therefore this statement
   // will trigger the above EXPECT_CALL.
-  mock_buzzer_.ShareBuzz(MakeUnique&lt;Buzz&gt;(AccessLevel::kInternal),
+  mock_buzzer_.ShareBuzz(MakeUnique<Buzz>(AccessLevel::kInternal),
                          ::base::Now());
 ```
 
@@ -2405,7 +2406,7 @@ Now, the mock `DoShareBuzz()` method is free to save the buzz argument for later
 ```
   std::unique_ptr<Buzz> intercepted_buzz;
   EXPECT_CALL(mock_buzzer_, DoShareBuzz(NotNull(), _))
-      .WillOnce(Invoke([&amp;intercepted_buzz](Buzz* buzz, Time timestamp) {
+      .WillOnce(Invoke([&intercepted_buzz](Buzz* buzz, Time timestamp) {
         // Save buzz in intercepted_buzz for analysis later.
         intercepted_buzz.reset(buzz);
         return false;

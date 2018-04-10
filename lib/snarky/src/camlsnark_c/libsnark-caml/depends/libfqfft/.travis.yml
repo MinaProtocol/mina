@@ -24,6 +24,7 @@ before_script:
 script:
   - make
   - make check
+  - make tutorials
 
 notifications:
   email: false

@@ -24,7 +24,7 @@ namespace libsnark {
 typedef std::map<size_t, size_t> memory_contents;
 
 /**
- * A memory interface is a virtual class for specifying and maintining a memory.
+ * A memory interface is a virtual class for specifying and maintaining a memory.
  *
  * A memory is parameterized by two quantities:
  * - num_addresses (which specifies the number of addresses); and
