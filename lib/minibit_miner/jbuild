@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name minibit_miner)
+  (public_name minibit_miner)
+  (library_flags (-linkall))
+  (libraries (core async minibit protocols async_extra ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib minibit_networking))))
+  (synopsis "Miner layer for Minibit")))
+
