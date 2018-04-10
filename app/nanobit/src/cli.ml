@@ -109,7 +109,6 @@ module Inputs = struct
       ; state : state
       }
       [@@deriving bin_io]
-    type t_with_witness = t
 
     module Stripped = struct
       type witness = Transaction.t list
@@ -139,7 +138,6 @@ module Inputs = struct
       { transactions : witness
       ; transition : Transition.t
       }
-    type t_with_witness = t
 
     let forget_witness {transition} = transition
     (* TODO should we also consume a ledger here so we know the transactions valid? *)
@@ -255,7 +253,7 @@ let daemon =
             | None -> Find_ip.find ()
             | Some ip -> return ip
           in
-          let remap_addr_port = fun addr -> addr in
+          let remap_addr_port = Fn.id in
           let me = Host_and_port.create ~host:ip ~port in
           let net_config = 
             { Inputs.Net.Config.parent_log = log

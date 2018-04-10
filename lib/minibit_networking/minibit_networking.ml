@@ -113,7 +113,8 @@ module Make
   type t =
     { gossip_net : Gossip_net.t 
     ; new_state_reader : State_with_witness.Stripped.t Linear_pipe.Reader.t
-    ; new_state_writer : State_with_witness.Stripped.t Linear_pipe.Writer.t }
+    ; new_state_writer : State_with_witness.Stripped.t Linear_pipe.Writer.t 
+    }
 
   type ledger = Ledger.t
   type stripped_state_with_witness = State_with_witness.Stripped.t
@@ -183,7 +184,8 @@ module Make
     end;
     { gossip_net
     ; new_state_reader
-    ; new_state_writer }
+    ; new_state_writer 
+    }
 
   module State_io = struct
     type net = t
@@ -219,8 +221,7 @@ module Make
                    ~how:`Parallel
                    xs
                    ~f:(fun x -> 
-                     let%map result = f x in
-                     match result with 
+                     match%map f x with 
                      | Some r -> Ivar.fill_if_empty ivar (Some r)
                      | None -> ()
                    )
@@ -257,7 +258,7 @@ module Make
         match ledger with
         | Ok (Some ledger) -> Deferred.Or_error.return ledger
         | Ok None -> Deferred.Or_error.error_string "no ledger found"
-        | Error s -> Deferred.Or_error.error_string (Error.to_string_hum s)
+        | Error s -> Deferred.Or_error.error_string (Error.to_string_mach s)
   end
 end
 

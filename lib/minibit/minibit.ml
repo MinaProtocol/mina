@@ -26,8 +26,11 @@ module type Network_intf = sig
   type stripped_state_with_witness
   type ledger
   type 'a hash
-  module State_io : State_io_intf with type stripped_state_with_witness := stripped_state_with_witness and type net := t
-  module Ledger_fetcher_io : Ledger_fetcher_io_intf with type net := t and type ledger := ledger and type 'a hash := 'a hash
+  module State_io : State_io_intf with type stripped_state_with_witness := stripped_state_with_witness 
+                                   and type net := t
+  module Ledger_fetcher_io : Ledger_fetcher_io_intf with type net := t 
+                                                     and type ledger := ledger 
+                                                     and type 'a hash := 'a hash
 
   module Config : sig
     type t
@@ -96,7 +99,7 @@ module type Transition_with_witness_intf = sig
     ; transition : transition
     }
 
-  include Witness_change_intf with type t_with_witness = t
+  include Witness_change_intf with type t_with_witness := t
                               and type witness = transaction_with_valid_signature list
                               and type t := transition
 end
@@ -122,7 +125,7 @@ module type State_with_witness_intf = sig
 
   val strip : t -> Stripped.t
 
-  include Witness_change_intf with type t_with_witness = t
+  include Witness_change_intf with type t_with_witness := t
                               and type witness = transaction_with_valid_signature list
                               and type t := state
 end
@@ -195,7 +198,10 @@ module Make
              | Ok ledger -> Some ledger
              | _ -> None))
     in
-    let state_io = Net.State_io.create net ~broadcast_state:(Linear_pipe.map miner_broadcast_reader ~f:(fun s -> State_with_witness.strip s)) in
+    let state_io = 
+      Net.State_io.create 
+        net 
+        ~broadcast_state:(Linear_pipe.map miner_broadcast_reader ~f:State_with_witness.strip) in
     { miner
     ; net
     ; state_io
