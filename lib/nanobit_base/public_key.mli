@@ -35,7 +35,7 @@ module Compressed : sig
   type var = (Field.var, Boolean.var) t_
   val typ : (var, t) Typ.t
 
-  include Hashable.S with type t := t
+  include Hashable.S_binable with type t := t
 
   val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
   val to_bits : t -> bool list

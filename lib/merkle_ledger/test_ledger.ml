@@ -3,8 +3,8 @@ open Ledger
 
 module Hash = struct
 
-  type hash = Md5.t [@@deriving sexp]
-  type account = int [@@deriving sexp]
+  type hash = Md5.t [@@deriving sexp, bin_io]
+  type account = int [@@deriving sexp, bin_io]
 
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
@@ -27,11 +27,11 @@ end
 
 module Key = struct
   module T = struct
-    type t = string [@@deriving sexp, compare, hash]
-    type key = t [@@deriving sexp]
+    type t = string [@@deriving sexp, compare, hash, bin_io]
+    type key = t [@@deriving sexp, bin_io]
   end
   include T 
-  include Hashable.Make(T)
+  include Hashable.Make_binable(T)
 end
 
 include Ledger.Make(Hash)(Max_depth)(Key)

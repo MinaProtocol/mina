@@ -4,22 +4,22 @@ open Core;;
 
 module type S =
   functor (Hash : sig 
-       type hash [@@deriving sexp]
-       type account [@@deriving sexp]
+       type hash [@@deriving sexp, bin_io]
+       type account [@@deriving sexp, bin_io]
        val hash_account : account -> hash 
        val empty_hash : hash
        val merge : hash -> hash -> hash
      end)
     (Max_depth : sig val max_depth : int end)
     (Key : sig 
-        type t [@@deriving sexp]
-        include Hashable.S with type t := t
+        type t [@@deriving sexp, bin_io]
+        include Hashable.S_binable with type t := t
      end) -> sig
 
   type index = int
 
   type t
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   module Path : sig
     type elem =
@@ -94,53 +94,58 @@ end
 
 module Make 
     (Hash : sig 
-       type hash [@@deriving sexp]
-       type account [@@deriving sexp]
+       type hash [@@deriving sexp, bin_io]
+       type account [@@deriving sexp, bin_io]
        val hash_account : account -> hash 
        val empty_hash : hash
        val merge : hash -> hash -> hash
      end)
     (Max_depth : sig val max_depth : int end)
     (Key : sig 
-        type t [@@deriving sexp]
-        include Hashable.S with type t := t
+        type t [@@deriving sexp, bin_io]
+        include Hashable.S_binable with type t := t
      end) = struct
 
-  type key = Key.t [@@deriving sexp]
+  type key = Key.t [@@deriving sexp, bin_io]
 
   type entry = 
     { merkle_index : int
     ; account : Hash.account 
     }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
-  type accounts = entry Key.Table.t [@@deriving sexp]
+  type accounts = entry Key.Table.t [@@deriving sexp, bin_io]
 
   module DynArray = struct
     include DynArray
     let sexp_of_t sexp_of_a t = [%sexp_of: a list] (DynArray.to_list t)
     let t_of_sexp a_of_sexp ls = DynArray.of_list ([%of_sexp: a list] ls)
+    include Binable.Of_binable1(Array)(struct
+        type 'a t = 'a DynArray.t
+        let to_binable = DynArray.to_array
+        let of_binable = DynArray.of_array
+      end)
   end
 
   type index = int
 
-  type leafs = key DynArray.t [@@deriving sexp]
+  type leafs = key DynArray.t [@@deriving sexp, bin_io]
 
-  type nodes = Hash.hash DynArray.t list [@@deriving sexp]
+  type nodes = Hash.hash DynArray.t list [@@deriving sexp, bin_io]
 
   type tree = 
     { leafs : leafs
     ; mutable nodes_height : int
     ; mutable nodes : nodes
     ; mutable dirty_indices : int list }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   type t = 
     { accounts : accounts
     ; tree : tree 
     ; depth : int
     }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   module Path = struct
     type elem = 
