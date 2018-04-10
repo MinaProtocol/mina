@@ -137,9 +137,7 @@ module Tick = struct
     module P = Pedersen.Make(Field)(Tick_curve.Bigint.R)(Curve)
     include (P : module type of P with module Digest := P.Digest)
     module Digest = struct
-      include Hashable.Make(struct
-        type t = bool list [@@deriving compare, hash, sexp]
-      end)
+      include Hashable.Make(Field)
 
       include P.Digest
       include Snarkable(Tick0)

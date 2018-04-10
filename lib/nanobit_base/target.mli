@@ -3,7 +3,7 @@ open Snark_params
 open Tick
 
 type t = private Field.t
-[@@deriving sexp]
+[@@deriving sexp, bin_io]
 
 module Stable : sig
   module V1 : sig

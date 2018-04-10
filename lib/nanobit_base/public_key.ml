@@ -38,7 +38,7 @@ module Compressed = struct
   end
 
   include Stable.V1
-  include Hashable.Make(Stable.V1)
+  include Hashable.Make_binable(Stable.V1)
 
   type var = (Field.var, Boolean.var) t_
 

@@ -8,42 +8,49 @@ module Inputs = struct
   module Time = Block_time
   module Hash = struct
     type 'a t = Snark_params.Tick.Pedersen.Digest.t
-    [@@deriving sexp]
+    [@@deriving compare, hash, sexp, bin_io]
     (* TODO *)
     let hash _ = Snark_params.Tick.Pedersen.zero_hash
   end
   module Transaction = struct
-    type 'a t =
-      { transaction: Nanobit_base.Transaction.t
-      ; validation: 'a
-      }
+    type t = { transaction: Nanobit_base.Transaction.t }
+      [@@deriving bin_io]
 
-    let of_transaction transaction =
-      { transaction
-      ; validation = `Unknown
-      }
+    module With_valid_signature = struct
+      type t = 
+        { transaction: Nanobit_base.Transaction.t 
+        ; validation: unit
+        }
+      [@@deriving bin_io]
+    end
 
     let check t =
       if Nanobit_base.Transaction.check_signature t.transaction then
-        Some { t with validation = `Valid_signature }
+        Some
+          { transaction = t.transaction
+          ; With_valid_signature.validation = ()
+          }
       else
         None
+    let forget t = { transaction = t.With_valid_signature.transaction }
   end
   module Nonce = Nanobit_base.Nonce
   module Difficulty = struct
     type t = Target.t
+    [@@deriving bin_io]
 
     let next t ~last ~this =
       Blockchain_state.compute_target last t this
   end
   module Strength = struct
     type t = Strength.t
+    [@@deriving bin_io]
 
     (* TODO *)
     let increase t ~by = t
   end
   module Ledger = struct
-    type t = Nanobit_base.Ledger.t
+    type t = Nanobit_base.Ledger.t [@@deriving bin_io]
   end
   module Ledger_proof = struct
     type t = unit
@@ -74,11 +81,12 @@ module Inputs = struct
       ; strength             : Strength.t
       ; timestamp            : Time.t
       }
-    [@@deriving fields]
+    [@@deriving fields, bin_io]
 
     module Proof = struct
       type input = t
       type t = unit
+      [@@deriving bin_io]
 
       (* TODO *)
       let verify t _ = return true
@@ -86,12 +94,36 @@ module Inputs = struct
   end
   module Proof_carrying_state = struct
     type t = (State.t, State.Proof.t) Protocols.Minibit_pow.Proof_carrying_data.t
+    [@@deriving bin_io]
   end
   module State_with_witness = struct
-    type 'a witness = 'a Transaction.t list
-    type 'a t =
-      { transactions : 'a witness
-      ; state : Proof_carrying_state.t
+    type transaction_with_valid_signature = Transaction.With_valid_signature.t
+    type transaction = Transaction.t
+      [@@deriving bin_io]
+    type witness = Transaction.With_valid_signature.t list
+      [@@deriving bin_io]
+    type state = Proof_carrying_state.t 
+      [@@deriving bin_io]
+    type t =
+      { transactions : witness
+      ; state : state
+      }
+      [@@deriving bin_io]
+    type t_with_witness = t
+
+    module Stripped = struct
+      type witness = Transaction.t list
+        [@@deriving bin_io]
+      type t =
+        { transactions : witness
+        ; state : Proof_carrying_state.t
+        }
+      [@@deriving bin_io]
+    end
+
+    let strip t = 
+      { Stripped.transactions = List.map t.transactions ~f:(fun t -> Transaction.forget t)
+      ; state = t.state
       }
 
     let forget_witness {state} = state
@@ -102,11 +134,12 @@ module Inputs = struct
     let add_witness state transactions = Or_error.return {state ; transactions}
   end
   module Transition_with_witness = struct
-    type 'a witness = 'a Transaction.t list
-    type 'a t =
-      { transactions : 'a witness
+    type witness = Transaction.With_valid_signature.t list
+    type t =
+      { transactions : witness
       ; transition : Transition.t
       }
+    type t_with_witness = t
 
     let forget_witness {transition} = transition
     (* TODO should we also consume a ledger here so we know the transactions valid? *)
@@ -115,20 +148,15 @@ module Inputs = struct
     (* TODO same *)
     let add_witness transition transactions = Or_error.return {transition ; transactions}
   end
-  module State_io = struct
-    type t = unit
-
-    let create ~broadcast_state = ()
-
-    let new_states t =
-      let (r,w) = Linear_pipe.create () in
-      r
-  end
+  module Net = Minibit_networking.Make(State_with_witness)(Hash)(Ledger)
+  module Ledger_fetcher_io = Net.Ledger_fetcher_io
+  module State_io = Net.State_io
   module Ledger_fetcher = struct
     type t = unit
     let create ~ledger_transitions = ()
 
     let get t hash = Deferred.never ()
+    let local_get t hash = Or_error.error_string "nyi"
   end
   module Transaction_pool = struct
     type t
@@ -210,23 +238,43 @@ let daemon =
             Option.value ~default:(home ^/ ".current-config") conf_dir
           in
           let%bind () = Unix.mkdir ~p:() conf_dir in
-          let minibit = Main.create () in
+          let%bind initial_peers =
+            let peers_path = conf_dir ^/ "peers" in
+            match%bind Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list] with
+            | Ok ls -> return ls
+            | Error e -> 
+              begin
+                let default_initial_peers = [] in
+                let%map () = Writer.save_sexp peers_path ([%sexp_of: Host_and_port.t list] default_initial_peers) in
+                []
+              end
+          in
+          let log = Logger.create () in
+          let%bind ip =
+            match ip with
+            | None -> Find_ip.find ()
+            | Some ip -> return ip
+          in
+          let remap_addr_port = fun addr -> addr in
+          let me = Host_and_port.create ~host:ip ~port in
+          let net_config = 
+            { Inputs.Net.Config.parent_log = log
+            ; gossip_net_params =
+                { timeout = Time.Span.of_sec 1.
+                ; target_peer_count = 8
+                ; address = remap_addr_port me
+                } 
+            ; initial_peers
+            ; me
+            ; remap_addr_port
+            }
+          in
+          let%bind minibit = Main.create net_config in
           printf "Created minibit\n%!";
           Main.run minibit;
           printf "Ran minibit\n%!";
           Async.never ()
 
-          (*let%bind initial_peers =*)
-            (*let peers_path = conf_dir ^/ "peers" in*)
-            (*match%bind Reader.load_sexp peers_path [%of_sexp: Host_and_port.t list] with*)
-            (*| Ok ls -> return ls*)
-            (*| Error e -> *)
-              (*begin*)
-                (*let default_initial_peers = [] in*)
-                (*let%map () = Writer.save_sexp peers_path ([%sexp_of: Host_and_port.t list] default_initial_peers) in*)
-                (*[]*)
-              (*end*)
-          (*in*)
           (*let%bind prover =*)
             (*if start_prover*)
             (*then Prover.create ~port:prover_port ~debug:()*)

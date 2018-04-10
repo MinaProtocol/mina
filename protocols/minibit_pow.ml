@@ -6,7 +6,7 @@ module type Time_intf = sig
 end
 
 module type Hash_intf = sig
-  type 'a t [@@deriving sexp]
+  type 'a t [@@deriving compare, hash, sexp, bin_io]
 
   val hash : 'a -> 'a t
 end
@@ -19,7 +19,7 @@ module type Proof_intf = sig
 end
 
 module type Ledger_intf = sig
-  type t
+  type t [@@deriving bin_io]
 end
 
 module type Nonce_intf = sig
@@ -27,9 +27,13 @@ module type Nonce_intf = sig
 end
 
 module type Transaction_intf = sig
-  type _ t
+  type t
+  module With_valid_signature : sig
+    type t
+  end
 
-  val check : _ t -> [> `Valid_signature ] t option
+  val check : t -> With_valid_signature.t option
+  val forget : With_valid_signature.t -> t
 end
 
 module type Strength_intf = sig
@@ -125,7 +129,7 @@ module Proof_carrying_data = struct
     { data : 'a
     ; proof : 'b
     }
-  [@@deriving fields]
+  [@@deriving fields, bin_io]
 end
 
 module type Inputs_intf = sig

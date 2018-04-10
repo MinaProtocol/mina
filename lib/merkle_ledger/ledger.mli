@@ -2,22 +2,22 @@ open Core
 
 module type S =
   functor (Hash : sig 
-       type hash [@@deriving sexp]
-       type account [@@deriving sexp]
+       type hash [@@deriving sexp, bin_io]
+       type account [@@deriving sexp, bin_io]
        val hash_account : account -> hash 
        val empty_hash : hash
        val merge : hash -> hash -> hash
      end)
     (Max_depth : sig val max_depth : int end)
     (Key : sig 
-        type t [@@deriving sexp]
-        include Hashable.S with type t := t
+        type t [@@deriving sexp, bin_io]
+        include Hashable.S_binable with type t := t
      end) -> sig
 
   type index = int
 
   type t
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   module Path : sig
     type elem =

@@ -36,7 +36,7 @@ module Linked_blockchain = struct
   let all_nodes t =
     Digest.Table.data t._all_nodes
 
-  let key n = Digest.Bits.to_bits n.node.state.block_hash
+  let key n = n.node.state.block_hash
 
   let mutate_add t n ~is_root =
     let _ = Digest.Table.add ~key:(key n) ~data:n t._all_nodes in

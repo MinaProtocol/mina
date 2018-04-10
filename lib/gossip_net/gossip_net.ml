@@ -12,6 +12,49 @@ module type Message_intf = sig
     and type caller_msg := msg
 end
 
+module type Peer_intf = sig
+  type t
+  include Hashable with type t := t
+  include Sexpable with type t := t
+
+  module Event : sig
+    type nonrec t =
+      | Connect of t list
+      | Disconnect of t list
+    include Sexpable with type t := t
+  end
+end
+
+module type Gossip_net_intf = sig
+  type msg
+  type peer
+
+  type t
+
+  val received : t -> msg Linear_pipe.Reader.t
+
+  val broadcast : t -> msg Linear_pipe.Writer.t
+
+  val broadcast_all : t -> msg -> 
+    (unit -> [`Done | `Continue] Deferred.t) Staged.t
+
+  val random_peers : t -> int -> peer list
+
+  val query_peer
+    : t
+    -> peer
+    -> ('q, 'r) dispatch
+    -> 'q
+    -> 'r Or_error.t Deferred.t
+
+  val query_random_peers
+    : t
+    -> int
+    -> ('q, 'r) dispatch
+    -> 'q
+    -> 'r Or_error.t Deferred.t List.t
+end
+
 module type S =
   functor (Message : Message_intf) -> sig
 
@@ -46,6 +89,8 @@ module type S =
 
     val broadcast_all : t -> Message.msg -> 
       (unit -> [`Done | `Continue] Deferred.t) Staged.t
+
+    val random_peers : t -> int -> Peer.t list
 
     val query_peer
       : t
@@ -167,11 +212,11 @@ module Make (Message : Message_intf) = struct
         peer_events ~f:(function
           | Connect peers -> 
             Logger.info log "Some peers connected %s"
-              (List.sexp_of_t Host_and_port.sexp_of_t peers |> Sexp.to_string_hum);
+              (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum);
             List.iter peers ~f:(fun peer -> Hash_set.add t.peers peer); Deferred.unit
           | Disconnect peers -> 
             Logger.info log "Some peers disconnected %s"
-              (List.sexp_of_t Host_and_port.sexp_of_t peers |> Sexp.to_string_hum);
+              (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum);
             List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer); Deferred.unit 
         )
     end;
@@ -205,6 +250,8 @@ module Make (Message : Message_intf) = struct
         to_broadcast := List.drop !to_broadcast t.target_peer_count;
         let%map () = broadcast_selected t selected msg in
         if List.length !to_broadcast = 0 then `Done else `Continue)
+
+  let random_peers t n = random_sublist (Hash_set.to_list t.peers) n
 
   let query_peer t (peer : Peer.t) rpc query = 
     Logger.trace t.log "querying peer" ~attrs:[ ("peer", [%sexp_of: Peer.t] peer) ];

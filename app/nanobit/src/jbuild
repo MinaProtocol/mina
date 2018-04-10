@@ -8,6 +8,7 @@
       core
       client_lib
       linear_pipe
+      minibit_networking
       gossip_net
       kademlia
       minibit

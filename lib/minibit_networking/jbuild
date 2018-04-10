@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name minibit_networking)
+  (public_name minibit_networking)
+  (library_flags (-linkall))
+  (libraries (core async gossip_net minibit protocols async_extra ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib minibit_networking))))
+  (synopsis "Networking layer for Minibit")))
+
