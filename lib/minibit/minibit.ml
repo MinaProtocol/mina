@@ -77,7 +77,7 @@ module type Transition_with_witness_intf = sig
     ; transition : transition
     }
 
-  include Witness_change_intf with type 'a t_with_witness = 'a t
+  include Witness_change_intf with type 'a t_with_witness := 'a t
                               and type 'a witness = 'a transaction list
                               and type t := transition
 end
@@ -91,15 +91,13 @@ module type State_with_witness_intf = sig
     ; state : state
     }
 
-  include Witness_change_intf with type 'a t_with_witness = 'a t
+  include Witness_change_intf with type 'a t_with_witness := 'a t
                               and type 'a witness = 'a transaction list
                               and type t := state
 end
 
 module type Inputs_intf = sig
   include Minibit_pow.Inputs_intf
-
-  module Ledger_fetcher_io : Ledger_fetcher_io_intf
   module Proof_carrying_state : sig
     type t = (State.t, State.Proof.t) Minibit_pow.Proof_carrying_data.t
   end
@@ -143,6 +141,20 @@ module Make
     }
   constraint 'a = [> `Valid_signature]
 
+  let create () =
+    let (miner_broadcast_reader,miner_broadcast_writer) = Linear_pipe.create () in
+    let (ledger_fetcher_transitions_reader, ledger_fetcher_transitions_writer) = Linear_pipe.create () in
+    let (change_feeder_reader, change_feeder_writer) = Linear_pipe.create () in
+    let miner = Miner.create ~change_feeder:change_feeder_reader in
+    let ledger_fetcher = Ledger_fetcher.create  ~ledger_transitions:ledger_fetcher_transitions_reader in
+    let state_io = State_io.create ~broadcast_state:miner_broadcast_reader in
+    { miner
+    ; state_io
+    ; miner_broadcast_writer
+    ; ledger_fetcher
+    ; ledger_fetcher_transitions = ledger_fetcher_transitions_writer
+    }
+
   let run t =
     let p : Protocol.t = Protocol.create ~initial:{ data = Genesis.state ; proof = Genesis.proof } in
 
@@ -185,6 +197,7 @@ module Make
       Linear_pipe.transfer updated_state_ledger t.ledger_fetcher_transitions
         ~f:(fun {state ; transactions} -> (state.data.ledger_hash, transactions))
     end;
+    printf "Pipes hooked in\n%!"
 end
 
 
