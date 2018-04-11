@@ -7,6 +7,7 @@ module Proof_type : sig
 end
 
 type t
+[@@deriving bin_io]
 
 val create
   : source:Ledger_hash.t

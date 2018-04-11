@@ -117,7 +117,7 @@ module Main (Params : Params_intf) = struct
 
   module Transition = Blockchain_transition
 
-  module Keys = Transition_keys.Make(struct end)
+  module Keys = Keys.Make()
 
   module Transaction_snark = Transaction_snark.Make(struct let keys = Keys.transaction_snark_keys end)
 

@@ -22,6 +22,7 @@
       logger
       async
       async_extra
+      rpc_parallel
       async_ssl
       cohttp
       cohttp-async))
