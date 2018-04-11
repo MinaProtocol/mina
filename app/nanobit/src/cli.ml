@@ -168,7 +168,7 @@ module Inputs = struct
     let remove t valid_transactions = t
     let get t ~k  = []
   end
-  module Miner = Minibit_miner.Make(Inputs0)
+  module Miner = Minibit_miner.Make(Inputs0.Transition_with_witness)(Inputs0)
   module Genesis = struct
     (* TODO actually do this right *)
     let state : State.t =
