@@ -44,7 +44,7 @@ let%test "idx_nonexist" =
   let b = 100 in
   let d = 16 in
   let ledger, _keys = load_ledger d 10 b in
-  `Index_not_found = Test_ledger.get_at_index ledger 0
+  `Index_not_found = Test_ledger.get_at_index ledger 1234567
 ;;
 
 let%test_unit "modify_account" = 
@@ -81,8 +81,8 @@ let%test "merkle_root" =
 ;;
 
 let%test "merkle_root_nonempty" =
-  let d = 16 in
-  let ledger, keys = load_ledger d 1 10 in
+  let d = 3 in
+  let ledger, keys = load_ledger d (1 lsl d) 1 in
   let root = Test_ledger.merkle_root ledger in
   Test_ledger.Hash.empty_hash <> root
 ;;
@@ -124,9 +124,8 @@ let check_path account (path : Test_ledger.Path.t) root =
 
 let%test_unit "merkle_path" =
   let b1 = 10 in
-  let d = 16 in
-  List.iter 
-    (List.range 1 20)
+  let d = 3 in
+  List.iter (List.range ~stop:`inclusive 1 (1 lsl d))
     ~f:(fun n -> 
       let ledger, keys = load_ledger d n b1 in
       let key = List.nth_exn keys 0 in
