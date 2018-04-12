@@ -54,7 +54,17 @@ module type Ledger_fetcher_intf = sig
   type state
   type net
 
-  val create : parent_log:Logger.t -> net_deferred:(net Deferred.t) -> ledger_transitions:(ledger hash * transaction_with_valid_signature list * state) Linear_pipe.Reader.t -> t
+  module Config : sig
+    type t =
+      { keep_count : int [@default 50]
+      ; parent_log : Logger.t
+      ; net_deferred : net Deferred.t
+      ; ledger_transitions : (ledger hash * transaction_with_valid_signature list * state) Linear_pipe.Reader.t
+      }
+    [@@deriving make]
+  end
+
+  val create : Config.t -> t
   val get : t -> ledger hash -> ledger Deferred.Or_error.t
 
   val local_get : t -> ledger hash -> (ledger * state) Or_error.t
@@ -202,7 +212,7 @@ module Make
     let (change_feeder_reader, change_feeder_writer) = Linear_pipe.create () in
     let miner = Miner.create ~change_feeder:change_feeder_reader in
     let ledger_fetcher_net_ivar = Ivar.create () in
-    let ledger_fetcher = Ledger_fetcher.create ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader in
+    let ledger_fetcher = Ledger_fetcher.create (Ledger_fetcher.Config.make ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader ()) in
     let%map net = 
       Net.create 
         config.net_config
@@ -264,10 +274,14 @@ module Make
     end;
 
     don't_wait_for begin
-      Linear_pipe.transfer updated_state_ledger t.ledger_fetcher_transitions
-        ~f:(fun {state ; transactions} ->
-              (state.data.ledger_hash, transactions, state.data))
+      Linear_pipe.iter updated_state_ledger ~f:(fun {state ; transactions} ->
+        (* TODO: Right now we're crashing on purpose if we even get a tiny bit
+         *       backed up. We should fix this see issues #178 and #177 *)
+        Linear_pipe.write_or_exn ~capacity:10 t.ledger_fetcher_transitions updated_state_ledger (state.data.ledger_hash, transactions, state.data);
+        return ()
+      )
     end;
+
     printf "Pipes hooked in\n%!"
 end
 

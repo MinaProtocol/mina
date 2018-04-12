@@ -19,14 +19,14 @@ val wrap_reader : 'a Pipe.Reader.t -> 'a Reader.t
 val write_or_drop
   : capacity : int
   -> 'a Writer.t 
-  -> 'a Reader.t 
+  -> 'b Reader.t 
   -> 'a 
   -> unit
 
 val write_or_exn
   : capacity : int
   -> 'a Writer.t 
-  -> 'a Reader.t 
+  -> 'b Reader.t 
   -> 'a 
   -> unit
 
