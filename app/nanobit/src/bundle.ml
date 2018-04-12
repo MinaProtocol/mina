@@ -83,13 +83,17 @@ module M = Map_reduce.Make_map_reduce_function(struct
       let handler (With { request; respond}) =
         let ledger = ref ledger in
         let open Ledger_hash in
+        let path_exn idx =
+          List.map (Sparse_ledger.path_exn !ledger idx)
+            ~f:(function `Left h -> h | `Right h -> h)
+        in
         match request with
         | Get_element idx ->
           let elt = Sparse_ledger.get_exn !ledger idx in
-          let path = Sparse_ledger.path_exn !ledger idx in
+          let path = path_exn idx in
           respond (Provide (elt, path))
         | Get_path idx ->
-          respond (Provide (Sparse_ledger.path_exn !ledger idx))
+          respond (Provide (path_exn idx))
         | Set (idx, account) ->
           ledger := Sparse_ledger.set_exn !ledger idx account;
           respond (Provide ())
