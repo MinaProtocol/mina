@@ -159,7 +159,7 @@ module Make
   let create 
         (config : Config.t)
         check_ledger_at_hash 
-        (get_ledger_at_hash : Ledger.t Hash.t -> (Ledger.t * State.t) option Deferred.t)
+        get_ledger_at_hash
     = 
     let log = Logger.child config.parent_log "minibit networking" in
     let check_ledger_at_hash_rpc () ~version hash = check_ledger_at_hash hash in

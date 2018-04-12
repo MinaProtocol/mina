@@ -14,7 +14,6 @@ end
 
 module Make
   (Inputs : Inputs_intf)
-  (* TODO: Not sure if we should depend on logger directly here or functor it out *)
 = struct
   open Inputs
 
@@ -60,7 +59,6 @@ module Make
       ledger
     | Ok (l,s) -> Deferred.Or_error.return l
 
-    (*:(Ledger.t Hash.t * [> `Valid_signature ] Transaction.t list * State.t) Linear_pipe.Reader.t -> t = fun ~ledger_transitions -> ()*)
   let create ~parent_log ~net_deferred ~ledger_transitions =
     let t =
       { strongest_ledgers = Heap.create ~cmp:(fun (_, s) (_, s') -> Strength.compare s s') ()
