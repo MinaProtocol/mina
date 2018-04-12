@@ -2,13 +2,13 @@ open Core
 
 module Make
     (Hash : sig
-       type t [@@deriving bin_io, eq]
+       type t [@@deriving bin_io, eq, sexp]
 
        val merge : t -> t -> t
      end)
-    (Key : sig type t [@@deriving bin_io, eq] end)
+    (Key : sig type t [@@deriving bin_io, eq, sexp] end)
     (Account : sig
-       type t [@@deriving bin_io, eq]
+       type t [@@deriving bin_io, eq, sexp]
 
        val key : t -> Key.t
        val hash : t -> Hash.t
@@ -17,21 +17,21 @@ module Make
     | Account of Account.t
     | Hash of Hash.t
     | Node of Hash.t * tree * tree
-  [@@deriving bin_io]
+  [@@deriving bin_io, eq, sexp]
 
   let hash = function
     | Account a -> Account.hash a
     | Hash h -> h
     | Node (h, _, _) -> h
 
-  type index = int [@@deriving bin_io]
+  type index = int [@@deriving bin_io, sexp]
 
   type t =
     { indexes : (Key.t, index) List.Assoc.t
     ; depth   : int
     ; tree    : tree
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp]
 
   let of_hash ~depth h =
     { indexes = []; depth; tree = Hash h }
@@ -126,9 +126,98 @@ module Make
         | Node (_, l, r) ->
           let go_right = ith_bit idx i in
           if go_right
-          then go (hash l :: acc) (i - 1) r
-          else go (hash r :: acc) (i - 1) l
+          then go (`Right (hash l) :: acc) (i - 1) r
+          else go (`Left (hash r) :: acc) (i - 1) l
     in
     go [] (depth - 1) tree
 end
 
+let%test_module "sparse-ledger-test" =
+  (module struct
+    module Hash = struct
+      include Md5
+      let merge x y =
+        Md5.(digest_string (to_binary x ^ to_binary y))
+
+      let gen = Quickcheck.Generator.map String.gen ~f:digest_string
+    end
+
+    module Account = struct
+      module T = struct
+        type t =
+          { name : string
+          ; favorite_number : int
+          }
+        [@@deriving bin_io, eq, sexp]
+      end
+      include T
+
+      let gen =
+        let open Quickcheck.Generator.Let_syntax in
+        let%map name = String.gen and favorite_number = Int.gen in
+        { name; favorite_number }
+
+      let key { name } = name
+
+      let hash t = Md5.digest_string (Binable.to_string (module T) t)
+    end
+
+    include Make(Hash)(String)(Account)
+
+    let gen =
+      let rec tree_depth = function
+        | Account _ | Hash _ -> 0
+        | Node (_, l, r) -> 1 + max (tree_depth l) (tree_depth r)
+      in
+      let rec prune_hash_branches = function
+        | Hash h -> Hash h
+        | Account a -> Account a
+        | Node (h, l, r) ->
+          begin match prune_hash_branches l, prune_hash_branches r with 
+          | Hash _, Hash _ -> Hash h
+          | l, r -> Node (h, l, r)
+          end
+      in
+      let prune_shallow_accounts max_depth t =
+        let rec go d t =
+          match t with
+          | Account a ->
+            if d < max_depth then Hash (Account.hash a) else t
+          | Hash _ -> t
+          | Node (h, l, r) ->
+            Node (h, go (d + 1) l, go (d + 1) r)
+        in
+        go 0 t
+      in
+      let indexes max_depth t =
+        let rec go addr d = function
+          | Account a -> [ (Account.key a, addr) ]
+          | Hash _ -> []
+          | Node (_, l, r) ->
+            go addr (d - 1) l
+            @ go (addr lor (1 lsl d)) (d - 1) r
+        in
+        go 0 (max_depth - 1) t
+      in
+      let open Quickcheck.Generator in
+      recursive (fun gen_tree ->
+        variant3 Account.gen Hash.gen (tuple2 gen_tree gen_tree) >>| function
+        | `A account -> Account account
+        | `B hash -> Hash hash
+        | `C (l, r) -> Node (Hash.merge (hash l) (hash r), l, r))
+      >>| fun tree ->
+      let depth = tree_depth tree in
+      let tree = prune_shallow_accounts depth tree |> prune_hash_branches in
+      { tree; depth; indexes = indexes depth tree }
+
+    let%test_unit "path_test" =
+      Quickcheck.test gen ~f:(fun t ->
+        let root = { t with indexes = []; tree = Hash (merkle_root t) } in
+        let t' =
+          List.fold t.indexes ~init:root ~f:(fun acc (_, index) ->
+            let account = get_exn t index in
+            add_path acc (path_exn t index) account)
+        in
+        assert (equal_tree t'.tree t.tree))
+
+  end)
