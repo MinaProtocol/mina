@@ -16,6 +16,7 @@
       minibit
       protocols
       nanobit_base
+      sparse_ledger
       blockchain_snark
       transaction_snark
       snarky
