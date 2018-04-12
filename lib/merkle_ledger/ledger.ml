@@ -4,7 +4,7 @@ open Core;;
 
 module type S =
   functor (Hash : sig 
-       type hash [@@deriving sexp, bin_io]
+       type hash [@@deriving sexp, hash, compare, bin_io]
        type account [@@deriving sexp, bin_io]
        val hash_account : account -> hash 
        val empty_hash : hash
@@ -20,6 +20,8 @@ module type S =
 
   type t
   [@@deriving sexp, bin_io]
+
+  val copy : t -> t
 
   module Path : sig
     type elem =
@@ -55,6 +57,10 @@ module type S =
   val merkle_root
     : t
     -> Hash.hash
+
+  val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
+  val hash_fold_t : Ppx_hash_lib.Std.Hash.state -> t -> Ppx_hash_lib.Std.Hash.state
+  val compare : t -> t -> int
 
   val merkle_path
     : t
@@ -94,7 +100,7 @@ end
 
 module Make 
     (Hash : sig 
-       type hash [@@deriving sexp, bin_io]
+       type hash [@@deriving sexp, hash, compare, bin_io]
        type account [@@deriving sexp, bin_io]
        val hash_account : account -> hash 
        val empty_hash : hash
@@ -146,6 +152,19 @@ module Make
     ; depth : int
     }
   [@@deriving sexp, bin_io]
+
+  let copy t =
+    let copy_tree tree =
+      { leafs = DynArray.copy tree.leafs
+      ; nodes_height = tree.nodes_height
+      ; nodes = tree.nodes
+      ; dirty_indices = tree.dirty_indices
+      }
+    in
+    { accounts = Key.Table.copy t.accounts
+    ; tree = copy_tree t.tree
+    ; depth = t.depth
+    }
 
   module Path = struct
     type elem = 
@@ -345,6 +364,10 @@ module Make
     in
     go (t.depth - height - 1) base_root
   ;;
+
+  let hash t = Hash.hash_hash (merkle_root t)
+  let hash_fold_t state t = Ppx_hash_lib.Std.Hash.fold_int state (hash t)
+  let compare t t' = Hash.compare_hash (merkle_root t) (merkle_root t')
 
   let merkle_path t key = 
     recompute_tree t;

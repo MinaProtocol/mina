@@ -3,12 +3,12 @@ open Async_kernel
 open Protocols
 
 module type Ledger_fetcher_io_intf = sig
-  type net
   type t
   type 'a hash
   type ledger
+  type state
 
-  val get_ledger_at_hash : net -> t -> ledger hash -> ledger Deferred.Or_error.t
+  val get_ledger_at_hash : t -> ledger hash -> (ledger * state) Deferred.Or_error.t
 end
 
 module type State_io_intf = sig
@@ -26,11 +26,13 @@ module type Network_intf = sig
   type stripped_state_with_witness
   type ledger
   type 'a hash
+  type state
   module State_io : State_io_intf with type stripped_state_with_witness := stripped_state_with_witness 
                                    and type net := t
-  module Ledger_fetcher_io : Ledger_fetcher_io_intf with type net := t 
+  module Ledger_fetcher_io : Ledger_fetcher_io_intf with type t := t
                                                      and type ledger := ledger 
                                                      and type 'a hash := 'a hash
+                                                     and type state := state
 
   module Config : sig
     type t
@@ -39,7 +41,7 @@ module type Network_intf = sig
   val create
     : Config.t
     -> (ledger hash -> bool Deferred.t)
-    -> (ledger hash -> ledger option Deferred.t)
+    -> (ledger hash -> (ledger * state) option Deferred.t)
     -> t Deferred.t
 
 end
@@ -49,11 +51,23 @@ module type Ledger_fetcher_intf = sig
   type 'a hash
   type ledger
   type transaction_with_valid_signature
+  type state
+  type net
 
-  val create : ledger_transitions:(ledger hash * transaction_with_valid_signature list) Linear_pipe.Reader.t -> t
+  module Config : sig
+    type t =
+      { keep_count : int [@default 50]
+      ; parent_log : Logger.t
+      ; net_deferred : net Deferred.t
+      ; ledger_transitions : (ledger hash * transaction_with_valid_signature list * state) Linear_pipe.Reader.t
+      }
+    [@@deriving make]
+  end
+
+  val create : Config.t -> t
   val get : t -> ledger hash -> ledger Deferred.Or_error.t
 
-  val local_get : t -> ledger hash -> ledger Or_error.t
+  val local_get : t -> ledger hash -> (ledger * state) Or_error.t
 end
 
 module type Transaction_pool_intf = sig
@@ -143,14 +157,17 @@ module type Inputs_intf = sig
   module Transition_with_witness : Transition_with_witness_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
                                                                  and type transition := Transition.t
 
-  module Net : Network_intf  
+  module Net : Network_intf
     with type stripped_state_with_witness := State_with_witness.Stripped.t 
      and type ledger := Ledger.t
      and type 'a hash := 'a Hash.t
+     and type state := State.t
 
   module Ledger_fetcher : Ledger_fetcher_intf with type 'a hash := 'a Hash.t
                                                and type ledger := Ledger.t
                                                and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+                                               and type state := State.t
+                                               and type net := Net.t
 
   module Transaction_pool : Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
   module Miner : Miner_intf with type 'a hash := 'a Hash.t
@@ -179,25 +196,34 @@ module Make
     ; net : Net.t
     ; state_io : Net.State_io.t
     ; miner_broadcast_writer : State_with_witness.t Linear_pipe.Writer.t
-    ; ledger_fetcher_transitions : (Ledger.t Hash.t * Transaction.With_valid_signature.t list) Linear_pipe.Writer.t
+    ; ledger_fetcher_transitions : (Ledger.t Hash.t * Transaction.With_valid_signature.t list * State.t) Linear_pipe.Writer.t
     }
 
-  let create net_config =
+  module Config = struct
+    type t =
+      { log : Logger.t
+      ; net_config : Net.Config.t
+      }
+  end
+
+  let create (config : Config.t) =
     let (miner_broadcast_reader,miner_broadcast_writer) = Linear_pipe.create () in
     let (ledger_fetcher_transitions_reader, ledger_fetcher_transitions_writer) = Linear_pipe.create () in
     let (change_feeder_reader, change_feeder_writer) = Linear_pipe.create () in
     let miner = Miner.create ~change_feeder:change_feeder_reader in
-    let ledger_fetcher = Ledger_fetcher.create  ~ledger_transitions:ledger_fetcher_transitions_reader in
+    let ledger_fetcher_net_ivar = Ivar.create () in
+    let ledger_fetcher = Ledger_fetcher.create (Ledger_fetcher.Config.make ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader ()) in
     let%map net = 
       Net.create 
-        net_config
+        config.net_config
         (fun hash -> return (Or_error.is_ok (Ledger_fetcher.local_get ledger_fetcher hash)))
         (fun hash -> 
            return (
              match Ledger_fetcher.local_get ledger_fetcher hash with
-             | Ok ledger -> Some ledger
+             | Ok ledger_and_state -> Some ledger_and_state
              | _ -> None))
     in
+    Ivar.fill ledger_fetcher_net_ivar net;
     let state_io = 
       Net.State_io.create 
         net 
@@ -248,9 +274,14 @@ module Make
     end;
 
     don't_wait_for begin
-      Linear_pipe.transfer updated_state_ledger t.ledger_fetcher_transitions
-        ~f:(fun {state ; transactions} -> (state.data.ledger_hash, transactions))
+      Linear_pipe.iter updated_state_ledger ~f:(fun {state ; transactions} ->
+        (* TODO: Right now we're crashing on purpose if we even get a tiny bit
+         *       backed up. We should fix this see issues #178 and #177 *)
+        Linear_pipe.write_or_exn ~capacity:10 t.ledger_fetcher_transitions updated_state_ledger (state.data.ledger_hash, transactions, state.data);
+        return ()
+      )
     end;
+
     printf "Pipes hooked in\n%!"
 end
 

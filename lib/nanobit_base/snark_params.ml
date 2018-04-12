@@ -138,8 +138,8 @@ module Tick = struct
     include (P : module type of P with module Digest := P.Digest)
     module Digest = struct
       include Hashable.Make(Field)
-
       include P.Digest
+
       include Snarkable(Tick0)
     end
 

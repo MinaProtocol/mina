@@ -10,7 +10,7 @@ module Inputs0 = struct
     type 'a t = Snark_params.Tick.Pedersen.Digest.t
     [@@deriving compare, hash, sexp, bin_io]
     (* TODO *)
-    let hash _ = Snark_params.Tick.Pedersen.zero_hash
+    let digest _ = Snark_params.Tick.Pedersen.zero_hash
   end
   module Transaction = struct
     type t = { transaction: Nanobit_base.Transaction.t }
@@ -43,14 +43,18 @@ module Inputs0 = struct
       Blockchain_state.compute_target last t this
   end
   module Strength = struct
-    type t = Strength.t
-    [@@deriving bin_io]
+    include Strength
 
     (* TODO *)
     let increase t ~by = t
   end
   module Ledger = struct
-    type t = Nanobit_base.Ledger.t [@@deriving bin_io]
+    type t = Nanobit_base.Ledger.t [@@deriving sexp, compare, hash, bin_io]
+    type valid_transaction = Transaction.With_valid_signature.t
+
+    let copy = Nanobit_base.Ledger.copy
+    let apply_transaction t (valid_transaction : Transaction.With_valid_signature.t) : unit Or_error.t =
+      Nanobit_base.Ledger.apply_transaction_unchecked t valid_transaction.transaction
   end
   module Ledger_proof = struct
     type t = unit
@@ -74,12 +78,19 @@ module Inputs0 = struct
       Time.(diff now t < (Span.of_time_span (Core_kernel.Time.Span.of_sec 900.)))
   end
   module State = struct
+    type 'a hash = 'a Hash.t [@@deriving bin_io]
+    type transition = Transition.t
+    type difficulty = Difficulty.t [@@deriving bin_io]
+    type strength = Strength.t [@@deriving bin_io]
+    type ledger = Ledger.t [@@deriving bin_io]
+    type time = Time.t [@@deriving bin_io]
+
     type t =
-      { next_difficulty      : Difficulty.t
-      ; previous_state_hash  : t Hash.t
-      ; ledger_hash          : Ledger.t Hash.t
-      ; strength             : Strength.t
-      ; timestamp            : Time.t
+      { next_difficulty      : difficulty
+      ; previous_state_hash  : t hash
+      ; ledger_hash          : ledger hash
+      ; strength             : strength
+      ; timestamp            : time
       }
     [@@deriving fields, bin_io]
 
@@ -150,16 +161,13 @@ module Inputs0 = struct
 end
 module Inputs = struct
   include Inputs0
-  module Net = Minibit_networking.Make(State_with_witness)(Hash)(Ledger)
+  module Net = Minibit_networking.Make(State_with_witness)(Hash)(Ledger)(State)
   module Ledger_fetcher_io = Net.Ledger_fetcher_io
   module State_io = Net.State_io
-  module Ledger_fetcher = struct
-    type t = unit
-    let create ~ledger_transitions = ()
-
-    let get t hash = Deferred.never ()
-    let local_get t hash = Or_error.error_string "nyi"
-  end
+  module Ledger_fetcher = Ledger_fetcher.Make(struct
+    include Inputs0
+    module Net = Net
+  end)
   module Transaction_pool = struct
     type t
 
@@ -261,7 +269,7 @@ let daemon =
             ; remap_addr_port
             }
           in
-          let%bind minibit = Main.create net_config in
+          let%bind minibit = Main.create {log ; net_config} in
           printf "Created minibit\n%!";
           Main.run minibit;
           printf "Ran minibit\n%!";

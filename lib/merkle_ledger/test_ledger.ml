@@ -3,7 +3,7 @@ open Ledger
 
 module Hash = struct
 
-  type hash = Md5.t [@@deriving sexp, bin_io]
+  type hash = Md5.t [@@deriving sexp, hash, compare, bin_io]
   type account = int [@@deriving sexp, bin_io]
 
   (* to prevent pre-image attack,

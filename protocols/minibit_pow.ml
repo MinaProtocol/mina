@@ -7,8 +7,7 @@ end
 
 module type Hash_intf = sig
   type 'a t [@@deriving compare, hash, sexp, bin_io]
-
-  val hash : 'a -> 'a t
+  val digest : 'a -> 'a t
 end
 
 module type Proof_intf = sig
@@ -19,7 +18,11 @@ module type Proof_intf = sig
 end
 
 module type Ledger_intf = sig
-  type t [@@deriving bin_io]
+  type t [@@deriving sexp, compare, hash, bin_io]
+  type valid_transaction
+
+  val copy : t -> t
+  val apply_transaction : t -> valid_transaction -> unit Or_error.t
 end
 
 module type Nonce_intf = sig
@@ -37,9 +40,12 @@ module type Transaction_intf = sig
 end
 
 module type Strength_intf = sig
-  type t
+  type t [@@deriving compare]
   type difficulty
 
+  val ( < ) : t -> t -> bool
+  val ( > ) : t -> t -> bool
+  val ( = ) : t -> t -> bool
   val increase : t -> by:difficulty -> t
 end
 
@@ -65,7 +71,7 @@ module type State_intf  = sig
     ; strength             : strength
     ; timestamp            : time
     }
-  [@@deriving fields]
+  [@@deriving bin_io, fields]
 end
 
 module type Transition_intf  = sig
@@ -140,7 +146,7 @@ module type Inputs_intf = sig
   module Difficulty : Difficulty_intf with type time := Time.t
   module Strength : Strength_intf with type difficulty := Difficulty.t
 
-  module Ledger : Ledger_intf
+  module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
   module Ledger_proof : Proof_intf with type input = Ledger.t Hash.t
 
   module Transition : Transition_intf with type 'a hash := 'a Hash.t
@@ -209,7 +215,7 @@ module Make
       in
       let new_state : State.t =
         { next_difficulty
-        ; previous_state_hash  = Hash.hash state
+        ; previous_state_hash  = Hash.digest state
         ; ledger_hash          = transition.ledger_hash
         ; strength             = Strength.increase state.strength ~by:state.next_difficulty
         ; timestamp            = transition.timestamp
