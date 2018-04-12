@@ -38,8 +38,6 @@ module Make
 
   let merkle_root { tree; _ } = hash tree
 
-  let is_prefix ~depth ~prefix idx = failwith "TODO"
-
   let add_path tree0 path0 account =
     let rec build_tree = function
       | `Left h_r :: path ->
