@@ -195,14 +195,21 @@ module Make
       }
   end
 
+  module Tip = struct
+    type t =
+      { state : State.t
+      ; ledger : Ledger.t
+      ; transaction_pool : Transaction_pool.t
+      }
+  end
+
   type change =
-    | Tip_change of { state : State.t; transaction_pool : Transaction_pool.t }
+    | Tip_change of Tip.t
 
   let transactions_per_bundle = 10
 
   type state =
-    { transaction_pool : Transaction_pool.t
-    ; state : State.t
+    { tip : Tip.t
     ; result : Mining_result.t
     }
 
@@ -213,9 +220,7 @@ module Make
 
   let create
         ~logger
-        ~ledger
-        ~(initial_state:State.t)
-        ~(initial_transaction_pool:Transaction_pool.t)
+        ~(initial_tip:Tip.t)
         ~change_feeder
     =
     let (r, w) = Linear_pipe.create () in
@@ -226,32 +231,27 @@ module Make
       | Error e ->
         Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
     in
-    let create_result state pool =
-      let transactions, pool =
-        let ts = Transaction_pool.get pool transactions_per_bundle in
-        ts, List.fold ts ~init:pool ~f:Transaction_pool.remove
-      in
+    let create_result { Tip.state; transaction_pool; ledger } =
       let result =
         Mining_result.create
           ~state
-          ~transactions
+          ~transactions:(Transaction_pool.get transaction_pool transactions_per_bundle)
           ~ledger
       in
       upon (Mining_result.result result) write_result;
       result
     in
     let state0 =
-      { result = create_result initial_state initial_transaction_pool
-      ; state = initial_state
-      ; transaction_pool = initial_transaction_pool
+      { result = create_result initial_tip
+      ; tip = initial_tip
       }
     in
     Linear_pipe.fold change_feeder ~init:state0 ~f:(fun s u ->
       match u with
-      | Tip_change { state; transaction_pool } ->
+      | Tip_change tip ->
         Mining_result.cancel s.result;
-        let result = create_result state transaction_pool in
-        return { result; state; transaction_pool })
+        let result = create_result tip in
+        return { result; tip })
     >>| ignore |> don't_wait_for;
     { transitions = r }
 end

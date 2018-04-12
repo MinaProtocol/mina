@@ -87,14 +87,20 @@ module type Miner_intf = sig
   type state
   type transaction_pool
 
+  module Tip : sig
+    type t =
+      { state : state
+      ; ledger : ledger
+      ; transaction_pool : transaction_pool
+      }
+  end
+
   type change =
-    | Tip_change of { state : state; transaction_pool : transaction_pool }
+    | Tip_change of Tip.t
 
   val create
     : logger:Logger.t
-    -> ledger:ledger
-    -> initial_state:state
-    -> initial_transaction_pool:transaction_pool
+    -> initial_tip:Tip.t
     -> change_feeder:change Linear_pipe.Reader.t
     -> t
 
@@ -221,11 +227,8 @@ module Make
     let ledger_fetcher_net_ivar = Ivar.create () in
     let ledger_fetcher = Ledger_fetcher.create (Ledger_fetcher.Config.make ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader ()) in
     let miner =
-      Miner.create
-        ~ledger:(failwith "TODO")
-        ~logger:config.log
-        ~initial_state:(failwith "TODO")
-        ~initial_transaction_pool:(failwith "TODO")
+      Miner.create ~logger:config.log
+        ~initial_tip:(failwith "TODO")
         ~change_feeder:change_feeder_reader
     in
     let%map net = 
