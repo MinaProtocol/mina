@@ -4,7 +4,7 @@
  ((name minibit)
   (public_name minibit)
   (library_flags (-linkall))
-  (libraries (core protocols linear_pipe ppx_deriving logger async async_extra ppx_inline_test.runtime-lib))
+  (libraries (core protocols linear_pipe logger async async_extra ppx_inline_test.runtime-lib))
   (preprocess (pps (ppx_jane ppx_deriving.std ppx_driver.runner (-inline-test-lib minibit))))
   (synopsis "Minibit gut layer")))
 

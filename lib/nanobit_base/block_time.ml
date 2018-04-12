@@ -60,3 +60,5 @@ let to_time t =
   Time.of_span_since_epoch
     (Time.Span.of_ms (Int64.to_float t))
 ;;
+
+let now () = of_time (Time.now ())

@@ -47,3 +47,5 @@ val diff : t -> t -> Span.t
 val of_time : Time.t -> t
 
 val to_time : t -> Time.t
+
+val now : unit -> t
