@@ -21,6 +21,7 @@ struct
 
   module Signature = struct
     type 'a t = 'a * 'a
+    [@@deriving eq]
     type var = Curve.Scalar.var t
     type value = Curve.Scalar.value t
     let typ : (var, value) Typ.t =
