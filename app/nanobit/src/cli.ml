@@ -170,6 +170,7 @@ module Inputs = struct
   module Ledger_fetcher = Ledger_fetcher.Make(struct
     include Inputs0
     module Net = Net
+    module Store = Storage.Disk
   end)
   module Transaction_pool = struct
     type t
@@ -282,7 +283,13 @@ let daemon =
             ; remap_addr_port
             }
           in
-          let%bind minibit = Main.create {log ; net_config} in
+          let%bind minibit =
+            Main.create
+              { log
+              ; net_config
+              ; ledger_disk_location = conf_dir ^/ "ledgers"
+              }
+          in
           printf "Created minibit\n%!";
           Main.run minibit;
           printf "Ran minibit\n%!";

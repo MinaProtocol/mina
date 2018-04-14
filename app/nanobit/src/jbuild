@@ -20,6 +20,7 @@
       blockchain_snark
       transaction_snark
       snarky
+      storage
       logger
       async
       async_extra

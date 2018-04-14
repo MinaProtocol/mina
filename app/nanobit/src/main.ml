@@ -71,7 +71,7 @@ module Make
     (Membership       : Membership.S)
     (Gossip_net : Gossip_net.S)
     (Miner_impl : Miner.S)
-    (Storage    : Storage.S)
+    (Storage    : Blockchain_storage.S)
   =
 struct
   module Gossip_net = Gossip_net(Message)
@@ -396,5 +396,5 @@ end
 (* Make sure tests work *)
 let%test "trivial" = true
 
-include Make(Membership.Haskell)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
+include Make(Membership.Haskell)(Gossip_net.Make)(Miner.Cpu)(Blockchain_storage.Filesystem)
 

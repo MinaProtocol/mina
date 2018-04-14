@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name storage)
+  (public_name storage)
+  (library_flags (-linkall))
+  (libraries (core async async_extra logger ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib storage))))
+  (synopsis "Storage module checksums data and stores it")))
+
