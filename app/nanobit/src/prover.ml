@@ -142,12 +142,7 @@ module Main (Params : Params_intf) = struct
         let open Tick.Pedersen.State in
         let s = create Tick.Pedersen.params in
         let s = update_fold s (List.fold self) in
-        let s =
-          update_fold s
-            (List.fold
-              (Digest.Bits.to_bits
-                 (Blockchain_state.hash state)))
-        in
+        let s = update_fold s (State_hash.fold (Blockchain_state.hash state)) in
         digest s
 
     let embed (x : Tick.Field.t) : Tock.Field.t =
@@ -231,7 +226,6 @@ module Main (Params : Params_intf) = struct
     in
     { Blockchain.proof
     ; state = State.update_exn prev_state block 
-    ; most_recent_block = block
     }
   ;;
 
@@ -250,15 +244,12 @@ module Main (Params : Params_intf) = struct
             (fun s () -> 
                return (Lazy.force base_proof))
         ; Rpc.Rpc.implement Rpcs.Verify.rpc
-            (fun s ({ Blockchain.state; proof; most_recent_block }) ->
+            (fun s ({ Blockchain.state; proof }) ->
                if Insecure.verify_blockchain
                then return true
                else
-                 let consistent_block_hash =
-                   Digest.(=) state.block_hash (Block.hash most_recent_block)
-                 in
                  let proof_verifies = Transition_utils.verify state proof in
-                 return (consistent_block_hash && proof_verifies))
+                 return proof_verifies)
         ]
       ~on_unknown_rpc:(`Call (fun () ~rpc_tag ~version ->
         Logger.error log "prover: unknown rpc: %s %d" rpc_tag version;
