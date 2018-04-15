@@ -4,7 +4,7 @@ open Snark_params
 module Stable = struct
   module V1 = struct
     type t = Tick.Field.t
-    [@@deriving bin_io, sexp]
+    [@@deriving bin_io, sexp, eq]
   end
 end
 

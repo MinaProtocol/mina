@@ -7,13 +7,15 @@ open Let_syntax
 module Stable = struct
   module V1 = struct
     type t = Int64.t
-    [@@deriving bin_io, sexp, compare]
+    [@@deriving bin_io, sexp, compare, eq]
   end
 end
 
 include Stable.V1
 
 module B = Bits
+
+let bit_length = 64
 
 module Bits = Bits.Int64
 include B.Snarkable.Int64(Tick)

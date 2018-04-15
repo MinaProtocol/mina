@@ -1,13 +1,15 @@
 open Core_kernel
 open Snark_params
 
-type t [@@deriving sexp, bin_io]
+type t [@@deriving sexp, bin_io, eq]
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving sexp, bin_io, compare]
+    type nonrec t = t [@@deriving sexp, bin_io, compare, eq]
   end
 end
+
+val bit_length : int
 
 module Bits : Bits_intf.S with type t := t
 

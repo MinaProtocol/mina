@@ -6,7 +6,7 @@ module type S = sig
   type fold = init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving bin_io, sexp, eq]
 
     val size_in_bits : int
 
