@@ -186,7 +186,6 @@ module Make_update (T : Transaction_snark.S) = struct
            (to_bits_unchecked state @ Nonce.Bits.to_bits block.header.nonce))
     in
     assert (Target.meets_target_unchecked state.next_difficulty ~hash);
-    (* TODO: Check proof of work *)
     update_unchecked state block
 
   module Checked = struct
