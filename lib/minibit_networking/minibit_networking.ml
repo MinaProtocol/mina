@@ -6,7 +6,7 @@ open Kademlia
 module Rpcs
   (Ledger : Protocols.Minibit_pow.Ledger_intf)
   (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
-  (State : Protocols.Minibit_pow.State_intf)
+  (State : Binable.S)
 = struct
   module Get_ledger_at_hash = struct
     module T = struct
@@ -95,7 +95,7 @@ module Make
   (State_with_witness : Minibit.State_with_witness_intf)
   (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
   (Ledger : Protocols.Minibit_pow.Ledger_intf)
-  (State : Protocols.Minibit_pow.State_intf)
+  (State : Binable.S)
 = struct
 
   module Message = Message (State_with_witness)

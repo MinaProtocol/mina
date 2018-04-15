@@ -8,7 +8,7 @@ end
 module type Inputs_intf = sig
   include Protocols.Minibit_pow.Inputs_intf
   module Net : Minibit.Network_intf with type ledger := Ledger.t
-                                     and type 'a hash := 'a Hash.t
+                                     and type ledger_hash := Ledger_hash.t
                                      and type state := State.t
   module Store : Storage.With_checksum_intf
 end
@@ -18,16 +18,12 @@ module Make
 = struct
   open Inputs
 
-  module Ledger_hash = Hashable.Make_binable(struct
-    type t = Ledger.t Hash.t [@@deriving sexp, compare, hash, bin_io]
-  end)
-
   module Config = struct
     type t =
       { keep_count : int [@default 50]
       ; parent_log : Logger.t
       ; net_deferred : Net.t Deferred.t
-      ; ledger_transitions : (Ledger.t Hash.t * Transaction.With_valid_signature.t list * State.t) Linear_pipe.Reader.t
+      ; ledger_transitions : (Ledger_hash.t * Transaction.With_valid_signature.t list * State.t) Linear_pipe.Reader.t
       ; disk_location : Store.location
       }
     [@@deriving make]
@@ -98,7 +94,7 @@ module Make
 
   let local_get t h =
     match Ledger_hash.Table.find t.state.hash_to_ledger h with
-    | None -> Or_error.errorf !"Couldn't find %{sexp:Ledger.t Hash.t} locally" h
+    | None -> Or_error.errorf !"Couldn't find %{sexp:Ledger_hash.t} locally" h
     | Some x -> Or_error.return x
 
   let get t h : Ledger.t Deferred.Or_error.t =

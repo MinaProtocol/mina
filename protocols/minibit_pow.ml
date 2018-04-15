@@ -12,8 +12,15 @@ module type Hash_intf = sig
   val digest : 'a -> 'a t
 end
 
-module type Ledger_hash_intf = sig type t [@@deriving bin_io] end
-module type State_hash_intf = sig type t [@@deriving bin_io] end
+module type Ledger_hash_intf = sig
+  type t [@@deriving bin_io, sexp]
+  include Hashable.S with type t := t
+end
+
+module type State_hash_intf = sig
+  type t [@@deriving bin_io, sexp]
+  include Hashable.S with type t := t
+end
 
 module type Proof_intf = sig
   type input
@@ -76,10 +83,8 @@ module type State_intf  = sig
   type ledger_hash
   type nonce
   type pow
-  type transition
   type difficulty
   type strength
-  type ledger
   type time
 
   type t =
@@ -193,8 +198,6 @@ module type Inputs_intf = sig
                         and type state_hash := State_hash.t
                         and type difficulty := Difficulty.t
                         and type strength := Strength.t
-                        and type transition := Transition.t
-                        and type ledger := Ledger.t
                         and type time := Time.t
                         and type nonce := Nonce.t
                         and type pow := Pow.t

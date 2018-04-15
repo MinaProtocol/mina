@@ -14,7 +14,8 @@ module type S = sig
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, eq]
+      [@@deriving bin_io, sexp, compare, eq]
+      include Hashable.S with type t := t
     end
   end
 
@@ -37,8 +38,12 @@ end
 module Make () = struct
   module Stable = struct
     module V1 = struct
-      type t = Pedersen.Digest.t
-      [@@deriving bin_io, sexp, eq]
+      module T = struct
+        type t = Pedersen.Digest.t
+        [@@deriving bin_io, sexp, eq, compare, hash]
+      end
+      include T
+      include Hashable.Make(T)
     end
   end
 

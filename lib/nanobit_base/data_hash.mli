@@ -14,7 +14,8 @@ module type S = sig
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, eq]
+      [@@deriving bin_io, sexp, compare, eq]
+      include Hashable.S with type t := t
     end
   end
 
