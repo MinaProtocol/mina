@@ -84,40 +84,14 @@ module Inputs0 = struct
       let now_time = Time.now () in
       Time.(diff now_time t < (Span.of_time_span (Core_kernel.Time.Span.of_sec 900.)))
   end
-  (*
-<<<<<<< ec7093754e0fd88ef186fbbc183e78b7c2a11a56
-  module State = struct
-    type 'a hash = 'a Hash.t [@@deriving bin_io]
-    type transition = Transition.t
-    type difficulty = Difficulty.t [@@deriving bin_io]
-    type strength = Strength.t [@@deriving bin_io]
-    type ledger = Ledger.t [@@deriving bin_io]
-    type time = Time.t [@@deriving bin_io]
 
-    type t =
-      { next_difficulty      : difficulty
-      ; previous_state_hash  : t hash
-      ; ledger_hash          : ledger hash
-      ; strength             : strength
-      ; timestamp            : time
-      }
-    [@@deriving fields, bin_io]
-
-    module Proof = struct
-      type input = t
-      type t = unit
-      [@@deriving bin_io]
-
-      (* TODO *)
-      let verify t _ = return true
-    end
-  end
-======= *)
   module State = State
+
   module Proof_carrying_state = struct
     type t = (State.t, State.Proof.t) Protocols.Minibit_pow.Proof_carrying_data.t
     [@@deriving bin_io]
   end
+
   module State_with_witness = struct
     type transaction_with_valid_signature = Transaction.With_valid_signature.t
     type transaction = Transaction.t
