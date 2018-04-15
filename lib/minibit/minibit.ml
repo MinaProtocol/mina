@@ -99,8 +99,7 @@ module type Miner_intf = sig
     | Tip_change of Tip.t
 
   val create
-    : logger:Logger.t
-    -> initial_tip:Tip.t
+    : parent_log:Logger.t
     -> change_feeder:change Linear_pipe.Reader.t
     -> t
 
@@ -227,8 +226,7 @@ module Make
     let ledger_fetcher_net_ivar = Ivar.create () in
     let ledger_fetcher = Ledger_fetcher.create (Ledger_fetcher.Config.make ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader ()) in
     let miner =
-      Miner.create ~logger:config.log
-        ~initial_tip:(failwith "TODO")
+      Miner.create ~parent_log:config.log
         ~change_feeder:change_feeder_reader
     in
     let%map net = 

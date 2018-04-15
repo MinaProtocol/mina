@@ -218,16 +218,15 @@ module Make
     }
   [@@deriving fields]
 
-  let create
-        ~logger
-        ~(initial_tip:Tip.t)
-        ~change_feeder
+  let transition_capacity = 64
+
+  let create ~parent_log ~change_feeder
     =
+    let logger = Logger.extend parent_log [ "module", Atom __MODULE__ ] in
     let (r, w) = Linear_pipe.create () in
     let write_result = function
       | Ok t ->
-        Linear_pipe.write_or_exn ~capacity:(failwith "TODO")
-          w r t
+        Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
       | Error e ->
         Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
     in
@@ -241,17 +240,22 @@ module Make
       upon (Mining_result.result result) write_result;
       result
     in
-    let state0 =
-      { result = create_result initial_tip
-      ; tip = initial_tip
-      }
-    in
-    Linear_pipe.fold change_feeder ~init:state0 ~f:(fun s u ->
-      match u with
-      | Tip_change tip ->
-        Mining_result.cancel s.result;
-        let result = create_result tip in
-        return { result; tip })
-    >>| ignore |> don't_wait_for;
+    don't_wait_for begin
+      match%bind Pipe.read change_feeder.Linear_pipe.Reader.pipe with
+      | `Eof -> failwith "change_feeder was empty"
+      | `Ok (Tip_change initial_tip) ->
+        let state0 =
+          { result = create_result initial_tip
+          ; tip = initial_tip
+          }
+        in
+        Linear_pipe.fold change_feeder ~init:state0 ~f:(fun s u ->
+          match u with
+          | Tip_change tip ->
+            Mining_result.cancel s.result;
+            let result = create_result tip in
+            return { result; tip })
+        >>| ignore
+    end;
     { transitions = r }
 end
