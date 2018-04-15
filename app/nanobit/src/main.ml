@@ -160,8 +160,8 @@ struct
         ~f:(fun blockchain ->
           let state = blockchain.Blockchain.state in
           let ledger_hash = state.Blockchain_state.ledger_hash in
-          let time = state.Blockchain_state.previous_time in
-          let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.target) in
+          let time = state.Blockchain_state.timestamp in
+          let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.next_difficulty) in
           let strength = Bignum.Bigint.((Nanobit_base.Target.to_bigint Nanobit_base.Target.max) / target) in
           let diff = 
             match !last_time with
@@ -245,7 +245,9 @@ struct
      * *)
     let rec rebroadcast_timer () = 
       let rec rebroadcast_loop (blockchain : Blockchain.t) continue = 
-        let is_latest = Digest.(blockchain.state.block_hash = !latest_strongest_block.state.block_hash) in
+        let is_latest =
+          Blockchain_state.equal blockchain.state !latest_strongest_block.state
+        in
         if is_latest
         then 
           match%bind continue () with
@@ -256,7 +258,7 @@ struct
       in
       let%bind () = after rebroadcast_period in
       let mined_block : Blockchain.t = !latest_mined_block in
-      let is_latest = Digest.(mined_block.state.block_hash = !latest_strongest_block.state.block_hash) in
+      let is_latest = Blockchain_state.equal mined_block.state !latest_strongest_block.state in
       let%bind () = 
         if is_latest
         then rebroadcast_loop 
