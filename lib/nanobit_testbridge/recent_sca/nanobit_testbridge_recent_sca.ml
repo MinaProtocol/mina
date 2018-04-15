@@ -10,7 +10,7 @@ let dump_path_hashes ~tag (p : Blockchain.t list) =
   printf "Dumping %s:\n" tag;
   List.iter p ~f:(fun chain ->
     printf "%s, "
-      (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: Digest.t] chain.state.block_hash))))
+      (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: State_hash.t] (Blockchain_state.hash chain.state)))))
   );
   printf "\n"
 ;;
@@ -36,7 +36,7 @@ module Linked_blockchain = struct
   let all_nodes t =
     Digest.Table.data t._all_nodes
 
-  let key n = n.node.state.block_hash
+  let key n = (n.node.state.previous_state_hash :> Digest.t)
 
   let mutate_add t n ~is_root =
     let _ = Digest.Table.add ~key:(key n) ~data:n t._all_nodes in
@@ -48,7 +48,9 @@ module Linked_blockchain = struct
 
   let needs_child : parent:elt -> child_candidate:Blockchain.t -> bool =
     fun ~parent ~child_candidate ->
-      Digest.(parent.node.most_recent_block.header.previous_block_hash = child_candidate.state.block_hash)
+      State_hash.(=) 
+        (Blockchain_state.hash parent.node.state)
+        child_candidate.state.previous_state_hash
 
   let fixup_roots t =
     let non_roots = Digest.Hash_set.create () in
@@ -213,7 +215,7 @@ let main nanobits =
       in
       let newest_match =
         (List.findi oldest_to_newest ~f:(fun idx (s, l) ->
-            not Digest.(s.state.block_hash = l.state.block_hash)
+            not (State_hash.equal (Blockchain_state.hash s.state) (Blockchain_state.hash l.state))
         )) |> Option.map ~f:(fun (idx, _) -> idx)
           |> Option.value ~default:shortest_path_len
       in
@@ -229,10 +231,10 @@ let main nanobits =
       match (current_hash, chain) with
       | _, [] -> ()
       | Some h, blockchain::rest ->
-          assert Digest.(blockchain.state.block_hash = h);
-          go (Some blockchain.most_recent_block.header.previous_block_hash) rest
+        assert (State_hash.equal (Blockchain_state.hash blockchain.state) h);
+        go (Some blockchain.state.previous_state_hash) rest
       | None, blockchain::rest ->
-          go (Some blockchain.most_recent_block.header.previous_block_hash) rest
+        go (Some blockchain.state.previous_state_hash) rest
     in
     go None chain
   in
@@ -242,8 +244,8 @@ let main nanobits =
   let resync idx (states : Linked_blockchain.t list) (new_chain : Blockchain.t) =
     printf "RESYNCING %d with %s (prior: %s)\n"
       idx
-      (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: Digest.t] new_chain.state.block_hash))))
-      (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: Digest.t] new_chain.most_recent_block.header.previous_block_hash))));
+      (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: State_hash.t] (Blockchain_state.hash new_chain.state)))))
+      (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: State_hash.t] new_chain.state.previous_state_hash))));
 
     let len = List.length states in
     let others =
@@ -266,10 +268,9 @@ let main nanobits =
         match tail_opt with
         | Some tail ->
           (* Either some other node also has this block *)
-          Digest.(new_chain.state.block_hash = tail.state.block_hash) ||
+          Blockchain_state.equal new_chain.state tail.state ||
           (* Or they ALMOST have this block *)
-          Digest.(new_chain.most_recent_block.header.previous_block_hash =
-              tail.state.block_hash)
+          State_hash.equal new_chain.state.previous_state_hash (Blockchain_state.hash tail.state)
         | None -> false
       )
     in
@@ -297,8 +298,8 @@ let main nanobits =
     printf "got blockchain idx:%d %s %s %s\n"
       i
       (Sexp.to_string_hum ([%sexp_of: Host_and_port.t] nanobit.Nanobit_testbridge.Nanobit.membership_addr))
-      (Sexp.to_string_hum ([%sexp_of: Block.Body.t] blockchain.most_recent_block.body))
-      (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: Digest.t] blockchain.state.block_hash))));
+      (Sexp.to_string_hum ([%sexp_of: Ledger_hash.t] blockchain.state.ledger_hash))
+      (Md5.to_hex (Md5.digest_string (Sexp.to_string_hum ([%sexp_of: State_hash.t] blockchain.state.previous_state_hash))));
     let lb = List.nth_exn states i in
     Linked_blockchain.add lb blockchain;
     (* Sanity check -- make sure linked_blockchain isn't busted *)
