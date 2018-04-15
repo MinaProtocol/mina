@@ -12,6 +12,8 @@ module Inputs0 = struct
     (* TODO *)
     let digest _ = Snark_params.Tick.Pedersen.zero_hash
   end
+  module State_hash = State_hash.Stable.V1
+  module Ledger_hash = Ledger_hash.Stable.V1
   module Transaction = struct
     type t = { transaction: Nanobit_base.Transaction.t }
       [@@deriving eq, bin_io]
@@ -46,16 +48,7 @@ module Inputs0 = struct
     let forget t = { transaction = t.With_valid_signature.transaction }
   end
   module Nonce = Nanobit_base.Nonce
-  module Difficulty = struct
-    type t = Target.t
-    [@@deriving bin_io]
-
-    let next t ~last ~this =
-      Blockchain_state.compute_target last t this
-
-    let meets t h =
-      Target.meets_target_unchecked t h
-  end
+  module Difficulty = Difficulty
   module Strength = struct
     include Strength
 
@@ -72,14 +65,14 @@ module Inputs0 = struct
   end
   module Ledger_proof = struct
     type t = unit
-    type input = Ledger.t Hash.t * Ledger.t Hash.t
+    type input = Ledger_hash.t * Ledger_hash.t
 
     (* TODO *)
     let verify t _ = return true
   end
   module Transition = struct
     type t =
-      { ledger_hash : Ledger.t Hash.t
+      { ledger_hash : Ledger_hash.t
       ; ledger_proof : Ledger_proof.t
       ; timestamp : Time.t
       ; nonce : Nonce.t
@@ -91,6 +84,8 @@ module Inputs0 = struct
       let now_time = Time.now () in
       Time.(diff now_time t < (Span.of_time_span (Core_kernel.Time.Span.of_sec 900.)))
   end
+  (*
+<<<<<<< ec7093754e0fd88ef186fbbc183e78b7c2a11a56
   module State = struct
     type 'a hash = 'a Hash.t [@@deriving bin_io]
     type transition = Transition.t
@@ -117,6 +112,8 @@ module Inputs0 = struct
       let verify t _ = return true
     end
   end
+======= *)
+  module State = State
   module Proof_carrying_state = struct
     type t = (State.t, State.Proof.t) Protocols.Minibit_pow.Proof_carrying_data.t
     [@@deriving bin_io]
@@ -175,7 +172,7 @@ module Inputs0 = struct
 end
 module Inputs = struct
   include Inputs0
-  module Net = Minibit_networking.Make(State_with_witness)(Hash)(Ledger)(State)
+  module Net = Minibit_networking.Make(State_with_witness)(Ledger_hash)(Ledger)(State)
   module Ledger_fetcher_io = Net.Ledger_fetcher_io
   module State_io = Net.State_io
   module Ledger_fetcher = Ledger_fetcher.Make(struct
@@ -196,14 +193,7 @@ module Inputs = struct
   module Transaction_pool = Transaction_pool.Make(Transaction)
   module Miner = Minibit_miner.Make(Inputs0)(Transition_with_witness)(Transaction_pool)(Bundle)
   module Genesis = struct
-    (* TODO actually do this right *)
-    let state : State.t =
-      { next_difficulty = Blockchain_state.zero.Blockchain_state.target
-      ; previous_state_hash = Blockchain_state.negative_one.Blockchain_state.block_hash
-      ; ledger_hash = Snark_params.Tick.Field.of_int 0
-      ; strength = Nanobit_base.Strength.zero
-      ; timestamp = Block.genesis.Block.header.Block.Header.time
-      }
+    let state : State.t = State.zero
     let proof = ()
   end
   module Block_state_transition_proof = struct
@@ -221,7 +211,6 @@ module Inputs = struct
 end
 
 module Main = Minibit.Make(Inputs)(Inputs.Block_state_transition_proof)
-
 
 let daemon =
   let open Command.Let_syntax in

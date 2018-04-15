@@ -6,3 +6,6 @@ type t = Target.t
 
 let next t ~last ~this =
   Blockchain_state.compute_target last t this
+
+let meets t h =
+  Target.meets_target_unchecked t h
