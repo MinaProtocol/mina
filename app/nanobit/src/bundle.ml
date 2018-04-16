@@ -119,9 +119,12 @@ module Make() = struct
         return (Transaction_snark.merge t1 t2)
     end)
 
-  let create ledger transactions : t =
+  let create ~conf_dir ledger transactions : t =
     let config =
-      Map_reduce.Config.create ~redirect_stderr:`Dev_null ~redirect_stdout:`Dev_null ()
+      Map_reduce.Config.create
+        ~redirect_stderr:(`File_append (conf_dir ^/ "bundle-stderr"))
+        ~redirect_stdout:(`File_append (conf_dir ^/ "bundle-stdout"))
+        ()
     in
     let inputs =
       List.filter_map transactions ~f:(fun (transaction : Transaction.t) ->

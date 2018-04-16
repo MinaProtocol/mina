@@ -14,7 +14,7 @@ module Make () : sig
     One idea is to have a "drain" snark at the end that
     takes the built up fees and transfers them into one
     account. *)
-  val create : Ledger.t -> Transaction.t list -> t
+  val create : conf_dir:string -> Ledger.t -> Transaction.t list -> t
 
   val target_hash : t -> Ledger_hash.t
 
