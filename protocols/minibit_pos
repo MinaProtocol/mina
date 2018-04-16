@@ -90,6 +90,8 @@ check_state old_state new_state
     new_state.length > old_state.length
       &&
     is_time_for_slot(new_state.slot#, new_state.epoch#)
+      &&
+    if_could_have_randomness_has_randomness(new_state)
     
 on_event event
   = 
