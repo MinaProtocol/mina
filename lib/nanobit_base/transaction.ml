@@ -12,12 +12,12 @@ module Payload = struct
     ; amount   : 'amount
     ; fee      : 'fee
     }
-  [@@deriving bin_io, sexp, compare, hash]
+  [@@deriving bin_io, eq, sexp, compare, hash]
 
   module Stable = struct
     module V1 = struct
       type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t) t_
-      [@@deriving bin_io, sexp, compare, hash]
+      [@@deriving bin_io, eq, sexp, compare, hash]
     end
   end
 
@@ -69,10 +69,10 @@ module Stable = struct
       ; sender    : 'pk
       ; signature : 'signature
       }
-    [@@deriving bin_io, sexp, compare, hash]
+    [@@deriving bin_io, eq, sexp, compare, hash]
 
     type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
-    [@@deriving bin_io, sexp, compare, hash]
+    [@@deriving bin_io, eq, sexp, compare, hash]
   end
 end
 
