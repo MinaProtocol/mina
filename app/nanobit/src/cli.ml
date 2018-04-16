@@ -15,7 +15,16 @@ module Inputs0 = struct
   module Transaction = struct
     type t = { transaction: Nanobit_base.Transaction.t }
       [@@deriving eq, bin_io]
-    let compare t t' = Nanobit_base.Transaction.Fee.compare t.transaction.payload.fee t'.transaction.payload.fee
+    (* The underlying transaction has an arbitrary compare func, fallback to that *)
+    let compare t t' = 
+      let fee_compare =
+        Transaction.Fee.compare
+          t.transaction.payload.fee
+          t'.transaction.payload.fee
+      in
+      match fee_compare with
+      | 0 -> Transaction.compare t.transaction t'.transaction
+      | _ -> fee_compare
 
     module With_valid_signature = struct
       type t = 

@@ -15,7 +15,6 @@
       kademlia
       minibit
       protocols
-      ppx_deriving
       nanobit_base
       sparse_ledger
       blockchain_snark
