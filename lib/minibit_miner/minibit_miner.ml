@@ -59,7 +59,7 @@ module Make
       in
       let next_state : State.t =
         { next_difficulty
-        ; previous_state_hash = Hash.hash previous
+        ; previous_state_hash = Hash.digest previous
         ; ledger_hash = next_ledger_hash
         ; timestamp = now
         ; strength = Strength.increase previous.strength difficulty
@@ -70,7 +70,7 @@ module Make
         if i = iterations
         then None
         else
-          let hash = Hash.hash (next_state, nonce) in
+          let hash = Hash.digest (next_state, nonce) in
           if Difficulty.meets difficulty hash
           then Some (next_state, nonce)
           else go (Nonce.succ nonce) (i + 1)
