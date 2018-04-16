@@ -17,7 +17,7 @@ module Make
 
      val cancel : t -> unit
 
-     val target_hash : t -> Ledger.t Hash.t
+     val target_hash : t -> Ledger_hash.t
 
      val result : t -> Ledger_proof.t Deferred.Option.t
    end)
@@ -33,7 +33,7 @@ module Make
   module Hashing_result : sig
     type t
 
-    val create : State.t -> next_ledger_hash:Ledger.t Hash.t -> t
+    val create : State.t -> next_ledger_hash:Ledger_hash.t -> t
 
     val result : t -> [ `Ok of State.t * Nonce.t | `Cancelled ] Deferred.t
 
@@ -48,7 +48,7 @@ module Make
 
     let cancel t = t.cancelled := true
 
-    let find_block (previous : State.t) ~(next_ledger_hash : Ledger.t Hash.t)
+    let find_block (previous : State.t) ~(next_ledger_hash : Ledger_hash.t)
       : (State.t * Nonce.t) option =
       let iterations = 10 in
 
@@ -59,7 +59,7 @@ module Make
       in
       let next_state : State.t =
         { next_difficulty
-        ; previous_state_hash = Hash.digest previous
+        ; previous_state_hash = State.hash previous
         ; ledger_hash = next_ledger_hash
         ; timestamp = now
         ; strength = Strength.increase previous.strength difficulty
@@ -70,7 +70,7 @@ module Make
         if i = iterations
         then None
         else
-          let hash = Hash.digest (next_state, nonce) in
+          let hash = State.create_pow next_state nonce in
           if Difficulty.meets difficulty hash
           then Some (next_state, nonce)
           else go (Nonce.succ nonce) (i + 1)
@@ -100,7 +100,7 @@ module Make
 
     val transactions : t -> Transaction.With_valid_signature.t list 
 
-    val target_hash : t -> Ledger.t Hash.t
+    val target_hash : t -> Ledger_hash.t
 
     val result : t -> (Ledger_proof.t * Transaction.With_valid_signature.t list) option Deferred.t
 

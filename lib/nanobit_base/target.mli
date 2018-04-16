@@ -3,12 +3,12 @@ open Snark_params
 open Tick
 
 type t = private Field.t
-[@@deriving sexp, bin_io]
+[@@deriving sexp, bin_io, eq]
 
 module Stable : sig
   module V1 : sig
     type nonrec t = t
-    [@@deriving bin_io, sexp]
+    [@@deriving bin_io, sexp, eq]
   end
 end
 

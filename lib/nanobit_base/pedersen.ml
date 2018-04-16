@@ -6,7 +6,7 @@ module type S = sig
   type fold = init:(curve * int) -> f:((curve * int) -> bool -> (curve * int)) -> curve * int
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp]
+    type t [@@deriving bin_io, sexp, eq]
 
     val size_in_bits : int
 
@@ -61,11 +61,11 @@ module Make
     (Curve : Snarky.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
   module Digest = struct
-    type t = Field.t [@@deriving sexp]
+    type t = Field.t [@@deriving sexp, eq]
 
     let size_in_bits = Field.size_in_bits
 
-    let (=) = Field.equal
+    let (=) = equal
 
     include Field_bin.Make(Field)(Bigint)
 

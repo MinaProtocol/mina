@@ -11,53 +11,56 @@ let difficulty_window = 17
 
 let all_but_last_exn xs = fst (split_last_exn xs)
 
+module Hash = State_hash
+
 module Stable = struct
   module V1 = struct
     (* Someday: It may well be worth using bitcoin's compact nbits for target values since
       targets are quite chunky *)
-    type ('time, 'target, 'digest, 'ledger_hash, 'strength) t_ =
-      { previous_time : 'time
-      ; target        : 'target
-      ; block_hash    : 'digest
-      ; ledger_hash   : 'ledger_hash
-      ; strength      : 'strength
+    type ('target, 'state_hash, 'ledger_hash, 'strength, 'time) t_ =
+      { next_difficulty     : 'target
+      ; previous_state_hash : 'state_hash
+      ; ledger_hash         : 'ledger_hash
+      ; strength            : 'strength
+      ; timestamp           : 'time
       }
-    [@@deriving bin_io, sexp]
+    [@@deriving bin_io, sexp, fields, eq]
 
-    type t = (Block_time.Stable.V1.t, Target.Stable.V1.t, Digest.t, Ledger_hash.Stable.V1.t, Strength.Stable.V1.t) t_
-    [@@deriving bin_io, sexp]
+    type t = (Target.Stable.V1.t, State_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Strength.Stable.V1.t, Block_time.Stable.V1.t) t_
+    [@@deriving bin_io, sexp, eq]
   end
 end
 
 include Stable.V1
 
 type var =
-  ( Block_time.Unpacked.var
-  , Target.Unpacked.var
-  , Digest.Unpacked.var
+  ( Target.Unpacked.var
+  , State_hash.var
   , Ledger_hash.var
   , Strength.Unpacked.var
+  , Block_time.Unpacked.var
   ) t_
 
 type value =
-  ( Block_time.Unpacked.value
-  , Target.Unpacked.value
-  , Digest.Unpacked.value
+  ( Target.Unpacked.value
+  , State_hash.t
   , Ledger_hash.t
   , Strength.Unpacked.value
+  , Block_time.Unpacked.value
   ) t_
 
-let to_hlist { previous_time; target; block_hash; ledger_hash; strength } = H_list.([ previous_time; target; block_hash; ledger_hash; strength ])
-let of_hlist : (unit, 'ti -> 'ta -> 'd -> 'n -> 's -> unit) H_list.t -> ('ti, 'ta, 'd, 'n, 's) t_ =
-  H_list.(fun [ previous_time; target; block_hash; ledger_hash; strength ] -> { previous_time; target; block_hash; ledger_hash; strength })
+let to_hlist { next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } =
+  H_list.([ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp ])
+let of_hlist : (unit, 'ta -> 'sh -> 'lh -> 'st -> 'ti -> unit) H_list.t -> ('ta, 'sh, 'lh, 'st, 'ti) t_ =
+  H_list.(fun [ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp ] -> { next_difficulty; previous_state_hash; ledger_hash; strength; timestamp })
 
 let data_spec =
   let open Data_spec in
-  [ Block_time.Unpacked.typ
-  ; Target.Unpacked.typ
-  ; Digest.Unpacked.typ
+  [ Target.Unpacked.typ
+  ; State_hash.typ
   ; Ledger_hash.typ
   ; Strength.Unpacked.typ
+  ; Block_time.Unpacked.typ
   ]
 
 let typ : (var, value) Typ.t =
@@ -69,7 +72,7 @@ let bound_divisor = `Two_to_the 11
 let delta_minus_one_max_bits = 7
 let target_time_ms = `Two_to_the 13 (* 8.192 seconds *)
 
-let compute_target previous_time (previous_target : Target.t) time =
+let compute_target timestamp (previous_target : Target.t) time =
   let target_time_ms =
     let `Two_to_the k = target_time_ms in
     Bignum.Bigint.(pow (of_int 2) (of_int k))
@@ -80,11 +83,11 @@ let compute_target previous_time (previous_target : Target.t) time =
   in
   let div_pow_2 x (`Two_to_the k) = Bignum.Bigint.shift_right x k in
   let previous_target = Target.to_bigint previous_target in
-  assert Block_time.(time > previous_time);
+  assert Block_time.(time > timestamp);
   let rate_multiplier = div_pow_2 Bignum.Bigint.(target_max - previous_target) bound_divisor in
   let delta =
     Bignum.Bigint.(
-      of_int64 Block_time.(Span.to_ms (diff time previous_time)) / target_time_ms)
+      of_int64 Block_time.(Span.to_ms (diff time timestamp)) / target_time_ms)
   in
   let open Bignum.Bigint in
   Target.of_bigint begin
@@ -102,65 +105,71 @@ let compute_target previous_time (previous_target : Target.t) time =
   end
 ;;
 
-let update_unchecked : value -> Block.t -> value =
-  let genesis_hash = Block.(hash genesis) in
-  fun state block ->
-    let block_hash = Block.hash block in
-    (if not Field.(equal block_hash genesis_hash)
-     then assert(Target.meets_target_unchecked state.target ~hash:block_hash));
-    let new_target =
-      compute_target state.previous_time state.target
-        block.header.time
-    in
-    let strength = Target.strength_unchecked state.target in
-    { previous_time = block.header.time
-    ; target = new_target
-    ; block_hash
-    ; ledger_hash = block.body.target_hash
-    ; strength = Field.add strength state.strength
-    }
-
-let negative_one : value =
-  let previous_time =
-    Block_time.of_time
-      (Time.sub (Block_time.to_time Block.genesis.header.time) (Time.Span.second))
-  in
-  let target : Target.Unpacked.value =
+let negative_one =
+  let next_difficulty : Target.Unpacked.value =
     Target.of_bigint
       Bignum.Bigint.(
         Target.(to_bigint max) / pow (of_int 2) (of_int 4))
   in
-  { previous_time
-  ; target
-  ; block_hash = Block.genesis.header.previous_block_hash
-  ; ledger_hash = Ledger.(merkle_root (create ~depth:ledger_depth))
+  let timestamp =
+    Block_time.of_time
+      (Time.sub (Block_time.to_time Block.genesis.header.time) (Time.Span.second))
+  in
+  { next_difficulty
+  ; previous_state_hash = State_hash.of_hash Pedersen.zero_hash
+  ; ledger_hash = Ledger.merkle_root (Ledger.create ~depth:Snark_params.ledger_depth)
   ; strength = Strength.zero
+  ; timestamp
   }
 
-let zero = update_unchecked negative_one Block.genesis
-
-let to_bits ({ previous_time; target; block_hash; ledger_hash; strength } : var) =
-  let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash in
-  Block_time.Unpacked.var_to_bits previous_time
-  @ Target.Unpacked.var_to_bits target
-  @ Digest.Unpacked.var_to_bits block_hash
+let to_bits ({ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } : var) =
+  let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash
+  and previous_state_hash_bits = State_hash.var_to_bits previous_state_hash
+  in
+  Target.Unpacked.var_to_bits next_difficulty
+  @ previous_state_hash_bits
   @ ledger_hash_bits
   @ Strength.Unpacked.var_to_bits strength
+  @ Block_time.Unpacked.var_to_bits timestamp
 
-let to_bits_unchecked ({ previous_time; target; block_hash; ledger_hash; strength } : value) =
-  Block_time.Bits.to_bits previous_time
-  @ Target.Bits.to_bits target
-  @ Digest.Bits.to_bits block_hash
+let to_bits_unchecked ({ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } : value) =
+  Target.Bits.to_bits next_difficulty
+  @ State_hash.to_bits previous_state_hash
   @ Ledger_hash.to_bits ledger_hash
   @ Strength.Bits.to_bits strength
+  @ Block_time.Bits.to_bits timestamp
 
 let hash t =
   let s = Pedersen.State.create Pedersen.params in
   Pedersen.State.update_fold s
     (List.fold_left (to_bits_unchecked t))
   |> Pedersen.State.digest
+  |> State_hash.of_hash
 
+let update_unchecked : value -> Block.t -> value =
+  fun state block ->
+    let next_difficulty =
+      compute_target state.timestamp state.next_difficulty
+        block.header.time
+    in
+    { next_difficulty
+    ; previous_state_hash = hash state
+    ; ledger_hash = block.body.target_hash
+    ; strength = Field.add state.strength (Target.strength_unchecked state.next_difficulty)
+    ; timestamp = block.header.time
+    }
+
+let zero = update_unchecked negative_one Block.genesis
 let zero_hash = hash zero
+
+let bit_length =
+  let add bit_length acc _field = acc + bit_length in
+  Stable.V1.Fields_of_t_.fold zero ~init:0
+    ~next_difficulty:(add Target.bit_length)
+    ~previous_state_hash:(add State_hash.bit_length)
+    ~ledger_hash:(add Ledger_hash.bit_length)
+    ~strength:(add Strength.bit_length)
+    ~timestamp:(fun acc _ _ -> acc + Block_time.bit_length)
 
 module Make_update (T : Transaction_snark.S) = struct
   let update_exn state (block : Block.t) =
@@ -171,6 +180,12 @@ module Make_update (T : Transaction_snark.S) = struct
         ~proof_type:Merge
         ~proof:block.body.proof
         |> T.verify);
+    let hash =
+      Pedersen.hash_fold Pedersen.params
+        (List.fold
+           (to_bits_unchecked state @ Nonce.Bits.to_bits block.header.nonce))
+    in
+    assert (Target.meets_target_unchecked state.next_difficulty ~hash);
     update_unchecked state block
 
   module Checked = struct
@@ -254,53 +269,58 @@ module Make_update (T : Transaction_snark.S) = struct
       [@@deriving fields]
     end
 
-    let update (state : var) (block : Block.var)
-      : ( var * [ `Success of Boolean.var ], _) Tick.Checked.t
+    let update ((previous_state_hash, previous_state) : State_hash.var * var) (block : Block.var)
+      : (State_hash.var * var * [ `Success of Boolean.var ], _) Tick.Checked.t
       =
       with_label "Blockchain.State.update" begin
-        let%bind () =
-          assert_equal ~label:"previous_block_hash"
-  (* TODO-soon: There should be a "proof-of-work" var type which is a Target.bit_length
-    long string so we can use pack rather than project here. *)
-            (Digest.project_var block.header.previous_block_hash)
-            (Digest.project_var state.block_hash)
-        in
         let%bind good_body =
           T.verify_merge
-            state.ledger_hash block.body.target_hash
+            previous_state.ledger_hash block.body.target_hash
             (As_prover.return block.body.proof)
         in
-        let target_packed = Target.pack_var state.target in
-        let%bind strength = Target.strength target_packed state.target in
-        let%bind block_hash =
-          Block.var_to_bits block >>= hash_digest
-        in
-        let%bind block_hash_bits = Digest.choose_preimage_var block_hash in
-        let%bind meets_target = meets_target target_packed block_hash in
+        let difficulty = previous_state.next_difficulty in
+        let difficulty_packed = Target.pack_var difficulty in
+        let%bind strength = Target.strength difficulty_packed difficulty in
         let time = block.header.time in
-        let%bind new_target = compute_target state.previous_time state.target time in
-        let%map strength' =
-          Strength.unpack_var Cvar.Infix.(strength + Strength.pack_var state.strength)
-        and success = Boolean.(good_body && meets_target)
+        let%bind new_difficulty = compute_target previous_state.timestamp difficulty time in
+        let%bind new_strength =
+          Strength.unpack_var Cvar.Infix.(strength + Strength.pack_var previous_state.strength)
         in
-        ( { previous_time = time
-          ; target = new_target
-          ; block_hash = block_hash_bits
+        let new_state =
+          { next_difficulty = new_difficulty
+          ; previous_state_hash
           ; ledger_hash = block.body.target_hash
-          ; strength = strength'
+          ; strength = new_strength
+          ; timestamp = time
           }
-        , `Success success
-        )
+        in
+        let%bind state_bits = to_bits new_state in
+        let%bind state_hash =
+          Pedersen_hash.hash state_bits
+            ~params:Pedersen.params
+            ~init:(0, Tick.Hash_curve.Checked.identity)
+        in
+        let%bind pow_hash =
+          Pedersen_hash.hash (Nonce.Unpacked.var_to_bits block.header.nonce)
+            ~params:Pedersen.params
+            ~init:(List.length state_bits, state_hash)
+          >>| Pedersen_hash.digest
+        in
+        let%bind meets_target = meets_target difficulty_packed pow_hash in
+        let%map success = Boolean.(good_body && meets_target) in
+        (State_hash.var_of_hash_packed (Pedersen_hash.digest state_hash), new_state, `Success success)
       end
+    ;;
   end
 end
 
 module Checked = struct
   let is_base_hash h =
     with_label "State.is_base_hash"
-      (Checked.equal (Cvar.constant zero_hash) h)
+      (Checked.equal (Cvar.constant (zero_hash :> Field.t))
+         (State_hash.var_to_hash_packed h))
 
   let hash (t : var) =
-    with_label "State.hash" (to_bits t >>= hash_digest)
+    with_label "State.hash" (to_bits t >>= hash_digest >>| State_hash.var_of_hash_packed)
 end
 

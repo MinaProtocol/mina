@@ -6,52 +6,46 @@ module Pedersen = Tick.Pedersen
 module Header = struct
   module Stable = struct
     module V1 = struct
-      type ('hash, 'time, 'nonce) t_ =
-        { previous_block_hash : 'hash
-        ; time                : 'time
+      type ('time, 'nonce) t_ =
+        { time                : 'time
         ; nonce               : 'nonce
         }
       [@@deriving bin_io, sexp, fields]
 
-      type t = (Pedersen.Digest.t, Block_time.Stable.V1.t, Nonce.Stable.V1.t) t_
+      type t = (Block_time.Stable.V1.t, Nonce.Stable.V1.t) t_
       [@@deriving bin_io, sexp]
     end
   end
 
   include Stable.V1
 
-  let to_hlist { previous_block_hash; time; nonce } =
-      H_list.([ previous_block_hash; time; nonce ])
+  let to_hlist { time; nonce } =
+    H_list.([ time; nonce ])
 
-  let of_hlist : (unit, 'h -> 't -> 'n -> unit) H_list.t -> ('h, 't, 'n) t_ =
+  let of_hlist : (unit, 't -> 'n -> unit) H_list.t -> ('t, 'n) t_ =
     let open H_list in
-    fun [ previous_block_hash; time; nonce ] ->
-      { previous_block_hash; time; nonce }
+    fun [ time; nonce ] -> { time; nonce }
 
-  let fold_bits { previous_block_hash; time; nonce } ~init ~f =
-    let init = Pedersen.Digest.Bits.fold previous_block_hash ~init ~f in
+  let fold_bits { time; nonce } ~init ~f =
     let init = Block_time.Bits.fold time ~init ~f in
     let init = Nonce.Bits.fold nonce ~init ~f in
     init
 
   let data_spec =
     Tick.Data_spec.(
-      [ Pedersen.Digest.Unpacked.typ
-      ; Block_time.Unpacked.typ
+      [ Block_time.Unpacked.typ
       ; Nonce.Unpacked.typ
       ])
 
-  type var = (Pedersen.Digest.Unpacked.var, Block_time.Unpacked.var, Nonce.Unpacked.var) t_
-  type value = (Pedersen.Digest.Unpacked.value, Block_time.Unpacked.value, Nonce.Unpacked.value) t_
+  type var = (Block_time.Unpacked.var, Nonce.Unpacked.var) t_
+  type value = (Block_time.Unpacked.value, Nonce.Unpacked.value) t_
 
-  let to_bits ({ previous_block_hash; time; nonce } : t) =
-    Pedersen.Digest.Bits.to_bits previous_block_hash
-    @ Block_time.Bits.to_bits time
+  let to_bits ({ time; nonce } : t) =
+    Block_time.Bits.to_bits time
     @ Nonce.Bits.to_bits nonce
 
-  let var_to_bits { previous_block_hash; time; nonce } =
-    Pedersen.Digest.Unpacked.var_to_bits previous_block_hash
-    @ Block_time.Unpacked.var_to_bits time
+  let var_to_bits { time; nonce } =
+    Block_time.Unpacked.var_to_bits time
     @ Nonce.Unpacked.var_to_bits nonce
 
   let typ : (var, value) Tick.Typ.t =
@@ -141,14 +135,13 @@ let genesis : t =
     |> Block_time.of_time
   in
   { header =
-      { previous_block_hash = Pedersen.zero_hash
-      ; nonce = Nonce.zero
+      { nonce = Nonce.zero
       ; time
       }
   ; body =
       (* TODO: Fix  *)
       { proof = Lazy.force Tock.Proof.dummy
-      ; target_hash = Ledger_hash.of_hash Pedersen.zero_hash
+      ; target_hash = Ledger.(merkle_root (create ~depth:ledger_depth))
       }
   }
 

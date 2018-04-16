@@ -12,6 +12,16 @@ module type Hash_intf = sig
   val digest : 'a -> 'a t
 end
 
+module type Ledger_hash_intf = sig
+  type t [@@deriving bin_io, sexp]
+  include Hashable.S_binable with type t := t
+end
+
+module type State_hash_intf = sig
+  type t [@@deriving bin_io, sexp]
+  include Hashable.S_binable with type t := t
+end
+
 module type Proof_intf = sig
   type input
   type t
@@ -54,45 +64,52 @@ module type Strength_intf = sig
   val increase : t -> by:difficulty -> t
 end
 
+module type Pow_intf = sig
+  type t
+end
+
 module type Difficulty_intf = sig
   type t
   type time
-  type _ hash
-  type nonce
-  type state
+  type pow
 
   val next : t -> last:time -> this:time -> t
 
-  val meets : t -> (state * nonce) hash -> bool
+  val meets : t -> pow -> bool
 end
 
 module type State_intf  = sig
-  type 'a hash
-  type transition
+  type state_hash
+  type ledger_hash
+  type nonce
+  type pow
   type difficulty
   type strength
-  type ledger
   type time
 
   type t =
     { next_difficulty      : difficulty
-    ; previous_state_hash  : t hash
-    ; ledger_hash          : ledger hash
+    ; previous_state_hash  : state_hash
+    ; ledger_hash          : ledger_hash
     ; strength             : strength
     ; timestamp            : time
     }
   [@@deriving bin_io, fields]
+
+  val hash : t -> state_hash
+
+  val create_pow : t -> nonce -> pow
 end
 
 module type Transition_intf  = sig
-  type 'a hash
+  type ledger_hash
   type ledger
   type proof
   type nonce
   type time
 
   type t =
-    { ledger_hash : ledger hash
+    { ledger_hash : ledger_hash
     ; ledger_proof : proof
     ; timestamp : time
     ; nonce : nonce
@@ -155,9 +172,10 @@ module type Inputs_intf = sig
   module Nonce : Nonce_intf
 
   module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
-  module Ledger_proof : Proof_intf with type input = Ledger.t Hash.t * Ledger.t Hash.t
+  module Ledger_hash : Ledger_hash_intf
+  module Ledger_proof : Proof_intf with type input = Ledger_hash.t * Ledger_hash.t
 
-  module Transition : Transition_intf with type 'a hash := 'a Hash.t
+  module Transition : Transition_intf with type ledger_hash := Ledger_hash.t
                                        and type ledger := Ledger.t
                                        and type proof := Ledger_proof.t
                                        and type nonce := Nonce.t
@@ -165,21 +183,27 @@ module type Inputs_intf = sig
 
   module Time_close_validator : Time_close_validator_intf with type time := Time.t
 
-  module rec State : sig
-    include State_intf with type 'a hash := 'a Hash.t
+  module Pow : Pow_intf
+
+  module Difficulty : Difficulty_intf
+    with type time := Time.t
+     and type pow := Pow.t
+
+  module Strength : Strength_intf with type difficulty := Difficulty.t
+
+  module State_hash : State_hash_intf
+
+  module State : sig
+    include State_intf with type ledger_hash := Ledger_hash.t
+                        and type state_hash := State_hash.t
                         and type difficulty := Difficulty.t
                         and type strength := Strength.t
-                        and type transition := Transition.t
-                        and type ledger := Ledger.t
                         and type time := Time.t
+                        and type nonce := Nonce.t
+                        and type pow := Pow.t
 
     module Proof : Proof_intf with type input = t
-  end and Difficulty : (Difficulty_intf
-    with type time := Time.t
-     and type 'a hash := 'a Hash.t
-     and type nonce := Nonce.t
-     and type state := State.t)
-  and Strength : Strength_intf with type difficulty := Difficulty.t
+  end 
 end
 
 module Make
@@ -230,7 +254,7 @@ module Make
       in
       let new_state : State.t =
         { next_difficulty
-        ; previous_state_hash  = Hash.digest state
+        ; previous_state_hash  = State.hash state
         ; ledger_hash          = transition.ledger_hash
         ; strength             = Strength.increase state.strength ~by:state.next_difficulty
         ; timestamp            = transition.timestamp
