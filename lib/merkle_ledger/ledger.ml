@@ -16,6 +16,8 @@ module type S =
         include Hashable.S_binable with type t := t
      end) -> sig
 
+  val max_depth : int
+
   type index = int
 
   type t
@@ -115,6 +117,8 @@ module Make
 
   type key = Key.t [@@deriving sexp, bin_io]
 
+  let max_depth = Max_depth.max_depth
+
   type entry = 
     { merkle_index : int
     ; account : Hash.account 
@@ -190,7 +194,7 @@ module Make
   ;;
 
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights = Array.create (depth+1) Hash.empty_hash in
+    let empty_hash_at_heights = Array.create (depth + 1) Hash.empty_hash in
     let rec go i =
       if i <= depth
       then begin
@@ -359,12 +363,13 @@ module Make
       | Some a -> DynArray.get a 0
     in
     let rec go i hash =
-      let hash = Hash.merge hash (empty_hash_at_height (t.depth - i - 1)) in
       if i = 0
       then hash
-      else go (i-1) hash
+      else 
+        let hash = Hash.merge hash (empty_hash_at_height (t.depth - i)) in
+        go (i-1) hash
     in
-    go (t.depth - height - 1) base_root
+    go (t.depth - height) base_root
   ;;
 
   let hash t = Hash.hash_hash (merkle_root t)
@@ -396,8 +401,11 @@ module Make
         else (Hash.hash_account (Hashtbl.find_exn t.accounts (DynArray.get t.tree.leafs leaf_hash_idx)).account)  
       in
       let is_left = addr0 mod 2 = 0 in
+      let non_root_nodes =
+        List.take t.tree.nodes (t.depth - 1)
+      in
       let base_path, base_path_height = 
-        go 1 (addr0 lsr 1) t.tree.nodes
+        go 1 (addr0 lsr 1) non_root_nodes
           [ if is_left then `Left leaf_hash else `Right leaf_hash ]
       in
       List.rev_append 

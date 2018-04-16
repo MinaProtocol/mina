@@ -6,6 +6,13 @@ let load_ledger d n b =
   List.iter keys ~f:(fun k -> Test_ledger.update ledger k b);
   (ledger, keys)
 
+let load_little_ledger d n b = 
+  let ledger = Test_ledger.Little_ledger.create d in
+  let keys = List.init n ~f:(fun i -> Int.to_string i) in
+  List.iter keys ~f:(fun k -> Test_ledger.Little_ledger.update ledger k b);
+  (ledger, keys)
+
+
 let%test "empty_length" = 
   let ledger = Test_ledger.create 16 in
   Test_ledger.length ledger = 0
@@ -44,7 +51,7 @@ let%test "idx_nonexist" =
   let b = 100 in
   let d = 16 in
   let ledger, _keys = load_ledger d 10 b in
-  `Index_not_found = Test_ledger.get_at_index ledger 0
+  `Index_not_found = Test_ledger.get_at_index ledger 1234567
 ;;
 
 let%test_unit "modify_account" = 
@@ -68,21 +75,23 @@ let%test_unit "modify_account_by_idx" =
 ;;
 
 let rec compose_hash i hash =
-  let hash = Test_ledger.Hash.merge hash hash in
   if i = 0
   then hash
-  else compose_hash (i-1) hash
+  else 
+    let hash = Test_ledger.Hash.merge hash hash in
+    compose_hash (i - 1) hash
 
 let%test "merkle_root" =
   let d = 16 in
   let ledger = Test_ledger.create d in
   let root = Test_ledger.merkle_root ledger in
-  (compose_hash (d - 1) Test_ledger.Hash.empty_hash) = root
+  (compose_hash d Test_ledger.Hash.empty_hash) = root
 ;;
 
 let%test "merkle_root_nonempty" =
-  let d = 16 in
-  let ledger, keys = load_ledger d 1 10 in
+  let d = 3 in
+  let l = (1 lsl (d-1)) + 1 in
+  let ledger, keys = load_ledger d l 1 in
   let root = Test_ledger.merkle_root ledger in
   Test_ledger.Hash.empty_hash <> root
 ;;
@@ -122,11 +131,22 @@ let check_path account (path : Test_ledger.Path.t) root =
   in
   path_root = root
 
+let little_check_path account (path : Test_ledger.Little_ledger.Path.t) root =
+  let path_root = 
+    List.fold 
+      ~init:(Test_ledger.Hash.hash_account account)
+      path
+      ~f:(fun a b -> 
+        match b with
+        | `Left b -> Test_ledger.Hash.merge a b
+        | `Right b -> Test_ledger.Hash.merge b a)
+  in
+  path_root = root
+
 let%test_unit "merkle_path" =
   let b1 = 10 in
-  let d = 16 in
-  List.iter 
-    (List.range 1 20)
+  let d = 3 in
+  List.iter (List.range ~stop:`inclusive 1 (1 lsl d))
     ~f:(fun n -> 
       let ledger, keys = load_ledger d n b1 in
       let key = List.nth_exn keys 0 in
@@ -135,6 +155,21 @@ let%test_unit "merkle_path" =
       let root = Test_ledger.merkle_root ledger in
       assert (List.length path = d);
       assert (check_path account path root)
+    );
+;;
+
+let%test_unit "little_merkle_path" =
+  let b1 = 10 in
+  let d = Test_ledger.Little_ledger.max_depth in
+  List.iter (List.range ~stop:`inclusive 1 (1 lsl d))
+    ~f:(fun n -> 
+      let ledger, keys = load_little_ledger d n b1 in
+      let key = List.nth_exn keys 0 in
+      let path = Test_ledger.Little_ledger.merkle_path ledger key |> Option.value_exn in
+      let account = Test_ledger.Little_ledger.get ledger key |> Option.value_exn in
+      let root = Test_ledger.Little_ledger.merkle_root ledger in
+      assert (List.length path = d);
+      assert (little_check_path account path root)
     );
 ;;
 
