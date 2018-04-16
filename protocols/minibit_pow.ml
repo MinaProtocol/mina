@@ -47,7 +47,7 @@ module type Transaction_intf = sig
 end
 
 module type Strength_intf = sig
-  type t [@@deriving compare]
+  type t [@@deriving compare, bin_io]
   type difficulty
 
   val ( < ) : t -> t -> bool
