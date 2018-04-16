@@ -71,7 +71,6 @@ module Make
     (Membership       : Membership.S)
     (Gossip_net : Gossip_net.S)
     (Miner_impl : Miner.S)
-    (Storage    : Storage.S)
   =
 struct
   module Gossip_net = Gossip_net(Message)
@@ -304,10 +303,10 @@ struct
     =
       Logger.debug log "Starting with me %s; client_port %s" (Host_and_port.to_string me) (Int.to_string client_port);
     let open Let_syntax in
-    let%bind initial_blockchain =
-      match%map Storage.load storage_location log with
-      | Some x -> x
-      | None -> genesis_blockchain
+    let initial_blockchain =
+      (*match%map Storage.load storage_location log with*)
+      (*| Some x -> x*)
+      genesis_blockchain
     in
     (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
@@ -340,9 +339,6 @@ struct
         ~f:(fun b -> Miner.Update.Change_body Block.With_transactions.Body.dummy)
     end;
 
-    (* Store and accumulate updates *)
-    Storage.persist storage_location
-      (Linear_pipe.map pipes.storage_strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain_accumulator.accumulate
       ~prover
       ~parent_log:log
@@ -396,5 +392,5 @@ end
 (* Make sure tests work *)
 let%test "trivial" = true
 
-include Make(Membership.Haskell)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
+include Make(Membership.Haskell)(Gossip_net.Make)(Miner.Cpu)
 

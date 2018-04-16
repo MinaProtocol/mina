@@ -21,6 +21,7 @@
       transaction_snark
       transaction_pool
       snarky
+      storage
       logger
       async
       async_extra
