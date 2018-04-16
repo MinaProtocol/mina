@@ -83,11 +83,11 @@ module Make
   (* For now: Keep the top 50 ledgers (by strength), prune everything else *)
   let prune t =
     let rec go () =
-      if Heap.length t.state.strongest_ledgers > t.keep_count then
+      if Heap.length t.state.strongest_ledgers > t.keep_count then begin
         let (h, _) = Heap.pop_exn t.state.strongest_ledgers in
         Ledger_hash.Table.remove t.state.hash_to_ledger h;
         go ()
-      else ()
+      end
     in
     go ()
 
@@ -125,14 +125,14 @@ module Make
       match%map Store.load storage_controller config.disk_location with
       | Ok state -> state
       | Error (`IO_error e) ->
-          Logger.info log "Ledger failed to load from storage %s; recreating" (Error.to_string_hum e);
-          State.create ()
+        Logger.info log "Ledger failed to load from storage %s; recreating" (Error.to_string_hum e);
+        State.create ()
       | Error `No_exist ->
-          Logger.info log "Ledger doesn't exist in storage; recreating";
-          State.create ()
+        Logger.info log "Ledger doesn't exist in storage; recreating";
+        State.create ()
       | Error `Checksum_no_match ->
-          Logger.warn log "Checksum failed when loading ledger, recreating";
-          State.create ()
+        Logger.warn log "Checksum failed when loading ledger, recreating";
+        State.create ()
     in
     let t =
       { state
@@ -149,7 +149,8 @@ module Make
         (* Notice: This pipe iter blocks upstream while it's materializing ledgers from the network (potentially) AND saving to disk *)
         match%bind get t h with
         | Error e ->
-          return (Logger.warn t.log "Failed to keep-up with transactions (can't get ledger %s)" (Error.to_string_hum e))
+          Logger.warn t.log "Failed to keep-up with transactions (can't get ledger %s)" (Error.to_string_hum e);
+          return ()
         | Ok unsafe_ledger ->
           let ledger = Ledger.copy unsafe_ledger in
           List.iter transactions ~f:(fun transaction ->
