@@ -157,7 +157,7 @@ module type Inputs_intf = sig
   module Nonce : Nonce_intf
 
   module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
-  module Ledger_proof : Proof_intf with type input = Ledger.t Hash.t
+  module Ledger_proof : Proof_intf with type input = Ledger.t Hash.t * Ledger.t Hash.t
 
   module Transition : Transition_intf with type 'a hash := 'a Hash.t
                                        and type ledger := Ledger.t
