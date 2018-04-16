@@ -103,7 +103,7 @@ let main () =
     let%map membership = 
       let%bind prover =
         if start_prover
-        then Prover.create ~port:prover_port ~debug:()
+        then Prover.create ~port:prover_port ~debug:() ()
         else Prover.connect { host = "0.0.0.0"; port = prover_port }
       in
       let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
