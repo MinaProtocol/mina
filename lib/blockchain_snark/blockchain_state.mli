@@ -49,6 +49,8 @@ include Snarkable.S
 
 module Hash = State_hash
 
+val to_bits_unchecked : t -> bool list
+
 val hash : t -> Hash.t
 
 val negative_one : t

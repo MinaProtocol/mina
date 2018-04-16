@@ -15,7 +15,7 @@ module type S = sig
     module V1 : sig
       type nonrec t = t
       [@@deriving bin_io, sexp, compare, eq]
-      include Hashable.S with type t := t
+      include Hashable_binable with type t := t
     end
   end
 
@@ -43,7 +43,7 @@ module Make () = struct
         [@@deriving bin_io, sexp, eq, compare, hash]
       end
       include T
-      include Hashable.Make(T)
+      include Hashable.Make_binable(T)
     end
   end
 

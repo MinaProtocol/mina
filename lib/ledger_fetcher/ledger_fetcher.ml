@@ -34,7 +34,7 @@ module Make
   module State = struct
     module T = struct
       type t =
-        { strongest_ledgers : (Ledger.t Hash.t * Strength.t) Heap.t
+        { strongest_ledgers : (Ledger_hash.t * Strength.t) Heap.t
         ; hash_to_ledger : (Ledger.t * State.t) Ledger_hash.Table.t
         }
     end
@@ -43,7 +43,7 @@ module Make
     include Bin_prot.Utils.Make_binable(struct
       module Binable = struct
         type t =
-          { strongest_ledgers : (Ledger.t Hash.t * Strength.t) list
+          { strongest_ledgers : (Ledger_hash.t * Strength.t) list
           ; hash_to_ledger : (Ledger.t * State.t) Ledger_hash.Table.t
           }
         [@@deriving bin_io]

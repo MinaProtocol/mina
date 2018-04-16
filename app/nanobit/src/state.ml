@@ -22,6 +22,13 @@ let zero = of_blockchain_state Blockchain_state.zero
 
 let hash t = Blockchain_state.hash (to_blockchain_state t)
 
+let create_pow t nonce =
+  let open Snark_params.Tick in
+  Pedersen.hash_fold Pedersen.params
+    (fun ~init ~f ->
+       let init = List.fold (Blockchain_state.to_bits_unchecked (to_blockchain_state t)) ~init ~f in
+       Nonce.Bits.fold nonce ~init ~f)
+
 module Proof = struct
   type input = t
   type t = unit

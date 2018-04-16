@@ -47,8 +47,13 @@ module Inputs0 = struct
         None
     let forget t = { transaction = t.With_valid_signature.transaction }
   end
+
   module Nonce = Nanobit_base.Nonce
+
   module Difficulty = Difficulty
+
+  module Pow = Snark_params.Tick.Pedersen.Digest
+
   module Strength = struct
     include Strength
 

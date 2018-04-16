@@ -65,7 +65,7 @@ module type Ledger_fetcher_intf = sig
     [@@deriving make]
   end
 
-  val create : Config.t -> t
+  val create : Config.t -> t Deferred.t
   val get : t -> ledger_hash -> ledger Deferred.Or_error.t
 
   val local_get : t -> ledger_hash -> (ledger * state) Or_error.t

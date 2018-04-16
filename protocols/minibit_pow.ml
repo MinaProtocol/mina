@@ -14,12 +14,12 @@ end
 
 module type Ledger_hash_intf = sig
   type t [@@deriving bin_io, sexp]
-  include Hashable.S with type t := t
+  include Hashable.S_binable with type t := t
 end
 
 module type State_hash_intf = sig
   type t [@@deriving bin_io, sexp]
-  include Hashable.S with type t := t
+  include Hashable.S_binable with type t := t
 end
 
 module type Proof_intf = sig
@@ -173,7 +173,7 @@ module type Inputs_intf = sig
 
   module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
   module Ledger_hash : Ledger_hash_intf
-  module Ledger_proof : Proof_intf with type input = Ledger_hash.t
+  module Ledger_proof : Proof_intf with type input = Ledger_hash.t * Ledger_hash.t
 
   module Transition : Transition_intf with type ledger_hash := Ledger_hash.t
                                        and type ledger := Ledger.t
