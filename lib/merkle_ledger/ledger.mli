@@ -23,8 +23,9 @@ module type S =
 
   module Path : sig
     type elem =
-      | Left of Hash.hash
-      | Right of Hash.hash
+      [ `Left of Hash.hash
+      | `Right of Hash.hash
+      ]
     [@@deriving sexp]
 
     val elem_hash : elem -> Hash.hash

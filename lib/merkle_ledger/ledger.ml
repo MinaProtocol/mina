@@ -25,8 +25,9 @@ module type S =
 
   module Path : sig
     type elem =
-      | Left of Hash.hash
-      | Right of Hash.hash
+      [ `Left of Hash.hash
+      | `Right of Hash.hash
+      ]
     [@@deriving sexp]
 
     val elem_hash : elem -> Hash.hash
@@ -168,20 +169,21 @@ module Make
 
   module Path = struct
     type elem = 
-      | Left of Hash.hash
-      | Right of Hash.hash
+      [ `Left of Hash.hash
+      | `Right of Hash.hash
+      ]
     [@@deriving sexp]
 
     let elem_hash = function
-      | Left h | Right h -> h
+      | `Left h | `Right h -> h
 
     type t = elem list [@@deriving sexp]
 
     let implied_root (t : t) hash =
       List.fold t ~init:hash ~f:(fun acc elem ->
         match elem with
-        | Left h -> Hash.merge acc h
-        | Right h -> Hash.merge h acc)
+        | `Left h -> Hash.merge acc h
+        | `Right h -> Hash.merge h acc)
   end
 
   let create_account_table () = Key.Table.create ()
@@ -385,7 +387,7 @@ module Make
             else empty_hash_at_height height
           in
           go (height + 1) (addr lsr 1) layers
-            ((if is_left then Path.Left hash else Path.Right hash) :: acc)
+            ((if is_left then `Left hash else `Right hash) :: acc)
       in
       let leaf_hash_idx = addr0 lxor 1 in
       let leaf_hash = 
@@ -396,13 +398,13 @@ module Make
       let is_left = addr0 mod 2 = 0 in
       let base_path, base_path_height = 
         go 1 (addr0 lsr 1) t.tree.nodes
-          [ if is_left then Left leaf_hash else Right leaf_hash ]
+          [ if is_left then `Left leaf_hash else `Right leaf_hash ]
       in
       List.rev_append 
         base_path
         (List.init 
           (t.depth - base_path_height) 
-          ~f:(fun i -> Path.Left (empty_hash_at_height (i + base_path_height))))
+          ~f:(fun i -> `Left (empty_hash_at_height (i + base_path_height))))
     )
   ;;
 

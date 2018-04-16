@@ -16,12 +16,14 @@
       minibit
       protocols
       nanobit_base
+      sparse_ledger
       blockchain_snark
       transaction_snark
       snarky
       logger
       async
       async_extra
+      rpc_parallel
       async_ssl
       cohttp
       cohttp-async))

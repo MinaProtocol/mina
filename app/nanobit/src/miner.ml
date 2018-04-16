@@ -4,6 +4,8 @@ open Nanobit_base
 open Snark_params
 open Blockchain_snark
 
+module Bundle = Bundle
+
 module Update = struct
   type t =
     | Change_previous of Blockchain.t

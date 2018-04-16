@@ -117,8 +117,8 @@ let check_path account (path : Test_ledger.Path.t) root =
       path
       ~f:(fun a b -> 
         match b with
-        | Left b -> Test_ledger.Hash.merge a b
-        | Right b -> Test_ledger.Hash.merge b a)
+        | `Left b -> Test_ledger.Hash.merge a b
+        | `Right b -> Test_ledger.Hash.merge b a)
   in
   path_root = root
 
