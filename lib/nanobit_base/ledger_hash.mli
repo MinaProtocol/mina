@@ -2,30 +2,6 @@ open Core
 open Snark_params
 open Snarky
 open Tick
-(* TODO
-
-type t = private Pedersen.Digest.t
-[@@deriving sexp]
-
-val (=) : t -> t -> bool
-
-val of_hash : Pedersen.Digest.t -> t
-
-module Stable : sig
-  module V1 : sig
-    type nonrec t = t
-    [@@deriving bin_io, sexp]
-  end
-end
-
-type var
-
-val var_to_bits : var -> (Boolean.var list, _) Checked.t
-
-val typ : (var, t) Typ.t
-
-include Bits_intf.S with type t := t
-*)
 
 include Data_hash.S
 
