@@ -14,14 +14,25 @@ module Inputs0 = struct
   end
   module Transaction = struct
     type t = { transaction: Nanobit_base.Transaction.t }
-      [@@deriving bin_io]
+      [@@deriving eq, bin_io]
+    (* The underlying transaction has an arbitrary compare func, fallback to that *)
+    let compare t t' = 
+      let fee_compare =
+        Transaction.Fee.compare
+          t.transaction.payload.fee
+          t'.transaction.payload.fee
+      in
+      match fee_compare with
+      | 0 -> Transaction.compare t.transaction t'.transaction
+      | _ -> fee_compare
 
     module With_valid_signature = struct
       type t = 
         { transaction: Nanobit_base.Transaction.t 
         ; validation: unit
         }
-      [@@deriving bin_io]
+      [@@deriving eq, bin_io]
+      let compare t t' = compare {transaction = t.transaction} {transaction = t'.transaction}
     end
 
     let check t =
@@ -172,14 +183,6 @@ module Inputs = struct
     module Net = Net
     module Store = Storage.Disk
   end)
-  module Transaction_pool = struct
-    type t
-
-    (* TODO *)
-    let add t valid_transactions = t
-    let remove t valid_transactions = t
-    let get t ~k  = []
-  end
 
   module Bundle = struct
     (* TODO *)
@@ -190,6 +193,7 @@ module Inputs = struct
     let result _ = failwith "TODO"
   end
 
+  module Transaction_pool = Transaction_pool.Make(Transaction)
   module Miner = Minibit_miner.Make(Inputs0)(Transition_with_witness)(Transaction_pool)(Bundle)
   module Genesis = struct
     (* TODO actually do this right *)

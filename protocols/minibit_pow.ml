@@ -35,11 +35,9 @@ module type Nonce_intf = sig
 end
 
 module type Transaction_intf = sig
-  type t
-
-
+  type t [@@deriving compare, eq]
   module With_valid_signature : sig
-    type t
+    type t [@@deriving compare, eq]
   end
 
   val check : t -> With_valid_signature.t option
