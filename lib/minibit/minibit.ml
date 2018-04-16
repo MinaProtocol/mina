@@ -82,14 +82,26 @@ end
 module type Miner_intf = sig
   type t
   type 'a hash
+  type ledger
   type transition_with_witness
   type state
   type transaction_pool
 
-  type change =
-    | Tip_change of state
+  module Tip : sig
+    type t =
+      { state : state
+      ; ledger : ledger
+      ; transaction_pool : transaction_pool
+      }
+  end
 
-  val create : change_feeder:change Linear_pipe.Reader.t -> t
+  type change =
+    | Tip_change of Tip.t
+
+  val create
+    : parent_log:Logger.t
+    -> change_feeder:change Linear_pipe.Reader.t
+    -> t
 
   val transitions : t -> transition_with_witness Linear_pipe.Reader.t
 end
@@ -171,9 +183,10 @@ module type Inputs_intf = sig
 
   module Transaction_pool : Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
   module Miner : Miner_intf with type 'a hash := 'a Hash.t
-                       and type state := State.t
-                       and type transition_with_witness := Transition_with_witness.t
-                       and type transaction_pool := Transaction_pool.t
+                             and type ledger := Ledger.t
+                             and type state := State.t
+                             and type transition_with_witness := Transition_with_witness.t
+                             and type transaction_pool := Transaction_pool.t
   module Genesis : sig
     val state : State.t
     val proof : State.Proof.t
@@ -210,9 +223,12 @@ module Make
     let (miner_broadcast_reader,miner_broadcast_writer) = Linear_pipe.create () in
     let (ledger_fetcher_transitions_reader, ledger_fetcher_transitions_writer) = Linear_pipe.create () in
     let (change_feeder_reader, change_feeder_writer) = Linear_pipe.create () in
-    let miner = Miner.create ~change_feeder:change_feeder_reader in
     let ledger_fetcher_net_ivar = Ivar.create () in
     let ledger_fetcher = Ledger_fetcher.create (Ledger_fetcher.Config.make ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader ()) in
+    let miner =
+      Miner.create ~parent_log:config.log
+        ~change_feeder:change_feeder_reader
+    in
     let%map net = 
       Net.create 
         config.net_config

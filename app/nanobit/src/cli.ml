@@ -41,6 +41,9 @@ module Inputs0 = struct
 
     let next t ~last ~this =
       Blockchain_state.compute_target last t this
+
+    let meets t h =
+      Target.meets_target_unchecked t h
   end
   module Strength = struct
     include Strength
@@ -58,7 +61,7 @@ module Inputs0 = struct
   end
   module Ledger_proof = struct
     type t = unit
-    type input = Ledger.t Hash.t
+    type input = Ledger.t Hash.t * Ledger.t Hash.t
 
     (* TODO *)
     let verify t _ = return true
@@ -74,8 +77,8 @@ module Inputs0 = struct
   end
   module Time_close_validator = struct
     let validate t =
-      let now = Time.of_time (Core_kernel.Time.now ()) in
-      Time.(diff now t < (Span.of_time_span (Core_kernel.Time.Span.of_sec 900.)))
+      let now_time = Time.now () in
+      Time.(diff now_time t < (Span.of_time_span (Core_kernel.Time.Span.of_sec 900.)))
   end
   module State = struct
     type 'a hash = 'a Hash.t [@@deriving bin_io]
@@ -176,7 +179,17 @@ module Inputs = struct
     let remove t valid_transactions = t
     let get t ~k  = []
   end
-  module Miner = Minibit_miner.Make(Inputs0)
+
+  module Bundle = struct
+    (* TODO *)
+    type t = unit
+    let create _ _ = ()
+    let cancel _ = ()
+    let target_hash _ = failwith "TODO"
+    let result _ = failwith "TODO"
+  end
+
+  module Miner = Minibit_miner.Make(Inputs0)(Transition_with_witness)(Transaction_pool)(Bundle)
   module Genesis = struct
     (* TODO actually do this right *)
     let state : State.t =

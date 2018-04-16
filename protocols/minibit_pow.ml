@@ -3,6 +3,8 @@ open Async_kernel
 
 module type Time_intf = sig
   type t
+
+  val now : unit -> t
 end
 
 module type Hash_intf = sig
@@ -27,10 +29,15 @@ end
 
 module type Nonce_intf = sig
   type t
+
+  val succ : t -> t
+  val random : unit -> t
 end
 
 module type Transaction_intf = sig
   type t
+
+
   module With_valid_signature : sig
     type t
   end
@@ -52,8 +59,13 @@ end
 module type Difficulty_intf = sig
   type t
   type time
+  type _ hash
+  type nonce
+  type state
 
   val next : t -> last:time -> this:time -> t
+
+  val meets : t -> (state * nonce) hash -> bool
 end
 
 module type State_intf  = sig
@@ -143,19 +155,19 @@ module type Inputs_intf = sig
   module Hash : Hash_intf
   module Transaction : Transaction_intf
   module Nonce : Nonce_intf
-  module Difficulty : Difficulty_intf with type time := Time.t
-  module Strength : Strength_intf with type difficulty := Difficulty.t
 
   module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
-  module Ledger_proof : Proof_intf with type input = Ledger.t Hash.t
+  module Ledger_proof : Proof_intf with type input = Ledger.t Hash.t * Ledger.t Hash.t
 
   module Transition : Transition_intf with type 'a hash := 'a Hash.t
                                        and type ledger := Ledger.t
                                        and type proof := Ledger_proof.t
                                        and type nonce := Nonce.t
                                        and type time := Time.t
+
   module Time_close_validator : Time_close_validator_intf with type time := Time.t
-  module State : sig
+
+  module rec State : sig
     include State_intf with type 'a hash := 'a Hash.t
                         and type difficulty := Difficulty.t
                         and type strength := Strength.t
@@ -164,7 +176,12 @@ module type Inputs_intf = sig
                         and type time := Time.t
 
     module Proof : Proof_intf with type input = t
-  end
+  end and Difficulty : (Difficulty_intf
+    with type time := Time.t
+     and type 'a hash := 'a Hash.t
+     and type nonce := Nonce.t
+     and type state := State.t)
+  and Strength : Strength_intf with type difficulty := Difficulty.t
 end
 
 module Make
