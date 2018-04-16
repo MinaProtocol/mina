@@ -72,7 +72,7 @@ let connect host_and_port =
   return { host_and_port; connection }
 ;;
 
-let create ?debug ~port =
+let create ?debug ~port () =
   (* Soon: This channel should be authenticated somehow *)
   let%bind process =
     Process.create_exn

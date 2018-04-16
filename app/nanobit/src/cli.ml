@@ -4,7 +4,11 @@ open Nanobit_base
 open Blockchain_snark
 open Cli_common
 
-module Inputs0 = struct
+module type Init_intf = sig
+  val prover : Prover.t
+end
+
+module Make_inputs0 (Init : Init_intf) = struct
   module Time = Block_time
   module Hash = struct
     type 'a t = Snark_params.Tick.Pedersen.Digest.t
@@ -162,8 +166,10 @@ module Inputs0 = struct
   end
 
 end
-module Inputs = struct
+module Make_inputs (Init : Init_intf) = struct
+  module Inputs0 = Make_inputs0(Init)
   include Inputs0
+
   module Net = Minibit_networking.Make(State_with_witness)(Hash)(Ledger)(State)
   module Ledger_fetcher_io = Net.Ledger_fetcher_io
   module State_io = Net.State_io
@@ -214,9 +220,6 @@ module Inputs = struct
     let prove_zk_state_valid t ~new_state = return ()
   end
 end
-
-module Main = Minibit.Make(Inputs)(Inputs.Block_state_transition_proof)
-
 
 let daemon =
   let open Command.Let_syntax in
@@ -270,6 +273,13 @@ let daemon =
           in
           let remap_addr_port = Fn.id in
           let me = Host_and_port.create ~host:ip ~port in
+          let%bind prover = Prover.create ~port:Prover.default_port () in
+          let module Init = struct
+            let prover = prover
+          end
+          in
+          let module Inputs = Make_inputs(Init) in
+          let module Main = Minibit.Make(Inputs)(Inputs.Block_state_transition_proof) in
           let net_config = 
             { Inputs.Net.Config.parent_log = log
             ; gossip_net_params =

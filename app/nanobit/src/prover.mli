@@ -10,6 +10,7 @@ val default_port : int
 val create
   : ?debug:unit
   -> port:int
+  -> unit
   -> t Deferred.t
 
 val connect : Host_and_port.t -> t Deferred.t
