@@ -7,6 +7,7 @@ open Cli_common
 module type Init_intf = sig
   val conf_dir : string
   val prover : Prover.t
+  val genesis_proof : Proof.t
 end
 
 module Make_inputs0 (Init : Init_intf) = struct
@@ -102,7 +103,20 @@ module Make_inputs0 (Init : Init_intf) = struct
       Time.(diff now_time t < (Span.of_time_span (Core_kernel.Time.Span.of_sec 900.)))
   end
 
-  module State = State
+  module State = struct
+    include State
+    module Proof = struct
+      type input = t
+
+      type t = Proof.Stable.V1.t
+      [@@deriving bin_io]
+
+      let verify proof s =
+        Prover.verify_blockchain Init.prover
+          { Blockchain.state = to_blockchain_state s; proof }
+        >>| Or_error.ok_exn
+    end
+  end
 
   module Proof_carrying_state = struct
     type t = (State.t, State.Proof.t) Protocols.Minibit_pow.Proof_carrying_data.t
@@ -186,7 +200,7 @@ module Make_inputs (Init : Init_intf) = struct
   module Miner = Minibit_miner.Make(Inputs0)(Transition_with_witness)(Transaction_pool)(Bundle)
   module Genesis = struct
     let state : State.t = State.zero
-    let proof = ()
+    let proof = Init.genesis_proof
   end
   module Block_state_transition_proof = struct
     module Witness = struct
@@ -198,7 +212,14 @@ module Make_inputs (Init : Init_intf) = struct
     end
 
     (* TODO *)
-    let prove_zk_state_valid t ~new_state = return ()
+    let prove_zk_state_valid ({ old_state; old_proof; transition } : Witness.t) ~new_state:_ =
+      Prover.extend_blockchain Init.prover
+        { state = State.to_blockchain_state old_state; proof = old_proof }
+        { header = { time = transition.timestamp; nonce = transition.nonce }
+        ; body = { target_hash = transition.ledger_hash; proof = transition.ledger_proof }
+        }
+      >>| Or_error.ok_exn
+      >>| Blockchain.proof
   end
 end
 
@@ -249,9 +270,11 @@ let daemon =
           let remap_addr_port = Fn.id in
           let me = Host_and_port.create ~host:ip ~port in
           let%bind prover = Prover.create ~conf_dir in
+          let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
           let module Init = struct
             let conf_dir = conf_dir
             let prover = prover
+            let genesis_proof = genesis_proof
           end
           in
           let module Inputs = Make_inputs(Init) in
