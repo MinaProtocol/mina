@@ -11,10 +11,18 @@ module type Inputs_intf = sig
                                      and type ledger_hash := Ledger_hash.t
                                      and type state := State.t
   module Store : Storage.With_checksum_intf
+  module Transaction_pool : Minibit.Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
+  module Genesis : sig val state : State.t end
 end
 
 module Make
   (Inputs : Inputs_intf)
+  : Minibit.Ledger_fetcher_intf with type ledger_hash := Inputs.Ledger_hash.t
+                                and type ledger := Inputs.Ledger.t
+                                and type transaction_with_valid_signature := Inputs.Transaction.With_valid_signature.t
+                                and type state := Inputs.State.t
+                                and type net := Inputs.Net.t
+
 = struct
   open Inputs
 
@@ -74,6 +82,7 @@ module Make
     ; keep_count : int
     ; storage_controller : State.t Store.Controller.t
     ; disk_location : Store.location
+    ; all_new_states_reader : (Ledger.t * Inputs.State.t) Linear_pipe.Reader.t
     }
 
   (* For now: Keep the top 50 ledgers (by strength), prune everything else *)
@@ -107,7 +116,29 @@ module Make
       ledger
     | Ok (l,s) -> Deferred.Or_error.return l
 
+  let initialize t =
+    if Heap.length t.state.strongest_ledgers = 0 then begin
+      let empty = Ledger.create () in
+      add t (Ledger.merkle_root empty) empty Genesis.state;
+    end
+
+  let strongest_ledgers t =
+    let best_strength = ref Strength.zero in
+    Linear_pipe.filter_map t.all_new_states_reader ~f:(fun (ledger, state) ->
+      let new_strength = Inputs.State.strength state in
+      if !best_strength < new_strength then begin
+        best_strength := new_strength;
+        Some (ledger, state)
+      end else
+        None
+    )
+
+  let materialize_new_state t =
+    let (hash, _) = Heap.top_exn t.state.strongest_ledgers in
+    Or_error.ok_exn (local_get t hash)
+
   let create (config : Config.t) =
+    let (all_new_states_reader, all_new_states_writer) = Linear_pipe.create () in
     let storage_controller =
       Store.Controller.create
         ~parent_log:config.parent_log
@@ -130,6 +161,7 @@ module Make
         Logger.warn log "Checksum failed when loading ledger, recreating";
         State.create ()
     in
+
     let t =
       { state
       ; net = config.net_deferred
@@ -137,8 +169,14 @@ module Make
       ; keep_count = config.keep_count
       ; storage_controller
       ; disk_location = config.disk_location
+      ; all_new_states_reader
       }
     in
+
+    initialize t;
+    let initial_strong_state = materialize_new_state t in
+    Linear_pipe.write_or_exn ~capacity:1 all_new_states_writer all_new_states_reader initial_strong_state;
+
     don't_wait_for begin
       Linear_pipe.iter config.ledger_transitions ~f:(fun (h, transactions, state) ->
         let open Deferred.Let_syntax in
@@ -156,6 +194,10 @@ module Make
             | Ok () -> ()
           );
           add t h ledger state;
+          (* Capacity is tiny because contract is that miner will cancel whenever
+           * new tip is received *)
+          let next_state = materialize_new_state t in
+          Linear_pipe.write_or_exn ~capacity:1 all_new_states_writer all_new_states_reader next_state;
           (* TODO: Make state saving more efficient and in appropriate places (see #180) *)
           Store.store t.storage_controller t.disk_location t.state
       )
