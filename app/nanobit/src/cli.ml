@@ -69,7 +69,7 @@ module Make_inputs0 (Init : Init_intf) = struct
     type valid_transaction = Transaction.With_valid_signature.t
 
     (* TODO: Is this right? *)
-    let create () = Ledger.create ~depth:64
+    let create = Ledger.create
     let merkle_root = Ledger.merkle_root
     let copy = Nanobit_base.Ledger.copy
     let apply_transaction t (valid_transaction : Transaction.With_valid_signature.t) : unit Or_error.t =

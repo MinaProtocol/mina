@@ -6,8 +6,6 @@ module type Inputs_intf = sig
   module Transition_with_witness : Minibit.Transition_with_witness_intf
   with type transition := Transition.t
    and type transaction_with_valid_signature := Transaction.With_valid_signature.t
-  module Transaction_pool : Minibit.Transaction_pool_intf
-  with type transaction_with_valid_signature := Transaction.With_valid_signature.t
   module Bundle : sig
      type t
 

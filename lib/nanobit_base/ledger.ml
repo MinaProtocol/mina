@@ -20,8 +20,8 @@ include Merkle_ledger.Ledger.Make
         Tick.Pedersen.hash_fold Tick.Pedersen.params
           (Account.fold_bits account)
     end)
-    (struct let max_depth = ledger_depth end)
     (Public_key.Compressed)
+    (struct let depth = ledger_depth end)
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t)
 

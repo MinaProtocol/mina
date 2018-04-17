@@ -126,7 +126,7 @@ module Make
     let best_strength = ref Strength.zero in
     Linear_pipe.filter_map t.all_new_states_reader ~f:(fun (ledger, state) ->
       let new_strength = Inputs.State.strength state in
-      if !best_strength < new_strength then begin
+      if Strength.(<) !best_strength new_strength then begin
         best_strength := new_strength;
         Some (ledger, state)
       end else

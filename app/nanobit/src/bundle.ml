@@ -48,7 +48,7 @@ module Sparse_ledger = struct
       add_path acc (Option.value_exn (Ledger.merkle_path ledger key))
         (Option.value_exn (Ledger.get ledger key)))
       ~init:(
-        of_hash ~depth:(Ledger.depth ledger)
+        of_hash ~depth:Ledger.depth
           (Ledger.merkle_root ledger :> Pedersen.Digest.t))
 
   let apply_transaction_exn t ({ sender; payload = { amount; fee=_; receiver } } : Transaction.t) =
