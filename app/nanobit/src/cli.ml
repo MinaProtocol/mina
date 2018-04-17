@@ -304,10 +304,10 @@ let daemon =
     end
 ;;
 
-  let () = 
+let () = 
   Command.group ~summary:"Current"
     [ "daemon", daemon
-    ; "prover", Prover.command
+    ; Prover.command_name, Prover.command
     ; "rpc", Main_rpc.command
     ; "client", Client.command
     ]

@@ -214,26 +214,33 @@ let command_name = "prover"
 
 let command = Rpc_parallel.Expert.worker_command
 
-let init () =
-  let rpc_heartbeat_config =
-    Rpc.Connection.Heartbeat_config.create
-      ~send_every:(Time_ns.Span.of_sec 10.)
-      ~timeout:(Time_ns.Span.of_min 5.)
+let create =
+  let init () =
+    let rpc_heartbeat_config =
+      Rpc.Connection.Heartbeat_config.create
+        ~send_every:(Time_ns.Span.of_sec 10.)
+        ~timeout:(Time_ns.Span.of_min 5.)
+    in
+    Rpc_parallel.Expert.start_master_server_exn
+      ~rpc_handshake_timeout:(Time.Span.of_min 10.)
+      ~rpc_heartbeat_config
+      ~worker_command_args:[command_name]
+      ()
   in
-  Rpc_parallel.Expert.start_master_server_exn
-    ~rpc_handshake_timeout:(Time.Span.of_min 10.)
-    ~rpc_heartbeat_config
-    ~worker_command_args:[command_name]
-    ()
+  let initialized = ref false in
+  fun ~conf_dir ->
+    if not !initialized
+    then begin
+      init ();
+      initialized := true;
+    end;
+    Worker.spawn_exn ~on_failure:Error.raise
+      ~shutdown_on:Disconnect
+      ~redirect_stdout:(`File_append (conf_dir ^/ "prover-stdout"))
+      ~redirect_stderr:(`File_append (conf_dir ^/ "prover-stderr"))
+      ~connection_state_init_arg:()
+      ()
 ;;
-
-let create ~conf_dir =
-  Worker.spawn_exn ~on_failure:Error.raise
-    ~shutdown_on:Disconnect
-    ~redirect_stdout:(`File_append (conf_dir ^/ "prover-stdout"))
-    ~redirect_stderr:(`File_append (conf_dir ^/ "prover-stderr"))
-    ~connection_state_init_arg:()
-    ()
 
 let initialized t =
   Worker.Connection.run t ~f:Worker.functions.initialized ~arg:()
