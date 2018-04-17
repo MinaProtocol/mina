@@ -211,7 +211,6 @@ module Make_inputs (Init : Init_intf) = struct
         }
     end
 
-    (* TODO *)
     let prove_zk_state_valid ({ old_state; old_proof; transition } : Witness.t) ~new_state:_ =
       Prover.extend_blockchain Init.prover
         { state = State.to_blockchain_state old_state; proof = old_proof }
