@@ -240,12 +240,6 @@ let daemon =
         and ip =
           flag "ip"
             ~doc:"External IP address for others to connect" (optional string)
-        and start_prover =
-          flag "start-prover" no_arg
-            ~doc:"Start a new prover process"
-        and prover_port =
-          flag "prover-port" (optional_with_default Prover.default_port int16)
-            ~doc:"Port for prover to listen on" 
         in
         fun () ->
           let open Deferred.Let_syntax in
@@ -273,7 +267,7 @@ let daemon =
           in
           let remap_addr_port = Fn.id in
           let me = Host_and_port.create ~host:ip ~port in
-          let%bind prover = Prover.create ~port:Prover.default_port () in
+          let%bind prover = Prover.create ~conf_dir in
           let module Init = struct
             let prover = prover
           end

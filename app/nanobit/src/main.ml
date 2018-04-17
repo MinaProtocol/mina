@@ -63,7 +63,7 @@ module Message = struct
 end
  
 let assert_chain_verifies prover chain =
-  let%map b = Prover.verify prover chain >>| Or_error.ok_exn in
+  let%map b = Prover.verify_blockchain prover chain >>| Or_error.ok_exn in
   if not b then failwith "Chain did not verify"
 ;;
 
