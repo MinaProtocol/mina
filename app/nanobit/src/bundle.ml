@@ -1,7 +1,7 @@
 open Core
-open Rpc_parallel
 open Nanobit_base
 open Async
+module Map_reduce = Rpc_parallel.Map_reduce
 
 module T = struct
   type t =
@@ -11,6 +11,16 @@ module T = struct
   [@@deriving fields]
 end
 include T
+
+module Worker_state = struct
+  type t = (module Transaction_snark.S)
+
+  let create () : t =
+    let module Keys = Keys.Make() in
+    (module Transaction_snark.Make(struct
+         let keys = Keys.transaction_snark_keys
+       end))
+end
 
 module Sparse_ledger = struct
   open Snark_params.Tick
@@ -72,84 +82,82 @@ module Input = struct
   [@@deriving bin_io]
 end
 
-module Make() = struct
-  include T
-  module Keys = Keys.Make()
+module M = Map_reduce.Make_map_reduce_function_with_init(struct
+    module Input = Input
+    module Accum = Transaction_snark
+    module Param = struct type t = unit [@@deriving bin_io] end
 
-  module M = Map_reduce.Make_map_reduce_function(struct
-      module Input = Input
-      module Accum = Transaction_snark
+    open Snark_params
+    open Tick
 
-      module Transaction_snark =
-        Transaction_snark.Make(struct let keys = Keys.transaction_snark_keys end)
+    type state_type = Worker_state.t
 
-      open Snark_params
-      open Tick
+    let init () = return (Worker_state.create ())
 
-      let map { Input.transaction; ledger } =
-        let handler (With { request; respond}) =
-          let ledger = ref ledger in
-          let open Ledger_hash in
-          let path_exn idx =
-            List.map (Sparse_ledger.path_exn !ledger idx)
-              ~f:(function `Left h -> h | `Right h -> h)
-          in
-          match request with
-          | Get_element idx ->
-            let elt = Sparse_ledger.get_exn !ledger idx in
-            let path = path_exn idx in
-            respond (Provide (elt, path))
-          | Get_path idx ->
-            respond (Provide (path_exn idx))
-          | Set (idx, account) ->
-            ledger := Sparse_ledger.set_exn !ledger idx account;
-            respond (Provide ())
-          | Find_index pk ->
-            respond (Provide (Sparse_ledger.find_index_exn !ledger pk))
-          | _ -> unhandled
+    let map ((module T) : state_type) { Input.transaction; ledger } =
+      let handler (With { request; respond}) =
+        let ledger = ref ledger in
+        let open Ledger_hash in
+        let path_exn idx =
+          List.map (Sparse_ledger.path_exn !ledger idx)
+            ~f:(function `Left h -> h | `Right h -> h)
         in
-        Transaction_snark.of_transaction
-          (Sparse_ledger.merkle_root ledger)
-          Sparse_ledger.(merkle_root (apply_transaction_exn ledger transaction))
-          transaction
-          handler
-        |> return
+        match request with
+        | Get_element idx ->
+          let elt = Sparse_ledger.get_exn !ledger idx in
+          let path = path_exn idx in
+          respond (Provide (elt, path))
+        | Get_path idx ->
+          respond (Provide (path_exn idx))
+        | Set (idx, account) ->
+          ledger := Sparse_ledger.set_exn !ledger idx account;
+          respond (Provide ())
+        | Find_index pk ->
+          respond (Provide (Sparse_ledger.find_index_exn !ledger pk))
+        | _ -> unhandled
+      in
+      T.of_transaction
+        (Sparse_ledger.merkle_root ledger)
+        Sparse_ledger.(merkle_root (apply_transaction_exn ledger transaction))
+        transaction
+        handler
+      |> return
 
-      let combine t1 t2 =
-        return (Transaction_snark.merge t1 t2)
-    end)
+    let combine ((module T) : state_type) t1 t2 =
+      return (T.merge t1 t2)
+  end)
 
-  let create ~conf_dir ledger transactions : t =
-    let config =
-      Map_reduce.Config.create
-        ~redirect_stderr:(`File_append (conf_dir ^/ "bundle-stderr"))
-        ~redirect_stdout:(`File_append (conf_dir ^/ "bundle-stdout"))
-        ()
-    in
-    let inputs =
-      List.filter_map transactions ~f:(fun (transaction : Transaction.t) ->
-        let sparse_ledger =
-          Sparse_ledger.of_ledger_subset ledger
-            [ Public_key.compress transaction.sender; transaction.payload.receiver ]
-        in
-        (* TODO: Bad transactions should probably get thrown away earlier? *)
-        match Ledger.apply_transaction ledger transaction with
-        | Ok () ->
-          let target_hash = Ledger.merkle_root ledger in
-          let t = { Input.transaction; ledger = sparse_ledger; target_hash } in
-          Some t
-        | Error _s -> None)
-    in
-    let target_hash = Ledger.merkle_root ledger in
-    List.iter (List.rev inputs) ~f:(fun { transaction } ->
-      Or_error.ok_exn (Ledger.undo_transaction ledger transaction));
-    { snark =
-        Map_reduce.map_reduce config
-          (Pipe.of_list inputs)
-          ~m:(module M)
-          ~param:()
-    ; target_hash
-    }
+let create ~conf_dir ledger transactions : t =
+  Parallel.init_master ();
+  let config =
+    Map_reduce.Config.create
+      ~redirect_stderr:(`File_append (conf_dir ^/ "bundle-stderr"))
+      ~redirect_stdout:(`File_append (conf_dir ^/ "bundle-stdout"))
+      ()
+  in
+  let inputs =
+    List.filter_map transactions ~f:(fun (transaction : Transaction.t) ->
+      let sparse_ledger =
+        Sparse_ledger.of_ledger_subset ledger
+          [ Public_key.compress transaction.sender; transaction.payload.receiver ]
+      in
+      (* TODO: Bad transactions should probably get thrown away earlier? *)
+      match Ledger.apply_transaction ledger transaction with
+      | Ok () ->
+        let target_hash = Ledger.merkle_root ledger in
+        let t = { Input.transaction; ledger = sparse_ledger; target_hash } in
+        Some t
+      | Error _s -> None)
+  in
+  let target_hash = Ledger.merkle_root ledger in
+  List.iter (List.rev inputs) ~f:(fun { transaction } ->
+    Or_error.ok_exn (Ledger.undo_transaction ledger transaction));
+  { snark =
+      Map_reduce.map_reduce config
+        (Pipe.of_list inputs)
+        ~m:(module M)
+        ~param:()
+  ; target_hash
+  }
 
-  let cancel t = printf "Bundle.cancel: todo\n%!"
-end
+let cancel t = printf "Bundle.cancel: todo\n%!"

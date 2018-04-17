@@ -29,12 +29,3 @@ let create_pow t nonce =
        let init = List.fold (Blockchain_state.to_bits_unchecked (to_blockchain_state t)) ~init ~f in
        Nonce.Bits.fold nonce ~init ~f)
 
-module Proof = struct
-  type input = t
-  type t = unit
-  [@@deriving bin_io]
-
-  (* TODO *)
-  let verify t _ = return true
-end
-

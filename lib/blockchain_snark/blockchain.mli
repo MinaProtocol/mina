@@ -9,6 +9,7 @@ type t =
   { state : State.t
   ; proof : Proof.t
   }
+[@@deriving fields]
 
 module Stable : sig
   module V1 : sig

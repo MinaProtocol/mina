@@ -32,7 +32,7 @@ let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
 let get' ledger tag key = error_opt (sprintf "%s not found" tag) (get ledger key)
 
 let add_amount balance amount = error_opt "overflow" (Balance.add_amount balance amount)
-let sub_amount balance amount = error_opt "insufficient funds" (Balance.add_amount balance amount)
+let sub_amount balance amount = error_opt "insufficient funds" (Balance.sub_amount balance amount)
 
 let apply_transaction_unchecked ledger (transaction : Transaction.t) =
   let sender = Public_key.compress transaction.sender in

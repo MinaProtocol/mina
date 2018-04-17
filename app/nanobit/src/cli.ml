@@ -4,7 +4,13 @@ open Nanobit_base
 open Blockchain_snark
 open Cli_common
 
-module Inputs0 = struct
+module type Init_intf = sig
+  val conf_dir : string
+  val prover : Prover.t
+  val genesis_proof : Proof.t
+end
+
+module Make_inputs0 (Init : Init_intf) = struct
   module Time = Block_time
   module Hash = struct
     type 'a t = Snark_params.Tick.Pedersen.Digest.t
@@ -14,38 +20,35 @@ module Inputs0 = struct
   end
   module State_hash = State_hash.Stable.V1
   module Ledger_hash = Ledger_hash.Stable.V1
-  module Transaction = struct
-    type t = { transaction: Nanobit_base.Transaction.t }
-      [@@deriving eq, bin_io]
+  module Transaction : sig
+    type t = Nanobit_base.Transaction.t
+    [@@deriving eq, bin_io, compare]
+
+    module With_valid_signature : sig
+      type nonrec t = private t
+      [@@deriving eq, bin_io, compare]
+    end
+
+    val check : t -> With_valid_signature.t option
+  end = struct
+    type t = Nanobit_base.Transaction.t
+    [@@deriving eq, bin_io]
     (* The underlying transaction has an arbitrary compare func, fallback to that *)
-    let compare t t' = 
+    let compare (t : t) (t' : t) = 
       let fee_compare =
-        Transaction.Fee.compare
-          t.transaction.payload.fee
-          t'.transaction.payload.fee
+        Transaction.Fee.compare t.payload.fee t'.payload.fee
       in
       match fee_compare with
-      | 0 -> Transaction.compare t.transaction t'.transaction
+      | 0 -> Transaction.compare t t'
       | _ -> fee_compare
 
     module With_valid_signature = struct
-      type t = 
-        { transaction: Nanobit_base.Transaction.t 
-        ; validation: unit
-        }
+      type t = Nanobit_base.Transaction.t 
       [@@deriving eq, bin_io]
-      let compare t t' = compare {transaction = t.transaction} {transaction = t'.transaction}
+      let compare = compare
     end
 
-    let check t =
-      if Nanobit_base.Transaction.check_signature t.transaction then
-        Some
-          { transaction = t.transaction
-          ; With_valid_signature.validation = ()
-          }
-      else
-        None
-    let forget t = { transaction = t.With_valid_signature.transaction }
+    let check t = Option.some_if (Nanobit_base.Transaction.check_signature t) t
   end
 
   module Nonce = Nanobit_base.Nonce
@@ -60,21 +63,30 @@ module Inputs0 = struct
     (* TODO *)
     let increase t ~by = t
   end
+
   module Ledger = struct
     type t = Nanobit_base.Ledger.t [@@deriving sexp, compare, hash, bin_io]
     type valid_transaction = Transaction.With_valid_signature.t
 
     let copy = Nanobit_base.Ledger.copy
     let apply_transaction t (valid_transaction : Transaction.With_valid_signature.t) : unit Or_error.t =
-      Nanobit_base.Ledger.apply_transaction_unchecked t valid_transaction.transaction
+      Nanobit_base.Ledger.apply_transaction_unchecked t (valid_transaction :> Transaction.t)
   end
-  module Ledger_proof = struct
-    type t = unit
-    type input = Ledger_hash.t * Ledger_hash.t
 
-    (* TODO *)
-    let verify t _ = return true
+  module Ledger_proof = struct
+    type t = Proof.t
+    type input =
+      { source     : Ledger_hash.t
+      ; target     : Ledger_hash.t
+      ; proof_type : Transaction_snark.Proof_type.t
+      }
+
+    let verify proof { source; target; proof_type } =
+      Prover.verify_transaction_snark Init.prover
+        (Transaction_snark.create ~source ~target ~proof_type ~proof)
+      >>| Or_error.ok_exn
   end
+
   module Transition = struct
     type t =
       { ledger_hash : Ledger_hash.t
@@ -84,13 +96,27 @@ module Inputs0 = struct
       }
     [@@deriving fields]
   end
+
   module Time_close_validator = struct
     let validate t =
       let now_time = Time.now () in
       Time.(diff now_time t < (Span.of_time_span (Core_kernel.Time.Span.of_sec 900.)))
   end
 
-  module State = State
+  module State = struct
+    include State
+    module Proof = struct
+      type input = t
+
+      type t = Proof.Stable.V1.t
+      [@@deriving bin_io]
+
+      let verify proof s =
+        Prover.verify_blockchain Init.prover
+          { Blockchain.state = to_blockchain_state s; proof }
+        >>| Or_error.ok_exn
+    end
+  end
 
   module Proof_carrying_state = struct
     type t = (State.t, State.Proof.t) Protocols.Minibit_pow.Proof_carrying_data.t
@@ -122,7 +148,7 @@ module Inputs0 = struct
     end
 
     let strip t = 
-      { Stripped.transactions = List.map t.transactions ~f:(fun t -> Transaction.forget t)
+      { Stripped.transactions = (t.transactions :> Transaction.t list)
       ; state = t.state
       }
 
@@ -149,7 +175,8 @@ module Inputs0 = struct
   end
 
 end
-module Inputs = struct
+module Make_inputs (Init : Init_intf) = struct
+  module Inputs0 = Make_inputs0(Init)
   include Inputs0
   module Net = Minibit_networking.Make(State_with_witness)(Ledger_hash)(Ledger)(State)
   module Ledger_fetcher_io = Net.Ledger_fetcher_io
@@ -161,19 +188,19 @@ module Inputs = struct
   end)
 
   module Bundle = struct
-    (* TODO *)
-    type t = unit
-    let create _ _ = ()
-    let cancel _ = ()
-    let target_hash _ = failwith "TODO"
-    let result _ = failwith "TODO"
+    include Bundle
+
+    let create ledger (ts : Transaction.With_valid_signature.t list) =
+      create ~conf_dir:Init.conf_dir ledger (ts :> Transaction.t list)
+
+    let result t = Deferred.Option.(snark t >>| Transaction_snark.proof)
   end
 
   module Transaction_pool = Transaction_pool.Make(Transaction)
   module Miner = Minibit_miner.Make(Inputs0)(Transition_with_witness)(Transaction_pool)(Bundle)
   module Genesis = struct
     let state : State.t = State.zero
-    let proof = ()
+    let proof = Init.genesis_proof
   end
   module Block_state_transition_proof = struct
     module Witness = struct
@@ -184,12 +211,16 @@ module Inputs = struct
         }
     end
 
-    (* TODO *)
-    let prove_zk_state_valid t ~new_state = return ()
+    let prove_zk_state_valid ({ old_state; old_proof; transition } : Witness.t) ~new_state:_ =
+      Prover.extend_blockchain Init.prover
+        { state = State.to_blockchain_state old_state; proof = old_proof }
+        { header = { time = transition.timestamp; nonce = transition.nonce }
+        ; body = { target_hash = transition.ledger_hash; proof = transition.ledger_proof }
+        }
+      >>| Or_error.ok_exn
+      >>| Blockchain.proof
   end
 end
-
-module Main = Minibit.Make(Inputs)(Inputs.Block_state_transition_proof)
 
 let daemon =
   let open Command.Let_syntax in
@@ -210,12 +241,6 @@ let daemon =
         and ip =
           flag "ip"
             ~doc:"External IP address for others to connect" (optional string)
-        and start_prover =
-          flag "start-prover" no_arg
-            ~doc:"Start a new prover process"
-        and prover_port =
-          flag "prover-port" (optional_with_default Prover.default_port int16)
-            ~doc:"Port for prover to listen on" 
         in
         fun () ->
           let open Deferred.Let_syntax in
@@ -243,6 +268,16 @@ let daemon =
           in
           let remap_addr_port = Fn.id in
           let me = Host_and_port.create ~host:ip ~port in
+          let%bind prover = Prover.create ~conf_dir in
+          let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
+          let module Init = struct
+            let conf_dir = conf_dir
+            let prover = prover
+            let genesis_proof = genesis_proof
+          end
+          in
+          let module Inputs = Make_inputs(Init) in
+          let module Main = Minibit.Make(Inputs)(Inputs.Block_state_transition_proof) in
           let net_config = 
             { Inputs.Net.Config.parent_log = log
             ; gossip_net_params =
@@ -300,10 +335,10 @@ let daemon =
     end
 ;;
 
-  let () = 
+let () = 
   Command.group ~summary:"Current"
     [ "daemon", daemon
-    ; "prover", Prover.command
+    ; Parallel.worker_command_name, Parallel.worker_command
     ; "rpc", Main_rpc.command
     ; "client", Client.command
     ]
