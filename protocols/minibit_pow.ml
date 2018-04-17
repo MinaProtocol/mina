@@ -46,12 +46,12 @@ end
 
 module type Transaction_intf = sig
   type t [@@deriving compare, eq]
+
   module With_valid_signature : sig
-    type t [@@deriving compare, eq]
+    type nonrec t = private t [@@deriving compare, eq]
   end
 
   val check : t -> With_valid_signature.t option
-  val forget : With_valid_signature.t -> t
 end
 
 module type Strength_intf = sig
@@ -173,7 +173,7 @@ module type Inputs_intf = sig
 
   module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
   module Ledger_hash : Ledger_hash_intf
-  module Ledger_proof : Proof_intf with type input = Ledger_hash.t * Ledger_hash.t
+  module Ledger_proof : Proof_intf
 
   module Transition : Transition_intf with type ledger_hash := Ledger_hash.t
                                        and type ledger := Ledger.t

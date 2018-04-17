@@ -5,6 +5,7 @@ open Blockchain_snark
 open Cli_common
 
 module type Init_intf = sig
+  val conf_dir : string
   val prover : Prover.t
 end
 
@@ -18,38 +19,35 @@ module Make_inputs0 (Init : Init_intf) = struct
   end
   module State_hash = State_hash.Stable.V1
   module Ledger_hash = Ledger_hash.Stable.V1
-  module Transaction = struct
-    type t = { transaction: Nanobit_base.Transaction.t }
-      [@@deriving eq, bin_io]
+  module Transaction : sig
+    type t = Nanobit_base.Transaction.t
+    [@@deriving eq, bin_io, compare]
+
+    module With_valid_signature : sig
+      type nonrec t = private t
+      [@@deriving eq, bin_io, compare]
+    end
+
+    val check : t -> With_valid_signature.t option
+  end = struct
+    type t = Nanobit_base.Transaction.t
+    [@@deriving eq, bin_io]
     (* The underlying transaction has an arbitrary compare func, fallback to that *)
-    let compare t t' = 
+    let compare (t : t) (t' : t) = 
       let fee_compare =
-        Transaction.Fee.compare
-          t.transaction.payload.fee
-          t'.transaction.payload.fee
+        Transaction.Fee.compare t.payload.fee t'.payload.fee
       in
       match fee_compare with
-      | 0 -> Transaction.compare t.transaction t'.transaction
+      | 0 -> Transaction.compare t t'
       | _ -> fee_compare
 
     module With_valid_signature = struct
-      type t = 
-        { transaction: Nanobit_base.Transaction.t 
-        ; validation: unit
-        }
+      type t = Nanobit_base.Transaction.t 
       [@@deriving eq, bin_io]
-      let compare t t' = compare {transaction = t.transaction} {transaction = t'.transaction}
+      let compare = compare
     end
 
-    let check t =
-      if Nanobit_base.Transaction.check_signature t.transaction then
-        Some
-          { transaction = t.transaction
-          ; With_valid_signature.validation = ()
-          }
-      else
-        None
-    let forget t = { transaction = t.With_valid_signature.transaction }
+    let check t = Option.some_if (Nanobit_base.Transaction.check_signature t) t
   end
 
   module Nonce = Nanobit_base.Nonce
@@ -64,21 +62,30 @@ module Make_inputs0 (Init : Init_intf) = struct
     (* TODO *)
     let increase t ~by = t
   end
+
   module Ledger = struct
     type t = Nanobit_base.Ledger.t [@@deriving sexp, compare, hash, bin_io]
     type valid_transaction = Transaction.With_valid_signature.t
 
     let copy = Nanobit_base.Ledger.copy
     let apply_transaction t (valid_transaction : Transaction.With_valid_signature.t) : unit Or_error.t =
-      Nanobit_base.Ledger.apply_transaction_unchecked t valid_transaction.transaction
+      Nanobit_base.Ledger.apply_transaction_unchecked t (valid_transaction :> Transaction.t)
   end
-  module Ledger_proof = struct
-    type t = unit
-    type input = Ledger_hash.t * Ledger_hash.t
 
-    (* TODO *)
-    let verify t _ = return true
+  module Ledger_proof = struct
+    type t = Proof.t
+    type input =
+      { source     : Ledger_hash.t
+      ; target     : Ledger_hash.t
+      ; proof_type : Transaction_snark.Proof_type.t
+      }
+
+    let verify proof { source; target; proof_type } =
+      Prover.verify_transaction_snark Init.prover
+        (Transaction_snark.create ~source ~target ~proof_type ~proof)
+      >>| Or_error.ok_exn
   end
+
   module Transition = struct
     type t =
       { ledger_hash : Ledger_hash.t
@@ -88,6 +95,7 @@ module Make_inputs0 (Init : Init_intf) = struct
       }
     [@@deriving fields]
   end
+
   module Time_close_validator = struct
     let validate t =
       let now_time = Time.now () in
@@ -126,7 +134,7 @@ module Make_inputs0 (Init : Init_intf) = struct
     end
 
     let strip t = 
-      { Stripped.transactions = List.map t.transactions ~f:(fun t -> Transaction.forget t)
+      { Stripped.transactions = (t.transactions :> Transaction.t list)
       ; state = t.state
       }
 
@@ -166,12 +174,12 @@ module Make_inputs (Init : Init_intf) = struct
   end)
 
   module Bundle = struct
-    (* TODO *)
-    type t = unit
-    let create _ _ = ()
-    let cancel _ = ()
-    let target_hash _ = failwith "TODO"
-    let result _ = failwith "TODO"
+    include Bundle
+
+    let create ledger (ts : Transaction.With_valid_signature.t list) =
+      create ~conf_dir:Init.conf_dir ledger (ts :> Transaction.t list)
+
+    let result t = Deferred.Option.(snark t >>| Transaction_snark.proof)
   end
 
   module Transaction_pool = Transaction_pool.Make(Transaction)
@@ -242,6 +250,7 @@ let daemon =
           let me = Host_and_port.create ~host:ip ~port in
           let%bind prover = Prover.create ~conf_dir in
           let module Init = struct
+            let conf_dir = conf_dir
             let prover = prover
           end
           in
@@ -307,7 +316,7 @@ let daemon =
 let () = 
   Command.group ~summary:"Current"
     [ "daemon", daemon
-    ; Prover.command_name, Prover.command
+    ; Parallel.worker_command_name, Parallel.worker_command
     ; "rpc", Main_rpc.command
     ; "client", Client.command
     ]
