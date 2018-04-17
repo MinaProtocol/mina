@@ -210,10 +210,6 @@ end
 
 type t = Worker.Connection.t
 
-let command_name = "prover"
-
-let command = Rpc_parallel.Expert.worker_command
-
 let create =
   fun ~conf_dir ->
     Parallel.init_master ();

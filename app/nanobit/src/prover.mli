@@ -23,6 +23,3 @@ val verify_blockchain
 
 val verify_transaction_snark
   : t -> Transaction_snark.t -> bool Deferred.Or_error.t
-
-val command_name : string
-val command : Command.t
