@@ -7,9 +7,11 @@ type t = Tick.Field.t
 module Stable : sig
   module V1 : sig
     type nonrec t = t
-    [@@deriving bin_io, sexp]
+    [@@deriving bin_io, sexp, eq]
   end
 end
+
+val bit_length : int
 
 val zero : t
 

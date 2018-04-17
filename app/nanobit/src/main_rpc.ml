@@ -101,7 +101,9 @@ let main () =
     let%map membership = 
       let%bind prover = Prover.create ~conf_dir:storage_location in
       let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
-      let genesis_blockchain = { Blockchain.state = Blockchain.State.zero; proof = genesis_proof; most_recent_block = Block.genesis } in
+      let genesis_blockchain =
+        { Blockchain.state = Blockchain.State.zero; proof = genesis_proof }
+      in
       let%bind () = Main.assert_chain_verifies prover genesis_blockchain in
       Main.main_nowait
         ~log

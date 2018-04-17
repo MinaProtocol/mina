@@ -4,11 +4,11 @@ open Protocols
 
 module type Ledger_fetcher_io_intf = sig
   type t
-  type 'a hash
+  type ledger_hash
   type ledger
   type state
 
-  val get_ledger_at_hash : t -> ledger hash -> (ledger * state) Deferred.Or_error.t
+  val get_ledger_at_hash : t -> ledger_hash -> (ledger * state) Deferred.Or_error.t
 end
 
 module type State_io_intf = sig
@@ -25,13 +25,13 @@ module type Network_intf = sig
   type t
   type stripped_state_with_witness
   type ledger
-  type 'a hash
   type state
+  type ledger_hash
   module State_io : State_io_intf with type stripped_state_with_witness := stripped_state_with_witness 
                                    and type net := t
   module Ledger_fetcher_io : Ledger_fetcher_io_intf with type t := t
                                                      and type ledger := ledger 
-                                                     and type 'a hash := 'a hash
+                                                     and type ledger_hash := ledger_hash
                                                      and type state := state
 
   module Config : sig
@@ -40,15 +40,15 @@ module type Network_intf = sig
 
   val create
     : Config.t
-    -> (ledger hash -> bool Deferred.t)
-    -> (ledger hash -> (ledger * state) option Deferred.t)
+    -> (ledger_hash -> bool Deferred.t)
+    -> (ledger_hash -> (ledger * state) option Deferred.t)
     -> t Deferred.t
 
 end
 
 module type Ledger_fetcher_intf = sig
   type t
-  type 'a hash
+  type ledger_hash
   type ledger
   type transaction_with_valid_signature
   type state
@@ -59,15 +59,16 @@ module type Ledger_fetcher_intf = sig
       { keep_count : int [@default 50]
       ; parent_log : Logger.t
       ; net_deferred : net Deferred.t
-      ; ledger_transitions : (ledger hash * transaction_with_valid_signature list * state) Linear_pipe.Reader.t
+      ; ledger_transitions : (ledger_hash * transaction_with_valid_signature list * state) Linear_pipe.Reader.t
+      ; disk_location : string
       }
     [@@deriving make]
   end
 
-  val create : Config.t -> t
-  val get : t -> ledger hash -> ledger Deferred.Or_error.t
+  val create : Config.t -> t Deferred.t
+  val get : t -> ledger_hash -> ledger Deferred.Or_error.t
 
-  val local_get : t -> ledger hash -> (ledger * state) Or_error.t
+  val local_get : t -> ledger_hash -> (ledger * state) Or_error.t
 end
 
 module type Transaction_pool_intf = sig
@@ -172,10 +173,10 @@ module type Inputs_intf = sig
   module Net : Network_intf
     with type stripped_state_with_witness := State_with_witness.Stripped.t 
      and type ledger := Ledger.t
-     and type 'a hash := 'a Hash.t
+     and type ledger_hash := Ledger_hash.t
      and type state := State.t
 
-  module Ledger_fetcher : Ledger_fetcher_intf with type 'a hash := 'a Hash.t
+  module Ledger_fetcher : Ledger_fetcher_intf with type ledger_hash := Ledger_hash.t
                                                and type ledger := Ledger.t
                                                and type transaction_with_valid_signature := Transaction.With_valid_signature.t
                                                and type state := State.t
@@ -209,13 +210,14 @@ module Make
     ; net : Net.t
     ; state_io : Net.State_io.t
     ; miner_broadcast_writer : State_with_witness.t Linear_pipe.Writer.t
-    ; ledger_fetcher_transitions : (Ledger.t Hash.t * Transaction.With_valid_signature.t list * State.t) Linear_pipe.Writer.t
+    ; ledger_fetcher_transitions : (Ledger_hash.t * Transaction.With_valid_signature.t list * State.t) Linear_pipe.Writer.t
     }
 
   module Config = struct
     type t =
       { log : Logger.t
       ; net_config : Net.Config.t
+      ; ledger_disk_location : string
       }
   end
 
@@ -223,12 +225,12 @@ module Make
     let (miner_broadcast_reader,miner_broadcast_writer) = Linear_pipe.create () in
     let (ledger_fetcher_transitions_reader, ledger_fetcher_transitions_writer) = Linear_pipe.create () in
     let (change_feeder_reader, change_feeder_writer) = Linear_pipe.create () in
-    let ledger_fetcher_net_ivar = Ivar.create () in
-    let ledger_fetcher = Ledger_fetcher.create (Ledger_fetcher.Config.make ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader ()) in
     let miner =
       Miner.create ~parent_log:config.log
         ~change_feeder:change_feeder_reader
     in
+    let ledger_fetcher_net_ivar = Ivar.create () in
+    let%bind ledger_fetcher = Ledger_fetcher.create (Ledger_fetcher.Config.make ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader ~disk_location:config.ledger_disk_location ()) in
     let%map net = 
       Net.create 
         config.net_config

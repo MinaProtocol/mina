@@ -3,24 +3,31 @@ open Snark_params
 
 module type S = sig
   open Tick
-  type digest_var
 
   module Update : Snarkable.S
 
   module State : sig
+    module Hash : sig
+      type t
+      type var
+      val typ : (var, t) Typ.t
+      val var_to_bits : var -> (Boolean.var list, _) Checked.t
+    end
+
     type var
     type value
     val typ : (var, value) Typ.t
 
-    val hash : value -> Pedersen.Digest.t
-
     val update_exn : value -> Update.value -> value
 
     module Checked : sig
-      val hash : var -> (digest_var, _) Checked.t
-      val is_base_hash : digest_var -> (Boolean.var, _) Checked.t
+      val hash : var -> (Hash.var, _) Checked.t
+      val is_base_hash : Hash.var -> (Boolean.var, _) Checked.t
 
-      val update : var -> Update.var -> (var * [ `Success of Boolean.var ], _) Checked.t
+      val update
+        : Hash.var * var
+        -> Update.var
+        -> (Hash.var * var * [ `Success of Boolean.var ], _) Checked.t
     end
   end
 end
@@ -50,7 +57,7 @@ module Make
     (Hash : sig
        val hash : Tick.Boolean.var list -> (Digest.Tick.Packed.var, _) Tick.Checked.t
      end)
-    (System : S with type digest_var := Digest.Tick.Packed.var)
+    (System : S)
 =
 struct
   let step_input () =
@@ -90,16 +97,12 @@ struct
       Snarky.Verifier_gadget.Make(Tick)(Tick_curve)(Tock_curve)
         (struct let input_size = Tock.Data_spec.size (wrap_input ()) end)
 
-    let prev_state_valid wrap_vk prev_state =
+    let prev_state_valid wrap_vk prev_state_hash =
       let open Let_syntax in
       with_label "prev_state_valid" begin
-        let%bind prev_state_hash =
-          State.Checked.hash prev_state
-          >>= Digest.Tick.choose_preimage_var
-          >>| Digest.Tick.Unpacked.var_to_bits
-        in
+        let%bind prev_state_hash_bits = State.Hash.var_to_bits prev_state_hash in
         let%bind prev_top_hash =
-          Hash.hash (wrap_vk @ prev_state_hash)
+          Hash.hash (wrap_vk @ prev_state_hash_bits)
           >>= Digest.Tick.choose_preimage_var
           >>| Digest.Tick.Unpacked.var_to_bits
         in
@@ -123,23 +126,23 @@ struct
         let%bind prev_state = provide_witness' State.typ ~f:Prover_state.prev_state
         and update          = provide_witness' Update.typ ~f:Prover_state.update
         in
-        let%bind (next_state, `Success success) =
-          with_label "update" (State.Checked.update prev_state update)
-        in
-        let%bind state_hash =
-          with_label "hash_state" (State.Checked.hash next_state)
+        let%bind prev_state_hash = State.Checked.hash prev_state in
+        let%bind (next_state_hash, next_state, `Success success) =
+          with_label "update" (State.Checked.update (prev_state_hash, prev_state) update)
         in
         let%bind () =
           with_label "check_top_hash" begin
-            let%bind sh = Digest.Tick.(choose_preimage_var state_hash >>| Unpacked.var_to_bits) in
+            let%bind sh = State.Hash.var_to_bits next_state_hash in
+            (* We coudl be reusing the intermediate state of the hash on sh here instead of
+               hashing anew *)
             Hash.hash (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
           end
         in
-        let%bind prev_state_valid = prev_state_valid wrap_vk prev_state in
+        let%bind prev_state_valid = prev_state_valid wrap_vk prev_state_hash in
         let%bind inductive_case_passed =
           with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
         in
-        let%bind is_base_case = State.Checked.is_base_hash state_hash in
+        let%bind is_base_case = State.Checked.is_base_hash next_state_hash in
         with_label "result" begin
           Boolean.Assert.any
             [ is_base_case

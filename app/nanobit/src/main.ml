@@ -71,7 +71,6 @@ module Make
     (Membership       : Membership.S)
     (Gossip_net : Gossip_net.S)
     (Miner_impl : Miner.S)
-    (Storage    : Storage.S)
   =
 struct
   module Gossip_net = Gossip_net(Message)
@@ -161,8 +160,8 @@ struct
         ~f:(fun blockchain ->
           let state = blockchain.Blockchain.state in
           let ledger_hash = state.Blockchain_state.ledger_hash in
-          let time = state.Blockchain_state.previous_time in
-          let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.target) in
+          let time = state.Blockchain_state.timestamp in
+          let target = (Nanobit_base.Target.to_bigint state.Blockchain_state.next_difficulty) in
           let strength = Bignum.Bigint.((Nanobit_base.Target.to_bigint Nanobit_base.Target.max) / target) in
           let diff = 
             match !last_time with
@@ -246,7 +245,9 @@ struct
      * *)
     let rec rebroadcast_timer () = 
       let rec rebroadcast_loop (blockchain : Blockchain.t) continue = 
-        let is_latest = Digest.(blockchain.state.block_hash = !latest_strongest_block.state.block_hash) in
+        let is_latest =
+          Blockchain_state.equal blockchain.state !latest_strongest_block.state
+        in
         if is_latest
         then 
           match%bind continue () with
@@ -257,7 +258,7 @@ struct
       in
       let%bind () = after rebroadcast_period in
       let mined_block : Blockchain.t = !latest_mined_block in
-      let is_latest = Digest.(mined_block.state.block_hash = !latest_strongest_block.state.block_hash) in
+      let is_latest = Blockchain_state.equal mined_block.state !latest_strongest_block.state in
       let%bind () = 
         if is_latest
         then rebroadcast_loop 
@@ -304,10 +305,10 @@ struct
     =
       Logger.debug log "Starting with me %s; client_port %s" (Host_and_port.to_string me) (Int.to_string client_port);
     let open Let_syntax in
-    let%bind initial_blockchain =
-      match%map Storage.load storage_location log with
-      | Some x -> x
-      | None -> genesis_blockchain
+    let initial_blockchain =
+      (*match%map Storage.load storage_location log with*)
+      (*| Some x -> x*)
+      genesis_blockchain
     in
     (* TODO: fix mined_block vs mined_blocks *)
     let (blockchain_mined_block_reader, latest_mined_blocks_reader) =
@@ -340,9 +341,6 @@ struct
         ~f:(fun b -> Miner.Update.Change_body Block.With_transactions.Body.dummy)
     end;
 
-    (* Store and accumulate updates *)
-    Storage.persist storage_location
-      (Linear_pipe.map pipes.storage_strongest_block_reader ~f:(fun b -> `Change_head b));
     Blockchain_accumulator.accumulate
       ~prover
       ~parent_log:log
@@ -396,5 +394,5 @@ end
 (* Make sure tests work *)
 let%test "trivial" = true
 
-include Make(Membership.Haskell)(Gossip_net.Make)(Miner.Cpu)(Storage.Filesystem)
+include Make(Membership.Haskell)(Gossip_net.Make)(Miner.Cpu)
 

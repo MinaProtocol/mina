@@ -4,7 +4,7 @@
  ((name blockchain_snark)
   (public_name blockchain_snark)
   (library_flags (-linkall))
-  (libraries (core snarky nanobit_base transaction_snark bignum ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib blockchain_snark))))
+  (libraries (core protocols snarky nanobit_base transaction_snark bignum ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_driver.runner (-inline-test-lib blockchain_snark))))
   (synopsis "blockchain state transition snarking library")))
 

@@ -25,6 +25,10 @@ module Max_depth = struct
   let max_depth = 64
 end
 
+module Little_max_depth = struct
+  let max_depth = 4
+end
+
 module Key = struct
   module T = struct
     type t = string [@@deriving sexp, compare, hash, bin_io]
@@ -35,3 +39,5 @@ module Key = struct
 end
 
 include Ledger.Make(Hash)(Max_depth)(Key)
+
+module Little_ledger = Ledger.Make(Hash)(Little_max_depth)(Key)

@@ -28,11 +28,10 @@ module Cpu = struct
   let find_block (previous : Blockchain.State.t) (body : Block.With_transactions.Body.t)
     : (Block.With_transactions.t * Pedersen.Digest.t) option =
     let iterations = 10 in
-    let target = previous.target in
+    let target = previous.next_difficulty in
     let nonce0 = Nonce.random () in
     let header0 : Block.Header.t =
-      { previous_block_hash = previous.block_hash
-      ; time = Block_time.of_time (Time.now ())
+      { time = Block_time.of_time (Time.now ())
       ; nonce = nonce0
       }
     in

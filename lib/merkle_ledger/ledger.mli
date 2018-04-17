@@ -14,6 +14,8 @@ module type S =
         include Hashable.S_binable with type t := t
      end) -> sig
 
+  val max_depth : int
+
   type index = int
 
   type t

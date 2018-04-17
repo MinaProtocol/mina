@@ -18,11 +18,7 @@ module Transition_utils
       let open Tick.Pedersen.State in
       let s = create Tick.Pedersen.params in
       let s = update_fold s (List.fold self) in
-      let s =
-        update_fold s
-          (List.fold
-            (Tick.Pedersen.Digest.Bits.to_bits
-              (Blockchain_state.hash state)))
+      let s = update_fold s (State_hash.fold (Blockchain_state.hash state))
       in
       digest s
 
@@ -156,20 +152,14 @@ module Functions = struct
         return
           { Blockchain.proof
           ; state = W.update_state_exn prev_state block 
-          ; most_recent_block = block
           })
 
   let verify_blockchain =
     create Blockchain.Stable.V1.bin_t bin_bool
-      (fun (module W) ({ Blockchain.state; proof; most_recent_block }) ->
+      (fun (module W) ({ Blockchain.state; proof }) ->
         if Insecure.verify_blockchain
         then return true
-        else
-          let consistent_block_hash =
-            Tick.Pedersen.Digest.(=) state.block_hash (Block.hash most_recent_block)
-          in
-          let proof_verifies = W.verify state proof in
-          return (consistent_block_hash && proof_verifies))
+        else return (W.verify state proof))
 
   let verify_transaction_snark =
     create Transaction_snark.bin_t bin_bool (fun (module W) proof ->

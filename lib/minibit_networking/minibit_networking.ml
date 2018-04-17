@@ -5,14 +5,14 @@ open Kademlia
 
 module Rpcs
   (Ledger : Protocols.Minibit_pow.Ledger_intf)
-  (Hash : Protocols.Minibit_pow.Hash_intf)
-  (State : Protocols.Minibit_pow.State_intf)
+  (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
+  (State : Binable.S)
 = struct
   module Get_ledger_at_hash = struct
     module T = struct
       let name = "get_ledger_at_hash"
       module T = struct
-        type query = Ledger.t Hash.t
+        type query = Ledger_hash.t
         type response = (Ledger.t * State.t) option
       end
       module Caller = T
@@ -23,7 +23,7 @@ module Rpcs
 
     module V1 = struct
       module T = struct
-        type query = Ledger.t Hash.t [@@deriving bin_io]
+        type query = Ledger_hash.t [@@deriving bin_io]
         type response = (Ledger.t * State.t) option [@@deriving bin_io]
         let version = 1
         let query_of_caller_model = Fn.id
@@ -40,7 +40,7 @@ module Rpcs
     module T = struct
       let name = "check_ledger_at_hash"
       module T = struct
-        type query = Ledger.t Hash.t
+        type query = Ledger_hash.t
         type response = bool
       end
       module Caller = T
@@ -51,7 +51,7 @@ module Rpcs
 
     module V1 = struct
       module T = struct
-        type query = Ledger.t Hash.t [@@deriving bin_io]
+        type query = Ledger_hash.t [@@deriving bin_io]
         type response = bool [@@deriving bin_io]
         let version = 1
         let query_of_caller_model = Fn.id
@@ -93,9 +93,9 @@ end
 
 module Make
   (State_with_witness : Minibit.State_with_witness_intf)
-  (Hash : Protocols.Minibit_pow.Hash_intf)
+  (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
   (Ledger : Protocols.Minibit_pow.Ledger_intf)
-  (State : Protocols.Minibit_pow.State_intf)
+  (State : Binable.S)
 = struct
 
   module Message = Message (State_with_witness)
@@ -111,7 +111,7 @@ module Make
       }
   end
 
-  module Rpcs = Rpcs(Ledger)(Hash)(State)
+  module Rpcs = Rpcs(Ledger)(Ledger_hash)(State)
 
   module Membership = Membership.Haskell
 
@@ -123,8 +123,6 @@ module Make
 
   type ledger = Ledger.t
   type stripped_state_with_witness = State_with_witness.Stripped.t
-  type 'a hash = 'a Hash.t
-
 
   let init_gossip_net 
     params
