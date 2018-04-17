@@ -215,25 +215,8 @@ let command_name = "prover"
 let command = Rpc_parallel.Expert.worker_command
 
 let create =
-  let init () =
-    let rpc_heartbeat_config =
-      Rpc.Connection.Heartbeat_config.create
-        ~send_every:(Time_ns.Span.of_sec 10.)
-        ~timeout:(Time_ns.Span.of_min 5.)
-    in
-    Rpc_parallel.Expert.start_master_server_exn
-      ~rpc_handshake_timeout:(Time.Span.of_min 10.)
-      ~rpc_heartbeat_config
-      ~worker_command_args:[command_name]
-      ()
-  in
-  let initialized = ref false in
   fun ~conf_dir ->
-    if not !initialized
-    then begin
-      init ();
-      initialized := true;
-    end;
+    Parallel.init_master ();
     Worker.spawn_exn ~on_failure:Error.raise
       ~shutdown_on:Disconnect
       ~redirect_stdout:(`File_append (conf_dir ^/ "prover-stdout"))
