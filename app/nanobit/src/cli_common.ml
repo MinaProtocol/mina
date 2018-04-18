@@ -7,25 +7,51 @@ let int16 =
     then x
     else failwithf "Port not between 0 and %d" max_port ())
 
+module Key_command (Key : sig
+  type t
+  val name : string
+  val of_bigstring : Bigstring.t -> t Or_error.t
+  val to_bigstring : t -> Bigstring.t
+  val project : Nanobit_base.Signature_keypair.t -> t
+end) =
+  struct
+    let key =
+      let open Nanobit_base in
+      Command.Arg_type.map Command.Param.string ~f:(fun s ->
+        let key_maybe =
+          s |> B64.decode
+            |> Bigstring.of_string
+            |> Key.of_bigstring
+        in
+        match key_maybe with
+        | Ok key -> key
+        | Error e ->
+            failwithf "Couldn't read %s %s -- here's a sample one: %s"
+              Key.name
+              (Error.to_string_hum e)
+              (
+                let kp = Signature_keypair.create () in
+                (Key.project kp) |> Key.to_bigstring |> Bigstring.to_string |> B64.encode
+              )
+              ()
+      )
+  end
+
 let public_key =
-  let open Nanobit_base in
-  Command.Arg_type.map Command.Param.string ~f:(fun s ->
-    let public_key_maybe =
-      s |> B64.decode
-        |> Bigstring.of_string
-        |> Public_key.of_bigstring
-    in
-    match public_key_maybe with
-    | Ok key -> key
-    | Error e ->
-        failwithf "Couldn't read public key %s -- here's a sample one: %s"
-          (Error.to_string_hum e)
-          (
-            let kp = Signature_keypair.create () in
-            kp.public_key |> Public_key.to_bigstring |> Bigstring.to_string |> B64.encode
-          )
-          ()
-  )
+  let module Pk = Key_command(struct
+    include Nanobit_base.Public_key
+    let name = "public key"
+    let project (kp : Nanobit_base.Signature_keypair.t) = kp.public_key
+  end) in
+  Pk.key
+
+let private_key =
+  let module Sk = Key_command(struct
+    include Nanobit_base.Private_key
+    let name = "private key"
+    let project (kp : Nanobit_base.Signature_keypair.t) = kp.private_key
+  end) in
+  Sk.key
 
 let txn_fee =
   let open Nanobit_base in

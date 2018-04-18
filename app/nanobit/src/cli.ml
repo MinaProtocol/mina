@@ -241,6 +241,9 @@ let daemon =
         and port =
           flag "port"
             ~doc:"Server port for other to connect" (required int16)
+        and client_port =
+          flag "client_port"
+            ~doc:"Port for client to connect daemon locally" (required int16)
         and ip =
           flag "ip"
             ~doc:"External IP address for others to connect" (optional string)
@@ -301,40 +304,35 @@ let daemon =
               ; pool_disk_location = conf_dir ^/ "transaction_pool"
               }
           in
+
+          (* Setup RPC server for client interactions *)
+          let module Client_server = Client.Rpc_server(struct
+            type t = Main.t
+            let get_balance (t : t) (addr : Public_key.Stable.V1.t) =
+              let ledger = Inputs.Ledger_fetcher.best_ledger t.ledger_fetcher in
+              let key = Public_key.compress addr in
+              let maybe_balance =
+                Option.map
+                  (Ledger.get ledger key)
+                  ~f:(fun account -> account.Account.balance)
+              in
+              return maybe_balance
+            let send_txn t txn =
+              match Inputs.Transaction.check txn with
+              | Some txn ->
+                t.Main.transaction_pool <- Inputs.Transaction_pool.add t.Main.transaction_pool txn;
+                return (Some ())
+              | None -> return None
+          end) in
+          Client_server.init_server
+            ~parent_log:log
+            ~minibit
+            ~port:client_port;
+
           printf "Created minibit\n%!";
           Main.run minibit;
           printf "Ran minibit\n%!";
           Async.never ()
-
-          (*let%bind prover =*)
-            (*if start_prover*)
-            (*then Prover.create ~port:prover_port ~debug:()*)
-            (*else Prover.connect { host = "0.0.0.0"; port = prover_port }*)
-          (*in*)
-          (*let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in*)
-          (*let genesis_blockchain =*)
-            (*{ Blockchain.state = Blockchain.State.zero*)
-            (*; proof = genesis_proof*)
-            (*; most_recent_block = Block.genesis*)
-            (*}*)
-          (*in*)
-          (*let%bind () = Main.assert_chain_verifies prover genesis_blockchain in*)
-          (*let%bind ip =*)
-            (*match ip with*)
-            (*| None -> Find_ip.find ()*)
-            (*| Some ip -> return ip*)
-          (*in*)
-          (*let minibit = Main.create ()*)
-          (*let log = Logger.create () in*)
-          (*Main.main*)
-            (*~log*)
-            (*~prover*)
-            (*~storage_location:(conf_dir ^/ "storage")*)
-            (*~genesis_blockchain*)
-            (*~initial_peers *)
-            (*~should_mine*)
-            (*~me:(Host_and_port.create ~host:ip ~port)*)
-            (*()*)
       ]
     end
 ;;

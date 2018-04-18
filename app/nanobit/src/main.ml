@@ -353,11 +353,6 @@ struct
               Blockchain_accumulator.Update.New_chain b)
           ]);
 
-    (* Setup RPC server for client interactions *)
-    Client.init_server
-      ~parent_log:log
-      ~port:client_port;
-
     membership
 
 
