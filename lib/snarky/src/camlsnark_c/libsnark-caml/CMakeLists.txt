@@ -167,9 +167,9 @@ if(${CURVE} STREQUAL "BN128")
   )
 endif()
 
-#if("${DEBUG}")
+if("${DEBUG}")
   add_definitions(-DDEBUG=1)
-#endif()
+endif()
 
 if("${LOWMEM}")
   add_definitions(-DLOWMEM=1)
