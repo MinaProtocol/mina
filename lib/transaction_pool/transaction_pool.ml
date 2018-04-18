@@ -39,5 +39,9 @@ module Make (Transaction : Protocols.Minibit_pow.Transaction_intf) = struct
       | _, None, _ -> failwith "Impossible, top will be none if remove_top is none"
     in
     go t k []
+
+  (* TODO: Actually back this by the file-system *)
+  let load ~disk_location =
+    return empty
 end
 

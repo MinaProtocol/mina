@@ -56,6 +56,8 @@ module Make_inputs0 (Init : Init_intf) = struct
     type t = Nanobit_base.Ledger.t [@@deriving sexp, compare, hash, bin_io]
     type valid_transaction = Transaction.With_valid_signature.t
 
+    let create = Ledger.create
+    let merkle_root = Ledger.merkle_root
     let copy = Nanobit_base.Ledger.copy
     let apply_transaction t (valid_transaction : Transaction.With_valid_signature.t) : unit Or_error.t =
       Nanobit_base.Ledger.apply_transaction_unchecked t (valid_transaction :> Transaction.t)
@@ -166,15 +168,14 @@ end
 module Make_inputs (Init : Init_intf) = struct
   module Inputs0 = Make_inputs0(Init)
   include Inputs0
-  module Net = Minibit_networking.Make(State_with_witness)(Ledger_hash)(Ledger)(State)
+  module Net = Minibit_networking.Make(struct
+    module State_with_witness = State_with_witness
+    module Ledger_hash = Ledger_hash
+    module Ledger = Ledger
+    module State = State
+  end)
   module Ledger_fetcher_io = Net.Ledger_fetcher_io
   module State_io = Net.State_io
-  module Ledger_fetcher = Ledger_fetcher.Make(struct
-    include Inputs0
-    module Net = Net
-    module Store = Storage.Disk
-  end)
-
   module Bundle = struct
     include Bundle
 
@@ -185,11 +186,25 @@ module Make_inputs (Init : Init_intf) = struct
   end
 
   module Transaction_pool = Transaction_pool.Make(Transaction)
-  module Miner = Minibit_miner.Make(Inputs0)(Transition_with_witness)(Transaction_pool)(Bundle)
+
   module Genesis = struct
     let state : State.t = State.zero
     let proof = Init.genesis_proof
   end
+  module Ledger_fetcher = Ledger_fetcher.Make(struct
+    include Inputs0
+    module Net = Net
+    module Store = Storage.Disk
+    module Transaction_pool = Transaction_pool
+    module Genesis = Genesis
+  end)
+
+  module Miner = Minibit_miner.Make(struct
+    include Inputs0
+    module Transaction_pool = Transaction_pool
+    module Bundle = Bundle
+  end)
+
   module Block_state_transition_proof = struct
     module Witness = struct
       type t =
@@ -283,6 +298,7 @@ let daemon =
               { log
               ; net_config
               ; ledger_disk_location = conf_dir ^/ "ledgers"
+              ; pool_disk_location = conf_dir ^/ "transaction_pool"
               }
           in
           printf "Created minibit\n%!";

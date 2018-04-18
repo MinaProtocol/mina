@@ -4,8 +4,6 @@ open Snark_params
 open Snarky
 open Currency
 
-let depth = Snark_params.ledger_depth
-
 let bundle_length = 1
 
 let tick_input () = Tick.(Data_spec.([ Field.typ ]))
@@ -572,7 +570,7 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
         let wallets = random_wallets () in
         let ledger =
-          Ledger.create ~depth:ledger_depth
+          Ledger.create ()
         in
         Array.iter wallets ~f:(fun { account } ->
           Ledger.update ledger account.public_key account);

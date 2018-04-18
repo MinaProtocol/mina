@@ -46,6 +46,16 @@ module type Network_intf = sig
 
 end
 
+module type Transaction_pool_intf = sig
+  type t
+  type transaction_with_valid_signature
+
+  val add : t -> transaction_with_valid_signature -> t
+  val remove : t -> transaction_with_valid_signature -> t
+  val get : t -> k:int -> transaction_with_valid_signature list
+  val load : disk_location:string -> t Deferred.t
+end
+
 module type Ledger_fetcher_intf = sig
   type t
   type ledger_hash
@@ -69,29 +79,22 @@ module type Ledger_fetcher_intf = sig
   val get : t -> ledger_hash -> ledger Deferred.Or_error.t
 
   val local_get : t -> ledger_hash -> (ledger * state) Or_error.t
-end
-
-module type Transaction_pool_intf = sig
-  type t
-  type transaction_with_valid_signature
-
-  val add : t -> transaction_with_valid_signature -> t
-  val remove : t -> transaction_with_valid_signature -> t
-  val get : t -> k:int -> transaction_with_valid_signature list
+  val strongest_ledgers : t -> (ledger * state) Linear_pipe.Reader.t
 end
 
 module type Miner_intf = sig
   type t
+  type ledger_hash
   type ledger
+  type transaction
   type transition_with_witness
   type state
-  type transaction_pool
 
   module Tip : sig
     type t =
       { state : state
       ; ledger : ledger
-      ; transaction_pool : transaction_pool
+      ; transactions : transaction list
       }
   end
 
@@ -175,17 +178,20 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type state := State.t
 
+  module Transaction_pool : Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
   module Ledger_fetcher : Ledger_fetcher_intf with type ledger_hash := Ledger_hash.t
                                                and type ledger := Ledger.t
                                                and type transaction_with_valid_signature := Transaction.With_valid_signature.t
                                                and type state := State.t
                                                and type net := Net.t
 
-  module Transaction_pool : Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
-  module Miner : Miner_intf with type ledger := Ledger.t
+  module Miner : Miner_intf with type transition_with_witness := Transition_with_witness.t
+                             and type ledger_hash := Ledger_hash.t
+                             and type ledger := Ledger.t
+                             and type transaction := Transaction.With_valid_signature.t
                              and type state := State.t
-                             and type transition_with_witness := Transition_with_witness.t
-                             and type transaction_pool := Transaction_pool.t
+
+
   module Genesis : sig
     val state : State.t
     val proof : State.Proof.t
@@ -207,8 +213,12 @@ module Make
     { miner : Miner.t
     ; net : Net.t
     ; state_io : Net.State_io.t
+    ; miner_changes_writer : Miner.change Linear_pipe.Writer.t
     ; miner_broadcast_writer : State_with_witness.t Linear_pipe.Writer.t
     ; ledger_fetcher_transitions : (Ledger_hash.t * Transaction.With_valid_signature.t list * State.t) Linear_pipe.Writer.t
+    (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; mutable transaction_pool : Transaction_pool.t
+    ; ledger_fetcher : Ledger_fetcher.t
     }
 
   module Config = struct
@@ -216,20 +226,29 @@ module Make
       { log : Logger.t
       ; net_config : Net.Config.t
       ; ledger_disk_location : string
+      ; pool_disk_location : string
       }
   end
 
   let create (config : Config.t) =
+    let (miner_changes_reader, miner_changes_writer) = Linear_pipe.create () in
     let (miner_broadcast_reader,miner_broadcast_writer) = Linear_pipe.create () in
     let (ledger_fetcher_transitions_reader, ledger_fetcher_transitions_writer) = Linear_pipe.create () in
-    let (change_feeder_reader, change_feeder_writer) = Linear_pipe.create () in
-    let miner =
-      Miner.create ~parent_log:config.log
-        ~change_feeder:change_feeder_reader
-    in
     let ledger_fetcher_net_ivar = Ivar.create () in
-    let%bind ledger_fetcher = Ledger_fetcher.create (Ledger_fetcher.Config.make ~parent_log:config.log ~net_deferred:(Ivar.read ledger_fetcher_net_ivar) ~ledger_transitions:ledger_fetcher_transitions_reader ~disk_location:config.ledger_disk_location ()) in
-    let%map net = 
+    let%bind ledger_fetcher =
+      Ledger_fetcher.create
+        (Ledger_fetcher.Config.make
+          ~parent_log:config.log
+          ~net_deferred:(Ivar.read ledger_fetcher_net_ivar)
+          ~ledger_transitions:ledger_fetcher_transitions_reader
+          ~disk_location:config.ledger_disk_location ())
+    in
+    let miner =
+      Miner.create
+        ~parent_log:config.log
+        ~change_feeder:miner_changes_reader
+    in
+    let%bind net = 
       Net.create 
         config.net_config
         (fun hash -> return (Or_error.is_ok (Ledger_fetcher.local_get ledger_fetcher hash)))
@@ -244,11 +263,17 @@ module Make
       Net.State_io.create 
         net 
         ~broadcast_state:(Linear_pipe.map miner_broadcast_reader ~f:State_with_witness.strip) in
+    let%map transaction_pool =
+      Transaction_pool.load ~disk_location:config.pool_disk_location
+    in
     { miner
     ; net
     ; state_io
     ; miner_broadcast_writer
+    ; miner_changes_writer
     ; ledger_fetcher_transitions = ledger_fetcher_transitions_writer
+    ; transaction_pool
+    ; ledger_fetcher
     }
 
   let run t =
@@ -295,6 +320,14 @@ module Make
          *       backed up. We should fix this see issues #178 and #177 *)
         Linear_pipe.write_or_exn ~capacity:10 t.ledger_fetcher_transitions updated_state_ledger (state.data.ledger_hash, transactions, state.data);
         return ()
+      )
+    end;
+
+    don't_wait_for begin
+      Linear_pipe.transfer (Ledger_fetcher.strongest_ledgers t.ledger_fetcher) t.miner_changes_writer ~f:(fun (ledger, state) ->
+        let transaction_per_bundle = 10 in
+        let transactions = Transaction_pool.get ~k:transaction_per_bundle t.transaction_pool in
+        Tip_change { Miner.Tip.transactions ; ledger ; state }
       )
     end;
 
