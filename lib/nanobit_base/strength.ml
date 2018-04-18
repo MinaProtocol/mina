@@ -55,32 +55,6 @@ let of_target_unchecked : Target.t -> t =
 open Tick
 open Let_syntax
 
-let boolean_compare (x : Tick.Boolean.var) (y : Tick.Boolean.var) =
-  let x = (x :> Cvar.t) in
-  let y = (y :> Cvar.t) in
-  let%map xy = Checked.mul x y in
-  let open Cvar.Infix in
-  let lt = y - xy in
-  let gt = x - xy in
-  let eq = Cvar.constant Field.one - (lt + gt) in
-  Boolean.Unsafe.(of_cvar lt, of_cvar eq, of_cvar gt)
-;;
-
-let rec lt_bitstrings_msb =
-  let open Boolean in
-  fun (xs : Boolean.var list) (ys : Boolean.var list) ->
-    match xs, ys with
-    | [], [] -> return false_
-    | [ x ], [ y ] -> not x && y
-    | x :: xs, y :: ys ->
-      let%bind tail_lt = lt_bitstrings_msb xs ys
-      and (lt, eq, gt) = boolean_compare x y in
-      let%bind r = eq && tail_lt in
-      lt || r
-    | _::_, [] | [], _::_ ->
-      failwith "lt_bitstrings_msb: Got unequal length strings"
-;;
-
 type _ Snarky.Request.t +=
   | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Snarky.Request.t
 
