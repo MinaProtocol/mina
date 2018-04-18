@@ -3,8 +3,8 @@ open Async
 open Nanobit_base
 
 module Send_transaction = struct
-  type query = Public_key.Stable.V1.t * Transaction.Payload.Stable.V1.t [@@deriving bin_io]
-  type response = unit [@@deriving bin_io]
+  type query = Transaction.Stable.V1.t [@@deriving bin_io]
+  type response = unit option [@@deriving bin_io]
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -14,7 +14,7 @@ end
 
 module Get_balance = struct
   type query = Public_key.Stable.V1.t [@@deriving bin_io]
-  type response = Currency.Balance.Stable.V1.t [@@deriving bin_io]
+  type response = Currency.Balance.Stable.V1.t option [@@deriving bin_io]
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =

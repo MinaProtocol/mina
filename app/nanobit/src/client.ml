@@ -3,21 +3,15 @@ open Async
 open Cli_common
 open Nanobit_base
 
-(* TODO: Fill out this implementations properly *)
-let send_txn_impl _ (key, payload) =
-  printf "Starting keypair create\n";
-  let kp = Signature_keypair.create () in
-  printf "Ending keypair create\n";
-  let _txn : Transaction.t = Transaction.sign kp payload in
-  printf "Created a real transaction!\n";
-  return ()
-
-let get_balance_impl _ addr =
-  return (Currency.Balance.of_string "1000")
-
-let init_server ~parent_log ~port =
+module Rpc_server
+  (Main : sig
+    type t
+    val get_balance : t -> Public_key.Stable.V1.t -> Currency.Balance.Stable.V1.t option Deferred.t
+    val send_txn : t -> Transaction.Stable.V1.t -> unit option Deferred.t
+  end) = struct
+let init_server ~parent_log ~minibit ~port =
   let log = Logger.child parent_log "client" in
-  let _ =
+  ignore begin
     Tcp.Server.create
         ~on_handler_error:(`Call (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
         (Tcp.Where_to_listen.of_port port)
@@ -26,8 +20,8 @@ let init_server ~parent_log ~port =
              reader writer
              ~implementations:(Rpc.Implementations.create_exn 
                ~implementations:
-                 [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc send_txn_impl
-                 ; Rpc.Rpc.implement Client_lib.Get_balance.rpc get_balance_impl
+                 [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun _ -> Main.send_txn minibit)
+                 ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun _ -> Main.get_balance minibit)
                  ]
                ~on_unknown_rpc:`Raise
              )
@@ -36,7 +30,8 @@ let init_server ~parent_log ~port =
                (`Call (fun exn -> 
                   Logger.error log "%s" (Exn.to_string_mach exn);
                 Deferred.unit)))
-  in ()
+  end
+end
 
 let dispatch rpc query port =
   Tcp.with_connection
@@ -60,7 +55,8 @@ let get_balance =
     fun () ->
       let open Deferred.Let_syntax in
       match%map (dispatch Client_lib.Get_balance.rpc address port) with
-      | Ok b -> printf "%s\n" (Currency.Balance.to_string b)
+      | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
+      | Ok None -> printf "No account found at that public_key (zero balance)"
       | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)
   end
 
@@ -72,7 +68,7 @@ let send_txn =
       let address =
         flag "receiver" ~doc:"Public-key address to which you want to send money" (required public_key)
       and from_account =
-        flag "from" ~doc:"Public-key address from which you would like to send money" (required public_key)
+        flag "from" ~doc:"Private-key address from which you would like to send money" (required private_key)
       and fee =
         flag "fee" ~doc:"Transaction fee you're willing to pay" (required txn_fee)
       and amount =
@@ -89,8 +85,14 @@ let send_txn =
           ; fee
           }
         in
-        match%map (dispatch Client_lib.Send_transaction.rpc (from_account, payload) port) with
-        | Ok () -> printf "Successfully sent txn\n"
+        let txn : Transaction.t =
+          Transaction.sign
+            (Signature_keypair.of_private_key from_account)
+            payload
+        in
+        match%map (dispatch Client_lib.Send_transaction.rpc txn port) with
+        | Ok (Some ()) -> printf "Successfully enqueued txn in pool\n"
+        | Ok None -> printf "Txn can't be signed properly\n"
         | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)
     ]
     end
