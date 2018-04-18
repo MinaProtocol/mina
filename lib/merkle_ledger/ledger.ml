@@ -3,7 +3,7 @@ open Core;;
 (* SOMEDAY: handle empty wallets *)
 
 module type S = sig
-  type hash [@@deriving sexp]
+  type hash
   type account
   type key
 
@@ -113,9 +113,6 @@ module Make
          and type account := Hash.account
          and type key := Key.t
 = struct
-  let hash_of_sexp = Hash.hash_of_sexp
-  let sexp_of_hash = Hash.sexp_of_hash
-
   include Depth
 
   type entry = 

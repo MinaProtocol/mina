@@ -1,7 +1,7 @@
 open Core
 
 module type S = sig
-  type hash [@@deriving sexp]
+  type hash
   type account
   type key
 
