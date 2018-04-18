@@ -26,6 +26,8 @@ module Make
 = struct
   open Inputs
 
+  module Genesis_ledger = Genesis_ledger.Make(Ledger)
+
   module Config = struct
     type t =
       { keep_count : int [@default 50]
@@ -118,8 +120,8 @@ module Make
 
   let initialize t =
     if Heap.length t.state.strongest_ledgers = 0 then begin
-      let empty = Ledger.create () in
-      add t (Ledger.merkle_root empty) empty Genesis.state;
+      let genesis_ledger = Genesis_ledger.ledger in
+      add t (Ledger.merkle_root genesis_ledger) genesis_ledger Genesis.state;
     end
 
   let strongest_ledgers t =

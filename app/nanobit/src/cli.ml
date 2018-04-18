@@ -68,7 +68,6 @@ module Make_inputs0 (Init : Init_intf) = struct
     type t = Nanobit_base.Ledger.t [@@deriving sexp, compare, hash, bin_io]
     type valid_transaction = Transaction.With_valid_signature.t
 
-    (* TODO: Is this right? *)
     let create = Ledger.create
     let merkle_root = Ledger.merkle_root
     let copy = Nanobit_base.Ledger.copy
