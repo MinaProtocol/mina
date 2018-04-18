@@ -77,6 +77,10 @@ module Make
       }
   end
 
+  (* Invariant: After t is fully created (create returns), the following is always true
+   * 1. $len(t.state.strongest_ledgers) > 0$
+   * 2. $\forall hash \in t.state.strongest_ledgers, \exists hash in t.state.hash_to_ledger$
+   *)
   type t =
     { state : State.t
     ; net : Net.t Deferred.t
@@ -86,6 +90,12 @@ module Make
     ; disk_location : Store.location
     ; all_new_states_reader : (Ledger.t * Inputs.State.t) Linear_pipe.Reader.t
     }
+
+  (* TODO: Improve heuristic for "best" ledger. Perhaps take a confidence
+   * percentage and look back x-strengths to meet that confidence *)
+  let best_ledger t =
+    let (h, _) = Heap.top_exn t.state.strongest_ledgers in
+    fst (Ledger_hash.Table.find_exn t.state.hash_to_ledger h)
 
   (* For now: Keep the top 50 ledgers (by strength), prune everything else *)
   let prune t =
@@ -144,10 +154,7 @@ module Make
     let storage_controller =
       Store.Controller.create
         ~parent_log:config.parent_log
-        { Bin_prot.Type_class.writer = State.bin_writer_t
-        ; reader = State.bin_reader_t
-        ; shape = State.bin_shape_t
-        }
+        [%bin_type_class: State.t]
     in
     let log = Logger.child config.parent_log "ledger-fetcher" in
     let%map state =

@@ -30,7 +30,7 @@ struct
   end
 
   module Private_key = struct
-    type t = Scalar.t
+    type t = Scalar.t [@@deriving bin_io]
   end
 
   let compress ((x, _) : Curve.value) = Field.unpack x
