@@ -22,8 +22,7 @@ module Make
      val result : t -> Ledger_proof.t Deferred.Option.t
    end)
   : Minibit.Miner_intf
-    with type 'a hash := 'a Inputs.Hash.t
-     and type ledger := Inputs.Ledger.t
+    with type ledger := Inputs.Ledger.t
      and type state := Inputs.State.t
      and type transition_with_witness := Transition_with_witness.t
      and type transaction_pool := Transaction_pool.t

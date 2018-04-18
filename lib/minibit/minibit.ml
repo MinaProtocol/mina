@@ -82,7 +82,6 @@ end
 
 module type Miner_intf = sig
   type t
-  type 'a hash
   type ledger
   type transition_with_witness
   type state
@@ -183,8 +182,7 @@ module type Inputs_intf = sig
                                                and type net := Net.t
 
   module Transaction_pool : Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
-  module Miner : Miner_intf with type 'a hash := 'a Hash.t
-                             and type ledger := Ledger.t
+  module Miner : Miner_intf with type ledger := Ledger.t
                              and type state := State.t
                              and type transition_with_witness := Transition_with_witness.t
                              and type transaction_pool := Transaction_pool.t
