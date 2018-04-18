@@ -4,8 +4,8 @@ open Async
 open Kademlia
 
 module Rpcs
-  (Ledger : Protocols.Minibit_pow.Ledger_intf)
   (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
+  (Ledger : Protocols.Minibit_pow.Ledger_intf with type ledger_hash := Ledger_hash.t)
   (State : Binable.S)
 = struct
   module Get_ledger_at_hash = struct
@@ -91,12 +91,17 @@ module Message (State_with_witness : Minibit.State_with_witness_intf) = struct
   end
 end
 
+module type Inputs_intf = sig
+  module State_with_witness : Minibit.State_with_witness_intf
+  module Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf
+  module Ledger : Protocols.Minibit_pow.Ledger_intf with type ledger_hash := Ledger_hash.t
+  module State : Binable.S
+end
+
 module Make
-  (State_with_witness : Minibit.State_with_witness_intf)
-  (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
-  (Ledger : Protocols.Minibit_pow.Ledger_intf)
-  (State : Binable.S)
+  (Inputs : Inputs_intf)
 = struct
+  open Inputs
 
   module Message = Message (State_with_witness)
   module Gossip_net = Gossip_net.Make (Message)
@@ -111,7 +116,7 @@ module Make
       }
   end
 
-  module Rpcs = Rpcs(Ledger)(Ledger_hash)(State)
+  module Rpcs = Rpcs(Ledger_hash)(Ledger)(State)
 
   module Membership = Membership.Haskell
 

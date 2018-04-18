@@ -2,21 +2,12 @@ open Core;;
 
 (* SOMEDAY: handle empty wallets *)
 
-module type S =
-  functor (Hash : sig 
-       type hash [@@deriving sexp, hash, compare, bin_io]
-       type account [@@deriving sexp, bin_io]
-       val hash_account : account -> hash 
-       val empty_hash : hash
-       val merge : hash -> hash -> hash
-     end)
-    (Max_depth : sig val max_depth : int end)
-    (Key : sig 
-        type t [@@deriving sexp, bin_io]
-        include Hashable.S_binable with type t := t
-     end) -> sig
+module type S = sig
+  type hash
+  type account
+  type key
 
-  val max_depth : int
+  val depth : int
 
   type index = int
 
@@ -27,79 +18,83 @@ module type S =
 
   module Path : sig
     type elem =
-      [ `Left of Hash.hash
-      | `Right of Hash.hash
+      [ `Left of hash
+      | `Right of hash
       ]
     [@@deriving sexp]
 
-    val elem_hash : elem -> Hash.hash
+    val elem_hash : elem -> hash
 
     type t = elem list
     [@@deriving sexp]
 
-    val implied_root : t -> Hash.hash -> Hash.hash
+    val implied_root : t -> hash -> hash
   end
 
-  val create : depth:int -> t
-
-  val depth : t -> int
+  val create : unit -> t
 
   val length : t -> int
 
-  val get
-    : t
-    -> Key.t
-    -> Hash.account option
+  val get : t -> key -> account option
 
-  val update
-    : t
-    -> Key.t
-    -> Hash.account
-    -> unit
+  val update : t -> key -> account -> unit
 
-  val merkle_root
-    : t
-    -> Hash.hash
+  val merkle_root : t -> hash
 
   val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
   val hash_fold_t : Ppx_hash_lib.Std.Hash.state -> t -> Ppx_hash_lib.Std.Hash.state
   val compare : t -> t -> int
 
   val merkle_path
-    : t
-    -> Key.t
-    -> Path.t option
+    : t -> key -> Path.t option
 
   val key_of_index
-    : t -> index -> Key.t option
+    : t -> index -> key option
 
   val index_of_key
-    : t -> Key.t -> index option
+    : t -> key -> index option
 
   val key_of_index_exn
-    : t -> index -> Key.t
+    : t -> index -> key
 
   val index_of_key_exn
-    : t -> Key.t -> index
+    : t -> key -> index
 
   val get_at_index
-    : t -> index -> [ `Ok of Hash.account | `Index_not_found ]
+    : t -> index -> [ `Ok of account | `Index_not_found ]
 
   val update_at_index
-    : t -> index -> Hash.account -> [ `Ok | `Index_not_found ]
+    : t -> index -> account -> [ `Ok | `Index_not_found ]
 
   val merkle_path_at_index
     : t -> index -> [ `Ok of Path.t | `Index_not_found ]
 
   val get_at_index_exn
-    : t -> index -> Hash.account
+    : t -> index -> account
 
   val update_at_index_exn
-    : t -> index -> Hash.account -> unit
+    : t -> index -> account -> unit
 
   val merkle_path_at_index_exn
     : t -> index -> Path.t
 end
+
+module type F =
+  functor (Hash : sig 
+       type hash [@@deriving sexp, hash, compare, bin_io]
+       type account [@@deriving sexp, bin_io]
+       val hash_account : account -> hash 
+       val empty_hash : hash
+       val merge : hash -> hash -> hash
+     end)
+    (Key : sig 
+        type t [@@deriving sexp, bin_io]
+        include Hashable.S_binable with type t := t
+     end)
+    (Depth : sig val depth : int end)
+    -> S with type hash := Hash.hash
+          and type account := Hash.account
+          and type key := Key.t
 
 module Make 
     (Hash : sig 
@@ -109,15 +104,16 @@ module Make
        val empty_hash : hash
        val merge : hash -> hash -> hash
      end)
-    (Max_depth : sig val max_depth : int end)
     (Key : sig 
         type t [@@deriving sexp, bin_io]
         include Hashable.S_binable with type t := t
-     end) = struct
-
-  type key = Key.t [@@deriving sexp, bin_io]
-
-  let max_depth = Max_depth.max_depth
+     end)
+    (Depth : sig val depth : int end)
+    : S with type hash := Hash.hash
+         and type account := Hash.account
+         and type key := Key.t
+= struct
+  include Depth
 
   type entry = 
     { merkle_index : int
@@ -140,7 +136,7 @@ module Make
 
   type index = int
 
-  type leafs = key DynArray.t [@@deriving sexp, bin_io]
+  type leafs = Key.t DynArray.t [@@deriving sexp, bin_io]
 
   type nodes = Hash.hash DynArray.t list [@@deriving sexp, bin_io]
 
@@ -153,8 +149,7 @@ module Make
 
   type t = 
     { accounts : accounts
-    ; tree : tree 
-    ; depth : int
+    ; tree : tree
     }
   [@@deriving sexp, bin_io]
 
@@ -168,7 +163,6 @@ module Make
     in
     { accounts = Key.Table.copy t.accounts
     ; tree = copy_tree t.tree
-    ; depth = t.depth
     }
 
   module Path = struct
@@ -207,25 +201,21 @@ module Make
     empty_hash_at_heights
   ;;
 
-  let memoized_empty_hash_at_height = empty_hash_at_heights Max_depth.max_depth
+  let memoized_empty_hash_at_height = empty_hash_at_heights depth
 
   let empty_hash_at_height d = 
     memoized_empty_hash_at_height.(d)
 
   (* if depth = N, leafs = 2^N *)
-  let create ~depth = 
-    assert (depth <= Max_depth.max_depth);
+  let create () =
     { accounts = create_account_table ()
     ; tree = { leafs = DynArray.create ()
              ; nodes_height = 0
              ; nodes = []
              ; dirty_indices = [] 
              }
-    ; depth
     }
   ;;
-
-  let depth t = t.depth
 
   let length t = Key.Table.length t.accounts
 
@@ -366,10 +356,10 @@ module Make
       if i = 0
       then hash
       else 
-        let hash = Hash.merge hash (empty_hash_at_height (t.depth - i)) in
+        let hash = Hash.merge hash (empty_hash_at_height (depth - i)) in
         go (i-1) hash
     in
-    go (t.depth - height) base_root
+    go (depth - height) base_root
   ;;
 
   let hash t = Hash.hash_hash (merkle_root t)
@@ -402,7 +392,7 @@ module Make
       in
       let is_left = addr0 mod 2 = 0 in
       let non_root_nodes =
-        List.take t.tree.nodes (t.depth - 1)
+        List.take t.tree.nodes (depth - 1)
       in
       let base_path, base_path_height = 
         go 1 (addr0 lsr 1) non_root_nodes
@@ -411,7 +401,7 @@ module Make
       List.rev_append 
         base_path
         (List.init 
-          (t.depth - base_path_height) 
+          (depth - base_path_height) 
           ~f:(fun i -> `Left (empty_hash_at_height (i + base_path_height))))
     )
   ;;

@@ -32,8 +32,11 @@ end
 module type Ledger_intf = sig
   type t [@@deriving sexp, compare, hash, bin_io]
   type valid_transaction
+  type ledger_hash
 
+  val create : unit -> t
   val copy : t -> t
+  val merkle_root : t -> ledger_hash
   val apply_transaction : t -> valid_transaction -> unit Or_error.t
 end
 
@@ -58,6 +61,7 @@ module type Strength_intf = sig
   type t [@@deriving compare, bin_io]
   type difficulty
 
+  val zero : t
   val ( < ) : t -> t -> bool
   val ( > ) : t -> t -> bool
   val ( = ) : t -> t -> bool
@@ -171,9 +175,10 @@ module type Inputs_intf = sig
   module Transaction : Transaction_intf
   module Nonce : Nonce_intf
 
-  module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
   module Ledger_hash : Ledger_hash_intf
   module Ledger_proof : Proof_intf
+  module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
+                               and type ledger_hash := Ledger_hash.t
 
   module Transition : Transition_intf with type ledger_hash := Ledger_hash.t
                                        and type ledger := Ledger.t

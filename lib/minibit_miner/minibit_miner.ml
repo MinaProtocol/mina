@@ -1,16 +1,12 @@
 open Core
 open Async
 
-module Make
-  (Inputs : Protocols.Minibit_pow.Inputs_intf)
-  (Transition_with_witness : Minibit.Transition_with_witness_intf
-   with type transition := Inputs.Transition.t
-    and type transaction_with_valid_signature := Inputs.Transaction.With_valid_signature.t)
-  (Transaction_pool : Minibit.Transaction_pool_intf
-   with type transaction_with_valid_signature := Inputs.Transaction.With_valid_signature.t)
-  (Bundle : sig
-     open Inputs
-
+module type Inputs_intf = sig
+  include Protocols.Minibit_pow.Inputs_intf
+  module Transition_with_witness : Minibit.Transition_with_witness_intf
+  with type transition := Transition.t
+   and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+  module Bundle : sig
      type t
 
      val create : Ledger.t -> Transaction.With_valid_signature.t list -> t
@@ -20,14 +16,19 @@ module Make
      val target_hash : t -> Ledger_hash.t
 
      val result : t -> Ledger_proof.t Deferred.Option.t
-   end)
+   end
+end
+
+module Make
+  (Inputs : Inputs_intf)
   : Minibit.Miner_intf
-    with type 'a hash := 'a Inputs.Hash.t
+    with type transition_with_witness := Inputs.Transition_with_witness.t
+     and type ledger_hash := Inputs.Ledger_hash.t
      and type ledger := Inputs.Ledger.t
+     and type transaction := Inputs.Transaction.With_valid_signature.t
      and type state := Inputs.State.t
-     and type transition_with_witness := Transition_with_witness.t
-     and type transaction_pool := Transaction_pool.t
 = struct
+
   open Inputs
 
   module Hashing_result : sig
@@ -199,14 +200,12 @@ module Make
     type t =
       { state : State.t
       ; ledger : Ledger.t
-      ; transaction_pool : Transaction_pool.t
+      ; transactions : Transaction.With_valid_signature.t list
       }
   end
 
   type change =
     | Tip_change of Tip.t
-
-  let transactions_per_bundle = 10
 
   type state =
     { tip : Tip.t
@@ -230,11 +229,11 @@ module Make
       | Error e ->
         Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
     in
-    let create_result { Tip.state; transaction_pool; ledger } =
+    let create_result { Tip.state; transactions; ledger } =
       let result =
         Mining_result.create
           ~state
-          ~transactions:(Transaction_pool.get transaction_pool transactions_per_bundle)
+          ~transactions
           ~ledger
       in
       upon (Mining_result.result result) write_result;
