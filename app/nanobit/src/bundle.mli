@@ -4,19 +4,15 @@ open Nanobit_base
 
 type t
 
-module Make () : sig
-  type nonrec t = t
+val cancel : t -> unit
 
-  val cancel : t -> unit
+(* TODO: Need a mechanism for preventing malleability
+  of transaction bundle (so no one can steal fees).
+  One idea is to have a "drain" snark at the end that
+  takes the built up fees and transfers them into one
+  account. *)
+val create : conf_dir:string -> Ledger.t -> Transaction.t list -> t
 
-  (* TODO: Need a mechanism for preventing malleability
-    of transaction bundle (so no one can steal fees).
-    One idea is to have a "drain" snark at the end that
-    takes the built up fees and transfers them into one
-    account. *)
-  val create : conf_dir:string -> Ledger.t -> Transaction.t list -> t
+val target_hash : t -> Ledger_hash.t
 
-  val target_hash : t -> Ledger_hash.t
-
-  val snark : t -> Transaction_snark.t option Deferred.t
-end
+val snark : t -> Transaction_snark.t option Deferred.t

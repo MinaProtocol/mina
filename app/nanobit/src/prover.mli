@@ -5,16 +5,9 @@ open Blockchain_snark
 
 type t
 
-val default_port : int
+val create : conf_dir:string -> t Deferred.t
 
-val create
-  : ?debug:unit
-  -> port:int
-  -> t Deferred.t
-
-val connect : Host_and_port.t -> t Deferred.t
-
-val initialized : t -> unit Deferred.Or_error.t
+val initialized : t -> [`Initialized] Deferred.Or_error.t
 
 val extend_blockchain
   : t
@@ -25,7 +18,8 @@ val extend_blockchain
 val genesis_proof
   : t -> Proof.t Deferred.Or_error.t
 
-val verify
+val verify_blockchain
   : t -> Blockchain.t -> bool Deferred.Or_error.t
 
-val command : Command.t
+val verify_transaction_snark
+  : t -> Transaction_snark.t -> bool Deferred.Or_error.t

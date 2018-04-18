@@ -15,7 +15,7 @@ let accumulate ~init ~parent_log ~prover ~updates ~strongest_chain =
   don't_wait_for begin
     let%map _last_block =
       Linear_pipe.fold updates ~init ~f:(fun (chain : Blockchain.t) (Update.New_chain new_chain) ->
-        match%bind Prover.verify prover new_chain with
+        match%bind Prover.verify_blockchain prover new_chain with
         | Error e ->
           Logger.error log "%s" (Error.to_string_hum (Error.tag e ~tag:"prover verify failed"));
           return chain

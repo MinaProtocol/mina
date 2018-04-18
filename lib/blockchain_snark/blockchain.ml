@@ -10,7 +10,7 @@ module Stable = struct
       { state             : State.Stable.V1.t
       ; proof             : Proof.Stable.V1.t
       }
-    [@@deriving bin_io]
+    [@@deriving bin_io, fields]
   end
 end
 

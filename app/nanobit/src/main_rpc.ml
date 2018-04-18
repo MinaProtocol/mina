@@ -16,9 +16,7 @@ module Rpcs = struct
 
   module Main = struct
     type query = 
-      { start_prover: bool
-      ; prover_port: int
-      ; storage_location: string
+      { storage_location: string
       ; initial_peers: Host_and_port.t list
       ; should_mine: bool
       ; me: Host_and_port.t
@@ -89,7 +87,7 @@ let main () =
    , rpc_strongest_block_reader 
   in
 
-  let run_main _ { Rpcs.Main.start_prover; prover_port; storage_location; initial_peers; should_mine; me } = 
+  let run_main _ { Rpcs.Main.storage_location; initial_peers; should_mine; me } = 
     let log = Logger.create () in
     let pipes, rpc_strongest_block_reader = init_pipes () in
     don't_wait_for begin
@@ -101,11 +99,7 @@ let main () =
         );
     end;
     let%map membership = 
-      let%bind prover =
-        if start_prover
-        then Prover.create ~port:prover_port ~debug:()
-        else Prover.connect { host = "0.0.0.0"; port = prover_port }
-      in
+      let%bind prover = Prover.create ~conf_dir:storage_location in
       let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
       let genesis_blockchain =
         { Blockchain.state = Blockchain.State.zero; proof = genesis_proof }
