@@ -36,14 +36,5 @@ val var_to_unpacked : Cvar.t -> (Unpacked.var, _) Tick.Checked.t
 
 val constant : Packed.value -> Packed.var
 
-val strength_unchecked : t -> Strength.t
-
-(* Someday: Have a dual variable type so I don't have to pass both packed and unpacked
-   versions. *)
-val strength
-  : Packed.var
-  -> Unpacked.var
-  -> (Strength.Packed.var, _) Tick.Checked.t
-
 val to_bigint : t -> Bignum.Bigint.t
 val of_bigint : Bignum.Bigint.t -> t

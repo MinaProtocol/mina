@@ -12,12 +12,6 @@ end
 
 module Make_inputs0 (Init : Init_intf) = struct
   module Time = Block_time
-  module Hash = struct
-    type 'a t = Snark_params.Tick.Pedersen.Digest.t
-    [@@deriving compare, hash, sexp, bin_io]
-    (* TODO *)
-    let digest _ = Snark_params.Tick.Pedersen.zero_hash
-  end
   module State_hash = State_hash.Stable.V1
   module Ledger_hash = Ledger_hash.Stable.V1
   module Transaction : sig
@@ -57,13 +51,7 @@ module Make_inputs0 (Init : Init_intf) = struct
 
   module Pow = Snark_params.Tick.Pedersen.Digest
 
-  module Strength = struct
-    include Strength
-
-    (* TODO *)
-    let increase t ~by = t
-  end
-
+  module Strength = Strength
   module Ledger = struct
     type t = Nanobit_base.Ledger.t [@@deriving sexp, compare, hash, bin_io]
     type valid_transaction = Transaction.With_valid_signature.t

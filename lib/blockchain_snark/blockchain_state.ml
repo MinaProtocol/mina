@@ -155,7 +155,7 @@ let update_unchecked : value -> Block.t -> value =
     { next_difficulty
     ; previous_state_hash = hash state
     ; ledger_hash = block.body.target_hash
-    ; strength = Field.add state.strength (Target.strength_unchecked state.next_difficulty)
+    ; strength = Strength.increase state.strength ~by:state.next_difficulty
     ; timestamp = block.header.time
     }
 
@@ -280,11 +280,12 @@ module Make_update (T : Transaction_snark.S) = struct
         in
         let difficulty = previous_state.next_difficulty in
         let difficulty_packed = Target.pack_var difficulty in
-        let%bind strength = Target.strength difficulty_packed difficulty in
         let time = block.header.time in
         let%bind new_difficulty = compute_target previous_state.timestamp difficulty time in
         let%bind new_strength =
-          Strength.unpack_var Cvar.Infix.(strength + Strength.pack_var previous_state.strength)
+          Strength.increase_checked (Strength.pack_var previous_state.strength)
+            ~by:(difficulty_packed, difficulty)
+          >>= Strength.unpack_var
         in
         let new_state =
           { next_difficulty = new_difficulty

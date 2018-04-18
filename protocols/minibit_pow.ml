@@ -7,11 +7,6 @@ module type Time_intf = sig
   val now : unit -> t
 end
 
-module type Hash_intf = sig
-  type 'a t [@@deriving compare, hash, sexp, bin_io]
-  val digest : 'a -> 'a t
-end
-
 module type Ledger_hash_intf = sig
   type t [@@deriving bin_io, sexp]
   include Hashable.S_binable with type t := t
@@ -171,7 +166,6 @@ end
 
 module type Inputs_intf = sig
   module Time : Time_intf
-  module Hash : Hash_intf
   module Transaction : Transaction_intf
   module Nonce : Nonce_intf
 
