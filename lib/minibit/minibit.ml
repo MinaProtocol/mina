@@ -128,6 +128,7 @@ module type Transition_with_witness_intf = sig
     { transactions : transaction_with_valid_signature list
     ; transition : transition
     }
+  [@@deriving sexp]
 
   include Witness_change_intf with type t_with_witness := t
                               and type witness = transaction_with_valid_signature list
@@ -143,6 +144,7 @@ module type State_with_witness_intf = sig
     { transactions : transaction_with_valid_signature list
     ; state : state
     }
+  [@@deriving sexp]
 
   module Stripped : sig
     type t =
@@ -165,7 +167,7 @@ module type Inputs_intf = sig
 
   module Proof_carrying_state : sig
     type t = (State.t, State.Proof.t) Minibit_pow.Proof_carrying_data.t
-    [@@deriving bin_io]
+    [@@deriving sexp, bin_io]
   end
   module State_with_witness : State_with_witness_intf with type state := Proof_carrying_state.t
                                                        and type transaction := Transaction.t
@@ -220,6 +222,7 @@ module Make
     (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; mutable transaction_pool : Transaction_pool.t
     ; ledger_fetcher : Ledger_fetcher.t
+    ; log : Logger.t
     }
 
   module Config = struct
@@ -275,9 +278,11 @@ module Make
     ; ledger_fetcher_transitions = ledger_fetcher_transitions_writer
     ; transaction_pool
     ; ledger_fetcher
+    ; log = config.log
     }
 
   let run t =
+    Logger.info t.log "Starting to run minibit";
     let p : Protocol.t = Protocol.create ~initial:{ data = Genesis.state ; proof = Genesis.proof } in
 
     let (miner_transitions_protocol, miner_transitions_ledger_fetcher) =
@@ -300,9 +305,11 @@ module Make
       Linear_pipe.fork2 begin
         Linear_pipe.scan protocol_events ~init:(p, []) ~f:(fun (p, _) -> function
           | `Local transition ->
+              Logger.info t.log !"Stepping with local transition %{sexp: Transition_with_witness.t}" transition;
               let%map p' = Protocol.step p (Protocol.Event.Found (Transition_with_witness.forget_witness transition)) in
               (p', transition.transactions)
           | `Remote pcd ->
+              Logger.info t.log !"Stepping with remote pcd %{sexp: Inputs.State_with_witness.t}" pcd;
               let%map p' = Protocol.step p (Protocol.Event.New_state (State_with_witness.forget_witness pcd)) in
               (p', pcd.transactions)
         )
@@ -317,6 +324,7 @@ module Make
 
     don't_wait_for begin
       Linear_pipe.iter updated_state_ledger ~f:(fun {state ; transactions} ->
+        Logger.info t.log !"Ledger has new %{sexp: Proof_carrying_state.t} and %{sexp: Inputs.Transaction.With_valid_signature.t list}" state transactions;
         (* TODO: Right now we're crashing on purpose if we even get a tiny bit
          *       backed up. We should fix this see issues #178 and #177 *)
         Linear_pipe.write_or_exn ~capacity:10 t.ledger_fetcher_transitions updated_state_ledger (state.data.ledger_hash, transactions, state.data);

@@ -172,6 +172,7 @@ module Make
           in
           match hashing_result, bundle_result with
           | `Ok (new_state, nonce), Some (ledger_proof, ts) ->
+            printf "Mined a new block!\n";
             Ok
               { Transition_with_witness.transition =
                 { ledger_hash = next_ledger_hash
@@ -199,9 +200,10 @@ module Make
   module Tip = struct
     type t =
       { state : State.t
-      ; ledger : Ledger.t
+      ; ledger : Ledger.t sexp_opaque
       ; transactions : Transaction.With_valid_signature.t list
       }
+    [@@deriving sexp]
   end
 
   type change =
@@ -248,9 +250,11 @@ module Make
           ; tip = initial_tip
           }
         in
+        Logger.info logger !"Got initial change with tip %{sexp: Tip.t}" initial_tip;
         Linear_pipe.fold change_feeder ~init:state0 ~f:(fun s u ->
           match u with
           | Tip_change tip ->
+            Logger.info logger !"Starting to mine on a new tip %{sexp: Tip.t}" tip;
             Mining_result.cancel s.result;
             let result = create_result tip in
             return { result; tip })

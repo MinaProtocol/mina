@@ -13,6 +13,7 @@ module type Inputs_intf = sig
   module Store : Storage.With_checksum_intf
   module Transaction_pool : Minibit.Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
   module Genesis : sig val state : State.t end
+  module Genesis_ledger : sig val ledger : Ledger.t end
 end
 
 module Make
@@ -25,8 +26,6 @@ module Make
 
 = struct
   open Inputs
-
-  module Genesis_ledger = Genesis_ledger.Make(Ledger)
 
   module Config = struct
     type t =

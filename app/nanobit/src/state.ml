@@ -10,7 +10,7 @@ type t =
   ; strength             : Strength.t
   ; timestamp            : Block_time.t
   }
-[@@deriving fields, bin_io]
+[@@deriving sexp, fields, bin_io]
 
 let to_blockchain_state { next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } : Blockchain_state.t =
   { next_difficulty; previous_state_hash; ledger_hash; strength; timestamp }
