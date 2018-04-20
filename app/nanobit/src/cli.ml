@@ -9,6 +9,7 @@ module type Init_intf = sig
 
   val conf_dir : string
   val prover : Prover.t
+
   val genesis_proof : proof
 end
 
@@ -26,36 +27,7 @@ module Make_inputs0
   module Time = Block_time
   module State_hash = State_hash.Stable.V1
   module Ledger_hash = Ledger_hash.Stable.V1
-  module Transaction : sig
-    type t = Nanobit_base.Transaction.t
-    [@@deriving sexp, eq, bin_io, compare]
-
-    module With_valid_signature : sig
-      type nonrec t = private t
-      [@@deriving sexp, eq, bin_io, compare]
-    end
-
-    val check : t -> With_valid_signature.t option
-  end = struct
-    type t = Nanobit_base.Transaction.t
-    [@@deriving sexp, eq, bin_io]
-    (* The underlying transaction has an arbitrary compare func, fallback to that *)
-    let compare (t : t) (t' : t) = 
-      let fee_compare =
-        Transaction.Fee.compare t.payload.fee t'.payload.fee
-      in
-      match fee_compare with
-      | 0 -> Transaction.compare t t'
-      | _ -> fee_compare
-
-    module With_valid_signature = struct
-      type t = Nanobit_base.Transaction.t 
-      [@@deriving sexp, eq, bin_io]
-      let compare = compare
-    end
-
-    let check t = Option.some_if (Nanobit_base.Transaction.check_signature t) t
-  end
+  module Transaction = Transaction
 
   module Nonce = Nanobit_base.Nonce
 
@@ -164,22 +136,7 @@ module Make_inputs
     include Protocols.Minibit_pow.Proof_intf with type input = State.t
                                               and type t := t
   end)
-  (Make_bundle : functor (Inputs : sig
-    module Transaction : Protocols.Minibit_pow.Transaction_intf
-    module Ledger : Protocols.Minibit_pow.Ledger_intf
-        with type valid_transaction := Transaction.With_valid_signature.t
-         and type ledger_hash := Ledger_hash.t
-  end) -> sig
-     type t
-
-     val create : Inputs.Ledger.t -> Inputs.Transaction.With_valid_signature.t list -> t
-
-     val cancel : t -> unit
-
-     val target_hash : t -> Ledger_hash.t
-
-     val result : t -> Ledger_proof.t Deferred.Option.t
-  end)
+  (Bundle : Bundle.S with type proof := Ledger_proof.t)
 = struct
   module Inputs0 = Make_inputs0(Init)(Ledger_proof)(State_proof)
   include Inputs0
@@ -190,11 +147,14 @@ module Make_inputs
     module State = State
   end)
   module Ledger_fetcher_io = Net.Ledger_fetcher_io
+
   module State_io = Net.State_io
-  module Bundle = Make_bundle(struct
-    module Transaction = Transaction
-    module Ledger = Ledger
-  end)
+
+  module Bundle = struct
+    include Bundle
+    let create ledger ts = create ledger ts ~conf_dir:Init.conf_dir
+  end
+
   module Transaction_pool = Transaction_pool.Make(Transaction)
 
   module Genesis = struct
@@ -215,6 +175,92 @@ module Make_inputs
     module Transaction_pool = Transaction_pool
     module Bundle = Bundle
   end)
+end
+
+module Debug_main (Init : Init_intf) = struct
+  module Init = struct
+    type proof = () [@@deriving bin_io]
+
+    let conf_dir = Init.conf_dir
+    let prover = Init.prover
+    let genesis_proof = ()
+  end
+
+  module Ledger_proof = Ledger_proof.Debug
+
+  module State_proof = State_proof.Make_debug(Init)
+
+  module Bundle = struct
+    type t = Ledger_hash.t
+
+    let create ~conf_dir ledger ts =
+      let ts_rev =
+        List.rev_map ts ~f:(fun txn ->
+          ignore (Ledger.apply_transaction ledger txn);
+          txn);
+      in
+      List.iter ts_rev ~f:(fun txn ->
+        ignore (Ledger.undo_transaction ledger (txn :> Transaction.t)));
+      Ledger.merkle_root ledger
+
+    let cancel (t : t) : unit = ()
+
+    let target_hash t = t
+
+    let result (t : t) =
+      (* I need this local variable to convince the type checker *)
+      let p : Ledger_proof.t = () in
+      Deferred.Option.return p
+  end
+
+  module Inputs =
+    Make_inputs(Init)(Ledger_proof)(State_proof)(Bundle)
+
+  module Main =
+      Minibit.Make(Inputs)(struct
+        module Witness = struct
+          type t =
+            { old_state : Inputs.State.t
+            ; old_proof : Inputs.State.Proof.t
+            ; transition : Inputs.Transition.t
+            }
+        end
+
+        let prove_zk_state_valid _ ~new_state:_ = return Inputs.Genesis.proof
+      end)
+end
+
+module Prod_main
+    (Init : Init_intf with type proof = Proof.t)
+= struct
+  module Ledger_proof = Ledger_proof.Make_prod(Init)
+  module State_proof = State_proof.Make_prod(Init)
+  module Bundle = struct
+    include Bundle
+    let result t = Deferred.Option.(result t >>| Transaction_snark.proof)
+  end
+
+  module Inputs = Make_inputs(Init)(Ledger_proof)(State_proof)(Bundle)
+
+  module Main =
+    Minibit.Make(Inputs)(struct
+      module Witness = struct
+        type t =
+          { old_state : Inputs.State.t
+          ; old_proof : Inputs.State.Proof.t
+          ; transition : Inputs.Transition.t
+          }
+      end
+
+      let prove_zk_state_valid ({ old_state; old_proof; transition } : Witness.t) ~new_state:_ =
+        Prover.extend_blockchain Init.prover
+          { state = State.to_blockchain_state old_state; proof = old_proof }
+          { header = { time = transition.timestamp; nonce = transition.nonce }
+          ; body = { target_hash = transition.ledger_hash; proof = transition.ledger_proof }
+          }
+        >>| Or_error.ok_exn
+        >>| Blockchain.proof
+    end)
 end
 
 let daemon =
@@ -268,99 +314,16 @@ let daemon =
           let me = Host_and_port.create ~host:ip ~port in
           let%bind prover = Prover.create ~conf_dir in
           let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
-          let module Prod = struct
-            module Init = struct
-              type proof = Proof.Stable.V1.t [@@deriving bin_io]
+          let module Init = struct
+            type proof = Proof.Stable.V1.t [@@deriving bin_io]
 
-              let conf_dir = conf_dir
-              let prover = prover
-              let genesis_proof = genesis_proof
-            end
-            module Ledger_proof = Ledger_proof.Make_prod(Init)
-            module State_proof = State_proof.Make_prod(Init)
-            module Make_bundle (Inputs : sig
-              module Transaction : Protocols.Minibit_pow.Transaction_intf
-              module Ledger : Protocols.Minibit_pow.Ledger_intf
-                  with type valid_transaction := Transaction.With_valid_signature.t
-                   and type ledger_hash := Ledger_hash.t
-            end) = struct
-              open Inputs
-              include Bundle
-
-              let create ledger ts =
-                create ~conf_dir:Init.conf_dir (Obj.magic ledger) (Obj.magic ts)
-
-              let result t = Deferred.Option.(snark t >>| Transaction_snark.proof)
-            end
-            module Inputs =
-              Make_inputs(Init)(Ledger_proof)(State_proof)(Make_bundle)
-            module Main =
-              Minibit.Make(Inputs)(struct
-                module Witness = struct
-                  type t =
-                    { old_state : Inputs.State.t
-                    ; old_proof : Inputs.State.Proof.t
-                    ; transition : Inputs.Transition.t
-                    }
-                end
-
-                let prove_zk_state_valid ({ old_state; old_proof; transition } : Witness.t) ~new_state:_ =
-                  Prover.extend_blockchain Init.prover
-                    { state = State.to_blockchain_state old_state; proof = old_proof }
-                    { header = { time = transition.timestamp; nonce = transition.nonce }
-                    ; body = { target_hash = transition.ledger_hash; proof = transition.ledger_proof }
-                    }
-                  >>| Or_error.ok_exn
-                  >>| Blockchain.proof
-              end)
+            let conf_dir = conf_dir
+            let prover = prover
+            let genesis_proof = genesis_proof
           end
           in
-          let module Debug = struct
-            module Init = struct
-              type proof = () [@@deriving bin_io]
-
-              let conf_dir = conf_dir
-              let prover = prover
-              let genesis_proof = ()
-            end
-            module Ledger_proof = Ledger_proof.Debug
-            module State_proof = State_proof.Make_debug(Init)
-            module Make_bundle (Inputs : sig
-              module Transaction : Protocols.Minibit_pow.Transaction_intf
-              module Ledger : Protocols.Minibit_pow.Ledger_intf
-                  with type valid_transaction := Transaction.With_valid_signature.t
-                   and type ledger_hash := Ledger_hash.t
-            end) = struct
-              open Inputs
-              type t = Ledger_hash.t
-              let create ledger ts =
-                List.iter ts ~f:(fun txn ->
-                  ignore(Ledger.apply_transaction ledger txn)
-                );
-                Ledger.merkle_root ledger
-              let cancel (t : t) : unit = ()
-              let target_hash t = t
-              let result (t : t) =
-                (* I need this local variable to convince the type checker *)
-                let p : Ledger_proof.t = () in
-                Deferred.Option.return p
-            end
-            module Inputs =
-              Make_inputs(Init)(Ledger_proof)(State_proof)(Make_bundle)
-            module Main =
-                Minibit.Make(Inputs)(struct
-                  module Witness = struct
-                    type t =
-                      { old_state : Inputs.State.t
-                      ; old_proof : Inputs.State.Proof.t
-                      ; transition : Inputs.Transition.t
-                      }
-                  end
-
-                  let prove_zk_state_valid _ ~new_state:_ = return Inputs.Genesis.proof
-                end)
-          end
-          in
+          let module Debug = Debug_main(Init) in
+          let module Prod = Prod_main(Init) in
           let%bind () =
           if Insecure.key_generation then begin
             let open Debug in

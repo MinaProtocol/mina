@@ -47,10 +47,8 @@ let apply_transaction_unchecked ledger (transaction : Transaction.t) =
   update ledger sender { sender_account with balance = sender_balance' };
   update ledger receiver { receiver_account with balance = receiver_balance' }
 
-let apply_transaction ledger transaction =
-  if Transaction.check_signature transaction
-  then apply_transaction_unchecked ledger transaction
-  else error "bad signature"
+let apply_transaction ledger (transaction : Transaction.With_valid_signature.t) =
+  apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
 let undo_transaction ledger (transaction : Transaction.t) =
   let open Or_error.Let_syntax in

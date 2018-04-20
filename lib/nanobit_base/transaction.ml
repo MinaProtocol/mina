@@ -7,15 +7,15 @@ module Amount = Currency.Amount
 module Fee = Currency.Fee
 
 module Payload = struct
-  type ('pk, 'amount, 'fee) t_ =
-    { receiver : 'pk
-    ; amount   : 'amount
-    ; fee      : 'fee
-    }
-  [@@deriving bin_io, eq, sexp, compare, hash]
-
   module Stable = struct
     module V1 = struct
+      type ('pk, 'amount, 'fee) t_ =
+        { receiver : 'pk
+        ; amount   : 'amount
+        ; fee      : 'fee
+        }
+      [@@deriving bin_io, eq, sexp, compare, hash]
+
       type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t) t_
       [@@deriving bin_io, eq, sexp, compare, hash]
     end
@@ -73,6 +73,12 @@ module Stable = struct
 
     type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
     [@@deriving bin_io, eq, sexp, compare, hash]
+
+    let compare (t : t) (t' : t) = 
+      let fee_compare = Fee.compare t.payload.fee t'.payload.fee in
+      match fee_compare with
+      | 0 -> compare t t'
+      | _ -> fee_compare
   end
 end
 
@@ -80,9 +86,6 @@ include Stable.V1
 
 type value = t
 type var = (Payload.var, Public_key.var, Signature.var) t_
-
-let check_signature ({ payload; sender; signature } : t) =
-  Tick.Schnorr.verify signature sender (Payload.to_bits payload)
 
 let sign (kp : Signature_keypair.t) (payload : Payload.t): t =
   { payload
@@ -102,3 +105,13 @@ let typ : (var, t) Tick.Typ.t =
   Typ.of_hlistable spec
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+module With_valid_signature = struct
+  type t = Stable.V1.t
+  [@@deriving sexp, eq, bin_io, compare]
+end
+
+let check_signature ({ payload; sender; signature } : t) =
+  Tick.Schnorr.verify signature sender (Payload.to_bits payload)
+
+let check t = Option.some_if (check_signature t) t
