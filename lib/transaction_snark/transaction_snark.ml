@@ -153,24 +153,6 @@ module Base = struct
     in
     apply_transactions l1 ts >>= Ledger_hash.assert_equal l2
 
-  let handler (ledger : Ledger.t) =
-    fun (With { request; respond }) ->
-      let open Ledger_hash in
-      match request with
-      | Get_element idx ->
-        let elt = Ledger.get_at_index_exn ledger idx in
-        let path = Ledger.merkle_path_at_index_exn ledger idx in
-        respond (Provide (elt, List.map ~f:Ledger.Path.elem_hash path))
-      | Get_path idx ->
-        let path = Ledger.merkle_path_at_index_exn ledger idx in
-        respond (Provide (List.map ~f:Ledger.Path.elem_hash path))
-      | Set (idx, account) ->
-        Ledger.update_at_index_exn ledger idx account;
-        respond (Provide ())
-      | Find_index pk ->
-        respond (Provide (Ledger.index_of_key_exn ledger pk))
-      | _ -> unhandled
-
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
   let top_hash s1 s2 =
@@ -179,7 +161,7 @@ module Base = struct
          let init = Ledger_hash.fold s1 ~init ~f in
          Ledger_hash.fold s2 ~init ~f)
 
-  let bundle
+  let bundle ~create_proof
         (keys : Keys0.t)
         state1
         state2
@@ -192,7 +174,7 @@ module Base = struct
     let main top_hash = handle (main top_hash) handler in
     let top_hash = top_hash state1 state2 in
     top_hash,
-    prove keys.base_pk (tick_input ()) prover_state main top_hash
+    create_proof keys.base_pk (tick_input ()) prover_state main top_hash
 end
 
 module Merge = struct
@@ -350,7 +332,7 @@ module Wrap (Vk : sig
     in
     Boolean.Assert.is_true (Verifier.All_in_one.result v)
 
-  let create_keys() = generate_keypair ~exposing:(wrap_input ()) main
+  let create_keys () = generate_keypair ~exposing:(wrap_input ()) main
 end
 
 let embed (x : Tick.Field.t) : Tock.Field.t =
@@ -514,6 +496,25 @@ module Keys = struct
     }
 end
 
+let handle_with_ledger (ledger : Ledger.t) =
+  let open Tick in
+  fun (With { request; respond }) ->
+    let open Ledger_hash in
+    match request with
+    | Get_element idx ->
+      let elt = Ledger.get_at_index_exn ledger idx in
+      let path = Ledger.merkle_path_at_index_exn ledger idx in
+      respond (Provide (elt, List.map ~f:Ledger.Path.elem_hash path))
+    | Get_path idx ->
+      let path = Ledger.merkle_path_at_index_exn ledger idx in
+      respond (Provide (List.map ~f:Ledger.Path.elem_hash path))
+    | Set (idx, account) ->
+      Ledger.update_at_index_exn ledger idx account;
+      respond (Provide ())
+    | Find_index pk ->
+      respond (Provide (Ledger.index_of_key_exn ledger pk))
+    | _ -> unhandled
+
 let%test_module "transaction_snark" =
   (module struct
     type wallet = { private_key : Private_key.t ; account : Account.t }
@@ -555,16 +556,10 @@ let%test_module "transaction_snark" =
 
     include Make(struct let keys = keys end)
 
-    let root_after_transaction ledger transaction =
-      Or_error.ok_exn (Ledger.apply_transaction_unchecked ledger transaction);
-      let root = Ledger.merkle_root ledger in
-      Or_error.ok_exn (Ledger.undo_transaction ledger transaction);
-      root
-
     let of_transaction' ledger transaction =
       let source = Ledger.merkle_root ledger in
-      let target = root_after_transaction ledger transaction in
-      of_transaction source target transaction (Base.handler ledger)
+      let target = Ledger.root_after_transaction_exn ledger transaction in
+      of_transaction source target transaction (handle_with_ledger ledger)
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -584,3 +579,7 @@ let%test_module "transaction_snark" =
         Tock.verify proof13.proof keys.wrap_vk (wrap_input ())
           (embed (merge_top_hash state1 state3)))
   end)
+
+module Check_but_don't_prove = struct
+  let of_transaction source target transaction handler
+end

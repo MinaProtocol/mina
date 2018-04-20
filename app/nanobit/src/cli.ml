@@ -345,6 +345,7 @@ let () =
     ; Parallel.worker_command_name, Parallel.worker_command
     ; "rpc", Main_rpc.command
     ; "client", Client.command
+    ; "transaction-snark-profiler", Transaction_snark_profiler.command
     ]
   |> Command.run
 ;;
