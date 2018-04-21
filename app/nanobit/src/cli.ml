@@ -177,7 +177,7 @@ module Make_inputs
   end)
 end
 
-module Debug_main (Init : Init_intf) = struct
+module Main_without_snark (Init : Init_intf) = struct
   module Init = struct
     type proof = () [@@deriving bin_io]
 
@@ -223,7 +223,7 @@ module Debug_main (Init : Init_intf) = struct
       end)
 end
 
-module Prod_main
+module Main_with_snark
     (Init : Init_intf with type proof = Proof.t)
 = struct
   module Ledger_proof = Ledger_proof.Make_prod(Init)
@@ -256,7 +256,7 @@ module Prod_main
     end)
 end
 
-module type Program_intf = sig
+module type Main_intf = sig
   module Inputs : sig
     module Ledger_fetcher : sig
       type t
@@ -308,7 +308,7 @@ module type Program_intf = sig
   end
 end
 
-module Real_main (Program : Program_intf) = struct
+module Run (Program : Main_intf) = struct
   open Program
 
   let setup_client_server ~minibit ~log ~client_port =
@@ -407,18 +407,18 @@ let daemon =
             let genesis_proof = genesis_proof
           end
           in
-          let module Debug = Debug_main(Init) in
-          let module Prod = Prod_main(Init) in
+          let module Main_without_snark = Main_without_snark(Init) in
+          let module Main_with_snark = Main_with_snark(Init) in
           let p =
             if Insecure.key_generation then
-              (module Debug : Program_intf)
+              (module Main_without_snark : Main_intf)
             else
-              (module Prod : Program_intf)
+              (module Main_with_snark : Main_intf)
           in
-          let module Program = (val p : Program_intf) in
-          let module Real_main = Real_main(Program) in
+          let module Main = (val p : Main_intf) in
+          let module Run = Run(Main) in
           let%bind () =
-            let open Program in
+            let open Main in
             let net_config = 
               { Inputs.Net.Config.parent_log = log
               ; gossip_net_params =
@@ -439,8 +439,8 @@ let daemon =
                 ; pool_disk_location = conf_dir ^/ "transaction_pool"
                 }
             in
-            Real_main.setup_client_server ~minibit ~client_port ~log;
-            Real_main.run ~minibit ~log;
+            Run.setup_client_server ~minibit ~client_port ~log;
+            Run.run ~minibit ~log;
           in
           Async.never ()
       ]
