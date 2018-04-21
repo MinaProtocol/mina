@@ -225,6 +225,10 @@ module Make
     ; log : Logger.t
     }
 
+  let ledger_fetcher t = t.ledger_fetcher
+  let modify_transaction_pool t ~f =
+    t.transaction_pool <- f t.transaction_pool
+
   module Config = struct
     type t =
       { log : Logger.t

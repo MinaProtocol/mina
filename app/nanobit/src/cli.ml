@@ -194,14 +194,7 @@ module Debug_main (Init : Init_intf) = struct
     type t = Ledger_hash.t
 
     let create ~conf_dir ledger ts =
-      let ts_rev =
-        List.rev_map ts ~f:(fun txn ->
-          ignore (Ledger.apply_transaction ledger txn);
-          txn);
-      in
-      List.iter ts_rev ~f:(fun txn ->
-        ignore (Ledger.undo_transaction ledger (txn :> Transaction.t)));
-      Ledger.merkle_root ledger
+      Ledger.merkle_root_after_transactions ledger ts
 
     let cancel (t : t) : unit = ()
 
@@ -261,6 +254,98 @@ module Prod_main
         >>| Or_error.ok_exn
         >>| Blockchain.proof
     end)
+end
+
+module type Program_intf = sig
+  module Inputs : sig
+    module Ledger_fetcher : sig
+      type t
+      val best_ledger : t -> Ledger.t
+    end
+    module Transaction_pool : sig
+      type t
+      val add : t -> Transaction.With_valid_signature.t -> t
+    end
+    module Net : sig
+      open Kademlia
+      module Gossip_net : sig
+        module Params : sig
+          type t =
+            { timeout           : Time.Span.t
+            ; target_peer_count : int
+            ; address           : Peer.t
+            }
+        end
+      end
+      module Config : sig
+        type t = 
+          { parent_log : Logger.t
+          ; gossip_net_params : Gossip_net.Params.t
+          ; initial_peers : Peer.t list
+          ; me : Peer.t
+          ; remap_addr_port : Peer.t -> Peer.t
+          }
+      end
+    end
+  end
+
+  module Main : sig
+    module Config : sig
+      type t =
+        { log : Logger.t
+        ; net_config : Inputs.Net.Config.t
+        ; ledger_disk_location : string
+        ; pool_disk_location : string
+        }
+    end
+
+    type t
+    val ledger_fetcher : t -> Inputs.Ledger_fetcher.t
+    val modify_transaction_pool : t -> f:(Inputs.Transaction_pool.t -> Inputs.Transaction_pool.t) -> unit
+
+    val create : Config.t -> t Deferred.t
+    val run : t -> unit
+  end
+end
+
+module Real_main (Program : Program_intf) = struct
+  open Program
+
+  let setup_client_server ~minibit ~log ~client_port =
+    (* Setup RPC server for client interactions *)
+    let module Client_server = Client.Rpc_server(struct
+      type t = Main.t
+      let get_balance t (addr : Public_key.Stable.V1.t) =
+        let ledger = Inputs.Ledger_fetcher.best_ledger (Main.ledger_fetcher t) in
+        let key = Public_key.compress addr in
+        let maybe_balance =
+          Option.map
+            (Ledger.get ledger key)
+            ~f:(fun account -> account.Account.balance)
+        in
+        return maybe_balance
+      let send_txn t txn =
+        let ledger = Inputs.Ledger_fetcher.best_ledger (Main.ledger_fetcher t) in
+        match Transaction.check txn with
+        | Some txn ->
+          let ledger' = Ledger.copy ledger in
+          let () = Ledger.apply_transaction ledger' txn |> Or_error.ok_exn in
+          Main.modify_transaction_pool t ~f:(fun pool ->
+            Inputs.Transaction_pool.add pool txn
+          );
+          Logger.info log !"Added transaction %{sexp: Transaction.With_valid_signature.t} to pool successfully" txn;
+          return (Some ())
+        | None -> return None
+    end) in
+    Client_server.init_server
+      ~parent_log:log
+      ~minibit
+      ~port:client_port
+
+  let run ~minibit ~log =
+    Logger.debug log "Created minibit\n%!";
+    Main.run minibit;
+    Logger.debug log "Ran minibit\n%!";
 end
 
 let daemon =
@@ -324,16 +409,23 @@ let daemon =
           in
           let module Debug = Debug_main(Init) in
           let module Prod = Prod_main(Init) in
+          let p =
+            if Insecure.key_generation then
+              (module Debug : Program_intf)
+            else
+              (module Prod : Program_intf)
+          in
+          let module Program = (val p : Program_intf) in
+          let module Real_main = Real_main(Program) in
           let%bind () =
-          if Insecure.key_generation then begin
-            let open Debug in
+            let open Program in
             let net_config = 
               { Inputs.Net.Config.parent_log = log
               ; gossip_net_params =
                   { timeout = Time.Span.of_sec 1.
                   ; target_peer_count = 8
                   ; address = remap_addr_port me
-                  } 
+                  }
               ; initial_peers
               ; me
               ; remap_addr_port
@@ -347,92 +439,9 @@ let daemon =
                 ; pool_disk_location = conf_dir ^/ "transaction_pool"
                 }
             in
-            (* Setup RPC server for client interactions *)
-            let module Client_server = Client.Rpc_server(struct
-              type t = Main.t
-              let get_balance (t : t) (addr : Public_key.Stable.V1.t) =
-                let ledger = Inputs.Ledger_fetcher.best_ledger t.ledger_fetcher in
-                let key = Public_key.compress addr in
-                let maybe_balance =
-                  Option.map
-                    (Ledger.get ledger key)
-                    ~f:(fun account -> account.Account.balance)
-                in
-                return maybe_balance
-              let send_txn (t : t) txn =
-                let ledger = Inputs.Ledger_fetcher.best_ledger t.ledger_fetcher in
-                match Inputs.Transaction.check txn with
-                | Some txn ->
-                  let ledger' = Ledger.copy ledger in
-                  let () = Inputs.Ledger.apply_transaction ledger' txn |> Or_error.ok_exn in
-                  t.Main.transaction_pool <- Inputs.Transaction_pool.add t.Main.transaction_pool txn;
-                  Logger.info log !"Added transaction %{sexp: Inputs.Transaction.With_valid_signature.t} to pool successfully" txn;
-                  return (Some ())
-                | None -> return None
-            end) in
-            Client_server.init_server
-              ~parent_log:log
-              ~minibit
-              ~port:client_port;
-
-            printf "Created minibit\n%!";
-            Main.run minibit;
-            printf "Ran minibit\n%!";
-          end else begin
-            let open Prod in
-            let net_config = 
-              { Inputs.Net.Config.parent_log = log
-              ; gossip_net_params =
-                  { timeout = Time.Span.of_sec 1.
-                  ; target_peer_count = 8
-                  ; address = remap_addr_port me
-                  } 
-              ; initial_peers
-              ; me
-              ; remap_addr_port
-              }
-            in
-            let%map minibit =
-              Main.create
-                { log
-                ; net_config
-                ; ledger_disk_location = conf_dir ^/ "ledgers"
-                ; pool_disk_location = conf_dir ^/ "transaction_pool"
-                }
-            in
-            (* Setup RPC server for client interactions *)
-            let module Client_server = Client.Rpc_server(struct
-              type t = Main.t
-              let get_balance (t : t) (addr : Public_key.Stable.V1.t) =
-                let ledger = Inputs.Ledger_fetcher.best_ledger t.ledger_fetcher in
-                let key = Public_key.compress addr in
-                let maybe_balance =
-                  Option.map
-                    (Ledger.get ledger key)
-                    ~f:(fun account -> account.Account.balance)
-                in
-                return maybe_balance
-              let send_txn (t : t) txn =
-                let ledger = Inputs.Ledger_fetcher.best_ledger t.ledger_fetcher in
-                match Inputs.Transaction.check txn with
-                | Some txn ->
-                  let ledger' = Ledger.copy ledger in
-                  let () = Inputs.Ledger.apply_transaction ledger' txn |> Or_error.ok_exn in
-                  t.Main.transaction_pool <- Inputs.Transaction_pool.add t.Main.transaction_pool txn;
-                  Logger.info log !"Added transaction %{sexp: Inputs.Transaction.With_valid_signature.t} to pool successfully" txn;
-                  return (Some ())
-                | None -> return None
-            end) in
-            Client_server.init_server
-              ~parent_log:log
-              ~minibit
-              ~port:client_port;
-
-            printf "Created minibit\n%!";
-            Main.run minibit;
-            printf "Ran minibit\n%!";
-          end
-              in
+            Real_main.setup_client_server ~minibit ~client_port ~log;
+            Real_main.run ~minibit ~log;
+          in
           Async.never ()
       ]
     end

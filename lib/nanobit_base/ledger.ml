@@ -62,3 +62,15 @@ let undo_transaction ledger (transaction : Transaction.t) =
   in
   update ledger sender { sender_account with balance = sender_balance' };
   update ledger receiver { receiver_account with balance = receiver_balance' }
+
+let merkle_root_after_transactions t ts =
+  let ts_rev =
+    List.rev_map ts ~f:(fun txn ->
+      ignore (apply_transaction t txn);
+      txn);
+  in
+  let root = merkle_root t in
+  List.iter ts_rev ~f:(fun txn ->
+    ignore (undo_transaction t (txn :> Transaction.t)));
+  root
+
