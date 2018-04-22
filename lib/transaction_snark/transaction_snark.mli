@@ -46,4 +46,6 @@ module type S = sig
     -> (Tick.Boolean.var, 's) Tick.Checked.t
 end
 
+val handle_with_ledger : Ledger.t -> Tick.Handler.t
+
 module Make (K : sig val keys : Keys.t end) : S
