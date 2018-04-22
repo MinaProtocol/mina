@@ -102,14 +102,24 @@ module Make () = struct
       }
     in
     let read (t : var) = Field.typ.read t.digest in
-    let bitstring = Typ.list ~length:Field.size_in_bits Boolean.typ in
     let alloc =
-      Typ.Alloc.map bitstring.alloc ~f:(fun bits ->
-        { digest = Checked.project bits
-        ; bits = Some (Bitstring.Lsb_first.of_list bits)
-        })
+      let open Typ.Alloc.Let_syntax in
+      let rec go i acc =
+        if i < 0
+        then return (Bitstring.Lsb_first.of_list acc)
+        else
+          let%bind b = Boolean.typ.alloc in
+          go (i - 1) (b :: acc)
+      in
+      let%map bits = go (Field.size_in_bits - 1) [] in
+      { bits = Some bits
+      ; digest = Checked.project (bits :> Boolean.var list)
+      }
     in
-    let check { bits; _ } = bitstring.check (Option.value_exn bits :> Boolean.var list) in
+    let check { bits; _ } =
+      Checked.List.iter (Option.value_exn bits :> Boolean.var list)
+        ~f:Boolean.typ.check
+    in
     { store
     ; read
     ; alloc
