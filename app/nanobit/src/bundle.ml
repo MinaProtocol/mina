@@ -65,12 +65,37 @@ module Sparse_ledger = struct
           balance = Option.value_exn (Balance.sub_amount sender_account.balance amount)
         }
     in
-    set_exn t sender_idx
+    set_exn t receiver_idx
       { receiver_account with
         balance = Option.value_exn (Balance.add_amount sender_account.balance amount)
       }
 
   let merkle_root t = Ledger_hash.of_hash (merkle_root t)
+
+  let handler t =
+    let ledger = ref t in
+    let path_exn idx =
+      List.map (path_exn !ledger idx)
+        ~f:(function `Left h -> h | `Right h -> h)
+    in
+    stage begin
+      fun (With { request; respond}) ->
+        match request with
+        | Ledger_hash.Get_element idx ->
+          let elt = get_exn !ledger idx in
+          let path = path_exn idx in
+          respond (Provide (elt, path))
+        | Ledger_hash.Get_path idx ->
+          let path = path_exn idx in
+          respond (Provide path)
+        | Ledger_hash.Set (idx, account) ->
+          ledger := set_exn !ledger idx account;
+          respond (Provide ())
+        | Ledger_hash.Find_index pk ->
+          let index = find_index_exn !ledger pk in
+          respond (Provide index)
+        | _ -> unhandled
+    end
 end
 
 module Input = struct
@@ -95,32 +120,11 @@ module M = Map_reduce.Make_map_reduce_function_with_init(struct
     let init () = return (Worker_state.create ())
 
     let map ((module T) : state_type) { Input.transaction; ledger } =
-      let handler (With { request; respond}) =
-        let ledger = ref ledger in
-        let open Ledger_hash in
-        let path_exn idx =
-          List.map (Sparse_ledger.path_exn !ledger idx)
-            ~f:(function `Left h -> h | `Right h -> h)
-        in
-        match request with
-        | Get_element idx ->
-          let elt = Sparse_ledger.get_exn !ledger idx in
-          let path = path_exn idx in
-          respond (Provide (elt, path))
-        | Get_path idx ->
-          respond (Provide (path_exn idx))
-        | Set (idx, account) ->
-          ledger := Sparse_ledger.set_exn !ledger idx account;
-          respond (Provide ())
-        | Find_index pk ->
-          respond (Provide (Sparse_ledger.find_index_exn !ledger pk))
-        | _ -> unhandled
-      in
       T.of_transaction
         (Sparse_ledger.merkle_root ledger)
         Sparse_ledger.(merkle_root (apply_transaction_exn ledger transaction))
         transaction
-        handler
+        (unstage (Sparse_ledger.handler ledger))
       |> return
 
     let combine ((module T) : state_type) t1 t2 =

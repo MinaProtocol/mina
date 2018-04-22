@@ -64,3 +64,9 @@ let undo_transaction ledger (transaction : Transaction.t) =
   in
   update ledger sender { sender_account with balance = sender_balance' };
   update ledger receiver { receiver_account with balance = receiver_balance' }
+
+let merkle_root_after_transaction_exn ledger transaction =
+  Or_error.ok_exn (apply_transaction ledger transaction);
+  let root = merkle_root ledger in
+  Or_error.ok_exn (undo_transaction ledger transaction);
+  root

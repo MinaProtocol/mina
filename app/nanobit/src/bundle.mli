@@ -16,3 +16,20 @@ val create : conf_dir:string -> Ledger.t -> Transaction.t list -> t
 val target_hash : t -> Ledger_hash.t
 
 val snark : t -> Transaction_snark.t option Deferred.t
+
+module Sparse_ledger : sig
+  open Snark_params.Tick
+
+  type t
+  [@@deriving sexp]
+
+  val merkle_root : t -> Ledger_hash.t
+
+  val path_exn : t -> int -> [ `Left of Pedersen.Digest.t | `Right of Pedersen.Digest.t ] list
+
+  val apply_transaction_exn : t -> Transaction.t -> t
+
+  val of_ledger_subset : Ledger.t -> Public_key.Compressed.t list -> t
+
+  val handler : t -> Handler.t Staged.t
+end
