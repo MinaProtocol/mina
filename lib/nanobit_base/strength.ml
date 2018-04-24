@@ -111,7 +111,7 @@ let of_target
       (y : Target.Packed.var)
       (y_unpacked : Target.Unpacked.var)
   =
-  with_label "Target.strength" begin
+  with_label __LOC__ begin
     if Insecure.strength_calculation
     then
       provide_witness Typ.field

@@ -176,7 +176,8 @@ module Base = struct
     in
     apply_transactions l1 ts >>= Ledger_hash.assert_equal l2
 
-  let create_keys () = generate_keypair main ~exposing:(tick_input ())
+  let create_keys () =
+    generate_keypair main ~exposing:(tick_input ())
 
   let top_hash s1 s2 =
     Pedersen.hash_fold Pedersen.params
@@ -237,33 +238,43 @@ module Merge = struct
     let get_proof s = let (_t, proof) = proof_field s in proof in
     let get_type s = let (t, _proof) = proof_field s in t in
     let%bind states_hash = 
-      Pedersen_hash.hash (s1 @ s2)
-        ~params:Pedersen.params
-        ~init:(0, Hash_curve.Checked.identity)
+      with_label __LOC__ begin
+        Pedersen_hash.hash (s1 @ s2)
+          ~params:Pedersen.params
+          ~init:(0, Hash_curve.Checked.identity)
+      end
     in
     let%bind states_and_vk_hash =
-      Pedersen_hash.hash tock_vk
-        ~params:Pedersen.params
-        ~init:(2 * Tock.Field.size_in_bits, states_hash)
+      with_label __LOC__ begin
+        Pedersen_hash.hash tock_vk
+          ~params:Pedersen.params
+          ~init:(2 * Tock.Field.size_in_bits, states_hash)
+      end
     in
     let%bind is_base =
-      provide_witness' Boolean.typ ~f:(fun s ->
-        Proof_type.is_base (get_type s))
+      with_label __LOC__ begin
+        provide_witness' Boolean.typ ~f:(fun s ->
+          Proof_type.is_base (get_type s))
+      end
     in
     let%bind input =
-      Checked.if_ is_base
-        ~then_:(Pedersen_hash.digest states_hash)
-        ~else_:(Pedersen_hash.digest states_and_vk_hash)
-      >>= Pedersen.Digest.choose_preimage_var
-      >>| Pedersen.Digest.Unpacked.var_to_bits
+      with_label __LOC__ begin
+        Checked.if_ is_base
+          ~then_:(Pedersen_hash.digest states_hash)
+          ~else_:(Pedersen_hash.digest states_and_vk_hash)
+        >>= Pedersen.Digest.choose_preimage_var
+        >>| Pedersen.Digest.Unpacked.var_to_bits
+      end
     in
-    Verifier.All_in_one.create ~verification_key:tock_vk ~input
-      As_prover.(map get_state ~f:(fun s ->
-        { Verifier.All_in_one.
-          verification_key = s.Prover_state.tock_vk
-        ; proof            = get_proof s
-        }))
-    >>| Verifier.All_in_one.result
+    with_label __LOC__ begin
+      Verifier.All_in_one.create ~verification_key:tock_vk ~input
+        As_prover.(map get_state ~f:(fun s ->
+          { Verifier.All_in_one.
+            verification_key = s.Prover_state.tock_vk
+          ; proof            = get_proof s
+          }))
+      >>| Verifier.All_in_one.result
+    end
   ;;
 
   (* spec for [main top_hash]:
@@ -287,7 +298,9 @@ module Merge = struct
     in
     Boolean.Assert.all [ verify_12; verify_23 ]
 
-  let create_keys () = generate_keypair ~exposing:(input ()) main
+
+  let create_keys () =
+    generate_keypair ~exposing:(input ()) main
 end
 
 module Wrap (Vk : sig
@@ -354,7 +367,8 @@ module Wrap (Vk : sig
     in
     Boolean.Assert.is_true (Verifier.All_in_one.result v)
 
-  let create_keys() = generate_keypair ~exposing:(wrap_input ()) main
+  let create_keys () =
+    generate_keypair ~exposing:(wrap_input ()) main
 end
 
 let embed (x : Tick.Field.t) : Tock.Field.t =
@@ -378,6 +392,18 @@ module type S = sig
     -> (Tock.Proof.t, 's) Tick.As_prover.t
     -> (Tick.Boolean.var, 's) Tick.Checked.t
 end
+
+let check_transaction source target transaction handler =
+  let prover_state : Base.Prover_state.t =
+    { state1=source; state2=target; transactions = [ transaction ] }
+  in
+  let open Tick in
+  let top_hash = Base.top_hash source target in
+  let main = handle (Base.main (Cvar.constant top_hash)) handler in
+  let (_s, (), passed) =
+    run_and_check (Checked.map main ~f:As_prover.return) prover_state
+  in
+  assert passed
 
 module Make (K : sig val keys : Keys0.t end) = struct
   open K
@@ -482,7 +508,7 @@ module Make (K : sig val keys : Keys0.t end) = struct
         t1.target
         t2.source ());
     let input, proof =
-      merge_proof t1.source t1.target t2.source
+      merge_proof t1.source t1.target t2.target
         (t1.proof_type, t1.proof)
         (t2.proof_type, t2.proof)
     in

@@ -104,8 +104,10 @@ let decompress_var ({ x; is_odd } as c : Compressed.var) =
 let compress ((x, y) : t) : Compressed.t = { x; is_odd = parity y }
 
 let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
-  let%map is_odd = parity_var y in
-  { Compressed.x; is_odd }
+  with_label __LOC__ begin
+    let%map is_odd = parity_var y in
+    { Compressed.x; is_odd }
+  end
 
 let assert_equal ((x1, y1) : var) ((x2, y2) : var) : (unit, _) Checked.t =
   let%map () = assert_equal x1 x2

@@ -68,7 +68,7 @@ module Make () = struct
 
   let var_to_bits t =
     let open Let_syntax in
-    with_label "Data_hash.var_to_bits" begin
+    with_label __LOC__ begin
       match t.bits with
       | Some bits ->
         return (bits :> Boolean.var list)

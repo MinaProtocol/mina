@@ -27,6 +27,13 @@ module Keys : sig
   val create : unit -> t
 end
 
+val check_transaction
+  :  Ledger_hash.t
+  -> Ledger_hash.t
+  -> Transaction.t
+  -> Tick.Handler.t
+  -> unit
+
 module type S = sig
   val verify : t -> bool
 

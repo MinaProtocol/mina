@@ -99,7 +99,7 @@ struct
 
     let prev_state_valid wrap_vk prev_state_hash =
       let open Let_syntax in
-      with_label "prev_state_valid" begin
+      with_label __LOC__ begin
         let%bind prev_state_hash_bits = State.Hash.var_to_bits prev_state_hash in
         let%bind prev_top_hash =
           Hash.hash (wrap_vk @ prev_state_hash_bits)
@@ -118,7 +118,7 @@ struct
     let provide_witness' typ ~f = provide_witness typ As_prover.(map get_state ~f)
 
     let main (top_hash : Digest.Tick.Packed.var) =
-      with_label "Step.main" begin
+      with_label __LOC__ begin
         let%bind wrap_vk =
           provide_witness' wrap_vk_typ ~f:(fun { Prover_state.wrap_vk } ->
             Verifier.Verification_key.to_bool_list wrap_vk)
@@ -128,10 +128,10 @@ struct
         in
         let%bind prev_state_hash = State.Checked.hash prev_state in
         let%bind (next_state_hash, next_state, `Success success) =
-          with_label "update" (State.Checked.update (prev_state_hash, prev_state) update)
+          with_label __LOC__ (State.Checked.update (prev_state_hash, prev_state) update)
         in
         let%bind () =
-          with_label "check_top_hash" begin
+          with_label __LOC__ begin
             let%bind sh = State.Hash.var_to_bits next_state_hash in
             (* We coudl be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
@@ -140,10 +140,10 @@ struct
         in
         let%bind prev_state_valid = prev_state_valid wrap_vk prev_state_hash in
         let%bind inductive_case_passed =
-          with_label "inductive_case_passed" Boolean.(prev_state_valid && success)
+          with_label __LOC__ Boolean.(prev_state_valid && success)
         in
         let%bind is_base_case = State.Checked.is_base_hash next_state_hash in
-        with_label "result" begin
+        with_label __LOC__ begin
           Boolean.Assert.any
             [ is_base_case
             ; inductive_case_passed
@@ -181,7 +181,7 @@ struct
 
     let main (input : Digest.Tock.Packed.var) =
       let open Let_syntax in
-      with_label "Wrap.main" begin
+      with_label __LOC__ begin
         let%bind v =
           (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)
@@ -191,7 +191,7 @@ struct
             As_prover.(map get_state ~f:(fun {Prover_state.proof} ->
               { Verifier.All_in_one.verification_key=Step_vk.verification_key; proof }))
         in
-        with_label "verifier_result"
+        with_label __LOC__ 
           (Boolean.Assert.is_true (Verifier.All_in_one.result v))
       end
   end
