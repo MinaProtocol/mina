@@ -38,14 +38,15 @@ let apply_transaction_unchecked ledger (transaction : Transaction.t) =
   let sender = Public_key.compress transaction.sender in
   let { Transaction.Payload.fee=_; amount; receiver } = transaction.payload in
   let open Or_error.Let_syntax in
-  let%bind sender_account = get' ledger "sender" sender
-  and receiver_account = get' ledger "receiver" receiver
-  in
-  let%map sender_balance' = sub_amount sender_account.balance amount
-  and receiver_balance' = add_amount receiver_account.balance amount
-  in
-  update ledger sender { sender_account with balance = sender_balance' };
-  update ledger receiver { receiver_account with balance = receiver_balance' }
+  let%bind sender_account = get' ledger "sender" sender in
+  let%bind sender_balance' = sub_amount sender_account.balance amount in
+  if Public_key.Compressed.equal sender receiver
+  then return ()
+  else
+    let%bind receiver_account = get' ledger "receiver" receiver in
+    let%map receiver_balance' = add_amount receiver_account.balance amount in
+    update ledger sender { sender_account with balance = sender_balance' };
+    update ledger receiver { receiver_account with balance = receiver_balance' }
 
 let apply_transaction ledger transaction =
   if Transaction.check_signature transaction
@@ -56,14 +57,15 @@ let undo_transaction ledger (transaction : Transaction.t) =
   let open Or_error.Let_syntax in
   let sender = Public_key.compress transaction.sender in
   let { Transaction.Payload.fee=_; amount; receiver } = transaction.payload in
-  let%bind sender_account = get' ledger "sender" sender
-  and receiver_account = get' ledger "receiver" receiver
-  in
-  let%map sender_balance' = add_amount sender_account.balance amount
-  and receiver_balance' = sub_amount receiver_account.balance amount
-  in
-  update ledger sender { sender_account with balance = sender_balance' };
-  update ledger receiver { receiver_account with balance = receiver_balance' }
+  let%bind sender_account = get' ledger "sender" sender in
+  let%bind sender_balance' = add_amount sender_account.balance amount in
+  if Public_key.Compressed.equal sender receiver
+  then return ()
+  else
+    let%bind receiver_account = get' ledger "receiver" receiver in
+    let%map receiver_balance' = sub_amount receiver_account.balance amount in
+    update ledger sender { sender_account with balance = sender_balance' };
+    update ledger receiver { receiver_account with balance = receiver_balance' }
 
 let merkle_root_after_transaction_exn ledger transaction =
   Or_error.ok_exn (apply_transaction ledger transaction);

@@ -55,7 +55,6 @@ module Sparse_ledger = struct
     let sender_idx = find_index_exn t (Public_key.compress sender) in
     let receiver_idx = find_index_exn t receiver in
     let sender_account = get_exn t sender_idx in
-    let receiver_account = get_exn t receiver_idx in
     (if not Insecure.fee_collection
       then failwith "Bundle.Sparse_ledger: Insecure.fee_collection");
     let open Currency in
@@ -65,9 +64,10 @@ module Sparse_ledger = struct
           balance = Option.value_exn (Balance.sub_amount sender_account.balance amount)
         }
     in
+    let receiver_account = get_exn t receiver_idx in
     set_exn t receiver_idx
       { receiver_account with
-        balance = Option.value_exn (Balance.add_amount sender_account.balance amount)
+        balance = Option.value_exn (Balance.add_amount receiver_account.balance amount)
       }
 
   let merkle_root t = Ledger_hash.of_hash (merkle_root t)
