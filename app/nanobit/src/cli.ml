@@ -232,7 +232,7 @@ let daemon =
     begin
       [%map_open
         let conf_dir =
-          flag "config directory"
+          flag "config-directory"
             ~doc:"Configuration directory"
             (optional file)
         and should_mine =
@@ -242,7 +242,7 @@ let daemon =
           flag "port"
             ~doc:"Server port for other to connect" (required int16)
         and client_port =
-          flag "client_port"
+          flag "client-port"
             ~doc:"Port for client to connect daemon locally" (required int16)
         and ip =
           flag "ip"
@@ -343,6 +343,7 @@ let () =
     ; Parallel.worker_command_name, Parallel.worker_command
     ; "rpc", Main_rpc.command
     ; "client", Client.command
+    ; "transaction-snark-profiler", Transaction_snark_profiler.command
     ]
   |> Command.run
 ;;
