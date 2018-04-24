@@ -192,10 +192,10 @@ module Make_update (T : Transaction_snark.S) = struct
     let compute_target prev_time prev_target time =
       let div_pow_2 bits (`Two_to_the k) = List.drop bits k in
       let delta_minus_one_max_bits = 7 in
-      with_label "compute_target" begin
+      with_label __LOC__ begin
         let prev_target_n = Number.of_bits (Target.Unpacked.var_to_bits prev_target) in
         let%bind rate_multiplier =
-          with_label "rate_multiplier" begin
+          with_label __LOC__ begin
             let%map distance_to_max_target =
               let open Number in
               to_bits (constant (Target.max :> Field.t) - prev_target_n)
@@ -204,14 +204,14 @@ module Make_update (T : Transaction_snark.S) = struct
           end
         in
         let%bind delta =
-          with_label "delta" begin
+          with_label __LOC__ begin
             (* This also checks that time >= prev_time *)
             let%map d = Block_time.diff_checked time prev_time in
             div_pow_2 (Block_time.Span.Unpacked.var_to_bits d) target_time_ms
           end
         in
         let%bind delta_is_zero, delta_minus_one =
-          with_label "delta_is_nonzero, delta_minus_one" begin
+          with_label __LOC__ begin
             (* There used to be a trickier version of this code that did this in 2 fewer constraints,
               might be worth going back to if there is ever a reason. *)
             let n = List.length delta in
@@ -230,7 +230,7 @@ module Make_update (T : Transaction_snark.S) = struct
           end
         in
         let%bind nonzero_case =
-          with_label "nonzero_case" begin
+          with_label __LOC__ begin
             let open Number in
             let%bind gamma = clamp_to_n_bits delta_minus_one delta_minus_one_max_bits in
             let%map rg = rate_multiplier * gamma in
@@ -239,7 +239,7 @@ module Make_update (T : Transaction_snark.S) = struct
         in
         let%bind zero_case =
           (* This could be more efficient *)
-          with_label "zero_case" begin
+          with_label __LOC__ begin
             let%bind less = Number.(prev_target_n < rate_multiplier) in
             Checked.if_ less
               ~then_:(Cvar.constant Field.one)
@@ -247,7 +247,7 @@ module Make_update (T : Transaction_snark.S) = struct
           end
         in
         let%bind res =
-          with_label "res" begin
+          with_label __LOC__ begin
             Checked.if_ delta_is_zero
               ~then_:zero_case
               ~else_:(Number.to_var nonzero_case)
@@ -272,7 +272,7 @@ module Make_update (T : Transaction_snark.S) = struct
     let update ((previous_state_hash, previous_state) : State_hash.var * var) (block : Block.var)
       : (State_hash.var * var * [ `Success of Boolean.var ], _) Tick.Checked.t
       =
-      with_label "Blockchain.State.update" begin
+      with_label __LOC__ begin
         let%bind good_body =
           T.verify_merge
             previous_state.ledger_hash block.body.target_hash
@@ -317,11 +317,11 @@ end
 
 module Checked = struct
   let is_base_hash h =
-    with_label "State.is_base_hash"
+    with_label __LOC__
       (Checked.equal (Cvar.constant (zero_hash :> Field.t))
          (State_hash.var_to_hash_packed h))
 
   let hash (t : var) =
-    with_label "State.hash" (to_bits t >>= hash_digest >>| State_hash.var_of_hash_packed)
+    with_label __LOC__ (to_bits t >>= hash_digest >>| State_hash.var_of_hash_packed)
 end
 
