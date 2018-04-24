@@ -85,12 +85,12 @@ let send_txn =
           ; fee
           }
         in
-        let txn : Transaction.t =
+        let txn =
           Transaction.sign
             (Signature_keypair.of_private_key from_account)
             payload
         in
-        match%map (dispatch Client_lib.Send_transaction.rpc txn port) with
+        match%map (dispatch Client_lib.Send_transaction.rpc (txn :> Transaction.t) port) with
         | Ok (Some ()) -> printf "Successfully enqueued txn in pool\n"
         | Ok None -> printf "Txn can't be signed properly\n"
         | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)

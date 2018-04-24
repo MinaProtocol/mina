@@ -43,10 +43,10 @@ module type Nonce_intf = sig
 end
 
 module type Transaction_intf = sig
-  type t [@@deriving compare, eq]
+  type t [@@deriving sexp, compare, eq]
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving compare, eq]
+    type nonrec t = private t [@@deriving sexp, compare, eq]
   end
 
   val check : t -> With_valid_signature.t option
@@ -93,7 +93,7 @@ module type State_intf  = sig
     ; strength             : strength
     ; timestamp            : time
     }
-  [@@deriving bin_io, fields]
+  [@@deriving sexp, bin_io, fields]
 
   val hash : t -> state_hash
 
@@ -161,7 +161,7 @@ module Proof_carrying_data = struct
     { data : 'a
     ; proof : 'b
     }
-  [@@deriving fields, bin_io]
+  [@@deriving sexp, fields, bin_io]
 end
 
 module type Inputs_intf = sig

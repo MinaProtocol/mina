@@ -19,7 +19,8 @@ let init_master () =
       ~rpc_handshake_timeout:(Time.Span.of_min 10.)
       ~rpc_heartbeat_config
       ~worker_command_args:[worker_command_name]
-      ()
+      ();
+    initialized := true
   end
 ;;
 

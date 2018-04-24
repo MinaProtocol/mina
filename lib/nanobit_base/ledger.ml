@@ -47,10 +47,8 @@ let apply_transaction_unchecked ledger (transaction : Transaction.t) =
   update ledger sender { sender_account with balance = sender_balance' };
   update ledger receiver { receiver_account with balance = receiver_balance' }
 
-let apply_transaction ledger transaction =
-  if Transaction.check_signature transaction
-  then apply_transaction_unchecked ledger transaction
-  else error "bad signature"
+let apply_transaction ledger (transaction : Transaction.With_valid_signature.t) =
+  apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
 let undo_transaction ledger (transaction : Transaction.t) =
   let open Or_error.Let_syntax in
@@ -64,3 +62,15 @@ let undo_transaction ledger (transaction : Transaction.t) =
   in
   update ledger sender { sender_account with balance = sender_balance' };
   update ledger receiver { receiver_account with balance = receiver_balance' }
+
+let merkle_root_after_transactions t ts =
+  let ts_rev =
+    List.rev_map ts ~f:(fun txn ->
+      ignore (apply_transaction t txn);
+      txn);
+  in
+  let root = merkle_root t in
+  List.iter ts_rev ~f:(fun txn ->
+    ignore (undo_transaction t (txn :> Transaction.t)));
+  root
+
