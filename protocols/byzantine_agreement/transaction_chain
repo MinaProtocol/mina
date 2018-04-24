@@ -1,0 +1,8 @@
+
+check_sign transaction_chain_state obj
+  = 
+    let identities = latest permissioned identities in (tail, queue)
+    let (3f+1) = len(identities)
+    check at least 2f+1 of identities have signed obj
+
+generic_transaction_chain(check_sign)

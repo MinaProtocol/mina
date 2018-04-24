@@ -1,0 +1,85 @@
+Minibit PoW
+
+chain_state: {
+  body: {
+    ledger_hash
+  }
+  header: {
+    prev_timestamp
+    timestamp
+    length
+    most_recent_strength
+    most_recent_difficulty
+    nonce
+    prev_header_hash
+    body_hash
+  }
+  header_hash
+  proof
+}
+
+chain_transition: {
+  new_ledger_hash
+  ledger_proof
+  new_timestamp
+  nonce
+}
+
+apply_transition state transition
+  = 
+    difficulty = 
+      compute_next_difficulty(
+        state.header.most_recent_difficulty, 
+        state.header.timestamp,
+        state.header.new_timestamp)
+    new_body = 
+      ledger_hash = transition.new_ledger_hash
+    new_header =
+      prev_timestamp = state.timestamp
+      timestamp = transition.timestamp
+      length = state.length + 1
+      most_recent_strength = state.header.most_recent_strength + difficulty
+      most_recent_difficulty = difficulty
+      nonce = transition.nonce
+      prev_header_hash = state.header_hash
+      body_hash = hash(body)
+    header_hash = hash(new_state.header)
+    proof = 
+      SNARK "zk_state_valid" proving that, for new_state:
+        - all old values came from a chain_state with valid proof
+        - transition.ledger_proof proves a valid sequence of transactions moved the ledger from state.body.ledger_hash to new_ledger_hash 
+        - prev_timestamp is the old state.header.timestamp
+        - timestamp is a newer timestamp than the prev timestamp
+        - length is one greater than the old length
+        - a "current difficulty" is computed correctly from (most_recent_difficulty, timestamp, new_timestamp)
+        - the most recent strength is computed correctly from the most_recent_strength and the "current difficulty"
+        - most_recent_difficulty is current difficulty
+        - body hash is a hash of the new body
+        - prev_header_hash is the old state.header_hash
+        - header_hash is a hash of the new header
+        - header_hash meets current difficulty
+    {
+      body: new_body
+      header: new_header
+      header_hash
+      proof
+    }
+
+check_state old_state new_state
+  = 
+    new_strength = new_state.header.most_recent_strength
+    old_strength = old_state.header.most_recent_strength
+    new_state.proof zk_state_valid verifies new_state
+      &&
+    new_strength > old_strength
+    
+on_event event
+  = 
+    match event with
+    | Found transition -> 
+      try
+        state := apply_transition state transition
+        broadcast State state
+    | State new_state ->
+      if check_state state new_state
+      then state := new_state

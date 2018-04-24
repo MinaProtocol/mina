@@ -1,0 +1,7 @@
+
+check_sign transaction_chain_state obj
+  = 
+    let identity = latest permissioned identity in (tail, queue)
+    check identity has signed obj
+
+generic_transaction_chain(check_sign)
