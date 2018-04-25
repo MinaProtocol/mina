@@ -23,7 +23,7 @@ module type S = sig
 end
 
 module type Extended = sig
-  open Core
+  open Core_kernel
 
   include S
   include Sexpable.S with type t := t

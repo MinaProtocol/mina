@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module Make (Backend : Backend_intf.S)
   : Snark_intf.S

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module type Basic = sig
   module R1CS_constraint_system : sig

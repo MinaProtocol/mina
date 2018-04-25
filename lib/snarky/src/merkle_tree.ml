@@ -1,7 +1,4 @@
-open Core
-
-let%test "foomerkle" = false
-
+open Core_kernel
 
 module Address = struct
   type t = int

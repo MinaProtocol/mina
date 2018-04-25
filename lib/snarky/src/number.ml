@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 let pow2 n = Bignum.Bigint.(pow (of_int 2) (of_int n))
 

@@ -1,5 +1,4 @@
-open Core
-open Ctypes
+open Core_kernel
 
 let () = Camlsnark_c.linkme
 

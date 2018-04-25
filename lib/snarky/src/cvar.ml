@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module Make
     (Field : Field_intf.Extended)
