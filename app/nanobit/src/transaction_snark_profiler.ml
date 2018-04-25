@@ -35,6 +35,8 @@ let rec pair_up = function
   | x :: y :: xs -> (x, y) :: pair_up xs
   | _ -> failwith "Expected even length list"
 
+(* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
+   unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Transaction.t list) =
   let module Sparse_ledger = Bundle.Sparse_ledger in
   let (base_proof_time, _), base_proofs =
