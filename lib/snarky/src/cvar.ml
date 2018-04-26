@@ -1,11 +1,14 @@
-open Core
+open Core_kernel
 
-module Make (Field : Field_intf.S) (Var : Comparable.S) = struct
+module Make
+    (Field : Field_intf.Extended)
+    (Var : sig include Comparable.S include Sexpable.S with type t := t end) = struct
   type t =
     | Constant of Field.t
     | Var of Var.t
     | Add of t * t
     | Scale of Field.t * t
+  [@@deriving sexp]
 
   let length _ = failwith "TODO"
 

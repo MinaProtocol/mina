@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 module type Params_intf = sig
   type field

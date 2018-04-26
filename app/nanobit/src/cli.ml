@@ -136,7 +136,7 @@ module Make_inputs
     include Protocols.Minibit_pow.Proof_intf with type input = State.t
                                               and type t := t
   end)
-  (Bundle : Bundle.S with type proof := Ledger_proof.t)
+  (Bundle : Bundle.S0 with type proof := Ledger_proof.t)
 = struct
   module Inputs0 = Make_inputs0(Init)(Ledger_proof)(State_proof)
   include Inputs0
@@ -355,7 +355,7 @@ let daemon =
     begin
       [%map_open
         let conf_dir =
-          flag "config directory"
+          flag "config-directory"
             ~doc:"Configuration directory"
             (optional file)
         and should_mine =
@@ -453,6 +453,7 @@ let () =
     ; Parallel.worker_command_name, Parallel.worker_command
     ; "rpc", Main_rpc.command
     ; "client", Client.command
+    ; "transaction-snark-profiler", Transaction_snark_profiler.command
     ]
   |> Command.run
 ;;

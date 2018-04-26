@@ -204,7 +204,7 @@ module Tick = struct
       (* TODO: This hash function is NOT secure *)
       let hash_checked bs =
         let open Checked.Let_syntax in
-        with_label "Signature.hash_checked" begin
+        with_label __LOC__ begin
           let%map h = hash_digest bs >>= Pedersen.Digest.choose_preimage_var in
           List.take (Pedersen.Digest.Unpacked.var_to_bits h) Scalar.length
         end

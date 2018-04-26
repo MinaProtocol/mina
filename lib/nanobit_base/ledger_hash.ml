@@ -52,18 +52,20 @@ let reraise_merkle_requests (With { request; respond }) =
    which is [t] but with the account [f account] at path [addr].
 *)
 let modify_account t pk ~f =
-  let%bind addr =
-    request_witness Account.Index.Unpacked.typ
-      As_prover.(
-        map (read Public_key.Compressed.typ pk)
-          ~f:(fun s -> Find_index s))
-  in
-  handle
-    (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr ~f:(fun account ->
-      let%bind () = Public_key.Compressed.assert_equal account.public_key pk in
-      f account))
-    reraise_merkle_requests
-  >>| var_of_hash_packed
+  with_label __LOC__ begin
+    let%bind addr =
+      request_witness Account.Index.Unpacked.typ
+        As_prover.(
+          map (read Public_key.Compressed.typ pk)
+            ~f:(fun s -> Find_index s))
+    in
+    handle
+      (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr ~f:(fun account ->
+        let%bind () = Public_key.Compressed.assert_equal account.public_key pk in
+        f account))
+      reraise_merkle_requests
+    >>| var_of_hash_packed
+  end
 
 (* [create_account t pk] implements the following spec:
 

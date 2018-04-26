@@ -39,7 +39,7 @@ module Payload = struct
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
   let var_to_bits { receiver; amount; fee } =
-    with_label "Transaction.Payload.var_to_bits" begin
+    with_label __LOC__ begin
       let%map receiver = Public_key.Compressed.var_to_bits receiver in
       let amount = Amount.var_to_bits amount in
       let fee = Fee.var_to_bits fee in

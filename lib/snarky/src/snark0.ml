@@ -1,5 +1,4 @@
-open Core
-open Ctypes
+open Core_kernel
 
 let () = Camlsnark_c.linkme
 
@@ -48,9 +47,19 @@ module Bigint = struct
 end
 
 module Proof = Proof
-module Keypair = Keypair
+
 module Verification_key = Verification_key
 module Proving_key = Proving_key
+
+module Keypair = struct
+  type t =
+    { pk : Proving_key.t
+    ; vk : Verification_key.t
+    }
+  [@@deriving fields]
+
+  let of_backend_keypair kp = { pk = Keypair.pk kp; vk = Keypair.vk kp }
+end
 
 module Var = struct
   module T = struct
@@ -66,8 +75,48 @@ module Var = struct
   include Comparable.Make(T)
 end
 
+module Field0 = struct
+  include Field
+
+  let size =
+    Bigint.to_bignum_bigint Backend.field_size
+
+  let inv x = if equal x zero then failwith "Field.inv: zero" else inv x
+
+  (* TODO: Optimize *)
+  let div x y = mul x (inv y)
+
+  let negate x = sub zero x
+
+  let unpack x =
+    let n = Bigint.of_field x in
+    List.init size_in_bits ~f:(fun i -> Bigint.test_bit n i)
+  ;;
+
+  let project =
+    let rec go x acc = function
+      | [] -> acc
+      | b :: bs ->
+        go (Field.add x x) (if b then Field.add acc x else acc) bs
+    in
+    fun bs -> go Field.one Field.zero bs
+
+  let sexp_of_t x =
+    Bignum.Bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
+
+  let t_of_sexp s =
+    Bigint.to_field (Bigint.of_bignum_bigint (Bignum.Bigint.t_of_sexp s))
+
+  module Infix = struct
+    let (+) = add
+    let ( * ) = mul
+    let (-) = sub
+    let (/) = div
+  end
+end
+
 module Cvar = struct
-  include Cvar.Make(Field)(Var)
+  include Cvar.Make(Field0)(Var)
 
   let var_indices t =
     let (_, terms) = to_constant_and_terms t in
@@ -108,13 +157,16 @@ module Constraint = struct
     | Boolean of Cvar.t
     | Equal of Cvar.t * Cvar.t
     | R1CS of Cvar.t * Cvar.t * Cvar.t
+  [@@deriving sexp]
 
   type 'k with_constraint_args = ?label:string -> 'k
 
   type basic_with_annotation =
     { basic : basic; annotation : string option }
+  [@@deriving sexp]
 
   type t = basic_with_annotation list
+  [@@deriving sexp]
 
   let basic_to_r1cs_constraint : basic -> R1CS_constraint.t =
     let of_var = Linear_combination.of_var in
@@ -679,60 +731,9 @@ module Typ = struct
 end
 
 module Field = struct
-  include Field
-
+  include Field0
   type var = Cvar.t
-
   let typ = Typ.field
-
-  let size =
-    Bigint.to_bignum_bigint Backend.field_size
-
-  let inv x = if equal x zero then failwith "Field.inv: zero" else inv x
-
-  (* TODO: Optimize *)
-  let div x y = mul x (inv y)
-
-  let negate x = sub zero x
-
-  let unpack x =
-    let n = Bigint.of_field x in
-    List.init size_in_bits ~f:(fun i -> Bigint.test_bit n i)
-  ;;
-
-  let project =
-    let rec go x acc = function
-      | [] -> acc
-      | b :: bs ->
-        go (Field.add x x) (if b then Field.add acc x else acc) bs
-    in
-    fun bs -> go Field.one Field.zero bs
-
-  let to_string x =
-    let n = Bigint.of_field x in
-    String.init Field.size_in_bits ~f:(fun i ->
-      if Bigint.test_bit n i then '1' else '0')
-
-  let of_string_exn s =
-    let (_two_to_the_n, acc) =
-      String.fold s ~init:(one, zero)  ~f:(fun (two_to_the_i, acc) c ->
-        let pt = add two_to_the_i two_to_the_i in
-        match c with
-        | '0' -> (pt, acc)
-        | '1' -> (pt, add acc two_to_the_i)
-        | _ -> failwith "Field.of_string_exn: Got non 0-1 character.")
-    in
-    acc
-
-  let sexp_of_t x = String.sexp_of_t (to_string x)
-  let t_of_sexp s = of_string_exn (String.t_of_sexp s)
-
-  module Infix = struct
-    let (+) = add
-    let ( * ) = mul
-    let (-) = sub
-    let (/) = div
-  end
 end
 
 module As_prover = struct
@@ -1049,44 +1050,44 @@ module Checked = struct
     in
     let system = R1CS_constraint_system.create () in
     R1CS_constraint_system.set_primary_input_size system 0;
-    let rec go : type a s. (a, s) t -> Request.Handler.t -> s -> s * a =
-      fun t handler s ->
+    let rec go : type a s. string list -> (a, s) t -> Request.Handler.t -> s -> s * a =
+      fun stack t handler s ->
         match t with
         | Pure x -> (s, x)
         | With_constraint_system (f, k) ->
           f system;
-          go k handler s
-        | With_label (_, t, k) ->
-          let (s', y) = go t handler s in
-          go (k y) handler s'
+          go stack k handler s
+        | With_label (lab, t, k) ->
+          let (s', y) = go (lab :: stack) t handler s in
+          go stack (k y) handler s'
         | As_prover (x, k) ->
           let (s', ()) = As_prover.run x get_value s in
-          go k handler s'
+          go stack k handler s'
         | Add_constraint (c, t) ->
-          Constraint.add ~stack:[] c system;
-          go t handler s
+          Constraint.add ~stack c system;
+          go stack t handler s
         | With_state (p, and_then, t_sub, k) ->
           let (s, s_sub) = As_prover.run p get_value s in
-          let (s_sub, y) = go t_sub handler s_sub in
+          let (s_sub, y) = go stack t_sub handler s_sub in
           let (s, ()) = As_prover.run (and_then s_sub) get_value s in
-          go (k y) handler s
+          go stack (k y) handler s
         | With_handler (h, t, k) ->
-          let (s', y) = go t (Request.Handler.push handler h) s in
-          go (k y) handler s'
+          let (s', y) = go stack t (Request.Handler.push handler h) s in
+          go stack (k y) handler s'
         | Clear_handler (t, k) ->
-          let (s', y) = go t Request.Handler.fail s in
-          go (k y) handler s'
+          let (s', y) = go stack t Request.Handler.fail s in
+          go stack (k y) handler s'
         | Exists ({ store; check; _ }, p, k) ->
           let (s', value) = Provider.run p get_value s handler in
           let var =
             Typ.Store.run (store value) store_field_elt
           in
-          let ((), ()) = go (check var) handler () in
-          go (k { Handle.var; value = Some value }) handler s'
+          let ((), ()) = go stack (check var) handler () in
+          go stack (k { Handle.var; value = Some value }) handler s'
         | Next_auxiliary k ->
-          go (k !next_auxiliary) handler s
+          go stack (k !next_auxiliary) handler s
     in
-    let (s, x) = go t0 Request.Handler.fail s0 in
+    let (s, x) = go [] t0 Request.Handler.fail s0 in
     let primary_input = Field.Vector.create () in
     R1CS_constraint_system.set_auxiliary_input_size system (!next_auxiliary - 1);
     s, x, get_value, R1CS_constraint_system.is_satisfied system ~primary_input ~auxiliary_input:aux
@@ -1481,6 +1482,7 @@ module Run = struct
     =
     fun ~exposing:t k ->
       Backend.R1CS_constraint_system.create_keypair (constraint_system t k)
+      |> Keypair.of_backend_keypair
 
   let verify
     : Proof.t
@@ -1555,11 +1557,12 @@ module Run = struct
     =
     fun key t s k ->
       conv (fun c primary ->
-        Proof.create key ~primary
-          ~auxiliary:(
-            Checked.auxiliary_input
-              ~num_inputs:(Field.Vector.length primary)
-              c s primary))
+        let auxiliary =
+          Checked.auxiliary_input
+            ~num_inputs:(Field.Vector.length primary)
+            c s primary
+        in
+        Proof.create key ~primary ~auxiliary)
         t
         k
   ;;

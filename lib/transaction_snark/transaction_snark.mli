@@ -27,13 +27,20 @@ module Keys : sig
   val create : unit -> t
 end
 
+val check_transaction
+  :  Ledger_hash.t
+  -> Ledger_hash.t
+  -> Transaction.With_valid_signature.t
+  -> Tick.Handler.t
+  -> unit
+
 module type S = sig
   val verify : t -> bool
 
   val of_transaction
     : Ledger_hash.t
     -> Ledger_hash.t
-    -> Transaction.t
+    -> Transaction.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
@@ -45,5 +52,7 @@ module type S = sig
     -> (Tock.Proof.t, 's) Tick.As_prover.t
     -> (Tick.Boolean.var, 's) Tick.Checked.t
 end
+
+val handle_with_ledger : Ledger.t -> Tick.Handler.t
 
 module Make (K : sig val keys : Keys.t end) : S

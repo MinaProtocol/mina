@@ -1,5 +1,4 @@
-open Core
-open Snark0
+open Core_kernel
 
 module Make (Impl : Snark_intf.S) = struct
 open Impl
