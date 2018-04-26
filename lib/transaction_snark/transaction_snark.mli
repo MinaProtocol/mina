@@ -30,7 +30,7 @@ end
 val check_transaction
   :  Ledger_hash.t
   -> Ledger_hash.t
-  -> Transaction.t
+  -> Transaction.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
 
@@ -40,7 +40,7 @@ module type S = sig
   val of_transaction
     : Ledger_hash.t
     -> Ledger_hash.t
-    -> Transaction.t
+    -> Transaction.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 

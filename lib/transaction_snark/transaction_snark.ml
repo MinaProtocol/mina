@@ -148,7 +148,7 @@ module Base = struct
 
   module Prover_state = struct
     type t =
-      { transactions : Transaction.t list
+      { transactions : Transaction.With_valid_signature.t list
       ; state1 : Ledger_hash.t
       ; state2 : Ledger_hash.t
       }
@@ -172,7 +172,7 @@ module Base = struct
     in
     let%bind ts =
       provide_witness' (Typ.list ~length:bundle_length Transaction.typ)
-        ~f:Prover_state.transactions
+        ~f:(fun s -> (Prover_state.transactions s :> Transaction.t list))
     in
     apply_transactions l1 ts >>= Ledger_hash.assert_equal l2
 
@@ -380,7 +380,7 @@ module type S = sig
   val of_transaction
     : Ledger_hash.t
     -> Ledger_hash.t
-    -> Transaction.t
+    -> Transaction.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
@@ -575,11 +575,12 @@ let%test_module "transaction_snark" =
         Tick.Schnorr.sign sender.private_key
           (Transaction.Payload.to_bits payload)
       in
-      assert (Tick.Schnorr.verify signature (Public_key.of_private_key sender.private_key) (Transaction.Payload.to_bits payload));
-      { Transaction.payload
-      ; sender = Public_key.of_private_key sender.private_key
-      ; signature
-      }
+      Transaction.check
+        { Transaction.payload
+        ; sender = Public_key.of_private_key sender.private_key
+        ; signature
+        }
+      |> Option.value_exn
 
     let keys = Keys.create ()
 
