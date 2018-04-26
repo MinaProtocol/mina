@@ -3,7 +3,7 @@ open Nanobit_base
 open Async
 module Map_reduce = Rpc_parallel.Map_reduce
 
-module type S = sig
+module type S0 = sig
   type proof
   type t
 
@@ -14,6 +14,27 @@ module type S = sig
   val target_hash : t -> Ledger_hash.t
 
   val result : t -> proof option Deferred.t
+end
+
+module type S = sig
+  include S0
+
+  module Sparse_ledger : sig
+    open Snark_params.Tick
+
+    type t
+    [@@deriving sexp]
+
+    val merkle_root : t -> Ledger_hash.t
+
+    val path_exn : t -> int -> [ `Left of Pedersen.Digest.t | `Right of Pedersen.Digest.t ] list
+
+    val apply_transaction_exn : t -> Transaction.t -> t
+
+    val of_ledger_subset : Ledger.t -> Public_key.Compressed.t list -> t
+
+    val handler : t -> Handler.t Staged.t
+  end
 end
 
 module T = struct
@@ -113,7 +134,7 @@ end
 
 module Input = struct
   type t =
-    { transaction : Transaction.t
+    { transaction : Transaction.With_valid_signature.t
     ; ledger : Sparse_ledger.t
     ; target_hash : Ledger_hash.Stable.V1.t
     }
@@ -135,7 +156,7 @@ module M = Map_reduce.Make_map_reduce_function_with_init(struct
     let map ((module T) : state_type) { Input.transaction; ledger } =
       T.of_transaction
         (Sparse_ledger.merkle_root ledger)
-        Sparse_ledger.(merkle_root (apply_transaction_exn ledger transaction))
+        Sparse_ledger.(merkle_root (apply_transaction_exn ledger (transaction :> Transaction.t)))
         transaction
         (unstage (Sparse_ledger.handler ledger))
       |> return
@@ -163,12 +184,13 @@ let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t l
       match Ledger.apply_transaction ledger tx with
       | Ok () ->
         let target_hash = Ledger.merkle_root ledger in
-        let t = { Input.transaction; ledger = sparse_ledger; target_hash } in
+        let t = { Input.transaction = tx; ledger = sparse_ledger; target_hash } in
         Some t
       | Error _s -> None)
   in
   let target_hash = Ledger.merkle_root ledger in
   List.iter (List.rev inputs) ~f:(fun { transaction; _ } ->
+    let transaction = (transaction :> Transaction.t) in
     Or_error.ok_exn (Ledger.undo_transaction ledger transaction));
   { result =
       Map_reduce.map_reduce config

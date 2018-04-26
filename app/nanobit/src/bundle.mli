@@ -2,7 +2,7 @@ open Core
 open Async
 open Nanobit_base
 
-module type S = sig
+module type S0 = sig
   type proof
   type t
 
@@ -18,6 +18,10 @@ module type S = sig
   val target_hash : t -> Ledger_hash.t
 
   val result : t -> proof option Deferred.t
+end
+
+module type S = sig
+  include S0
 
   module Sparse_ledger : sig
     open Snark_params.Tick

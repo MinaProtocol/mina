@@ -11,7 +11,7 @@ let create_ledger_and_transactions num_transactions =
     let public_key = Public_key.compress k.public_key in
     Ledger.update ledger public_key
       { public_key; balance = Currency.Balance.of_int 10_000 });
-  let random_transaction () : Transaction.t =
+  let random_transaction () : Transaction.With_valid_signature.t =
     let sender = keys.(Random.int num_accounts) in
     let receiver = keys.(Random.int num_accounts) in
     let payload : Transaction.Payload.t =
@@ -37,12 +37,12 @@ let rec pair_up = function
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
-let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Transaction.t list) =
+let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Transaction.With_valid_signature.t list) =
   let module Sparse_ledger = Bundle.Sparse_ledger in
   let (base_proof_time, _), base_proofs =
     List.fold_map transactions ~init:(Time.Span.zero, sparse_ledger0) ~f:(fun (max_span, sparse_ledger) t ->
       let sparse_ledger' =
-        Sparse_ledger.apply_transaction_exn sparse_ledger t
+        Sparse_ledger.apply_transaction_exn sparse_ledger (t :> Transaction.t)
       in
       let span, proof = 
         time (fun () ->
@@ -76,6 +76,7 @@ let main num_transactions_log2 () =
     let sparse_ledger =
       Bundle.Sparse_ledger.of_ledger_subset ledger
         (List.concat_map transactions ~f:(fun t ->
+          let t = (t :> Transaction.t) in
           [ t.payload.receiver; Public_key.compress t.sender ]))
     in
     let total_time = profile (module T) sparse_ledger transactions in
