@@ -4,6 +4,6 @@
  ((name nanobit_base)
   (public_name nanobit_base)
   (library_flags (-linkall))
-  (libraries (core merkle_ledger snarky async async_extra bignum ppx_inline_test.runtime-lib))
+  (libraries (base64 core merkle_ledger snarky async async_extra bignum ppx_inline_test.runtime-lib))
   (preprocess (pps (ppx_jane ppx_deriving.eq ppx_driver.runner (-inline-test-lib nanobit_base))))
   (synopsis "Snarks and friends necessary for keypair generation")))

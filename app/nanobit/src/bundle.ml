@@ -3,9 +3,22 @@ open Nanobit_base
 open Async
 module Map_reduce = Rpc_parallel.Map_reduce
 
+module type S = sig
+  type proof
+  type t
+
+  val cancel : t -> unit
+
+  val create : conf_dir:string -> Ledger.t -> Transaction.With_valid_signature.t list -> t
+
+  val target_hash : t -> Ledger_hash.t
+
+  val result : t -> proof option Deferred.t
+end
+
 module T = struct
   type t =
-    { snark : Transaction_snark.t option Deferred.t
+    { result : Transaction_snark.t option Deferred.t
     ; target_hash : Ledger_hash.t
     }
   [@@deriving fields]
@@ -131,7 +144,7 @@ module M = Map_reduce.Make_map_reduce_function_with_init(struct
       return (T.merge t1 t2)
   end)
 
-let create ~conf_dir ledger transactions : t =
+let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t list) : t =
   Parallel.init_master ();
   let config =
     Map_reduce.Config.create
@@ -140,13 +153,14 @@ let create ~conf_dir ledger transactions : t =
       ()
   in
   let inputs =
-    List.filter_map transactions ~f:(fun (transaction : Transaction.t) ->
+    List.filter_map transactions ~f:(fun tx ->
+      let { Transaction.sender; payload } as transaction = (tx :> Transaction.t) in
       let sparse_ledger =
         Sparse_ledger.of_ledger_subset ledger
-          [ Public_key.compress transaction.sender; transaction.payload.receiver ]
+          [ Public_key.compress sender; payload.receiver ]
       in
       (* TODO: Bad transactions should probably get thrown away earlier? *)
-      match Ledger.apply_transaction ledger transaction with
+      match Ledger.apply_transaction ledger tx with
       | Ok () ->
         let target_hash = Ledger.merkle_root ledger in
         let t = { Input.transaction; ledger = sparse_ledger; target_hash } in
@@ -154,9 +168,9 @@ let create ~conf_dir ledger transactions : t =
       | Error _s -> None)
   in
   let target_hash = Ledger.merkle_root ledger in
-  List.iter (List.rev inputs) ~f:(fun { transaction } ->
+  List.iter (List.rev inputs) ~f:(fun { transaction; _ } ->
     Or_error.ok_exn (Ledger.undo_transaction ledger transaction));
-  { snark =
+  { result =
       Map_reduce.map_reduce config
         (Pipe.of_list inputs)
         ~m:(module M)
