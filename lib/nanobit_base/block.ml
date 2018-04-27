@@ -141,7 +141,7 @@ let genesis : t =
   ; body =
       (* TODO: Fix  *)
       { proof = Lazy.force Tock.Proof.dummy
-      ; target_hash = Ledger.(merkle_root (create ()))
+      ; target_hash = Ledger.(merkle_root (Genesis_ledger.ledger))
       }
   }
 
