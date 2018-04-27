@@ -6,6 +6,7 @@ module type Inputs_intf = sig
   module Transition_with_witness : Minibit.Transition_with_witness_intf
   with type transition := Transition.t
    and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+   and type ledger_hash := Ledger_hash.t
   module Bundle : sig
      type t
 
@@ -172,7 +173,6 @@ module Make
           in
           match hashing_result, bundle_result with
           | `Ok (new_state, nonce), Some (ledger_proof, ts) ->
-            printf "Mined a new block!\n";
             Ok
               { Transition_with_witness.transition =
                 { ledger_hash = next_ledger_hash
@@ -180,6 +180,7 @@ module Make
                 ; timestamp = new_state.timestamp
                 ; nonce
                 }
+              ; prior_ledger_hash = state.Inputs.State.ledger_hash
               ; transactions
               }
           | `Cancelled, _ -> Or_error.error_string "Mining cancelled"
