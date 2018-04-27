@@ -101,22 +101,8 @@ module Field0 = struct
     in
     fun bs -> go Field.one Field.zero bs
 
-    (* TODO: I changed the sexp of fields and bignums to print only the first
-     * few digits in order to trace logs more easily. This will break the
-     * `sexp_of_t / t_of_sexp` inverse property, so not sure if this is okay.
-     *)
   let sexp_of_t x =
-    let str =
-      (Bignum.Bigint.to_string (Bigint.to_bignum_bigint (Bigint.of_field x)))
-    in
-    let first_10 = String.slice str 0 (Int.min 10 (String.length str)) in
-    let patched =
-      if (String.length first_10 < String.length str) then
-        first_10 ^ ".."
-      else
-        first_10
-    in
-    String.sexp_of_t patched
+    Bignum.Bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
 
   let t_of_sexp s =
     Bigint.to_field (Bigint.of_bignum_bigint (Bignum.Bigint.t_of_sexp s))
