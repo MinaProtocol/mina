@@ -12,6 +12,9 @@ module type S = sig
   type t
   [@@deriving sexp, bin_io]
 
+  include Container.S0 with type t := t
+                        and type elt := account
+
   val copy : t -> t
 
   module Path : sig
@@ -80,8 +83,10 @@ end
 module type F =
   functor (Hash : sig 
        type hash [@@deriving sexp, hash, compare, bin_io]
-       type account [@@deriving sexp, bin_io]
-       val hash_account : account -> hash 
+       module Account : sig
+         type t [@@deriving sexp, eq, bin_io]
+       end
+       val hash_account : Account.t -> hash 
        val empty_hash : hash
        val merge : hash -> hash -> hash
      end)
@@ -91,7 +96,7 @@ module type F =
      end)
     (Depth : sig val depth : int end)
     -> S with type hash := Hash.hash
-          and type account := Hash.account
+          and type account := Hash.Account.t
           and type key := Key.t
 
 module Make : F

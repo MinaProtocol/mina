@@ -4,7 +4,7 @@ open Currency
 
 include Merkle_ledger.Ledger.Make
     (struct
-      type account = Account.t [@@deriving sexp, bin_io]
+      module Account = Account
       type hash = Tick.Pedersen.Digest.t [@@deriving sexp, hash, compare, bin_io]
 
       let empty_hash =

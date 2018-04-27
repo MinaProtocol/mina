@@ -11,10 +11,10 @@ module type Inputs_intf = sig
                                      and type ledger_hash := Ledger_hash.t
                                      and type state := State.t
   module Store : Storage.With_checksum_intf
-  module Transaction_pool : Minibit.Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
   module Genesis : sig val state : State.t end
   module Genesis_ledger : sig val ledger : Ledger.t end
 end
+
 
 module Make
   (Inputs : Inputs_intf)
@@ -38,7 +38,7 @@ module Make
     [@@deriving make]
   end
 
-  let heap_cmp (_, s) (_, s') = Strength.compare s s'
+  let heap_cmp (_, s) (_, s') = -1 * (Strength.compare s s')
 
   module State = struct
     module T = struct
@@ -119,7 +119,8 @@ module Make
 
   let get t h : Ledger.t Deferred.Or_error.t =
     match local_get t h with
-    | Error _ ->
+    | Error e ->
+      Logger.debug t.log "Didn't get ledger locally, trying remotely %s" (Error.to_string_hum e);
       let%bind net = t.net in
       let open Deferred.Or_error.Let_syntax in
       let%map (ledger, state) = Net.Ledger_fetcher_io.get_ledger_at_hash net h in
@@ -189,19 +190,23 @@ module Make
       Linear_pipe.iter config.ledger_transitions ~f:(fun (h, transactions, state) ->
         let open Deferred.Let_syntax in
         (* Notice: This pipe iter blocks upstream while it's materializing ledgers from the network (potentially) AND saving to disk *)
+        Logger.debug t.log !"Trying to get ledger with hash %{sexp: Ledger_hash.t}" h;
+        Logger.debug t.log !"All ledger hashes we know about are: %{sexp: Ledger_hash.t list}" (Ledger_hash.Table.keys t.state.hash_to_ledger);
         match%bind get t h with
         | Error e ->
-          Logger.warn t.log "Failed to keep-up with transactions (can't get ledger %s)" (Error.to_string_hum e);
+          Logger.warn t.log "Failed to keep-up with transactions (can't get ledger %s). Not mining until we get more data!" (Error.to_string_hum e);
           return ()
         | Ok unsafe_ledger ->
+
           let ledger = Ledger.copy unsafe_ledger in
           List.iter transactions ~f:(fun transaction ->
             match Ledger.apply_transaction ledger transaction with
             | Error e ->
-                Logger.warn t.log "Failed to apply a transaction %s" (Error.to_string_hum e)
+                Logger.warn t.log "Failed to apply a transaction %s ;; mining without this transaction" (Error.to_string_hum e);
             | Ok () -> ()
           );
-          add t h ledger state;
+          let new_root = Ledger.merkle_root ledger in
+          add t new_root ledger state;
           (* Capacity is tiny because contract is that miner will cancel whenever
            * new tip is received *)
           let next_state = materialize_new_state t in
