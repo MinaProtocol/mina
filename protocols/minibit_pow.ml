@@ -2,8 +2,20 @@ open Core_kernel
 open Async_kernel
 
 module type Time_intf = sig
-  type t
+  type t [@@deriving sexp, bin_io]
 
+  module Span : sig
+    type t
+    val of_time_span : Core_kernel.Time.Span.t -> t
+
+    val ( < ) : t -> t -> bool
+    val ( > ) : t -> t -> bool
+    val ( >= ) : t -> t -> bool
+    val ( <= ) : t -> t -> bool
+    val ( = ) : t -> t -> bool
+  end
+
+  val diff : t -> t -> Span.t
   val now : unit -> t
 end
 
