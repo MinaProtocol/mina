@@ -106,9 +106,29 @@ let typ : (var, t) Tick.Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
+let gen ~keys ~max_amount ~max_fee =
+  let open Quickcheck.Generator in
+  let open Quickcheck.Generator.Let_syntax in
+  let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
+    and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
+    and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
+    and amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int
+  in
+  let sender = keys.(sender_idx) in
+  let receiver = keys.(receiver_idx) in
+  let payload : Payload.t =
+    { receiver = Public_key.compress receiver.Signature_keypair.public_key
+    ; fee
+    ; amount
+    }
+  in
+  sign sender payload
+
 module With_valid_signature = struct
   type t = Stable.V1.t
   [@@deriving sexp, eq, bin_io, compare]
+
+  let gen = gen
 end
 
 let check_signature ({ payload; sender; signature } : t) =

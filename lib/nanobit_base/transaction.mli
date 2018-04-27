@@ -69,9 +69,18 @@ end
 type var = (Payload.var, Public_key.var, Signature.var) t_
 val typ : (var, t) Typ.t
 
+(* Generate a single transaction between
+ * $a, b \in keys$
+ * for fee $\in [0,max_fee]$
+ * and an amount $\in [1,max_amount]$
+ *)
+val gen : keys:Signature_keypair.t array -> max_amount:int -> max_fee:int -> t Quickcheck.Generator.t
+
 module With_valid_signature : sig
   type nonrec t = private t
   [@@deriving sexp, eq, bin_io, compare]
+
+  val gen : keys:Signature_keypair.t array -> max_amount:int -> max_fee:int -> t Quickcheck.Generator.t
 end
 
 val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
