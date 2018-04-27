@@ -298,9 +298,7 @@ module Make
     Logger.info t.log "Starting to run minibit";
     let p : Protocol.t = Protocol.create ~initial:{ data = Genesis.state ; proof = Genesis.proof } in
 
-    let (miner_transitions_protocol, miner_transitions_ledger_fetcher) =
-      Linear_pipe.fork2 (Miner.transitions t.miner)
-    in
+    let miner_transitions_protocol = Miner.transitions t.miner in
     let protocol_events =
       Linear_pipe.merge_unordered
         [ Linear_pipe.map
