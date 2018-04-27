@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 
 (*
- * TODO: Remove is really slow, we need to deal with this:
+ * TODO: Remove could be really slow, we need to deal with this:
  *
  *  Reification of in-person discussion:
  *  Let's say our transaction pool has 100M transactions in it
@@ -15,8 +15,17 @@ open Async_kernel
  * 2. We could instead just pop from our heap until we get `k` transactions that
  *    are valid on the current state (optionally we could use periodic garbage
  *    collection as well).
+ *
+ * For now we are removing lazily when we look for the next transactions
  *)
-module Make (Transaction : Protocols.Minibit_pow.Transaction_intf) = struct
+module Make
+  (Transaction : Protocols.Minibit_pow.Transaction_intf)
+  (Ledger: sig
+    type t
+    val apply_transaction : t -> Transaction.With_valid_signature.t -> unit Or_error.t
+    val undo_transaction : t -> Transaction.t -> unit Or_error.t
+  end)
+= struct
   module Txn = Transaction.With_valid_signature
 
   type t = Txn.t Fheap.t
@@ -25,17 +34,18 @@ module Make (Transaction : Protocols.Minibit_pow.Transaction_intf) = struct
 
   let add t txn = Fheap.add t txn
 
-  let remove t txn =
-    Fheap.of_list ~cmp:Txn.compare begin
-      List.filter (Fheap.to_list t) ~f:(fun txn' -> Txn.equal txn txn')
-    end
-
-  let get t ~k =
+  let get t ~k ~ledger =
     let rec go h i l =
       match Fheap.top h, Fheap.remove_top h, i with
       | None, _, _ -> l
       | _, _, 0 -> l
-      | Some txn, Some h', i -> go h' (i - 1) (txn::l)
+      | Some txn, Some h', i -> 
+          (match Ledger.apply_transaction ledger txn with
+          | Ok () ->
+              Ledger.undo_transaction ledger (txn :> Transaction.t) |> Or_error.ok_exn;
+              go h' (i - 1) (txn::l)
+          | Error e ->
+              go h' (i - 1) l)
       | _, None, _ -> failwith "Impossible, top will be none if remove_top is none"
     in
     go t k []
