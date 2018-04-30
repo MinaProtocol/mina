@@ -238,6 +238,9 @@ module Snarkable = struct
       end
 
       let var_to_bits = Fn.id
+
+      let var_of_value v =
+        List.init V.length (fun i -> Boolean.var_of_value (V.get v i))
     end
 
     let pack_var = Checked.project
@@ -282,6 +285,10 @@ module Snarkable = struct
       ;;
 
       let var_to_bits = Fn.id
+
+      let var_of_value v =
+        (unpack_field Field.unpack ~bit_length v)
+        |> List.map ~f:Boolean.var_of_value
     end
 
     let project_value = Fn.id
