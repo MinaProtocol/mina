@@ -29,8 +29,7 @@ module Make_inputs0
   module Ledger_hash = Ledger_hash.Stable.V1
   module Transaction = Transaction
 
-  module Nonce = Nanobit_base.Nonce
-
+  module Block_nonce = Nanobit_base.Block.Nonce
   module Difficulty = Difficulty
 
   module Pow = Snark_params.Tick.Pedersen.Digest
@@ -53,7 +52,7 @@ module Make_inputs0
       { ledger_hash : Ledger_hash.t
       ; ledger_proof : Ledger_proof.t sexp_opaque
       ; timestamp : Time.t
-      ; nonce : Nonce.t
+      ; nonce : Block.Nonce.t
       }
     [@@deriving sexp, fields]
   end

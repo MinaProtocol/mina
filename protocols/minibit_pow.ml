@@ -179,7 +179,7 @@ end
 module type Inputs_intf = sig
   module Time : Time_intf
   module Transaction : Transaction_intf
-  module Nonce : Nonce_intf
+  module Block_nonce : Nonce_intf
 
   module Ledger_hash : Ledger_hash_intf
   module Ledger_proof : Proof_intf
@@ -189,7 +189,7 @@ module type Inputs_intf = sig
   module Transition : Transition_intf with type ledger_hash := Ledger_hash.t
                                        and type ledger := Ledger.t
                                        and type proof := Ledger_proof.t
-                                       and type nonce := Nonce.t
+                                       and type nonce := Block_nonce.t
                                        and type time := Time.t
 
   module Time_close_validator : Time_close_validator_intf with type time := Time.t
@@ -210,7 +210,7 @@ module type Inputs_intf = sig
                         and type difficulty := Difficulty.t
                         and type strength := Strength.t
                         and type time := Time.t
-                        and type nonce := Nonce.t
+                        and type nonce := Block_nonce.t
                         and type pow := Pow.t
 
     module Proof : Proof_intf with type input = t
