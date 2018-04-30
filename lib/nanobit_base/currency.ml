@@ -37,6 +37,8 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
+  val length : int
+
   val zero : t
 
   val of_string : string -> t
@@ -49,23 +51,29 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
-  val var_to_bits : var -> Boolean.var list
+  val var_to_bits : var -> Boolean.var Bitstring.Lsb_first.t
 end
 
-module type S = sig
-  include Basic
-
+module type Arithmetic_intf = sig
+  type t
   val add : t -> t -> t option
   val sub : t -> t -> t option
   val (+) : t -> t -> t option
   val (-) : t -> t -> t option
+end
 
-  module Checked : sig
-    val add : var -> var -> (var, _) Checked.t
-    val sub : var -> var -> (var, _) Checked.t
-    val (+) : var -> var -> (var, _) Checked.t
-    val (-) : var -> var -> (var, _) Checked.t
-  end
+module type Checked_arithmetic_intf = sig
+  type var
+  val add : var -> var -> (var, _) Checked.t
+  val sub : var -> var -> (var, _) Checked.t
+  val (+) : var -> var -> (var, _) Checked.t
+  val (-) : var -> var -> (var, _) Checked.t
+end
+
+module type S = sig
+  include Basic
+  include Arithmetic_intf with type t := t
+  module Checked : Checked_arithmetic_intf with type var := var
 end
 
 module Make
@@ -76,9 +84,20 @@ module Make
        val of_signed : Signed.t -> Unsigned.t
        val length : int
      end)
-    : S with type t = Unsigned.t
+  : sig
+    include S with type t = Unsigned.t
+
+    val var_of_bits
+      : Boolean.var Bitstring.Lsb_first.t -> var
+
+    val unpack_var : Cvar.t -> (var, _) Tick.Checked.t
+
+    val pack_var : var -> Cvar.t
+  end
 = struct
   assert (M.length < Tick.Field.size_in_bits - 3)
+
+  let length = M.length
 
   module Stable = struct
     module V1 = struct
@@ -127,6 +146,15 @@ module Make
   include Bits.Snarkable.Small_bit_vector(Tick)(Vector)
 
   include Unpacked
+
+  let var_to_bits t = Bitstring.Lsb_first.of_list (var_to_bits t)
+
+  let var_of_bits (bits : Boolean.var Bitstring.Lsb_first.t) : var =
+    let bits = (bits :> Boolean.var list) in
+    let n = List.length bits in
+    assert (n <= M.length);
+    let padding = M.length - n in
+    bits @ List.init padding ~f:(fun _ -> Boolean.false_)
 
   let zero = Unsigned.zero
 
@@ -230,17 +258,160 @@ module Make
   end
 end
 
-module Amount = Make(Unsigned.UInt64)(Int64)(struct
-    let length = 64
-    let to_signed = Unsigned.UInt64.to_int64
-    let of_signed = Unsigned.UInt64.of_int64
-  end)
-
 module Fee = Make(Unsigned.UInt32)(Int32)(struct
     let length = 32
     let to_signed = Unsigned.UInt32.to_int32
     let of_signed = Unsigned.UInt32.of_int32
   end)
+
+module Amount = struct
+  module T = Make(Unsigned.UInt64)(Int64)(struct
+    let length = 64
+    let to_signed = Unsigned.UInt64.to_int64
+    let of_signed = Unsigned.UInt64.of_int64
+  end)
+
+  type amount = T.Stable.V1.t [@@deriving bin_io]
+  type amount_var = T.var
+  include (T : module type of T with type var = amount_var and module Checked := T.Checked)
+
+  let of_fee (fee : Fee.t) : t =
+    Unsigned.UInt64.of_int64 (Unsigned.UInt32.to_int64 fee)
+
+  let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
+
+  module Signed = struct
+    type ('magnitude, 'sgn) t_ =
+      { magnitude : 'magnitude
+      ; sgn       : 'sgn
+      }
+    [@@deriving bin_io]
+
+    let create ~magnitude ~sgn = { magnitude; sgn }
+
+    type t = (amount, Sgn.t) t_
+    [@@deriving bin_io]
+
+    let zero = create ~magnitude:zero ~sgn:Sgn.Pos
+
+    type nonrec var = (var, Sgn.var) t_
+
+    let length = Int.(+) T.length 1
+
+    let of_hlist : (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
+      H_list.(fun [ magnitude; sgn ] -> { magnitude; sgn })
+
+    let to_hlist { magnitude; sgn } = H_list.([ magnitude; sgn ])
+
+    let typ =
+      Typ.of_hlistable Data_spec.([ typ; Sgn.typ ])
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+    let fold ({ sgn; magnitude } : t) ~init ~f =
+      let init = f init (match sgn with Pos -> true | Neg -> false) in
+      fold magnitude ~init ~f
+
+    let add (x : t) (y : t) : t option =
+      match x.sgn, y.sgn with
+      | Neg, (Neg as sgn)
+      | Pos, (Pos as sgn) ->
+        let open Option.Let_syntax in
+        let%map magnitude = add x.magnitude y.magnitude in
+        { sgn; magnitude }
+      | Pos, Neg
+      | Neg, Pos ->
+        let c = compare x.magnitude y.magnitude in
+        Some begin
+          if c < 0
+          then
+            { sgn = y.sgn
+            ; magnitude = Unsigned.UInt64.Infix.(y.magnitude - x.magnitude)
+            }
+          else if c > 0
+          then
+            { sgn = x.sgn
+            ; magnitude = Unsigned.UInt64.Infix.(x.magnitude - y.magnitude)
+            }
+          else zero
+        end
+
+    let (+) = add
+
+    module Checked = struct
+      let to_bits { magnitude; sgn } =
+        Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
+
+      let to_field_var ({ magnitude; sgn } : var) =
+        Tick.Checked.mul (pack_var magnitude) (sgn :> Cvar.t)
+
+      let add (x : var) (y : var) =
+        let%bind xv = to_field_var x
+        and yv = to_field_var y
+        in
+        let%bind sgn =
+          provide_witness Sgn.typ begin
+            let open As_prover in
+            let open Let_syntax in
+            let%map x = read typ x
+            and y     = read typ y
+            in
+            (Option.value_exn (add x y)).sgn
+          end
+        in
+        let%bind res = Tick.Checked.mul (sgn :> Cvar.t) (Cvar.add xv yv) in
+        let%map magnitude = unpack_var res in
+        { magnitude; sgn }
+
+      let (+) = add
+
+      let cswap_field (b : Boolean.var) (x, y) =
+        (* (x + b(y - x), y + b(x - y)) *)
+        let open Cvar.Infix in
+        let%map b_y_minus_x = Tick.Checked.mul (b :> Cvar.t) (y - x) in
+        (x + b_y_minus_x, y - b_y_minus_x)
+
+      let cswap b (x, y) =
+        let l_sgn, r_sgn =
+          match x.sgn, y.sgn with
+          | Sgn.Pos, Sgn.Pos -> Sgn.Checked.(pos, pos)
+          | Neg, Neg -> Sgn.Checked.(neg, neg)
+          | Pos, Neg ->
+            ( Sgn.Checked.neg_if_true b
+            , Sgn.Checked.pos_if_true b
+            )
+          | Neg, Pos ->
+            ( Sgn.Checked.pos_if_true b
+            , Sgn.Checked.neg_if_true b
+            )
+        in
+        let%map l_mag, r_mag =
+          let%bind l, r =
+            cswap_field b (pack_var x.magnitude, pack_var y.magnitude)
+          in
+          let%map l = unpack_var l
+          and r = unpack_var r in
+          (l, r)
+        in
+        ( { sgn=l_sgn; magnitude=l_mag}, { sgn=r_sgn; magnitude=r_mag })
+    end
+  end
+
+  module Checked = struct
+    include T.Checked
+
+    let of_fee (fee : Fee.var) =
+      var_of_bits (Fee.var_to_bits fee)
+
+    let add_fee (t : var) (fee : Fee.var) =
+      Cvar.add (pack_var t) (Fee.pack_var fee)
+      |> unpack_var
+
+    let add_signed (t : var) (d : Signed.var) =
+      let%bind d = Signed.Checked.to_field_var d in
+      Cvar.add (pack_var t) d |> unpack_var
+  end
+end
 
 module Balance = struct
   include (Amount : Basic with type t = Amount.t and type var = Amount.var)
@@ -251,6 +422,7 @@ module Balance = struct
   let (-) = sub_amount
 
   module Checked = struct
+    let add_signed_amount = Amount.Checked.add_signed
     let add_amount = Amount.Checked.add
     let sub_amount = Amount.Checked.sub
     let (+) = add_amount
