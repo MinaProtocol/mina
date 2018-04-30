@@ -36,6 +36,21 @@ module Vector = struct
       else t land (lnot (one lsl i))
   end
 
+  module Int32 : S with type t = Int32.t = struct
+    include Int32
+
+    let length = 32
+    let get t i = Int32.((t lsr i) land one = one)
+
+    let empty = Int32.zero
+
+    let get t i = (t lsr i) land one = one
+    let set t i b =
+      if b
+      then t lor (one lsl i)
+      else t land (lnot (one lsl i))
+  end
+
   module Make (V : Basic)
     : Bits_intf.S with type t = V.t =
   struct
@@ -73,6 +88,7 @@ module Vector = struct
 end
 
 module Int64 : Bits_intf.S with type t := Int64.t = Vector.Make(Vector.Int64)
+module Int32 : Bits_intf.S with type t := Int32.t = Vector.Make(Vector.Int32)
 
 module Make_field0
     (Field : Snarky.Field_intf.S)
@@ -235,6 +251,9 @@ module Snarkable = struct
 
   module Int64 (Impl : Snarky.Snark_intf.S) =
     Small_bit_vector(Impl)(Vector.Int64)
+
+  module Int32 (Impl : Snarky.Snark_intf.S) =
+    Small_bit_vector(Impl)(Vector.Int32)
 
   module Field_backed
       (Impl : Snarky.Snark_intf.S)
