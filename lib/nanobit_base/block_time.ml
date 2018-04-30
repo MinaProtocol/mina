@@ -36,6 +36,12 @@ module Span = struct
     Int64.of_float (Time.Span.to_ms s)
 
   let to_ms t = t
+
+  let ( < ) = Int64.( < )
+  let ( > ) = Int64.( > )
+  let ( = ) = Int64.( = )
+  let ( <= ) = Int64.( <= )
+  let ( >= ) = Int64.( >= )
 end
 
 let field_var_to_unpacked (x : Tick.Cvar.t) = Tick.Checked.unpack ~length:64 x
@@ -64,3 +70,4 @@ let to_time t =
 ;;
 
 let now () = of_time (Time.now ())
+

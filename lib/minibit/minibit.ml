@@ -49,10 +49,10 @@ end
 module type Transaction_pool_intf = sig
   type t
   type transaction_with_valid_signature
+  type ledger
 
   val add : t -> transaction_with_valid_signature -> t
-  val remove : t -> transaction_with_valid_signature -> t
-  val get : t -> k:int -> transaction_with_valid_signature list
+  val get : t -> k:int -> ledger:ledger -> transaction_with_valid_signature list
   val load : disk_location:string -> t Deferred.t
 end
 
@@ -123,15 +123,17 @@ end
 module type Transition_with_witness_intf = sig
   type transition
   type transaction_with_valid_signature
+  type ledger_hash
 
   type t =
     { transactions : transaction_with_valid_signature list
+    ; previous_ledger_hash : ledger_hash
     ; transition : transition
     }
   [@@deriving sexp]
 
   include Witness_change_intf with type t_with_witness := t
-                              and type witness = transaction_with_valid_signature list
+                              and type witness = (transaction_with_valid_signature list * ledger_hash)
                               and type t := transition
 end
 
@@ -139,9 +141,11 @@ module type State_with_witness_intf = sig
   type state
   type transaction
   type transaction_with_valid_signature
+  type ledger_hash
 
   type t =
     { transactions : transaction_with_valid_signature list
+    ; previous_ledger_hash : ledger_hash
     ; state : state
     }
   [@@deriving sexp]
@@ -149,6 +153,7 @@ module type State_with_witness_intf = sig
   module Stripped : sig
     type t =
       { transactions : transaction list
+      ; previous_ledger_hash : ledger_hash
       ; state : state
       }
     [@@deriving bin_io]
@@ -158,7 +163,7 @@ module type State_with_witness_intf = sig
   val strip : t -> Stripped.t
 
   include Witness_change_intf with type t_with_witness := t
-                              and type witness = transaction_with_valid_signature list
+                              and type witness = (transaction_with_valid_signature list * ledger_hash)
                               and type t := state
 end
 
@@ -172,8 +177,10 @@ module type Inputs_intf = sig
   module State_with_witness : State_with_witness_intf with type state := Proof_carrying_state.t
                                                        and type transaction := Transaction.t
                                                        and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+                                                       and type ledger_hash := Ledger_hash.t
   module Transition_with_witness : Transition_with_witness_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
                                                                  and type transition := Transition.t
+                                                                 and type ledger_hash := Ledger_hash.t
 
   module Net : Network_intf
     with type stripped_state_with_witness := State_with_witness.Stripped.t 
@@ -181,7 +188,9 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type state := State.t
 
-  module Transaction_pool : Transaction_pool_intf with type transaction_with_valid_signature := Transaction.With_valid_signature.t
+  module Transaction_pool : Transaction_pool_intf
+    with type transaction_with_valid_signature := Transaction.With_valid_signature.t
+     and type ledger := Ledger.t
   module Ledger_fetcher : Ledger_fetcher_intf with type ledger_hash := Ledger_hash.t
                                                and type ledger := Ledger.t
                                                and type transaction_with_valid_signature := Transaction.With_valid_signature.t
@@ -289,9 +298,7 @@ module Make
     Logger.info t.log "Starting to run minibit";
     let p : Protocol.t = Protocol.create ~initial:{ data = Genesis.state ; proof = Genesis.proof } in
 
-    let (miner_transitions_protocol, miner_transitions_ledger_fetcher) =
-      Linear_pipe.fork2 (Miner.transitions t.miner)
-    in
+    let miner_transitions_protocol = Miner.transitions t.miner in
     let protocol_events =
       Linear_pipe.merge_unordered
         [ Linear_pipe.map
@@ -299,26 +306,26 @@ module Make
             ~f:(fun transition -> `Local transition)
         ; Linear_pipe.filter_map
             (Net.State_io.new_states t.net t.state_io)
-            ~f:(fun {state ; transactions} ->
+            ~f:(fun {state ; previous_ledger_hash ; transactions} ->
               let open Option.Let_syntax in
               let%map valid_transactions = Option.all (List.map ~f:Transaction.check transactions) in
-              `Remote {State_with_witness.state ; transactions = valid_transactions})
+              `Remote {State_with_witness.state ; previous_ledger_hash ; transactions = valid_transactions})
         ]
     in
     let (updated_state_network, updated_state_ledger) =
       Linear_pipe.fork2 begin
-        Linear_pipe.scan protocol_events ~init:(p, []) ~f:(fun (p, _) -> function
+        Linear_pipe.scan protocol_events ~init:(p, [], None) ~f:(fun (p, _, _) -> function
           | `Local transition ->
               Logger.info t.log !"Stepping with local transition %{sexp: Transition_with_witness.t}" transition;
               let%map p' = Protocol.step p (Protocol.Event.Found (Transition_with_witness.forget_witness transition)) in
-              (p', transition.transactions)
+              (p', transition.transactions, Some transition.previous_ledger_hash)
           | `Remote pcd ->
               Logger.info t.log !"Stepping with remote pcd %{sexp: Inputs.State_with_witness.t}" pcd;
               let%map p' = Protocol.step p (Protocol.Event.New_state (State_with_witness.forget_witness pcd)) in
-              (p', pcd.transactions)
+              (p', pcd.transactions, Some pcd.previous_ledger_hash)
         )
         |> Linear_pipe.map
-          ~f:(fun (p, transactions) -> State_with_witness.add_witness_exn p.state transactions)
+          ~f:(fun (p, transactions, previous_ledger_hash) -> State_with_witness.add_witness_exn p.state (transactions, Option.value_exn previous_ledger_hash))
       end
     in
 
@@ -327,11 +334,11 @@ module Make
     end;
 
     don't_wait_for begin
-      Linear_pipe.iter updated_state_ledger ~f:(fun {state ; transactions} ->
+      Linear_pipe.iter updated_state_ledger ~f:(fun {state ; transactions ; previous_ledger_hash} ->
         Logger.info t.log !"Ledger has new %{sexp: Proof_carrying_state.t} and %{sexp: Inputs.Transaction.With_valid_signature.t list}" state transactions;
         (* TODO: Right now we're crashing on purpose if we even get a tiny bit
          *       backed up. We should fix this see issues #178 and #177 *)
-        Linear_pipe.write_or_exn ~capacity:10 t.ledger_fetcher_transitions updated_state_ledger (state.data.ledger_hash, transactions, state.data);
+        Linear_pipe.write_or_exn ~capacity:10 t.ledger_fetcher_transitions updated_state_ledger (previous_ledger_hash, transactions, state.data);
         return ()
       )
     end;
@@ -339,12 +346,10 @@ module Make
     don't_wait_for begin
       Linear_pipe.transfer (Ledger_fetcher.strongest_ledgers t.ledger_fetcher) t.miner_changes_writer ~f:(fun (ledger, state) ->
         let transaction_per_bundle = 10 in
-        let transactions = Transaction_pool.get ~k:transaction_per_bundle t.transaction_pool in
+        let transactions = Transaction_pool.get ~k:transaction_per_bundle ~ledger t.transaction_pool in
         Tip_change { Miner.Tip.transactions ; ledger ; state }
       )
     end;
-
-    printf "Pipes hooked in\n%!"
 end
 
 
