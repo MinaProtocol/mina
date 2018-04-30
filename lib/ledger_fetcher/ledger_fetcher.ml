@@ -202,7 +202,7 @@ module Make
           List.iter transactions ~f:(fun transaction ->
             match Ledger.apply_transaction ledger transaction with
             | Error e ->
-                Logger.warn t.log "Failed to apply a transaction %s ;; mining without this transaction" (Error.to_string_hum e);
+                Logger.warn t.log "Failed to apply a transaction %s ;; mining without this transaction" (Error.to_string_hum e)
             | Ok () -> ()
           );
           let new_root = Ledger.merkle_root ledger in

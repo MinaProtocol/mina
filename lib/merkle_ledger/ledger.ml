@@ -83,11 +83,12 @@ module type S = sig
 end
 
 module type F =
-  functor (Hash : sig 
+  functor 
+    (Account : sig
+      type t [@@deriving sexp, eq, bin_io]
+    end)
+    (Hash : sig 
        type hash [@@deriving sexp, hash, compare, bin_io]
-       module Account : sig
-         type t [@@deriving sexp, eq, bin_io]
-       end
        val hash_account : Account.t -> hash 
        val empty_hash : hash
        val merge : hash -> hash -> hash
@@ -98,17 +99,16 @@ module type F =
      end)
     (Depth : sig val depth : int end)
     -> S with type hash := Hash.hash
-          and type account := Hash.Account.t
+          and type account := Account.t
           and type key := Key.t
 
 module Make 
+    (Account : sig
+      type t [@@deriving sexp, eq, bin_io]
+    end)
     (Hash : sig 
        type hash
        [@@deriving sexp, hash, compare, bin_io]
-       module Account : sig
-         type t
-         [@@deriving sexp, eq, bin_io]
-       end
        val hash_account : Account.t -> hash
        val empty_hash : hash
        val merge : hash -> hash -> hash
@@ -119,14 +119,14 @@ module Make
      end)
     (Depth : sig val depth : int end)
     : S with type hash := Hash.hash
-         and type account := Hash.Account.t
+         and type account := Account.t
          and type key := Key.t
 = struct
   include Depth
 
   type entry = 
     { merkle_index : int
-    ; account : Hash.Account.t 
+    ; account : Account.t 
     }
   [@@deriving sexp, bin_io]
 
@@ -164,12 +164,12 @@ module Make
 
   module Container0 : Container.S0
     with type t := t
-     and type elt := Hash.Account.t =
+     and type elt := Account.t =
     Container.Make0(struct
-      module Elt = Hash.Account
+      module Elt = Account
       type nonrec t = t
       let fold t ~init ~f =
-        List.fold (Key.Table.data t.accounts) ~init ~f:(fun acc {account} -> f acc account)
+        Hashtbl.fold t.accounts ~init ~f:(fun ~key:_ ~data:{account} acc -> f acc account)
       let iter = `Define_using_fold
     end)
 

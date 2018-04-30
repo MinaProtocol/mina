@@ -81,11 +81,12 @@ module type S = sig
 end
 
 module type F =
-  functor (Hash : sig 
+  functor 
+    (Account : sig
+      type t [@@deriving sexp, eq, bin_io]
+    end)
+    (Hash : sig 
        type hash [@@deriving sexp, hash, compare, bin_io]
-       module Account : sig
-         type t [@@deriving sexp, eq, bin_io]
-       end
        val hash_account : Account.t -> hash 
        val empty_hash : hash
        val merge : hash -> hash -> hash
@@ -96,7 +97,7 @@ module type F =
      end)
     (Depth : sig val depth : int end)
     -> S with type hash := Hash.hash
-          and type account := Hash.Account.t
+          and type account := Account.t
           and type key := Key.t
 
 module Make : F

@@ -127,7 +127,7 @@ module type Transition_with_witness_intf = sig
 
   type t =
     { transactions : transaction_with_valid_signature list
-    ; prior_ledger_hash : ledger_hash
+    ; previous_ledger_hash : ledger_hash
     ; transition : transition
     }
   [@@deriving sexp]
@@ -145,7 +145,7 @@ module type State_with_witness_intf = sig
 
   type t =
     { transactions : transaction_with_valid_signature list
-    ; prior_ledger_hash : ledger_hash
+    ; previous_ledger_hash : ledger_hash
     ; state : state
     }
   [@@deriving sexp]
@@ -153,7 +153,7 @@ module type State_with_witness_intf = sig
   module Stripped : sig
     type t =
       { transactions : transaction list
-      ; prior_ledger_hash : ledger_hash
+      ; previous_ledger_hash : ledger_hash
       ; state : state
       }
     [@@deriving bin_io]
@@ -306,10 +306,10 @@ module Make
             ~f:(fun transition -> `Local transition)
         ; Linear_pipe.filter_map
             (Net.State_io.new_states t.net t.state_io)
-            ~f:(fun {state ; prior_ledger_hash ; transactions} ->
+            ~f:(fun {state ; previous_ledger_hash ; transactions} ->
               let open Option.Let_syntax in
               let%map valid_transactions = Option.all (List.map ~f:Transaction.check transactions) in
-              `Remote {State_with_witness.state ; prior_ledger_hash ; transactions = valid_transactions})
+              `Remote {State_with_witness.state ; previous_ledger_hash ; transactions = valid_transactions})
         ]
     in
     let (updated_state_network, updated_state_ledger) =
@@ -318,14 +318,14 @@ module Make
           | `Local transition ->
               Logger.info t.log !"Stepping with local transition %{sexp: Transition_with_witness.t}" transition;
               let%map p' = Protocol.step p (Protocol.Event.Found (Transition_with_witness.forget_witness transition)) in
-              (p', transition.transactions, Some transition.prior_ledger_hash)
+              (p', transition.transactions, Some transition.previous_ledger_hash)
           | `Remote pcd ->
               Logger.info t.log !"Stepping with remote pcd %{sexp: Inputs.State_with_witness.t}" pcd;
               let%map p' = Protocol.step p (Protocol.Event.New_state (State_with_witness.forget_witness pcd)) in
-              (p', pcd.transactions, Some pcd.prior_ledger_hash)
+              (p', pcd.transactions, Some pcd.previous_ledger_hash)
         )
         |> Linear_pipe.map
-          ~f:(fun (p, transactions, prior_ledger_hash) -> State_with_witness.add_witness_exn p.state (transactions, Option.value_exn prior_ledger_hash))
+          ~f:(fun (p, transactions, previous_ledger_hash) -> State_with_witness.add_witness_exn p.state (transactions, Option.value_exn previous_ledger_hash))
       end
     in
 
@@ -334,11 +334,11 @@ module Make
     end;
 
     don't_wait_for begin
-      Linear_pipe.iter updated_state_ledger ~f:(fun {state ; transactions ; prior_ledger_hash} ->
+      Linear_pipe.iter updated_state_ledger ~f:(fun {state ; transactions ; previous_ledger_hash} ->
         Logger.info t.log !"Ledger has new %{sexp: Proof_carrying_state.t} and %{sexp: Inputs.Transaction.With_valid_signature.t list}" state transactions;
         (* TODO: Right now we're crashing on purpose if we even get a tiny bit
          *       backed up. We should fix this see issues #178 and #177 *)
-        Linear_pipe.write_or_exn ~capacity:10 t.ledger_fetcher_transitions updated_state_ledger (prior_ledger_hash, transactions, state.data);
+        Linear_pipe.write_or_exn ~capacity:10 t.ledger_fetcher_transitions updated_state_ledger (previous_ledger_hash, transactions, state.data);
         return ()
       )
     end;

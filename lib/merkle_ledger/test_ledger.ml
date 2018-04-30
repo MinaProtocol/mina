@@ -1,13 +1,13 @@
 open Core
 open Ledger
 
+module Account = struct
+  type t = int [@@deriving sexp, eq, bin_io]
+end
+
 module Hash = struct
 
   type hash = Md5.t [@@deriving sexp, hash, compare, bin_io]
-  module Account = struct
-    type t = int [@@deriving sexp, eq, bin_io]
-  end
-
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
 
@@ -32,5 +32,5 @@ module Key = struct
   include Hashable.Make_binable(T)
 end
 
-module Make = Ledger.Make(Hash)(Key)
+module Make = Ledger.Make(Account)(Hash)(Key)
 

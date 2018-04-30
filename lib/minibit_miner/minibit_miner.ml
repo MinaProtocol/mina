@@ -180,7 +180,7 @@ module Make
                 ; timestamp = new_state.timestamp
                 ; nonce
                 }
-              ; prior_ledger_hash = state.Inputs.State.ledger_hash
+              ; previous_ledger_hash = state.Inputs.State.ledger_hash
               ; transactions
               }
           | `Cancelled, _ -> Or_error.error_string "Mining cancelled"

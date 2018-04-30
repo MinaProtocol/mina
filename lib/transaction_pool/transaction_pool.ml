@@ -42,13 +42,16 @@ module Make
       | Some txn, Some h', i -> 
           (match Ledger.apply_transaction ledger txn with
           | Ok () ->
-              Ledger.undo_transaction ledger (txn :> Transaction.t) |> Or_error.ok_exn;
               go h' (i - 1) (txn::l)
           | Error e ->
               go h' (i - 1) l)
       | _, None, _ -> failwith "Impossible, top will be none if remove_top is none"
     in
-    go t k []
+    let txns = go t k [] in
+    List.iter txns ~f:(fun txn ->
+      Ledger.undo_transaction ledger (txn :> Transaction.t) |> Or_error.ok_exn
+    );
+    txns
 
   (* TODO: Actually back this by the file-system *)
   let load ~disk_location =

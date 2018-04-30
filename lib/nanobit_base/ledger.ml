@@ -3,8 +3,8 @@ open Snark_params
 open Currency
 
 include Merkle_ledger.Ledger.Make
+    (Account)
     (struct
-      module Account = Account
       type hash = Tick.Pedersen.Digest.t [@@deriving sexp, hash, compare, bin_io]
 
       let empty_hash =

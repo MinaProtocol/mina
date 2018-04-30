@@ -87,7 +87,7 @@ module Make_inputs0
       [@@deriving sexp, bin_io]
     type t =
       { transactions : transaction_with_valid_signature list
-      ; prior_ledger_hash : ledger_hash
+      ; previous_ledger_hash : ledger_hash
       ; state : state
       }
       [@@deriving sexp, bin_io]
@@ -97,7 +97,7 @@ module Make_inputs0
       type witness = witness0 [@@deriving bin_io]
       type t =
         { transactions : transaction list
-        ; prior_ledger_hash : ledger_hash
+        ; previous_ledger_hash : ledger_hash
         ; state : state
         }
       [@@deriving bin_io]
@@ -105,33 +105,33 @@ module Make_inputs0
 
     let strip t = 
       { Stripped.transactions = (t.transactions :> Transaction.t list)
-      ; prior_ledger_hash = t.prior_ledger_hash
+      ; previous_ledger_hash = t.previous_ledger_hash
       ; state = t.state
       }
 
     let forget_witness {state} = state
     (* TODO should we also consume a ledger here so we know the transactions valid? *)
-    let add_witness_exn state (transactions, prior_ledger_hash) =
-      {state ; transactions ; prior_ledger_hash}
+    let add_witness_exn state (transactions, previous_ledger_hash) =
+      {state ; transactions ; previous_ledger_hash}
     (* TODO same *)
-    let add_witness state (transactions, prior_ledger_hash) = Or_error.return {state ; transactions ; prior_ledger_hash}
+    let add_witness state (transactions, previous_ledger_hash) = Or_error.return {state ; transactions ; previous_ledger_hash}
   end
   module Transition_with_witness = struct
     type witness = (Transaction.With_valid_signature.t list * Ledger_hash.t)
     [@@deriving sexp]
     type t =
       { transactions : Transaction.With_valid_signature.t list
-      ; prior_ledger_hash : Ledger_hash.t
+      ; previous_ledger_hash : Ledger_hash.t
       ; transition : Transition.t
       }
     [@@deriving sexp]
 
     let forget_witness {transition} = transition
     (* TODO should we also consume a ledger here so we know the transactions valid? *)
-    let add_witness_exn transition (transactions, prior_ledger_hash) =
-      {transition ; transactions ; prior_ledger_hash}
+    let add_witness_exn transition (transactions, previous_ledger_hash) =
+      {transition ; transactions ; previous_ledger_hash}
     (* TODO same *)
-    let add_witness transition (transactions, prior_ledger_hash) = Or_error.return {transition ; transactions ; prior_ledger_hash}
+    let add_witness transition (transactions, previous_ledger_hash) = Or_error.return {transition ; transactions ; previous_ledger_hash}
   end
 
 end
