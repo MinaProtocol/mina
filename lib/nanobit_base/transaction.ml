@@ -41,8 +41,8 @@ module Payload = struct
   let var_to_bits { receiver; amount; fee } =
     with_label __LOC__ begin
       let%map receiver = Public_key.Compressed.var_to_bits receiver in
-      let amount = Amount.var_to_bits amount in
-      let fee = Fee.var_to_bits fee in
+      let amount = (Amount.var_to_bits amount :> Boolean.var list) in
+      let fee = (Fee.var_to_bits fee :> Boolean.var list) in
       receiver @ amount @ fee
     end
 

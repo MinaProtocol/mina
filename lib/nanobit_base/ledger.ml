@@ -45,8 +45,8 @@ let apply_transaction_unchecked ledger (transaction : Transaction.t) =
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
     let%map receiver_balance' = add_amount receiver_account.balance amount in
-    update ledger sender { sender_account with balance = sender_balance' };
-    update ledger receiver { receiver_account with balance = receiver_balance' }
+    set ledger sender { sender_account with balance = sender_balance' };
+    set ledger receiver { receiver_account with balance = receiver_balance' }
 
 let apply_transaction ledger (transaction : Transaction.With_valid_signature.t) =
   apply_transaction_unchecked ledger (transaction :> Transaction.t)
@@ -62,8 +62,8 @@ let undo_transaction ledger (transaction : Transaction.t) =
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
     let%map receiver_balance' = sub_amount receiver_account.balance amount in
-    update ledger sender { sender_account with balance = sender_balance' };
-    update ledger receiver { receiver_account with balance = receiver_balance' }
+    set ledger sender { sender_account with balance = sender_balance' };
+    set ledger receiver { receiver_account with balance = receiver_balance' }
 
 let merkle_root_after_transaction_exn ledger transaction =
   Or_error.ok_exn (apply_transaction ledger transaction);
@@ -82,3 +82,23 @@ let merkle_root_after_transactions t ts =
     ignore (undo_transaction t (txn :> Transaction.t)));
   root
 
+let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
+  let open Or_error.Let_syntax in
+  match transfer with
+  | One (pk, fee) ->
+    let%map a = get' t "One-pk" pk in
+    set t pk { a with balance = modify_balance a.balance fee }
+  | Two ((pk1, fee1), (pk2, fee2)) ->
+    let%map a1 = get' t "Two-pk1" pk1
+    and a2 = get' t "Two-pk2" pk2
+    in
+    set t pk1 { a1 with balance = modify_balance a1.balance fee1 };
+    set t pk2 { a2 with balance = modify_balance a2.balance fee2 }
+
+let apply_fee_transfer t transfer =
+  process_fee_transfer t transfer
+    ~modify_balance:(fun b f -> Option.value_exn (Balance.add_amount b (Amount.of_fee f)))
+
+let undo_fee_transfer t transfer =
+  process_fee_transfer t transfer
+    ~modify_balance:(fun b f -> Option.value_exn (Balance.sub_amount b (Amount.of_fee f)))
