@@ -9,7 +9,12 @@ module type S0 = sig
 
   val cancel : t -> unit
 
-  val create : conf_dir:string -> Ledger.t -> Transaction.With_valid_signature.t list -> t
+  val create
+    : conf_dir:string
+    -> Ledger.t
+    -> Transaction.With_valid_signature.t list
+    -> Public_key.Compressed.t
+    -> t
 
   val target_hash : t -> Ledger_hash.t
 
@@ -133,8 +138,13 @@ module Sparse_ledger = struct
 end
 
 module Input = struct
+  type transition =
+    | Transaction of Transaction.With_valid_signature.t
+    | Fee_transfer of Fee_transfer.t
+  [@@deriving bin_io]
+
   type t =
-    { transaction : Transaction.With_valid_signature.t
+    { transition : transition
     ; ledger : Sparse_ledger.t
     ; target_hash : Ledger_hash.Stable.V1.t
     }
@@ -153,19 +163,21 @@ module M = Map_reduce.Make_map_reduce_function_with_init(struct
 
     let init () = return (Worker_state.create ())
 
-    let map ((module T) : state_type) { Input.transaction; ledger } =
-      T.of_transaction
-        (Sparse_ledger.merkle_root ledger)
-        Sparse_ledger.(merkle_root (apply_transaction_exn ledger (transaction :> Transaction.t)))
-        transaction
-        (unstage (Sparse_ledger.handler ledger))
-      |> return
+    let map ((module T) : state_type) { Input.transition; ledger; target_hash } =
+      return begin match transition with
+      | Fee_transfer t ->
+        T.of_fee_transfer (Sparse_ledger.merkle_root ledger) target_hash t
+          (unstage (Sparse_ledger.handler ledger))
+      | Transaction t ->
+        T.of_transaction (Sparse_ledger.merkle_root ledger) target_hash t
+          (unstage (Sparse_ledger.handler ledger))
+      end
 
     let combine ((module T) : state_type) t1 t2 =
       return (T.merge t1 t2)
   end)
 
-let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t list) : t =
+let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t list) fee_pk : t =
   Parallel.init_master ();
   let config =
     Map_reduce.Config.create
@@ -173,6 +185,7 @@ let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t l
       ~redirect_stdout:(`File_append (conf_dir ^/ "bundle-stdout"))
       ()
   in
+  let total_fees = ref Currency.Fee.zero in
   let inputs =
     List.filter_map transactions ~f:(fun tx ->
       let { Transaction.sender; payload } as transaction = (tx :> Transaction.t) in
@@ -184,14 +197,27 @@ let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t l
       match Ledger.apply_transaction ledger tx with
       | Ok () ->
         let target_hash = Ledger.merkle_root ledger in
-        let t = { Input.transaction = tx; ledger = sparse_ledger; target_hash } in
+        total_fees := Option.value_exn (Currency.Fee.add !total_fees payload.fee);
+        let t = { Input.transition = Transaction tx; ledger = sparse_ledger; target_hash } in
         Some t
       | Error _s -> None)
   in
+  let fee_collection = Fee_transfer.One (fee_pk, !total_fees) in
+  let fee_collection_ledger = Sparse_ledger.of_ledger_subset ledger [ fee_pk ] in
+  Or_error.ok_exn (Ledger.apply_fee_transfer ledger fee_collection);
   let target_hash = Ledger.merkle_root ledger in
-  List.iter (List.rev inputs) ~f:(fun { transaction; _ } ->
-    let transaction = (transaction :> Transaction.t) in
-    Or_error.ok_exn (Ledger.undo_transaction ledger transaction));
+  let fee_collection_input : Input.t =
+    { transition = Fee_transfer fee_collection
+    ; ledger = fee_collection_ledger
+    ; target_hash
+    }
+  in
+  let inputs = inputs @ [ fee_collection_input ] in
+  List.iter (List.rev inputs) ~f:(fun { transition; _ } ->
+    Or_error.ok_exn begin match transition with
+      | Fee_transfer t -> Ledger.undo_fee_transfer ledger t
+      | Transaction t -> Ledger.undo_transaction ledger (t :> Transaction.t)
+    end);
   { result =
       Map_reduce.map_reduce config
         (Pipe.of_list inputs)

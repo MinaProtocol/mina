@@ -13,7 +13,10 @@ module type S0 = sig
     One idea is to have a "drain" snark at the end that
     takes the built up fees and transfers them into one
     account. *)
-  val create : conf_dir:string -> Ledger.t -> Transaction.With_valid_signature.t list -> t
+  val create
+    : conf_dir:string -> Ledger.t -> Transaction.With_valid_signature.t list
+    -> Public_key.Compressed.t
+    -> t
 
   val target_hash : t -> Ledger_hash.t
 
