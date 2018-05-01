@@ -9,14 +9,14 @@ let create_ledger_and_transactions num_transactions =
   let keys = Array.init num_accounts ~f:(fun _ -> Signature_keypair.create ()) in
   Array.iter keys ~f:(fun k ->
     let public_key = Public_key.compress k.public_key in
-    Ledger.update ledger public_key
+    Ledger.set ledger public_key
       { public_key; balance = Currency.Balance.of_int 10_000 });
   let random_transaction () : Transaction.With_valid_signature.t =
     let sender = keys.(Random.int num_accounts) in
     let receiver = keys.(Random.int num_accounts) in
     let payload : Transaction.Payload.t =
       { receiver = Public_key.compress receiver.public_key
-      ; fee = Currency.Fee.zero
+      ; fee = Currency.Fee.of_int (1 + Random.int 100)
       ; amount = Currency.Amount.of_int (1 + Random.int 100)
       }
     in

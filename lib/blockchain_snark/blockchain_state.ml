@@ -178,6 +178,7 @@ module Make_update (T : Transaction_snark.S) = struct
         ~source:state.ledger_hash
         ~target:block.body.target_hash
         ~proof_type:Merge
+        ~fee_excess:Currency.Amount.Signed.zero
         ~proof:block.body.proof
         |> T.verify);
     let hash =
@@ -274,7 +275,7 @@ module Make_update (T : Transaction_snark.S) = struct
       =
       with_label __LOC__ begin
         let%bind good_body =
-          T.verify_merge
+          T.verify_complete_merge
             previous_state.ledger_hash block.body.target_hash
             (As_prover.return block.body.proof)
         in

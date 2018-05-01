@@ -11,6 +11,9 @@ module type Init_intf = sig
   val prover : Prover.t
 
   val genesis_proof : proof
+
+  (* Public key to allocate fees to *)
+  val fee_public_key : Public_key.Compressed.t
 end
 
 module Make_inputs0
@@ -152,7 +155,7 @@ module Make_inputs
 
   module Bundle = struct
     include Bundle
-    let create ledger ts = create ledger ts ~conf_dir:Init.conf_dir
+    let create ledger ts = create ledger ~conf_dir:Init.conf_dir ts Init.fee_public_key
   end
 
   module Transaction_pool = Transaction_pool.Make(Transaction)
@@ -184,6 +187,7 @@ module Main_without_snark (Init : Init_intf) = struct
     let conf_dir = Init.conf_dir
     let prover = Init.prover
     let genesis_proof = ()
+    let fee_public_key = Genesis_ledger.rich_pk
   end
 
   module Ledger_proof = Ledger_proof.Debug
@@ -193,7 +197,7 @@ module Main_without_snark (Init : Init_intf) = struct
   module Bundle = struct
     type t = Ledger_hash.t
 
-    let create ~conf_dir ledger ts =
+    let create ~conf_dir ledger ts _pk =
       Ledger.merkle_root_after_transactions ledger ts
 
     let cancel (t : t) : unit = ()
@@ -405,6 +409,7 @@ let daemon =
             let conf_dir = conf_dir
             let prover = prover
             let genesis_proof = genesis_proof
+            let fee_public_key = Genesis_ledger.rich_pk
           end
           in
           let module Main_without_snark = Main_without_snark(Init) in

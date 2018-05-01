@@ -4,9 +4,11 @@ open Nanobit_base
 open Snark_params
 open Blockchain_snark
 
+let insecure_key_generation = true
+
 module Transaction_snark_keys = struct
   let keys =
-    if Insecure.key_generation
+    if insecure_key_generation
     then Transaction_snark.Keys.dummy ()
     else Transaction_snark.Keys.create ()
 end
@@ -24,7 +26,7 @@ module Transition =
 ;;
 
 let real_tick_vk, tick_vk, tick_pk =
-  if Insecure.key_generation then
+  if insecure_key_generation then
     let kp =
       let open Tick in
       generate_keypair Data_spec.[Boolean.typ] (fun b -> Boolean.Assert.is_true b)

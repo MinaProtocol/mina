@@ -12,7 +12,10 @@ module Make_prod (Init : sig val prover : Prover.t end) = struct
 
   let verify proof { source; target; proof_type } =
     Prover.verify_transaction_snark Init.prover
-      (Transaction_snark.create ~source ~target ~proof_type ~proof)
+      (Transaction_snark.create
+         ~source ~target
+         ~proof_type ~fee_excess:Currency.Amount.Signed.zero
+         ~proof)
     >>| Or_error.ok_exn
 end
 
