@@ -13,6 +13,88 @@ let wrap_input () = Tock.(Data_spec.([ Field.typ ]))
 let provide_witness' typ ~f =
   Tick.(provide_witness typ As_prover.(map get_state ~f))
 
+module Tag : sig
+  open Tick
+
+  type t =
+    | Normal
+    | Fee_transfer
+
+  type var
+
+  val typ : (var, t) Typ.t
+
+  module Checked : sig
+    val is_normal : var -> Boolean.var
+    val is_fee_transfer : var -> Boolean.var
+  end
+end = struct
+  open Tick
+
+  type t =
+    | Normal
+    | Fee_transfer
+
+  let is_normal = function
+    | Normal -> true
+    | Fee_transfer -> false
+
+  type var = Boolean.var
+
+  let typ =
+    Typ.transport Boolean.typ ~there:is_normal
+      ~back:(function true -> Normal | false -> Fee_transfer)
+
+  module Checked = struct
+    let is_normal = Fn.id
+    let is_fee_transfer = Boolean.not
+  end
+end
+
+module Tagged_transaction = struct
+  open Tick
+
+  type t = Tag.t * Transaction.t
+  type var = Tag.var * Transaction.var
+  let typ : (var, t) Typ.t = Typ.(Tag.typ * Transaction.typ)
+
+  let excess ((tag, t) : t) =
+    match tag with
+    | Normal ->
+      Amount.Signed.create ~sgn:Sgn.Pos
+        ~magnitude:(Amount.of_fee t.payload.fee)
+    | Fee_transfer ->
+      let magnitude =
+        Amount.add_fee t.payload.amount t.payload.fee
+        |> Option.value_exn
+      in
+      Amount.Signed.create ~sgn:Sgn.Neg ~magnitude
+end
+
+module Fee_transfer = struct
+  include Fee_transfer
+
+  let dummy_signature =
+    Tick.Schnorr.sign (Private_key.create ())
+      (List.init 256 ~f:(fun _ -> true))
+
+  let two (pk1, fee1) (pk2, fee2) : Tagged_transaction.t =
+    ( Fee_transfer
+    , { payload =
+          { receiver = pk1
+          ; amount = Amount.of_fee fee1 (* What "receiver" receives *)
+          ; fee = fee2 (* What "sender" receives *)
+          }
+      ; sender = Public_key.decompress_exn pk2
+      ; signature = dummy_signature
+      }
+    )
+
+  let to_tagged_transaction = function
+    | One (pk1, fee1) -> two (pk1, fee1) (pk1, Fee.zero)
+    | Two (t1, t2) -> two t1 t2
+end
+
 module Proof_type = struct
   type t = Base | Merge
   [@@deriving bin_io]
@@ -26,11 +108,35 @@ type t =
   { source     : Ledger_hash.Stable.V1.t
   ; target     : Ledger_hash.Stable.V1.t
   ; proof_type : Proof_type.t
+  ; fee_excess : Amount.Signed.t
   ; proof      : Proof.Stable.V1.t
   }
 [@@deriving fields, bin_io]
 
 let create = Fields.create
+
+(*
+module State = struct
+  type ('ledger_hash, 'amount) t_ =
+    { ledger_hash : 'ledger_hash
+    ; total_fees  : 'amount
+    }
+
+  type t = (Ledger_hash.t, Amount.t) t_
+  type var = (Ledger_hash.var, Amount.var) t_
+
+  let to_hlist { ledger_hash; total_fees } = H_list.([ ledger_hash; total_fees ])
+  let of_hlist : (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
+    H_list.(fun [ ledger_hash; total_fees ] -> { ledger_hash; total_fees })
+
+  let typ =
+    let open Tick in
+    Typ.of_hlistable Data_spec.([ Ledger_hash.typ; Amount.typ ])
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  module Hash = Data_hash.Make()
+end *)
 
 module Keys0 = struct
   module Binable_of_bigstringable
@@ -97,7 +203,7 @@ let handle_with_ledger (ledger : Ledger.t) =
       let path = path_at_index idx in
       respond (Provide path)
     | Set (idx, account) ->
-      Ledger.update_at_index_exn ledger idx account;
+      Ledger.set_at_index_exn ledger idx account;
       respond (Provide ())
     | Find_index pk ->
       let index = Ledger.index_of_key_exn ledger pk in
@@ -112,6 +218,53 @@ let handle_with_ledger (ledger : Ledger.t) =
 module Base = struct
   open Tick
   open Let_syntax
+
+  (* spec for [apply_transaction root { sender; signature; payload }]:
+     - check that [signature] is a signature by [sender] of payload
+     - return the merkle tree [root'] where the sender balance is decremented by
+     [payload.amount] and the receiver balance is incremented by [payload.amount].
+  *)
+  (* Nonce should only be incremented if it is a "Normal" transaction. *)
+  let apply_tagged_transaction root
+        ((tag, { sender; signature; payload }) : Tagged_transaction.var) =
+    (if not Insecure.transaction_replay
+     then failwith "Insecure.transaction_replay false");
+    let { Transaction.Payload.receiver; amount; fee } = payload in
+    let%bind () =
+      (* Should only assert_verifies if the tag is Normal *)
+      let%bind bs = Transaction.Payload.var_to_bits payload in
+      Schnorr.Checked.assert_verifies signature sender bs
+    in
+    let%bind excess, sender_delta =
+      let%bind amount_plus_fee = Amount.Checked.add_fee amount fee in
+      let open Amount.Signed in
+      let neg_amount_plus_fee = create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee in
+      let pos_fee = create ~sgn:Sgn.Pos ~magnitude:(Amount.Checked.of_fee fee) in
+      (* If tag = Normal:
+         sender gets -(amount + fee)
+         excess is +fee
+
+         If tag = Fee_transfer:
+         "sender" gets +fee
+         excess is -(amount + fee) (since "receiver" gets amount)
+      *)
+      Checked.cswap (Tag.Checked.is_fee_transfer tag)
+        (pos_fee, neg_amount_plus_fee)
+    in
+    let%bind root =
+      let%bind sender_compressed = Public_key.compress_var sender in
+      Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
+        let%map balance =
+          Balance.Checked.add_signed_amount account.balance sender_delta
+        in
+        { account with balance })
+    in
+    let%map root =
+      Ledger_hash.modify_account root receiver ~f:(fun account ->
+        let%map balance = Balance.Checked.(account.balance + amount) in
+        { account with balance })
+    in
+    (root, excess)
 
   (* spec for [apply_transaction root { sender; signature; payload }]:
      - check that [signature] is a signature by [sender] of payload
@@ -143,14 +296,11 @@ module Base = struct
    - apply a transaction and stuff in the wrong target hash
 *)
 
-  let apply_transactions root ts =
-    Checked.List.fold ~init:root ~f:apply_transaction ts
-
   module Prover_state = struct
     type t =
-      { transactions : Transaction.With_valid_signature.t list
-      ; state1 : Ledger_hash.t
-      ; state2 : Ledger_hash.t
+      { transaction : Tagged_transaction.t
+      ; state1      : Ledger_hash.t
+      ; state2      : Ledger_hash.t
       }
     [@@deriving fields]
   end
@@ -162,42 +312,53 @@ module Base = struct
    H(l1, l2) = top_hash,
    applying ts to ledger with merkle hash l1 results in ledger with merkle hash l2. *)
   let main top_hash =
-    let%bind l1 = provide_witness' Ledger_hash.typ ~f:Prover_state.state1 in
-    let%bind l2 = provide_witness' Ledger_hash.typ ~f:Prover_state.state2 in
-    let%bind () =
-      let%bind b1 = Ledger_hash.var_to_bits l1
-      and b2 = Ledger_hash.var_to_bits l2
+    let open Let_syntax in
+    let%bind root_before = provide_witness' Ledger_hash.typ ~f:Prover_state.state1 in
+(*     let%bind l2 = provide_witness' Ledger_hash.typ ~f:Prover_state.state2 in *)
+    let%bind t =
+      provide_witness' Tagged_transaction.typ
+        ~f:Prover_state.transaction
+    in
+    let%bind root_after, fee_excess = apply_tagged_transaction root_before t in
+    let%map () =
+      let%bind b1 = Ledger_hash.var_to_bits root_before
+      and b2 = Ledger_hash.var_to_bits root_after
       in
-      hash_digest (b1 @ b2) >>= assert_equal top_hash
+      let fee_excess_bits = Amount.Signed.Checked.to_bits fee_excess in
+      hash_digest (b1 @ b2 @ fee_excess_bits)
+      >>= assert_equal top_hash
     in
-    let%bind ts =
-      provide_witness' (Typ.list ~length:bundle_length Transaction.typ)
-        ~f:(fun s -> (Prover_state.transactions s :> Transaction.t list))
-    in
-    apply_transactions l1 ts >>= Ledger_hash.assert_equal l2
+    ()
 
   let create_keys () =
     generate_keypair main ~exposing:(tick_input ())
 
-  let top_hash s1 s2 =
+  let top_hash s1 s2 excess =
     Pedersen.hash_fold Pedersen.params
       (fun ~init ~f ->
          let init = Ledger_hash.fold s1 ~init ~f in
-         Ledger_hash.fold s2 ~init ~f)
+         let init = Ledger_hash.fold s2 ~init ~f in
+         Amount.Signed.fold excess ~init ~f)
 
-  let bundle ~proving_key
+  let tagged_transaction_proof ~proving_key
         state1
         state2
-        transaction
+        (transaction : Tagged_transaction.t)
         handler
     =
-    let prover_state : Prover_state.t =
-      { state1; state2; transactions = [ transaction ] }
-    in
+    let prover_state : Prover_state.t = { state1; state2; transaction } in
     let main top_hash = handle (main top_hash) handler in
-    let top_hash = top_hash state1 state2 in
+    let top_hash = top_hash state1 state2 (Tagged_transaction.excess transaction) in
     top_hash,
     prove proving_key (tick_input ()) prover_state main top_hash
+
+  let fee_transfer_proof ~proving_key state1 state2 transfer handler = 
+    tagged_transaction_proof ~proving_key state1 state2
+      (Fee_transfer.to_tagged_transaction transfer) handler
+
+  let transaction_proof ~proving_key state1 state2 transaction handler =
+    tagged_transaction_proof ~proving_key state1 state2
+      (Normal, transaction) handler
 end
 
 module Merge = struct
@@ -206,12 +367,16 @@ module Merge = struct
 
   module Prover_state = struct
     type t =
-      { tock_vk : Tock_curve.Verification_key.t
-      ; input1  : bool list
-      ; proof12 : Proof_type.t * Tock_curve.Proof.t
-      ; input2  : bool list
-      ; proof23 : Proof_type.t * Tock_curve.Proof.t
-      ; input3  : bool list
+      { tock_vk      : Tock_curve.Verification_key.t
+      ; ledger_hash1 : bool list
+
+      ; ledger_hash2 : bool list
+      ; proof12      : Proof_type.t * Tock_curve.Proof.t
+      ; fee_excess12 : Amount.Signed.t
+
+      ; ledger_hash3 : bool list
+      ; proof23      : Proof_type.t * Tock_curve.Proof.t
+      ; fee_excess23 : Amount.Signed.t
       }
     [@@deriving fields]
   end
@@ -233,13 +398,18 @@ module Merge = struct
      returns a bool which is true iff
      there is a snark proving making tock_vk
      accept on one of [ H(s1, s2); H(s1, s2, tock_vk) ] *)
-  let verify_transition tock_vk proof_field s1 s2 =
+  let verify_transition tock_vk proof_field s1 s2 fee_excess =
     let open Let_syntax in
     let get_proof s = let (_t, proof) = proof_field s in proof in
     let get_type s = let (t, _proof) = proof_field s in t in
+    let input_bits = s1 @ s2 @ Amount.Signed.Checked.to_bits fee_excess in
+    let input_bits_length = List.length input_bits in
+    assert (input_bits_length = 2 * Tock.Field.size_in_bits + Amount.Signed.length);
     let%bind states_hash = 
+      (* TODO: This only works because Fees are smaller than amounts and
+        are LSB first and hashing 0s does nothing. *)
       with_label __LOC__ begin
-        Pedersen_hash.hash (s1 @ s2)
+        Pedersen_hash.hash input_bits
           ~params:Pedersen.params
           ~init:(0, Hash_curve.Checked.identity)
       end
@@ -248,7 +418,7 @@ module Merge = struct
       with_label __LOC__ begin
         Pedersen_hash.hash tock_vk
           ~params:Pedersen.params
-          ~init:(2 * Tock.Field.size_in_bits, states_hash)
+          ~init:(input_bits_length, states_hash)
       end
     in
     let%bind is_base =
@@ -288,13 +458,18 @@ module Merge = struct
     let%bind tock_vk =
       provide_witness' tock_vk_typ ~f:(fun { Prover_state.tock_vk } ->
         Verifier.Verification_key.to_bool_list tock_vk)
-    and s1 = provide_witness' wrap_input_typ ~f:Prover_state.input1
-    and s2 = provide_witness' wrap_input_typ ~f:Prover_state.input2
-    and s3 = provide_witness' wrap_input_typ ~f:Prover_state.input3
+    and s1 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash1
+    and s2 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash2
+    and s3 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash3
+    and fee_excess12 = provide_witness' Amount.Signed.typ ~f:Prover_state.fee_excess12
+    and fee_excess23 = provide_witness' Amount.Signed.typ ~f:Prover_state.fee_excess23
     in
-    let%bind () = hash_digest (s1 @ s3 @ tock_vk) >>= assert_equal top_hash
-    and verify_12 = verify_transition tock_vk Prover_state.proof12 s1 s2
-    and verify_23 = verify_transition tock_vk Prover_state.proof23 s2 s3
+    let%bind () =
+      let%bind total_fees = Amount.Signed.Checked.add fee_excess12 fee_excess23 in
+      hash_digest (s1 @ s3 @ Amount.Signed.Checked.to_bits total_fees @ tock_vk)
+      >>= assert_equal top_hash
+    and verify_12 = verify_transition tock_vk Prover_state.proof12 s1 s2 fee_excess12
+    and verify_23 = verify_transition tock_vk Prover_state.proof23 s2 s3 fee_excess23
     in
     Boolean.Assert.all [ verify_12; verify_23 ]
 
@@ -384,26 +559,40 @@ module type S = sig
     -> Tick.Handler.t
     -> t
 
+  val of_fee_transfer
+    :  Ledger_hash.t
+    -> Ledger_hash.t
+    -> Fee_transfer.t
+    -> Tick.Handler.t
+    -> t
+
   val merge : t -> t -> t
 
-  val verify_merge
+  val verify_complete_merge
     : Ledger_hash.var
     -> Ledger_hash.var
     -> (Tock.Proof.t, 's) Tick.As_prover.t
     -> (Tick.Boolean.var, 's) Tick.Checked.t
 end
 
-let check_transaction source target transaction handler =
+let check_tagged_transaction source target transaction handler =
   let prover_state : Base.Prover_state.t =
-    { state1=source; state2=target; transactions = [ transaction ] }
+    { state1=source; state2=target; transaction }
   in
+  let excess = Tagged_transaction.excess transaction in
+  let top_hash = Base.top_hash source target excess in
   let open Tick in
-  let top_hash = Base.top_hash source target in
   let main = handle (Base.main (Cvar.constant top_hash)) handler in
   let (_s, (), passed) =
     run_and_check (Checked.map main ~f:As_prover.return) prover_state
   in
   assert passed
+
+let check_transaction source target (transaction : Transaction.With_valid_signature.t) handler =
+  check_tagged_transaction source target (Normal, (transaction :> Transaction.t)) handler
+
+let check_fee_transfer source target transfer handler =
+  check_tagged_transaction source target (Fee_transfer.to_tagged_transaction transfer) handler
 
 module Make (K : sig val keys : Keys0.t end) = struct
   open K
@@ -421,54 +610,78 @@ module Make (K : sig val keys : Keys0.t end) = struct
 
   let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list keys.wrap_vk
 
-  let merge_top_hash s1 s2 =
+  let merge_top_hash s1 s2 fee_excess =
     Tick.Pedersen.hash_fold Tick.Pedersen.params
       (fun ~init ~f ->
         let init = Ledger_hash.fold ~init ~f s1 in
         let init = Ledger_hash.fold ~init ~f s2 in
+        let init = Amount.Signed.fold ~init ~f fee_excess in
         List.fold ~init ~f wrap_vk_bits)
 
-  let merge_proof input1 input2 input3 proof12 proof23 =
-    let top_hash = merge_top_hash input1 input3 in
+  let merge_proof
+        ledger_hash1
+        ledger_hash2
+        ledger_hash3
+        proof12
+        proof23
+        fee_excess12
+        fee_excess23
+    =
+    let fee_excess =
+      Amount.Signed.add fee_excess12 fee_excess23
+      |> Option.value_exn
+    in
+    let top_hash = merge_top_hash ledger_hash1 ledger_hash3 fee_excess in
     let to_bits = Ledger_hash.to_bits in
     top_hash,
     Tick.prove keys.merge_pk (tick_input ())
-      { Merge.Prover_state.input1 = to_bits input1
-      ; input2 = to_bits input2
-      ; input3 = to_bits input3
+      { Merge.Prover_state.ledger_hash1 = to_bits ledger_hash1
+      ; ledger_hash2 = to_bits ledger_hash2
+      ; ledger_hash3 = to_bits ledger_hash3
       ; proof12
       ; proof23
+      ; fee_excess12
+      ; fee_excess23
       ; tock_vk = keys.wrap_vk
       }
       Merge.main
       top_hash
 
-  let vk_curve_pt =
+(* The curve pt corresponding to H(Amount.Signed.zero, wrap_vk)
+   (with starting point shifted over by 2 * digest_size so that
+   this can then be used to compute H(s1, s2, Amount.Signed.zero, wrap_vk) *)
+  let zero_and_vk_curve_pt =
     let open Tick in
     let s =
       Pedersen.State.create
         ~bits_consumed:(Pedersen.Digest.size_in_bits * 2)
         Pedersen.params
     in
-    (Pedersen.State.update_fold s (List.fold wrap_vk_bits)).acc
+    let s =
+      Pedersen.State.update_fold s
+        (fun ~init ~f ->
+           let init = Amount.Signed.(fold zero ~init ~f) in
+           List.fold wrap_vk_bits ~init ~f)
+    in
+    s.acc
 
 (* spec for [verify_merge s1 s2 _]:
    Returns a boolean which is true if there exists a tock proof proving
-   (against the wrap verification key) H(s1, s2, wrap_vk).
+   (against the wrap verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
    This in turn should only happen if there exists a tick proof proving
-   (against the merge verification key) H(s1, s2, wrap_vk).
+   (against the merge verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
 
-   We precompute the part of the pedersen involving wrap_vk outside the SNARK
-   since this saves us many constraints.
+   We precompute the parts of the pedersen involving wrap_vk and
+   Amount.Signed.zero outside the SNARK since this saves us many constraints.
 *)
-  let verify_merge s1 s2 get_proof =
+  let verify_complete_merge s1 s2 get_proof =
     let open Tick in
     let open Let_syntax in
     let%bind s1 = Ledger_hash.var_to_bits s1
     and s2 = Ledger_hash.var_to_bits s2
     in
     let%bind top_hash =
-      let (vx, vy) = vk_curve_pt in
+      let (vx, vy) = zero_and_vk_curve_pt in
       Pedersen_hash.hash ~params:Pedersen.params
         ~init:(0, (Cvar.constant vx, Cvar.constant vy))
         (s1 @ s2)
@@ -483,22 +696,32 @@ module Make (K : sig val keys : Keys0.t end) = struct
     >>| Merge.Verifier.All_in_one.result
   ;;
 
-  let verify { source; target; proof; proof_type } =
+  let verify { source; target; proof; proof_type; fee_excess } =
     let input =
       match proof_type with
-      | Base -> Base.top_hash source target
-      | Merge -> merge_top_hash source target
+      | Base -> Base.top_hash source target fee_excess
+      | Merge -> merge_top_hash source target fee_excess
     in
     Tock.verify proof keys.wrap_vk (wrap_input ()) (embed input)
 
-  let of_transaction source target transaction handler =
-    let top_hash, proof = Base.bundle ~proving_key:keys.base_pk source target transaction handler in
-    let proof_type = Proof_type.Base in
+  let of_tagged_transaction source target transaction handler =
+    let top_hash, proof =
+      Base.tagged_transaction_proof ~proving_key:keys.base_pk source target transaction handler
+    in
     { source
     ; target
-    ; proof_type
-    ; proof = wrap proof_type proof top_hash
+    ; proof_type = Base
+    ; fee_excess = Tagged_transaction.excess transaction
+    ; proof = wrap Proof_type.Base proof top_hash
     }
+
+  let of_transaction source target (transaction : Transaction.With_valid_signature.t) handler =
+    of_tagged_transaction source target
+      (Normal, (transaction :> Transaction.t)) handler
+
+  let of_fee_transfer source target transfer handler =
+    of_tagged_transaction source target
+      (Fee_transfer.to_tagged_transaction transfer) handler
 
   let merge t1 t2 =
     (if not (Ledger_hash.(=) t1.target t2.source)
@@ -507,16 +730,30 @@ module Make (K : sig val keys : Keys0.t end) = struct
         !"Transaction_snark.merge: t1.target <> t2.source (%{sexp:Ledger_hash.t} vs %{sexp:Ledger_hash.t})"
         t1.target
         t2.source ());
+    (*
+    let t1_proof_type, t1_total_fees =
+      Proof_type_with_fees.to_proof_type_and_amount t1.proof_type_with_fees
+    in
+    let t2_proof_type, t2_total_fees =
+      Proof_type_with_fees.to_proof_type_and_amount t2.proof_type_with_fees
+       in *)
     let input, proof =
-      merge_proof t1.source t1.target t2.target
+      merge_proof
+        t1.source t1.target t2.target
         (t1.proof_type, t1.proof)
         (t2.proof_type, t2.proof)
+        t1.fee_excess
+        t2.fee_excess
     in
-    let proof_type = Proof_type.Merge in
+    let fee_excess =
+      Amount.Signed.add t1.fee_excess t2.fee_excess
+      |> Option.value_exn
+    in
     { source = t1.source
     ; target = t2.target
-    ; proof_type
-    ; proof = wrap proof_type proof input
+    ; fee_excess
+    ; proof_type = Merge
+    ; proof = wrap Proof_type.Merge proof input
     }
 end
 
@@ -562,12 +799,12 @@ let%test_module "transaction_snark" =
       Array.init n ~f:(fun _ -> random_wallet ())
     ;;
 
-    let transaction wallets i j amt =
+    let transaction wallets i j amt fee =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
       let payload : Transaction.Payload.t =
         { receiver = receiver.account.public_key
-        ; fee = Fee.zero
+        ; fee
         ; amount = Amount.of_int amt
         }
       in
@@ -598,14 +835,23 @@ let%test_module "transaction_snark" =
           Ledger.create ()
         in
         Array.iter wallets ~f:(fun { account } ->
-          Ledger.update ledger account.public_key account);
-        let t1 = transaction wallets 0 1 8 in
-        let t2 = transaction wallets 1 2 3 in
+          Ledger.set ledger account.public_key account);
+        let t1 = transaction wallets 0 1 8 (Fee.of_int (Random.int 20)) in
+        let t2 = transaction wallets 1 2 3 (Fee.of_int (Random.int 20)) in
         let state1 = Ledger.merkle_root ledger in
         let proof12 = of_transaction' ledger t1 in
         let proof23 = of_transaction' ledger t2 in
+        let total_fees =
+          let open Amount in
+          let magnitude =
+            of_fee ((t1 :> Transaction.t).payload.fee)
+            + of_fee ((t2 :> Transaction.t).payload.fee)
+            |> Option.value_exn
+          in
+          Signed.create ~magnitude ~sgn:Sgn.Pos
+        in
         let state3 = Ledger.merkle_root ledger in
         let proof13 = merge proof12 proof23 in
         Tock.verify proof13.proof keys.wrap_vk (wrap_input ())
-          (embed (merge_top_hash state1 state3)))
+          (embed (merge_top_hash state1 state3 total_fees)))
   end)
