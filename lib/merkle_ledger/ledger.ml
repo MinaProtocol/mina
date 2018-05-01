@@ -37,7 +37,9 @@ module type S = sig
 
   val get : t -> key -> account option
 
-  val update : t -> key -> account -> unit
+  val set : t -> key -> account -> unit
+
+  val update : t -> key -> f:(account option -> account) -> unit
 
   val merkle_root : t -> hash
 
@@ -63,7 +65,7 @@ module type S = sig
   val get_at_index
     : t -> index -> [ `Ok of account | `Index_not_found ]
 
-  val update_at_index
+  val set_at_index
     : t -> index -> account -> [ `Ok | `Index_not_found ]
 
   val merkle_path_at_index
@@ -72,7 +74,7 @@ module type S = sig
   val get_at_index_exn
     : t -> index -> account
 
-  val update_at_index_exn
+  val set_at_index_exn
     : t -> index -> account -> unit
 
   val merkle_path_at_index_exn
@@ -254,7 +256,7 @@ module Make
     | `Index_not_found ->
       index_not_found "get_at_index_exn" index
 
-  let update t key account = 
+  let set t key account = 
     match Hashtbl.find t.accounts key with
     | None -> 
       let merkle_index = DynArray.length t.tree.leafs in
@@ -266,7 +268,19 @@ module Make
       t.tree.dirty_indices <- entry.merkle_index :: t.tree.dirty_indices;
   ;;
 
-  let update_at_index t index account =
+  let update t key ~f = 
+    match Hashtbl.find t.accounts key with
+    | None -> 
+      let merkle_index = DynArray.length t.tree.leafs in
+      Hashtbl.set t.accounts ~key ~data:{ merkle_index; account = f None };
+      DynArray.add t.tree.leafs key;
+      t.tree.dirty_indices <- merkle_index :: t.tree.dirty_indices;
+    | Some { merkle_index; account } -> 
+      Hashtbl.set t.accounts ~key ~data:{ merkle_index; account = f (Some account) };
+      t.tree.dirty_indices <- merkle_index :: t.tree.dirty_indices;
+  ;;
+
+  let set_at_index t index account =
     let leafs = t.tree.leafs in
     if index < DynArray.length leafs
     then begin
@@ -277,11 +291,11 @@ module Make
       `Ok
     end else `Index_not_found
 
-  let update_at_index_exn t index account =
-    match update_at_index t index account with
+  let set_at_index_exn t index account =
+    match set_at_index t index account with
     | `Ok -> ()
     | `Index_not_found ->
-      index_not_found "update_at_index_exn" index
+      index_not_found "set_at_index_exn" index
 
   let extend_tree tree = 
     let leafs = DynArray.length tree.leafs in

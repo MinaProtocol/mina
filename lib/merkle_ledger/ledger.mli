@@ -35,7 +35,9 @@ module type S = sig
 
   val get : t -> key -> account option
 
-  val update : t -> key -> account -> unit
+  val set : t -> key -> account -> unit
+
+  val update : t -> key -> f:(account option -> account) -> unit
 
   val merkle_root : t -> hash
 
@@ -61,7 +63,7 @@ module type S = sig
   val get_at_index
     : t -> index -> [ `Ok of account | `Index_not_found ]
 
-  val update_at_index
+  val set_at_index
     : t -> index -> account -> [ `Ok | `Index_not_found ]
 
   val merkle_path_at_index
@@ -70,7 +72,7 @@ module type S = sig
   val get_at_index_exn
     : t -> index -> account
 
-  val update_at_index_exn
+  val set_at_index_exn
     : t -> index -> account -> unit
 
   val merkle_path_at_index_exn

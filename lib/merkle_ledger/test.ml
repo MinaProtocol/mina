@@ -10,7 +10,7 @@ module Ledger (L : S) = struct
   let load_ledger n b =
     let ledger = create () in
     let keys = List.init n ~f:(fun i -> Int.to_string i) in
-    List.iter keys ~f:(fun k -> update ledger k b);
+    List.iter keys ~f:(fun k -> set ledger k b);
     (ledger, keys)
 end
 
@@ -58,7 +58,7 @@ let%test_unit "modify_account" =
   let ledger, keys = L16.load_ledger 10 b in
   let key = List.nth_exn keys 0 in
   assert (Some 100 = L16.get ledger key);
-  L16.update ledger key 50;
+  L16.set ledger key 50;
   assert (Some 50 = L16.get ledger key);
 ;;
 
@@ -67,7 +67,7 @@ let%test_unit "modify_account_by_idx" =
   let ledger, keys = L16.load_ledger 10 b in
   let idx = 0 in
   assert (`Ok 100 = L16.get_at_index ledger idx);
-  L16.update_at_index_exn ledger idx 50;
+  L16.set_at_index_exn ledger idx 50;
   assert (`Ok 50 = L16.get_at_index ledger idx);
 ;;
 
@@ -100,15 +100,15 @@ let%test_unit "merkle_root_edit" =
   let root0 = L16.merkle_root ledger in
   assert (Test_ledger.Hash.empty_hash <> root0);
 
-  L16.update ledger key b2;
+  L16.set ledger key b2;
   let root1 = L16.merkle_root ledger in
   assert (root1 <> root0);
 
-  L16.update ledger key b1;
+  L16.set ledger key b1;
   let root2 = L16.merkle_root ledger in
   assert (root2 = root0);
 
-  L16.update ledger key b2;
+  L16.set ledger key b2;
   let root3 = L16.merkle_root ledger in
   assert (root3 = root1);
 ;;
@@ -187,7 +187,7 @@ let%test_unit "merkle_path_edits" =
   List.iter (List.range 0 n)
     ~f:(fun i -> 
       let key = List.nth_exn keys i in
-      L16.update ledger key b2;
+      L16.set ledger key b2;
       let path = L16.merkle_path ledger key |> Option.value_exn in
       let account = L16.get ledger key |> Option.value_exn in
       let root = L16.merkle_root ledger in
