@@ -70,11 +70,12 @@ module Extend
   include T
   include Hashable.Make(T)
 
-  include Make_bin_io(struct
-    type v = Unsigned.t
-    type t = Signed.t [@@deriving bin_io]
-    let there = M.to_signed
-    let back = M.of_signed
+  include Bin_prot.Utils.Make_binable(struct
+    module Binable = Signed
+
+    type t = Unsigned.t
+    let to_binable = M.to_signed
+    let of_binable = M.of_signed
   end)
 
   include (Unsigned : Unsigned_intf with type t := t)
