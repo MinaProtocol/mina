@@ -1,7 +1,7 @@
 open Core_kernel
 open Snark_params
 
-type t [@@deriving sexp, bin_io, eq]
+type t [@@deriving sexp, eq]
 
 module Stable : sig
   module V1 : sig

@@ -8,7 +8,7 @@ type t =
   ; previous_state_hash  : State_hash.Stable.V1.t
   ; ledger_hash          : Ledger_hash.Stable.V1.t
   ; strength             : Strength.t
-  ; timestamp            : Block_time.t
+  ; timestamp            : Block_time.Stable.V1.t
   }
 [@@deriving sexp, fields, bin_io]
 

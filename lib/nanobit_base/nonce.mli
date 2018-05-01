@@ -29,8 +29,7 @@ end
 module type F = functor
   (N : sig
     type t [@@deriving bin_io, sexp, eq]
-    val succ : t -> t
-    val zero : t
+    include Unsigned_extended.S with type t := t
     val random : unit -> t
   end)
   (Bits : Bits_intf.S with type t := N.t)
@@ -46,5 +45,5 @@ module type F = functor
              and module Bits := Bits
 
 module Make : F
-module Make32 () : S with type t = Int32.t
-module Make64 () : S with type t = Int64.t
+module Make32 () : S with type t = Unsigned_extended.UInt32.t
+module Make64 () : S with type t = Unsigned_extended.UInt64.t

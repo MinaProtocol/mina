@@ -29,8 +29,7 @@ end
 module type F = functor
   (N : sig
     type t [@@deriving bin_io, sexp, eq]
-    val succ : t -> t
-    val zero : t
+    include Unsigned_extended.S with type t := t
     val random : unit -> t
   end)
   (Bits : Bits_intf.S with type t := N.t)
@@ -48,8 +47,7 @@ module type F = functor
 module Make
   (N : sig
     type t [@@deriving bin_io, sexp, eq]
-    val succ : t -> t
-    val zero : t
+    include Unsigned_extended.S with type t := t
     val random : unit -> t
   end)
   (Bits : Bits_intf.S with type t := N.t)
@@ -70,24 +68,35 @@ module Make
   end
 
   include Stable.V1
-
-  let succ = N.succ
-
-  let zero = N.zero
-
-  let random = N.random
+  include (N : (module type of N) with type t := t)
 
   include Bits_snarkable(Snark_params.Tick)
 
   module Bits = Bits
 end
 
-module Make32 () : S with type t = Int32.t = Make(struct
-  include Int32
-  let random () = Random.int32 Int32.max_value
-end)(Bits.Int32)(Bits.Snarkable.Int32)
+module Make32 () : S with type t = Unsigned_extended.UInt32.t = Make(struct
+  open Unsigned_extended
+  include UInt32
+  let random () =
+    let mask =
+      if Random.bool () then one else zero
+    in
+    let open UInt32.Infix in
+    logor
+      (mask lsl 31)
+      (Int32.max_value |> Random.int32 |> Int64.of_int32 |> UInt32.of_int64)
+end)(Bits.UInt32)(Bits.Snarkable.UInt32)
 
-module Make64 () : S with type t = Int64.t = Make(struct
-  include Int64
-  let random () = Random.int64 Int64.max_value
-end)(Bits.Int64)(Bits.Snarkable.Int64)
+module Make64 () : S with type t = Unsigned_extended.UInt64.t = Make(struct
+  open Unsigned_extended
+  include UInt64
+  let random () =
+    let mask =
+      if Random.bool () then one else zero
+    in
+    let open UInt64.Infix in
+    logor
+      (mask lsl 63)
+      (Int64.max_value |> Random.int64 |> UInt64.of_int64)
+end)(Bits.UInt64)(Bits.Snarkable.UInt64)

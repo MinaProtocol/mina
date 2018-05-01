@@ -2,7 +2,13 @@ open Core_kernel
 open Async_kernel
 
 module type Time_intf = sig
-  type t [@@deriving sexp, bin_io]
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
+    end
+  end
+
+  type t [@@deriving sexp]
 
   module Span : sig
     type t
