@@ -34,6 +34,7 @@ module Snarkable = struct
       val typ : (var, value) typ
 
       val var_to_bits : var -> boolean_var list
+      val var_of_value : value -> var
     end
   end
 

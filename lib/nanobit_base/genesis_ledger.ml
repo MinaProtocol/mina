@@ -34,6 +34,7 @@ let ledger =
     compressed_rich_pk
     { Account.public_key = compressed_rich_pk
     ; balance = initial_rich_balance
+    ; nonce = Account.Nonce.zero
     };
 
   Ledger.update
@@ -41,6 +42,7 @@ let ledger =
     compressed_poor_pk
     { Account.public_key = compressed_poor_pk
     ; balance = initial_poor_balance
+    ; nonce = Account.Nonce.zero
     };
   ledger
 

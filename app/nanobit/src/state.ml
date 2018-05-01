@@ -8,7 +8,7 @@ type t =
   ; previous_state_hash  : State_hash.Stable.V1.t
   ; ledger_hash          : Ledger_hash.Stable.V1.t
   ; strength             : Strength.t
-  ; timestamp            : Block_time.t
+  ; timestamp            : Block_time.Stable.V1.t
   }
 [@@deriving sexp, fields, bin_io]
 
@@ -27,5 +27,5 @@ let create_pow t nonce =
   Pedersen.hash_fold Pedersen.params
     (fun ~init ~f ->
        let init = List.fold (Blockchain_state.to_bits_unchecked (to_blockchain_state t)) ~init ~f in
-       Nonce.Bits.fold nonce ~init ~f)
+       Block.Nonce.Bits.fold nonce ~init ~f)
 

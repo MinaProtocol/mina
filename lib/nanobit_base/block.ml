@@ -3,6 +3,8 @@ open Snark_params
 
 module Pedersen = Tick.Pedersen
 
+module Nonce = Nonce.Make64 (struct end)
+
 module Header = struct
   module Stable = struct
     module V1 = struct

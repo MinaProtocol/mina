@@ -555,6 +555,7 @@ let%test_module "transaction_snark" =
         ; account =
             { public_key = Public_key.compress (Public_key.of_private_key private_key)
             ; balance = Balance.of_int (10 + Random.int 100)
+            ; nonce = Account.Nonce.zero
             }
         }
       in

@@ -21,19 +21,34 @@ module Vector = struct
     val set : t -> int -> bool -> t
   end
 
-  module Int64 : S with type t = Int64.t = struct
-    include Int64
+  module UInt64 : S with type t = Unsigned.UInt64.t = struct
+    open Unsigned.UInt64.Infix
+    include Unsigned.UInt64
 
     let length = 64
-    let get t i = Int64.((t lsr i) land one = one)
 
-    let empty = Int64.zero
+    let empty = zero
 
     let get t i = (t lsr i) land one = one
     let set t i b =
       if b
       then t lor (one lsl i)
-      else t land (lnot (one lsl i))
+      else t land (lognot (one lsl i))
+  end
+
+  module UInt32 : S with type t = Unsigned.UInt32.t = struct
+    open Unsigned.UInt32.Infix
+    include Unsigned.UInt32
+
+    let length = 32
+
+    let empty = zero
+
+    let get t i = (t lsr i) land one = one
+    let set t i b =
+      if b
+      then t lor (one lsl i)
+      else t land (lognot (one lsl i))
   end
 
   module Make (V : Basic)
@@ -72,7 +87,8 @@ module Vector = struct
   end
 end
 
-module Int64 : Bits_intf.S with type t := Int64.t = Vector.Make(Vector.Int64)
+module UInt64 : Bits_intf.S with type t := Unsigned.UInt64.t = Vector.Make(Vector.UInt64)
+module UInt32 : Bits_intf.S with type t := Unsigned.UInt32.t = Vector.Make(Vector.UInt32)
 
 module Make_field0
     (Field : Snarky.Field_intf.S)
@@ -222,6 +238,9 @@ module Snarkable = struct
       end
 
       let var_to_bits = Fn.id
+
+      let var_of_value v =
+        List.init V.length (fun i -> Boolean.var_of_value (V.get v i))
     end
 
     let pack_var = Checked.project
@@ -233,8 +252,11 @@ module Snarkable = struct
     let unpack_value (x : Packed.value) : Unpacked.value = x
   end
 
-  module Int64 (Impl : Snarky.Snark_intf.S) =
-    Small_bit_vector(Impl)(Vector.Int64)
+  module UInt64 (Impl : Snarky.Snark_intf.S) =
+    Small_bit_vector(Impl)(Vector.UInt64)
+
+  module UInt32 (Impl : Snarky.Snark_intf.S) =
+    Small_bit_vector(Impl)(Vector.UInt32)
 
   module Field_backed
       (Impl : Snarky.Snark_intf.S)
@@ -263,6 +285,10 @@ module Snarkable = struct
       ;;
 
       let var_to_bits = Fn.id
+
+      let var_of_value v =
+        (unpack_field Field.unpack ~bit_length v)
+        |> List.map ~f:Boolean.var_of_value
     end
 
     let project_value = Fn.id

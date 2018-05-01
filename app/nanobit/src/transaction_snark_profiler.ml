@@ -10,7 +10,7 @@ let create_ledger_and_transactions num_transactions =
   Array.iter keys ~f:(fun k ->
     let public_key = Public_key.compress k.public_key in
     Ledger.update ledger public_key
-      { public_key; balance = Currency.Balance.of_int 10_000 });
+      { public_key; balance = Currency.Balance.of_int 10_000; nonce = Account.Nonce.zero });
   let random_transaction () : Transaction.With_valid_signature.t =
     let sender = keys.(Random.int num_accounts) in
     let receiver = keys.(Random.int num_accounts) in

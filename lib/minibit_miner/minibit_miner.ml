@@ -37,13 +37,13 @@ module Make
 
     val create : State.t -> next_ledger_hash:Ledger_hash.t -> t
 
-    val result : t -> [ `Ok of State.t * Nonce.t | `Cancelled ] Deferred.t
+    val result : t -> [ `Ok of State.t * Block_nonce.t | `Cancelled ] Deferred.t
 
     val cancel : t -> unit
   end = struct
     type t =
       { cancelled : bool ref
-      ; result : [ `Ok of State.t * Nonce.t | `Cancelled ] Deferred.t
+      ; result : [ `Ok of State.t * Block_nonce.t | `Cancelled ] Deferred.t
       }
 
     let result t = t.result
@@ -51,7 +51,7 @@ module Make
     let cancel t = t.cancelled := true
 
     let find_block (previous : State.t) ~(next_ledger_hash : Ledger_hash.t)
-      : (State.t * Nonce.t) option =
+      : (State.t * Block_nonce.t) option =
       let iterations = 10 in
 
       let now = Time.now () in
@@ -67,7 +67,7 @@ module Make
         ; strength = Strength.increase previous.strength difficulty
         }
       in
-      let nonce0 = Nonce.random () in
+      let nonce0 = Block_nonce.random () in
       let rec go nonce i =
         if i = iterations
         then None
@@ -75,7 +75,7 @@ module Make
           let hash = State.create_pow next_state nonce in
           if Difficulty.meets difficulty hash
           then Some (next_state, nonce)
-          else go (Nonce.succ nonce) (i + 1)
+          else go (Block_nonce.succ nonce) (i + 1)
       in
       go nonce0 0
     ;;

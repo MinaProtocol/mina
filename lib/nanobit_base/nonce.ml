@@ -1,20 +1,102 @@
 open Core_kernel
 
-module Stable = struct
-  module V1 = struct
-    type t = Int64.t
-    [@@deriving bin_io, sexp]
+module type S = sig
+  type t
+  [@@deriving sexp]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t
+      [@@deriving bin_io, sexp, eq]
+    end
   end
+
+  val zero : t
+
+  val succ : t -> t
+
+  (* Someday: I think this only does ones greater than zero, but it doesn't really matter for
+    selecting the nonce *)
+  val random : unit -> t
+
+  module Bits : Bits_intf.S with type t := t
+
+  include Snark_params.Tick.Snarkable.Bits.Faithful
+    with type Unpacked.value = t
+     and type Packed.value = t
 end
 
-include Stable.V1
+module type F = functor
+  (N : sig
+    type t [@@deriving bin_io, sexp, eq]
+    include Unsigned_extended.S with type t := t
+    val random : unit -> t
+  end)
+  (Bits : Bits_intf.S with type t := N.t)
+  (Bits_snarkable : functor (Impl : Snarky.Snark_intf.S) -> Bits_intf.Snarkable.Faithful
+       with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+        and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
+        and type boolean_var := Impl.Boolean.var
+        and type Packed.var = Impl.Cvar.t
+        and type Packed.value = N.t
+        and type Unpacked.var = Impl.Boolean.var list
+        and type Unpacked.value = N.t) ->
+          S with type t := N.t
+             and module Bits := Bits
 
-let succ = Int64.succ
+module Make
+  (N : sig
+    type t [@@deriving bin_io, sexp, eq]
+    include Unsigned_extended.S with type t := t
+    val random : unit -> t
+  end)
+  (Bits : Bits_intf.S with type t := N.t)
+  (Bits_snarkable : functor (Impl : Snarky.Snark_intf.S) -> Bits_intf.Snarkable.Faithful
+       with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+        and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
+        and type boolean_var := Impl.Boolean.var
+        and type Packed.var = Impl.Cvar.t
+        and type Packed.value = N.t
+        and type Unpacked.var = Impl.Boolean.var list
+        and type Unpacked.value = N.t)
+= struct
+  module Stable = struct
+    module V1 = struct
+      type t = N.t
+      [@@deriving bin_io, sexp, eq]
+    end
+  end
 
-let zero = Int64.zero
+  include Stable.V1
+  include (N : (module type of N) with type t := t)
 
-let random () = Random.int64 Int64.max_value
+  include Bits_snarkable(Snark_params.Tick)
 
-include Bits.Snarkable.Int64(Snark_params.Tick)
+  module Bits = Bits
+end
 
-module Bits = Bits.Int64
+module Make32 () : S with type t = Unsigned_extended.UInt32.t = Make(struct
+  open Unsigned_extended
+  include UInt32
+  let random () =
+    let mask =
+      if Random.bool () then one else zero
+    in
+    let open UInt32.Infix in
+    logor
+      (mask lsl 31)
+      (Int32.max_value |> Random.int32 |> Int64.of_int32 |> UInt32.of_int64)
+end)(Bits.UInt32)(Bits.Snarkable.UInt32)
+
+module Make64 () : S with type t = Unsigned_extended.UInt64.t = Make(struct
+  open Unsigned_extended
+  include UInt64
+  let random () =
+    let mask =
+      if Random.bool () then one else zero
+    in
+    let open UInt64.Infix in
+    logor
+      (mask lsl 63)
+      (Int64.max_value |> Random.int64 |> UInt64.of_int64)
+end)(Bits.UInt64)(Bits.Snarkable.UInt64)
