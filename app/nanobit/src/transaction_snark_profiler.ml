@@ -5,7 +5,6 @@ open Snark_params
 let create_ledger_and_transactions num_transactions =
   let open Tick in
   let num_accounts = 4 in
-  let nonces = Int.Table.create () in
   let ledger = Ledger.create () in
   let keys = Array.init num_accounts ~f:(fun _ -> Signature_keypair.create ()) in
   Array.iter keys ~f:(fun k ->
@@ -29,15 +28,14 @@ let create_ledger_and_transactions num_transactions =
     let sender = keys.(sender_idx) in
     let receiver = keys.(Random.int num_accounts) in
     let nonce =
-      match Int.Table.find nonces sender_idx with
-      | None ->
-          let n' = Account.Nonce.zero in
-          Int.Table.set nonces ~key:sender_idx ~data:n';
-          n'
-      | Some n ->
-          let n' = Account.Nonce.succ n in
-          Int.Table.set nonces ~key:sender_idx ~data:n';
-          n'
+      let account =
+        Ledger.find ledger ~f:(fun account ->
+          Public_key.Compressed.equal
+            account.public_key
+            (Public_key.compress sender.public_key))
+        |> Option.value_exn
+      in
+      account.nonce
     in
     txn sender receiver (Currency.Amount.of_int (1 + Random.int 100)) nonce
   in
@@ -93,7 +91,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Tran
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let check_snark sparse_ledger0 (transactions : Transaction.With_valid_signature.t list) =
+let check_base_snarks sparse_ledger0 (transactions : Transaction.With_valid_signature.t list) =
   let module Sparse_ledger = Bundle.Sparse_ledger in
   let _ =
     List.fold transactions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
@@ -109,7 +107,7 @@ let check_snark sparse_ledger0 (transactions : Transaction.With_valid_signature.
       in
       sparse_ledger')
   in
-  "*** Snark checked successfully!!"
+  "Base constraint system satisfied"
 
 let run profiler num_transactions =
   let (ledger, transactions) = create_ledger_and_transactions num_transactions in
@@ -134,7 +132,7 @@ let main num_transactions_log2 () =
 let dry _ () =
   Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
     let num_transactions = `Two_from_same in
-    run check_snark num_transactions
+    run check_base_snarks num_transactions
   )
 
 let command =

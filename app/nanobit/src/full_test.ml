@@ -108,7 +108,7 @@ let run_test : unit -> unit Deferred.t = fun () ->
   let build_txn amount =
     let poor_pk = Genesis_ledger.poor_pk in
     let payload : Transaction.Payload.t =
-      { Transaction.Payload.receiver = poor_pk |> Public_key.compress
+      { receiver = poor_pk |> Public_key.compress
       ; amount   = send_amount
       ; fee      = Currency.Fee.of_int 0
       ; nonce    = Account.Nonce.zero
@@ -123,7 +123,7 @@ let run_test : unit -> unit Deferred.t = fun () ->
   let () = Option.value_exn o in
   (* Send a similar the transaction twice on purpose; this second one
    * will be rejected because the nonce is wrong *)
-  let transaction' = build_txn (Currency.Amount.(+) send_amount (Currency.Amount.of_int 1)) in
+  let transaction' = build_txn Currency.Amount.(send_amount + (of_int 1)) in
   let%bind o = Run.send_txn log minibit (transaction' :> Transaction.t) in
   let () = Option.value_exn o in
 

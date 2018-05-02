@@ -48,7 +48,7 @@ module Snarkable = struct
     val choose_preimage_var : Packed.var -> (Unpacked.var, _) checked
   end
 
-  module type Faithful0 = sig
+  module type Faithful = sig
     include Basic
 
     val pack_value : Unpacked.value -> Packed.value
@@ -58,9 +58,8 @@ module Snarkable = struct
     val unpack_var : Packed.var -> (Unpacked.var, _) checked
   end
 
-  module type Faithful = Faithful0
   module type Small = sig
-    include Faithful0
+    include Faithful
 
     type comparison_result
     val compare_var : Unpacked.var -> Unpacked.var -> (comparison_result, _) checked

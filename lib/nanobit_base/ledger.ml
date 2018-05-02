@@ -35,10 +35,10 @@ let add_amount balance amount = error_opt "overflow" (Balance.add_amount balance
 let sub_amount balance amount = error_opt "insufficient funds" (Balance.sub_amount balance amount)
 
 let validate_nonces txn_nonce account_nonce =
-  if (Account.Nonce.equal account_nonce txn_nonce) then
+  if Account.Nonce.equal account_nonce txn_nonce then
     Or_error.return ()
   else
-    error (Printf.sprintf !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in transaction %{sexp: Account.Nonce.t}" account_nonce txn_nonce)
+    Or_error.errorf !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in transaction %{sexp: Account.Nonce.t}" account_nonce txn_nonce
 
 let apply_transaction_unchecked ledger (transaction : Transaction.t) =
   let sender = Public_key.compress transaction.sender in
