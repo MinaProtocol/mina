@@ -1,8 +1,10 @@
 #!/bin/bash
 
-eval `opam config env`
-jbuilder run_test --verbose
+set -eo pipefail
 
-jbuilder exec cli -- full_test
+eval `opam config env`
+jbuilder runtest --verbose
+
+jbuilder exec cli -- full-test
 jbuilder exec cli -- transaction-snark-profiler -k 1 -dry-run true
 
