@@ -31,7 +31,7 @@ module Stable = struct
       ; balance : 'amount
       ; nonce : 'nonce
       }
-    [@@deriving sexp, bin_io, eq]
+    [@@deriving fields, sexp, bin_io, eq]
 
     type t = (Public_key.Compressed.Stable.V1.t, Balance.Stable.V1.t, Nonce.Stable.V1.t) t_
     [@@deriving sexp, bin_io, eq]

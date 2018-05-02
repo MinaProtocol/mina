@@ -28,14 +28,9 @@ let create_ledger_and_transactions num_transactions =
     let sender = keys.(sender_idx) in
     let receiver = keys.(Random.int num_accounts) in
     let nonce =
-      let account =
-        Ledger.find ledger ~f:(fun account ->
-          Public_key.Compressed.equal
-            account.public_key
-            (Public_key.compress sender.public_key))
-        |> Option.value_exn
-      in
-      account.nonce
+        Ledger.get ledger (Public_key.compress sender.public_key)
+          |> Option.value_exn
+          |> Account.nonce
     in
     txn sender receiver (Currency.Amount.of_int (1 + Random.int 100)) nonce
   in
