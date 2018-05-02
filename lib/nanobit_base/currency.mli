@@ -71,7 +71,7 @@ module Amount : sig
     val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
 
     type nonrec t = (t, Sgn.t) t_
-    [@@deriving bin_io]
+    [@@deriving bin_io, sexp]
 
     type nonrec var = (var, Sgn.var) t_
     val typ : (var, t) Typ.t

@@ -271,7 +271,7 @@ module Amount = struct
     let of_signed = Unsigned.UInt64.of_int64
   end)
 
-  type amount = T.Stable.V1.t [@@deriving bin_io]
+  type amount = T.Stable.V1.t [@@deriving bin_io, sexp]
   type amount_var = T.var
   include (T : module type of T with type var = amount_var and module Checked := T.Checked)
 
@@ -285,12 +285,12 @@ module Amount = struct
       { magnitude : 'magnitude
       ; sgn       : 'sgn
       }
-    [@@deriving bin_io]
+    [@@deriving bin_io, sexp]
 
     let create ~magnitude ~sgn = { magnitude; sgn }
 
     type t = (amount, Sgn.t) t_
-    [@@deriving bin_io]
+    [@@deriving bin_io, sexp]
 
     let zero = create ~magnitude:zero ~sgn:Sgn.Pos
 

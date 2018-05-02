@@ -130,6 +130,8 @@ module Tick = struct
               ~there:(fun n -> List.init length ~f:(Z.testbit (Bignum.Bigint.to_zarith_bigint n)))
               ~back:pack)
 
+        let equal = Checked.equal_bitstrings
+
         let assert_equal = Checked.Assert.equal_bitstrings
       end
     end
