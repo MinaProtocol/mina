@@ -1380,6 +1380,23 @@ module Checked = struct
       { less; less_or_equal }
     end
 
+  let chunk_bitstrings_for_equality (t1 : Boolean.var list) (t2 : Boolean.var list) =
+    let chunk_size = Field.size_in_bits - 1 in
+    let rec go acc t1 t2 =
+      match t1, t2 with
+      | [], [] -> acc
+      | _, _ ->
+        let (t1_a, t1_b) = List.split_n t1 chunk_size in
+        let (t2_a, t2_b) = List.split_n t2 chunk_size in
+        go ((pack t1_a, pack t2_a) :: acc) t1_b t2_b
+    in
+    go [] t1 t2
+
+  let equal_bitstrings t1 t2 =
+    all (List.map (chunk_bitstrings_for_equality t1 t2) ~f:(fun (x1, x2) ->
+      equal x1 x2))
+    >>= Boolean.all
+
   module Assert = struct
     let lt ~bit_length x y =
       let open Let_syntax in
@@ -1394,18 +1411,10 @@ module Checked = struct
     let gt ~bit_length x y = lt ~bit_length y x
     let gte ~bit_length x y = lte ~bit_length y x
 
-    let equal_bitstrings (t1 : Boolean.var list) (t2 : Boolean.var list) =
-      let chunk_size = Field.size_in_bits - 1 in
-      let rec go acc t1 t2 =
-        match t1, t2 with
-        | [], [] -> acc
-        | _, _ ->
-          let (t1_a, t1_b) = List.split_n t1 chunk_size in
-          let (t2_a, t2_b) = List.split_n t2 chunk_size in
-          go (Constraint.equal (pack t1_a) (pack t2_a) :: acc) t1_b t2_b
-      in
-      assert_all ~label:"Checked.Assert.equal_bitstrings" (go [] t1 t2)
-    ;;
+    let equal_bitstrings t1 t2 =
+      List.map (chunk_bitstrings_for_equality t1 t2) ~f:(fun (x1, x2) ->
+        Constraint.equal x1 x2)
+      |> assert_all ~label:"Checked.Assert.equal_bitstrings"
 
     let non_zero (v : Cvar.t) =
       with_label "Checked.Assert.non_zero" Let_syntax.(let%map _ =  inv v in ())

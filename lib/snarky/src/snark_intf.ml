@@ -218,6 +218,9 @@ module type Basic = sig
 
     val compare : bit_length:int -> Cvar.t -> Cvar.t -> (comparison_result, _) t
 
+    val equal_bitstrings
+      : Boolean.var list -> Boolean.var list -> (Boolean.var, _) t
+
     module Assert : sig
       val lte : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
       val gte : bit_length:int -> Cvar.t -> Cvar.t -> (unit, _) t
