@@ -2,10 +2,11 @@ open Core
 open Snark_params.Tick
 
 module Payload : sig
-  type ('pk, 'amount, 'fee) t_ =
+  type ('pk, 'amount, 'fee, 'nonce) t_ =
     { receiver : 'pk
     ; amount   : 'amount
     ; fee      : 'fee
+    ; nonce    : 'nonce
     }
   [@@deriving bin_io, eq, sexp, compare, hash]
 
@@ -13,15 +14,17 @@ module Payload : sig
     ( Public_key.Compressed.t
     , Currency.Amount.t
     , Currency.Fee.t
+    , Account.Nonce.t
     ) t_
   [@@deriving bin_io, eq, sexp, compare, hash]
 
   module Stable : sig
     module V1 : sig
-      type nonrec ('pk, 'amount, 'fee) t_ = ('pk, 'amount, 'fee) t_ =
+      type nonrec ('pk, 'amount, 'fee, 'nonce) t_ = ('pk, 'amount, 'fee, 'nonce) t_ =
         { receiver : 'pk
         ; amount   : 'amount
         ; fee      : 'fee
+        ; nonce    : 'nonce
         }
       [@@deriving bin_io, eq, sexp, compare, hash]
 
@@ -29,12 +32,13 @@ module Payload : sig
         ( Public_key.Compressed.Stable.V1.t
         , Currency.Amount.Stable.V1.t
         , Currency.Fee.Stable.V1.t
+        , Account.Nonce.t
         ) t_
       [@@deriving bin_io, eq, sexp, compare, hash]
     end
   end
 
-  type var = (Public_key.Compressed.var, Currency.Amount.var, Currency.Fee.var) t_
+  type var = (Public_key.Compressed.var, Currency.Amount.var, Currency.Fee.var, Account.Nonce.Unpacked.var) t_
 
   val typ : (var, t) Typ.t
 
