@@ -4,6 +4,15 @@ open Snark_params
 open Snarky
 open Currency
 
+let print lab typ x to_sexp =
+  let open Tick in
+  as_prover begin
+    let open As_prover in
+    map (read typ x) ~f:(fun x ->
+      printf "%s: %s" lab (Sexp.to_string_hum (to_sexp x)))
+  end
+;;
+
 let bundle_length = 1
 
 let tick_input () = Tick.(Data_spec.([ Field.typ ]))
@@ -95,6 +104,17 @@ module Fee_transfer = struct
     | Two (t1, t2) -> two t1 t2
 end
 
+module Transition = struct
+  type t =
+    | Transaction of Transaction.With_valid_signature.t
+    | Fee_transfer of Fee_transfer.t
+  [@@deriving bin_io, sexp]
+
+  let to_tagged_transaction = function
+    | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
+    | Transaction t -> (Normal, (t :> Transaction.t))
+end
+
 module Proof_type = struct
   type t = Base | Merge
   [@@deriving bin_io]
@@ -114,29 +134,6 @@ type t =
 [@@deriving fields, bin_io]
 
 let create = Fields.create
-
-(*
-module State = struct
-  type ('ledger_hash, 'amount) t_ =
-    { ledger_hash : 'ledger_hash
-    ; total_fees  : 'amount
-    }
-
-  type t = (Ledger_hash.t, Amount.t) t_
-  type var = (Ledger_hash.var, Amount.var) t_
-
-  let to_hlist { ledger_hash; total_fees } = H_list.([ ledger_hash; total_fees ])
-  let of_hlist : (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
-    H_list.(fun [ ledger_hash; total_fees ] -> { ledger_hash; total_fees })
-
-  let typ =
-    let open Tick in
-    Typ.of_hlistable Data_spec.([ Ledger_hash.typ; Amount.typ ])
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-  module Hash = Data_hash.Make()
-end *)
 
 module Keys0 = struct
   module Binable_of_bigstringable
@@ -219,52 +216,79 @@ module Base = struct
   open Tick
   open Let_syntax
 
-  (* spec for [apply_transaction root { sender; signature; payload }]:
-     - check that [signature] is a signature by [sender] of payload
-     - return the merkle tree [root'] where the sender balance is decremented by
-     [payload.amount] and the receiver balance is incremented by [payload.amount].
+  (* spec for
+     [apply_tagged_transaction root (tag, { sender; signature; payload }]):
+     - if tag = Normal:
+        - check that [signature] is a signature by [sender] of payload
+        - return:
+          - merkle tree [root'] where the sender balance is decremented by
+            [payload.amount] and the receiver balance is incremented by [payload.amount].
+          - fee excess = +fee.
+
+     - if tag = Fee_transfer
+        - return:
+          - merkle tree [root'] where the sender balance is incremented by
+            fee and the receiver balance is incremented by amount
+          - fee excess = -(amount + fee)
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let apply_tagged_transaction root
         ((tag, { sender; signature; payload }) : Tagged_transaction.var) =
-    (if not Insecure.transaction_replay
-     then failwith "Insecure.transaction_replay false");
-    let { Transaction.Payload.receiver; amount; fee } = payload in
-    let%bind () =
-      (* Should only assert_verifies if the tag is Normal *)
-      let%bind bs = Transaction.Payload.var_to_bits payload in
-      Schnorr.Checked.assert_verifies signature sender bs
-    in
-    let%bind excess, sender_delta =
-      let%bind amount_plus_fee = Amount.Checked.add_fee amount fee in
-      let open Amount.Signed in
-      let neg_amount_plus_fee = create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee in
-      let pos_fee = create ~sgn:Sgn.Pos ~magnitude:(Amount.Checked.of_fee fee) in
-      (* If tag = Normal:
-         sender gets -(amount + fee)
-         excess is +fee
-
-         If tag = Fee_transfer:
-         "sender" gets +fee
-         excess is -(amount + fee) (since "receiver" gets amount)
-      *)
-      Checked.cswap (Tag.Checked.is_fee_transfer tag)
-        (pos_fee, neg_amount_plus_fee)
-    in
-    let%bind root =
-      let%bind sender_compressed = Public_key.compress_var sender in
-      Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
-        let%map balance =
-          Balance.Checked.add_signed_amount account.balance sender_delta
+    with_label __LOC__ begin
+      (if not Insecure.transaction_replay
+      then failwith "Insecure.transaction_replay false");
+      let { Transaction.Payload.receiver; amount; fee } = payload in
+      let%bind () =
+        let%bind bs = Transaction.Payload.var_to_bits payload in
+        let%bind verifies =
+          Schnorr.Checked.verifies signature sender bs
         in
-        { account with balance })
-    in
-    let%map root =
-      Ledger_hash.modify_account root receiver ~f:(fun account ->
-        let%map balance = Balance.Checked.(account.balance + amount) in
-        { account with balance })
-    in
-    (root, excess)
+        (* Should only assert_verifies if the tag is Normal *)
+        Boolean.Assert.any [Tag.Checked.is_fee_transfer tag; verifies]
+      in
+      let%bind excess, sender_delta =
+        let%bind amount_plus_fee = Amount.Checked.add_fee amount fee in
+        let open Amount.Signed in
+        let neg_amount_plus_fee = create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee in
+        let pos_fee = create ~sgn:Sgn.Pos ~magnitude:(Amount.Checked.of_fee fee) in
+        (* If tag = Normal:
+          sender gets -(amount + fee)
+          excess is +fee
+
+          If tag = Fee_transfer:
+          "sender" gets +fee
+          excess is -(amount + fee) (since "receiver" gets amount)
+        *)
+        Checked.cswap (Tag.Checked.is_fee_transfer tag)
+          (pos_fee, neg_amount_plus_fee)
+      in
+      let%bind () =
+        print "sender_delta"
+          Amount.Signed.typ
+          sender_delta
+          Amount.Signed.sexp_of_t
+      in
+      let%bind () =
+        print "excess"
+          Amount.Signed.typ
+          excess
+          Amount.Signed.sexp_of_t
+      in
+      let%bind root =
+        let%bind sender_compressed = Public_key.compress_var sender in
+        Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
+          let%map balance =
+            Balance.Checked.add_signed_amount account.balance sender_delta
+          in
+          { account with balance })
+      in
+      let%map root =
+        Ledger_hash.modify_account root receiver ~f:(fun account ->
+          let%map balance = Balance.Checked.(account.balance + amount) in
+          { account with balance })
+      in
+      (root, excess)
+    end
 
   (* spec for [apply_transaction root { sender; signature; payload }]:
      - check that [signature] is a signature by [sender] of payload
@@ -307,28 +331,38 @@ module Base = struct
 
 (* spec for [main top_hash]:
    constraints pass iff
-   there exist l1 : Ledger_hash.t, l2 : Ledger_hash.t, ts : Transaction.t list
+   there exist
+      l1 : Ledger_hash.t,
+      l2 : Ledger_hash.t,
+      fee_excess : Amount.Signed.t,
+      t : Tagged_transaction.t
    such that
-   H(l1, l2) = top_hash,
-   applying ts to ledger with merkle hash l1 results in ledger with merkle hash l2. *)
+   H(l1, l2, fee_excess) = top_hash,
+   applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
   let main top_hash =
-    let open Let_syntax in
-    let%bind root_before = provide_witness' Ledger_hash.typ ~f:Prover_state.state1 in
-(*     let%bind l2 = provide_witness' Ledger_hash.typ ~f:Prover_state.state2 in *)
-    let%bind t =
-      provide_witness' Tagged_transaction.typ
-        ~f:Prover_state.transaction
-    in
-    let%bind root_after, fee_excess = apply_tagged_transaction root_before t in
-    let%map () =
-      let%bind b1 = Ledger_hash.var_to_bits root_before
-      and b2 = Ledger_hash.var_to_bits root_after
+    with_label __LOC__ begin
+      let open Let_syntax in
+      let%bind root_before = provide_witness' Ledger_hash.typ ~f:Prover_state.state1 in
+      let%bind t =
+        with_label __LOC__
+          (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
       in
-      let fee_excess_bits = Amount.Signed.Checked.to_bits fee_excess in
-      hash_digest (b1 @ b2 @ fee_excess_bits)
-      >>= assert_equal top_hash
-    in
-    ()
+      let%bind root_after, fee_excess = apply_tagged_transaction root_before t in
+      let%bind () =
+        print "root_after" Ledger_hash.typ root_after Ledger_hash.sexp_of_t
+      in
+      let%map () =
+        with_label __LOC__ begin
+          let%bind b1 = Ledger_hash.var_to_bits root_before
+          and b2 = Ledger_hash.var_to_bits root_after
+          in
+          let fee_excess_bits = Amount.Signed.Checked.to_bits fee_excess in
+          hash_digest (b1 @ b2 @ fee_excess_bits)
+          >>= assert_equal ~label:"equals-top_hash" top_hash
+        end
+      in
+      ()
+    end
 
   let create_keys () =
     generate_keypair main ~exposing:(tick_input ())
@@ -552,6 +586,13 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
 module type S = sig
   val verify : t -> bool
 
+  val of_transition
+    :  Ledger_hash.t
+    -> Ledger_hash.t
+    -> Transition.t
+    -> Tick.Handler.t
+    -> t
+
   val of_transaction
     : Ledger_hash.t
     -> Ledger_hash.t
@@ -715,13 +756,14 @@ module Make (K : sig val keys : Keys0.t end) = struct
     ; proof = wrap Proof_type.Base proof top_hash
     }
 
-  let of_transaction source target (transaction : Transaction.With_valid_signature.t) handler =
-    of_tagged_transaction source target
-      (Normal, (transaction :> Transaction.t)) handler
+  let of_transition source target transition handler =
+    of_tagged_transaction source target (Transition.to_tagged_transaction transition) handler
+
+  let of_transaction source target transaction handler =
+    of_transition source target (Transaction transaction) handler
 
   let of_fee_transfer source target transfer handler =
-    of_tagged_transaction source target
-      (Fee_transfer.to_tagged_transaction transfer) handler
+    of_transition source target (Fee_transfer transfer) handler
 
   let merge t1 t2 =
     (if not (Ledger_hash.(=) t1.target t2.source)

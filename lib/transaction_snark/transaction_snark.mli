@@ -6,6 +6,13 @@ module Proof_type : sig
   [@@deriving bin_io]
 end
 
+module Transition : sig
+  type t =
+    | Transaction of Transaction.With_valid_signature.t
+    | Fee_transfer of Fee_transfer.t
+  [@@deriving bin_io, sexp]
+end
+
 type t
 [@@deriving bin_io]
 
@@ -37,6 +44,13 @@ val check_transaction
 
 module type S = sig
   val verify : t -> bool
+
+  val of_transition
+    :  Ledger_hash.t
+    -> Ledger_hash.t
+    -> Transition.t
+    -> Tick.Handler.t
+    -> t
 
   val of_transaction
     :  Ledger_hash.t
