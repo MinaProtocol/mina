@@ -2,7 +2,7 @@ open Core
 open Nanobit_base
 open Snark_params
 
-let create_ledger_and_transactions num_transactions =
+let create_ledger_and_transactions num_transitions =
   let open Tick in
   let num_accounts = 4 in
   let ledger = Ledger.create () in
@@ -22,7 +22,21 @@ let create_ledger_and_transactions num_transactions =
     in
     Transaction.sign sender payload
   in
-  (ledger, List.init num_transactions (fun _ -> random_transaction ()))
+  let num_transactions = num_transitions - 1 in
+  let transactions = List.init num_transactions (fun _ -> random_transaction ()) in
+  let fee_transfer =
+    let open Currency.Fee in
+    let total_fee =
+      List.fold transactions ~init:zero ~f:(fun acc t ->
+        Option.value_exn (add acc (t :> Transaction.t).payload.fee))
+    in
+    Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
+  in
+  let transitions =
+    List.map transactions ~f:(fun t -> Transaction_snark.Transition.Transaction t)
+    @ [ Fee_transfer fee_transfer ]
+  in
+  (ledger, transitions)
 
 let time thunk =
   let start = Time.now () in
@@ -37,16 +51,14 @@ let rec pair_up = function
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
-let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Transaction.With_valid_signature.t list) =
+let profile (module T : Transaction_snark.S) sparse_ledger0 (transitions : Transaction_snark.Transition.t list) =
   let module Sparse_ledger = Bundle.Sparse_ledger in
   let (base_proof_time, _), base_proofs =
-    List.fold_map transactions ~init:(Time.Span.zero, sparse_ledger0) ~f:(fun (max_span, sparse_ledger) t ->
-      let sparse_ledger' =
-        Sparse_ledger.apply_transaction_exn sparse_ledger (t :> Transaction.t)
-      in
+    List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:(fun (max_span, sparse_ledger) t ->
+      let sparse_ledger' = Sparse_ledger.apply_transition_exn sparse_ledger t in
       let span, proof = 
         time (fun () ->
-          T.of_transaction
+          T.of_transition
             (Sparse_ledger.merkle_root sparse_ledger)
             (Sparse_ledger.merkle_root sparse_ledger')
             t
@@ -67,21 +79,24 @@ let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Tran
   in
   merge_all base_proof_time base_proofs
 
-let main num_transactions_log2 () =
+let main num_transitions_log2 () =
   Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
-    let num_transactions = Int.pow 2 num_transactions_log2 in
-    let keys = Transaction_snark.Keys.create () in
-    let module T = Transaction_snark.Make(struct let keys = keys end) in
-    let (ledger, transactions) = create_ledger_and_transactions num_transactions in
+    let num_transitions = Int.pow 2 num_transitions_log2 in
+    let (ledger, transitions) = create_ledger_and_transactions num_transitions in
     let sparse_ledger =
       Bundle.Sparse_ledger.of_ledger_subset ledger
-        (List.concat_map transactions ~f:(fun t ->
-          let t = (t :> Transaction.t) in
-          [ t.payload.receiver; Public_key.compress t.sender ]))
+        (List.concat_map transitions ~f:(fun t ->
+           match t with
+           | Fee_transfer t ->
+             List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
+           | Transaction t ->
+             let t = (t :> Transaction.t) in
+             [ t.payload.receiver; Public_key.compress t.sender ]))
     in
-    let total_time = profile (module T) sparse_ledger transactions in
-    Core.printf !"Total time was: %{Time.Span}\n%!" total_time
-  )
+    let keys = Transaction_snark.Keys.create () in
+    let module T = Transaction_snark.Make(struct let keys = keys end) in
+    let total_time = profile (module T) sparse_ledger transitions in
+    Core.printf !"Total time was: %{Time.Span}\n%!" total_time)
 
 let command =
   let open Command.Let_syntax in
