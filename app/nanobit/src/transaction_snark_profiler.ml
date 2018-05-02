@@ -120,7 +120,8 @@ let run profiler num_transactions =
         [ t.payload.receiver; Public_key.compress t.sender ]))
   in
   let message = profiler sparse_ledger transactions in
-  Core.printf !"%s\n%!" message
+  Core.printf !"%s\n%!" message;
+  exit 0
 
 let main num_transactions_log2 () =
   Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
