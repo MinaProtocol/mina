@@ -53,3 +53,6 @@ ci-base-docker:
 
 update-deps: base-googlecloud
 	./rewrite-from-dockerfile.sh ocaml-base $(shell git rev-parse HEAD)
+
+test:
+	./test_all.sh

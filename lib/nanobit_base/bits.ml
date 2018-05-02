@@ -158,7 +158,7 @@ module Snarkable = struct
        val get : t -> int -> bool
        val set : t -> int -> bool -> t
      end)
-    : Bits_intf.Snarkable.Faithful
+    : Bits_intf.Snarkable.Small
        with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
         and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
         and type boolean_var := Impl.Boolean.var
@@ -166,6 +166,7 @@ module Snarkable = struct
         and type Packed.value = V.t
         and type Unpacked.var = Impl.Boolean.var list
         and type Unpacked.value = V.t
+        and type comparison_result := Impl.Checked.comparison_result
     =
   struct
     open Impl
@@ -219,6 +220,10 @@ module Snarkable = struct
       List.foldi vs ~init:V.empty
         ~f:(fun i acc b -> if i < V.length then V.set acc i b else acc)
 
+    let pack_var = Checked.project
+
+    let pack_value = Fn.id
+
     module Unpacked = struct
       type var = Boolean.var list
       type value = V.t
@@ -243,13 +248,25 @@ module Snarkable = struct
         List.init V.length (fun i -> Boolean.var_of_value (V.get v i))
     end
 
-    let pack_var = Checked.project
-
-    let pack_value = Fn.id
-
     let unpack_var x = Impl.Checked.unpack x ~length:bit_length
 
     let unpack_value (x : Packed.value) : Unpacked.value = x
+
+    let compare_var x y =
+      Impl.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
+
+    let increment_var bs =
+      let open Impl in
+      with_label __LOC__ begin
+        let v = Checked.pack bs in
+        let v' = Cvar.add v (Cvar.constant Field.one) in
+        Checked.unpack v' ~length:V.length
+      end
+
+    let assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+      with_label __LOC__ begin
+        assert_equal (pack_var n) (pack_var n')
+      end
   end
 
   module UInt64 (Impl : Snarky.Snark_intf.S) =

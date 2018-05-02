@@ -21,4 +21,5 @@ jobs:
 
       - run:
           name: Run All Tests
-          command: eval `opam config env` && jbuilder runtest --verbose
+          command: make test
+

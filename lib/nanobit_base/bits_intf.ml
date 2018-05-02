@@ -57,4 +57,13 @@ module Snarkable = struct
     val pack_var : Unpacked.var -> Packed.var
     val unpack_var : Packed.var -> (Unpacked.var, _) checked
   end
+
+  module type Small = sig
+    include Faithful
+
+    type comparison_result
+    val compare_var : Unpacked.var -> Unpacked.var -> (comparison_result, _) checked
+    val increment_var : Unpacked.var -> (Unpacked.var, _) checked
+    val assert_equal_var : Unpacked.var -> Unpacked.var -> (unit, _) checked
+  end
 end

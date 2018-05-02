@@ -2,12 +2,12 @@ open Core_kernel
 
 module type S = sig
   type t
-  [@@deriving sexp]
+  [@@deriving sexp, compare, eq, hash]
 
   module Stable : sig
     module V1 : sig
       type nonrec t = t
-      [@@deriving bin_io, sexp, eq]
+      [@@deriving bin_io, sexp, eq, compare, hash]
     end
   end
 
@@ -19,58 +19,51 @@ module type S = sig
     selecting the nonce *)
   val random : unit -> t
 
+  val of_string : string -> t
+  val to_string : t -> string
+
   module Bits : Bits_intf.S with type t := t
 
-  include Snark_params.Tick.Snarkable.Bits.Faithful
+  include Snark_params.Tick.Snarkable.Bits.Small
     with type Unpacked.value = t
      and type Packed.value = t
 end
 
 module type F = functor
   (N : sig
-    type t [@@deriving bin_io, sexp, eq]
+    type t [@@deriving bin_io, sexp, eq, compare, hash]
     include Unsigned_extended.S with type t := t
     val random : unit -> t
   end)
   (Bits : Bits_intf.S with type t := N.t)
-  (Bits_snarkable : functor (Impl : Snarky.Snark_intf.S) -> Bits_intf.Snarkable.Faithful
-       with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
-        and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-        and type boolean_var := Impl.Boolean.var
-        and type Packed.var = Impl.Cvar.t
-        and type Packed.value = N.t
-        and type Unpacked.var = Impl.Boolean.var list
-        and type Unpacked.value = N.t) ->
+  (Bits_snarkable : Snark_params.Tick.Snarkable.Bits.Small
+        with type Packed.value = N.t
+         and type Unpacked.value = N.t) ->
           S with type t := N.t
              and module Bits := Bits
 
 module Make
   (N : sig
-    type t [@@deriving bin_io, sexp, eq]
+    type t [@@deriving bin_io, sexp, eq, compare, hash]
     include Unsigned_extended.S with type t := t
     val random : unit -> t
   end)
   (Bits : Bits_intf.S with type t := N.t)
-  (Bits_snarkable : functor (Impl : Snarky.Snark_intf.S) -> Bits_intf.Snarkable.Faithful
-       with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
-        and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-        and type boolean_var := Impl.Boolean.var
-        and type Packed.var = Impl.Cvar.t
-        and type Packed.value = N.t
-        and type Unpacked.var = Impl.Boolean.var list
-        and type Unpacked.value = N.t)
+  (Bits_snarkable : Snark_params.Tick.Snarkable.Bits.Small
+        with type Packed.value = N.t
+         and type Unpacked.value = N.t)
 = struct
   module Stable = struct
     module V1 = struct
       type t = N.t
-      [@@deriving bin_io, sexp, eq]
+      [@@deriving bin_io, sexp, eq, compare, hash]
     end
   end
 
   include Stable.V1
   include (N : (module type of N) with type t := t)
 
-  include Bits_snarkable(Snark_params.Tick)
+  include Bits_snarkable
 
   module Bits = Bits
 end
@@ -86,7 +79,7 @@ module Make32 () : S with type t = Unsigned_extended.UInt32.t = Make(struct
     logor
       (mask lsl 31)
       (Int32.max_value |> Random.int32 |> Int64.of_int32 |> UInt32.of_int64)
-end)(Bits.UInt32)(Bits.Snarkable.UInt32)
+end)(Bits.UInt32)(Bits.Snarkable.UInt32(Snark_params.Tick))
 
 module Make64 () : S with type t = Unsigned_extended.UInt64.t = Make(struct
   open Unsigned_extended
@@ -99,4 +92,4 @@ module Make64 () : S with type t = Unsigned_extended.UInt64.t = Make(struct
     logor
       (mask lsl 63)
       (Int64.max_value |> Random.int64 |> UInt64.of_int64)
-end)(Bits.UInt64)(Bits.Snarkable.UInt64)
+end)(Bits.UInt64)(Bits.Snarkable.UInt64(Snark_params.Tick))

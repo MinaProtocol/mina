@@ -11,18 +11,36 @@ let create_ledger_and_transactions num_transactions =
     let public_key = Public_key.compress k.public_key in
     Ledger.update ledger public_key
       { public_key; balance = Currency.Balance.of_int 10_000; nonce = Account.Nonce.zero });
-  let random_transaction () : Transaction.With_valid_signature.t =
-    let sender = keys.(Random.int num_accounts) in
-    let receiver = keys.(Random.int num_accounts) in
+
+  let txn from_kp (to_kp : Signature_keypair.t) amount nonce =
     let payload : Transaction.Payload.t =
-      { receiver = Public_key.compress receiver.public_key
+      { receiver = Public_key.compress to_kp.public_key
       ; fee = Currency.Fee.zero
-      ; amount = Currency.Amount.of_int (1 + Random.int 100)
+      ; amount
+      ; nonce
       }
     in
-    Transaction.sign sender payload
+    Transaction.sign from_kp payload
   in
-  (ledger, List.init num_transactions (fun _ -> random_transaction ()))
+
+  let random_transaction () : Transaction.With_valid_signature.t =
+    let sender_idx = Random.int num_accounts in
+    let sender = keys.(sender_idx) in
+    let receiver = keys.(Random.int num_accounts) in
+    let nonce =
+        Ledger.get ledger (Public_key.compress sender.public_key)
+          |> Option.value_exn
+          |> Account.nonce
+    in
+    txn sender receiver (Currency.Amount.of_int (1 + Random.int 100)) nonce
+  in
+  match num_transactions with
+  | `Count n ->
+    (ledger, List.init n (fun _ -> random_transaction ()))
+  | `Two_from_same ->
+    let a = txn keys.(0) keys.(1) (Currency.Amount.of_int 10) Account.Nonce.zero in
+    let b = txn keys.(0) keys.(1) (Currency.Amount.of_int 10) (Account.Nonce.succ (Account.Nonce.zero)) in
+    (ledger, [a ; b])
 
 let time thunk =
   let start = Time.now () in
@@ -65,27 +83,65 @@ let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Tran
       in
       merge_all (Time.Span.(+) serial_time layer_time) new_proofs
   in
-  merge_all base_proof_time base_proofs
+  let total_time = merge_all base_proof_time base_proofs in
+  Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let main num_transactions_log2 () =
+let check_base_snarks sparse_ledger0 (transactions : Transaction.With_valid_signature.t list) =
+  let module Sparse_ledger = Bundle.Sparse_ledger in
+  let _ =
+    List.fold transactions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
+      let sparse_ledger' =
+        Sparse_ledger.apply_transaction_exn sparse_ledger (t :> Transaction.t)
+      in
+      let () = 
+          Transaction_snark.check_transaction
+            (Sparse_ledger.merkle_root sparse_ledger)
+            (Sparse_ledger.merkle_root sparse_ledger')
+            t
+            (unstage (Sparse_ledger.handler sparse_ledger))
+      in
+      sparse_ledger')
+  in
+  "Base constraint system satisfied"
+
+let run profiler num_transactions =
+  let (ledger, transactions) = create_ledger_and_transactions num_transactions in
+  let sparse_ledger =
+    Bundle.Sparse_ledger.of_ledger_subset ledger
+      (List.concat_map transactions ~f:(fun t ->
+        let t = (t :> Transaction.t) in
+        [ t.payload.receiver; Public_key.compress t.sender ]))
+  in
+  let message = profiler sparse_ledger transactions in
+  Core.printf !"%s\n%!" message;
+  exit 0
+
+let main num_transactions () =
   Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
-    let num_transactions = Int.pow 2 num_transactions_log2 in
     let keys = Transaction_snark.Keys.create () in
     let module T = Transaction_snark.Make(struct let keys = keys end) in
-    let (ledger, transactions) = create_ledger_and_transactions num_transactions in
-    let sparse_ledger =
-      Bundle.Sparse_ledger.of_ledger_subset ledger
-        (List.concat_map transactions ~f:(fun t ->
-          let t = (t :> Transaction.t) in
-          [ t.payload.receiver; Public_key.compress t.sender ]))
-    in
-    let total_time = profile (module T) sparse_ledger transactions in
-    Core.printf !"Total time was: %{Time.Span}\n%!" total_time
+    run (profile (module T)) num_transactions
+  )
+
+let dry num_transactions () =
+  Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
+    run check_base_snarks num_transactions
   )
 
 let command =
   let open Command.Let_syntax in
   Command.basic ~summary:"transaction snark profiler" begin
-    let%map_open n = flag "k" ~doc:"log_2(number of transactions to snark)" (required int) in
-    main n
+    [%map_open
+      let n = flag "k" ~doc:"log_2(number of transactions to snark) or none for the mocked ones" (optional int)
+      and check_only = flag "check-only"
+        ~doc:"Just check base snarks, don't keys or time anything" (required bool) in
+      let num_transactions = Option.map n ~f:(fun n ->
+        `Count (Int.pow 2 n)
+      ) |> Option.value ~default:`Two_from_same
+      in
+      if check_only then
+        dry num_transactions
+      else
+        main num_transactions
+    ]
   end

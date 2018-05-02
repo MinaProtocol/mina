@@ -98,32 +98,35 @@ let run_test : unit -> unit Deferred.t = fun () ->
     assert_balance poor_pk initial_poor_balance
   in
 
-  (* HACK: This is slightly less than all of the initial_rich_balance
-   *       so the transaction can't be replayed (before implementing
-   *       transaction nonces)
+  (* Note: This is much less than half of the rich balance so we can test
+   *       transaction replays being prohibited
    *)
   let send_amount =
-    Currency.Amount.of_string
-      (Currency.Balance.to_string (
-       Currency.Balance.(-) initial_rich_balance (Currency.Amount.of_int 50) |> Option.value_exn
-      ))
+    Currency.Amount.of_int 10
   in
-
   (* Send money to someone *)
-  let poor_pk = Genesis_ledger.poor_pk in
-  let payload : Transaction.Payload.t =
-    { Transaction.Payload.receiver = poor_pk |> Public_key.compress
-    ; amount   = send_amount
-    ; fee      = Currency.Fee.of_int 0
-    }
-  in
-  let transaction =
+  let build_txn amount =
+    let poor_pk = Genesis_ledger.poor_pk in
+    let payload : Transaction.Payload.t =
+      { receiver = poor_pk |> Public_key.compress
+      ; amount   = send_amount
+      ; fee      = Currency.Fee.of_int 0
+      ; nonce    = Account.Nonce.zero
+      }
+    in
     Transaction.sign
       (Signature_keypair.of_private_key rich_sk)
       payload
   in
+  let transaction = build_txn send_amount in
   let%bind o = Run.send_txn log minibit (transaction :> Transaction.t) in
   let () = Option.value_exn o in
+  (* Send a similar the transaction twice on purpose; this second one
+   * will be rejected because the nonce is wrong *)
+  let transaction' = build_txn Currency.Amount.(send_amount + (of_int 1)) in
+  let%bind o = Run.send_txn log minibit (transaction' :> Transaction.t) in
+  let () = Option.value_exn o in
+
   (* Let the system settle *)
   let%bind () =
     Async.after (Time.Span.of_ms 50.)
@@ -148,5 +151,4 @@ let command =
   let open Async in
   Command.async ~summary:"Full minibit end-to-end test"
     (Command.Param.return run_test)
-
 

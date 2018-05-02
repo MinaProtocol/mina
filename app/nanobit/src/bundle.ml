@@ -96,6 +96,7 @@ module Sparse_ledger = struct
       set_exn t sender_idx
         { sender_account with
           balance = Option.value_exn (Balance.sub_amount sender_account.balance amount)
+        ; nonce = Account.Nonce.succ sender_account.nonce
         }
     in
     let receiver_account = get_exn t receiver_idx in
