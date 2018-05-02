@@ -121,17 +121,15 @@ let run profiler num_transactions =
   Core.printf !"%s\n%!" message;
   exit 0
 
-let main num_transactions_log2 () =
+let main num_transactions () =
   Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
-    let num_transactions = `Count (Int.pow 2 num_transactions_log2) in
     let keys = Transaction_snark.Keys.create () in
     let module T = Transaction_snark.Make(struct let keys = keys end) in
     run (profile (module T)) num_transactions
   )
 
-let dry _ () =
+let dry num_transactions () =
   Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
-    let num_transactions = `Two_from_same in
     run check_base_snarks num_transactions
   )
 
@@ -139,12 +137,16 @@ let command =
   let open Command.Let_syntax in
   Command.basic ~summary:"transaction snark profiler" begin
     [%map_open
-      let n = flag "k" ~doc:"log_2(number of transactions to snark)" (required int)
-      and dry_run = flag "dry-run"
-        ~doc:"Just check snark, don't keys or time anything" (required bool) in
-      if dry_run then
-        dry n
+      let n = flag "k" ~doc:"log_2(number of transactions to snark) or none for the mocked ones" (optional int)
+      and check_only = flag "check-only"
+        ~doc:"Just check base snarks, don't keys or time anything" (required bool) in
+      let num_transactions = Option.map n ~f:(fun n ->
+        `Count (Int.pow 2 n)
+      ) |> Option.value ~default:`Two_from_same
+      in
+      if check_only then
+        dry num_transactions
       else
-        main n
+        main num_transactions
     ]
   end
