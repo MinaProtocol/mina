@@ -36,6 +36,8 @@ module type S = sig
 
     val apply_transaction_exn : t -> Transaction.t -> t
 
+    val apply_transition_exn : t -> Transaction_snark.Transition.t -> t
+
     val of_ledger_subset : Ledger.t -> Public_key.Compressed.t list -> t
 
     val handler : t -> Handler.t Staged.t
@@ -90,7 +92,7 @@ module Sparse_ledger = struct
         of_hash ~depth:Ledger.depth
           (Ledger.merkle_root ledger :> Pedersen.Digest.t))
 
-  let apply_transaction_exn t ({ sender; payload = { amount; fee=_; receiver } } : Transaction.t) =
+  let apply_transaction_exn t ({ sender; payload = { amount; fee; receiver } } : Transaction.t) =
     let sender_idx = find_index_exn t (Public_key.compress sender) in
     let receiver_idx = find_index_exn t receiver in
     let sender_account = get_exn t sender_idx in
@@ -100,7 +102,12 @@ module Sparse_ledger = struct
     let t =
       set_exn t sender_idx
         { sender_account with
-          balance = Option.value_exn (Balance.sub_amount sender_account.balance amount)
+          balance =
+            let open Option in
+            value_exn (
+              let open Let_syntax in
+              let%bind total = Amount.add_fee amount fee in
+              Balance.sub_amount sender_account.balance total)
         }
     in
     let receiver_account = get_exn t receiver_idx in
@@ -108,6 +115,24 @@ module Sparse_ledger = struct
       { receiver_account with
         balance = Option.value_exn (Balance.add_amount receiver_account.balance amount)
       }
+
+  let apply_fee_transfer_exn =
+    let apply_single t ((pk, fee) : Fee_transfer.single) =
+      let index = find_index_exn t pk in
+      let account = get_exn t index in
+      let open Currency in
+      set_exn t index
+        { account
+          with balance = Option.value_exn (Balance.add_amount account.balance (Amount.of_fee fee))
+        }
+    in
+    fun t transfer ->
+      List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
+
+  let apply_transition_exn t transition =
+    match transition with
+    | Transaction_snark.Transition.Fee_transfer tr -> apply_fee_transfer_exn t tr
+    | Transaction tr -> apply_transaction_exn t (tr :> Transaction.t)
 
   let merkle_root t = Ledger_hash.of_hash (merkle_root t)
 
@@ -138,13 +163,8 @@ module Sparse_ledger = struct
 end
 
 module Input = struct
-  type transition =
-    | Transaction of Transaction.With_valid_signature.t
-    | Fee_transfer of Fee_transfer.t
-  [@@deriving bin_io]
-
   type t =
-    { transition : transition
+    { transition : Transaction_snark.Transition.t
     ; ledger : Sparse_ledger.t
     ; target_hash : Ledger_hash.Stable.V1.t
     }
@@ -164,14 +184,9 @@ module M = Map_reduce.Make_map_reduce_function_with_init(struct
     let init () = return (Worker_state.create ())
 
     let map ((module T) : state_type) { Input.transition; ledger; target_hash } =
-      return begin match transition with
-      | Fee_transfer t ->
-        T.of_fee_transfer (Sparse_ledger.merkle_root ledger) target_hash t
-          (unstage (Sparse_ledger.handler ledger))
-      | Transaction t ->
-        T.of_transaction (Sparse_ledger.merkle_root ledger) target_hash t
-          (unstage (Sparse_ledger.handler ledger))
-      end
+      return
+        (T.of_transition (Sparse_ledger.merkle_root ledger) target_hash transition
+           (unstage (Sparse_ledger.handler ledger)))
 
     let combine ((module T) : state_type) t1 t2 =
       return (T.merge t1 t2)

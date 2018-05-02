@@ -38,6 +38,8 @@ module type S = sig
 
     val apply_transaction_exn : t -> Transaction.t -> t
 
+    val apply_transition_exn : t -> Transaction_snark.Transition.t -> t
+
     val of_ledger_subset : Ledger.t -> Public_key.Compressed.t list -> t
 
     val handler : t -> Handler.t Staged.t
