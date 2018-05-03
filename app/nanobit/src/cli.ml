@@ -3,6 +3,7 @@ open Async
 open Nanobit_base
 open Blockchain_snark
 open Cli_common
+(* <<<<<<< HEAD
 
 module type Init_intf = sig
   type proof [@@deriving bin_io]
@@ -351,6 +352,9 @@ module Run (Program : Main_intf) = struct
     Main.run minibit;
     Logger.debug log "Ran minibit\n%!";
 end
+=======
+>>>>>>> master *)
+open Main
 
 let daemon =
   let open Command.Let_syntax in
@@ -451,12 +455,11 @@ let daemon =
       ]
     end
 ;;
-
 let () = 
   Command.group ~summary:"Current"
     [ "daemon", daemon
     ; Parallel.worker_command_name, Parallel.worker_command
-    ; "rpc", Main_rpc.command
+    ; "full-test", Full_test.command
     ; "client", Client.command
     ; "transaction-snark-profiler", Transaction_snark_profiler.command
     ]

@@ -93,6 +93,7 @@ module Fee_transfer = struct
           { receiver = pk1
           ; amount = Amount.of_fee fee1 (* What "receiver" receives *)
           ; fee = fee2 (* What "sender" receives *)
+          ; nonce = Account.Nonce.zero
           }
       ; sender = Public_key.decompress_exn pk2
       ; signature = dummy_signature
@@ -237,14 +238,16 @@ module Base = struct
     with_label __LOC__ begin
       (if not Insecure.transaction_replay
       then failwith "Insecure.transaction_replay false");
-      let { Transaction.Payload.receiver; amount; fee } = payload in
+      let { Transaction.Payload.receiver; amount; fee; nonce } = payload in
+      let is_fee_transfer = Tag.Checked.is_fee_transfer tag in
+      let is_normal = Tag.Checked.is_normal tag in
       let%bind () =
         let%bind bs = Transaction.Payload.var_to_bits payload in
         let%bind verifies =
           Schnorr.Checked.verifies signature sender bs
         in
         (* Should only assert_verifies if the tag is Normal *)
-        Boolean.Assert.any [Tag.Checked.is_fee_transfer tag; verifies]
+        Boolean.Assert.any [is_fee_transfer; verifies]
       in
       let%bind excess, sender_delta =
         let%bind amount_plus_fee = Amount.Checked.add_fee amount fee in
@@ -259,8 +262,7 @@ module Base = struct
           "sender" gets +fee
           excess is -(amount + fee) (since "receiver" gets amount)
         *)
-        Checked.cswap (Tag.Checked.is_fee_transfer tag)
-          (pos_fee, neg_amount_plus_fee)
+        Checked.cswap is_fee_transfer (pos_fee, neg_amount_plus_fee)
       in
       let%bind () =
         print "sender_delta"
@@ -277,10 +279,15 @@ module Base = struct
       let%bind root =
         let%bind sender_compressed = Public_key.compress_var sender in
         Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
+          let%bind next_nonce = Account.Nonce.increment_if_var account.nonce is_normal in
+          let%bind () =
+            let%bind nonce_matches = Account.Nonce.equal_var nonce account.nonce in
+            Boolean.Assert.any [ is_fee_transfer; nonce_matches ]
+          in
           let%map balance =
             Balance.Checked.add_signed_amount account.balance sender_delta
           in
-          { account with balance })
+          { account with balance; nonce = next_nonce })
       in
       let%map root =
         Ledger_hash.modify_account root receiver ~f:(fun account ->
@@ -294,11 +301,11 @@ module Base = struct
      - check that [signature] is a signature by [sender] of payload
      - return the merkle tree [root'] where the sender balance is decremented by
      [payload.amount] and the receiver balance is incremented by [payload.amount].
+     - ensure that the nonce in the transaction is the same as the nonce in the
+     ledger; increment the nonce in the ledger afterwards
   *)
   let apply_transaction root ({ sender; signature; payload } : Transaction.var) =
-    (if not Insecure.transaction_replay
-     then failwith "Insecure.transaction_replay false");
-    let { Transaction.Payload.receiver; amount; fee } = payload in
+    let { Transaction.Payload.receiver; amount; fee; nonce } = payload in
     let%bind () =
       let%bind bs = Transaction.Payload.var_to_bits payload in
       Schnorr.Checked.assert_verifies signature sender bs
@@ -306,8 +313,12 @@ module Base = struct
     let%bind root =
       let%bind sender_compressed = Public_key.compress_var sender in
       Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
-        let%map balance = Balance.Checked.(account.balance - amount) in (* TODO: Fee *)
-        { account with balance })
+        let%bind balance = Balance.Checked.(account.balance - amount) in (* TODO: Fee *)
+        with_label __LOC__ begin
+          let%bind () = Account.Nonce.assert_equal_var account.nonce nonce in
+          let%map next_nonce = Account.Nonce.increment_var account.nonce in
+          { account with balance ; nonce = next_nonce }
+        end)
     in
     Ledger_hash.modify_account root receiver ~f:(fun account ->
       let%map balance = Balance.Checked.(account.balance + amount) in
@@ -629,11 +640,15 @@ let check_tagged_transaction source target transaction handler =
   in
   assert passed
 
-let check_transaction source target (transaction : Transaction.With_valid_signature.t) handler =
-  check_tagged_transaction source target (Normal, (transaction :> Transaction.t)) handler
+let check_transition source target (t : Transition.t) handler =
+  check_tagged_transaction source target
+    (Transition.to_tagged_transaction t) handler
 
-let check_fee_transfer source target transfer handler =
-  check_tagged_transaction source target (Fee_transfer.to_tagged_transaction transfer) handler
+let check_transaction source target t handler =
+  check_transition source target (Transaction t) handler
+
+let check_fee_transfer source target t handler =
+  check_transition source target (Fee_transfer t) handler
 
 module Make (K : sig val keys : Keys0.t end) = struct
   open K
@@ -834,6 +849,7 @@ let%test_module "transaction_snark" =
         ; account =
             { public_key = Public_key.compress (Public_key.of_private_key private_key)
             ; balance = Balance.of_int (10 + Random.int 100)
+            ; nonce = Account.Nonce.zero
             }
         }
       in
@@ -841,13 +857,14 @@ let%test_module "transaction_snark" =
       Array.init n ~f:(fun _ -> random_wallet ())
     ;;
 
-    let transaction wallets i j amt fee =
+    let transaction wallets i j amt fee nonce =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
       let payload : Transaction.Payload.t =
         { receiver = receiver.account.public_key
         ; fee
         ; amount = Amount.of_int amt
+        ; nonce
         }
       in
       let signature =
@@ -878,8 +895,8 @@ let%test_module "transaction_snark" =
         in
         Array.iter wallets ~f:(fun { account } ->
           Ledger.set ledger account.public_key account);
-        let t1 = transaction wallets 0 1 8 (Fee.of_int (Random.int 20)) in
-        let t2 = transaction wallets 1 2 3 (Fee.of_int (Random.int 20)) in
+        let t1 = transaction wallets 0 1 8 (Fee.of_int (Random.int 20)) Account.Nonce.zero in
+        let t2 = transaction wallets 1 2 3 (Fee.of_int (Random.int 20)) Account.Nonce.zero in
         let state1 = Ledger.merkle_root ledger in
         let proof12 = of_transaction' ledger t1 in
         let proof23 = of_transaction' ledger t2 in

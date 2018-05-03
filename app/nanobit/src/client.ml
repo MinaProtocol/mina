@@ -73,6 +73,8 @@ let send_txn =
         flag "fee" ~doc:"Transaction fee you're willing to pay" (required txn_fee)
       and amount =
         flag "amount" ~doc:"Transaction amount you want to send" (required txn_amount)
+      and nonce =
+        flag "nonce" ~doc:"Transaction nonce to ensure no replay attacks" (required txn_nonce)
       and port =
         flag "daemon-port" ~doc:"Port of the deamon's client-rpc handlers" (required int16)
       in
@@ -83,6 +85,7 @@ let send_txn =
           { receiver = receiver_compressed
           ; amount
           ; fee
+          ; nonce
           }
         in
         let txn =

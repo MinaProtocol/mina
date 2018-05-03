@@ -9,14 +9,15 @@ module Fee = Currency.Fee
 module Payload = struct
   module Stable = struct
     module V1 = struct
-      type ('pk, 'amount, 'fee) t_ =
+      type ('pk, 'amount, 'fee, 'nonce) t_ =
         { receiver : 'pk
         ; amount   : 'amount
         ; fee      : 'fee
+        ; nonce    : 'nonce
         }
       [@@deriving bin_io, eq, sexp, compare, hash]
 
-      type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t) t_
+      type t = (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t, Fee.Stable.V1.t, Account.Nonce.Stable.V1.t) t_
       [@@deriving bin_io, eq, sexp, compare, hash]
     end
   end
@@ -24,32 +25,37 @@ module Payload = struct
   include Stable.V1
 
   type value = t
-  type var = (Public_key.Compressed.var, Amount.var, Fee.var) t_
+  type var = (Public_key.Compressed.var, Amount.var, Fee.var, Account.Nonce.Unpacked.var) t_
   let typ : (var, t) Tick.Typ.t =
     let spec =
       Data_spec.(
-        [ Public_key.Compressed.typ; Amount.typ; Fee.typ ])
+        [ Public_key.Compressed.typ
+        ; Amount.typ
+        ; Fee.typ
+        ; Account.Nonce.Unpacked.typ ])
     in
-    let of_hlist : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
-      H_list.(fun [ receiver; amount; fee ] -> { receiver; amount; fee })
+    let of_hlist : 'a 'b 'c 'd. (unit, 'a -> 'b -> 'c -> 'd -> unit) H_list.t -> ('a, 'b, 'c, 'd) t_ =
+      H_list.(fun [ receiver; amount; fee; nonce ] -> { receiver; amount; fee; nonce })
     in
-    let to_hlist { receiver; amount; fee } = H_list.([ receiver; amount; fee ]) in
+    let to_hlist { receiver; amount; fee; nonce } = H_list.([ receiver; amount; fee; nonce ]) in
     Typ.of_hlistable spec
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_bits { receiver; amount; fee } =
+  let var_to_bits { receiver; amount; fee; nonce } =
     with_label __LOC__ begin
       let%map receiver = Public_key.Compressed.var_to_bits receiver in
       let amount = (Amount.var_to_bits amount :> Boolean.var list) in
       let fee = (Fee.var_to_bits fee :> Boolean.var list) in
-      receiver @ amount @ fee
+      let nonce = Account.Nonce.Unpacked.var_to_bits nonce in
+      receiver @ amount @ fee @ nonce
     end
 
-  let to_bits { receiver; amount; fee } =
+  let to_bits { receiver; amount; fee; nonce } =
     Public_key.Compressed.to_bits receiver
     @ Amount.to_bits amount
     @ Fee.to_bits fee
+    @ Account.Nonce.Bits.to_bits nonce
 
   let%test_unit "to_bits" =
     let open Test_util in
@@ -59,6 +65,7 @@ module Payload = struct
         { receiver = { x = Field.random (); is_odd = Random.bool () }
         ; amount = Amount.of_int (Random.int Int.max_value)
         ; fee = Fee.of_int (Random.int Int.max_value_30_bits)
+        ; nonce = Account.Nonce.random ()
         })
 end
 
@@ -106,9 +113,30 @@ let typ : (var, t) Tick.Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
+let gen ~keys ~max_amount ~max_fee =
+  let open Quickcheck.Generator in
+  let open Quickcheck.Generator.Let_syntax in
+  let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
+    and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
+    and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
+    and amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int
+  in
+  let sender = keys.(sender_idx) in
+  let receiver = keys.(receiver_idx) in
+  let payload : Payload.t =
+    { receiver = Public_key.compress receiver.Signature_keypair.public_key
+    ; fee
+    ; amount
+    ; nonce = Account.Nonce.zero
+    }
+  in
+  sign sender payload
+
 module With_valid_signature = struct
   type t = Stable.V1.t
   [@@deriving sexp, eq, bin_io, compare]
+
+  let gen = gen
 end
 
 let check_signature ({ payload; sender; signature } : t) =

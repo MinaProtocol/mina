@@ -1416,6 +1416,10 @@ module Checked = struct
         Constraint.equal x1 x2)
       |> assert_all ~label:"Checked.Assert.equal_bitstrings"
 
+    let equal =
+      assert_equal ~label:"Checked.Assert.equal"
+    ;;
+
     let non_zero (v : Cvar.t) =
       with_label "Checked.Assert.non_zero" Let_syntax.(let%map _ =  inv v in ())
     ;;

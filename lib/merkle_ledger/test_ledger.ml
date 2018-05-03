@@ -1,15 +1,17 @@
 open Core
 open Ledger
 
+module Account = struct
+  type t = int [@@deriving sexp, eq, bin_io]
+end
+
 module Hash = struct
 
   type hash = Md5.t [@@deriving sexp, hash, compare, bin_io]
-  type account = int [@@deriving sexp, bin_io]
-
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
 
-  let hash_account account = Md5.digest_string ("0" ^ (Sexp.to_string ([%sexp_of: account] account)))
+  let hash_account account = Md5.digest_string ("0" ^ (Sexp.to_string ([%sexp_of: Account.t] account)))
   ;;
 
   let empty_hash = Md5.digest_string ""
@@ -30,5 +32,5 @@ module Key = struct
   include Hashable.Make_binable(T)
 end
 
-module Make = Ledger.Make(Hash)(Key)
+module Make = Ledger.Make(Account)(Hash)(Key)
 

@@ -23,6 +23,12 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
         with type ('a, 'b) typ := ('a, 'b) Typ.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
+
+      module type Small = Bits_intf.Snarkable.Small
+        with type ('a, 'b) typ := ('a, 'b) Typ.t
+         and type ('a, 'b) checked := ('a, 'b) Checked.t
+         and type boolean_var := Boolean.var
+         and type comparison_result := Checked.comparison_result
     end
   end
 end

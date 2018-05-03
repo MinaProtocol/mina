@@ -117,7 +117,7 @@ let negative_one =
   in
   { next_difficulty
   ; previous_state_hash = State_hash.of_hash Pedersen.zero_hash
-  ; ledger_hash = Ledger.merkle_root (Ledger.create ())
+  ; ledger_hash = Ledger.merkle_root Genesis_ledger.ledger
   ; strength = Strength.zero
   ; timestamp
   }
@@ -184,7 +184,7 @@ module Make_update (T : Transaction_snark.S) = struct
     let hash =
       Pedersen.hash_fold Pedersen.params
         (List.fold
-           (to_bits_unchecked state @ Nonce.Bits.to_bits block.header.nonce))
+           (to_bits_unchecked state @ Block.Nonce.Bits.to_bits block.header.nonce))
     in
     assert (Target.meets_target_unchecked state.next_difficulty ~hash);
     update_unchecked state block
@@ -303,7 +303,7 @@ module Make_update (T : Transaction_snark.S) = struct
             ~init:(0, Tick.Hash_curve.Checked.identity)
         in
         let%bind pow_hash =
-          Pedersen_hash.hash (Nonce.Unpacked.var_to_bits block.header.nonce)
+          Pedersen_hash.hash (Block.Nonce.Unpacked.var_to_bits block.header.nonce)
             ~params:Pedersen.params
             ~init:(List.length state_bits, state_hash)
           >>| Pedersen_hash.digest

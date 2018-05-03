@@ -3,8 +3,8 @@ open Snark_params
 open Currency
 
 include Merkle_ledger.Ledger.Make
+    (Account)
     (struct
-      type account = Account.t [@@deriving sexp, bin_io]
       type hash = Tick.Pedersen.Digest.t [@@deriving sexp, hash, compare, bin_io]
 
       let empty_hash =
@@ -34,18 +34,25 @@ let get' ledger tag key = error_opt (sprintf "%s not found" tag) (get ledger key
 let add_amount balance amount = error_opt "overflow" (Balance.add_amount balance amount)
 let sub_amount balance amount = error_opt "insufficient funds" (Balance.sub_amount balance amount)
 
+let validate_nonces txn_nonce account_nonce =
+  if Account.Nonce.equal account_nonce txn_nonce then
+    Or_error.return ()
+  else
+    Or_error.errorf !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in transaction %{sexp: Account.Nonce.t}" account_nonce txn_nonce
+
 let apply_transaction_unchecked ledger (transaction : Transaction.t) =
   let sender = Public_key.compress transaction.sender in
-  let { Transaction.Payload.fee=_; amount; receiver } = transaction.payload in
+  let { Transaction.Payload.fee=_; amount; receiver; nonce } = transaction.payload in
   let open Or_error.Let_syntax in
   let%bind sender_account = get' ledger "sender" sender in
+  let%bind () = validate_nonces nonce sender_account.nonce in
   let%bind sender_balance' = sub_amount sender_account.balance amount in
   if Public_key.Compressed.equal sender receiver
   then return ()
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
     let%map receiver_balance' = add_amount receiver_account.balance amount in
-    set ledger sender { sender_account with balance = sender_balance' };
+    set ledger sender { sender_account with balance = sender_balance' ; nonce = Account.Nonce.succ nonce };
     set ledger receiver { receiver_account with balance = receiver_balance' }
 
 let apply_transaction ledger (transaction : Transaction.With_valid_signature.t) =
@@ -54,15 +61,16 @@ let apply_transaction ledger (transaction : Transaction.With_valid_signature.t) 
 let undo_transaction ledger (transaction : Transaction.t) =
   let open Or_error.Let_syntax in
   let sender = Public_key.compress transaction.sender in
-  let { Transaction.Payload.fee=_; amount; receiver } = transaction.payload in
+  let { Transaction.Payload.fee=_; amount; receiver; nonce } = transaction.payload in
   let%bind sender_account = get' ledger "sender" sender in
   let%bind sender_balance' = add_amount sender_account.balance amount in
+  let%bind () = validate_nonces (Account.Nonce.succ nonce) sender_account.nonce in
   if Public_key.Compressed.equal sender receiver
   then return ()
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
     let%map receiver_balance' = sub_amount receiver_account.balance amount in
-    set ledger sender { sender_account with balance = sender_balance' };
+    set ledger sender { sender_account with balance = sender_balance' ; nonce };
     set ledger receiver { receiver_account with balance = receiver_balance' }
 
 let merkle_root_after_transaction_exn ledger transaction =

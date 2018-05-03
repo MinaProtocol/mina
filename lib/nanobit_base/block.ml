@@ -3,6 +3,8 @@ open Snark_params
 
 module Pedersen = Tick.Pedersen
 
+module Nonce = Nonce.Make64 (struct end)
+
 module Header = struct
   module Stable = struct
     module V1 = struct
@@ -141,7 +143,7 @@ let genesis : t =
   ; body =
       (* TODO: Fix  *)
       { proof = Lazy.force Tock.Proof.dummy
-      ; target_hash = Ledger.(merkle_root (create ()))
+      ; target_hash = Ledger.(merkle_root Genesis_ledger.ledger)
       }
   }
 

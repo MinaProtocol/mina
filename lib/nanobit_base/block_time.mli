@@ -1,7 +1,7 @@
 open Core_kernel
 open Snark_params
 
-type t [@@deriving sexp, bin_io, eq]
+type t [@@deriving sexp, eq]
 
 module Stable : sig
   module V1 : sig
@@ -34,6 +34,12 @@ module Span : sig
     and type Packed.value = t
 
   val to_ms : t -> Int64.t
+
+  val ( < ) : t -> t -> bool
+  val ( > ) : t -> t -> bool
+  val ( = ) : t -> t -> bool
+  val ( <= ) : t -> t -> bool
+  val ( >= ) : t -> t -> bool
 end
 
 val field_var_to_unpacked : Tick.Cvar.t -> (Unpacked.var, _) Tick.Checked.t
@@ -51,3 +57,4 @@ val of_time : Time.t -> t
 val to_time : t -> Time.t
 
 val now : unit -> t
+
