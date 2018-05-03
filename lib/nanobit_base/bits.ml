@@ -233,15 +233,6 @@ module Snarkable = struct
           ~there:(v_to_list V.length)
           ~back:v_of_list
 
-      module Padded = struct
-        type var = Boolean.var list
-        type value = V.t
-        let typ : (var, value) Typ.t =
-          Typ.transport (Typ.list ~length:Field.size_in_bits Boolean.typ)
-            ~there:(v_to_list Field.size_in_bits)
-            ~back:v_of_list
-      end
-
       let var_to_bits = Fn.id
 
       let var_of_value v =
@@ -255,12 +246,25 @@ module Snarkable = struct
     let compare_var x y =
       Impl.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
 
+    let increment_if_var bs (b : Boolean.var)=
+      let open Impl in
+      with_label __LOC__ begin
+        let v = Checked.pack bs in
+        let v' = Cvar.add v (b :> Cvar.t) in
+        Checked.unpack v' ~length:V.length
+      end
+
     let increment_var bs =
       let open Impl in
       with_label __LOC__ begin
         let v = Checked.pack bs in
         let v' = Cvar.add v (Cvar.constant Field.one) in
         Checked.unpack v' ~length:V.length
+      end
+
+    let equal_var (n : Unpacked.var) (n' : Unpacked.var) =
+      with_label __LOC__ begin
+        Checked.equal (pack_var n) (pack_var n')
       end
 
     let assert_equal_var (n : Unpacked.var) (n' : Unpacked.var) =
@@ -368,12 +372,4 @@ module Make_unpacked
   include T
   let typ : (var, value) Typ.t =
     Typ.list ~length:M.bit_length Boolean.typ
-
-  module Padded = struct
-    include T
-
-    let typ : (var, value) Typ.t =
-      Typ.list ~length:(M.element_length * Field.size_in_bits)
-        Boolean.typ
-  end
 end

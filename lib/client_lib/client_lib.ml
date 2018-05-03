@@ -13,7 +13,7 @@ module Send_transaction = struct
 end
 
 module Get_balance = struct
-  type query = Public_key.Stable.V1.t [@@deriving bin_io]
+  type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
   type response = Currency.Balance.Stable.V1.t option [@@deriving bin_io]
   type error = unit [@@deriving bin_io]
 

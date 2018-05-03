@@ -35,6 +35,13 @@ module Keys : sig
   val create : unit -> t
 end
 
+val check_transition
+  :  Ledger_hash.t
+  -> Ledger_hash.t
+  -> Transition.t
+  -> Tick.Handler.t
+  -> unit
+
 val check_transaction
   :  Ledger_hash.t
   -> Ledger_hash.t

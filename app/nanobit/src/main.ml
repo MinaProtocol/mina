@@ -10,6 +10,9 @@ module type Init_intf = sig
   val prover : Prover.t
 
   val genesis_proof : proof
+
+  (* Public key to allocate fees to *)
+  val fee_public_key : Public_key.Compressed.t
 end
 
 module Make_inputs0
@@ -160,7 +163,7 @@ module Make_inputs
 
   module Bundle = struct
     include Bundle
-    let create ledger ts = create ledger ts ~conf_dir:Init.conf_dir
+    let create ledger ts = create ledger ~conf_dir:Init.conf_dir ts Init.fee_public_key
   end
 
   module Transaction_pool = Transaction_pool.Make(Transaction)(Ledger)
@@ -189,6 +192,7 @@ module Main_without_snark (Init : Init_intf) = struct
 
     let conf_dir = Init.conf_dir
     let prover = Init.prover
+    let fee_public_key = Init.fee_public_key
     let genesis_proof = ()
   end
 
@@ -199,7 +203,7 @@ module Main_without_snark (Init : Init_intf) = struct
   module Bundle = struct
     type t = Ledger_hash.t
 
-    let create ~conf_dir ledger ts =
+    let create ~conf_dir ledger ts _fee_pk =
       Ledger.merkle_root_after_transactions ledger ts
 
     let cancel (t : t) : unit = ()
@@ -317,12 +321,10 @@ end
 module Run (Program : Main_intf) = struct
   open Program
 
-  let get_balance t (addr : Public_key.Stable.V1.t) =
+  let get_balance t (addr : Public_key.Compressed.t) =
     let ledger = Inputs.Ledger_fetcher.best_ledger (Main.ledger_fetcher t) in
-    let key = Public_key.compress addr in
     let maybe_balance =
-      Option.map
-        (Ledger.get ledger key)
+      Option.map (Ledger.get ledger addr)
         ~f:(fun account -> account.Account.balance)
     in
     return maybe_balance

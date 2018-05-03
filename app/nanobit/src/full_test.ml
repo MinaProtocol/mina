@@ -47,6 +47,7 @@ let run_test : unit -> unit Deferred.t = fun () ->
     let conf_dir = "/tmp"
     let prover = prover
     let genesis_proof = genesis_proof
+    let fee_public_key = Genesis_ledger.rich_pk
   end
   in
   let module Main = Main_mem_for_tests(Init) in
@@ -108,7 +109,7 @@ let run_test : unit -> unit Deferred.t = fun () ->
   let build_txn amount =
     let poor_pk = Genesis_ledger.poor_pk in
     let payload : Transaction.Payload.t =
-      { receiver = poor_pk |> Public_key.compress
+      { receiver = poor_pk
       ; amount   = send_amount
       ; fee      = Currency.Fee.of_int 0
       ; nonce    = Account.Nonce.zero
