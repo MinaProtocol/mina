@@ -4,15 +4,6 @@ open Snark_params
 open Snarky
 open Currency
 
-let print lab typ x to_sexp =
-  let open Tick in
-  as_prover begin
-    let open As_prover in
-    map (read typ x) ~f:(fun x ->
-      printf "%s: %s" lab (Sexp.to_string_hum (to_sexp x)))
-  end
-;;
-
 let bundle_length = 1
 
 let tick_input () = Tick.(Data_spec.([ Field.typ ]))
@@ -263,18 +254,6 @@ module Base = struct
           excess is -(amount + fee) (since "receiver" gets amount)
         *)
         Checked.cswap is_fee_transfer (pos_fee, neg_amount_plus_fee)
-      in
-      let%bind () =
-        print "sender_delta"
-          Amount.Signed.typ
-          sender_delta
-          Amount.Signed.sexp_of_t
-      in
-      let%bind () =
-        print "excess"
-          Amount.Signed.typ
-          excess
-          Amount.Signed.sexp_of_t
       in
       let%bind root =
         let%bind sender_compressed = Public_key.compress_var sender in
