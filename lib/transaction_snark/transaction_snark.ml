@@ -19,6 +19,7 @@ module Tag : sig
   type t =
     | Normal
     | Fee_transfer
+  [@@deriving sexp]
 
   type var
 
@@ -34,6 +35,7 @@ end = struct
   type t =
     | Normal
     | Fee_transfer
+  [@@deriving sexp]
 
   let is_normal = function
     | Normal -> true
@@ -55,6 +57,8 @@ module Tagged_transaction = struct
   open Tick
 
   type t = Tag.t * Transaction.t
+  [@@deriving sexp]
+
   type var = Tag.var * Transaction.var
   let typ : (var, t) Typ.t = Typ.(Tag.typ * Transaction.typ)
 
@@ -260,8 +264,10 @@ module Base = struct
         Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
           let%bind next_nonce = Account.Nonce.increment_if_var account.nonce is_normal in
           let%bind () =
-            let%bind nonce_matches = Account.Nonce.equal_var nonce account.nonce in
-            Boolean.Assert.any [ is_fee_transfer; nonce_matches ]
+            with_label __LOC__ begin
+              let%bind nonce_matches = Account.Nonce.equal_var nonce account.nonce in
+              Boolean.Assert.any [ is_fee_transfer; nonce_matches ]
+            end
           in
           let%map balance =
             Balance.Checked.add_signed_amount account.balance sender_delta
@@ -311,9 +317,6 @@ module Base = struct
           (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
       in
       let%bind root_after, fee_excess = apply_tagged_transaction root_before t in
-      let%bind () =
-        print "root_after" Ledger_hash.typ root_after Ledger_hash.sexp_of_t
-      in
       let%map () =
         with_label __LOC__ begin
           let%bind b1 = Ledger_hash.var_to_bits root_before
