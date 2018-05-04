@@ -1178,6 +1178,10 @@ module Checked = struct
     end
   ;;
 
+  let assert_non_zero (v : Cvar.t) =
+    with_label __LOC__
+      Let_syntax.(let%map _ =  inv v in ())
+
   module Boolean = struct
     type var = Cvar.t
     type value = bool
@@ -1247,10 +1251,18 @@ module Checked = struct
 
       let is_true (v : var) = assert_equal v true_
 
-      (* Someday: Make more efficient *)
-      let any vs = any vs >>= is_true
+      let any (bs : var list) =
+        with_label __LOC__
+          (assert_non_zero (Cvar.sum bs))
 
-      let all vs = all vs >>= is_true
+      let all (bs : var list) =
+        with_label __LOC__
+          (assert_equal (Cvar.sum bs)
+             (Cvar.constant (Field.of_int (List.length bs))))
+
+      let exactly_one  (bs : var list) =
+        with_label __LOC__
+          (assert_equal (Cvar.sum bs) (Cvar.constant Field.one))
     end
 
     module Expr = struct
@@ -1418,24 +1430,11 @@ module Checked = struct
 
     let equal =
       assert_equal ~label:"Checked.Assert.equal"
-    ;;
 
-    let non_zero (v : Cvar.t) =
-      with_label "Checked.Assert.non_zero" Let_syntax.(let%map _ =  inv v in ())
-    ;;
+    let non_zero = assert_non_zero
 
     let not_equal (x : Cvar.t) (y : Cvar.t) =
       with_label "Checked.Assert.not_equal" (non_zero (Cvar.sub x y))
-    ;;
-
-    let any (bs : Boolean.var list) =
-      with_label "Checked.Assert.any" (non_zero (Cvar.sum (bs :> Cvar.t list)))
-    ;;
-
-    let exactly_one  (bs : Boolean.var list) =
-      with_label "Checked.Assert.exactly_one"
-        (assert_equal (Cvar.sum bs) (Cvar.constant Field.one))
-    ;;
   end
 
   module List = Monad_sequence.List(Checked1)(struct type t = Boolean.var include Boolean end)

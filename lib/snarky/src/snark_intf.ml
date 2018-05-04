@@ -178,6 +178,8 @@ module type Basic = sig
       val any : var list -> (unit, _) Checked.t
 
       val all : var list -> (unit, _) Checked.t
+
+      val exactly_one : var list -> (unit, _) Checked.t
     end
   end
   and
@@ -235,11 +237,6 @@ module type Basic = sig
       val not_equal : Cvar.t -> Cvar.t -> (unit, _) t
 
       val non_zero : Cvar.t -> (unit, _) t
-
-      (* Someday: Move these into Boolean *)
-      val any : Boolean.var list -> (unit, _) t
-
-      val exactly_one : Boolean.var list -> (unit, _) t
     end
   end
 
