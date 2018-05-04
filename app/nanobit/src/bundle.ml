@@ -38,7 +38,7 @@ module type S = sig
 
     val apply_transition_exn : t -> Transaction_snark.Transition.t -> t
 
-    val of_ledger_subset : Ledger.t -> Public_key.Compressed.t list -> t
+    val of_ledger_subset_exn : Ledger.t -> Public_key.Compressed.t list -> t
 
     val handler : t -> Handler.t Staged.t
   end
@@ -84,7 +84,7 @@ module Sparse_ledger = struct
           hash_fold params (Account.fold_bits account)
       end)
 
-  let of_ledger_subset ledger keys =
+  let of_ledger_subset_exn ledger keys =
     List.fold keys ~f:(fun acc key ->
       add_path acc (Option.value_exn (Ledger.merkle_path ledger key))
         (Option.value_exn (Ledger.get ledger key)))
@@ -190,10 +190,10 @@ module M = Map_reduce.Make_map_reduce_function_with_init(struct
            (unstage (Sparse_ledger.handler ledger)))
 
     let combine ((module T) : state_type) t1 t2 =
-      return (T.merge t1 t2)
+      return (T.merge t1 t2 |> Or_error.ok_exn)
   end)
 
-let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t list) fee_pk : t =
+let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t list) fee_pk =
   Parallel.init_master ();
   let config =
     Map_reduce.Config.create
@@ -201,39 +201,58 @@ let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t l
       ~redirect_stdout:(`File_append (conf_dir ^/ "bundle-stdout"))
       ()
   in
-  let total_fees = ref Currency.Fee.zero in
-  let inputs =
-    List.filter_map transactions ~f:(fun tx ->
-      let { Transaction.sender; payload } as transaction = (tx :> Transaction.t) in
-      let sparse_ledger =
-        Sparse_ledger.of_ledger_subset ledger
-          [ Public_key.compress sender; payload.receiver ]
+  let (inputs, target_hash) =
+    let finalize_with_fees inputs total_fees =
+      let fee_collection = Fee_transfer.One (fee_pk, total_fees) in
+      let sparse_ledger = Sparse_ledger.of_ledger_subset_exn ledger [ fee_pk ] in
+      (* We assume that the ledger and transactions passed in are constructed such that
+         an overflow will not occur here. *)
+      Or_error.ok_exn (Ledger.apply_fee_transfer ledger fee_collection);
+      let target_hash = Ledger.merkle_root ledger in
+      let fee_collection =
+        { Input.transition = Fee_transfer fee_collection
+        ; ledger = sparse_ledger
+        ; target_hash
+        }
       in
-      (* TODO: Bad transactions should probably get thrown away earlier? *)
-      match Ledger.apply_transaction ledger tx with
-      | Ok () ->
-        let target_hash = Ledger.merkle_root ledger in
-        total_fees := Option.value_exn (Currency.Fee.add !total_fees payload.fee);
-        let t = { Input.transition = Transaction tx; ledger = sparse_ledger; target_hash } in
-        Some t
-      | Error _s -> None)
+      let rev_inputs = fee_collection :: inputs in
+      List.iter rev_inputs ~f:(fun { transition; _ } ->
+        Or_error.ok_exn begin match transition with
+          | Fee_transfer t -> Ledger.undo_fee_transfer ledger t
+          | Transaction t -> Ledger.undo_transaction ledger (t :> Transaction.t)
+        end);
+      (List.rev rev_inputs, target_hash)
+    in
+    let rec go inputs total_fees = function
+      | [] -> finalize_with_fees inputs total_fees
+      | (tx : Transaction.With_valid_signature.t) :: txs ->
+        let { Transaction.sender; payload } as transaction = (tx :> Transaction.t) in
+        begin match Currency.Fee.add payload.fee total_fees with
+        | None ->
+          (* We have hit max fees, truncate the list *)
+          finalize_with_fees inputs total_fees
+        | Some total_fees' ->
+          (* TODO: Bad transactions should get thrown away earlier.
+             That is, the error case here is actually unexpected and we
+             should construct the system so that it does not occur.
+          *)
+          begin match Ledger.apply_transaction ledger tx with
+          | Error _s -> go inputs total_fees txs
+          | Ok () ->
+            let input : Input.t =
+              { transition = Transaction tx
+              ; ledger = 
+                  Sparse_ledger.of_ledger_subset_exn ledger
+                    [ Public_key.compress sender; payload.receiver ]
+              ; target_hash = Ledger.merkle_root ledger
+              }
+            in
+            go (input :: inputs) total_fees' txs
+          end
+        end
+    in
+    go [] Currency.Fee.zero transactions
   in
-  let fee_collection = Fee_transfer.One (fee_pk, !total_fees) in
-  let fee_collection_ledger = Sparse_ledger.of_ledger_subset ledger [ fee_pk ] in
-  Or_error.ok_exn (Ledger.apply_fee_transfer ledger fee_collection);
-  let target_hash = Ledger.merkle_root ledger in
-  let fee_collection_input : Input.t =
-    { transition = Fee_transfer fee_collection
-    ; ledger = fee_collection_ledger
-    ; target_hash
-    }
-  in
-  let inputs = inputs @ [ fee_collection_input ] in
-  List.iter (List.rev inputs) ~f:(fun { transition; _ } ->
-    Or_error.ok_exn begin match transition with
-      | Fee_transfer t -> Ledger.undo_fee_transfer ledger t
-      | Transaction t -> Ledger.undo_transaction ledger (t :> Transaction.t)
-    end);
   { result =
       Map_reduce.map_reduce config
         (Pipe.of_list inputs)

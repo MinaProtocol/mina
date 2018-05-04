@@ -9,18 +9,6 @@ let create_ledger_and_transactions num_transitions =
   let keys = Array.init num_accounts ~f:(fun _ -> Signature_keypair.create ()) in
   Array.iter keys ~f:(fun k ->
     let public_key = Public_key.compress k.public_key in
-    (*
-<<<<<<< HEAD
-    Ledger.set ledger public_key
-      { public_key; balance = Currency.Balance.of_int 10_000 });
-  let random_transaction () : Transaction.With_valid_signature.t =
-    let sender = keys.(Random.int num_accounts) in
-    let receiver = keys.(Random.int num_accounts) in
-    let payload : Transaction.Payload.t =
-      { receiver = Public_key.compress receiver.public_key
-      ; fee = Currency.Fee.of_int (1 + Random.int 100)
-      ; amount = Currency.Amount.of_int (1 + Random.int 100)
-======= *)
     Ledger.set ledger public_key
       { public_key; balance = Currency.Balance.of_int 10_000; nonce = Account.Nonce.zero });
 
@@ -104,7 +92,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0 (transitions : Trans
     | _ ->
       let layer_time, new_proofs =
         List.fold_map (pair_up proofs) ~init:Time.Span.zero ~f:(fun max_time (x, y) ->
-          let (pair_time, proof) = time (fun () -> T.merge x y) in
+          let (pair_time, proof) =
+            time (fun () -> T.merge x y |> Or_error.ok_exn)
+          in
           (Time.Span.max max_time pair_time, proof))
       in
       merge_all (Time.Span.(+) serial_time layer_time) new_proofs
@@ -112,17 +102,6 @@ let profile (module T : Transaction_snark.S) sparse_ledger0 (transitions : Trans
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-(*
-<<<<<<< HEAD
-let main num_transitions_log2 () =
-  Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
-    let num_transitions = Int.pow 2 num_transitions_log2 in
-    let (ledger, transitions) = create_ledger_and_transactions num_transitions in
-    let keys = Transaction_snark.Keys.create () in
-    let module T = Transaction_snark.Make(struct let keys = keys end) in
-    let total_time = profile (module T) sparse_ledger transitions in
-    Core.printf !"Total time was: %{Time.Span}\n%!" total_time)
-=======*)
 let check_base_snarks sparse_ledger0 (transitions : Transaction_snark.Transition.t list) =
   let module Sparse_ledger = Bundle.Sparse_ledger in
   let _ =
@@ -144,7 +123,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction_snark.Transition
 let run profiler num_transactions =
   let (ledger, transitions) = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
-    Bundle.Sparse_ledger.of_ledger_subset ledger
+    Bundle.Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map transitions ~f:(fun t ->
           match t with
           | Fee_transfer t ->

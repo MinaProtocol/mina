@@ -297,33 +297,6 @@ module Base = struct
       (root, excess)
     end
 
-  (* spec for [apply_transaction root { sender; signature; payload }]:
-     - check that [signature] is a signature by [sender] of payload
-     - return the merkle tree [root'] where the sender balance is decremented by
-     [payload.amount] and the receiver balance is incremented by [payload.amount].
-     - ensure that the nonce in the transaction is the same as the nonce in the
-     ledger; increment the nonce in the ledger afterwards
-  *)
-  let apply_transaction root ({ sender; signature; payload } : Transaction.var) =
-    let { Transaction.Payload.receiver; amount; fee; nonce } = payload in
-    let%bind () =
-      let%bind bs = Transaction.Payload.var_to_bits payload in
-      Schnorr.Checked.assert_verifies signature sender bs
-    in
-    let%bind root =
-      let%bind sender_compressed = Public_key.compress_var sender in
-      Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
-        let%bind balance = Balance.Checked.(account.balance - amount) in (* TODO: Fee *)
-        with_label __LOC__ begin
-          let%bind () = Account.Nonce.assert_equal_var account.nonce nonce in
-          let%map next_nonce = Account.Nonce.increment_var account.nonce in
-          { account with balance ; nonce = next_nonce }
-        end)
-    in
-    Ledger_hash.modify_account root receiver ~f:(fun account ->
-      let%map balance = Balance.Checked.(account.balance + amount) in
-      { account with balance })
-
 (* Someday:
    write the following soundness tests:
    - apply a transaction where the signature is incorrect
@@ -442,7 +415,7 @@ module Merge = struct
   (* spec for [verify_transition tock_vk proof_field s1 s2]:
      returns a bool which is true iff
      there is a snark proving making tock_vk
-     accept on one of [ H(s1, s2); H(s1, s2, tock_vk) ] *)
+     accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
   let verify_transition tock_vk proof_field s1 s2 fee_excess =
     let open Let_syntax in
     let get_proof s = let (_t, proof) = proof_field s in proof in
@@ -450,20 +423,18 @@ module Merge = struct
     let input_bits = s1 @ s2 @ Amount.Signed.Checked.to_bits fee_excess in
     let input_bits_length = List.length input_bits in
     assert (input_bits_length = 2 * Tock.Field.size_in_bits + Amount.Signed.length);
-    let%bind states_hash = 
-      (* TODO: This only works because Fees are smaller than amounts and
-        are LSB first and hashing 0s does nothing. *)
+    let%bind states_and_excess_hash = 
       with_label __LOC__ begin
         Pedersen_hash.hash input_bits
           ~params:Pedersen.params
           ~init:(0, Hash_curve.Checked.identity)
       end
     in
-    let%bind states_and_vk_hash =
+    let%bind states_and_excess_and_vk_hash =
       with_label __LOC__ begin
         Pedersen_hash.hash tock_vk
           ~params:Pedersen.params
-          ~init:(input_bits_length, states_hash)
+          ~init:(input_bits_length, states_and_excess_hash)
       end
     in
     let%bind is_base =
@@ -475,8 +446,8 @@ module Merge = struct
     let%bind input =
       with_label __LOC__ begin
         Checked.if_ is_base
-          ~then_:(Pedersen_hash.digest states_hash)
-          ~else_:(Pedersen_hash.digest states_and_vk_hash)
+          ~then_:(Pedersen_hash.digest states_and_excess_hash)
+          ~else_:(Pedersen_hash.digest states_and_excess_and_vk_hash)
         >>= Pedersen.Digest.choose_preimage_var
         >>| Pedersen.Digest.Unpacked.var_to_bits
       end
@@ -618,7 +589,7 @@ module type S = sig
     -> Tick.Handler.t
     -> t
 
-  val merge : t -> t -> t
+  val merge : t -> t -> t Or_error.t 
 
   val verify_complete_merge
     : Ledger_hash.var
@@ -802,9 +773,11 @@ module Make (K : sig val keys : Keys0.t end) = struct
         t1.fee_excess
         t2.fee_excess
     in
-    let fee_excess =
+    let open Or_error.Let_syntax in
+    let%map fee_excess =
       Amount.Signed.add t1.fee_excess t2.fee_excess
-      |> Option.value_exn
+      |> Option.value_map ~f:Or_error.return
+           ~default:(Or_error.errorf "Transaction_snark.merge: Amount overflow")
     in
     { source = t1.source
     ; target = t2.target
@@ -910,7 +883,7 @@ let%test_module "transaction_snark" =
           Signed.create ~magnitude ~sgn:Sgn.Pos
         in
         let state3 = Ledger.merkle_root ledger in
-        let proof13 = merge proof12 proof23 in
+        let proof13 = merge proof12 proof23 |> Or_error.ok_exn in
         Tock.verify proof13.proof keys.wrap_vk (wrap_input ())
           (embed (merge_top_hash state1 state3 total_fees)))
   end)

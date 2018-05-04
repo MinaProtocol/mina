@@ -1,3 +1,4 @@
+open Base
 open Nanobit_base
 open Snark_params
 
@@ -73,7 +74,7 @@ module type S = sig
     -> Tick.Handler.t
     -> t
 
-  val merge : t -> t -> t
+  val merge : t -> t -> t Or_error.t
 
   val verify_complete_merge
     : Ledger_hash.var
