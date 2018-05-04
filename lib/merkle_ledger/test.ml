@@ -62,6 +62,16 @@ let%test_unit "modify_account" =
   assert (Some 50 = L16.get ledger key);
 ;;
 
+let%test_unit "update_account" = 
+  let b = 100 in
+  let ledger, keys = L16.load_ledger 10 b in
+  let key = List.nth_exn keys 0 in
+  L16.update ledger key ~f:(function
+    | None -> assert false
+    | Some x -> x + 1);
+  assert (Some (b + 1) = L16.get ledger key);
+;;
+
 let%test_unit "modify_account_by_idx" = 
   let b = 100 in
   let ledger, keys = L16.load_ledger 10 b in

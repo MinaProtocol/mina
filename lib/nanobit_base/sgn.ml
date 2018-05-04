@@ -12,7 +12,7 @@ let to_field = function
   | Pos -> Field.one
   | Neg -> neg_one
 
-let of_field x =
+let of_field_exn x =
   if Field.equal x Field.one
   then Pos
   else if Field.equal x neg_one
@@ -25,7 +25,7 @@ let typ : (var, t) Typ.t =
   let open Typ in
   { check = (fun x -> assert_r1cs x x (Cvar.constant Field.one))
   ; store = (fun t -> Store.store (to_field t))
-  ; read = (fun x -> Read.(read x >>| of_field))
+  ; read = (fun x -> Read.(read x >>| of_field_exn))
   ; alloc = Alloc.alloc
   }
 
