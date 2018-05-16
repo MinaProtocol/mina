@@ -18,15 +18,17 @@ Work_snark:
   match type with
   | Bundle transactions
     -> verify transactions are valid, and applying them takes A -> B
-  | Merge proofs
-    -> verify proofs are valid (A -> C -> B), and applying them takes A -> B
+  | Merge proofAC proofCB
+    -> 
+      - verify proofAC verifies A -> C
+      - verify proofCB verifies C -> B
 
 global: {
   max_transaction_queue_constraints
 }
 
 blockchain: {
-  processing_pool_hash
+  transaction_queue_hash
   ledger_hash
   timestamp
   previous_blockchain_hash
@@ -35,19 +37,19 @@ blockchain: {
   snark
 }
 
-processing_pool_transition: {
+transaction_queue_transition: {
   new_transactions
   work_snarks
 }
 
-processing_pool: {
+transaction_queue: {
   transaction_queue
   work_tree
 }
 
 blockchain_transition: {
   nonce
-  processing_pool_transition
+  transaction_queue_transition
   timestamp
 }
 
@@ -56,10 +58,10 @@ work_snark: {
   work
 }
 
-apply_transition blockchain transition
+step' blockchain transition
   =
-    processing_pool = get(blockchain.processing_pool)
-    new_processing_pool, maybe_new_ledger_snark_hash = apply processing_pool processing_pool_transition
+    transaction_queue = get(blockchain.transaction_queue_hash)
+    new_transaction_queue, maybe_new_ledger_snark_hash = apply transaction_queue transaction_queue_transition
     new_ledger_snark, new_ledger_hash = 
       Option.value_default maybe_new_ledger_snark
                            (old.ledger_snark, old.ledger_hash)
@@ -71,7 +73,7 @@ apply_transition blockchain transition
     new_blockchain = {
       next_difficulty
       previous_blockchain_hash = hash(blockchain)
-      processing_pool_hash = blockchain.processing_pool_hash
+      transaction_queue_hash = blockchain.transaction_queue_hash
       strength = blockchain.strength + blockchain.next_difficulty
       timestamp = transition.timestamp
       ledger_hash = new_ledger_hash
@@ -83,44 +85,37 @@ apply_transition blockchain transition
         ~ledger_snark:new_ledger_snark
         ~new:new_blockchain
     new_blockchain.snark = proof
-    new_blockchain
-  snark:
-    check hash
-    check block snark validity
-    check T validity
-      verify that constraints more than in T_queue less than constraints in T_work
-      verify Snark work applied to T Snark
-      verify that fees for Snark work are in T_queue 
+    new_blockchain, transition.transaction_queue_transition
 
-update_blockchain old new processing_pool_transition
+update_blockchain old new transaction_queue_transition
   =
-    old_processing_pool = get(old.processing_pool_hash)
-    new_processing_pool, maybe_new_ledger_snark_hash = apply(old_processing_pool, processing_pool_transition)
-    queue_constraints_remaining = max_transaction_queue_constraints - constraints(new_processing_pool.queue)
-    work_constraints_remaining = constraints(new_processing_pool.work_tree)
+    old_transaction_queue = get(old.transaction_queue_hash)
+    new_transaction_queue, maybe_new_ledger_snark_hash = apply(old_transaction_queue, transaction_queue_transition)
+    queue_constraints_remaining = max_transaction_queue_constraints - constraints(new_transaction_queue.queue)
+    work_constraints_remaining = constraints(new_transaction_queue.work_tree)
     new_ledger_snark, new_ledger_hash = 
       Option.value_default(maybe_new_ledger_snark,
                            (old.ledger_snark, old.ledger_hash))
-    processing_pool_transition_valid = 
-         hash(new_processing_pool) = new.processing_pool_hash
+    transaction_queue_transition_valid = 
+         hash(new_transaction_queue) = new.transaction_queue_hash
       && queue_constraints_remaining >= work_constraints_remaining
-      && has_work_fees(processing_pool_transition.work_snarks, processing_pool_transition.new_transactions)
-      && verify_work(work_snark, old_processing_pool.work_tree, processing_pool_transition.work_snarks)
+      && has_work_fees(transaction_queue_transition.work_snarks, transaction_queue_transition.new_transactions)
+      && verify_work(work_snark, old_transaction_queue.work_tree, transaction_queue_transition.work_snarks)
       && new_ledger_hash = new.ledger_hash
     if   new.strength > old.strength
       && Time_close(new.timestamp)
       && Blockchain_snark.verify(new)
-      && processing_pool_transition_valid
+      && transaction_queue_transition_valid
     then new
     else old
 
-on_event event
+step transition
   =
-    match event with
-    | Received received_blockchain, processing_pool_transition ->
-      blockchain := strongest_blockchain blockchain received_blockchain, processing_pool_transition
+    match transition with
+    | Received received_blockchain, transaction_queue_transition ->
+      blockchain := strongest_blockchain blockchain received_blockchain, transaction_queue_transition
       if blockchain = received_blockchain
-      then broadcast (Blockchain blockchain)
+      then broadcast (Blockchain blockchain, transaction_queue_transition)
     | Transition transition ->
-      blockchain := apply_transition blockchain transition
-      broadcast (Blockchain blockchain)
+      blockchain, transaction_queue_transition := step' blockchain transition
+      broadcast (Blockchain blockchain, transaction_queue_transition)
