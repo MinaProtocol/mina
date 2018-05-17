@@ -84,7 +84,12 @@ module Make
 
   let submit t ~units ~proofs =
     let exists_a_tree tree units =
-      let new_tree, leftovers = Tree.attempt_prove tree proofs in
+      let new_tree_option, leftovers = Tree.attempt_prove tree proofs in
+      let new_tree =
+        match new_tree_option with
+        | None -> rebuild_tree t (Buffer.drain t.buffer)
+        | Some tree -> tree
+      in
       let positive_constraints = (Tree.free new_tree) - (Tree.free tree) in
       let cheapest_first = List.sort ~cmp:(fun u u' -> Int.compare (Work_unit.cost u) (Work_unit.cost u')) units in
       (* TODO: Remove once I make sure compare works the way I think *)

@@ -185,7 +185,7 @@ module Make
 
   (* Try to annotate the tree with proofs,
    * returns all proofs that got filled in by someone else and the new tree *)
-  let attempt_prove t proofs : t * Evidence.t list =
+  let attempt_prove t proofs : t option * Evidence.t list =
     let rec go ps leftovers =
       let open With_path in
       match ps with
@@ -214,5 +214,13 @@ module Make
             go rest leftovers
           )
     in
-    { t with index = rebuild_index t.tree }, go proofs []
+    let new_tree = { t with index = rebuild_index t.tree } in
+    let new_tree =
+      (* If there is no work left to do, then there is no new tree *)
+      if List.length new_tree.index = 0 then
+        None
+      else
+        Some new_tree
+    in
+    new_tree, go proofs []
 end
