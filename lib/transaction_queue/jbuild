@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name transaction_queue)
+  (public_name transaction_queue)
+  (library_flags (-linkall))
+  (libraries (core async async_extra ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_deriving.std ppx_driver.runner (-inline-test-lib transaction_queue))))
+  (synopsis "Transaction Queue is a Queue, a work tree, and tools for updating those things")))
+
