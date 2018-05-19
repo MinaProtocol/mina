@@ -6,7 +6,7 @@ open Nanobit_base
 module Rpc_server
   (Main : sig
     type t
-    val get_balance : t -> Public_key.Stable.V1.t -> Currency.Balance.Stable.V1.t option Deferred.t
+    val get_balance : t -> Public_key.Compressed.Stable.V1.t -> Currency.Balance.Stable.V1.t option Deferred.t
     val send_txn : t -> Transaction.Stable.V1.t -> unit option Deferred.t
   end) = struct
 let init_server ~parent_log ~minibit ~port =
@@ -54,7 +54,7 @@ let get_balance =
     in
     fun () ->
       let open Deferred.Let_syntax in
-      match%map (dispatch Client_lib.Get_balance.rpc address port) with
+      match%map (dispatch Client_lib.Get_balance.rpc (Public_key.compress address) port) with
       | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
       | Ok None -> printf "No account found at that public_key (zero balance)"
       | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)

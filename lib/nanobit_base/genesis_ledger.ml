@@ -14,9 +14,9 @@ let poor_sk =
     |> Private_key.of_bigstring
     |> Or_error.ok_exn
 
-let poor_pk = Public_key.of_private_key poor_sk
+let poor_pk = Public_key.of_private_key poor_sk |> Public_key.compress
 
-let rich_pk = Public_key.of_private_key rich_sk
+let rich_pk = Public_key.of_private_key rich_sk |> Public_key.compress
 
 let initial_rich_balance = Currency.Balance.of_int 10_000
 let initial_poor_balance = Currency.Balance.of_int 100
@@ -24,23 +24,18 @@ let initial_poor_balance = Currency.Balance.of_int 100
 (* Genesis ledger has a single rich person *)
 let ledger =
   let ledger = Ledger.create () in
-  let compressed_rich_pk =
-    Public_key.compress rich_pk
-  and compressed_poor_pk =
-    Public_key.compress poor_pk
-  in
-  Ledger.update
+  Ledger.set
     ledger
-    compressed_rich_pk
-    { Account.public_key = compressed_rich_pk
+    rich_pk
+    { Account.public_key = rich_pk
     ; balance = initial_rich_balance
     ; nonce = Account.Nonce.zero
     };
 
-  Ledger.update
+  Ledger.set
     ledger
-    compressed_poor_pk
-    { Account.public_key = compressed_poor_pk
+    poor_pk
+    { Account.public_key = poor_pk
     ; balance = initial_poor_balance
     ; nonce = Account.Nonce.zero
     };

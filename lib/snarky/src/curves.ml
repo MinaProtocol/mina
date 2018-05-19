@@ -12,11 +12,13 @@ end
 module type Scalar_intf = sig
   type (_, _) typ 
   type (_, _) checked
+  type boolean_var
   type var
   type value
   val length : int
   val typ : (var, value) typ
   val assert_equal : var -> var -> (unit, _) checked
+  val equal : var -> var -> (boolean_var, _) checked
   val test_bit : value -> int -> bool
 end
 
@@ -29,6 +31,7 @@ module Make_intf (Impl : Snark_intf.S) = struct
     module Scalar : Scalar_intf
       with type ('a, 'b) typ := ('a, 'b) Typ.t
        and type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type boolean_var := Boolean.var
 
     type 'a t = 'a * 'a
 
@@ -151,6 +154,7 @@ module Edwards = struct
     module Scalar : Scalar_intf
       with type ('a, 'b) checked := ('a, 'b) checked
        and type ('a, 'b) typ := ('a, 'b) typ
+       and type boolean_var := boolean_var
 
     type var
     type value = t
@@ -190,6 +194,7 @@ module Edwards = struct
       (Scalar : Scalar_intf
        with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
         and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+        and type boolean_var := Impl.Boolean.var
         and type var = Impl.Boolean.var list)
       (Basic : Basic.S with type field := Impl.Field.t)
     : S with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
@@ -434,6 +439,7 @@ module Edwards = struct
         val test_bit : value -> int -> bool
         val length : int
         val typ : (var, value) Impl.Typ.t
+        val equal : var -> var -> (Impl.Boolean.var, _) Impl.Checked.t
         val assert_equal : var -> var -> (unit, _) Impl.Checked.t
       end)
       (Params : Params_intf with type field := Impl.Field.t)

@@ -64,6 +64,8 @@ module Snarkable = struct
     type comparison_result
     val compare_var : Unpacked.var -> Unpacked.var -> (comparison_result, _) checked
     val increment_var : Unpacked.var -> (Unpacked.var, _) checked
+    val increment_if_var : Unpacked.var -> boolean_var -> (Unpacked.var, _) checked
     val assert_equal_var : Unpacked.var -> Unpacked.var -> (unit, _) checked
+    val equal_var : Unpacked.var -> Unpacked.var -> (boolean_var, _) checked
   end
 end

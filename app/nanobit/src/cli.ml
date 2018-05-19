@@ -62,6 +62,7 @@ let daemon =
             let conf_dir = conf_dir
             let prover = prover
             let genesis_proof = genesis_proof
+            let fee_public_key = Genesis_ledger.rich_pk
           end
           in
           let module Main_without_snark = Main_without_snark(Init) in

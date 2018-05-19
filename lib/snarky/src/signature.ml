@@ -100,19 +100,28 @@ struct
     let compress ((x, _) : Curve.var) =
       Checked.choose_preimage x ~length:Field.size_in_bits
 
-    let assert_verifies
+    open Impl.Let_syntax
+
+    let verification_hash
           ((s, h) : Signature.var)
           (public_key : Public_key.var)
           (m : Boolean.var list)
       =
-      let open Let_syntax in
-      let%bind r =
-        let%bind s_g = Curve.Checked.scale_known Curve.generator s
-        and h_pk     = Curve.Checked.scale public_key h in
-        Checked.bind ~f:compress (Curve.Checked.add s_g h_pk)
-      in
-      let%bind h' = Hash.hash_checked (r @ m) in
-      Curve.Scalar.assert_equal h' h
-    ;;
+      with_label __LOC__ begin
+        let%bind r =
+          let%bind s_g = Curve.Checked.scale_known Curve.generator s
+          and h_pk     = Curve.Checked.scale public_key h in
+          Checked.bind ~f:compress (Curve.Checked.add s_g h_pk)
+        in
+        Hash.hash_checked (r @ m)
+      end
+
+    let verifies ((_, h) as signature) pk m =
+      with_label __LOC__
+        (verification_hash signature pk m >>= Curve.Scalar.equal h)
+
+    let assert_verifies ((_, h) as signature) pk m =
+      with_label __LOC__
+        (verification_hash signature pk m >>= Curve.Scalar.assert_equal h)
   end
 end

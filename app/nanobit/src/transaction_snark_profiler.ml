@@ -2,20 +2,20 @@ open Core
 open Nanobit_base
 open Snark_params
 
-let create_ledger_and_transactions num_transactions =
+let create_ledger_and_transactions num_transitions =
   let open Tick in
   let num_accounts = 4 in
   let ledger = Ledger.create () in
   let keys = Array.init num_accounts ~f:(fun _ -> Signature_keypair.create ()) in
   Array.iter keys ~f:(fun k ->
     let public_key = Public_key.compress k.public_key in
-    Ledger.update ledger public_key
+    Ledger.set ledger public_key
       { public_key; balance = Currency.Balance.of_int 10_000; nonce = Account.Nonce.zero });
 
-  let txn from_kp (to_kp : Signature_keypair.t) amount nonce =
+  let txn from_kp (to_kp : Signature_keypair.t) amount fee nonce =
     let payload : Transaction.Payload.t =
       { receiver = Public_key.compress to_kp.public_key
-      ; fee = Currency.Fee.zero
+      ; fee
       ; amount
       ; nonce
       }
@@ -23,24 +23,43 @@ let create_ledger_and_transactions num_transactions =
     Transaction.sign from_kp payload
   in
 
+  let nonces =
+    Public_key.Compressed.Table.of_alist_exn
+      (List.map (Array.to_list keys) ~f:(fun k ->
+         (Public_key.compress k.public_key, Account.Nonce.zero)))
+  in
   let random_transaction () : Transaction.With_valid_signature.t =
     let sender_idx = Random.int num_accounts in
     let sender = keys.(sender_idx) in
     let receiver = keys.(Random.int num_accounts) in
-    let nonce =
-        Ledger.get ledger (Public_key.compress sender.public_key)
-          |> Option.value_exn
-          |> Account.nonce
-    in
-    txn sender receiver (Currency.Amount.of_int (1 + Random.int 100)) nonce
+    let sender_pk = Public_key.compress sender.public_key in
+    let nonce = Hashtbl.find_exn nonces sender_pk in
+    Hashtbl.change nonces sender_pk ~f:(Option.map ~f:Account.Nonce.succ);
+    let fee = Currency.Fee.of_int (1 + Random.int 100) in
+    let amount = Currency.Amount.of_int (1 + Random.int 100) in
+    txn sender receiver amount fee nonce
   in
-  match num_transactions with
+  match num_transitions with
   | `Count n ->
-    (ledger, List.init n (fun _ -> random_transaction ()))
+    let num_transactions = n - 1 in
+    let transactions = List.rev (List.init num_transactions (fun _ -> random_transaction ())) in
+    let fee_transfer =
+      let open Currency.Fee in
+      let total_fee =
+        List.fold transactions ~init:zero ~f:(fun acc t ->
+          Option.value_exn (add acc (t :> Transaction.t).payload.fee))
+      in
+      Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
+    in
+    let transitions =
+      List.map transactions ~f:(fun t -> Transaction_snark.Transition.Transaction t)
+      @ [ Fee_transfer fee_transfer ]
+    in
+    (ledger, transitions)
   | `Two_from_same ->
-    let a = txn keys.(0) keys.(1) (Currency.Amount.of_int 10) Account.Nonce.zero in
-    let b = txn keys.(0) keys.(1) (Currency.Amount.of_int 10) (Account.Nonce.succ (Account.Nonce.zero)) in
-    (ledger, [a ; b])
+    let a = txn keys.(0) keys.(1) (Currency.Amount.of_int 10) Currency.Fee.zero Account.Nonce.zero in
+    let b = txn keys.(0) keys.(1) (Currency.Amount.of_int 10) Currency.Fee.zero (Account.Nonce.succ (Account.Nonce.zero)) in
+    (ledger, [Transaction a; Transaction b])
 
 let time thunk =
   let start = Time.now () in
@@ -55,16 +74,14 @@ let rec pair_up = function
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
-let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Transaction.With_valid_signature.t list) =
+let profile (module T : Transaction_snark.S) sparse_ledger0 (transitions : Transaction_snark.Transition.t list) =
   let module Sparse_ledger = Bundle.Sparse_ledger in
   let (base_proof_time, _), base_proofs =
-    List.fold_map transactions ~init:(Time.Span.zero, sparse_ledger0) ~f:(fun (max_span, sparse_ledger) t ->
-      let sparse_ledger' =
-        Sparse_ledger.apply_transaction_exn sparse_ledger (t :> Transaction.t)
-      in
+    List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:(fun (max_span, sparse_ledger) t ->
+      let sparse_ledger' = Sparse_ledger.apply_transition_exn sparse_ledger t in
       let span, proof = 
         time (fun () ->
-          T.of_transaction
+          T.of_transition
             (Sparse_ledger.merkle_root sparse_ledger)
             (Sparse_ledger.merkle_root sparse_ledger')
             t
@@ -78,7 +95,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Tran
     | _ ->
       let layer_time, new_proofs =
         List.fold_map (pair_up proofs) ~init:Time.Span.zero ~f:(fun max_time (x, y) ->
-          let (pair_time, proof) = time (fun () -> T.merge x y) in
+          let (pair_time, proof) =
+            time (fun () -> T.merge x y |> Or_error.ok_exn)
+          in
           (Time.Span.max max_time pair_time, proof))
       in
       merge_all (Time.Span.(+) serial_time layer_time) new_proofs
@@ -86,15 +105,15 @@ let profile (module T : Transaction_snark.S) sparse_ledger0 (transactions : Tran
   let total_time = merge_all base_proof_time base_proofs in
   Printf.sprintf !"Total time was: %{Time.Span}" total_time
 
-let check_base_snarks sparse_ledger0 (transactions : Transaction.With_valid_signature.t list) =
+let check_base_snarks sparse_ledger0 (transitions : Transaction_snark.Transition.t list) =
   let module Sparse_ledger = Bundle.Sparse_ledger in
   let _ =
-    List.fold transactions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
+    List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
       let sparse_ledger' =
-        Sparse_ledger.apply_transaction_exn sparse_ledger (t :> Transaction.t)
+        Sparse_ledger.apply_transition_exn sparse_ledger t
       in
       let () = 
-          Transaction_snark.check_transaction
+          Transaction_snark.check_transition
             (Sparse_ledger.merkle_root sparse_ledger)
             (Sparse_ledger.merkle_root sparse_ledger')
             t
@@ -105,14 +124,18 @@ let check_base_snarks sparse_ledger0 (transactions : Transaction.With_valid_sign
   "Base constraint system satisfied"
 
 let run profiler num_transactions =
-  let (ledger, transactions) = create_ledger_and_transactions num_transactions in
+  let (ledger, transitions) = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
-    Bundle.Sparse_ledger.of_ledger_subset ledger
-      (List.concat_map transactions ~f:(fun t ->
-        let t = (t :> Transaction.t) in
-        [ t.payload.receiver; Public_key.compress t.sender ]))
+    Bundle.Sparse_ledger.of_ledger_subset_exn ledger
+      (List.concat_map transitions ~f:(fun t ->
+          match t with
+          | Fee_transfer t ->
+            List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
+          | Transaction t ->
+            let t = (t :> Transaction.t) in
+            [ t.payload.receiver; Public_key.compress t.sender ]))
   in
-  let message = profiler sparse_ledger transactions in
+  let message = profiler sparse_ledger transitions in
   Core.printf !"%s\n%!" message;
   exit 0
 

@@ -8,12 +8,10 @@ module type S0 = sig
 
   val cancel : t -> unit
 
-  (* TODO: Need a mechanism for preventing malleability
-    of transaction bundle (so no one can steal fees).
-    One idea is to have a "drain" snark at the end that
-    takes the built up fees and transfers them into one
-    account. *)
-  val create : conf_dir:string -> Ledger.t -> Transaction.With_valid_signature.t list -> t
+  val create
+    : conf_dir:string -> Ledger.t -> Transaction.With_valid_signature.t list
+    -> Public_key.Compressed.t
+    -> t
 
   val target_hash : t -> Ledger_hash.t
 
@@ -35,7 +33,9 @@ module type S = sig
 
     val apply_transaction_exn : t -> Transaction.t -> t
 
-    val of_ledger_subset : Ledger.t -> Public_key.Compressed.t list -> t
+    val apply_transition_exn : t -> Transaction_snark.Transition.t -> t
+
+    val of_ledger_subset_exn : Ledger.t -> Public_key.Compressed.t list -> t
 
     val handler : t -> Handler.t Staged.t
   end

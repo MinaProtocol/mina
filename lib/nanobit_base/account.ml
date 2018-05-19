@@ -61,7 +61,7 @@ let typ : (var, value) Typ.t =
 
 let var_to_bits { public_key; balance; nonce } =
   let%map public_key = Public_key.Compressed.var_to_bits public_key in
-  let balance = Balance.var_to_bits balance in
+  let balance = (Balance.var_to_bits balance :> Boolean.var list) in
   let nonce = Nonce.Unpacked.var_to_bits nonce in
   public_key @ balance @ nonce
 
