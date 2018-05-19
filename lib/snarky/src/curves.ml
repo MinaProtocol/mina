@@ -159,6 +159,8 @@ module Edwards = struct
     type var
     type value = t
 
+    val var_of_value : value -> var
+
     val typ : (var, value) typ
     val add : value -> value -> value
 
@@ -176,6 +178,8 @@ module Edwards = struct
       val add : var -> var -> (var, _) checked
 
       val if_ : boolean_var -> then_:var -> else_:var -> (var, _) checked
+
+      val if_value : boolean_var -> then_:value -> else_:value -> var
 
       val cond_add : value -> to_:var -> if_:boolean_var -> (var, _) checked
 
@@ -307,6 +311,12 @@ module Edwards = struct
           (a, b)
         end
       ;;
+
+      let if_value (b : Boolean.var) ~then_:(x1, y1) ~else_:(x2, y2) =
+        let not_b = (Boolean.not b :> Cvar.t) in
+        let b = (b :> Cvar.t) in
+        let choose_field t e = Cvar.(Infix.(t * b + e * not_b)) in
+        (choose_field x1 x2, choose_field y1 y2)
 
       (* TODO-someday: Make it so this doesn't have to compute both branches *)
       let if_ =

@@ -68,7 +68,7 @@ module Checked
       type var
       type value
       val typ : (var, value) Impl.Typ.t
-      val hash : var -> var -> (var, _) Impl.Checked.t
+      val hash : height:int -> var -> var -> (var, _) Impl.Checked.t
       val if_ : Impl.Boolean.var -> then_:var -> else_:var -> (var, _) Impl.Checked.t
       val assert_equal : var -> var -> (unit, _) Impl.Checked.t
     end)
