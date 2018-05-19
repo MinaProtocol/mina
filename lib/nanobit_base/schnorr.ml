@@ -16,8 +16,7 @@ include Snarky.Signature.Schnorr(Tick)(Snark_params.Tick.Signature_curve)(struct
       end
 
     let hash bs =
-      let s = Pedersen.(State.create params) in
-      let s = Pedersen.State.update_fold s (List.fold bs) in
+      let s = Pedersen.State.update_fold Hash_prefix.signature (List.fold bs) in
       Scalar.pack 
         (List.take (Field.unpack (Pedersen.State.digest s)) Scalar.length)
   end)
