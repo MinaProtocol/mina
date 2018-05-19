@@ -171,7 +171,7 @@ module Tick = struct
         let bits = list_with_length length Bool.gen in
         filter (both bits bits) ~f:(fun (x, y) -> x <> y)
       in
-      let h bs = hash_fold params (List.fold bs) in
+      let h bs = digest_fold (State.create params) (List.fold bs) in
       Quickcheck.test gen ~f:(fun (x, y) ->
         assert (not (Digest.(=) (h x) (h y))))
 
@@ -199,31 +199,14 @@ module Tick = struct
       let cond_add = Checked.cond_add
     end)
 
-  let hash_digest x =
-    let open Checked in
-    Pedersen_hash.hash x
-      ~params:Pedersen.params
-      ~init:(0, Hash_curve.Checked.identity)
-    >>| Pedersen_hash.digest
+  let hash_bits ~(init : Pedersen.State.t) x =
+    Pedersen_hash.hash x ~params:Pedersen.params
+      ~init:(init.bits_consumed, Hash_curve.var_of_value init.acc)
+
+  let digest_bits ~init x =
+    Checked.(hash_bits ~init x >>| Pedersen_hash.digest)
 
   module Util = Snark_util.Make(Tick0)
-
-  module Schnorr = Snarky.Signature.Schnorr(Tick0)(Signature_curve)(struct
-      (* TODO: This hash function is NOT secure *)
-      let hash_checked bs =
-        let open Checked.Let_syntax in
-        with_label __LOC__ begin
-          let%map h = hash_digest bs >>= Pedersen.Digest.choose_preimage_var in
-          List.take (Pedersen.Digest.Unpacked.var_to_bits h) Scalar.length
-        end
-
-
-      let hash bs =
-        let s = Pedersen.(State.create params) in
-        let s = Pedersen.State.update_fold s (List.fold bs) in
-        Scalar.pack 
-          (List.take (Field.unpack (Pedersen.State.digest s)) Scalar.length)
-    end)
 end
 
 let ledger_depth = 3
