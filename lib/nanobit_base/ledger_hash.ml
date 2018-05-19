@@ -9,17 +9,22 @@ module Merkle_tree = Snarky.Merkle_tree.Checked(Tick)(struct
     open Pedersen.Digest
     include Packed
 
-    let hash h1 h2 =
+    let hash ~height h1 h2 =
       (* TODO: Think about if choose_preimage_var is ok *)
       let%bind h1 = choose_preimage_var h1
       and h2 = choose_preimage_var h2
       in
-      Tick.hash_digest (Unpacked.var_to_bits h1 @ Unpacked.var_to_bits h2)
+      Tick.digest_bits ~init:Hash_prefix.merkle_tree.(height)
+        (Unpacked.var_to_bits h1 @ Unpacked.var_to_bits h2)
 
     let assert_equal h1 h2 = assert_equal h1 h2
 
     let if_ = Checked.if_
-  end)(Account)
+  end)
+    (struct
+      include Account
+      let hash = Checked.digest
+    end)
 
 let depth = Snark_params.ledger_depth
 
@@ -92,7 +97,7 @@ let create_account t pk =
   let account : Account.var = { public_key = pk; balance = Balance.(var_of_t zero); nonce = Account.Nonce.(Unpacked.var_of_value zero) } in
   (* Could save some constraints applying Account.Balance.zero to the hash
      (since it's a no-op) *)
-  let%bind account_hash = Account.hash account in
+  let%bind account_hash = Account.Checked.digest account in
   let%bind () =
     perform As_prover.(Let_syntax.(
       let%map addr = read Account.Index.Unpacked.typ addr
