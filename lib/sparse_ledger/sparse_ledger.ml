@@ -4,7 +4,7 @@ module Make
     (Hash : sig
        type t [@@deriving bin_io, eq, sexp]
 
-       val merge : t -> t -> t
+       val merge : height:int -> t -> t -> t
      end)
     (Key : sig type t [@@deriving bin_io, eq, sexp] end)
     (Account : sig
@@ -38,30 +38,31 @@ module Make
 
   let merkle_root { tree; _ } = hash tree
 
-  let add_path tree0 path0 account =
-    let rec build_tree = function
+  (* TODO: Potential off-by-one here *)
+  let add_path depth tree0 path0 account =
+    let rec build_tree height = function
       | `Left h_r :: path ->
-        let l = build_tree path in
-        Node (Hash.merge (hash l) h_r, l, Hash h_r)
+        let l = build_tree (height - 1) path in
+        Node (Hash.merge ~height (hash l) h_r, l, Hash h_r)
       | `Right h_l :: path ->
-        let r = build_tree path in
-        Node (Hash.merge h_l (hash r), Hash h_l, r)
+        let r = build_tree (height - 1) path in
+        Node (Hash.merge ~height h_l (hash r), Hash h_l, r)
       | [] ->
         Account account
     in
-    let rec union tree path =
+    let rec union height tree path =
       match tree, path with
       | Hash h, path ->
-        let t = build_tree path in
+        let t = build_tree height path in
         assert (Hash.equal h (hash t));
         t
       | Node (h, l, r), (`Left h_r :: path) ->
         assert (Hash.equal h_r (hash r));
-        let l = union l path in
+        let l = union height l path in
         Node (h, l, r)
       | Node (h, l, r), (`Right h_l :: path) ->
         assert (Hash.equal h_l (hash l));
-        let r = union r path in
+        let r = union height r path in
         Node (h, l, r)
       | Node _, [] -> failwith "Path too short"
       | Account _, _::_ -> failwith "Path too long"
@@ -69,7 +70,7 @@ module Make
         assert (Account.equal a account);
         tree
     in
-    union tree0 (List.rev path0)
+    union (depth - 1) tree0 (List.rev path0)
   ;;
 
   let add_path t path account =
@@ -79,7 +80,7 @@ module Make
         | `Right _ -> acc + (1 lsl i)
         | `Left _ -> acc)
     in
-    { t with tree = add_path t.tree path account 
+    { t with tree = add_path t.depth t.tree path account 
     ; indexes = (Account.key account, index) :: t.indexes
     }
 
@@ -110,7 +111,7 @@ module Make
           then (l, go (i - 1) r)
           else (go (i - 1) l, r)
         in
-        Node (Hash.merge (hash l) (hash r), l, r)
+        Node (Hash.merge ~height:i (hash l) (hash r), l, r)
       | _ -> failwith "Sparse_ledger.get: Bad index"
     in
     { t with tree = go (t.depth - 1) t.tree }
@@ -136,8 +137,8 @@ let%test_module "sparse-ledger-test" =
   (module struct
     module Hash = struct
       include Md5
-      let merge x y =
-        Md5.(digest_string (to_binary x ^ to_binary y))
+      let merge ~height x y =
+        Md5.(digest_string (sprintf "sparse-ledger_%03d" height ^ to_binary x ^ to_binary y))
 
       let gen = Quickcheck.Generator.map String.gen ~f:digest_string
     end
@@ -199,15 +200,27 @@ let%test_module "sparse-ledger-test" =
         in
         go 0 (max_depth - 1) t
       in
+      let rec fix_hashes height t =
+        match t with
+        | Account _ ->
+          assert (height = 0);
+          t
+        | Hash _ -> t
+        | Node (_, l, r) ->
+          let height = height - 1 in
+          let l = fix_hashes height l in
+          let r = fix_hashes height r in
+          Node (Hash.merge ~height (hash l) (hash r), l, r)
+      in
       let open Quickcheck.Generator in
       recursive (fun gen_tree ->
         variant3 Account.gen Hash.gen (tuple2 gen_tree gen_tree) >>| function
         | `A account -> Account account
         | `B hash -> Hash hash
-        | `C (l, r) -> Node (Hash.merge (hash l) (hash r), l, r))
+        | `C (l, r) -> Node (Hash.merge ~height:0 (hash l) (hash r), l, r))
       >>| fun tree ->
       let depth = tree_depth tree in
-      let tree = prune_shallow_accounts depth tree |> prune_hash_branches in
+      let tree = prune_shallow_accounts depth tree |> prune_hash_branches |> fix_hashes depth in
       { tree; depth; indexes = indexes depth tree }
 
     let%test_unit "path_test" =
