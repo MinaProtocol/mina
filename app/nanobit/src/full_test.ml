@@ -3,12 +3,12 @@ open Async_kernel
 open Nanobit_base
 open Main
 
-module Main_mem_for_tests (Init : Init_intf) = struct
-  module No_snark = Main_without_snark(Init)
-  module Init = No_snark.Init
-  module Ledger_proof = No_snark.Ledger_proof
-  module State_proof = No_snark.State_proof
-  module Bundle = No_snark.Bundle
+module Main_mem_for_tests (Init : Init_intf with type proof = Proof.t) = struct
+  module Main0 = Main_with_snark(Init)
+  module Init = Init
+  module Ledger_proof = Main0.Ledger_proof
+  module State_proof = Main0.State_proof
+  module Bundle = Main0.Bundle
   module Difficulty = struct
     include Difficulty
 
@@ -42,7 +42,7 @@ let run_test : unit -> unit Deferred.t = fun () ->
   let log = Logger.create () in
   let%bind prover = Prover.create ~conf_dir:"/tmp" in
   let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
-  let module Init : Init_intf = struct
+  let module Init = struct
     type proof = Proof.Stable.V1.t [@@deriving bin_io]
     let conf_dir = "/tmp"
     let prover = prover
