@@ -11,3 +11,7 @@ let split_last_exn =
   | x :: xs -> go [] x xs
 ;;
 
+(* TODO: Check associativity *)
+let (+>) fold1 fold2 =
+  fun ~init ~f ->
+    fold2 ~init:(fold1 ~init ~f) ~f
