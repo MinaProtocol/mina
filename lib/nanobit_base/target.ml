@@ -34,10 +34,6 @@ let of_bigint n =
   assert (Bigint.compare x max_bigint <= 0);
   Bigint.to_field x
 
-let meets_target_unchecked t ~hash =
-  Bigint.(compare (of_field hash) (of_field t)) < 0
-;;
-
 let assert_mem x xs =
   let open Tick in
   let open Let_syntax in

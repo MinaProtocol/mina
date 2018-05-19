@@ -18,11 +18,6 @@ val max : t
 
 val of_field : Field.t -> t
 
-val meets_target_unchecked
-  : t
-  -> hash:Pedersen.Digest.t
-  -> bool
-
 module Bits : Bits_intf.S with type t := t
 
 include Snarkable.Bits.Faithful
