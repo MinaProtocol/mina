@@ -69,19 +69,13 @@ module Sparse_ledger = struct
   include Sparse_ledger.Make(struct
       include Pedersen.Digest
       let equal = (=)
-      let merge h1 h2 =
-        let open Pedersen in
-        hash_fold params (fun ~init ~f ->
-          let init = Bits.fold h1 ~init ~f in
-          Bits.fold h2 ~init ~f)
+      let merge = Merkle_hash.merge
     end)
       (Public_key.Compressed.Stable.V1)
       (struct
         include Account.Stable.V1
         let key { Account.public_key } = public_key
-        let hash account =
-          let open Snark_params.Tick.Pedersen in
-          hash_fold params (Account.fold_bits account)
+        let hash = Account.digest
       end)
 
   let of_ledger_subset_exn ledger keys =
