@@ -81,13 +81,13 @@ let%test_unit "modify_account_by_idx" =
   assert (`Ok 50 = L16.get_at_index ledger idx);
 ;;
 
-let rec compose_hash n hash =
+let compose_hash n hash =
   let rec go i hash =
     if i = n
     then hash
     else
       let hash = Test_ledger.Hash.merge ~height:i hash hash in
-      compose_hash (i + 1) hash
+      go (i + 1) hash
   in
   go 0 hash
 
