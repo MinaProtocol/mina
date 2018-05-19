@@ -5,68 +5,7 @@ open Snark_params
 open Tick
 open Let_syntax
 
-module Digest = Pedersen.Digest
-
-let difficulty_window = 17
-
-let all_but_last_exn xs = fst (split_last_exn xs)
-
-module Hash = State_hash
-
-module Stable = struct
-  module V1 = struct
-    (* Someday: It may well be worth using bitcoin's compact nbits for target values since
-      targets are quite chunky *)
-    type ('target, 'state_hash, 'ledger_hash, 'strength, 'time) t_ =
-      { next_difficulty     : 'target
-      ; previous_state_hash : 'state_hash
-      ; ledger_hash         : 'ledger_hash
-      ; strength            : 'strength
-      ; timestamp           : 'time
-      }
-    [@@deriving bin_io, sexp, fields, eq]
-
-    type t = (Target.Stable.V1.t, State_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Strength.Stable.V1.t, Block_time.Stable.V1.t) t_
-    [@@deriving bin_io, sexp, eq]
-  end
-end
-
-include Stable.V1
-
-type var =
-  ( Target.Unpacked.var
-  , State_hash.var
-  , Ledger_hash.var
-  , Strength.Unpacked.var
-  , Block_time.Unpacked.var
-  ) t_
-
-type value =
-  ( Target.Unpacked.value
-  , State_hash.t
-  , Ledger_hash.t
-  , Strength.Unpacked.value
-  , Block_time.Unpacked.value
-  ) t_
-
-let to_hlist { next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } =
-  H_list.([ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp ])
-let of_hlist : (unit, 'ta -> 'sh -> 'lh -> 'st -> 'ti -> unit) H_list.t -> ('ta, 'sh, 'lh, 'st, 'ti) t_ =
-  H_list.(fun [ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp ] -> { next_difficulty; previous_state_hash; ledger_hash; strength; timestamp })
-
-let data_spec =
-  let open Data_spec in
-  [ Target.Unpacked.typ
-  ; State_hash.typ
-  ; Ledger_hash.typ
-  ; Strength.Unpacked.typ
-  ; Block_time.Unpacked.typ
-  ]
-
-let typ : (var, value) Typ.t =
-  Typ.of_hlistable data_spec
-    ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-    ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+include Blockchain_state
 
 let bound_divisor = `Two_to_the 11
 let delta_minus_one_max_bits = 7
@@ -122,30 +61,6 @@ let negative_one =
   ; timestamp
   }
 
-let to_bits ({ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } : var) =
-  let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash
-  and previous_state_hash_bits = State_hash.var_to_bits previous_state_hash
-  in
-  Target.Unpacked.var_to_bits next_difficulty
-  @ previous_state_hash_bits
-  @ ledger_hash_bits
-  @ Strength.Unpacked.var_to_bits strength
-  @ Block_time.Unpacked.var_to_bits timestamp
-
-let to_bits_unchecked ({ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } : value) =
-  Target.Bits.to_bits next_difficulty
-  @ State_hash.to_bits previous_state_hash
-  @ Ledger_hash.to_bits ledger_hash
-  @ Strength.Bits.to_bits strength
-  @ Block_time.Bits.to_bits timestamp
-
-let hash t =
-  let s = Pedersen.State.create Pedersen.params in
-  Pedersen.State.update_fold s
-    (List.fold_left (to_bits_unchecked t))
-  |> Pedersen.State.digest
-  |> State_hash.of_hash
-
 let update_unchecked : value -> Block.t -> value =
   fun state block ->
     let next_difficulty =
@@ -164,7 +79,7 @@ let zero_hash = hash zero
 
 let bit_length =
   let add bit_length acc _field = acc + bit_length in
-  Stable.V1.Fields_of_t_.fold zero ~init:0
+  Fields_of_t_.fold zero ~init:0
     ~next_difficulty:(add Target.bit_length)
     ~previous_state_hash:(add State_hash.bit_length)
     ~ledger_hash:(add Ledger_hash.bit_length)
@@ -181,12 +96,10 @@ module Make_update (T : Transaction_snark.S) = struct
         ~fee_excess:Currency.Amount.Signed.zero
         ~proof:block.body.proof
         |> T.verify);
-    let hash =
-      Pedersen.hash_fold Pedersen.params
-        (List.fold
-           (to_bits_unchecked state @ Block.Nonce.Bits.to_bits block.header.nonce))
+    let proof_of_work =
+      Proof_of_work.create state block.header.nonce
     in
-    assert (Target.meets_target_unchecked state.next_difficulty ~hash);
+    assert (Proof_of_work.meets_target_unchecked proof_of_work state.next_difficulty);
     update_unchecked state block
 
   module Checked = struct
@@ -258,7 +171,7 @@ module Make_update (T : Transaction_snark.S) = struct
       end
     ;;
 
-    let meets_target (target : Target.Packed.var) (hash : Digest.Packed.var) =
+    let meets_target (target : Target.Packed.var) (hash : Pedersen.Digest.Packed.var) =
       if Insecure.check_target
       then return Boolean.true_
       else Target.passes target hash
@@ -323,6 +236,8 @@ module Checked = struct
          (State_hash.var_to_hash_packed h))
 
   let hash (t : var) =
-    with_label __LOC__ (to_bits t >>= hash_digest >>| State_hash.var_of_hash_packed)
+    with_label __LOC__
+      (to_bits t
+       >>= digest_bits ~init:Hash_prefix.blockchain_state
+       >>| State_hash.var_of_hash_packed)
 end
-
