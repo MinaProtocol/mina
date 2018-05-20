@@ -38,9 +38,9 @@ module Make
 
   let merkle_root { tree; _ } = hash tree
 
-  (* TODO: Potential off-by-one here *)
-  let add_path depth tree0 path0 account =
-    let rec build_tree height = function
+  let add_path depth0 tree0 path0 account =
+    let rec build_tree height p =
+      match p with
       | `Left h_r :: path ->
         let l = build_tree (height - 1) path in
         Node (Hash.merge ~height (hash l) h_r, l, Hash h_r)
@@ -48,6 +48,7 @@ module Make
         let r = build_tree (height - 1) path in
         Node (Hash.merge ~height h_l (hash r), Hash h_l, r)
       | [] ->
+        assert (height = -1);
         Account account
     in
     let rec union height tree path =
@@ -58,11 +59,11 @@ module Make
         t
       | Node (h, l, r), (`Left h_r :: path) ->
         assert (Hash.equal h_r (hash r));
-        let l = union height l path in
+        let l = union (height - 1) l path in
         Node (h, l, r)
       | Node (h, l, r), (`Right h_l :: path) ->
         assert (Hash.equal h_l (hash l));
-        let r = union height r path in
+        let r = union (height - 1) r path in
         Node (h, l, r)
       | Node _, [] -> failwith "Path too short"
       | Account _, _::_ -> failwith "Path too long"
@@ -70,7 +71,7 @@ module Make
         assert (Account.equal a account);
         tree
     in
-    union (depth - 1) tree0 (List.rev path0)
+    union (depth0 - 1) tree0 (List.rev path0)
   ;;
 
   let add_path t path account =
@@ -166,30 +167,8 @@ let%test_module "sparse-ledger-test" =
     include Make(Hash)(String)(Account)
 
     let gen =
-      let rec tree_depth = function
-        | Account _ | Hash _ -> 0
-        | Node (_, l, r) -> 1 + max (tree_depth l) (tree_depth r)
-      in
-      let rec prune_hash_branches = function
-        | Hash h -> Hash h
-        | Account a -> Account a
-        | Node (h, l, r) ->
-          begin match prune_hash_branches l, prune_hash_branches r with 
-          | Hash _, Hash _ -> Hash h
-          | l, r -> Node (h, l, r)
-          end
-      in
-      let prune_shallow_accounts max_depth t =
-        let rec go d t =
-          match t with
-          | Account a ->
-            if d < max_depth then Hash (Account.hash a) else t
-          | Hash _ -> t
-          | Node (h, l, r) ->
-            Node (h, go (d + 1) l, go (d + 1) r)
-        in
-        go 0 t
-      in
+      let open Quickcheck.Generator in
+      let open Let_syntax in
       let indexes max_depth t =
         let rec go addr d = function
           | Account a -> [ (Account.key a, addr) ]
@@ -200,27 +179,33 @@ let%test_module "sparse-ledger-test" =
         in
         go 0 (max_depth - 1) t
       in
-      let rec fix_hashes height t =
-        match t with
-        | Account _ ->
-          assert (height = 0);
-          t
-        | Hash _ -> t
-        | Node (_, l, r) ->
-          let height = height - 1 in
-          let l = fix_hashes height l in
-          let r = fix_hashes height r in
-          Node (Hash.merge ~height (hash l) (hash r), l, r)
+      let rec prune_hash_branches = function
+        | Hash h -> Hash h
+        | Account a -> Account a
+        | Node (h, l, r) ->
+          begin match prune_hash_branches l, prune_hash_branches r with 
+          | Hash _, Hash _ -> Hash h
+          | l, r -> Node (h, l, r)
+          end
       in
-      let open Quickcheck.Generator in
-      recursive (fun gen_tree ->
-        variant3 Account.gen Hash.gen (tuple2 gen_tree gen_tree) >>| function
-        | `A account -> Account account
-        | `B hash -> Hash hash
-        | `C (l, r) -> Node (Hash.merge ~height:0 (hash l) (hash r), l, r))
-      >>| fun tree ->
-      let depth = tree_depth tree in
-      let tree = prune_shallow_accounts depth tree |> prune_hash_branches |> fix_hashes depth in
+      let rec gen depth =
+        if depth = 0
+        then Account.gen >>| fun a -> Account a
+        else
+          let t =
+            let sub = gen (depth - 1) in
+            let%map l = sub
+            and r = sub
+            in
+            Node (Hash.merge ~height:(depth - 1) (hash l) (hash r), l, r)
+          in
+          weighted_union
+            [ (1./.3., Hash.gen >>| fun h -> Hash h)
+            ; (2./.3., t)
+            ]
+      in
+      let%bind depth = Int.gen_incl 0 16 in
+      let%map tree = gen depth >>| prune_hash_branches in
       { tree; depth; indexes = indexes depth tree }
 
     let%test_unit "path_test" =
@@ -232,5 +217,4 @@ let%test_module "sparse-ledger-test" =
             add_path acc (path_exn t index) account)
         in
         assert (equal_tree t'.tree t.tree))
-
   end)
