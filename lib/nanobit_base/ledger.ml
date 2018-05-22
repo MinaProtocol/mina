@@ -33,6 +33,7 @@ let get' ledger tag key = error_opt (sprintf "%s not found" tag) (get ledger key
 
 let add_amount balance amount = error_opt "overflow" (Balance.add_amount balance amount)
 let sub_amount balance amount = error_opt "insufficient funds" (Balance.sub_amount balance amount)
+let add_fee amount fee = error_opt "add_fee: overflow" (Amount.add_fee amount fee)
 
 let validate_nonces txn_nonce account_nonce =
   if Account.Nonce.equal account_nonce txn_nonce then
@@ -40,13 +41,16 @@ let validate_nonces txn_nonce account_nonce =
   else
     Or_error.errorf !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in transaction %{sexp: Account.Nonce.t}" account_nonce txn_nonce
 
-let apply_transaction_unchecked ledger (transaction : Transaction.t) =
-  let sender = Public_key.compress transaction.sender in
-  let { Transaction.Payload.fee=_; amount; receiver; nonce } = transaction.payload in
+let apply_transaction_unchecked ledger ({ payload; sender } : Transaction.t) =
+  let sender = Public_key.compress sender in
+  let { Transaction.Payload.fee; amount; receiver; nonce } = payload in
   let open Or_error.Let_syntax in
   let%bind sender_account = get' ledger "sender" sender in
   let%bind () = validate_nonces nonce sender_account.nonce in
-  let%bind sender_balance' = sub_amount sender_account.balance amount in
+  let%bind sender_balance' =
+    let%bind amount_and_fee = add_fee amount fee in
+    sub_amount sender_account.balance amount_and_fee
+  in
   if Public_key.Compressed.equal sender receiver
   then return ()
   else
@@ -58,12 +62,15 @@ let apply_transaction_unchecked ledger (transaction : Transaction.t) =
 let apply_transaction ledger (transaction : Transaction.With_valid_signature.t) =
   apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
-let undo_transaction ledger (transaction : Transaction.t) =
+let undo_transaction ledger ({ payload; sender } : Transaction.t) =
+  let sender = Public_key.compress sender in
+  let { Transaction.Payload.fee; amount; receiver; nonce } = payload in
   let open Or_error.Let_syntax in
-  let sender = Public_key.compress transaction.sender in
-  let { Transaction.Payload.fee=_; amount; receiver; nonce } = transaction.payload in
   let%bind sender_account = get' ledger "sender" sender in
-  let%bind sender_balance' = add_amount sender_account.balance amount in
+  let%bind sender_balance' =
+    let%bind amount_and_fee = add_fee amount fee in
+    add_amount sender_account.balance amount_and_fee
+  in
   let%bind () = validate_nonces (Account.Nonce.succ nonce) sender_account.nonce in
   if Public_key.Compressed.equal sender receiver
   then return ()
