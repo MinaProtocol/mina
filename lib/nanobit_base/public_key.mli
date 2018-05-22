@@ -13,6 +13,9 @@ module Stable : sig
 end
 
 type var = Field.var * Field.var
+
+val typ_unchecked : (var, t) Typ.t
+
 val typ : (var, t) Typ.t
 
 val of_private_key : Private_key.t -> t
