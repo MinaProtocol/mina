@@ -212,6 +212,9 @@ module Base = struct
   open Tick
   open Let_syntax
 
+  let assert_valid_compressed_key pk =
+    Public_key.decompress_var pk >>| ignore
+
   (* spec for
      [apply_tagged_transaction root (tag, { sender; signature; payload }]):
      - if tag = Normal:
@@ -236,6 +239,7 @@ module Base = struct
       let { Transaction.Payload.receiver; amount; fee; nonce } = payload in
       let is_fee_transfer = Tag.Checked.is_fee_transfer tag in
       let is_normal = Tag.Checked.is_normal tag in
+      let%bind () = assert_valid_compressed_key receiver in
       let%bind () =
         let%bind bs = Transaction.Payload.var_to_bits payload in
         let%bind verifies =
