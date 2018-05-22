@@ -102,6 +102,20 @@ let sign (kp : Signature_keypair.t) (payload : Payload.t): t =
 
 let typ : (var, t) Tick.Typ.t =
   let spec =
+    (* Someday: It is (under some assumptions) safe to have the sender be an unchecked
+       public key (i.e., just a pair of field elements) in the following sitaution:
+       - When a transaction is performed, we check the receiver to ensure it
+       corresponds to a valid (i.e., on subgroup) public key
+       - When a coinbase occurs, we check the receiver to ensure it
+       corresponds to a valid (i.e., on subgroup) public key.
+
+       Thus, the public key of any account which has money to send has
+       already been checked for validity and there is no need to redo it.
+
+       For now, we are conservative (in case one of the above is violated)
+       and check the sender public key (by using Public_key.typ rather than
+       Public_key.typ_unchecked).
+    *)
     Data_spec.(
       [ Payload.typ; Public_key.typ; Signature.typ ])
   in
