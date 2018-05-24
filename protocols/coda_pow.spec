@@ -6,22 +6,24 @@ requirements:
   - transaction queue should have merkle root to transactions (by account) available
 
 Blockchain_snark
-  ~old ~nonce ~ledger_snark ~new
-  - verify old.snark for old
-  - verify ledger_snark verifies old.ledger_hash -> new.ledger_hash
-  - verify new.timestamp > old.timestamp
-  - verify new.(strength, previous_blockchain_hash, next_difficulty) computed as expected
-  - verify hash (concat new nonce) meets old.next_difficulty
+  ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
+  - assert(Blockchain_snark.verify(old.snark, old))
+  - new = update_with_asserts(old, nonce, timestamp, ledger_hash)
+  - assert(hash(new) = new_hash)
+  - assert(Work_snark.verify(new.ledger_snark, genesis_ledger, new.ledger_hash))
+  - # should also assert old.ledger_hash is a "prefix" of new.ledger_hash
+  - assert(new.timestamp > old.timestamp)
+  - assert(hash(concat hash(new) nonce) < target(old.next_difficulty))
 
 Work_snark:
   ~A ~B ~type:(Bundle transactions | Merge proofs)
   match type with
   | Bundle transactions
-    -> verify transactions are valid, and applying them takes A -> B
+    -> assert transactions are valid, and applying them takes A -> B
   | Merge proofAC proofCB
     -> 
-      - verify proofAC verifies A -> C
-      - verify proofCB verifies C -> B
+      - assert proofAC verifies A -> C
+      - assert proofCB verifies C -> B
 
 global: {
   max_transaction_queue_constraints
@@ -83,7 +85,9 @@ step' blockchain transition
         ~old:blockchain
         ~nonce:blockchain_transition.nonce
         ~ledger_snark:new_ledger_snark
-        ~new:new_blockchain
+        ~ledger_hash:new_ledger_hash
+        ~timestamp:new_blockchain.timestamp
+        ~new_hash:hash(new_blockchain)
     new_blockchain.snark = proof
     new_blockchain, transition.transaction_queue_transition
 
