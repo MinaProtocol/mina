@@ -58,8 +58,8 @@ module type Ledger_intf = sig
   val apply_transaction : t -> valid_transaction -> unit Or_error.t
 end
 
-(* Snarket proof has a price attached *)
-module type Snarket_proof_intf = sig
+(* Proofs have prices attached *)
+module type Snark_pool_proof_intf = sig
   type proof
   type t [@@deriving sexp, bin_io]
   val proof : t -> proof
@@ -82,7 +82,7 @@ module type Ledger_builder_witness_intf = sig
   val proofs : t -> snarket_proof list
   val transactions : t -> transaction list
 
-  val check_has_snarket_fees : t -> bool
+  val check_has_snark_pool_fees : t -> bool
 end
 
 module type Ledger_builder_intf = sig
@@ -245,10 +245,10 @@ module type Inputs_intf = sig
   module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
                                and type ledger_hash := Ledger_hash.t
 
-  module Snarket_proof : Snarket_proof_intf with type proof := Ledger_proof.t
+  module Snark_pool_proof : Snark_pool_proof_intf with type proof := Ledger_proof.t
   module Ledger_builder_hash : Ledger_builder_hash_intf
   module Ledger_builder_witness : Ledger_builder_witness_intf with type transaction := Transaction.t
-                                                               and type snarket_proof := Snarket_proof.t
+                                                               and type snarket_proof := Snark_pool_proof.t
   module Ledger_builder : Ledger_builder_intf with type witness := Ledger_builder_witness.t
                                                and type ledger_builder_hash := Ledger_builder_hash.t
                                                and type ledger_hash := Ledger_hash.t
@@ -330,30 +330,34 @@ module Make
       let state = t.state.data in
       let proof = t.state.proof in
 
-      let next_difficulty =
-        Difficulty.next
-          state.next_difficulty
-          ~last:state.timestamp
-          ~this:transition.timestamp
-      in
-      let new_state : State.t =
-        { next_difficulty
-        ; previous_state_hash  = State.hash state
-        ; ledger_builder_hash  = t.state.data.ledger_builder_hash
-        ; ledger_hash          = transition.ledger_hash
-        ; strength             = Strength.increase state.strength ~by:state.next_difficulty
-        ; timestamp            = transition.timestamp
-        }
-      in
+      let {Ledger_builder_transition.old; witness} = transition.Transition.ledger_builder_transition in
+      match%bind Ledger_builder.apply old witness with
+      | Error e -> return t
+      | Ok (ledger_builder, maybe_new_ledger) ->
+        let next_difficulty =
+          Difficulty.next
+            state.next_difficulty
+            ~last:state.timestamp
+            ~this:transition.timestamp
+        in
+        let new_state : State.t =
+          { next_difficulty
+          ; previous_state_hash  = State.hash state
+          ; ledger_builder_hash  = Ledger_builder.hash ledger_builder
+          ; ledger_hash          = transition.ledger_hash
+          ; strength             = Strength.increase state.strength ~by:state.next_difficulty
+          ; timestamp            = transition.timestamp
+          }
+        in
 
-      let%map proof = Block_state_transition_proof.prove_zk_state_valid
-        { old_state = state
-        ; old_proof = proof
-        ; transition
-        }
-        ~new_state
-      in
-      { state = { data = new_state ; proof} }
+        let%map proof = Block_state_transition_proof.prove_zk_state_valid
+          { old_state = state
+          ; old_proof = proof
+          ; transition
+          }
+          ~new_state
+        in
+        { state = { data = new_state ; proof} }
 
     let create ~initial : t =
       { state = initial
@@ -373,7 +377,7 @@ module Make
         let margin = Ledger_builder.margin new_ledger_builder in
         Ledger_builder.hash new_ledger_builder = new_pcd.data.ledger_builder_hash &&
           margin >= Ledger_builder.max_margin &&
-          Ledger_builder_witness.check_has_snarket_fees ledger_builder_transition.witness &&
+          Ledger_builder_witness.check_has_snark_pool_fees ledger_builder_transition.witness &&
           new_ledger_hash = new_pcd.data.ledger_hash
       in
       let new_strength = new_pcd.data.strength in
