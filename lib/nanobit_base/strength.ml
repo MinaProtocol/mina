@@ -30,7 +30,7 @@ let field_var_to_unpacked (x : Tick.Cvar.t) = Tick.Checked.unpack ~length:bit_le
 
 include Bits.Snarkable.Small(Tick)(struct let bit_length = bit_length end)
 
-module Bits = Bits.Make_field(Tick.Field)(Tick.Bigint)
+module Bits = Bits.Make_field0(Tick.Field)(Tick.Bigint)(struct let bit_length = bit_length end)
 
 let packed_to_number t = 
   let%map unpacked = unpack_var t in
@@ -128,7 +128,9 @@ let (=) x y = compare x y = 0
 let (>=) x y = not (x < y)
 let (<=) x y = not (x > y)
 
-let increase (t : t) ~(by : Target.t) = of_field (Field.add t (by :> Field.t))
+let increase (t : t) ~(by : Target.t) : t =
+  let incr = of_target_unchecked by in
+  of_field (Field.add t incr)
 
 let increase_checked t ~by:(target_packed, target_unpacked) =
   let%map incr = of_target target_packed target_unpacked in
