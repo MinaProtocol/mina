@@ -224,6 +224,52 @@ module type Block_state_transition_proof_intf = sig
       }
   end
 
+  (*
+Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
+  Input:
+    old : Blockchain.t
+    old_snark : proof
+    nonce : int
+    work_snark : proof
+    ledger_hash : Ledger_hash.t
+    timestamp : Time.t
+    new_hash : State_hash.t
+  Witness:
+    transition : Transition.t
+  such that
+    the old_snark verifies against old
+    new = update_with_asserts(old, nonce, timestamp, ledger_hash)
+    hash(new) = new_hash
+    the work_snark verifies against the old.ledger_hash and new_ledger_hash
+    new.timestamp > old.timestamp
+    hash(new_hash||nonce) < target(old.next_difficulty)
+
+Bundle Snark:
+   Input:
+      l1 : Ledger_hash.t,
+      l2 : Ledger_hash.t,
+      fee_excess : Amount.Signed.t,
+   Witness:
+      t : Tagged_transaction.t
+   such that
+     applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2].
+
+Merge Snark:
+    Input:
+      s1 : state
+      s3 : state
+      fee_excess_total : Amount.Signed.t
+    Witness:
+      s2 : state
+      p12 : proof
+      p23 : proof
+      fee_excess12 : Amount.Signed.t
+      fee_excess23 : Amount.Signed.t
+    s.t.
+      p12 verifies s1 -> s2 is a valid transition with fee_excess12
+      p23 verifies s2 -> s3 is a valid transition with fee_excess23
+      fee_excess_total = fee_excess12 + fee_excess23
+  *)
   val prove_zk_state_valid : Witness.t -> new_state:state -> proof Deferred.t
 end
 
