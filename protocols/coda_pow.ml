@@ -292,20 +292,6 @@ end
 
 module Make
   (Inputs : Inputs_intf)
-  (* SNARK "zk_state_valid" proving that, for new_state:
-    - old_proof verifies old_state (Induction hypothesis)
-    - transition.ledger_proof verifies a valid sequence of transactions moved the ledger from old_state.ledger_hash to new_state.ledger_hash
-    - new_state.timestamp is transition.timestamp
-    - new_state.ledger_hash is transition.ledger_hash
-    - new_state.timestamp is newer than old_state.timestamp
-    - the "next difficulty" is computed correctly from (old_state.next_difficulty, old_state.timestamp, new_state.timestamp)
-    - the strength is computed correctly from the old_state.next_difficulty and the old_state.strength
-    - new_state.next_difficulty is "next difficulty"
-    - new_state.previous_state_hash is a hash of old_state
-    - hash(new_state||transition.nonce) meets old_state.next_difficulty
-    as) meets old_state.next_difficulty
-    *)
-  (* TODO: Lift this out of the functor and inline it *)
   (Block_state_transition_proof : Block_state_transition_proof_intf with type state := Inputs.State.t
                                                                      and type proof := Inputs.State.Proof.t
                                                                      and type transition := Inputs.Transition.t)
