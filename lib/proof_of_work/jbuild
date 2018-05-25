@@ -1,0 +1,9 @@
+(jbuild_version 1)
+
+(library
+ ((name proof_of_work)
+  (public_name proof_of_work)
+  (library_flags (-linkall))
+  (libraries (core_kernel nanobit_base ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_driver.runner (-inline-test-lib proof_of_work))))
+  (synopsis "Just a simple module for the proof of work")))
