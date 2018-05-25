@@ -1169,10 +1169,19 @@ module Checked = struct
     end
   ;;
 
+  (* We get a better stack trace by failing at the call to is_satisfied, so we
+     put a bogus value for the inverse to make the constraint system unsat if
+     x is zero. *)
   let inv x =
     with_label "Checked.inv" begin
       let open Let_syntax in
-      let%bind x_inv = provide_witness Typ.field As_prover.(map ~f:Field.inv (read_var x)) in
+      let%bind x_inv =
+        provide_witness Typ.field As_prover.(
+          map (read_var x) ~f:(fun x ->
+            if Field.(equal zero x)
+            then Field.zero
+            else Backend.Field.inv x))
+      in
       let%map () = assert_r1cs ~label:"field_inverse" x x_inv (Cvar.constant Field.one) in
       x_inv
     end
