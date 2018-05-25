@@ -4,6 +4,8 @@ open Snark_params
 include Snarky.Signature.Schnorr(Tick)(Snark_params.Tick.Signature_curve)(struct
     open Tick
 
+    let () = assert Insecure.signature_hash_function
+
     (* TODO: This hash function is NOT secure *)
     let hash_checked bs =
       let open Checked.Let_syntax in
