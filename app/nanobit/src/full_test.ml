@@ -3,9 +3,6 @@ open Async_kernel
 open Nanobit_base
 open Main
 
-module Main_mem_for_tests (Init : Init_intf with type proof = Proof.t) =
-  Main_with_snark(Storage.Memory)(Init)
-
 let run_test with_snark : unit -> unit Deferred.t = fun () ->
   let log = Logger.create () in
   let conf_dir = "/tmp" in

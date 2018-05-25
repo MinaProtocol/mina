@@ -100,7 +100,6 @@ let compute_target timestamp (previous_target : Target.t) time =
 ;;
 
 let negative_one =
-  (* TODO: Add an insecure flag for this difficulty, do not accept this PR! *)
   let next_difficulty : Target.Unpacked.value =
     if Insecure.initial_difficulty
     then Target.max
