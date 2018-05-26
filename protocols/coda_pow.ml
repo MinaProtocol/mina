@@ -243,7 +243,28 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
     the work_snark verifies against the old.ledger_hash and new_ledger_hash
     new.timestamp > old.timestamp
     hash(new_hash||nonce) < target(old.next_difficulty)
+  *)
+  val prove_zk_state_valid : Witness.t -> new_state:state -> proof Deferred.t
+end
 
+module Proof_carrying_data = struct
+  type ('a, 'b) t =
+    { data : 'a
+    ; proof : 'b
+    }
+  [@@deriving sexp, fields, bin_io]
+end
+
+module type Inputs_intf = sig
+  module Time : Time_intf
+  module Transaction : Transaction_intf
+  module Block_nonce : Nonce_intf
+
+  module Ledger_hash : Ledger_hash_intf
+  module Ledger_proof : Proof_intf
+  module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
+                               and type ledger_hash := Ledger_hash.t
+  (*
 Bundle Snark:
    Input:
       l1 : Ledger_hash.t,
@@ -270,27 +291,6 @@ Merge Snark:
       p23 verifies s2 -> s3 is a valid transition with fee_excess23
       fee_excess_total = fee_excess12 + fee_excess23
   *)
-  val prove_zk_state_valid : Witness.t -> new_state:state -> proof Deferred.t
-end
-
-module Proof_carrying_data = struct
-  type ('a, 'b) t =
-    { data : 'a
-    ; proof : 'b
-    }
-  [@@deriving sexp, fields, bin_io]
-end
-
-module type Inputs_intf = sig
-  module Time : Time_intf
-  module Transaction : Transaction_intf
-  module Block_nonce : Nonce_intf
-
-  module Ledger_hash : Ledger_hash_intf
-  module Ledger_proof : Proof_intf
-  module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
-                               and type ledger_hash := Ledger_hash.t
-
   module Snark_pool_proof : Snark_pool_proof_intf with type proof := Ledger_proof.t
   module Ledger_builder_hash : Ledger_builder_hash_intf
   module Ledger_builder_witness : Ledger_builder_witness_intf with type transaction := Transaction.t
