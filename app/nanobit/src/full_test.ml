@@ -3,55 +3,25 @@ open Async_kernel
 open Nanobit_base
 open Main
 
-module Main_mem_for_tests (Init : Init_intf) = struct
-  module No_snark = Main_without_snark(Init)
-  module Init = No_snark.Init
-  module Ledger_proof = No_snark.Ledger_proof
-  module State_proof = No_snark.State_proof
-  module Bundle = No_snark.Bundle
-  module Difficulty = struct
-    include Difficulty
-
-    let is_trivial = ref false
-
-    let meets _ _ = !is_trivial
-
-    let make_impossible () =
-      is_trivial := false
-
-    let make_trivial () =
-      is_trivial := true
-  end
-  module Inputs =
-    Make_inputs(Init)(Ledger_proof)(State_proof)(Difficulty)(Storage.Memory)(Bundle)
-  module Main =
-    Minibit.Make(Inputs)(struct
-      module Witness = struct
-        type t =
-          { old_state : Inputs.State.t
-          ; old_proof : Inputs.State.Proof.t
-          ; transition : Inputs.Transition.t
-          }
-      end
-
-      let prove_zk_state_valid _ ~new_state:_ = return Inputs.Genesis.proof
-    end)
-end
-
-let run_test : unit -> unit Deferred.t = fun () ->
+let run_test with_snark : unit -> unit Deferred.t = fun () ->
   let log = Logger.create () in
-  let%bind prover = Prover.create ~conf_dir:"/tmp" in
+  let conf_dir = "/tmp" in
+  let%bind prover = Prover.create ~conf_dir in
   let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
-  let module Init : Init_intf = struct
+  let module Init = struct
     type proof = Proof.Stable.V1.t [@@deriving bin_io]
-    let conf_dir = "/tmp"
+    let conf_dir = conf_dir
     let prover = prover
     let genesis_proof = genesis_proof
     let fee_public_key = Genesis_ledger.rich_pk
   end
   in
-  let module Main = Main_mem_for_tests(Init) in
-  let module Difficulty = Main.Difficulty in
+  let module Main =
+    (val
+      (if with_snark
+       then (module Main_with_snark(Storage.Memory)(Init) : Main_intf)
+       else (module Main_without_snark(Init) : Main_intf)))
+  in
   let module Run = Run(Main) in
   let open Main in
   let net_config = 
@@ -74,6 +44,17 @@ let run_test : unit -> unit Deferred.t = fun () ->
       ; pool_disk_location = "transaction_pool"
       }
   in
+  let balance_change_or_timeout =
+    let rec go () =
+      match%bind Run.get_balance minibit Genesis_ledger.poor_pk with
+      | Some b when not (Currency.Balance.equal b Genesis_ledger.initial_poor_balance) ->
+        return ()
+      | _ ->
+        let%bind () = after (Time_ns.Span.of_sec 10.) in
+        go ()
+    in
+    Deferred.any [ after (Time_ns.Span.of_min 5.); go () ]
+  in
   let open Genesis_ledger in
   let assert_balance pk amount =
     match%map
@@ -88,16 +69,10 @@ let run_test : unit -> unit Deferred.t = fun () ->
 
   Run.run ~minibit ~log;
   (* Let the system settle *)
-  let%bind () =
-    Async.after (Time.Span.of_ms 100.)
-  in
+  let%bind () = Async.after (Time.Span.of_ms 100.) in
   (* Check if rich-man has some balance *)
-  let%bind () =
-    assert_balance rich_pk initial_rich_balance
-  in
-  let%bind () =
-    assert_balance poor_pk initial_poor_balance
-  in
+  let%bind () = assert_balance rich_pk initial_rich_balance in
+  let%bind () = assert_balance poor_pk initial_poor_balance in
 
   (* Note: This is much less than half of the rich balance so we can test
    *       transaction replays being prohibited
@@ -128,17 +103,8 @@ let run_test : unit -> unit Deferred.t = fun () ->
   let%bind o = Run.send_txn log minibit (transaction' :> Transaction.t) in
   let () = Option.value_exn o in
 
-  (* Let the system settle *)
-  let%bind () =
-    Async.after (Time.Span.of_ms 50.)
-  in
-  (* Mine some blocks *)
-  Difficulty.make_trivial ();
-  let%bind () =
-    Async.after (Time.Span.of_ms 50.)
-  in
-  Difficulty.make_impossible ();
-
+  (* Let the system settle, mine some blocks *)
+  let%bind () = balance_change_or_timeout in
   let%bind () =
     assert_balance poor_pk (Currency.Balance.(+) Genesis_ledger.initial_poor_balance send_amount |> Option.value_exn)
   in
@@ -150,6 +116,8 @@ let run_test : unit -> unit Deferred.t = fun () ->
 let command =
   let open Core in
   let open Async in
-  Command.async ~summary:"Full minibit end-to-end test"
-    (Command.Param.return run_test)
-
+  Command.async ~summary:"Full minibit end-to-end test" begin
+    let open Command.Let_syntax in
+    let%map_open with_snark = flag "with-snark" no_arg ~doc:"Produce snarks" in
+    run_test with_snark
+  end

@@ -38,13 +38,7 @@ type var =
   , Block_time.Unpacked.var
   ) t_
 
-type value =
-  ( Target.Unpacked.value
-  , State_hash.t
-  , Ledger_hash.t
-  , Strength.Unpacked.value
-  , Block_time.Unpacked.value
-  ) t_
+type value = t
 
 let to_hlist { next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } =
   H_list.([ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp ])

@@ -234,6 +234,7 @@ module Main_without_snark (Init : Init_intf) = struct
 end
 
 module Main_with_snark
+    (Storage : Storage.With_checksum_intf)
     (Init : Init_intf with type proof = Proof.t)
 = struct
   module Ledger_proof = Ledger_proof.Make_prod(Init)
@@ -243,7 +244,7 @@ module Main_with_snark
     let result t = Deferred.Option.(result t >>| Transaction_snark.proof)
   end
 
-  module Inputs = Make_inputs(Init)(Ledger_proof)(State_proof)(Difficulty)(Storage.Disk)(Bundle)
+  module Inputs = Make_inputs(Init)(Ledger_proof)(State_proof)(Difficulty)(Storage)(Bundle)
 
   module Main =
     Minibit.Make(Inputs)(struct

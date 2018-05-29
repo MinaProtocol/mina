@@ -8,17 +8,18 @@ module type S = sig
 
   module State : sig
     module Hash : sig
-      type t
+      type t [@@deriving sexp]
       type var
       val typ : (var, t) Typ.t
       val var_to_bits : var -> (Boolean.var list, _) Checked.t
     end
 
     type var
-    type value
-    val typ : (var, value) Typ.t
+    type t [@@deriving sexp]
 
-    val update_exn : value -> Update.value -> value
+    val typ : (var, t) Typ.t
+
+    val update_exn : t -> Update.value -> t
 
     module Checked : sig
       val hash : var -> (Hash.var, _) Checked.t
@@ -77,7 +78,7 @@ struct
       type t =
         { wrap_vk    : Tock_curve.Verification_key.t
         ; prev_proof : Tock_curve.Proof.t
-        ; prev_state : State.value
+        ; prev_state : State.t
         ; update     : Update.value
         }
       [@@deriving fields]

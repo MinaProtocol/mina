@@ -46,9 +46,12 @@ let compute_target timestamp (previous_target : Target.t) time =
 
 let negative_one =
   let next_difficulty : Target.Unpacked.value =
-    Target.of_bigint
-      Bignum.Bigint.(
-        Target.(to_bigint max) / pow (of_int 2) (of_int 4))
+    if Insecure.initial_difficulty
+    then Target.max
+    else
+      Target.of_bigint
+        Bignum.Bigint.(
+          Target.(to_bigint max) / pow (of_int 2) (of_int 4))
   in
   let timestamp =
     Block_time.of_time
@@ -88,19 +91,22 @@ let bit_length =
 
 module Make_update (T : Transaction_snark.S) = struct
   let update_exn state (block : Block.t) =
-    assert
-      (Transaction_snark.create
-        ~source:state.ledger_hash
-        ~target:block.body.target_hash
-        ~proof_type:Merge
-        ~fee_excess:Currency.Amount.Signed.zero
-        ~proof:block.body.proof
-        |> T.verify);
+    assert (
+      Ledger_hash.equal state.ledger_hash block.body.target_hash
+      ||
+      T.verify
+        (Transaction_snark.create
+          ~source:state.ledger_hash
+          ~target:block.body.target_hash
+          ~proof_type:Merge
+          ~fee_excess:Currency.Amount.Signed.zero
+          ~proof:block.body.proof));
+    let next_state = update_unchecked state block in
     let proof_of_work =
-      Proof_of_work.create state block.header.nonce
+      Proof_of_work.create next_state block.header.nonce
     in
     assert (Proof_of_work.meets_target_unchecked proof_of_work state.next_difficulty);
-    update_unchecked state block
+    next_state
 
   module Checked = struct
     let compute_target prev_time prev_target time =
@@ -207,9 +213,14 @@ module Make_update (T : Transaction_snark.S) = struct
       =
       with_label __LOC__ begin
         let%bind good_body =
-          T.verify_complete_merge
-            previous_state.ledger_hash block.body.target_hash
-            (As_prover.return block.body.proof)
+          let%bind correct_transaction_snark =
+            T.verify_complete_merge
+              previous_state.ledger_hash block.body.target_hash
+              (As_prover.return block.body.proof)
+          and ledger_hash_didn't_change =
+            Ledger_hash.equal_var previous_state.ledger_hash block.body.target_hash
+          in
+          Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
         in
         let difficulty = previous_state.next_difficulty in
         let difficulty_packed = Target.pack_var difficulty in
