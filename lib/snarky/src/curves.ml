@@ -255,6 +255,7 @@ module Edwards = struct
       assert Bignum.Bigint.(one = x * Params.cofactor + y * Params.order);
       let x = Bignum.Bigint.(x % Params.order) in
       assert (Bignum.Bigint.is_non_negative x);
+      assert Bignum.Bigint.(x * Params.cofactor % Params.order = one);
       x
 
     let is_on_subgroup =
@@ -263,7 +264,7 @@ module Edwards = struct
          We have [G = H * < g >] (where [g = Params.generator] is an
          element of prime order [p = Params.order] and [|H| = Params.cofactor].
 
-         Let [c = Params.cofactor] and [d = 1 / c mod Params.order].
+         Let [c = Params.cofactor] and [d = 1 / c mod p] (i.e., [d = cofactor_inverse_mod_subgroup_order]).
          This means that [cd = kp + 1] for some [k].
 
          Let's see how to check if [x : G] is in [< g >].
@@ -286,6 +287,7 @@ module Edwards = struct
       fun x -> equal x (scale_unchecked ~num_bits x s)
 
 
+    (* TODO: Come up with a way to test off subgroup points as well. *)
     let%test_unit "on_subgroup" =
       let subgroup_pt =
         let open Quickcheck.Generator in
@@ -415,6 +417,34 @@ module Edwards = struct
             go 1 acc pt
         end
 
+      let gen =
+        let open Quickcheck.Generator in
+        let open Let_syntax in
+        let field =
+          let%map x = Bignum.Bigint.(gen_incl zero Field.size) in
+          Bigint.(to_field (of_bignum_bigint x))
+        in
+        filter_map field ~f:(fun x ->
+          Option.map (find_y x) ~f:(fun y ->
+            let%map b = Bool.gen in
+            if b then (x, y) else (x, Field.negate y)))
+        |> join
+
+      let%test_unit "scale-known-scalar" =
+        let module T = Test_util.Make(Impl) in
+        let open Quickcheck in
+        let gen =
+          Generator.tuple3
+            gen
+            Bignum.Bigint.(gen_incl zero Params.order)
+            (Int.gen_incl 1 (bigint_num_bits Params.order))
+        in
+        Quickcheck.test gen ~f:(fun (pt, s, num_bits) ->
+          T.test_equal ~equal typ_unchecked typ_unchecked
+            (fun pt -> scale_known_scalar pt ~num_bits s)
+            (fun pt -> scale_unchecked pt ~num_bits s)
+            pt)
+
       (* TODO: Unit test *)
       let cond_add ((x2, y2) : value) ~to_:((x1, y1) : var) ~if_:(b : Boolean.var) : (var, _) Checked.t =
         with_label "Edwards.Checked.cond_add" begin
@@ -492,7 +522,27 @@ module Edwards = struct
           and () = assert_equal y1 y2 in
           ()
 
-        let not_identity (x, y) = failwith ""
+        let not_identity =
+          assert (not (Field.(equal Params.d one)));
+          (* Let (x, y) be a point on the curve.
+             Claim:
+             To check if (x, y) is not the identity it is sufficient to check y != 1.
+             This is essentially because y = 1 implies x = 0 (which implies (x, y) is the identity).
+
+             First, it is clear that if y != 1, then (x, y) is not the identity since
+             the identity is (0, 1).
+
+             Conversely suppose (x, y) is not the identity. This means either x != 0 or y != 1.
+             If y != 1, we're done. Otherwise x != 0 and y = 1. (x, y) is on the curve so we have
+
+             x^2 + y^2 = 1 + dx^2 y^2
+             x^2 + 1 = 1 + dx^2
+             x^2 = dx^2
+
+             Which implies x = 0 since d != 1. This is in contradiction to x != 0, so in fact
+             we must have y != 1. *)
+          fun (x, y) ->
+            Checked.Assert.not_equal y (Cvar.constant Field.one)
 
         let typ_on_curve : (var, value) Typ.t =
           { typ_unchecked with check = on_curve }

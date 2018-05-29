@@ -1,7 +1,6 @@
 open Core
 open Nanobit_base
 open Snark_params
-open Snarky
 open Currency
 
 let bundle_length = 1
