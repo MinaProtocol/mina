@@ -271,6 +271,25 @@ module Make_update (T : Transaction_snark.S) = struct
       [@@deriving fields]
     end
 
+    (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
+  Input:
+    old : Blockchain.t
+    old_snark : proof
+    nonce : int
+    work_snark : proof
+    ledger_hash : Ledger_hash.t
+    timestamp : Time.t
+    new_hash : State_hash.t
+  Witness:
+    transition : Transition.t
+  such that
+    the old_snark verifies against old
+    new = update_with_asserts(old, nonce, timestamp, ledger_hash)
+    hash(new) = new_hash
+    the work_snark verifies against the old.ledger_hash and new_ledger_hash
+    new.timestamp > old.timestamp
+    hash(new_hash||nonce) < target(old.next_difficulty)
+    *)
     let update ((previous_state_hash, previous_state) : State_hash.var * var) (block : Block.var)
       : (State_hash.var * var * [ `Success of Boolean.var ], _) Tick.Checked.t
       =
