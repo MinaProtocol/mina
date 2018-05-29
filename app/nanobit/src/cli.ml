@@ -65,15 +65,13 @@ let daemon =
             let fee_public_key = Genesis_ledger.rich_pk
           end
           in
-          let module Main_without_snark = Main_without_snark(Init) in
-          let module Main_with_snark = Main_with_snark(Init) in
-          let p =
-            if Insecure.key_generation then
-              (module Main_without_snark : Main_intf)
-            else
-              (module Main_with_snark : Main_intf)
+          let module Main =
+            (val
+              (if Insecure.key_generation then
+                (module Main_without_snark(Init) : Main_intf)
+              else
+                (module Main_with_snark(Storage.Disk)(Init) : Main_intf)))
           in
-          let module Main = (val p : Main_intf) in
           let module Run = Run(Main) in
           let%bind () =
             let open Main in

@@ -32,6 +32,8 @@ module type S = sig
 
   val assert_equal : var -> var -> (unit, _) Checked.t
 
+  val equal_var : var -> var -> (Boolean.var, _) Checked.t
+
   include Bits_intf.S with type t := t
 end
 

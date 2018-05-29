@@ -262,7 +262,6 @@ module Make
     let step' t (transition : Transition.t) : t Deferred.t =
       let state = t.state.data in
       let proof = t.state.proof in
-
       let next_difficulty =
         Difficulty.next
           state.next_difficulty
@@ -277,7 +276,6 @@ module Make
         ; timestamp            = transition.timestamp
         }
       in
-
       let%map proof = Block_state_transition_proof.prove_zk_state_valid
         { old_state = state
         ; old_proof = proof
