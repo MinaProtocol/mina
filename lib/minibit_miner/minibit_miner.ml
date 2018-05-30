@@ -72,10 +72,10 @@ module Make
         if i = iterations
         then None
         else
-          let hash = State.create_pow next_state nonce in
-          if Difficulty.meets difficulty hash
-          then Some (next_state, nonce)
-          else go (Block_nonce.succ nonce) (i + 1)
+          match State.create_pow next_state nonce with
+          | Ok hash when Difficulty.meets difficulty hash ->
+            Some (next_state, nonce)
+          | _ -> go (Block_nonce.succ nonce) (i + 1)
       in
       go nonce0 0
     ;;
