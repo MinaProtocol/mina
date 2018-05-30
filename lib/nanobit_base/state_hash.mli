@@ -1,1 +1,1 @@
-include Data_hash.S
+include Data_hash.Full_size
