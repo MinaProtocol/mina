@@ -64,6 +64,11 @@ let negative_one =
   ; timestamp
   }
 
+let check cond msg =
+  if not cond
+  then Or_error.errorf "Blockchain_state.update: %s" msg
+  else Ok ()
+
 let update_unchecked : value -> Block.t -> value =
   fun state block ->
     let next_difficulty =
@@ -77,7 +82,15 @@ let update_unchecked : value -> Block.t -> value =
     ; timestamp = block.header.time
     }
 
-let zero = update_unchecked negative_one Block.genesis
+let zero =
+  let open Or_error.Let_syntax in
+  let block = Block.genesis in
+  let zero = update_unchecked negative_one block in
+  ignore
+    (Or_error.ok_exn
+       (Proof_of_work.create zero block.header.nonce));
+  zero
+
 let zero_hash = hash zero
 
 let bit_length =
@@ -90,8 +103,8 @@ let bit_length =
     ~timestamp:(fun acc _ _ -> acc + Block_time.bit_length)
 
 module Make_update (T : Transaction_snark.S) = struct
-  let update_exn state (block : Block.t) =
-    assert (
+  let update state (block : Block.t) =
+    let good_body =
       Ledger_hash.equal state.ledger_hash block.body.target_hash
       ||
       T.verify
@@ -100,12 +113,16 @@ module Make_update (T : Transaction_snark.S) = struct
           ~target:block.body.target_hash
           ~proof_type:Merge
           ~fee_excess:Currency.Amount.Signed.zero
-          ~proof:block.body.proof));
-    let next_state = update_unchecked state block in
-    let proof_of_work =
-      Proof_of_work.create next_state block.header.nonce
+          ~proof:block.body.proof)
     in
-    assert (Proof_of_work.meets_target_unchecked proof_of_work state.next_difficulty);
+    let open Or_error.Let_syntax in
+    let%bind () = check good_body "Bad body" in
+    let next_state = update_unchecked state block in
+    let%map () =
+      let%bind proof_of_work = Proof_of_work.create next_state block.header.nonce in
+      check (Proof_of_work.meets_target_unchecked proof_of_work state.next_difficulty)
+        "Did not meet target"
+    in
     next_state
 
   module Checked = struct
@@ -177,10 +194,10 @@ module Make_update (T : Transaction_snark.S) = struct
       end
     ;;
 
-    let meets_target (target : Target.Packed.var) (hash : Pedersen.Digest.Packed.var) =
+    let meets_target (target : Target.Packed.var) (pow : Proof_of_work.var) =
       if Insecure.check_target
       then return Boolean.true_
-      else Target.passes target hash
+      else Proof_of_work.meets_target_var pow target
 
     module Prover_state = struct
       type t =
@@ -240,18 +257,29 @@ module Make_update (T : Transaction_snark.S) = struct
           }
         in
         let%bind state_bits = to_bits new_state in
-        let%bind state_hash =
+        let%bind state_partial =
           Pedersen_hash.hash state_bits
             ~params:Pedersen.params
-            ~init:(0, Tick.Hash_curve.Checked.identity)
+            ~init:(Hash_prefix.length_in_bits, Hash_curve.Checked.identity)
         in
-        let%bind pow_hash =
+        let%bind state_hash =
+          Hash_curve.Checked.add_known
+            state_partial
+            Hash_prefix.blockchain_state.acc
+        in
+        let%bind pow =
+          let%bind pow_init =
+            Hash_curve.Checked.add_known
+              state_partial
+              Hash_prefix.proof_of_work.acc
+          in
           Pedersen_hash.hash (Block.Nonce.Unpacked.var_to_bits block.header.nonce)
             ~params:Pedersen.params
-            ~init:(List.length state_bits, state_hash)
+            ~init:(Hash_prefix.length_in_bits + List.length state_bits, pow_init)
           >>| Pedersen_hash.digest
+          >>= Proof_of_work.var_of_hash_packed
         in
-        let%bind meets_target = meets_target difficulty_packed pow_hash in
+        let%bind meets_target = meets_target difficulty_packed pow in
         let%map success = Boolean.(good_body && meets_target) in
         (State_hash.var_of_hash_packed (Pedersen_hash.digest state_hash), new_state, `Success success)
       end

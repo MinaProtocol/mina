@@ -413,7 +413,7 @@ module Merge = struct
     in
     let%bind states_and_excess_hash =
       let init =
-        ( Hash_prefix.length
+        ( Hash_prefix.length_in_bits
         , Hash_curve.Checked.if_value is_base
             ~then_:Hash_prefix.base_snark.acc
             ~else_:Hash_prefix.merge_snark.acc
@@ -426,7 +426,7 @@ module Merge = struct
       with_label __LOC__ begin
         Pedersen_hash.hash tock_vk
           ~params:Pedersen.params
-          ~init:(input_bits_length + Hash_prefix.length, states_and_excess_hash)
+          ~init:(input_bits_length + Hash_prefix.length_in_bits, states_and_excess_hash)
       end
     in
     let%bind input =
@@ -592,10 +592,8 @@ let check_tagged_transaction source target transaction handler =
   let top_hash = Base.top_hash source target excess in
   let open Tick in
   let main = handle (Base.main (Cvar.constant top_hash)) handler in
-  let (_s, (), passed) =
-    run_and_check (Checked.map main ~f:As_prover.return) prover_state
-  in
-  assert passed
+  assert (check main prover_state)
+;;
 
 let check_transition source target (t : Transition.t) handler =
   check_tagged_transaction source target
@@ -660,15 +658,16 @@ module Make (K : sig val keys : Keys0.t end) = struct
       Merge.main
       top_hash
 
-(* The curve pt corresponding to H(Amount.Signed.zero, wrap_vk)
+(* The curve pt corresponding to H(merge_prefix, _, _, Amount.Signed.zero, wrap_vk)
    (with starting point shifted over by 2 * digest_size so that
-   this can then be used to compute H(s1, s2, Amount.Signed.zero, wrap_vk) *)
-  let zero_and_vk_curve_pt =
+   this can then be used to compute H(merge_prefix, s1, s2, Amount.Signed.zero, wrap_vk) *)
+  let merge_prefix_and_zero_and_vk_curve_pt =
     let open Tick in
     let s =
-      Pedersen.State.create
-        ~bits_consumed:(Pedersen.Digest.size_in_bits * 2)
-        Pedersen.params
+      { Hash_prefix.merge_snark
+        with bits_consumed = Hash_prefix.merge_snark.bits_consumed
+                             + Pedersen.Digest.size_in_bits * 2
+      }
     in
     let s =
       Pedersen.State.update_fold s
@@ -694,9 +693,9 @@ module Make (K : sig val keys : Keys0.t end) = struct
     and s2 = Ledger_hash.var_to_bits s2
     in
     let%bind top_hash =
-      let (vx, vy) = zero_and_vk_curve_pt in
+      let (vx, vy) = merge_prefix_and_zero_and_vk_curve_pt in
       Pedersen_hash.hash ~params:Pedersen.params
-        ~init:(0, (Cvar.constant vx, Cvar.constant vy))
+        ~init:(Hash_prefix.length_in_bits, (Cvar.constant vx, Cvar.constant vy))
         (s1 @ s2)
       >>| Pedersen_hash.digest
       >>= Pedersen.Digest.choose_preimage_var
