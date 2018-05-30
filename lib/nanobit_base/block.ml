@@ -132,12 +132,12 @@ let hash t =
 
 let genesis : t =
   let time =
-    Time.of_date_ofday ~zone:Time.Zone.utc (Date.create_exn ~y:2018 ~m:Month.Feb ~d:1)
+    Time.of_date_ofday ~zone:Time.Zone.utc (Date.create_exn ~y:2018 ~m:Month.Feb ~d:2)
       Time.Ofday.start_of_day
     |> Block_time.of_time
   in
   { header =
-      { nonce = Nonce.zero
+      { nonce = Nonce.(succ (succ (succ zero)))
       ; time
       }
   ; body =

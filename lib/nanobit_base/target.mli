@@ -25,8 +25,6 @@ include Snarkable.Bits.Faithful
    and type Packed.value = t
    and type Packed.var = private Cvar.t
 
-val passes : Packed.var -> Pedersen.Digest.Packed.var -> (Boolean.var, _) Tick.Checked.t
-
 val var_to_unpacked : Cvar.t -> (Unpacked.var, _) Tick.Checked.t
 
 val constant : Packed.value -> Packed.var

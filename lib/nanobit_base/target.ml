@@ -55,8 +55,4 @@ module Bits = Bits.Small(Tick.Field)(Tick.Bigint)(struct let bit_length = bit_le
 open Tick
 open Let_syntax
 
-let passes t h =
-  let%map { less; _ } = Checked.compare ~bit_length h t in
-  less
-
 let var_to_unpacked (x : Cvar.t) = Checked.unpack ~length:bit_length x

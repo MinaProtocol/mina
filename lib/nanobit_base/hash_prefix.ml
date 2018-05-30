@@ -1,6 +1,8 @@
 open Core_kernel
 
-let length = 20
+let length_in_bytes = 20
+
+let length_in_bits = 8 * length_in_bytes
 
 module T : sig
   type t = private string
@@ -12,9 +14,11 @@ end = struct
 
   let create s : t =
     let string_length = String.length s in
-    assert (string_length <= length);
-    let diff = length - string_length in
-    s ^ String.init diff ~f:(fun _ -> padding_char)
+    assert (string_length <= length_in_bytes);
+    let diff = length_in_bytes - string_length in
+    let r = s ^ String.init diff ~f:(fun _ -> padding_char) in
+    assert (String.length r = length_in_bytes);
+    r
 end
 
 let salt s =

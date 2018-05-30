@@ -1,6 +1,6 @@
 open Snark_params
 
-val length : int
+val length_in_bits : int
 
 val blockchain_state : Tick.Pedersen.State.t
 
