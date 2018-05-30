@@ -12,5 +12,5 @@ let fee_collection          = true
 let signature_hash_function = true
 let initial_difficulty      = true
 (* Enabling this will SPEED UP builds as keys are generated at compile-time *)
-let key_generation = false
+let key_generation = true
 
