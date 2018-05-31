@@ -15,6 +15,8 @@ module type S = sig
 
   val succ : t -> t
 
+  val of_int : int -> t
+
   (* Someday: I think this only does ones greater than zero, but it doesn't really matter for
     selecting the nonce *)
   val random : unit -> t

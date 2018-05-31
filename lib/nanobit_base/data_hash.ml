@@ -174,5 +174,8 @@ module Make_small (M : sig val bit_length : int end) = struct
   let of_hash x =
     if Bignum.Bigint.(<=) Bigint.(to_bignum_bigint (of_field x)) max
     then Ok x
-    else Or_error.errorf !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} too large" x
+    else
+      Or_error.errorf
+        !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > %{sexp:Bignum.Bigint.t}"
+        x max
 end

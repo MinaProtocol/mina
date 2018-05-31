@@ -137,7 +137,7 @@ let genesis : t =
     |> Block_time.of_time
   in
   { header =
-      { nonce = Nonce.(succ (succ (succ zero)))
+      { nonce = Nonce.of_int 193
       ; time
       }
   ; body =
