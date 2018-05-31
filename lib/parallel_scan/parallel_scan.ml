@@ -89,6 +89,14 @@ module State1 = struct
 = fun t ~spec ds ->
     let open Job in
     let module Spec = (val spec : Spec_intf with type Data.t = d and type Accum.t = a and type Output.t = b) in
+    let jobs_string t =
+      (Ring_buffer.sexp_of_t
+        (Job.sexp_of_t Spec.Accum.sexp_of_t Spec.Data.sexp_of_t)
+        t.jobs) |> Sexp.to_string_hum
+    in
+    let data_buffer_string t =
+      Queue.sexp_of_t Spec.Data.sexp_of_t t.data_buffer |> Sexp.to_string_hum
+    in
     let step () =
       let fill_job dir z job =
         let open Direction in
@@ -117,13 +125,7 @@ module State1 = struct
               t.acc <- acc';
               Merge_up None
           | Merge (Some _, None)
-          | Merge (None, Some _) ->
-              let jobs_string t =
-                (Ring_buffer.sexp_of_t
-                  (Job.sexp_of_t Spec.Accum.sexp_of_t Spec.Data.sexp_of_t)
-                  t.jobs) |> Sexp.to_string_hum
-              in
-              failwithf !"impossible: We'll always have a complete merge %s\n%!" (jobs_string t) ()
+          | Merge (None, Some _) -> (* only happens in the beginning *) return job
           | Merge (Some x, Some y) ->
               let%bind z = Spec.Accum.(+) x y in
               let%map () = rewrite i z in
@@ -139,8 +141,11 @@ module State1 = struct
     let last_acc = t.acc in
     let%map () = List.fold ~init:(return ()) ds ~f:(fun acc d ->
       let%bind () = acc in
+      printf !"BEFORE: %s;; %s\n%!" (jobs_string t) (data_buffer_string t);
       let%bind () = step () in
+      printf !"AFTER1: %s;; %s\n%!" (jobs_string t) (data_buffer_string t);
       let%map () = step () in
+      printf !"AFTER2: %s;; %s\n%!" (jobs_string t) (data_buffer_string t);
       Queue.enqueue t.data_buffer d;
     ) in
     if not (Spec.Output.equal last_acc t.acc) then
@@ -240,6 +245,7 @@ let%test_module "scan (+) over ints" = (module struct
 
   let spec = (module Spec : Spec_intf with type Data.t = Int64.t and type Accum.t = Int64.t and type Output.t = Int64.t)
 
+  (*
   let%test_unit "scan can be initialized from intermediate state" =
     Quickcheck.test ~trials:10 ~sexp_of:[%sexp_of: (Int64.t, Int64.t, Int64.t) State.t]
       (State1.gen
@@ -292,8 +298,11 @@ let%test_module "scan (+) over ints" = (module struct
             assert (acc_plus_one = Int64.(+) acc Int64.one)
           )
         )
+*)
+end)
 
-  module Spec1 = struct
+let%test_module "scan (+) over ints, map from string" = (module struct
+  module Spec = struct
     module Data = struct
       type t = string [@@deriving sexp_of]
     end
@@ -312,7 +321,7 @@ let%test_module "scan (+) over ints" = (module struct
     let merge t t' = Int64.(+) t t' |> return
   end
 
-  let spec1 = (module Spec1 : Spec_intf with type Data.t = string and type Accum.t = Int64.t and type Output.t = Int64.t)
+  let spec = (module Spec : Spec_intf with type Data.t = string and type Accum.t = Int64.t and type Output.t = Int64.t)
 
   let%test_unit "scan behaves like a fold long-term" =
     let a_bunch_of_ones_then_zeros x =
@@ -324,22 +333,78 @@ let%test_module "scan (+) over ints" = (module struct
         in
         go x)
     in
+    let n = 20 in
     let result =
       scan ~init:Int64.zero
-        ~data:(a_bunch_of_ones_then_zeros 100)
-        ~spec:spec1
-        ~parallelism_log_2:5
+        ~data:(a_bunch_of_ones_then_zeros n)
+        ~spec
+        ~parallelism_log_2:3
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
       let%map after_300 =
-        List.init 300 ~f:(fun _ -> ()) |>
+        List.init (3*n) ~f:(fun _ -> ()) |>
           Deferred.List.foldi ~init:Int64.zero ~f:(fun i acc _ ->
               match%map Linear_pipe.read result with
               | `Eof -> acc
               | `Ok (Some v, s) -> v
               | `Ok (None, _) -> acc)
       in
-      let expected = List.fold (List.init 100 ~f:(fun _ -> Int64.one)) ~init:Int64.zero ~f:Int64.(+) in
+      let expected = List.fold (List.init n ~f:(fun _ -> Int64.one)) ~init:Int64.zero ~f:Int64.(+) in
+      printf !"\nExpected: %{sexp: Int64.t}\nButFound: %{sexp: Int64.t}\n\n%!" expected after_300;
+      assert (after_300 = expected)
+    )
+end)
+
+let%test_module "scan (concat) over strings" = (module struct
+  module Spec = struct
+    module Data = struct
+      type t = string [@@deriving sexp_of]
+    end
+
+    module Accum = struct
+      type t = string [@@deriving sexp_of]
+      (* Semigroup+deferred *)
+      let ( + ) t t' = String.(^) t t' |> return
+    end
+
+    module Output = struct
+      type t = string [@@deriving sexp_of, eq]
+    end
+
+    let map x = return x
+    let merge t t' = String.(^) t t' |> return
+  end
+
+  let spec = (module Spec : Spec_intf with type Data.t = string and type Accum.t = string and type Output.t = string)
+
+  let%test_unit "scan performs operation in correct order with non-commutative semigroup" =
+    let a_bunch_of_ones_then_empties x =
+      Linear_pipe.create_reader ~close_on_exception:true (fun w ->
+        let rec go count max =
+          let next = if count <= 0 then "" else Int.to_string (max - count) ^ "," in
+          let%bind () = Pipe.write w next in
+          go (count-1) max
+        in
+        go x x)
+    in
+    let n = 40 in
+    let result =
+      scan ~init:""
+        ~data:(a_bunch_of_ones_then_empties n)
+        ~spec
+        ~parallelism_log_2:4
+    in
+    Async.Thread_safe.block_on_async_exn (fun () ->
+      let%map after_300 =
+        List.init (3*n) ~f:(fun _ -> ()) |>
+          Deferred.List.foldi ~init:"" ~f:(fun i acc _ ->
+              match%map Linear_pipe.read result with
+              | `Eof -> acc
+              | `Ok (Some v, s) -> v
+              | `Ok (None, _) -> acc)
+      in
+      let expected = List.fold (List.init n ~f:(fun i -> Int.to_string i ^ ",")) ~init:"" ~f:String.(^) in
+      printf "\nExpected %s\nButFound %s\n\n" expected after_300;
       assert (after_300 = expected)
     )
 end)
