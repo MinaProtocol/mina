@@ -41,13 +41,7 @@ type var =
   , Block_time.Unpacked.var
   ) t_
 
-type value =
-  ( Target.Unpacked.value
-  , State_hash.t
-  , Ledger_hash.t
-  , Strength.Unpacked.value
-  , Block_time.Unpacked.value
-  ) t_
+type value = t
 
 let to_hlist { next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } =
   H_list.([ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp ])
@@ -107,9 +101,12 @@ let compute_target timestamp (previous_target : Target.t) time =
 
 let negative_one =
   let next_difficulty : Target.Unpacked.value =
-    Target.of_bigint
-      Bignum.Bigint.(
-        Target.(to_bigint max) / pow (of_int 2) (of_int 4))
+    if Insecure.initial_difficulty
+    then Target.max
+    else
+      Target.of_bigint
+        Bignum.Bigint.(
+          Target.(to_bigint max) / pow (of_int 2) (of_int 4))
   in
   let timestamp =
     Block_time.of_time
@@ -173,21 +170,25 @@ let bit_length =
 
 module Make_update (T : Transaction_snark.S) = struct
   let update_exn state (block : Block.t) =
-    assert
-      (Transaction_snark.create
-        ~source:state.ledger_hash
-        ~target:block.body.target_hash
-        ~proof_type:Merge
-        ~fee_excess:Currency.Amount.Signed.zero
-        ~proof:block.body.proof
-        |> T.verify);
+    assert (
+      Ledger_hash.equal state.ledger_hash block.body.target_hash
+      ||
+      T.verify
+        (Transaction_snark.create
+          ~source:state.ledger_hash
+          ~target:block.body.target_hash
+          ~proof_type:Merge
+          ~fee_excess:Currency.Amount.Signed.zero
+          ~proof:block.body.proof));
+    let next_state = update_unchecked state block in
     let hash =
       Pedersen.hash_fold Pedersen.params
         (List.fold
-           (to_bits_unchecked state @ Block.Nonce.Bits.to_bits block.header.nonce))
+           (to_bits_unchecked next_state
+            @ Block.Nonce.Bits.to_bits block.header.nonce))
     in
     assert (Target.meets_target_unchecked state.next_difficulty ~hash);
-    update_unchecked state block
+    next_state
 
   module Checked = struct
     let compute_target prev_time prev_target time =
@@ -270,14 +271,38 @@ module Make_update (T : Transaction_snark.S) = struct
       [@@deriving fields]
     end
 
+    (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
+  Input:
+    old : Blockchain.t
+    old_snark : proof
+    nonce : int
+    work_snark : proof
+    ledger_hash : Ledger_hash.t
+    timestamp : Time.t
+    new_hash : State_hash.t
+  Witness:
+    transition : Transition.t
+  such that
+    the old_snark verifies against old
+    new = update_with_asserts(old, nonce, timestamp, ledger_hash)
+    hash(new) = new_hash
+    the work_snark verifies against the old.ledger_hash and new_ledger_hash
+    new.timestamp > old.timestamp
+    hash(new_hash||nonce) < target(old.next_difficulty)
+    *)
     let update ((previous_state_hash, previous_state) : State_hash.var * var) (block : Block.var)
       : (State_hash.var * var * [ `Success of Boolean.var ], _) Tick.Checked.t
       =
       with_label __LOC__ begin
         let%bind good_body =
-          T.verify_complete_merge
-            previous_state.ledger_hash block.body.target_hash
-            (As_prover.return block.body.proof)
+          let%bind correct_transaction_snark =
+            T.verify_complete_merge
+              previous_state.ledger_hash block.body.target_hash
+              (As_prover.return block.body.proof)
+          and ledger_hash_didn't_change =
+            Ledger_hash.equal_var previous_state.ledger_hash block.body.target_hash
+          in
+          Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
         in
         let difficulty = previous_state.next_difficulty in
         let difficulty_packed = Target.pack_var difficulty in
@@ -323,6 +348,7 @@ module Checked = struct
          (State_hash.var_to_hash_packed h))
 
   let hash (t : var) =
-    with_label __LOC__ (to_bits t >>= hash_digest >>| State_hash.var_of_hash_packed)
+    with_label __LOC__
+      (to_bits t >>= hash_digest >>| State_hash.var_of_hash_packed)
 end
 

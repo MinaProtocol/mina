@@ -197,6 +197,7 @@ let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t l
   Parallel.init_master ();
   let config =
     Map_reduce.Config.create
+      ~local:1
       ~redirect_stderr:(`File_append (conf_dir ^/ "bundle-stderr"))
       ~redirect_stdout:(`File_append (conf_dir ^/ "bundle-stdout"))
       ()
@@ -236,14 +237,16 @@ let create ~conf_dir ledger (transactions : Transaction.With_valid_signature.t l
              That is, the error case here is actually unexpected and we
              should construct the system so that it does not occur.
           *)
+          let sparse_ledger =
+            Sparse_ledger.of_ledger_subset_exn ledger
+              [ Public_key.compress sender; payload.receiver ]
+          in
           begin match Ledger.apply_transaction ledger tx with
           | Error _s -> go inputs total_fees txs
           | Ok () ->
             let input : Input.t =
               { transition = Transaction tx
-              ; ledger = 
-                  Sparse_ledger.of_ledger_subset_exn ledger
-                    [ Public_key.compress sender; payload.receiver ]
+              ; ledger = sparse_ledger
               ; target_hash = Ledger.merkle_root ledger
               }
             in

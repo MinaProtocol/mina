@@ -234,7 +234,7 @@ module Base = struct
         ((tag, { sender; signature; payload }) : Tagged_transaction.var) =
     with_label __LOC__ begin
       (if not Insecure.transaction_replay
-      then failwith "Insecure.transaction_replay false");
+       then failwith "Insecure.transaction_replay false");
       let { Transaction.Payload.receiver; amount; fee; nonce } = payload in
       let is_fee_transfer = Tag.Checked.is_fee_transfer tag in
       let is_normal = Tag.Checked.is_normal tag in
