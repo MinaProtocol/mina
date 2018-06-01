@@ -1,15 +1,7 @@
 open Core_kernel
+open Util
 
 let pow2 n = Bignum.Bigint.(pow (of_int 2) (of_int n))
-
-let bigint_num_bits =
-  let rec go acc i =
-    if Bignum.Bigint.(acc = zero)
-    then i
-    else go (Bignum.Bigint.shift_right acc 1) (i + 1)
-  in
-  fun n -> go n 0
-;;
 
 module Make (Impl : Snark_intf.Basic) = struct
   open Impl

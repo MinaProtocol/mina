@@ -1,4 +1,5 @@
 open Core_kernel
+open Util
 
 module type Params_intf = sig
   type field
@@ -169,6 +170,8 @@ module Edwards = struct
 
     val scale : value -> Scalar.value -> value
 
+    val is_on_subgroup : value -> bool
+
     module Checked : sig
       val generator : var
       val identity : var
@@ -182,10 +185,12 @@ module Edwards = struct
       module Assert : sig
         val equal : var -> var -> (unit, _) checked
         val on_curve : var -> (unit, _) checked
+        val on_subgroup : var -> (unit, _) checked
       end
 
       val scale : var -> Scalar.var -> (var, _) checked
       val scale_known : value -> Scalar.var -> (var, _) checked
+      val scale_known_scalar : var -> Scalar.value -> num_bits:int -> (var, _) checked
     end
   end
 
@@ -194,6 +199,7 @@ module Edwards = struct
       (Scalar : Scalar_intf
        with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
         and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+        and type value = Bignum.Bigint.t
         and type boolean_var := Impl.Boolean.var
         and type var = Impl.Boolean.var list)
       (Basic : Basic.S with type field := Impl.Field.t)
@@ -220,11 +226,12 @@ module Edwards = struct
 
     let identity_value = identity
 
-    (* TODO: Assert quadratic non-residuosity of Params.d *)
+    let () = assert (not (Field.is_square Params.d))
 
-    let scale x s =
+    (* Someday: This is pretty inefficient *)
+    let scale_unchecked x s ~num_bits =
       let rec go i two_to_the_i_x acc =
-        if i >= Scalar.length
+        if i >= num_bits
         then acc
         else 
           let acc' =
@@ -236,44 +243,64 @@ module Edwards = struct
       in
       go 0 x identity_value
 
-    let assert_on_curve (x, y) =
-      let open Let_syntax in
-      let%bind x2 = Checked.mul x x
-      and y2      = Checked.mul y y in
-      let open Cvar.Infix in
-      assert_r1cs
-        (Params.d * x2)
-        y2
-        (x2 + y2 - Cvar.constant Field.one)
-    ;;
+    let scale = scale_unchecked ~num_bits:Scalar.length
 
-    let typ_unchecked : (var, value) Typ.t =
-      Typ.(tuple2 field field)
-
-    let typ : (var, value) Typ.t =
-      (* TODO: Check if in subgroup? *)
-      { typ_unchecked with check = assert_on_curve }
-    ;;
+    let typ_unchecked : (var, value) Typ.t = Typ.(tuple2 field field)
 
     let double_value = double
+
+    let cofactor_inverse_mod_subgroup_order =
+      let (gcd, x, y) = euclid Params.cofactor Params.order in
+      assert Bignum.Bigint.(gcd = one);
+      assert Bignum.Bigint.(one = x * Params.cofactor + y * Params.order);
+      let x = Bignum.Bigint.(x % Params.order) in
+      assert (Bignum.Bigint.is_non_negative x);
+      assert Bignum.Bigint.(x * Params.cofactor % Params.order = one);
+      x
+
+    let is_on_subgroup =
+      (*
+         Let [G] be the entire group of rational points of this curve.
+         We have [G = H * < g >] (where [g = Params.generator] is an
+         element of prime order [p = Params.order] and [|H| = Params.cofactor].
+
+         Let [c = Params.cofactor] and [d = 1 / c mod p] (i.e., [d = cofactor_inverse_mod_subgroup_order]).
+         This means that [cd = kp + 1] for some [k].
+
+         Let's see how to check if [x : G] is in [< g >].
+         By the above we have [x = h g^r] for some [h : H] and [r].
+         Let [y = x^{cd}]. We have
+
+         y
+         = x^{cd}
+         = h^{cd} g^{r * cd}
+         = (h^c)^d (g^{cd})^r
+         = 1^d (g^{kp + 1})^r
+         = (g^{kp} g)^r
+         = g^r
+
+         (Here we use the fact that [h] has order dividing [c] and [g] has order [p].)
+         Thus we have [x : < g >] iff [h = 1] iff [x = y].
+      *)
+      let s = Bignum.Bigint.(Params.cofactor * cofactor_inverse_mod_subgroup_order) in
+      let num_bits = bigint_num_bits s in
+      fun x -> equal x (scale_unchecked ~num_bits x s)
+
+
+    (* TODO: Come up with a way to test off subgroup points as well. *)
+    let%test_unit "on_subgroup" =
+      let subgroup_pt =
+        let open Quickcheck.Generator in
+        Bignum.Bigint.(gen_incl zero Params.order) >>| fun s ->
+        scale generator s
+      in
+      Quickcheck.test subgroup_pt ~f:(fun x -> assert (is_on_subgroup x))
 
     module Checked = struct
       open Let_syntax
 
       let identity = var_of_value identity_value
       let generator = var_of_value generator
-
-      module Assert = struct
-        let on_curve = assert_on_curve
-
-        let equal (x1, y1) (x2, y2) =
-          let%map () = assert_equal x1 x2
-          and () = assert_equal y1 y2 in
-          ()
-        ;;
-
-        let not_identity (x, y) = failwith ""
-      end
 
       (* TODO: Optimize -- could probably shave off one constraint. *)
       let add (x1, y1) (x2, y2) =
@@ -323,9 +350,9 @@ module Edwards = struct
         fun b ~then_ ~else_ ->
           with_label "Edwards.Checked.if_" begin
             let%bind r =
-              provide_witness typ As_prover.(Let_syntax.(
+              provide_witness typ_unchecked As_prover.(Let_syntax.(
                 let%bind b = read Boolean.typ b in
-                read typ (if b then then_ else else_)))
+                read typ_unchecked (if b then then_ else else_)))
             in
           (*     r - e = b (t - e) *)
             let%map () =
@@ -366,6 +393,57 @@ module Edwards = struct
             go 1 acc pt bs
         end
       ;;
+
+      let scale_known_scalar t (c : Scalar.value) ~num_bits =
+        with_label "Edwards.Checked.scale_known_scalar" begin
+          let rec go i acc pt =
+            if i >= num_bits
+            then return acc
+            else
+              let%bind acc' =
+                if Scalar.test_bit c i
+                then add acc pt
+                else return acc
+              and pt' = double pt
+              in
+              go (i + 1) acc' pt'
+          in
+          if num_bits = 0
+          then failwith "Edwards.Checked.scale_known_scalar: Empty bits"
+          else
+            let b = Scalar.test_bit c 0 in
+            let acc = if b then t else identity in
+            let%bind pt = double t in
+            go 1 acc pt
+        end
+
+      let gen =
+        let open Quickcheck.Generator in
+        let open Let_syntax in
+        let field =
+          let%map x = Bignum.Bigint.(gen_incl zero Field.size) in
+          Bigint.(to_field (of_bignum_bigint x))
+        in
+        filter_map field ~f:(fun x ->
+          Option.map (find_y x) ~f:(fun y ->
+            let%map b = Bool.gen in
+            if b then (x, y) else (x, Field.negate y)))
+        |> join
+
+      let%test_unit "scale-known-scalar" =
+        let module T = Test_util.Make(Impl) in
+        let open Quickcheck in
+        let gen =
+          Generator.tuple3
+            gen
+            Bignum.Bigint.(gen_incl zero Params.order)
+            (Int.gen_incl 1 (bigint_num_bits Params.order))
+        in
+        Quickcheck.test gen ~f:(fun (pt, s, num_bits) ->
+          T.test_equal ~equal typ_unchecked typ_unchecked
+            (fun pt -> scale_known_scalar pt ~num_bits s)
+            (fun pt -> scale_unchecked pt ~num_bits s)
+            pt)
 
       (* TODO: Unit test *)
       let cond_add ((x2, y2) : value) ~to_:((x1, y1) : var) ~if_:(b : Boolean.var) : (var, _) Checked.t =
@@ -427,15 +505,76 @@ module Edwards = struct
             go 1 acc (double_value t) bs
         end
       ;;
-    end
-  end
 
+      module Assert = struct
+        let on_curve (x, y) =
+          let open Let_syntax in
+          let%bind x2 = Checked.mul x x
+          and y2      = Checked.mul y y in
+          let open Cvar.Infix in
+          assert_r1cs
+            (Params.d * x2)
+            y2
+            (x2 + y2 - Cvar.constant Field.one)
+
+        let equal (x1, y1) (x2, y2) =
+          let%map () = assert_equal x1 x2
+          and () = assert_equal y1 y2 in
+          ()
+
+        let not_identity =
+          assert (not (Field.(equal Params.d one)));
+          (* Let (x, y) be a point on the curve.
+             Claim:
+             To check if (x, y) is not the identity it is sufficient to check y != 1.
+             This is essentially because y = 1 implies x = 0 (which implies (x, y) is the identity).
+
+             First, it is clear that if y != 1, then (x, y) is not the identity since
+             the identity is (0, 1).
+
+             Conversely suppose (x, y) is not the identity. This means either x != 0 or y != 1.
+             If y != 1, we're done. Otherwise x != 0 and y = 1. (x, y) is on the curve so we have
+
+             x^2 + y^2 = 1 + dx^2 y^2
+             x^2 + 1 = 1 + dx^2
+             x^2 = dx^2
+
+             Which implies x = 0 since d != 1. This is in contradiction to x != 0, so in fact
+             we must have y != 1. *)
+          fun (x, y) ->
+            Checked.Assert.not_equal y (Cvar.constant Field.one)
+
+        let typ_on_curve : (var, value) Typ.t =
+          { typ_unchecked with check = on_curve }
+
+        let cofactor_inverse_num_bits = bigint_num_bits cofactor_inverse_mod_subgroup_order
+
+        let cofactor_num_bits = bigint_num_bits Params.cofactor
+
+        let move_to_subgroup pt =
+          scale_known_scalar pt Params.cofactor ~num_bits:cofactor_num_bits
+
+        let on_subgroup =
+          fun pt ->
+            let%bind on_curve_preimage =
+              provide_witness typ_on_curve As_prover.(
+                map (read typ_unchecked pt) ~f:(fun t ->
+                  scale_unchecked ~num_bits:cofactor_inverse_num_bits
+                    t cofactor_inverse_mod_subgroup_order))
+            in
+            move_to_subgroup on_curve_preimage >>= equal pt
+      end
+    end
+
+    let typ : (var, value) Typ.t =
+      { typ_unchecked with check = Checked.Assert.on_subgroup }
+  end
 
   module Make
       (Impl : Snark_intf.S)
       (Scalar : sig
         type var = Impl.Boolean.var list
-        type value
+        type value = Bignum.Bigint.t
         val test_bit : value -> int -> bool
         val length : int
         val typ : (var, value) Impl.Typ.t

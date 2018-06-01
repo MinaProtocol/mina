@@ -13,7 +13,10 @@ include Stable.V1
 let (=) = equal
 
 type var = Tick.Field.var * Tick.Field.var
-let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
+let typ_unchecked : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
+
+(* This checks that the point is in the subgroup *)
+let typ = Tick.Signature_curve.typ
 
 (* TODO: We can move it onto the subgroup during account creation. No need to check with
   every transaction *)
@@ -75,13 +78,17 @@ open Let_syntax
 
 let parity y = Bigint.(test_bit (of_field y) 0)
 
-let decompress ({ x; is_odd } : Compressed.t) =
-  Option.map (Signature_curve.find_y x) ~f:(fun y ->
-    let y_parity = parity y in
-    let y =
-      if Bool.(is_odd = y_parity) then y else Field.negate y
-    in
-    (x, y))
+let decompress =
+  let decompress ({ x; is_odd } : Compressed.t) =
+    Option.map (Signature_curve.find_y x) ~f:(fun y ->
+      let y_parity = parity y in
+      let y =
+        if Bool.(is_odd = y_parity) then y else Field.negate y
+      in
+      (x, y))
+  in
+  fun t ->
+    Option.filter ~f:Signature_curve.is_on_subgroup (decompress t)
 
 let decompress_exn t = Option.value_exn (decompress t)
 
@@ -96,12 +103,13 @@ let decompress_var ({ x; is_odd } as c : Compressed.var) =
         map (read Compressed.typ c) ~f:(fun c ->
           snd (decompress_exn c)))
   in
-  let%map () = Signature_curve.Checked.Assert.on_curve (x, y)
+  let%map () = Signature_curve.Checked.Assert.on_subgroup (x, y)
   and () = parity_var y >>= Boolean.Assert.((=) is_odd)
   in
   (x, y)
 
-let compress ((x, y) : t) : Compressed.t = { x; is_odd = parity y }
+let compress ((x, y) : t) : Compressed.t =
+  { x; is_odd = parity y }
 
 let compress_var ((x, y) : var) : (Compressed.var, _) Checked.t =
   with_label __LOC__ begin
