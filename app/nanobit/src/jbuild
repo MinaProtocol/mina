@@ -16,6 +16,7 @@
       minibit
       protocols
       nanobit_base
+      proof_of_work
       sparse_ledger
       blockchain_snark
       transaction_snark

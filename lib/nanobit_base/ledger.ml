@@ -5,20 +5,15 @@ open Currency
 include Merkle_ledger.Ledger.Make
     (Account)
     (struct
-      type hash = Tick.Pedersen.Digest.t [@@deriving sexp, hash, compare, bin_io]
+      type hash = Tick.Pedersen.Digest.t
+      [@@deriving sexp, hash, compare, bin_io]
 
       let empty_hash =
         Tick.Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
 
-      let merge t1 t2 =
-        let open Tick.Pedersen in
-        hash_fold params (fun ~init ~f ->
-          let init = Digest.Bits.fold t1 ~init ~f in
-          Digest.Bits.fold t2 ~init ~f)
+      let merge = Merkle_hash.merge
 
-      let hash_account account =
-        Tick.Pedersen.hash_fold Tick.Pedersen.params
-          (Account.fold_bits account)
+      let hash_account = Account.digest
     end)
     (Public_key.Compressed)
     (struct let depth = ledger_depth end)

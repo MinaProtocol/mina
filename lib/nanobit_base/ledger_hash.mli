@@ -3,7 +3,7 @@ open Snark_params
 open Snarky
 open Tick
 
-include Data_hash.S
+include Data_hash.Full_size
 
 type path = Pedersen.Digest.t list
 

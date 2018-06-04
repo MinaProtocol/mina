@@ -1,15 +1,14 @@
 open Core
+open Util
 open Snark_params.Tick
 
-module type S = sig
+module type Basic = sig
   type t = private Pedersen.Digest.t
   [@@deriving sexp, eq]
 
   val bit_length : int
 
   val (=) : t -> t -> bool
-
-  val of_hash : Pedersen.Digest.t -> t
 
   module Stable : sig
     module V1 : sig
@@ -22,7 +21,6 @@ module type S = sig
   type var
 
   val var_of_hash_unpacked : Pedersen.Digest.Unpacked.var -> var
-  val var_of_hash_packed : Pedersen.Digest.Packed.var -> var
 
   val var_to_hash_packed : var -> Pedersen.Digest.Packed.var
 
@@ -37,7 +35,23 @@ module type S = sig
   include Bits_intf.S with type t := t
 end
 
-module Make () = struct
+module type Full_size = sig
+  include Basic
+
+  val var_of_hash_packed : Pedersen.Digest.Packed.var -> var
+
+  val of_hash : Pedersen.Digest.t -> t
+end
+
+module type Small = sig
+  include Basic
+
+  val var_of_hash_packed : Pedersen.Digest.Packed.var -> (var, _) Checked.t
+
+  val of_hash : Pedersen.Digest.t -> t Or_error.t
+end
+
+module Make_basic (M : sig val bit_length : int end) = struct
   module Stable = struct
     module V1 = struct
       module T = struct
@@ -51,7 +65,7 @@ module Make () = struct
 
   include Stable.V1
 
-  let bit_length = Field.size_in_bits
+  let bit_length = M.bit_length
 
   let (=) = equal
 
@@ -60,7 +74,8 @@ module Make () = struct
     ; mutable bits : Boolean.var Bitstring.Lsb_first.t option
     }
 
-  let var_of_hash_packed digest = { digest; bits = None }
+  open Let_syntax
+
   let var_of_hash_unpacked unpacked =
     { digest = Pedersen.Digest.project_var unpacked
     ; bits = Some (Bitstring.Lsb_first.of_list (Pedersen.Digest.Unpacked.var_to_bits unpacked))
@@ -68,17 +83,21 @@ module Make () = struct
 
   let var_to_hash_packed { digest; _ } = digest
 
+  (* TODO: Audit this usage of choose_preimage *)
+  let unpack =
+    if Int.(=) bit_length Field.size_in_bits
+    then
+      (fun x -> Pedersen.Digest.choose_preimage_var x
+        >>| Pedersen.Digest.Unpacked.var_to_bits)
+    else Checked.unpack ~length:bit_length
+
   let var_to_bits t =
-    let open Let_syntax in
     with_label __LOC__ begin
       match t.bits with
       | Some bits ->
         return (bits :> Boolean.var list)
       | None ->
-        let%map bits =
-          Pedersen.Digest.choose_preimage_var t.digest
-          >>| Pedersen.Digest.Unpacked.var_to_bits
-        in
+        let%map bits = unpack t.digest in
         t.bits <- Some (Bitstring.Lsb_first.of_list bits);
         bits
     end
@@ -129,7 +148,34 @@ module Make () = struct
     ; alloc
     ; check
     }
+end
+
+module Make_full_size () = struct
+  include Make_basic(struct let bit_length = Field.size_in_bits end)
+
+  let var_of_hash_packed digest = { digest; bits = None }
 
   let of_hash = Fn.id
 end
 
+module Make_small (M : sig val bit_length : int end) = struct
+  let () = assert (M.bit_length < Field.size_in_bits)
+
+  include Make_basic(M)
+
+  open Let_syntax
+
+  let var_of_hash_packed digest =
+    let%map bits = unpack digest in
+    { digest; bits = Some (Bitstring.Lsb_first.of_list bits) }
+
+  let max = Bignum.Bigint.(two_to_the bit_length - one)
+
+  let of_hash x =
+    if Bignum.Bigint.(<=) Bigint.(to_bignum_bigint (of_field x)) max
+    then Ok x
+    else
+      Or_error.errorf
+        !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > %{sexp:Bignum.Bigint.t}"
+        x max
+end

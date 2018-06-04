@@ -115,7 +115,7 @@ module type State_intf  = sig
 
   val hash : t -> state_hash
 
-  val create_pow : t -> nonce -> pow
+  val create_pow : t -> nonce -> pow Or_error.t
 end
 
 module type Transition_intf  = sig

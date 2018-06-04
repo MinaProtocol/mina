@@ -35,7 +35,7 @@ module Make_inputs0
   module Block_nonce = Nanobit_base.Block.Nonce
   module Difficulty = Difficulty
 
-  module Pow = Snark_params.Tick.Pedersen.Digest
+  module Pow = Proof_of_work
 
   module Strength = Strength
   module Ledger = struct

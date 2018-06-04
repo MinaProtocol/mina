@@ -34,10 +34,6 @@ let of_bigint n =
   assert (Bigint.compare x max_bigint <= 0);
   Bigint.to_field x
 
-let meets_target_unchecked t ~hash =
-  Bigint.(compare (of_field hash) (of_field t)) < 0
-;;
-
 let assert_mem x xs =
   let open Tick in
   let open Let_syntax in
@@ -58,9 +54,5 @@ module Bits = Bits.Small(Tick.Field)(Tick.Bigint)(struct let bit_length = bit_le
 
 open Tick
 open Let_syntax
-
-let passes t h =
-  let%map { less; _ } = Checked.compare ~bit_length h t in
-  less
 
 let var_to_unpacked (x : Cvar.t) = Checked.unpack ~length:bit_length x

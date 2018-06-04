@@ -39,6 +39,8 @@ module type S = sig
 
     val update_bigstring : t -> Bigstring.t -> t
 
+    val update_string : t -> string -> t
+
     val update_fold
       : t -> fold -> t
 
@@ -48,9 +50,12 @@ module type S = sig
       -> t
 
     val digest : t -> Digest.t
+
+    val salt : Params.t -> string -> t
   end
 
-  val hash_fold : Params.t -> fold -> Digest.t
+  val hash_fold : State.t -> fold -> State.t
+  val digest_fold : State.t -> fold -> Digest.t
 end
 
 module Make

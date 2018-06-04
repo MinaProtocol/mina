@@ -147,14 +147,8 @@ module Make
     let (+) = add
 
     let%test_module "currency_test" = (module struct
-      let check c =
-        let ((), (), passed) =
-          run_and_check (Checked.map c ~f:(fun _ -> As_prover.return ())) ()
-        in
-        passed
-
-      let expect_failure err c = (if check c then failwith err)
-      let expect_success err c = (if not (check c) then failwith err)
+      let expect_failure err c = (if check c () then failwith err)
+      let expect_success err c = (if not (check c ()) then failwith err)
 
       let to_bigint x =
         Bignum.Bigint.of_string (Unsigned.to_string x)

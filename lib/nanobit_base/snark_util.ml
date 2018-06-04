@@ -219,7 +219,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         let value = random_biased_bitstring p length in
         let var = random_bitstring length in
         let correct_answer = var < value in
-        let ((), lt, passed) = 
+        let ((), lt) =
           run_and_check
             (Checked.map ~f:(As_prover.read Boolean.typ)
                (lt_bitstring_value
@@ -227,8 +227,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
                      (List.map ~f:Boolean.var_of_value var))
                   (Bitstring.Msb_first.of_list value)))
             ()
+          |> Or_error.ok_exn
         in
-        assert passed;
         assert (lt = correct_answer)
       in
       for _ = 1 to 50 do test 0.5 done;
@@ -244,7 +244,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
       let test () =
         let x = random () in
         let y = random () in
-        let ((), (less, less_or_equal), passed) =
+        let ((), (less, less_or_equal)) =
           run_and_check
             (let%map { less; less_or_equal } =
               Checked.compare ~bit_length (Cvar.constant x) (Cvar.constant y)
@@ -253,8 +253,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
               map2 (read Boolean.typ less) (read Boolean.typ less_or_equal)
                 ~f:Tuple2.create))
             ()
+          |> Or_error.ok_exn
         in
-        assert passed;
         let r = Bigint.(compare (of_field x) (of_field y)) in
         assert (less = (r < 0));
         assert (less_or_equal = (r <= 0))

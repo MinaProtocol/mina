@@ -39,6 +39,8 @@ module type S = sig
 
     val update_bigstring : t -> Bigstring.t -> t
 
+    val update_string : t -> string -> t
+
     val update_fold
       : t
       -> fold
@@ -50,9 +52,13 @@ module type S = sig
       -> t
 
     val digest : t -> Digest.t
+
+    val salt : Params.t -> string -> t
   end
 
-  val hash_fold : Params.t -> fold -> Digest.t
+  val hash_fold : State.t -> fold -> State.t
+
+  val digest_fold : State.t -> fold -> Digest.t
 end
 
 module Make
@@ -136,36 +142,53 @@ struct
       { t with acc = !acc; bits_consumed = !i }
     ;;
 
+    let update_char_fold ({ acc; bits_consumed; params } : t) fold_chars =
+      let (acc, bits_consumed) =
+        fold_chars ~init:(acc, bits_consumed) ~f:(fun (acc, offset) c ->
+          let c = Char.to_int c in
+          let cond_add j acc =
+            if ith_bit_int c j
+            then Curve.add acc params.(offset + j)
+            else acc
+          in
+          ( acc
+            |> cond_add 0
+            |> cond_add 1
+            |> cond_add 2
+            |> cond_add 3
+            |> cond_add 4
+            |> cond_add 5
+            |> cond_add 6
+            |> cond_add 7
+          , offset + 8
+          ))
+      in
+      { acc; bits_consumed; params }
+
+    let fold_bigstring s ~init ~f =
+      let length = Bigstring.length s in
+      let rec go acc i =
+        if i = length
+        then acc
+        else go (f acc (Bigstring.get s i)) (i + 1)
+      in
+      go init 0
+
     let update_bigstring (t : t) (s : Bigstring.t) =
-      let byte_length = Bigstring.length s in
-      let bit_length = 8 * byte_length in
+      let bit_length = 8 * Bigstring.length s in
       assert (bit_length <= Params.max_input_length t.params - t.bits_consumed);
-      let acc = ref t.acc in
-      for i = 0 to byte_length - 1 do
-        let c = Char.to_int (Bigstring.get s i) in
-        let cond_add j acc =
-          if ith_bit_int c j
-          then Curve.add acc t.params.(i)
-          else acc
-        in
-        acc :=
-          !acc
-          |> cond_add 0
-          |> cond_add 1
-          |> cond_add 2
-          |> cond_add 3
-          |> cond_add 4
-          |> cond_add 5
-          |> cond_add 6
-          |> cond_add 7
-      done;
-      { t with acc = !acc; bits_consumed = t.bits_consumed + bit_length }
-    ;;
+      update_char_fold t (fold_bigstring s)
+
+    let update_string (t : t) (s : string) =
+      let bit_length = 8 * String.length s in
+      assert (bit_length <= Params.max_input_length t.params - t.bits_consumed);
+      update_char_fold t (String.fold s)
 
     let digest t = let (x, _y) = t.acc in x
+
+    let salt params s = update_string (create params) s
   end
 
-  let hash_fold params fold =
-    let open State in
-    digest (update_fold (create params) fold)
+  let hash_fold s fold = State.update_fold s fold
+  let digest_fold s fold = State.digest (hash_fold s fold)
 end
