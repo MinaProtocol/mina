@@ -386,7 +386,7 @@ module Checked
        type var
        type value
        val typ : (var, value) Impl.Typ.t
-       val hash : var -> var -> (var, _) Impl.Checked.t
+       val hash : height:int -> var -> var -> (var, _) Impl.Checked.t
        val if_ : Impl.Boolean.var -> then_:var -> else_:var -> (var, _) Impl.Checked.t
        val assert_equal : var -> var -> (unit, _) Impl.Checked.t
      end)
@@ -421,7 +421,7 @@ module Checked
   end
 
   let implied_root entry_hash addr0 path0 =
-    let rec go acc addr path =
+    let rec go height acc addr path =
       let open Let_syntax in
       match addr, path with
       | [], [] -> return acc
@@ -429,11 +429,11 @@ module Checked
         let%bind l = Hash.if_ b ~then_:h ~else_:acc
         and r = Hash.if_ b ~then_:acc ~else_:h
         in
-        let%bind acc' = Hash.hash l r in
-        go acc' bs hs
+        let%bind acc' = Hash.hash ~height l r in
+        go (height + 1) acc' bs hs
       | _, _ -> failwith "Merkle_tree.Checked.implied_root: address, path length mismatch"
     in
-    go entry_hash addr0 path0
+    go 0 entry_hash addr0 path0
   ;;
 
   type _ Request.t +=

@@ -1,1 +1,3 @@
-include Data_hash.Make()
+open Snark_params.Tick
+
+include Data_hash.Make_full_size()

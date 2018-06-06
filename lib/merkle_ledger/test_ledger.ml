@@ -17,8 +17,9 @@ module Hash = struct
   let empty_hash = Md5.digest_string ""
   ;;
 
-
-  let merge a b =  Md5.digest_string ((Md5.to_hex a) ^ (Md5.to_hex b))
+  let merge ~height a b =
+    Md5.digest_string
+      (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
   ;;
 
 end

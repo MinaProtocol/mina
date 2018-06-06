@@ -1,4 +1,5 @@
 open Core_kernel
+open Util
 open Snark_params
 open Tick
 open Let_syntax
@@ -59,7 +60,7 @@ type _ Snarky.Request.t +=
   | Floor_divide : [ `Two_to_the of int ] * Field.t -> Field.t Snarky.Request.t
 
 let two_to_the i =
-  Bignum.Bigint.(pow (of_int 2) (of_int i))
+  two_to_the i
   |> Bigint.of_bignum_bigint
   |> Bigint.to_field
 

@@ -71,7 +71,13 @@ let fold_bits ({ public_key; balance; nonce } : t) =
     let init = Balance.fold balance ~init ~f in
     Nonce.Bits.fold nonce ~init ~f
 
-let hash t =
-  var_to_bits t
-  >>= hash_digest
+let hash_prefix = Hash_prefix.account
+
+let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
+let digest t = Pedersen.State.digest (hash t)
+
+module Checked = struct
+  let hash t = var_to_bits t >>= hash_bits ~init:hash_prefix
+  let digest t = var_to_bits t >>= digest_bits ~init:hash_prefix
+end
 

@@ -140,6 +140,6 @@ module With_valid_signature = struct
 end
 
 let check_signature ({ payload; sender; signature } : t) =
-  Tick.Schnorr.verify signature sender (Payload.to_bits payload)
+  Schnorr.verify signature sender (Payload.to_bits payload)
 
 let check t = Option.some_if (check_signature t) t

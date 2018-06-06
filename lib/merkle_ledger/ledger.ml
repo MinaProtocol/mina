@@ -93,7 +93,7 @@ module type F =
        type hash [@@deriving sexp, hash, compare, bin_io]
        val hash_account : Account.t -> hash 
        val empty_hash : hash
-       val merge : hash -> hash -> hash
+       val merge : height:int -> hash -> hash -> hash
      end)
     (Key : sig 
         type t [@@deriving sexp, bin_io]
@@ -113,7 +113,7 @@ module Make
        [@@deriving sexp, hash, compare, bin_io]
        val hash_account : Account.t -> hash
        val empty_hash : hash
-       val merge : hash -> hash -> hash
+       val merge : height:int -> hash -> hash -> hash
      end)
     (Key : sig 
         type t [@@deriving sexp, bin_io]
@@ -202,10 +202,14 @@ module Make
     type t = elem list [@@deriving sexp]
 
     let implied_root (t : t) hash =
-      List.fold t ~init:hash ~f:(fun acc elem ->
-        match elem with
-        | `Left h -> Hash.merge acc h
-        | `Right h -> Hash.merge h acc)
+      List.fold t ~init:(hash, 0) ~f:(fun (acc, height) elem ->
+        let acc =
+          match elem with
+          | `Left h -> Hash.merge ~height acc h
+          | `Right h -> Hash.merge ~height h acc
+        in
+        (acc, height + 1))
+      |> fst
   end
 
   let create_account_table () = Key.Table.create ()
@@ -217,7 +221,7 @@ module Make
       if i <= depth
       then begin
         let h = empty_hash_at_heights.(i - 1) in
-        empty_hash_at_heights.(i) <- Hash.merge h h;
+        empty_hash_at_heights.(i) <- Hash.merge ~height:(i - 1) h h;
         go (i + 1)
       end
     in
@@ -350,7 +354,7 @@ module Make
       in
       List.iter dirty_indices ~f:(fun i ->
         DynArray.set curr i
-          (Hash.merge
+          (Hash.merge ~height:(curr_height - 1)
              (get_prev_hash (2 * i))
              (get_prev_hash (2 * i + 1))));
       let dirty_indices =
@@ -392,7 +396,8 @@ module Make
       if i = 0
       then hash
       else 
-        let hash = Hash.merge hash (empty_hash_at_height (depth - i)) in
+        let height = depth - i in
+        let hash = Hash.merge ~height hash (empty_hash_at_height height) in
         go (i-1) hash
     in
     go (depth - height) base_root

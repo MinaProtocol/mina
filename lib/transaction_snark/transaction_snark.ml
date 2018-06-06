@@ -79,7 +79,7 @@ module Fee_transfer = struct
   include Fee_transfer
 
   let dummy_signature =
-    Tick.Schnorr.sign (Private_key.create ())
+    Schnorr.sign (Private_key.create ())
       (List.init 256 ~f:(fun _ -> true))
 
   let two (pk1, fee1) (pk2, fee2) : Tagged_transaction.t =
@@ -323,7 +323,7 @@ module Base = struct
           and b2 = Ledger_hash.var_to_bits root_after
           in
           let fee_excess_bits = Amount.Signed.Checked.to_bits fee_excess in
-          hash_digest (b1 @ b2 @ fee_excess_bits)
+          digest_bits ~init:Hash_prefix.base_snark (b1 @ b2 @ fee_excess_bits)
           >>= assert_equal ~label:"equals-top_hash" top_hash
         end
       in
@@ -334,7 +334,7 @@ module Base = struct
     generate_keypair main ~exposing:(tick_input ())
 
   let top_hash s1 s2 excess =
-    Pedersen.hash_fold Pedersen.params
+    Pedersen.digest_fold Hash_prefix.base_snark
       (fun ~init ~f ->
          let init = Ledger_hash.fold s1 ~init ~f in
          let init = Ledger_hash.fold s2 ~init ~f in
@@ -405,24 +405,28 @@ module Merge = struct
     let input_bits = s1 @ s2 @ Amount.Signed.Checked.to_bits fee_excess in
     let input_bits_length = List.length input_bits in
     assert (input_bits_length = 2 * Tock.Field.size_in_bits + Amount.Signed.length);
-    let%bind states_and_excess_hash = 
+    let%bind is_base =
       with_label __LOC__ begin
-        Pedersen_hash.hash input_bits
-          ~params:Pedersen.params
-          ~init:(0, Hash_curve.Checked.identity)
+        provide_witness' Boolean.typ ~f:(fun s ->
+          Proof_type.is_base (get_type s))
       end
+    in
+    let%bind states_and_excess_hash =
+      let init =
+        ( Hash_prefix.length_in_bits
+        , Hash_curve.Checked.if_value is_base
+            ~then_:Hash_prefix.base_snark.acc
+            ~else_:Hash_prefix.merge_snark.acc
+        )
+      in
+      with_label __LOC__
+        (Pedersen_hash.hash ~init ~params:Pedersen.params input_bits)
     in
     let%bind states_and_excess_and_vk_hash =
       with_label __LOC__ begin
         Pedersen_hash.hash tock_vk
           ~params:Pedersen.params
-          ~init:(input_bits_length, states_and_excess_hash)
-      end
-    in
-    let%bind is_base =
-      with_label __LOC__ begin
-        provide_witness' Boolean.typ ~f:(fun s ->
-          Proof_type.is_base (get_type s))
+          ~init:(input_bits_length + Hash_prefix.length_in_bits, states_and_excess_hash)
       end
     in
     let%bind input =
@@ -464,7 +468,7 @@ module Merge = struct
     in
     let%bind () =
       let%bind total_fees = Amount.Signed.Checked.add fee_excess12 fee_excess23 in
-      hash_digest (s1 @ s3 @ Amount.Signed.Checked.to_bits total_fees @ tock_vk)
+      digest_bits ~init:Hash_prefix.merge_snark (s1 @ s3 @ Amount.Signed.Checked.to_bits total_fees @ tock_vk)
       >>= assert_equal top_hash
     and verify_12 = verify_transition tock_vk Prover_state.proof12 s1 s2 fee_excess12
     and verify_23 = verify_transition tock_vk Prover_state.proof23 s2 s3 fee_excess23
@@ -588,10 +592,8 @@ let check_tagged_transaction source target transaction handler =
   let top_hash = Base.top_hash source target excess in
   let open Tick in
   let main = handle (Base.main (Cvar.constant top_hash)) handler in
-  let (_s, (), passed) =
-    run_and_check (Checked.map main ~f:As_prover.return) prover_state
-  in
-  assert passed
+  assert (check main prover_state)
+;;
 
 let check_transition source target (t : Transition.t) handler =
   check_tagged_transaction source target
@@ -620,7 +622,7 @@ module Make (K : sig val keys : Keys0.t end) = struct
   let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list keys.wrap_vk
 
   let merge_top_hash s1 s2 fee_excess =
-    Tick.Pedersen.hash_fold Tick.Pedersen.params
+    Tick.Pedersen.digest_fold Hash_prefix.merge_snark
       (fun ~init ~f ->
         let init = Ledger_hash.fold ~init ~f s1 in
         let init = Ledger_hash.fold ~init ~f s2 in
@@ -656,15 +658,16 @@ module Make (K : sig val keys : Keys0.t end) = struct
       Merge.main
       top_hash
 
-(* The curve pt corresponding to H(Amount.Signed.zero, wrap_vk)
+(* The curve pt corresponding to H(merge_prefix, _, _, Amount.Signed.zero, wrap_vk)
    (with starting point shifted over by 2 * digest_size so that
-   this can then be used to compute H(s1, s2, Amount.Signed.zero, wrap_vk) *)
-  let zero_and_vk_curve_pt =
+   this can then be used to compute H(merge_prefix, s1, s2, Amount.Signed.zero, wrap_vk) *)
+  let merge_prefix_and_zero_and_vk_curve_pt =
     let open Tick in
     let s =
-      Pedersen.State.create
-        ~bits_consumed:(Pedersen.Digest.size_in_bits * 2)
-        Pedersen.params
+      { Hash_prefix.merge_snark
+        with bits_consumed = Hash_prefix.merge_snark.bits_consumed
+                             + Pedersen.Digest.size_in_bits * 2
+      }
     in
     let s =
       Pedersen.State.update_fold s
@@ -690,9 +693,9 @@ module Make (K : sig val keys : Keys0.t end) = struct
     and s2 = Ledger_hash.var_to_bits s2
     in
     let%bind top_hash =
-      let (vx, vy) = zero_and_vk_curve_pt in
+      let (vx, vy) = merge_prefix_and_zero_and_vk_curve_pt in
       Pedersen_hash.hash ~params:Pedersen.params
-        ~init:(0, (Cvar.constant vx, Cvar.constant vy))
+        ~init:(Hash_prefix.length_in_bits, (Cvar.constant vx, Cvar.constant vy))
         (s1 @ s2)
       >>| Pedersen_hash.digest
       >>= Pedersen.Digest.choose_preimage_var
@@ -823,7 +826,7 @@ let%test_module "transaction_snark" =
         }
       in
       let signature =
-        Tick.Schnorr.sign sender.private_key
+        Schnorr.sign sender.private_key
           (Transaction.Payload.to_bits payload)
       in
       Transaction.check

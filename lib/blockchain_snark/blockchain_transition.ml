@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Nanobit_base
-open Snark_params
+open Nanobit_base.Snark_params
 
 module Digest = Tick.Pedersen.Digest
 
@@ -16,14 +15,16 @@ module Make (T : Transaction_snark.S) = struct
         include U.Checked
       end
     end
-    module Update = Block
+    module Update = Nanobit_base.Block
   end
+
+  open Nanobit_base
 
   include Transition_system.Make
       (struct
         module Tick = Digest
         module Tock = Bits.Snarkable.Field(Tock)
       end)
-      (struct let hash = Tick.hash_digest end)
+      (struct let hash bs = Tick.digest_bits ~init:Hash_prefix.transition_system_snark bs end)
       (System)
 end

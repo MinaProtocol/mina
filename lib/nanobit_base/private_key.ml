@@ -1,7 +1,7 @@
 open Core_kernel
 open Async_kernel
 
-include Snark_params.Tick.Schnorr.Private_key
+include Schnorr.Private_key
 
 let create () =
   if Insecure.private_key_generation

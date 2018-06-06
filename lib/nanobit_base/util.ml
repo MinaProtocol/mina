@@ -11,3 +11,8 @@ let split_last_exn =
   | x :: xs -> go [] x xs
 ;;
 
+let (+>) fold1 fold2 =
+  fun ~init ~f ->
+    fold2 ~init:(fold1 ~init ~f) ~f
+
+let two_to_the i = Bignum.Bigint.(pow (of_int 2) (of_int i))
