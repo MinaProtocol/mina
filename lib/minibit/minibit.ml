@@ -14,20 +14,20 @@ end
 module type State_io_intf = sig
   type net
   type t
-  type stripped_state_with_witness
+  type state_with_witness
 
-  val create : net -> broadcast_state:stripped_state_with_witness Linear_pipe.Reader.t -> t
+  val create : net -> broadcast_state:state_with_witness Linear_pipe.Reader.t -> t
 
-  val new_states : net -> t -> stripped_state_with_witness Linear_pipe.Reader.t
+  val new_states : net -> t -> state_with_witness Linear_pipe.Reader.t
 end
 
 module type Network_intf = sig
   type t
-  type stripped_state_with_witness
+  type state_with_witness
   type ledger
   type state
   type ledger_hash
-  module State_io : State_io_intf with type stripped_state_with_witness := stripped_state_with_witness 
+  module State_io : State_io_intf with type state_with_witness := state_with_witness
                                    and type net := t
   module Ledger_fetcher_io : Ledger_fetcher_io_intf with type t := t
                                                      and type ledger := ledger 
@@ -159,8 +159,8 @@ module type State_with_witness_intf = sig
     [@@deriving bin_io]
   end
 
-
   val strip : t -> Stripped.t
+  val check : Stripped.t -> t
 
   include Witness_change_intf with type t_with_witness := t
                               and type witness = (transaction_with_valid_signature list * ledger_hash)
@@ -183,7 +183,7 @@ module type Inputs_intf = sig
                                                                  and type ledger_hash := Ledger_hash.t
 
   module Net : Network_intf
-    with type stripped_state_with_witness := State_with_witness.Stripped.t 
+    with type state_with_witness := State_with_witness.t 
      and type ledger := Ledger.t
      and type ledger_hash := Ledger_hash.t
      and type state := State.t
@@ -279,7 +279,8 @@ module Make
     let state_io = 
       Net.State_io.create 
         net 
-        ~broadcast_state:(Linear_pipe.map miner_broadcast_reader ~f:State_with_witness.strip) in
+        ~broadcast_state:miner_broadcast_reader
+    in
     let%map transaction_pool =
       Transaction_pool.load ~disk_location:config.pool_disk_location
     in
@@ -304,12 +305,9 @@ module Make
         [ Linear_pipe.map
             miner_transitions_protocol
             ~f:(fun transition -> `Local transition)
-        ; Linear_pipe.filter_map
+        ; Linear_pipe.map
             (Net.State_io.new_states t.net t.state_io)
-            ~f:(fun {state ; previous_ledger_hash ; transactions} ->
-              let open Option.Let_syntax in
-              let%map valid_transactions = Option.all (List.map ~f:Transaction.check transactions) in
-              `Remote {State_with_witness.state ; previous_ledger_hash ; transactions = valid_transactions})
+            ~f:(fun s -> `Remote s)
         ]
     in
     let (updated_state_network, updated_state_ledger) =

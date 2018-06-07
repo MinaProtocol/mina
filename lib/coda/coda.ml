@@ -14,21 +14,21 @@ end
 module type State_io_intf = sig
   type net
   type t
-  type stripped_state_with_witness
+  type state_with_witness
 
-  val create : net -> broadcast_state:stripped_state_with_witness Linear_pipe.Reader.t -> t
+  val create : net -> broadcast_state:state_with_witness Linear_pipe.Reader.t -> t
 
   (* Over the wire we should be passing ledger_builder_hash, this function needs to preimage the hash also *)
-  val new_states : net -> t -> stripped_state_with_witness Linear_pipe.Reader.t
+  val new_states : net -> t -> state_with_witness Linear_pipe.Reader.t
 end
 
 module type Network_intf = sig
   type t
-  type stripped_state_with_witness
+  type state_with_witness
   type ledger_builder
   type state
   type ledger_builder_hash
-  module State_io : State_io_intf with type stripped_state_with_witness := stripped_state_with_witness
+  module State_io : State_io_intf with type state_with_witness := state_with_witness
                                    and type net := t
   module Ledger_builder_io : Ledger_builder_io_intf with type t := t
                                                      and type ledger_builder := ledger_builder
@@ -82,13 +82,14 @@ module type Ledger_builder_controller_intf = sig
   val create : Config.t -> t Deferred.t
 
   val local_get_ledger : t -> ledger_builder_hash -> (ledger_builder * state) Or_error.t
-  val strongest_ledgers : t -> (ledger * state) Linear_pipe.Reader.t
+  val strongest_ledgers : t -> (ledger_builder * ledger * state) Linear_pipe.Reader.t
 end
 
 module type Miner_intf = sig
   type t
-  type ledger_hash
   type ledger
+  type ledger_hash
+  type ledger_builder
   type transaction
   type transition_with_witness
   type state
@@ -97,6 +98,7 @@ module type Miner_intf = sig
     type t =
       { state : state
       ; ledger : ledger
+      ; ledger_builder : ledger_builder
       ; transactions : transaction list
       }
   end
@@ -162,8 +164,8 @@ module type State_with_witness_intf = sig
     [@@deriving bin_io]
   end
 
-
   val strip : t -> Stripped.t
+  val check : Stripped.t -> t
 
   include Witness_change_intf with type t_with_witness := t
                               and type witness = (transaction_with_valid_signature list * ledger_builder_transition)
@@ -173,6 +175,7 @@ end
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
+  module Ledger : sig type t end
   module Proof_carrying_state : sig
     type t = (State.t, State.Proof.t) Coda_pow.Proof_carrying_data.t
     [@@deriving sexp, bin_io]
@@ -186,9 +189,8 @@ module type Inputs_intf = sig
                                                                  and type transition := Transition.t
                                                                  and type ledger_hash := Ledger_hash.t
 
-  module Ledger : sig type t end
   module Net : Network_intf
-    with type stripped_state_with_witness := State_with_witness.Stripped.t 
+    with type state_with_witness := State_with_witness.t 
      and type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type state := State.t
@@ -207,8 +209,9 @@ module type Inputs_intf = sig
      and type ledger := Ledger.t
 
   module Miner : Miner_intf with type transition_with_witness := Transition_with_witness.t
-                             and type ledger_hash := Ledger_hash.t
                              and type ledger := Ledger.t
+                             and type ledger_hash := Ledger_hash.t
+                             and type ledger_builder := Ledger_builder.t
                              and type transaction := Transaction.With_valid_signature.t
                              and type state := State.t
 
@@ -241,6 +244,8 @@ module Make
     ; mutable transaction_pool : Transaction_pool.t
     ; ledger_builder : Ledger_builder_controller.t
     ; log : Logger.t
+    ; transactions_per_bundle : int
+    ; ledger_builder_transition_backup_capacity : int
     }
 
   let ledger_builder_controller t = t.ledger_builder
@@ -251,9 +256,12 @@ module Make
     type t =
       { log : Logger.t
       ; net_config : Net.Config.t
-      ; ledger_builder_disk_location : string
+      ; ledger_builder_persistant_location : string
       ; pool_disk_location : string
+      ; transactions_per_bundle : int [@default 10]
+      ; ledger_builder_transition_backup_capacity : int [@default 10]
       }
+    [@@deriving make]
   end
 
   let create (config : Config.t) =
@@ -267,7 +275,7 @@ module Make
           ~parent_log:config.log
           ~net_deferred:(Ivar.read net_ivar)
           ~ledger_builder_transitions:ledger_builder_transitions_reader
-          ~disk_location:config.ledger_builder_disk_location ())
+          ~disk_location:config.ledger_builder_persistant_location ())
     in
     let miner =
       Miner.create
@@ -288,7 +296,8 @@ module Make
     let state_io = 
       Net.State_io.create 
         net 
-        ~broadcast_state:(Linear_pipe.map miner_broadcast_reader ~f:State_with_witness.strip) in
+        ~broadcast_state:miner_broadcast_reader
+    in
     let%map transaction_pool =
       Transaction_pool.load ~disk_location:config.pool_disk_location
     in
@@ -301,10 +310,13 @@ module Make
     ; transaction_pool
     ; ledger_builder
     ; log = config.log
+    ; transactions_per_bundle = config.transactions_per_bundle
+    ; ledger_builder_transition_backup_capacity =
+        config.ledger_builder_transition_backup_capacity
     }
 
   let run t =
-    Logger.info t.log "Starting to run coda";
+    Logger.info t.log "Starting to run Coda";
     let p : Protocol.t = Protocol.create ~initial:{ data = Genesis.state ; proof = Genesis.proof } in
 
     let miner_transitions_protocol = Miner.transitions t.miner in
@@ -313,12 +325,9 @@ module Make
         [ Linear_pipe.map
             miner_transitions_protocol
             ~f:(fun transition -> `Local transition)
-        ; Linear_pipe.filter_map
+        ; Linear_pipe.map
             (Net.State_io.new_states t.net t.state_io)
-            ~f:(fun {state ; ledger_builder_transition ; transactions} ->
-              let open Option.Let_syntax in
-              let%map valid_transactions = Option.all (List.map ~f:Transaction.check transactions) in
-              `Remote {State_with_witness.state ; ledger_builder_transition ; transactions = valid_transactions})
+            ~f:(fun s -> `Remote s)
         ]
     in
     let (updated_state_network, updated_state_ledger) =
@@ -351,16 +360,15 @@ module Make
         Logger.info t.log !"Ledger has new %{sexp: Proof_carrying_state.t} and %{sexp: Inputs.Transaction.With_valid_signature.t list}" state transactions;
         (* TODO: Right now we're crashing on purpose if we even get a tiny bit
          *       backed up. We should fix this see issues #178 and #177 *)
-        Linear_pipe.write_or_exn ~capacity:10 t.ledger_builder_transitions updated_state_ledger (transactions, state.data, ledger_builder_transition);
+        Linear_pipe.write_or_exn ~capacity:t.ledger_builder_transition_backup_capacity t.ledger_builder_transitions updated_state_ledger (transactions, state.data, ledger_builder_transition);
         return ()
       )
     end;
 
     don't_wait_for begin
-      Linear_pipe.transfer (Ledger_builder_controller.strongest_ledgers t.ledger_builder) t.miner_changes_writer ~f:(fun (ledger, state) ->
-        let transaction_per_bundle = 10 in
-        let transactions = Transaction_pool.get ~k:transaction_per_bundle ~ledger t.transaction_pool in
-        Tip_change { Miner.Tip.transactions ; ledger ; state }
+      Linear_pipe.transfer (Ledger_builder_controller.strongest_ledgers t.ledger_builder) t.miner_changes_writer ~f:(fun (ledger_builder, ledger, state) ->
+        let transactions = Transaction_pool.get ~k:t.transactions_per_bundle ~ledger t.transaction_pool in
+        Tip_change { Miner.Tip.transactions ; ledger_builder ; ledger ; state }
       )
     end;
 end
