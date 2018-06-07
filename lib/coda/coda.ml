@@ -57,6 +57,14 @@ module type Transaction_pool_intf = sig
   val load : disk_location:string -> t Deferred.t
 end
 
+module type Snark_pool_intf = sig
+  type t
+  type snark_pool_proof
+
+  val add : t -> snark_pool_proof -> t
+  val load : disk_location:string -> t Deferred.t
+end
+
 module type Ledger_builder_controller_intf = sig
   type ledger_builder
   type ledger_builder_hash
@@ -65,6 +73,7 @@ module type Ledger_builder_controller_intf = sig
   type transaction_with_valid_signature
   type net
   type state
+  type snark_pool
 
   type t
 
@@ -75,6 +84,7 @@ module type Ledger_builder_controller_intf = sig
       ; net_deferred : net Deferred.t
       ; ledger_builder_transitions : (transaction_with_valid_signature list * state * ledger_builder_transition) Linear_pipe.Reader.t
       ; disk_location : string
+      ; snark_pool : snark_pool
       }
     [@@deriving make]
   end
@@ -195,6 +205,9 @@ module type Inputs_intf = sig
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type state := State.t
 
+  module Snark_pool : Snark_pool_intf
+    with type snark_pool_proof := Snark_pool_proof.t
+
   module Ledger_builder_controller : Ledger_builder_controller_intf
     with type net := Net.t
      and type ledger := Ledger.t
@@ -202,6 +215,7 @@ module type Inputs_intf = sig
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_builder_transition := Ledger_builder_transition.t
      and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+     and type snark_pool := Snark_pool.t
      and type state := State.t
 
   module Transaction_pool : Transaction_pool_intf
@@ -242,6 +256,7 @@ module Make
     ; ledger_builder_transitions : (Transaction.With_valid_signature.t list * State.t * Ledger_builder_transition.t) Linear_pipe.Writer.t
     (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; mutable transaction_pool : Transaction_pool.t
+    ; mutable snark_pool : Snark_pool.t
     ; ledger_builder : Ledger_builder_controller.t
     ; log : Logger.t
     ; transactions_per_bundle : int
@@ -251,13 +266,16 @@ module Make
   let ledger_builder_controller t = t.ledger_builder
   let modify_transaction_pool t ~f =
     t.transaction_pool <- f t.transaction_pool
+  let modify_snark_pool t ~f =
+    t.snark_pool <- f t.snark_pool
 
   module Config = struct
     type t =
       { log : Logger.t
       ; net_config : Net.Config.t
       ; ledger_builder_persistant_location : string
-      ; pool_disk_location : string
+      ; transaction_pool_disk_location : string
+      ; snark_pool_disk_location : string
       ; transactions_per_bundle : int [@default 10]
       ; ledger_builder_transition_backup_capacity : int [@default 10]
       }
@@ -269,9 +287,13 @@ module Make
     let (miner_broadcast_reader,miner_broadcast_writer) = Linear_pipe.create () in
     let (ledger_builder_transitions_reader, ledger_builder_transitions_writer) = Linear_pipe.create () in
     let net_ivar = Ivar.create () in
-    let%bind ledger_builder =
+    let%bind snark_pool =
+      Snark_pool.load ~disk_location:config.snark_pool_disk_location
+    in
+    let%map ledger_builder =
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make
+          ~snark_pool
           ~parent_log:config.log
           ~net_deferred:(Ivar.read net_ivar)
           ~ledger_builder_transitions:ledger_builder_transitions_reader
@@ -299,7 +321,7 @@ module Make
         ~broadcast_state:miner_broadcast_reader
     in
     let%map transaction_pool =
-      Transaction_pool.load ~disk_location:config.pool_disk_location
+      Transaction_pool.load ~disk_location:config.transaction_pool_disk_location
     in
     { miner
     ; net
@@ -308,6 +330,7 @@ module Make
     ; miner_changes_writer
     ; ledger_builder_transitions = ledger_builder_transitions_writer
     ; transaction_pool
+    ; snark_pool
     ; ledger_builder
     ; log = config.log
     ; transactions_per_bundle = config.transactions_per_bundle
