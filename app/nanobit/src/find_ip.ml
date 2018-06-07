@@ -10,13 +10,17 @@ let services = [
   { uri = "http://ifconfig.co/ip"; body_handler = String.rstrip ~drop:(fun c -> c = '\n') }
 ];;
 
+let ip_service_result { uri; body_handler } =
+  let%bind (resp, body) = Client.get (Uri.of_string uri) in
+  Body.to_string body >>| body_handler >>|
+  (fun s -> if resp.status = `OK then Some s else None)
+;;
+
 let find () =
-  let handler : string option -> ip_service -> string option Deferred.t = fun acc elem -> match acc with
-    | None ->
-        let%bind (resp, body) = Client.get (Uri.of_string elem.uri) in
-        Body.to_string body >>| elem.body_handler >>|
-        (fun s -> if resp.status = `OK then Some s else None)
+  let handler = fun acc elem -> match acc with
+    | None -> ip_service_result elem
     | Some x -> return acc
-  in (Deferred.List.fold services ~init:None ~f:handler >>|
-    (fun x -> Option.value_exn ~message:"couldn't figure out own IP from the internet" x))
+  in
+  Deferred.List.fold services ~init:None ~f:handler >>|
+    (fun x -> Option.value_exn ~message:"couldn't figure out own IP from the internet" x)
 ;;
