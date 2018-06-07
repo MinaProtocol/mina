@@ -111,6 +111,13 @@ module Make_inputs0
       ; state = t.state
       }
 
+    let check {Stripped.transactions;previous_ledger_hash;state} =
+      let transactions = List.filter_map ~f:Transaction.check transactions in
+      { transactions
+      ; previous_ledger_hash
+      ; state
+      }
+
     let forget_witness {state} = state
     (* TODO should we also consume a ledger here so we know the transactions valid? *)
     let add_witness_exn state (transactions, previous_ledger_hash) =
