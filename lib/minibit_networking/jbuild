@@ -3,8 +3,9 @@
 (library
  ((name minibit_networking)
   (public_name minibit_networking)
+  (inline_tests)
   (library_flags (-linkall))
-  (libraries (core async gossip_net minibit protocols async_extra ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_deriving.make ppx_driver.runner (-inline-test-lib minibit_networking))))
+  (libraries (core async gossip_net minibit protocols async_extra))
+  (preprocess (pps (ppx_jane ppx_deriving.make)))
   (synopsis "Networking layer for Minibit")))
 

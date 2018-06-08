@@ -4,7 +4,8 @@
  ((name gossip_net)
   (public_name gossip_net)
   (library_flags (-linkall))
-  (libraries (core linear_pipe logger kademlia async async_extra ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib gossip_net))))
+  (inline_tests)
+  (libraries (core linear_pipe logger kademlia async async_extra))
+  (preprocess (pps (ppx_jane)))
   (synopsis "Gossip Network")))
 

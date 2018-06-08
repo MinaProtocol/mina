@@ -4,7 +4,8 @@
  ((name ledger_fetcher)
   (public_name ledger_fetcher)
   (library_flags (-linkall))
-  (libraries (core storage logger protocols minibit async async_extra ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner ppx_deriving.std (-inline-test-lib nanobit_base))))
+  (inline_tests)
+  (libraries (core storage logger protocols minibit async async_extra))
+  (preprocess (pps (ppx_jane ppx_deriving.std)))
   (synopsis "Ledger fetcher fetches ledgers over the network")))
 

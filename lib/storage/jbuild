@@ -3,8 +3,9 @@
 (library
  ((name storage)
   (public_name storage)
+  (inline_tests)
   (library_flags (-linkall))
-  (libraries (core async async_extra logger ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib storage))))
+  (libraries (core async async_extra logger))
+  (preprocess (pps (ppx_jane)))
   (synopsis "Storage module checksums data and stores it")))
 

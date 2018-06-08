@@ -4,7 +4,8 @@
  ((name transaction_snark)
   (public_name transaction_snark)
   (library_flags (-linkall))
-  (libraries (core snarky nanobit_base bignum ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib transaction_snark))))
+  (inline_tests)
+  (libraries (core snarky nanobit_base bignum))
+  (preprocess (pps (ppx_jane)))
   (synopsis "Transaction state transition snarking library")))
 
