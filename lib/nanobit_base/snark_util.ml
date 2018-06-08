@@ -184,7 +184,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         eval (of_binary (lt_binary (xs :> Boolean.var list) (ys :> bool list))))
 
   let field_size_bits =
-    let testbit n i = Snarky.Bignum_bigint.((shift_right n i) land one = one) in
+    let testbit n i = Bignum_bigint.((shift_right n i) land one = one) in
     List.init Field.size_in_bits ~f:(fun i ->
       testbit Impl.Field.size
         (Field.size_in_bits - 1 - i))

@@ -6,7 +6,7 @@ include Schnorr.Private_key
 let create () =
   if Insecure.private_key_generation
   then
-    Snarky.Bignum_bigint.random
+    Bignum_bigint.random
       Snark_params.Tick.Hash_curve.Params.order
   else
     failwith "Insecure.private_key_generation"

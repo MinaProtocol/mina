@@ -15,4 +15,4 @@ let (+>) fold1 fold2 =
   fun ~init ~f ->
     fold2 ~init:(fold1 ~init ~f) ~f
 
-let two_to_the i = Snarky.Bignum_bigint.(pow (of_int 2) (of_int i))
+let two_to_the i = Bignum_bigint.(pow (of_int 2) (of_int i))

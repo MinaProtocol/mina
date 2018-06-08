@@ -20,7 +20,7 @@ let bit_length = Target.bit_length + 1
 let () = assert (bit_length < Field.size_in_bits)
 
 let max =
-  Snarky.Bignum_bigint.(pow (of_int 2) (of_int bit_length) - one)
+  Bignum_bigint.(pow (of_int 2) (of_int bit_length) - one)
   |> Bigint.of_bignum_bigint |> Bigint.to_field
 
 let of_field x =

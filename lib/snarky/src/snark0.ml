@@ -1,3 +1,4 @@
+module Bignum_bigint = Bigint
 open Core_kernel
 
 let () = Camlsnark_c.linkme
