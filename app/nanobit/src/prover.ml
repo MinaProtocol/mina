@@ -1,6 +1,7 @@
 open Core
 open Async
 open Nanobit_base
+open Util
 open Blockchain_snark
 open Cli_common
 
@@ -15,12 +16,8 @@ module Transition_utils
       Step.Verifier.Verification_key.to_bool_list Wrap.verification_key
     in
     fun state ->
-      let open Tick.Pedersen.State in
-      let s = create Tick.Pedersen.params in
-      let s = update_fold s (List.fold self) in
-      let s = update_fold s (State_hash.fold (Blockchain_state.hash state))
-      in
-      digest s
+      Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
+        (List.fold self +> State_hash.fold (Blockchain_state.hash state))
 
   let embed (x : Tick.Field.t) : Tock.Field.t =
     let n = Tick.Bigint.of_field x in
@@ -44,10 +41,12 @@ module Transition_utils
         (embed hash)
 
   module State = Blockchain_state.Make_update(Transaction_snark)
-  let update_state_exn = State.update_exn
+
+  let update = State.update
 
   let step ~prev_proof ~prev_state block =
-    let next_state = update_state_exn prev_state block in
+    let open Or_error.Let_syntax in
+    let%map next_state = update prev_state block in
     let next_state_top_hash = instance_hash next_state in
     let prev_proof =
       Tick.prove Step.proving_key (Step.input ())
@@ -59,7 +58,9 @@ module Transition_utils
         Step.main
         next_state_top_hash
     in
-    wrap next_state_top_hash prev_proof
+    { Blockchain.state = next_state
+    ; proof = wrap next_state_top_hash prev_proof
+    }
 
   let verify state proof =
     Tock.verify proof
@@ -99,10 +100,17 @@ module Worker_state = struct
   module type S = sig
     module Transaction_snark : Transaction_snark.S
     val base_proof : Proof.t Lazy.t
-    val step : prev_proof:Proof.t -> prev_state:Blockchain_state.t -> Block.t -> Proof.t
+
+    val step
+      : prev_proof:Proof.t
+      -> prev_state:Blockchain_state.t
+      -> Block.t
+      -> Blockchain.t Or_error.t
+
     val verify : Blockchain_state.t -> Proof.t -> bool
 
-    val update_state_exn : Blockchain_state.t -> Block.t -> Blockchain_state.t
+    val update
+      : Blockchain_state.t -> Block.t -> Blockchain_state.t Or_error.t
   end
 
   type init_arg = unit [@@deriving bin_io]
@@ -144,15 +152,12 @@ module Functions = struct
       [%bin_type_class: Blockchain.Stable.V1.t * Block.Stable.V1.t]
       Blockchain.Stable.V1.bin_t
       (fun (module W) ({ Blockchain.state=prev_state; proof=prev_proof }, block) ->
-        let proof =
-          if Insecure.extend_blockchain
-          then Lazy.force W.base_proof
-          else W.step ~prev_proof ~prev_state block
-        in
-        return
-          { Blockchain.proof
-          ; state = W.update_state_exn prev_state block 
-          })
+         return (
+           if Insecure.extend_blockchain
+           then
+             let proof = Lazy.force W.base_proof in
+             { Blockchain.proof; state = Or_error.ok_exn (W.update prev_state block) }
+           else Or_error.ok_exn (W.step ~prev_proof ~prev_state block)))
 
   let verify_blockchain =
     create Blockchain.Stable.V1.bin_t bin_bool

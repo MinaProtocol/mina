@@ -159,6 +159,8 @@ module Edwards = struct
     type var
     type value = t
 
+    val var_of_value : value -> var
+
     val typ : (var, value) typ
     val add : value -> value -> value
 
@@ -175,7 +177,11 @@ module Edwards = struct
 
       val add : var -> var -> (var, _) checked
 
+      val add_known : var -> value -> (var, _) checked
+
       val if_ : boolean_var -> then_:var -> else_:var -> (var, _) checked
+
+      val if_value : boolean_var -> then_:value -> else_:value -> var
 
       val cond_add : value -> to_:var -> if_:boolean_var -> (var, _) checked
 
@@ -275,9 +281,25 @@ module Edwards = struct
         let not_identity (x, y) = failwith ""
       end
 
+      let add_known (x1, y1) (x2, y2) =
+        with_label __LOC__ begin
+          let x1x2 = Cvar.scale x1 x2
+          and y1y2 = Cvar.scale y1 y2
+          and x1y2 = Cvar.scale x1 y2
+          and y1x2 = Cvar.scale y1 x2
+          in
+          let%bind p = Checked.mul x1x2 y1y2 in
+          let open Cvar.Infix in
+          let p = Params.d * p in
+          let%map a = Checked.div (x1y2 + y1x2) (Cvar.constant Field.one + p)
+          and b     = Checked.div (y1y2 - x1x2) (Cvar.constant Field.one - p)
+          in
+          (a, b)
+        end
+
       (* TODO: Optimize -- could probably shave off one constraint. *)
       let add (x1, y1) (x2, y2) =
-        with_label "Edwards.Checked.add" begin
+        with_label __LOC__ begin
           let%bind x1x2 = Checked.mul x1 x2
           and y1y2      = Checked.mul y1 y2
           and x1y2      = Checked.mul x1 y2
@@ -291,10 +313,9 @@ module Edwards = struct
           in
           (a, b)
         end
-      ;;
 
       let double (x, y) =
-        with_label "Edwards.Checked.double" begin
+        with_label __LOC__ begin
           let%bind xy = Checked.mul x y
           and xx = Checked.mul x x
           and yy = Checked.mul y y
@@ -306,7 +327,12 @@ module Edwards = struct
           in
           (a, b)
         end
-      ;;
+
+      let if_value (b : Boolean.var) ~then_:(x1, y1) ~else_:(x2, y2) =
+        let not_b = (Boolean.not b :> Cvar.t) in
+        let b = (b :> Cvar.t) in
+        let choose_field t e = Cvar.(Infix.(t * b + e * not_b)) in
+        (choose_field x1 x2, choose_field y1 y2)
 
       (* TODO-someday: Make it so this doesn't have to compute both branches *)
       let if_ =
@@ -321,7 +347,7 @@ module Edwards = struct
           go 0 [] xs ys zs
         in
         fun b ~then_ ~else_ ->
-          with_label "Edwards.Checked.if_" begin
+          with_label __LOC__ begin
             let%bind r =
               provide_witness typ As_prover.(Let_syntax.(
                 let%bind b = read Boolean.typ b in
@@ -343,7 +369,7 @@ module Edwards = struct
       ;;
 
       let scale t (c : Scalar.var) =
-        with_label "Edwards.Checked.scale" begin
+        with_label __LOC__ begin
           let rec go i acc pt = function
             | [] -> return acc
             | b :: bs ->
@@ -369,7 +395,7 @@ module Edwards = struct
 
       (* TODO: Unit test *)
       let cond_add ((x2, y2) : value) ~to_:((x1, y1) : var) ~if_:(b : Boolean.var) : (var, _) Checked.t =
-        with_label "Edwards.Checked.cond_add" begin
+        with_label __LOC__ begin
           let one = Cvar.constant Field.one in
           let b   = (b :> Cvar.t) in
           let open Let_syntax in
@@ -401,8 +427,7 @@ module Edwards = struct
       ;;
 
       let scale_known (t : value) (c : Scalar.var) =
-        let label = "Edwards.Checked.scale_known" in
-        with_label label begin
+        with_label __LOC__ begin
           let rec go i acc pt = function
             | b :: bs ->
                 let%bind acc' =
@@ -414,7 +439,7 @@ module Edwards = struct
             | [] -> return acc
           in
           match c with
-          | [] -> failwithf "%s: Empty bits" label ()
+          | [] -> failwith "scale_known: Empty bits"
           | b :: bs ->
             let acc =
               let b = (b :> Cvar.t) in
@@ -514,7 +539,7 @@ module Checked = struct
   ;;
 
   let assert_on_curve (x, y) =
-    with_label "Curve.assert_on_curve" begin
+    with_label __LOC__ begin
       let open Let_syntax in
       let%bind x_squared = Checked.mul x x in
       let%bind y_squared = Checked.mul y y in
@@ -527,7 +552,7 @@ module Checked = struct
   ;;
 
   let add (ax, ay) (bx, by) =
-    with_label "Curve.add" begin
+    with_label __LOC__ begin
       let open Let_syntax in
       let%bind denom = Checked.inv Cvar.Infix.(bx - ax) in
       let%bind lambda = Checked.mul Cvar.Infix.(by - ay) denom in
@@ -567,7 +592,7 @@ module Checked = struct
   ;;
 
   let double (ax, ay) =
-    with_label "Curve.double" begin
+    with_label __LOC__ begin
       let open Let_syntax in
       let%bind x_squared = Checked.mul ax ax in
       let%bind lambda =
@@ -646,7 +671,7 @@ module Checked = struct
 
 
   let scale_bits t (c : Boolean.var list) ~init =
-    with_label "Curve.scale_bits" begin
+    with_label __LOC__ begin
       let open Let_syntax in
       let rec go i bs0 acc pt =
         match bs0 with
@@ -681,7 +706,7 @@ module Checked = struct
   ;;
 
   let multi_sum (pairs : (Scalar.var * var) list) ~init =
-    with_label "multi_sum" begin
+    with_label __LOC__ begin
       let open Let_syntax in
       let rec go init = function
         | (c, t) :: ps ->

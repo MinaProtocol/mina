@@ -81,12 +81,16 @@ let%test_unit "modify_account_by_idx" =
   assert (`Ok 50 = L16.get_at_index ledger idx);
 ;;
 
-let rec compose_hash i hash =
-  if i = 0
-  then hash
-  else 
-    let hash = Test_ledger.Hash.merge hash hash in
-    compose_hash (i - 1) hash
+let compose_hash n hash =
+  let rec go i hash =
+    if i = n
+    then hash
+    else
+      let hash = Test_ledger.Hash.merge ~height:i hash hash in
+      go (i + 1) hash
+  in
+  go 0 hash
+
 
 let%test "merkle_root" =
   let ledger = L16.create () in
@@ -124,26 +128,30 @@ let%test_unit "merkle_root_edit" =
 ;;
 
 let check_path account (path : L16.Path.t) root =
-  let path_root = 
-    List.fold 
-      ~init:(Test_ledger.Hash.hash_account account)
-      path
-      ~f:(fun a b -> 
-        match b with
-        | `Left b -> Test_ledger.Hash.merge a b
-        | `Right b -> Test_ledger.Hash.merge b a)
+  let (path_root, _) =
+    List.fold path ~init:(Test_ledger.Hash.hash_account account, 0)
+      ~f:(fun (a, height) b ->
+        let a =
+          match b with
+          | `Left b -> Test_ledger.Hash.merge ~height a b
+          | `Right b -> Test_ledger.Hash.merge ~height b a
+        in
+        (a, height + 1))
   in
   path_root = root
 
 let little_check_path account (path : L3.Path.t) root =
-  let path_root = 
+  let (path_root, _) =
     List.fold 
-      ~init:(Test_ledger.Hash.hash_account account)
+      ~init:(Test_ledger.Hash.hash_account account, 0)
       path
-      ~f:(fun a b -> 
-        match b with
-        | `Left b -> Test_ledger.Hash.merge a b
-        | `Right b -> Test_ledger.Hash.merge b a)
+      ~f:(fun (a, height) b ->
+        let a =
+          match b with
+          | `Left b -> Test_ledger.Hash.merge ~height a b
+          | `Right b -> Test_ledger.Hash.merge ~height b a
+        in
+        (a, height + 1))
   in
   path_root = root
 

@@ -91,7 +91,7 @@ module type F =
        type hash [@@deriving sexp, hash, compare, bin_io]
        val hash_account : Account.t -> hash 
        val empty_hash : hash
-       val merge : hash -> hash -> hash
+       val merge : height:int -> hash -> hash -> hash
      end)
     (Key : sig 
         type t [@@deriving sexp, bin_io]

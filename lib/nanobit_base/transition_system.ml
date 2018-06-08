@@ -19,8 +19,6 @@ module type S = sig
 
     val typ : (var, t) Typ.t
 
-    val update_exn : t -> Update.value -> t
-
     module Checked : sig
       val hash : var -> (Hash.var, _) Checked.t
       val is_base_hash : Hash.var -> (Boolean.var, _) Checked.t
@@ -101,6 +99,7 @@ struct
     let prev_state_valid wrap_vk prev_state_hash =
       let open Let_syntax in
       with_label __LOC__ begin
+        (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
         let%bind prev_state_hash_bits = State.Hash.var_to_bits prev_state_hash in
         let%bind prev_top_hash =
           Hash.hash (wrap_vk @ prev_state_hash_bits)
@@ -134,7 +133,7 @@ struct
         let%bind () =
           with_label __LOC__ begin
             let%bind sh = State.Hash.var_to_bits next_state_hash in
-            (* We coudl be reusing the intermediate state of the hash on sh here instead of
+            (* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
             Hash.hash (wrap_vk @ sh) >>= assert_equal ~label:"equal_to_top_hash" top_hash
           end

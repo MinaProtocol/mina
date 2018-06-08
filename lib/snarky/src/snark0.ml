@@ -205,6 +205,22 @@ module Constraint = struct
       R1CS_constraint_system.add_constraint_with_annotation system c
         (stack_to_string (label :: stack)))
   ;;
+
+  let eval_basic t get_value =
+    match t with
+    | Boolean v ->
+      let x = get_value v in
+      Field.(equal x zero || equal x one)
+    | Equal (v1, v2) ->
+      Field.equal (get_value v1) (get_value v2)
+    | R1CS (v1, v2, v3) ->
+      Field.(equal (mul (get_value v1) (get_value v2)) (get_value v3))
+
+  let eval t get_value = List.for_all t ~f:(fun {basic} -> eval_basic basic get_value)
+
+  let annotation (t : t) =
+    String.concat ~sep:"; "
+      (List.filter_map t ~f:(fun {annotation} -> annotation))
 end
 
 module Typ_monads = struct
@@ -944,13 +960,13 @@ module Checked = struct
         | Pure x -> (s, x)
         | With_constraint_system (_, k) ->
           go k handler s
-        | With_label (_, t, k) ->
+        | With_label (_lab, t, k) ->
           let (s', y) = go t handler s in
           go (k y) handler s'
         | As_prover (x, k) ->
           let (s', ()) = As_prover.run x get_value s in
           go k handler s'
-        | Add_constraint (_c, t) ->
+        | Add_constraint (c, t) ->
           go t handler s
         | With_state (p, and_then, t_sub, k) ->
           let (s, s_sub) = As_prover.run p get_value s in
@@ -1064,6 +1080,11 @@ module Checked = struct
           let (s', ()) = As_prover.run x get_value s in
           go stack k handler s'
         | Add_constraint (c, t) ->
+          (if not (Constraint.eval c get_value)
+           then
+             failwithf "Constraint unsatisfied:\n%s\n%s\n"
+               (Constraint.annotation c)
+               (Constraint.stack_to_string stack) ());
           Constraint.add ~stack c system;
           go stack t handler s
         | With_state (p, and_then, t_sub, k) ->
@@ -1087,19 +1108,23 @@ module Checked = struct
         | Next_auxiliary k ->
           go stack (k !next_auxiliary) handler s
     in
-    let (s, x) = go [] t0 Request.Handler.fail s0 in
-    let primary_input = Field.Vector.create () in
-    R1CS_constraint_system.set_auxiliary_input_size system (!next_auxiliary - 1);
-    s, x, get_value, R1CS_constraint_system.is_satisfied system ~primary_input ~auxiliary_input:aux
-  ;;
+    match go [] t0 Request.Handler.fail s0 with
+    | exception e ->
+      Or_error.of_exn e
+    | (s, x) ->
+      let primary_input = Field.Vector.create () in
+      R1CS_constraint_system.set_auxiliary_input_size system (!next_auxiliary - 1);
+      if not (R1CS_constraint_system.is_satisfied system ~primary_input ~auxiliary_input:aux)
+      then Or_error.error_string "Unknown constraint unsatisfied"
+      else
+        Ok (s, x, get_value)
 
   let run_and_check t s =
-    let (s, x, get_value, b) = run_and_check' t s in
-    let (s', x) = As_prover.run x get_value s in
-    s', x, b
-  ;;
+    Or_error.map (run_and_check' t s) ~f:(fun (s, x, get_value) ->
+      let (s', x) = As_prover.run x get_value s in
+      s', x)
 
-  let check t s = let (_, _, _, b) = run_and_check' t s in b
+  let check t s = Or_error.is_ok (run_and_check' t s)
 
   let equal (x : Cvar.t) (y : Cvar.t) : (Cvar.t, _) t =
     let open Let_syntax in
@@ -1385,7 +1410,7 @@ module Checked = struct
 
   let compare ~bit_length a b =
     let open Let_syntax in
-    with_label "Snark_util.compare" begin
+    with_label __LOC__ begin
       let alpha_packed =
         let open Cvar.Infix in
         Cvar.constant (two_to_the bit_length) + b - a

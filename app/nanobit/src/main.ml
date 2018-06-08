@@ -35,7 +35,7 @@ module Make_inputs0
   module Block_nonce = Nanobit_base.Block.Nonce
   module Difficulty = Difficulty
 
-  module Pow = Snark_params.Tick.Pedersen.Digest
+  module Pow = Proof_of_work
 
   module Strength = Strength
   module Ledger = struct
@@ -109,6 +109,13 @@ module Make_inputs0
       { Stripped.transactions = (t.transactions :> Transaction.t list)
       ; previous_ledger_hash = t.previous_ledger_hash
       ; state = t.state
+      }
+
+    let check {Stripped.transactions;previous_ledger_hash;state} =
+      let transactions = List.filter_map ~f:Transaction.check transactions in
+      { transactions
+      ; previous_ledger_hash
+      ; state
       }
 
     let forget_witness {state} = state

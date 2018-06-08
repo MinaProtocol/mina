@@ -401,7 +401,7 @@ module type Basic = sig
   val run_unchecked : ('a, 's) Checked.t -> 's -> 's * 'a
 
   val run_and_check
-    : (('a, 's) As_prover.t, 's) Checked.t -> 's -> 's * 'a * bool
+    : (('a, 's) As_prover.t, 's) Checked.t -> 's -> ('s * 'a) Or_error.t
 
   val check : ('a, 's) Checked.t -> 's -> bool
 end

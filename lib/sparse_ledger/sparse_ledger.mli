@@ -4,7 +4,7 @@ module Make
     (Hash : sig
        type t [@@deriving bin_io, eq, sexp]
 
-       val merge : t -> t -> t
+       val merge : height:int -> t -> t -> t
      end)
     (Key : sig type t [@@deriving bin_io, eq, sexp] end)
     (Account : sig
