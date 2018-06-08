@@ -4,14 +4,14 @@
  ((name minibit_miner)
   (public_name minibit_miner)
   (library_flags (-linkall))
+  (inline_tests)
   (libraries
     ( core
       async
       minibit
       nanobit_base
       protocols
-      async_extra
-      ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib minibit_networking))))
+      async_extra ))
+  (preprocess (pps (ppx_jane)))
   (synopsis "Miner layer for Minibit")))
 

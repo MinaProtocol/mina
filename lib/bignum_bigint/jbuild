@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(library
+ ((name bignum_bigint)
+  (public_name bignum_bigint)
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries (core async async_extra bignum))
+  (preprocess (pps (ppx_jane)))
+  (synopsis "Bignum's bigint re-exported as Bignum_bigint")))
+

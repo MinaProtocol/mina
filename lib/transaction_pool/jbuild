@@ -4,7 +4,8 @@
  ((name transaction_pool)
   (public_name transaction_pool)
   (library_flags (-linkall))
-  (libraries (core protocols minibit async async_extra ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner ppx_deriving.std (-inline-test-lib nanobit_base))))
+  (inline_tests)
+  (libraries (core protocols minibit async async_extra))
+  (preprocess (pps (ppx_jane ppx_deriving.std)))
   (synopsis "Ledger fetcher fetches ledgers over the network")))
 

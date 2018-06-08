@@ -184,7 +184,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         eval (of_binary (lt_binary (xs :> Boolean.var list) (ys :> bool list))))
 
   let field_size_bits =
-    let testbit n i = Bignum.Bigint.((shift_right n i) land one = one) in
+    let testbit n i = Bignum_bigint.((shift_right n i) land one = one) in
     List.init Field.size_in_bits ~f:(fun i ->
       testbit Impl.Field.size
         (Field.size_in_bits - 1 - i))
@@ -266,7 +266,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let%test_unit "boolean_assert_lte" =
       assert (
         check
-          (Checked.all_ignore
+          (Checked.all_unit
           [ boolean_assert_lte Boolean.false_ Boolean.false_ 
           ; boolean_assert_lte Boolean.false_ Boolean.true_
           ; boolean_assert_lte Boolean.true_ Boolean.true_

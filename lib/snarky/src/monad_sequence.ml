@@ -50,7 +50,7 @@ module List
   let fold t ~init ~f = foldi t ~init ~f:(fun _ acc x -> f acc x)
 
   let all = M.all
-  let all_unit = M.all_ignore
+  let all_unit = M.all_unit
 
   let init n ~f =
     let rec go acc i =
