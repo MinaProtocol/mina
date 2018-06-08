@@ -169,7 +169,6 @@ end
 
 module type Transition_intf  = sig
   type ledger_hash
-  type ledger
   type proof
   type nonce
   type time
@@ -262,8 +261,6 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
   module Ledger_proof : Proof_intf
-  module Ledger : Ledger_intf with type valid_transaction := Transaction.With_valid_signature.t
-                               and type ledger_hash := Ledger_hash.t
   (*
 Bundle Snark:
    Input:
@@ -304,7 +301,6 @@ Merge Snark:
      and type witness := Ledger_builder_witness.t
 
   module Transition : Transition_intf with type ledger_hash := Ledger_hash.t
-                                       and type ledger := Ledger.t
                                        and type proof := Ledger_proof.t
                                        and type nonce := Block_nonce.t
                                        and type time := Time.t

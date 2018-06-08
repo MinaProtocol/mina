@@ -127,7 +127,7 @@ module Make
     }
 
   type ledger = Ledger.t
-  type stripped_state_with_witness = State_with_witness.Stripped.t
+  type state_with_witness = State_with_witness.t
 
   let init_gossip_net 
     params
@@ -203,7 +203,7 @@ module Make
       don't_wait_for begin
         Linear_pipe.iter_unordered 
           ~max_concurrency:64 
-          broadcast_state
+          (Linear_pipe.map broadcast_state ~f:State_with_witness.strip)
           ~f:(fun x -> 
             Pipe.write 
               (Gossip_net.broadcast net.gossip_net) 
@@ -211,7 +211,8 @@ module Make
       end;
       ()
 
-    let new_states net t = net.new_state_reader
+    (* TODO: Punish sources that send invalid transactions *)
+    let new_states net t = Linear_pipe.map net.new_state_reader ~f:State_with_witness.check
   end
 
   module Ledger_fetcher_io = struct
