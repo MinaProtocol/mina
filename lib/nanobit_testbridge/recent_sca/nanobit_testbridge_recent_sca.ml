@@ -278,7 +278,7 @@ let main nanobits =
     let best_path =
       List.map2_exn other_paths mask ~f:(fun p b ->
         if b then p else []
-      ) |> List.max_elt ~cmp:(fun p p' -> Int.compare (List.length p) (List.length p'))
+      ) |> List.max_elt ~compare:(fun p p' -> Int.compare (List.length p) (List.length p'))
         |> Option.value_exn
     in
 

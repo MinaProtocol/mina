@@ -4,7 +4,8 @@
  ((name linear_pipe)
   (public_name linear_pipe)
   (library_flags (-linkall))
-  (libraries (core async async_extra ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib nanobit_base))))
+  (inline_tests)
+  (libraries (core async async_extra))
+  (preprocess (pps (ppx_jane)))
   (synopsis "Linear pipes are like pipes, but they're linear (enforced at runtime)")))
 

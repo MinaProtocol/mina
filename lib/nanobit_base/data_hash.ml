@@ -169,13 +169,13 @@ module Make_small (M : sig val bit_length : int end) = struct
     let%map bits = unpack digest in
     { digest; bits = Some (Bitstring.Lsb_first.of_list bits) }
 
-  let max = Bignum.Bigint.(two_to_the bit_length - one)
+  let max = Bignum_bigint.(two_to_the bit_length - one)
 
   let of_hash x =
-    if Bignum.Bigint.(<=) Bigint.(to_bignum_bigint (of_field x)) max
+    if Bignum_bigint.(<=) Bigint.(to_bignum_bigint (of_field x)) max
     then Ok x
     else
       Or_error.errorf
-        !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > %{sexp:Bignum.Bigint.t}"
+        !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > %{sexp:Bignum_bigint.t}"
         x max
 end
