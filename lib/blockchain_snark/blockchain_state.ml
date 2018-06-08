@@ -14,21 +14,21 @@ let target_time_ms = `Two_to_the 13 (* 8.192 seconds *)
 let compute_target timestamp (previous_target : Target.t) time =
   let target_time_ms =
     let `Two_to_the k = target_time_ms in
-    Bignum.Std.Bigint.(pow (of_int 2) (of_int k))
+    Snarky.Bignum_bigint.(pow (of_int 2) (of_int k))
   in
   let target_max = Target.(to_bigint max) in
   let delta_minus_one_max =
-    Bignum.Std.Bigint.(pow (of_int 2) (of_int delta_minus_one_max_bits) - one)
+    Snarky.Bignum_bigint.(pow (of_int 2) (of_int delta_minus_one_max_bits) - one)
   in
-  let div_pow_2 x (`Two_to_the k) = Bignum.Std.Bigint.shift_right x k in
+  let div_pow_2 x (`Two_to_the k) = Snarky.Bignum_bigint.shift_right x k in
   let previous_target = Target.to_bigint previous_target in
   assert Block_time.(time > timestamp);
-  let rate_multiplier = div_pow_2 Bignum.Std.Bigint.(target_max - previous_target) bound_divisor in
+  let rate_multiplier = div_pow_2 Snarky.Bignum_bigint.(target_max - previous_target) bound_divisor in
   let delta =
-    Bignum.Std.Bigint.(
+    Snarky.Bignum_bigint.(
       of_int64 Block_time.(Span.to_ms (diff time timestamp)) / target_time_ms)
   in
-  let open Bignum.Std.Bigint in
+  let open Snarky.Bignum_bigint in
   Target.of_bigint begin
     if delta = zero
     then begin
@@ -50,7 +50,7 @@ let negative_one =
     then Target.max
     else
       Target.of_bigint
-        Bignum.Std.Bigint.(
+        Snarky.Bignum_bigint.(
           Target.(to_bigint max) / pow (of_int 2) (of_int 4))
   in
   let timestamp =

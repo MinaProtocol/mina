@@ -17,7 +17,7 @@ let bit_length = Snark_params.target_bit_length
 
 let max_bigint =
   Tick.Bigint.of_bignum_bigint
-    Bignum.Std.Bigint.(pow (of_int 2) (of_int bit_length) - one)
+    Snarky.Bignum_bigint.(pow (of_int 2) (of_int bit_length) - one)
 
 let max = Bigint.to_field max_bigint
 

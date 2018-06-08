@@ -151,14 +151,14 @@ module Make
       let expect_success err c = (if not (check c ()) then failwith err)
 
       let to_bigint x =
-        Bignum.Std.Bigint.of_string (Unsigned.to_string x)
+        Snarky.Bignum_bigint.of_string (Unsigned.to_string x)
 
       let of_bigint x =
-        Unsigned.of_string (Bignum.Std.Bigint.to_string x)
+        Unsigned.of_string (Snarky.Bignum_bigint.to_string x)
 
       let gen_incl x y =
         Quickcheck.Generator.map ~f:of_bigint
-          (Bignum.Std.Bigint.gen_incl (to_bigint x) (to_bigint y))
+          (Snarky.Bignum_bigint.gen_incl (to_bigint x) (to_bigint y))
 
       let%test_unit "subtraction_completeness" =
         let generator =

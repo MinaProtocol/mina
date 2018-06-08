@@ -30,7 +30,7 @@ module Bigint = struct
   include Bigint.R
 
   let of_bignum_bigint n =
-    of_decimal_string (Bignum.Std.Bigint.to_string n)
+    of_decimal_string (Bignum_bigint.to_string n)
 
   let to_bignum_bigint n =
     let rec go i two_to_the_i acc =
@@ -39,12 +39,12 @@ module Bigint = struct
       else
         let acc' =
           if test_bit n i
-          then Bignum.Std.Bigint.(acc + two_to_the_i)
+          then Bignum_bigint.(acc + two_to_the_i)
           else acc
         in
-        go (i + 1) Bignum.Std.Bigint.(two_to_the_i + two_to_the_i) acc'
+        go (i + 1) Bignum_bigint.(two_to_the_i + two_to_the_i) acc'
     in
-    go 0 Bignum.Std.Bigint.one Bignum.Std.Bigint.zero
+    go 0 Bignum_bigint.one Bignum_bigint.zero
 end
 
 module Proof = Proof
@@ -103,10 +103,10 @@ module Field0 = struct
     fun bs -> go Field.one Field.zero bs
 
   let sexp_of_t x =
-    Bignum.Std.Bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
+    Bignum_bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
 
   let t_of_sexp s =
-    Bigint.to_field (Bigint.of_bignum_bigint (Bignum.Std.Bigint.t_of_sexp s))
+    Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.t_of_sexp s))
 
   module Infix = struct
     let (+) = add

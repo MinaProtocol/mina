@@ -3,10 +3,10 @@ open Core
 module Stable = struct
   module V1 = struct
     module T = struct
-      type t = Bignum.Std.Bigint.t * Bignum.Std.Bigint.t
+      type t = Snarky.Bignum_bigint.t * Snarky.Bignum_bigint.t
       [@@deriving sexp, eq, compare, hash]
     end
-    type t = Bignum.Std.Bigint.Stable.V1.t * Bignum.Std.Bigint.Stable.V1.t
+    type t = Snarky.Bignum_bigint.Stable.V1.t * Snarky.Bignum_bigint.Stable.V1.t
     [@@deriving bin_io]
     let equal = T.equal
 

@@ -4,20 +4,20 @@ module Schnorr
     (Impl : Snark_intf.S)
     (Curve : Curves.Edwards.S
      with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-      and type Scalar.value = Bignum.Std.Bigint.t
+      and type Scalar.value = Bignum_bigint.t
       and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
       and type boolean_var := Impl.Boolean.var
       and type var = Impl.Cvar.t * Impl.Cvar.t
       and type field := Impl.Field.t)
     (Hash : sig
-       val hash : bool list -> Bignum.Std.Bigint.t
+       val hash : bool list -> Bignum_bigint.t
        val hash_checked : Impl.Boolean.var list -> (Curve.Scalar.var, _) Impl.Checked.t
       end)
 =
 struct
   open Impl
 
-  module Scalar = Bignum.Std.Bigint
+  module Scalar = Bignum_bigint
 
   module Signature = struct
     type 'a t = 'a * 'a
@@ -90,7 +90,7 @@ struct
 
     let create () =
       (* TODO: More secure random *)
-      let x = Bignum.Std.Bigint.random Curve.Params.order in
+      let x = Bignum_bigint.random Curve.Params.order in
       { public = Curve.scale Curve.generator x
       ; secret = x
       }
