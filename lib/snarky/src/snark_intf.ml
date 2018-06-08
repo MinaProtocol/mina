@@ -14,8 +14,8 @@ module type Basic = sig
 
   module Bigint : sig
     include Bigint_intf.Extended with type field := field
-    val of_bignum_bigint : Bignum.Bigint.t -> t
-    val to_bignum_bigint : t -> Bignum.Bigint.t
+    val of_bignum_bigint : Bignum.Std.Bigint.t -> t
+    val to_bignum_bigint : t -> Bignum.Std.Bigint.t
   end
 
   module Cvar : sig
@@ -248,7 +248,7 @@ module type Basic = sig
 
     val typ : (var, t) Typ.t
 
-    val size : Bignum.Bigint.t
+    val size : Bignum.Std.Bigint.t
     val unpack : t -> bool list
     val project : bool list -> t
   end

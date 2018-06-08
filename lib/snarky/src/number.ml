@@ -1,12 +1,12 @@
 open Core_kernel
 
-let pow2 n = Bignum.Bigint.(pow (of_int 2) (of_int n))
+let pow2 n = Bignum.Std.Bigint.(pow (of_int 2) (of_int n))
 
 let bigint_num_bits =
   let rec go acc i =
-    if Bignum.Bigint.(acc = zero)
+    if Bignum.Std.Bigint.(acc = zero)
     then i
-    else go (Bignum.Bigint.shift_right acc 1) (i + 1)
+    else go (Bignum.Std.Bigint.shift_right acc 1) (i + 1)
   in
   fun n -> go n 0
 ;;
@@ -16,8 +16,8 @@ module Make (Impl : Snark_intf.Basic) = struct
   open Let_syntax
 
   type t =
-    { upper_bound : Bignum.Bigint.t
-    ; lower_bound : Bignum.Bigint.t
+    { upper_bound : Bignum.Std.Bigint.t
+    ; lower_bound : Bignum.Std.Bigint.t
     ; var         : Cvar.t
     ; bits        : Boolean.var list option
     }
@@ -42,8 +42,8 @@ module Make (Impl : Snark_intf.Basic) = struct
   let of_bits bs =
     let n = List.length bs in
     assert (n < Field.size_in_bits);
-    { upper_bound = Bignum.Bigint.(pow2 n - one)
-    ; lower_bound = Bignum.Bigint.zero
+    { upper_bound = Bignum.Std.Bigint.(pow2 n - one)
+    ; lower_bound = Bignum.Std.Bigint.zero
     ; var = Checked.project bs
     ; bits = Some bs
     }
@@ -52,8 +52,8 @@ module Make (Impl : Snark_intf.Basic) = struct
     let%map bits = to_bits n in
     let divided = List.drop bits k in
     let divided_of_bits = of_bits divided in
-    { upper_bound = Bignum.Bigint.(divided_of_bits.upper_bound / (pow (of_int 2) (of_int k)))
-    ; lower_bound = Bignum.Bigint.(divided_of_bits.lower_bound / (pow (of_int 2) (of_int k)))
+    { upper_bound = Bignum.Std.Bigint.(divided_of_bits.upper_bound / (pow (of_int 2) (of_int k)))
+    ; lower_bound = Bignum.Std.Bigint.(divided_of_bits.lower_bound / (pow (of_int 2) (of_int k)))
     ; var = divided_of_bits.var
     ; bits = divided_of_bits.bits
     }
@@ -62,7 +62,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     assert (n < Field.size_in_bits);
     with_label "Number.clamp_to_n_bits" begin
       let k = pow2 n in
-      if Bignum.Bigint.(t.upper_bound < k)
+      if Bignum.Std.Bigint.(t.upper_bound < k)
       then return t
       else
         let%bind bs = to_bits t in
@@ -74,7 +74,7 @@ module Make (Impl : Snark_intf.Basic) = struct
             ~then_:g
             ~else_:(Cvar.constant Field.(sub (two_to_the n) one))
         in
-        { upper_bound = Bignum.Bigint.(k - one)
+        { upper_bound = Bignum.Std.Bigint.(k - one)
         ; lower_bound = t.lower_bound
         ; var = r
         ; bits = None
@@ -83,7 +83,7 @@ module Make (Impl : Snark_intf.Basic) = struct
   ;;
 
   let (<) x y =
-    let open Bignum.Bigint in
+    let open Bignum.Std.Bigint in
     (*
       x [ ]
       y     [ ]
@@ -106,7 +106,7 @@ module Make (Impl : Snark_intf.Basic) = struct
   ;;
 
   let (<=) x y =
-    let open Bignum.Bigint in
+    let open Bignum.Std.Bigint in
     (*
       x [ ]
       y   [ ]
@@ -157,7 +157,7 @@ module Make (Impl : Snark_intf.Basic) = struct
 
   let if_ b ~then_ ~else_ =
     let%map var = Checked.if_ b ~then_:then_.var ~else_:else_.var in
-    let open Bignum.Bigint in
+    let open Bignum.Std.Bigint in
     { upper_bound = max then_.upper_bound else_.upper_bound
     ; lower_bound = min then_.lower_bound else_.lower_bound
     ; var
@@ -165,7 +165,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     }
 
   let (+) x y =
-    let open Bignum.Bigint in
+    let open Bignum.Std.Bigint in
     let upper_bound = x.upper_bound + y.upper_bound in
     if upper_bound < Field.size
     then
@@ -178,7 +178,7 @@ module Make (Impl : Snark_intf.Basic) = struct
         (to_string x.upper_bound) (to_string y.upper_bound) ()
 
   let (-) x y =
-    let open Bignum.Bigint in
+    let open Bignum.Std.Bigint in
     (* x_upper_bound >= x >= x_lower_bound >= y_upper_bound >= y >= y_lower_bound *)
     if x.lower_bound >= y.upper_bound
     then
@@ -192,7 +192,7 @@ module Make (Impl : Snark_intf.Basic) = struct
         (to_string x.lower_bound) (to_string y.upper_bound) ()
 
   let ( * ) x y =
-    let open Bignum.Bigint in
+    let open Bignum.Std.Bigint in
     with_label "Number.(*)" begin
       let upper_bound = x.upper_bound * y.upper_bound in
       if upper_bound < Field.size

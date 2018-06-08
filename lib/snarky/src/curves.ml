@@ -68,9 +68,9 @@ module Edwards = struct
   module type Params_intf = sig
     type field
     val d : field
-    val cofactor : Bignum.Bigint.t
+    val cofactor : Bignum.Std.Bigint.t
     val generator : field * field
-    val order : Bignum.Bigint.t
+    val order : Bignum.Std.Bigint.t
   end
 
   module Basic = struct

@@ -29,5 +29,5 @@ val var_to_unpacked : Cvar.t -> (Unpacked.var, _) Tick.Checked.t
 
 val constant : Packed.value -> Packed.var
 
-val to_bigint : t -> Bignum.Bigint.t
-val of_bigint : Bignum.Bigint.t -> t
+val to_bigint : t -> Bignum.Std.Bigint.t
+val of_bigint : Bignum.Std.Bigint.t -> t

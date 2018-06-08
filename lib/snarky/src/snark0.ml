@@ -10,7 +10,8 @@ module Restrict_monad2 (M : Monad.S2)(T : sig type t end)
   let bind = M.bind
   let return = M.return
   let all = M.all
-  let all_ignore = M.all_ignore
+  let all_ignore = M.all_unit
+  let all_unit = M.all_unit
   let ignore_m = M.ignore_m
   let join = M.join
   module Let_syntax = M.Let_syntax
@@ -29,7 +30,7 @@ module Bigint = struct
   include Bigint.R
 
   let of_bignum_bigint n =
-    of_decimal_string (Bignum.Bigint.to_string n)
+    of_decimal_string (Bignum.Std.Bigint.to_string n)
 
   let to_bignum_bigint n =
     let rec go i two_to_the_i acc =
@@ -38,12 +39,12 @@ module Bigint = struct
       else
         let acc' =
           if test_bit n i
-          then Bignum.Bigint.(acc + two_to_the_i)
+          then Bignum.Std.Bigint.(acc + two_to_the_i)
           else acc
         in
-        go (i + 1) Bignum.Bigint.(two_to_the_i + two_to_the_i) acc'
+        go (i + 1) Bignum.Std.Bigint.(two_to_the_i + two_to_the_i) acc'
     in
-    go 0 Bignum.Bigint.one Bignum.Bigint.zero
+    go 0 Bignum.Std.Bigint.one Bignum.Std.Bigint.zero
 end
 
 module Proof = Proof
@@ -102,10 +103,10 @@ module Field0 = struct
     fun bs -> go Field.one Field.zero bs
 
   let sexp_of_t x =
-    Bignum.Bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
+    Bignum.Std.Bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
 
   let t_of_sexp s =
-    Bigint.to_field (Bigint.of_bignum_bigint (Bignum.Bigint.t_of_sexp s))
+    Bigint.to_field (Bigint.of_bignum_bigint (Bignum.Std.Bigint.t_of_sexp s))
 
   module Infix = struct
     let (+) = add
@@ -609,7 +610,7 @@ module Typ = struct
       Store.all (List.map ~f:store ts)
     in
     let alloc = Alloc.all (List.init length (fun _ -> alloc)) in
-    let check ts = Checked1.all_ignore (List.map ts ~f:check) in
+    let check ts = Checked1.all_unit (List.map ts ~f:check) in
     let read vs = Read.all (List.map vs ~f:read) in
     { read; store; alloc; check }
   ;;

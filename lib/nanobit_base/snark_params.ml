@@ -62,7 +62,7 @@ module Tick = struct
       let compare t1 t2 = Bigint.(compare (of_field t1) (of_field t2))
 
       let hash_fold_t s x =
-        Bignum.Bigint.hash_fold_t s
+        Bignum.Std.Bigint.hash_fold_t s
           Bigint.(to_bignum_bigint (of_field x))
 
       let hash = Hash.of_fold hash_fold_t
@@ -101,8 +101,8 @@ module Tick = struct
   2^3 * 5 * 7 * 399699743 * 4252498232415687930110553454452223399041429939925660931491171303058234989338533 *)
 
           let d = Field.of_int 20
-          let cofactor = Bignum.Bigint.(of_int 8 * of_int 5 * of_int 7 * of_int 399699743)
-          let order = Bignum.Bigint.of_string "4252498232415687930110553454452223399041429939925660931491171303058234989338533"
+          let cofactor = Bignum.Std.Bigint.(of_int 8 * of_int 5 * of_int 7 * of_int 399699743)
+          let order = Bignum.Std.Bigint.of_string "4252498232415687930110553454452223399041429939925660931491171303058234989338533"
 
           let generator = 
             let f s = Tick_curve.Bigint.R.(to_field (of_decimal_string s)) in
@@ -114,10 +114,10 @@ module Tick = struct
         (* Someday: Make more efficient *)
         open Impl
         type var = Boolean.var list
-        type value = Bignum.Bigint.t
+        type value = Bignum.Std.Bigint.t
 
         let test_bit t i =
-          Bignum.Bigint.(shift_right t i land one = one)
+          Bignum.Std.Bigint.(shift_right t i land one = one)
 
         let pack bs =
           let pack_char bs =
@@ -127,13 +127,13 @@ module Tick = struct
           in
           String.of_char_list (List.map ~f:pack_char (List.chunks_of ~length:8 bs))
           |> Z.of_bits
-          |> Bignum.Bigint.of_zarith_bigint
+          |> Bignum.Std.Bigint.of_zarith_bigint
 
         let length = bit_length
         let typ : (var, value) Typ.t =
           Typ.(
             transport (list ~length Boolean.typ)
-              ~there:(fun n -> List.init length ~f:(Z.testbit (Bignum.Bigint.to_zarith_bigint n)))
+              ~there:(fun n -> List.init length ~f:(Z.testbit (Bignum.Std.Bigint.to_zarith_bigint n)))
               ~back:pack)
 
         let equal = Checked.equal_bitstrings
