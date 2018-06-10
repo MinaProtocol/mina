@@ -19,8 +19,7 @@ module type S = sig
   val transaction_snark_keys : Transaction_snark.Keys.t
 
   module Step : sig
-    val verification_key : Tick.Verification_key.t
-    val proving_key : Tick.Proving_key.t
+    val keys : Tick.Keypair.t
 
     val input : unit -> ('a, 'b, Tick.Field.var -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
 
@@ -36,8 +35,7 @@ module type S = sig
   end
 
   module Wrap : sig
-    val verification_key : Tock.Verification_key.t
-    val proving_key : Tock.Proving_key.t
+    val keys : Tock.Keypair.t
 
     val input : unit -> ('a, 'b, Tock.Field.var -> 'a, Tock.Field.t -> 'b) Tock.Data_spec.t
 

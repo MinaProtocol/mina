@@ -13,7 +13,8 @@ module Transition_utils
 
   let instance_hash =
     let self =
-      Step.Verifier.Verification_key.to_bool_list Wrap.verification_key
+      Step.Verifier.Verification_key.to_bool_list
+        (Tock.Keypair.vk Wrap.keys)
     in
     fun state ->
       Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
@@ -35,7 +36,7 @@ module Transition_utils
 
   let wrap : Tick.Pedersen.Digest.t -> Tick.Proof.t -> Tock.Proof.t =
     fun hash proof ->
-      Tock.prove Wrap.proving_key (Wrap.input ())
+      Tock.prove (Tock.Keypair.pk Wrap.keys) (Wrap.input ())
         { Wrap.Prover_state.proof }
         Wrap.main
         (embed hash)
@@ -49,9 +50,9 @@ module Transition_utils
     let%map next_state = update prev_state block in
     let next_state_top_hash = instance_hash next_state in
     let prev_proof =
-      Tick.prove Step.proving_key (Step.input ())
+      Tick.prove (Tick.Keypair.pk Step.keys) (Step.input ())
         { Step.Prover_state.prev_proof
-        ; wrap_vk = Wrap.verification_key
+        ; wrap_vk = Tock.Keypair.vk Wrap.keys
         ; prev_state
         ; update = block
         }
@@ -64,7 +65,7 @@ module Transition_utils
 
   let verify state proof =
     Tock.verify proof
-      (Wrap.verification_key) (Wrap.input ()) (embed (instance_hash state))
+      (Tock.Keypair.vk Wrap.keys) (Wrap.input ()) (embed (instance_hash state))
 
   (* TODO: Hard code base_hash, or in any case make it not depend on
   transition *)
@@ -82,9 +83,9 @@ module Transition_utils
     end else
       Lazy.map base_hash ~f:(fun base_hash ->
         let tick =
-          Tick.prove (Keys.Step.proving_key) (Keys.Step.input ())
+          Tick.prove (Tick.Keypair.pk Keys.Step.keys) (Keys.Step.input ())
             { Keys.Step.Prover_state.prev_proof = Tock.Proof.dummy
-            ; wrap_vk  = Keys.Wrap.verification_key
+            ; wrap_vk  = Tock.Keypair.vk Keys.Wrap.keys
             ; prev_state = Blockchain.State.negative_one
             ; update = Block.genesis
             }

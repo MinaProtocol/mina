@@ -19,10 +19,11 @@ let create ~directory ~digest_input ~bin_t f input =
   | Error ((`IO_error _ | `No_exist) as err) ->
     begin match err with
     | `IO_error e -> Core.printf "Cached error: %s\n%!" (Error.to_string_hum e)
-    | `No_exist -> ()
+    | `No_exist -> Core.printf "Not found\n%!"
     end;
     let value = f input in
     let%map checksum = store_with_checksum controller path value in
     { path; value; checksum }
   | Ok { data; checksum } ->
+    Core.printf "All ok!\n%!";
     return { path; value=data; checksum }
