@@ -257,7 +257,7 @@ module type Basic = sig
   include Monad.Syntax2 with type ('a, 's) t := ('a, 's) Checked.t
 
   module Proving_key : sig
-    type t
+    type t [@@deriving bin_io]
     val to_string : t -> string
     val of_string : string -> t
     val to_bigstring : t -> Bigstring.t
@@ -265,7 +265,7 @@ module type Basic = sig
   end
 
   module Verification_key : sig
-    type t
+    type t [@@deriving bin_io]
     val to_string : t -> string
     val of_string : string -> t
     val to_bigstring : t -> Bigstring.t
@@ -273,7 +273,8 @@ module type Basic = sig
   end
 
   module Keypair : sig
-    type t
+    type t [@@deriving bin_io]
+    val create : pk:Proving_key.t -> vk:Verification_key.t -> t
     val pk : t -> Proving_key.t
     val vk : t -> Verification_key.t
   end
@@ -405,6 +406,13 @@ module type Basic = sig
     : (('a, 's) As_prover.t, 's) Checked.t -> 's -> ('s * 'a) Or_error.t
 
   val check : ('a, 's) Checked.t -> 's -> bool
+
+  module Debug : sig
+    val constraint_system_digest
+      : exposing:((unit, 's) Checked.t, _, 'k_var, _) Data_spec.t
+      -> 'k_var
+      -> Md5.t
+  end
 end
 
 module type S = sig

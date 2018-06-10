@@ -50,15 +50,24 @@ end
 
 module Proof = Proof
 
-module Verification_key = Verification_key
-module Proving_key = Proving_key
+module Verification_key = struct
+  include Verification_key
+  include Binable.Of_stringable(Verification_key)
+end
+
+module Proving_key = struct
+  include Proving_key
+  include Binable.Of_stringable(Proving_key)
+end
 
 module Keypair = struct
   type t =
     { pk : Proving_key.t
     ; vk : Verification_key.t
     }
-  [@@deriving fields]
+  [@@deriving fields, bin_io]
+
+  let create = Fields.create
 
   let of_backend_keypair kp = { pk = Keypair.pk kp; vk = Keypair.vk kp }
 end
@@ -1621,6 +1630,11 @@ include Checked
 let generate_keypair = Run.generate_keypair
 let prove = Run.prove
 let verify = Run.verify
+
+module Debug = struct
+  let constraint_system_digest ~exposing t : Md5.t =
+    R1CS_constraint_system.digest (Run.constraint_system exposing t)
+end
 
 end
 

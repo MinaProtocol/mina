@@ -41,14 +41,14 @@ module type S = sig
 
   module Verification_key : sig
     type t
-    val to_string : t -> string
-    val of_string : string -> t
+    include Stringable.S with type t := t
     val to_bigstring : t -> Bigstring.t
     val of_bigstring : Bigstring.t -> t
   end
 
   module Proof : sig
     type t
+    include Stringable.S with type t := t
     val create : Proving_key.t -> primary:Field.Vector.t -> auxiliary:Field.Vector.t -> t
     val verify : t -> Verification_key.t -> Field.Vector.t -> bool
   end
@@ -75,5 +75,6 @@ module type S = sig
     val check_exn : t -> unit
     val is_satisfied
       : t -> primary_input:Field.Vector.t -> auxiliary_input:Field.Vector.t -> bool
+    val digest : t -> Md5.t
   end
 end
