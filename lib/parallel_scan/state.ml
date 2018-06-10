@@ -1,7 +1,5 @@
 open Core_kernel
 
-open Dependency_tree
-
 module Job = struct
   type ('a, 'd) t =
     | Merge_up of 'a option
@@ -40,11 +38,10 @@ end
 type ('a, 'b, 'd) t =
   { jobs : ('a, 'd) Job.t Ring_buffer.t
   ; data_buffer : 'd Queue.t
-  ; deps : int Dependency_tree.Dep_node.t Int.Table.t sexp_opaque
-  ; mutable acc : 'b
+  ; mutable acc : (int * 'b)
   }
 [@@deriving sexp, bin_io]
 
-let acc {acc} = acc
+let acc {acc} = snd acc
 let jobs {jobs} = jobs
 

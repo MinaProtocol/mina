@@ -16,6 +16,8 @@ let create ~len ~default =
   ; position = 0
   }
 
+let length {data} = Array.length data
+
 let copy {data;position} =
   { data = Array.copy data
   ; position
@@ -68,11 +70,9 @@ let gen gen_elem =
   let%map elems = Quickcheck.Generator.list_with_length len gen_elem
       and default_elem = gen_elem
   in
-  let b = create ~len ~default:default_elem in
-  back ~n:1 b;
-  add_many b elems;
-  b.position <- 0;
-  b
+  { data = Array.of_list elems
+  ; position = 0
+  }
 
 let%test_unit "buffer wraps around" =
   let b = create ~len:3 ~default:0 in
@@ -92,6 +92,6 @@ let%test_unit "b = let s = read_all b; back1;add_many s;forwards1" =
     back ~n:1 b;
     add_many b stuff;
     forwards ~n:1 b;
-    assert (old = b)
+    assert (old.data = b.data && old.position = b.position)
   )
 

@@ -3,8 +3,9 @@
 (library
  ((name parallel_scan)
   (public_name parallel_scan)
+  (inline_tests)
   (library_flags (-linkall))
-  (libraries (linear_pipe core async async_extra ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_driver.runner (-inline-test-lib parallel_scan))))
+  (libraries (linear_pipe core async async_extra))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Parallel scan over an infinite stream (incremental map-reduce)")))
 
