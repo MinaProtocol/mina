@@ -1,3 +1,4 @@
+open Core
 open Nanobit_base.Snark_params
 
 module Step_prover_state = struct
@@ -47,11 +48,26 @@ module type S = sig
   end
 end
 
+let transaction_snark_keys = lazy (Snark_keys.transaction ())
+
+let blockchain_snark_keys = lazy (Snark_keys.blockchain ())
+
+let keys = Set_once.create ()
+
+let create () =
+  match Set_once.get keys with
+  | Some x -> x
+  | None ->
+    let open Async in
+    let%map tx_keys = Lazy.force transaction_snark_keys
+    and bc_keys = Lazy.force blockchain_snark_keys
+    in
+    failwith "TODO"
+
+(*
 let keys =
   lazy begin
     let module M = struct
-      module M = Transition_keys.Make(struct end)
-      open M
       let transaction_snark_keys = transaction_snark_keys
 
       module Step = struct
@@ -94,4 +110,4 @@ let keys =
 
 module Make () = struct
   include (val (Lazy.force keys))
-end
+   end *)

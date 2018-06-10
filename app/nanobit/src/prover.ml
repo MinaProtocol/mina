@@ -78,22 +78,20 @@ module Transition_utils
   let base_proof =
     if Insecure.compute_base_proof
     then begin
-      Tock.Proof.dummy
-    end else lazy begin
-      let dummy_proof = Lazy.force Tock.Proof.dummy in
-      let base_hash = Lazy.force base_hash in
-      let tick =
-        Tick.prove (Keys.Step.proving_key) (Keys.Step.input ())
-          { Keys.Step.Prover_state.prev_proof = dummy_proof
-          ; wrap_vk  = Keys.Wrap.verification_key
-          ; prev_state = Blockchain.State.negative_one
-          ; update = Block.genesis
-          }
-          Keys.Step.main
-          base_hash
-      in
-      wrap base_hash tick
-    end
+      Lazy.return Tock.Proof.dummy
+    end else
+      Lazy.map base_hash ~f:(fun base_hash ->
+        let tick =
+          Tick.prove (Keys.Step.proving_key) (Keys.Step.input ())
+            { Keys.Step.Prover_state.prev_proof = Tock.Proof.dummy
+            ; wrap_vk  = Keys.Wrap.verification_key
+            ; prev_state = Blockchain.State.negative_one
+            ; update = Block.genesis
+            }
+            Keys.Step.main
+            base_hash
+        in
+        wrap base_hash tick)
 end
 
 module Worker_state = struct
@@ -116,11 +114,12 @@ module Worker_state = struct
   type init_arg = unit [@@deriving bin_io]
   type t = (module S)
 
-  let create () : t =
+  let create () : t Deferred.t =
+    let%map keys = Keys.create () in
     let module M = struct
       open Snark_params
 
-      module Keys = Keys.Make()
+      module Keys = (val keys)
       module Transaction_snark = Transaction_snark.Make(struct let keys = Keys.transaction_snark_keys end)
       include Transition_utils(Keys)(Transaction_snark)
     end
@@ -206,7 +205,7 @@ module Worker = struct
         ; verify_transaction_snark = f verify_transaction_snark
         }
 
-      let init_worker_state () = return (Worker_state.create ())
+      let init_worker_state () = Worker_state.create ()
       let init_connection_state ~connection:_ ~worker_state:_ = return
     end
   end

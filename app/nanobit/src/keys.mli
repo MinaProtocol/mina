@@ -47,4 +47,4 @@ module type S = sig
   end
 end
 
-module Make () : S
+val create : unit -> (module S) Async.Deferred.t
