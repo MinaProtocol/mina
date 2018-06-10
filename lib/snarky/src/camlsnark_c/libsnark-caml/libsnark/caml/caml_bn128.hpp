@@ -9,6 +9,7 @@
 #include <libff/algebra/fields/bigint.hpp>
 #include <libff/algebra/scalar_multiplication/wnaf.hpp>
 #include <gmp.h>
+#include <openssl/md5.h>
 
 typedef libff::bn128_pp ppT;
 typedef libff::Fr<ppT> FieldT;
