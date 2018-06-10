@@ -1,0 +1,15 @@
+(library
+ ((name        dummy_proof)
+  (public_name dummy_proof)
+  (libraries
+    ( crypto_params
+      snarky ))
+  (ppx_runtime_libraries (base))
+  (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))))
+
+(rule
+ ((targets (dummy_proof.ml))
+  (deps    (gen_proofs/gen_proofs.exe))
+  (action  (run ${<} ${@}))))
+
+(jbuild_version 1)
