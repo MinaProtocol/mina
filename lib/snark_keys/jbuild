@@ -1,0 +1,17 @@
+(library
+ ((name        snark_keys)
+  (public_name snark_keys)
+  (libraries
+    ( async
+      transaction_snark
+      blockchain_snark
+      core
+    ))
+  (preprocess (pps (ppx_jane ppxlib.runner)))))
+
+(rule
+ ((targets (snark_keys.ml))
+  (deps    (gen_keys/gen_keys.exe))
+  (action  (run ${<} ${@}))))
+
+(jbuild_version 1)
