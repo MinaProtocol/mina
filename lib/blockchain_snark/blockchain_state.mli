@@ -10,7 +10,7 @@ val zero : t
 val zero_hash : State_hash.t
 val compute_target : Block_time.t -> Target.t -> Block_time.t -> Target.t
 
-module Make_update (T : Transaction_snark.S) : sig
+module Make_update (T : Transaction_snark.Verification.S) : sig
   val update : t -> Block.t -> t Or_error.t
 
   module Checked : sig

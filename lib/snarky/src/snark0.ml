@@ -25,8 +25,6 @@ open Backend
 
 type field = Field.t
 
-module R1CS_constraint_system = R1CS_constraint_system
-
 module Bigint = struct
   include Bigint.R
 
@@ -1528,8 +1526,12 @@ module Run = struct
       Checked.constraint_system ~num_inputs:(!next_input - 1) r
   ;;
 
-  let constraint_system : ((unit, 's) Checked.t, _, 'k_var, _) t -> 'k_var -> R1CS_constraint_system.t =
-    fun t k -> r1cs_h (ref 1) t k
+  let constraint_system
+    : exposing:((unit, 's) Checked.t, _, 'k_var, _) t
+    -> 'k_var
+    -> R1CS_constraint_system.t
+    =
+    fun ~exposing k -> r1cs_h (ref 1) exposing k
   ;;
 
   let generate_keypair
@@ -1537,8 +1539,9 @@ module Run = struct
       -> 'k_var
       -> Keypair.t
     =
-    fun ~exposing:t k ->
-      Backend.R1CS_constraint_system.create_keypair (constraint_system t k)
+    fun ~exposing k ->
+      Backend.R1CS_constraint_system.create_keypair
+        (constraint_system ~exposing k)
       |> Keypair.of_backend_keypair
 
   let verify
@@ -1630,12 +1633,12 @@ include Checked
 let generate_keypair = Run.generate_keypair
 let prove = Run.prove
 let verify = Run.verify
+let constraint_system = Run.constraint_system
 
-module Debug = struct
-  let constraint_system_digest ~exposing t : Md5.t =
-    R1CS_constraint_system.digest (Run.constraint_system exposing t)
+module R1CS_constraint_system = struct
+  include R1CS_constraint_system
+  let generate_keypair = Fn.compose Keypair.of_backend_keypair create_keypair
 end
-
 end
 
 module Make (Backend : Backend_intf.S) = struct

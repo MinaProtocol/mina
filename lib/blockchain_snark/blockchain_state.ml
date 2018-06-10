@@ -102,7 +102,7 @@ let bit_length =
     ~strength:(add Strength.bit_length)
     ~timestamp:(fun acc _ _ -> acc + Block_time.bit_length)
 
-module Make_update (T : Transaction_snark.S) = struct
+module Make_update (T : Transaction_snark.Verification.S) = struct
   let update state (block : Block.t) =
     let good_body =
       Ledger_hash.equal state.ledger_hash block.body.target_hash

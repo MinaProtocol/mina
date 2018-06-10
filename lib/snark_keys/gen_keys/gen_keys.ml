@@ -49,7 +49,7 @@ let main () =
     Transaction_snark.Keys.cached ()
   in
   let module M = Blockchain_snark.Blockchain_transition.Make(
-    Transaction_snark.Make(struct let keys = tx_keys end))
+    Transaction_snark.Verification.Make(struct let keys = tx_keys end))
   in
   let%bind (bc_keys_location, _bc_keys, bc_keys_checksum) = M.Keys.cached () in
   let loc = Ppxlib.Location.none in

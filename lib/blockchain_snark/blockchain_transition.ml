@@ -53,7 +53,7 @@ module Keys = struct
     (t, checksum ~step:step.checksum ~wrap:wrap.checksum)
 end
 
-module Make (T : Transaction_snark.S) = struct
+module Make (T : Transaction_snark.Verification.S) = struct
   module System = struct
     module U = Blockchain_state.Make_update(T)
     module State = struct
@@ -83,25 +83,21 @@ module Make (T : Transaction_snark.S) = struct
     let cached () =
       let open Async in
       let%bind step =
-        Cached.create ~directory:Cache_dir.cache_dir
+        Cached.create
+          ~directory:Cache_dir.cache_dir
           ~bin_t:Tick.Keypair.bin_t
-          ~digest_input:(fun () ->
-            Md5.to_hex
-              (Tick.Debug.constraint_system_digest Step_base.main ~exposing:(Step_base.input ())))
-          (fun () ->
-            Tick.generate_keypair Step_base.main ~exposing:(Step_base.input ()))
-          ()
+          ~digest_input:(Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
+          Tick.R1CS_constraint_system.generate_keypair
+          (Tick.constraint_system ~exposing:(Step_base.input ()) Step_base.main)
       in
       let module Wrap = Wrap_base(struct let verification_key = Tick.Keypair.vk step.value end) in
       let%map wrap =
-        Cached.create ~directory:Cache_dir.cache_dir
+        Cached.create
+          ~directory:Cache_dir.cache_dir
           ~bin_t:Tock.Keypair.bin_t
-          ~digest_input:(fun () ->
-            Md5.to_hex
-              (Tock.Debug.constraint_system_digest Wrap.main ~exposing:(Wrap.input ())))
-          (fun () ->
-            Tock.generate_keypair Wrap.main ~exposing:(Wrap.input ()))
-          ()
+          ~digest_input:(Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
+          Tock.R1CS_constraint_system.generate_keypair
+          (Tock.constraint_system ~exposing:(Wrap.input ()) Wrap.main)
       in
       let location : Location.t =
         { step = step.path

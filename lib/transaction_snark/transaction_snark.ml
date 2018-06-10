@@ -1,5 +1,6 @@
 open Core
 open Nanobit_base
+open Util
 open Snark_params
 open Snarky
 open Currency
@@ -130,6 +131,20 @@ type t =
 [@@deriving fields, bin_io]
 
 let create = Fields.create
+
+let base_top_hash s1 s2 excess =
+  Tick.Pedersen.digest_fold Hash_prefix.base_snark
+    (Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Amount.Signed.fold excess)
+
+let merge_top_hash s1 s2 fee_excess wrap_vk_bits =
+  Tick.Pedersen.digest_fold Hash_prefix.merge_snark
+    (Ledger_hash.fold s1
+     +> Ledger_hash.fold s2
+     +> Amount.Signed.fold fee_excess
+     +> List.fold wrap_vk_bits)
+
+let embed (x : Tick.Field.t) : Tock.Field.t =
+  Tock.Field.project (Tick.Field.unpack x)
 
 module Keys0 = struct
   type t =
@@ -307,13 +322,6 @@ module Base = struct
   let create_keys () =
     generate_keypair main ~exposing:(tick_input ())
 
-  let top_hash s1 s2 excess =
-    Pedersen.digest_fold Hash_prefix.base_snark
-      (fun ~init ~f ->
-         let init = Ledger_hash.fold s1 ~init ~f in
-         let init = Ledger_hash.fold s2 ~init ~f in
-         Amount.Signed.fold excess ~init ~f)
-
   let tagged_transaction_proof ~proving_key
         state1
         state2
@@ -322,7 +330,7 @@ module Base = struct
     =
     let prover_state : Prover_state.t = { state1; state2; transaction } in
     let main top_hash = handle (main top_hash) handler in
-    let top_hash = top_hash state1 state2 (Tagged_transaction.excess transaction) in
+    let top_hash = base_top_hash state1 state2 (Tagged_transaction.excess transaction) in
     top_hash,
     prove proving_key (tick_input ()) prover_state main top_hash
 
@@ -337,11 +345,10 @@ module Base = struct
   let cached () =
     Cached.create
       ~directory:Cache_dir.cache_dir
-      ~digest_input:(fun () ->
-        Md5.to_hex
-          (Tick.Debug.constraint_system_digest ~exposing:(tick_input ()) main))
-      ~bin_t:Tick.Keypair.bin_t
-      (fun () -> create_keys ()) ()
+      ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
+      ~bin_t:Keypair.bin_t
+      R1CS_constraint_system.generate_keypair
+      (constraint_system ~exposing:(tick_input ()) main)
 end
 
 module Merge = struct
@@ -465,11 +472,99 @@ module Merge = struct
   let cached () =
     Cached.create
       ~directory:Cache_dir.cache_dir
-      ~digest_input:(fun () ->
-        Md5.to_hex
-          (Tick.Debug.constraint_system_digest ~exposing:(input ()) main))
-      ~bin_t:Tick.Keypair.bin_t
-      (fun () -> create_keys ()) ()
+      ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
+      ~bin_t:Keypair.bin_t
+      R1CS_constraint_system.generate_keypair
+      (constraint_system ~exposing:(input ()) main)
+end
+
+module Verification = struct
+  module Keys = struct
+    type t =
+      { base : Tick.Verification_key.t
+      ; wrap : Tock.Verification_key.t
+      ; merge : Tick.Verification_key.t
+      }
+  end
+
+  module type S = sig
+    val verify : t -> bool
+
+    val verify_complete_merge
+      : Ledger_hash.var
+      -> Ledger_hash.var
+      -> (Tock.Proof.t, 's) Tick.As_prover.t
+      -> (Tick.Boolean.var, 's) Tick.Checked.t
+  end
+
+  module Make (K : sig val keys : Keys.t end) = struct
+    open K
+
+    let wrap_vk_bits =
+      Merge.Verifier.Verification_key.to_bool_list keys.wrap
+
+    let verify { source; target; proof; proof_type; fee_excess } =
+      let input =
+        match proof_type with
+        | Base ->
+          base_top_hash source target fee_excess
+        | Merge ->
+          merge_top_hash source target fee_excess wrap_vk_bits
+      in
+      Tock.verify proof keys.wrap (wrap_input ()) (embed input)
+
+    (* The curve pt corresponding to H(merge_prefix, _, _, Amount.Signed.zero, wrap_vk)
+      (with starting point shifted over by 2 * digest_size so that
+      this can then be used to compute H(merge_prefix, s1, s2, Amount.Signed.zero, wrap_vk) *)
+    let merge_prefix_and_zero_and_vk_curve_pt =
+      let open Tick in
+      let s =
+        { Hash_prefix.merge_snark
+          with bits_consumed = Hash_prefix.merge_snark.bits_consumed
+                              + Pedersen.Digest.size_in_bits * 2
+        }
+      in
+      let s =
+        Pedersen.State.update_fold s
+          (fun ~init ~f ->
+            let init = Amount.Signed.(fold zero ~init ~f) in
+            List.fold wrap_vk_bits ~init ~f)
+      in
+      s.acc
+
+    (* spec for [verify_merge s1 s2 _]:
+      Returns a boolean which is true if there exists a tock proof proving
+      (against the wrap verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
+      This in turn should only happen if there exists a tick proof proving
+      (against the merge verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
+
+      We precompute the parts of the pedersen involving wrap_vk and
+      Amount.Signed.zero outside the SNARK since this saves us many constraints.
+    *)
+    let verify_complete_merge s1 s2 get_proof =
+      let open Tick in
+      let open Let_syntax in
+      let%bind s1 = Ledger_hash.var_to_bits s1
+      and s2 = Ledger_hash.var_to_bits s2
+      in
+      let%bind top_hash =
+        let (vx, vy) = merge_prefix_and_zero_and_vk_curve_pt in
+        Pedersen_hash.hash ~params:Pedersen.params
+          ~init:(Hash_prefix.length_in_bits, (Cvar.constant vx, Cvar.constant vy))
+          (s1 @ s2)
+        >>| Pedersen_hash.digest
+        >>= Pedersen.Digest.choose_preimage_var
+        >>| Pedersen.Digest.Unpacked.var_to_bits
+      in
+      Merge.Verifier.All_in_one.create ~input:top_hash
+        ~verification_key:(List.map ~f:Boolean.var_of_value wrap_vk_bits)
+        (As_prover.map get_proof ~f:(fun proof ->
+          { Merge.Verifier.All_in_one.proof
+          ; verification_key = keys.wrap
+          }))
+      >>| Merge.Verifier.All_in_one.result
+    ;;
+  end
 end
 
 module Wrap (Vk : sig
@@ -542,18 +637,14 @@ module Wrap (Vk : sig
   let cached () =
     Cached.create
       ~directory:Cache_dir.cache_dir
-      ~digest_input:(fun () ->
-        Md5.to_hex
-          (Tock.Debug.constraint_system_digest ~exposing:(wrap_input ()) main))
-      ~bin_t:Tock.Keypair.bin_t
-      (fun () -> create_keys ()) ()
+      ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
+      ~bin_t:Keypair.bin_t
+      R1CS_constraint_system.generate_keypair
+      (constraint_system ~exposing:(wrap_input ()) main)
 end
 
-let embed (x : Tick.Field.t) : Tock.Field.t =
-  Tock.Field.project (Tick.Field.unpack x)
-
 module type S = sig
-  val verify : t -> bool
+  include Verification.S
 
   val of_transition
     :  Ledger_hash.t
@@ -577,12 +668,6 @@ module type S = sig
     -> t
 
   val merge : t -> t -> t Or_error.t 
-
-  val verify_complete_merge
-    : Ledger_hash.var
-    -> Ledger_hash.var
-    -> (Tock.Proof.t, 's) Tick.As_prover.t
-    -> (Tick.Boolean.var, 's) Tick.Checked.t
 end
 
 let check_tagged_transaction source target transaction handler =
@@ -590,7 +675,7 @@ let check_tagged_transaction source target transaction handler =
     { state1=source; state2=target; transaction }
   in
   let excess = Tagged_transaction.excess transaction in
-  let top_hash = Base.top_hash source target excess in
+  let top_hash = base_top_hash source target excess in
   let open Tick in
   let main = handle (Base.main (Cvar.constant top_hash)) handler in
   assert (check main prover_state)
@@ -606,8 +691,18 @@ let check_transaction source target t handler =
 let check_fee_transfer source target t handler =
   check_transition source target (Fee_transfer t) handler
 
+let verification_keys_of_keys { Keys0.merge; wrap; base } =
+  { Verification.Keys.merge = Tick.Keypair.vk merge
+  ; wrap = Tock.Keypair.vk wrap
+  ; base = Tick.Keypair.vk base
+  }
+
 module Make (K : sig val keys : Keys0.t end) = struct
   open K
+
+  include Verification.Make(struct
+      let keys = verification_keys_of_keys keys
+    end)
 
   module Wrap = Wrap(struct
       let merge = Tick.Keypair.vk keys.merge
@@ -619,18 +714,6 @@ module Make (K : sig val keys : Keys0.t end) = struct
       { Wrap.Prover_state.proof; proof_type }
       Wrap.main
       (embed input)
-
-  let wrap_vk_bits =
-    Merge.Verifier.Verification_key.to_bool_list
-      (Tock.Keypair.vk keys.wrap)
-
-  let merge_top_hash s1 s2 fee_excess =
-    Tick.Pedersen.digest_fold Hash_prefix.merge_snark
-      (fun ~init ~f ->
-        let init = Ledger_hash.fold ~init ~f s1 in
-        let init = Ledger_hash.fold ~init ~f s2 in
-        let init = Amount.Signed.fold ~init ~f fee_excess in
-        List.fold ~init ~f wrap_vk_bits)
 
   let merge_proof
         ledger_hash1
@@ -645,7 +728,7 @@ module Make (K : sig val keys : Keys0.t end) = struct
       Amount.Signed.add fee_excess12 fee_excess23
       |> Option.value_exn
     in
-    let top_hash = merge_top_hash ledger_hash1 ledger_hash3 fee_excess in
+    let top_hash = merge_top_hash ledger_hash1 ledger_hash3 fee_excess wrap_vk_bits in
     let to_bits = Ledger_hash.to_bits in
     top_hash,
     Tick.prove (Tick.Keypair.pk keys.merge) (tick_input ())
@@ -660,66 +743,6 @@ module Make (K : sig val keys : Keys0.t end) = struct
       }
       Merge.main
       top_hash
-
-(* The curve pt corresponding to H(merge_prefix, _, _, Amount.Signed.zero, wrap_vk)
-   (with starting point shifted over by 2 * digest_size so that
-   this can then be used to compute H(merge_prefix, s1, s2, Amount.Signed.zero, wrap_vk) *)
-  let merge_prefix_and_zero_and_vk_curve_pt =
-    let open Tick in
-    let s =
-      { Hash_prefix.merge_snark
-        with bits_consumed = Hash_prefix.merge_snark.bits_consumed
-                             + Pedersen.Digest.size_in_bits * 2
-      }
-    in
-    let s =
-      Pedersen.State.update_fold s
-        (fun ~init ~f ->
-           let init = Amount.Signed.(fold zero ~init ~f) in
-           List.fold wrap_vk_bits ~init ~f)
-    in
-    s.acc
-
-(* spec for [verify_merge s1 s2 _]:
-   Returns a boolean which is true if there exists a tock proof proving
-   (against the wrap verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
-   This in turn should only happen if there exists a tick proof proving
-   (against the merge verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
-
-   We precompute the parts of the pedersen involving wrap_vk and
-   Amount.Signed.zero outside the SNARK since this saves us many constraints.
-*)
-  let verify_complete_merge s1 s2 get_proof =
-    let open Tick in
-    let open Let_syntax in
-    let%bind s1 = Ledger_hash.var_to_bits s1
-    and s2 = Ledger_hash.var_to_bits s2
-    in
-    let%bind top_hash =
-      let (vx, vy) = merge_prefix_and_zero_and_vk_curve_pt in
-      Pedersen_hash.hash ~params:Pedersen.params
-        ~init:(Hash_prefix.length_in_bits, (Cvar.constant vx, Cvar.constant vy))
-        (s1 @ s2)
-      >>| Pedersen_hash.digest
-      >>= Pedersen.Digest.choose_preimage_var
-      >>| Pedersen.Digest.Unpacked.var_to_bits
-    in
-    Merge.Verifier.All_in_one.create ~input:top_hash
-      ~verification_key:(List.map ~f:Boolean.var_of_value wrap_vk_bits)
-      (As_prover.map get_proof ~f:(fun proof ->
-         { Merge.Verifier.All_in_one.proof
-         ; verification_key = Tock.Keypair.vk keys.wrap
-         }))
-    >>| Merge.Verifier.All_in_one.result
-  ;;
-
-  let verify { source; target; proof; proof_type; fee_excess } =
-    let input =
-      match proof_type with
-      | Base -> Base.top_hash source target fee_excess
-      | Merge -> merge_top_hash source target fee_excess
-    in
-    Tock.verify proof (Tock.Keypair.vk keys.wrap) (wrap_input ()) (embed input)
 
   let of_tagged_transaction source target transaction handler =
     let top_hash, proof =
@@ -782,6 +805,8 @@ end
 module Keys = struct
   include Keys0
 
+  let verification_keys = verification_keys_of_keys
+
   module Location = struct
     module T = struct
       type t =
@@ -805,19 +830,21 @@ module Keys = struct
 
   let cached () =
     let open Async in
-    let%bind base = Base.cached ()
-    and merge = Merge.cached ()
+    let get_vk (t : _ Cached.t) = { t with value = Tick.Keypair.vk t.value } in
+    let%bind base = Base.cached () >>| get_vk
+    and merge = Merge.cached () >>| get_vk
     in
     let%map wrap =
       let module Wrap =
         Wrap(struct
-          let base = Tick.Keypair.vk base.value
-          let merge = Tick.Keypair.vk merge.value
+          let base = base.value
+          let merge = merge.value
         end)
       in
       Wrap.cached ()
+      >>| fun t -> { t with value = Tock.Keypair.vk t.value }
     in
-    let t : t =
+    let t : Verification.Keys.t =
       { base = base.value
       ; merge = merge.value
       ; wrap = wrap.value
@@ -951,5 +978,5 @@ let%test_module "transaction_snark" =
         let state3 = Ledger.merkle_root ledger in
         let proof13 = merge proof12 proof23 |> Or_error.ok_exn in
         Tock.verify proof13.proof (Tock.Keypair.vk keys.Keys.wrap) (wrap_input ())
-          (embed (merge_top_hash state1 state3 total_fees)))
+          (embed (merge_top_hash state1 state3 total_fees wrap_vk_bits)))
   end)

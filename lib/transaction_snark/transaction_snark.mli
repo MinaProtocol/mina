@@ -27,17 +27,37 @@ val create
 
 val proof : t -> Tock.Proof.t
 
+module Verification : sig
+  module Keys : sig
+    type t
+  end
+
+  module type S = sig
+    val verify : t -> bool
+
+    val verify_complete_merge
+      : Ledger_hash.var
+      -> Ledger_hash.var
+      -> (Tock.Proof.t, 's) Tick.As_prover.t
+      -> (Tick.Boolean.var, 's) Tick.Checked.t
+  end
+
+  module Make (K : sig val keys : Keys.t end) : S
+end
+
 module Keys : sig
   type t
   [@@deriving bin_io]
 
   module Location : Stringable.S
 
+  val verification_keys : t -> Verification.Keys.t
+
   val dummy :  unit -> t
 
   val create : unit -> t
 
-  val cached : unit -> (Location.t * t * Md5.t) Async.Deferred.t
+  val cached : unit -> (Location.t * Verification.Keys.t * Md5.t) Async.Deferred.t
 
   val load : Location.t -> (t * Md5.t) Async.Deferred.t
 end
@@ -57,7 +77,7 @@ val check_transaction
   -> unit
 
 module type S = sig
-  val verify : t -> bool
+  include Verification.S
 
   val of_transition
     :  Ledger_hash.t
@@ -81,12 +101,6 @@ module type S = sig
     -> t
 
   val merge : t -> t -> t Or_error.t
-
-  val verify_complete_merge
-    : Ledger_hash.var
-    -> Ledger_hash.var
-    -> (Tock.Proof.t, 's) Tick.As_prover.t
-    -> (Tick.Boolean.var, 's) Tick.Checked.t
 end
 
 val handle_with_ledger : Ledger.t -> Tick.Handler.t
