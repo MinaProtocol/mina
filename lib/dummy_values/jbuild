@@ -1,6 +1,6 @@
 (library
- ((name        dummy_proof)
-  (public_name dummy_proof)
+ ((name        dummy_values)
+  (public_name dummy_values)
   (libraries
     ( crypto_params
       snarky ))
@@ -8,8 +8,8 @@
   (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))))
 
 (rule
- ((targets (dummy_proof.ml))
-  (deps    (gen_proofs/gen_proofs.exe))
+ ((targets (dummy_values.ml))
+  (deps    (gen_values/gen_values.exe))
   (action  (run ${<} ${@}))))
 
 (jbuild_version 1)

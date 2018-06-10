@@ -154,14 +154,16 @@ module Keys0 = struct
     }
   [@@deriving bin_io]
 
-  let dummy () =
+  let dummy : t=
     let tick_keypair =
-      let open Tick in
-      generate_keypair ~exposing:(tick_input ()) (fun x -> assert_equal x x)
+      Tick.Keypair.create
+        ~pk:Dummy_values.Tick.proving_key
+        ~vk:Dummy_values.Tick.verification_key
     in
     let tock_keypair =
-      let open Tock in
-      generate_keypair ~exposing:(wrap_input ()) (fun x -> assert_equal x x)
+      Tock.Keypair.create
+        ~pk:Dummy_values.Tock.proving_key
+        ~vk:Dummy_values.Tock.verification_key
     in
     { base = tick_keypair
     ; wrap = tock_keypair

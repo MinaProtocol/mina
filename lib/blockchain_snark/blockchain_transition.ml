@@ -10,6 +10,11 @@ module Keys = struct
     ; wrap : Tock.Keypair.t
     }
 
+  let dummy =
+    { step = Tick.Keypair.create ~vk:Dummy_values.Tick.verification_key ~pk:Dummy_values.Tick.proving_key
+    ; wrap = Tock.Keypair.create ~vk:Dummy_values.Tock.verification_key ~pk:Dummy_values.Tock.proving_key
+    }
+
   module Location = struct
     module T = struct
       type t =

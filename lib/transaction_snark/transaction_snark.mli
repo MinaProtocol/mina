@@ -46,14 +46,18 @@ module Verification : sig
 end
 
 module Keys : sig
-  type t
+  type t =
+    { base : Tick.Keypair.t
+    ; wrap : Tock.Keypair.t
+    ; merge : Tick.Keypair.t
+    }
   [@@deriving bin_io]
 
   module Location : Stringable.S
 
   val verification_keys : t -> Verification.Keys.t
 
-  val dummy :  unit -> t
+  val dummy :  t
 
   val create : unit -> t
 

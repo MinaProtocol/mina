@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
 (executable
-  ((name gen_proofs)
+  ((name gen_values)
   (libraries
     ( async
       core

@@ -40,7 +40,7 @@ module Tock = struct
   module Proof = struct
     include Tock0.Proof
 
-    let dummy = Dummy_proof.tock
+    let dummy = Dummy_values.Tock.proof
   end
 end
 

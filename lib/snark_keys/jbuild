@@ -4,6 +4,7 @@
   (libraries
     ( async
       transaction_snark
+      dummy_values
       blockchain_snark
       core
     ))
