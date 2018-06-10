@@ -5,7 +5,7 @@
   (public_name transaction_snark)
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core snarky nanobit_base bignum))
+  (libraries (core cache_dir cached snarky nanobit_base bignum))
   (preprocess (pps (ppx_jane)))
   (synopsis "Transaction state transition snarking library")))
 

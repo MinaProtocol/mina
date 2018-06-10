@@ -132,33 +132,10 @@ type t =
 let create = Fields.create
 
 module Keys0 = struct
-  module Binable_of_bigstringable
-      (M : sig
-         type t
-         val to_bigstring : t -> Bigstring.t
-         val of_bigstring : Bigstring.t -> t
-       end)
-    = struct
-      type t = M.t
-      include Binable.Of_binable(Bigstring)(struct
-        type t = M.t
-        let to_binable = M.to_bigstring
-        let of_binable = M.of_bigstring
-      end)
-    end
-
-  module Tick_vk = Binable_of_bigstringable(Tick_curve.Verification_key)
-  module Tick_pk = Binable_of_bigstringable(Tick_curve.Proving_key)
-  module Tock_vk = Binable_of_bigstringable(Tock_curve.Verification_key)
-  module Tock_pk = Binable_of_bigstringable(Tock_curve.Proving_key)
-
   type t =
-    { base_vk  : Tick_vk.t
-    ; base_pk  : Tick_pk.t
-    ; wrap_vk  : Tock_vk.t
-    ; wrap_pk  : Tock_pk.t
-    ; merge_vk : Tick_vk.t
-    ; merge_pk : Tick_pk.t
+    { base : Tick.Keypair.t
+    ; wrap : Tock.Keypair.t
+    ; merge : Tick.Keypair.t
     }
   [@@deriving bin_io]
 
@@ -171,12 +148,9 @@ module Keys0 = struct
       let open Tock in
       generate_keypair ~exposing:(wrap_input ()) (fun x -> assert_equal x x)
     in
-    { base_vk  = Tick.Keypair.vk tick_keypair
-    ; base_pk  = Tick.Keypair.pk tick_keypair
-    ; wrap_vk  = Tock.Keypair.vk tock_keypair
-    ; wrap_pk  = Tock.Keypair.pk tock_keypair
-    ; merge_vk = Tick.Keypair.vk tick_keypair
-    ; merge_pk = Tick.Keypair.pk tick_keypair
+    { base = tick_keypair
+    ; wrap = tock_keypair
+    ; merge = tick_keypair
     }
 end
 
@@ -359,6 +333,15 @@ module Base = struct
   let transaction_proof ~proving_key state1 state2 transaction handler =
     tagged_transaction_proof ~proving_key state1 state2
       (Normal, transaction) handler
+
+  let cached () =
+    Cached.create
+      ~directory:Cache_dir.cache_dir
+      ~digest_input:(fun () ->
+        Md5.to_hex
+          (Tick.Debug.constraint_system_digest ~exposing:(tick_input ()) main))
+      ~bin_t:Tick.Keypair.bin_t
+      (fun () -> create_keys ()) ()
 end
 
 module Merge = struct
@@ -478,6 +461,15 @@ module Merge = struct
 
   let create_keys () =
     generate_keypair ~exposing:(input ()) main
+
+  let cached () =
+    Cached.create
+      ~directory:Cache_dir.cache_dir
+      ~digest_input:(fun () ->
+        Md5.to_hex
+          (Tick.Debug.constraint_system_digest ~exposing:(input ()) main))
+      ~bin_t:Tick.Keypair.bin_t
+      (fun () -> create_keys ()) ()
 end
 
 module Wrap (Vk : sig
@@ -546,6 +538,15 @@ module Wrap (Vk : sig
 
   let create_keys () =
     generate_keypair ~exposing:(wrap_input ()) main
+
+  let cached () =
+    Cached.create
+      ~directory:Cache_dir.cache_dir
+      ~digest_input:(fun () ->
+        Md5.to_hex
+          (Tock.Debug.constraint_system_digest ~exposing:(wrap_input ()) main))
+      ~bin_t:Tock.Keypair.bin_t
+      (fun () -> create_keys ()) ()
 end
 
 let embed (x : Tick.Field.t) : Tock.Field.t =
@@ -609,17 +610,19 @@ module Make (K : sig val keys : Keys0.t end) = struct
   open K
 
   module Wrap = Wrap(struct
-      let merge = keys.merge_vk
-      let base = keys.base_vk
+      let merge = Tick.Keypair.vk keys.merge
+      let base = Tick.Keypair.vk keys.base
     end)
 
   let wrap proof_type proof input =
-    Tock.prove keys.wrap_pk (wrap_input ())
+    Tock.prove (Tock.Keypair.pk keys.wrap) (wrap_input ())
       { Wrap.Prover_state.proof; proof_type }
       Wrap.main
       (embed input)
 
-  let wrap_vk_bits = Merge.Verifier.Verification_key.to_bool_list keys.wrap_vk
+  let wrap_vk_bits =
+    Merge.Verifier.Verification_key.to_bool_list
+      (Tock.Keypair.vk keys.wrap)
 
   let merge_top_hash s1 s2 fee_excess =
     Tick.Pedersen.digest_fold Hash_prefix.merge_snark
@@ -645,7 +648,7 @@ module Make (K : sig val keys : Keys0.t end) = struct
     let top_hash = merge_top_hash ledger_hash1 ledger_hash3 fee_excess in
     let to_bits = Ledger_hash.to_bits in
     top_hash,
-    Tick.prove keys.merge_pk (tick_input ())
+    Tick.prove (Tick.Keypair.pk keys.merge) (tick_input ())
       { Merge.Prover_state.ledger_hash1 = to_bits ledger_hash1
       ; ledger_hash2 = to_bits ledger_hash2
       ; ledger_hash3 = to_bits ledger_hash3
@@ -653,7 +656,7 @@ module Make (K : sig val keys : Keys0.t end) = struct
       ; proof23
       ; fee_excess12
       ; fee_excess23
-      ; tock_vk = keys.wrap_vk
+      ; tock_vk = Tock.Keypair.vk keys.wrap
       }
       Merge.main
       top_hash
@@ -704,7 +707,9 @@ module Make (K : sig val keys : Keys0.t end) = struct
     Merge.Verifier.All_in_one.create ~input:top_hash
       ~verification_key:(List.map ~f:Boolean.var_of_value wrap_vk_bits)
       (As_prover.map get_proof ~f:(fun proof ->
-        { Merge.Verifier.All_in_one.proof; verification_key = keys.wrap_vk }))
+         { Merge.Verifier.All_in_one.proof
+         ; verification_key = Tock.Keypair.vk keys.wrap
+         }))
     >>| Merge.Verifier.All_in_one.result
   ;;
 
@@ -714,11 +719,13 @@ module Make (K : sig val keys : Keys0.t end) = struct
       | Base -> Base.top_hash source target fee_excess
       | Merge -> merge_top_hash source target fee_excess
     in
-    Tock.verify proof keys.wrap_vk (wrap_input ()) (embed input)
+    Tock.verify proof (Tock.Keypair.vk keys.wrap) (wrap_input ()) (embed input)
 
   let of_tagged_transaction source target transaction handler =
     let top_hash, proof =
-      Base.tagged_transaction_proof ~proving_key:keys.base_pk source target transaction handler
+      Base.tagged_transaction_proof
+        ~proving_key:(Tick.Keypair.pk keys.base)
+        source target transaction handler
     in
     { source
     ; target
@@ -775,6 +782,83 @@ end
 module Keys = struct
   include Keys0
 
+  module Location = struct
+    module T = struct
+      type t =
+        { base : string
+        ; merge : string
+        ; wrap : string
+        }
+      [@@deriving sexp]
+    end
+    include T
+    include Sexpable.To_stringable(T)
+  end
+
+  let checksum ~base ~merge ~wrap =
+    let open Cached in
+    Md5.digest_string
+      ("Transaction_snark"
+        ^ Md5.to_hex base
+        ^ Md5.to_hex merge
+        ^ Md5.to_hex wrap)
+
+  let cached () =
+    let open Async in
+    let%bind base = Base.cached ()
+    and merge = Merge.cached ()
+    in
+    let%map wrap =
+      let module Wrap =
+        Wrap(struct
+          let base = Tick.Keypair.vk base.value
+          let merge = Tick.Keypair.vk merge.value
+        end)
+      in
+      Wrap.cached ()
+    in
+    let t : t =
+      { base = base.value
+      ; merge = merge.value
+      ; wrap = wrap.value
+      }
+    in
+    let location : Location.t =
+      { base = base.path
+      ; merge = merge.path
+      ; wrap = wrap.path
+      }
+    in
+    let checksum = checksum ~base:base.checksum ~merge:merge.checksum ~wrap:wrap.checksum in
+    (location, t, checksum)
+
+  let load ({merge; base; wrap} : Location.t) =
+    let open Storage.Disk in
+    let parent_log = Logger.create () in
+    let tick_controller =
+      Controller.create ~parent_log Tick.Keypair.bin_t
+    in
+    let tock_controller =
+      Controller.create ~parent_log Tock.Keypair.bin_t
+    in
+    let open Async in
+    let load c p =
+      match%map load_with_checksum c p with
+      | Ok x -> x
+      | Error e -> failwithf "Transaction_snark: load failed on %s" p ()
+    in
+    let%map base = load tick_controller base
+    and merge = load tick_controller merge
+    and wrap = load tock_controller wrap
+    in
+    let t =
+      { base = base.data
+      ; merge = merge.data
+      ; wrap = wrap.data
+      }
+    in
+    (t, checksum ~base:base.checksum ~merge:merge.checksum ~wrap:wrap.checksum)
+
   let create () =
     let base = Base.create_keys () in
     let merge = Merge.create_keys () in
@@ -787,12 +871,9 @@ module Keys = struct
       in
       Wrap.create_keys ()
     in
-    { base_vk = Tick.Keypair.vk base
-    ; base_pk = Tick.Keypair.pk base
-    ; merge_vk = Tick.Keypair.vk merge
-    ; merge_pk = Tick.Keypair.pk merge
-    ; wrap_vk = Tock.Keypair.vk wrap
-    ; wrap_pk = Tock.Keypair.pk wrap
+    { base
+    ; merge
+    ; wrap
     }
 end
 
@@ -869,6 +950,6 @@ let%test_module "transaction_snark" =
         in
         let state3 = Ledger.merkle_root ledger in
         let proof13 = merge proof12 proof23 |> Or_error.ok_exn in
-        Tock.verify proof13.proof keys.wrap_vk (wrap_input ())
+        Tock.verify proof13.proof (Tock.Keypair.vk keys.Keys.wrap) (wrap_input ())
           (embed (merge_top_hash state1 state3 total_fees)))
   end)

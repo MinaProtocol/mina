@@ -1,4 +1,4 @@
-open Base
+open Core
 open Nanobit_base
 open Snark_params
 
@@ -31,9 +31,15 @@ module Keys : sig
   type t
   [@@deriving bin_io]
 
+  module Location : Stringable.S
+
   val dummy :  unit -> t
 
   val create : unit -> t
+
+  val cached : unit -> (Location.t * t * Md5.t) Async.Deferred.t
+
+  val load : Location.t -> (t * Md5.t) Async.Deferred.t
 end
 
 val check_transition
