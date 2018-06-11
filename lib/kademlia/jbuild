@@ -4,7 +4,8 @@
  ((name kademlia)
   (public_name kademlia)
   (library_flags (-linkall))
-  (libraries (core logger linear_pipe async async_extra ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib kademlia))))
+  (inline_tests)
+  (libraries (core logger linear_pipe async async_extra))
+  (preprocess (pps (ppx_jane)))
   (synopsis "Kademlia DHT -- only being used for it's membership")))
 

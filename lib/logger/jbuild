@@ -4,7 +4,8 @@
  ((name logger)
   (public_name logger)
   (library_flags (-linkall))
-  (libraries (core async ppx_inline_test.runtime-lib))
-  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib logger))))
+  (inline_tests)
+  (libraries (core async))
+  (preprocess (pps (ppx_jane)))
   (synopsis "Logging library")))
 

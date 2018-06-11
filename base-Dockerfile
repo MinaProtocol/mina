@@ -1,4 +1,4 @@
-FROM gcr.io/o1labs-192920/ocaml405:latest
+FROM gcr.io/o1labs-192920/ocaml406:latest
 
 # Install nix for our haskell deps
 RUN sudo mkdir -p /nix
@@ -17,20 +17,18 @@ RUN sudo apt-get install --yes libgmp3-dev
 RUN sudo apt-get install --yes libboost-dev
 RUN sudo apt-get install --yes libboost-program-options-dev
 
+RUN opam update -y && opam upgrade -y
 RUN opam depext -i jbuilder
 RUN opam install core async ppx_deriving
 
 RUN opam install merlin ocp-indent
-RUN opam install ctypes-foreign
-RUN opam install ctypes
+RUN opam install ctypes-foreign ctypes
 RUN opam install jbuilder
-RUN opam install yojson menhir
+RUN opam install yojson menhir bignum
 RUN opam install async_ssl cohttp cohttp-async
-RUN opam install bignum
+RUN opam install extlib rpc_parallel
 
 ADD ./app/kademlia-haskell/prefetch /prefetch
 RUN sudo chown -R opam /prefetch
 RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix
 
-RUN opam install extlib
-RUN opam install rpc_parallel
