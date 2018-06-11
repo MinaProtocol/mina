@@ -148,7 +148,7 @@ let tally_and_prove (ballots : Ballot.Opened.t array) =
       (check_winner commitments claimed_winner)
       (fun (With {request; respond}) ->
         match request with
-        | Open_ballot i -> respond ballots.(i)
+        | Open_ballot i -> respond (Provide ballots.(i))
         | _ -> unhandled)
   in
   ( commitments
