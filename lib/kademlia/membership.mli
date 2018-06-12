@@ -3,8 +3,11 @@ open Async_kernel
 module type S = sig
   type t
 
-  val connect
-    : initial_peers:Peer.t list -> me:Peer.t -> parent_log:Logger.t -> t Deferred.Or_error.t
+  val connect :
+       initial_peers:Peer.t list
+    -> me:Peer.t
+    -> parent_log:Logger.t
+    -> t Deferred.Or_error.t
 
   val peers : t -> Peer.t list
 
