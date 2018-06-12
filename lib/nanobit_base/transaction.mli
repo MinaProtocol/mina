@@ -8,7 +8,7 @@ module Payload : sig
     ; fee      : 'fee
     ; nonce    : 'nonce
     }
-  [@@deriving bin_io, eq, sexp, compare, hash]
+  [@@deriving bin_io, eq, sexp, hash]
 
   type t =
     ( Public_key.Compressed.t
@@ -16,7 +16,7 @@ module Payload : sig
     , Currency.Fee.t
     , Account.Nonce.t
     ) t_
-  [@@deriving bin_io, eq, sexp, compare, hash]
+  [@@deriving bin_io, eq, sexp, hash]
 
   module Stable : sig
     module V1 : sig
@@ -26,7 +26,7 @@ module Payload : sig
         ; fee      : 'fee
         ; nonce    : 'nonce
         }
-      [@@deriving bin_io, eq, sexp, compare, hash]
+      [@@deriving bin_io, eq, sexp, hash]
 
       type t =
         ( Public_key.Compressed.Stable.V1.t
@@ -34,7 +34,7 @@ module Payload : sig
         , Currency.Fee.Stable.V1.t
         , Account.Nonce.t
         ) t_
-      [@@deriving bin_io, eq, sexp, compare, hash]
+      [@@deriving bin_io, eq, sexp, hash]
     end
   end
 
@@ -51,10 +51,10 @@ type ('payload, 'pk, 'signature) t_ =
   ; sender    : 'pk
   ; signature : 'signature
   }
-[@@deriving bin_io, eq, sexp, compare, hash]
+[@@deriving bin_io, eq, sexp, hash]
 
 type t = (Payload.t, Public_key.t, Signature.t) t_
-[@@deriving bin_io, eq, sexp, compare, hash]
+[@@deriving bin_io, eq, sexp, hash]
 
 module Stable : sig
   module V1 : sig
@@ -63,10 +63,12 @@ module Stable : sig
       ; sender    : 'pk
       ; signature : 'signature
       }
-    [@@deriving bin_io, eq, sexp, compare, hash]
+    [@@deriving bin_io, eq, sexp, hash]
 
     type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, compare, hash]
+    [@@deriving bin_io, eq, sexp, hash]
+
+    val compare : seed:string -> t -> t -> int
   end
 end
 
@@ -82,8 +84,9 @@ val gen : keys:Signature_keypair.t array -> max_amount:int -> max_fee:int -> t Q
 
 module With_valid_signature : sig
   type nonrec t = private t
-  [@@deriving sexp, eq, bin_io, compare]
+  [@@deriving sexp, eq, bin_io]
 
+  val compare : seed:string -> t -> t -> int
   val gen : keys:Signature_keypair.t array -> max_amount:int -> max_fee:int -> t Quickcheck.Generator.t
 end
 

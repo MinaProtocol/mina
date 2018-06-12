@@ -30,7 +30,7 @@ module Make
 
   type t = Txn.t Fheap.t
 
-  let empty = Fheap.create ~cmp:Txn.compare
+  let empty = Fheap.create ~cmp:(Txn.compare ~seed:"TODO: seed me!")
 
   let add t txn = Fheap.add t txn
 
