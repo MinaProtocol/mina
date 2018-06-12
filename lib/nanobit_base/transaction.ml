@@ -85,7 +85,7 @@ module Stable = struct
     [@@deriving hash]
 
     let compare ~seed (t : t) (t' : t) =
-      let hash x = hash_t_with_seed (seed, x) in
+      let hash x = hash_with_seed (seed, x) in
       let fee_compare = Fee.compare t.payload.fee t'.payload.fee in
       if fee_compare <> 0 then fee_compare else hash t - hash t'
   end
