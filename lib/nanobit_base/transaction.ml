@@ -81,7 +81,7 @@ module Stable = struct
     type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
     [@@deriving bin_io, eq, sexp, hash]
 
-    type t_with_seed = string * t
+    type with_seed = string * t
     [@@deriving hash]
 
     let compare ~seed (t : t) (t' : t) =
