@@ -2,13 +2,11 @@ open Core
 open Snark_params.Tick
 
 module type Basic = sig
-  type t
-  [@@deriving sexp, compare, eq, hash]
+  type t [@@deriving sexp, compare, eq, hash]
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq, hash]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
     end
   end
 
@@ -19,9 +17,11 @@ module type Basic = sig
   val zero : t
 
   val of_string : string -> t
+
   val to_string : t -> string
 
   type var
+
   val typ : (var, t) Typ.t
 
   val of_int : int -> t
@@ -33,28 +33,39 @@ end
 
 module type Arithmetic_intf = sig
   type t
+
   val add : t -> t -> t option
+
   val sub : t -> t -> t option
-  val (+) : t -> t -> t option
-  val (-) : t -> t -> t option
+
+  val ( + ) : t -> t -> t option
+
+  val ( - ) : t -> t -> t option
 end
 
 module type Checked_arithmetic_intf = sig
   type var
+
   val add : var -> var -> (var, _) Checked.t
+
   val sub : var -> var -> (var, _) Checked.t
-  val (+) : var -> var -> (var, _) Checked.t
-  val (-) : var -> var -> (var, _) Checked.t
+
+  val ( + ) : var -> var -> (var, _) Checked.t
+
+  val ( - ) : var -> var -> (var, _) Checked.t
 end
 
 module Fee : sig
   include Basic
+
   include Arithmetic_intf with type t := t
+
   module Checked : Checked_arithmetic_intf with type var := var
 end
 
 module Amount : sig
   include Basic
+
   include Arithmetic_intf with type t := t
 
   type amount_var = var
@@ -70,10 +81,10 @@ module Amount : sig
 
     val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
 
-    type nonrec t = (t, Sgn.t) t_
-    [@@deriving bin_io, sexp]
+    type nonrec t = (t, Sgn.t) t_ [@@deriving bin_io, sexp]
 
     type nonrec var = (var, Sgn.var) t_
+
     val typ : (var, t) Typ.t
 
     val zero : t
@@ -81,16 +92,18 @@ module Amount : sig
     val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
 
     val add : t -> t -> t option
-    val (+) : t -> t -> t option
+
+    val ( + ) : t -> t -> t option
 
     module Checked : sig
       val to_bits : var -> Boolean.var list
 
       val add : var -> var -> (var, _) Checked.t
-      val (+) : var -> var -> (var, _) Checked.t
 
-      val cswap
-        : Boolean.var
+      val ( + ) : var -> var -> (var, _) Checked.t
+
+      val cswap :
+           Boolean.var
         -> (amount_var, Sgn.t) t_ * (amount_var, Sgn.t) t_
         -> (var * var, _) Checked.t
     end
@@ -109,16 +122,24 @@ end
 
 module Balance : sig
   include Basic
+
   val add_amount : t -> Amount.t -> t option
+
   val sub_amount : t -> Amount.t -> t option
-  val (+) : t -> Amount.t -> t option
-  val (-) : t -> Amount.t -> t option
+
+  val ( + ) : t -> Amount.t -> t option
+
+  val ( - ) : t -> Amount.t -> t option
 
   module Checked : sig
     val add_signed_amount : var -> Amount.Signed.var -> (var, _) Checked.t
+
     val add_amount : var -> Amount.var -> (var, _) Checked.t
+
     val sub_amount : var -> Amount.var -> (var, _) Checked.t
-    val (+) : var -> Amount.var -> (var, _) Checked.t
-    val (-) : var -> Amount.var -> (var, _) Checked.t
+
+    val ( + ) : var -> Amount.var -> (var, _) Checked.t
+
+    val ( - ) : var -> Amount.var -> (var, _) Checked.t
   end
 end

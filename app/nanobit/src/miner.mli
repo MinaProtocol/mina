@@ -10,8 +10,8 @@ module Update : sig
 end
 
 module type S = sig
-  val mine
-    : prover:Prover.t
+  val mine :
+       prover:Prover.t
     -> parent_log:Logger.t
     -> initial:Blockchain.t
     -> body:Block.With_transactions.Body.t
