@@ -420,12 +420,11 @@ module Merge = struct
         , Hash_curve.Checked.if_value is_base ~then_:Hash_prefix.base_snark.acc
             ~else_:Hash_prefix.merge_snark.acc )
       in
-      with_label __LOC__
-        (Pedersen_hash.hash ~init ~params:Pedersen.params input_bits)
+      with_label __LOC__ (Pedersen_hash.hash ~init input_bits)
     in
     let%bind states_and_excess_and_vk_hash =
       with_label __LOC__
-        (Pedersen_hash.hash tock_vk ~params:Pedersen.params
+        (Pedersen_hash.hash tock_vk
            ~init:
              ( input_bits_length + Hash_prefix.length_in_bits
              , states_and_excess_hash ))
@@ -659,7 +658,12 @@ struct
           let init = Amount.Signed.(fold zero ~init ~f) in
           List.fold wrap_vk_bits ~init ~f )
     in
-    s.acc
+    Tick.Pedersen_hash.Section.create ~acc:(`Value s.acc)
+      ~support:
+        (Interval_union.of_intervals_exn
+           [ (0, Hash_prefix.length_in_bits)
+           ; ( (2 * Ledger_hash.length_in_bits) + Hash_prefix.length_in_bits
+             , Amount.Signed.length + List.length wrap_vk_bits ) ])
 
   (* spec for [verify_merge s1 s2 _]:
    Returns a boolean which is true if there exists a tock proof proving
@@ -675,12 +679,25 @@ struct
     let open Let_syntax in
     let%bind s1 = Ledger_hash.var_to_bits s1
     and s2 = Ledger_hash.var_to_bits s2 in
+    let%bind top_hash_section =
+      Pedersen_hash.Section.extend merge_prefix_and_zero_and_vk_curve_pt
+        ~start:Hash_prefix.length_in_bits (s1 @ s2)
+    in
+    let () =
+      let open Interval_union in
+      let total_length =
+        Hash_prefix.length_in_bits
+        + (2 * Ledger_hash.length_in_bits)
+        + Amount.Signed.length + List.length wrap_vk_bits
+      in
+      assert (
+        equal
+          (of_interval (0, total_length))
+          (Pedersen_hash.Section.support top_hash_section) )
+    in
     let%bind top_hash =
-      let vx, vy = merge_prefix_and_zero_and_vk_curve_pt in
-      Pedersen_hash.hash ~params:Pedersen.params
-        ~init:(Hash_prefix.length_in_bits, (Cvar.constant vx, Cvar.constant vy))
-        (s1 @ s2)
-      >>| Pedersen_hash.digest >>= Pedersen.Digest.choose_preimage_var
+      top_hash_section |> Pedersen_hash.Section.acc |> Pedersen_hash.digest
+      |> Pedersen.Digest.choose_preimage_var
       >>| Pedersen.Digest.Unpacked.var_to_bits
     in
     Merge.Verifier.All_in_one.create ~input:top_hash
