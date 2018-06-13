@@ -7,6 +7,6 @@
   (inline_tests)
   (libraries
     ( core_kernel ))
-  (preprocess (pps ()))
+  (preprocess (pps (ppx_deriving.eq)))
   (synopsis "Union of intervals data structure")))
 
