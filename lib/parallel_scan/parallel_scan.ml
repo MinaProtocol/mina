@@ -45,11 +45,8 @@ module State1 = struct
 = fun ~parallelism_log_2 ~init ~seed ->
     let open Job in
     let parallelism = Int.pow 2 parallelism_log_2 in
-
     let jobs = Ring_buffer.create ~len:(parallelism*2) ~default:(Base None) in
-
     let repeat n x = List.init n ~f:(fun _ -> x) in
-
     let merges1 = repeat ((parallelism / 2)-1) (Merge (None, None)) in
     let bases1 = repeat (parallelism / 2) (Base None) in
     let merges2 = repeat (parallelism / 2) (Merge (None, None)) in
@@ -170,14 +167,6 @@ module State1 = struct
 = fun t ~spec ds ->
     let open Job in
     let module Spec = (val spec : Spec_intf with type Data.t = d and type Accum.t = a and type Output.t = b) in
-    let _jobs_string t =
-      (Ring_buffer.sexp_of_t
-        (Job.sexp_of_t Spec.Accum.sexp_of_t Spec.Data.sexp_of_t)
-        t.jobs) |> Sexp.to_string_hum
-    in
-    let _data_buffer_string t =
-      Queue.sexp_of_t Spec.Data.sexp_of_t t.data_buffer |> Sexp.to_string_hum
-    in
     (* This breaks down if we ever step an odd number of times *)
     (* step_twice ensures we always step twice *)
     let step_twice () =
@@ -187,8 +176,9 @@ module State1 = struct
         | _, Merge_up None -> Merge_up (Some z)
         | Left, Merge (None, r) -> Merge (Some z, r)
         | Right, Merge (l, None) -> Merge (l, Some z)
-        | _, Merge_up _ -> failwith "impossible: Merge_ups should be empty"
-        | _, Merge (_, _) -> failwithf !"impossible: the side of merge we want will be empty but we have %{sexp: Direction.t} and job %s" dir ((Job.sexp_of_t Spec.Accum.sexp_of_t Spec.Data.sexp_of_t job) |> Sexp.to_string_hum) ()
+        | Left, Merge_up (Some _) | Right, Merge_up (Some _) ->
+            failwith "impossible: Merge_ups should be empty"
+        | Left, Merge (Some _, _) | Right, Merge (_, Some _) -> failwithf !"impossible: the side of merge we want will be empty but we have %{sexp: Direction.t} and job %s" dir ((Job.sexp_of_t Spec.Accum.sexp_of_t Spec.Data.sexp_of_t job) |> Sexp.to_string_hum) ()
         | _, Base _ -> failwith "impossible: we never fill base"
       in
       (* Returns the ptr rewritten *)
@@ -241,11 +231,9 @@ module State1 = struct
     let last_acc = t.acc in
     let%map () = List.fold ~init:(return ()) ds ~f:(fun acc d ->
       let%bind () = acc in
-      (*printf !"Before: %s;; %s\n%!" (_jobs_string t) (_data_buffer_string t);*)
       let%bind _ = after (Time_ns.Span.of_ms 5.) in
       let%bind () = step_twice () in
       let%map _ = after (Time_ns.Span.of_ms 5.) in
-      (*printf !"AFTER1: %s;; %s\n%!" (_jobs_string t) (_data_buffer_string t);*)
       Queue.enqueue t.data_buffer d;
     ) in
     if not (fst last_acc = fst t.acc) then
@@ -286,229 +274,245 @@ module State1 = struct
     )
 end
 
-let handle_next_state state ~data ~spec w =
+let handle_next_state state ~data ~spec =
   let parallelism = State1.parallelism state in
-  let rec go () =
-    match%bind Linear_pipe.read' ~max_queue_length:parallelism data with
-    | `Eof -> return ()
-    | `Ok q ->
-      let ds = Queue.to_list q in
-      let%bind maybe_b = State1.consume state ds ~spec in
-      let%bind () = Linear_pipe.write w (maybe_b, state) in
-      go ()
-  in
-  go ()
+  match%bind Linear_pipe.read' ~max_queue_length:parallelism data with
+  | `Eof -> Deferred.Or_error.error_string "No more data!"
+  | `Ok q ->
+    let ds = Queue.to_list q in
+    let%map maybe_b = State1.consume state ds ~spec in
+    Or_error.return (maybe_b, state)
 
-let scan :
+let start :
   type a b d.
   init:b ->
   data:d Linear_pipe.Reader.t ->
   parallelism_log_2:int ->
   spec:(module Spec_intf with type Data.t = d and type Accum.t = a and type Output.t = b) ->
-  (b option * (a, b, d) State.t) Linear_pipe.Reader.t
+  (b option * (a, b, d) State.t) Deferred.Or_error.t
 =
  fun ~init ~data ~parallelism_log_2 ~spec ->
-    Linear_pipe.create_reader ~close_on_exception:true (fun w ->
-      match%bind Linear_pipe.read data with
-      | `Eof -> return ()
-      | `Ok seed ->
-        let state : (a,b,d) State.t = State1.create ~parallelism_log_2 ~init ~seed in
-        handle_next_state state ~data ~spec w)
+    match%bind Linear_pipe.read data with
+    | `Eof -> Deferred.Or_error.error_string "No more data!"
+    | `Ok seed ->
+      let state : (a,b,d) State.t = State1.create ~parallelism_log_2 ~init ~seed in
+      handle_next_state state ~data ~spec
 
-let scan_from :
+let step :
   type a b d.
   state:(a, b, d) State.t ->
   data:d Linear_pipe.Reader.t ->
   spec:(module Spec_intf with type Data.t = d and type Accum.t = a and type Output.t = b) ->
-  (b option * (a, b, d) State.t) Linear_pipe.Reader.t
+  (b option * (a, b, d) State.t) Deferred.Or_error.t
 = fun ~state ~data ~spec ->
-  Linear_pipe.create_reader ~close_on_exception:true
-    (handle_next_state state ~data ~spec)
+    handle_next_state state ~data ~spec
 
-let%test_module "scan (+) over ints" = (module struct
-  module Spec = struct
-    module Data = struct
-      type t = Int64.t [@@deriving sexp_of]
-    end
+let%test_module "scans" = (module struct
 
-    module Accum = struct
-      type t = Int64.t [@@deriving sexp_of]
-      (* Semigroup+deferred *)
-      let ( + ) t t' = Int64.(+) t t' |> return
-    end
-
-    module Output = struct
-      type t = Int64.t [@@deriving sexp_of, eq]
-    end
-
-    let map x = return x
-    let merge t t' = Int64.(+) t t' |> return
-  end
-
-  let spec = (module Spec : Spec_intf with type Data.t = Int64.t and type Accum.t = Int64.t and type Output.t = Int64.t)
-
-  (* Once again Quickcheck is foiled by slow CPUs :( *)
-  let%test_unit "scan can be initialized from intermediate state" =
-    let g =
-      State1.gen
-        ~init:(Int64.zero)
-        ~gen_data:(
-          let open Quickcheck.Generator.Let_syntax in
-          Int.gen >>| Int64.of_int)
-        ~spec
+  let do_steps ~state ~data ~spec w =
+    let rec go () =
+      match%bind step ~state ~data ~spec with
+      | Ok v ->
+          let%bind () = Linear_pipe.write w v in
+          go ()
+      | Error _ -> return ()
     in
-    let s = Quickcheck.random_value ~seed:Quickcheck.default_seed g in
-    Async.Thread_safe.block_on_async_exn (fun () ->
-      let%bind s = s in
-      let do_one_next = ref false in
-      (* For any arbitrary intermediate state *)
-      let parallelism = State1.parallelism s in
-      (* if we then add 1 and a bunch of zeros *)
-      let one_then_zeros =
-        Linear_pipe.create_reader ~close_on_exception:true (fun w ->
-          let rec go () =
-            let next =
-                if !do_one_next then begin
-                  do_one_next := false;
-                  Int64.one
-                end else Int64.zero
-            in
-            let%bind () = Pipe.write w next in
-            go ()
-          in
-          go ())
-      in
+    go ()
 
-      let pipe =
-        scan_from
-          ~state:s
-          ~data:one_then_zeros
+  let scan ~init ~data ~spec ~parallelism_log_2 =
+    Linear_pipe.create_reader ~close_on_exception:true (fun w ->
+      match%bind start ~init ~data ~spec ~parallelism_log_2 with
+      | Error _ -> return ()
+      | Ok (_, s) -> do_steps ~state:s ~data ~spec w
+    )
+
+  let step_repeatedly ~state ~data ~spec =
+    Linear_pipe.create_reader ~close_on_exception:true (fun w ->
+      do_steps ~state ~data ~spec w
+    )
+
+  let%test_module "scan (+) over ints" = (module struct
+    module Spec = struct
+      module Data = struct
+        type t = Int64.t [@@deriving sexp_of]
+      end
+
+      module Accum = struct
+        type t = Int64.t [@@deriving sexp_of]
+        (* Semigroup+deferred *)
+        let ( + ) t t' = Int64.(+) t t' |> return
+      end
+
+      module Output = struct
+        type t = Int64.t [@@deriving sexp_of, eq]
+      end
+
+      let map x = return x
+      let merge t t' = Int64.(+) t t' |> return
+    end
+
+    let spec = (module Spec : Spec_intf with type Data.t = Int64.t and type Accum.t = Int64.t and type Output.t = Int64.t)
+
+    (* Once again Quickcheck is foiled by slow CPUs :( *)
+    let%test_unit "scan can be initialized from intermediate state" =
+      let g =
+        State1.gen
+          ~init:(Int64.zero)
+          ~gen_data:(
+            let open Quickcheck.Generator.Let_syntax in
+            Int.gen >>| Int64.of_int)
           ~spec
       in
-      let fill_some_zeros v s =
-        List.init (parallelism*parallelism) ~f:(fun _ -> ()) |>
-          Deferred.List.foldi ~init:(v, s) ~f:(fun i (v, s) _ ->
-              match%map Linear_pipe.read pipe with
-              | `Eof -> v, s
-              | `Ok (Some v', s') -> v', s'
-              | `Ok (None, s') -> v, s')
-      in
-      (* after we flush intermediate work *)
-      let old_acc = State1.acc s in
-      let%bind (v, s) = fill_some_zeros Int64.zero s in
-      do_one_next := true;
-      let acc = State1.acc s in
-      assert (acc <> old_acc);
-      (* eventually we'll emit the acc+1 element *)
-      let%map (acc_plus_one, s') = fill_some_zeros v s in
-      assert (acc_plus_one = Int64.(+) acc Int64.one)
-    )
-end)
-
-let%test_module "scan (+) over ints, map from string" = (module struct
-  module Spec = struct
-    module Data = struct
-      type t = string [@@deriving sexp_of]
-    end
-
-    module Accum = struct
-      type t = Int64.t [@@deriving sexp_of]
-      (* Semigroup+deferred *)
-      let ( + ) t t' = Int64.(+) t t' |> return
-    end
-
-    module Output = struct
-      type t = Int64.t [@@deriving sexp_of, eq]
-    end
-
-    let map x = return (Int64.of_string x)
-    let merge t t' = Int64.(+) t t' |> return
-  end
-
-  let spec = (module Spec : Spec_intf with type Data.t = string and type Accum.t = Int64.t and type Output.t = Int64.t)
-
-  let%test_unit "scan behaves like a fold long-term" =
-    let a_bunch_of_ones_then_zeros x =
-      {Linear_pipe.Reader.pipe =
-        Pipe.unfold ~init:x ~f:(fun count ->
-          let next = if count <= 0 then "0" else (Int.to_string (x-count)) in
-          return (Some (next, count-1))
-        )
-      ; has_reader = false
-      }
-    in
-    let n = 20 in
-    let result =
-      scan ~init:Int64.zero
-        ~data:(a_bunch_of_ones_then_zeros n)
-        ~spec
-        ~parallelism_log_2:3
-    in
-    Async.Thread_safe.block_on_async_exn (fun () ->
-      let%map after_300 =
-        List.init (3*n) ~f:(fun _ -> ()) |>
-          Deferred.List.foldi ~init:Int64.zero ~f:(fun i acc _ ->
-              match%map Linear_pipe.read result with
-              | `Eof -> acc
-              | `Ok (Some v, s) -> v
-              | `Ok (None, _) -> acc)
-      in
-      let expected = List.fold (List.init n ~f:(fun i -> Int64.of_int i)) ~init:Int64.zero ~f:Int64.(+) in
-      (*printf !"\nExpected: %{sexp: Int64.t}\nButFound: %{sexp: Int64.t}\n\n%!" expected after_300;*)
-      assert (after_300 = expected)
-    )
-end)
-
-let%test_module "scan (concat) over strings" = (module struct
-  module Spec = struct
-    module Data = struct
-      type t = string [@@deriving sexp_of]
-    end
-
-    module Accum = struct
-      type t = string [@@deriving sexp_of]
-      (* Semigroup+deferred *)
-      let ( + ) t t' = String.(^) t t' |> return
-    end
-
-    module Output = struct
-      type t = string [@@deriving sexp_of, eq]
-    end
-
-    let map x = return x
-    let merge t t' = String.(^) t t' |> return
-  end
-
-  let spec = (module Spec : Spec_intf with type Data.t = string and type Accum.t = string and type Output.t = string)
-
-  let%test_unit "scan performs operation in correct order with non-commutative semigroup" =
-    let a_bunch_of_ones_then_empties x =
-      Linear_pipe.create_reader ~close_on_exception:true (fun w ->
-        let rec go count max =
-          let next = if count <= 0 then "" else Int.to_string (max - count) ^ "," in
-          let%bind () = Pipe.write w next in
-          go (count-1) max
+      let s = Quickcheck.random_value ~seed:Quickcheck.default_seed g in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+        let%bind s = s in
+        let do_one_next = ref false in
+        (* For any arbitrary intermediate state *)
+        let parallelism = State1.parallelism s in
+        (* if we then add 1 and a bunch of zeros *)
+        let one_then_zeros =
+          Linear_pipe.create_reader ~close_on_exception:true (fun w ->
+            let rec go () =
+              let next =
+                  if !do_one_next then begin
+                    do_one_next := false;
+                    Int64.one
+                  end else Int64.zero
+              in
+              let%bind () = Pipe.write w next in
+              go ()
+            in
+            go ())
         in
-        go x x)
-    in
-    let n = 40 in
-    let result =
-      scan ~init:""
-        ~data:(a_bunch_of_ones_then_empties n)
-        ~spec
-        ~parallelism_log_2:4
-    in
-    Async.Thread_safe.block_on_async_exn (fun () ->
-      let%map after_300 =
-        List.init (3*n) ~f:(fun _ -> ()) |>
-          Deferred.List.foldi ~init:"" ~f:(fun i acc _ ->
-              match%map Linear_pipe.read result with
-              | `Eof -> acc
-              | `Ok (Some v, s) -> v
-              | `Ok (None, _) -> acc)
+
+        let pipe =
+          step_repeatedly ~state:s
+            ~data:one_then_zeros
+            ~spec
+        in
+        let fill_some_zeros v s =
+          List.init (parallelism*parallelism) ~f:(fun _ -> ()) |>
+            Deferred.List.foldi ~init:(v, s) ~f:(fun i (v, s) _ ->
+                match%map Linear_pipe.read pipe with
+                | `Eof -> v, s
+                | `Ok (Some v', s') -> v', s'
+                | `Ok (None, s') -> v, s')
+        in
+        (* after we flush intermediate work *)
+        let old_acc = State1.acc s in
+        let%bind (v, s) = fill_some_zeros Int64.zero s in
+        do_one_next := true;
+        let acc = State1.acc s in
+        assert (acc <> old_acc);
+        (* eventually we'll emit the acc+1 element *)
+        let%map (acc_plus_one, s') = fill_some_zeros v s in
+        assert (acc_plus_one = Int64.(+) acc Int64.one)
+      )
+  end)
+
+  let%test_module "scan (+) over ints, map from string" = (module struct
+    module Spec = struct
+      module Data = struct
+        type t = string [@@deriving sexp_of]
+      end
+
+      module Accum = struct
+        type t = Int64.t [@@deriving sexp_of]
+        (* Semigroup+deferred *)
+        let ( + ) t t' = Int64.(+) t t' |> return
+      end
+
+      module Output = struct
+        type t = Int64.t [@@deriving sexp_of, eq]
+      end
+
+      let map x = return (Int64.of_string x)
+      let merge t t' = Int64.(+) t t' |> return
+    end
+
+    let spec = (module Spec : Spec_intf with type Data.t = string and type Accum.t = Int64.t and type Output.t = Int64.t)
+
+    let%test_unit "scan behaves like a fold long-term" =
+      let a_bunch_of_ones_then_zeros x =
+        {Linear_pipe.Reader.pipe =
+          Pipe.unfold ~init:x ~f:(fun count ->
+            let next = if count <= 0 then "0" else (Int.to_string (x-count)) in
+            return (Some (next, count-1))
+          )
+        ; has_reader = false
+        }
       in
-      let expected = List.fold (List.init n ~f:(fun i -> Int.to_string i ^ ",")) ~init:"" ~f:String.(^) in
-      (*printf "\nExpected %s\nButFound %s\n\n" expected after_300;*)
-      assert (after_300 = expected)
-    )
+      let n = 20 in
+      let result =
+        scan ~init:Int64.zero
+          ~data:(a_bunch_of_ones_then_zeros n)
+          ~spec
+          ~parallelism_log_2:3
+      in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+        let%map after_3n =
+          List.init (3*n) ~f:(fun _ -> ()) |>
+            Deferred.List.foldi ~init:Int64.zero ~f:(fun i acc _ ->
+                match%map Linear_pipe.read result with
+                | `Eof -> acc
+                | `Ok (Some v, s) -> v
+                | `Ok (None, _) -> acc)
+        in
+        let expected = List.fold (List.init n ~f:(fun i -> Int64.of_int i)) ~init:Int64.zero ~f:Int64.(+) in
+        assert (after_3n = expected)
+      )
+  end)
+
+  let%test_module "scan (concat) over strings" = (module struct
+    module Spec = struct
+      module Data = struct
+        type t = string [@@deriving sexp_of]
+      end
+
+      module Accum = struct
+        type t = string [@@deriving sexp_of]
+        (* Semigroup+deferred *)
+        let ( + ) t t' = String.(^) t t' |> return
+      end
+
+      module Output = struct
+        type t = string [@@deriving sexp_of, eq]
+      end
+
+      let map x = return x
+      let merge t t' = String.(^) t t' |> return
+    end
+
+    let spec = (module Spec : Spec_intf with type Data.t = string and type Accum.t = string and type Output.t = string)
+
+    let%test_unit "scan performs operation in correct order with non-commutative semigroup" =
+      let a_bunch_of_nums_then_empties x =
+        {Linear_pipe.Reader.pipe =
+          Pipe.unfold ~init:x ~f:(fun count ->
+            let next = if count <= 0 then "" else (Int.to_string (x-count)) ^ "," in
+            return (Some (next, count-1))
+          )
+        ; has_reader = false
+        }
+      in
+      let n = 40 in
+      let result =
+        scan ~init:""
+          ~data:(a_bunch_of_nums_then_empties n)
+          ~spec
+          ~parallelism_log_2:4
+      in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+        let%map after_3n =
+          List.init (3*n) ~f:(fun _ -> ()) |>
+            Deferred.List.foldi ~init:"" ~f:(fun i acc _ ->
+                match%map Linear_pipe.read result with
+                | `Eof -> acc
+                | `Ok (Some v, s) -> v
+                | `Ok (None, _) -> acc)
+        in
+        let expected = List.fold (List.init n ~f:(fun i -> Int.to_string i ^ ",")) ~init:"" ~f:String.(^) in
+        assert (after_3n = expected)
+      )
+  end)
 end)
