@@ -211,9 +211,12 @@ module Tick = struct
 
         let cond_add = Checked.cond_add
       end)
+      (struct
+        let params = Pedersen.params
+      end)
 
   let hash_bits ~(init: Pedersen.State.t) x =
-    Pedersen_hash.hash x ~params:Pedersen.params
+    Pedersen_hash.hash x
       ~init:(init.bits_consumed, Hash_curve.var_of_value init.acc)
 
   let digest_bits ~init x = Checked.(hash_bits ~init x >>| Pedersen_hash.digest)

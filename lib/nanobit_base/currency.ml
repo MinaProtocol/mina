@@ -272,9 +272,13 @@ module Amount = struct
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
+    let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
+
     let fold ({sgn; magnitude}: t) ~init ~f =
-      let init = f init (match sgn with Pos -> true | Neg -> false) in
+      let init = f init (sgn_to_bool sgn) in
       fold magnitude ~init ~f
+
+    let to_bits ({sgn; magnitude}: t) = sgn_to_bool sgn :: T.to_bits magnitude
 
     let add (x: t) (y: t) : t option =
       match (x.sgn, y.sgn) with

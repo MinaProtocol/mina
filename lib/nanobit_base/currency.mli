@@ -91,6 +91,8 @@ module Amount : sig
 
     val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
 
+    val to_bits : t -> bool list
+
     val add : t -> t -> t option
 
     val ( + ) : t -> t -> t option
