@@ -8,8 +8,22 @@ module Make
 
         val typ : (var, value) Impl.Typ.t
 
-        val cond_add :
-          value -> to_:var -> if_:Impl.Boolean.var -> (var, _) Impl.Checked.t
+        val add : value -> value -> value
+
+        val var_of_value : value -> var
+
+        val identity : value
+
+        module Checked : sig
+          val add : var -> var -> (var, _) Impl.Checked.t
+
+          val add_known : var -> value -> (var, _) Impl.Checked.t
+
+          val cond_add :
+            value -> to_:var -> if_:Impl.Boolean.var -> (var, _) Impl.Checked.t
+        end
+    end) (Params : sig
+      val params : Curve.value array
     end) : sig
   open Impl
 
@@ -31,15 +45,34 @@ module Make
     val choose_preimage : var -> (Unpacked.var, _) Checked.t
   end
 
+  module Section : sig
+    type t
+
+    val disjoint_union_exn : t -> t -> (t, _) Checked.t
+
+    val extend : t -> Boolean.var list -> start:int -> (t, _) Checked.t
+
+    val acc : t -> Curve.var
+
+    val support : t -> Interval_union.t
+
+    val empty : t
+
+    val create :
+         acc:[`Var of Curve.var | `Value of Curve.value]
+      -> support:Interval_union.t
+      -> t
+
+    val of_bits : bool list -> start:int -> t
+  end
+
   val hash :
-       params:Curve.value array
-    -> init:int * Curve.var
-    -> Boolean.var list
-    -> (Curve.var, _) Checked.t
+    init:int * Curve.var -> Boolean.var list -> (Curve.var, _) Checked.t
 
   val digest : Curve.var -> Digest.var
 end = struct
   open Impl
+  open Params
 
   let hash_length = Field.size_in_bits
 
@@ -65,7 +98,22 @@ end = struct
 
   open Let_syntax
 
-  let hash ~params ~init:(i0, init) bs0 =
+  let hash_unchecked ~init:(i0, init) bs0 =
+    let n = Array.length params in
+    let rec go acc i = function
+      | [] -> acc
+      | b :: bs ->
+          if i = n then
+            failwithf
+              "Pedersen.hash_unchecked: Input length (%d) exceeded max (%d)"
+              (List.length bs0) n ()
+          else
+            let acc' = if b then Curve.add params.(i) acc else acc in
+            go acc' (i + 1) bs
+    in
+    go init i0 bs0
+
+  let hash ~init:(i0, init) bs0 =
     let n = Array.length params in
     let rec go acc i = function
       | [] -> return acc
@@ -74,10 +122,60 @@ end = struct
             failwithf "Pedersen.hash: Input length (%d) exceeded max (%d)"
               (List.length bs0) n ()
           else
-            let%bind acc' = Curve.cond_add params.(i) ~to_:acc ~if_:b in
+            let%bind acc' =
+              Curve.Checked.cond_add params.(i) ~to_:acc ~if_:b
+            in
             go acc' (i + 1) bs
     in
     with_label "Pedersen.hash" (go init i0 bs0)
+
+  module Section = struct
+    module Acc = struct
+      type t = [`Var of Curve.var | `Value of Curve.value]
+
+      let add t1 t2 =
+        match (t1, t2) with
+        | `Var v1, `Var v2 ->
+            let%map v = Curve.Checked.add v1 v2 in
+            `Var v
+        | `Var v, `Value x | `Value x, `Var v ->
+            let%map v = Curve.Checked.add_known v x in
+            `Var v
+        | `Value x1, `Value x2 -> return (`Value (Curve.add x2 x2))
+
+      let to_var = function `Var v -> v | `Value x -> Curve.var_of_value x
+    end
+
+    type t = {support: Interval_union.t; acc: Acc.t}
+
+    let create ~acc ~support = {acc; support}
+
+    let of_bits bs ~start =
+      let n = List.length bs in
+      let interval = (0, n) in
+      { support= Interval_union.of_interval interval
+      ; acc= `Value (hash_unchecked ~init:(0, Curve.identity) bs) }
+
+    let empty = {support= Interval_union.empty; acc= `Value Curve.identity}
+
+    let acc t = Acc.to_var t.acc
+
+    let support t = t.support
+
+    let extend t bits ~start =
+      let n = List.length bits in
+      let interval = (0, n) in
+      let support =
+        Interval_union.(disjoint_union_exn (of_interval interval) t.support)
+      in
+      let%map acc = hash ~init:(start, Acc.to_var t.acc) bits in
+      {support; acc= `Var acc}
+
+    let disjoint_union_exn t1 t2 =
+      let support = Interval_union.disjoint_union_exn t1.support t2.support in
+      let%map acc = Acc.add t1.acc t2.acc in
+      {support; acc}
+  end
 
   let digest (x, _) = x
 end
