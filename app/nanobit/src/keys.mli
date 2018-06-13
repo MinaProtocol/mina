@@ -2,17 +2,14 @@ open Nanobit_base.Snark_params
 
 module Step_prover_state : sig
   type t =
-    { wrap_vk : Tock.Verification_key.t
-    ; prev_proof : Tock.Proof.t
-    ; prev_state : Blockchain_snark.Blockchain_state.t
-    ; update : Nanobit_base.Block.t
-    }
+    { wrap_vk: Tock.Verification_key.t
+    ; prev_proof: Tock.Proof.t
+    ; prev_state: Blockchain_snark.Blockchain_state.t
+    ; update: Nanobit_base.Block.t }
 end
 
 module Wrap_prover_state : sig
-  type t =
-    { proof : Tick.Proof.t
-    }
+  type t = {proof: Tick.Proof.t}
 end
 
 module type S = sig
@@ -21,7 +18,9 @@ module type S = sig
   module Step : sig
     val keys : Tick.Keypair.t
 
-    val input : unit -> ('a, 'b, Tick.Field.var -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
+    val input :
+         unit
+      -> ('a, 'b, Tick.Field.var -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
 
     module Verifier : sig
       module Verification_key : sig
@@ -37,7 +36,9 @@ module type S = sig
   module Wrap : sig
     val keys : Tock.Keypair.t
 
-    val input : unit -> ('a, 'b, Tock.Field.var -> 'a, Tock.Field.t -> 'b) Tock.Data_spec.t
+    val input :
+         unit
+      -> ('a, 'b, Tock.Field.var -> 'a, Tock.Field.t -> 'b) Tock.Data_spec.t
 
     module Prover_state = Wrap_prover_state
 
