@@ -51,4 +51,4 @@ val step :
   -> spec:(module
            Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
                                                                           t = 'b)
-  -> ('b option * ('a, 'b, 'd) State.t) Deferred.t
+  -> 'b option Deferred.t

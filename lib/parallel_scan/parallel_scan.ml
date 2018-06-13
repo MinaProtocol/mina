@@ -290,10 +290,8 @@ let step : type a b d.
     -> spec:(module
              Spec_intf with type Data.t = d and type Accum.t = a and type Output.
                                                                           t = b)
-    -> (b option * (a, b, d) State.t) Deferred.t =
- fun ~state ~data ~spec ->
-  let%map maybe_b = State1.consume state data ~spec in
-  (maybe_b, state)
+    -> b option Deferred.t =
+ fun ~state ~data -> State1.consume state data
 
 let%test_module "scans" =
   ( module struct
@@ -381,20 +379,20 @@ let%test_module "scans" =
               let pipe = step_repeatedly ~state:s ~data:one_then_zeros ~spec in
               let fill_some_zeros v s =
                 List.init (parallelism * parallelism) ~f:(fun _ -> ())
-                |> Deferred.List.foldi ~init:(v, s) ~f:(fun i (v, s) _ ->
+                |> Deferred.List.foldi ~init:v ~f:(fun i v _ ->
                        match%map Linear_pipe.read pipe with
-                       | `Eof -> (v, s)
-                       | `Ok (Some v', s') -> (v', s')
-                       | `Ok (None, s') -> (v, s') )
+                       | `Eof -> v
+                       | `Ok (Some v') -> v'
+                       | `Ok None -> v )
               in
               (* after we flush intermediate work *)
               let old_acc = State1.acc s in
-              let%bind v, s = fill_some_zeros Int64.zero s in
+              let%bind v = fill_some_zeros Int64.zero s in
               do_one_next := true ;
               let acc = State1.acc s in
               assert (acc <> old_acc) ;
               (* eventually we'll emit the acc+1 element *)
-              let%map acc_plus_one, s' = fill_some_zeros v s in
+              let%map acc_plus_one = fill_some_zeros v s in
               assert (acc_plus_one = Int64.( + ) acc Int64.one) )
       end )
 
@@ -448,8 +446,8 @@ let%test_module "scans" =
                 |> Deferred.List.foldi ~init:Int64.zero ~f:(fun i acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc
-                       | `Ok (Some v, s) -> v
-                       | `Ok (None, _) -> acc )
+                       | `Ok (Some v) -> v
+                       | `Ok None -> acc )
               in
               let expected =
                 List.fold
@@ -511,8 +509,8 @@ let%test_module "scans" =
                 |> Deferred.List.foldi ~init:"" ~f:(fun i acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc
-                       | `Ok (Some v, s) -> v
-                       | `Ok (None, _) -> acc )
+                       | `Ok (Some v) -> v
+                       | `Ok None -> acc )
               in
               let expected =
                 List.fold
