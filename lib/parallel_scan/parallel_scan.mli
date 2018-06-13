@@ -43,19 +43,12 @@ module type Spec_intf = sig
   val merge : Output.t -> Accum.t -> Output.t Deferred.t
 end
 
-val start :
-     init:'b
-  -> data:'d Linear_pipe.Reader.t
-  -> parallelism_log_2:int
-  -> spec:(module
-           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                          t = 'b)
-  -> ('b option * ('a, 'b, 'd) State.t) Deferred.Or_error.t
+val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
 
 val step :
      state:('a, 'b, 'd) State.t
-  -> data:'d Linear_pipe.Reader.t
+  -> data:'d list
   -> spec:(module
            Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
                                                                           t = 'b)
-  -> ('b option * ('a, 'b, 'd) State.t) Deferred.Or_error.t
+  -> ('b option * ('a, 'b, 'd) State.t) Deferred.t

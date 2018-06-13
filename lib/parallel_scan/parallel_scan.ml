@@ -280,58 +280,42 @@ module State1 = struct
         acc )
 end
 
-let handle_next_state state ~data ~spec =
-  let parallelism = State1.parallelism state in
-  match%bind Linear_pipe.read' ~max_queue_length:parallelism data with
-  | `Eof -> Deferred.Or_error.error_string "No more data!"
-  | `Ok q ->
-      let ds = Queue.to_list q in
-      let%map maybe_b = State1.consume state ds ~spec in
-      Or_error.return (maybe_b, state)
-
 let start : type a b d.
-       init:b
-    -> data:d Linear_pipe.Reader.t
-    -> parallelism_log_2:int
-    -> spec:(module
-             Spec_intf with type Data.t = d and type Accum.t = a and type Output.
-                                                                          t = b)
-    -> (b option * (a, b, d) State.t) Deferred.Or_error.t =
- fun ~init ~data ~parallelism_log_2 ~spec ->
-  match%bind Linear_pipe.read data with
-  | `Eof -> Deferred.Or_error.error_string "No more data!"
-  | `Ok seed ->
-      let state : (a, b, d) State.t =
-        State1.create ~parallelism_log_2 ~init ~seed
-      in
-      handle_next_state state ~data ~spec
+    parallelism_log_2:int -> init:b -> seed:d -> (a, b, d) State.t =
+  State1.create
 
 let step : type a b d.
        state:(a, b, d) State.t
-    -> data:d Linear_pipe.Reader.t
+    -> data:d list
     -> spec:(module
              Spec_intf with type Data.t = d and type Accum.t = a and type Output.
                                                                           t = b)
-    -> (b option * (a, b, d) State.t) Deferred.Or_error.t =
- fun ~state ~data ~spec -> handle_next_state state ~data ~spec
+    -> (b option * (a, b, d) State.t) Deferred.t =
+ fun ~state ~data ~spec ->
+  let%map maybe_b = State1.consume state data ~spec in
+  (maybe_b, state)
 
 let%test_module "scans" =
   ( module struct
     let do_steps ~state ~data ~spec w =
       let rec go () =
-        match%bind step ~state ~data ~spec with
-        | Ok v ->
-            let%bind () = Linear_pipe.write w v in
+        match%bind Linear_pipe.read' data with
+        | `Eof -> return ()
+        | `Ok q ->
+            let ds = Queue.to_list q in
+            let%bind x = step ~state ~data:ds ~spec in
+            let%bind () = Linear_pipe.write w x in
             go ()
-        | Error _ -> return ()
       in
       go ()
 
     let scan ~init ~data ~spec ~parallelism_log_2 =
       Linear_pipe.create_reader ~close_on_exception:true (fun w ->
-          match%bind start ~init ~data ~spec ~parallelism_log_2 with
-          | Error _ -> return ()
-          | Ok (_, s) -> do_steps ~state:s ~data ~spec w )
+          match%bind Linear_pipe.read data with
+          | `Eof -> return ()
+          | `Ok seed ->
+              let s = start ~init ~seed ~parallelism_log_2 in
+              do_steps ~state:s ~data ~spec w )
 
     let step_repeatedly ~state ~data ~spec =
       Linear_pipe.create_reader ~close_on_exception:true (fun w ->
