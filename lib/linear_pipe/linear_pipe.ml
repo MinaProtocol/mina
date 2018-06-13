@@ -19,7 +19,7 @@ let write_or_drop ~capacity writer reader x =
 
 let create_reader ~close_on_exception f =
   let r = Pipe.create_reader ~close_on_exception f in
-  { Reader.pipe = r ; has_reader = false }
+  {Reader.pipe= r; has_reader= false}
 
 let write = Pipe.write
 
@@ -208,5 +208,7 @@ let read_now reader =
   let res = Pipe.read_now reader.pipe in
   release_has_reader reader ; res
 
-let read' ?max_queue_length ({pipe} : 'a Reader.t) = Pipe.read' ?max_queue_length pipe
-let read ({pipe} : 'a Reader.t) = Pipe.read pipe
+let read' ?max_queue_length ({pipe}: 'a Reader.t) =
+  Pipe.read' ?max_queue_length pipe
+
+let read ({pipe}: 'a Reader.t) = Pipe.read pipe

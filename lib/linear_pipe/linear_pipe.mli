@@ -10,32 +10,21 @@ module Reader : sig
 end
 
 val create : unit -> 'a Reader.t * 'a Writer.t
-val create_reader : close_on_exception:bool -> ('a Writer.t -> unit Deferred.t) -> 'a Reader.t
+
+val create_reader :
+  close_on_exception:bool -> ('a Writer.t -> unit Deferred.t) -> 'a Reader.t
 
 val wrap_reader : 'a Pipe.Reader.t -> 'a Reader.t
 
-val write
-  :  'a Writer.t
-  -> 'a
-  -> unit Deferred.t
+val write : 'a Writer.t -> 'a -> unit Deferred.t
 
-val write_or_drop
-  : capacity : int
-  -> 'a Writer.t 
-  -> 'b Reader.t 
-  -> 'a 
-  -> unit
+val write_or_drop : capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
 
-val write_or_exn
-  : capacity : int
-  -> 'a Writer.t 
-  -> 'b Reader.t 
-  -> 'a 
-  -> unit
+val write_or_exn : capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
 
-val iter
-  :  ?consumer          : Pipe.Consumer.t
-  -> ?continue_on_error : bool  (** default is [false] *)
+val iter :
+     ?consumer:Pipe.Consumer.t
+  -> ?continue_on_error:bool (** default is [false] *)
   -> 'a Reader.t
   -> f:('a -> unit Deferred.t)
   -> unit Deferred.t
@@ -121,7 +110,9 @@ val values_available : 'a Reader.t -> [`Eof | `Ok] Deferred.t
 
 val peek : 'a Reader.t -> 'a option
 
-val read_now : 'a Reader.t -> [ `Eof | `Nothing_available | `Ok of 'a ]
-val read' : ?max_queue_length:int -> 'a Reader.t -> [`Eof | `Ok of 'a Queue.t ] Deferred.t
-val read : 'a Reader.t -> [`Eof | `Ok of 'a ] Deferred.t
+val read_now : 'a Reader.t -> [`Eof | `Nothing_available | `Ok of 'a]
 
+val read' :
+  ?max_queue_length:int -> 'a Reader.t -> [`Eof | `Ok of 'a Queue.t] Deferred.t
+
+val read : 'a Reader.t -> [`Eof | `Ok of 'a] Deferred.t

@@ -3,6 +3,7 @@ open Async_kernel
 
 module Ring_buffer : sig
   type 'a t [@@deriving sexp, bin_io]
+
   val read_all : 'a t -> 'a list
 end
 
@@ -16,6 +17,7 @@ module State : sig
   end
 
   type ('a, 'b, 'd) t [@@deriving bin_io]
+
   val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t
 end
 
@@ -26,7 +28,9 @@ module type Spec_intf = sig
 
   module Accum : sig
     type t [@@deriving sexp_of]
+
     (* Semigroup+deferred *)
+
     val ( + ) : t -> t -> t Deferred.t
   end
 
@@ -35,19 +39,23 @@ module type Spec_intf = sig
   end
 
   val map : Data.t -> Accum.t Deferred.t
+
   val merge : Output.t -> Accum.t -> Output.t Deferred.t
 end
 
 val start :
-  init:'b ->
-  data:'d Linear_pipe.Reader.t ->
-  parallelism_log_2:int ->
-  spec:(module Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.t = 'b) ->
-  ('b option * ('a, 'b, 'd) State.t) Deferred.Or_error.t
+     init:'b
+  -> data:'d Linear_pipe.Reader.t
+  -> parallelism_log_2:int
+  -> spec:(module
+           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
+                                                                          t = 'b)
+  -> ('b option * ('a, 'b, 'd) State.t) Deferred.Or_error.t
 
 val step :
-  state:('a, 'b, 'd) State.t ->
-  data:'d Linear_pipe.Reader.t ->
-  spec:(module Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.t = 'b) ->
-  ('b option * ('a, 'b, 'd) State.t) Deferred.Or_error.t
-
+     state:('a, 'b, 'd) State.t
+  -> data:'d Linear_pipe.Reader.t
+  -> spec:(module
+           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
+                                                                          t = 'b)
+  -> ('b option * ('a, 'b, 'd) State.t) Deferred.Or_error.t
