@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name interval_union)
+  (public_name interval_union)
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core_kernel ))
+  (preprocess (pps ()))
+  (synopsis "Union of intervals data structure")))
+
