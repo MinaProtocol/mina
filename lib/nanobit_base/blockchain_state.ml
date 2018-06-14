@@ -83,6 +83,16 @@ let to_bits_unchecked ({ next_difficulty; previous_state_hash; ledger_hash; stre
   @ Strength.Bits.to_bits strength
   @ Block_time.Bits.to_bits timestamp
 
+let dummy : t =
+  { next_difficulty = Target.max
+  ; previous_state_hash = State_hash.of_hash Field.zero
+  ; ledger_hash = Ledger_hash.of_hash Field.zero
+  ; strength = Strength.zero
+  ; timestamp = Block_time.of_time Time.epoch
+  }
+
+let length_in_bits = fold ~init:0 ~f:(fun acc _ -> acc + 1) dummy
+
 let hash t =
   Pedersen.State.update_fold Hash_prefix.blockchain_state
     (List.fold_left (to_bits_unchecked t))

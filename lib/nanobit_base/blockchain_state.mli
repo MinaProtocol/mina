@@ -46,6 +46,8 @@ include Snarkable.S
 
 module Hash = State_hash
 
+val length_in_bits : int
+
 val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
 
 val to_bits : var -> (Boolean.var list, _) Checked.t
