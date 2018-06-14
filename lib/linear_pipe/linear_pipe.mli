@@ -11,7 +11,12 @@ end
 
 val create : unit -> 'a Reader.t * 'a Writer.t
 
+val create_reader :
+  close_on_exception:bool -> ('a Writer.t -> unit Deferred.t) -> 'a Reader.t
+
 val wrap_reader : 'a Pipe.Reader.t -> 'a Reader.t
+
+val write : 'a Writer.t -> 'a -> unit Deferred.t
 
 val write_or_drop : capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
 
@@ -106,3 +111,8 @@ val values_available : 'a Reader.t -> [`Eof | `Ok] Deferred.t
 val peek : 'a Reader.t -> 'a option
 
 val read_now : 'a Reader.t -> [`Eof | `Nothing_available | `Ok of 'a]
+
+val read' :
+  ?max_queue_length:int -> 'a Reader.t -> [`Eof | `Ok of 'a Queue.t] Deferred.t
+
+val read : 'a Reader.t -> [`Eof | `Ok of 'a] Deferred.t

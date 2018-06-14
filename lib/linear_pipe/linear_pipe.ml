@@ -17,6 +17,12 @@ let write_or_drop ~capacity writer reader x =
     ignore (Pipe.read_now reader.Reader.pipe) ;
   Pipe.write_without_pushback writer x
 
+let create_reader ~close_on_exception f =
+  let r = Pipe.create_reader ~close_on_exception f in
+  {Reader.pipe= r; has_reader= false}
+
+let write = Pipe.write
+
 exception Overflow
 
 let write_or_exn ~capacity writer reader x =
@@ -201,3 +207,8 @@ let read_now reader =
   set_has_reader reader ;
   let res = Pipe.read_now reader.pipe in
   release_has_reader reader ; res
+
+let read' ?max_queue_length ({pipe}: 'a Reader.t) =
+  Pipe.read' ?max_queue_length pipe
+
+let read ({pipe}: 'a Reader.t) = Pipe.read pipe
