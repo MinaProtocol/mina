@@ -1,5 +1,6 @@
 open Core
 open Snark_params
+open Util
 open Tick
 open Let_syntax
 open Currency
@@ -24,16 +25,22 @@ module Index = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
 end
 
+module Nonce = Account_nonce
+
 module Stable = struct
   module V1 = struct
-    type ('pk, 'amount, 'nonce) t_ =
-      {public_key: 'pk; balance: 'amount; nonce: 'nonce}
+    type ('pk, 'amount, 'nonce, 'receipt_chain) t_ =
+      { public_key: 'pk
+      ; balance: 'amount
+      ; nonce: 'nonce
+      ; receipt_chain: 'receipt_chain }
     [@@deriving fields, sexp, bin_io, eq]
 
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Balance.Stable.V1.t
-      , Account_nonce.Stable.V1.t )
+      , Nonce.Stable.V1.t
+      , Receipt_chain.Tail.Stable.V1.t )
       t_
     [@@deriving sexp, bin_io, eq]
   end
@@ -42,9 +49,14 @@ end
 include Stable.V1
 
 type var =
-  (Public_key.Compressed.var, Balance.var, Account_nonce.Unpacked.var) t_
+  ( Public_key.Compressed.var
+  , Balance.var
+  , Nonce.Unpacked.var
+  , Receipt_chain.Tail.var )
+  t_
 
-type value = (Public_key.Compressed.t, Balance.t, Account_nonce.t) t_
+type value =
+  (Public_key.Compressed.t, Balance.t, Nonce.t, Receipt_chain.Tail.t) t_
 [@@deriving sexp]
 
 let empty_hash =
@@ -53,28 +65,35 @@ let empty_hash =
 let typ : (var, value) Typ.t =
   let spec =
     let open Data_spec in
-    [Public_key.Compressed.typ; Balance.typ; Account_nonce.Unpacked.typ]
+    [ Public_key.Compressed.typ
+    ; Balance.typ
+    ; Nonce.Unpacked.typ
+    ; Receipt_chain.Tail.typ ]
   in
   let of_hlist
-        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
-    H_list.(fun [public_key; balance; nonce] -> {public_key; balance; nonce})
+        : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) H_list.t
+          -> ('a, 'b, 'c, 'd) t_ =
+    let open H_list in
+    fun [public_key; balance; nonce; receipt_chain] ->
+      {public_key; balance; nonce; receipt_chain}
   in
-  let to_hlist {public_key; balance; nonce} =
-    H_list.[public_key; balance; nonce]
+  let to_hlist {public_key; balance; nonce; receipt_chain} =
+    H_list.[public_key; balance; nonce; receipt_chain]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_to_bits {public_key; balance; nonce} =
-  let%map public_key = Public_key.Compressed.var_to_bits public_key in
+let var_to_bits {public_key; balance; nonce; receipt_chain} =
+  let%map public_key = Public_key.Compressed.var_to_bits public_key
+  and receipt_chain = Receipt_chain.Tail.var_to_bits receipt_chain in
   let balance = (Balance.var_to_bits balance :> Boolean.var list) in
-  let nonce = Account_nonce.Unpacked.var_to_bits nonce in
-  public_key @ balance @ nonce
+  let nonce = Nonce.Unpacked.var_to_bits nonce in
+  public_key @ balance @ nonce @ receipt_chain
 
-let fold_bits ({public_key; balance; nonce}: t) ~init ~f =
-  let init = Public_key.Compressed.fold public_key ~init ~f in
-  let init = Balance.fold balance ~init ~f in
-  Account_nonce.Bits.fold nonce ~init ~f
+let fold_bits ({public_key; balance; nonce; receipt_chain}: t) =
+  Public_key.Compressed.fold public_key
+  +> Balance.fold balance +> Nonce.Bits.fold nonce
+  +> Receipt_chain.Tail.fold receipt_chain
 
 let hash_prefix = Hash_prefix.account
 
