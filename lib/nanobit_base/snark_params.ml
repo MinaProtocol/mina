@@ -74,7 +74,6 @@ module Tick = struct
 
     include T
     include Hashable.Make (T)
-    include Field_bin.Make (Tick0.Field) (Tick_curve.Bigint.R)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let rec compare_bitstring xs0 ys0 =
