@@ -55,18 +55,18 @@ module Make (Field : sig
   include Snarky.Field_intf.S
 
   include Sexpable.S with type t := t
+  include Binable.S with type t := t
 end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t)
 (Curve : Snarky.Curves.Edwards.Basic.S with type field := Field.t) =
 struct
   module Digest = struct
-    type t = Field.t [@@deriving sexp, eq]
+    type t = Field.t [@@deriving sexp, eq, bin_io]
 
     let size_in_bits = Field.size_in_bits
 
     let ( = ) = equal
 
-    include Field_bin.Make (Field) (Bigint)
     module Snarkable = Bits.Snarkable.Field
     module Bits = Bits.Make_field (Field) (Bigint)
   end

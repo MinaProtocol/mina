@@ -182,6 +182,7 @@ module Edwards = struct
     type var
 
     type value = t
+    [@@deriving bin_io]
 
     val var_of_value : value -> var
 
@@ -246,10 +247,12 @@ module Edwards = struct
     module Scalar = Scalar
 
     type 'a tup = 'a * 'a
+    [@@deriving bin_io]
 
     type var = Cvar.t tup
 
     type value = Field.t tup
+    [@@deriving bin_io]
 
     let var_of_value (x, y) = (Cvar.constant x, Cvar.constant y)
 
