@@ -182,7 +182,7 @@ let handle_with_ledger (ledger: Ledger.t) =
       (Ledger.merkle_path_at_index_exn ledger idx)
   in
   fun (With {request; respond}) ->
-    let open Ledger_hash in
+    let open Ledger.Checked in
     match request with
     | Get_element idx ->
         let elt = Ledger.get_at_index_exn ledger idx in
@@ -259,7 +259,8 @@ module Base = struct
         in
         let%bind root =
           let%bind sender_compressed = Public_key.compress_var sender in
-          Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
+          Ledger.Checked.modify_account root sender_compressed ~f:
+            (fun account ->
               let%bind next_nonce =
                 Account_nonce.increment_if_var account.nonce is_normal
               in
@@ -276,7 +277,7 @@ module Base = struct
               {account with balance; nonce= next_nonce} )
         in
         let%map root =
-          Ledger_hash.modify_account root receiver ~f:(fun account ->
+          Ledger.Checked.modify_account root receiver ~f:(fun account ->
               let%map balance = Balance.Checked.(account.balance + amount) in
               {account with balance} )
         in
@@ -784,7 +785,8 @@ let%test_module "transaction_snark" =
             { public_key=
                 Public_key.compress (Public_key.of_private_key private_key)
             ; balance= Balance.of_int (10 + Random.int 100)
-            ; nonce= Account_nonce.zero } }
+            ; nonce= Account_nonce.zero
+            ; receipt_chain= Receipt_chain.Tail.empty } }
       in
       let n = Int.pow 2 ledger_depth in
       Array.init n ~f:(fun _ -> random_wallet ())
