@@ -106,11 +106,22 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       fun bs -> go Field.one Field.zero bs
 
-    let sexp_of_t x =
-      Bignum_bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
+    let to_bignum_bigint = Fn.compose Bigint.to_bignum_bigint Bigint.of_field
+    let of_bignum_bigint = Fn.compose Bigint.to_field Bigint.of_bignum_bigint
 
-    let t_of_sexp s =
-      Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.t_of_sexp s))
+    include Sexpable.Of_sexpable(Bignum_bigint)(struct
+        type nonrec t = t
+        let to_sexpable = to_bignum_bigint
+        let of_sexpable = of_bignum_bigint
+      end)
+
+    (* TODO There should be a more efficient way of doing
+      this since bigints are backed by a char[] *)
+    include Binable.Of_binable(Bignum_bigint)(struct
+        type nonrec t = t
+        let to_binable = to_bignum_bigint
+        let of_binable = of_bignum_bigint
+      end)
 
     module Infix = struct
       let ( + ) = add
