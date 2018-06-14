@@ -122,3 +122,5 @@ let apply_fee_transfer t transfer =
 let undo_fee_transfer t transfer =
   process_fee_transfer t transfer ~modify_balance:(fun b f ->
       Option.value_exn (Balance.sub_amount b (Amount.of_fee f)) )
+
+module Checked = Ledger_checked
