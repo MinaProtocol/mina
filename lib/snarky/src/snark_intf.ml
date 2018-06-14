@@ -284,6 +284,7 @@ module type Basic = sig
     include Field_intf.Extended with type t = field
 
     include Sexpable.S with type t := t
+
     include Binable.S with type t := t
 
     type var = Cvar.t

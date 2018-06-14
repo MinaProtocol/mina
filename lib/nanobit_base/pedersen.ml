@@ -55,6 +55,7 @@ module Make (Field : sig
   include Snarky.Field_intf.S
 
   include Sexpable.S with type t := t
+
   include Binable.S with type t := t
 end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t)

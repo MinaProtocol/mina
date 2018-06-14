@@ -102,7 +102,7 @@ module Edwards = struct
     module type S = sig
       type field
 
-      type t = field * field
+      type t = field * field [@@deriving bin_io]
 
       module Params : Params_intf with type field := field
 
@@ -119,15 +119,18 @@ module Edwards = struct
       val find_y : field -> field option
     end
 
-    module Make
-        (Field : Field_intf.Extended)
-        (Params : Params_intf with type field := Field.t) :
+    module Make (Field : sig
+      include Field_intf.Extended
+
+      include Binable.S with type t := t
+    end)
+    (Params : Params_intf with type field := Field.t) :
       S with type field := Field.t and module Params = Params =
     struct
       open Field
       module Params = Params
 
-      type t = Field.t * Field.t
+      type t = Field.t * Field.t [@@deriving bin_io]
 
       (* x^2 + y^2 = 1 + dx^2 y^2 *)
 
@@ -182,7 +185,6 @@ module Edwards = struct
     type var
 
     type value = t
-    [@@deriving bin_io]
 
     val var_of_value : value -> var
 
@@ -247,12 +249,10 @@ module Edwards = struct
     module Scalar = Scalar
 
     type 'a tup = 'a * 'a
-    [@@deriving bin_io]
 
     type var = Cvar.t tup
 
     type value = Field.t tup
-    [@@deriving bin_io]
 
     let var_of_value (x, y) = (Cvar.constant x, Cvar.constant y)
 
