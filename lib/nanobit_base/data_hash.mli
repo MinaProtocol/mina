@@ -18,6 +18,10 @@ module type Basic = sig
 
   type var
 
+  val var_of_t : t -> var
+
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
   val var_of_hash_unpacked : Pedersen.Digest.Unpacked.var -> var
 
   val var_to_hash_packed : var -> Pedersen.Digest.Packed.var
@@ -54,4 +58,6 @@ module Make_small (M : sig
 end) :
   Small
 
-module Make_full_size () : Full_size
+module Make_full_size_loose_unpacking () : Full_size
+
+module Make_full_size_strict_unpacking () : Full_size

@@ -19,6 +19,10 @@ module type Basic = sig
 
   type var
 
+  val var_of_t : t -> var
+
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
   val var_of_hash_unpacked : Pedersen.Digest.Unpacked.var -> var
 
   val var_to_hash_packed : var -> Pedersen.Digest.Packed.var
@@ -52,6 +56,10 @@ end
 
 module Make_basic (M : sig
   val bit_length : int
+
+  val unpack :
+       Pedersen.Digest.Packed.var
+    -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 end) =
 struct
   module Stable = struct
@@ -75,7 +83,27 @@ struct
     { digest: Pedersen.Digest.Packed.var
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
 
+  let var_of_t =
+    let max =
+      if M.bit_length < Field.size_in_bits then
+        Bignum_bigint.(two_to_the bit_length - one)
+      else Field.size
+    in
+    fun t ->
+      let n = Bigint.of_field t in
+      assert (Bignum_bigint.( <= ) (Bigint.to_bignum_bigint n) max) ;
+      { digest= Cvar.constant t
+      ; bits=
+          Some
+            (Bitstring.Lsb_first.of_list
+               (List.init M.bit_length ~f:(fun i ->
+                    Boolean.var_of_value (Bigint.test_bit n i) ))) }
+
   open Let_syntax
+
+  let if_ b ~then_ ~else_ =
+    let%map digest = Checked.if_ b ~then_:then_.digest ~else_:else_.digest in
+    {digest; bits= None}
 
   let var_of_hash_unpacked unpacked =
     { digest= Pedersen.Digest.project_var unpacked
@@ -86,21 +114,24 @@ struct
 
   let var_to_hash_packed {digest; _} = digest
 
+  (*
   (* TODO: Audit this usage of choose_preimage *)
   let unpack =
-    if Int.( = ) bit_length Field.size_in_bits then fun x ->
-      Pedersen.Digest.choose_preimage_var x
-      >>| Pedersen.Digest.Unpacked.var_to_bits
+    if Int.(=) bit_length Field.size_in_bits
+    then
+      (fun x -> Pedersen.Digest.choose_preimage_var x
+        >>| Pedersen.Digest.Unpacked.var_to_bits)
     else Checked.unpack ~length:bit_length
 
+*)
   let var_to_bits t =
     with_label __LOC__
       ( match t.bits with
       | Some bits -> return (bits :> Boolean.var list)
       | None ->
-          let%map bits = unpack t.digest in
-          t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
-          bits )
+          let%map bits = M.unpack t.digest in
+          t.bits <- Some bits ;
+          (bits :> Boolean.var list) )
 
   include Pedersen.Digest.Bits
 
@@ -141,9 +172,26 @@ struct
     {store; read; alloc; check}
 end
 
-module Make_full_size () = struct
+module Make_full_size_loose_unpacking () = struct
   include Make_basic (struct
     let bit_length = Field.size_in_bits
+
+    let unpack x =
+      let open Let_syntax in
+      Pedersen.Digest.choose_preimage_var x
+      >>| Pedersen.Digest.Unpacked.var_to_bits >>| Bitstring.Lsb_first.of_list
+  end)
+
+  let var_of_hash_packed digest = {digest; bits= None}
+
+  let of_hash = Fn.id
+end
+
+module Make_full_size_strict_unpacking () = struct
+  include Make_basic (struct
+    let bit_length = Field.size_in_bits
+
+    let unpack = Util.unpack_field_var
   end)
 
   let var_of_hash_packed digest = {digest; bits= None}
@@ -157,12 +205,21 @@ end) =
 struct
   let () = assert (M.bit_length < Field.size_in_bits)
 
-  include Make_basic (M)
+  let unpack x =
+    let open Let_syntax in
+    Checked.unpack ~length:M.bit_length x >>| Bitstring.Lsb_first.of_list
+
+  include Make_basic (struct
+    include M
+
+    let unpack = unpack
+  end)
+
   open Let_syntax
 
   let var_of_hash_packed digest =
     let%map bits = unpack digest in
-    {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
+    {digest; bits= Some bits}
 
   let max = Bignum_bigint.(two_to_the bit_length - one)
 
