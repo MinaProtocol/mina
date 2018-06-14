@@ -87,7 +87,7 @@ module Fee_transfer = struct
           { receiver= pk1
           ; amount= Amount.of_fee fee1 (* What "receiver" receives *)
           ; fee= fee2 (* What "sender" receives *)
-          ; nonce= Account.Nonce.zero }
+          ; nonce= Account_nonce.zero }
       ; sender= Public_key.decompress_exn pk2
       ; signature= dummy_signature } )
 
@@ -261,12 +261,12 @@ module Base = struct
           let%bind sender_compressed = Public_key.compress_var sender in
           Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
               let%bind next_nonce =
-                Account.Nonce.increment_if_var account.nonce is_normal
+                Account_nonce.increment_if_var account.nonce is_normal
               in
               let%bind () =
                 with_label __LOC__
                   (let%bind nonce_matches =
-                     Account.Nonce.equal_var nonce account.nonce
+                     Account_nonce.equal_var nonce account.nonce
                    in
                    Boolean.Assert.any [is_fee_transfer; nonce_matches])
               in
@@ -784,7 +784,7 @@ let%test_module "transaction_snark" =
             { public_key=
                 Public_key.compress (Public_key.of_private_key private_key)
             ; balance= Balance.of_int (10 + Random.int 100)
-            ; nonce= Account.Nonce.zero } }
+            ; nonce= Account_nonce.zero } }
       in
       let n = Int.pow 2 ledger_depth in
       Array.init n ~f:(fun _ -> random_wallet ())
@@ -829,12 +829,12 @@ let%test_module "transaction_snark" =
           let t1 =
             transaction wallets 0 1 8
               (Fee.of_int (Random.int 20))
-              Account.Nonce.zero
+              Account_nonce.zero
           in
           let t2 =
             transaction wallets 1 2 3
               (Fee.of_int (Random.int 20))
-              Account.Nonce.zero
+              Account_nonce.zero
           in
           let state1 = Ledger.merkle_root ledger in
           let proof12 = of_transaction' ledger t1 in

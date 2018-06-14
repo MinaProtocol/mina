@@ -39,11 +39,11 @@ let add_fee amount fee =
   error_opt "add_fee: overflow" (Amount.add_fee amount fee)
 
 let validate_nonces txn_nonce account_nonce =
-  if Account.Nonce.equal account_nonce txn_nonce then Or_error.return ()
+  if Account_nonce.equal account_nonce txn_nonce then Or_error.return ()
   else
     Or_error.errorf
-      !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in \
-        transaction %{sexp: Account.Nonce.t}"
+      !"Nonce in account %{sexp: Account_nonce.t} different from nonce in \
+        transaction %{sexp: Account_nonce.t}"
       account_nonce txn_nonce
 
 let apply_transaction_unchecked ledger ({payload; sender}: Transaction.t) =
@@ -62,7 +62,7 @@ let apply_transaction_unchecked ledger ({payload; sender}: Transaction.t) =
     let%map receiver_balance' = add_amount receiver_account.balance amount in
     set ledger sender
       { sender_account with
-        balance= sender_balance'; nonce= Account.Nonce.succ nonce } ;
+        balance= sender_balance'; nonce= Account_nonce.succ nonce } ;
     set ledger receiver {receiver_account with balance= receiver_balance'}
 
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
@@ -78,7 +78,7 @@ let undo_transaction ledger ({payload; sender}: Transaction.t) =
     add_amount sender_account.balance amount_and_fee
   in
   let%bind () =
-    validate_nonces (Account.Nonce.succ nonce) sender_account.nonce
+    validate_nonces (Account_nonce.succ nonce) sender_account.nonce
   in
   if Public_key.Compressed.equal sender receiver then return ()
   else

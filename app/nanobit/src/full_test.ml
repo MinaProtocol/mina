@@ -84,7 +84,7 @@ let run_test with_snark : unit -> unit Deferred.t =
       { receiver= poor_pk
       ; amount= send_amount
       ; fee= Currency.Fee.of_int 0
-      ; nonce= Account.Nonce.zero }
+      ; nonce= Account_nonce.zero }
     in
     Transaction.sign (Signature_keypair.of_private_key rich_sk) payload
   in

@@ -23,9 +23,9 @@ let ledger =
   Ledger.set ledger rich_pk
     { Account.public_key= rich_pk
     ; balance= initial_rich_balance
-    ; nonce= Account.Nonce.zero } ;
+    ; nonce= Account_nonce.zero } ;
   Ledger.set ledger poor_pk
     { Account.public_key= poor_pk
     ; balance= initial_poor_balance
-    ; nonce= Account.Nonce.zero } ;
+    ; nonce= Account_nonce.zero } ;
   ledger

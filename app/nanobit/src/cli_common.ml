@@ -65,4 +65,4 @@ let txn_amount =
 
 let txn_nonce =
   let open Nanobit_base in
-  Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
+  Command.Arg_type.map Command.Param.string ~f:Account_nonce.of_string

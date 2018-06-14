@@ -14,7 +14,7 @@ let create_ledger_and_transactions num_transitions =
       Ledger.set ledger public_key
         { public_key
         ; balance= Currency.Balance.of_int 10_000
-        ; nonce= Account.Nonce.zero } ) ;
+        ; nonce= Account_nonce.zero } ) ;
   let txn from_kp (to_kp: Signature_keypair.t) amount fee nonce =
     let payload : Transaction.Payload.t =
       {receiver= Public_key.compress to_kp.public_key; fee; amount; nonce}
@@ -24,7 +24,7 @@ let create_ledger_and_transactions num_transitions =
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
       (List.map (Array.to_list keys) ~f:(fun k ->
-           (Public_key.compress k.public_key, Account.Nonce.zero) ))
+           (Public_key.compress k.public_key, Account_nonce.zero) ))
   in
   let random_transaction () : Transaction.With_valid_signature.t =
     let sender_idx = Random.int num_accounts in
@@ -32,7 +32,7 @@ let create_ledger_and_transactions num_transitions =
     let receiver = keys.(Random.int num_accounts) in
     let sender_pk = Public_key.compress sender.public_key in
     let nonce = Hashtbl.find_exn nonces sender_pk in
-    Hashtbl.change nonces sender_pk ~f:(Option.map ~f:Account.Nonce.succ) ;
+    Hashtbl.change nonces sender_pk ~f:(Option.map ~f:Account_nonce.succ) ;
     let fee = Currency.Fee.of_int (1 + Random.int 100) in
     let amount = Currency.Amount.of_int (1 + Random.int 100) in
     txn sender receiver amount fee nonce
@@ -61,13 +61,13 @@ let create_ledger_and_transactions num_transitions =
       let a =
         txn keys.(0) keys.(1)
           (Currency.Amount.of_int 10)
-          Currency.Fee.zero Account.Nonce.zero
+          Currency.Fee.zero Account_nonce.zero
       in
       let b =
         txn keys.(0) keys.(1)
           (Currency.Amount.of_int 10)
           Currency.Fee.zero
-          (Account.Nonce.succ Account.Nonce.zero)
+          (Account_nonce.succ Account_nonce.zero)
       in
       (ledger, [Transaction a; Transaction b])
 

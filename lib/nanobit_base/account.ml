@@ -24,8 +24,6 @@ module Index = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
 end
 
-module Nonce = Nonce.Make32 ()
-
 module Stable = struct
   module V1 = struct
     type ('pk, 'amount, 'nonce) t_ =
@@ -35,7 +33,7 @@ module Stable = struct
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Balance.Stable.V1.t
-      , Nonce.Stable.V1.t )
+      , Account_nonce.Stable.V1.t )
       t_
     [@@deriving sexp, bin_io, eq]
   end
@@ -43,16 +41,19 @@ end
 
 include Stable.V1
 
-type var = (Public_key.Compressed.var, Balance.var, Nonce.Unpacked.var) t_
+type var =
+  (Public_key.Compressed.var, Balance.var, Account_nonce.Unpacked.var) t_
 
-type value = (Public_key.Compressed.t, Balance.t, Nonce.t) t_ [@@deriving sexp]
+type value = (Public_key.Compressed.t, Balance.t, Account_nonce.t) t_
+[@@deriving sexp]
 
 let empty_hash =
   Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
 
 let typ : (var, value) Typ.t =
   let spec =
-    Data_spec.[Public_key.Compressed.typ; Balance.typ; Nonce.Unpacked.typ]
+    let open Data_spec in
+    [Public_key.Compressed.typ; Balance.typ; Account_nonce.Unpacked.typ]
   in
   let of_hlist
         : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
@@ -67,13 +68,13 @@ let typ : (var, value) Typ.t =
 let var_to_bits {public_key; balance; nonce} =
   let%map public_key = Public_key.Compressed.var_to_bits public_key in
   let balance = (Balance.var_to_bits balance :> Boolean.var list) in
-  let nonce = Nonce.Unpacked.var_to_bits nonce in
+  let nonce = Account_nonce.Unpacked.var_to_bits nonce in
   public_key @ balance @ nonce
 
 let fold_bits ({public_key; balance; nonce}: t) ~init ~f =
   let init = Public_key.Compressed.fold public_key ~init ~f in
   let init = Balance.fold balance ~init ~f in
-  Nonce.Bits.fold nonce ~init ~f
+  Account_nonce.Bits.fold nonce ~init ~f
 
 let hash_prefix = Hash_prefix.account
 

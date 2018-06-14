@@ -78,7 +78,7 @@ let modify_account t pk ~f =
    the same hash as [Account.empty_hash]
    - returns the merkle tree [t'] which is [t] but with the account
    [{ public_key = pk; balance = Account.Balance.zero; nonce =
-     Account.Nonce.zero }] at [addr] instead of
+     Account_nonce.zero }] at [addr] instead of
    an account with the empty hash
 *)
 let create_account t pk =
@@ -94,7 +94,7 @@ let create_account t pk =
     >>| var_of_hash_packed
     >>= assert_equal t
   in
-  let account : Account.var = { public_key = pk; balance = Balance.(var_of_t zero); nonce = Account.Nonce.(Unpacked.var_of_value zero) } in
+  let account : Account.var = { public_key = pk; balance = Balance.(var_of_t zero); nonce = Account_nonce.(Unpacked.var_of_value zero) } in
   (* Could save some constraints applying Account.Balance.zero to the hash
      (since it's a no-op) *)
   let%bind account_hash = Account.Checked.digest account in

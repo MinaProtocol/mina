@@ -16,7 +16,7 @@ module Payload = struct
         ( Public_key.Compressed.Stable.V1.t
         , Amount.Stable.V1.t
         , Fee.Stable.V1.t
-        , Account.Nonce.Stable.V1.t )
+        , Account_nonce.Stable.V1.t )
         t_
       [@@deriving bin_io, eq, sexp, compare, hash]
     end
@@ -30,7 +30,7 @@ module Payload = struct
     ( Public_key.Compressed.var
     , Amount.var
     , Fee.var
-    , Account.Nonce.Unpacked.var )
+    , Account_nonce.Unpacked.var )
     t_
 
   let typ : (var, t) Tick.Typ.t =
@@ -39,7 +39,7 @@ module Payload = struct
       [ Public_key.Compressed.typ
       ; Amount.typ
       ; Fee.typ
-      ; Account.Nonce.Unpacked.typ ]
+      ; Account_nonce.Unpacked.typ ]
     in
     let of_hlist
           : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) H_list.t
@@ -58,13 +58,13 @@ module Payload = struct
       (let%map receiver = Public_key.Compressed.var_to_bits receiver in
        let amount = (Amount.var_to_bits amount :> Boolean.var list) in
        let fee = (Fee.var_to_bits fee :> Boolean.var list) in
-       let nonce = Account.Nonce.Unpacked.var_to_bits nonce in
+       let nonce = Account_nonce.Unpacked.var_to_bits nonce in
        receiver @ amount @ fee @ nonce)
 
   let to_bits {receiver; amount; fee; nonce} =
     Public_key.Compressed.to_bits receiver
     @ Amount.to_bits amount @ Fee.to_bits fee
-    @ Account.Nonce.Bits.to_bits nonce
+    @ Account_nonce.Bits.to_bits nonce
 
   let%test_unit "to_bits" =
     let open Test_util in
@@ -76,7 +76,7 @@ module Payload = struct
           { receiver= {x= Field.random (); is_odd= Random.bool ()}
           ; amount= Amount.of_int (Random.int Int.max_value)
           ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
-          ; nonce= Account.Nonce.random () } )
+          ; nonce= Account_nonce.random () } )
 end
 
 module Stable = struct
@@ -131,7 +131,7 @@ let gen ~keys ~max_amount ~max_fee =
     { receiver= Public_key.compress receiver.Signature_keypair.public_key
     ; fee
     ; amount
-    ; nonce= Account.Nonce.zero }
+    ; nonce= Account_nonce.zero }
   in
   sign sender payload
 
