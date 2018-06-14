@@ -14,6 +14,8 @@ module Payload : sig
     t_
   [@@deriving bin_io, eq, sexp, compare, hash]
 
+  val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
+
   module Stable : sig
     module V1 : sig
       type nonrec ('pk, 'amount, 'fee, 'nonce) t_ =

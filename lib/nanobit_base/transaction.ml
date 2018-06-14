@@ -1,5 +1,6 @@
 open Core
 open Snark_params
+open Util
 open Tick
 open Let_syntax
 module Amount = Currency.Amount
@@ -52,6 +53,11 @@ module Payload = struct
     in
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let fold {receiver; amount; fee; nonce} =
+    Public_key.Compressed.fold receiver
+    +> Amount.fold amount +> Fee.fold fee
+    +> Account_nonce.Bits.fold nonce
 
   let var_to_bits {receiver; amount; fee; nonce} =
     with_label __LOC__
