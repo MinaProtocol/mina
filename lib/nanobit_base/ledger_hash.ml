@@ -28,7 +28,7 @@ module Merkle_tree = Snarky.Merkle_tree.Checked(Tick)(struct
 
 let depth = Snark_params.ledger_depth
 
-include Data_hash.Make_full_size()
+include Data_hash.Make_full_size_loose_unpacking()
 
 type path = Pedersen.Digest.t list
 
