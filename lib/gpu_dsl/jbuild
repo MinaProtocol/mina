@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name gpu_dsl)
+  (public_name gpu_dsl)
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core
+      ))
+  (preprocess (pps (ppx_jane)))
+  (synopsis "GPU dsl")))
