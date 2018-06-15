@@ -15,6 +15,7 @@ base64	2.2.0	installed
 bignum	v0.11.0	root
 bin_prot	v0.11.0	installed
 biniou	1.2.0	installed
+bitstring	3.0.0	root
 camomile	0.8.7	installed
 cmdliner	1.0.2	root
 cohttp	1.1.0	root
@@ -60,7 +61,7 @@ ocamlfind	1.8.0	installed
 ocp-build	1.99.20-beta	installed
 ocp-indent	1.6.1	root
 octavius	1.2.0	installed
-orocksdb	0.3.0	root
+orocksdb	0.3.0	root	path	/home/nathan/o1-labs/orocksdb
 parsexp	v0.11.0	installed
 ppx_assert	v0.11.0	installed
 ppx_ast	v0.11.0	installed
@@ -107,7 +108,6 @@ sexplib	v0.11.0	installed
 sexplib0	v0.11.0	installed
 spawn	v0.12.0	installed
 splittable_random	v0.11.0	installed
-stdint	0.5.0	root
 stdio	v0.11.0	installed
 stringext	1.5.0	installed
 topkg	0.9.1	installed

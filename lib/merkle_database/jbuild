@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name merkle_database)
+  (public_name merkle_database)
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries (core bitstring integers))
+  (preprocess (pps (ppx_jane ppx_deriving.eq bitstring.ppx)))
+  (synopsis "RocksDB Database module")))
