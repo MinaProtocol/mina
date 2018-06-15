@@ -37,15 +37,11 @@ module type S = sig
 end
 
 module type Tick_keypair_intf = sig
-  val verification_key : Tick.Verification_key.t
-
-  val proving_key : Tick.Proving_key.t
+  val keys : Tick.Keypair.t
 end
 
 module type Tock_keypair_intf = sig
-  val verification_key : Tock.Verification_key.t
-
-  val proving_key : Tock.Proving_key.t
+  val keys : Tock.Keypair.t
 end
 
 (* Someday:

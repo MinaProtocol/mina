@@ -557,6 +557,8 @@ struct
       -> primary_input:Field.Vector.t
       -> auxiliary_input:Field.Vector.t
       -> bool
+
+    val digest : t -> Md5.t
   end = struct
     type t = unit ptr
 
@@ -625,6 +627,15 @@ struct
         let keypair = stub t in
         Caml.Gc.finalise Keypair.delete keypair ;
         keypair
+
+    let digest =
+      let stub =
+        foreign (func_name "digest") (typ @-> returning Cpp_string.typ)
+      in
+      fun t ->
+        let s = stub t in
+        let r = Cpp_string.to_string s in
+        Cpp_string.delete s ; Md5.of_binary_exn r
   end
 
   module Protoboard : sig

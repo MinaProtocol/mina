@@ -77,7 +77,7 @@ module Body = struct
     in
     let alloc =
       Alloc.map typ.alloc ~f:(fun target_hash ->
-          {target_hash; proof= Lazy.force Tock.Proof.dummy} )
+          {target_hash; proof= Tock.Proof.dummy} )
     in
     let check t = typ.check t.target_hash in
     {store; read; alloc; check}
@@ -117,8 +117,7 @@ let genesis : t =
   in
   { header= {nonce= Nonce.of_int 193; time}
   ; body=
-      (* TODO: Fix  *)
-      { proof= Lazy.force Tock.Proof.dummy
+      { proof= Tock.Proof.dummy
       ; target_hash= Ledger.(merkle_root Genesis_ledger.ledger) } }
 
 let to_hlist {header; body} = H_list.[header; body]
@@ -160,7 +159,7 @@ module With_transactions = struct
     (* TODO: Remove in PR implementing miner *)
     let dummy : t =
       { target_hash= Ledger_hash.of_hash Tick.Pedersen.zero_hash
-      ; proof= Lazy.force Tock.Proof.dummy
+      ; proof= Tock.Proof.dummy
       ; transactions= [] }
   end
 

@@ -2,8 +2,46 @@ module Bignum_bigint = Bigint
 open Core_kernel
 
 module type Basic = sig
+  module Proving_key : sig
+    type t [@@deriving bin_io]
+
+    val to_string : t -> string
+
+    val of_string : string -> t
+
+    val to_bigstring : t -> Bigstring.t
+
+    val of_bigstring : Bigstring.t -> t
+  end
+
+  module Verification_key : sig
+    type t [@@deriving bin_io]
+
+    val to_string : t -> string
+
+    val of_string : string -> t
+
+    val to_bigstring : t -> Bigstring.t
+
+    val of_bigstring : Bigstring.t -> t
+  end
+
+  module Keypair : sig
+    type t [@@deriving bin_io]
+
+    val create : pk:Proving_key.t -> vk:Verification_key.t -> t
+
+    val pk : t -> Proving_key.t
+
+    val vk : t -> Verification_key.t
+  end
+
   module R1CS_constraint_system : sig
     type t
+
+    val digest : t -> Md5.t
+
+    val generate_keypair : t -> Keypair.t
   end
 
   module Var : sig
@@ -298,38 +336,6 @@ module type Basic = sig
 
   include Monad.Syntax2 with type ('a, 's) t := ('a, 's) Checked.t
 
-  module Proving_key : sig
-    type t
-
-    val to_string : t -> string
-
-    val of_string : string -> t
-
-    val to_bigstring : t -> Bigstring.t
-
-    val of_bigstring : Bigstring.t -> t
-  end
-
-  module Verification_key : sig
-    type t
-
-    val to_string : t -> string
-
-    val of_string : string -> t
-
-    val to_bigstring : t -> Bigstring.t
-
-    val of_bigstring : Bigstring.t -> t
-  end
-
-  module Keypair : sig
-    type t
-
-    val pk : t -> Proving_key.t
-
-    val vk : t -> Verification_key.t
-  end
-
   module Proof : sig
     type t
   end
@@ -437,6 +443,11 @@ module type Basic = sig
 
   val with_constraint_system :
     (R1CS_constraint_system.t -> unit) -> (unit, _) Checked.t
+
+  val constraint_system :
+       exposing:((unit, 's) Checked.t, _, 'k_var, _) Data_spec.t
+    -> 'k_var
+    -> R1CS_constraint_system.t
 
   val generate_keypair :
        exposing:((unit, 's) Checked.t, _, 'k_var, _) Data_spec.t
