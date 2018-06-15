@@ -4,12 +4,15 @@ open Nanobit_base
 
 module type S0 = sig
   type proof
+
   type t
 
   val cancel : t -> unit
 
-  val create
-    : conf_dir:string -> Ledger.t -> Transaction.With_valid_signature.t list
+  val create :
+       conf_dir:string
+    -> Ledger.t
+    -> Transaction.With_valid_signature.t list
     -> Public_key.Compressed.t
     -> t
 
@@ -24,12 +27,14 @@ module type S = sig
   module Sparse_ledger : sig
     open Snark_params.Tick
 
-    type t
-    [@@deriving sexp]
+    type t [@@deriving sexp]
 
     val merkle_root : t -> Ledger_hash.t
 
-    val path_exn : t -> int -> [ `Left of Pedersen.Digest.t | `Right of Pedersen.Digest.t ] list
+    val path_exn :
+         t
+      -> int
+      -> [`Left of Pedersen.Digest.t | `Right of Pedersen.Digest.t] list
 
     val apply_transaction_exn : t -> Transaction.t -> t
 

@@ -6,6 +6,7 @@ let length_in_bits = 8 * length_in_bytes
 
 module T : sig
   type t = private string
+
   val create : string -> t
 end = struct
   type t = string
@@ -14,16 +15,15 @@ end = struct
 
   let create s : t =
     let string_length = String.length s in
-    assert (string_length <= length_in_bytes);
+    assert (string_length <= length_in_bytes) ;
     let diff = length_in_bytes - string_length in
     let r = s ^ String.init diff ~f:(fun _ -> padding_char) in
-    assert (String.length r = length_in_bytes);
+    assert (String.length r = length_in_bytes) ;
     r
 end
 
 let salt s =
-  let open Snark_params.Tick.Pedersen in
-  State.salt params (T.create s :> string)
+  Snark_params.Tick.Pedersen.(State.salt params (T.create s :> string))
 
 let blockchain_state = salt "CodaBCState"
 
@@ -31,7 +31,7 @@ let account = salt "CodaAccount"
 
 let merkle_tree =
   Array.init Snark_params.ledger_depth ~f:(fun i ->
-    salt (sprintf "CodaMklTree%03d" i))
+      salt (sprintf "CodaMklTree%03d" i) )
 
 let proof_of_work = salt "CodaPoW"
 

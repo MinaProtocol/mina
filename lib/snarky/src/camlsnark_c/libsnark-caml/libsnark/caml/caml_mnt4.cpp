@@ -462,6 +462,39 @@ r1cs_constraint_system<FieldT>* camlsnark_mnt4_r1cs_constraint_system_create() {
   return new r1cs_constraint_system<FieldT>();
 }
 
+void camlsnark_mnt4_linear_combination_update_digest(
+    linear_combination<FieldT>& lc,
+    MD5_CTX* ctx) {
+  long coeff_size_in_bytes = libff::mnt4_r_limbs * sizeof(mp_limb_t);
+
+  std::vector<linear_term<FieldT>>& terms = lc.terms;
+  for (size_t i = 0; i < terms.size(); ++i) {
+    size_t index = terms[i].index;
+    FieldT coeff = terms[i].coeff;
+    MD5_Update(ctx, (void*) &index, (sizeof index));
+    MD5_Update(ctx, coeff.as_bigint().data, coeff_size_in_bytes);
+  }
+}
+
+std::string* camlsnark_mnt4_r1cs_constraint_system_digest(
+    r1cs_constraint_system<FieldT>* sys) {
+  MD5_CTX ctx;
+  MD5_Init(&ctx);
+
+  std::vector<r1cs_constraint<FieldT>>& cs = sys->constraints;
+
+  for (size_t i = 0; i < cs.size(); ++i) {
+    r1cs_constraint<FieldT> c = cs[i];
+    camlsnark_mnt4_linear_combination_update_digest(c.a, &ctx);
+    camlsnark_mnt4_linear_combination_update_digest(c.b, &ctx);
+    camlsnark_mnt4_linear_combination_update_digest(c.c, &ctx);
+  }
+
+  std::string* result = new std::string(MD5_DIGEST_LENGTH, '\0');
+  MD5_Final((unsigned char *) result->c_str(), &ctx);
+  return result;
+}
+
 bool camlsnark_mnt4_r1cs_constraint_system_is_satisfied(
     r1cs_constraint_system<FieldT>* sys,
     const r1cs_primary_input<FieldT>* primary_input,

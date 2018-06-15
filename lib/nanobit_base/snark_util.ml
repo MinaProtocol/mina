@@ -51,16 +51,16 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     assert (n <= Field.size_in_bits);
     let rec go acc two_to_the_i = function
       | b :: bs ->
-        go Cvar.(add acc (scale b two_to_the_i))
-          (Field.add two_to_the_i two_to_the_i)
-          bs
+        go
+        (Cvar.add acc (Cvar.scale b two_to_the_i))
+        (Field.add two_to_the_i two_to_the_i)
+        bs
       | [] -> acc
     in
     go (Cvar.constant Field.zero) Field.one (bs0 :> Cvar.t list)
   ;;
 
-  type _ Snarky.Request.t +=
-    | N_ones : bool list Snarky.Request.t
+  type _ Snarky.Request.t += N_ones : bool list Snarky.Request.t
 
   let n_ones ~total_length n =
     let%bind bs =
@@ -73,7 +73,8 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     in
     let%map () =
       assert_equal
-        (Cvar.sum (bs :> Cvar.t list)) (* This can't overflow since the field is huge *)
+        (Cvar.sum (bs :> Cvar.t list))
+        (* This can't overflow since the field is huge *)
         n
     and () = assert_decreasing bs in
     bs

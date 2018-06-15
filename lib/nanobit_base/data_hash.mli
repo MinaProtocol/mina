@@ -2,17 +2,16 @@ open Core
 open Snark_params.Tick
 
 module type Basic = sig
-  type t = private Pedersen.Digest.t
-  [@@deriving sexp, eq]
+  type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
   val bit_length : int
 
-  val (=) : t -> t -> bool
+  val ( = ) : t -> t -> bool
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq]
+
       include Hashable_binable with type t := t
     end
   end
@@ -50,5 +49,9 @@ module type Small = sig
   val of_hash : Pedersen.Digest.t -> t Or_error.t
 end
 
-module Make_small (M : sig val bit_length : int end) : Small
+module Make_small (M : sig
+  val bit_length : int
+end) :
+  Small
+
 module Make_full_size () : Full_size
