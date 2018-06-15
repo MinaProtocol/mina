@@ -32,7 +32,7 @@ struct
 
   type t = Txn.t Fheap.t
 
-  let empty = Fheap.create ~cmp:(Txn.compare ~seed:"TODO: seed me!")
+  let empty = Fheap.create ~cmp:(Txn.compare ~seed:(Random.float Float.max_value |> string_of_float))
 
   let add t txn = Fheap.add t txn
 
