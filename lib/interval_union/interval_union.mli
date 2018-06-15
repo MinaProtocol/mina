@@ -1,8 +1,7 @@
 open Core_kernel
 
 module Interval : sig
-  type t = int * int
-  [@@deriving eq]
+  type t = int * int [@@deriving eq]
 end
 
 type t [@@deriving eq]

@@ -685,14 +685,15 @@ struct
     in
     let digest =
       let open Interval_union in
-      let (digest, `Length n) =
-        Or_error.ok_exn (Pedersen_hash.Section.to_initial_segment_digest top_hash_section)
+      let digest, `Length n =
+        Or_error.ok_exn
+          (Pedersen_hash.Section.to_initial_segment_digest top_hash_section)
       in
-      assert
-        (n =
-        Hash_prefix.length_in_bits
-        + (2 * Ledger_hash.length_in_bits)
-        + Amount.Signed.length + List.length wrap_vk_bits);
+      assert (
+        n
+        = Hash_prefix.length_in_bits
+          + (2 * Ledger_hash.length_in_bits)
+          + Amount.Signed.length + List.length wrap_vk_bits ) ;
       digest
     in
     let%bind top_hash =

@@ -65,7 +65,8 @@ module Make
 
     val of_bits : bool list -> start:int -> t
 
-    val to_initial_segment_digest : t -> (Digest.var * [ `Length of int ]) Or_error.t
+    val to_initial_segment_digest :
+      t -> (Digest.var * [`Length of int]) Or_error.t
   end
 
   val hash :
@@ -182,10 +183,11 @@ end = struct
 
     let to_initial_segment_digest t =
       let open Or_error.Let_syntax in
-      let%bind (a, b) = Interval_union.to_interval t.support in
+      let%bind a, b = Interval_union.to_interval t.support in
       let%map () =
-        if a = 0
-        then Or_error.error_string "to_initial_segment: Left endpoint was not zero"
+        if a = 0 then
+          Or_error.error_string
+            "to_initial_segment: Left endpoint was not zero"
         else Ok ()
       in
       (digest (acc t), `Length b)
