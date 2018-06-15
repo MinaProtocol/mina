@@ -64,6 +64,8 @@ module Make
       -> t
 
     val of_bits : bool list -> start:int -> t
+
+    val to_initial_segment_digest : t -> (Digest.var * [ `Length of int ]) Or_error.t
   end
 
   val hash :
@@ -129,6 +131,8 @@ end = struct
     in
     with_label "Pedersen.hash" (go init i0 bs0)
 
+  let digest (x, _) = x
+
   module Section = struct
     module Acc = struct
       type t = [`Var of Curve.var | `Value of Curve.value]
@@ -164,7 +168,7 @@ end = struct
 
     let extend t bits ~start =
       let n = List.length bits in
-      let interval = (0, n) in
+      let interval = (start, start + n) in
       let support =
         Interval_union.(disjoint_union_exn (of_interval interval) t.support)
       in
@@ -175,7 +179,15 @@ end = struct
       let support = Interval_union.disjoint_union_exn t1.support t2.support in
       let%map acc = Acc.add t1.acc t2.acc in
       {support; acc}
-  end
 
-  let digest (x, _) = x
+    let to_initial_segment_digest t =
+      let open Or_error.Let_syntax in
+      let%bind (a, b) = Interval_union.to_interval t.support in
+      let%map () =
+        if a = 0
+        then Or_error.error_string "to_initial_segment: Left endpoint was not zero"
+        else Ok ()
+      in
+      (digest (acc t), `Length b)
+  end
 end

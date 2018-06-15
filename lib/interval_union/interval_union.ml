@@ -49,3 +49,7 @@ let of_intervals_exn is =
   | i :: is ->
       List.fold is ~init:(of_interval i) ~f:(fun acc x ->
           disjoint_union_exn (of_interval x) acc )
+
+let to_interval = function
+  | [ i ] -> Ok i
+  | [] | _:: (_::_) -> Or_error.error_string "Interval_union.to_interval: was not an interval"

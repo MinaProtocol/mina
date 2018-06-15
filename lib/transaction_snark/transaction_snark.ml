@@ -683,21 +683,20 @@ struct
       Pedersen_hash.Section.extend merge_prefix_and_zero_and_vk_curve_pt
         ~start:Hash_prefix.length_in_bits (s1 @ s2)
     in
-    let () =
+    let digest =
       let open Interval_union in
-      let total_length =
+      let (digest, `Length n) =
+        Or_error.ok_exn (Pedersen_hash.Section.to_initial_segment_digest top_hash_section)
+      in
+      assert
+        (n =
         Hash_prefix.length_in_bits
         + (2 * Ledger_hash.length_in_bits)
-        + Amount.Signed.length + List.length wrap_vk_bits
-      in
-      assert (
-        equal
-          (of_interval (0, total_length))
-          (Pedersen_hash.Section.support top_hash_section) )
+        + Amount.Signed.length + List.length wrap_vk_bits);
+      digest
     in
     let%bind top_hash =
-      top_hash_section |> Pedersen_hash.Section.acc |> Pedersen_hash.digest
-      |> Pedersen.Digest.choose_preimage_var
+      Pedersen.Digest.choose_preimage_var digest
       >>| Pedersen.Digest.Unpacked.var_to_bits
     in
     Merge.Verifier.All_in_one.create ~input:top_hash
