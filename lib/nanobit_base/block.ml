@@ -117,7 +117,6 @@ let genesis : t =
   in
   { header= {nonce= Nonce.of_int 193; time}
   ; body=
-      (* TODO: Fix  *)
       { proof= Tock.Proof.dummy
       ; target_hash= Ledger.(merkle_root Genesis_ledger.ledger) } }
 
