@@ -2,7 +2,7 @@ open Core_kernel
 
 module Make
     (Impl : Snark_intf.S) (Curve : sig
-        type var = Impl.Cvar.t * Impl.Cvar.t
+        type var = Impl.Field.Checked.t * Impl.Field.Checked.t
 
         type value
 
@@ -22,7 +22,7 @@ module Make
       val typ : (var, value) Typ.t
     end
 
-    type var = Cvar.t
+    type var = Field.Checked.t
 
     type value = Field.t
 
@@ -52,7 +52,7 @@ end = struct
       let typ : (var, value) Typ.t = Typ.list Boolean.typ ~length:hash_length
     end
 
-    type var = Cvar.t
+    type var = Field.Checked.t
 
     type value = Field.t
 

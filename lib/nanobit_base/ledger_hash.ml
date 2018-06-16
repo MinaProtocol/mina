@@ -88,7 +88,7 @@ let create_account t pk =
   in
   let%bind () =
     Merkle_tree.implied_root
-      (Cvar.constant Account.empty_hash) (* Could save some boolean constraints by unpacking this outside the snark *)
+      (Field.Checked.constant Account.empty_hash) (* Could save some boolean constraints by unpacking this outside the snark *)
       addr
       path
     >>| var_of_hash_packed

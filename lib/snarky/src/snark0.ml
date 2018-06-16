@@ -687,6 +687,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
     type var = Cvar.t
 
     let typ = Typ.field
+
+    module Checked = Cvar
   end
 
   module As_prover = struct

@@ -8,7 +8,7 @@ module Schnorr
               and type Scalar.value = Bignum_bigint.t
               and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
               and type boolean_var := Impl.Boolean.var
-              and type var = Impl.Cvar.t * Impl.Cvar.t
+              and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
               and type field := Impl.Field.t) (Hash : sig
         val hash : bool list -> Bignum_bigint.t
 

@@ -19,6 +19,7 @@ let meets_target_unchecked (pow: t) (target: Target.t) =
 let meets_target_var (pow: var) (target: Target.Packed.var) =
   let open Let_syntax in
   let%map {less; _} =
-    Checked.compare ~bit_length (var_to_hash_packed pow) (target :> Cvar.t)
+    Checked.compare ~bit_length (var_to_hash_packed pow)
+      (target :> Field.Checked.t)
   in
   less
