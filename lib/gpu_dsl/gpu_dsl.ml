@@ -157,6 +157,8 @@ module Op = struct
       | Or : bool Id.t * bool Id.t -> bool op
       | Add : uint32 Id.t * uint32 Id.t -> uint32 Arith_result.t op
       | Add_ignore_overflow : uint32 Id.t * uint32 Id.t -> uint32 op
+      | Mul : uint32 Id.t * uint32 Id.t -> uint32 Arith_result.t op
+      | Mul_ignore_overflow : uint32 Id.t * uint32 Id.t -> uint32 op
       | Bitwise_or : uint32 Id.t * uint32 Id.t -> uint32 op
       | Less_than : uint32 Id.t * uint32 Id.t -> bool op
       | Array_get : 'b array Id.t * uint32 Id.t -> 'b op
@@ -171,6 +173,8 @@ module Op = struct
       | Or _ -> Typ.bool
       | Add _ -> Typ.Arith_result
       | Add_ignore_overflow _ -> Typ.uint32
+      | Mul _ -> Typ.Arith_result
+      | Mul_ignore_overflow _ -> Typ.uint32
       | Bitwise_or _ -> Typ.uint32
       | Less_than _ -> Typ.bool
       | High_bits _ -> Typ.uint32
@@ -319,7 +323,8 @@ module Compiler = struct
       fun t acc ->
         let acc =
           match t with
-          | Declare_constant (typ, x, k) -> Value.T (typ, x) :: acc
+          | Declare_constant (typ, x, k) ->
+            Value.T (typ, x) :: acc
           | _ -> acc
         in
         match step t with
@@ -375,16 +380,33 @@ module Interpreter = struct
       let (_, y) = State.get_exn s t in
       let id = Id.Id (Typ.snd (Id.typ t), label) in
       (State.set_exn s id y, id)
-    | Add_ignore_overflow (x, y) ->
-      let x = State.get_exn s x in
-      let y = State.get_exn s y in
-      let id = Id.Id (Typ.uint32, label) in
-      (State.set_exn s id (UInt32.add x y), id)
     | Bitwise_or (x, y) ->
       let x = State.get_exn s x in
       let y = State.get_exn s y in
       let id = Id.Id (Typ.uint32, label) in
       (State.set_exn s id (UInt32.logor x y), id)
+    | Mul_ignore_overflow (x, y) ->
+      let x = State.get_exn s x in
+      let y = State.get_exn s y in
+      let id = Id.Id (Typ.uint32, label) in
+      (State.set_exn s id (UInt32.mul x y), id)
+    | Mul (x, y) ->
+      let x = State.get_exn s x in
+      let y = State.get_exn s y in
+      let low_bits = UInt32.mul x y in
+      let high_bits =
+        let c = Fn.compose Bigint.of_int UInt32.to_int in
+        let unc = Fn.compose UInt32.of_int Bigint.to_int_exn in
+        unc Bigint.(shift_right (c x * c y) 32)
+      in
+      let r = {Arith_result.low_bits; high_bits} in
+      let id = Id.Id (Typ.Arith_result, label) in
+      (State.set_exn s id r, id)
+    | Add_ignore_overflow (x, y) ->
+      let x = State.get_exn s x in
+      let y = State.get_exn s y in
+      let id = Id.Id (Typ.uint32, label) in
+      (State.set_exn s id (UInt32.add x y), id)
     | Add (x, y) ->
       let x = State.get_exn s x in
       let y = State.get_exn s y in
@@ -560,8 +582,7 @@ let add n rs xs ys =
       let%bind new_carry = bitwise_or carry1 carry2 "new_carry" in
       store carryp new_carry
     in
-    array_set rs i x_plus_y_with_prev_carry
-  )
+    array_set rs i x_plus_y_with_prev_carry)
 
 let bignum_limbs = 24
 let bignum_bytes = 4 * bignum_limbs
