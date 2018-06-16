@@ -14,6 +14,13 @@ module Pointer = struct
   type 'a t = Pointer
 end
 
+module Arith_result = struct
+  type 'a t =
+    { low_bits : 'a
+    ; high_bits : 'a
+    }
+end
+
 module Typ = struct
   module Scalar = struct
     type 'a t =
@@ -36,6 +43,16 @@ module Typ = struct
     | Scalar  : 'a Scalar.t -> 'a t
     | Pointer : 'a Scalar.t -> 'a Pointer.t t
     | Array   : 'a Scalar.t -> 'a array t
+    | Tuple2  : 'a Scalar.t * 'b Scalar.t -> ('a * 'b) t
+    | Arith_result  : uint32 Arith_result.t t
+
+  let fst : type a b. (a * b) t -> a t = function
+    | Tuple2 (x,_) -> Scalar x
+    | Scalar _ -> assert false
+
+  let snd : type a b. (a * b) t -> b t = function
+    | Tuple2 (x, y) -> Scalar y
+    | Scalar _ -> assert false
 
   let pointer_elt : type a. a Pointer.t t -> a t = function
     | Pointer scalar -> Scalar scalar
@@ -48,6 +65,12 @@ module Typ = struct
   let equality : type a b. a t -> b t -> (a, b) Type_equal.t option =
     fun x y ->
       match x, y with
+      | Arith_result, Arith_result -> Some Type_equal.T
+      | Tuple2 (a1, b1), Tuple2 (a2, b2) ->
+        begin match Scalar.equality a1 a2, Scalar.equality b1 b2 with
+        | Some Type_equal.T, Some Type_equal.T -> Some Type_equal.T
+        | _ -> None
+        end
       | Scalar a, Scalar b -> Scalar.equality a b
       | Array a, Array b ->
         begin match Scalar.equality a b with
@@ -64,11 +87,16 @@ module Value = struct
   type t =
     | T : 'a Typ.t * 'a -> t
 
-  let sexp_of_t (T (typ, x)) =
+  let rec sexp_of_t (T (typ, x)) =
     let open Typ in
     let open Scalar in
     match typ with
+    | Arith_result -> Sexp.of_string "Arith_result"
     | Pointer _ -> Sexp.of_string "Pointer"
+    | Tuple2 (ta, tb) ->
+      let (a, b) = x in
+      [%sexp_of: Sexp.t * Sexp.t]
+        (sexp_of_t (T (Scalar ta, a)), sexp_of_t (T (Scalar tb, b)))
     | Scalar Uint32 -> Sexp.of_string (Unsigned.UInt32.to_string x)
     | Scalar Bool -> Bool.sexp_of_t x
     | Array Uint32 ->
@@ -120,16 +148,36 @@ end = struct
   type t = Todo
 end
 
+module UInt32 = Unsigned.UInt32
+
 module Op = struct
   (* First arg is the result *)
   module Value = struct
     type 'a op =
       | Or : bool Id.t * bool Id.t -> bool op
-      | Add : uint32 Id.t * uint32 Id.t -> uint32 op
+      | Add : uint32 Id.t * uint32 Id.t -> uint32 Arith_result.t op
+      | Add_ignore_overflow : uint32 Id.t * uint32 Id.t -> uint32 op
+      | Bitwise_or : uint32 Id.t * uint32 Id.t -> uint32 op
       | Less_than : uint32 Id.t * uint32 Id.t -> bool op
       | Array_get : 'b array Id.t * uint32 Id.t -> 'b op
+      | Fst : ('a * 'b) Id.t -> 'a op
+      | Snd : ('a * 'b) Id.t -> 'b op
+      | High_bits : uint32 Arith_result.t Id.t -> uint32 op
+      | Low_bits : uint32 Arith_result.t Id.t -> uint32 op
 
     type 'a t = { op : 'a op; label : string }
+
+    let typ : type a. a op -> a Typ.t = function
+      | Or _ -> Typ.bool
+      | Add _ -> Typ.Arith_result
+      | Add_ignore_overflow _ -> Typ.uint32
+      | Bitwise_or _ -> Typ.uint32
+      | Less_than _ -> Typ.bool
+      | High_bits _ -> Typ.uint32
+      | Low_bits _ -> Typ.uint32
+      | Array_get (arr, _) -> Typ.array_elt (Id.typ arr)
+      | Fst t -> Typ.fst (Id.typ t)
+      | Snd t -> Typ.snd (Id.typ t)
   end
 
   module Action = struct
@@ -249,33 +297,37 @@ let name_of_constant : Value.t -> string = function
   | _ ->
     "%" ^ sprintf "c_%d" (get_id ())
 
-(*
 module Compiler = struct
+  let step : type a. a t -> [ `Done of a | `Continue of a t] =
+    fun t ->
+      match t with
+      | Pure x -> `Done x
+      | Declare_constant (typ, x, k) -> `Continue (k (Id.dummy typ))
+      | Create_pointer (typ, s, k) -> `Continue (k (Id.pointer typ s))
+      | Load (ptr, lab, k) -> `Continue (k (Id.dummy (Typ.pointer_elt (Id.typ ptr))))
+      | Action_op (op, k) -> `Continue (k ())
+      | Phi (_, k) -> `Continue (k ())
+      | Value_op (op, k) ->
+        `Continue (k (Id.dummy (Op.Value.typ op.op)))
+      | For { after; _ } -> `Continue (after ())
+      | Do_if { after; _} -> `Continue (after ())
+      | If { after; then_; _} -> `Continue (after (Id.dummy (Id.typ then_)))
+  ;;
+
   let constants =
     let rec go : type a. a t -> Value.t list -> Value.t list =
       fun t acc ->
-        match t with
-        | Pure x -> acc
-        | Create_pointer (typ, s, k) ->
-          let id = Id.pointer typ s in
-          go (k id) acc
-
-        | Load (ptr, lab, k) ->
-          go (k (Id.dummy (Typ.pointer_elt (Id.typ ptr)))) acc
-
-        | Action_op (op, k) ->
-          Action_op (op, fun () -> bind (k ()) ~f)
-        | Value_op (op, k) -> Value_op (op, fun v -> bind (k v) ~f)
-        | For { range; closure; body; after } ->
-          For { range; closure; body; after = fun ctx -> bind (after ctx) ~f }
-        | Phi (vs, k) -> Phi (vs, fun () -> bind (k ()) ~f)
-        | If { cond; then_; else_; after } ->
-          If { cond; then_; else_; after = fun v -> bind (after v) ~f }
-        | Do_if { cond; then_; after } ->
-          Do_if { cond; then_; after = fun x -> bind (after x) ~f }
+        let acc =
+          match t with
+          | Declare_constant (typ, x, k) -> Value.T (typ, x) :: acc
+          | _ -> acc
+        in
+        match step t with
+        | `Done _ -> acc
+        | `Continue k -> go k acc
     in
     fun t -> go t []
-end *)
+end
 
 module Interpreter = struct
   module State = struct
@@ -315,11 +367,40 @@ module Interpreter = struct
   let eval_op (type a) (s : State.t) ({op; label} : a Op.Value.t) : State.t * a Id.t =
     let open Op.Value in
     match op with
-    | Add (x, y) ->
+    | Fst t ->
+      let (x, _) = State.get_exn s t in
+      let id = Id.Id (Typ.fst (Id.typ t), label) in
+      (State.set_exn s id x, id)
+    | Snd t ->
+      let (_, y) = State.get_exn s t in
+      let id = Id.Id (Typ.snd (Id.typ t), label) in
+      (State.set_exn s id y, id)
+    | Add_ignore_overflow (x, y) ->
       let x = State.get_exn s x in
       let y = State.get_exn s y in
       let id = Id.Id (Typ.uint32, label) in
-      (State.set_exn s id (Unsigned.UInt32.add x y), id)
+      (State.set_exn s id (UInt32.add x y), id)
+    | Bitwise_or (x, y) ->
+      let x = State.get_exn s x in
+      let y = State.get_exn s y in
+      let id = Id.Id (Typ.uint32, label) in
+      (State.set_exn s id (UInt32.logor x y), id)
+    | Add (x, y) ->
+      let x = State.get_exn s x in
+      let y = State.get_exn s y in
+      let low_bits = UInt32.add x y in
+      let high_bits = if (UInt32.compare low_bits x < 0) then UInt32.one else UInt32.zero in
+      let r = {Arith_result.low_bits; high_bits} in
+      let id = Id.Id (Typ.Arith_result, label) in
+      (State.set_exn s id r, id)
+    | High_bits t ->
+      let t = State.get_exn s t in
+      let id = Id.Id (Typ.uint32, label) in
+      (State.set_exn s id t.high_bits, id)
+    | Low_bits t ->
+      let t = State.get_exn s t in
+      let id = Id.Id (Typ.uint32, label) in
+      (State.set_exn s id t.low_bits, id)
     | Or (x, y) ->
       let x = State.get_exn s x in
       let y = State.get_exn s y in
@@ -441,26 +522,42 @@ let load ptr label =
 let store ptr value =
   Action_op (Op.Action.Store (ptr, value), return)
 
+let high_bits x lab = do_value (High_bits x) lab
+let low_bits x lab = do_value (Low_bits x) lab
+
 let or_ x y lab = do_value (Or (x, y)) lab
 
+let add x y lab =
+  let%bind r = add (lab ^ "_result") x y in
+  let%map high_bits = high_bits r (lab ^ "_high_bits")
+  and low_bits = low_bits r (lab ^ "_low_bits")
+  in
+  { Arith_result.high_bits; low_bits }
+
+let add_ignore_overflow x y lab =
+  do_value (Op.Value.Add_ignore_overflow (x, y)) lab
+
+let bitwise_or x y lab =
+  do_value (Op.Value.Bitwise_or (x, y)) lab
+
 let add n rs xs ys =
-  let%bind carryp = create_pointer Typ.Scalar.Bool "carryp" in
-  let%bind () = constant Typ.bool false >>= store carryp in
+  let%bind carryp = create_pointer Typ.Scalar.Uint32 "carryp" in
+  let%bind () = constant Typ.uint32 UInt32.zero >>= store carryp in
   let%bind start = constant Typ.uint32 Unsigned.UInt32.zero in
   let%bind stop = constant Typ.uint32 Unsigned.UInt32.(sub n one) in
   for_ (start, stop) (fun i ->
     let%bind x = array_get "x" xs i
     and y = array_get "y" ys i
     in
-    let%bind x_plus_y = add "x_plus_y" x y in
-    let%bind c = less_than "c" x_plus_y x in
-    let%bind carry = load carryp "carry" in
-    let%bind x_plus_y_with_prev_carry =
-      add_bool "x_plus_y_with_prev_carry" x_plus_y carry
+    let%bind { high_bits=carry1; low_bits=x_plus_y } =
+      add x y "x_plus_y"
     in
-    let%bind d = less_than "d" x_plus_y_with_prev_carry x_plus_y in
+    let%bind carry = load carryp "carry" in
+    let%bind {low_bits=x_plus_y_with_prev_carry; high_bits=carry2 } =
+      add x_plus_y carry "x_plus_y_with_prev_carry"
+    in
     let%bind () =
-      let%bind new_carry = or_ c d "new_carry" in
+      let%bind new_carry = bitwise_or carry1 carry2 "new_carry" in
       store carryp new_carry
     in
     array_set rs i x_plus_y_with_prev_carry
