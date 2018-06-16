@@ -98,23 +98,20 @@ module Kernel_input = struct
 module Id = struct
   type 'a t =
     | Id : 'a Typ.t * string -> 'a t
-    | Constant : 'a Typ.t * 'a -> 'a t
 
   let sexp_of_t = function
     | Id (_, lab) -> 
       Sexp.List [ Atom "Id"; List [Atom "<opaque>"; Atom lab]]
-    | Constant (typ, x) ->
-      Sexp.List [Atom "Constant"; Value.sexp_of_t (T (typ, x))]
 
   let typ = function
     | Id (typ, _) -> typ
-    | Constant (typ, _) -> typ
 
   let label = function
     | Id (_, s) -> s
-    | _ -> failwith "label: Constant"
 
-  let constant typ x = Constant (typ, x)
+  let pointer typ lab = Id (Typ.Pointer typ, lab)
+
+  let dummy typ = Id (typ, "dummy")
 end
 
 module Ctx : sig
@@ -150,6 +147,7 @@ module T = struct
     | Load : 'c Pointer.t Id.t * string * ('c Id.t -> 'a t) -> 'a t
     | Value_op : 'a Op.Value.t * ('a Id.t -> 'b t) -> 'b t
     | Action_op of Op.Action.t * (unit -> 'a t)
+    | Declare_constant : 'a Typ.t * 'a * ('a Id.t -> 'b t) -> 'b t
     | For of
         { range: (uint32 Id.t * uint32 Id.t)
         ; closure : string list
@@ -175,6 +173,8 @@ module T = struct
   let rec map t ~f =
     match t with
     | Pure x -> Pure (f x)
+    | Declare_constant (typ, x, k) ->
+      Declare_constant (typ, x, fun v -> map (k v) ~f)
     | Create_pointer (typ, s, k) ->
       Create_pointer (typ, s, fun v -> map (k v) ~f)
     | Load (ptr, lab, k) ->
@@ -195,6 +195,8 @@ module T = struct
       | Pure x -> f x
       | Create_pointer (typ, s, k) ->
         Create_pointer (typ, s, fun v -> bind (k v) ~f)
+      | Declare_constant (typ, x, k) ->
+        Declare_constant (typ, x, fun v -> bind (k v) ~f)
       | Load (ptr, lab, k) ->
         Load (ptr, lab, fun v -> bind (k v) ~f)
       | Action_op (op, k) -> Action_op (op, fun () -> bind (k ()) ~f)
@@ -219,6 +221,9 @@ module T = struct
 
   let do_value op label = Value_op ({ op; label }, return)
   let do_ op = Action_op (op, fun () -> return ())
+
+  let constant typ x =
+    Declare_constant (typ, x, return)
 end
 
 include Monad.Make(struct
@@ -226,8 +231,55 @@ include Monad.Make(struct
     let map = `Custom map
   end)
 
+include T
+open Let_syntax
+
+let get_id =
+  let r = ref 0 in
+  fun () ->
+    let x = !r in
+    incr r;
+    x
+
+let name_of_constant : Value.t -> string = function
+  | Value.T (Typ.Scalar Typ.Scalar.Bool, x) ->
+    "%" ^ sprintf "c_bool_%s" (Bool.to_string x)
+  | Value.T (Typ.Scalar Typ.Scalar.Uint32, x) ->
+    "%" ^ sprintf "c_uint32_%s" (Unsigned.UInt32.to_string x)
+  | _ ->
+    "%" ^ sprintf "c_%d" (get_id ())
+
+(*
+module Compiler = struct
+  let constants =
+    let rec go : type a. a t -> Value.t list -> Value.t list =
+      fun t acc ->
+        match t with
+        | Pure x -> acc
+        | Create_pointer (typ, s, k) ->
+          let id = Id.pointer typ s in
+          go (k id) acc
+
+        | Load (ptr, lab, k) ->
+          go (k (Id.dummy (Typ.pointer_elt (Id.typ ptr)))) acc
+
+        | Action_op (op, k) ->
+          Action_op (op, fun () -> bind (k ()) ~f)
+        | Value_op (op, k) -> Value_op (op, fun v -> bind (k v) ~f)
+        | For { range; closure; body; after } ->
+          For { range; closure; body; after = fun ctx -> bind (after ctx) ~f }
+        | Phi (vs, k) -> Phi (vs, fun () -> bind (k ()) ~f)
+        | If { cond; then_; else_; after } ->
+          If { cond; then_; else_; after = fun v -> bind (after v) ~f }
+        | Do_if { cond; then_; after } ->
+          Do_if { cond; then_; after = fun x -> bind (after x) ~f }
+    in
+    fun t -> go t []
+end *)
+
 module Interpreter = struct
   module State = struct
+    (* TODO: Use or get rid of used_names *)
     type t =
       { bindings : Value.t String.Map.t
       ; used_names : String.Set.t
@@ -249,11 +301,12 @@ module Interpreter = struct
       match v with
       | Id.Id (typ, lab) ->
         get_lab_exn s lab typ
-      | Id.Constant (_, x) -> x
+
+    let clear s label =
+      { s with bindings = Map.remove s.bindings label }
 
     let set_exn (type a) s (v : a Id.t) (x : a) =
       match v with
-      | Id.Constant _ -> failwith "Cannot set a constant"
       | Id.Id (typ, lab) ->
         { s with
           bindings = Map.set ~key:lab ~data:(Value.T (typ, x)) s.bindings }
@@ -314,7 +367,13 @@ module Interpreter = struct
           | Typ.Pointer t -> Typ.Scalar t
           | _ -> assert false
         in
-        eval s (k (Id.constant typ value))
+        let id = Id.Id (typ, lab) in
+        let s = State.set_exn s id value in
+        eval s (k id)
+      | Declare_constant (typ, x, k) ->
+        let id = Id.Id (typ, name_of_constant (Value.T (typ, x))) in
+        let s = State.set_exn s id x in
+        eval s (k id)
       | Create_pointer (typ, lab, k) ->
         if Set.mem s.used_names lab
         then failwithf "Name %s already in use" lab ()
@@ -327,17 +386,17 @@ module Interpreter = struct
       | For { range=(a, b); closure=_; body; after } ->
         let a = Unsigned.UInt32.to_int (State.get_exn s a) in
         let b = Unsigned.UInt32.to_int (State.get_exn s b) in
+        let label = sprintf "loop_%d" (get_id ()) in
+        let id = Id.Id (Typ.uint32, label) in
         let rec go s i =
           if i > b
           then eval s (after ())
           else
-            let (s', ()) =
-              eval s
-                (body (Id.constant Typ.uint32 (Unsigned.UInt32.of_int i)))
-            in
+            let s = State.set_exn s id (Unsigned.UInt32.of_int i) in
+            let (s', ()) = eval s (body id) in
             go s' (i + 1)
         in
-        go s a
+        go (State.clear s label) a
       | Action_op (op, k) ->
         let s = eval_action_op s op in
         eval s (k ())
@@ -346,12 +405,7 @@ module Interpreter = struct
         eval s (k id)
       | If { cond; then_; else_; after } ->
         let cond = State.get_exn s cond in
-        let value =
-          if cond
-          then State.get_exn s then_
-          else State.get_exn s else_
-        in
-        eval s (after (Id.constant (Id.typ then_) value))
+        eval s (after (if cond then then_ else else_))
       | Do_if { cond; then_; after } ->
         let cond = State.get_exn s cond in
         if cond
@@ -360,9 +414,6 @@ module Interpreter = struct
           eval s (after ())
         else eval s (after ())
 end
-
-include T
-open Let_syntax
 
 let array_get label xs i =
   let open Op.Value in
@@ -376,8 +427,8 @@ let add lab x y = do_value (Add (x, y)) lab
 let less_than lab x y = do_value (Less_than (x, y)) lab
 
 let add_bool lab x b =
-  let one = Id.constant Typ.uint32 Unsigned.UInt32.one in
-  let zero = Id.constant Typ.uint32 Unsigned.UInt32.zero in
+  let%bind one = constant Typ.uint32 Unsigned.UInt32.one in
+  let%bind zero = constant Typ.uint32 Unsigned.UInt32.zero in
   let%bind n = if_ b ~then_:one ~else_:zero in
   add lab x n
 
@@ -394,9 +445,9 @@ let or_ x y lab = do_value (Or (x, y)) lab
 
 let add n rs xs ys =
   let%bind carryp = create_pointer Typ.Scalar.Bool "carryp" in
-  let%bind () = store carryp (Id.constant Typ.bool false) in
-  let start = Id.constant Typ.uint32 Unsigned.UInt32.zero in
-  let stop = Id.constant Typ.uint32 Unsigned.UInt32.(sub n one) in
+  let%bind () = constant Typ.bool false >>= store carryp in
+  let%bind start = constant Typ.uint32 Unsigned.UInt32.zero in
+  let%bind stop = constant Typ.uint32 Unsigned.UInt32.(sub n one) in
   for_ (start, stop) (fun i ->
     let%bind x = array_get "x" xs i
     and y = array_get "y" ys i
@@ -445,19 +496,18 @@ let bigint_of_uint32_array arr =
   acc
 
 let add x y =
-  let c x =
-    Id.constant (Array Typ.Scalar.Uint32) x
-  in
+  let bigint_typ = Typ.Array Typ.Scalar.Uint32 in
   let result = Array.init bignum_limbs ~f:(fun _ -> Unsigned.UInt32.zero) in
-  let x = c (uint32_array_of_bigint x) in
-  let y = c (uint32_array_of_bigint y) in
+  let x = uint32_array_of_bigint x in
+  let y = uint32_array_of_bigint y in
   let _ =
-    Interpreter.eval Interpreter.State.empty
-      (add
-        (Unsigned.UInt32.of_int bignum_limbs)
-        (c result)
-        x
-        y)
+    Interpreter.eval Interpreter.State.empty begin
+      let%bind x = constant bigint_typ x
+      and y = constant bigint_typ y
+      and r = constant bigint_typ result
+      in
+      add (Unsigned.UInt32.of_int bignum_limbs) r x y 
+    end
   in
   bigint_of_uint32_array result
 
