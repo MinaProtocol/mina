@@ -10,8 +10,29 @@ open Unsigned
    (input and output locations)
 *)
 
+module Location : sig
+  type t
+
+  include Comparable.S with type t := t
+  include Sexpable.S with type t := t
+
+  val create : unit -> t
+end = struct
+  include Int
+
+  let create =
+    let r = ref 0 in
+    fun () ->
+      let x = !r in
+      incr r;
+      x
+end
+
 module Pointer = struct
-  type 'a t = Pointer
+  type 'a t = Pointer of Location.t
+
+  let sexp_of_t (Pointer loc) =
+    Sexp.List [ Atom "pointer"; Location.sexp_of_t loc ]
 end
 
 module Arith_result = struct
@@ -65,6 +86,11 @@ module Typ = struct
   let equality : type a b. a t -> b t -> (a, b) Type_equal.t option =
     fun x y ->
       match x, y with
+      | Pointer a1, Pointer a2 ->
+        begin match Scalar.equality a1 a2 with
+        | Some Type_equal.T -> Some Type_equal.T
+        | None -> None
+        end
       | Arith_result, Arith_result -> Some Type_equal.T
       | Tuple2 (a1, b1), Tuple2 (a2, b2) ->
         begin match Scalar.equality a1 a2, Scalar.equality b1 b2 with
@@ -92,7 +118,7 @@ module Value = struct
     let open Scalar in
     match typ with
     | Arith_result -> Sexp.of_string "Arith_result"
-    | Pointer _ -> Sexp.of_string "Pointer"
+    | Pointer _ -> Pointer.sexp_of_t x
     | Tuple2 (ta, tb) ->
       let (a, b) = x in
       [%sexp_of: Sexp.t * Sexp.t]
@@ -199,7 +225,7 @@ module T = struct
     | Load : 'c Pointer.t Id.t * string * ('c Id.t -> 'a t) -> 'a t
     | Value_op : 'a Op.Value.t * ('a Id.t -> 'b t) -> 'b t
     | Action_op of Op.Action.t * (unit -> 'a t)
-    | Declare_constant : 'a Typ.t * 'a * ('a Id.t -> 'b t) -> 'b t
+    | Declare_constant : 'a Typ.t * 'a * string option * ('a Id.t -> 'b t) -> 'b t
     | For of
         { range: (uint32 Id.t * uint32 Id.t)
         ; closure : string list
@@ -225,8 +251,8 @@ module T = struct
   let rec map t ~f =
     match t with
     | Pure x -> Pure (f x)
-    | Declare_constant (typ, x, k) ->
-      Declare_constant (typ, x, fun v -> map (k v) ~f)
+    | Declare_constant (typ, x, lab, k) ->
+      Declare_constant (typ, x, lab, fun v -> map (k v) ~f)
     | Create_pointer (typ, s, k) ->
       Create_pointer (typ, s, fun v -> map (k v) ~f)
     | Load (ptr, lab, k) ->
@@ -247,8 +273,8 @@ module T = struct
       | Pure x -> f x
       | Create_pointer (typ, s, k) ->
         Create_pointer (typ, s, fun v -> bind (k v) ~f)
-      | Declare_constant (typ, x, k) ->
-        Declare_constant (typ, x, fun v -> bind (k v) ~f)
+      | Declare_constant (typ, x, lab, k) ->
+        Declare_constant (typ, x, lab, fun v -> bind (k v) ~f)
       | Load (ptr, lab, k) ->
         Load (ptr, lab, fun v -> bind (k v) ~f)
       | Action_op (op, k) -> Action_op (op, fun () -> bind (k ()) ~f)
@@ -274,8 +300,8 @@ module T = struct
   let do_value op label = Value_op ({ op; label }, return)
   let do_ op = Action_op (op, fun () -> return ())
 
-  let constant typ x =
-    Declare_constant (typ, x, return)
+  let constant ?label typ x =
+    Declare_constant (typ, x, label, return)
 end
 
 include Monad.Make(struct
@@ -293,20 +319,25 @@ let get_id =
     incr r;
     x
 
-let name_of_constant : Value.t -> string = function
-  | Value.T (Typ.Scalar Typ.Scalar.Bool, x) ->
-    "%" ^ sprintf "c_bool_%s" (Bool.to_string x)
-  | Value.T (Typ.Scalar Typ.Scalar.Uint32, x) ->
-    "%" ^ sprintf "c_uint32_%s" (Unsigned.UInt32.to_string x)
-  | _ ->
-    "%" ^ sprintf "c_%d" (get_id ())
+let name_of_constant : ?label:string -> Value.t -> string =
+  fun ?label v ->
+    match label with
+    | Some l -> l
+    | None -> 
+      match v with
+      | Value.T (Typ.Scalar Typ.Scalar.Bool, x) ->
+        sprintf "c_bool_%s" (Bool.to_string x)
+      | Value.T (Typ.Scalar Typ.Scalar.Uint32, x) ->
+        sprintf "c_uint32_%s" (Unsigned.UInt32.to_string x)
+      | _ ->
+        sprintf "c_%d" (get_id ())
 
 module Compiler = struct
   let step : type a. a t -> [ `Done of a | `Continue of a t] =
     fun t ->
       match t with
       | Pure x -> `Done x
-      | Declare_constant (typ, x, k) -> `Continue (k (Id.dummy typ))
+      | Declare_constant (typ, x, lab, k) -> `Continue (k (Id.dummy typ))
       | Create_pointer (typ, s, k) -> `Continue (k (Id.pointer typ s))
       | Load (ptr, lab, k) -> `Continue (k (Id.dummy (Typ.pointer_elt (Id.typ ptr))))
       | Action_op (op, k) -> `Continue (k ())
@@ -323,7 +354,7 @@ module Compiler = struct
       fun t acc ->
         let acc =
           match t with
-          | Declare_constant (typ, x, k) ->
+          | Declare_constant (typ, x, lab, k) ->
             Value.T (typ, x) :: acc
           | _ -> acc
         in
@@ -339,30 +370,49 @@ module Interpreter = struct
     (* TODO: Use or get rid of used_names *)
     type t =
       { bindings : Value.t String.Map.t
-      ; used_names : String.Set.t
+      ; pointer_values : Value.t Location.Map.t
       }
     [@@deriving sexp_of]
 
     let empty =
       { bindings = String.Map.empty
-      ; used_names = String.Set.empty 
+      ; pointer_values = Location.Map.empty
       }
 
     let get_lab_exn { bindings; _ } lab typ =
       match String.Map.find bindings lab with
       | None -> failwithf "get_lab_exn: %s" lab ()
       | Some v ->
-        Option.value_exn (Value.conv v typ)
+        match Value.conv v typ with
+        | None -> failwithf "Conversion failure for %s" lab ()
+        | Some x -> x
 
     let get_exn (type a) s (v : a Id.t) : a =
       match v with
       | Id.Id (typ, lab) ->
         get_lab_exn s lab typ
 
+    let deref_exn (type a) s (loc : Location.t) (typ : a Typ.t) : a =
+      Option.value_exn
+        (Value.conv (Map.find_exn s.pointer_values loc) typ)
+
+    let set_pointer_value (type a) s (loc : Location.t) (x : a Id.t) =
+      let value = String.Map.find_exn s.bindings (Id.label x) in
+      let pointer_values = Location.Map.set s.pointer_values loc value in
+      { s with pointer_values }
+
     let clear s label =
       { s with bindings = Map.remove s.bindings label }
 
     let set_exn (type a) s (v : a Id.t) (x : a) =
+      match v with
+      | Id.Id (typ, lab) ->
+        (if Map.mem s.bindings lab
+         then failwithf "Duplicate binding: %s" lab ());
+        { s with
+          bindings = Map.set ~key:lab ~data:(Value.T (typ, x)) s.bindings }
+
+    let set_ignore_duplicate_exn (type a) s (v : a Id.t) (x : a) =
       match v with
       | Id.Id (typ, lab) ->
         { s with
@@ -433,9 +483,9 @@ module Interpreter = struct
       let y = State.get_exn s y in
       let id = Id.Id (Typ.bool, label) in
       (State.set_exn s id (Unsigned.UInt32.compare x y < 0), id)
-    | Array_get (arr_id, i) ->
+    | Array_get (arr_id, idx_id) ->
       let arr = State.get_exn s arr_id in
-      let i = State.get_exn s i in
+      let i = State.get_exn s idx_id in
       let y = arr.(Unsigned.UInt32.to_int i) in
       let typ = Typ.array_elt (Id.typ arr_id) in
       let id = Id.Id (typ, label) in
@@ -448,13 +498,13 @@ module Interpreter = struct
     let open Op.Action in
     match op with
     | Store (ptr, value) ->
-      let id = ptr_value_id ptr in
-      State.set_exn s id (State.get_exn s value)
+      let Pointer.Pointer loc = State.get_exn s ptr in
+      State.set_pointer_value s loc value
 
-    | Array_set (arr, i, elt) ->
-      let arr = State.get_exn s arr in
+    | Array_set (arr_id, i, elt_id) ->
+      let arr = State.get_exn s arr_id in
       let i = State.get_exn s i in
-      let elt = State.get_exn s elt in
+      let elt = State.get_exn s elt_id in
       arr.(Unsigned.UInt32.to_int i) <- elt;
       s
 
@@ -464,42 +514,40 @@ module Interpreter = struct
       match t with
       | Pure x -> (s, x)
       | Load (ptr, lab, k) ->
-        let value = State.get_exn s (ptr_value_id ptr) in 
+        let Pointer.Pointer loc = State.get_exn s ptr in 
         let typ =
           match Id.typ ptr with
           | Typ.Pointer t -> Typ.Scalar t
           | _ -> assert false
         in
+        let value = State.deref_exn s loc typ in
         let id = Id.Id (typ, lab) in
         let s = State.set_exn s id value in
         eval s (k id)
-      | Declare_constant (typ, x, k) ->
-        let id = Id.Id (typ, name_of_constant (Value.T (typ, x))) in
-        let s = State.set_exn s id x in
+      | Declare_constant (typ, x, label, k) ->
+        let id = Id.Id (typ, name_of_constant ?label (Value.T (typ, x))) in
+        let s = State.set_ignore_duplicate_exn s id x in
         eval s (k id)
       | Create_pointer (typ, lab, k) ->
-        if Set.mem s.used_names lab
-        then failwithf "Name %s already in use" lab ()
-        else
-          let id = Id.Id (Typ.Pointer typ, lab) in
-          eval
-            {s with used_names = Set.add s.used_names lab}
-            (k id)
+        let id = Id.Id (Typ.Pointer typ, lab) in
+        let loc = Location.create () in
+        let s = State.set_exn s id (Pointer loc) in
+        eval s (k id)
       | Phi (_, k) -> eval s (k ())
       | For { range=(a, b); closure=_; body; after } ->
         let a = Unsigned.UInt32.to_int (State.get_exn s a) in
         let b = Unsigned.UInt32.to_int (State.get_exn s b) in
         let label = sprintf "loop_%d" (get_id ()) in
         let id = Id.Id (Typ.uint32, label) in
-        let rec go s i =
+        let rec go s0 i =
           if i > b
-          then eval s (after ())
+          then eval s0 (after ())
           else
-            let s = State.set_exn s id (Unsigned.UInt32.of_int i) in
-            let (s', ()) = eval s (body id) in
-            go s' (i + 1)
+            let s_in_body = State.set_exn s0 id (Unsigned.UInt32.of_int i) in
+            let (s, ()) = eval s_in_body (body id) in
+            go { s with bindings = s0.bindings } (i + 1)
         in
-        go (State.clear s label) a
+        go s a
       | Action_op (op, k) ->
         let s = eval_action_op s op in
         eval s (k ())
@@ -550,7 +598,14 @@ let low_bits x lab = do_value (Low_bits x) lab
 let or_ x y lab = do_value (Or (x, y)) lab
 
 let add x y lab =
-  let%bind r = add (lab ^ "_result") x y in
+  let%bind r = add (lab ^ "_add_result") x y in
+  let%map high_bits = high_bits r (lab ^ "_high_bits")
+  and low_bits = low_bits r (lab ^ "_low_bits")
+  in
+  { Arith_result.high_bits; low_bits }
+
+let mul x y lab =
+  let%bind r = do_value (Mul (x, y)) (lab ^ "_mul_result") in
   let%map high_bits = high_bits r (lab ^ "_high_bits")
   and low_bits = low_bits r (lab ^ "_low_bits")
   in
@@ -562,7 +617,7 @@ let add_ignore_overflow x y lab =
 let bitwise_or x y lab =
   do_value (Op.Value.Bitwise_or (x, y)) lab
 
-let add n rs xs ys =
+let bigint_add n rs xs ys =
   let%bind carryp = create_pointer Typ.Scalar.Uint32 "carryp" in
   let%bind () = constant Typ.uint32 UInt32.zero >>= store carryp in
   let%bind start = constant Typ.uint32 Unsigned.UInt32.zero in
@@ -583,6 +638,64 @@ let add n rs xs ys =
       store carryp new_carry
     in
     array_set rs i x_plus_y_with_prev_carry)
+
+let bigint_mul n ws xs ys =
+  let%bind zero = constant Typ.uint32 UInt32.zero
+  and num_limbs = constant Typ.uint32 n
+  and stop = constant Typ.uint32 UInt32.(sub n one)
+  in
+  let start = zero in
+  let%bind kp = create_pointer Typ.Scalar.Uint32 "kp" in
+  for_ (start, stop) (fun j ->
+    let%bind y = array_get "y" ys j in
+    let%bind () = store kp zero in
+    let%bind () =
+      for_ (start, stop) (fun i ->
+        let%bind i_plus_j = add_ignore_overflow i j "i_plus_j" in
+        let%bind k = load kp "k_in_i_loop" in
+        let%bind t =
+          let%bind x = array_get "x" xs i in
+          let%bind xy = mul x y "xy" in
+          let%bind w = array_get "w" ws i_plus_j in
+          (* Claim:
+             x*y + w + k < 2^(2 * 32) (i.e., it will fit in 2 uint32s).
+
+             x, y, w, k <= 2^32 - 1
+             xy <= (2^32 - 1)(2^32 - 1) = 2^64 - 2 * 2^32 + 1
+
+             xy + w + k
+             <= 2^64 - 2 * 2^32 + 1 + 2*(2^32 - 1)
+             = 2^64 - 2 * 2^32 + 1 + 2 * 2^32 - 2
+             = 2^64 - 2 * 2^32 + 2 * 2^32 + 1 - 2
+             = 2^64 + 1 - 2
+             = 2^64 - 1
+          *)
+          let%bind k_plus_w = add k w "k_plus_w" in
+          let%bind xy_plus_k_plus_w_low_bits =
+            add xy.low_bits k_plus_w.low_bits "xy_plus_k_plus_w_low_bits"
+          in
+          (* By the above there should be no overflow here *)
+          let%map high_bits =
+            let%bind intermediate =
+              add_ignore_overflow
+                xy.high_bits
+                xy_plus_k_plus_w_low_bits.high_bits
+                "intermediate"
+            in
+            add_ignore_overflow intermediate k_plus_w.high_bits
+              "high_bits"
+          in
+          { Arith_result.high_bits
+          ; low_bits = xy_plus_k_plus_w_low_bits.low_bits }
+        in
+        let%bind () = array_set ws i_plus_j t.low_bits in
+        store kp t.high_bits
+      )
+    in
+    let%bind k = load kp "k_in_j_loop" in
+    let%bind j_plus_n = add_ignore_overflow j num_limbs "j_plus_n" in
+    array_set ws j_plus_n k
+  )
 
 let bignum_limbs = 24
 let bignum_bytes = 4 * bignum_limbs
@@ -606,10 +719,12 @@ let uint32_array_of_bigint n =
 
 let bigint_of_uint32_array arr =
   let open Bigint in
-  let b32 = of_int 32 in
+  let b32 = of_int (Int.pow 2 32) in
   let (_, acc) =
     Array.fold arr ~init:(one, zero) ~f:(fun (shift, acc) c ->
-      (shift * b32, acc + of_int (Unsigned.UInt32.to_int c) * shift))
+      ( shift * b32
+      , acc
+        + of_int (Unsigned.UInt32.to_int c) * shift))
   in
   acc
 
@@ -624,22 +739,50 @@ let add x y =
       and y = constant bigint_typ y
       and r = constant bigint_typ result
       in
-      add (Unsigned.UInt32.of_int bignum_limbs) r x y 
+      bigint_add (Unsigned.UInt32.of_int bignum_limbs) r x y 
+    end
+  in
+  bigint_of_uint32_array result
+
+let mul x y =
+  let bigint_typ = Typ.Array Typ.Scalar.Uint32 in
+  let result = Array.init (2*bignum_limbs) ~f:(fun _ -> Unsigned.UInt32.zero) in
+  let x = uint32_array_of_bigint x in
+  let y = uint32_array_of_bigint y in
+  let _ =
+    Interpreter.eval Interpreter.State.empty begin
+      let%bind x = constant bigint_typ x ~label:"xs"
+      and y = constant bigint_typ y ~label:"ys"
+      and r = constant bigint_typ result ~label:"result"
+      in
+      bigint_mul (Unsigned.UInt32.of_int bignum_limbs)
+        r x y 
     end
   in
   bigint_of_uint32_array result
 
 let () =
   let g = 
-    Bigint.(gen_incl zero (pow (of_int 2) (of_int 31) - one))
+    Bigint.(gen_incl zero (pow (of_int 2) (of_int bignum_bits) - one))
+  in
+  Quickcheck.test 
+    (Quickcheck.Generator.tuple2 g g)
+    ~f:(fun (x, y) ->
+      let r = mul x y in
+      let actual = Bigint.( * ) x y in
+      if not (Bigint.equal r actual)
+      then failwithf !"(%{sexp:Bigint.t} * %{sexp:Bigint.t}): got %{sexp:Bigint.t}, expected %{sexp:Bigint.t}"
+             x y r actual ()
+    )
+
+let () =
+  let g = 
+    (* TODO: This actually fails for now since I don't hold onto the last carry.
+       It works for things with no overflow though. *)
+    Bigint.(gen_incl zero (pow (of_int 2) (of_int bignum_bits) - one))
   in
   Quickcheck.test 
     (Quickcheck.Generator.tuple2 g g)
     ~f:(fun (x, y) ->
       assert (Bigint.equal (add x y) (Bigint.(+) x y)))
-
-let () =
-  let open Bigint in
-  printf !"%{sexp:Bigint.t}\n%!"
-    (add (of_int 123) (of_int 456))
 
