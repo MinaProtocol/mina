@@ -232,68 +232,21 @@ module type Basic = sig
   and Checked : sig
     include Monad.S2
 
+    module Control : sig
+      val if_ :
+           Boolean.var
+        -> then_:Field.Checked.t
+        -> else_:Field.Checked.t
+        -> (Field.Checked.t, _) t
+    end
+
     module List :
       Monad_sequence.S
       with type ('a, 's) monad := ('a, 's) t
        and type 'a t = 'a list
        and type boolean := Boolean.var
 
-    val mul : Field.Checked.t -> Field.Checked.t -> (Field.Checked.t, _) t
-
-    val div : Field.Checked.t -> Field.Checked.t -> (Field.Checked.t, _) t
-
-    val inv : Field.Checked.t -> (Field.Checked.t, _) t
-
-    val if_ :
-         Boolean.var
-      -> then_:Field.Checked.t
-      -> else_:Field.Checked.t
-      -> (Field.Checked.t, _) t
-
-    val equal : Field.Checked.t -> Field.Checked.t -> (Boolean.var, 's) t
-
-    val project : Boolean.var list -> Field.Checked.t
-
-    val pack : Boolean.var list -> Field.Checked.t
-
     type _ Request.t += Choose_preimage: field * int -> bool list Request.t
-
-    val choose_preimage :
-      Field.Checked.t -> length:int -> (Boolean.var list, _) t
-
-    val unpack : Field.Checked.t -> length:int -> (Boolean.var list, _) t
-
-    type comparison_result = {less: Boolean.var; less_or_equal: Boolean.var}
-
-    val compare :
-         bit_length:int
-      -> Field.Checked.t
-      -> Field.Checked.t
-      -> (comparison_result, _) t
-
-    val equal_bitstrings :
-      Boolean.var list -> Boolean.var list -> (Boolean.var, _) t
-
-    module Assert : sig
-      val lte :
-        bit_length:int -> Field.Checked.t -> Field.Checked.t -> (unit, _) t
-
-      val gte :
-        bit_length:int -> Field.Checked.t -> Field.Checked.t -> (unit, _) t
-
-      val lt :
-        bit_length:int -> Field.Checked.t -> Field.Checked.t -> (unit, _) t
-
-      val gt :
-        bit_length:int -> Field.Checked.t -> Field.Checked.t -> (unit, _) t
-
-      val equal_bitstrings :
-        Boolean.var list -> Boolean.var list -> (unit, _) t
-
-      val not_equal : Field.Checked.t -> Field.Checked.t -> (unit, _) t
-
-      val non_zero : Field.Checked.t -> (unit, _) t
-    end
   end
   
   and Field : sig
@@ -329,6 +282,25 @@ module type Basic = sig
 
       val scale : t -> field -> t
 
+      val mul : t -> t -> (t, _) Checked.t
+
+      val div : t -> t -> (t, _) Checked.t
+
+      val inv : t -> (t, _) Checked.t
+
+      val equal : t -> t -> (Boolean.var, 's) Checked.t
+
+      val project : Boolean.var list -> t
+
+      val pack : Boolean.var list -> t
+
+      val unpack : t -> length:int -> (Boolean.var list, _) Checked.t
+
+      type comparison_result = {less: Boolean.var; less_or_equal: Boolean.var}
+
+      val compare :
+        bit_length:int -> t -> t -> (comparison_result, _) Checked.t
+
       module Infix : sig
         val ( + ) : t -> t -> t
 
@@ -339,6 +311,22 @@ module type Basic = sig
 
       module Unsafe : sig
         val of_var : Var.t -> t
+      end
+
+      module Assert : sig
+        val lte : bit_length:int -> t -> t -> (unit, _) Checked.t
+
+        val gte : bit_length:int -> t -> t -> (unit, _) Checked.t
+
+        val lt : bit_length:int -> t -> t -> (unit, _) Checked.t
+
+        val gt : bit_length:int -> t -> t -> (unit, _) Checked.t
+
+        val not_equal : t -> t -> (unit, _) Checked.t
+
+        val equal : t -> t -> (unit, _) Checked.t
+
+        val non_zero : t -> (unit, _) Checked.t
       end
     end
 
@@ -351,6 +339,18 @@ module type Basic = sig
 
   module Proof : sig
     type t
+  end
+
+  module Bitstring_checked : sig
+    type t = Boolean.var list
+
+    val choose_preimage : Field.Checked.t -> length:int -> (t, _) Checked.t
+
+    val equal : t -> t -> (Boolean.var, _) Checked.t
+
+    module Assert : sig
+      val equal : t -> t -> (unit, _) Checked.t
+    end
   end
 
   module As_prover : sig
@@ -404,9 +404,6 @@ module type Basic = sig
     -> Field.Checked.t
     -> (unit, _) Checked.t
 
-  val assert_equal :
-    ?label:string -> Field.Checked.t -> Field.Checked.t -> (unit, 's) Checked.t
-
   val as_prover : (unit, 's) As_prover.t -> (unit, 's) Checked.t
 
   val with_state :
@@ -424,13 +421,12 @@ module type Basic = sig
 
   val perform : (unit Request.t, 's) As_prover.t -> (unit, 's) Checked.t
 
-  (* TODO: Come up with a better name for this in relation to the above *)
-
   val request :
        ?such_that:('var -> (unit, 's) Checked.t)
     -> ('var, 'value) Typ.t
     -> 'value Request.t
     -> ('var, 's) Checked.t
+  (** TODO: Come up with a better name for this in relation to the above *)
 
   val provide_witness :
     ('var, 'value) Typ.t -> ('value, 's) As_prover.t -> ('var, 's) Checked.t
