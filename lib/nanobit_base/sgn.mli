@@ -5,7 +5,7 @@ type t = Pos | Neg [@@deriving sexp, bin_io]
 
 val to_field : t -> Field.t
 
-type var = private Cvar.t
+type var = private Field.Checked.t
 
 val typ : (var, t) Typ.t
 

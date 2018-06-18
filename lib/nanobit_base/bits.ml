@@ -154,7 +154,7 @@ module Snarkable = struct
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type boolean_var := Impl.Boolean.var
-     and type Packed.var = Impl.Cvar.t
+     and type Packed.var = Impl.Field.Checked.t
      and type Packed.value = V.t
      and type Unpacked.var = Impl.Boolean.var list
      and type Unpacked.value = V.t
@@ -173,7 +173,7 @@ module Snarkable = struct
       go V.empty 0
 
     module Packed = struct
-      type var = Cvar.t
+      type var = Field.Checked.t
 
       type value = V.t
 
@@ -240,14 +240,14 @@ module Snarkable = struct
       let open Impl in
       with_label __LOC__
         (let v = Checked.pack bs in
-         let v' = Cvar.add v (b :> Cvar.t) in
+         let v' = Field.Checked.add v (b :> Field.Checked.t) in
          Checked.unpack v' ~length:V.length)
 
     let increment_var bs =
       let open Impl in
       with_label __LOC__
         (let v = Checked.pack bs in
-         let v' = Cvar.add v (Cvar.constant Field.one) in
+         let v' = Field.Checked.add v (Field.Checked.constant Field.one) in
          Checked.unpack v' ~length:V.length)
 
     let equal_var (n: Unpacked.var) (n': Unpacked.var) =
@@ -271,7 +271,7 @@ module Snarkable = struct
     include M
 
     module Packed = struct
-      type var = Cvar.t
+      type var = Field.Checked.t
 
       type value = Field.t
 
@@ -313,7 +313,7 @@ module Snarkable = struct
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type boolean_var := Impl.Boolean.var
-     and type Packed.var = Impl.Cvar.t
+     and type Packed.var = Impl.Field.Checked.t
      and type Packed.value = Impl.Field.t
      and type Unpacked.var = Impl.Boolean.var list
      and type Unpacked.value = Impl.Field.t =
@@ -330,7 +330,7 @@ module Snarkable = struct
     with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type boolean_var := Impl.Boolean.var
-     and type Packed.var = Impl.Cvar.t
+     and type Packed.var = Impl.Field.Checked.t
      and type Packed.value = Impl.Field.t
      and type Unpacked.var = Impl.Boolean.var list
      and type Unpacked.value = Impl.Field.t =

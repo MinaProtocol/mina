@@ -17,7 +17,7 @@ module Make (Impl : Snark_intf.Basic) = struct
   type t =
     { upper_bound: Bignum_bigint.t
     ; lower_bound: Bignum_bigint.t
-    ; var: Cvar.t
+    ; var: Field.Checked.t
     ; bits: Boolean.var list option }
 
   let two_to_the n =
@@ -64,7 +64,7 @@ module Make (Impl : Snark_intf.Basic) = struct
          let%bind fits = Checked.equal t.var g in
          let%map r =
            Checked.if_ fits ~then_:g
-             ~else_:(Cvar.constant Field.(sub (two_to_the n) one))
+             ~else_:(Field.Checked.constant Field.(sub (two_to_the n) one))
          in
          { upper_bound= Bignum_bigint.(k - one)
          ; lower_bound= t.lower_bound
@@ -128,7 +128,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     let n = Bigint.to_bignum_bigint tick_n in
     { upper_bound= n
     ; lower_bound= n
-    ; var= Cvar.constant x
+    ; var= Field.Checked.constant x
     ; bits=
         Some
           (List.init (bigint_num_bits n) ~f:(fun i ->
@@ -154,7 +154,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     if upper_bound < Field.size then
       { upper_bound
       ; lower_bound= x.lower_bound + y.lower_bound
-      ; var= Cvar.add x.var y.var
+      ; var= Field.Checked.add x.var y.var
       ; bits= None }
     else
       failwithf "Number.+: Potential overflow: (%s + %s > Field.size)"
@@ -166,7 +166,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     if x.lower_bound >= y.upper_bound then
       { upper_bound= x.upper_bound - y.lower_bound
       ; lower_bound= x.lower_bound - y.upper_bound
-      ; var= Cvar.sub x.var y.var
+      ; var= Field.Checked.sub x.var y.var
       ; bits= None }
     else
       failwithf "Number.-: Potential underflow (%s < %s)"

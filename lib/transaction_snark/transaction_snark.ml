@@ -536,7 +536,8 @@ module Verification = struct
         let vx, vy = merge_prefix_and_zero_and_vk_curve_pt in
         Pedersen_hash.hash ~params:Pedersen.params
           ~init:
-            (Hash_prefix.length_in_bits, (Cvar.constant vx, Cvar.constant vy))
+            ( Hash_prefix.length_in_bits
+            , (Field.Checked.constant vx, Field.Checked.constant vy) )
           (s1 @ s2)
         >>| Pedersen_hash.digest >>= Pedersen.Digest.choose_preimage_var
         >>| Pedersen.Digest.Unpacked.var_to_bits
@@ -648,7 +649,7 @@ let check_tagged_transaction source target transaction handler =
   let excess = Tagged_transaction.excess transaction in
   let top_hash = base_top_hash source target excess in
   let open Tick in
-  let main = handle (Base.main (Cvar.constant top_hash)) handler in
+  let main = handle (Base.main (Field.Checked.constant top_hash)) handler in
   assert (check main prover_state)
 
 let check_transition source target (t: Transition.t) handler =
