@@ -45,13 +45,14 @@ module Span = struct
   let ( >= ) = UInt64.( >= )
 end
 
-let field_var_to_unpacked (x: Tick.Cvar.t) = Tick.Checked.unpack ~length:64 x
+let field_var_to_unpacked (x: Tick.Field.Checked.t) =
+  Tick.Checked.unpack ~length:64 x
 
 let diff x y = UInt64.sub x y
 
 let diff_checked x y =
   let pack = Tick.Checked.project in
-  Span.unpack_var Tick.Cvar.Infix.(pack x - pack y)
+  Span.unpack_var Tick.Field.Checked.Infix.(pack x - pack y)
 
 let unpacked_to_number var =
   let bits = Span.Unpacked.var_to_bits var in

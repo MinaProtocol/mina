@@ -19,7 +19,7 @@ let max_bigint =
 
 let max = Bigint.to_field max_bigint
 
-let constant = Tick.Cvar.constant
+let constant = Tick.Field.Checked.constant
 
 let of_field x =
   assert (Bigint.compare (Bigint.of_field x) max_bigint <= 0) ;
@@ -59,4 +59,4 @@ module Bits =
 open Tick
 open Let_syntax
 
-let var_to_unpacked (x: Cvar.t) = Checked.unpack ~length:bit_length x
+let var_to_unpacked (x: Field.Checked.t) = Checked.unpack ~length:bit_length x

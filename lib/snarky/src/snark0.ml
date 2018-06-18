@@ -37,8 +37,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
   type field = Field.t
 
-  module R1CS_constraint_system = R1CS_constraint_system
-
   module Bigint = struct
     include Bigint.R
 
@@ -57,11 +55,22 @@ module Make_basic (Backend : Backend_intf.S) = struct
   end
 
   module Proof = Proof
-  module Verification_key = Verification_key
-  module Proving_key = Proving_key
+
+  module Verification_key = struct
+    include Verification_key
+    include Binable.Of_stringable (Verification_key)
+  end
+
+  module Proving_key = struct
+    include Proving_key
+    include Binable.Of_stringable (Proving_key)
+  end
 
   module Keypair = struct
-    type t = {pk: Proving_key.t; vk: Verification_key.t} [@@deriving fields]
+    type t = {pk: Proving_key.t; vk: Verification_key.t}
+    [@@deriving fields, bin_io]
+
+    let create = Fields.create
 
     let of_backend_keypair kp = {pk= Keypair.pk kp; vk= Keypair.vk kp}
   end
@@ -678,6 +687,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
     type var = Cvar.t
 
     let typ = Typ.field
+
+    module Checked = Cvar
   end
 
   module As_prover = struct
@@ -1362,15 +1373,16 @@ module Make_basic (Backend : Backend_intf.S) = struct
       Checked.constraint_system ~num_inputs:(!next_input - 1) r
 
     let constraint_system :
-           ((unit, 's) Checked.t, _, 'k_var, _) t
+           exposing:((unit, 's) Checked.t, _, 'k_var, _) t
         -> 'k_var
         -> R1CS_constraint_system.t =
-     fun t k -> r1cs_h (ref 1) t k
+     fun ~exposing k -> r1cs_h (ref 1) exposing k
 
     let generate_keypair :
         exposing:((unit, 's) Checked.t, _, 'k_var, _) t -> 'k_var -> Keypair.t =
-     fun ~exposing:t k ->
-      Backend.R1CS_constraint_system.create_keypair (constraint_system t k)
+     fun ~exposing k ->
+      Backend.R1CS_constraint_system.create_keypair
+        (constraint_system ~exposing k)
       |> Keypair.of_backend_keypair
 
     let verify :
@@ -1452,6 +1464,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
   let prove = Run.prove
 
   let verify = Run.verify
+
+  let constraint_system = Run.constraint_system
+
+  module R1CS_constraint_system = struct
+    include R1CS_constraint_system
+
+    let generate_keypair = Fn.compose Keypair.of_backend_keypair create_keypair
+  end
 end
 
 module Make (Backend : Backend_intf.S) = struct
