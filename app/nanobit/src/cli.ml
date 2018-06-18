@@ -10,12 +10,12 @@ let daemon =
   Command.async ~summary:"Current daemon"
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"Configuration directory" (optional file)
-     and should_mine = flag "mine" ~doc:"Run the miner" (required bool)
+     and should_mine = flag "mine" ~doc:"Run the miner" (optional bool)
      and port =
-       flag "port" ~doc:"Server port for other to connect" (required int16)
+       flag "port" ~doc:"Server port for other to connect" (optional int16)
      and client_port =
        flag "client-port" ~doc:"Port for client to connect daemon locally"
-         (required int16)
+         (optional int16)
      and ip =
        flag "ip" ~doc:"External IP address for others to connect"
          (optional string)
@@ -26,6 +26,8 @@ let daemon =
        let conf_dir =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
+       let port = Option.value ~default:default_daemon_port port in
+       let client_port = Option.value ~default:8301 client_port in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
          let peers_path = conf_dir ^/ "peers" in
