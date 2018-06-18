@@ -50,7 +50,7 @@ end
 module Make (Digest : sig
   module Tick :
     Tick.Snarkable.Bits.Lossy
-    with type Packed.var = Tick.Cvar.t
+    with type Packed.var = Tick.Field.Checked.t
      and type Packed.value = Tick.Pedersen.Digest.t
 
   module Tock : Tock.Snarkable.Bits.Lossy with type Packed.value = Tock.Field.t

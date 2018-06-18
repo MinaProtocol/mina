@@ -28,7 +28,8 @@ module Make (M : Snark_intf.S) : sig
   end
 
   module Checked : sig
-    val hash_to_field : t -> Boolean.var list -> (Cvar.t list, _) Checked.t
+    val hash_to_field :
+      t -> Boolean.var list -> (Field.Checked.t list, _) Checked.t
 
     val hash_to_bits : t -> Boolean.var list -> (Boolean.var list, _) Checked.t
   end

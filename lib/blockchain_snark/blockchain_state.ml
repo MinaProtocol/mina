@@ -142,12 +142,13 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
               let n = List.length delta in
               let d = Checked.pack delta in
               let%bind delta_is_zero =
-                Checked.equal d (Cvar.constant Field.zero)
+                Checked.equal d (Field.Checked.constant Field.zero)
               in
               let%map delta_minus_one =
-                Checked.if_ delta_is_zero ~then_:(Cvar.constant Field.zero)
+                Checked.if_ delta_is_zero
+                  ~then_:(Field.Checked.constant Field.zero)
                   ~else_:
-                    (let open Cvar in
+                    (let open Field.Checked in
                     Infix.(d - constant Field.one))
                 (* We convert to bits here because we will in [clamp_to_n_bits] anyway, and
                 this gives us the upper bound we need for multiplying with [rate_multiplier]. *)
@@ -168,9 +169,10 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            (* This could be more efficient *)
            with_label __LOC__
              (let%bind less = Number.(prev_target_n < rate_multiplier) in
-              Checked.if_ less ~then_:(Cvar.constant Field.one)
+              Checked.if_ less
+                ~then_:(Field.Checked.constant Field.one)
                 ~else_:
-                  (Cvar.sub
+                  (Field.Checked.sub
                      (Number.to_var prev_target_n)
                      (Number.to_var rate_multiplier)))
          in
@@ -275,7 +277,7 @@ module Checked = struct
   let is_base_hash h =
     with_label __LOC__
       (Checked.equal
-         (Cvar.constant (zero_hash :> Field.t))
+         (Field.Checked.constant (zero_hash :> Field.t))
          (State_hash.var_to_hash_packed h))
 
   let hash (t: var) =

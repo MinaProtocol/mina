@@ -17,7 +17,7 @@ module type S = sig
 
     module Snarkable (Impl : Snark_intf.S) :
       Impl.Snarkable.Bits.Lossy
-      with type Packed.var = Impl.Cvar.t
+      with type Packed.var = Impl.Field.Checked.t
        and type Packed.value = Impl.Field.t
        and type Unpacked.value = Impl.Field.t
   end
