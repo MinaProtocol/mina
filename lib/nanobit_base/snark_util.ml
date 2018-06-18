@@ -72,7 +72,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
               Bigint.(compare (of_field (Field.of_int i)) (of_field n) < 0))))
     in
     let%map () =
-      assert_equal
+      Field.Checked.Assert.equal
         (Field.Checked.sum (bs :> Field.Checked.t list))
         (* This can't overflow since the field is huge *)
         n
@@ -84,8 +84,10 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     assert (total_length < Field.size_in_bits);
     let%bind mask = n_ones ~total_length u in
     let%bind masked = apply_mask mask bs in
-    assert_equal ~label:"Snark_util.assert_num_bits_upper_bound"
-      (pack_unsafe masked) (pack_unsafe bs)
+    with_label __LOC__ (
+      Field.Checked.Assert.equal
+        (pack_unsafe masked) (pack_unsafe bs)
+    )
 
   let num_bits_int =
     let rec go acc n =
@@ -119,7 +121,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         exists Typ.field
           ~request:(As_prover.return Num_bits_upper_bound)
           ~compute:As_prover.(
-            map (read_var (Checked.project x_unpacked))
+            map (read_var (Field.Checked.project x_unpacked))
               ~f:(fun x -> Field.of_int (num_bits_upper_bound_unchecked x)))
       in
       let%map () = assert_num_bits_upper_bound x_unpacked res in
@@ -127,7 +129,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
   ;;
 
   let num_bits_upper_bound ~max_length (x : Field.Checked.t) : (Field.Checked.t, _) Checked.t =
-    Checked.unpack x ~length:max_length
+    Field.Checked.unpack x ~length:max_length
     >>= num_bits_upper_bound_unpacked
   ;;
 
@@ -193,7 +195,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
 
   let unpack_field_var x =
     let%bind res =
-      Impl.Checked.choose_preimage x ~length:Field.size_in_bits
+      Impl.Bitstring_checked.choose_preimage x ~length:Field.size_in_bits
       >>| Bitstring.Lsb_first.of_list
     in
     let%map () =
@@ -248,7 +250,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         let ((), (less, less_or_equal)) =
           run_and_check
             (let%map { less; less_or_equal } =
-              Checked.compare ~bit_length (Field.Checked.constant x) (Field.Checked.constant y)
+              Field.Checked.compare ~bit_length (Field.Checked.constant x) (Field.Checked.constant y)
             in
             As_prover.(
               map2 (read Boolean.typ less) (read Boolean.typ less_or_equal)

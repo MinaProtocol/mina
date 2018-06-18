@@ -88,7 +88,7 @@ struct
 
   module Checked = struct
     let compress ((x, _): Curve.var) =
-      Checked.choose_preimage x ~length:Field.size_in_bits
+      Bitstring_checked.choose_preimage x ~length:Field.size_in_bits
 
     open Impl.Let_syntax
 

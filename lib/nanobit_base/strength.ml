@@ -27,7 +27,7 @@ let of_field x =
   x
 
 let field_var_to_unpacked (x: Tick.Field.Checked.t) =
-  Tick.Checked.unpack ~length:bit_length x
+  Tick.Field.Checked.unpack ~length:bit_length x
 
 include Bits.Snarkable.Small (Tick)
           (struct
@@ -92,18 +92,18 @@ let floor_divide ~numerator:(`Two_to_the (b: int) as numerator) y y_unpacked =
        equal to a sum of [b] booleans, but we add an explicit check here since it
        is relatively cheap and the internals of that function might change. *)
     let%bind () =
-      Checked.Assert.lte ~bit_length:(Util.num_bits_int b) k
+      Field.Checked.Assert.lte ~bit_length:(Util.num_bits_int b) k
         (Field.Checked.constant (Field.of_int b))
     in
     let m = Field.Checked.(sub (constant (Field.of_int (b + 1))) k) in
-    let%bind z_unpacked = Checked.unpack z ~length:b in
+    let%bind z_unpacked = Field.Checked.unpack z ~length:b in
     Util.assert_num_bits_upper_bound z_unpacked m
   in
-  let%bind zy = Checked.mul z y in
+  let%bind zy = Field.Checked.mul z y in
   let numerator = Field.Checked.constant (two_to_the b) in
-  let%map () = Checked.Assert.lte ~bit_length:(b + 1) zy numerator
+  let%map () = Field.Checked.Assert.lte ~bit_length:(b + 1) zy numerator
   and () =
-    Checked.Assert.lt ~bit_length:(b + 1) numerator
+    Field.Checked.Assert.lt ~bit_length:(b + 1) numerator
       Field.Checked.Infix.(zy + y)
   in
   z

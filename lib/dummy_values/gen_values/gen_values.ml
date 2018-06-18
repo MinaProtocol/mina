@@ -28,7 +28,7 @@ module Make (B : Snarky.Backend_intf.S) (M : sig val name : Curve_name.t end) = 
     let open Impl in
     let proof =
       let exposing = Data_spec.([ Typ.field ]) in
-      let main x = assert_equal x x in
+      let main x = Field.Checked.Assert.equal x x in
       let keypair = generate_keypair main ~exposing in
       prove (Keypair.pk keypair) exposing () main Field.one
     in

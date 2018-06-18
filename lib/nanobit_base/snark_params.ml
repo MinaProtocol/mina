@@ -32,7 +32,7 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
         with type ('a, 'b) typ := ('a, 'b) Typ.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
-         and type comparison_result := Checked.comparison_result
+         and type comparison_result := Field.Checked.comparison_result
     end
   end
 end
@@ -125,9 +125,9 @@ module Tick = struct
                 ~f:(Z.testbit (Bignum_bigint.to_zarith_bigint n)) )
             ~back:pack
 
-        let equal = Checked.equal_bitstrings
+        let equal = Bitstring_checked.equal
 
-        let assert_equal = Checked.Assert.equal_bitstrings
+        let assert_equal = Bitstring_checked.Assert.equal
       end
     end
 

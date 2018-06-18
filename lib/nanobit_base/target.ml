@@ -38,7 +38,7 @@ let assert_mem x xs =
   let rec go acc = function
     | [] -> Boolean.Assert.any acc
     | y :: ys ->
-        let%bind e = Checked.equal x y in
+        let%bind e = Field.Checked.equal x y in
         go (e :: acc) ys
   in
   go [] xs
@@ -59,4 +59,5 @@ module Bits =
 open Tick
 open Let_syntax
 
-let var_to_unpacked (x: Field.Checked.t) = Checked.unpack ~length:bit_length x
+let var_to_unpacked (x: Field.Checked.t) =
+  Field.Checked.unpack ~length:bit_length x

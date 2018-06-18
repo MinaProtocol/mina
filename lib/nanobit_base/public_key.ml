@@ -51,7 +51,7 @@ module Compressed = struct
 
   let assert_equal (t1: var) (t2: var) =
     let open Let_syntax in
-    let%map () = assert_equal t1.x t2.x
+    let%map () = Field.Checked.Assert.equal t1.x t2.x
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
     ()
 
@@ -63,7 +63,9 @@ module Compressed = struct
    Either decide this is ok or assert bitstring lt field size *)
   let var_to_bits ({x; is_odd}: var) =
     let open Let_syntax in
-    let%map x_bits = Checked.choose_preimage x ~length:Field.size_in_bits in
+    let%map x_bits =
+      Bitstring_checked.choose_preimage x ~length:Field.size_in_bits
+    in
     is_odd :: x_bits
 end
 
@@ -102,7 +104,8 @@ let compress_var ((x, y): var) : (Compressed.var, _) Checked.t =
      {Compressed.x; is_odd})
 
 let assert_equal ((x1, y1): var) ((x2, y2): var) : (unit, _) Checked.t =
-  let%map () = assert_equal x1 x2 and () = assert_equal y1 y2 in
+  let%map () = Field.Checked.Assert.equal x1 x2
+  and () = Field.Checked.Assert.equal y1 y2 in
   ()
 
 let of_bigstring bs =

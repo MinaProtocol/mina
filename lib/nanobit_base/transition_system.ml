@@ -139,8 +139,7 @@ struct
              (let%bind sh = State.Hash.var_to_bits next_state_hash in
               (* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
-              Hash.hash (wrap_vk @ sh)
-              >>= assert_equal ~label:"equal_to_top_hash" top_hash)
+              Hash.hash (wrap_vk @ sh) >>= Field.Checked.Assert.equal top_hash)
          in
          let%bind prev_state_valid =
            prev_state_valid wrap_vk prev_state_hash

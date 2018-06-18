@@ -301,7 +301,7 @@ module Amount = struct
         Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
 
       let to_field_var ({magnitude; sgn}: var) =
-        Tick.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
+        Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
 
       let add (x: var) (y: var) =
         let%bind xv = to_field_var x and yv = to_field_var y in
@@ -313,7 +313,9 @@ module Amount = struct
             (Option.value_exn (add x y)).sgn)
         in
         let%bind res =
-          Tick.Checked.mul (sgn :> Field.Checked.t) (Field.Checked.add xv yv)
+          Tick.Field.Checked.mul
+            (sgn :> Field.Checked.t)
+            (Field.Checked.add xv yv)
         in
         let%map magnitude = unpack_var res in
         {magnitude; sgn}
@@ -324,7 +326,7 @@ module Amount = struct
         (* (x + b(y - x), y + b(x - y)) *)
         let open Field.Checked.Infix in
         let%map b_y_minus_x =
-          Tick.Checked.mul (b :> Field.Checked.t) (y - x)
+          Tick.Field.Checked.mul (b :> Field.Checked.t) (y - x)
         in
         (x + b_y_minus_x, y - b_y_minus_x)
 
