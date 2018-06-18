@@ -122,7 +122,11 @@ module type Slot_intf = sig
 
   val ( < ) : t -> t -> bool
 
+  val ( <= ) : t -> t -> bool
+
   val ( > ) : t -> t -> bool
+
+  val ( >= ) : t -> t -> bool
 
   val ( = ) : t -> t -> bool
 
@@ -161,6 +165,7 @@ module type State_intf = sig
     ; epoch_seed: seed
     ; next_epoch_seed: seed
     ; next_epoch_ledger_hash: ledger_hash
+    ; epoch_ledger_hash: ledger_hash
     ; length: length
     ; timestamp: time
     ; slot: slot
@@ -323,7 +328,7 @@ module type Inputs_intf = sig
     val epoch_slots : int
   end
 
-  module Off_chain_checker : sig
+  module Validator : sig
     val validate : State.t -> State.Proof.t -> bool Deferred.t
     (** This includes the State.Proof.t validation *)
 
@@ -376,7 +381,7 @@ struct
     let next_epoch_seed =
       if is_epoch_transition then Epoch_seed.empty
       else if
-        Slot.( > ) transition.slot Constants.forkable_slot
+        Slot.( >= ) transition.slot Constants.forkable_slot
         && Slot.(transition.slot < of_int 2 * Constants.forkable_slot)
       then Vrf.update_seed t.state.data.next_epoch_seed transition.vrf
       else t.state.data.next_epoch_seed
@@ -387,7 +392,7 @@ struct
     in
     let epoch_ledger_hash =
       if is_epoch_transition then t.state.data.next_epoch_ledger_hash
-      else t.state.data.ledger_hash
+      else t.state.data.epoch_ledger_hash
     in
     assert (
       Ledger_hash.equal
@@ -428,6 +433,7 @@ struct
       ; timestamp= transition.timestamp
       ; next_epoch_seed
       ; next_epoch_ledger_hash
+      ; epoch_ledger_hash
       ; ledger_hash= Ledger.merkle_root transition.ledger
       ; length= Length.increment t.state.data.length
       ; slot= transition.slot
@@ -446,14 +452,11 @@ struct
 
   let select (current: Proof_carrying_state.t)
       (candidate: Proof_carrying_state.t) =
-    let%bind validated =
-      Off_chain_checker.validate candidate.data candidate.proof
-    in
+    let%bind validated = Validator.validate candidate.data candidate.proof in
     if not validated then return current
     else
       let%map prefixed =
-        Off_chain_checker.prefix_of
-          ~candidate_locked:candidate.data.locked_hash
+        Validator.prefix_of ~candidate_locked:candidate.data.locked_hash
           ~curr_locked:current.data.locked_hash
       in
       if not prefixed then current
