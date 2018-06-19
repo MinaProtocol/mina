@@ -12,11 +12,16 @@ let daemon =
        flag "config-directory" ~doc:"Configuration directory" (optional file)
      and should_mine = flag "mine" ~doc:"Run the miner" (optional bool)
      and port =
-       flag "port" ~doc:"Server port for other to connect" (optional int16)
-     and client_port =
-       flag "client-port" ~doc:"Port for client to connect daemon locally"
+       flag "port" ~doc:"Server port for other to connect (default: 8302)"
          (optional int16)
-     and membership_port = flag "membership-port" ~doc:"Port for dameon to find out the membership topology"
+     and client_port =
+       flag "client-port"
+         ~doc:"Port for client to connect daemon locally (default: 8301)"
+         (optional int16)
+     and membership_port =
+       flag "membership-port"
+         ~doc:
+           "Port for dameon to find out the membership topology (default: 8303)"
          (optional int16)
      and ip =
        flag "ip" ~doc:"External IP address for others to connect"
@@ -39,12 +44,12 @@ let daemon =
          with
          | Ok ls -> return ls
          | Error e ->
-           let default_initial_peers = [] in
-           let%map () =
-             Writer.save_sexp peers_path
-               ([%sexp_of : Host_and_port.t list] default_initial_peers)
-           in
-           []
+             let default_initial_peers = [] in
+             let%map () =
+               Writer.save_sexp peers_path
+                 ([%sexp_of : Host_and_port.t list] default_initial_peers)
+             in
+             []
        in
        let log = Logger.create () in
        let%bind ip =
@@ -68,11 +73,11 @@ let daemon =
          let fee_public_key = Genesis_ledger.rich_pk
        end in
        let module Main = ( val if Insecure.key_generation then ( module Main_without_snark
-             (Init)
-           : Main_intf )
-           else
-             (module Main_with_snark (Storage.Disk) (Init)
-                : Main_intf ) ) in
+                                                                          (Init)
+                                 : Main_intf )
+                               else
+                                 (module Main_with_snark (Storage.Disk) (Init)
+                                 : Main_intf ) ) in
        let module Run = Run (Main) in
        let%bind () =
          let open Main in
@@ -81,7 +86,8 @@ let daemon =
            ; gossip_net_params=
                { timeout= Time.Span.of_sec 1.
                ; target_peer_count= 8
-               ; address= (Host_and_port.create ~host:ip ~port:membership_port) }
+               ; address= Host_and_port.create ~host:ip ~port:membership_port
+               }
            ; initial_peers
            ; me
            ; remap_addr_port }
