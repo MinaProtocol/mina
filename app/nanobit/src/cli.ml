@@ -94,6 +94,7 @@ let daemon =
        Async.never ())
 
 let () =
+  Random.self_init () ;
   Command.group ~summary:"Current"
     [ ("daemon", daemon)
     ; (Parallel.worker_command_name, Parallel.worker_command)

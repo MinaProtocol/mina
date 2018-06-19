@@ -80,6 +80,7 @@ module type Transaction_intf = sig
 
   module With_valid_signature : sig
     type nonrec t = private t [@@deriving sexp, eq]
+
     val compare : seed:string -> t -> t -> int
   end
 

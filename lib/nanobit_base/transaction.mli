@@ -3,37 +3,34 @@ open Snark_params.Tick
 
 module Payload : sig
   type ('pk, 'amount, 'fee, 'nonce) t_ =
-    { receiver : 'pk
-    ; amount   : 'amount
-    ; fee      : 'fee
-    ; nonce    : 'nonce
-    }
+    {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
   [@@deriving bin_io, eq, sexp, hash]
 
   type t =
     ( Public_key.Compressed.t
     , Currency.Amount.t
     , Currency.Fee.t
-    , Account.Nonce.t
-    ) t_
+    , Account.Nonce.t )
+    t_
   [@@deriving bin_io, eq, sexp, hash]
 
   module Stable : sig
     module V1 : sig
-      type nonrec ('pk, 'amount, 'fee, 'nonce) t_ = ('pk, 'amount, 'fee, 'nonce) t_ =
-        { receiver : 'pk
-        ; amount   : 'amount
-        ; fee      : 'fee
-        ; nonce    : 'nonce
-        }
+      type nonrec ('pk, 'amount, 'fee, 'nonce) t_ =
+                                                   ( 'pk
+                                                   , 'amount
+                                                   , 'fee
+                                                   , 'nonce )
+                                                   t_ =
+        {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
       [@@deriving bin_io, eq, sexp, hash]
 
       type t =
         ( Public_key.Compressed.Stable.V1.t
         , Currency.Amount.Stable.V1.t
         , Currency.Fee.Stable.V1.t
-        , Account.Nonce.t
-        ) t_
+        , Account.Nonce.t )
+        t_
       [@@deriving bin_io, eq, sexp, hash]
     end
   end
@@ -53,10 +50,7 @@ module Payload : sig
 end
 
 type ('payload, 'pk, 'signature) t_ =
-  { payload   : 'payload
-  ; sender    : 'pk
-  ; signature : 'signature
-  }
+  {payload: 'payload; sender: 'pk; signature: 'signature}
 [@@deriving bin_io, eq, sexp, hash]
 
 type t = (Payload.t, Public_key.t, Signature.t) t_
@@ -64,14 +58,13 @@ type t = (Payload.t, Public_key.t, Signature.t) t_
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('payload, 'pk, 'signature) t_ = ('payload, 'pk, 'signature) t_ =
-      { payload   : 'payload
-      ; sender    : 'pk
-      ; signature : 'signature
-      }
+    type nonrec ('payload, 'pk, 'signature) t_ =
+                                                ('payload, 'pk, 'signature) t_ =
+      {payload: 'payload; sender: 'pk; signature: 'signature}
     [@@deriving bin_io, eq, sexp, hash]
 
-    type t = (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
+    type t =
+      (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
     [@@deriving bin_io, eq, sexp, hash]
 
     val compare : seed:string -> t -> t -> int
@@ -95,8 +88,9 @@ val gen :
   -> t Quickcheck.Generator.t
 
 module With_valid_signature : sig
-  type nonrec t = private t
-  [@@deriving sexp, eq, bin_io]
+  type nonrec t = private t [@@deriving sexp, eq, bin_io]
+
+  val compare : seed:string -> t -> t -> int
 
   val compare : seed:string -> t -> t -> int
   val gen : keys:Signature_keypair.t array -> max_amount:int -> max_fee:int -> t Quickcheck.Generator.t
