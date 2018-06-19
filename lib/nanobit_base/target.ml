@@ -3,13 +3,11 @@ open Snark_params
 
 module Stable = struct
   module V1 = struct
-    type t = Tick.Field.t
-    [@@deriving bin_io, sexp, eq]
+    type t = Tick.Field.t [@@deriving bin_io, sexp, eq]
   end
 end
 
 include Stable.V1
-
 module Field = Tick.Field
 module Bigint = Tick_curve.Bigint.R
 
@@ -21,17 +19,17 @@ let max_bigint =
 
 let max = Bigint.to_field max_bigint
 
-let constant = Tick.Cvar.constant
+let constant = Tick.Field.Checked.constant
 
 let of_field x =
-  assert (Bigint.compare (Bigint.of_field x) max_bigint <= 0);
+  assert (Bigint.compare (Bigint.of_field x) max_bigint <= 0) ;
   x
-;;
 
 let to_bigint x = Tick.Bigint.to_bignum_bigint (Bigint.of_field x)
+
 let of_bigint n =
   let x = Tick.Bigint.of_bignum_bigint n in
-  assert (Bigint.compare x max_bigint <= 0);
+  assert (Bigint.compare x max_bigint <= 0) ;
   Bigint.to_field x
 
 let assert_mem x xs =
@@ -40,19 +38,25 @@ let assert_mem x xs =
   let rec go acc = function
     | [] -> Boolean.Assert.any acc
     | y :: ys ->
-      let%bind e = Checked.equal x y in
-      go (e :: acc) ys
+        let%bind e = Checked.equal x y in
+        go (e :: acc) ys
   in
   go [] xs
-;;
 
 (* TODO: Use a "dual" variable to ensure the bit_length constraint is actually always
    enforced. *)
-include Bits.Snarkable.Small(Tick)(struct let bit_length = bit_length end)
+include Bits.Snarkable.Small (Tick)
+          (struct
+            let bit_length = bit_length
+          end)
 
-module Bits = Bits.Small(Tick.Field)(Tick.Bigint)(struct let bit_length = bit_length end)
+module Bits =
+  Bits.Small (Tick.Field) (Tick.Bigint)
+    (struct
+      let bit_length = bit_length
+    end)
 
 open Tick
 open Let_syntax
 
-let var_to_unpacked (x : Cvar.t) = Checked.unpack ~length:bit_length x
+let var_to_unpacked (x: Field.Checked.t) = Checked.unpack ~length:bit_length x

@@ -1,35 +1,44 @@
 open Core_kernel
 
 module Make
-    (Impl : Snark_intf.S)
-    (Curve : sig
-      type var = Impl.Cvar.t * Impl.Cvar.t
-      type value
-      val typ : (var, value) Impl.Typ.t
-      val cond_add : value -> to_:var -> if_:Impl.Boolean.var -> (var, _) Impl.Checked.t
-    end)
-  : sig
-    open Impl
+    (Impl : Snark_intf.S) (Curve : sig
+        type var = Impl.Field.Checked.t * Impl.Field.Checked.t
 
-    module Digest : sig
-      module Unpacked : sig
-        type var = Boolean.var list
         type value
-        val typ : (var, value) Typ.t
-      end
 
-      type var = Cvar.t
-      type value = Field.t
+        val typ : (var, value) Impl.Typ.t
+
+        val cond_add :
+          value -> to_:var -> if_:Impl.Boolean.var -> (var, _) Impl.Checked.t
+    end) : sig
+  open Impl
+
+  module Digest : sig
+    module Unpacked : sig
+      type var = Boolean.var list
+
+      type value
+
       val typ : (var, value) Typ.t
-
-      val choose_preimage : var -> (Unpacked.var, _) Checked.t
     end
 
-    val hash : params:Curve.value array -> init:(int * Curve.var) -> Boolean.var list -> (Curve.var, _) Checked.t
-    val digest : Curve.var -> Digest.var
+    type var = Field.Checked.t
+
+    type value = Field.t
+
+    val typ : (var, value) Typ.t
+
+    val choose_preimage : var -> (Unpacked.var, _) Checked.t
   end
-=
-struct
+
+  val hash :
+       params:Curve.value array
+    -> init:int * Curve.var
+    -> Boolean.var list
+    -> (Curve.var, _) Checked.t
+
+  val digest : Curve.var -> Digest.var
+end = struct
   open Impl
 
   let hash_length = Field.size_in_bits
@@ -37,12 +46,16 @@ struct
   module Digest = struct
     module Unpacked = struct
       type var = Boolean.var list
+
       type value = bool list
+
       let typ : (var, value) Typ.t = Typ.list Boolean.typ ~length:hash_length
     end
 
-    type var = Cvar.t
+    type var = Field.Checked.t
+
     type value = Field.t
+
     let typ = Typ.field
 
     let choose_preimage x =
@@ -57,16 +70,14 @@ struct
     let rec go acc i = function
       | [] -> return acc
       | b :: bs ->
-        if i = n
-        then
-          failwithf "Pedersen.hash: Input length (%d) exceeded max (%d)"
-            (List.length bs0) n ()
-        else
-          let%bind acc' = Curve.cond_add params.(i) ~to_:acc ~if_:b in
-          go acc' (i + 1) bs
+          if i = n then
+            failwithf "Pedersen.hash: Input length (%d) exceeded max (%d)"
+              (List.length bs0) n ()
+          else
+            let%bind acc' = Curve.cond_add params.(i) ~to_:acc ~if_:b in
+            go acc' (i + 1) bs
     in
     with_label "Pedersen.hash" (go init i0 bs0)
-  ;;
 
   let digest (x, _) = x
 end

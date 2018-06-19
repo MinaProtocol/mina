@@ -1,272 +1,258 @@
-
 open Core_kernel
 open Async
 open Kademlia
 
 module Rpcs
-  (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
-  (Ledger : Protocols.Minibit_pow.Ledger_intf with type ledger_hash := Ledger_hash.t)
-  (State : Binable.S)
-= struct
+    (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
+    (Ledger : Protocols.Minibit_pow.Ledger_intf
+              with type ledger_hash := Ledger_hash.t)
+    (State : Binable.S) =
+struct
   module Get_ledger_at_hash = struct
     module T = struct
       let name = "get_ledger_at_hash"
+
       module T = struct
         type query = Ledger_hash.t
+
         type response = (Ledger.t * State.t) option
       end
+
       module Caller = T
       module Callee = T
     end
+
     include T.T
-    include Versioned_rpc.Both_convert.Plain.Make(T)
+    include Versioned_rpc.Both_convert.Plain.Make (T)
 
     module V1 = struct
       module T = struct
         type query = Ledger_hash.t [@@deriving bin_io]
+
         type response = (Ledger.t * State.t) option [@@deriving bin_io]
+
         let version = 1
+
         let query_of_caller_model = Fn.id
+
         let callee_model_of_query = Fn.id
+
         let response_of_callee_model = Fn.id
+
         let caller_model_of_response = Fn.id
       end
+
       include T
-      include Register(T)
+      include Register (T)
     end
   end
 
   module Check_ledger_at_hash = struct
     module T = struct
       let name = "check_ledger_at_hash"
+
       module T = struct
         type query = Ledger_hash.t
+
         type response = bool
       end
+
       module Caller = T
       module Callee = T
     end
+
     include T.T
-    include Versioned_rpc.Both_convert.Plain.Make(T)
+    include Versioned_rpc.Both_convert.Plain.Make (T)
 
     module V1 = struct
       module T = struct
         type query = Ledger_hash.t [@@deriving bin_io]
+
         type response = bool [@@deriving bin_io]
+
         let version = 1
+
         let query_of_caller_model = Fn.id
+
         let callee_model_of_query = Fn.id
+
         let response_of_callee_model = Fn.id
+
         let caller_model_of_response = Fn.id
       end
+
       include T
-      include Register(T)
+      include Register (T)
     end
   end
 end
 
 module Message (State_with_witness : Minibit.State_with_witness_intf) = struct
-
   module T = struct
     module T = struct
-      type msg =
-        | New_state of State_with_witness.Stripped.t
+      type msg = New_state of State_with_witness.Stripped.t
       [@@deriving bin_io]
     end
+
     let name = "message"
+
     module Caller = T
     module Callee = T
   end
+
   include T.T
-  include Versioned_rpc.Both_convert.One_way.Make(T)
+  include Versioned_rpc.Both_convert.One_way.Make (T)
 
   module V1 = struct
     module T = struct
       include T.T
+
       let version = 1
+
       let callee_model_of_msg = Fn.id
+
       let msg_of_caller_model = Fn.id
     end
-    include Register(T)
+
+    include Register (T)
   end
 end
 
 module type Inputs_intf = sig
   module State_with_witness : Minibit.State_with_witness_intf
+
   module Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf
-  module Ledger : Protocols.Minibit_pow.Ledger_intf with type ledger_hash := Ledger_hash.t
+
+  module Ledger :
+    Protocols.Minibit_pow.Ledger_intf with type ledger_hash := Ledger_hash.t
+
   module State : Binable.S
 end
 
-module Make
-  (Inputs : Inputs_intf)
-= struct
+module Make (Inputs : Inputs_intf) = struct
   open Inputs
-
   module Message = Message (State_with_witness)
   module Gossip_net = Gossip_net.Make (Message)
 
   module Config = struct
-    type t = 
-      { parent_log : Logger.t
-      ; gossip_net_params : Gossip_net.Params.t
-      ; initial_peers : Peer.t list
-      ; me : Peer.t
-      ; remap_addr_port : Peer.t -> Peer.t
-      }
+    type t =
+      { parent_log: Logger.t
+      ; gossip_net_params: Gossip_net.Params.t
+      ; initial_peers: Peer.t list
+      ; me: Peer.t
+      ; remap_addr_port: Peer.t -> Peer.t }
   end
 
-  module Rpcs = Rpcs(Ledger_hash)(Ledger)(State)
-
+  module Rpcs = Rpcs (Ledger_hash) (Ledger) (State)
   module Membership = Membership.Haskell
 
   type t =
-    { gossip_net : Gossip_net.t 
-    ; new_state_reader : State_with_witness.Stripped.t Linear_pipe.Reader.t
-    ; new_state_writer : State_with_witness.Stripped.t Linear_pipe.Writer.t 
-    }
+    { gossip_net: Gossip_net.t
+    ; new_state_reader: State_with_witness.Stripped.t Linear_pipe.Reader.t
+    ; new_state_writer: State_with_witness.Stripped.t Linear_pipe.Writer.t }
 
   type ledger = Ledger.t
+
   type state_with_witness = State_with_witness.t
 
-  let init_gossip_net 
-    params
-    initial_peers
-    me
-    log
-    remap_addr_port
-    implementations
-    =
+  let init_gossip_net params initial_peers me log remap_addr_port
+      implementations =
     let%map membership =
-      match%map (Membership.connect ~initial_peers ~me ~parent_log:log) with
+      match%map Membership.connect ~initial_peers ~me ~parent_log:log with
       | Ok membership -> membership
-      | Error e -> failwith (Printf.sprintf "Failed to connect to kademlia process: %s\n" (Error.to_string_hum e))
+      | Error e ->
+          failwith
+            (Printf.sprintf "Failed to connect to kademlia process: %s\n"
+               (Error.to_string_hum e))
     in
-    let remap_ports peers = 
+    let remap_ports peers =
       List.map peers ~f:(fun peer -> remap_addr_port peer)
     in
-    let peer_events = 
-      (Linear_pipe.map 
-         (Membership.changes membership) 
-         ~f:(function
-           | Connect peers -> Peer.Event.Connect (remap_ports peers)
-           | Disconnect peers -> Disconnect (remap_ports peers)
-         )) 
+    let peer_events =
+      Linear_pipe.map (Membership.changes membership) ~f:(function
+        | Connect peers -> Peer.Event.Connect (remap_ports peers)
+        | Disconnect peers -> Disconnect (remap_ports peers) )
     in
-    Gossip_net.create 
-      peer_events
-      params
-      log
-      implementations
+    Gossip_net.create peer_events params log implementations
 
-  let create 
-        (config : Config.t)
-        check_ledger_at_hash 
-        get_ledger_at_hash
-    = 
+  let create (config: Config.t) check_ledger_at_hash get_ledger_at_hash =
     let log = Logger.child config.parent_log "minibit networking" in
-    let check_ledger_at_hash_rpc () ~version hash = check_ledger_at_hash hash in
+    let check_ledger_at_hash_rpc () ~version hash =
+      check_ledger_at_hash hash
+    in
     let get_ledger_at_hash_rpc () ~version hash = get_ledger_at_hash hash in
-    let implementations = 
+    let implementations =
       List.append
         (Rpcs.Check_ledger_at_hash.implement_multi check_ledger_at_hash_rpc)
         (Rpcs.Get_ledger_at_hash.implement_multi get_ledger_at_hash_rpc)
     in
-    let%map gossip_net = 
-      init_gossip_net 
-        config.gossip_net_params 
-        config.initial_peers
-        config.me 
-        log 
-        config.remap_addr_port 
-        implementations
+    let%map gossip_net =
+      init_gossip_net config.gossip_net_params config.initial_peers config.me
+        log config.remap_addr_port implementations
     in
     let new_state_reader, new_state_writer = Linear_pipe.create () in
-    don't_wait_for begin
-      Linear_pipe.iter_unordered 
-        ~max_concurrency:64 
-        (Gossip_net.received gossip_net)
-        ~f:(function 
-          | New_state s -> Linear_pipe.write_or_drop new_state_writer new_state_reader ~capacity:1024 s; Deferred.unit
-        )
-    end;
-    { gossip_net
-    ; new_state_reader
-    ; new_state_writer 
-    }
+    don't_wait_for
+      (Linear_pipe.iter_unordered ~max_concurrency:64
+           (Gossip_net.received gossip_net) ~f:(function New_state s ->
+           Linear_pipe.write_or_drop new_state_writer new_state_reader
+             ~capacity:1024 s ;
+           Deferred.unit )) ;
+    {gossip_net; new_state_reader; new_state_writer}
 
   module State_io = struct
     type net = t
+
     type t = unit
 
-    let create net ~broadcast_state = 
-      don't_wait_for begin
-        Linear_pipe.iter_unordered 
-          ~max_concurrency:64 
-          (Linear_pipe.map broadcast_state ~f:State_with_witness.strip)
-          ~f:(fun x -> 
-            Pipe.write 
-              (Gossip_net.broadcast net.gossip_net) 
-              (New_state x))
-      end;
+    let create net ~broadcast_state =
+      don't_wait_for
+        (Linear_pipe.iter_unordered ~max_concurrency:64
+           (Linear_pipe.map broadcast_state ~f:State_with_witness.strip) ~f:
+           (fun x ->
+             Pipe.write (Gossip_net.broadcast net.gossip_net) (New_state x) )) ;
       ()
 
     (* TODO: Punish sources that send invalid transactions *)
-    let new_states net t = Linear_pipe.map net.new_state_reader ~f:State_with_witness.check
+    let new_states net t =
+      Linear_pipe.map net.new_state_reader ~f:State_with_witness.check
   end
 
   module Ledger_fetcher_io = struct
     type nonrec t = t
 
-    let get_ledger_at_hash t hash = 
+    let get_ledger_at_hash t hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
       let par_find_map xs ~f =
-        Deferred.create
-          (fun ivar -> 
-             don't_wait_for begin
-               let%map () = 
-                 Deferred.List.iter
-                   ~how:`Parallel
-                   xs
-                   ~f:(fun x -> 
-                     match%map f x with 
+        Deferred.create (fun ivar ->
+            don't_wait_for
+              (let%map () =
+                 Deferred.List.iter ~how:`Parallel xs ~f:(fun x ->
+                     match%map f x with
                      | Some r -> Ivar.fill_if_empty ivar (Some r)
-                     | None -> ()
-                   )
+                     | None -> () )
                in
-               Ivar.fill_if_empty ivar None
-            end
-          )
+               Ivar.fill_if_empty ivar None) )
       in
-      let%bind ledger_peer = 
-        par_find_map
-          peers
-          ~f:(fun peer -> 
+      let%bind ledger_peer =
+        par_find_map peers ~f:(fun peer ->
             match%map
-              Gossip_net.query_peer 
-                t.gossip_net 
-                peer 
-                Rpcs.Check_ledger_at_hash.dispatch_multi 
-                hash 
+              Gossip_net.query_peer t.gossip_net peer
+                Rpcs.Check_ledger_at_hash.dispatch_multi hash
             with
-            | Ok true -> Some peer 
-            | _ -> None
-          )
+            | Ok true -> Some peer
+            | _ -> None )
       in
       match ledger_peer with
       | None -> Deferred.Or_error.error_string "no ledger peer found"
-      | Some ledger_peer -> 
-        let%bind ledger_and_state =
-          Gossip_net.query_peer
-            t.gossip_net
-            ledger_peer
-            Rpcs.Get_ledger_at_hash.dispatch_multi
-            hash
-        in
-        match ledger_and_state with
-        | Ok (Some ledger_and_state) -> Deferred.Or_error.return ledger_and_state
-        | Ok None -> Deferred.Or_error.error_string "no ledger found"
-        | Error s -> Deferred.Or_error.error_string (Error.to_string_mach s)
+      | Some ledger_peer ->
+          let%bind ledger_and_state =
+            Gossip_net.query_peer t.gossip_net ledger_peer
+              Rpcs.Get_ledger_at_hash.dispatch_multi hash
+          in
+          match ledger_and_state with
+          | Ok (Some ledger_and_state) ->
+              Deferred.Or_error.return ledger_and_state
+          | Ok None -> Deferred.Or_error.error_string "no ledger found"
+          | Error s -> Deferred.Or_error.error_string (Error.to_string_mach s)
   end
 end
-

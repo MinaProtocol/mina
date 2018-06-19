@@ -2,16 +2,25 @@ module type S = sig
   type t
 
   val of_int : int -> t
+
   val one : t
+
   val zero : t
 
   val add : t -> t -> t
+
   val sub : t -> t -> t
+
   val mul : t -> t -> t
+
   val inv : t -> t
+
   val square : t -> t
+
   val sqrt : t -> t
+
   val is_square : t -> bool
+
   val equal : t -> t -> bool
 
   val size_in_bits : int
@@ -19,6 +28,7 @@ module type S = sig
   val print : t -> unit
 
   val random : unit -> t
+
   module Vector : Vector.S with type elt = t
 end
 
@@ -26,14 +36,18 @@ module type Extended = sig
   open Core_kernel
 
   include S
+
   include Sexpable.S with type t := t
 
   val negate : t -> t
 
   module Infix : sig
-    val (+) : t -> t -> t
+    val ( + ) : t -> t -> t
+
     val ( * ) : t -> t -> t
-    val (-) : t -> t -> t
-    val (/) : t -> t -> t
+
+    val ( - ) : t -> t -> t
+
+    val ( / ) : t -> t -> t
   end
 end

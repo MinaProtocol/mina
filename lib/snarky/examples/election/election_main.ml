@@ -28,7 +28,6 @@ open Impl
    In plain English, the government will prove "I know votes corresponding to the commitments $h_i$
    such that taking the majority of those votes results in winner $w$".
 *)
-
 (* This is an example usage of the above "election proof system".
    To see how this is actually implemented using Snarky, check out election.ml.
 *)
@@ -36,12 +35,8 @@ let () =
   (* Mock data *)
   let received_ballots =
     Array.init number_of_voters ~f:(fun _ ->
-      (Ballot.Opened.create
-        (if Random.bool () then Pepperoni else Mushroom)))
+        Ballot.Opened.create (if Random.bool () then Pepperoni else Mushroom)
+    )
   in
-  let (commitments, winner, proof) = tally_and_prove received_ballots in
-  assert
-    (verify proof (Keypair.vk keypair) (exposed ())
-       commitments winner)
-;;
-
+  let commitments, winner, proof = tally_and_prove received_ballots in
+  assert (verify proof (Keypair.vk keypair) (exposed ()) commitments winner)

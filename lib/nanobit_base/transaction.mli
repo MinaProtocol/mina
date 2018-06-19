@@ -38,11 +38,17 @@ module Payload : sig
     end
   end
 
-  type var = (Public_key.Compressed.var, Currency.Amount.var, Currency.Fee.var, Account.Nonce.Unpacked.var) t_
+  type var =
+    ( Public_key.Compressed.var
+    , Currency.Amount.var
+    , Currency.Fee.var
+    , Account.Nonce.Unpacked.var )
+    t_
 
   val typ : (var, t) Typ.t
 
   val to_bits : t -> bool list
+
   val var_to_bits : var -> (Boolean.var list, _) Checked.t
 end
 
@@ -73,6 +79,7 @@ module Stable : sig
 end
 
 type var = (Payload.var, Public_key.var, Signature.var) t_
+
 val typ : (var, t) Typ.t
 
 (* Generate a single transaction between
@@ -80,7 +87,12 @@ val typ : (var, t) Typ.t
  * for fee $\in [0,max_fee]$
  * and an amount $\in [1,max_amount]$
  *)
-val gen : keys:Signature_keypair.t array -> max_amount:int -> max_fee:int -> t Quickcheck.Generator.t
+
+val gen :
+     keys:Signature_keypair.t array
+  -> max_amount:int
+  -> max_fee:int
+  -> t Quickcheck.Generator.t
 
 module With_valid_signature : sig
   type nonrec t = private t

@@ -2,12 +2,11 @@ open Nanobit_base
 open Blockchain_snark
 
 module Update : sig
-  type t =
-    | New_chain of Blockchain.t
+  type t = New_chain of Blockchain.t
 end
 
-val accumulate
-  :  init:Blockchain.t
+val accumulate :
+     init:Blockchain.t
   -> parent_log:Logger.t
   -> prover:Prover.t
   -> updates:Update.t Linear_pipe.Reader.t

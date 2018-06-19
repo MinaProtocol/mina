@@ -14,9 +14,9 @@ val bit_length : int
 module Bits : Bits_intf.S with type t := t
 
 include Tick.Snarkable.Bits.Faithful
-  with type Unpacked.value = t
-   and type Packed.value = t
-   and type Packed.var = private Tick.Cvar.t
+        with type Unpacked.value = t
+         and type Packed.value = t
+         and type Packed.var = private Tick.Field.Checked.t
 
 module Span : sig
   type t [@@deriving sexp]
@@ -30,25 +30,29 @@ module Span : sig
   val of_time_span : Time.Span.t -> t
 
   include Tick.Snarkable.Bits.Faithful
-    with type Unpacked.value = t
-    and type Packed.value = t
+          with type Unpacked.value = t
+           and type Packed.value = t
 
   val to_ms : t -> Int64.t
 
   val ( < ) : t -> t -> bool
+
   val ( > ) : t -> t -> bool
+
   val ( = ) : t -> t -> bool
+
   val ( <= ) : t -> t -> bool
+
   val ( >= ) : t -> t -> bool
 end
 
-val field_var_to_unpacked : Tick.Cvar.t -> (Unpacked.var, _) Tick.Checked.t
+val field_var_to_unpacked :
+  Tick.Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t
 
-val diff_checked
-  : Unpacked.var -> Unpacked.var -> (Span.Unpacked.var, _) Tick.Checked.t
+val diff_checked :
+  Unpacked.var -> Unpacked.var -> (Span.Unpacked.var, _) Tick.Checked.t
 
-val unpacked_to_number 
-  : Span.Unpacked.var -> Tick.Number.t
+val unpacked_to_number : Span.Unpacked.var -> Tick.Number.t
 
 val diff : t -> t -> Span.t
 
@@ -57,4 +61,3 @@ val of_time : Time.t -> t
 val to_time : t -> Time.t
 
 val now : unit -> t
-
