@@ -84,8 +84,8 @@ let get_nonce addr port =
     dispatch Client_lib.Get_nonce.rpc (Public_key.compress addr) port
   with
   | Ok (Some n) -> Ok n
-  | Ok None     -> Error "No account found at that public_key"
-  | Error e     -> Error (Error.to_string_hum e)
+  | Ok None -> Error "No account found at that public_key"
+  | Error e -> Error (Error.to_string_hum e)
 
 let send_txn =
   Command.async ~summary:"Send transaction to an address"
