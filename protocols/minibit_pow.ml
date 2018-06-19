@@ -76,10 +76,12 @@ module type Nonce_intf = sig
 end
 
 module type Transaction_intf = sig
-  type t [@@deriving sexp, compare, eq]
+  type t [@@deriving sexp, eq]
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, compare, eq]
+    type nonrec t = private t [@@deriving sexp, eq]
+
+    val compare : seed:string -> t -> t -> int
   end
 
   val check : t -> With_valid_signature.t option
