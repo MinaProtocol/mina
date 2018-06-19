@@ -29,7 +29,7 @@ module Payload : sig
         ( Public_key.Compressed.Stable.V1.t
         , Currency.Amount.Stable.V1.t
         , Currency.Fee.Stable.V1.t
-        , Account.Nonce.t)
+        , Account.Nonce.t )
         t_
       [@@deriving bin_io, eq, sexp, hash]
     end
@@ -91,6 +91,7 @@ module With_valid_signature : sig
   type nonrec t = private t [@@deriving sexp, eq, bin_io]
 
   val compare : seed:string -> t -> t -> int
+
   val gen :
        keys:Signature_keypair.t array
     -> max_amount:int
