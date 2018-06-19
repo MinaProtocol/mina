@@ -1,21 +1,31 @@
 open Core
 open Unsigned
 
-module ImmutableArray : sig
-  type 'a t
-  val wrap : 'a array -> 'a t
-  val get : 'a t -> int -> 'a
-end = struct
-  type 'a t = 'a array
-  let wrap arr = arr
-  let get arr i = arr.(i)
+module Direction = struct
+  type t = Left | Right
+
+  let of_bool = function
+    | false -> Left
+    | true  -> Right
+  let to_bool = function
+    | Left  -> false
+    | Right -> true
+
+  let flip = function
+    | Left  -> Right
+    | Right -> Left
+
+  let gen =
+    let open Quickcheck.Let_syntax in
+    Quickcheck.Generator.bool >>| of_bool
 end
 
 module type Account_intf = sig
   type t [@@deriving bin_io, eq]
 
   val empty : t
-  val is_empty : t -> bool
+  val balance : t -> UInt64.t
+  val set_balance : t -> UInt64.t -> t
   val public_key : t -> string
 
   val gen : t Quickcheck.Generator.t
@@ -39,9 +49,9 @@ module type Key_value_database_intf = sig
 
   val create : directory:string -> t
   val destroy : t -> unit
-  val get : t -> Bigstring.t -> Bigstring.t option
-  val set : t -> Bigstring.t -> Bigstring.t -> unit
-  val delete : t -> Bigstring.t -> unit
+  val get : t -> key:Bigstring.t -> Bigstring.t option
+  val set : t -> key:Bigstring.t -> data:Bigstring.t -> unit
+  val delete : t -> key:Bigstring.t -> unit
 end
 
 module type Stack_database_intf = sig
@@ -56,42 +66,65 @@ end
 module type S = sig
   type account
   type hash
-
   type key
   type t
 
-  exception Database_keys_exhausted
-  exception Key_not_found of key
+  type error =
+    | Account_key_not_found
+    | Out_of_leaves
+    | Malformed_database
+
+  module MerklePath : sig
+    type t = Direction.t * hash
+    val implied_root : t list -> hash -> hash
+  end
 
   val create : key_value_db_dir:string -> stack_db_file:string -> t
   val destroy : t -> unit
 
-  val get_key_of_account : t -> account -> key option
+  val get_key_of_account : t -> account -> (key, error) Result.t
 
   val get_account : t -> key -> account option
-  val set_account : t -> account -> unit
+  val set_account : t -> account -> (unit, error) Result.t
 
   val merkle_root : t -> hash
-  val merkle_path : t -> key -> hash list
+  val merkle_path : t -> key -> MerklePath.t list
 end
 
 module Make
   (Account : Account_intf)
-  (Hash : Hash_intf with type account = Account.t)
+  (Hash : Hash_intf with type account := Account.t)
   (Depth : Depth_intf)
-  (KVDB : Key_value_database_intf)
-  (SDB : Stack_database_intf)
-  : S with type account = Account.t 
-       and type hash = Hash.t
+  (Kvdb : Key_value_database_intf)
+  (Sdb : Stack_database_intf)
+  : S with type account := Account.t 
+       and type hash := Hash.t
   = struct
-
-  exception Database_keys_exhausted
-  type account = Account.t
-  type hash = Hash.t
 
   (* The depth of a merkle tree can never be greater than 253. *)
   let max_depth = Depth.depth
   let () = assert (max_depth < 0xfe)
+
+  type error =
+    | Account_key_not_found
+    | Out_of_leaves
+    | Malformed_database
+  exception Error_exception of error
+  let exn_of_error err = Error_exception err
+
+  module MerklePath = struct
+    type t = Direction.t * Hash.t
+
+    let implied_root path leaf_hash =
+      let rec loop sibling_hash = function
+        | []                           -> sibling_hash
+        | (Direction.Left, hash) :: t  ->
+            loop (Hash.merge (hash, sibling_hash)) t
+        | (Direction.Right, hash) :: t ->
+            loop (Hash.merge (sibling_hash, hash)) t
+      in
+      loop leaf_hash path
+  end
 
   (* Keys are a bitstring prefixed by a byte. In the case of accounts, the prefix
    * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
@@ -102,32 +135,10 @@ module Make
    * any bitstring.
    *)
   module Key = struct
-    exception Invalid_binary_key
-    exception Out_of_paths
-
     let byte_count_of_bits n = n / 8 + min 1 (n % 8)
     let path_byte_count = byte_count_of_bits Depth.depth
 
     module Path = struct
-      module Direction = struct
-        type t = Left | Right
-
-        let of_bool = function
-          | false -> Left
-          | true  -> Right
-        let to_bool = function
-          | Left  -> false
-          | Right -> true
-
-        let flip = function
-          | Left  -> Right
-          | Right -> Left
-
-        let gen =
-          let open Quickcheck.Let_syntax in
-          let%map bool = Quickcheck.Generator.bool in
-          of_bool bool
-      end
 
       open Bitstring
       type nonrec t = t
@@ -178,13 +189,13 @@ module Make
         flip path last_bit_index;
         path
 
-      let next (path : t) : t = 
+      let next (path : t) : (t, unit) Result.t = 
         let path = copy path in
         let len = length path in
 
         let rec find_first_clear_bit i =
-          if i < 0 then raise Out_of_paths else
-            if is_clear path i then i else 
+          if i < 0 then Result.fail () else
+            if is_clear path i then Result.Ok i else 
               find_first_clear_bit (i - 1)
         in
         let rec clear_bits i =
@@ -193,10 +204,10 @@ module Make
             clear_bits (i + 1))
         in
 
-        let first_clear_index = find_first_clear_bit (len - 1) in
-        set path first_clear_index;
-        clear_bits (first_clear_index + 1);
-        path
+        Result.map (find_first_clear_bit (len - 1)) ~f:(fun first_clear_index ->
+          set path first_clear_index;
+          clear_bits (first_clear_index + 1);
+          path)
 
       let serialize (path : t) : Bigstring.t =
         let path_bstr = Bigstring.of_string (Bitstring.string_of_bitstring path) in
@@ -238,27 +249,27 @@ module Make
     let root_hash : t = Hash (Bitstring.create_bitstring 0)
     let build_generic (data : Bigstring.t) : t = Generic data
     let build_empty_account () : t = Account (Bitstring.create_bitstring max_depth)
-    let build_account (path : Path.Direction.t list) : t =
+    let build_account (path : Direction.t list) : t =
       assert (List.length path = max_depth);
       Account (Path.build path)
-    let build_hash (path : Path.Direction.t list) : t =
+    let build_hash (path : Direction.t list) : t =
       assert (List.length path <= max_depth);
       Hash (Path.build path)
 
-    let parse (str : Bigstring.t) : t =
+    let parse (str : Bigstring.t) : (t, unit) Result.t =
       let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
       let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
       if prefix = Prefix.generic then
-        Generic data
+        Result.return (Generic data)
       else
         let path = Bitstring.bitstring_of_string (Bigstring.to_string data) in
         let slice_path = Bitstring.subbitstring path 0 in
         if prefix = Prefix.account then
-          Account (slice_path max_depth)
+          Result.return (Account (slice_path max_depth))
         else if UInt8.to_int prefix <= max_depth then
-          Hash (slice_path (max_depth - UInt8.to_int prefix))
+          Result.return (Hash (slice_path (max_depth - UInt8.to_int prefix)))
         else
-          raise Invalid_binary_key
+          Result.fail ()
 
     let prefix_bigstring prefix src =
       let src_len = Bigstring.length src in
@@ -293,16 +304,16 @@ module Make
       | Account _ -> raise (Invalid_argument "parent: account keys have no parent")
       | Hash path -> assert (Path.length path > 0); Hash (Path.parent path)
 
-    let child (key : t) (dir : Path.Direction.t) : t =
+    let child (key : t) (dir : Direction.t) : t =
       match key with
         | Generic _ -> raise (Invalid_argument "child: generic keys have no child")
         | Account _ -> raise (Invalid_argument "child: account keys have no child")
         | Hash path -> assert (Path.length path < max_depth); Hash (Path.child path dir)
 
-    let next : t -> t = function
+    let next : t -> (t, unit) Result.t = function
       | Generic _    -> raise (Invalid_argument "next: generic keys have no next key")
-      | Account path -> Account (Path.next path)
-      | Hash path    -> Hash (Path.next path)
+      | Account path -> Path.next path |> Result.map ~f:(fun next -> Account next)
+      | Hash path    -> Path.next path |> Result.map ~f:(fun next -> Hash next)
 
     let sibling : t -> t = function
       | Generic _    -> raise (Invalid_argument "sibling: generic keys have no sibling")
@@ -316,23 +327,21 @@ module Make
 
     let gen_account =
       let open Quickcheck.Let_syntax in
-      let%map dirs = Quickcheck.Generator.list_with_length Depth.depth Path.Direction.gen in
+      let%map dirs = Quickcheck.Generator.list_with_length Depth.depth Direction.gen in
       build_account dirs
   end
 
   type key = Key.t [@@deriving show]
-  type t = { kvdb: KVDB.t; sdb: SDB.t }
-
-  exception Key_not_found of key
+  type t = { kvdb: Kvdb.t; sdb: Sdb.t }
 
   let create ~key_value_db_dir ~stack_db_file =
-    let kvdb = KVDB.create key_value_db_dir in
-    let sdb = SDB.create stack_db_file in
+    let kvdb = Kvdb.create key_value_db_dir in
+    let sdb = Sdb.create stack_db_file in
     { kvdb; sdb }
 
   let destroy { kvdb; sdb } =
-    KVDB.destroy kvdb;
-    SDB.destroy sdb
+    Kvdb.destroy kvdb;
+    Sdb.destroy sdb
 
   let empty_hashes =
     let empty_hashes = Array.create max_depth Hash.empty in
@@ -343,9 +352,9 @@ module Make
         loop hash (i + 1)))
     in
     loop Hash.empty 1;
-    ImmutableArray.wrap empty_hashes
+    Immutable_array.wrap empty_hashes
 
-  let get_raw { kvdb; _ } key = KVDB.get kvdb (Key.serialize key)
+  let get_raw { kvdb; _ } key = Kvdb.get kvdb (Key.serialize key)
   let get_bin mdb key bin_read = get_raw mdb key |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
   let get_generic mdb key = assert (Key.is_generic key); get_raw mdb key
   let get_account mdb key = assert (Key.is_account key); get_bin mdb key Account.bin_read_t
@@ -353,16 +362,16 @@ module Make
     assert (Key.is_hash key);
     match get_bin mdb key Hash.bin_read_t with
       | Some hash -> hash
-      | None      -> ImmutableArray.get empty_hashes (Key.depth key)
+      | None      -> Immutable_array.get empty_hashes (Key.depth key)
 
-  let set_raw { kvdb; _ } key bin = KVDB.set kvdb (Key.serialize key) bin
+  let set_raw { kvdb; _ } key bin = Kvdb.set kvdb (Key.serialize key) bin
   let set_bin mdb key bin_size bin_write v =
     let size = bin_size v in
     let buf = Bigstring.create size in
     ignore (bin_write buf ~pos:0 v);
     set_raw mdb key buf
 
-  let delete_raw { kvdb; _ } key = KVDB.delete kvdb (Key.serialize key)
+  let delete_raw { kvdb; _ } key = Kvdb.delete kvdb (Key.serialize key)
 
   let rec set_hash mdb key new_hash =
     assert (Key.is_hash key);
@@ -374,52 +383,71 @@ module Make
       let parent_hash = Hash.merge (Key.order_siblings key new_hash sibling_hash) in
       set_hash mdb (Key.parent key) parent_hash)
 
-  let build_key_of_account_key account =
-    Key.build_generic (Bigstring.of_string ("$" ^ Account.public_key account))
-  let get_key_of_account mdb account =
-    get_generic mdb (build_key_of_account_key account)
-      |> Option.map ~f:Key.parse
-  let set_key_of_account mdb account key =
-    set_raw mdb (build_key_of_account_key account) key
-  let delete_key_of_account mdb account =
-    delete_raw mdb (build_key_of_account_key account)
+  module Account_key = struct
+    let build_key account =
+      Key.build_generic (Bigstring.of_string ("$" ^ Account.public_key account))
 
-  let get_next_free_account_key mdb =
-    let key = Key.build_generic (Bigstring.of_string "next_free_account_key") in
-    let account_key = match get_generic mdb key with
-      | None     -> Key.build_empty_account ()
-      | Some key -> Key.parse key
-    in
-    let next_account_key = Key.next account_key in
-    set_raw mdb key (Key.serialize next_account_key);
-    account_key
-  let allocate_account_key mdb account =
-    let key = match SDB.pop mdb.sdb with
-      | None     -> get_next_free_account_key mdb
-      | Some key -> Key.parse key
-    in
-    set_key_of_account mdb account (Key.serialize key);
-    key
+    let get mdb account =
+      match get_generic mdb (build_key account) with
+        | None         -> Error Account_key_not_found
+        | Some key_bin -> Key.parse key_bin |> Result.map_error ~f:(fun () -> Malformed_database)
+
+    let set mdb account key =
+      set_raw mdb (build_key account) key
+
+    let delete mdb account =
+      delete_raw mdb (build_key account)
+
+    let next_free_key mdb =
+      let key = Key.build_generic (Bigstring.of_string "next_free_account_key") in
+      let account_key_result = match get_generic mdb key with
+        | None     -> Result.return (Key.build_empty_account ())
+        | Some key -> Key.parse key
+      in
+      match account_key_result with
+        | Error ()       -> Error Malformed_database
+        | Ok account_key ->
+            Key.next account_key
+              |> Result.map_error ~f:(fun () -> Out_of_leaves)
+              |> Result.map ~f:(fun next_account_key ->
+                  set_raw mdb key (Key.serialize next_account_key);
+                  account_key)
+
+    let allocate mdb account =
+      let key_result = match Sdb.pop mdb.sdb with
+        | None     -> next_free_key mdb
+        | Some key -> Key.parse key |> Result.map_error ~f:(fun () -> Malformed_database)
+      in
+      Result.map key_result ~f:(fun key ->
+        set mdb account (Key.serialize key);
+        key)
+  end
+
+  let get_key_of_account = Account_key.get
 
   let update_account mdb key account =
     set_bin mdb key Account.bin_size_t Account.bin_write_t account;
     set_hash mdb (Key.Hash (Key.path key)) (Hash.hash_account account)
   let delete_account mdb account =
-    match get_key_of_account mdb account with
-      | None     -> ()
-      | Some key ->
-          update_account mdb key Account.empty;
-          delete_key_of_account mdb account;
-          SDB.push mdb.sdb (Key.serialize key)
+    match Account_key.get mdb account with
+      | Error Account_key_not_found -> Ok ()
+      | Error err                   -> Error err
+      | Ok key                      ->
+          Kvdb.delete mdb.kvdb (Key.serialize key);
+          set_hash mdb (Key.Hash (Key.path key)) Hash.empty;
+          Account_key.delete mdb account;
+          Sdb.push mdb.sdb (Key.serialize key);
+          Ok ()
   let set_account mdb account =
-    if Account.is_empty account then
+    if Account.balance account = UInt64.zero then
       delete_account mdb account
-    else (
-      let key = match get_key_of_account mdb account with
-        | Some key -> key
-        | None     -> allocate_account_key mdb account
+    else
+      let key_result = match Account_key.get mdb account with
+        | Error Account_key_not_found -> Account_key.allocate mdb account
+        | Error err                   -> Error err
+        | Ok key                      -> Ok key
       in
-      update_account mdb key account)
+      Result.map key_result ~f:(fun key -> update_account mdb key account)
 
   let merkle_root mdb = get_hash mdb Key.root_hash
 
@@ -427,7 +455,9 @@ module Make
     let key = if Key.is_account key then Key.Hash (Key.path key) else key in
     assert (Key.is_hash key);
     let rec loop k =
-      get_hash mdb (Key.sibling k) ::
+      let sibling = Key.sibling k in
+      let sibling_dir = Key.Path.last_direction (Key.path k) in
+      (sibling_dir, get_hash mdb sibling) ::
         if Key.depth key < max_depth then loop (Key.parent k) else []
     in
     loop key
@@ -454,65 +484,94 @@ module Make
       cleanup ();
       raise exn
 
-  let%test "getting a non existing account returns None" =
+  let%test_unit "getting a non existing account returns None" =
     with_test_instance (fun mdb ->
-      let key = Quickcheck.random_value Key.gen_account in
-      get_account mdb key = None)
+      Quickcheck.test Key.gen_account ~f:(fun key ->
+        assert (get_account mdb key = None)))
 
   let%test "add and retrieve an account" =
     with_test_instance (fun mdb ->
       let account = Quickcheck.random_value Account.gen in
-      set_account mdb account;
-      let key = Option.value_exn (get_key_of_account mdb account) in
+      assert (set_account mdb account = Ok ());
+      let key = Account_key.get mdb account |> Result.map_error ~f:exn_of_error |> Result.ok_exn in
       Account.equal (Option.value_exn (get_account mdb key)) account)
 
   let%test "accounts are atomic" =
     with_test_instance (fun mdb ->
       let account = Quickcheck.random_value Account.gen in
-      set_account mdb account;
-      let key = Option.value_exn (get_key_of_account mdb account) in
-      set_account mdb account;
-      let key' = Option.value_exn (get_key_of_account mdb account) in
+      assert (set_account mdb account = Ok ());
+      let key = Account_key.get mdb account |> Result.map_error ~f:exn_of_error |> Result.ok_exn in
+      assert (set_account mdb account = Ok ());
+      let key' =Account_key.get mdb account |> Result.map_error ~f:exn_of_error |> Result.ok_exn in
       key = key' && get_account mdb key = get_account mdb key')
+
+  let%test "accounts can be deleted" =
+    with_test_instance (fun mdb ->
+      let account = Quickcheck.random_value Account.gen in
+      assert (set_account mdb account = Ok ());
+      let key = Account_key.get mdb account |> Result.map_error ~f:exn_of_error |> Result.ok_exn in
+      assert (Option.is_some (get_account mdb key));
+      let account = Account.set_balance account UInt64.zero in
+      assert (set_account mdb account = Ok ());
+      get_account mdb key = None)
+
+  let%test "deleted account keys are reassigned" =
+    with_test_instance (fun mdb ->
+      let account = Quickcheck.random_value Account.gen in
+      let account' = Quickcheck.random_value Account.gen in
+
+      assert (set_account mdb account = Ok ());
+      let key = Account_key.get mdb account |> Result.map_error ~f:exn_of_error |> Result.ok_exn in
+      let account = Account.set_balance account UInt64.zero in
+      assert (set_account mdb account = Ok ());
+      assert (set_account mdb account' = Ok ());
+      get_account mdb key = Some account')
 end
 
 let%test_module "test functor on in memory databases" = (module struct
   module Account : Account_intf = struct
-    type t = { public_key: string; balance: int }
+    module UInt64 = struct
+      include UInt64
+      include Binable.Of_stringable(UInt64)
+      let equal x y = UInt64.compare x y = 0
+    end
+
+    type t = { public_key: string; balance: UInt64.t }
     [@@deriving bin_io, eq]
 
-    let empty = { public_key = ""; balance = 0 }
-    let is_empty { balance; _ } = balance = 0
+    let empty = { public_key = ""; balance = UInt64.zero }
+    let balance { balance; _ } = balance 
+    let set_balance { public_key; _ } balance = { public_key; balance }
     let public_key { public_key; _ } = public_key
 
     let gen =
       let open Quickcheck.Let_syntax in
       let%bind public_key = String.gen in
-      let%map balance = Int.gen in
+      let%map int_balance = Int.gen in
+      let nat_balance = abs int_balance in
+      let balance = UInt64.of_int nat_balance in
       { public_key; balance }
-
   end
 
-  module Hash : Hash_intf with type account = Account.t = struct
+  module Hash : Hash_intf with type account := Account.t = struct
     type t = int [@@deriving bin_io, eq]
-    type account = Account.t
 
     let empty = 0
     let merge : t * t -> t = Hashtbl.hash
-    let hash_account : account -> t = Hashtbl.hash
+    let hash_account : Account.t -> t = Hashtbl.hash
   end
 
-  module In_memory_KVDB : Key_value_database_intf = struct
+  module In_memory_kvdb : Key_value_database_intf = struct
     type t = (string, Bigstring.t) Hashtbl.t
 
     let create ~directory = Hashtbl.create (module String)
     let destroy _ = ()
-    let get tbl key = Hashtbl.find tbl (Bigstring.to_string key)
-    let set tbl key data = Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
-    let delete tbl key = Hashtbl.remove tbl (Bigstring.to_string key)
+    let get tbl ~key = Hashtbl.find tbl (Bigstring.to_string key)
+    let set tbl ~key ~data = Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
+    let delete tbl ~key = Hashtbl.remove tbl (Bigstring.to_string key)
   end
 
-  module In_memory_SDB : Stack_database_intf = struct
+  module In_memory_sdb : Stack_database_intf = struct
     type t = Bigstring.t list ref
 
     let create ~filename = ref []
@@ -524,9 +583,7 @@ let%test_module "test functor on in memory databases" = (module struct
         | h :: t -> ls := t; Some h
   end
 
-  module MDB_D(D : Depth_intf) = Make(Account)(Hash)(D)(In_memory_KVDB)(In_memory_SDB)
+  module MDB_D(D : Depth_intf) = Make(Account)(Hash)(D)(In_memory_kvdb)(In_memory_sdb)
   module MDB_D4 = MDB_D(struct let depth = 4 end)
   module MDB_D30 = MDB_D(struct let depth = 30 end)
 end)
-
-(* TODO: test on real databases? *)

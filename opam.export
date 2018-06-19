@@ -48,8 +48,6 @@ jbuilder	1.0+beta20	installed
 jsonm	1.0.1	installed
 lambda-term	1.12.0	installed
 logs	0.6.2	installed
-lwt	3.2.1	installed
-lwt_react	1.1.0	installed
 magic-mime	1.1.0	installed
 menhir	20180530	root
 merlin	3.0.5	root
@@ -103,7 +101,6 @@ ppx_variants_conv	v0.11.0	installed
 ppxlib	0.2.1	installed
 protocol_version_header	v0.11.0	installed
 re	1.7.3	installed
-react	1.2.1	installed
 result	1.3	installed
 rpc_parallel	v0.11.0	root
 sexplib	v0.11.0	installed
@@ -117,10 +114,8 @@ travis-opam	1.2.0	root
 typerep	v0.11.0	installed
 uchar	0.0.2	installed
 uri	1.9.6	installed
-utop	2.0.2	root
+utop	2.0.2	installed
 uutf	1.0.1	installed
 variantslib	v0.11.0	installed
 yojson	1.4.1	installed
 zarith	1.7	installed
-zed	1.6	installed
-snarky	--	uninstalled		path	/home/nathan/o1-labs/snarky
