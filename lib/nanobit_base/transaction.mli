@@ -92,6 +92,8 @@ module With_valid_signature : sig
 
   val compare : seed:string -> t -> t -> int
 
+  val compare : seed:string -> t -> t -> int
+
   val gen :
        keys:Signature_keypair.t array
     -> max_amount:int

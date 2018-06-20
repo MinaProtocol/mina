@@ -143,6 +143,8 @@ module With_valid_signature = struct
 
   let compare = Stable.V1.compare
 
+  let compare = Stable.V1.compare
+
   let gen = gen
 end
 
