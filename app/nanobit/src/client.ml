@@ -98,24 +98,30 @@ let send_txn =
         ~doc:"Private-key address from which you would like to send money"
         (required private_key)
     and fee =
-      flag "fee" ~doc:"Transaction fee you're willing to pay"
-        (required txn_fee)
+      flag "fee" ~doc:"Transaction fee you're willing to pay (default: 1)"
+        (optional txn_fee)
     and amount =
       flag "amount" ~doc:"Transaction amount you want to send"
         (required txn_amount)
     and port =
-      flag "daemon-port" ~doc:"Port of the deamon's client-rpc handlers"
-        (required int16)
+      flag "daemon-port"
+        ~doc:
+          (Printf.sprintf
+             "Port of the deamon's client-rpc handlers (default: %d)"
+             default_daemon_port)
+        (optional int16)
     in
     fun () ->
       let open Deferred.Let_syntax in
       let receiver_compressed = Public_key.compress address in
       let sender_kp = Signature_keypair.of_private_key from_account in
+      let port = Option.value ~default:default_daemon_port port in
       match%bind get_nonce sender_kp.public_key port with
       | Error e ->
           printf "Failed to get nonce %s\n" e ;
           return ()
       | Ok nonce ->
+          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
           let payload : Transaction.Payload.t =
             {receiver= receiver_compressed; amount; fee; nonce}
           in
