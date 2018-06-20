@@ -12,7 +12,10 @@ let daemon =
        flag "config-directory" ~doc:"Configuration directory" (optional file)
      and should_mine = flag "mine" ~doc:"Run the miner" (optional bool)
      and port =
-       flag "port" ~doc:"Server port for other to connect (default: 8302)"
+       flag "port"
+         ~doc:
+           (Printf.sprintf "Server port for other to connect (default: %d)"
+              default_daemon_port)
          (optional int16)
      and client_port =
        flag "client-port"

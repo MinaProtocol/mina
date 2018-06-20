@@ -92,7 +92,10 @@ let send_txn =
         (required txn_nonce)
     and port =
       flag "daemon-port"
-        ~doc:"Port of the deamon's client-rpc handlers (default: 8302)"
+        ~doc:
+          (Printf.sprintf
+             "Port of the deamon's client-rpc handlers (default: %d)"
+             default_daemon_port)
         (optional int16)
     in
     fun () ->
