@@ -13,14 +13,22 @@ module Direction = struct
   let gen = Quickcheck.Let_syntax.(Quickcheck.Generator.bool >>| of_bool)
 end
 
+module type Balance_intf = sig
+  type t [@@deriving eq]
+
+  val zero : t
+end
+
 module type Account_intf = sig
   type t [@@deriving bin_io, eq]
 
+  type balance
+
   val empty : t
 
-  val balance : t -> UInt64.t
+  val balance : t -> balance
 
-  val set_balance : t -> UInt64.t -> t
+  val set_balance : t -> balance -> t
 
   val public_key : t -> string
 
@@ -102,7 +110,8 @@ module type S = sig
 end
 
 module Make
-    (Account : Account_intf)
+    (Balance : Balance_intf)
+    (Account : Account_intf with type balance := Balance.t)
     (Hash : Hash_intf with type account := Account.t)
     (Depth : Depth_intf)
     (Kvdb : Key_value_database_intf)
@@ -499,7 +508,8 @@ struct
         Ok ()
 
   let set_account mdb account =
-    if Account.balance account = UInt64.zero then delete_account mdb account
+    if Balance.equal (Account.balance account) Balance.zero then
+      delete_account mdb account
     else
       let key_result =
         match Account_key.get mdb account with
@@ -582,7 +592,7 @@ struct
           |> Result.ok_exn
         in
         assert (Option.is_some (get_account mdb key)) ;
-        let account = Account.set_balance account UInt64.zero in
+        let account = Account.set_balance account Balance.zero in
         assert (set_account mdb account = Ok ()) ;
         get_account mdb key = None )
 
@@ -596,7 +606,7 @@ struct
           |> Result.map_error ~f:exn_of_error
           |> Result.ok_exn
         in
-        let account = Account.set_balance account UInt64.zero in
+        let account = Account.set_balance account Balance.zero in
         assert (set_account mdb account = Ok ()) ;
         assert (set_account mdb account' = Ok ()) ;
         get_account mdb key = Some account' )
@@ -604,14 +614,14 @@ end
 
 let%test_module "test functor on in memory databases" =
   ( module struct
-    module Account : Account_intf = struct
-      module UInt64 = struct
-        include UInt64
-        include Binable.Of_stringable (UInt64)
+    module UInt64 = struct
+      include UInt64
+      include Binable.Of_stringable (UInt64)
 
-        let equal x y = UInt64.compare x y = 0
-      end
+      let equal x y = UInt64.compare x y = 0
+    end
 
+    module Account : Account_intf with type balance := UInt64.t = struct
       type t = {public_key: string; balance: UInt64.t} [@@deriving bin_io, eq]
 
       let empty = {public_key= ""; balance= UInt64.zero}
@@ -674,7 +684,7 @@ let%test_module "test functor on in memory databases" =
     end
 
     module MDB_D (D : Depth_intf) =
-      Make (Account) (Hash) (D) (In_memory_kvdb) (In_memory_sdb)
+      Make (UInt64) (Account) (Hash) (D) (In_memory_kvdb) (In_memory_sdb)
 
     module MDB_D4 = MDB_D (struct
       let depth = 4
