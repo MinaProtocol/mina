@@ -19,7 +19,7 @@ bitstring	3.0.0	root
 camomile	0.8.7	installed
 cmdliner	1.0.2	root
 cohttp	1.1.0	root
-cohttp-async	1.0.2	root
+cohttp-async	1.0.2	installed
 conduit	1.1.0	installed
 conduit-async	1.1.0	installed
 conf-gmp	1	installed
@@ -46,7 +46,6 @@ ipaddr	2.8.0	installed
 jane-street-headers	v0.11.0	installed
 jbuilder	1.0+beta20	installed
 jsonm	1.0.1	installed
-lambda-term	1.12.0	installed
 logs	0.6.2	installed
 magic-mime	1.1.0	installed
 menhir	20180530	root
@@ -61,7 +60,7 @@ ocamlformat_support	0.4	installed
 ocp-build	1.99.20-beta	installed
 ocp-indent	1.6.1	root
 octavius	1.2.0	installed
-orocksdb	0.3.0	installed
+orocksdb	0.3.0	root
 parsexp	v0.11.0	installed
 ppx_assert	v0.11.0	installed
 ppx_ast	v0.11.0	installed
@@ -114,7 +113,6 @@ travis-opam	1.2.0	root
 typerep	v0.11.0	installed
 uchar	0.0.2	installed
 uri	1.9.6	installed
-utop	2.0.2	installed
 uutf	1.0.1	installed
 variantslib	v0.11.0	installed
 yojson	1.4.1	installed
