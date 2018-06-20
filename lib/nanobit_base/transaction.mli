@@ -93,7 +93,12 @@ module With_valid_signature : sig
   val compare : seed:string -> t -> t -> int
 
   val compare : seed:string -> t -> t -> int
-  val gen : keys:Signature_keypair.t array -> max_amount:int -> max_fee:int -> t Quickcheck.Generator.t
+
+  val gen :
+       keys:Signature_keypair.t array
+    -> max_amount:int
+    -> max_fee:int
+    -> t Quickcheck.Generator.t
 end
 
 val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
