@@ -115,13 +115,13 @@ let send_txn =
       let open Deferred.Let_syntax in
       let receiver_compressed = Public_key.compress address in
       let sender_kp = Signature_keypair.of_private_key from_account in
+      let port = Option.value ~default:default_daemon_port port in
       match%bind get_nonce sender_kp.public_key port with
       | Error e ->
           printf "Failed to get nonce %s\n" e ;
           return ()
       | Ok nonce ->
           let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-          let port = Option.value ~default:default_daemon_port port in
           let payload : Transaction.Payload.t =
             {receiver= receiver_compressed; amount; fee; nonce}
           in
