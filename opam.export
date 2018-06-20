@@ -61,7 +61,7 @@ ocamlformat_support	0.4	installed
 ocp-build	1.99.20-beta	installed
 ocp-indent	1.6.1	root
 octavius	1.2.0	installed
-orocksdb	0.3.0	root	path	/home/nathan/o1-labs/orocksdb
+orocksdb	0.3.0	installed
 parsexp	v0.11.0	installed
 ppx_assert	v0.11.0	installed
 ppx_ast	v0.11.0	installed
