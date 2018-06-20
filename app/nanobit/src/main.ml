@@ -387,12 +387,22 @@ module Run (Program : Main_intf) = struct
         return (Some ())
     | None -> return None
 
+  let get_nonce t (addr: Public_key.Compressed.t) =
+    let ledger = Inputs.Ledger_fetcher.best_ledger (Main.ledger_fetcher t) in
+    let maybe_nonce =
+      Option.map (Ledger.get ledger addr) ~f:(fun account ->
+          account.Account.nonce )
+    in
+    return maybe_nonce
+
   let setup_client_server ~minibit ~log ~client_port =
     (* Setup RPC server for client interactions *)
     let module Client_server = Client.Rpc_server (struct
       type t = Main.t
 
       let get_balance = get_balance
+
+      let get_nonce = get_nonce
 
       let send_txn = send_txn log
     end) in

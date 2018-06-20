@@ -10,7 +10,7 @@ module Payload = struct
     module V1 = struct
       type ('pk, 'amount, 'fee, 'nonce) t_ =
         {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
-      [@@deriving bin_io, eq, sexp, compare, hash]
+      [@@deriving bin_io, eq, sexp, hash]
 
       type t =
         ( Public_key.Compressed.Stable.V1.t
@@ -18,7 +18,7 @@ module Payload = struct
         , Fee.Stable.V1.t
         , Account.Nonce.Stable.V1.t )
         t_
-      [@@deriving bin_io, eq, sexp, compare, hash]
+      [@@deriving bin_io, eq, sexp, hash]
     end
   end
 
@@ -83,15 +83,18 @@ module Stable = struct
   module V1 = struct
     type ('payload, 'pk, 'signature) t_ =
       {payload: 'payload; sender: 'pk; signature: 'signature}
-    [@@deriving bin_io, eq, sexp, compare, hash]
+    [@@deriving bin_io, eq, sexp, hash]
 
     type t =
       (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, compare, hash]
+    [@@deriving bin_io, eq, sexp, hash]
 
-    let compare (t: t) (t': t) =
+    type with_seed = string * t [@@deriving hash]
+
+    let compare ~seed (t: t) (t': t) =
+      let hash x = hash_with_seed (seed, x) in
       let fee_compare = Fee.compare t.payload.fee t'.payload.fee in
-      match fee_compare with 0 -> compare t t' | _ -> fee_compare
+      if fee_compare <> 0 then fee_compare else hash t - hash t'
   end
 end
 
@@ -136,7 +139,11 @@ let gen ~keys ~max_amount ~max_fee =
   sign sender payload
 
 module With_valid_signature = struct
-  type t = Stable.V1.t [@@deriving sexp, eq, bin_io, compare]
+  type t = Stable.V1.t [@@deriving sexp, eq, bin_io]
+
+  let compare = Stable.V1.compare
+
+  let compare = Stable.V1.compare
 
   let gen = gen
 end
