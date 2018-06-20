@@ -195,7 +195,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
 
   let unpack_field_var x =
     let%bind res =
-      Impl.Bitstring_checked.choose_preimage x ~length:Field.size_in_bits
+      Impl.Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
       >>| Bitstring.Lsb_first.of_list
     in
     let%map () =

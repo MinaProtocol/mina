@@ -304,7 +304,7 @@ module Snarkable = struct
     let project_var = Field.Checked.project
 
     let choose_preimage_var : Packed.var -> (Unpacked.var, _) Checked.t =
-      Bitstring_checked.choose_preimage ~length:bit_length
+      Field.Checked.choose_preimage_var ~length:bit_length
 
     let unpack_value = Fn.id
   end

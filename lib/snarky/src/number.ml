@@ -63,7 +63,7 @@ module Make (Impl : Snark_intf.Basic) = struct
          let g = Field.Checked.project bs' in
          let%bind fits = Field.Checked.equal t.var g in
          let%map r =
-           Checked.Control.if_ fits ~then_:g
+           Field.Checked.if_ fits ~then_:g
              ~else_:(Field.Checked.constant Field.(sub (two_to_the n) one))
          in
          { upper_bound= Bignum_bigint.(k - one)
@@ -141,7 +141,7 @@ module Make (Impl : Snark_intf.Basic) = struct
   let of_pow_2 (`Two_to_the k) = constant (Field.of_int (Int.pow 2 k))
 
   let if_ b ~then_ ~else_ =
-    let%map var = Checked.Control.if_ b ~then_:then_.var ~else_:else_.var in
+    let%map var = Field.Checked.if_ b ~then_:then_.var ~else_:else_.var in
     let open Bignum_bigint in
     { upper_bound= max then_.upper_bound else_.upper_bound
     ; lower_bound= min then_.lower_bound else_.lower_bound

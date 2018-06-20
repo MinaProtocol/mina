@@ -19,7 +19,7 @@ module Merkle_tree = Snarky.Merkle_tree.Checked(Tick)(struct
 
     let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
-    let if_ = Checked.Control.if_
+    let if_ = Field.Checked.if_
   end)
     (struct
       include Account

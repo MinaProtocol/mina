@@ -64,7 +64,7 @@ module Compressed = struct
   let var_to_bits ({x; is_odd}: var) =
     let open Let_syntax in
     let%map x_bits =
-      Bitstring_checked.choose_preimage x ~length:Field.size_in_bits
+      Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
     in
     is_odd :: x_bits
 end

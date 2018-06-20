@@ -410,7 +410,7 @@ module Merge = struct
     in
     let%bind input =
       with_label __LOC__
-        ( Checked.Control.if_ is_base
+        ( Field.Checked.if_ is_base
             ~then_:(Pedersen_hash.digest states_and_excess_hash)
             ~else_:(Pedersen_hash.digest states_and_excess_and_vk_hash)
         >>= Pedersen.Digest.choose_preimage_var
@@ -592,7 +592,7 @@ struct
   let main input =
     let open Let_syntax in
     let%bind input =
-      Bitstring_checked.choose_preimage input
+      Field.Checked.choose_preimage_var input
         ~length:Tick_curve.Field.size_in_bits
     in
     let%bind is_base =

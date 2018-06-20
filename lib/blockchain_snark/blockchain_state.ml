@@ -145,7 +145,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                 Field.Checked.equal d (Field.Checked.constant Field.zero)
               in
               let%map delta_minus_one =
-                Checked.Control.if_ delta_is_zero
+                Field.Checked.if_ delta_is_zero
                   ~then_:(Field.Checked.constant Field.zero)
                   ~else_:
                     (let open Field.Checked in
@@ -170,7 +170,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            (* This could be more efficient *)
            with_label __LOC__
              (let%bind less = Number.(prev_target_n < rate_multiplier) in
-              Checked.Control.if_ less
+              Field.Checked.if_ less
                 ~then_:(Field.Checked.constant Field.one)
                 ~else_:
                   (Field.Checked.sub
@@ -179,7 +179,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
          in
          let%bind res =
            with_label __LOC__
-             (Checked.Control.if_ delta_is_zero ~then_:zero_case
+             (Field.Checked.if_ delta_is_zero ~then_:zero_case
                 ~else_:(Number.to_var nonzero_case))
          in
          Target.var_to_unpacked res)

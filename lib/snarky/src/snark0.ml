@@ -1185,26 +1185,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     end
 
     module Control = struct
-      let if_ (b: Boolean.var) ~then_ ~else_ =
-        with_label "if_"
-          (let open Let_syntax in
-          (* r = e + b (t - e)
-          r - e = b (t - e)
-        *)
-          let%bind r =
-            provide_witness Typ.field
-              (let open As_prover in
-              let open Let_syntax in
-              let%bind b = read Boolean.typ b in
-              read Typ.field (if b then then_ else else_))
-          in
-          let%map () =
-            assert_r1cs
-              (b :> Cvar.t)
-              Cvar.Infix.(then_ - else_)
-              Cvar.Infix.(r - else_)
-          in
-          r)
+      
     end
 
     let two_to_the n =
@@ -1391,8 +1372,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
   module Bitstring_checked = struct
     type t = Checked.Boolean.var list
 
-    let choose_preimage = Checked.choose_preimage
-
     let chunk_for_equality (t1: Checked.Boolean.var list)
         (t2: Checked.Boolean.var list) =
       let chunk_size = Field.size_in_bits - 1 in
@@ -1422,63 +1401,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
     end
   end
 
-  module Cvar2 = struct
-    include Cvar1
-
-    let equal = Checked.equal
-
-    let mul x y = Checked.mul ~label:"Field.Checked.mul" x y
-
-    let div x y = Checked.div ~label:"Field.Checked.div" x y
-
-    let inv x = Checked.inv ~label:"Field.Checked.inv" x
-
-    type comparison_result =
-      {less: Checked.Boolean.var; less_or_equal: Checked.Boolean.var}
-
-    let compare ~bit_length a b =
-      let open Checked in
-      let open Let_syntax in
-      with_label __LOC__
-        (let alpha_packed =
-           Cvar.Infix.(Cvar.constant (two_to_the bit_length) + b - a)
-         in
-         let%bind alpha = unpack alpha_packed ~length:(bit_length + 1) in
-         let prefix, less_or_equal =
-           match Core_kernel.List.split_n alpha bit_length with
-           | p, [l] -> (p, l)
-           | _ -> failwith "compare: Invalid alpha"
-         in
-         let%bind not_all_zeros = Boolean.any prefix in
-         let%map less = Boolean.(less_or_equal && not_all_zeros) in
-         {less; less_or_equal})
-
-    module Assert = struct
-      let lt ~bit_length x y =
-        let open Checked in
-        let open Let_syntax in
-        let%bind {less; _} = compare ~bit_length x y in
-        Boolean.Assert.is_true less
-
-      let lte ~bit_length x y =
-        let open Checked in
-        let open Let_syntax in
-        let%bind {less_or_equal; _} = compare ~bit_length x y in
-        Boolean.Assert.is_true less_or_equal
-
-      let gt ~bit_length x y = lt ~bit_length y x
-
-      let gte ~bit_length x y = lte ~bit_length y x
-
-      let non_zero = Checked.assert_non_zero
-
-      let equal x y = Checked.assert_equal ~label:"Checked.Assert.equal" x y
-
-      let not_equal (x: t) (y: t) =
-        Checked.with_label "Checked.Assert.not_equal" (non_zero (sub x y))
-    end
-  end
-
   module Field = struct
     include Field0
 
@@ -1486,7 +1408,86 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let typ = Typ.field
 
-    module Checked = Cvar2
+    module Checked = struct
+      include Cvar1
+
+      let equal = Checked.equal
+
+      let mul x y = Checked.mul ~label:"Field.Checked.mul" x y
+
+      let div x y = Checked.div ~label:"Field.Checked.div" x y
+
+      let inv x = Checked.inv ~label:"Field.Checked.inv" x
+
+      let choose_preimage_var = Checked.choose_preimage
+
+      type comparison_result =
+        {less: Checked.Boolean.var; less_or_equal: Checked.Boolean.var}
+
+      let if_ (b: Checked.Boolean.var) ~then_ ~else_ =
+        let open Checked in
+        with_label "if_"
+          (let open Let_syntax in
+          (* r = e + b (t - e)
+          r - e = b (t - e)
+        *)
+          let%bind r =
+            provide_witness Typ.field
+              (let open As_prover in
+              let open Let_syntax in
+              let%bind b = read Boolean.typ b in
+              read Typ.field (if b then then_ else else_))
+          in
+          let%map () =
+            assert_r1cs
+              (b :> Cvar.t)
+              Cvar.Infix.(then_ - else_)
+              Cvar.Infix.(r - else_)
+          in
+          r)
+
+      let compare ~bit_length a b =
+        let open Checked in
+        let open Let_syntax in
+        with_label __LOC__
+          (let alpha_packed =
+             Cvar.Infix.(Cvar.constant (two_to_the bit_length) + b - a)
+           in
+           let%bind alpha = unpack alpha_packed ~length:(bit_length + 1) in
+           let prefix, less_or_equal =
+             match Core_kernel.List.split_n alpha bit_length with
+             | p, [l] -> (p, l)
+             | _ -> failwith "compare: Invalid alpha"
+           in
+           let%bind not_all_zeros = Boolean.any prefix in
+           let%map less = Boolean.(less_or_equal && not_all_zeros) in
+           {less; less_or_equal})
+
+      module Assert = struct
+        let lt ~bit_length x y =
+          let open Checked in
+          let open Let_syntax in
+          let%bind {less; _} = compare ~bit_length x y in
+          Boolean.Assert.is_true less
+
+        let lte ~bit_length x y =
+          let open Checked in
+          let open Let_syntax in
+          let%bind {less_or_equal; _} = compare ~bit_length x y in
+          Boolean.Assert.is_true less_or_equal
+
+        let gt ~bit_length x y = lt ~bit_length y x
+
+        let gte ~bit_length x y = lte ~bit_length y x
+
+        let non_zero = Checked.assert_non_zero
+
+        let equal x y = Checked.assert_equal ~label:"Checked.Assert.equal" x y
+
+        let not_equal (x: t) (y: t) =
+          Checked.with_label "Checked.Assert.not_equal" (non_zero (sub x y))
+      end
+    end
   end
 
   include Checked

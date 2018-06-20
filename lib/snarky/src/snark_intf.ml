@@ -232,14 +232,6 @@ module type Basic = sig
   and Checked : sig
     include Monad.S2
 
-    module Control : sig
-      val if_ :
-           Boolean.var
-        -> then_:Field.Checked.t
-        -> else_:Field.Checked.t
-        -> (Field.Checked.t, _) t
-    end
-
     module List :
       Monad_sequence.S
       with type ('a, 's) monad := ('a, 's) t
@@ -296,10 +288,15 @@ module type Basic = sig
 
       val unpack : t -> length:int -> (Boolean.var list, _) Checked.t
 
+      val choose_preimage_var :
+        t -> length:int -> (Boolean.var list, _) Checked.t
+
       type comparison_result = {less: Boolean.var; less_or_equal: Boolean.var}
 
       val compare :
         bit_length:int -> t -> t -> (comparison_result, _) Checked.t
+
+      val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
       module Infix : sig
         val ( + ) : t -> t -> t
@@ -343,8 +340,6 @@ module type Basic = sig
 
   module Bitstring_checked : sig
     type t = Boolean.var list
-
-    val choose_preimage : Field.Checked.t -> length:int -> (t, _) Checked.t
 
     val equal : t -> t -> (Boolean.var, _) Checked.t
 
