@@ -209,6 +209,7 @@ struct
         flip path last_bit_index ; path
 
       let next (path: t) : (t, unit) Result.t =
+        let open Result.Let_syntax in
         let path = copy path in
         let len = length path in
         let rec find_first_clear_bit i =
@@ -222,12 +223,10 @@ struct
             clear path i ;
             clear_bits (i + 1) )
         in
-        Result.map
-          (find_first_clear_bit (len - 1))
-          ~f:(fun first_clear_index ->
-            set path first_clear_index ;
-            clear_bits (first_clear_index + 1) ;
-            path )
+        let%map first_clear_index = find_first_clear_bit (len - 1) in
+        set path first_clear_index ;
+        clear_bits (first_clear_index + 1) ;
+        path
 
       let serialize (path: t) : Bigstring.t =
         let path_bstr =
@@ -402,7 +401,7 @@ struct
         loop hash (i + 1) )
     in
     loop Hash.empty 1 ;
-    Immutable_array.wrap empty_hashes
+    Immutable_array.of_array empty_hashes
 
   let get_raw {kvdb; _} key = Kvdb.get kvdb (Key.serialize key)
 
@@ -683,14 +682,14 @@ let%test_module "test functor on in memory databases" =
             Some h
     end
 
-    module MDB_D (D : Depth_intf) =
+    module Mdb_d (D : Depth_intf) =
       Make (UInt64) (Account) (Hash) (D) (In_memory_kvdb) (In_memory_sdb)
 
-    module MDB_D4 = MDB_D (struct
+    module Mdb_d4 = Mdb_d (struct
       let depth = 4
     end)
 
-    module MDB_D30 = MDB_D (struct
+    module Mdb_d30 = Mdb_d (struct
       let depth = 30
     end)
   end )
