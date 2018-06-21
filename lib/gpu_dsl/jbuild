@@ -6,7 +6,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries
-    ( core integers bignum
-      ))
+    (core integers bignum spirv))
   (preprocess (pps (ppx_jane)))
   (synopsis "GPU dsl")))
