@@ -518,9 +518,9 @@ module Verification = struct
       Tick.Pedersen_hash.Section.create ~acc:(`Value s.acc)
         ~support:
           (Interval_union.of_intervals_exn
-            [ (0, Hash_prefix.length_in_bits)
-            ; ( (2 * Ledger_hash.length_in_bits) + Hash_prefix.length_in_bits
-              , Amount.Signed.length + List.length wrap_vk_bits ) ])
+             [ (0, Hash_prefix.length_in_bits)
+             ; ( (2 * Ledger_hash.length_in_bits) + Hash_prefix.length_in_bits
+               , Amount.Signed.length + List.length wrap_vk_bits ) ])
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
@@ -560,10 +560,10 @@ module Verification = struct
       Merge.Verifier.All_in_one.create ~input:top_hash
         ~verification_key:(List.map ~f:Boolean.var_of_value wrap_vk_bits)
         (As_prover.map get_proof ~f:(fun proof ->
-            {Merge.Verifier.All_in_one.proof; verification_key= keys.wrap} ))
+             {Merge.Verifier.All_in_one.proof; verification_key= keys.wrap} ))
       >>| Merge.Verifier.All_in_one.result
 
-(*
+    (*
       let open Tick in
       let open Let_syntax in
       let%bind s1 = Ledger_hash.var_to_bits s1
