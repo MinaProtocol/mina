@@ -1,0 +1,16 @@
+(jbuild_version 1)
+
+(library
+ ((name p2p_storage)
+  (public_name p2p_storage)
+  (library_flags (-linkall))
+  (libraries
+    ( core
+      async
+      bin_prot
+      cohttp-async
+      logger
+      ppx_inline_test.runtime-lib))
+  (preprocess (pps (ppx_jane ppx_driver.runner (-inline-test-lib p2p_storage))))
+  (synopsis "Distributed P2P storage of objects")))
+
