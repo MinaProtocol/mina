@@ -10,12 +10,22 @@ let daemon =
   Command.async ~summary:"Current daemon"
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"Configuration directory" (optional file)
-     and should_mine = flag "mine" ~doc:"Run the miner" (required bool)
+     and should_mine = flag "mine" ~doc:"Run the miner" (optional bool)
      and port =
-       flag "port" ~doc:"Server port for other to connect" (required int16)
+       flag "port"
+         ~doc:
+           (Printf.sprintf "Server port for other to connect (default: %d)"
+              default_daemon_port)
+         (optional int16)
      and client_port =
-       flag "client-port" ~doc:"Port for client to connect daemon locally"
-         (required int16)
+       flag "client-port"
+         ~doc:"Port for client to connect daemon locally (default: 8301)"
+         (optional int16)
+     and membership_port =
+       flag "membership-port"
+         ~doc:
+           "Port for dameon to find out the membership topology (default: 8303)"
+         (optional int16)
      and ip =
        flag "ip" ~doc:"External IP address for others to connect"
          (optional string)
@@ -26,6 +36,9 @@ let daemon =
        let conf_dir =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
+       let port = Option.value ~default:default_daemon_port port in
+       let client_port = Option.value ~default:8301 client_port in
+       let membership_port = Option.value ~default:8303 membership_port in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
          let peers_path = conf_dir ^/ "peers" in
@@ -76,7 +89,8 @@ let daemon =
            ; gossip_net_params=
                { timeout= Time.Span.of_sec 1.
                ; target_peer_count= 8
-               ; address= remap_addr_port me }
+               ; address= Host_and_port.create ~host:ip ~port:membership_port
+               }
            ; initial_peers
            ; me
            ; remap_addr_port }
@@ -94,6 +108,7 @@ let daemon =
        Async.never ())
 
 let () =
+  Random.self_init () ;
   Command.group ~summary:"Current"
     [ ("daemon", daemon)
     ; (Parallel.worker_command_name, Parallel.worker_command)

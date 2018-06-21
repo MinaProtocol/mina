@@ -73,9 +73,9 @@ module Make
 
   val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var
 
-  val unpack_var : Cvar.t -> (var, _) Tick.Checked.t
+  val unpack_var : Field.Checked.t -> (var, _) Tick.Checked.t
 
-  val pack_var : var -> Cvar.t
+  val pack_var : var -> Field.Checked.t
 end = struct
   let length = M.length
 
@@ -142,11 +142,11 @@ end = struct
   module Checked = struct
     (* Unpacking protects against underflow *)
     let sub (x: Unpacked.var) (y: Unpacked.var) =
-      unpack_var (Cvar.sub (pack_var x) (pack_var y))
+      unpack_var (Field.Checked.sub (pack_var x) (pack_var y))
 
     (* Unpacking protects against overflow *)
     let add (x: Unpacked.var) (y: Unpacked.var) =
-      unpack_var (Cvar.add (pack_var x) (pack_var y))
+      unpack_var (Field.Checked.add (pack_var x) (pack_var y))
 
     let ( - ) = sub
 
@@ -305,7 +305,7 @@ module Amount = struct
         Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
 
       let to_field_var ({magnitude; sgn}: var) =
-        Tick.Checked.mul (pack_var magnitude) (sgn :> Cvar.t)
+        Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
 
       let add (x: var) (y: var) =
         let%bind xv = to_field_var x and yv = to_field_var y in
@@ -316,7 +316,11 @@ module Amount = struct
             let%map x = read typ x and y = read typ y in
             (Option.value_exn (add x y)).sgn)
         in
-        let%bind res = Tick.Checked.mul (sgn :> Cvar.t) (Cvar.add xv yv) in
+        let%bind res =
+          Tick.Field.Checked.mul
+            (sgn :> Field.Checked.t)
+            (Field.Checked.add xv yv)
+        in
         let%map magnitude = unpack_var res in
         {magnitude; sgn}
 
@@ -324,8 +328,10 @@ module Amount = struct
 
       let cswap_field (b: Boolean.var) (x, y) =
         (* (x + b(y - x), y + b(x - y)) *)
-        let open Cvar.Infix in
-        let%map b_y_minus_x = Tick.Checked.mul (b :> Cvar.t) (y - x) in
+        let open Field.Checked.Infix in
+        let%map b_y_minus_x =
+          Tick.Field.Checked.mul (b :> Field.Checked.t) (y - x)
+        in
         (x + b_y_minus_x, y - b_y_minus_x)
 
       let cswap b (x, y) =
@@ -353,11 +359,11 @@ module Amount = struct
     let of_fee (fee: Fee.var) = var_of_bits (Fee.var_to_bits fee)
 
     let add_fee (t: var) (fee: Fee.var) =
-      Cvar.add (pack_var t) (Fee.pack_var fee) |> unpack_var
+      Field.Checked.add (pack_var t) (Fee.pack_var fee) |> unpack_var
 
     let add_signed (t: var) (d: Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
-      Cvar.add (pack_var t) d |> unpack_var
+      Field.Checked.add (pack_var t) d |> unpack_var
   end
 end
 

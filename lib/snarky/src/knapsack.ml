@@ -34,13 +34,14 @@ module Make (Impl : Snark_intf.S) = struct
 
   module Checked = struct
     let hash_to_field ({dimension; max_input_length; coefficients}: t)
-        (vs: Boolean.var list) : (Cvar.t list, _) Checked.t =
-      let vs = (vs :> Cvar.t list) in
+        (vs: Boolean.var list) : (Field.Checked.t list, _) Checked.t =
+      let vs = (vs :> Field.Checked.t list) in
       let input_len = List.length vs in
       if input_len > max_input_length then
         failwithf "Input size %d exceeded max %d" input_len max_input_length () ;
       List.map coefficients ~f:(fun cs ->
-          Cvar.linear_combination (map2_lax cs vs ~f:(fun c v -> (c, v))) )
+          Field.Checked.linear_combination
+            (map2_lax cs vs ~f:(fun c v -> (c, v))) )
       |> Checked.return
 
     let hash_to_bits (t: t) (vs: Boolean.var list) :
@@ -50,7 +51,7 @@ module Make (Impl : Snark_intf.S) = struct
       with_label "hash_to_bits"
         (let%map bss =
            Checked.all
-             (List.map xs ~f:(Checked.unpack ~length:Field.size_in_bits))
+             (List.map xs ~f:(Field.Checked.unpack ~length:Field.size_in_bits))
          in
          List.concat bss)
   end
@@ -85,15 +86,15 @@ module Make (Impl : Snark_intf.S) = struct
           | true -> As_prover.read typ ys)
       in
       let%map () =
-        let open Cvar.Infix in
+        let open Field.Checked.Infix in
         assert_all
           (List.map3_exn
-             (xs :> Cvar.t list)
-             (ys :> Cvar.t list)
-             (res :> Cvar.t list)
+             (xs :> Field.Checked.t list)
+             (ys :> Field.Checked.t list)
+             (res :> Field.Checked.t list)
              ~f:(fun x y r ->
                Constraint.r1cs ~label:"Knapsack.Hash.if_"
-                 (b :> Cvar.t)
+                 (b :> Field.Checked.t)
                  (y - x) (r - x) ))
       in
       res
@@ -110,6 +111,6 @@ module Make (Impl : Snark_intf.S) = struct
       in
       go [] 0 xs ys
 
-    let assert_equal = Impl.Checked.Assert.equal_bitstrings
+    let assert_equal = Impl.Bitstring_checked.Assert.equal
   end
 end

@@ -17,7 +17,7 @@ module Make (Impl : Snark_intf.Basic) = struct
   type t =
     { upper_bound: Bignum_bigint.t
     ; lower_bound: Bignum_bigint.t
-    ; var: Cvar.t
+    ; var: Field.Checked.t
     ; bits: Boolean.var list option }
 
   let two_to_the n =
@@ -31,14 +31,14 @@ module Make (Impl : Snark_intf.Basic) = struct
     with_label "Number.to_bits"
       ( match bits with
       | Some bs -> return (List.take bs length)
-      | None -> Checked.unpack var ~length )
+      | None -> Field.Checked.unpack var ~length )
 
   let of_bits bs =
     let n = List.length bs in
     assert (n < Field.size_in_bits) ;
     { upper_bound= Bignum_bigint.(pow2 n - one)
     ; lower_bound= Bignum_bigint.zero
-    ; var= Checked.project bs
+    ; var= Field.Checked.project bs
     ; bits= Some bs }
 
   let div_pow_2 n (`Two_to_the k) =
@@ -60,11 +60,11 @@ module Make (Impl : Snark_intf.Basic) = struct
        else
          let%bind bs = to_bits t in
          let bs' = List.take bs n in
-         let g = Checked.project bs' in
-         let%bind fits = Checked.equal t.var g in
+         let g = Field.Checked.project bs' in
+         let%bind fits = Field.Checked.equal t.var g in
          let%map r =
-           Checked.if_ fits ~then_:g
-             ~else_:(Cvar.constant Field.(sub (two_to_the n) one))
+           Field.Checked.if_ fits ~then_:g
+             ~else_:(Field.Checked.constant Field.(sub (two_to_the n) one))
          in
          { upper_bound= Bignum_bigint.(k - one)
          ; lower_bound= t.lower_bound
@@ -89,7 +89,7 @@ module Make (Impl : Snark_intf.Basic) = struct
             (bigint_num_bits x.upper_bound)
             (bigint_num_bits y.upper_bound)
         in
-        let%map {less; _} = Checked.compare ~bit_length x.var y.var in
+        let%map {less; _} = Field.Checked.compare ~bit_length x.var y.var in
         less )
 
   let ( <= ) x y =
@@ -110,7 +110,7 @@ module Make (Impl : Snark_intf.Basic) = struct
             (bigint_num_bits x.upper_bound)
             (bigint_num_bits y.upper_bound)
         in
-        let%map {less; _} = Checked.compare ~bit_length x.var y.var in
+        let%map {less; _} = Field.Checked.compare ~bit_length x.var y.var in
         less )
 
   let ( > ) x y = y < x
@@ -119,7 +119,7 @@ module Make (Impl : Snark_intf.Basic) = struct
 
   let ( = ) x y =
     (* TODO: Have "short circuiting" for efficiency as above. *)
-    Checked.equal x.var y.var
+    Field.Checked.equal x.var y.var
 
   let to_var {var; _} = var
 
@@ -128,7 +128,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     let n = Bigint.to_bignum_bigint tick_n in
     { upper_bound= n
     ; lower_bound= n
-    ; var= Cvar.constant x
+    ; var= Field.Checked.constant x
     ; bits=
         Some
           (List.init (bigint_num_bits n) ~f:(fun i ->
@@ -141,7 +141,7 @@ module Make (Impl : Snark_intf.Basic) = struct
   let of_pow_2 (`Two_to_the k) = constant (Field.of_int (Int.pow 2 k))
 
   let if_ b ~then_ ~else_ =
-    let%map var = Checked.if_ b ~then_:then_.var ~else_:else_.var in
+    let%map var = Field.Checked.if_ b ~then_:then_.var ~else_:else_.var in
     let open Bignum_bigint in
     { upper_bound= max then_.upper_bound else_.upper_bound
     ; lower_bound= min then_.lower_bound else_.lower_bound
@@ -154,7 +154,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     if upper_bound < Field.size then
       { upper_bound
       ; lower_bound= x.lower_bound + y.lower_bound
-      ; var= Cvar.add x.var y.var
+      ; var= Field.Checked.add x.var y.var
       ; bits= None }
     else
       failwithf "Number.+: Potential overflow: (%s + %s > Field.size)"
@@ -166,7 +166,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     if x.lower_bound >= y.upper_bound then
       { upper_bound= x.upper_bound - y.lower_bound
       ; lower_bound= x.lower_bound - y.upper_bound
-      ; var= Cvar.sub x.var y.var
+      ; var= Field.Checked.sub x.var y.var
       ; bits= None }
     else
       failwithf "Number.-: Potential underflow (%s < %s)"
@@ -177,7 +177,7 @@ module Make (Impl : Snark_intf.Basic) = struct
     with_label "Number.(*)"
       (let upper_bound = x.upper_bound * y.upper_bound in
        if upper_bound < Field.size then
-         let%map var = Checked.mul x.var y.var in
+         let%map var = Field.Checked.mul x.var y.var in
          { upper_bound
          ; lower_bound= x.lower_bound * y.lower_bound
          ; var

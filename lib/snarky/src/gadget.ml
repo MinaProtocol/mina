@@ -19,8 +19,8 @@ module Make
 
         val create :
              Libsnark.Protoboard.t
-          -> (Impl.Cvar.t -> Libsnark.Protoboard.Variable.t)
-          -> (Libsnark.Protoboard.Variable.t -> Impl.Cvar.t)
+          -> (Impl.Field.Checked.t -> Libsnark.Protoboard.Variable.t)
+          -> (Libsnark.Protoboard.Variable.t -> Impl.Field.Checked.t)
           -> input
           -> t
 
@@ -39,7 +39,7 @@ struct
     let num_input_vars = ref 0 in
     let var_pairs = ref [] in
     let conv cvar =
-      let c, terms = Cvar.to_constant_and_terms cvar in
+      let c, terms = Field.Checked.to_constant_and_terms cvar in
       let lc =
         match c with
         | None -> Linear_combination.create ()
@@ -63,7 +63,7 @@ struct
       (* TODO-soon: This is slightly hacky ATM and requires the caller only call
          conv_back after they are done calling conv. Please make this staging explicit in
          the types. *)
-      Impl.Cvar.Unsafe.of_var
+      Impl.Field.Checked.Unsafe.of_var
         (Var.create (Protoboard.Variable.index pb_var + shift))
     in
     let t = M.create pb conv conv_back input in

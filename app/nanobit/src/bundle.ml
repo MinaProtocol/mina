@@ -58,11 +58,13 @@ include T
 module Worker_state = struct
   type t = (module Transaction_snark.S)
 
-  let create () : t =
-    let module Keys = Keys.Make () in
-    ( module Transaction_snark.Make (struct
-      let keys = Keys.transaction_snark_keys
-    end) )
+  let create () : t Deferred.t =
+    let%map keys = Keys.create () in
+    let module Keys = (val keys) in
+    ( ( module Transaction_snark.Make (struct
+        let keys = Keys.transaction_snark_keys
+      end) )
+    : t )
 end
 
 module Sparse_ledger = struct
@@ -188,7 +190,7 @@ module M = Map_reduce.Make_map_reduce_function_with_init (struct
 
   type state_type = Worker_state.t
 
-  let init () = return (Worker_state.create ())
+  let init () = Worker_state.create ()
 
   let map ((module T): state_type) {Input.transition; ledger; target_hash} =
     return

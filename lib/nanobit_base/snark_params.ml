@@ -1,6 +1,6 @@
 open Core_kernel
-module Tick_curve = Snarky.Backends.Mnt4
-module Tock_curve = Snarky.Backends.Mnt6
+module Tick_curve = Crypto_params.Tick_curve
+module Tock_curve = Crypto_params.Tock_curve
 
 module Extend (Impl : Snarky.Snark_intf.S) = struct
   include Impl
@@ -32,7 +32,7 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
         with type ('a, 'b) typ := ('a, 'b) Typ.t
          and type ('a, 'b) checked := ('a, 'b) Checked.t
          and type boolean_var := Boolean.var
-         and type comparison_result := Checked.comparison_result
+         and type comparison_result := Field.Checked.comparison_result
     end
   end
 end
@@ -45,13 +45,7 @@ module Tock = struct
   module Proof = struct
     include Tock0.Proof
 
-    (* TODO: Do at compile time *)
-    let dummy =
-      lazy
-        (let exposing = Data_spec.[Typ.field] in
-         let main x = assert_equal x x in
-         let keypair = generate_keypair main ~exposing in
-         prove (Keypair.pk keypair) exposing () main Field.one)
+    let dummy = Dummy_values.Tock.proof
   end
 end
 
@@ -99,33 +93,7 @@ module Tick = struct
       let bit_length = 262
 
       include Snarky.Curves.Edwards.Basic.Make (Field)
-                (struct
-                  (*
-  Curve params:
-  d = 20
-  cardinality = 475922286169261325753349249653048451545124878135421791758205297448378458996221426427165320
-  2^3 * 5 * 7 * 399699743 * 4252498232415687930110553454452223399041429939925660931491171303058234989338533 *)
-
-                  let d = Field.of_int 20
-
-                  let cofactor =
-                    let open Bignum_bigint in
-                    of_int 8 * of_int 5 * of_int 7 * of_int 399699743
-
-                  let order =
-                    Bignum_bigint.of_string
-                      "4252498232415687930110553454452223399041429939925660931491171303058234989338533"
-
-                  let generator =
-                    let f s =
-                      Tick_curve.Bigint.R.(to_field (of_decimal_string s))
-                    in
-                    ( f
-                        "327139552581206216694048482879340715614392408122535065054918285794885302348678908604813232"
-                    , f
-                        "269570906944652130755537879906638127626718348459103982395416666003851617088183934285066554"
-                    )
-                end)
+                (Crypto_params.Hash_curve)
 
       module Scalar (Impl : Snarky.Snark_intf.S) = struct
         (* Someday: Make more efficient *)
@@ -157,9 +125,9 @@ module Tick = struct
                 ~f:(Z.testbit (Bignum_bigint.to_zarith_bigint n)) )
             ~back:pack
 
-        let equal = Checked.equal_bitstrings
+        let equal = Bitstring_checked.equal
 
-        let assert_equal = Checked.Assert.equal_bitstrings
+        let assert_equal = Bitstring_checked.Assert.equal
       end
     end
 

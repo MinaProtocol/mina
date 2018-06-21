@@ -16,9 +16,7 @@ module type S = sig
   val transaction_snark_keys : Transaction_snark.Keys.t
 
   module Step : sig
-    val verification_key : Tick.Verification_key.t
-
-    val proving_key : Tick.Proving_key.t
+    val keys : Tick.Keypair.t
 
     val input :
          unit
@@ -36,9 +34,7 @@ module type S = sig
   end
 
   module Wrap : sig
-    val verification_key : Tock.Verification_key.t
-
-    val proving_key : Tock.Proving_key.t
+    val keys : Tock.Keypair.t
 
     val input :
          unit
@@ -50,4 +46,4 @@ module type S = sig
   end
 end
 
-module Make () : S
+val create : unit -> (module S) Async.Deferred.t
