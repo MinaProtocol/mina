@@ -60,7 +60,7 @@ end = struct
 
     let choose_preimage x =
       with_label "Pedersen.Digest.choose_preimage"
-        (Checked.choose_preimage ~length:Field.size_in_bits x)
+        (Field.Checked.choose_preimage_var ~length:Field.size_in_bits x)
   end
 
   open Let_syntax

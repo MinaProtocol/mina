@@ -304,7 +304,7 @@ module Base = struct
            and b2 = Ledger_hash.var_to_bits root_after in
            let fee_excess_bits = Amount.Signed.Checked.to_bits fee_excess in
            digest_bits ~init:Hash_prefix.base_snark (b1 @ b2 @ fee_excess_bits)
-           >>= assert_equal ~label:"equals-top_hash" top_hash)
+           >>= Field.Checked.Assert.equal top_hash)
       in
       ())
 
@@ -410,7 +410,7 @@ module Merge = struct
     in
     let%bind input =
       with_label __LOC__
-        ( Checked.if_ is_base
+        ( Field.Checked.if_ is_base
             ~then_:(Pedersen_hash.digest states_and_excess_hash)
             ~else_:(Pedersen_hash.digest states_and_excess_and_vk_hash)
         >>= Pedersen.Digest.choose_preimage_var
@@ -449,7 +449,7 @@ module Merge = struct
       in
       digest_bits ~init:Hash_prefix.merge_snark
         (s1 @ s3 @ Amount.Signed.Checked.to_bits total_fees @ tock_vk)
-      >>= assert_equal top_hash
+      >>= Field.Checked.Assert.equal top_hash
     and verify_12 =
       verify_transition tock_vk Prover_state.proof12 s1 s2 fee_excess12
     and verify_23 =
@@ -592,7 +592,8 @@ struct
   let main input =
     let open Let_syntax in
     let%bind input =
-      Checked.choose_preimage input ~length:Tick_curve.Field.size_in_bits
+      Field.Checked.choose_preimage_var input
+        ~length:Tick_curve.Field.size_in_bits
     in
     let%bind is_base =
       provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type} ->

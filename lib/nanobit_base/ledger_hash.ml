@@ -17,9 +17,9 @@ module Merkle_tree = Snarky.Merkle_tree.Checked(Tick)(struct
       Tick.digest_bits ~init:Hash_prefix.merkle_tree.(height)
         (Unpacked.var_to_bits h1 @ Unpacked.var_to_bits h2)
 
-    let assert_equal h1 h2 = assert_equal h1 h2
+    let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
-    let if_ = Checked.if_
+    let if_ = Field.Checked.if_
   end)
     (struct
       include Account

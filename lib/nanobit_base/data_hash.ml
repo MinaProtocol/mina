@@ -91,7 +91,7 @@ struct
     if Int.( = ) bit_length Field.size_in_bits then fun x ->
       Pedersen.Digest.choose_preimage_var x
       >>| Pedersen.Digest.Unpacked.var_to_bits
-    else Checked.unpack ~length:bit_length
+    else Field.Checked.unpack ~length:bit_length
 
   let var_to_bits t =
     with_label __LOC__
@@ -104,9 +104,9 @@ struct
 
   include Pedersen.Digest.Bits
 
-  let assert_equal x y = assert_equal x.digest y.digest
+  let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 
-  let equal_var x y = Checked.equal x.digest y.digest
+  let equal_var x y = Field.Checked.equal x.digest y.digest
 
   let typ : (var, t) Typ.t =
     let store (t: t) =
@@ -119,7 +119,8 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Checked.project (bits :> Boolean.var list)}
+      { bits= Some bits
+      ; digest= Field.Checked.project (bits :> Boolean.var list) }
     in
     let read (t: var) = Field.typ.read t.digest in
     let alloc =
@@ -131,7 +132,8 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Checked.project (bits :> Boolean.var list)}
+      { bits= Some bits
+      ; digest= Field.Checked.project (bits :> Boolean.var list) }
     in
     let check {bits; _} =
       Checked.List.iter

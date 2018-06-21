@@ -140,19 +140,20 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
              ((* There used to be a trickier version of this code that did this in 2 fewer constraints,
               might be worth going back to if there is ever a reason. *)
               let n = List.length delta in
-              let d = Checked.pack delta in
+              let d = Field.Checked.pack delta in
               let%bind delta_is_zero =
-                Checked.equal d (Field.Checked.constant Field.zero)
+                Field.Checked.equal d (Field.Checked.constant Field.zero)
               in
               let%map delta_minus_one =
-                Checked.if_ delta_is_zero
+                Field.Checked.if_ delta_is_zero
                   ~then_:(Field.Checked.constant Field.zero)
                   ~else_:
                     (let open Field.Checked in
                     Infix.(d - constant Field.one))
                 (* We convert to bits here because we will in [clamp_to_n_bits] anyway, and
                 this gives us the upper bound we need for multiplying with [rate_multiplier]. *)
-                >>= Checked.unpack ~length:n >>| Number.of_bits
+                >>= Field.Checked.unpack ~length:n
+                >>| Number.of_bits
               in
               (delta_is_zero, delta_minus_one))
          in
@@ -169,7 +170,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            (* This could be more efficient *)
            with_label __LOC__
              (let%bind less = Number.(prev_target_n < rate_multiplier) in
-              Checked.if_ less
+              Field.Checked.if_ less
                 ~then_:(Field.Checked.constant Field.one)
                 ~else_:
                   (Field.Checked.sub
@@ -178,7 +179,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
          in
          let%bind res =
            with_label __LOC__
-             (Checked.if_ delta_is_zero ~then_:zero_case
+             (Field.Checked.if_ delta_is_zero ~then_:zero_case
                 ~else_:(Number.to_var nonzero_case))
          in
          Target.var_to_unpacked res)
@@ -276,7 +277,7 @@ end
 module Checked = struct
   let is_base_hash h =
     with_label __LOC__
-      (Checked.equal
+      (Field.Checked.equal
          (Field.Checked.constant (zero_hash :> Field.t))
          (State_hash.var_to_hash_packed h))
 

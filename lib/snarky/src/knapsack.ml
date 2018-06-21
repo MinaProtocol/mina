@@ -51,7 +51,7 @@ module Make (Impl : Snark_intf.S) = struct
       with_label "hash_to_bits"
         (let%map bss =
            Checked.all
-             (List.map xs ~f:(Checked.unpack ~length:Field.size_in_bits))
+             (List.map xs ~f:(Field.Checked.unpack ~length:Field.size_in_bits))
          in
          List.concat bss)
   end
@@ -111,6 +111,6 @@ module Make (Impl : Snark_intf.S) = struct
       in
       go [] 0 xs ys
 
-    let assert_equal = Impl.Checked.Assert.equal_bitstrings
+    let assert_equal = Impl.Bitstring_checked.Assert.equal
   end
 end
