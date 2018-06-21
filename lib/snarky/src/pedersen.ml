@@ -63,7 +63,7 @@ module Make
       -> support:Interval_union.t
       -> t
 
-    val of_bits : bool list -> start:int -> t
+    val of_bits : bool list -> t
 
     val to_initial_segment_digest :
       t -> (Digest.var * [`Length of int]) Or_error.t
@@ -155,7 +155,7 @@ end = struct
 
     let create ~acc ~support = {acc; support}
 
-    let of_bits bs ~start =
+    let of_bits bs =
       let n = List.length bs in
       let interval = (0, n) in
       { support= Interval_union.of_interval interval
