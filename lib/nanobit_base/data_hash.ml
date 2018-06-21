@@ -91,7 +91,7 @@ struct
     if Int.( = ) length_in_bits Field.size_in_bits then fun x ->
       Pedersen.Digest.choose_preimage_var x
       >>| Pedersen.Digest.Unpacked.var_to_bits
-    else Field.Checked.unpack ~length:bit_length
+    else Field.Checked.unpack ~length:length_in_bits
 
   let var_to_bits t =
     with_label __LOC__
