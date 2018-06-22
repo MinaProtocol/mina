@@ -23,7 +23,7 @@ let _foo () : (unit, _) Checked.t = Checked.return ()
 
    You "run" Checked.t's in two ways:
    1. To generate a constraint system for the SNARK
-   2. To generate proofs. 
+   2. To generate proofs.
 
    We'll see exactly how this works later.
 
@@ -226,15 +226,22 @@ module Exercise3 = struct
   (* Let's partially apply it to some arbitrary matrix that we can pretend we
      "don't know the sqrt of" so we can prove something interesting. In
      reality, since this is just a tutorial, we're going to hardcode a boring
-     matrix (the square of )
+     matrix (the square of [1; 2]; [4; 5] )
   *)
   let assert_exists_sqrt sqrt_x =
-    assert_exists_mat_sqrt Field.[| sqrt_x
+    let f x = Field.Checked.constant (Field.of_int x) in
+    assert_exists_mat_sqrt [|[|f 9; f 12|]; [|f 24; f 33|]|] sqrt_x
 
   (* Now the data_spec is more interesting:
-   * First of all, SNARKs require fixed sized inputs, so we'll fix our proof to
-   * work over matrices of size exactly 2x2.
-   *
+     First of all, SNARKs require fixed sized inputs, so we'll fix our proof to
+     work over matrices of size exactly 2x2.
+     Second, we're not just using a boring field, we have nested arrays. The
+     `Typ` module has combinators for building up lists of typs and arrays of
+     typs.
+     There's also a `transport` where if you provide self-inverse `there` and
+     `back` functions you can describe more complex types for the snark.
+
+     Look at the available functions on `Typ` by using your editor's autocomplete
    *)
   let input () =
     let cols = Typ.array ~length:2 Field.typ in
@@ -243,32 +250,48 @@ module Exercise3 = struct
 
   let keypair = generate_keypair ~exposing:(input ()) assert_exists_sqrt
 
-  let mat_1245 =
-      Field.[|[|of_int 1; of_int 2|]; [|of_int 4; of_int 5|]|]
-  in
+  let mat_1245 = Field.[|[|of_int 1; of_int 2|]; [|of_int 4; of_int 5|]|]
+
   let proof =
     prove (Keypair.pk keypair) (input ()) () assert_exists_sqrt mat_1245
-  let is_valid =
-    verify proof (Keypair.vk keypair) (input ()) mat_1245 in
 
-  let run () = printf "Done!"
+  let is_valid = verify proof (Keypair.vk keypair) (input ()) mat_1245
+
+  let run () =
+    printf "Is mat_1245 the sqrt of our 9;12 24;33 matrix: %b?" is_valid
 end
 
 (* Exercise 3: Comment this out when you're ready to test it! *)
 (* let () = Exercise3.run () *)
-(* TODO: Here's how you can encode other richer data types in terms of fields *)
-(* TODO: Prove knowledge of a matrix sqrt *)
-let row = Typ.(field * field)
 
-let matrix = Typ.(row * row)
 
-(* TODO: To_bits of_bits *)
-(* TODO: put somewhere *)
-let square_root x =
-  let%bind y =
-    provide_witness Field.typ As_prover.(map (read Field.typ x) ~f:Field.sqrt)
-    (* TODO: explain *)
-  in
-  let%map () = assert_r1cs x x y in
-  (* TODO: Explain... everything *)
-  y
+let exercise4 =
+  (* SNARKs allow you to prove "there exists" statements in "zero-knowledge".
+   * On the prover side, the "there exists" bit requires you to actually
+   * provide a witness. On the verifier side, we just see an opaque there exists.
+   *
+   * There are two ways to prove the "there exists" statements, let's explore the
+   * first one now:
+   *
+   * Let's say we want to prove we know a square_root of some value `x`, but we,
+   * the prover, don't want verifiers to know the square root (we only want
+   * verifiers to know it exists).
+   *)
+  let square_root x =
+    let%bind y =
+      (* `provide_witness` lets you declare a hidden variable as long as you
+         tell the prover how to compute it from any other vars in scope.
+       *)
+      provide_witness Field.typ As_prover.(map (read Field.typ x) ~f:Field.sqrt)
+    in
+    (* Now we're using a very low level assertion primitive -- a rank1
+      constraint.
+
+      `assert_r1cs a b c` lets us assert that a*b=c. Here we're using it to
+      assert y*y = x -- i.e., that y is the square root of x
+    *)
+    let%map () = assert_r1cs y y x in
+    y
+
+
+  (* TODO: To_bits of_bits *)
