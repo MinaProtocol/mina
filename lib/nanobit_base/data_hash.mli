@@ -4,7 +4,7 @@ open Snark_params.Tick
 module type Basic = sig
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
-  val bit_length : int
+  val length_in_bits : int
 
   val ( = ) : t -> t -> bool
 
@@ -50,7 +50,7 @@ module type Small = sig
 end
 
 module Make_small (M : sig
-  val bit_length : int
+  val length_in_bits : int
 end) :
   Small
 

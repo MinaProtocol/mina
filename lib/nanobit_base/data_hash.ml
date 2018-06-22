@@ -5,7 +5,7 @@ open Snark_params.Tick
 module type Basic = sig
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
-  val bit_length : int
+  val length_in_bits : int
 
   val ( = ) : t -> t -> bool
 
@@ -51,7 +51,7 @@ module type Small = sig
 end
 
 module Make_basic (M : sig
-  val bit_length : int
+  val length_in_bits : int
 end) =
 struct
   module Stable = struct
@@ -67,7 +67,7 @@ struct
 
   include Stable.V1
 
-  let bit_length = M.bit_length
+  let length_in_bits = M.length_in_bits
 
   let ( = ) = equal
 
@@ -88,10 +88,10 @@ struct
 
   (* TODO: Audit this usage of choose_preimage *)
   let unpack =
-    if Int.( = ) bit_length Field.size_in_bits then fun x ->
+    if Int.( = ) length_in_bits Field.size_in_bits then fun x ->
       Pedersen.Digest.choose_preimage_var x
       >>| Pedersen.Digest.Unpacked.var_to_bits
-    else Field.Checked.unpack ~length:bit_length
+    else Field.Checked.unpack ~length:length_in_bits
 
   let var_to_bits t =
     with_label __LOC__
@@ -145,7 +145,7 @@ end
 
 module Make_full_size () = struct
   include Make_basic (struct
-    let bit_length = Field.size_in_bits
+    let length_in_bits = Field.size_in_bits
   end)
 
   let var_of_hash_packed digest = {digest; bits= None}
@@ -154,10 +154,10 @@ module Make_full_size () = struct
 end
 
 module Make_small (M : sig
-  val bit_length : int
+  val length_in_bits : int
 end) =
 struct
-  let () = assert (M.bit_length < Field.size_in_bits)
+  let () = assert (M.length_in_bits < Field.size_in_bits)
 
   include Make_basic (M)
   open Let_syntax
@@ -166,7 +166,7 @@ struct
     let%map bits = unpack digest in
     {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
 
-  let max = Bignum_bigint.(two_to_the bit_length - one)
+  let max = Bignum_bigint.(two_to_the length_in_bits - one)
 
   let of_hash x =
     if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max then

@@ -85,8 +85,8 @@ let zero_hash = hash zero
 let bit_length =
   let add bit_length acc _field = acc + bit_length in
   Fields_of_t_.fold zero ~init:0 ~next_difficulty:(add Target.bit_length)
-    ~previous_state_hash:(add State_hash.bit_length)
-    ~ledger_hash:(add Ledger_hash.bit_length)
+    ~previous_state_hash:(add State_hash.length_in_bits)
+    ~ledger_hash:(add Ledger_hash.length_in_bits)
     ~strength:(add Strength.bit_length) ~timestamp:(fun acc _ _ ->
       acc + Block_time.bit_length )
 
@@ -247,7 +247,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
          in
          let%bind state_bits = to_bits new_state in
          let%bind state_partial =
-           Pedersen_hash.hash state_bits ~params:Pedersen.params
+           Pedersen_hash.hash state_bits
              ~init:(Hash_prefix.length_in_bits, Hash_curve.Checked.identity)
          in
          let%bind state_hash =
@@ -261,7 +261,6 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            in
            Pedersen_hash.hash
              (Block.Nonce.Unpacked.var_to_bits block.header.nonce)
-             ~params:Pedersen.params
              ~init:
                (Hash_prefix.length_in_bits + List.length state_bits, pow_init)
            >>| Pedersen_hash.digest >>= Proof_of_work.var_of_hash_packed

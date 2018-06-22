@@ -4,7 +4,7 @@ open Util
 open Snark_params.Tick
 
 include Data_hash.Make_small (struct
-  let bit_length = Target.bit_length
+  let length_in_bits = Target.bit_length
 end)
 
 let create state nonce =
@@ -19,7 +19,7 @@ let meets_target_unchecked (pow: t) (target: Target.t) =
 let meets_target_var (pow: var) (target: Target.Packed.var) =
   let open Let_syntax in
   let%map {less; _} =
-    Field.Checked.compare ~bit_length (var_to_hash_packed pow)
+    Field.Checked.compare ~bit_length:length_in_bits (var_to_hash_packed pow)
       (target :> Field.Checked.t)
   in
   less
