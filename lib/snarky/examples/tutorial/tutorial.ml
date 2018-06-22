@@ -1,6 +1,5 @@
 open Core
 open Snarky
-
 (* Welcome!
 
    Snarky is a library for constructing R1CS SNARKs.
@@ -8,9 +7,8 @@ open Snarky
    TODO: Explanation of R1CSs, how it makes addition and scalar mult 'free' but
    multiplication of variables costs 1.
 *)
-
 (* 0. First we instantiate Snarky with a 'backend' *)
-module Impl = Snark.Make(Backends.Bn128)
+module Impl = Snark.Make (Backends.Bn128)
 open Impl
 open Let_syntax
 
@@ -32,7 +30,6 @@ let _foo () : (unit, _) Checked.t = Checked.return ()
    First let's understand "field var"s which are the main primitive type we
    have access to in Checked.t's.
 *)
-
 (* A [Field.t] represents an element of the finite field of order [Field.size]
    It is a prime order field so you can think about it as "integers mod Field.size".
 *)
@@ -46,25 +43,22 @@ let () =
 (* Try seeing what operations there are in the [Field] module by using
    your editor's auto-completion feature
 *)
-
 (* Inside Checked.t's we work with "Field.var"s. These are sort of like
    Field.t's but we can make assertions about them.
 
    Field.Checked provides "Checked" versions of the usual field operations.
 *)
-
-
 (* [assert_equal : Field.var -> Field.var -> (unit, _) Checked.t] lets us
    make an assertion that two field elements are equal.
 
    Here we assert that [x] is a square root of 9.
 *)
-(* TODO: Have Field.Checked. *)
-let assert_is_square_root_of_9 (x : Field.var) : (unit, _) Checked.t =
-  let%bind x_squared = Checked.mul x x in (* TODO: Put this in Field.Checked *)
-  assert_equal x_squared (Cvar.constant (Field.of_int 9)) (* TODO: Field.Checked.constant, Field.Checked.of_int *)
+let assert_is_square_root_of_9 (x: Field.var) : (unit, _) Checked.t =
+  let%bind x_squared = Field.Checked.mul x x in
+  Field.Checked.Assert.equal x_squared
+    (Field.Checked.constant (Field.of_int 9))
 
-(* Exercise:
+(* Exercise 1:
    Write a function
    [assert_is_cube_root_of_1 : Field.var -> (unit, _) Checked.t]
    that asserts its argument is a cube root of 1.
@@ -84,47 +78,197 @@ let assert_is_square_root_of_9 (x : Field.var) : (unit, _) Checked.t =
    so if sqrt(1 - 4) = sqrt(-3) exists in the field then there will
    be two additional cube roots of 1.
 *)
-
 (* In this field, it happens to be the case that -3 is a square. *)
 let () = assert (Field.is_square (Field.of_int (-3)))
 
-(* TODO: pk -> proving_key *)
-let assert_is_cube_root_of_1 (x : Field.var) = return ()
-
-let input () = Data_spec.([ Field.typ ])
-
-let keypair =
-  generate_keypair ~exposing:(input ())
-    assert_is_cube_root_of_1
+let assert_is_cube_root_of_1 (x: Field.var) = failwith "Exercise 1"
 
 let cube_root_of_1 =
   let open Field in
-  let open Infix in
-  (of_int (-1) + sqrt (of_int (-3))) / of_int 2
+  Infix.((of_int (-1) + sqrt (of_int (-3))) / of_int 2)
 
-let proof =
-  prove (Keypair.pk keypair) (input ()) ()
-    assert_is_cube_root_of_1
-    cube_root_of_1
+let exercise1 () =
+  (* Before we generate a constraint system or a proof for our checked
+     computation we must first specify the "data spec" of the input.
 
-let () =
-  printf !"is %{sexp:Field.t} a cube root of 1? %b\n%!"
-    cube_root_of_1
-    (verify proof (Keypair.vk keypair) (input ()) cube_root_of_1)
+     This is actually an HList which we can represent in OCaml by overriding the
+     list type constructors. We also need to make input a function over unit due
+     to value restriction reasons.
 
-(* Now let's prove that there are two cube roots of 1. *)
-let distinct_cube_roots_of_1 x y =
-  let%map () = assert_is_cube_root_of_1 x
-  and () = assert_is_cube_root_of_1 y
-  and () = Checked.Assert.not_equal x y (* TODO: Checked.Assert.not_equal? Field.Checked.Assert.not_equal, Field.Checked.Assert.equal *)
+     Here our function `assert_is_curbe_root_of_1` takes a single Field.var as
+     input. The type of that var is `Field.typ`.
+   *)
+  let input () = Data_spec.[Field.typ] in
+  (* Now we generate a keypair that we can use produce and verify proofs *)
+  let keypair =
+    generate_keypair ~exposing:(input ()) assert_is_cube_root_of_1
   in
-  ()
+  (* Now we prove: Here is an input to `assert_is_cube_root_of_1` such that the
+     checked computation terminates without failing any assertions. In other
+     words, there exists some cube_root_of_1.
+   *)
+  let proof =
+    prove (Keypair.pk keypair) (input ()) () assert_is_cube_root_of_1
+      cube_root_of_1
+  in
+  (* We can verify a proof as follows *)
+  let is_valid = verify proof (Keypair.vk keypair) (input ()) cube_root_of_1 in
+  printf !"is %{sexp:Field.t} a cube root of 1? %b\n%!" cube_root_of_1 is_valid
 
+(* Exercise 1: Comment this out when you're ready to test it! *)
+(* let () = exercise1 () *)
+
+let exercise2 () =
+  (* Now let's prove that there are two cube roots of 1. *)
+  let distinct_cube_roots_of_1 x y =
+    let%map () = assert_is_cube_root_of_1 x
+    and () = assert_is_cube_root_of_1 y
+    and () = Field.Checked.Assert.not_equal x y in
+    ()
+  in
+  (* Exercise 2:
+     Now you try: Creating a data spec, keypair, proof, and verifying that proof
+     for `distinct_cube_roots_of_1`.
+   *)
+  let another_cube_root_of_1 = failwith "x^3 = 1, find x" in
+  let input () = failwith "Exercise 2: Data_spec here" in
+  let keypair = failwith "Exercise 2: Keypair here" in
+  let proof = failwith "Exercise 2: Proof" in
+  let is_valid = failwith "Exercise 2: Verify" in
+  printf
+    !"Are %{sexp:Field.t} and %{sexp:Field.t} two distinct cube roots of 1? %b\n\
+      %!"
+    cube_root_of_1 another_cube_root_of_1 is_valid
+
+(* Exercise 2: Comment this out when you're ready to test it! *)
+(* let () = exercise2 () *)
+
+module Exercise3 = struct
+  (* We can encode more richer data types in terms of the underlying fields. One
+     example of this is a Boolean.
+
+     A Boolean is just a Field element that is either zero or one. We can build
+     all sorts of utility functions on 
+
+     For example, `ifeqxy_x_else_z` checkes if x and y are equal and if so
+     returns x. If not, we return z.
+
+     This is also an example of a Checked computation that doesn't return unit!
+   *)
+  let ifeqxy_x_else_z x y z =
+    let%bind b = Field.Checked.equal x y in
+    Field.Checked.if_ b ~then_:x ~else_:z
+
+  (* We can also define a matrix over some ring as follows *)
+  module Matrix (R : sig
+    type t [@@deriving sexp]
+
+    val zero : t
+
+    val mul : t -> t -> t
+
+    val add : t -> t -> t
+  end) =
+  struct
+    type t = R.t array array [@@deriving sexp]
+
+    let rows t = Array.length t
+
+    let row t i = t.(i)
+
+    let col t i = Array.map t ~f:(fun xs -> xs.(i))
+
+    let cols t = Array.length t.(0)
+
+    let mul a b =
+      (* n x m * m x p -> n x p *)
+      assert (cols a = rows b) ;
+      Array.init (rows a) ~f:(fun i ->
+          Array.init (cols b) ~f:(fun j ->
+              Array.fold2_exn (row a i) (col b j) ~init:R.zero ~f:
+                (fun acc aik bkj -> R.add acc (R.mul aik bkj) ) ) )
+  end
+
+  (* A Field is a ring *)
+  module Mat = Matrix (Field)
+
+  (* We can multiply *)
+  let a =
+    Field.[|[|of_int 1; of_int 2; of_int 3|]; [|of_int 4; of_int 5; of_int 6|]|]
+
+  let b =
+    let open Field in
+    [|[|of_int 1; of_int 2|]; [|of_int 3; of_int 4|]; [|of_int 5; of_int 6|]|]
+
+  let () = printf !"Result %{sexp: Mat.t}\n%!" (Mat.mul a b)
+
+  (* Exercise 3:
+   * Write `assert_exists_mat_sqrt` that takes an x and a sqrt_x and asserts
+   * that sqrt_x is a valid sqrt of x (with respect to matrix multiplication).
+   * Note that this involves implementing matrix multiplication in terms of
+   * checked computations. 
+   *
+   * Bonus: Try an adjust the Matrix definition above to functor over a monad,
+   * make mul monadic. Then instantiate the Field version with the identity
+   * monad, and the Field.Checked version with the Checked monad
+   *)
+  module Mat_checked = struct
+    type t = Field.var array array
+
+    (* Exercise 3: fill me out *)
+    let mul : t -> t -> (t, _) Checked.t =
+     fun a b -> failwith "Exercise3: Write mul"
+  end
+
+  let assert_exists_mat_sqrt x sqrt_x =
+    failwith "Exercise 3: write a snark proof"
+
+  (* Let's partially apply it to some arbitrary matrix that we can pretend we
+     "don't know the sqrt of" so we can prove something interesting. In
+     reality, since this is just a tutorial, we're going to hardcode a boring
+     matrix (the square of )
+  *)
+  let assert_exists_sqrt sqrt_x =
+    assert_exists_mat_sqrt Field.[| sqrt_x
+
+  (* Now the data_spec is more interesting:
+   * First of all, SNARKs require fixed sized inputs, so we'll fix our proof to
+   * work over matrices of size exactly 2x2.
+   *
+   *)
+  let input () =
+    let cols = Typ.array ~length:2 Field.typ in
+    let matrix = Typ.array ~length:2 cols in
+    Data_spec.[matrix]
+
+  let keypair = generate_keypair ~exposing:(input ()) assert_exists_sqrt
+
+  let mat_1245 =
+      Field.[|[|of_int 1; of_int 2|]; [|of_int 4; of_int 5|]|]
+  in
+  let proof =
+    prove (Keypair.pk keypair) (input ()) () assert_exists_sqrt mat_1245
+  let is_valid =
+    verify proof (Keypair.vk keypair) (input ()) mat_1245 in
+
+  let run () = printf "Done!"
+end
+
+(* Exercise 3: Comment this out when you're ready to test it! *)
+(* let () = Exercise3.run () *)
+(* TODO: Here's how you can encode other richer data types in terms of fields *)
+(* TODO: Prove knowledge of a matrix sqrt *)
+let row = Typ.(field * field)
+
+let matrix = Typ.(row * row)
+
+(* TODO: To_bits of_bits *)
 (* TODO: put somewhere *)
 let square_root x =
   let%bind y =
-    provide_witness Field.typ As_prover.(map (read Field.typ x) ~f:Field.sqrt) (* TODO: explain *)
+    provide_witness Field.typ As_prover.(map (read Field.typ x) ~f:Field.sqrt)
+    (* TODO: explain *)
   in
-  let%map () = assert_r1cs x x y in (* TODO: Explain... everything *)
+  let%map () = assert_r1cs x x y in
+  (* TODO: Explain... everything *)
   y
-
