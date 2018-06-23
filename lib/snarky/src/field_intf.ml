@@ -41,6 +41,8 @@ module type Extended = sig
 
   val negate : t -> t
 
+  val to_int_exn : t -> int
+
   module Infix : sig
     val ( + ) : t -> t -> t
 

@@ -7,6 +7,7 @@ let whitelist =
   ; "lib/dummy_values/gen_values/gen_values.ml"
   ; "lib/nanobit_base/ledger_hash.ml"
   ; "lib/nanobit_base/blockchain_state.ml"
+  ; "app/calc/calc.ml"
   ; "lib/snarky/src/request.ml"
   ; "lib/snarky/src/request.mli" ]
 

@@ -104,6 +104,9 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let negate x = sub zero x
 
+    let to_int_exn x =
+      Bigint.of_field x |> Bigint.to_bignum_bigint |> Bignum_bigint.to_int_exn
+
     let unpack x =
       let n = Bigint.of_field x in
       List.init size_in_bits ~f:(fun i -> Bigint.test_bit n i)
