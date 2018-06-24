@@ -219,14 +219,24 @@ let run program : (Field.var, Vm_stack.t) Checked.t =
   let%bind last_stack =
     Checked.List.fold program ~init:(Field.Checked.constant Hash.empty) ~f:eval
   in
-  provide_witness Field.typ
-    (let open As_prover in
-    let open As_prover.Let_syntax in
-    let%bind stack = get_state in
-    let%map last_stack = read Field.typ last_stack in
-    assert (Field.equal (Merkle_stack.root stack) last_stack) ;
-    let v, _ = Merkle_stack.pop_exn stack in
-    v)
+  let%bind v, rest_stack =
+    provide_witness
+      Typ.(field * field)
+      (let open As_prover in
+      let open As_prover.Let_syntax in
+      let%bind stack = get_state in
+      let%map last_stack = read Field.typ last_stack in
+      assert (Field.equal (Merkle_stack.root stack) last_stack) ;
+      let v, rest = Merkle_stack.pop_exn stack in
+      (v, Merkle_stack.root rest))
+  in
+  let%map () =
+    let should_be_old_stack =
+      Hash.Checked.combine rest_stack (Hash.Checked.hash v)
+    in
+    Field.Checked.Assert.equal should_be_old_stack last_stack
+  in
+  v
 
 let prove_calc program output : (unit, Vm_stack.t) Checked.t =
   let%bind result = run program in
