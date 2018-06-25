@@ -130,8 +130,7 @@ module type Ledger_builder_controller_intf = sig
   val local_get_ledger :
     t -> ledger_builder_hash -> (ledger_builder * state) Or_error.t
 
-  val strongest_ledgers :
-    t -> (ledger_builder * ledger * state) Linear_pipe.Reader.t
+  val strongest_ledgers : t -> (ledger_builder * state) Linear_pipe.Reader.t
 end
 
 module type Miner_intf = sig
