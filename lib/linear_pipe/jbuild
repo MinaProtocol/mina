@@ -3,6 +3,7 @@
 (library
  ((name linear_pipe)
   (public_name linear_pipe)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core async async_extra))

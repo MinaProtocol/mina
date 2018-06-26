@@ -3,6 +3,7 @@
 (library
  ((name parallel_scan)
   (public_name parallel_scan)
+  (flags (:standard -short-paths))
   (inline_tests)
   (library_flags (-linkall))
   (libraries (linear_pipe core async async_extra))

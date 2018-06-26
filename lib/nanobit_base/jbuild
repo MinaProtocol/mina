@@ -3,6 +3,7 @@
 (library
  ((name nanobit_base)
   (public_name nanobit_base)
+  (flags (:standard -short-paths))
   (inline_tests)
   (library_flags (-linkall))
   (libraries (base64 protocols core dummy_values merkle_ledger snarky crypto_params async async_extra bignum_bigint))

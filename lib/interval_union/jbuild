@@ -3,6 +3,7 @@
 (library
  ((name interval_union)
   (public_name interval_union)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries

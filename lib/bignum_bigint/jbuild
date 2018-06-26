@@ -3,6 +3,7 @@
 (library
  ((name bignum_bigint)
   (public_name bignum_bigint)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core async async_extra bignum))

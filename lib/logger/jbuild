@@ -3,6 +3,7 @@
 (library
  ((name logger)
   (public_name logger)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core async))
