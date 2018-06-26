@@ -3,6 +3,7 @@
 (library
  ((name rocksdb_database)
   (public_name rocksdb_database)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (libraries (rocks))
   (synopsis "RocksDB Database module")))

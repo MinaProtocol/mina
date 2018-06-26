@@ -3,6 +3,7 @@
 (library
  ((name minibit_networking)
   (public_name minibit_networking)
+  (flags (:standard -short-paths))
   (inline_tests)
   (library_flags (-linkall))
   (libraries (core async gossip_net minibit protocols async_extra))

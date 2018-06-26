@@ -3,6 +3,7 @@
 (library
  ((name kademlia)
   (public_name kademlia)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core logger linear_pipe async async_extra))

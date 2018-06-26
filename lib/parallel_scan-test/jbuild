@@ -4,6 +4,7 @@
   ((name parallel_scan_test)
    (package parallel_scan)
    (public_name parallel_scan_test)
+(flags (:standard -short-paths))
    (libraries (parallel_scan ppx_inline_test.runner.lib))
   ))
 

@@ -3,6 +3,7 @@
 (library
  ((name cached)
   (public_name cached)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries

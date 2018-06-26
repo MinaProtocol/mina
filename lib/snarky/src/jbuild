@@ -1,6 +1,7 @@
 (library
  ((name snarky)
   (public_name snarky)
+  (flags (:standard -short-paths))
   (inline_tests)
   (libraries (core_kernel interval_union bignum camlsnark_c))
   (c_library_flags (:standard -lstdc++ -lpthread))
