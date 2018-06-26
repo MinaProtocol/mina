@@ -5,11 +5,15 @@ open Protocols
 module type Ledger_builder_io_intf = sig
   type t
 
+  type net
+
   type ledger_builder_hash
 
   type ledger_builder
 
   type state
+
+  val create : net -> t
 
   val get_ledger_builder_at_hash :
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
@@ -237,10 +241,6 @@ end
 
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
-
-  module Ledger : sig
-    type t
-  end
 
   module Proof_carrying_state : sig
     type t = (State.t, State.Proof.t) Coda_pow.Proof_carrying_data.t
@@ -481,7 +481,8 @@ struct
     don't_wait_for
       (Linear_pipe.transfer
          (Ledger_builder_controller.strongest_ledgers t.ledger_builder)
-         t.miner_changes_writer ~f:(fun (ledger_builder, ledger, state) ->
+         t.miner_changes_writer ~f:(fun (ledger_builder, state) ->
+           let ledger = Ledger_builder.ledger ledger_builder in
            let transactions =
              Transaction_pool.get ~k:t.transactions_per_bundle ~ledger
                t.transaction_pool
