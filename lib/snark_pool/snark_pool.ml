@@ -33,10 +33,7 @@ module Make
 
         include Hashable.S_binable with type t := t
     end) :
-  S
-  with type work := Work.t
-   and type proof := Proof.t
-   and type fee := Fee.t =
+  S with type work := Work.t and type proof := Proof.t and type fee := Fee.t =
 struct
   module WorkRandomSet = Random_set.Make (Work)
 
