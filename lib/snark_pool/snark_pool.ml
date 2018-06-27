@@ -10,7 +10,7 @@ module type S = sig
 
   type fee
 
-  type pool
+  type priced_proof
 
   type t
 
@@ -18,7 +18,7 @@ module type S = sig
 
   val add_snark : t -> work:work -> proof:proof -> fee:fee -> unit
 
-  val request_proof : t -> work -> pool option
+  val request_proof : t -> work -> priced_proof option
 
   val add_unsolved_work : t -> work -> unit
 
@@ -37,7 +37,7 @@ module Make
         val gen : t Quickcheck.Generator.t
 
         include Hashable.S_binable with type t := t
-    end) (Pool : sig
+    end) (Priced_proof : sig
       type t = {proof: Proof.t; fee: Fee.t} [@@deriving fields]
 
       include Snark_pool_proof_intf with type proof := Proof.t and type t := t
@@ -46,12 +46,12 @@ module Make
   with type work := Work.t
    and type proof := Proof.t
    and type fee := Fee.t
-   and type pool := Pool.t =
+   and type priced_proof := Priced_proof.t =
 struct
   module Work_random_set = Random_set.Make (Work)
 
   type t =
-    { proofs: Pool.t Work.Table.t
+    { proofs: Priced_proof.t Work.Table.t
     ; solved_work: Work_random_set.t
     ; unsolved_work: Work_random_set.t }
   [@@deriving bin_io]
@@ -78,18 +78,16 @@ struct
            heuristics since there will be high contention when the work pool is small.
            See issue #276 *)
   let request_work t =
-    let open Option.Let_syntax in
-    let remove_random_unsolved_work =
-      let%bind work = Work_random_set.get_random t.unsolved_work in
-      Work_random_set.remove t.unsolved_work work ;
-      Some (lazy work)
+    let ( |? ) maybe default =
+      match maybe with Some v -> Some v | None -> Lazy.force default
     in
-    let%bind work = Work_random_set.get_random t.solved_work in
-    return
-    @@ lazy
-         ( Work_random_set.remove t.solved_work work ;
-           Work.Table.remove t.proofs work ;
-           work )
-    |> Option.first_some remove_random_unsolved_work
-    >>| Lazy.force
+    let open Option.Let_syntax in
+    (let%map work = Work_random_set.get_random t.unsolved_work in
+     Work_random_set.remove t.unsolved_work work ;
+     work)
+    |? lazy
+         (let%map work = Work_random_set.get_random t.solved_work in
+          Work_random_set.remove t.solved_work work ;
+          Work.Table.remove t.proofs work ;
+          work)
 end
