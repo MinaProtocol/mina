@@ -54,6 +54,7 @@ struct
     { proofs: Pool.t Work.Table.t
     ; solved_work: Work_random_set.t
     ; unsolved_work: Work_random_set.t }
+  [@@deriving bin_io]
 
   let create_pool () =
     { proofs= Work.Table.create ()

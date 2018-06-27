@@ -1,8 +1,9 @@
 open Core
 open Nanobit_base
+open Dyn_array
 
 module type S = sig
-  type t
+  type t [@@deriving bin_io]
 
   type key
 
@@ -28,39 +29,31 @@ module Make (Key : sig
 end) :
   S with type key := Key.t =
 struct
-  module DynArray = struct
-    include DynArray
+  type t = {keys: Key.t Dyn_array.t; key_to_loc: Int.t Key.Table.t}
+  [@@deriving sexp, bin_io]
 
-    let sexp_of_t sexp_of_a t = [%sexp_of : a list] (DynArray.to_list t)
-
-    let t_of_sexp a_of_sexp ls = DynArray.of_list ([%of_sexp : a list] ls)
-  end
-
-  type t = {keys: Key.t DynArray.t; key_to_loc: Int.t Key.Table.t}
-  [@@deriving sexp]
-
-  let create () = {keys= DynArray.create (); key_to_loc= Key.Table.create ()}
+  let create () = {keys= Dyn_array.create (); key_to_loc= Key.Table.create ()}
 
   let add t key =
     if not (Key.Table.mem t.key_to_loc key) then (
-      Key.Table.set t.key_to_loc key (DynArray.length t.keys) ;
-      DynArray.add t.keys key )
+      Key.Table.set t.key_to_loc key (Dyn_array.length t.keys) ;
+      Dyn_array.add t.keys key )
     else ()
 
   let mem t = Key.Table.mem t.key_to_loc
 
   let get_random t =
-    if DynArray.empty t.keys then None
+    if Dyn_array.empty t.keys then None
     else
-      let random_index = Random.int (DynArray.length t.keys) in
-      Some (DynArray.get t.keys random_index)
+      let random_index = Random.int (Dyn_array.length t.keys) in
+      Some (Dyn_array.get t.keys random_index)
 
   let remove t key =
     Option.iter (Key.Table.find_and_remove t.key_to_loc key) ~f:
       (fun delete_index ->
-        let last_elem = DynArray.last t.keys in
-        DynArray.set t.keys delete_index last_elem ;
-        DynArray.delete_last t.keys )
+        let last_elem = Dyn_array.last t.keys in
+        Dyn_array.set t.keys delete_index last_elem ;
+        Dyn_array.delete_last t.keys )
 
   let gen =
     let open Quickcheck in
