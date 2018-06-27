@@ -1,5 +1,5 @@
-(* open Base *)
 open Core
+open Nanobit_base
 
 module type S = sig
   type t
@@ -36,33 +36,31 @@ struct
     let t_of_sexp a_of_sexp ls = DynArray.of_list ([%of_sexp : a list] ls)
   end
 
-  type t = {key_arr: Key.t DynArray.t; key_to_loc_map: Int.t Key.Table.t}
+  type t = {keys: Key.t DynArray.t; key_to_loc: Int.t Key.Table.t}
   [@@deriving sexp]
 
-  let create () =
-    {key_arr= DynArray.create (); key_to_loc_map= Key.Table.create ()}
+  let create () = {keys= DynArray.create (); key_to_loc= Key.Table.create ()}
 
   let add t key =
-    if not (Key.Table.mem t.key_to_loc_map key) then (
-      Key.Table.set t.key_to_loc_map key (DynArray.length t.key_arr) ;
-      DynArray.add t.key_arr key )
+    if not (Key.Table.mem t.key_to_loc key) then (
+      Key.Table.set t.key_to_loc key (DynArray.length t.keys) ;
+      DynArray.add t.keys key )
     else ()
 
-  let mem t = Key.Table.mem t.key_to_loc_map
+  let mem t = Key.Table.mem t.key_to_loc
 
   let get_random t =
-    if DynArray.empty t.key_arr then None
+    if DynArray.empty t.keys then None
     else
-      let random_index = Random.int (DynArray.length t.key_arr) in
-      Some (DynArray.get t.key_arr random_index)
+      let random_index = Random.int (DynArray.length t.keys) in
+      Some (DynArray.get t.keys random_index)
 
   let remove t key =
-    match Key.Table.find_and_remove t.key_to_loc_map key with
-    | None -> ()
-    | Some delete_index ->
-        let last_elem = DynArray.last t.key_arr in
-        DynArray.set t.key_arr delete_index last_elem ;
-        DynArray.delete_last t.key_arr
+    Option.iter (Key.Table.find_and_remove t.key_to_loc key) ~f:
+      (fun delete_index ->
+        let last_elem = DynArray.last t.keys in
+        DynArray.set t.keys delete_index last_elem ;
+        DynArray.delete_last t.keys )
 
   let gen =
     let open Quickcheck in
@@ -91,25 +89,28 @@ let%test_module "random set test" =
     module Int_random_set = Make (Int)
 
     let%test "simulate random numbers from 0 to 10" =
-      let s = Int_random_set.create () in
-      let upper_bound = 10 in
-      let sample_size = 1000000 in
-      List.iter
-        (List.range 1 (upper_bound + 1))
-        ~f:(fun i -> Int_random_set.add s i) ;
-      let sampled_values =
-        let open List in
-        range 0 sample_size
-        >>| fun _ -> Option.value_exn (Int_random_set.get_random s)
-      in
-      let summed_values = List.fold sampled_values ~init:0 ~f:( + ) in
-      let sampled_expectation =
-        Int.to_float summed_values /. Int.to_float sample_size
-      in
-      let expected_expectation =
-        Int.to_float (upper_bound * (upper_bound + 1) / 2)
-        /. Int.to_float upper_bound
-      in
-      let episilon = Float.abs (sampled_expectation -. expected_expectation) in
-      episilon <. 0.1
+      Test_util.with_randomness 123456789 (fun () ->
+          let s = Int_random_set.create () in
+          let upper_bound = 10 in
+          let sample_size = 100000 in
+          List.iter
+            (List.range 1 (upper_bound + 1))
+            ~f:(fun i -> Int_random_set.add s i) ;
+          let sampled_values =
+            let open List in
+            range 0 sample_size
+            >>| fun _ -> Option.value_exn (Int_random_set.get_random s)
+          in
+          let summed_values = List.fold sampled_values ~init:0 ~f:( + ) in
+          let sampled_expectation =
+            Int.to_float summed_values /. Int.to_float sample_size
+          in
+          let expected_expectation =
+            Int.to_float (upper_bound * (upper_bound + 1) / 2)
+            /. Int.to_float upper_bound
+          in
+          let episilon =
+            Float.abs (sampled_expectation -. expected_expectation)
+          in
+          episilon <. 0.1 )
   end )
