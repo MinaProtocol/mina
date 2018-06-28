@@ -3,7 +3,7 @@ open Nanobit_base
 open Dyn_array
 
 module type S = sig
-  type t [@@deriving bin_io]
+  type t [@@deriving sexp, bin_io]
 
   type key
 
@@ -16,6 +16,8 @@ module type S = sig
   val mem : t -> key -> bool
 
   val get_random : t -> key option
+
+  val length : t -> int
 
   val gen : t Quickcheck.Generator.t
 end
@@ -54,6 +56,8 @@ struct
         let last_elem = Dyn_array.last t.keys in
         Dyn_array.set t.keys delete_index last_elem ;
         Dyn_array.delete_last t.keys )
+
+  let length t = DynArray.length t.keys
 
   let gen =
     let open Quickcheck in
