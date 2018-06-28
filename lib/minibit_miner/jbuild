@@ -3,6 +3,7 @@
 (library
  ((name minibit_miner)
   (public_name minibit_miner)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries

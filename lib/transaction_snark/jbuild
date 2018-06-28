@@ -3,6 +3,7 @@
 (library
  ((name transaction_snark)
   (public_name transaction_snark)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core cache_dir cached snarky nanobit_base bignum))

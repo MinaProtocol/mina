@@ -1,6 +1,7 @@
 (library
  ((name        dummy_values)
   (public_name dummy_values)
+  (flags (:standard -short-paths))
   (libraries
     ( crypto_params
       snarky ))

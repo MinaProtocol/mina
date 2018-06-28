@@ -1,6 +1,7 @@
 (library
  ((name        snark_keys)
   (public_name snark_keys)
+  (flags (:standard -short-paths))
   (libraries
     ( async
       transaction_snark

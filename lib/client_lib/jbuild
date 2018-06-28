@@ -3,6 +3,7 @@
 (library
  ((name client_lib)
   (public_name client_lib)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core async nanobit_base))

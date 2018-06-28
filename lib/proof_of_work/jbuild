@@ -3,6 +3,7 @@
 (library
  ((name proof_of_work)
   (public_name proof_of_work)
+  (flags (:standard -short-paths))
   (inline_tests)
   (library_flags (-linkall))
   (libraries (core_kernel nanobit_base))
