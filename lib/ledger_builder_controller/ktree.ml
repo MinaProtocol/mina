@@ -44,6 +44,9 @@ struct
 
   type t = {tree: Elem.t Rose.t; elems: Elem_set.t} [@@deriving sexp, bin_io]
 
+  let single (e: Elem.t) : t =
+    {tree= Rose.single e; elems= Elem_set.singleton e}
+
   let gen =
     let open Quickcheck.Generator.Let_syntax in
     (* We need to force the ref to be under the monad so it regenerates *)
