@@ -3,6 +3,11 @@ open Core_kernel
 open Async_kernel
 open Coda_pow
 
+module Priced_proof = struct
+  type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
+  [@@deriving bin_io, sexp, fields]
+end
+
 module type S = sig
   type work
 
@@ -30,13 +35,11 @@ module type S = sig
 end
 
 module Make (Proof : sig
-  type t [@@deriving sexp]
-
-  val gen : t Quickcheck.Generator.t
+  type t [@@deriving bin_io]
 
   include Proof_intf with type t := t
 end) (Fee : sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   val gen : t Quickcheck.Generator.t
 
@@ -47,18 +50,41 @@ end) (Work : sig
   val gen : t Quickcheck.Generator.t
 
   include Hashable.S_binable with type t := t
-end) (Priced_proof : sig
-  type t = {proof: Proof.t; fee: Fee.t}
-
-  include Snark_pool_proof_intf with type proof := Proof.t and type t := t
 end) :
-  S
+  sig
+    include S
+
+    val sexp_of_t : t -> Sexp.t
+
+    val unsolved_work_count : t -> int
+
+    val remove_solved_work : t -> work -> unit
+
+    val to_record : priced_proof -> (proof, fee) Priced_proof.t
+  end
   with type work := Work.t
    and type proof := Proof.t
-   and type fee := Fee.t
-   and type priced_proof := Priced_proof.t =
+   and type fee := Fee.t =
 struct
   module Work_random_set = Random_set.Make (Work)
+
+  module Priced_proof = struct
+    type t = (Proof.t sexp_opaque, Fee.t) Priced_proof.t
+    [@@deriving sexp, bin_io]
+
+    let create proof fee : (Proof.t, Fee.t) Priced_proof.t = {proof; fee}
+
+    let proof (t: t) = t.proof
+
+    let fee (t: t) = t.fee
+  end
+
+  let to_record priced_proof =
+    Priced_proof.create
+      (Priced_proof.proof priced_proof)
+      (Priced_proof.fee priced_proof)
+
+  type priced_proof = Priced_proof.t
 
   type t =
     { proofs: Priced_proof.t Work.Table.t
@@ -77,9 +103,9 @@ struct
       Work.Table.find t.proofs work
       >>| (fun {proof= existing_proof; fee= existing_fee} ->
             if existing_fee <= fee then
-              {Priced_proof.proof= existing_proof; fee= existing_fee}
+              Priced_proof.create existing_proof existing_fee
             else {proof; fee} )
-      |> Option.value ~default:{proof; fee}
+      |> Option.value ~default:(Priced_proof.create proof fee)
     in
     Work.Table.set t.proofs work smallest_priced_proof ;
     Work_random_set.add t.solved_work work
@@ -109,59 +135,7 @@ struct
          (let%map work = Work_random_set.get_random t.solved_work in
           remove_solved_work t work ; work)
 
-  let gen =
-    let open Quickcheck in
-    let open Quickcheck.Generator.Let_syntax in
-    let gen_entry () =
-      Quickcheck.Generator.tuple3 Work.gen Proof.gen Fee.gen
-    in
-    let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ())
-    and sample_unsolved_solved_work = Quickcheck.Generator.list Work.gen in
-    let pool = create_pool () in
-    List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
-        add_snark pool work proof fee ) ;
-    List.iter sample_unsolved_solved_work ~f:(fun work ->
-        add_unsolved_work pool work ) ;
-    pool
-
-  let%test_unit "When two priced proofs of the same work are inserted into \
-                 the snark pool, the fee of the work is at most the minimum \
-                 of those fees" =
-    let gen_entry () = Quickcheck.Generator.tuple2 Proof.gen Fee.gen in
-    Quickcheck.test
-      ~sexp_of:[%sexp_of : t * Work.t * (Proof.t * Fee.t) * (Proof.t * Fee.t)]
-      (Quickcheck.Generator.tuple4 gen Work.gen (gen_entry ()) (gen_entry ()))
-      ~f:(fun (t, work, (proof_1, fee_1), (proof_2, fee_2)) ->
-        add_snark t work proof_1 fee_1 ;
-        add_snark t work proof_2 fee_2 ;
-        let fee_upper_bound = Fee.min fee_1 fee_2 in
-        let {Priced_proof.fee; _} = Option.value_exn (request_proof t work) in
-        assert (fee <= fee_upper_bound) )
-
-  let%test_unit "A priced proof of a work will replace an existing priced \
-                 proof of the same work only if it's fee is smaller than the \
-                 existing priced proof" =
-    Quickcheck.test
-      ~sexp_of:[%sexp_of : t * Work.t * Fee.t * Fee.t * Proof.t * Proof.t]
-      (Quickcheck.Generator.tuple6 gen Work.gen Fee.gen Fee.gen Proof.gen
-         Proof.gen) ~f:
-      (fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
-        remove_solved_work t work ;
-        let expensive_fee = max fee_1 fee_2 and cheap_fee = min fee_1 fee_2 in
-        add_snark t work cheap_proof cheap_fee ;
-        add_snark t work expensive_proof expensive_fee ;
-        assert (
-          {Priced_proof.fee= cheap_fee; proof= cheap_proof}
-          = Option.value_exn (request_proof t work) ) )
-
-  let%test_unit "Remove unsolved work if unsolved work pool is not empty" =
-    Quickcheck.test ~sexp_of:[%sexp_of : t * Work.t]
-      (Quickcheck.Generator.tuple2 gen Work.gen) ~f:(fun (t, work) ->
-        let open Quickcheck.Generator.Let_syntax in
-        add_unsolved_work t work ;
-        let size = Work_random_set.length t.unsolved_work in
-        ignore @@ request_work t ;
-        assert (size - 1 = Work_random_set.length t.unsolved_work) )
+  let unsolved_work_count t = Work_random_set.length t.unsolved_work
 end
 
 let%test_module "random set test" =
@@ -176,15 +150,94 @@ let%test_module "random set test" =
       let gen = Int.gen
     end
 
+    module Mock_work = Int
+    module Mock_fee = Int
+
     module Mock_Priced_proof = struct
-      type t = {proof: Mock_proof.t; fee: Int.t} [@@deriving sexp, bin_io]
+      type proof = Mock_proof.t [@@deriving sexp, bin_io]
+
+      type fee = Mock_fee.t [@@deriving sexp, bin_io]
+
+      type t = {proof: proof; fee: fee} [@@deriving sexp, bin_io]
 
       let proof t = t.proof
-
-      type proof = Mock_proof.t
-
-      type fee = Int.t
     end
 
-    module Mock_snark_pool = Make (Mock_proof) (Int) (Int) (Mock_Priced_proof)
+    module Mock_snark_pool = Make (Mock_proof) (Mock_fee) (Mock_work)
+
+    let gen =
+      let open Quickcheck in
+      let open Quickcheck.Generator.Let_syntax in
+      let gen_entry () =
+        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
+      in
+      let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ())
+      and sample_unsolved_solved_work =
+        Quickcheck.Generator.list Mock_work.gen
+      in
+      let pool = Mock_snark_pool.create_pool () in
+      List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
+          Mock_snark_pool.add_snark pool work proof fee ) ;
+      List.iter sample_unsolved_solved_work ~f:(fun work ->
+          Mock_snark_pool.add_unsolved_work pool work ) ;
+      pool
+
+    let%test_unit "When two priced proofs of the same work are inserted into \
+                   the snark pool, the fee of the work is at most the minimum \
+                   of those fees" =
+      let gen_entry () =
+        Quickcheck.Generator.tuple2 Mock_proof.gen Mock_fee.gen
+      in
+      Quickcheck.test
+        ~sexp_of:
+          [%sexp_of
+            : Mock_snark_pool.t
+              * Mock_work.t
+              * (Mock_proof.t * Mock_fee.t)
+              * (Mock_proof.t * Mock_fee.t)]
+        (Quickcheck.Generator.tuple4 gen Mock_work.gen (gen_entry ())
+           (gen_entry ()))
+        ~f:(fun (t, work, (proof_1, fee_1), (proof_2, fee_2)) ->
+          Mock_snark_pool.add_snark t work proof_1 fee_1 ;
+          Mock_snark_pool.add_snark t work proof_2 fee_2 ;
+          let fee_upper_bound = Mock_fee.min fee_1 fee_2 in
+          let {Priced_proof.fee; _} =
+            Mock_snark_pool.to_record
+            @@ Option.value_exn (Mock_snark_pool.request_proof t work)
+          in
+          assert (fee <= fee_upper_bound) )
+
+    let%test_unit "A priced proof of a work will replace an existing priced \
+                   proof of the same work only if it's fee is smaller than \
+                   the existing priced proof" =
+      Quickcheck.test
+        ~sexp_of:
+          [%sexp_of
+            : Mock_snark_pool.t
+              * Mock_work.t
+              * Mock_fee.t
+              * Mock_fee.t
+              * Mock_proof.t
+              * Mock_proof.t]
+        (Quickcheck.Generator.tuple6 gen Mock_work.gen Mock_fee.gen
+           Mock_fee.gen Mock_proof.gen Mock_proof.gen) ~f:
+        (fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
+          Mock_snark_pool.remove_solved_work t work ;
+          let expensive_fee = max fee_1 fee_2
+          and cheap_fee = min fee_1 fee_2 in
+          Mock_snark_pool.add_snark t work cheap_proof cheap_fee ;
+          Mock_snark_pool.add_snark t work expensive_proof expensive_fee ;
+          assert (
+            {Priced_proof.fee= cheap_fee; proof= cheap_proof}
+            = Mock_snark_pool.to_record
+              @@ Option.value_exn (Mock_snark_pool.request_proof t work) ) )
+
+    let%test_unit "Remove unsolved work if unsolved work pool is not empty" =
+      Quickcheck.test ~sexp_of:[%sexp_of : Mock_snark_pool.t * Mock_work.t]
+        (Quickcheck.Generator.tuple2 gen Mock_work.gen) ~f:(fun (t, work) ->
+          let open Quickcheck.Generator.Let_syntax in
+          Mock_snark_pool.add_unsolved_work t work ;
+          let size = Mock_snark_pool.unsolved_work_count t in
+          ignore @@ Mock_snark_pool.request_work t ;
+          assert (size - 1 = Mock_snark_pool.unsolved_work_count t) )
   end )
