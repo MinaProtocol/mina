@@ -16,7 +16,7 @@ module State : sig
     [@@deriving bin_io, sexp]
   end
 
-  type ('a, 'b, 'd) t [@@deriving bin_io]
+  type ('a, 'b, 'd) t [@@deriving sexp, bin_io]
 
   val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t
 end
@@ -35,7 +35,7 @@ module type Spec_intf = sig
   end
 
   module Output : sig
-    type t [@@deriving sexp_of, eq]
+    type t [@@deriving sexp_of]
   end
 
   val map : Data.t -> Accum.t Deferred.t

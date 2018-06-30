@@ -3,6 +3,8 @@ open Async_kernel
 
 type 'a t = {data: 'a Array.t; mutable position: int} [@@deriving sexp, bin_io]
 
+let filter_map t = Array.filter_map t.data
+
 let mod_ x y =
   let r = x mod y in
   if r >= 0 then r else y + r

@@ -62,6 +62,8 @@ module type Ledger_intf = sig
 
   type valid_transaction
 
+  type super_transaction
+
   type ledger_hash
 
   val create : unit -> t
@@ -71,6 +73,8 @@ module type Ledger_intf = sig
   val merkle_root : t -> ledger_hash
 
   val apply_transaction : t -> valid_transaction -> unit Or_error.t
+
+  val apply_super_transaction : t -> super_transaction -> unit Or_error.t
 end
 
 (* Proofs have prices attached *)
@@ -86,10 +90,22 @@ module type Transaction_intf = sig
   type t [@@deriving sexp, compare, eq]
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, compare, eq]
+    type nonrec t = private t [@@deriving sexp, compare, eq, bin_io]
   end
 
   val check : t -> With_valid_signature.t option
+end
+
+module type Fee_transfer_intf = sig
+  type t [@@deriving sexp, compare, eq]
+end
+
+module type Super_transaction_intf = sig
+  type t [@@deriving sexp, compare, eq]
+
+  type transaction
+
+  type fee_transfer
 end
 
 module type Ledger_builder_witness_intf = sig
@@ -308,6 +324,10 @@ module type Inputs_intf = sig
   module Time : Time_intf
 
   module Transaction : Transaction_intf
+
+  module Fee_transfer : Fee_transfer_intf
+
+  module Super_transaction : Super_transaction_intf
 
   module Block_nonce : Nonce_intf
 

@@ -22,7 +22,7 @@ module type Spec_intf = sig
   end
 
   module Output : sig
-    type t [@@deriving sexp_of, eq]
+    type t [@@deriving sexp_of]
   end
 
   val map : Data.t -> Accum.t Deferred.t
