@@ -378,7 +378,17 @@ target_link_libraries(
 
   snark
 )
+add_executable(
+  gadgetlib1_r1cs_gg_ppzksnark_verifier_gadget_test
+  EXCLUDE_FROM_ALL
 
+  gadgetlib1/gadgets/verifiers/tests/test_r1cs_gg_ppzksnark_verifier_gadget.cpp
+)
+target_link_libraries(
+  gadgetlib1_r1cs_gg_ppzksnark_verifier_gadget_test
+
+  snark
+)
 add_executable(
   gadgetlib2_adapters_test
   EXCLUDE_FROM_ALL
@@ -683,6 +693,10 @@ add_test(
   COMMAND gadgetlib1_r1cs_ppzksnark_verifier_gadget_test
 )
 add_test(
+  NAME gadgetlib1_r1cs_gg_ppzksnark_verifier_gadget_test
+  COMMAND gadgetlib1_r1cs_gg_ppzksnark_verifier_gadget_test
+)
+add_test(
   NAME gadgetlib2_adapters_test
   COMMAND gadgetlib2_adapters_test
 )
@@ -766,6 +780,7 @@ add_test(
 add_dependencies(check common_routing_algorithms_test)
 add_dependencies(check gadgetlib1_simple_test)
 add_dependencies(check gadgetlib1_r1cs_ppzksnark_verifier_gadget_test)
+add_dependencies(check gadgetlib1_r1cs_gg_ppzksnark_verifier_gadget_test)
 add_dependencies(check gadgetlib2_adapters_test)
 add_dependencies(check gadgetlib2_constraint_test)
 add_dependencies(check gadgetlib2_gadget_test)
