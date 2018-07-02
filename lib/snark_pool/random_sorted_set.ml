@@ -14,7 +14,7 @@ module type S = sig
 
   val mem : t -> key -> bool
 
-  val get_random : t -> key -> key option
+  (* val get_random : t -> key -> key option *)
 
 end
 
@@ -56,9 +56,6 @@ end) : S with type key := Key.t = struct
       let delete_index = Sorted_array.get_index t key 0 (Dyn_array.length t) in
         if is_match t key delete_index then Sorted_array.delete t delete_index
 
-  (* let get_random (t: t) (key: Key.t) = *)
-
-
   let gen =
     let open Quickcheck in
     let open Quickcheck.Generator.Let_syntax in
@@ -66,6 +63,14 @@ end) : S with type key := Key.t = struct
     let t = create () in
     List.iter sample_list ~f:(add t) ;
     t
+  
+  let%test_unit "for all s, key : i_k <- get_index s key -> s (i_k - 1) <= key and s(i_k + 1) > key" =
+  Quickcheck.test ~sexp_of:[%sexp_of : t * Key.t]
+    (Quickcheck.Generator.tuple2 gen Key.gen) ~f: ((fun (s, key) ->
+      let index = Sorted_array.get_index s key in
+        if index - 1 < 0 then (assert (Sorted_array.get_index ))
+      ))
+  
   let%test_unit "for all s : is_sorted s" =
   Quickcheck.test ~sexp_of:[%sexp_of : t]
     gen ~f: ([%test_pred: t] (fun s ->
