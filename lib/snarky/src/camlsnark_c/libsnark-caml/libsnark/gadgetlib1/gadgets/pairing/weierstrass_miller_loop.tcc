@@ -176,6 +176,8 @@ mnt_miller_loop_gadget<ppT>::mnt_miller_loop_gadget(protoboard<FieldT> &pb,
 
     f_count = add_count = dbl_count = 0;
 
+    result_before_potential_negation.reset(new Fqk_variable<ppT>(pb, FMT(annotation_prefix, " result_before_potential_negation")));
+
     bool found_nonzero = false;
     std::vector<long> NAF = find_wnaf(1, loop_count);
     for (long i = NAF.size()-1; i >= 0; --i)
@@ -234,7 +236,7 @@ mnt_miller_loop_gadget<ppT>::mnt_miller_loop_gadget(protoboard<FieldT> &pb,
         ++prec_id;
         dbl_sqrs[dbl_id].reset(new Fqk_sqr_gadget<ppT>(pb, *fs[f_id], *fs[f_id+1], FMT(annotation_prefix, " dbl_sqrs_%zu", dbl_id)));
         ++f_id;
-        dbl_muls[dbl_id].reset(new Fqk_special_mul_gadget<ppT>(pb, *fs[f_id], *g_RR_at_Ps[dbl_id], (f_id + 1 == f_count ? result : *fs[f_id+1]), FMT(annotation_prefix, " dbl_muls_%zu", dbl_id)));
+        dbl_muls[dbl_id].reset(new Fqk_special_mul_gadget<ppT>(pb, *fs[f_id], *g_RR_at_Ps[dbl_id], (f_id + 1 == f_count ? *result_before_potential_negation : *fs[f_id+1]), FMT(annotation_prefix, " dbl_muls_%zu", dbl_id)));
         ++f_id;
         ++dbl_id;
 
@@ -246,7 +248,7 @@ mnt_miller_loop_gadget<ppT>::mnt_miller_loop_gadget(protoboard<FieldT> &pb,
                                                                                 g_RQ_at_Ps[add_id],
                                                                                 FMT(annotation_prefix, " addition_steps_%zu", add_id)));
             ++prec_id;
-            add_muls[add_id].reset(new Fqk_special_mul_gadget<ppT>(pb, *fs[f_id], *g_RQ_at_Ps[add_id], (f_id + 1 == f_count ? result : *fs[f_id+1]), FMT(annotation_prefix, " add_muls_%zu", add_id)));
+            add_muls[add_id].reset(new Fqk_special_mul_gadget<ppT>(pb, *fs[f_id], *g_RQ_at_Ps[add_id], (f_id + 1 == f_count ? *result_before_potential_negation : *fs[f_id+1]), FMT(annotation_prefix, " add_muls_%zu", add_id)));
             ++f_id;
             ++add_id;
         }
@@ -257,6 +259,8 @@ template<typename ppT>
 void mnt_miller_loop_gadget<ppT>::generate_r1cs_constraints()
 {
     fs[0]->generate_r1cs_equals_const_constraints(FqkT::one());
+
+    bool is_neg = pairing_selector<ppT>::is_loop_count_neg;
 
     for (size_t i = 0; i < dbl_count; ++i)
     {
@@ -270,12 +274,22 @@ void mnt_miller_loop_gadget<ppT>::generate_r1cs_constraints()
         addition_steps[i]->generate_r1cs_constraints();
         add_muls[i]->generate_r1cs_constraints();
     }
+
+    if (is_neg) {
+      printf("Was negative\n");
+      result.generate_r1cs_equals_unitary_inverse_constraints(*result_before_potential_negation);
+    } else {
+      printf("Was not negative\n");
+      result.generate_r1cs_equals_constraints(*result_before_potential_negation);
+    }
+
 }
 
 template<typename ppT>
 void mnt_miller_loop_gadget<ppT>::generate_r1cs_witness()
 {
     fs[0]->generate_r1cs_witness(FqkT::one());
+    bool is_neg = pairing_selector<ppT>::is_loop_count_neg;
 
     size_t add_id = 0;
     size_t dbl_id = 0;
@@ -305,6 +319,17 @@ void mnt_miller_loop_gadget<ppT>::generate_r1cs_witness()
             ++add_id;
         }
     }
+
+    if (is_neg) {
+      printf("Witness was neg\n");
+      result.generate_r1cs_witness(
+                                   result_before_potential_negation->get_element().unitary_inverse());
+    } else {
+      printf("Witness was not neg\n");
+      result.generate_r1cs_witness(
+                                   result_before_potential_negation->get_element());
+    }
+
 }
 
 template<typename ppT>
@@ -617,6 +642,8 @@ gadget<FieldT>(pb, annotation_prefix), prec_P1(prec_P1), prec_Q1(prec_Q1), prec_
 
     f_count = add_count = dbl_count = 0;
 
+    result_before_potential_negation.reset(new Fqk_variable<ppT>(pb, FMT(annotation_prefix, " result_before_potential_negation")));
+
     bool found_nonzero = false;
     std::vector<long> NAF = find_wnaf(1, loop_count);
     for (long i = NAF.size()-1; i >= 0; --i)
@@ -700,7 +727,7 @@ gadget<FieldT>(pb, annotation_prefix), prec_P1(prec_P1), prec_Q1(prec_Q1), prec_
         ++f_id;
         dbl_muls2[dbl_id].reset(new Fqk_special_mul_gadget<ppT>(pb, *fs[f_id], *g_RR_at_P2s[dbl_id], *fs[f_id+1], FMT(annotation_prefix, " dbl_muls2_%zu", dbl_id)));
         ++f_id;
-        dbl_muls3[dbl_id].reset(new Fqk_special_mul_gadget<ppT>(pb, (f_id + 1 == f_count ? result : *fs[f_id+1]), *g_RR_at_P3s[dbl_id], *fs[f_id], FMT(annotation_prefix, " dbl_muls3_%zu", dbl_id)));
+        dbl_muls3[dbl_id].reset(new Fqk_special_mul_gadget<ppT>(pb, (f_id + 1 == f_count ? *result_before_potential_negation : *fs[f_id+1]), *g_RR_at_P3s[dbl_id], *fs[f_id], FMT(annotation_prefix, " dbl_muls3_%zu", dbl_id)));
         ++f_id;
         ++dbl_id;
 
@@ -726,7 +753,7 @@ gadget<FieldT>(pb, annotation_prefix), prec_P1(prec_P1), prec_Q1(prec_Q1), prec_
             ++f_id;
             add_muls2[add_id].reset(new Fqk_special_mul_gadget<ppT>(pb, *fs[f_id], *g_RQ_at_P2s[add_id], *fs[f_id+1], FMT(annotation_prefix, " add_muls2_%zu", add_id)));
             ++f_id;
-            add_muls3[add_id].reset(new Fqk_special_mul_gadget<ppT>(pb, (f_id + 1 == f_count ? result : *fs[f_id+1]), *g_RQ_at_P3s[add_id], *fs[f_id], FMT(annotation_prefix, " add_muls3_%zu", add_id)));
+            add_muls3[add_id].reset(new Fqk_special_mul_gadget<ppT>(pb, (f_id + 1 == f_count ? *result_before_potential_negation : *fs[f_id+1]), *g_RQ_at_P3s[add_id], *fs[f_id], FMT(annotation_prefix, " add_muls3_%zu", add_id)));
             ++f_id;
             ++add_id;
         }
@@ -737,6 +764,7 @@ template<typename ppT>
 void mnt_e_times_e_over_e_miller_loop_gadget<ppT>::generate_r1cs_constraints()
 {
     fs[0]->generate_r1cs_equals_const_constraints(FqkT::one());
+    bool is_neg = pairing_selector<ppT>::is_loop_count_neg;
 
     for (size_t i = 0; i < dbl_count; ++i)
     {
@@ -758,6 +786,12 @@ void mnt_e_times_e_over_e_miller_loop_gadget<ppT>::generate_r1cs_constraints()
         add_muls2[i]->generate_r1cs_constraints();
         add_muls3[i]->generate_r1cs_constraints();
     }
+
+    if (is_neg) {
+      result.generate_r1cs_equals_unitary_inverse_constraints(*result_before_potential_negation);
+    } else {
+      result.generate_r1cs_equals_constraints(*result_before_potential_negation);
+    }
 }
 
 template<typename ppT>
@@ -770,6 +804,7 @@ void mnt_e_times_e_over_e_miller_loop_gadget<ppT>::generate_r1cs_witness()
     size_t f_id = 0;
 
     const auto &loop_count = pairing_selector<ppT>::pairing_loop_count;
+    bool is_neg = pairing_selector<ppT>::is_loop_count_neg;
 
     bool found_nonzero = false;
     std::vector<long> NAF = find_wnaf(1, loop_count);
@@ -791,7 +826,7 @@ void mnt_e_times_e_over_e_miller_loop_gadget<ppT>::generate_r1cs_witness()
         ++f_id;
         dbl_muls2[dbl_id]->generate_r1cs_witness();
         ++f_id;
-        (f_id+1 == f_count ? result : *fs[f_id+1]).generate_r1cs_witness(fs[f_id]->get_element() * g_RR_at_P3s[dbl_id]->get_element().inverse());
+        (f_id+1 == f_count ? *result_before_potential_negation : *fs[f_id+1]).generate_r1cs_witness(fs[f_id]->get_element() * g_RR_at_P3s[dbl_id]->get_element().unitary_inverse());
         dbl_muls3[dbl_id]->generate_r1cs_witness();
         ++f_id;
         ++dbl_id;
@@ -805,11 +840,27 @@ void mnt_e_times_e_over_e_miller_loop_gadget<ppT>::generate_r1cs_witness()
             ++f_id;
             add_muls2[add_id]->generate_r1cs_witness();
             ++f_id;
-            (f_id+1 == f_count ? result : *fs[f_id+1]).generate_r1cs_witness(fs[f_id]->get_element() * g_RQ_at_P3s[add_id]->get_element().inverse());
+            (f_id+1 == f_count ? *result_before_potential_negation : *fs[f_id+1]).generate_r1cs_witness(fs[f_id]->get_element() * g_RQ_at_P3s[add_id]->get_element().unitary_inverse());
             add_muls3[add_id]->generate_r1cs_witness();
             ++f_id;
             ++add_id;
         }
+    }
+
+    if (is_neg) {
+      printf("859:\n");
+      result_before_potential_negation->get_element().print();
+      printf("861:\n");
+      result_before_potential_negation->get_element().unitary_inverse().print();
+
+      result.generate_r1cs_witness(
+                                   result_before_potential_negation->get_element().unitary_inverse());
+    } else {
+      printf("867:\n");
+      result_before_potential_negation->get_element().print();
+
+      result.generate_r1cs_witness(
+                                   result_before_potential_negation->get_element());
     }
 }
 
