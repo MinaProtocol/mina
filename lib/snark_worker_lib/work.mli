@@ -10,6 +10,5 @@ module Spec : sig
 end
 
 module Result : sig
-  type t = Transaction_snark.t
-  [@@deriving bin_io]
+  type t = Transaction_snark.t [@@deriving bin_io]
 end

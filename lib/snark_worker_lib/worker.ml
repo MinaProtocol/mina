@@ -22,9 +22,8 @@ let perform ((module M): State.t) : Work.Spec.t -> Work.Result.t Or_error.t =
     | Transition (input, t, l) ->
         return
           (M.of_transition input.source input.target t
-            (unstage (Ledger.handler l)))
-    | Merge (proof1, proof2) ->
-        M.merge proof1 proof2
+             (unstage (Ledger.handler l)))
+    | Merge (proof1, proof2) -> M.merge proof1 proof2
 
 let main daemon_port =
   let%bind conn =

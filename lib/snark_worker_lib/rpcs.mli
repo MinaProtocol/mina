@@ -14,4 +14,3 @@ module Submit_work : sig
 
   val rpc : msg Rpc.One_way.t
 end
-
