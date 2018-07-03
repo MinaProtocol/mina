@@ -89,23 +89,41 @@ end
 module type Transaction_intf = sig
   type t [@@deriving sexp, compare, eq]
 
+  type fee
+
   module With_valid_signature : sig
     type nonrec t = private t [@@deriving sexp, compare, eq, bin_io]
   end
 
   val check : t -> With_valid_signature.t option
+
+  val transaction_fee : t -> fee
+end
+
+module type Public_Key_intf = sig
+  type t
 end
 
 module type Fee_transfer_intf = sig
   type t [@@deriving sexp, compare, eq]
+
+  type public_key
+
+  type fee
+
+  val fee_transfer : public_key -> fee -> t
 end
 
 module type Super_transaction_intf = sig
   type t [@@deriving sexp, compare, eq]
 
-  type transaction
+  type valid_transaction
 
   type fee_transfer
+
+  val from_fee_transfer : fee_transfer -> t
+
+  val from_transaction : valid_transaction -> t
 end
 
 module type Ledger_builder_witness_intf = sig

@@ -36,8 +36,16 @@ end) (Transaction : sig
   include Sexpable with type t := t
   (*[@@deriving sexp] , bin_io, eq] *)
 end)
-(Fee_transfer : Coda_pow.Fee_transfer_intf) (Super_transaction : sig
-    include Coda_pow.Super_transaction_intf
+(Public_key : Coda_pow.Public_Key_intf) (Fee : sig
+    type t [@@deriving sexp]
+end) (Fee_transfer : sig
+  include Coda_pow.Fee_transfer_intf
+          with type public_key := Public_key.t
+           and type fee := Fee.t
+end) (Super_transaction : sig
+  include Coda_pow.Super_transaction_intf
+          with type valid_transaction := Transaction.With_valid_signature.t
+           and type fee_transfer := Fee_transfer.t
 end) (Ledger : sig
   include Coda_pow.Ledger_intf
           with type valid_transaction := Transaction.With_valid_signature.t
@@ -47,14 +55,14 @@ end) (Ledger : sig
 end) (Witness : sig
   include Coda_pow.Ledger_builder_witness_intf
           with type transaction := Transaction.With_valid_signature.t
-end) (Fee : sig
-  type t [@@deriving sexp]
 end) (Snark_pool : sig
   type t
 
-  type work = (Proof.t * Fee.t, Super_transaction.t) Work.t
+  type work = (Proof.t * Fee.t, Super_transaction.t) Work.work_item
 
-  val request_proof : t -> work -> (Proof.t * Fee.t) option
+  type proof_fee = Proof.t * Fee.t
+
+  val request_proof : t -> work -> proof_fee option
 
   val request_work : t -> work option
 
@@ -69,17 +77,18 @@ struct
 
   module Ledger_builder_update = struct
     type t =
-      { payments: Transaction.With_valid_signature.t list
-      ; fee_transfers: Fee_transfer.t list
+      { super_transactions: Super_transaction.t list
       ; prev_ledger_hash: Ledger_hash.t
-      ; self_pk: Public_key.Compressed.t }
+      ; self_pk: Public_key.t }
 
     let verify t : bool = true
+
+    (* Transaction_fee*)
   end
 
   type leaf = Super_transaction.t [@@deriving sexp_of]
 
-  (*Need transaction list to update the ledger*)
+  (*Need transaction list corresponding to each proof to update the ledger*)
   type node = Proof.t * Fee.t * leaf list [@@deriving sexp_of]
 
   let snark_pool = Snark_pool.get
@@ -95,13 +104,16 @@ struct
 
   type ledger_proof = Proof.t
 
-  type snark_data = Proof.t * Fee.t * Public_key.Compressed.t
+  let payment_transitions payments =
+    List.map payments Super_transaction.from_transaction
 
-  let payment_transitions payments = failwith "TODO"
+  let fee_transitions fee_transfers =
+    List.map fee_transfers Super_transaction.from_fee_transfer
 
-  let fee_transitions fee_transfers = failwith "TODO"
-
-  let transitions payments fee_transfers = failwith "TODO"
+  let transitions payments fee_transfers =
+    List.append
+      (List.map payments payment_transitions)
+      (List.map fee_transfers fee_transitions)
 
   module Config = struct
     type t =
@@ -109,24 +121,20 @@ struct
       ; snark_pool: Snark_pool.t
       ; init_state: (node, node, leaf) Parallel_scan.State.t
       ; witness: Witness.t
-      ; self_pk: Public_key.Compressed.t }
+      ; self_pk: Public_key.t }
   end
 
-  let snark_fees payments : Fee_transfer.t list = failwith "TODO"
-
   let create (config: Config.t) =
-    let payments = Witness.transactions config.witness in
-    let fees = snark_fees payments in
     let ledger_hash = Ledger.merkle_root config.ledger in
     let update : Ledger_builder_update.t =
-      { payments
-      ; fee_transfers= fees
+      { super_transactions= []
       ; prev_ledger_hash= ledger_hash
       ; self_pk= config.self_pk }
     in
     {ledger= config.ledger; scan_state= config.init_state; lb_update= update}
 
-  let copy t = failwith "TODO"
+  let copy t =
+    {ledger= t.ledger; scan_state= t.scan_state; lb_update= t.lb_update}
 
   module Spec = struct
     (*let rec combine = fun t t' -> match (t, t') with (*failwith "TODO"*)
@@ -138,7 +146,7 @@ struct
     let prover work =
       match Snark_pool.request_proof snark_pool work with
       | None -> failwith "TODO"
-      | Some p -> return p
+      | Some p -> p
 
     module Accum = struct
       type t = node [@@deriving sexp_of]
@@ -150,11 +158,7 @@ struct
       let thrd (a, b, c) = c
 
       let ( + ) t t' =
-        let%bind proof, fee =
-          prover
-            { max_length= max_length'
-            ; items= [Merge ((fst t, snd t), (fst t', snd t'))] }
-        in
+        let proof, fee = prover (Merge ((fst t, snd t), (fst t', snd t'))) in
         return (proof, fee, List.append (thrd t) (thrd t'))
     end
 
@@ -168,18 +172,13 @@ struct
 
     let lift t = Snark_pool.request_work snark_pool
 
-    let prover work : snark_data = failwith "TODO"
-
     let merge t t' = return t'
 
     let map (x: Data.t) : Accum.t Deferred.t =
-      match
-        Snark_pool.request_proof snark_pool
-          {max_length= max_length'; items= [Base x]}
-      with
-      | None -> failwith "TODO"
-      | Some (proof, fee) -> return (proof, fee, [x])
+      let proof, fee = prover (Base x) in
+      return (proof, fee, [x])
 
+    (* TODO already retieving to create fee transfers*)
     (*??*)
   end
 
@@ -190,37 +189,43 @@ struct
 
   let copy t = failwith "TODO"
 
-  let retrieve_from_pool no : snark_data list = failwith "TODO"
+  let retrieve_from_pool (work: ('a, 'd) Work.t) no :
+      (('a, 'd) Work.work_item * Snark_pool.proof_fee option) list =
+    List.zip_exn work.items
+      (List.map work.items ~f:(Snark_pool.request_proof snark_pool))
 
-  let create_transaction (proof, fee, addr) : leaf = failwith "TODO"
+  (* using exn because we know for sure both the lists are of same size *)
 
-  (* let receiver_compressed = Public_key.compress addr in
-    let sender_kp = Signature_keypair.of_private_key Config.t.private_key in
-    failwith "TODO" 
-*)
-  (*let sign_txns ts : Transaction.With_valid_signature.t list = failwith "TODO"*)
-  (* Deferred.List.fold
-  let rec apply_txns t txns : unit Core_kernel.Or_error.t= 
-    match txns with
-    | []        -> Ok ()
-    | (t':: ts) ->
-    let open Or_error.Let_syntax in 
-    let%bind () = Ledger.apply_transaction t.ledger t' in
-    apply_txns t ts *)
-  (*let apply_transition ledger transition = match transition with 
-   | Transaction_snark.Transition.Transaction txn ->  
-        return @@ (Ok ())(*Ledger.apply_transaction ledger txn *) 
-   | Transaction_snark.Transition.Fee_transfer ft ->
-        return @@ Ledger.apply_fee_transfer ledger ft *)
+  let proven_transactions proofs =
+    List.filter_map proofs ~f:(fun x ->
+        match x with Base t, Some p -> Some t | _ -> None )
+
+  let fee_transfer (lb_update: Ledger_builder_update.t) from_snark :
+      Fee_transfer.t option =
+    match from_snark with
+    | _, None -> None
+    | _, Some (_, fee) ->
+        Some (Fee_transfer.fee_transfer lb_update.self_pk fee)
 
   let apply t witness :
       (t * (ledger_hash * ledger_proof) option) Deferred.Or_error.t =
-    let ts = Witness.transactions witness in
+    let ts =
+      List.map
+        (Witness.transactions witness)
+        Super_transaction.from_transaction
+    in
     let work_list = gen ts in
-    let snarks = retrieve_from_pool (work_list.max_length * List.length ts) in
-    let fee_transfers : leaf list = List.map snarks create_transaction in
-    let valid_list = transitions ts fee_transfers in
-    let%bind final_proof = Parallel_scan.step t.scan_state valid_list spec in
+    let snarks =
+      retrieve_from_pool work_list (work_list.max_length * List.length ts)
+    in
+    let fee_transfers = List.filter_map snarks (fee_transfer t.lb_update) in
+    let final_list =
+      List.append
+        (proven_transactions snarks)
+        (List.map fee_transfers Super_transaction.from_fee_transfer)
+    in
+    let can_include = Ledger_builder_update.verify final_list in
+    let%bind final_proof = Parallel_scan.step t.scan_state final_list spec in
     match final_proof with
     | None -> return @@ Ok (t, None)
     | Some (proof, fee, txns') ->
@@ -230,6 +235,4 @@ struct
         with
         | Ok () -> return @@ Ok (t, Some (Ledger.merkle_root t.ledger, proof))
         | Error e -> return @@ Error e
-
-  (*how do you fold when things mutate?*)
 end
