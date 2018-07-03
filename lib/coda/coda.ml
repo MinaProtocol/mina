@@ -356,6 +356,10 @@ struct
     [@@deriving make]
   end
 
+  (* - Change Snark pool intf to cloud snark pool intf
+     - add functions for serializing and deserializing snark pool
+     - in [create], create the snark pool
+  *)
   let create (config: Config.t) =
     let miner_changes_reader, miner_changes_writer = Linear_pipe.create () in
     let miner_broadcast_reader, miner_broadcast_writer =
@@ -415,6 +419,12 @@ struct
     ; ledger_builder_transition_backup_capacity=
         config.ledger_builder_transition_backup_capacity }
 
+(* Here:
+   - handle the incoming snark pool diffs (by passing them to the network snark pool)
+   - handle the outgoing snark pool diffs (i.e., the ones from the broadast pipe of network snark pool)
+    by transfering them into the gossip net's broadcast pipe.
+    - you might have to pull out gossip net out of State_io
+   *)
   let run t =
     Logger.info t.log "Starting to run Coda" ;
     let p : Protocol.t =

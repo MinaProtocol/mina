@@ -90,6 +90,9 @@ end
 module Message (State_with_witness : Minibit.State_with_witness_intf) = struct
   module T = struct
     module T = struct
+      (* Add a messag variant which is like
+         [New_snark_pool_diff of Snark_pool_diff.t]
+      *)
       type msg = New_state of State_with_witness.Stripped.t
       [@@deriving bin_io]
     end
