@@ -1,0 +1,19 @@
+(jbuild_version 1)
+
+(library
+ ((name snark_worker_lib)
+  (public_name snark_worker_lib)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core
+      async
+      nanobit_base
+      blockchain_snark
+      transaction_snark
+      keys_lib
+      sparse_ledger ))
+  (preprocess (pps (ppx_jane)))
+  (synopsis "Lib powering the snark_worker interactions with the daemon")))
+
