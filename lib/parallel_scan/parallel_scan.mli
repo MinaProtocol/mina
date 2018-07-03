@@ -53,10 +53,25 @@ val step :
                                                                           t = 'b)
   -> 'b option Deferred.t
 
+val next :
+     state:('a, 'b, 'd) State.t
+  -> data:'d list
+  -> spec:(module
+        Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
+                                                                       t = 'b)
+  -> ('a, 'd) State.Job.t
+
+
 val next_k_jobs :
      state:('a, 'b, 'd) State.t
   -> spec:(module
-           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                          t = 'b)
-  -> int
-  -> ('a, 'd) State.Job.t list Or_error.t
+           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.t = 'b)
+  -> k:int
+  -> ('a, 'd) State.Job.t list (*Or_error.t*)
+
+val enqueue_new_jobs : 
+       state: ('a, 'b, 'd) State.t 
+    -> jobs: ('a,'d) State.Job.t list 
+    -> unit Deferred.t
+
+

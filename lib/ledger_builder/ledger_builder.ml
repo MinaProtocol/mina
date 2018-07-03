@@ -1,44 +1,25 @@
 open Core_kernel
 open Async_kernel
-open Nanobit_base
 open Protocols
 
-module Work = struct
-  type ('a, 'd) work_item = Base of 'd | Merge of 'a * 'a
-  [@@deriving sexp, bin_io]
-
-  let max_length' = 8
-
-  type ('a, 'd) t =
-    { max_length:
-        int
-        (* max number of items should always be of the this length.
-    Currently length = 8 *)
-    ; items: ('a, 'd) work_item list }
-  [@@deriving sexp, bin_io]
-
-  let gen txns =
-    let () = assert (List.length txns = max_length') in
-    let addto work t' =
-      {max_length= work.max_length; items= Base t' :: work.items}
-    in
-    let init_work = {max_length= 8; items= []} in
-    List.fold txns ~init:init_work ~f:addto
-end
-
-module Make (Proof : sig
-  include Coda_pow.Snark_pool_proof_intf
-
-  include Sexpable with type t := t
-end) (Transaction : sig
-  include Coda_pow.Transaction_intf
-
-  include Sexpable with type t := t
-  (*[@@deriving sexp] , bin_io, eq] *)
+module Make 
+(Fee : sig
+  type t [@@deriving sexp_of]
+  val add : t -> t -> t
+  val sub : t -> t -> t
+  val zero : t
+  val gte : t -> t -> bool
 end)
-(Public_key : Coda_pow.Public_Key_intf) (Fee : sig
-    type t [@@deriving sexp]
-end) (Fee_transfer : sig
+(Public_key : sig 
+  include Coda_pow.Public_Key_intf
+end)
+(Transaction : sig
+  include Coda_pow.Transaction_intf
+    with type fee := Fee.t
+  include Sexpable with type t := t
+  (*[@@deriving sexp] , bin_io, eq] *) 
+end)
+(Fee_transfer : sig
   include Coda_pow.Fee_transfer_intf
           with type public_key := Public_key.t
            and type fee := Fee.t
@@ -46,193 +27,208 @@ end) (Super_transaction : sig
   include Coda_pow.Super_transaction_intf
           with type valid_transaction := Transaction.With_valid_signature.t
            and type fee_transfer := Fee_transfer.t
-end) (Ledger : sig
-  include Coda_pow.Ledger_intf
-          with type valid_transaction := Transaction.With_valid_signature.t
-           and type super_transaction := Super_transaction.t
-
-  val apply_fee_transfer : t -> Fee_transfer.t -> unit Or_error.t
-end) (Witness : sig
+           and type fee := Fee.t
+end)
+(Proof : sig
+  include Coda_pow.Snark_pool_proof_intf
+  include Sexpable with type t := t
+end)
+(Ledger_hash : sig
+  include Coda_pow.Ledger_hash_intf
+  val equal : t -> t -> bool
+end)
+(Ledger_builder_hash : sig
+  type t [@@deriving eq]
+end)
+(Ledger_builder_witness : sig
   include Coda_pow.Ledger_builder_witness_intf
-          with type transaction := Transaction.With_valid_signature.t
-end) (Snark_pool : sig
-  type t
-
-  type work = (Proof.t * Fee.t, Super_transaction.t) Work.work_item
-
-  type proof_fee = Proof.t * Fee.t
-
-  val request_proof : t -> work -> proof_fee option
-
-  val request_work : t -> work option
-
-  val add_work : t -> work -> unit
-
-  val get : t
-end) (Ledger_hash : sig
-  include Coda_pow.Ledger_hash_intf with type t = Ledger.ledger_hash
-end) =
+   with type fee := Fee.t
+    and type transaction := Transaction.With_valid_signature.t
+    and type pk := Public_key.t
+  val prev_hash : t -> Ledger_builder_hash.t
+end)
+(Proof_type : sig
+  type t [@@deriving sexp_of]
+end)
+(Transaction_snark : sig
+  type t [@@deriving sexp_of]
+  val base: Proof_type.t
+  val merge: Proof_type.t
+  val verify: t -> bool
+  val create :
+       proof:Ledger_builder_witness.snarket_proof 
+    -> source:Ledger_hash.t
+    -> target:Ledger_hash.t 
+    -> fee_excess:Fee.t
+    -> proof_type:Proof_type.t
+    -> t
+end)
+=
 struct
-  open Work
 
-  module Ledger_builder_update = struct
+  (* Assume you have
+
+  enqueue_data
+  : Paralell_scan.State.t -> Transition,t list -> unit
+
+  complete_jobs
+  : Paralell_scan.State.t -> Accum.t list -> unit
+  
+  Alternatively,
+  change the intf of parallel scan to take a function
+  check_work : Job.t -> Accum.t -> bool Deferred,t
+
+  and then have in parallel scan
+
+  validate_and_apply_work
+  : Parallel_scan.State.t -> Accum.t list -> unit Or_error.t Deferred.t
+
+  *)
+
+  module Statement = struct
     type t =
-      { super_transactions: Super_transaction.t list
-      ; prev_ledger_hash: Ledger_hash.t
-      ; self_pk: Public_key.t }
-
-    let verify t : bool = true
-
-    (* Transaction_fee*)
+      { source : Ledger_hash.t
+      ; target : Ledger_hash.t
+      ; fee_excess : Fee.t(*Currency.Amount.Signed.t*) 
+      ; proof_type : Proof_type.t (*[ `Merge | `Base ]*)
+      (*Should this also contain the transactions part of this statement?*)
+      }
+      [@@deriving sexp_of]
   end
 
-  type leaf = Super_transaction.t [@@deriving sexp_of]
+  module With_statement = struct
+    type 'a t = 'a * Statement.t [@@deriving sexp_of]
+  end
 
-  (*Need transaction list corresponding to each proof to update the ledger*)
-  type node = Proof.t * Fee.t * leaf list [@@deriving sexp_of]
+  module Ledger_proof = struct
+    type t =
+      { next_ledger_hash : Ledger_hash.t
+      ; proof : Proof.t
+      }
+  end
 
-  let snark_pool = Snark_pool.get
+  (*module Completed_work = struct
+    type t =
+      { fee : Currency.Fee.t
+      ; worker : Public_key.t
+      ; proof : Proof.t
+      }
+  end*)
+
+  
+
+  type transaction = Super_transaction.t [@@deriving sexp_of]
+
+  type job  = (Transaction_snark.t With_statement.t,transaction With_statement.t) Parallel_scan.State.Job.t
 
   type t =
-    { ledger: Ledger.t
-    ; scan_state: (node, node, leaf) Parallel_scan.State.t
-    ; lb_update: Ledger_builder_update.t }
+    {scan_state : 
+    ( Transaction_snark.t With_statement.t,
+      Transaction_snark.t With_statement.t,
+      transaction With_statement.t
+    ) Parallel_scan.State.t}
 
-  (*[@@deriving sexp, bin_io, eq]*)
-
-  type ledger_hash = Ledger.ledger_hash
-
-  type ledger_proof = Proof.t
-
-  let payment_transitions payments =
-    List.map payments Super_transaction.from_transaction
-
-  let fee_transitions fee_transfers =
-    List.map fee_transfers Super_transaction.from_fee_transfer
-
-  let transitions payments fee_transfers =
-    List.append
-      (List.map payments payment_transitions)
-      (List.map fee_transfers fee_transitions)
-
-  module Config = struct
-    type t =
-      { ledger: Ledger.t
-      ; snark_pool: Snark_pool.t
-      ; init_state: (node, node, leaf) Parallel_scan.State.t
-      ; witness: Witness.t
-      ; self_pk: Public_key.t }
-  end
-
-  let create (config: Config.t) =
-    let ledger_hash = Ledger.merkle_root config.ledger in
-    let update : Ledger_builder_update.t =
-      { super_transactions= []
-      ; prev_ledger_hash= ledger_hash
-      ; self_pk= config.self_pk }
-    in
-    {ledger= config.ledger; scan_state= config.init_state; lb_update= update}
-
-  let copy t =
-    {ledger= t.ledger; scan_state= t.scan_state; lb_update= t.lb_update}
+  let hash t : Ledger_builder_hash.t = failwith "TODO"
 
   module Spec = struct
-    (*let rec combine = fun t t' -> match (t, t') with (*failwith "TODO"*)
-      | (Base x, Base x') -> Merge (lift x, lift x')
-      | (Merge (x, x'), Merge (y, y')) ->  
-          Merge (merge_proof x x', merge_proof y y')
-      | _ -> failwith "TODO"*)
-
-    let prover work =
-      match Snark_pool.request_proof snark_pool work with
-      | None -> failwith "TODO"
-      | Some p -> p
 
     module Accum = struct
-      type t = node [@@deriving sexp_of]
+      type t = Transaction_snark.t With_statement.t [@@deriving sexp_of]
 
-      let fst (a, b, c) = a
-
-      let snd (a, b, c) = b
-
-      let thrd (a, b, c) = c
-
-      let ( + ) t t' =
-        let proof, fee = prover (Merge ((fst t, snd t), (fst t', snd t'))) in
-        return (proof, fee, List.append (thrd t) (thrd t'))
+      let ( + ) t t' : t Deferred.t = failwith "TODO"
     end
 
     module Data = struct
-      type t = leaf [@@deriving sexp_of]
+      type t = transaction With_statement.t [@@deriving sexp_of]
     end
 
     module Output = struct
-      type t = node [@@deriving sexp_of]
+      type t = Transaction_snark.t With_statement.t [@@deriving sexp_of]
     end
-
-    let lift t = Snark_pool.request_work snark_pool
 
     let merge t t' = return t'
 
-    let map (x: Data.t) : Accum.t Deferred.t =
-      let proof, fee = prover (Base x) in
-      return (proof, fee, [x])
-
-    (* TODO already retieving to create fee transfers*)
-    (*??*)
+    let map (x: Data.t) : Accum.t Deferred.t = failwith "TODO"
   end
 
   let spec =
     ( module Spec
-    : Parallel_scan.Spec_intf with type Data.t = leaf and type Accum.t = node and type 
-      Output.t = node )
+    : Parallel_scan.Spec_intf with type Data.t = transaction With_statement.t and type Accum.t = Transaction_snark.t With_statement.t and type 
+      Output.t = Transaction_snark.t With_statement.t )
 
-  let copy t = failwith "TODO"
+  let statement_of_job : job -> Statement.t option = function
+    | Base (Some (_, statement)) -> Some statement
+    | Merge_up (Some (_, statement)) -> Some statement
+    | Merge (Some (_, stmt1), Some (_, stmt2)) ->
+        assert (Ledger_hash.equal stmt1.target stmt2.source);
+        Some { source = stmt1.source
+        ; target = stmt2.target
+        ; fee_excess = Fee.add stmt1.fee_excess stmt2.fee_excess
+            (*Currency.Amount.Signed.add stmt1.fee_excess stmt2.fee_excess
+            |> Option.value_exn*) 
+        ; proof_type = Transaction_snark.merge (*`Merge*)
+        }
+    | _ -> None
 
-  let retrieve_from_pool (work: ('a, 'd) Work.t) no :
-      (('a, 'd) Work.work_item * Snark_pool.proof_fee option) list =
-    List.zip_exn work.items
-      (List.map work.items ~f:(Snark_pool.request_proof snark_pool))
+  let verify job proof = 
+    let statement = Option.value_exn (statement_of_job job) in
+    let transaction_snark = Transaction_snark.create
+      ~proof:proof
+      ~source:statement.source
+      ~target:statement.target
+      ~fee_excess:statement.fee_excess
+      ~proof_type:statement.proof_type
+    in assert(Transaction_snark.verify transaction_snark)
 
-  (* using exn because we know for sure both the lists are of same size *)
 
-  let proven_transactions proofs =
-    List.filter_map proofs ~f:(fun x ->
-        match x with Base t, Some p -> Some t | _ -> None )
+  let fill_in_completed_work state works = failwith "TODO: To be done in parallel scan?"
 
-  let fee_transfer (lb_update: Ledger_builder_update.t) from_snark :
-      Fee_transfer.t option =
-    match from_snark with
-    | _, None -> None
-    | _, Some (_, fee) ->
-        Some (Fee_transfer.fee_transfer lb_update.self_pk fee)
+  let new_job (transaction:Super_transaction.t) : ('a, transaction With_statement.t) Parallel_scan.State.Job.t =
+    let statement : Statement.t = 
+      { source = failwith "TODO"
+      ; target = failwith "TODO"
+      ; fee_excess = Super_transaction.fee_excess transaction
+      ; proof_type = Transaction_snark.base
+      } in
+    Base (Some (transaction, statement))
 
-  let apply t witness :
-      (t * (ledger_hash * ledger_proof) option) Deferred.Or_error.t =
-    let ts =
-      List.map
-        (Witness.transactions witness)
-        Super_transaction.from_transaction
+  let apply t (witness:Ledger_builder_witness.t) :
+    (t * (Ledger_hash.t * Ledger_proof.t) option) Deferred.Or_error.t =
+    let check b label =
+      if not b then Or_error.error_string label else Ok ()
     in
-    let work_list = gen ts in
-    let snarks =
-      retrieve_from_pool work_list (work_list.max_length * List.length ts)
+    let open Or_error.Let_syntax in
+    let _ = 
+       check (not (Ledger_builder_hash.equal
+        (Ledger_builder_witness.prev_hash witness)
+        (hash t)))
+        "bad hash" in
+    let payments = Ledger_builder_witness.transactions witness in
+    let work_fee = Ledger_builder_witness.total_work_fee witness in
+    let delta = Fee.sub (List.fold (List.map payments Transaction.transaction_fee) ~init:Fee.zero ~f:Fee.add ) work_fee
     in
-    let fee_transfers = List.filter_map snarks (fee_transfer t.lb_update) in
-    let final_list =
-      List.append
-        (proven_transactions snarks)
-        (List.map fee_transfers Super_transaction.from_fee_transfer)
+    let _ = check (Fee.gte delta Fee.zero) "fees does not suffice" in
+    let next_jobs =
+      Parallel_scan.next_k_jobs
+       ~state:t.scan_state
+       ~spec: spec
+       ~k:(List.length @@ Ledger_builder_witness.proofs witness) in
+    let completed_works = (Ledger_builder_witness.completed_work_list witness) in
+    let _ = (*verify the completed_work*)
+      List.iter2 next_jobs (List.map completed_works (fun (proof,_,_)-> proof)) verify in
+    let _ = fill_in_completed_work t.scan_state completed_works (*Applying the work to the scan state*) in
+    let fee_transfers = (*create fee transfers to pay the workers*)
+      let ft = List.map completed_works ~f:(fun (_, fee, worker) ->
+        (worker, fee))
+      |> Fee_transfer.of_single_list in
+      List.map ft Super_transaction.from_fee_transfer 
     in
-    let can_include = Ledger_builder_update.verify final_list in
-    let%bind final_proof = Parallel_scan.step t.scan_state final_list spec in
-    match final_proof with
-    | None -> return @@ Ok (t, None)
-    | Some (proof, fee, txns') ->
-        match%bind
-          Deferred.List.fold txns' (Ok ()) (fun r t' ->
-              return @@ Ledger.apply_super_transaction t.ledger t' )
-        with
-        | Ok () -> return @@ Ok (t, Some (Ledger.merkle_root t.ledger, proof))
-        | Error e -> return @@ Error e
+    let new_jobs = List.map (List.append fee_transfers (List.map payments Super_transaction.from_transaction)) new_job in
+    let _ = (*Enqueueing new jobs to the scan state*)
+      Parallel_scan.enqueue_new_jobs t.scan_state new_jobs
+
+    in failwith "TODO"
+
+
+
 end

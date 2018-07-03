@@ -293,6 +293,31 @@ let step : type a b d.
     -> b option Deferred.t =
  fun ~state ~data -> State1.consume state data
 
+let next:
+    state:('a, 'b, 'd) State1.t
+ -> data:'d list
+ -> spec:(module
+       Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
+                                                                      t = 'b)
+ -> (('a, 'd) State1.Job.t)
+ = fun ~state ~data ~spec -> failwith "TODO"
+
+
+let next_k_jobs:
+      state:('a, 'b, 'd) State1.t
+   -> spec:(module
+          Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
+                                                                         t = 'b)
+   -> k:int
+   -> ('a, 'd) State1.Job.t list (*Or_error.t*)
+  = fun ~state ~spec ~k -> failwith "TODO"
+
+let enqueue_new_jobs : 
+     state: ('a, 'b, 'd) State.t 
+  -> jobs: ('a,'d) State.Job.t list 
+  -> unit Deferred.t
+= fun ~state ~jobs -> failwith "TODO"
+
 let%test_module "scans" =
   ( module struct
     let do_steps ~state ~data ~spec w =

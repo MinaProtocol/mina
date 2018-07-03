@@ -32,7 +32,7 @@ module type Time_intf = sig
 end
 
 module type Ledger_hash_intf = sig
-  type t [@@deriving bin_io, sexp]
+  type t [@@deriving bin_io, eq, sexp]
 
   include Hashable.S_binable with type t := t
 end
@@ -97,7 +97,7 @@ module type Transaction_intf = sig
 
   val check : t -> With_valid_signature.t option
 
-  val transaction_fee : t -> fee
+  val transaction_fee : With_valid_signature.t -> fee (*Fee excess*)
 end
 
 module type Public_Key_intf = sig
@@ -111,7 +111,10 @@ module type Fee_transfer_intf = sig
 
   type fee
 
-  val fee_transfer : public_key -> fee -> t
+  type single
+
+  val of_single_list : (public_key * fee) list -> t list
+
 end
 
 module type Super_transaction_intf = sig
@@ -121,9 +124,17 @@ module type Super_transaction_intf = sig
 
   type fee_transfer
 
+  type fee
+
   val from_fee_transfer : fee_transfer -> t
 
   val from_transaction : valid_transaction -> t
+
+  val fee_transfer : t -> fee_transfer
+
+  val transaction : t -> valid_transaction
+
+  val fee_excess : t -> fee (*fee_excess for file_transfers would be zero?*)
 end
 
 module type Ledger_builder_witness_intf = sig
@@ -133,11 +144,30 @@ module type Ledger_builder_witness_intf = sig
 
   type transaction
 
+  type ledger_builder_hash
+
+  type pk
+
+  type fee
+
+  type completed_work = snarket_proof * fee * pk
+
+  val prev_hash : t -> ledger_builder_hash
+
   val proofs : t -> snarket_proof list
+
+  val workers_fees : t -> pk * fee list  
 
   val transactions : t -> transaction list
 
   val check_has_snark_pool_fees : t -> bool
+
+  val creator : t -> pk
+  
+  val total_work_fee : t -> fee 
+
+  val completed_work_list : t -> completed_work list
+
 end
 
 module type Ledger_builder_intf = sig
