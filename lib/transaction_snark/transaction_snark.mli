@@ -13,6 +13,14 @@ module Transition : sig
   [@@deriving bin_io, sexp]
 end
 
+module Input : sig
+  type t =
+    { source: Ledger_hash.t
+    ; target: Ledger_hash.t
+    ; fee_excess: Currency.Amount.Signed.t }
+  [@@deriving bin_io]
+end
+
 type t [@@deriving bin_io]
 
 val create :
@@ -24,6 +32,8 @@ val create :
   -> t
 
 val proof : t -> Tock.Proof.t
+
+val input : t -> Input.t
 
 module Verification : sig
   module Keys : sig
