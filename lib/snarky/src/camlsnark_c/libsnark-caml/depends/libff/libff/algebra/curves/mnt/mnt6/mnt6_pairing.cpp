@@ -377,7 +377,7 @@ mnt6_Fq6 mnt6_affine_ate_miller_loop(const mnt6_affine_ate_G1_precomputation &pr
     /* TODO: maybe handle neg */
     if (mnt6_ate_is_loop_count_neg)
     {
-    	f = f.inverse();
+    	f = f.unitary_inverse();
     }
 
 
