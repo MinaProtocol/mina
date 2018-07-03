@@ -395,18 +395,39 @@ module Run (Program : Main_intf) = struct
     in
     return maybe_nonce
 
-  let setup_client_server ~minibit ~log ~client_port =
+  let setup_local_server ~minibit ~log ~client_port =
+    let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
-    let module Client_server = Client.Rpc_server (struct
-      type t = Main.t
-
-      let get_balance = get_balance
-
-      let get_nonce = get_nonce
-
-      let send_txn = send_txn log
-    end) in
-    Client_server.init_server ~parent_log:log ~minibit ~port:client_port
+    let client_impls =
+      [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun () ->
+            send_txn log minibit )
+      ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () ->
+            get_balance minibit )
+      ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () -> get_nonce minibit)
+      ]
+    in
+    let snark_worker_impls = [] in
+    let where_to_listen =
+      Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
+    in
+    ignore
+      (Tcp.Server.create
+         ~on_handler_error:
+           (`Call
+             (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+         where_to_listen
+         (fun address reader writer ->
+           Rpc.Connection.server_with_close reader writer
+             ~implementations:
+               (Rpc.Implementations.create_exn
+                  ~implementations:(client_impls @ snark_worker_impls)
+                  ~on_unknown_rpc:`Raise)
+             ~connection_state:(fun _ -> ())
+             ~on_handshake_error:
+               (`Call
+                 (fun exn ->
+                   Logger.error log "%s" (Exn.to_string_mach exn) ;
+                   Deferred.unit )) ))
 
   let run ~minibit ~log =
     Logger.debug log "Created minibit\n%!" ;

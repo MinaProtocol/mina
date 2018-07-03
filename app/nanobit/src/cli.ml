@@ -102,7 +102,7 @@ let daemon =
              ; ledger_disk_location= conf_dir ^/ "ledgers"
              ; pool_disk_location= conf_dir ^/ "transaction_pool" }
          in
-         Run.setup_client_server ~minibit ~client_port ~log ;
+         Run.setup_local_server ~minibit ~client_port ~log ;
          Run.run ~minibit ~log
        in
        Async.never ())

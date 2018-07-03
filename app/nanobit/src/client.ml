@@ -3,6 +3,7 @@ open Async
 open Cli_common
 open Nanobit_base
 
+(*
 module Rpc_server (Main : sig
   type t
 
@@ -19,25 +20,25 @@ module Rpc_server (Main : sig
     -> Account.Nonce.Stable.V1.t option Deferred.t
 end) =
 struct
-  let init_server ~parent_log ~minibit ~port =
+  let implementations ~parent_log ~minibit ~port =
     let log = Logger.child parent_log "client" in
+    [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc
+        (fun _ -> Main.send_txn minibit )
+    ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun _ ->
+          Main.get_balance minibit )
+    ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun _ ->
+          Main.get_nonce minibit ) ]
     ignore
       (Tcp.Server.create
          ~on_handler_error:
            (`Call
              (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-         (Tcp.Where_to_listen.of_port port)
+         where_to_listen
          (fun address reader writer ->
            Rpc.Connection.server_with_close reader writer
              ~implementations:
                (Rpc.Implementations.create_exn
                   ~implementations:
-                    [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc
-                        (fun _ -> Main.send_txn minibit )
-                    ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun _ ->
-                          Main.get_balance minibit )
-                    ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun _ ->
-                          Main.get_nonce minibit ) ]
                   ~on_unknown_rpc:`Raise)
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:
@@ -46,6 +47,7 @@ struct
                    Logger.error log "%s" (Exn.to_string_mach exn) ;
                    Deferred.unit )) ))
 end
+*)
 
 let dispatch rpc query port =
   Tcp.with_connection
