@@ -66,7 +66,7 @@ public:
     typedef mnt4_final_exp_gadget<libff::mnt4_pp> final_exp_gadget_type;
 
     static const constexpr libff::bigint<libff::mnt6_Fr::num_limbs> &pairing_loop_count = libff::mnt6_ate_loop_count;
-  static const constexpr bool &is_loop_count_neg = libff::mnt6_ate_is_loop_count_neg;
+    static const constexpr bool &is_loop_count_neg = libff::mnt6_ate_is_loop_count_neg;
 };
 
 /**
@@ -97,7 +97,7 @@ public:
     typedef mnt6_final_exp_gadget<libff::mnt6_pp> final_exp_gadget_type;
 
     static const constexpr libff::bigint<libff::mnt4_Fr::num_limbs> &pairing_loop_count = libff::mnt4_ate_loop_count;
-  static const constexpr bool &is_loop_count_neg = libff::mnt4_ate_is_loop_count_neg;
+    static const constexpr bool &is_loop_count_neg = libff::mnt4_ate_is_loop_count_neg;
 };
 
 } // libsnark

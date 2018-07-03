@@ -799,7 +799,7 @@ void mnt_e_times_e_over_e_miller_loop_gadget<ppT>::generate_r1cs_constraints()
         add_muls2[i]->generate_r1cs_constraints();
         add_muls3[i]->generate_r1cs_constraints();
     }
-    /* */
+
     if (is_neg) {
       result.generate_r1cs_equals_unitary_inverse_constraints(*result_before_potential_negation);
     } else {

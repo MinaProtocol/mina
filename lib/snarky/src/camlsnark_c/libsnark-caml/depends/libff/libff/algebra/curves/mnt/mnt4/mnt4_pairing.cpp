@@ -368,7 +368,6 @@ mnt4_Fq4 mnt4_affine_ate_miller_loop(const mnt4_affine_ate_G1_precomputation &pr
         }
     }
 
-    /* TODO: maybe handle neg */
        if (mnt4_ate_is_loop_count_neg)
        {
        f = f.unitary_inverse();
