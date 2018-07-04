@@ -97,7 +97,8 @@ module type Transaction_intf = sig
 
   val check : t -> With_valid_signature.t option
 
-  val transaction_fee : With_valid_signature.t -> fee (*Fee excess*)
+  val transaction_fee : With_valid_signature.t -> fee
+  (*Fee excess*)
 end
 
 module type Public_Key_intf = sig
@@ -114,7 +115,6 @@ module type Fee_transfer_intf = sig
   type single
 
   val of_single_list : (public_key * fee) list -> t list
-
 end
 
 module type Super_transaction_intf = sig
@@ -134,7 +134,8 @@ module type Super_transaction_intf = sig
 
   val transaction : t -> valid_transaction
 
-  val fee_excess : t -> fee (*fee_excess for file_transfers would be zero?*)
+  val fee_excess : t -> fee
+  (*fee_excess for file_transfers would be zero?*)
 end
 
 module type Ledger_builder_witness_intf = sig
@@ -156,18 +157,17 @@ module type Ledger_builder_witness_intf = sig
 
   val proofs : t -> snarket_proof list
 
-  val workers_fees : t -> pk * fee list  
+  val workers_fees : t -> pk * fee list
 
   val transactions : t -> transaction list
 
   val check_has_snark_pool_fees : t -> bool
 
   val creator : t -> pk
-  
-  val total_work_fee : t -> fee 
+
+  val total_work_fee : t -> fee
 
   val completed_work_list : t -> completed_work list
-
 end
 
 module type Ledger_builder_intf = sig
@@ -180,6 +180,8 @@ module type Ledger_builder_intf = sig
   type ledger_hash
 
   type ledger_proof
+
+  val copy : t -> t
 
   val max_margin : int
 

@@ -5,6 +5,8 @@ module Ring_buffer : sig
   type 'a t [@@deriving sexp, bin_io]
 
   val read_all : 'a t -> 'a list
+
+  val read_k : 'a t -> int -> 'a list
 end
 
 module State : sig
@@ -57,21 +59,21 @@ val next :
      state:('a, 'b, 'd) State.t
   -> data:'d list
   -> spec:(module
-        Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                       t = 'b)
+           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
+                                                                          t = 'b)
   -> ('a, 'd) State.Job.t
-
 
 val next_k_jobs :
      state:('a, 'b, 'd) State.t
   -> spec:(module
-           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.t = 'b)
+           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
+                                                                          t = 'b)
   -> k:int
-  -> ('a, 'd) State.Job.t list (*Or_error.t*)
+  -> ('a, 'd) State.Job.t list
 
-val enqueue_new_jobs : 
-       state: ('a, 'b, 'd) State.t 
-    -> jobs: ('a,'d) State.Job.t list 
-    -> unit Deferred.t
+(*Or_error.t*)
 
-
+val enqueue_new_jobs :
+     state:('a, 'b, 'd) State.t
+  -> jobs:('a, 'd) State.Job.t list
+  -> unit Deferred.t

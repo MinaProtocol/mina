@@ -11,6 +11,6 @@ let of_single_list xs =
   let rec go acc = function
     | x1 :: x2 :: xs -> go (Two (x1, x2) :: acc) xs
     | [] -> acc
-    | [x] -> (One x :: acc)
+    | [x] -> One x :: acc
   in
   go [] xs
