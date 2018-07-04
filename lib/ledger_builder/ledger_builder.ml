@@ -5,9 +5,9 @@ open Protocols
 module Make (Fee : sig
   type t [@@deriving sexp_of]
 
-  val add : t -> t -> t
+  val add : t -> t -> t option
 
-  val sub : t -> t -> t
+  val sub : t -> t -> t option
 
   val zero : t
 
@@ -183,67 +183,87 @@ struct
                                                                          With_statement.
                                                                          t )
 
+  let option lab =
+    Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
+
+  let check label b =
+    if not b
+    then Or_error.error_string label
+    else Ok ()
+
   let statement_of_job : job -> Statement.t option = function
     | Base (Some (_, statement)) -> Some statement
     | Merge_up (Some (_, statement)) -> Some statement
     | Merge (Some (_, stmt1), Some (_, stmt2)) ->
-        assert (Ledger_hash.equal stmt1.target stmt2.source) ;
-        Some
-          { source= stmt1.source
-          ; target= stmt2.target
-          ; fee_excess=
-              Fee.add stmt1.fee_excess stmt2.fee_excess
-              (*Currency.Amount.Signed.add stmt1.fee_excess stmt2.fee_excess
-            |> Option.value_exn*)
-          ; proof_type= Transaction_snark.merge (*`Merge*) }
+      let open Option.Let_syntax in
+      let%bind () =
+        Option.some_if (Ledger_hash.equal stmt1.target stmt2.source) ()
+      in
+      let%map fee_excess = Fee.add stmt1.fee_excess stmt2.fee_excess in
+      { Statement.source= stmt1.source
+      ; target= stmt2.target
+      ; fee_excess
+      ; proof_type= Transaction_snark.merge
+      }
     | _ -> None
 
+  (* TODO: This should yield to the scheduler between verify's *)
   let verify job proof =
-    let statement = Option.value_exn (statement_of_job job) in
-    let transaction_snark =
-      Transaction_snark.create ~proof ~source:statement.source
-        ~target:statement.target ~fee_excess:statement.fee_excess
-        ~proof_type:statement.proof_type
-    in
-    assert (Transaction_snark.verify transaction_snark)
+    match statement_of_job job with
+    | None -> return false
+    | Some statement ->
+      let transaction_snark =
+        Transaction_snark.create ~proof ~source:statement.source
+          ~target:statement.target ~fee_excess:statement.fee_excess
+          ~proof_type:statement.proof_type
+      in
+      return (Transaction_snark.verify transaction_snark)
 
   let fill_in_completed_work state works =
     failwith "TODO: To be done in parallel scan?"
 
+  let sum_fees xs ~f =
+    with_return (fun {return} ->
+      Ok (
+        List.fold ~init:Fee.zero xs ~f:(fun acc x ->
+          match Fee.add acc (f x) with
+          | None -> return (Or_error.error_string "Fee overflow")
+          | Some res -> res)))
+
   let apply t (witness: Ledger_builder_witness.t) :
       (t * (Ledger_hash.t * Ledger_proof.t) option) Deferred.Or_error.t =
-    let check b label = if not b then Or_error.error_string label else Ok () in
-    let open Or_error.Let_syntax in
-    let _ =
-      check
-        (not
-           (Ledger_builder_hash.equal
-              (Ledger_builder_witness.prev_hash witness)
-              (hash t)))
-        "bad hash"
-    in
+    let open Deferred.Or_error.Let_syntax in
     let payments = Ledger_builder_witness.transactions witness in
-    let work_fee = Ledger_builder_witness.total_work_fee witness in
-    let delta =
-      Fee.sub
-        (List.fold
-           (List.map payments Transaction.transaction_fee)
-           ~init:Fee.zero ~f:Fee.add)
-        work_fee
-    in
-    let _ = check (Fee.gte delta Fee.zero) "fees does not suffice" in
-    let next_jobs =
-      Parallel_scan.next_k_jobs ~state:t.scan_state ~spec
-        ~k:(List.length @@ Ledger_builder_witness.proofs witness)
-    in
     let completed_works = Ledger_builder_witness.completed_work_list witness in
-    let _ =
-      (*verify the completed_work*)
-      List.iter2 next_jobs
-        (List.map completed_works (fun (proof, _, _) -> proof))
-        verify
+    let check_hash_and_fees =
+      let open Or_error.Let_syntax in
+      let%bind () =
+        check "bad hash"
+          (not
+            (Ledger_builder_hash.equal
+                (Ledger_builder_witness.prev_hash witness)
+                (hash t)))
+      in
+      let%bind budget = sum_fees payments ~f:Transaction.transaction_fee in
+      let%bind work_fee = sum_fees completed_works ~f:(fun (_, fee, _) -> fee) in
+      let%map delta =
+        Fee.sub budget work_fee
+        |> option "budget did not suffice"
+      in
+      ()
     in
-    let _ =
+    let%bind () = Deferred.return check_hash_and_fees in
+    let%bind () =
+      let next_jobs =
+        Parallel_scan.next_k_jobs ~state:t.scan_state ~spec
+          ~k:(List.length @@ Ledger_builder_witness.proofs witness)
+      in
+      Deferred.List.for_all
+        (List.zip_exn next_jobs completed_works)
+        ~f:(fun (job, (proof, _, _)) -> verify job proof)
+      |> Deferred.map ~f:(check "proofs did not verify")
+    in
+    let%bind () =
       fill_in_completed_work t.scan_state completed_works
       (*Applying the completed work to the scan state*)
     in
@@ -257,13 +277,13 @@ struct
     in
     let new_jobs =
       List.map
-        (List.append fee_transfers
-           (List.map payments Super_transaction.from_transaction))
+        (List.map payments Super_transaction.from_transaction @ fee_transfers)
         new_job
     in
-    let _ =
+    let%bind () =
       (*Enqueueing new jobs to the scan state*)
       Parallel_scan.enqueue_new_jobs t.scan_state new_jobs
+      |> Deferred.map ~f:(fun () -> Ok ())
     in
     Deferred.return @@ Ok (t, None)
 end
