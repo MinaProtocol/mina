@@ -148,8 +148,6 @@ struct
     type t = job [@@deriving sexp_of]
   end
 
-  let job_proof_map = Hashtbl.create
-
   let hash t : Ledger_builder_hash.t = failwith "TODO"
 
   module Spec = struct
@@ -213,7 +211,7 @@ struct
     | None -> return false
     | Some statement ->
       let transaction_snark =
-        Transaction_snark.create ~proof ~source:statement.source
+        Transaction_snark.create ~proof:proof ~source:statement.source
           ~target:statement.target ~fee_excess:statement.fee_excess
           ~proof_type:statement.proof_type
       in
@@ -229,6 +227,51 @@ struct
           match Fee.add acc (f x) with
           | None -> return (Or_error.error_string "Fee overflow")
           | Some res -> res)))
+
+  let fst (a, b, c) = a
+  let snd (a, b, c) = b
+  let thrd (a, b, c) = c 
+
+  let create_transaction_snark (statement:Statement.t) work = 
+    Transaction_snark.create 
+      ~proof:work 
+        ~source:statement.source
+          ~target:statement.target 
+            ~fee_excess:statement.fee_excess
+              ~proof_type:statement.proof_type
+    
+
+  let job_proof (job:job) (work:Ledger_builder_witness.completed_work) : (job* snark_for_statement) Or_error.t = 
+     match job with
+      | Base Some(t,s) -> 
+        Ok (job, (create_transaction_snark s (fst work),s))
+      | Merge (Some (t,s),Some (t',s')) ->
+        let open Or_error.Let_syntax in
+        let%bind fee = Fee.add s.fee_excess s'.fee_excess |> option "Error adding fee_excess" in
+        let new_stmt : Statement.t = 
+          { source = s.source
+          ; target = s'.target
+          ; fee_excess = fee
+          ; proof_type = Transaction_snark.merge
+          } in
+          Ok (job,(create_transaction_snark new_stmt (fst work), new_stmt ))
+      | _ -> Error (Error.of_thunk 
+        (fun () -> sprintf "Invalid job for the corresponding transaction_snark"))
+
+  
+  
+  let jobs_proofs_assoc jobs completed_works : ((job*snark_for_statement) list) Or_error.t=
+    let open Or_error.Let_syntax in
+    let rec map_custom js ws = match (js, ws) with
+      | ([],[])          -> Ok []
+      | (j::js', w::ws') -> 
+        let%bind sn = job_proof j w in
+        let%bind rem_sn = map_custom js' ws' in
+        Ok (sn :: rem_sn)
+      | _                -> 
+        Error (Error.of_thunk (fun () -> sprintf "Job list and work list length mismatch"))
+    in map_custom jobs completed_works
+
 
   let apply t (witness: Ledger_builder_witness.t) :
       (t * (Ledger_hash.t * Ledger_proof.t) option) Deferred.Or_error.t =
@@ -253,15 +296,16 @@ struct
       ()
     in
     let%bind () = Deferred.return check_hash_and_fees in
-    let%bind () =
+    let%bind assoc_list = (*TODO to be sent to the parallel scan to update the ring_buffer*)
       let next_jobs =
         Parallel_scan.next_k_jobs ~state:t.scan_state ~spec
           ~k:(List.length @@ Ledger_builder_witness.proofs witness)
       in
-      Deferred.List.for_all
+      let%bind () = Deferred.List.for_all
         (List.zip_exn next_jobs completed_works)
         ~f:(fun (job, (proof, _, _)) -> verify job proof)
       |> Deferred.map ~f:(check "proofs did not verify")
+      in return @@ jobs_proofs_assoc next_jobs completed_works 
     in
     let%bind () =
       fill_in_completed_work t.scan_state completed_works
