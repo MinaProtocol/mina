@@ -74,6 +74,4 @@ val next_k_jobs :
   -> ('a, 'd) State.Job.t list Or_error.t
 
 val enqueue_data :
-     state:('a, 'b, 'd) State.t
-  -> data:'d list
-  -> unit Or_error.t
+  state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t

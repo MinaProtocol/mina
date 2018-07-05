@@ -35,8 +35,5 @@ let acc {acc} = snd acc
 
 let jobs {jobs} = jobs
 
-let copy { jobs; data_buffer; acc } =
-  { jobs = Ring_buffer.copy jobs
-  ; data_buffer = Queue.copy data_buffer
-  ; acc
-  }
+let copy {jobs; data_buffer; acc} =
+  {jobs= Ring_buffer.copy jobs; data_buffer= Queue.copy data_buffer; acc}

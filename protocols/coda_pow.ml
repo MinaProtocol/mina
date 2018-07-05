@@ -79,7 +79,19 @@ module type Ledger_intf = sig
   val undo_super_transaction : t -> super_transaction -> unit Or_error.t
 end
 
-(* Proofs have prices attached *)
+module type Transaction_snark_statement_intf = sig
+  type signed_fee
+
+  type ledger_hash
+
+  type t =
+    { source: ledger_hash
+    ; target: ledger_hash
+    ; fee_excess: signed_fee
+    ; proof_type: [`Base | `Merge] }
+  [@@deriving sexp_of]
+end
+
 module type Snark_pool_proof_intf = sig
   type proof
 
@@ -99,11 +111,11 @@ module type Transaction_intf = sig
 
   val check : t -> With_valid_signature.t option
 
-  val fee : With_valid_signature.t -> fee
+  val fee : t -> fee
   (*Fee excess*)
 end
 
-module type Public_Key_intf = sig
+module type Public_key_intf = sig
   type t
 end
 
@@ -126,33 +138,41 @@ module type Super_transaction_intf = sig
 
   type signed_fee
 
-  type t =
-    | Fee_transfer of fee_transfer
-    | Transaction of valid_transaction
+  type t = Fee_transfer of fee_transfer | Transaction of valid_transaction
   [@@deriving sexp, compare, eq]
 
   val fee_excess : t -> signed_fee
 end
 
-module type Ledger_builder_witness_intf = sig
-  type snarket_proof
+module type Completed_work_intf = sig
+  type fee
 
+  type proof
+
+  type public_key
+
+  type statement
+
+  type t = {fee: fee; proof: proof; prover: public_key}
+  [@@deriving sexp, bin_io]
+
+  val verify : t -> statement -> bool Deferred.t
+end
+
+module type Ledger_builder_witness_intf = sig
   type transaction
 
   type ledger_builder_hash
 
-  type pk
+  type public_key
 
-  type fee
-
-  type completed_work = snarket_proof * fee * pk
+  type completed_work
 
   type t =
-    { prev_hash : ledger_builder_hash
-    ; completed_works : completed_work list
-    ; transactions : transaction list
-    ; creator : pk
-    }
+    { prev_hash: ledger_builder_hash
+    ; completed_works: completed_work list
+    ; transactions: transaction list
+    ; creator: public_key }
   [@@deriving sexp, bin_io]
 end
 
@@ -405,9 +425,7 @@ Merge Snark:
   module Ledger_builder_hash : Ledger_builder_hash_intf
 
   module Ledger_builder_witness :
-    Ledger_builder_witness_intf
-    with type transaction := Transaction.t
-     and type snarket_proof := Snark_pool_proof.t
+    Ledger_builder_witness_intf with type transaction := Transaction.t
 
   module Ledger_builder :
     Ledger_builder_intf
@@ -525,7 +543,7 @@ struct
           (* This code is badly wrong. We have to turn off polymorphic
              compare *)
           true
-          (* TODO
+      (* TODO
           let margin = Ledger_builder.margin new_ledger_builder in
           Ledger_builder.hash new_ledger_builder
           = new_pcd.data.ledger_builder_hash
