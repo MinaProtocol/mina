@@ -5,7 +5,7 @@ open Snark_params.Tick
 include Sparse_ledger.Make (struct
             include Pedersen.Digest
 
-            let equal = ( = )
+            let equal = Pedersen.Digest.( = )
 
             let merge = Merkle_hash.merge
           end)
