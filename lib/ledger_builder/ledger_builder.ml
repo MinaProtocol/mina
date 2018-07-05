@@ -184,25 +184,21 @@ struct
   let option lab =
     Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-  let check label b =
-    if not b
-    then Or_error.error_string label
-    else Ok ()
+  let check label b = if not b then Or_error.error_string label else Ok ()
 
   let statement_of_job : job -> Statement.t option = function
     | Base (Some (_, statement)) -> Some statement
     | Merge_up (Some (_, statement)) -> Some statement
     | Merge (Some (_, stmt1), Some (_, stmt2)) ->
-      let open Option.Let_syntax in
-      let%bind () =
-        Option.some_if (Ledger_hash.equal stmt1.target stmt2.source) ()
-      in
-      let%map fee_excess = Fee.add stmt1.fee_excess stmt2.fee_excess in
-      { Statement.source= stmt1.source
-      ; target= stmt2.target
-      ; fee_excess
-      ; proof_type= Transaction_snark.merge
-      }
+        let open Option.Let_syntax in
+        let%bind () =
+          Option.some_if (Ledger_hash.equal stmt1.target stmt2.source) ()
+        in
+        let%map fee_excess = Fee.add stmt1.fee_excess stmt2.fee_excess in
+        { Statement.source= stmt1.source
+        ; target= stmt2.target
+        ; fee_excess
+        ; proof_type= Transaction_snark.merge }
     | _ -> None
 
   (* TODO: This should yield to the scheduler between verify's *)
@@ -210,68 +206,73 @@ struct
     match statement_of_job job with
     | None -> return false
     | Some statement ->
-      let transaction_snark =
-        Transaction_snark.create ~proof:proof ~source:statement.source
-          ~target:statement.target ~fee_excess:statement.fee_excess
-          ~proof_type:statement.proof_type
-      in
-      return (Transaction_snark.verify transaction_snark)
+        let transaction_snark =
+          Transaction_snark.create ~proof ~source:statement.source
+            ~target:statement.target ~fee_excess:statement.fee_excess
+            ~proof_type:statement.proof_type
+        in
+        return (Transaction_snark.verify transaction_snark)
 
   let fill_in_completed_work state works =
     failwith "TODO: To be done in parallel scan?"
 
   let sum_fees xs ~f =
     with_return (fun {return} ->
-      Ok (
-        List.fold ~init:Fee.zero xs ~f:(fun acc x ->
-          match Fee.add acc (f x) with
-          | None -> return (Or_error.error_string "Fee overflow")
-          | Some res -> res)))
+        Ok
+          (List.fold ~init:Fee.zero xs ~f:(fun acc x ->
+               match Fee.add acc (f x) with
+               | None -> return (Or_error.error_string "Fee overflow")
+               | Some res -> res )) )
 
   let fst (a, b, c) = a
+
   let snd (a, b, c) = b
-  let thrd (a, b, c) = c 
 
-  let create_transaction_snark (statement:Statement.t) work = 
-    Transaction_snark.create 
-      ~proof:work 
-        ~source:statement.source
-          ~target:statement.target 
-            ~fee_excess:statement.fee_excess
-              ~proof_type:statement.proof_type
-    
+  let thrd (a, b, c) = c
 
-  let job_proof (job:job) (work:Ledger_builder_witness.completed_work) : (job* snark_for_statement) Or_error.t = 
-     match job with
-      | Base Some(t,s) -> 
-        Ok (job, (create_transaction_snark s (fst work),s))
-      | Merge (Some (t,s),Some (t',s')) ->
+  let create_transaction_snark (statement: Statement.t) work =
+    Transaction_snark.create ~proof:work ~source:statement.source
+      ~target:statement.target ~fee_excess:statement.fee_excess
+      ~proof_type:statement.proof_type
+
+  let job_proof (job: job) (work: Ledger_builder_witness.completed_work) :
+      (job * snark_for_statement) Or_error.t =
+    match job with
+    | Base (Some (t, s)) -> Ok (job, (create_transaction_snark s (fst work), s))
+    | Merge (Some (t, s), Some (t', s')) ->
         let open Or_error.Let_syntax in
-        let%bind fee = Fee.add s.fee_excess s'.fee_excess |> option "Error adding fee_excess" in
-        let new_stmt : Statement.t = 
-          { source = s.source
-          ; target = s'.target
-          ; fee_excess = fee
-          ; proof_type = Transaction_snark.merge
-          } in
-          Ok (job,(create_transaction_snark new_stmt (fst work), new_stmt ))
-      | _ -> Error (Error.of_thunk 
-        (fun () -> sprintf "Invalid job for the corresponding transaction_snark"))
+        let%bind fee =
+          Fee.add s.fee_excess s'.fee_excess
+          |> option "Error adding fee_excess"
+        in
+        let new_stmt : Statement.t =
+          { source= s.source
+          ; target= s'.target
+          ; fee_excess= fee
+          ; proof_type= Transaction_snark.merge }
+        in
+        Ok (job, (create_transaction_snark new_stmt (fst work), new_stmt))
+    | _ ->
+        Error
+          (Error.of_thunk (fun () ->
+               sprintf "Invalid job for the corresponding transaction_snark" ))
 
-  
-  
-  let jobs_proofs_assoc jobs completed_works : ((job*snark_for_statement) list) Or_error.t=
+  let jobs_proofs_assoc jobs completed_works :
+      (job * snark_for_statement) list Or_error.t =
     let open Or_error.Let_syntax in
-    let rec map_custom js ws = match (js, ws) with
-      | ([],[])          -> Ok []
-      | (j::js', w::ws') -> 
-        let%bind sn = job_proof j w in
-        let%bind rem_sn = map_custom js' ws' in
-        Ok (sn :: rem_sn)
-      | _                -> 
-        Error (Error.of_thunk (fun () -> sprintf "Job list and work list length mismatch"))
-    in map_custom jobs completed_works
-
+    let rec map_custom js ws =
+      match (js, ws) with
+      | [], [] -> Ok []
+      | j :: js', w :: ws' ->
+          let%bind sn = job_proof j w in
+          let%bind rem_sn = map_custom js' ws' in
+          Ok (sn :: rem_sn)
+      | _ ->
+          Error
+            (Error.of_thunk (fun () ->
+                 sprintf "Job list and work list length mismatch" ))
+    in
+    map_custom jobs completed_works
 
   let apply t (witness: Ledger_builder_witness.t) :
       (t * (Ledger_hash.t * Ledger_proof.t) option) Deferred.Or_error.t =
@@ -283,29 +284,32 @@ struct
       let%bind () =
         check "bad hash"
           (not
-            (Ledger_builder_hash.equal
+             (Ledger_builder_hash.equal
                 (Ledger_builder_witness.prev_hash witness)
                 (hash t)))
       in
       let%bind budget = sum_fees payments ~f:Transaction.transaction_fee in
-      let%bind work_fee = sum_fees completed_works ~f:(fun (_, fee, _) -> fee) in
+      let%bind work_fee =
+        sum_fees completed_works ~f:(fun (_, fee, _) -> fee)
+      in
       let%map delta =
-        Fee.sub budget work_fee
-        |> option "budget did not suffice"
+        Fee.sub budget work_fee |> option "budget did not suffice"
       in
       ()
     in
     let%bind () = Deferred.return check_hash_and_fees in
-    let%bind assoc_list = (*TODO to be sent to the parallel scan to update the ring_buffer*)
+    let%bind assoc_list =
+      (*TODO to be sent to the parallel scan to update the ring_buffer*)
       let next_jobs =
         Parallel_scan.next_k_jobs ~state:t.scan_state ~spec
           ~k:(List.length @@ Ledger_builder_witness.proofs witness)
       in
-      let%bind () = Deferred.List.for_all
-        (List.zip_exn next_jobs completed_works)
-        ~f:(fun (job, (proof, _, _)) -> verify job proof)
-      |> Deferred.map ~f:(check "proofs did not verify")
-      in return @@ jobs_proofs_assoc next_jobs completed_works 
+      let%bind () =
+        Deferred.List.for_all (List.zip_exn next_jobs completed_works) ~f:
+          (fun (job, (proof, _, _)) -> verify job proof )
+        |> Deferred.map ~f:(check "proofs did not verify")
+      in
+      return @@ jobs_proofs_assoc next_jobs completed_works
     in
     let%bind () =
       fill_in_completed_work t.scan_state completed_works
