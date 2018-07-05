@@ -21,6 +21,8 @@ module State : sig
   type ('a, 'b, 'd) t [@@deriving sexp, bin_io]
 
   val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t
+
+  val copy : ('a, 'b, 'd) t -> ('a, 'b, 'd) t
 end
 
 module type Spec_intf = sig
@@ -69,11 +71,9 @@ val next_k_jobs :
            Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
                                                                           t = 'b)
   -> k:int
-  -> ('a, 'd) State.Job.t list
+  -> ('a, 'd) State.Job.t list Or_error.t
 
-(*Or_error.t*)
-
-val enqueue_new_jobs :
+val enqueue_data :
      state:('a, 'b, 'd) State.t
-  -> jobs:('a, 'd) State.Job.t list
-  -> unit Deferred.t
+  -> data:'d list
+  -> unit Or_error.t
