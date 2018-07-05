@@ -238,9 +238,59 @@ struct
       Deferred.map dresult ~f:(fun result -> {result; rollback= Do_nothing})
   end
 
-  let fill_in_completed_work state works : 
-    proof_with_statement option Result_with_rollback.t =
-      failwith "TODO: To be done in parallel scan?"
+  let job_proof (job: job) (work: Completed_work.t) :
+      (job * proof_with_statement) Result_with_rollback.t =
+    let open Result_with_rollback.Let_syntax in
+    match job with
+    | Base (Some (t, s)) -> return @@ (job, (work.proof, s))
+    | Merge (Some (t, s), Some (t', s')) ->
+        Result_with_rollback.of_or_error
+          (let open Or_error.Let_syntax in
+          let%bind fee =
+            Fee.Signed.add s.fee_excess s'.fee_excess
+            |> option "Error adding fee_excess"
+          in
+          let new_stmt : Statement.t =
+            { source= s.source
+            ; target= s'.target
+            ; fee_excess= fee
+            ; proof_type= `Merge }
+          in
+          Ok (job, (work.proof, new_stmt)))
+    | _ ->
+        Result_with_rollback.error
+          (Error.of_thunk (fun () ->
+               sprintf "Invalid job for the corresponding transaction_snark" ))
+
+  let jobs_proofs_assoc jobs completed_works :
+      (job * proof_with_statement) list Result_with_rollback.t =
+    let open Result_with_rollback.Let_syntax in
+    let rec map_custom js ws :
+        (job * proof_with_statement) list Result_with_rollback.t =
+      match (js, ws) with
+      | [], [] -> return @@ []
+      | j :: js', w :: ws' ->
+          let%bind sn = job_proof j w in
+          let%bind rem_sn = map_custom js' ws' in
+          Result_with_rollback.return (sn :: rem_sn)
+      | _ ->
+          Result_with_rollback.error
+            (Error.of_thunk (fun () ->
+                 sprintf "Job list and work list length mismatch" ))
+    in
+    map_custom jobs completed_works
+
+  let fill_in_completed_work state works :
+      proof_with_statement option Result_with_rollback.t =
+    let open Result_with_rollback.Let_syntax in
+    let%bind next_jobs =
+      Result_with_rollback.with_no_rollback
+        Deferred.Or_error.Let_syntax.(
+          Parallel_scan.next_k_jobs ~state ~spec ~k:(List.length works)
+          |> Deferred.return)
+    in
+    let%bind assoc_list = jobs_proofs_assoc next_jobs works in
+    failwith "TODO: To be done in parallel scan?"
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     failwith "TODO"
