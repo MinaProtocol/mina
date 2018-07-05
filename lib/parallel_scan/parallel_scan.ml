@@ -310,14 +310,14 @@ let next_k_jobs :
                                                                             t = 
              'b)
     -> k:int
-    -> ('a, 'd) State1.Job.t list (*Or_error.t*) =
- fun ~state ~spec ~k -> Ring_buffer.read_k (State1.jobs state) k
+    -> ('a, 'd) State1.Job.t list Or_error.t =
+ fun ~state ~spec ~k -> failwith "TODO"
 
-let enqueue_new_jobs :
-       state:('a, 'b, 'd) State.t
-    -> jobs:('a, 'd) State.Job.t list
-    -> unit Deferred.t =
- fun ~state ~jobs -> failwith "TODO"
+(* Ring_buffer.read_k (State1.jobs state) k *)
+
+let enqueue_data :
+    state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t =
+ fun ~state ~data -> failwith "TODO"
 
 let%test_module "scans" =
   ( module struct
