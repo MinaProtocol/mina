@@ -2,6 +2,7 @@ open Protocols
 open Coda_pow
 open Core_kernel
 open Snark_pool
+open Async
 
 type ('work, 'priced_proof) diff =
   | Add_unsolved of 'work
@@ -20,9 +21,10 @@ struct
 
   type t = (Work.t, priced_proof) diff
 
-  let apply (pool: Pool.t) (t: t) : unit Or_error.t =
+  let apply (pool: Pool.t) (t: t) : unit Or_error.t Deferred.t =
     match t with
-    | Add_unsolved work -> Ok (Pool.add_unsolved_work pool work)
+    | Add_unsolved work ->
+        Deferred.return @@ Ok (Pool.add_unsolved_work pool work)
     | Add_solved_work (work, {fee; proof}) ->
-        Ok (Pool.add_snark pool ~work ~proof ~fee)
+        Deferred.return @@ Ok (Pool.add_snark pool ~work ~proof ~fee)
 end
