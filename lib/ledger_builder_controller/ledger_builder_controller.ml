@@ -302,3 +302,7 @@ struct
     |> Option.value
          ~default:(return @@ Or_error.error_string "Haven't seen any nodes yet")
 end
+
+let%test_module "test" = (module struct
+  module Lbc = 
+end)
