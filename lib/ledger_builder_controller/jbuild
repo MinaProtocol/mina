@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(library
+ ((name ledger_builder_controller)
+  (public_name ledger_builder_controller)
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries (core storage logger protocols coda async async_extra))
+  (preprocess (pps (ppx_jane ppx_deriving.std)))
+  (synopsis "Ledger builder controlelr manages ledger-builders attached to blocks")))
+

@@ -117,11 +117,15 @@ module type Ledger_builder_intf = sig
 
   type ledger_proof
 
+  type ledger
+
   val max_margin : int
 
   val hash : t -> ledger_builder_hash
 
   val margin : t -> int
+
+  val ledger : t -> ledger
 
   (* This should memoize the snark verifications *)
 
@@ -315,6 +319,10 @@ module type Inputs_intf = sig
 
   module Ledger_proof : Proof_intf
 
+  module Ledger : sig
+    type t
+  end
+
   (*
 Bundle Snark:
    Input:
@@ -358,6 +366,7 @@ Merge Snark:
     with type witness := Ledger_builder_witness.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_hash := Ledger_hash.t
+     and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
 
   module Ledger_builder_transition :
