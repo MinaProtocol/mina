@@ -82,15 +82,13 @@ let%test_module "random set test" =
 
     let%test_unit "for all s, x : add s x -> mem s x" =
       Quickcheck.test ~sexp_of:[%sexp_of : Int_random_set.t * int]
-        (Quickcheck.Generator.tuple2 gen Int.gen) ~f:
-        (fun (s, x) ->
+        (Quickcheck.Generator.tuple2 gen Int.gen) ~f:(fun (s, x) ->
           Int_random_set.add s x ;
           assert (Int_random_set.mem s x) )
 
     let%test_unit "for all s, x: add s x & remove s x -> !mem s x" =
       Quickcheck.test ~sexp_of:[%sexp_of : Int_random_set.t * int]
-        (Quickcheck.Generator.tuple2 gen Int.gen) ~f:
-        (fun (s, x) ->
+        (Quickcheck.Generator.tuple2 gen Int.gen) ~f:(fun (s, x) ->
           Int_random_set.add s x ;
           Int_random_set.remove s x ;
           assert (not (Int_random_set.mem s x)) )
