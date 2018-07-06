@@ -3,7 +3,7 @@ open Nanobit_base
 open Dyn_array
 
 module type S = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving bin_io]
 
   type key
 
@@ -17,22 +17,22 @@ module type S = sig
 
   val get_random : t -> key option
 
+  val to_list : t -> key list
+
   val length : t -> int
 
-  val gen : t Quickcheck.Generator.t
+  val gen : key Quickcheck.Generator.t -> t Quickcheck.Generator.t
 end
 
 module Make (Key : sig
-  type t [@@deriving sexp, bin_io]
-
-  val gen : t Quickcheck.Generator.t
+  type t [@@deriving bin_io]
 
   include Hashable.S_binable with type t := t
 end) :
   S with type key := Key.t =
 struct
   type t = {keys: Key.t Dyn_array.t; key_to_loc: Int.t Key.Table.t}
-  [@@deriving sexp, bin_io]
+  [@@deriving bin_io]
 
   let create () = {keys= Dyn_array.create (); key_to_loc= Key.Table.create ()}
 
@@ -50,6 +50,8 @@ struct
       let random_index = Random.int (Dyn_array.length t.keys) in
       Some (Dyn_array.get t.keys random_index)
 
+  let to_list t = Dyn_array.to_list t.keys
+
   let remove t key =
     Option.iter (Key.Table.find_and_remove t.key_to_loc key) ~f:
       (fun delete_index ->
@@ -59,31 +61,39 @@ struct
 
   let length t = DynArray.length t.keys
 
-  let gen =
+  let gen key_gen =
     let open Quickcheck in
     let open Quickcheck.Generator.Let_syntax in
-    let%map sample_list = Quickcheck.Generator.list Key.gen in
+    let%map sample_list = Quickcheck.Generator.list key_gen in
     let t = create () in
     List.iter sample_list ~f:(add t) ;
     t
-
-  let%test_unit "for all s, x : add s x -> mem s x" =
-    Quickcheck.test ~sexp_of:[%sexp_of : t * Key.t]
-      (Quickcheck.Generator.tuple2 gen Key.gen) ~f:(fun (s, x) ->
-        add s x ;
-        assert (mem s x) )
-
-  let%test_unit "for all s, x: add s x & remove s x -> !mem s x" =
-    Quickcheck.test ~sexp_of:[%sexp_of : t * Key.t]
-      (Quickcheck.Generator.tuple2 gen Key.gen) ~f:(fun (s, x) ->
-        add s x ;
-        remove s x ;
-        assert (not (mem s x)) )
 end
 
 let%test_module "random set test" =
   ( module struct
-    module Int_random_set = Make (Int)
+    module Int_random_set = struct
+      include Make (Int)
+
+      let sexp_of_t t = [%sexp_of : int list] (to_list t)
+    end
+
+    let gen = Int_random_set.gen Int.gen
+
+    let%test_unit "for all s, x : add s x -> mem s x" =
+      Quickcheck.test ~sexp_of:[%sexp_of : Int_random_set.t * int]
+        (Quickcheck.Generator.tuple2 gen Int.gen) ~f:
+        (fun (s, x) ->
+          Int_random_set.add s x ;
+          assert (Int_random_set.mem s x) )
+
+    let%test_unit "for all s, x: add s x & remove s x -> !mem s x" =
+      Quickcheck.test ~sexp_of:[%sexp_of : Int_random_set.t * int]
+        (Quickcheck.Generator.tuple2 gen Int.gen) ~f:
+        (fun (s, x) ->
+          Int_random_set.add s x ;
+          Int_random_set.remove s x ;
+          assert (not (Int_random_set.mem s x)) )
 
     let%test "simulate random numbers from 0 to 10" =
       Test_util.with_randomness 123456789 (fun () ->

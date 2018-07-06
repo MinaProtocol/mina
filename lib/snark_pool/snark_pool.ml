@@ -5,7 +5,7 @@ open Coda_pow
 
 module Priced_proof = struct
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
-  [@@deriving bin_io, sexp, fields]
+  [@@deriving bin_io, fields]
 end
 
 module type S = sig
@@ -39,28 +39,34 @@ module Make (Proof : sig
 
   include Proof_intf with type t := t
 end) (Fee : sig
-  type t [@@deriving sexp, bin_io]
-
-  val gen : t Quickcheck.Generator.t
+  type t [@@deriving bin_io]
 
   include Comparable.S with type t := t
 end) (Work : sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving bin_io]
 
-  val gen : t Quickcheck.Generator.t
+  (* gen work_gen fee_gen proof_gen *)
 
   include Hashable.S_binable with type t := t
 end) :
   sig
     include S
 
-    val sexp_of_t : t -> Sexp.t
-
     val unsolved_work_count : t -> int
 
     val remove_solved_work : t -> work -> unit
 
     val to_record : priced_proof -> (proof, fee) Priced_proof.t
+
+    val gen :
+         Proof.t Quickcheck.Generator.t
+      -> Fee.t Quickcheck.Generator.t
+      -> Work.t Quickcheck.Generator.t
+      -> t Quickcheck.Generator.t
+
+    val solved_work : t -> work list
+
+    val unsolved_work : t -> work list
   end
   with type work := Work.t
    and type proof := Proof.t
@@ -69,8 +75,7 @@ struct
   module Work_random_set = Random_set.Make (Work)
 
   module Priced_proof = struct
-    type t = (Proof.t sexp_opaque, Fee.t) Priced_proof.t
-    [@@deriving sexp, bin_io]
+    type t = (Proof.t, Fee.t) Priced_proof.t [@@deriving bin_io]
 
     let create proof fee : (Proof.t, Fee.t) Priced_proof.t = {proof; fee}
 
@@ -90,7 +95,11 @@ struct
     { proofs: Priced_proof.t Work.Table.t
     ; solved_work: Work_random_set.t
     ; unsolved_work: Work_random_set.t }
-  [@@deriving sexp, bin_io]
+  [@@deriving bin_io]
+
+  let solved_work t = Work_random_set.to_list t.solved_work
+
+  let unsolved_work t = Work_random_set.to_list t.unsolved_work
 
   let create_pool () =
     { proofs= Work.Table.create ()
@@ -136,9 +145,24 @@ struct
           remove_solved_work t work ; work)
 
   let unsolved_work_count t = Work_random_set.length t.unsolved_work
+
+  let gen proof_gen fee_gen work_gen =
+    let open Quickcheck in
+    let open Quickcheck.Generator.Let_syntax in
+    let gen_entry () =
+      Quickcheck.Generator.tuple3 proof_gen fee_gen work_gen
+    in
+    let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ())
+    and sample_unsolved_solved_work = Quickcheck.Generator.list work_gen in
+    let pool = create_pool () in
+    List.iter sample_solved_work ~f:(fun (proof, fee, work) ->
+        add_snark pool work proof fee ) ;
+    List.iter sample_unsolved_solved_work ~f:(fun work ->
+        add_unsolved_work pool work ) ;
+    pool
 end
 
-let%test_module "random set test" =
+let%test_module "snark pool test" =
   ( module struct
     module Mock_proof = struct
       type input = Int.t
@@ -163,24 +187,20 @@ let%test_module "random set test" =
       let proof t = t.proof
     end
 
-    module Mock_snark_pool = Make (Mock_proof) (Mock_fee) (Mock_work)
+    module Mock_snark_pool = struct
+      include Make (Mock_proof) (Mock_fee) (Mock_work)
 
-    let gen =
-      let open Quickcheck in
-      let open Quickcheck.Generator.Let_syntax in
-      let gen_entry () =
-        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
-      in
-      let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ())
-      and sample_unsolved_solved_work =
-        Quickcheck.Generator.list Mock_work.gen
-      in
-      let pool = Mock_snark_pool.create_pool () in
-      List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
-          Mock_snark_pool.add_snark pool work proof fee ) ;
-      List.iter sample_unsolved_solved_work ~f:(fun work ->
-          Mock_snark_pool.add_unsolved_work pool work ) ;
-      pool
+      type t' = {solved_work: Mock_work.t list; unsolved_work: Mock_work.t list}
+      [@@deriving sexp]
+
+      let sexp_of_t t =
+        [%sexp_of : t']
+          {solved_work= solved_work t; unsolved_work= unsolved_work t}
+    end
+
+    type t = {solved_work: Mock_work.t list; unsolved_work: Mock_work.t list}
+
+    let gen = Mock_snark_pool.gen Mock_proof.gen Mock_fee.gen Mock_work.gen
 
     let%test_unit "When two priced proofs of the same work are inserted into \
                    the snark pool, the fee of the work is at most the minimum \
