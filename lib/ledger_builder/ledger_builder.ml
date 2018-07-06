@@ -11,8 +11,6 @@ module Make (Fee : sig
     val sub : t -> t -> t option
 
     val zero : t
-
-    val gte : t -> t -> bool
   end
 
   module Signed : sig
