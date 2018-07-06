@@ -132,7 +132,7 @@ module type Ledger_builder_controller_intf = sig
   val create : Config.t -> t Deferred.t
 
   val local_get_ledger :
-    t -> ledger_builder_hash -> (ledger_builder * state) Or_error.t
+    t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
 
   val strongest_ledgers : t -> (ledger_builder * state) Linear_pipe.Reader.t
 end
@@ -380,17 +380,14 @@ struct
     let%bind net =
       Net.create config.net_config
         (fun hash ->
-          return
-            (Or_error.is_ok
-               (Ledger_builder_controller.local_get_ledger ledger_builder hash))
-          )
+          Ledger_builder_controller.local_get_ledger ledger_builder hash
+          >>| Or_error.is_ok )
         (fun hash ->
-          return
-            ( match
-                Ledger_builder_controller.local_get_ledger ledger_builder hash
-              with
-            | Ok ledger_and_state -> Some ledger_and_state
-            | _ -> None ) )
+          match%map
+            Ledger_builder_controller.local_get_ledger ledger_builder hash
+          with
+          | Ok ledger_and_state -> Some ledger_and_state
+          | _ -> None )
     in
     Ivar.fill net_ivar net ;
     let state_io =

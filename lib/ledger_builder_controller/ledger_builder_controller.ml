@@ -6,40 +6,44 @@ module type S = sig
 end
 
 module Make (Ledger_builder_hash : sig
-  type t
+  type t [@@deriving eq, bin_io]
 end) (Ledger_hash : sig
-  type t [@@deriving eq]
-end) (Ledger_proof : sig
-  type t
+  type t [@@deriving bin_io]
 end) (Ledger_builder_transition : sig
   type t [@@deriving eq, sexp, compare, bin_io]
 
   val gen : t Quickcheck.Generator.t
-end)
-(Ledger : sig
+end) (Ledger : sig
   type t
 
   val merkle_root : t -> Ledger_hash.t
-end)
-(Ledger_builder : sig
+end) (Ledger_builder : sig
   type t [@@deriving bin_io]
+
+  type proof
 
   val ledger : t -> Ledger.t
 
-  val create : unit -> t
+  val create : Ledger.t -> t
 
   val copy : t -> t
+
+  val root_hash : t -> Ledger_builder_hash.t
 
   val apply :
        t
     -> Ledger_builder_transition.t
-    -> ((Ledger_hash.t * Ledger_proof.t) option) Deferred.Or_error.t
-end)  (Ledger_hash : sig
-  type t [@@deriving bin_io]
-end)  (State : sig
+    -> (Ledger_hash.t * proof) option Deferred.Or_error.t
+end) (State_hash : sig
+  type t [@@deriving eq]
+end) (State : sig
   type t [@@deriving eq, sexp, compare, bin_io]
 
-  val root_hash : t -> Ledger_hash.t
+  val root_hash : t -> Ledger_builder_hash.t
+
+  val state_hash : t -> State_hash.t
+
+  val previous_state_hash : t -> State_hash.t
 
   val gen : t Quickcheck.Generator.t
 end) (Valid_transaction : sig
@@ -75,7 +79,13 @@ struct
       { transactions: Valid_transaction.t list
       ; transition: Ledger_builder_transition.t
       ; state: State.t }
-    [@@deriving eq, compare, bin_io, sexp]
+    [@@deriving eq, compare, bin_io, sexp, fields]
+
+    let root_hash {state} = State.root_hash state
+
+    let state_hash {state} = State.state_hash state
+
+    let previous_state_hash {state} = State.previous_state_hash state
 
     let gen =
       let open Quickcheck.Generator.Let_syntax in
@@ -91,10 +101,22 @@ struct
         let k = 50
       end)
 
+  module Tagged_lb = struct
+    type t = Ledger_hash.t ref * Ledger_builder.t [@@deriving bin_io]
+
+    let create ~hash ~builder = (ref hash, builder)
+
+    let ledger_builder = snd
+
+    let hash t = !(fst t)
+
+    let set_hash t h = fst t := h
+  end
+
   module State = struct
     type t =
-      { locked_ledger_builder: Ledger_hash.t * Ledger_builder.t
-      ; longest_branch_tip: Ledger_hash.t * Ledger_builder.t
+      { locked_ledger_builder: Tagged_lb.t
+      ; longest_branch_tip: Tagged_lb.t
       ; mutable ktree: Witness_tree.t option
       (* TODO: This impl assumes we have the original Ouroboros assumption. In
          order to work with the Praos assumption we'll need to keep a linked
@@ -105,18 +127,34 @@ struct
 
     let create genesis_ledger : t =
       let root = Ledger.merkle_root genesis_ledger in
-      { locked_ledger_builder= (root, Ledger_builder.create ())
-      ; longest_branch_tip= (root, Ledger_builder.create ())
+      { locked_ledger_builder=
+          Tagged_lb.create ~hash:root
+            ~builder:(Ledger_builder.create genesis_ledger)
+      ; longest_branch_tip=
+          Tagged_lb.create ~hash:root
+            ~builder:(Ledger_builder.create genesis_ledger)
       ; ktree= None }
   end
 
-  type t = {ledger_builder_io: Net.t; log: Logger.t; state: State.t}
+  type t =
+    { ledger_builder_io: Net.t
+    ; log: Logger.t
+    ; state: State.t
+    ; strongest_ledgers: Ledger_builder.t Linear_pipe.Reader.t }
 
-  let best_tip tree =
-    Witness_tree.longest_path tree |> List.last_exn
+  let best_tip tree = Witness_tree.longest_path tree |> List.last_exn
 
-  let locked_head tree =
-    Witness_tree.longest_path tree |> List.hd_exn
+  let locked_head tree = Witness_tree.longest_path tree |> List.hd_exn
+
+  (* The following assertion will always pass without extra checks because
+     we're supposed to have validated the witness upstream this pipe (see
+     coda.ml) *)
+  let assert_valid_state (witness: Witness.t) builder =
+    assert (
+      Ledger_builder_hash.equal
+        (Witness.root_hash witness)
+        (Ledger_builder.root_hash builder) ) ;
+    ()
 
   let create (config: Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
@@ -138,43 +176,133 @@ struct
           State.create config.genesis_ledger
     in
     let%map net = config.net_deferred in
-    let t =
-      { ledger_builder_io= Net.create net
-      ; log= Logger.child config.parent_log "ledger_builder_controller"
-      ; state }
-    in
+    (* Here we effectfully listen to transitions and emit what we belive are
+       the strongest ledger_builders *)
     let strongest_ledgers =
-      Linear_pipe.filter_map_unordered ~max_concurrency:1 config.ledger_builder_transitions ~f:
-        (fun (transactions, state, transition) ->
-          (* The following assertion will always pass because we're supposed
-             to have validated the witness upstream this pipe (see coda.ml) *)
-          let assert_valid_state (witness : Witness.t) builder =
-            assert (Ledger_hash.equal (State.root_hash witness.state) (Ledger.merkle_root @@ Ledger_builder.ledger builder) );
-            ()
-          in
+      Linear_pipe.filter_map_unordered ~max_concurrency:1
+        config.ledger_builder_transitions ~f:
+        (fun (transactions, s, transition) ->
+          match state.ktree with
+          (* If we've seen no data from the network, we can only do nothing here *)
+          | None ->
+              return None
+          | Some old_tree ->
+              let witness_to_add : Witness.t =
+                {transactions; transition; state= s}
+              in
+              let p_eq_previous_state_hash (w: Witness.t) =
+                State_hash.equal (Witness.state_hash w)
+                  (Witness.previous_state_hash witness_to_add)
+              in
+              (* When we get a new transition adjust our ktree *)
+              let new_tree =
+                Witness_tree.add old_tree witness_to_add
+                  ~parent:p_eq_previous_state_hash
+              in
+              state.ktree <- Some new_tree ;
+              let force_apply_transition lb tip =
+                match%map Ledger_builder.apply lb tip with
+                | Ok _ -> ()
+                | Error e ->
+                    failwithf
+                      "Invariant failed, we should have validated the data \
+                       before here %s"
+                      (Error.to_string_hum e) ()
+              in
+              (* Adjust the locked_ledger if necessary *)
+              let%bind () =
+                let new_head = locked_head new_tree in
+                if Witness.equal (locked_head old_tree) new_head then return ()
+                else
+                  let lb =
+                    Tagged_lb.ledger_builder state.locked_ledger_builder
+                  in
+                  let%map () =
+                    force_apply_transition lb (Witness.transition new_head)
+                  in
+                  assert_valid_state new_head lb ;
+                  ()
+              in
+              (* Adjust the longest_branch_tip if necessary *)
+              let new_tip =
+                Witness_tree.longest_path new_tree |> List.last_exn
+              in
+              if Witness.equal (best_tip old_tree) new_tip then return None
+              else
+                let lb = Tagged_lb.ledger_builder state.longest_branch_tip in
+                let%map () =
+                  force_apply_transition lb (Witness.transition new_tip)
+                in
+                Some lb )
+    in
+    { ledger_builder_io= Net.create net
+    ; log= Logger.child config.parent_log "ledger_builder_controller"
+    ; strongest_ledgers
+    ; state }
 
-          let old_tree = t.state.ktree in
-          (* When we get a new transition adjust our ktree *)
-          (t.state).ktree
-          <- Witness_tree.add t.state.ktree {transactions; transition; state};
+  let strongest_ledgers {strongest_ledgers} = strongest_ledgers
 
-          (* Adjust the locked_ledger if necessary *)
-          let%bind () =
-            let new_head = locked_head t.state.ktree in
-            if (Witness.equal (locked_head old_tree) new_head) then return () else (
-              let%map (_, _) = Ledger_builder.apply t.state.locked_ledger_builder new_head in
-              assert_valid_state new_head t.state.locked_ledger_builder;
-              ()
-            )
-          in
-
-          (* Adjust the longest_branch_tip if necessary *)
-          let tip = path |> List.last_exn in
-          if Witness.equal tip t.best_tip then
-            None
-          else
-            Some 
-          )
-
-  let strongest_ledgers
+  (** Returns a reference to a ledger_builder denoted by [hash], materialize a
+   fresh ledger at a specific hash if necessary *)
+  let local_get_ledger t hash =
+    let lb_hash tagged_lb =
+      Tagged_lb.ledger_builder tagged_lb |> Ledger_builder.root_hash
+    in
+    let find_state tree lb_hash =
+      Witness_tree.find_map tree ~f:(fun w ->
+          if Ledger_builder_hash.equal (Witness.root_hash w) lb_hash then
+            Some (Witness.state w)
+          else None )
+    in
+    Option.map t.state.ktree ~f:(fun tree ->
+        (* First let's see if we have an easy case *)
+        let locked = t.state.locked_ledger_builder in
+        let tip = t.state.longest_branch_tip in
+        let attempt_easy w err_msg_name =
+          match find_state tree (lb_hash w) with
+          | None ->
+              return
+              @@ Or_error.errorf
+                   "This was our %s, but we didn't witness the state"
+                   err_msg_name
+          | Some state -> return @@ Ok (Tagged_lb.ledger_builder w, state)
+        in
+        if Ledger_builder_hash.equal hash (lb_hash locked) then
+          attempt_easy locked "locked_head"
+        else if Ledger_builder_hash.equal hash (lb_hash tip) then
+          attempt_easy tip "tip"
+        else
+          (* Now we need to materialize it *)
+          match
+            Witness_tree.path tree ~f:(fun w ->
+                Ledger_builder_hash.equal hash (Witness.root_hash w) )
+          with
+          | Some path ->
+              let lb_start =
+                Tagged_lb.ledger_builder t.state.locked_ledger_builder
+              in
+              assert_valid_state (List.hd_exn path) lb_start ;
+              let lb = Ledger_builder.copy lb_start in
+              (* Fast-forward the lb *)
+              let%map () =
+                Deferred.List.fold ~init:() (List.tl_exn path) ~f:(fun () w ->
+                    let open Deferred.Let_syntax in
+                    match%map Ledger_builder.apply lb w.Witness.transition with
+                    | Ok None -> ()
+                    | Ok (Some _) -> ()
+                    (* We've already verified that all the patches can be
+                       applied successfully before we added to the ktree, so we
+                       can force-unwrap here *)
+                    | Error e ->
+                        failwithf
+                          "We should have already verified patches can be \
+                           applied: %s"
+                          (Error.to_string_hum e) () )
+              in
+              assert (
+                Ledger_builder_hash.equal (Ledger_builder.root_hash lb) hash ) ;
+              Ok (lb, List.last_exn path |> Witness.state)
+          | None -> return (Or_error.error_string "Hash not found locally") )
+    |> Option.value
+         ~default:(return @@ Or_error.error_string "Haven't seen any nodes yet")
 end

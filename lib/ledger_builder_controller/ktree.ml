@@ -28,6 +28,8 @@ module Rose = struct
   let to_array = C.to_array
 
   let mem = C.mem
+
+  let find = C.find
 end
 
 (** A Rose tree with max-depth k. Whenever we want to add a node that would increase the depth past k, we instead move the tree forward and root it at the node towards that path *)
@@ -43,6 +45,19 @@ struct
   module Elem_set = Set.Make_binable (Elem)
 
   type t = {tree: Elem.t Rose.t; elems: Elem_set.t} [@@deriving sexp, bin_io]
+
+  let find_map {elems} ~f = Elem_set.find_map elems ~f
+
+  (** Path from the root to the first node where the predicate returns true *)
+  let path {tree} ~f =
+    let rec go tree path =
+      match tree with
+      | Rose.Rose (x, _) when f x -> Some (x :: path)
+      | Rose.Rose (x, []) when not (f x) -> None
+      | Rose.Rose (x, children) ->
+          List.find_map children ~f:(fun c -> go c (x :: path))
+    in
+    go tree [] |> Option.map ~f:List.rev
 
   let single (e: Elem.t) : t =
     {tree= Rose.single e; elems= Elem_set.singleton e}
@@ -78,13 +93,13 @@ struct
     in
     go tree 0 [] |> fst |> List.rev
 
+  (** Extends tree with e at the first node n where (parent n) returns true *)
   let add t e ~parent =
     if Elem_set.mem t.elems e then t
     else
       let rec go node depth =
         let (Rose.Rose (x, xs)) = node in
-        if Elem.equal x parent then
-          (Rose.Rose (x, Rose.single e :: xs), depth + 1)
+        if parent x then (Rose.Rose (x, Rose.single e :: xs), depth + 1)
         else
           let xs, ds =
             List.map xs ~f:(fun x -> go x (depth + 1)) |> List.unzip
@@ -96,7 +111,7 @@ struct
       let x, tree_and_depths =
         let (Rose.Rose (x, xs)) = t.tree in
         let children = List.map xs ~f:(fun x -> go x 1) in
-        if Elem.equal x parent then (x, (Rose.single e, 1) :: children)
+        if parent x then (x, (Rose.single e, 1) :: children)
         else (
           assert (List.length xs <> 0) ;
           (x, children) )
@@ -113,12 +128,6 @@ struct
                 Int.compare d d' )
             |> Option.value_exn
           in
-          (*printf*)
-          (*!"Tree_and_depths %{sexp: (Elem.t Rose.t * int) list}\n%!"*)
-          (*tree_and_depths ;*)
-          (*printf*)
-          (*!"Longest_subtree, longest_depth : %{sexp: Elem.t Rose.t} , %d\n%!"*)
-          (*longest_subtree longest_depth ;*)
           if longest_depth >= Small_k.k then
             {tree= longest_subtree; elems= Elem_set.add t.elems e}
           else default
@@ -132,7 +141,7 @@ struct
       let%map idx = Int.gen_incl 0 (Array.length candidates - 1) in
       (r, e, candidates.(idx)))
       ~f:(fun (r, e, parent) ->
-        let r' = add r e ~parent in
+        let r' = add r e ~parent:(Elem.equal parent) in
         assert (
           Elem_set.mem r.elems e || not (Rose.equal Elem.equal r.tree r'.tree)
         ) )
@@ -145,7 +154,7 @@ struct
              not (Rose.mem r.tree e ~equal:Elem.equal) ) )
       ~f:(fun (r, e) ->
         let path = longest_path r in
-        let r' = add r e ~parent:(List.last_exn path) in
+        let r' = add r e ~parent:(Elem.equal (List.last_exn path)) in
         assert (Elem.equal e (List.last_exn (longest_path r'))) ;
         (* If there were two paths of the same length, we may be missing the
          * last thing in our first path *)
@@ -157,6 +166,14 @@ struct
           || List.is_prefix ~equal:Elem.equal
                ~prefix:(List.drop potential_prefix 1)
                path' ) )
+
+  let%test_unit "There exists a path between the root and any node" =
+    Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
+      (let open Quickcheck.Generator.Let_syntax in
+      let%bind r = gen in
+      let%map e = Quickcheck.Generator.of_list (Elem_set.to_list r.elems) in
+      (r, e))
+      ~f:(fun (r, e) -> assert (Option.is_some (path r ~f:(Elem.equal e))))
 
   let%test_unit "Extending a tree with depth-k, extends full-tree properly" =
     let elem_pairs =
@@ -175,8 +192,7 @@ struct
     in
     assert (List.length (longest_path t) = Small_k.k) ;
     let (Rose.Rose (head, first_children)) = t.tree in
-    let t' = add t e2 ~parent:e1 in
-    (*printf !"Length: %d\n%!" (List.length @@ longest_path t') ;*)
+    let t' = add t e2 ~parent:(Elem.equal e1) in
     assert (List.length (longest_path t') = Small_k.k) ;
     assert (not (Rose.mem t'.tree head ~equal:Elem.equal)) ;
     assert (
@@ -211,4 +227,15 @@ let%test_module "K-tree" =
         ; elems= Tree.Elem_set.of_list [1; 2; 3; 4] }
       in
       assert (List.equal ~equal:Int.equal (Tree.longest_path t) [1; 2; 3])
+
+    let%test_unit "Paths are found in the middle of some tree" =
+      let t =
+        { Tree.tree=
+            Rose.Rose (1, [Rose.Rose (2, [Rose.single 3]); Rose.single 4])
+        ; elems= Tree.Elem_set.of_list [1; 2; 3; 4] }
+      in
+      assert (
+        List.equal ~equal:Int.equal
+          (Tree.path t ~f:(Int.equal 2) |> Option.value_exn)
+          [1; 2] )
   end )
