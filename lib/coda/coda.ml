@@ -239,10 +239,6 @@ end
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
-  module Ledger : sig
-    type t
-  end
-
   module Proof_carrying_state : sig
     type t = (State.t, State.Proof.t) Coda_pow.Proof_carrying_data.t
     [@@deriving sexp, bin_io]
