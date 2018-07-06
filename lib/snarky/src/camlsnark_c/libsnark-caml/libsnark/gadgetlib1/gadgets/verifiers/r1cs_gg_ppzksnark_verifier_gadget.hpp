@@ -60,13 +60,6 @@ public:
     std::shared_ptr<G2_variable<ppT>> gamma_g2;
     std::shared_ptr<G2_variable<ppT>> delta_g2;
 
-    // std::shared_ptr<G2_variable<ppT> > alphaA_g2;
-    // std::shared_ptr<G1_variable<ppT> > alphaB_g1;
-    // std::shared_ptr<G2_variable<ppT> > alphaC_g2;
-    // std::shared_ptr<G2_variable<ppT> > gamma_g2;
-    // std::shared_ptr<G1_variable<ppT> > gamma_beta_g1;
-    // std::shared_ptr<G2_variable<ppT> > gamma_beta_g2;
-    // std::shared_ptr<G2_variable<ppT> > rC_Z_g2;
     std::shared_ptr<G1_variable<ppT> > encoded_IC_base; // elim?
     std::vector<std::shared_ptr<G1_variable<ppT> > > gamma_ABC_g1; // encoded_IC_query
 
@@ -165,10 +158,6 @@ public:
     std::shared_ptr<precompute_G2_gadget<ppT>> compute_proof_g_B_precomp;
     std::shared_ptr<precompute_G1_gadget<ppT>> compute_proof_g_C_precomp;
     std::shared_ptr<precompute_G1_gadget<ppT>> compute_acc_precomp;
-
-    /*
-    std::shared_ptr<Fqk_variable<ppT>> QAP_miller;
-    std::shared_ptr<e_times_e_over_e_miller_loop_gadget<ppT>> compute_QAP_miller; */
 
     std::shared_ptr<check_e_times_e_over_e_equals_value_gadget<ppT>> check_QAP_valid;
 

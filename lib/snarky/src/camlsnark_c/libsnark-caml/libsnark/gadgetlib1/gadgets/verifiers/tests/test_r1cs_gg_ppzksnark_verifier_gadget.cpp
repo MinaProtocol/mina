@@ -153,10 +153,8 @@ void test_hardcoded_verifier(const std::string &annotation_A, const std::string 
     online_verifier.generate_r1cs_witness();
     pb.val(result) = FieldT_B::one();
 
-    //fails in libsnark
-
-    //    printf("positive test:\n");
-    //assert(pb.is_satisfied());
+    printf("positive test:\n");
+    assert(pb.is_satisfied());
 
     pb.val(primary_input_bits[0]) = FieldT_B::one() - pb.val(primary_input_bits[0]);
     online_verifier.generate_r1cs_witness();
@@ -371,8 +369,7 @@ void test_full_precomputed_pairing(const std::string &annotation)
     finexp.result->get_element().print();
     native_finexp_result.print();
 
-    //disabled below, assert also fails in libsnark
-    //assert(finexp.result->get_element() == native_finexp_result);
+    assert(finexp.result->get_element() == native_finexp_result);
 
     printf("number of constraints for full precomputed pairing (Fr is %s)  = %zu\n", annotation.c_str(), pb.num_constraints());
 }
