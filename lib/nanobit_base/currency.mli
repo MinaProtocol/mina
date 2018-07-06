@@ -45,6 +45,7 @@ end
 
 module type Checked_arithmetic_intf = sig
   type var
+  type signed_var
 
   val add : var -> var -> (var, _) Checked.t
 
@@ -53,6 +54,52 @@ module type Checked_arithmetic_intf = sig
   val ( + ) : var -> var -> (var, _) Checked.t
 
   val ( - ) : var -> var -> (var, _) Checked.t
+
+  val add_signed : var -> signed_var -> (var, _) Checked.t
+end
+
+module type Signed_intf = sig
+  type magnitude
+  type magnitude_var
+
+  type ('magnitude, 'sgn) t_
+
+  val length : int
+
+  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
+
+  type nonrec t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp]
+
+  type nonrec var = (magnitude_var, Sgn.var) t_
+
+  val typ : (var, t) Typ.t
+
+  val zero : t
+
+  val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
+
+  val to_bits : t -> bool list
+
+  val add : t -> t -> t option
+
+  val ( + ) : t -> t -> t option
+
+  val negate : t -> t
+
+  module Checked : sig
+    val to_bits : var -> Boolean.var list
+
+    val add : var -> var -> (var, _) Checked.t
+
+    val ( + ) : var -> var -> (var, _) Checked.t
+
+    val to_field_var : var -> (Field.var, _) Checked.t
+
+    val cswap :
+          Boolean.var
+      -> (magnitude_var, Sgn.t) t_ * (magnitude_var, Sgn.t) t_
+      -> (var * var, _) Checked.t
+  end
 end
 
 module Fee : sig
@@ -60,7 +107,17 @@ module Fee : sig
 
   include Arithmetic_intf with type t := t
 
-  module Checked : Checked_arithmetic_intf with type var := var
+  module Signed : Signed_intf
+    with type magnitude := t
+     and type magnitude_var := var
+
+  module Checked : sig
+    include Checked_arithmetic_intf
+      with type var := var
+       and type signed_var := Signed.var
+
+    val add_signed : var -> Signed.var -> (var, _) Checked.t
+  end
 end
 
 module Amount : sig
@@ -68,51 +125,18 @@ module Amount : sig
 
   include Arithmetic_intf with type t := t
 
-  type amount_var = var
+  module Signed : Signed_intf
+    with type magnitude := t
+     and type magnitude_var := var
 
   val of_fee : Fee.t -> t
 
   val add_fee : t -> Fee.t -> t option
 
-  module Signed : sig
-    type ('magnitude, 'sgn) t_
-
-    val length : int
-
-    val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
-
-    type nonrec t = (t, Sgn.t) t_ [@@deriving bin_io, sexp]
-
-    type nonrec var = (var, Sgn.var) t_
-
-    val typ : (var, t) Typ.t
-
-    val zero : t
-
-    val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
-
-    val to_bits : t -> bool list
-
-    val add : t -> t -> t option
-
-    val ( + ) : t -> t -> t option
-
-    module Checked : sig
-      val to_bits : var -> Boolean.var list
-
-      val add : var -> var -> (var, _) Checked.t
-
-      val ( + ) : var -> var -> (var, _) Checked.t
-
-      val cswap :
-           Boolean.var
-        -> (amount_var, Sgn.t) t_ * (amount_var, Sgn.t) t_
-        -> (var * var, _) Checked.t
-    end
-  end
-
   module Checked : sig
-    include Checked_arithmetic_intf with type var := var
+    include Checked_arithmetic_intf
+      with type var := var
+       and type signed_var := Signed.var
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
