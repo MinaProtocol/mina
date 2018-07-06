@@ -27,6 +27,8 @@ module Compressed : sig
     end
   end
 
+  val empty : t
+
   type var = (Field.var, Boolean.var) t_
 
   val typ : (var, t) Typ.t

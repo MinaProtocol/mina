@@ -30,6 +30,24 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
+  module Addr : sig
+    type t [@@deriving sexp, bin_io, hash, compare]
+
+    include Hashable.S with type t := t
+
+    val depth : t -> int
+
+    val parent : t -> t
+
+    val child : t -> [`Left | `Right] -> t option
+
+    val child_exn : t -> [`Left | `Right] -> t
+
+    val unpeel : t -> [`Left | `Right] * t
+
+    val root : t
+  end
+
   val create : unit -> t
 
   val length : t -> int
@@ -70,13 +88,25 @@ module type S = sig
   val set_at_index_exn : t -> index -> account -> unit
 
   val merkle_path_at_index_exn : t -> index -> Path.t
+
+  val addr_of_index : t -> index -> Addr.t
+
+  val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
+
+  val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
+
+  val extend_with_empty_to_fit : t -> int -> unit
+
+  val set_syncing : t -> unit
+
+  val clear_syncing : t -> unit
 end
 
 module type F = functor (Account :sig
-                                    
+
                                     type t [@@deriving sexp, eq, bin_io]
 end) -> functor (Hash :sig
-                         
+
                          type hash [@@deriving sexp, hash, compare, bin_io]
 
                          val hash_account : Account.t -> hash
@@ -85,12 +115,14 @@ end) -> functor (Hash :sig
 
                          val merge : height:int -> hash -> hash -> hash
 end) -> functor (Key :sig
-                        
+
                         type t [@@deriving sexp, bin_io]
+
+                        val empty : t
 
                         include Hashable.S_binable with type t := t
 end) -> functor (Depth :sig
-                          
+
                           val depth : int
 end) -> S
         with type hash := Hash.hash
@@ -110,6 +142,8 @@ end) (Hash : sig
 end) (Key : sig
   type t [@@deriving sexp, bin_io]
 
+  val empty : t
+
   include Hashable.S_binable with type t := t
 end) (Depth : sig
   val depth : int
@@ -126,6 +160,34 @@ struct
 
   type accounts = entry Key.Table.t [@@deriving sexp, bin_io]
 
+  module Addr = struct
+    module T = struct
+      type t = {depth: int; index: int}
+      [@@deriving sexp, bin_io, hash, compare]
+    end
+
+    include T
+    include Hashable.Make (T)
+
+    let depth {depth; _} = depth
+
+    let parent {depth; index} = {depth= depth - 1; index}
+
+    let child {depth; index} d =
+      let bit_val = match d with `Left -> 0 | `Right -> 1 in
+      if depth + 1 < Depth.depth then
+        Some {depth= depth + 1; index= index lor (bit_val lsl depth)}
+      else None
+
+    let child_exn a d = child a d |> Option.value_exn
+
+    let unpeel {depth; index} =
+      let dir = if index land (1 lsl depth) = 0 then `Left else `Right in
+      (dir, {depth= depth - 1; index})
+
+    let root = {depth= 0; index= 0}
+  end
+
   type index = int
 
   type leafs = Key.t Dyn_array.t [@@deriving sexp, bin_io]
@@ -134,6 +196,8 @@ struct
 
   type tree =
     { leafs: leafs
+    ; mutable dirty: bool
+    ; mutable syncing: bool
     ; mutable nodes_height: int
     ; mutable nodes: nodes
     ; mutable dirty_indices: int list }
@@ -160,6 +224,8 @@ struct
   let copy t =
     let copy_tree tree =
       { leafs= Dyn_array.copy tree.leafs
+      ; dirty= false
+      ; syncing= false
       ; nodes_height= tree.nodes_height
       ; nodes= tree.nodes
       ; dirty_indices= tree.dirty_indices }
@@ -205,6 +271,8 @@ struct
     { accounts= create_account_table ()
     ; tree=
         { leafs= Dyn_array.create ()
+        ; dirty= false
+        ; syncing= false
         ; nodes_height= 0
         ; nodes= []
         ; dirty_indices= [] } }
@@ -318,8 +386,11 @@ struct
         recompute_layers (curr_height + 1) get_curr_hash layers dirty_indices
 
   let recompute_tree t =
-    if not (List.is_empty t.tree.dirty_indices) then (
+    if t.tree.syncing then
+      failwith "recompute tree while syncing -- logic error!" ;
+    if not (List.is_empty t.tree.dirty_indices) || t.tree.dirty then (
       extend_tree t.tree ;
+      (t.tree).dirty <- false ;
       let layer_dirty_indices =
         Int.Set.to_list
           (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
@@ -404,4 +475,32 @@ struct
     match merkle_path_at_index t index with
     | `Ok path -> path
     | `Index_not_found -> index_not_found "merkle_path_at_index_exn" index
+
+  let addr_of_index t index = {Addr.depth; index}
+
+  let extend_with_empty_to_fit t new_size =
+    let tree = t.tree in
+    let len = DynArray.length tree.leafs in
+    if new_size > len then
+      DynArray.append tree.leafs
+        (DynArray.init (new_size - len) (fun x -> Key.empty)) ;
+    recompute_tree t
+
+  let get_inner_hash_at_addr_exn t {Addr.index; depth= adepth} =
+    assert (adepth < depth) ;
+    let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
+    DynArray.get l index
+
+  let set_inner_hash_at_addr_exn t {Addr.index; depth= adepth}
+      (hash: Hash.hash) =
+    assert (adepth < depth) ;
+    (t.tree).dirty <- true ;
+    let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
+    DynArray.set l index hash
+
+  let set_syncing t =
+    recompute_tree t ;
+    (t.tree).syncing <- true
+
+  let clear_syncing t = (t.tree).syncing <- false
 end

@@ -27,6 +27,24 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
+  module Addr : sig
+    type t [@@deriving sexp, bin_io, hash, compare]
+
+    include Hashable.S with type t := t
+
+    val depth : t -> int
+
+    val parent : t -> t
+
+    val child : t -> [`Left | `Right] -> t option
+
+    val child_exn : t -> [`Left | `Right] -> t
+
+    val unpeel : t -> [`Left | `Right] * t
+
+    val root : t
+  end
+
   val create : unit -> t
 
   val length : t -> int
@@ -67,6 +85,18 @@ module type S = sig
   val set_at_index_exn : t -> index -> account -> unit
 
   val merkle_path_at_index_exn : t -> index -> Path.t
+
+  val addr_of_index : t -> index -> Addr.t
+
+  val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
+
+  val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
+
+  val extend_with_empty_to_fit : t -> int -> unit
+
+  val set_syncing : t -> unit
+
+  val clear_syncing : t -> unit
 end
 
 module type F = functor (Account :sig
@@ -84,6 +114,8 @@ end) -> functor (Hash :sig
 end) -> functor (Key :sig
                         
                         type t [@@deriving sexp, bin_io]
+
+                        val empty : t
 
                         include Hashable.S_binable with type t := t
 end) -> functor (Depth :sig

@@ -28,6 +28,8 @@ module Key = struct
     type key = t [@@deriving sexp, bin_io]
   end
 
+  let empty = ""
+
   include T
   include Hashable.Make_binable (T)
 end
