@@ -135,7 +135,7 @@ struct
     module Accum = struct
       type t = Proof.t With_statement.t [@@deriving sexp_of]
 
-      let ( + ) t t' : t Deferred.t = failwith "TODO"
+      let ( + ) t t' : t = failwith "TODO"
     end
 
     module Data = struct
@@ -146,9 +146,9 @@ struct
       type t = Proof.t With_statement.t [@@deriving sexp_of]
     end
 
-    let merge t t' = return t'
+    let merge t t' = t'
 
-    let map (x: Data.t) : Accum.t Deferred.t =
+    let map (x: Data.t) : Accum.t =
       failwith
         "Create a transaction snark from a transaction. Needs to look up some \
          ds that stores all the proofs that the witness has"
@@ -469,4 +469,10 @@ struct
     ; completed_works= works
     ; creator= t.public_key
     ; prev_hash= hash t }
+
 end
+
+let%test_module "ledger_builder" = 
+  (module struct
+
+  end)

@@ -18,16 +18,16 @@ module type Spec_intf = sig
 
     (* Semigroup+deferred *)
 
-    val ( + ) : t -> t -> t Deferred.t
+    val ( + ) : t -> t -> t
   end
 
   module Output : sig
     type t [@@deriving sexp_of]
   end
 
-  val map : Data.t -> Accum.t Deferred.t
+  val map : Data.t -> Accum.t
 
-  val merge : Output.t -> Accum.t -> Output.t Deferred.t
+  val merge : Output.t -> Accum.t -> Output.t
 end
 
 module State1 = struct
@@ -157,7 +157,7 @@ module State1 = struct
                                                                             t = 
                b)
       -> d list
-      -> b option Deferred.t =
+      -> b option =
    fun t ~spec ds ->
     let open Job in
     let module Spec = ( val ( spec
@@ -186,12 +186,12 @@ module State1 = struct
         | _, Base _ -> failwith "impossible: we never fill base"
       in
       (* Returns the ptr rewritten *)
-      let rewrite (i: int) (z: a) : unit Deferred.t =
+      let rewrite (i: int) (z: a) : unit =
         let ptr, dir = ptr (parallelism t) i in
         Ring_buffer.direct_update t.jobs ptr ~f:(fun job ->
-            fill_job dir z job |> return )
+            fill_job dir z job )
       in
-      let%map () =
+      let () =
         (* Note: We don't have to worry about position overflow because
          * we always have an even number of elems in the ring buffer *)
         let i1, i2 =
@@ -207,21 +207,21 @@ module State1 = struct
         in
         let work i job =
           match job with
-          | Merge_up None -> return job
-          | Merge (None, None) -> return job
-          | Base None -> return (Base (Some (Queue.dequeue_exn t.data_buffer)))
+          | Merge_up None -> job
+          | Merge (None, None) -> job
+          | Base None -> (Base (Some (Queue.dequeue_exn t.data_buffer)))
           | Merge_up (Some x) ->
-              let%map acc' = Spec.merge (snd t.acc) x in
+              let acc' = Spec.merge (snd t.acc) x in
               t.acc <- (fst t.acc |> Int.( + ) 1, acc') ;
               Merge_up None
-          | Merge (Some _, None) -> return job
+          | Merge (Some _, None) -> job
           | Merge (Some x, Some x') ->
-              let%bind z = Spec.Accum.( + ) x x' in
-              let%map () = rewrite i z in
+              let z = Spec.Accum.( + ) x x' in
+              let () = rewrite i z in
               Merge (None, None)
           | Base (Some d) ->
-              let%bind z = Spec.map d in
-              let%map () = rewrite i z in
+              let z = Spec.map d in
+              let () = rewrite i z in
               Base (Some (Queue.dequeue_exn t.data_buffer))
           | x ->
               failwithf !"Doesn't happen x:%s\n"
@@ -229,18 +229,18 @@ module State1 = struct
                 |> Sexp.to_string_hum )
                 ()
         in
-        let%bind () = Ring_buffer.direct_update t.jobs i1 ~f:(work i1) in
+        let () = Ring_buffer.direct_update t.jobs i1 ~f:(work i1) in
         Ring_buffer.direct_update t.jobs i2 ~f:(work i2)
       in
       Ring_buffer.forwards ~n:2 t.jobs
     in
     let last_acc = t.acc in
-    let%map () =
-      List.fold ~init:(return ()) ds ~f:(fun acc d ->
-          let%bind () = acc in
-          let%bind _ = after (Time_ns.Span.of_ms 5.) in
-          let%bind () = step_twice () in
-          let%map _ = after (Time_ns.Span.of_ms 5.) in
+    let () =
+      List.fold ~init:() ds ~f:(fun acc d ->
+          let () = acc in
+          let _ = after (Time_ns.Span.of_ms 5.) in
+          let () = step_twice () in
+          let  _ = after (Time_ns.Span.of_ms 5.) in
           Queue.enqueue t.data_buffer d )
     in
     if not (fst last_acc = fst t.acc) then Some (snd t.acc) else None
@@ -276,8 +276,8 @@ module State1 = struct
                                                                            t = a and type 
                                    Output.t = b) ) ) in
         let open Deferred.Let_syntax in
-        let%map _ = consume acc chunk ~spec in
-        acc )
+        let _ = consume acc chunk ~spec in
+        return acc )
 end
 
 let start : type a b d.
@@ -290,7 +290,7 @@ let step : type a b d.
     -> spec:(module
              Spec_intf with type Data.t = d and type Accum.t = a and type Output.
                                                                           t = b)
-    -> b option Deferred.t =
+    -> b option =
  fun ~state ~data -> State1.consume state data
 
 let next :
@@ -327,7 +327,7 @@ let%test_module "scans" =
         | `Eof -> return ()
         | `Ok q ->
             let ds = Queue.to_list q in
-            let%bind x = step ~state ~data:ds ~spec in
+            let x = step ~state ~data:ds ~spec in
             let%bind () = Linear_pipe.write w x in
             go ()
       in
@@ -356,16 +356,16 @@ let%test_module "scans" =
             type t = Int64.t [@@deriving sexp_of]
 
             (* Semigroup+deferred *)
-            let ( + ) t t' = Int64.( + ) t t' |> return
+            let ( + ) t t' = Int64.( + ) t t'
           end
 
           module Output = struct
             type t = Int64.t [@@deriving sexp_of, eq]
           end
 
-          let map x = return x
+          let map x =  x
 
-          let merge t t' = Int64.( + ) t t' |> return
+          let merge t t' = Int64.( + ) t t' 
         end
 
         let spec =
@@ -433,16 +433,16 @@ let%test_module "scans" =
             type t = Int64.t [@@deriving sexp_of]
 
             (* Semigroup+deferred *)
-            let ( + ) t t' = Int64.( + ) t t' |> return
+            let ( + ) t t' = Int64.( + ) t t'
           end
 
           module Output = struct
             type t = Int64.t [@@deriving sexp_of, eq]
           end
 
-          let map x = return (Int64.of_string x)
+          let map x = Int64.of_string x
 
-          let merge t t' = Int64.( + ) t t' |> return
+          let merge t t' = Int64.( + ) t t' 
         end
 
         let spec =
@@ -494,16 +494,16 @@ let%test_module "scans" =
             type t = string [@@deriving sexp_of]
 
             (* Semigroup+deferred *)
-            let ( + ) t t' = String.( ^ ) t t' |> return
+            let ( + ) t t' = String.( ^ ) t t'
           end
 
           module Output = struct
             type t = string [@@deriving sexp_of, eq]
           end
 
-          let map x = return x
+          let map x = x
 
-          let merge t t' = String.( ^ ) t t' |> return
+          let merge t t' = String.( ^ ) t t'
         end
 
         let spec =

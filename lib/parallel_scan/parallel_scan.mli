@@ -35,16 +35,16 @@ module type Spec_intf = sig
 
     (* Semigroup+deferred *)
 
-    val ( + ) : t -> t -> t Deferred.t
+    val ( + ) : t -> t -> t
   end
 
   module Output : sig
     type t [@@deriving sexp_of]
   end
 
-  val map : Data.t -> Accum.t Deferred.t
+  val map : Data.t -> Accum.t
 
-  val merge : Output.t -> Accum.t -> Output.t Deferred.t
+  val merge : Output.t -> Accum.t -> Output.t
 end
 
 val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
@@ -55,7 +55,7 @@ val step :
   -> spec:(module
            Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
                                                                           t = 'b)
-  -> 'b option Deferred.t
+  -> 'b option
 
 val next :
      state:('a, 'b, 'd) State.t

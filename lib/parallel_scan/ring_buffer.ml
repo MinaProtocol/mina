@@ -17,7 +17,7 @@ let copy {data; position} = {data= Array.copy data; position}
 
 let direct_update t i ~f =
   let x : 'a = (t.data).(i) in
-  let%map v = f x in
+  let v = f x in
   (t.data).(i) <- v
 
 let update t ~f = direct_update t t.position ~f:(fun x -> f t.position x)
