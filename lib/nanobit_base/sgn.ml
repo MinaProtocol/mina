@@ -3,9 +3,7 @@ open Snark_params.Tick
 
 type t = Pos | Neg [@@deriving sexp, bin_io]
 
-let negate = function
-  | Pos -> Neg
-  | Neg -> Pos
+let negate = function Pos -> Neg | Neg -> Pos
 
 let neg_one = Field.(negate one)
 

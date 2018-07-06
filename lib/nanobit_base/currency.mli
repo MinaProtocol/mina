@@ -45,6 +45,7 @@ end
 
 module type Checked_arithmetic_intf = sig
   type var
+
   type signed_var
 
   val add : var -> var -> (var, _) Checked.t
@@ -60,6 +61,7 @@ end
 
 module type Signed_intf = sig
   type magnitude
+
   type magnitude_var
 
   type ('magnitude, 'sgn) t_
@@ -96,7 +98,7 @@ module type Signed_intf = sig
     val to_field_var : var -> (Field.var, _) Checked.t
 
     val cswap :
-          Boolean.var
+         Boolean.var
       -> (magnitude_var, Sgn.t) t_ * (magnitude_var, Sgn.t) t_
       -> (var * var, _) Checked.t
   end
@@ -107,14 +109,13 @@ module Fee : sig
 
   include Arithmetic_intf with type t := t
 
-  module Signed : Signed_intf
-    with type magnitude := t
-     and type magnitude_var := var
+  module Signed :
+    Signed_intf with type magnitude := t and type magnitude_var := var
 
   module Checked : sig
     include Checked_arithmetic_intf
-      with type var := var
-       and type signed_var := Signed.var
+            with type var := var
+             and type signed_var := Signed.var
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
@@ -125,9 +126,8 @@ module Amount : sig
 
   include Arithmetic_intf with type t := t
 
-  module Signed : Signed_intf
-    with type magnitude := t
-     and type magnitude_var := var
+  module Signed :
+    Signed_intf with type magnitude := t and type magnitude_var := var
 
   val of_fee : Fee.t -> t
 
@@ -135,8 +135,8 @@ module Amount : sig
 
   module Checked : sig
     include Checked_arithmetic_intf
-      with type var := var
-       and type signed_var := Signed.var
+            with type var := var
+             and type signed_var := Signed.var
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 

@@ -47,6 +47,7 @@ end
 
 module type Signed_intf = sig
   type magnitude
+
   type magnitude_var
 
   type ('magnitude, 'sgn) t_
@@ -83,7 +84,7 @@ module type Signed_intf = sig
     val to_field_var : var -> (Field.var, _) Checked.t
 
     val cswap :
-          Boolean.var
+         Boolean.var
       -> (magnitude_var, Sgn.t) t_ * (magnitude_var, Sgn.t) t_
       -> (var * var, _) Checked.t
   end
@@ -91,6 +92,7 @@ end
 
 module type Checked_arithmetic_intf = sig
   type var
+
   type signed_var
 
   val add : var -> var -> (var, _) Checked.t
@@ -109,11 +111,11 @@ module type S = sig
 
   include Arithmetic_intf with type t := t
 
-  module Signed : Signed_intf
-    with type magnitude := t
-     and type magnitude_var := var
+  module Signed :
+    Signed_intf with type magnitude := t and type magnitude_var := var
 
-  module Checked : Checked_arithmetic_intf
+  module Checked :
+    Checked_arithmetic_intf
     with type var := var
      and type signed_var := Signed.var
 end
@@ -238,14 +240,13 @@ end = struct
           Some
             ( if c < 0 then
                 { sgn= y.sgn
-                ; magnitude= Unsigned.Infix.(y.magnitude - x.magnitude)
-                }
+                ; magnitude= Unsigned.Infix.(y.magnitude - x.magnitude) }
             else if c > 0 then
               { sgn= x.sgn
               ; magnitude= Unsigned.Infix.(x.magnitude - y.magnitude) }
             else zero )
 
-    let negate t = { t with sgn = Sgn.negate t.sgn }
+    let negate t = {t with sgn= Sgn.negate t.sgn}
 
     let ( + ) = add
 
@@ -384,7 +385,6 @@ end = struct
                 (var_of_t x + var_of_t y) )
       end )
   end
-
 end
 
 let currency_length = 64
