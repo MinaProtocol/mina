@@ -35,8 +35,6 @@ end
 (** A Rose tree with max-depth k. Whenever we want to add a node that would increase the depth past k, we instead move the tree forward and root it at the node towards that path *)
 module Make (Elem : sig
   type t [@@deriving eq, compare, bin_io, sexp]
-
-  val gen : t Quickcheck.Generator.t
 end) (Small_k : sig
   val k : int
   (** The idea is k is "small" in the sense of probability of forking within k is < some nontrivial epsilon (like once a week?) *)
@@ -62,14 +60,14 @@ struct
   let single (e: Elem.t) : t =
     {tree= Rose.single e; elems= Elem_set.singleton e}
 
-  let gen =
+  let gen elem_gen =
     let open Quickcheck.Generator.Let_syntax in
     (* We need to force the ref to be under the monad so it regenerates *)
     let%bind () = return () in
     let r = ref Elem_set.empty in
     let elem_unique_gen =
       let%map e =
-        Quickcheck.Generator.filter Elem.gen ~f:(fun e ->
+        Quickcheck.Generator.filter elem_gen ~f:(fun e ->
             not (Elem_set.mem !r e) )
       in
       r := Elem_set.add !r e ;
@@ -131,91 +129,104 @@ struct
           if longest_depth >= Small_k.k then
             {tree= longest_subtree; elems= Elem_set.add t.elems e}
           else default
-
-  let%test_unit "Adding an element either changes the tree or it was already \
-                 in the set" =
-    Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t * Elem.t]
-      (let open Quickcheck.Generator.Let_syntax in
-      let%bind r = gen and e = Elem.gen in
-      let candidates = Rose.to_array r.tree in
-      let%map idx = Int.gen_incl 0 (Array.length candidates - 1) in
-      (r, e, candidates.(idx)))
-      ~f:(fun (r, e, parent) ->
-        let r' = add r e ~parent:(Elem.equal parent) in
-        assert (
-          Elem_set.mem r.elems e || not (Rose.equal Elem.equal r.tree r'.tree)
-        ) )
-
-  let%test_unit "Adding to the end of the longest_path extends the path \
-                 (modulo the last thing / first-thing)" =
-    Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
-      ( Quickcheck.Generator.tuple2 gen Elem.gen
-      |> Quickcheck.Generator.filter ~f:(fun (r, e) ->
-             not (Rose.mem r.tree e ~equal:Elem.equal) ) )
-      ~f:(fun (r, e) ->
-        let path = longest_path r in
-        let r' = add r e ~parent:(Elem.equal (List.last_exn path)) in
-        assert (Elem.equal e (List.last_exn (longest_path r'))) ;
-        (* If there were two paths of the same length, we may be missing the
-         * last thing in our first path *)
-        let path = longest_path r in
-        let potential_prefix = List.take path (List.length path - 1) in
-        let path' = longest_path r' in
-        assert (
-          List.is_prefix ~equal:Elem.equal ~prefix:potential_prefix path'
-          || List.is_prefix ~equal:Elem.equal
-               ~prefix:(List.drop potential_prefix 1)
-               path' ) )
-
-  let%test_unit "There exists a path between the root and any node" =
-    Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
-      (let open Quickcheck.Generator.Let_syntax in
-      let%bind r = gen in
-      let%map e = Quickcheck.Generator.of_list (Elem_set.to_list r.elems) in
-      (r, e))
-      ~f:(fun (r, e) -> assert (Option.is_some (path r ~f:(Elem.equal e))))
-
-  let%test_unit "Extending a tree with depth-k, extends full-tree properly" =
-    let elem_pairs =
-      Quickcheck.random_value ~seed:(`Deterministic "seed")
-        (Quickcheck.Generator.list_with_length Small_k.k
-           (Quickcheck.Generator.tuple2 Elem.gen Elem.gen))
-    in
-    let (e1, e2), es = (List.hd_exn elem_pairs, List.tl_exn elem_pairs) in
-    let t =
-      let tree =
-        List.fold es
-          ~init:(Rose.Rose (e1, []))
-          ~f:(fun r (e, e') -> Rose.Rose (e, [Rose.single e'; r]))
-      in
-      {tree; elems= Elem_set.of_list (Rose.to_list tree)}
-    in
-    assert (List.length (longest_path t) = Small_k.k) ;
-    let (Rose.Rose (head, first_children)) = t.tree in
-    let t' = add t e2 ~parent:(Elem.equal e1) in
-    assert (List.length (longest_path t') = Small_k.k) ;
-    assert (not (Rose.mem t'.tree head ~equal:Elem.equal)) ;
-    assert (
-      not
-        (Rose.mem t'.tree
-           (Rose.extract (List.hd_exn first_children))
-           ~equal:Elem.equal) ) ;
-    assert (
-      Rose.mem t'.tree
-        (Rose.extract (List.nth_exn first_children 1))
-        ~equal:Elem.equal )
 end
 
 let%test_module "K-tree" =
   ( module struct
+    module Make_quickchecks (Elem : sig
+      type t [@@deriving eq, compare, bin_io, sexp]
+
+      val gen : t Quickcheck.Generator.t
+    end) (Small_k : sig
+      val k : int
+    end) =
+    struct
+      include Make (Elem) (Small_k)
+
+      let%test_unit "Adding an element either changes the tree or it was \
+                     already in the set" =
+        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t * Elem.t]
+          (let open Quickcheck.Generator.Let_syntax in
+          let%bind r = gen Elem.gen and e = Elem.gen in
+          let candidates = Rose.to_array r.tree in
+          let%map idx = Int.gen_incl 0 (Array.length candidates - 1) in
+          (r, e, candidates.(idx)))
+          ~f:(fun (r, e, parent) ->
+            let r' = add r e ~parent:(Elem.equal parent) in
+            assert (
+              Elem_set.mem r.elems e
+              || not (Rose.equal Elem.equal r.tree r'.tree) ) )
+
+      let%test_unit "Adding to the end of the longest_path extends the path \
+                     (modulo the last thing / first-thing)" =
+        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
+          ( Quickcheck.Generator.tuple2 (gen Elem.gen) Elem.gen
+          |> Quickcheck.Generator.filter ~f:(fun (r, e) ->
+                 not (Rose.mem r.tree e ~equal:Elem.equal) ) )
+          ~f:(fun (r, e) ->
+            let path = longest_path r in
+            let r' = add r e ~parent:(Elem.equal (List.last_exn path)) in
+            assert (Elem.equal e (List.last_exn (longest_path r'))) ;
+            (* If there were two paths of the same length, we may be missing the
+             * last thing in our first path *)
+            let path = longest_path r in
+            let potential_prefix = List.take path (List.length path - 1) in
+            let path' = longest_path r' in
+            assert (
+              List.is_prefix ~equal:Elem.equal ~prefix:potential_prefix path'
+              || List.is_prefix ~equal:Elem.equal
+                   ~prefix:(List.drop potential_prefix 1)
+                   path' ) )
+
+      let%test_unit "There exists a path between the root and any node" =
+        Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
+          (let open Quickcheck.Generator.Let_syntax in
+          let%bind r = gen Elem.gen in
+          let%map e =
+            Quickcheck.Generator.of_list (Elem_set.to_list r.elems)
+          in
+          (r, e))
+          ~f:(fun (r, e) -> assert (Option.is_some (path r ~f:(Elem.equal e))))
+
+      let%test_unit "Extending a tree with depth-k, extends full-tree properly" =
+        let elem_pairs =
+          Quickcheck.random_value ~seed:(`Deterministic "seed")
+            (Quickcheck.Generator.list_with_length Small_k.k
+               (Quickcheck.Generator.tuple2 Elem.gen Elem.gen))
+        in
+        let (e1, e2), es = (List.hd_exn elem_pairs, List.tl_exn elem_pairs) in
+        let t =
+          let tree =
+            List.fold es
+              ~init:(Rose.Rose (e1, []))
+              ~f:(fun r (e, e') -> Rose.Rose (e, [Rose.single e'; r]))
+          in
+          {tree; elems= Elem_set.of_list (Rose.to_list tree)}
+        in
+        assert (List.length (longest_path t) = Small_k.k) ;
+        let (Rose.Rose (head, first_children)) = t.tree in
+        let t' = add t e2 ~parent:(Elem.equal e1) in
+        assert (List.length (longest_path t') = Small_k.k) ;
+        assert (not (Rose.mem t'.tree head ~equal:Elem.equal)) ;
+        assert (
+          not
+            (Rose.mem t'.tree
+               (Rose.extract (List.hd_exn first_children))
+               ~equal:Elem.equal) ) ;
+        assert (
+          Rose.mem t'.tree
+            (Rose.extract (List.nth_exn first_children 1))
+            ~equal:Elem.equal )
+    end
+
     module Tree =
-      Make (Int)
+      Make_quickchecks (Int)
         (struct
           let k = 10
         end)
 
     module Big_tree =
-      Make (Int)
+      Make_quickchecks (Int)
         (struct
           let k = 50
         end)

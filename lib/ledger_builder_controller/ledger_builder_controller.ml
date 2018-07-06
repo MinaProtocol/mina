@@ -1,5 +1,7 @@
 open Core_kernel
 open Async_kernel
+open Core_kernel
+open Async_kernel
 
 module type S = sig
   include Coda.Ledger_builder_controller_intf
@@ -11,8 +13,6 @@ end) (Ledger_hash : sig
   type t [@@deriving bin_io]
 end) (Ledger_builder_transition : sig
   type t [@@deriving eq, sexp, compare, bin_io]
-
-  val gen : t Quickcheck.Generator.t
 end) (Ledger : sig
   type t
 
@@ -28,7 +28,7 @@ end) (Ledger_builder : sig
 
   val copy : t -> t
 
-  val root_hash : t -> Ledger_builder_hash.t
+  val hash : t -> Ledger_builder_hash.t
 
   val apply :
        t
@@ -39,17 +39,13 @@ end) (State_hash : sig
 end) (State : sig
   type t [@@deriving eq, sexp, compare, bin_io]
 
-  val root_hash : t -> Ledger_builder_hash.t
+  val ledger_builder_hash : t -> Ledger_builder_hash.t
 
-  val state_hash : t -> State_hash.t
+  val hash : t -> State_hash.t
 
   val previous_state_hash : t -> State_hash.t
-
-  val gen : t Quickcheck.Generator.t
 end) (Valid_transaction : sig
   type t [@@deriving eq, sexp, compare, bin_io]
-
-  val gen : t Quickcheck.Generator.t
 end) (Net : sig
   include Coda.Ledger_builder_io_intf
           with type ledger_builder := Ledger_builder.t
@@ -81,17 +77,17 @@ struct
       ; state: State.t }
     [@@deriving eq, compare, bin_io, sexp, fields]
 
-    let root_hash {state} = State.root_hash state
+    let ledger_builder_hash {state} = State.ledger_builder_hash state
 
-    let state_hash {state} = State.state_hash state
+    let state_hash {state} = State.hash state
 
     let previous_state_hash {state} = State.previous_state_hash state
 
-    let gen =
+    let gen txn_gen transition_gen state_gen =
       let open Quickcheck.Generator.Let_syntax in
-      let%map transactions = Quickcheck.Generator.list Valid_transaction.gen
-      and transition = Ledger_builder_transition.gen
-      and state = State.gen in
+      let%map transactions = Quickcheck.Generator.list txn_gen
+      and transition = transition_gen
+      and state = state_gen in
       {transactions; transition; state}
   end
 
@@ -152,8 +148,8 @@ struct
   let assert_valid_state (witness: Witness.t) builder =
     assert (
       Ledger_builder_hash.equal
-        (Witness.root_hash witness)
-        (Ledger_builder.root_hash builder) ) ;
+        (Witness.ledger_builder_hash witness)
+        (Ledger_builder.hash builder) ) ;
     ()
 
   let create (config: Config.t) =
@@ -246,12 +242,12 @@ struct
    fresh ledger at a specific hash if necessary *)
   let local_get_ledger t hash =
     let lb_hash tagged_lb =
-      Tagged_lb.ledger_builder tagged_lb |> Ledger_builder.root_hash
+      Tagged_lb.ledger_builder tagged_lb |> Ledger_builder.hash
     in
     let find_state tree lb_hash =
       Witness_tree.find_map tree ~f:(fun w ->
-          if Ledger_builder_hash.equal (Witness.root_hash w) lb_hash then
-            Some (Witness.state w)
+          if Ledger_builder_hash.equal (Witness.ledger_builder_hash w) lb_hash
+          then Some (Witness.state w)
           else None )
     in
     Option.map t.state.ktree ~f:(fun tree ->
@@ -275,7 +271,8 @@ struct
           (* Now we need to materialize it *)
           match
             Witness_tree.path tree ~f:(fun w ->
-                Ledger_builder_hash.equal hash (Witness.root_hash w) )
+                Ledger_builder_hash.equal hash (Witness.ledger_builder_hash w)
+            )
           with
           | Some path ->
               let lb_start =
@@ -299,8 +296,7 @@ struct
                            applied: %s"
                           (Error.to_string_hum e) () )
               in
-              assert (
-                Ledger_builder_hash.equal (Ledger_builder.root_hash lb) hash ) ;
+              assert (Ledger_builder_hash.equal (Ledger_builder.hash lb) hash) ;
               Ok (lb, List.last_exn path |> Witness.state)
           | None -> return (Or_error.error_string "Hash not found locally") )
     |> Option.value
