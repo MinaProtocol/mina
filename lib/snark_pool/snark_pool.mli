@@ -27,6 +27,12 @@ module type S = sig
           returned work does not have any unsolved work *)
 
   val request_work : t -> work option
+
+  val gen :
+       proof Quickcheck.Generator.t
+    -> fee Quickcheck.Generator.t
+    -> work Quickcheck.Generator.t
+    -> t Quickcheck.Generator.t
 end
 
 module Make (Proof : sig

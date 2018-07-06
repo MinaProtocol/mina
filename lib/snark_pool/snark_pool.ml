@@ -32,6 +32,12 @@ module type S = sig
           returned work does not have any unsolved work *)
 
   val request_work : t -> work option
+
+  val gen :
+       proof Quickcheck.Generator.t
+    -> fee Quickcheck.Generator.t
+    -> work Quickcheck.Generator.t
+    -> t Quickcheck.Generator.t
 end
 
 module Make (Proof : sig
@@ -45,8 +51,6 @@ end) (Fee : sig
 end) (Work : sig
   type t [@@deriving bin_io]
 
-  (* gen work_gen fee_gen proof_gen *)
-
   include Hashable.S_binable with type t := t
 end) :
   sig
@@ -57,12 +61,6 @@ end) :
     val remove_solved_work : t -> work -> unit
 
     val to_record : priced_proof -> (proof, fee) Priced_proof.t
-
-    val gen :
-         Proof.t Quickcheck.Generator.t
-      -> Fee.t Quickcheck.Generator.t
-      -> Work.t Quickcheck.Generator.t
-      -> t Quickcheck.Generator.t
 
     val solved_work : t -> work list
 
