@@ -6,26 +6,25 @@ let int16 =
       if 0 <= x && x < max_port then x
       else failwithf "Port not between 0 and %d" max_port () )
 
-let base64_of_binable m x =
-  B64.encode (Binable.to_string m x)
+let base64_of_binable m x = B64.encode (Binable.to_string m x)
 
-let binable_of_base64 m s =
-  Binable.of_string m (B64.decode s)
+let binable_of_base64 m s = Binable.of_string m (B64.decode s)
 
-module Key_arg_type
-    (Key : sig
-       include Binable.S
-       val name : string
-       val random : unit -> t
-     end) = struct
+module Key_arg_type (Key : sig
+  include Binable.S
+
+  val name : string
+
+  val random : unit -> t
+end) =
+struct
   let arg_type =
     Command.Arg_type.create (fun s ->
-      try binable_of_base64 (module Key) s
-      with e ->
-        failwithf "Couldn't read %s %s -- here's a sample one: %s" Key.name
-          (Error.to_string_hum (Error.of_exn e))
-          (base64_of_binable (module Key) (Key.random ()))
-          ())
+        try binable_of_base64 (module Key) s with e ->
+          failwithf "Couldn't read %s %s -- here's a sample one: %s" Key.name
+            (Error.to_string_hum (Error.of_exn e))
+            (base64_of_binable (module Key) (Key.random ()))
+            () )
 end
 
 let public_key_compressed =
@@ -50,8 +49,7 @@ let private_key =
 
     let name = "private key"
 
-    let random () =
-      (Nanobit_base.Signature_keypair.create ()).private_key
+    let random () = (Nanobit_base.Signature_keypair.create ()).private_key
   end) in
   Sk.arg_type
 
