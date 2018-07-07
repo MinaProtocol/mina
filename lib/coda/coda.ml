@@ -5,11 +5,15 @@ open Protocols
 module type Ledger_builder_io_intf = sig
   type t
 
+  type net
+
   type ledger_builder_hash
 
   type ledger_builder
 
   type state
+
+  val create : net -> t
 
   val get_ledger_builder_at_hash :
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
@@ -120,6 +124,7 @@ module type Ledger_builder_controller_intf = sig
           * state
           * ledger_builder_transition )
           Linear_pipe.Reader.t
+      ; genesis_ledger: ledger
       ; disk_location: string
       ; snark_pool: snark_pool }
     [@@deriving make]
@@ -128,10 +133,9 @@ module type Ledger_builder_controller_intf = sig
   val create : Config.t -> t Deferred.t
 
   val local_get_ledger :
-    t -> ledger_builder_hash -> (ledger_builder * state) Or_error.t
+    t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
 
-  val strongest_ledgers :
-    t -> (ledger_builder * ledger * state) Linear_pipe.Reader.t
+  val strongest_ledgers : t -> (ledger_builder * state) Linear_pipe.Reader.t
 end
 
 module type Miner_intf = sig
@@ -300,6 +304,8 @@ module type Inputs_intf = sig
   module Genesis : sig
     val state : State.t
 
+    val ledger : Ledger.t
+
     val proof : State.Proof.t
   end
 end
@@ -368,6 +374,7 @@ struct
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make ~snark_pool
            ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
+           ~genesis_ledger:Genesis.ledger
            ~ledger_builder_transitions:ledger_builder_transitions_reader
            ~disk_location:config.ledger_builder_persistant_location ())
     in
@@ -377,17 +384,14 @@ struct
     let%bind net =
       Net.create config.net_config
         (fun hash ->
-          return
-            (Or_error.is_ok
-               (Ledger_builder_controller.local_get_ledger ledger_builder hash))
-          )
+          Ledger_builder_controller.local_get_ledger ledger_builder hash
+          >>| Or_error.is_ok )
         (fun hash ->
-          return
-            ( match
-                Ledger_builder_controller.local_get_ledger ledger_builder hash
-              with
-            | Ok ledger_and_state -> Some ledger_and_state
-            | _ -> None ) )
+          match%map
+            Ledger_builder_controller.local_get_ledger ledger_builder hash
+          with
+          | Ok ledger_and_state -> Some ledger_and_state
+          | _ -> None )
     in
     Ivar.fill net_ivar net ;
     let state_io =
@@ -478,7 +482,8 @@ struct
     don't_wait_for
       (Linear_pipe.transfer
          (Ledger_builder_controller.strongest_ledgers t.ledger_builder)
-         t.miner_changes_writer ~f:(fun (ledger_builder, ledger, state) ->
+         t.miner_changes_writer ~f:(fun (ledger_builder, state) ->
+           let ledger = Ledger_builder.ledger ledger_builder in
            let transactions =
              Transaction_pool.get ~k:t.transactions_per_bundle ~ledger
                t.transaction_pool
