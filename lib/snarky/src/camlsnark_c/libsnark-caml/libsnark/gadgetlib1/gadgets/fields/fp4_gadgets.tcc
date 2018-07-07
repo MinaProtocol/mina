@@ -20,6 +20,11 @@ template<typename Fp4T>
 Fp4_variable<Fp4T>::Fp4_variable(protoboard<FieldT> &pb, const std::string &annotation_prefix) :
     gadget<FieldT>(pb, annotation_prefix), c0(pb, FMT(annotation_prefix, " c0")), c1(pb, FMT(annotation_prefix, " c1"))
 {
+    all_vars.emplace_back(c0.c0);
+    all_vars.emplace_back(c0.c1);
+    all_vars.emplace_back(c1.c0);
+    all_vars.emplace_back(c1.c1);
+
 }
 
 template<typename Fp4T>
@@ -28,12 +33,71 @@ Fp4_variable<Fp4T>::Fp4_variable(protoboard<FieldT> &pb,
                                  const std::string &annotation_prefix) :
     gadget<FieldT>(pb, annotation_prefix), c0(pb, el.c0, FMT(annotation_prefix, " c0")), c1(pb, el.c1, FMT(annotation_prefix, " c1"))
 {
+    all_vars.emplace_back(c0.c0);
+    all_vars.emplace_back(c0.c1);
+    all_vars.emplace_back(c1.c0);
+    all_vars.emplace_back(c1.c1);
+
 }
 
 template<typename Fp4T>
 Fp4_variable<Fp4T>::Fp4_variable(protoboard<FieldT> &pb, const Fp2_variable<Fp2T> &c0, const Fp2_variable<Fp2T> &c1, const std::string &annotation_prefix) :
     gadget<FieldT>(pb, annotation_prefix), c0(c0), c1(c1)
 {
+    all_vars.emplace_back(c0.c0);
+    all_vars.emplace_back(c0.c1);
+    all_vars.emplace_back(c1.c0);
+    all_vars.emplace_back(c1.c1);
+}
+
+template<typename Fp4T>
+void Fp4_variable<Fp4T>::generate_r1cs_equals_constraints(
+  const Fp4_variable<Fp4T> &other)
+{
+    this->pb.add_r1cs_constraint(
+        r1cs_constraint<FieldT>(1, this->c0.c0, other.c0.c0),
+        FMT(this->annotation_prefix, " c0.c0"));
+    this->pb.add_r1cs_constraint(
+        r1cs_constraint<FieldT>(1, this->c0.c1, other.c0.c1),
+        FMT(this->annotation_prefix, " c0.c1"));
+
+    this->pb.add_r1cs_constraint(
+        r1cs_constraint<FieldT>(1, this->c1.c0, other.c1.c0),
+        FMT(this->annotation_prefix, " c1.c0"));
+    this->pb.add_r1cs_constraint(
+        r1cs_constraint<FieldT>(1, this->c1.c1, other.c1.c1),
+        FMT(this->annotation_prefix, " c1.c1"));
+}
+
+template<typename Fp4T>
+void Fp4_variable<Fp4T>::generate_r1cs_equals_unitary_inverse_constraints(
+  const Fp4_variable<Fp4T> &other)
+{
+  /*
+   this.c0 = other.c0
+   this.c1 = - other.c1
+
+   iff
+
+   this.c0.c0 = other.c0.c0
+   this.c0.c1 = other.c0.c1
+
+   this.c1.c0 = - other.c1.c0
+   this.c1.c1 = - other.c1.c1
+  */
+    this->pb.add_r1cs_constraint(
+        r1cs_constraint<FieldT>(1, this->c0.c0, other.c0.c0),
+        FMT(this->annotation_prefix, " c0.c0"));
+    this->pb.add_r1cs_constraint(
+        r1cs_constraint<FieldT>(1, this->c0.c1, other.c0.c1),
+        FMT(this->annotation_prefix, " c0.c1"));
+
+    this->pb.add_r1cs_constraint(
+        r1cs_constraint<FieldT>(-1, this->c1.c0, other.c1.c0),
+        FMT(this->annotation_prefix, " c1.c0"));
+    this->pb.add_r1cs_constraint(
+        r1cs_constraint<FieldT>(-1, this->c1.c1, other.c1.c1),
+        FMT(this->annotation_prefix, " c1.c1"));
 }
 
 template<typename Fp4T>
@@ -57,6 +121,18 @@ Fp4T Fp4_variable<Fp4T>::get_element()
     el.c0 = c0.get_element();
     el.c1 = c1.get_element();
     return el;
+}
+
+template<typename Fp4T>
+size_t Fp4_variable<Fp4T>::size_in_bits()
+{
+    return 4 * FieldT::size_in_bits();
+}
+
+template<typename Fp4T>
+size_t Fp4_variable<Fp4T>::num_variables()
+{
+    return 4;
 }
 
 template<typename Fp4T>

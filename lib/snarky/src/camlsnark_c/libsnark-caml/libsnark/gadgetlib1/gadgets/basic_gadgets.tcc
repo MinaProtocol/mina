@@ -110,7 +110,51 @@ size_t multipacking_num_chunks(const size_t num_bits)
 {
     return libff::div_ceil(num_bits, FieldT::capacity());
 }
+template<typename FieldT>
+field_vector_equals_gadget<FieldT>::field_vector_equals_gadget(
+    protoboard<FieldT> &pb,
+    const pb_linear_combination_array<FieldT> &X,
+    const pb_linear_combination_array<FieldT> &Y,
+    const pb_variable<FieldT> &result,
+    const std::string &annotation_prefix) :
+gadget<FieldT>(pb, annotation_prefix), X(X), Y(Y), result(result)
+{
+    assert(X.size() == Y.size());
+    invs.allocate(pb, X.size(), FMT(this->annotation_prefix, " invs"));
+    results.allocate(pb, X.size(), FMT(this->annotation_prefix, " results"));
+    all_equal.reset(new conjunction_gadget<FieldT>(pb, results, result, FMT(this->annotation_prefix, " all_equal")));
+}
 
+template<typename FieldT>
+void field_vector_equals_gadget<FieldT>::generate_r1cs_constraints()
+{
+    for (size_t i = 0; i < X.size(); ++i)
+    {
+        // If X[i] != Y[i], then results[i] = 0
+        this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(results[i], X[i] - Y[i], 0),
+                                     FMT(this->annotation_prefix, " vector_equals_check_1_%zu", i));
+        // If X[i] = Y[i], then this constraint forces
+        // 0 = 1 - results[i]
+        // so results[i] = 1.
+        this->pb.add_r1cs_constraint(r1cs_constraint<FieldT>(invs[i], X[i] - Y[i], 1 - results[i]),
+                                     FMT(this->annotation_prefix, " vector_equals_check_2_%zu", i));
+    }
+
+    all_equal->generate_r1cs_constraints();
+}
+
+template<typename FieldT>
+void field_vector_equals_gadget<FieldT>::generate_r1cs_witness()
+{
+    for (size_t i = 0; i < X.size(); ++i) {
+        FieldT x = this->pb.lc_val(X[i]);
+        FieldT y = this->pb.lc_val(Y[i]);
+        bool equal = x == y;
+        this->pb.val(results[i]) = equal ? FieldT::one() : FieldT::zero();
+        this->pb.val(invs[i]) = equal ? FieldT::zero() : (x - y).inverse();
+    }
+    all_equal->generate_r1cs_witness();
+}
 template<typename FieldT>
 field_vector_copy_gadget<FieldT>::field_vector_copy_gadget(protoboard<FieldT> &pb,
                                                            const pb_variable_array<FieldT> &source,
