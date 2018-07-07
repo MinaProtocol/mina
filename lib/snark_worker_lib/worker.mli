@@ -7,6 +7,11 @@ module State : sig
   val create : unit -> t Deferred.t
 end
 
-val perform : State.t -> Work.Spec.t -> Work.Result.t Or_error.t
-
 val command : Command.t
+
+val command_name : string
+
+val arguments :
+     public_key:Nanobit_base.Public_key.Compressed.t
+  -> daemon_port:int
+  -> string list

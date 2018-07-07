@@ -9,6 +9,7 @@
   (libraries
     ( core
       async
+      cli_lib
       nanobit_base
       blockchain_snark
       transaction_snark
