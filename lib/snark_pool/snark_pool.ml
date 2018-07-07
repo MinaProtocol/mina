@@ -32,6 +32,8 @@ module type S = sig
           returned work does not have any unsolved work *)
 
   val request_work : t -> work option
+
+  val mem : t -> work -> bool
 end
 
 module Make (Proof : sig
@@ -136,6 +138,10 @@ struct
           remove_solved_work t work ; work)
 
   let unsolved_work_count t = Work_random_set.length t.unsolved_work
+
+  let mem t work =
+    Work_random_set.mem t.solved_work work
+    || Work_random_set.mem t.unsolved_work work
 end
 
 let%test_module "random set test" =

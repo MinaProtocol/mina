@@ -27,6 +27,8 @@ module type S = sig
           returned work does not have any unsolved work *)
 
   val request_work : t -> work option
+
+  val mem : t -> work -> bool
 end
 
 module Make (Proof : sig
