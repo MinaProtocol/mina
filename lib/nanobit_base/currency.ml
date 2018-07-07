@@ -390,7 +390,7 @@ end
 let currency_length = 64
 
 module Fee =
-  Make (Unsigned_extended.UInt32)
+  Make (Unsigned_extended.UInt64)
     (struct
       let length = currency_length
     end)
@@ -413,8 +413,7 @@ module Amount = struct
        and module Signed = T.Signed
        and module Checked := T.Checked )
 
-  let of_fee (fee: Fee.t) : t =
-    Unsigned.UInt64.of_int64 (Unsigned.UInt32.to_int64 fee)
+  let of_fee (fee: Fee.t) : t = fee
 
   let add_fee (t: t) (fee: Fee.t) = add t (of_fee fee)
 
