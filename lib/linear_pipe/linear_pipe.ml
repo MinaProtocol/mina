@@ -65,6 +65,8 @@ let of_list xs =
   let reader = wrap_reader (Pipe.of_list xs) in
   reader
 
+let to_list reader = Pipe.to_list reader.Reader.pipe
+
 let fold reader ~init ~f =
   bracket reader (Pipe.fold reader.Reader.pipe ~init ~f)
 

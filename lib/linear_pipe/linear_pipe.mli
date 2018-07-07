@@ -52,6 +52,8 @@ val scan :
 
 val of_list : 'a List.t -> 'a Reader.t
 
+val to_list : 'a Reader.t -> 'a list Deferred.t
+
 val map : 'a Reader.t -> f:('a -> 'b) -> 'b Reader.t
 
 val filter_map : 'a Reader.t -> f:('a -> 'b option) -> 'b Reader.t

@@ -3,63 +3,82 @@ open Async_kernel
 open Core_kernel
 open Async_kernel
 
-module type S = sig
-  include Coda.Ledger_builder_controller_intf
+module type Inputs_intf = sig
+  module Ledger_builder_hash : sig
+    type t [@@deriving eq, bin_io]
+  end
+
+  module Ledger_hash : sig
+    type t [@@deriving bin_io]
+  end
+
+  module Ledger_builder_transition : sig
+    type t [@@deriving eq, sexp, compare, bin_io]
+  end
+
+  module Ledger : sig
+    type t
+
+    val merkle_root : t -> Ledger_hash.t
+  end
+
+  module Ledger_builder : sig
+    type t [@@deriving bin_io]
+
+    type proof
+
+    val ledger : t -> Ledger.t
+
+    val create : Ledger.t -> t
+
+    val copy : t -> t
+
+    val hash : t -> Ledger_builder_hash.t
+
+    val apply :
+         t
+      -> Ledger_builder_transition.t
+      -> (Ledger_hash.t * proof) option Deferred.Or_error.t
+  end
+
+  module State_hash : sig
+    type t [@@deriving eq]
+  end
+
+  module State : sig
+    type t [@@deriving eq, sexp, compare, bin_io]
+
+    val ledger_builder_hash : t -> Ledger_builder_hash.t
+
+    val hash : t -> State_hash.t
+
+    val previous_state_hash : t -> State_hash.t
+  end
+
+  module Valid_transaction : sig
+    type t [@@deriving eq, sexp, compare, bin_io]
+  end
+
+  module Net : sig
+    include Coda.Ledger_builder_io_intf
+            with type ledger_builder := Ledger_builder.t
+             and type ledger_builder_hash := Ledger_builder_hash.t
+             and type state := State.t
+  end
+
+  module Snark_pool : sig
+    type t
+  end
+
+  module Store : Storage.With_checksum_intf
 end
 
-module Make (Ledger_builder_hash : sig
-  type t [@@deriving eq, bin_io]
-end) (Ledger_hash : sig
-  type t [@@deriving bin_io]
-end) (Ledger_builder_transition : sig
-  type t [@@deriving eq, sexp, compare, bin_io]
-end) (Ledger : sig
-  type t
+module Make (Inputs : Inputs_intf) = struct
+  open Inputs
 
-  val merkle_root : t -> Ledger_hash.t
-end) (Ledger_builder : sig
-  type t [@@deriving bin_io]
-
-  type proof
-
-  val ledger : t -> Ledger.t
-
-  val create : Ledger.t -> t
-
-  val copy : t -> t
-
-  val hash : t -> Ledger_builder_hash.t
-
-  val apply :
-       t
-    -> Ledger_builder_transition.t
-    -> (Ledger_hash.t * proof) option Deferred.Or_error.t
-end) (State_hash : sig
-  type t [@@deriving eq]
-end) (State : sig
-  type t [@@deriving eq, sexp, compare, bin_io]
-
-  val ledger_builder_hash : t -> Ledger_builder_hash.t
-
-  val hash : t -> State_hash.t
-
-  val previous_state_hash : t -> State_hash.t
-end) (Valid_transaction : sig
-  type t [@@deriving eq, sexp, compare, bin_io]
-end) (Net : sig
-  include Coda.Ledger_builder_io_intf
-          with type ledger_builder := Ledger_builder.t
-           and type ledger_builder_hash := Ledger_builder_hash.t
-           and type state := State.t
-end) (Snark_pool : sig
-  type t
-end)
-(Store : Storage.With_checksum_intf) =
-struct
   module Config = struct
     type t =
-      { keep_count: int [@default 50]
-      ; parent_log: Logger.t
+      { parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
       ; ledger_builder_transitions:
           (Valid_transaction.t list * State.t * Ledger_builder_transition.t)
@@ -136,7 +155,8 @@ struct
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; state: State.t
-    ; strongest_ledgers: Ledger_builder.t Linear_pipe.Reader.t }
+    ; strongest_ledgers:
+        (Ledger_builder.t * Inputs.State.t) Linear_pipe.Reader.t }
 
   let best_tip tree = Witness_tree.longest_path tree |> List.last_exn
 
@@ -181,6 +201,9 @@ struct
           match state.ktree with
           (* If we've seen no data from the network, we can only do nothing here *)
           | None ->
+              state.ktree
+              <- Some
+                   (Witness_tree.single {transactions; transition; state= s}) ;
               return None
           | Some old_tree ->
               let witness_to_add : Witness.t =
@@ -229,7 +252,7 @@ struct
                 let%map () =
                   force_apply_transition lb (Witness.transition new_tip)
                 in
-                Some lb )
+                Some (lb, Witness.state new_tip) )
     in
     { ledger_builder_io= Net.create net
     ; log= Logger.child config.parent_log "ledger_builder_controller"
@@ -303,6 +326,118 @@ struct
          ~default:(return @@ Or_error.error_string "Haven't seen any nodes yet")
 end
 
-let%test_module "test" = (module struct
-  module Lbc = 
-end)
+let%test_module "test" =
+  ( module struct
+    module Inputs = struct
+      module Ledger_builder_hash = Int
+      module Ledger_hash = Int
+      (* A ledger_builder transition will just add to a "ledger" integer *)
+      module Ledger_builder_transition = Int
+
+      module Ledger = struct
+        include Int
+
+        let merkle_root t = t
+      end
+
+      module Ledger_builder = struct
+        type t = int ref [@@deriving eq, sexp, bin_io]
+
+        type proof = ()
+
+        let ledger t = !t
+
+        let create x = ref x
+
+        let copy t = ref !t
+
+        let hash t = !t
+
+        let apply (t: t) (x: Ledger_builder_transition.t) =
+          t := x ;
+          return (Ok (Some (x, ())))
+      end
+
+      module State_hash = Int
+
+      module State = struct
+        type t =
+          { ledger_builder_hash: Ledger_builder_hash.t
+          ; hash: State_hash.t
+          ; previous_state_hash: State_hash.t }
+        [@@deriving eq, sexp, compare, bin_io, fields]
+      end
+
+      (* Not sure if we even need this *)
+      module Valid_transaction = Int
+
+      module Net = struct
+        type t = State.t State_hash.Table.t
+
+        type net = unit
+
+        let create () = State_hash.Table.create ()
+
+        let get_ledger_builder_at_hash t hash =
+          return
+            (Ok
+               ( ref hash
+               , { State.ledger_builder_hash= hash
+                 ; hash
+                 ; previous_state_hash=
+                     State.previous_state_hash
+                       (State_hash.Table.find_exn t hash) } ))
+      end
+
+      module Snark_pool = struct
+        type t = unit
+      end
+
+      module Store = Storage.Memory
+    end
+
+    module Lbc = Make (Inputs)
+
+    let%test_unit "strongest_ledgers updates appropriately when new_states \
+                   flow in within tree" =
+      let ledger_builder_transitions =
+        let f x parent =
+          ( []
+          , { Inputs.State.ledger_builder_hash= x
+            ; hash= x
+            ; previous_state_hash= parent }
+          , x )
+        in
+        Linear_pipe.of_list
+          [f 0 (-1); f 1 0; f 2 1; f 3 0; f 4 0; f 5 2; f 6 1; f 7 5]
+      in
+      let config =
+        Lbc.Config.make ~parent_log:(Logger.create ())
+          ~net_deferred:(return ()) ~ledger_builder_transitions
+          ~genesis_ledger:0 ~disk_location:"/tmp/test_lbc_disk" ~snark_pool:()
+      in
+      let take_map ~f p cnt =
+        let rec go acc cnt =
+          if cnt = 0 then return acc
+          else
+            match%bind Linear_pipe.read p with
+            | `Eof -> return acc
+            | `Ok x -> go (f x :: acc) (cnt - 1)
+        in
+        go [] cnt >>| List.rev
+      in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let%bind lbc = Lbc.create config in
+          let%map results =
+            take_map (Lbc.strongest_ledgers lbc) 4 ~f:(fun (lb, s) -> (!lb, s))
+          in
+          assert (
+            List.map results ~f:(fun (b, _) -> b)
+            |> List.equal [1; 2; 5; 7] ~equal:Int.equal ) )
+
+    let%test_unit "strongest_ledgers updates appropriately using the network" =
+      failwith "Todo"
+
+    let%test_unit "local_get_ledger can materialize a ledger locally" =
+      failwith "TODO"
+  end )
