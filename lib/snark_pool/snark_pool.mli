@@ -16,19 +16,17 @@ module type S = sig
 
   val create_pool : unit -> t
 
-  val add_snark : t -> work:work -> proof:proof -> fee:fee -> unit
+  val add_snark : t -> work:work -> proof:proof -> fee:fee -> [ `Rebroadcast | `Don't_rebroadcast ]
 
   val request_proof : t -> work -> priced_proof option
 
-  val add_unsolved_work : t -> work -> unit
+  val add_unsolved_work : t -> work -> [ `Rebroadcast | `Don't_rebroadcast ]
 
   (* TODO: Include my_fee as a paramter for request work and 
           return work that has a fee less than my_fee if the 
           returned work does not have any unsolved work *)
 
   val request_work : t -> work option
-
-  val mem : t -> work -> bool
 end
 
 module Make (Proof : sig

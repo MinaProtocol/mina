@@ -22,14 +22,14 @@ struct
   type t = (Work.t, priced_proof) diff
 
   let apply (pool: Pool.t) (t: t) : unit Or_error.t Deferred.t =
-    let verify_pool work ~f =
-      if Pool.mem pool work then Or_error.error_string "already in pool"
-      else Ok (f work)
+    let to_or_error = function
+      | `Don't_rebroadcast -> Or_error.error_string "Worse fee or already in pool"
+      | `Rebroadcast -> Ok ()
     in
-    Deferred.return
-      ( match t with
-      | Add_unsolved work -> verify_pool work ~f:(Pool.add_unsolved_work pool)
-      | Add_solved_work (work, {fee; proof}) ->
-          verify_pool work ~f:(fun work ->
-              Pool.add_snark pool ~work ~proof ~fee ) )
+    begin match t with
+    | Add_unsolved work -> Pool.add_unsolved_work pool work
+    | Add_solved_work (work, {proof; fee}) -> Pool.add_snark pool ~work ~proof ~fee
+    end
+    |> to_or_error
+    |> Deferred.return
 end

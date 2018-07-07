@@ -21,19 +21,17 @@ module type S = sig
 
   val create_pool : unit -> t
 
-  val add_snark : t -> work:work -> proof:proof -> fee:fee -> unit
+  val add_snark : t -> work:work -> proof:proof -> fee:fee -> [ `Rebroadcast | `Don't_rebroadcast ]
 
   val request_proof : t -> work -> priced_proof option
 
-  val add_unsolved_work : t -> work -> unit
+  val add_unsolved_work : t -> work -> [ `Rebroadcast | `Don't_rebroadcast ]
 
   (* TODO: Include my_fee as a paramter for request work and 
           return work that has a fee less than my_fee if the 
           returned work does not have any unsolved work *)
 
   val request_work : t -> work option
-
-  val mem : t -> work -> bool
 end
 
 module Make (Proof : sig
@@ -100,21 +98,28 @@ struct
     ; unsolved_work= Work_random_set.create () }
 
   let add_snark t ~work ~proof ~fee =
-    let open Option in
-    let smallest_priced_proof =
-      Work.Table.find t.proofs work
-      >>| (fun {proof= existing_proof; fee= existing_fee} ->
-            if existing_fee <= fee then
-              Priced_proof.create existing_proof existing_fee
-            else {proof; fee} )
-      |> Option.value ~default:(Priced_proof.create proof fee)
+    let update_and_rebroadcast () =
+      Hashtbl.set t.proofs ~key:work ~data:(Priced_proof.create proof fee);
+      `Rebroadcast
     in
-    Work.Table.set t.proofs work smallest_priced_proof ;
-    Work_random_set.add t.solved_work work
+    match Work.Table.find t.proofs work with
+    | None ->
+      Work_random_set.add t.solved_work work;
+      update_and_rebroadcast ()
+    | Some prev ->
+      if Fee.(<) fee prev.fee
+      then update_and_rebroadcast ()
+      else `Don't_rebroadcast
 
   let request_proof t = Work.Table.find t.proofs
 
-  let add_unsolved_work t = Work_random_set.add t.unsolved_work
+  let add_unsolved_work t work =
+    if Work_random_set.mem t.unsolved_work work
+    then `Don't_rebroadcast
+    else begin
+      Work_random_set.add t.unsolved_work work;
+      `Rebroadcast
+    end
 
   let remove_solved_work t work =
     Work_random_set.remove t.solved_work work ;
@@ -138,10 +143,6 @@ struct
           remove_solved_work t work ; work)
 
   let unsolved_work_count t = Work_random_set.length t.unsolved_work
-
-  let mem t work =
-    Work_random_set.mem t.solved_work work
-    || Work_random_set.mem t.unsolved_work work
 end
 
 let%test_module "random set test" =
@@ -183,9 +184,9 @@ let%test_module "random set test" =
       in
       let pool = Mock_snark_pool.create_pool () in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
-          Mock_snark_pool.add_snark pool work proof fee ) ;
+          ignore (Mock_snark_pool.add_snark pool work proof fee )) ;
       List.iter sample_unsolved_solved_work ~f:(fun work ->
-          Mock_snark_pool.add_unsolved_work pool work ) ;
+          ignore (Mock_snark_pool.add_unsolved_work pool work )) ;
       pool
 
     let%test_unit "When two priced proofs of the same work are inserted into \
