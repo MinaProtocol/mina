@@ -1,6 +1,6 @@
 open Core
 open Async
-open Cli_common
+open Cli_lib
 open Nanobit_base
 
 let dispatch rpc query port =

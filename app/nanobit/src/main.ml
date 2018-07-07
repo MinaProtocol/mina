@@ -32,6 +32,7 @@ struct
   module Time = Block_time
   module State_hash = State_hash.Stable.V1
   module Ledger_hash = Ledger_hash.Stable.V1
+  module Public_key = Public_key
   module Transaction = Transaction
   module Block_nonce = Nanobit_base.Block.Nonce
   module Difficulty = Difficulty
@@ -361,6 +362,13 @@ module type Main_intf = sig
   end
 end
 
+module Run_config = struct
+  type t =
+    { run_snark_worker:
+        [`Don't_run | `With_public_key of Public_key.Compressed.t]
+    ; client_port: int }
+end
+
 module Run (Program : Main_intf) = struct
   open Program
 
@@ -428,6 +436,21 @@ module Run (Program : Main_intf) = struct
                  (fun exn ->
                    Logger.error log "%s" (Exn.to_string_mach exn) ;
                    Deferred.unit )) ))
+
+  let create_snark_worker ~public_key ~client_port =
+    let open Snark_worker_lib in
+    let our_binary = Sys.argv.(0) in
+    Process.create_exn () ~prog:our_binary
+      ~args:
+        ( Worker.command_name
+        :: Worker.arguments ~public_key ~daemon_port:client_port )
+    >>| ignore
+
+  let run_snark_worker ~client_port run_snark_worker =
+    match run_snark_worker with
+    | `Don't_run -> ()
+    | `With_public_key public_key ->
+        create_snark_worker ~public_key ~client_port |> ignore
 
   let run ~minibit ~log =
     Logger.debug log "Created minibit\n%!" ;
