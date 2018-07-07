@@ -23,13 +23,13 @@ struct
 
   let apply (pool: Pool.t) (t: t) : unit Or_error.t Deferred.t =
     let to_or_error = function
-      | `Don't_rebroadcast -> Or_error.error_string "Worse fee or already in pool"
+      | `Don't_rebroadcast ->
+          Or_error.error_string "Worse fee or already in pool"
       | `Rebroadcast -> Ok ()
     in
-    begin match t with
+    ( match t with
     | Add_unsolved work -> Pool.add_unsolved_work pool work
-    | Add_solved_work (work, {proof; fee}) -> Pool.add_snark pool ~work ~proof ~fee
-    end
-    |> to_or_error
-    |> Deferred.return
+    | Add_solved_work (work, {proof; fee}) ->
+        Pool.add_snark pool ~work ~proof ~fee )
+    |> to_or_error |> Deferred.return
 end

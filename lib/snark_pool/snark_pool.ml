@@ -21,11 +21,16 @@ module type S = sig
 
   val create_pool : unit -> t
 
-  val add_snark : t -> work:work -> proof:proof -> fee:fee -> [ `Rebroadcast | `Don't_rebroadcast ]
+  val add_snark :
+       t
+    -> work:work
+    -> proof:proof
+    -> fee:fee
+    -> [`Rebroadcast | `Don't_rebroadcast]
 
   val request_proof : t -> work -> priced_proof option
 
-  val add_unsolved_work : t -> work -> [ `Rebroadcast | `Don't_rebroadcast ]
+  val add_unsolved_work : t -> work -> [`Rebroadcast | `Don't_rebroadcast]
 
   (* TODO: Include my_fee as a paramter for request work and 
           return work that has a fee less than my_fee if the 
@@ -99,27 +104,24 @@ struct
 
   let add_snark t ~work ~proof ~fee =
     let update_and_rebroadcast () =
-      Hashtbl.set t.proofs ~key:work ~data:(Priced_proof.create proof fee);
+      Hashtbl.set t.proofs ~key:work ~data:(Priced_proof.create proof fee) ;
       `Rebroadcast
     in
     match Work.Table.find t.proofs work with
     | None ->
-      Work_random_set.add t.solved_work work;
-      update_and_rebroadcast ()
+        Work_random_set.add t.solved_work work ;
+        update_and_rebroadcast ()
     | Some prev ->
-      if Fee.(<) fee prev.fee
-      then update_and_rebroadcast ()
-      else `Don't_rebroadcast
+        if Fee.( < ) fee prev.fee then update_and_rebroadcast ()
+        else `Don't_rebroadcast
 
   let request_proof t = Work.Table.find t.proofs
 
   let add_unsolved_work t work =
-    if Work_random_set.mem t.unsolved_work work
-    then `Don't_rebroadcast
-    else begin
-      Work_random_set.add t.unsolved_work work;
-      `Rebroadcast
-    end
+    if Work_random_set.mem t.unsolved_work work then `Don't_rebroadcast
+    else (
+      Work_random_set.add t.unsolved_work work ;
+      `Rebroadcast )
 
   let remove_solved_work t work =
     Work_random_set.remove t.solved_work work ;
@@ -184,9 +186,9 @@ let%test_module "random set test" =
       in
       let pool = Mock_snark_pool.create_pool () in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
-          ignore (Mock_snark_pool.add_snark pool work proof fee )) ;
+          ignore (Mock_snark_pool.add_snark pool work proof fee) ) ;
       List.iter sample_unsolved_solved_work ~f:(fun work ->
-          ignore (Mock_snark_pool.add_unsolved_work pool work )) ;
+          ignore (Mock_snark_pool.add_unsolved_work pool work) ) ;
       pool
 
     let%test_unit "When two priced proofs of the same work are inserted into \
@@ -205,8 +207,8 @@ let%test_module "random set test" =
         (Quickcheck.Generator.tuple4 gen Mock_work.gen (gen_entry ())
            (gen_entry ()))
         ~f:(fun (t, work, (proof_1, fee_1), (proof_2, fee_2)) ->
-          Mock_snark_pool.add_snark t work proof_1 fee_1 ;
-          Mock_snark_pool.add_snark t work proof_2 fee_2 ;
+          ignore (Mock_snark_pool.add_snark t work proof_1 fee_1) ;
+          ignore (Mock_snark_pool.add_snark t work proof_2 fee_2) ;
           let fee_upper_bound = Mock_fee.min fee_1 fee_2 in
           let {Priced_proof.fee; _} =
             Mock_snark_pool.to_record
@@ -232,8 +234,10 @@ let%test_module "random set test" =
           Mock_snark_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2
           and cheap_fee = min fee_1 fee_2 in
-          Mock_snark_pool.add_snark t work cheap_proof cheap_fee ;
-          Mock_snark_pool.add_snark t work expensive_proof expensive_fee ;
+          ignore (Mock_snark_pool.add_snark t work cheap_proof cheap_fee) ;
+          assert (
+            Mock_snark_pool.add_snark t work expensive_proof expensive_fee
+            = `Don't_rebroadcast ) ;
           assert (
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}
             = Mock_snark_pool.to_record
@@ -243,7 +247,7 @@ let%test_module "random set test" =
       Quickcheck.test ~sexp_of:[%sexp_of : Mock_snark_pool.t * Mock_work.t]
         (Quickcheck.Generator.tuple2 gen Mock_work.gen) ~f:(fun (t, work) ->
           let open Quickcheck.Generator.Let_syntax in
-          Mock_snark_pool.add_unsolved_work t work ;
+          ignore (Mock_snark_pool.add_unsolved_work t work) ;
           let size = Mock_snark_pool.unsolved_work_count t in
           ignore @@ Mock_snark_pool.request_work t ;
           assert (size - 1 = Mock_snark_pool.unsolved_work_count t) )
