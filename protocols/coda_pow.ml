@@ -199,6 +199,7 @@ module type Ledger_builder_intf = sig
   val create : ledger:ledger -> self:public_key -> t
 
   val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
+
   (* This should memoize the snark verifications *)
 
   val create_diff :
