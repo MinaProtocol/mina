@@ -132,22 +132,10 @@ module Make (Inputs : Inputs_intf) = struct
         let k = 50
       end)
 
-  module Tagged_lb = struct
-    type t = Ledger_hash.t ref * Ledger_builder.t [@@deriving bin_io]
-
-    let create ~hash ~builder = (ref hash, builder)
-
-    let ledger_builder = snd
-
-    let hash t = !(fst t)
-
-    let set_hash t h = fst t := h
-  end
-
   module State = struct
     type t =
-      { mutable locked_ledger_builder: Tagged_lb.t
-      ; mutable longest_branch_tip: Tagged_lb.t
+      { mutable locked_ledger_builder: Ledger_builder.t
+      ; mutable longest_branch_tip: Ledger_builder.t
       ; mutable ktree: Witness_tree.t option
       (* TODO: This impl assumes we have the original Ouroboros assumption. In
          order to work with the Praos assumption we'll need to keep a linked
@@ -157,13 +145,8 @@ module Make (Inputs : Inputs_intf) = struct
     [@@deriving bin_io]
 
     let create genesis_ledger : t =
-      let root = Ledger.merkle_root genesis_ledger in
-      { locked_ledger_builder=
-          Tagged_lb.create ~hash:root
-            ~builder:(Ledger_builder.create genesis_ledger)
-      ; longest_branch_tip=
-          Tagged_lb.create ~hash:root
-            ~builder:(Ledger_builder.create genesis_ledger)
+      { locked_ledger_builder= Ledger_builder.create genesis_ledger
+      ; longest_branch_tip= Ledger_builder.create genesis_ledger
       ; ktree= None }
   end
 
@@ -251,14 +234,8 @@ module Make (Inputs : Inputs_intf) = struct
                         <- Some
                              (Witness_tree.single
                                 {transactions; transition; state= s}) ;
-                        state.locked_ledger_builder
-                        <- Tagged_lb.create
-                             ~hash:(Inputs.State.ledger_hash s)
-                             ~builder:lb ;
-                        state.longest_branch_tip
-                        <- Tagged_lb.create
-                             ~hash:(Inputs.State.ledger_hash s)
-                             ~builder:lb ;
+                        state.locked_ledger_builder <- lb ;
+                        state.longest_branch_tip <- Ledger_builder.copy lb ;
                         Some (lb, s)
                     | Error e ->
                         Logger.warn log
@@ -284,9 +261,7 @@ module Make (Inputs : Inputs_intf) = struct
                     if Witness.equal (locked_head old_tree) new_head then
                       return ()
                     else
-                      let lb =
-                        Tagged_lb.ledger_builder state.locked_ledger_builder
-                      in
+                      let lb = state.locked_ledger_builder in
                       let%map () =
                         force_apply_transition lb (Witness.transition new_head)
                       in
@@ -299,9 +274,7 @@ module Make (Inputs : Inputs_intf) = struct
                   in
                   if Witness.equal (best_tip old_tree) new_tip then return None
                   else
-                    let lb =
-                      Tagged_lb.ledger_builder state.longest_branch_tip
-                    in
+                    let lb = state.longest_branch_tip in
                     let%map () =
                       force_apply_transition lb (Witness.transition new_tip)
                     in
@@ -317,9 +290,6 @@ module Make (Inputs : Inputs_intf) = struct
   (** Returns a reference to a ledger_builder denoted by [hash], materialize a
    fresh ledger at a specific hash if necessary *)
   let local_get_ledger t hash =
-    let lb_hash tagged_lb =
-      Tagged_lb.ledger_builder tagged_lb |> Ledger_builder.hash
-    in
     let find_state tree lb_hash =
       Witness_tree.find_map tree ~f:(fun w ->
           if Ledger_builder_hash.equal (Witness.ledger_builder_hash w) lb_hash
@@ -331,17 +301,17 @@ module Make (Inputs : Inputs_intf) = struct
         let locked = t.state.locked_ledger_builder in
         let tip = t.state.longest_branch_tip in
         let attempt_easy w err_msg_name =
-          match find_state tree (lb_hash w) with
+          match find_state tree (Ledger_builder.hash w) with
           | None ->
               return
               @@ Or_error.errorf
                    "This was our %s, but we didn't witness the state"
                    err_msg_name
-          | Some state -> return @@ Ok (Tagged_lb.ledger_builder w, state)
+          | Some state -> return @@ Ok (w, state)
         in
-        if Ledger_builder_hash.equal hash (lb_hash locked) then
+        if Ledger_builder_hash.equal hash (Ledger_builder.hash locked) then
           attempt_easy locked "locked_head"
-        else if Ledger_builder_hash.equal hash (lb_hash tip) then
+        else if Ledger_builder_hash.equal hash (Ledger_builder.hash tip) then
           attempt_easy tip "tip"
         else
           (* Now we need to materialize it *)
@@ -351,9 +321,7 @@ module Make (Inputs : Inputs_intf) = struct
             )
           with
           | Some path ->
-              let lb_start =
-                Tagged_lb.ledger_builder t.state.locked_ledger_builder
-              in
+              let lb_start = t.state.locked_ledger_builder in
               assert_valid_state (List.hd_exn path) lb_start ;
               let lb = Ledger_builder.copy lb_start in
               (* Fast-forward the lb *)
