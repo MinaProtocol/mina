@@ -368,16 +368,11 @@ mnt4_Fq4 mnt4_affine_ate_miller_loop(const mnt4_affine_ate_G1_precomputation &pr
         }
     }
 
-    /* TODO: maybe handle neg
        if (mnt4_ate_is_loop_count_neg)
        {
-       // TODO:
-       mnt4_affine_ate_coeffs ac = prec_Q.coeffs[idx++];
-       mnt4_Fq4 g_RnegR_at_P = mnt4_Fq4(prec_P.PY_twist_squared,
-       - prec_P.PX * c.gamma_twist + c.gamma_X - c.old_RY);
-       f = (f * g_RnegR_at_P).inverse();
+       f = f.unitary_inverse();
        }
-    */
+
 
     leave_block("Call to mnt4_affine_ate_miller_loop");
 
