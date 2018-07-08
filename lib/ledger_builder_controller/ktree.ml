@@ -93,7 +93,8 @@ struct
 
   (** Extends tree with e at the first node n where (parent n) returns true *)
   let add t e ~parent =
-    if Elem_set.mem t.elems e then t
+    if Elem_set.mem t.elems e then `Repeat
+    else if Elem_set.find t.elems ~f:parent |> Option.is_none then `No_parent
     else
       let rec go node depth =
         let (Rose.Rose (x, xs)) = node in
@@ -119,7 +120,7 @@ struct
         ; elems= Elem_set.add t.elems e }
       in
       match tree_and_depths with
-      | [] | [_] -> default
+      | [] | [_] -> `Added default
       | _ ->
           let longest_subtree, longest_depth =
             List.max_elt tree_and_depths ~compare:(fun (_, d) (_, d') ->
@@ -127,8 +128,10 @@ struct
             |> Option.value_exn
           in
           if longest_depth >= Small_k.k then
-            {tree= longest_subtree; elems= Elem_set.add t.elems e}
-          else default
+            `Added
+              { tree= longest_subtree
+              ; elems= Elem_set.of_list (Rose.to_list longest_subtree) }
+          else `Added default
 end
 
 let%test_module "K-tree" =
@@ -152,10 +155,11 @@ let%test_module "K-tree" =
           let%map idx = Int.gen_incl 0 (Array.length candidates - 1) in
           (r, e, candidates.(idx)))
           ~f:(fun (r, e, parent) ->
-            let r' = add r e ~parent:(Elem.equal parent) in
-            assert (
-              Elem_set.mem r.elems e
-              || not (Rose.equal Elem.equal r.tree r'.tree) ) )
+            match add r e ~parent:(Elem.equal parent) with
+            | `No_parent -> failwith "Unexpected"
+            | `Repeat -> assert (Elem_set.mem r.elems e)
+            | `Added r' -> assert (not (Rose.equal Elem.equal r.tree r'.tree))
+            )
 
       let%test_unit "Adding to the end of the longest_path extends the path \
                      (modulo the last thing / first-thing)" =
@@ -165,18 +169,21 @@ let%test_module "K-tree" =
                  not (Rose.mem r.tree e ~equal:Elem.equal) ) )
           ~f:(fun (r, e) ->
             let path = longest_path r in
-            let r' = add r e ~parent:(Elem.equal (List.last_exn path)) in
-            assert (Elem.equal e (List.last_exn (longest_path r'))) ;
-            (* If there were two paths of the same length, we may be missing the
+            match add r e ~parent:(Elem.equal (List.last_exn path)) with
+            | `No_parent | `Repeat -> failwith "Unexpected"
+            | `Added r' ->
+                assert (Elem.equal e (List.last_exn (longest_path r'))) ;
+                (* If there were two paths of the same length, we may be missing the
              * last thing in our first path *)
-            let path = longest_path r in
-            let potential_prefix = List.take path (List.length path - 1) in
-            let path' = longest_path r' in
-            assert (
-              List.is_prefix ~equal:Elem.equal ~prefix:potential_prefix path'
-              || List.is_prefix ~equal:Elem.equal
-                   ~prefix:(List.drop potential_prefix 1)
-                   path' ) )
+                let path = longest_path r in
+                let potential_prefix = List.take path (List.length path - 1) in
+                let path' = longest_path r' in
+                assert (
+                  List.is_prefix ~equal:Elem.equal ~prefix:potential_prefix
+                    path'
+                  || List.is_prefix ~equal:Elem.equal
+                       ~prefix:(List.drop potential_prefix 1)
+                       path' ) )
 
       let%test_unit "There exists a path between the root and any node" =
         Quickcheck.test ~sexp_of:[%sexp_of : t * Elem.t]
@@ -205,18 +212,20 @@ let%test_module "K-tree" =
         in
         assert (List.length (longest_path t) = Small_k.k) ;
         let (Rose.Rose (head, first_children)) = t.tree in
-        let t' = add t e2 ~parent:(Elem.equal e1) in
-        assert (List.length (longest_path t') = Small_k.k) ;
-        assert (not (Rose.mem t'.tree head ~equal:Elem.equal)) ;
-        assert (
-          not
-            (Rose.mem t'.tree
-               (Rose.extract (List.hd_exn first_children))
-               ~equal:Elem.equal) ) ;
-        assert (
-          Rose.mem t'.tree
-            (Rose.extract (List.nth_exn first_children 1))
-            ~equal:Elem.equal )
+        match add t e2 ~parent:(Elem.equal e1) with
+        | `No_parent | `Repeat -> failwith "Unexpected"
+        | `Added t' ->
+            assert (List.length (longest_path t') = Small_k.k) ;
+            assert (not (Rose.mem t'.tree head ~equal:Elem.equal)) ;
+            assert (
+              not
+                (Rose.mem t'.tree
+                   (Rose.extract (List.hd_exn first_children))
+                   ~equal:Elem.equal) ) ;
+            assert (
+              Rose.mem t'.tree
+                (Rose.extract (List.nth_exn first_children 1))
+                ~equal:Elem.equal )
     end
 
     module Tree =
@@ -231,22 +240,24 @@ let%test_module "K-tree" =
           let k = 50
         end)
 
+    let sample_tree =
+      { Tree.tree=
+          Rose.Rose (1, [Rose.Rose (2, [Rose.single 3]); Rose.single 4])
+      ; elems= Tree.Elem_set.of_list [1; 2; 3; 4] }
+
     let%test_unit "longest_path finds longest path" =
-      let t =
-        { Tree.tree=
-            Rose.Rose (1, [Rose.Rose (2, [Rose.single 3]); Rose.single 4])
-        ; elems= Tree.Elem_set.of_list [1; 2; 3; 4] }
-      in
-      assert (List.equal ~equal:Int.equal (Tree.longest_path t) [1; 2; 3])
+      assert (
+        List.equal ~equal:Int.equal (Tree.longest_path sample_tree) [1; 2; 3]
+      )
+
+    let%test_unit "Adding with an always false parent reports No_parent" =
+      match Tree.add sample_tree 5 ~parent:(fun _ -> false) with
+      | `No_parent -> ()
+      | _ -> failwith "Unexpected"
 
     let%test_unit "Paths are found in the middle of some tree" =
-      let t =
-        { Tree.tree=
-            Rose.Rose (1, [Rose.Rose (2, [Rose.single 3]); Rose.single 4])
-        ; elems= Tree.Elem_set.of_list [1; 2; 3; 4] }
-      in
       assert (
         List.equal ~equal:Int.equal
-          (Tree.path t ~f:(Int.equal 2) |> Option.value_exn)
+          (Tree.path sample_tree ~f:(Int.equal 2) |> Option.value_exn)
           [1; 2] )
   end )
