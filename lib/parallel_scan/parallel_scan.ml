@@ -30,6 +30,8 @@ module type Spec_intf = sig
   val merge : Output.t -> Accum.t -> Output.t
 end
 
+
+
 module State1 = struct
   include State
 
@@ -55,7 +57,8 @@ module State1 = struct
     assert (jobs.Ring_buffer.position = 0) ;
     let data_buffer = Queue.create ~capacity:parallelism () in
     Queue.enqueue data_buffer seed ;
-    {jobs; data_buffer; acc= (0, init)}
+    {jobs; data_buffer; acc= (0, init); allowed_data_count= 4} 
+    (* TODO Initial count cannot be zero, what should it be then?*) 
 
   let parallelism {jobs} = Ring_buffer.length jobs / 2
 
@@ -149,49 +152,43 @@ module State1 = struct
     assert (p 5 = (10, Right)) ;
     assert (p 6 = (11, Left)) ;
     assert (p 7 = (11, Right))
-
+  
   let consume : type a b d.
-         (a, b, d) t
-      -> spec:(module
-               Spec_intf with type Data.t = d and type Accum.t = a and type Output.
-                                                                            t = 
-               b)
-      -> d list
-      -> b option =
-   fun t ~spec ds ->
-    let open Job in
-    let module Spec = ( val ( spec
-                            : (module
-                               Spec_intf with type Data.t = d and type Accum.t = 
-                               a and type Output.t = b) ) ) in
-    (* This breaks down if we ever step an odd number of times *)
-    (* step_twice ensures we always step twice *)
-    let step_twice () =
-      let fill_job dir z job =
-        let open Direction in
-        match (dir, job) with
-        | _, Merge_up None -> Merge_up (Some z)
-        | Left, Merge (None, r) -> Merge (Some z, r)
-        | Right, Merge (l, None) -> Merge (l, Some z)
-        | Left, Merge_up (Some _) | Right, Merge_up (Some _) ->
-            failwith "impossible: Merge_ups should be empty"
-        | Left, Merge (Some _, _) | Right, Merge (_, Some _) ->
-            failwithf
-              !"impossible: the side of merge we want will be empty but we \
-                have %{sexp: Direction.t} and job %s"
+           (a, b, d) t
+        -> ( (a, b) Completed_job.t * (a, b) Completed_job.t) list
+        -> b option Or_error.t=
+    fun t cs ->
+      let open Or_error.Let_syntax in 
+      let open Job in
+      let open Completed_job in
+      (* This breaks down if we ever step an odd number of times *)
+      (* step_twice ensures we always step twice *)
+      let step_twice (cj1, cj2) =
+        let fill_job dir z job : (a, d) Job.t Or_error.t =
+          let open Direction in
+          match (dir, job) with
+            | _, Merge_up None -> Ok (Merge_up (Some z))
+            | Left, Merge (None, r) -> Ok (Merge (Some z, r))
+            | Right, Merge (l, None) -> Ok (Merge (l, Some z))
+            | Left, Merge_up (Some _) | Right, Merge_up (Some _) ->
+                Error (Error.of_string "impossible: Merge_ups should be empty")
+            | Left, Merge (Some _, _) | Right, Merge (_, Some _) ->
+              Error (Error.of_string "impossible: the side of merge we want will be empty but we
+            have %{sexp: Direction.t}")
+              (*!"impossible: the side of merge we want will be empty but we \
+                have %{sexp: Direction.t}" 
               dir
-              ( Job.sexp_of_t Spec.Accum.sexp_of_t Spec.Data.sexp_of_t job
-              |> Sexp.to_string_hum )
-              ()
-        | _, Base _ -> failwith "impossible: we never fill base"
+              ()*)
+            | _, Base _ -> Error (Error.of_string "impossible: we never fill base")
+        in
+         (* Returns the ptr rewritten *)
+        let rewrite (i: int) (z: a) : (unit Or_error.t) =
+          let ptr, dir = ptr (parallelism t) i in
+          let js : (a, d) Job.t Ring_buffer.t = jobs t in
+          Ring_buffer.direct_update js ptr 
+            ~f:(fun job -> fill_job dir z job )
       in
-      (* Returns the ptr rewritten *)
-      let rewrite (i: int) (z: a) : unit =
-        let ptr, dir = ptr (parallelism t) i in
-        Ring_buffer.direct_update t.jobs ptr ~f:(fun job ->
-            fill_job dir z job )
-      in
-      let () =
+      let%bind () =
         (* Note: We don't have to worry about position overflow because
          * we always have an even number of elems in the ring buffer *)
         let i1, i2 =
@@ -205,47 +202,45 @@ module State1 = struct
               else (t.jobs.position, t.jobs.position + 1)
           | _ -> (t.jobs.position, t.jobs.position + 1)
         in
-        let work i job =
-          match job with
-          | Merge_up None -> job
-          | Merge (None, None) -> job
-          | Base None -> (Base (Some (Queue.dequeue_exn t.data_buffer)))
-          | Merge_up (Some x) ->
-              let acc' = Spec.merge (snd t.acc) x in
+        let work i (cj: (a, b) Completed_job.t) job : (a, d) Job.t Or_error.t=
+          match (job, cj) with
+          | Merge_up None, _ -> Ok job
+          | Merge (None, None), _ -> Ok job
+          | Base None, _ ->
+            (match Queue.dequeue t.data_buffer with
+              | None -> 
+                  Or_error.error_string "Data queue empty. Cannot  proceed."
+              | Some x -> Ok (Base (Some x)))
+          | Merge_up (Some x), Merged_up acc' ->
               t.acc <- (fst t.acc |> Int.( + ) 1, acc') ;
-              Merge_up None
-          | Merge (Some _, None) -> job
-          | Merge (Some x, Some x') ->
-              let z = Spec.Accum.( + ) x x' in
-              let () = rewrite i z in
-              Merge (None, None)
-          | Base (Some d) ->
-              let z = Spec.map d in
-              let () = rewrite i z in
-              Base (Some (Queue.dequeue_exn t.data_buffer))
+              Ok (Merge_up None)
+          | Merge (Some _, None), _ -> Ok job
+          | Merge (Some x, Some x'), Merged z ->
+              let%bind () = rewrite i z in
+              Ok (Merge (None, None))
+          | Base (Some d), Lifted z ->
+              let%bind () = rewrite i z in
+              Ok (Base (Some (Queue.dequeue_exn t.data_buffer)))
           | x ->
-              failwithf !"Doesn't happen x:%s\n"
-                ( Job.sexp_of_t Spec.Accum.sexp_of_t Spec.Data.sexp_of_t x
+              failwith "Doesn't happen x:%s\n"
+                (*( Job.sexp_of_t (*Spec.Accum.sexp_of_t Spec.Data.sexp_of_t x*)
                 |> Sexp.to_string_hum )
-                ()
+                ()*)
         in
-        let () = Ring_buffer.direct_update t.jobs i1 ~f:(work i1) in
-        Ring_buffer.direct_update t.jobs i2 ~f:(work i2)
+        let%bind () = Ring_buffer.direct_update t.jobs i1 ~f:(work i1 cj1) in
+        Ring_buffer.direct_update t.jobs i2 ~f:(work i2 cj2)
       in
-      Ring_buffer.forwards ~n:2 t.jobs
+      return (Ring_buffer.forwards ~n:2 t.jobs)
     in
     let last_acc = t.acc in
-    let () =
-      List.fold ~init:() ds ~f:(fun acc d ->
-          let () = acc in
-          let _ = after (Time_ns.Span.of_ms 5.) in
-          let () = step_twice () in
-          let  _ = after (Time_ns.Span.of_ms 5.) in
-          Queue.enqueue t.data_buffer d )
+    let%bind () = List.fold ~init: (Ok ()) cs 
+      ~f:(fun acc cj ->
+        let _ = acc in
+        step_twice cj)
     in
-    if not (fst last_acc = fst t.acc) then Some (snd t.acc) else None
+    if not (fst last_acc = fst t.acc) then Ok (Some (snd t.acc)) else (Ok None)
 
-  let gen : type a b d.
+  (*let gen : type a b d.
          init:b
       -> gen_data:d Quickcheck.Generator.t
       -> spec:(module
@@ -277,7 +272,7 @@ module State1 = struct
                                    Output.t = b) ) ) in
         let open Deferred.Let_syntax in
         let _ = consume acc chunk ~spec in
-        return acc )
+        return acc )*)
 end
 
 let start : type a b d.
@@ -286,40 +281,47 @@ let start : type a b d.
 
 let step : type a b d.
        state:(a, b, d) State.t
-    -> data:d list
-    -> spec:(module
-             Spec_intf with type Data.t = d and type Accum.t = a and type Output.
-                                                                          t = b)
-    -> b option =
+    -> data: ( (a, b) State1.Completed_job.t * (a, b) State1.Completed_job.t) list
+    -> b option Or_error.t=
  fun ~state ~data -> State1.consume state data
 
-let next :
+
+ let next :
        state:('a, 'b, 'd) State1.t
-    -> data:'d list
-    -> spec:(module
-             Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                            t = 
-             'b)
-    -> ('a, 'd) State1.Job.t =
- fun ~state ~data ~spec -> failwith "TODO"
+    -> ('a, 'd) State1.Job.t option=
+ fun ~state -> Some (Ring_buffer.read state.jobs)
 
 let next_k_jobs :
        state:('a, 'b, 'd) State1.t
-    -> spec:(module
-             Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                            t = 
-             'b)
     -> k:int
-    -> ('a, 'd) State1.Job.t list Or_error.t =
- fun ~state ~spec ~k -> failwith "TODO"
+    -> ('a, 'd) State1.Job.t list =
+ fun ~state ~k -> Ring_buffer.read_k state.jobs k
 
-(* Ring_buffer.read_k (State1.jobs state) k *)
+let no_allowed_to_enqueue : 
+    state:('a, 'b, 'd) State1.t -> int = fun ~state -> state.allowed_data_count
 
 let enqueue_data :
-    state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t =
- fun ~state ~data -> failwith "TODO"
+    state:('a, 'b, 'd) State1.t -> data:'d list -> unit Or_error.t =
+ fun ~state ~data -> 
+  if no_allowed_to_enqueue state < List.length data then
+    Or_error.error_string 
+      (sprintf "data list larger than allowed. Current number of items allowed: %d"
+        (no_allowed_to_enqueue state) )
+  else
+    Ok (List.fold 
+          ~init:() 
+            data 
+              ~f:(fun () d -> Queue.enqueue state.data_buffer d))                     
 
-let%test_module "scans" =
+
+
+let fill_in_completed_job : 
+        state:('a, 'b, 'd) State1.t 
+    ->  job: (('a,'b) State1.Completed_job.t * ('a, 'b) State1.Completed_job.t)  
+    -> 'b option Or_error.t = 
+  fun ~state ~job -> step state [job]
+
+(*let%test_module "scans" =
   ( module struct
     let do_steps ~state ~data ~spec w =
       let rec go () =
@@ -545,4 +547,4 @@ let%test_module "scans" =
               in
               assert (after_3n = expected) )
       end )
-  end )
+  end ) *)

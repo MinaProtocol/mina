@@ -284,8 +284,8 @@ struct
     let%bind next_jobs =
       Result_with_rollback.with_no_rollback
         Deferred.Or_error.Let_syntax.(
-          Parallel_scan.next_k_jobs ~state ~spec ~k:(List.length works)
-          |> Deferred.return)
+          Parallel_scan.next_k_jobs ~state ~k:(List.length works)
+          |> return)
     in
     let%bind assoc_list = jobs_proofs_assoc next_jobs works in
     failwith "TODO: To be done in parallel scan?"
@@ -333,9 +333,9 @@ struct
     Result_with_rollback.with_no_rollback
       (let open Deferred.Or_error.Let_syntax in
       let%bind next_jobs =
-        Parallel_scan.next_k_jobs ~state:t.scan_state ~spec
+        Parallel_scan.next_k_jobs ~state:t.scan_state
           ~k:(List.length completed_works)
-        |> Deferred.return
+        |> return
       in
       Deferred.List.for_all (List.zip_exn next_jobs completed_works) ~f:
         (fun (job, work) -> verify job work )

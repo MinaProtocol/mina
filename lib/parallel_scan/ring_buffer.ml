@@ -15,12 +15,13 @@ let length {data} = Array.length data
 
 let copy {data; position} = {data= Array.copy data; position}
 
-let direct_update t i ~f =
+let direct_update t i  ~f = (*)    ('a -> 'a Or_error.t) =*)
+  let open Or_error.Let_syntax in
   let x : 'a = (t.data).(i) in
-  let v = f x in
-  (t.data).(i) <- v
+  let%bind v = f x in
+  return @@ (t.data).(i) <- v
 
-let update t ~f = direct_update t t.position ~f:(fun x -> f t.position x)
+let update t ~f = direct_update t t.position (fun x -> f t.position x)
 
 let read t = (t.data).(t.position)
 

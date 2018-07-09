@@ -18,9 +18,17 @@ module State : sig
     [@@deriving bin_io, sexp]
   end
 
+  module Completed_job : sig
+    type ('a, 'b) t = 
+      | Lifted of 'a 
+      | Merged of 'a 
+      | Merged_up of 'b
+      [@@deriving bin_io, sexp]
+  end
+
   type ('a, 'b, 'd) t [@@deriving sexp, bin_io]
 
-  val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t
+  (* val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t *)
 
   val copy : ('a, 'b, 'd) t -> ('a, 'b, 'd) t
 end
@@ -49,6 +57,7 @@ end
 
 val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
 
+(*
 val step :
      state:('a, 'b, 'd) State.t
   -> data:'d list
@@ -56,22 +65,20 @@ val step :
            Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
                                                                           t = 'b)
   -> 'b option
+*)
 
 val next :
-     state:('a, 'b, 'd) State.t
-  -> data:'d list
-  -> spec:(module
-           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                          t = 'b)
-  -> ('a, 'd) State.Job.t
+  state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t option
 
 val next_k_jobs :
-     state:('a, 'b, 'd) State.t
-  -> spec:(module
-           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                          t = 'b)
-  -> k:int
-  -> ('a, 'd) State.Job.t list Or_error.t
+  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list
 
 val enqueue_data :
   state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t
+
+val no_allowed_to_enqueue : state:('a, 'b, 'd) State.t -> int
+
+val fill_in_completed_job :
+     state:('a, 'b, 'd) State.t
+  -> job:('a, 'b) State.Completed_job.t * ('a, 'b) State.Completed_job.t
+  -> 'b option Or_error.t
