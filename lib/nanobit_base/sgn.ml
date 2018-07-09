@@ -3,6 +3,8 @@ open Snark_params.Tick
 
 type t = Pos | Neg [@@deriving sexp, bin_io]
 
+let negate = function Pos -> Neg | Neg -> Pos
+
 let neg_one = Field.(negate one)
 
 let to_field = function Pos -> Field.one | Neg -> neg_one
@@ -47,6 +49,8 @@ module Checked = struct
   let neg_if_true (b: Boolean.var) =
     let open Field.Checked in
     Infix.((neg_two * (b :> Field.Checked.t)) + constant Field.one)
+
+  let negate t = Field.Checked.scale t neg_one
 
   let neg = Field.Checked.constant (to_field Neg)
 
