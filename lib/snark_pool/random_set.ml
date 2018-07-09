@@ -32,7 +32,6 @@ end) :
   S with type key := Key.t =
 struct
   type t = {keys: Key.t Dyn_array.t; key_to_loc: Int.t Key.Table.t}
-
   [@@deriving sexp, bin_io]
 
   let create () = {keys= Dyn_array.create (); key_to_loc= Key.Table.create ()}
