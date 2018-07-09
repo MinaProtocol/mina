@@ -2,71 +2,90 @@ open Core_kernel
 open Async_kernel
 open Protocols
 
-module Make (Fee : sig
-  module Unsigned : sig
-    type t [@@deriving sexp_of, eq]
+module type Inputs_intf = sig
+  module Fee : sig
+    module Unsigned : sig
+      type t [@@deriving sexp_of, eq]
 
-    val add : t -> t -> t option
+      val add : t -> t -> t option
 
-    val sub : t -> t -> t option
+      val sub : t -> t -> t option
 
-    val zero : t
+      val zero : t
+    end
+
+    module Signed : sig
+      type t [@@deriving sexp_of]
+
+      val add : t -> t -> t option
+
+      val negate : t -> t
+
+      val of_unsigned : Unsigned.t -> t
+    end
   end
 
-  module Signed : sig
-    type t [@@deriving sexp_of]
+  module Public_key : Coda_pow.Public_key_intf
 
-    val add : t -> t -> t option
+  module Transaction :
+    Coda_pow.Transaction_intf with type fee := Fee.Unsigned.t
 
-    val negate : t -> t
+  module Fee_transfer :
+    Coda_pow.Fee_transfer_intf
+    with type public_key := Public_key.Compressed.t
+     and type fee := Fee.Unsigned.t
 
-    val of_unsigned : Unsigned.t -> t
-  end
-end)
-(Public_key : Coda_pow.Public_key_intf) (Transaction : sig
-    include Coda_pow.Transaction_intf with type fee := Fee.Unsigned.t
+  module Super_transaction :
+    Coda_pow.Super_transaction_intf
+    with type valid_transaction := Transaction.With_valid_signature.t
+     and type fee_transfer := Fee_transfer.t
+     and type signed_fee := Fee.Signed.t
 
-    include Sexpable with type t := t
-end) (Fee_transfer : sig
-  include Coda_pow.Fee_transfer_intf
-          with type public_key := Public_key.t
-           and type fee := Fee.Unsigned.t
-end) (Super_transaction : sig
-  include Coda_pow.Super_transaction_intf
-          with type valid_transaction := Transaction.With_valid_signature.t
-           and type fee_transfer := Fee_transfer.t
-           and type signed_fee := Fee.Signed.t
-end) (Ledger_hash : sig
-  include Coda_pow.Ledger_hash_intf
+  module Ledger_proof : Coda_pow.Proof_intf
 
-  val equal : t -> t -> bool
-end)
-(Statement : Coda_pow.Transaction_snark_statement_intf
-             with type ledger_hash := Ledger_hash.t
-              and type signed_fee := Fee.Signed.t) (Proof : sig
-    type t [@@deriving sexp]
-end) (Ledger : sig
-  include Coda_pow.Ledger_intf
-          with type ledger_hash := Ledger_hash.t
-           and type super_transaction := Super_transaction.t
-end) (Ledger_builder_hash : sig
-  type t [@@deriving eq]
-end)
-(Completed_work : Coda_pow.Completed_work_intf
-                  with type proof := Proof.t
-                   and type fee := Fee.Unsigned.t
-                   and type public_key := Public_key.t
-                   and type statement := Statement.t)
-                                                    (Ledger_builder_witness : sig
-    include Coda_pow.Ledger_builder_witness_intf
-            with type completed_work := Completed_work.t
-             and type transaction := Transaction.With_valid_signature.t
-             and type public_key := Public_key.t
-             and type ledger_builder_hash := Ledger_builder_hash.t
+  module Ledger_hash : Coda_pow.Ledger_hash_intf
 
-    val prev_hash : t -> Ledger_builder_hash.t
-end) =
-struct
+  module Snark_pool_proof : Coda_pow.Snark_pool_proof_intf
+
+  module Transaction_snark : Coda_pow.Transaction_snark_intf
+    with type fee := Fee.Signed.t
+     and type ledger_hash := Ledger_hash.t
+     and type message := Fee.Unsigned.t * Public_key.Compressed.t
+
+  module Ledger :
+    Coda_pow.Ledger_intf
+    with type ledger_hash := Ledger_hash.t
+     and type super_transaction := Super_transaction.t
+
+  module Ledger_builder_hash : Coda_pow.Ledger_builder_hash_intf
+
+  module Completed_work :
+    Coda_pow.Completed_work_intf
+    with type proof := Transaction_snark.t
+     and type statement := Transaction_snark.Statement.t
+     and type fee := Fee.Unsigned.t
+     and type public_key := Public_key.Compressed.t
+
+  module Ledger_builder_diff :
+    Coda_pow.Ledger_builder_diff_intf
+    with type completed_work := Completed_work.t
+     and type transaction := Transaction.With_valid_signature.t
+     and type public_key := Public_key.Compressed.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+end
+
+module Make (Inputs : Inputs_intf) :
+  Coda_pow.Ledger_builder_intf
+  with type diff := Inputs.Ledger_builder_diff.t
+   and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
+   and type public_key := Inputs.Public_key.Compressed.t
+   and type ledger := Inputs.Ledger.t
+   and type transaction_snark := Inputs.Transaction_snark.t
+   and type transaction_with_valid_signature :=
+              Inputs.Transaction.With_valid_signature.t
+   and type completed_work := Inputs.Completed_work.t 
+   and type statement := Inputs.Completed_work.Statement.t
+= struct
   (* Assume you have
 
   enqueue_data
@@ -86,29 +105,23 @@ struct
 
   *)
 
-  module With_statement = struct
-    type 'a t = 'a * Statement.t [@@deriving sexp_of]
-  end
+  open Inputs
 
-  module Ledger_proof = struct
-    type t = {next_ledger_hash: Ledger_hash.t; proof: Proof.t}
-  end
-
-  type transaction = Super_transaction.t [@@deriving sexp_of]
-
-  type proof_with_statement = Proof.t With_statement.t [@@deriving sexp_of]
+  type 'a with_statement = 'a * Transaction_snark.Statement.t
+  [@@deriving sexp, bin_io]
 
   type job =
-    ( proof_with_statement
-    , transaction With_statement.t )
-    Parallel_scan.State.Job.t
+    ( Transaction_snark.t with_statement
+    , Super_transaction.t with_statement
+    ) Parallel_scan.State.Job.t
   [@@deriving sexp_of]
 
   type scan_state =
-    ( proof_with_statement
-    , proof_with_statement
-    , transaction With_statement.t )
+    ( Transaction_snark.t with_statement
+    , Transaction_snark.t with_statement
+    , Super_transaction.t with_statement )
     Parallel_scan.State.t
+    [@@deriving sexp, bin_io]
 
   type t =
     { scan_state:
@@ -116,7 +129,8 @@ struct
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
     ; ledger: Ledger.t
-    ; public_key: Public_key.t }
+    ; public_key: Public_key.Compressed.t }
+    [@@deriving sexp, bin_io]
 
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
@@ -129,6 +143,16 @@ struct
 
   let hash t : Ledger_builder_hash.t = failwith "TODO"
 
+    
+  let ledger t = failwith "TODO"
+
+  let max_margin : int = failwith "TODO"
+ 
+  let margin t : int = failwith "TODO"
+  
+  let  create ~ledger ~self : t = failwith "TODO"
+
+  (*
   module Spec = struct
     module Accum = struct
       type t = Proof.t With_statement.t [@@deriving sexp_of]
@@ -157,14 +181,14 @@ struct
     : Parallel_scan.Spec_intf with type Data.t = transaction With_statement.t and type 
       Accum.t = Proof.t With_statement.t and type Output.t = Proof.t
                                                              With_statement.t
-    )
+    ) *)
 
   let option lab =
     Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
   let check label b = if not b then Or_error.error_string label else Ok ()
 
-  let statement_of_job : job -> Statement.t option = function
+  let statement_of_job : job -> Transaction_snark.Statement.t option = function
     | Base (Some (_, statement)) -> Some statement
     | Merge_up (Some (_, statement)) -> Some statement
     | Merge (Some (_, stmt1), Some (_, stmt2)) ->
@@ -175,16 +199,17 @@ struct
         let%map fee_excess =
           Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
         in
-        { Statement.source= stmt1.source
+        { Transaction_snark.Statement.source= stmt1.source
         ; target= stmt2.target
         ; fee_excess
         ; proof_type= `Merge }
     | _ -> None
 
-  let verify job proof =
+  let verify ~message job proof =
     match statement_of_job job with
     | None -> return false
-    | Some statement -> Completed_work.verify proof statement
+    | Some statement ->
+      Transaction_snark.verify proof statement ~message
 
   module Result_with_rollback = struct
     module Rollback = struct
@@ -236,6 +261,7 @@ struct
       Deferred.map dresult ~f:(fun result -> {result; rollback= Do_nothing})
   end
 
+  (*
   let job_proof (job: job) (work: Completed_work.t) :
       (job * proof_with_statement) Result_with_rollback.t =
     let open Result_with_rollback.Let_syntax in
@@ -258,8 +284,9 @@ struct
     | _ ->
         Result_with_rollback.error
           (Error.of_thunk (fun () ->
-               sprintf "Invalid job for the corresponding transaction_snark" ))
+               sprintf "Invalid job for the corresponding transaction_snark" )) *)
 
+(*
   let jobs_proofs_assoc jobs completed_works :
       (job * proof_with_statement) list Result_with_rollback.t =
     let open Result_with_rollback.Let_syntax in
@@ -278,16 +305,17 @@ struct
     in
     map_custom jobs completed_works
 
+*)
   let fill_in_completed_work state works :
-      proof_with_statement option Result_with_rollback.t =
-    let open Result_with_rollback.Let_syntax in
+      Transaction_snark.t with_statement option Result_with_rollback.t =
+    (*let open Result_with_rollback.Let_syntax in
     let%bind next_jobs =
       Result_with_rollback.with_no_rollback
         Deferred.Or_error.Let_syntax.(
           Parallel_scan.next_k_jobs ~state ~k:(List.length works)
           |> return)
     in
-    let%bind assoc_list = jobs_proofs_assoc next_jobs works in
+    let%bind assoc_list = jobs_proofs_assoc next_jobs works in *)
     failwith "TODO: To be done in parallel scan?"
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
@@ -319,7 +347,7 @@ struct
               Result_with_rollback.error e
           | Ok () ->
               let target = Ledger.merkle_root ledger in
-              let stmt : Statement.t =
+              let stmt : Transaction_snark.Statement.t =
                 { source
                 ; target
                 ; fee_excess= Super_transaction.fee_excess t
@@ -329,28 +357,34 @@ struct
     in
     go [] [] ts
 
-  let check_completed_works t completed_works =
+  let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
+
+  let check_completed_works t (completed_works : Completed_work.t list) =
     Result_with_rollback.with_no_rollback
       (let open Deferred.Or_error.Let_syntax in
-      let%bind next_jobs =
+       match
         Parallel_scan.next_k_jobs ~state:t.scan_state
-          ~k:(List.length completed_works)
-        |> return
-      in
-      Deferred.List.for_all (List.zip_exn next_jobs completed_works) ~f:
-        (fun (job, work) -> verify job work )
-      |> Deferred.map ~f:(check "proofs did not verify"))
+          ~k:(List.length completed_works * Completed_work.proofs_length)
+        |> Or_error.map ~f:(chunks_of ~n:Completed_work.proofs_length)
+       with
+       | Error e -> Deferred.return (Error e)
+       | Ok jobses ->
+         Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:(fun (jobs, work) ->
+          let message = (work.fee, work.prover) in
+           Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
+               verify ~message job proof))
+        |> Deferred.map ~f:(check "proofs did not verify"))
 
-  let apply t (witness: Ledger_builder_witness.t) :
-      proof_with_statement option Result_with_rollback.t =
-    let payments = witness.transactions in
-    let completed_works = witness.completed_works in
+  let apply_diff t (diff: Ledger_builder_diff.t) = (* :
+  Transaction_snark.t option Result_with_rollback.t*)
+    let payments = diff.transactions in
+    let completed_works = diff.completed_works in
     let open Result_with_rollback.Let_syntax in
     let%bind () =
       check "bad hash"
         (not
            (Ledger_builder_hash.equal
-              (Ledger_builder_witness.prev_hash witness)
+              diff.prev_hash
               (hash t)))
       |> Result_with_rollback.of_or_error
     in
@@ -384,17 +418,31 @@ struct
     let%bind () = check_completed_works t completed_works in
     let%bind res_opt = fill_in_completed_work t.scan_state completed_works in
     let%map () = enqueue_data_with_rollback t.scan_state new_data in
-    res_opt
+    match res_opt with
+    | None               ->   None
+    | Some (snark, stmt) ->   (Some snark)
 
-  let apply t witness = Result_with_rollback.run (apply t witness)
+  let apply t witness = Result_with_rollback.run (apply_diff t witness)
 
   let free_space : scan_state -> int = failwith "TODO"
 
-  let work_to_do : scan_state -> Statement.t Sequence.t = failwith "TODO"
+  let sequence_chunks_of seq ~n =
+    Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
+      if i = n
+      then Yield (List.rev acc, ([], 0, seq))
+      else
+        match Sequence.next seq with
+        | None -> Done
+        | Some (x, seq) ->
+          Skip (x :: acc, i + 1, seq))
+
+  let work_to_do : scan_state -> Transaction_snark.Statement.t Sequence.t = failwith "TODO"
 
   (* First, if there's any free space on the queue, put transactions there *)
-  let create_diff t (ts_by_fee: Transaction.With_valid_signature.t Sequence.t)
-      ~(get_completed_work: Statement.t -> Completed_work.t option) =
+  let create_diff t ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
+        ~(get_completed_work
+          : Completed_work.Statement.t -> Completed_work.t option)
+    =
     let take_until_budget_exceeded_or_work_absent budget0 work_to_do =
       Sequence.fold_until work_to_do ~init:(budget0, [])
         ~f:(fun (budget, ws) stmt ->
@@ -407,8 +455,8 @@ struct
         ~finish:Fn.id
     in
     let rec go budget payments works
-        (ts_by_fee: Transaction.With_valid_signature.t Sequence.t) work_to_do =
-      match (Sequence.next ts_by_fee, Sequence.next work_to_do) with
+        (transactions_by_fee: Transaction.With_valid_signature.t Sequence.t) work_to_do =
+      match (Sequence.next transactions_by_fee, Sequence.next work_to_do) with
       | None, Some _ ->
           (* Now we take work as our budget permits *)
           let budget', additional_works =
@@ -418,7 +466,7 @@ struct
       | Some _, None | None, None ->
           (* No work to do. *)
           (budget, payments, works)
-      | Some (t, ts_by_fee), Some (stmt, work_to_do) ->
+      | Some (t, transactions_by_fee), Some (stmt, work_to_do) ->
         match get_completed_work stmt with
         | None -> (budget, payments, works)
         | Some work ->
@@ -439,11 +487,11 @@ struct
             (* The work was too expensive, so we are done *)
             | None -> (budget, payments, works)
             | Some budget' ->
-                go budget' (t :: payments) (work :: works) ts_by_fee work_to_do
+                go budget' (t :: payments) (work :: works) transactions_by_fee work_to_do
     in
     (* First, we can add as many transactions as there is space on the
        queue (up to the max fee) *)
-    let initial_budget, initial_payments, ts_by_fee =
+    let initial_budget, initial_payments, transactions_by_fee =
       let free_space = free_space t.scan_state in
       let rec go total_fee acc i
           (ts: Transaction.With_valid_signature.t Sequence.t) =
@@ -458,16 +506,18 @@ struct
             | None -> (total_fee, acc, Sequence.empty)
             | Some total_fee' -> go total_fee' (t :: acc) (i + 1) ts'
       in
-      go Fee.Unsigned.zero [] 0 ts_by_fee
+      go Fee.Unsigned.zero [] 0 transactions_by_fee
     in
     let _left_over_fees, payments, works =
-      go initial_budget initial_payments [] ts_by_fee (work_to_do t.scan_state)
+      go initial_budget initial_payments [] transactions_by_fee
+        (sequence_chunks_of (work_to_do t.scan_state) Completed_work.proofs_length)
     in
-    { Ledger_builder_witness.transactions= payments
+    { Ledger_builder_diff.transactions= payments
     ; completed_works= works
     ; creator= t.public_key
-    ; prev_hash= hash t }
-
+    ; prev_hash= hash t 
+    }
+  
 end
 
 let%test_module "ledger_builder" = 

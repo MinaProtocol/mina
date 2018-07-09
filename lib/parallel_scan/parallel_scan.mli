@@ -71,12 +71,12 @@ val next :
   state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t option
 
 val next_k_jobs :
-  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list
+  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t
 
 val enqueue_data :
   state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t
 
-val no_allowed_to_enqueue : state:('a, 'b, 'd) State.t -> int
+val allowed_to_enqueue_count : state:('a, 'b, 'd) State.t -> int
 
 val fill_in_completed_job :
      state:('a, 'b, 'd) State.t

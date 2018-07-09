@@ -235,8 +235,9 @@ module State1 = struct
     let last_acc = t.acc in
     let%bind () = List.fold ~init: (Ok ()) cs 
       ~f:(fun acc cj ->
-        let _ = acc in
-        step_twice cj)
+        let%bind () = step_twice cj in
+        t.allowed_data_count <- t.allowed_data_count + 1;
+        return ())
     in
     if not (fst last_acc = fst t.acc) then Ok (Some (snd t.acc)) else (Ok None)
 
@@ -294,26 +295,24 @@ let step : type a b d.
 let next_k_jobs :
        state:('a, 'b, 'd) State1.t
     -> k:int
-    -> ('a, 'd) State1.Job.t list =
- fun ~state ~k -> Ring_buffer.read_k state.jobs k
+    -> ('a, 'd) State1.Job.t list Or_error.t=
+ fun ~state ~k -> Ok (Ring_buffer.read_k state.jobs k)
 
-let no_allowed_to_enqueue : 
+let allowed_to_enqueue_count : 
     state:('a, 'b, 'd) State1.t -> int = fun ~state -> state.allowed_data_count
 
 let enqueue_data :
     state:('a, 'b, 'd) State1.t -> data:'d list -> unit Or_error.t =
  fun ~state ~data -> 
-  if no_allowed_to_enqueue state < List.length data then
+  if allowed_to_enqueue_count state < List.length data then
     Or_error.error_string 
-      (sprintf "data list larger than allowed. Current number of items allowed: %d"
-        (no_allowed_to_enqueue state) )
+      (sprintf "data list larger than allowed. Current number of items allowed to be enqueued = %d"
+        (allowed_to_enqueue_count state) )
   else
     Ok (List.fold 
           ~init:() 
             data 
               ~f:(fun () d -> Queue.enqueue state.data_buffer d))                     
-
-
 
 let fill_in_completed_job : 
         state:('a, 'b, 'd) State1.t 

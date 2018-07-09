@@ -37,7 +37,7 @@ type ('a, 'b, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
   ; data_buffer: 'd Queue.t
   ; mutable acc: int * 'b 
-  ; allowed_data_count: int}
+  ; mutable allowed_data_count: int}
 [@@deriving sexp, bin_io]
 
 let acc {acc} = snd acc
