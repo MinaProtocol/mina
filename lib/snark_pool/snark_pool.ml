@@ -60,7 +60,6 @@ end) :
     include S
 
     val sexp_of_t : t -> Sexp.t
-
     val unsolved_work_count : t -> int
 
     val remove_solved_work : t -> work -> unit
