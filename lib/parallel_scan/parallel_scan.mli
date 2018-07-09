@@ -67,9 +67,6 @@ val next :
 
 val next_k_jobs :
      state:('a, 'b, 'd) State.t
-  -> spec:(module
-           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                          t = 'b)
   -> k:int
   -> ('a, 'd) State.Job.t list Or_error.t
 

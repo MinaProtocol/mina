@@ -305,13 +305,9 @@ let next :
 
 let next_k_jobs :
        state:('a, 'b, 'd) State1.t
-    -> spec:(module
-             Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                            t = 
-             'b)
     -> k:int
     -> ('a, 'd) State1.Job.t list Or_error.t =
- fun ~state ~spec ~k -> failwith "TODO"
+ fun ~state ~k -> failwith "TODO"
 
 (* Ring_buffer.read_k (State1.jobs state) k *)
 

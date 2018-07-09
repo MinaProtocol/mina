@@ -135,19 +135,42 @@ module type Super_transaction_intf = sig
   val fee_excess : t -> signed_fee
 end
 
-module type Completed_work_intf = sig
+module type Transaction_snark_intf = sig
+  type ledger_hash
   type fee
+  type message
 
-  type proof
-
-  type public_key
-
-  type statement
-
-  type t = {fee: fee; proof: proof; prover: public_key}
+  type t
   [@@deriving sexp, bin_io]
 
-  val verify : t -> statement -> bool Deferred.t
+  module Statement : sig
+    type t = 
+      { source : ledger_hash
+      ; target : ledger_hash
+      ; fee_excess : fee
+      ; proof_type : [`Merge | `Base]
+      }
+    [@@deriving sexp, bin_io]
+  end
+
+  val verify
+    : t -> Statement.t -> message:message -> bool Deferred.t
+end
+
+module type Completed_work_intf = sig
+  type proof
+  type statement
+  type fee
+  type public_key
+
+  module Statement : sig
+    type t = statement list
+  end
+
+  type t = {fee: fee; proofs: proof list; prover: public_key}
+  [@@deriving sexp, bin_io]
+
+  val proofs_length : int
 end
 
 module type Ledger_builder_diff_intf = sig
