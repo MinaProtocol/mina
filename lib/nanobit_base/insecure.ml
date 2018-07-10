@@ -23,3 +23,5 @@ let initial_difficulty = true
 
 (* Enabling this will SPEED UP builds as keys are generated at compile-time *)
 let key_generation = true
+
+let randomness = true

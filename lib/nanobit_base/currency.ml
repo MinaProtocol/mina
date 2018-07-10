@@ -52,11 +52,19 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
+  type t = (magnitude, Sgn.t) t_ [@@deriving sexp]
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
+
+      type nonrec t = t [@@deriving bin_io, sexp]
+    end
+  end
+
   val length : int
 
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
-
-  type nonrec t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp]
 
   type nonrec var = (magnitude_var, Sgn.var) t_
 
@@ -73,6 +81,8 @@ module type Signed_intf = sig
   val ( + ) : t -> t -> t option
 
   val negate : t -> t
+
+  val of_unsigned : magnitude -> t
 
   module Checked : sig
     val to_bits : var -> Boolean.var list
@@ -197,12 +207,18 @@ end = struct
   type magnitude = t [@@deriving sexp, bin_io]
 
   module Signed = struct
-    type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
-    [@@deriving bin_io, sexp]
+    module Stable = struct
+      module V1 = struct
+        type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
+        [@@deriving bin_io, sexp]
 
-    let create ~magnitude ~sgn = {magnitude; sgn}
+        let create ~magnitude ~sgn = {magnitude; sgn}
 
-    type t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp]
+        type t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp]
+      end
+    end
+
+    include Stable.V1
 
     let zero = create ~magnitude:zero ~sgn:Sgn.Pos
 
@@ -247,6 +263,8 @@ end = struct
             else zero )
 
     let negate t = {t with sgn= Sgn.negate t.sgn}
+
+    let of_unsigned magnitude = {magnitude; sgn= Sgn.Pos}
 
     let ( + ) = add
 

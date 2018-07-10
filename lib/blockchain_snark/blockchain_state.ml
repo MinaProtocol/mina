@@ -55,6 +55,7 @@ let negative_one =
   in
   { next_difficulty
   ; previous_state_hash= State_hash.of_hash Pedersen.zero_hash
+  ; ledger_builder_hash= Ledger_builder_hash.of_hash Pedersen.zero_hash
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
   ; strength= Strength.zero
   ; timestamp }
@@ -69,6 +70,7 @@ let update_unchecked : value -> Block.t -> value =
   in
   { next_difficulty
   ; previous_state_hash= hash state
+  ; ledger_builder_hash= block.body.ledger_builder_hash
   ; ledger_hash= block.body.target_hash
   ; strength= Strength.increase state.strength ~by:state.next_difficulty
   ; timestamp= block.header.time }
@@ -77,6 +79,11 @@ let zero =
   let open Or_error.Let_syntax in
   let block = Block.genesis in
   let zero = update_unchecked negative_one block in
+  let rec _find_ok_nonce i =
+    if Or_error.is_ok (Proof_of_work.create zero i) then
+      printf "nonce = %s\n%!" (Block.Nonce.to_string i)
+    else _find_ok_nonce (Block.Nonce.succ i)
+  in
   ignore (Or_error.ok_exn (Proof_of_work.create zero block.header.nonce)) ;
   zero
 
@@ -242,6 +249,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            { next_difficulty= new_difficulty
            ; previous_state_hash
            ; ledger_hash= block.body.target_hash
+           ; ledger_builder_hash= block.body.ledger_builder_hash
            ; strength= new_strength
            ; timestamp= time }
          in
