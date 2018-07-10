@@ -103,20 +103,20 @@ struct
           let xs, ds =
             List.map xs ~f:(fun x -> go x (depth + 1)) |> List.unzip
           in
-          ( Rose.Rose (x, xs)
-          , List.fold ds ~init:0 ~f:(fun a b ->
-                if Int.compare a b >= 0 then a else b ) )
+          (Rose.Rose (x, xs), List.fold ds ~init:0 ~f:max)
       in
-      let x, tree_and_depths =
-        let (Rose.Rose (x, xs)) = t.tree in
-        let children = List.map xs ~f:(fun x -> go x 1) in
-        if parent x then (x, (Rose.single e, 1) :: children)
+      let root, tree_and_depths =
+        let (Rose.Rose (root, root_children)) = t.tree in
+        let children_and_depths =
+          List.map root_children ~f:(fun x -> go x 1)
+        in
+        if parent root then (root, (Rose.single e, 1) :: children_and_depths)
         else (
-          assert (List.length xs <> 0) ;
-          (x, children) )
+          assert (List.length root_children <> 0) ;
+          (root, children_and_depths) )
       in
       let default =
-        { tree= Rose.Rose (x, tree_and_depths |> List.map ~f:fst)
+        { tree= Rose.Rose (root, tree_and_depths |> List.map ~f:fst)
         ; elems= Elem_set.add t.elems e }
       in
       match tree_and_depths with
