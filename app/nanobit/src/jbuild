@@ -14,8 +14,10 @@
       gossip_net
       kademlia
       minibit
+      coda
       protocols
       nanobit_base
+      ledger_builder
       proof_of_work
       sparse_ledger
       blockchain_snark

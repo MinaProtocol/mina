@@ -88,10 +88,6 @@ end
 module type Snark_pool_intf = sig
   type t
 
-  type snark_pool_proof
-
-  val add : t -> snark_pool_proof -> t
-
   val load : disk_location:string -> t Deferred.t
 end
 
@@ -100,7 +96,7 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger_builder_hash
 
-  type ledger_builder_transition
+  type ledger_builder_diff
 
   type ledger
 
@@ -119,10 +115,8 @@ module type Ledger_builder_controller_intf = sig
       { keep_count: int [@default 50]
       ; parent_log: Logger.t
       ; net_deferred: net Deferred.t
-      ; ledger_builder_transitions:
-          ( transaction_with_valid_signature list
-          * state
-          * ledger_builder_transition )
+      ; ledger_builder_diffs:
+          (transaction_with_valid_signature list * state * ledger_builder_diff)
           Linear_pipe.Reader.t
       ; genesis_ledger: ledger
       ; disk_location: string
@@ -212,18 +206,18 @@ module type State_with_witness_intf = sig
 
   type ledger_hash
 
-  type ledger_builder_transition
+  type ledger_builder_diff
 
   type t =
     { transactions: transaction_with_valid_signature list
-    ; ledger_builder_transition: ledger_builder_transition
+    ; ledger_builder_diff: ledger_builder_diff
     ; state: state }
   [@@deriving sexp]
 
   module Stripped : sig
     type t =
       { transactions: transaction list
-      ; ledger_builder_transition: ledger_builder_transition
+      ; ledger_builder_diff: ledger_builder_diff
       ; state: state }
     [@@deriving bin_io]
   end
@@ -236,7 +230,7 @@ module type State_with_witness_intf = sig
           with type t_with_witness := t
            and type witness =
                       transaction_with_valid_signature list
-                      * ledger_builder_transition
+                      * ledger_builder_diff
            and type t := state
 end
 
@@ -255,7 +249,7 @@ module type Inputs_intf = sig
      and type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
      and type ledger_hash := Ledger_hash.t
-     and type ledger_builder_transition := Ledger_builder_transition.t
+     and type ledger_builder_diff := Ledger_builder_diff.t
 
   module Transition_with_witness :
     Transition_with_witness_intf
@@ -271,8 +265,7 @@ module type Inputs_intf = sig
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type state := State.t
 
-  module Snark_pool :
-    Snark_pool_intf with type snark_pool_proof := Snark_pool_proof.t
+  module Snark_pool : Snark_pool_intf
 
   module Ledger_builder_controller :
     Ledger_builder_controller_intf
@@ -280,7 +273,7 @@ module type Inputs_intf = sig
      and type ledger := Ledger.t
      and type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_builder_transition := Ledger_builder_transition.t
+     and type ledger_builder_diff := Ledger_builder_diff.t
      and type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
      and type snark_pool := Snark_pool.t
@@ -307,6 +300,8 @@ module type Inputs_intf = sig
     val ledger : Ledger.t
 
     val proof : State.Proof.t
+
+    val ledger_builder : unit -> Ledger_builder.t
   end
 end
 
@@ -327,10 +322,10 @@ struct
     ; state_io: Net.State_io.t
     ; miner_changes_writer: Miner.change Linear_pipe.Writer.t
     ; miner_broadcast_writer: State_with_witness.t Linear_pipe.Writer.t
-    ; ledger_builder_transitions:
+    ; ledger_builder_diffs:
         ( Transaction.With_valid_signature.t list
         * State.t
-        * Ledger_builder_transition.t )
+        * Ledger_builder_diff.t )
         Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; mutable transaction_pool: Transaction_pool.t
@@ -363,7 +358,7 @@ struct
     let miner_broadcast_reader, miner_broadcast_writer =
       Linear_pipe.create ()
     in
-    let ledger_builder_transitions_reader, ledger_builder_transitions_writer =
+    let ledger_builder_diffs_reader, ledger_builder_diffs_writer =
       Linear_pipe.create ()
     in
     let net_ivar = Ivar.create () in
@@ -375,7 +370,7 @@ struct
         (Ledger_builder_controller.Config.make ~snark_pool
            ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
            ~genesis_ledger:Genesis.ledger
-           ~ledger_builder_transitions:ledger_builder_transitions_reader
+           ~ledger_builder_diffs:ledger_builder_diffs_reader
            ~disk_location:config.ledger_builder_persistant_location ())
     in
     let miner =
@@ -406,7 +401,7 @@ struct
     ; state_io
     ; miner_broadcast_writer
     ; miner_changes_writer
-    ; ledger_builder_transitions= ledger_builder_transitions_writer
+    ; ledger_builder_diffs= ledger_builder_diffs_writer
     ; transaction_pool
     ; snark_pool
     ; ledger_builder
@@ -418,7 +413,9 @@ struct
   let run t =
     Logger.info t.log "Starting to run Coda" ;
     let p : Protocol.t =
-      Protocol.create ~initial:{data= Genesis.state; proof= Genesis.proof}
+      Protocol.create
+        ~state:{data= Genesis.state; proof= Genesis.proof}
+        ~ledger_builder:(Genesis.ledger_builder ())
     in
     let miner_transitions_protocol = Miner.transitions t.miner in
     let protocol_events =
@@ -444,7 +441,7 @@ struct
                 in
                 ( p'
                 , transition.transactions
-                , Some transition.transition.ledger_builder_transition )
+                , Some transition.transition.ledger_builder_diff )
             | `Remote pcd ->
                 Logger.info t.log
                   !"Stepping with remote pcd %{sexp: \
@@ -454,9 +451,9 @@ struct
                   Protocol.step p
                     (Protocol.Event.New_state
                        ( State_with_witness.forget_witness pcd
-                       , pcd.State_with_witness.ledger_builder_transition ))
+                       , pcd.State_with_witness.ledger_builder_diff ))
                 in
-                (p', pcd.transactions, Some pcd.ledger_builder_transition) )
+                (p', pcd.transactions, Some pcd.ledger_builder_diff) )
         |> Linear_pipe.map ~f:
              (fun (p, transactions, ledger_builder_transition) ->
                State_with_witness.add_witness_exn p.state
@@ -467,7 +464,7 @@ struct
       (Linear_pipe.transfer_id updated_state_network t.miner_broadcast_writer) ;
     don't_wait_for
       (Linear_pipe.iter updated_state_ledger ~f:
-         (fun {state; transactions; ledger_builder_transition} ->
+         (fun {state; transactions; ledger_builder_diff} ->
            Logger.info t.log
              !"Ledger has new %{sexp: Proof_carrying_state.t} and %{sexp: \
                Inputs.Transaction.With_valid_signature.t list}"
@@ -476,8 +473,8 @@ struct
          *       backed up. We should fix this see issues #178 and #177 *)
            Linear_pipe.write_or_exn
              ~capacity:t.ledger_builder_transition_backup_capacity
-             t.ledger_builder_transitions updated_state_ledger
-             (transactions, state.data, ledger_builder_transition) ;
+             t.ledger_builder_diffs updated_state_ledger
+             (transactions, state.data, ledger_builder_diff) ;
            return () )) ;
     don't_wait_for
       (Linear_pipe.transfer
