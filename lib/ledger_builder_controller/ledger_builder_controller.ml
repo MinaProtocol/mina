@@ -87,6 +87,35 @@ module type Inputs_intf = sig
   module Store : Storage.With_checksum_intf
 end
 
+module Interruptible = struct
+  module T = struct
+    type 'a t = {stopped: bool ref; d: 'a Deferred.t option}
+
+    let bind t ~f =
+      if !(t.stopped) then {t with d= None}
+      else
+        let d' =
+          Deferred.bind (Option.value_exn t.d) ~f:(fun a ->
+              let t' = f a in
+              t.stopped := !(t'.stopped) ;
+              Option.value_exn t'.d )
+        in
+        {t with d= Some d'}
+
+    let interrupt t = t.stopped := true
+
+    let return a = {stopped= ref false; d= Some (Deferred.return a)}
+
+    let lift d = {stopped= ref false; d= Some d}
+
+    let map = `Define_using_bind
+  end
+
+  module M = Monad.Make (T)
+  include T
+  include M
+end
+
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
@@ -192,9 +221,17 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let%map net = config.net_deferred in
     let ledger_builder_io = Net.create net in
+    let force_apply_transition lb tip =
+      match%map Ledger_builder.apply lb tip with
+      | Ok _ -> ()
+      | Error e ->
+          failwithf
+            "Invariant failed, we should have validated the data before here %s"
+            (Error.to_string_hum e) ()
+    in
     (* Here we effectfully listen to transitions and emit what we belive are
        the strongest ledger_builders *)
-    let strongest_ledgers =
+    let possibly_works =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.ledger_builder_transitions ~f:
         (fun (transactions, s, transition) ->
@@ -225,18 +262,20 @@ module Make (Inputs : Inputs_intf) = struct
                   then (
                     (* TODO: We'll need the full history in order to trust that
                       the ledger builder we get is actually valid. See #285 *)
+                    (* TODO: This should be interruptible as well, when Corey's
+                      PR is ready to integrate, we should do that *)
                     match%map
                       Net.get_ledger_builder_at_hash ledger_builder_io
                         (Inputs.State.ledger_builder_hash s)
                     with
                     | Ok (lb, _) ->
-                        state.ktree
-                        <- Some
-                             (Witness_tree.single
-                                {transactions; transition; state= s}) ;
+                        let new_tree =
+                          Witness_tree.single
+                            {transactions; transition; state= s}
+                        in
+                        state.ktree <- Some new_tree ;
                         state.locked_ledger_builder <- lb ;
-                        state.longest_branch_tip <- Ledger_builder.copy lb ;
-                        Some (lb, s)
+                        Some (Witness_tree.longest_path new_tree)
                     | Error e ->
                         Logger.warn log
                           "Couldn't get ledger_builder_at_hash %s"
@@ -246,17 +285,8 @@ module Make (Inputs : Inputs_intf) = struct
               | `Repeat -> return None
               | `Added new_tree ->
                   state.ktree <- Some new_tree ;
-                  let force_apply_transition lb tip =
-                    match%map Ledger_builder.apply lb tip with
-                    | Ok _ -> ()
-                    | Error e ->
-                        failwithf
-                          "Invariant failed, we should have validated the \
-                           data before here %s"
-                          (Error.to_string_hum e) ()
-                  in
                   (* Adjust the locked_ledger if necessary *)
-                  let%bind () =
+                  let%map () =
                     let new_head = locked_head new_tree in
                     if Witness.equal (locked_head old_tree) new_head then
                       return ()
@@ -269,20 +299,68 @@ module Make (Inputs : Inputs_intf) = struct
                       ()
                   in
                   (* Adjust the longest_branch_tip if necessary *)
-                  let new_tip =
-                    Witness_tree.longest_path new_tree |> List.last_exn
-                  in
-                  if Witness.equal (best_tip old_tree) new_tip then return None
-                  else
-                    let lb = state.longest_branch_tip in
-                    let%map () =
-                      force_apply_transition lb (Witness.transition new_tip)
-                    in
-                    Some (lb, Witness.state new_tip) )
+                  let new_best_path = Witness_tree.longest_path new_tree in
+                  let new_tip = List.last_exn new_best_path in
+                  if Witness.equal (best_tip old_tree) new_tip then None
+                  else Some new_best_path )
     in
+    let iter_and_interrupt p ~f =
+      let w : 'a Interruptible.t option ref = ref None in
+      Linear_pipe.iter p ~f:(fun a ->
+          Option.iter !w ~f:(fun w -> Interruptible.interrupt w) ;
+          let w', d = f a in
+          w := w' ;
+          d )
+    in
+    let strongest_ledgers_reader, strongest_ledgers_writer =
+      Linear_pipe.create ()
+    in
+    don't_wait_for
+      (iter_and_interrupt possibly_works ~f:(fun new_best_path ->
+           let new_tip = new_best_path |> List.last_exn in
+           let curr_tip_hash = Ledger_builder.hash state.longest_branch_tip in
+           let is_lb_hash_curr_tip w =
+             Ledger_builder_hash.equal curr_tip_hash
+               (Witness.ledger_builder_hash w)
+           in
+           if is_lb_hash_curr_tip new_tip then
+             ( None
+             , Linear_pipe.write strongest_ledgers_writer
+                 (state.longest_branch_tip, Witness.state new_tip) )
+           else
+             let apply lb transition =
+               Interruptible.lift (force_apply_transition lb transition)
+             in
+             let w =
+               let best_lb, path =
+                 match
+                   List.findi new_best_path ~f:(fun i tip ->
+                       is_lb_hash_curr_tip tip )
+                 with
+                 | None ->
+                     ( Ledger_builder.copy state.locked_ledger_builder
+                     , new_best_path )
+                 | Some (i, _) ->
+                     ( Ledger_builder.copy state.longest_branch_tip
+                     , List.drop new_best_path i )
+               in
+               let open Interruptible.Let_syntax in
+               let lb = best_lb in
+               let%map () =
+                 List.fold path ~init:(Interruptible.return ()) ~f:
+                   (fun acc w ->
+                     let%bind () = acc in
+                     apply lb w.Witness.transition )
+               in
+               state.longest_branch_tip <- lb ;
+               Linear_pipe.write_or_exn ~capacity:3 strongest_ledgers_writer
+                 strongest_ledgers_reader
+                 (lb, Witness.state new_tip)
+             in
+             (Some w, Deferred.return ()) )) ;
     { ledger_builder_io
     ; log= Logger.child config.parent_log "ledger_builder_controller"
-    ; strongest_ledgers
+    ; strongest_ledgers= strongest_ledgers_reader
     ; state }
 
   let strongest_ledgers {strongest_ledgers} = strongest_ledgers
