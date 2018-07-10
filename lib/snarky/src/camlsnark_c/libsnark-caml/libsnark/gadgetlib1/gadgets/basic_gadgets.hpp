@@ -218,6 +218,26 @@ public:
 template<typename FieldT>
 void test_conjunction_gadget(const size_t n);
 
+  template<typename FieldT>
+class field_vector_equals_gadget : public gadget<FieldT> {
+public:
+    const pb_linear_combination_array<FieldT> X;
+    const pb_linear_combination_array<FieldT> Y;
+    const pb_variable<FieldT> result;
+
+    pb_variable_array<FieldT> results; // boolean
+    pb_variable_array<FieldT> invs;
+
+    std::shared_ptr<conjunction_gadget<FieldT>> all_equal;
+
+    field_vector_equals_gadget(protoboard<FieldT> &pb,
+                               const pb_linear_combination_array<FieldT> &X,
+                               const pb_linear_combination_array<FieldT> &Y,
+                               const pb_variable<FieldT> &result,
+                               const std::string &annotation_prefix="");
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+  };
 template<typename FieldT>
 class comparison_gadget : public gadget<FieldT> {
 private:

@@ -116,14 +116,14 @@ module type Ledger_builder_controller_intf = sig
 
   module Config : sig
     type t =
-      { keep_count: int [@default 50]
-      ; parent_log: Logger.t
+      { parent_log: Logger.t
       ; net_deferred: net Deferred.t
       ; ledger_builder_transitions:
           ( transaction_with_valid_signature list
           * state
           * ledger_builder_transition )
           Linear_pipe.Reader.t
+      ; genesis_ledger: ledger
       ; disk_location: string
       ; snark_pool: snark_pool }
     [@@deriving make]
@@ -303,6 +303,8 @@ module type Inputs_intf = sig
   module Genesis : sig
     val state : State.t
 
+    val ledger : Ledger.t
+
     val proof : State.Proof.t
   end
 end
@@ -369,10 +371,11 @@ struct
     in
     let%map ledger_builder =
       Ledger_builder_controller.create
-        (Ledger_builder_controller.Config.make ~snark_pool
-           ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
+        (Ledger_builder_controller.Config.make ~parent_log:config.log
+           ~net_deferred:(Ivar.read net_ivar)
            ~ledger_builder_transitions:ledger_builder_transitions_reader
-           ~disk_location:config.ledger_builder_persistant_location ())
+           ~genesis_ledger:Genesis.ledger
+           ~disk_location:config.ledger_builder_persistant_location ~snark_pool)
     in
     let miner =
       Miner.create ~parent_log:config.log ~change_feeder:miner_changes_reader

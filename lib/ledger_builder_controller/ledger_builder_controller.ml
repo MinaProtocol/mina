@@ -1,7 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Core_kernel
-open Async_kernel
 
 module type Inputs_intf = sig
   module Ledger_builder_hash : sig
@@ -116,7 +114,21 @@ module Interruptible = struct
   include M
 end
 
-module Make (Inputs : Inputs_intf) = struct
+module Make (Inputs : Inputs_intf) : sig
+  include Coda.Ledger_builder_controller_intf
+          with type ledger_builder := Inputs.Ledger_builder.t
+           and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
+           and type ledger_builder_transition :=
+                      Inputs.Ledger_builder_transition.t
+           and type ledger := Inputs.Ledger.t
+           and type transaction_with_valid_signature :=
+                      Inputs.Valid_transaction.t
+           and type net := Inputs.Net.net
+           and type state := Inputs.State.t
+           and type snark_pool := Inputs.Snark_pool.t
+
+  val ledger_builder_io : t -> Inputs.Net.t
+end = struct
   open Inputs
 
   module Config = struct
@@ -185,6 +197,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; state: State.t
     ; strongest_ledgers:
         (Ledger_builder.t * Inputs.State.t) Linear_pipe.Reader.t }
+
+  let ledger_builder_io {ledger_builder_io} = ledger_builder_io
 
   let best_tip tree = Witness_tree.longest_path tree |> List.last_exn
 
@@ -559,7 +573,9 @@ let%test_module "test" =
       let config = config transitions in
       let lbc_deferred =
         let%map lbc = Lbc.create config in
-        Inputs.State_hash.Table.add_exn lbc.Lbc.ledger_builder_io ~key:3
+        Inputs.State_hash.Table.add_exn
+          (Lbc.ledger_builder_io lbc)
+          ~key:3
           ~data:
             { Inputs.State.ledger_builder_hash= 3
             ; hash= 3

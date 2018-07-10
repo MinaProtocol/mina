@@ -33,14 +33,25 @@ public:
     Fp3_variable<Fp3T> c0;
     Fp3_variable<Fp3T> c1;
 
+  pb_linear_combination_array<FieldT> all_vars;
+
+
     Fp6_variable(protoboard<FieldT> &pb, const std::string &annotation_prefix);
     Fp6_variable(protoboard<FieldT> &pb, const Fp6T &el, const std::string &annotation_prefix);
     Fp6_variable(protoboard<FieldT> &pb, const Fp3_variable<Fp3T> &c0, const Fp3_variable<Fp3T> &c1, const std::string &annotation_prefix);
-    void generate_r1cs_equals_const_constraints(const Fp6T &el);
+
+  void generate_r1cs_equals_constraints(const Fp6_variable<Fp6T> &other);
+  void generate_r1cs_equals_unitary_inverse_constraints(const Fp6_variable<Fp6T> &other);
+  void generate_r1cs_equals_const_constraints(const Fp6T &el);
     void generate_r1cs_witness(const Fp6T &el);
     Fp6T get_element();
     Fp6_variable<Fp6T> Frobenius_map(const size_t power) const;
     void evaluate() const;
+
+  static size_t __attribute__((noinline)) size_in_bits();
+  static size_t num_variables();
+
+
 };
 
 /**

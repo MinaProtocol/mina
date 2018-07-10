@@ -45,8 +45,55 @@ module type Arithmetic_intf = sig
   val ( - ) : t -> t -> t option
 end
 
+module type Signed_intf = sig
+  type magnitude
+
+  type magnitude_var
+
+  type ('magnitude, 'sgn) t_
+
+  val length : int
+
+  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
+
+  type nonrec t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp]
+
+  type nonrec var = (magnitude_var, Sgn.var) t_
+
+  val typ : (var, t) Typ.t
+
+  val zero : t
+
+  val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
+
+  val to_bits : t -> bool list
+
+  val add : t -> t -> t option
+
+  val ( + ) : t -> t -> t option
+
+  val negate : t -> t
+
+  module Checked : sig
+    val to_bits : var -> Boolean.var list
+
+    val add : var -> var -> (var, _) Checked.t
+
+    val ( + ) : var -> var -> (var, _) Checked.t
+
+    val to_field_var : var -> (Field.var, _) Checked.t
+
+    val cswap :
+         Boolean.var
+      -> (magnitude_var, Sgn.t) t_ * (magnitude_var, Sgn.t) t_
+      -> (var * var, _) Checked.t
+  end
+end
+
 module type Checked_arithmetic_intf = sig
   type var
+
+  type signed_var
 
   val add : var -> var -> (var, _) Checked.t
 
@@ -55,6 +102,8 @@ module type Checked_arithmetic_intf = sig
   val ( + ) : var -> var -> (var, _) Checked.t
 
   val ( - ) : var -> var -> (var, _) Checked.t
+
+  val add_signed : var -> signed_var -> (var, _) Checked.t
 end
 
 module type S = sig
@@ -62,7 +111,13 @@ module type S = sig
 
   include Arithmetic_intf with type t := t
 
-  module Checked : Checked_arithmetic_intf with type var := var
+  module Signed :
+    Signed_intf with type magnitude := t and type magnitude_var := var
+
+  module Checked :
+    Checked_arithmetic_intf
+    with type var := var
+     and type signed_var := Signed.var
 end
 
 module Make
@@ -139,6 +194,115 @@ end = struct
   let var_of_t t =
     List.init M.length (fun i -> Boolean.var_of_value (Vector.get t i))
 
+  type magnitude = t [@@deriving sexp, bin_io]
+
+  module Signed = struct
+    type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
+    [@@deriving bin_io, sexp]
+
+    let create ~magnitude ~sgn = {magnitude; sgn}
+
+    type t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp]
+
+    let zero = create ~magnitude:zero ~sgn:Sgn.Pos
+
+    type nonrec var = (var, Sgn.var) t_
+
+    let length = Int.( + ) length 1
+
+    let of_hlist : (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
+      H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
+
+    let to_hlist {magnitude; sgn} = H_list.[magnitude; sgn]
+
+    let typ =
+      Typ.of_hlistable
+        Data_spec.[typ; Sgn.typ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
+
+    let fold ({sgn; magnitude}: t) ~init ~f =
+      let init = f init (sgn_to_bool sgn) in
+      fold magnitude ~init ~f
+
+    let to_bits ({sgn; magnitude}: t) = sgn_to_bool sgn :: to_bits magnitude
+
+    let add (x: t) (y: t) : t option =
+      match (x.sgn, y.sgn) with
+      | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
+          let open Option.Let_syntax in
+          let%map magnitude = add x.magnitude y.magnitude in
+          {sgn; magnitude}
+      | Pos, Neg | Neg, Pos ->
+          let c = compare x.magnitude y.magnitude in
+          Some
+            ( if c < 0 then
+                { sgn= y.sgn
+                ; magnitude= Unsigned.Infix.(y.magnitude - x.magnitude) }
+            else if c > 0 then
+              { sgn= x.sgn
+              ; magnitude= Unsigned.Infix.(x.magnitude - y.magnitude) }
+            else zero )
+
+    let negate t = {t with sgn= Sgn.negate t.sgn}
+
+    let ( + ) = add
+
+    module Checked = struct
+      let to_bits {magnitude; sgn} =
+        Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
+
+      let to_field_var ({magnitude; sgn}: var) =
+        Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
+
+      let add (x: var) (y: var) =
+        let%bind xv = to_field_var x and yv = to_field_var y in
+        let%bind sgn =
+          provide_witness Sgn.typ
+            (let open As_prover in
+            let open Let_syntax in
+            let%map x = read typ x and y = read typ y in
+            (Option.value_exn (add x y)).sgn)
+        in
+        let%bind res =
+          Tick.Field.Checked.mul
+            (sgn :> Field.Checked.t)
+            (Field.Checked.add xv yv)
+        in
+        let%map magnitude = unpack_var res in
+        {magnitude; sgn}
+
+      let ( + ) = add
+
+      let cswap_field (b: Boolean.var) (x, y) =
+        (* (x + b(y - x), y + b(x - y)) *)
+        let open Field.Checked.Infix in
+        let%map b_y_minus_x =
+          Tick.Field.Checked.mul (b :> Field.Checked.t) (y - x)
+        in
+        (x + b_y_minus_x, y - b_y_minus_x)
+
+      let cswap b (x, y) =
+        let l_sgn, r_sgn =
+          match (x.sgn, y.sgn) with
+          | Sgn.Pos, Sgn.Pos -> Sgn.Checked.(pos, pos)
+          | Neg, Neg -> Sgn.Checked.(neg, neg)
+          | Pos, Neg -> (Sgn.Checked.neg_if_true b, Sgn.Checked.pos_if_true b)
+          | Neg, Pos -> (Sgn.Checked.pos_if_true b, Sgn.Checked.neg_if_true b)
+        in
+        let%map l_mag, r_mag =
+          let%bind l, r =
+            cswap_field b (pack_var x.magnitude, pack_var y.magnitude)
+          in
+          let%map l = unpack_var l and r = unpack_var r in
+          (l, r)
+        in
+        ({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
+    end
+  end
+
   module Checked = struct
     (* Unpacking protects against underflow *)
     let sub (x: Unpacked.var) (y: Unpacked.var) =
@@ -151,6 +315,10 @@ end = struct
     let ( - ) = sub
 
     let ( + ) = add
+
+    let add_signed (t: var) (d: Signed.var) =
+      let%bind d = Signed.Checked.to_field_var d in
+      Field.Checked.add (pack_var t) d |> unpack_var
 
     let%test_module "currency_test" =
       ( module struct
@@ -219,17 +387,19 @@ end = struct
   end
 end
 
+let currency_length = 64
+
 module Fee =
-  Make (Unsigned_extended.UInt32)
+  Make (Unsigned_extended.UInt64)
     (struct
-      let length = 32
+      let length = currency_length
     end)
 
 module Amount = struct
   module T =
     Make (Unsigned_extended.UInt64)
       (struct
-        let length = 64
+        let length = currency_length
       end)
 
   type amount = T.Stable.V1.t [@@deriving bin_io, sexp]
@@ -239,119 +409,13 @@ module Amount = struct
   include (
     T :
       module type of T
-      with type var = amount_var
+      with type var = T.var
+       and module Signed = T.Signed
        and module Checked := T.Checked )
 
-  let of_fee (fee: Fee.t) : t =
-    Unsigned.UInt64.of_int64 (Unsigned.UInt32.to_int64 fee)
+  let of_fee (fee: Fee.t) : t = fee
 
   let add_fee (t: t) (fee: Fee.t) = add t (of_fee fee)
-
-  module Signed = struct
-    type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
-    [@@deriving bin_io, sexp]
-
-    let create ~magnitude ~sgn = {magnitude; sgn}
-
-    type t = (amount, Sgn.t) t_ [@@deriving bin_io, sexp]
-
-    let zero = create ~magnitude:zero ~sgn:Sgn.Pos
-
-    type nonrec var = (var, Sgn.var) t_
-
-    let length = Int.( + ) T.length 1
-
-    let of_hlist : (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
-      H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
-
-    let to_hlist {magnitude; sgn} = H_list.[magnitude; sgn]
-
-    let typ =
-      Typ.of_hlistable
-        Data_spec.[typ; Sgn.typ]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
-
-    let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
-
-    let fold ({sgn; magnitude}: t) ~init ~f =
-      let init = f init (sgn_to_bool sgn) in
-      fold magnitude ~init ~f
-
-    let to_bits ({sgn; magnitude}: t) = sgn_to_bool sgn :: T.to_bits magnitude
-
-    let add (x: t) (y: t) : t option =
-      match (x.sgn, y.sgn) with
-      | Neg, (Neg as sgn) | Pos, (Pos as sgn) ->
-          let open Option.Let_syntax in
-          let%map magnitude = add x.magnitude y.magnitude in
-          {sgn; magnitude}
-      | Pos, Neg | Neg, Pos ->
-          let c = compare x.magnitude y.magnitude in
-          Some
-            ( if c < 0 then
-                { sgn= y.sgn
-                ; magnitude= Unsigned.UInt64.Infix.(y.magnitude - x.magnitude)
-                }
-            else if c > 0 then
-              { sgn= x.sgn
-              ; magnitude= Unsigned.UInt64.Infix.(x.magnitude - y.magnitude) }
-            else zero )
-
-    let ( + ) = add
-
-    module Checked = struct
-      let to_bits {magnitude; sgn} =
-        Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
-
-      let to_field_var ({magnitude; sgn}: var) =
-        Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
-
-      let add (x: var) (y: var) =
-        let%bind xv = to_field_var x and yv = to_field_var y in
-        let%bind sgn =
-          provide_witness Sgn.typ
-            (let open As_prover in
-            let open Let_syntax in
-            let%map x = read typ x and y = read typ y in
-            (Option.value_exn (add x y)).sgn)
-        in
-        let%bind res =
-          Tick.Field.Checked.mul
-            (sgn :> Field.Checked.t)
-            (Field.Checked.add xv yv)
-        in
-        let%map magnitude = unpack_var res in
-        {magnitude; sgn}
-
-      let ( + ) = add
-
-      let cswap_field (b: Boolean.var) (x, y) =
-        (* (x + b(y - x), y + b(x - y)) *)
-        let open Field.Checked.Infix in
-        let%map b_y_minus_x =
-          Tick.Field.Checked.mul (b :> Field.Checked.t) (y - x)
-        in
-        (x + b_y_minus_x, y - b_y_minus_x)
-
-      let cswap b (x, y) =
-        let l_sgn, r_sgn =
-          match (x.sgn, y.sgn) with
-          | Sgn.Pos, Sgn.Pos -> Sgn.Checked.(pos, pos)
-          | Neg, Neg -> Sgn.Checked.(neg, neg)
-          | Pos, Neg -> (Sgn.Checked.neg_if_true b, Sgn.Checked.pos_if_true b)
-          | Neg, Pos -> (Sgn.Checked.pos_if_true b, Sgn.Checked.neg_if_true b)
-        in
-        let%map l_mag, r_mag =
-          let%bind l, r =
-            cswap_field b (pack_var x.magnitude, pack_var y.magnitude)
-          in
-          let%map l = unpack_var l and r = unpack_var r in
-          (l, r)
-        in
-        ({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
-    end
-  end
 
   module Checked = struct
     include T.Checked
@@ -360,10 +424,6 @@ module Amount = struct
 
     let add_fee (t: var) (fee: Fee.var) =
       Field.Checked.add (pack_var t) (Fee.pack_var fee) |> unpack_var
-
-    let add_signed (t: var) (d: Signed.var) =
-      let%bind d = Signed.Checked.to_field_var d in
-      Field.Checked.add (pack_var t) d |> unpack_var
   end
 end
 
