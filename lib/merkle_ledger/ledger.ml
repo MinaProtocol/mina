@@ -37,13 +37,17 @@ module type S = sig
 
     val depth : t -> int
 
-    val parent : t -> t
+    val parent : t -> t option
+
+    val parent_exn : t -> t
 
     val child : t -> [`Left | `Right] -> t option
 
     val child_exn : t -> [`Left | `Right] -> t
 
-    val unpeel : t -> [`Left | `Right] * t
+    val unpeel : t -> ([`Left | `Right] * t) option
+
+    val unpeel_exn : t -> [`Left | `Right] * t
 
     val root : t
   end
@@ -103,10 +107,10 @@ module type S = sig
 end
 
 module type F = functor (Account :sig
-
+                                    
                                     type t [@@deriving sexp, eq, bin_io]
 end) -> functor (Hash :sig
-
+                         
                          type hash [@@deriving sexp, hash, compare, bin_io]
 
                          val hash_account : Account.t -> hash
@@ -115,14 +119,14 @@ end) -> functor (Hash :sig
 
                          val merge : height:int -> hash -> hash -> hash
 end) -> functor (Key :sig
-
+                        
                         type t [@@deriving sexp, bin_io]
 
                         val empty : t
 
                         include Hashable.S_binable with type t := t
 end) -> functor (Depth :sig
-
+                          
                           val depth : int
 end) -> S
         with type hash := Hash.hash
@@ -171,19 +175,29 @@ struct
 
     let depth {depth; _} = depth
 
-    let parent {depth; index} = {depth= depth - 1; index}
+    let bit_val = function `Left -> 0 | `Right -> 1
 
     let child {depth; index} d =
-      let bit_val = match d with `Left -> 0 | `Right -> 1 in
       if depth + 1 < Depth.depth then
-        Some {depth= depth + 1; index= index lor (bit_val lsl depth)}
+        Some {depth= depth + 1; index= index lor (bit_val d lsl depth)}
       else None
 
     let child_exn a d = child a d |> Option.value_exn
 
     let unpeel {depth; index} =
-      let dir = if index land (1 lsl depth) = 0 then `Left else `Right in
-      (dir, {depth= depth - 1; index})
+      if depth > 0 then
+        let dir = if index land (1 lsl depth) = 0 then `Left else `Right in
+        Some
+          ( dir
+          , {depth= depth - 1; index= index land (1 - (bit_val dir lsl depth))}
+          )
+      else None
+
+    let unpeel_exn a = unpeel a |> Option.value_exn
+
+    let parent a = Option.map (unpeel a) ~f:snd
+
+    let parent_exn a = unpeel_exn a |> snd
 
     let root = {depth= 0; index= 0}
   end

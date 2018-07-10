@@ -34,13 +34,17 @@ module type S = sig
 
     val depth : t -> int
 
-    val parent : t -> t
+    val parent : t -> t option
+
+    val parent_exn : t -> t
 
     val child : t -> [`Left | `Right] -> t option
 
     val child_exn : t -> [`Left | `Right] -> t
 
-    val unpeel : t -> [`Left | `Right] * t
+    val unpeel : t -> ([`Left | `Right] * t) option
+
+    val unpeel_exn : t -> [`Left | `Right] * t
 
     val root : t
   end
