@@ -7,6 +7,7 @@ end
 
 module Ring_buffer = Ring_buffer
 module State = State
+module Queue = Queue
 
 module type Spec_intf = sig
   module Data : sig
@@ -29,8 +30,6 @@ module type Spec_intf = sig
 
   val merge : Output.t -> Accum.t -> Output.t
 end
-
-
 
 module State1 = struct
   include State
@@ -57,8 +56,9 @@ module State1 = struct
     assert (jobs.Ring_buffer.position = 0) ;
     let data_buffer = Queue.create ~capacity:parallelism () in
     Queue.enqueue data_buffer seed ;
-    {jobs; data_buffer; acc= (0, init); allowed_data_count= 4} 
-    (* TODO Initial count cannot be zero, what should it be then?*) 
+    {jobs; data_buffer; acc= (0, init); current_data_length= 1}
+
+  (* TODO Initial count cannot be zero, what should it be then?*)
 
   let parallelism {jobs} = Ring_buffer.length jobs / 2
 
@@ -152,41 +152,43 @@ module State1 = struct
     assert (p 5 = (10, Right)) ;
     assert (p 6 = (11, Left)) ;
     assert (p 7 = (11, Right))
-  
+
   let consume : type a b d.
-           (a, b, d) t
-        -> ( (a, b) Completed_job.t * (a, b) Completed_job.t) list
-        -> b option Or_error.t=
-    fun t cs ->
-      let open Or_error.Let_syntax in 
-      let open Job in
-      let open Completed_job in
-      (* This breaks down if we ever step an odd number of times *)
-      (* step_twice ensures we always step twice *)
-      let step_twice (cj1, cj2) =
-        let fill_job dir z job : (a, d) Job.t Or_error.t =
-          let open Direction in
-          match (dir, job) with
-            | _, Merge_up None -> Ok (Merge_up (Some z))
-            | Left, Merge (None, r) -> Ok (Merge (Some z, r))
-            | Right, Merge (l, None) -> Ok (Merge (l, Some z))
-            | Left, Merge_up (Some _) | Right, Merge_up (Some _) ->
-                Error (Error.of_string "impossible: Merge_ups should be empty")
-            | Left, Merge (Some _, _) | Right, Merge (_, Some _) ->
-              Error (Error.of_string "impossible: the side of merge we want will be empty but we
-            have %{sexp: Direction.t}")
-              (*!"impossible: the side of merge we want will be empty but we \
+         (a, b, d) t
+      -> ((a, b) State.Completed_job.t * (a, b) State.Completed_job.t) list
+      -> b option Or_error.t =
+   fun t completed_jobs ->
+    let open Or_error.Let_syntax in
+    let open Job in
+    let open Completed_job in
+    (* This breaks down if we ever step an odd number of times *)
+    (* step_twice ensures we always step twice *)
+    let step_twice (cj1, cj2) =
+      let fill_job dir z job : (a, d) Job.t Or_error.t =
+        let open Direction in
+        match (dir, job) with
+        | _, Merge_up None -> Ok (Merge_up (Some z))
+        | Left, Merge (None, r) -> Ok (Merge (Some z, r))
+        | Right, Merge (l, None) -> Ok (Merge (l, Some z))
+        | Left, Merge_up (Some _) | Right, Merge_up (Some _) ->
+            Error (Error.of_string "impossible: Merge_ups should be empty")
+        | Left, Merge (Some _, _) | Right, Merge (_, Some _) ->
+            Error
+              (Error.of_string
+                 "impossible: the side of merge we want will be empty but we\n            \
+                  have %{sexp: Direction.t}")
+        (*!"impossible: the side of merge we want will be empty but we \
                 have %{sexp: Direction.t}" 
               dir
               ()*)
-            | _, Base _ -> Error (Error.of_string "impossible: we never fill base")
-        in
-         (* Returns the ptr rewritten *)
-        let rewrite (i: int) (z: a) : (unit Or_error.t) =
-          let ptr, dir = ptr (parallelism t) i in
-          let js : (a, d) Job.t Ring_buffer.t = jobs t in
-          Ring_buffer.direct_update js ptr 
-            ~f:(fun job -> fill_job dir z job )
+        | _, Base _ ->
+            Error (Error.of_string "impossible: we never fill base")
+      in
+      (* Returns the ptr rewritten *)
+      let rewrite (i: int) (z: a) : unit Or_error.t =
+        let ptr, dir = ptr (parallelism t) i in
+        let js : (a, d) Job.t Ring_buffer.t = t.jobs in
+        Ring_buffer.direct_update js ptr ~f:(fun job -> fill_job dir z job)
       in
       let%bind () =
         (* Note: We don't have to worry about position overflow because
@@ -202,15 +204,17 @@ module State1 = struct
               else (t.jobs.position, t.jobs.position + 1)
           | _ -> (t.jobs.position, t.jobs.position + 1)
         in
-        let work i (cj: (a, b) Completed_job.t) job : (a, d) Job.t Or_error.t=
+        let work i (cj: (a, b) Completed_job.t) job : (a, d) Job.t Or_error.t =
           match (job, cj) with
           | Merge_up None, _ -> Ok job
           | Merge (None, None), _ -> Ok job
-          | Base None, _ ->
-            (match Queue.dequeue t.data_buffer with
-              | None -> 
-                  Or_error.error_string "Data queue empty. Cannot  proceed."
-              | Some x -> Ok (Base (Some x)))
+          | Base None, _ -> (
+            match Queue.dequeue t.data_buffer with
+            | None ->
+                Or_error.error_string "Data buffer empty. Cannot proceed."
+            | Some x ->
+                t.current_data_length <- t.current_data_length - 1 ;
+                Ok (Base (Some x)) )
           | Merge_up (Some x), Merged_up acc' ->
               t.acc <- (fst t.acc |> Int.( + ) 1, acc') ;
               Ok (Merge_up None)
@@ -218,12 +222,15 @@ module State1 = struct
           | Merge (Some x, Some x'), Merged z ->
               let%bind () = rewrite i z in
               Ok (Merge (None, None))
-          | Base (Some d), Lifted z ->
+          | Base (Some d), Lifted z -> (
               let%bind () = rewrite i z in
-              Ok (Base (Some (Queue.dequeue_exn t.data_buffer)))
-          | x ->
-              failwith "Doesn't happen x:%s\n"
-                (*( Job.sexp_of_t (*Spec.Accum.sexp_of_t Spec.Data.sexp_of_t x*)
+              match Queue.dequeue t.data_buffer with
+              | None -> Ok (Base None)
+              | Some x ->
+                  t.current_data_length <- t.current_data_length - 1 ;
+                  Ok (Base (Some x)) )
+          | x -> failwith "Doesn't happen x:%s\n"
+          (*( Job.sexp_of_t (*Spec.Accum.sexp_of_t Spec.Data.sexp_of_t x*)
                 |> Sexp.to_string_hum )
                 ()*)
         in
@@ -233,13 +240,10 @@ module State1 = struct
       return (Ring_buffer.forwards ~n:2 t.jobs)
     in
     let last_acc = t.acc in
-    let%bind () = List.fold ~init: (Ok ()) cs 
-      ~f:(fun acc cj ->
-        let%bind () = step_twice cj in
-        t.allowed_data_count <- t.allowed_data_count + 1;
-        return ())
+    let%bind () =
+      List.fold ~init:(Ok ()) completed_jobs ~f:(fun acc cj -> step_twice cj)
     in
-    if not (fst last_acc = fst t.acc) then Ok (Some (snd t.acc)) else (Ok None)
+    if not (fst last_acc = fst t.acc) then Ok (Some (snd t.acc)) else Ok None
 
   (*let gen : type a b d.
          init:b
@@ -282,43 +286,57 @@ let start : type a b d.
 
 let step : type a b d.
        state:(a, b, d) State.t
-    -> data: ( (a, b) State1.Completed_job.t * (a, b) State1.Completed_job.t) list
-    -> b option Or_error.t=
+    -> data:((a, b) State1.Completed_job.t * (a, b) State1.Completed_job.t)
+            list
+    -> b option Or_error.t =
  fun ~state ~data -> State1.consume state data
 
-
- let next :
-       state:('a, 'b, 'd) State1.t
-    -> ('a, 'd) State1.Job.t option=
+let next_job : state:('a, 'b, 'd) State1.t -> ('a, 'd) State1.Job.t option =
  fun ~state -> Some (Ring_buffer.read state.jobs)
 
 let next_k_jobs :
        state:('a, 'b, 'd) State1.t
     -> k:int
-    -> ('a, 'd) State1.Job.t list Or_error.t=
+    -> ('a, 'd) State1.Job.t list Or_error.t =
  fun ~state ~k -> Ok (Ring_buffer.read_k state.jobs k)
 
-let allowed_to_enqueue_count : 
-    state:('a, 'b, 'd) State1.t -> int = fun ~state -> state.allowed_data_count
+let next_jobs :
+    state:('a, 'b, 'd) State1.t -> ('a, 'd) State1.Job.t list Or_error.t =
+ fun ~state -> Ok (Ring_buffer.read_all state.jobs)
+
+let free_space : state:('a, 'b, 'd) State1.t -> int =
+ fun ~state ->
+  let buff = State1.data_buffer state in
+  Queue.capacity buff - State.current_data_length state
 
 let enqueue_data :
     state:('a, 'b, 'd) State1.t -> data:'d list -> unit Or_error.t =
- fun ~state ~data -> 
-  if allowed_to_enqueue_count state < List.length data then
-    Or_error.error_string 
-      (sprintf "data list larger than allowed. Current number of items allowed to be enqueued = %d"
-        (allowed_to_enqueue_count state) )
-  else
-    Ok (List.fold 
-          ~init:() 
-            data 
-              ~f:(fun () d -> Queue.enqueue state.data_buffer d))                     
+ fun ~state ~data ->
+  if free_space state < List.length data then
+    Or_error.error_string
+      (sprintf
+         "data list larger than allowed. Current number of items allowed to \
+          be enqueued = %d"
+         (free_space state))
+  else (
+    state.current_data_length <- state.current_data_length + List.length data ;
+    Ok
+      (List.fold ~init:() data ~f:(fun () d ->
+           Queue.enqueue state.data_buffer d )) )
 
-let fill_in_completed_job : 
-        state:('a, 'b, 'd) State1.t 
-    ->  job: (('a,'b) State1.Completed_job.t * ('a, 'b) State1.Completed_job.t)  
-    -> 'b option Or_error.t = 
-  fun ~state ~job -> step state [job]
+let min_jobs = 2
+
+let rec pairs lst =
+  match lst with x :: y :: xs -> (x, y) :: pairs xs | _ -> []
+
+let fill_in_completed_jobs :
+       state:('a, 'b, 'd) State1.t
+    -> jobs:('a, 'b) State1.Completed_job.t list
+    -> 'b option Or_error.t =
+ fun ~state ~jobs ->
+  if List.length jobs < min_jobs || List.length jobs mod min_jobs <> 0 then
+    Error (Error.of_string "Insufficient/incorrect number of completed jobs")
+  else step state (pairs jobs)
 
 (*let%test_module "scans" =
   ( module struct

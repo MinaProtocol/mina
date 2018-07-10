@@ -106,7 +106,7 @@ module type Public_key_intf = sig
   type t
 
   module Compressed : sig
-    type t [@@deriving sexp, bin_io] 
+    type t [@@deriving sexp, bin_io]
   end
 end
 
@@ -137,30 +137,32 @@ end
 
 module type Transaction_snark_intf = sig
   type ledger_hash
+
   type fee
+
   type message
 
-  type t
-  [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io]
 
   module Statement : sig
-    type t = 
-      { source : ledger_hash
-      ; target : ledger_hash
-      ; fee_excess : fee
-      ; proof_type : [`Merge | `Base]
-      }
+    type t =
+      { source: ledger_hash
+      ; target: ledger_hash
+      ; fee_excess: fee
+      ; proof_type: [`Merge | `Base] }
     [@@deriving sexp, bin_io]
   end
 
-  val verify
-    : t -> Statement.t -> message:message -> bool Deferred.t
+  val verify : t -> Statement.t -> message:message -> bool Deferred.t
 end
 
 module type Completed_work_intf = sig
   type proof
+
   type statement
+
   type fee
+
   type public_key
 
   module Statement : sig

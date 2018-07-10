@@ -26,23 +26,27 @@ module Job = struct
 end
 
 module Completed_job = struct
-  type ('a, 'b) t = 
-    | Lifted of 'a
-    | Merged of 'a
-    | Merged_up of 'b
-    [@@deriving bin_io, sexp]
+  type ('a, 'b) t = Lifted of 'a | Merged of 'a | Merged_up of 'b
+  [@@deriving bin_io, sexp]
 end
 
 type ('a, 'b, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
   ; data_buffer: 'd Queue.t
-  ; mutable acc: int * 'b 
-  ; mutable allowed_data_count: int}
+  ; mutable acc: int * 'b
+  ; mutable current_data_length: int }
 [@@deriving sexp, bin_io]
 
 let acc {acc} = snd acc
 
 let jobs {jobs} = jobs
 
-let copy {jobs; data_buffer; acc; allowed_data_count} =
-  {jobs= Ring_buffer.copy jobs; data_buffer= Queue.copy data_buffer; acc; allowed_data_count}
+let data_buffer {data_buffer} = data_buffer
+
+let current_data_length {current_data_length} = current_data_length
+
+let copy {jobs; data_buffer; acc; current_data_length} =
+  { jobs= Ring_buffer.copy jobs
+  ; data_buffer= Queue.copy data_buffer
+  ; acc
+  ; current_data_length }

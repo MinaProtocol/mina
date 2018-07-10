@@ -15,7 +15,8 @@ let length {data} = Array.length data
 
 let copy {data; position} = {data= Array.copy data; position}
 
-let direct_update t i  ~f = (*)    ('a -> 'a Or_error.t) =*)
+let direct_update t i ~f =
+  (*    ('a -> 'a Or_error.t) =*)
   let open Or_error.Let_syntax in
   let x : 'a = (t.data).(i) in
   let%bind v = f x in

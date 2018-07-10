@@ -19,11 +19,8 @@ module State : sig
   end
 
   module Completed_job : sig
-    type ('a, 'b) t = 
-      | Lifted of 'a 
-      | Merged of 'a 
-      | Merged_up of 'b
-      [@@deriving bin_io, sexp]
+    type ('a, 'b) t = Lifted of 'a | Merged of 'a | Merged_up of 'b
+    [@@deriving bin_io, sexp]
   end
 
   type ('a, 'b, 'd) t [@@deriving sexp, bin_io]
@@ -67,18 +64,20 @@ val step :
   -> 'b option
 *)
 
-val next :
-  state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t option
+val next_job : state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t option
 
 val next_k_jobs :
   state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t
 
+val next_jobs :
+  state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t list Or_error.t
+
 val enqueue_data :
   state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t
 
-val allowed_to_enqueue_count : state:('a, 'b, 'd) State.t -> int
+val free_space : state:('a, 'b, 'd) State.t -> int
 
-val fill_in_completed_job :
+val fill_in_completed_jobs :
      state:('a, 'b, 'd) State.t
-  -> job:('a, 'b) State.Completed_job.t * ('a, 'b) State.Completed_job.t
+  -> jobs:('a, 'b) State.Completed_job.t list
   -> 'b option Or_error.t

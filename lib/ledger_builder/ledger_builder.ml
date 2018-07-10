@@ -47,7 +47,8 @@ module type Inputs_intf = sig
 
   module Snark_pool_proof : Coda_pow.Snark_pool_proof_intf
 
-  module Transaction_snark : Coda_pow.Transaction_snark_intf
+  module Transaction_snark :
+    Coda_pow.Transaction_snark_intf
     with type fee := Fee.Signed.t
      and type ledger_hash := Ledger_hash.t
      and type message := Fee.Unsigned.t * Public_key.Compressed.t
@@ -83,9 +84,9 @@ module Make (Inputs : Inputs_intf) :
    and type transaction_snark := Inputs.Transaction_snark.t
    and type transaction_with_valid_signature :=
               Inputs.Transaction.With_valid_signature.t
-   and type completed_work := Inputs.Completed_work.t 
-   and type statement := Inputs.Completed_work.Statement.t
-= struct
+   and type completed_work := Inputs.Completed_work.t
+   and type statement := Inputs.Completed_work.Statement.t =
+struct
   (* Assume you have
 
   enqueue_data
@@ -112,16 +113,23 @@ module Make (Inputs : Inputs_intf) :
 
   type job =
     ( Transaction_snark.t with_statement
-    , Super_transaction.t with_statement
-    ) Parallel_scan.State.Job.t
+    , Super_transaction.t with_statement )
+    Parallel_scan.State.Job.t
   [@@deriving sexp_of]
+
+  type parallel_scan_completed_job =
+    (*For the parallel scan*)
+    ( Transaction_snark.t with_statement
+    , Transaction_snark.t with_statement )
+    Parallel_scan.State.Completed_job.t
+  [@@deriving sexp, bin_io]
 
   type scan_state =
     ( Transaction_snark.t with_statement
     , Transaction_snark.t with_statement
     , Super_transaction.t with_statement )
     Parallel_scan.State.t
-    [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io]
 
   type t =
     { scan_state:
@@ -130,7 +138,7 @@ module Make (Inputs : Inputs_intf) :
     the above state. *)
     ; ledger: Ledger.t
     ; public_key: Public_key.Compressed.t }
-    [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io]
 
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
@@ -143,14 +151,13 @@ module Make (Inputs : Inputs_intf) :
 
   let hash t : Ledger_builder_hash.t = failwith "TODO"
 
-    
   let ledger t = failwith "TODO"
 
   let max_margin : int = failwith "TODO"
- 
+
   let margin t : int = failwith "TODO"
-  
-  let  create ~ledger ~self : t = failwith "TODO"
+
+  let create ~ledger ~self : t = failwith "TODO"
 
   (*
   module Spec = struct
@@ -205,11 +212,29 @@ module Make (Inputs : Inputs_intf) :
         ; proof_type= `Merge }
     | _ -> None
 
+  let completed_work_to_scanable_work (job: job) (proof: Transaction_snark.t) :
+      parallel_scan_completed_job Or_error.t =
+    match job with
+    | Base (Some (t, s)) -> Ok (Lifted (proof, s))
+    | Merge_up (Some (t, s)) -> Ok (Merged_up (proof, s))
+    | Merge (Some (t, s), Some (t', s')) ->
+        let open Or_error.Let_syntax in
+        let%map fee_excess =
+          Fee.Signed.add s.fee_excess s'.fee_excess
+          |> option "Error adding fees"
+        in
+        Parallel_scan.State.Completed_job.Merged
+          ( proof
+          , { Transaction_snark.Statement.source= s.source
+            ; target= s'.target
+            ; fee_excess
+            ; proof_type= `Merge } )
+    | _ -> Error (Error.of_thunk (fun () -> sprintf "Invalid job"))
+
   let verify ~message job proof =
     match statement_of_job job with
     | None -> return false
-    | Some statement ->
-      Transaction_snark.verify proof statement ~message
+    | Some statement -> Transaction_snark.verify proof statement ~message
 
   module Result_with_rollback = struct
     module Rollback = struct
@@ -261,65 +286,35 @@ module Make (Inputs : Inputs_intf) :
       Deferred.map dresult ~f:(fun result -> {result; rollback= Do_nothing})
   end
 
-  (*
-  let job_proof (job: job) (work: Completed_work.t) :
-      (job * proof_with_statement) Result_with_rollback.t =
-    let open Result_with_rollback.Let_syntax in
-    match job with
-    | Base (Some (t, s)) -> return @@ (job, (work.proof, s))
-    | Merge (Some (t, s), Some (t', s')) ->
-        Result_with_rollback.of_or_error
-          (let open Or_error.Let_syntax in
-          let%bind fee =
-            Fee.Signed.add s.fee_excess s'.fee_excess
-            |> option "Error adding fee_excess"
-          in
-          let new_stmt : Statement.t =
-            { source= s.source
-            ; target= s'.target
-            ; fee_excess= fee
-            ; proof_type= `Merge }
-          in
-          Ok (job, (work.proof, new_stmt)))
-    | _ ->
-        Result_with_rollback.error
-          (Error.of_thunk (fun () ->
-               sprintf "Invalid job for the corresponding transaction_snark" )) *)
+  let rec mapM_2 = function
+    | [], [] -> Ok []
+    | job :: jobs', work :: works' ->
+        let open Or_error.Let_syntax in
+        let%bind scanable_work = completed_work_to_scanable_work job work in
+        let%bind scanable_works = mapM_2 (jobs', works') in
+        Ok (scanable_work :: scanable_works)
+    | _, _ -> Error (Error.of_string "Lengths mismatch")
 
-(*
-  let jobs_proofs_assoc jobs completed_works :
-      (job * proof_with_statement) list Result_with_rollback.t =
-    let open Result_with_rollback.Let_syntax in
-    let rec map_custom js ws :
-        (job * proof_with_statement) list Result_with_rollback.t =
-      match (js, ws) with
-      | [], [] -> return @@ []
-      | j :: js', w :: ws' ->
-          let%bind sn = job_proof j w in
-          let%bind rem_sn = map_custom js' ws' in
-          Result_with_rollback.return (sn :: rem_sn)
-      | _ ->
-          Result_with_rollback.error
-            (Error.of_thunk (fun () ->
-                 sprintf "Job list and work list length mismatch" ))
-    in
-    map_custom jobs completed_works
-
-*)
-  let fill_in_completed_work state works :
-      Transaction_snark.t with_statement option Result_with_rollback.t =
-    (*let open Result_with_rollback.Let_syntax in
-    let%bind next_jobs =
-      Result_with_rollback.with_no_rollback
-        Deferred.Or_error.Let_syntax.(
-          Parallel_scan.next_k_jobs ~state ~k:(List.length works)
-          |> return)
-    in
-    let%bind assoc_list = jobs_proofs_assoc next_jobs works in *)
-    failwith "TODO: To be done in parallel scan?"
+  let fill_in_completed_work (state: scan_state) (works: Completed_work.t list)
+      : Transaction_snark.t with_statement option Result_with_rollback.t =
+    Result_with_rollback.with_no_rollback
+      (let open Deferred.Or_error.Let_syntax in
+      let next_jobs =
+        Parallel_scan.next_k_jobs ~state
+          ~k:(List.length works * Completed_work.proofs_length)
+      in
+      match next_jobs with
+      | Error e -> Deferred.return (Error e)
+      | Ok jobs ->
+          let%bind scanable_work_list =
+            Deferred.return
+            @@ mapM_2 (jobs, List.concat_map works (fun work -> work.proofs))
+          in
+          Deferred.return
+          @@ Parallel_scan.fill_in_completed_jobs state scanable_work_list)
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
-    failwith "TODO"
+    Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data state data
 
   let sum_fees xs ~f =
     with_return (fun {return} ->
@@ -359,33 +354,30 @@ module Make (Inputs : Inputs_intf) :
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
-  let check_completed_works t (completed_works : Completed_work.t list) =
+  let check_completed_works t (completed_works: Completed_work.t list) =
     Result_with_rollback.with_no_rollback
-      (let open Deferred.Or_error.Let_syntax in
-       match
-        Parallel_scan.next_k_jobs ~state:t.scan_state
-          ~k:(List.length completed_works * Completed_work.proofs_length)
-        |> Or_error.map ~f:(chunks_of ~n:Completed_work.proofs_length)
-       with
-       | Error e -> Deferred.return (Error e)
-       | Ok jobses ->
-         Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:(fun (jobs, work) ->
-          let message = (work.fee, work.prover) in
-           Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:(fun (job, proof) ->
-               verify ~message job proof))
-        |> Deferred.map ~f:(check "proofs did not verify"))
+      Deferred.Or_error.Let_syntax.(
+        match
+          Parallel_scan.next_k_jobs ~state:t.scan_state
+            ~k:(List.length completed_works * Completed_work.proofs_length)
+          |> Or_error.map ~f:(chunks_of ~n:Completed_work.proofs_length)
+        with
+        | Error e -> Deferred.return (Error e)
+        | Ok jobses ->
+            Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:
+              (fun (jobs, work) ->
+                let message = (work.fee, work.prover) in
+                Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:
+                  (fun (job, proof) -> verify ~message job proof ) )
+            |> Deferred.map ~f:(check "proofs did not verify"))
 
-  let apply_diff t (diff: Ledger_builder_diff.t) = (* :
-  Transaction_snark.t option Result_with_rollback.t*)
+  let apply_diff t (diff: Ledger_builder_diff.t) =
     let payments = diff.transactions in
     let completed_works = diff.completed_works in
     let open Result_with_rollback.Let_syntax in
     let%bind () =
       check "bad hash"
-        (not
-           (Ledger_builder_hash.equal
-              diff.prev_hash
-              (hash t)))
+        (not (Ledger_builder_hash.equal diff.prev_hash (hash t)))
       |> Result_with_rollback.of_or_error
     in
     let%bind delta =
@@ -418,31 +410,35 @@ module Make (Inputs : Inputs_intf) :
     let%bind () = check_completed_works t completed_works in
     let%bind res_opt = fill_in_completed_work t.scan_state completed_works in
     let%map () = enqueue_data_with_rollback t.scan_state new_data in
-    match res_opt with
-    | None               ->   None
-    | Some (snark, stmt) ->   (Some snark)
+    match res_opt with None -> None | Some (snark, stmt) -> Some snark
 
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
 
-  let free_space : scan_state -> int = failwith "TODO"
+  let free_space scan_state : int = Parallel_scan.free_space scan_state
 
   let sequence_chunks_of seq ~n =
     Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
-      if i = n
-      then Yield (List.rev acc, ([], 0, seq))
-      else
-        match Sequence.next seq with
-        | None -> Done
-        | Some (x, seq) ->
-          Skip (x :: acc, i + 1, seq))
+        if i = n then Yield (List.rev acc, ([], 0, seq))
+        else
+          match Sequence.next seq with
+          | None -> Done
+          | Some (x, seq) -> Skip (x :: acc, i + 1, seq) )
 
-  let work_to_do : scan_state -> Transaction_snark.Statement.t Sequence.t = failwith "TODO"
+  let work_to_do scan_state : Transaction_snark.Statement.t Sequence.t =
+    match Parallel_scan.next_jobs scan_state with
+    | Error e -> failwith @@ Error.to_string_hum e
+    | Ok work_list ->
+        Sequence.of_list
+        @@ List.map work_list (fun maybe_work ->
+               match statement_of_job maybe_work with
+               | None -> failwith "Error extracting statement from job"
+               | Some work -> work )
 
   (* First, if there's any free space on the queue, put transactions there *)
-  let create_diff t ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
-        ~(get_completed_work
-          : Completed_work.Statement.t -> Completed_work.t option)
-    =
+  let create_diff t
+      ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
+      ~(get_completed_work:
+         Completed_work.Statement.t -> Completed_work.t option) =
     let take_until_budget_exceeded_or_work_absent budget0 work_to_do =
       Sequence.fold_until work_to_do ~init:(budget0, [])
         ~f:(fun (budget, ws) stmt ->
@@ -455,7 +451,8 @@ module Make (Inputs : Inputs_intf) :
         ~finish:Fn.id
     in
     let rec go budget payments works
-        (transactions_by_fee: Transaction.With_valid_signature.t Sequence.t) work_to_do =
+        (transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
+        work_to_do =
       match (Sequence.next transactions_by_fee, Sequence.next work_to_do) with
       | None, Some _ ->
           (* Now we take work as our budget permits *)
@@ -487,7 +484,8 @@ module Make (Inputs : Inputs_intf) :
             (* The work was too expensive, so we are done *)
             | None -> (budget, payments, works)
             | Some budget' ->
-                go budget' (t :: payments) (work :: works) transactions_by_fee work_to_do
+                go budget' (t :: payments) (work :: works) transactions_by_fee
+                  work_to_do
     in
     (* First, we can add as many transactions as there is space on the
        queue (up to the max fee) *)
@@ -510,17 +508,16 @@ module Make (Inputs : Inputs_intf) :
     in
     let _left_over_fees, payments, works =
       go initial_budget initial_payments [] transactions_by_fee
-        (sequence_chunks_of (work_to_do t.scan_state) Completed_work.proofs_length)
+        (sequence_chunks_of (work_to_do t.scan_state)
+           Completed_work.proofs_length)
     in
     { Ledger_builder_diff.transactions= payments
     ; completed_works= works
     ; creator= t.public_key
-    ; prev_hash= hash t 
-    }
-  
+    ; prev_hash= hash t }
 end
 
-let%test_module "ledger_builder" = 
-  (module struct
-
-  end)
+let%test_module "ledger_builder" =
+  ( module struct
+    
+  end )
