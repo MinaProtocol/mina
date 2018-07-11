@@ -202,6 +202,14 @@ module type Ledger_builder_diff_intf = sig
   [@@deriving sexp, bin_io]
 end
 
+module type Ledger_builder_transition_intf = sig
+  type ledger_builder
+
+  type diff
+
+  type t = {old: ledger_builder; diff: diff}
+end
+
 module type Ledger_builder_intf = sig
   type t [@@deriving sexp, bin_io]
 
@@ -324,12 +332,12 @@ module type Transition_intf = sig
 
   type time
 
-  type ledger_builder_diff
+  type ledger_builder_transition
 
   type t =
-    { ledger_hash: ledger_hash
+    { ledger_hash: ledger_hash (* TODO: I believe this is unused. *)
     ; ledger_proof: proof
-    ; ledger_builder_diff: ledger_builder_diff
+    ; ledger_builder_transition: ledger_builder_transition
     ; timestamp: time
     ; nonce: nonce }
   [@@deriving fields]
@@ -348,12 +356,12 @@ module type Machine_intf = sig
 
   type transition
 
-  type ledger_builder_diff
+  type ledger_builder_transition
 
   module Event : sig
     type e = Found of transition | New_state of state
 
-    type t = e * ledger_builder_diff
+    type t = e * ledger_builder_transition
   end
 
   val current_state : t -> state
@@ -497,13 +505,18 @@ Merge Snark:
                 Transaction.With_valid_signature.t
      and type statement := Completed_work.Statement.t
 
+  module Ledger_builder_transition :
+    Ledger_builder_transition_intf
+    with type diff := Ledger_builder_diff.t
+     and type ledger_builder := Ledger_builder.t
+
   module Transition :
     Transition_intf
     with type ledger_hash := Ledger_hash.t
      and type proof := Ledger_proof.t
      and type nonce := Block_nonce.t
      and type time := Time.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type ledger_builder_transition := Ledger_builder_transition.t
 
   module State : sig
     include State_intf
@@ -536,18 +549,20 @@ struct
   module Event = struct
     type t =
       | Found of Transition.t
-      | New_state of Proof_carrying_state.t * Ledger_builder_diff.t
+      | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
   end
 
-  type t = {state: Proof_carrying_state.t; ledger_builder: Ledger_builder.t}
+  type t = {state: Proof_carrying_state.t}
   [@@deriving fields]
 
   let step' t (transition: Transition.t) : t Deferred.t =
     let state = t.state.data in
     let proof = t.state.proof in
-    let diff = transition.Transition.ledger_builder_diff in
-    match%bind Ledger_builder.apply t.ledger_builder diff with
+    let {Ledger_builder_transition.old;diff} = transition.ledger_builder_transition in
+    match%bind Ledger_builder.apply old diff with
     | Error e -> return t
+    (* TODO: This proof should go somewhere! Also we mutated [old] so not clear
+       if that's ok *)
     | Ok maybe_new_ledger ->
         let next_difficulty =
           Difficulty.next state.next_difficulty ~last:state.timestamp
@@ -556,8 +571,8 @@ struct
         let new_state : State.t =
           { next_difficulty
           ; previous_state_hash= State.hash state
-          ; ledger_builder_hash= Ledger_builder.hash t.ledger_builder
-          ; ledger_hash= transition.ledger_hash
+          ; ledger_builder_hash= Ledger_builder.hash old
+          ; ledger_hash= Ledger.merkle_root (Ledger_builder.ledger old)
           ; strength=
               Strength.increase state.strength ~by:state.next_difficulty
           ; timestamp= transition.timestamp }
@@ -567,21 +582,23 @@ struct
             {old_state= state; old_proof= proof; transition}
             ~new_state
         in
-        {t with state= {data= new_state; proof}}
+        {state= {data= new_state; proof}}
 
-  let create ~state ~ledger_builder : t = {state; ledger_builder}
+  let create ~state : t = {state}
 
-  let check_state old_t (new_state: Proof_carrying_state.t)
-      (ledger_builder_diff: Ledger_builder_diff.t) =
-    let old_state = old_t.state in
+  let check_state (old_pcd: Proof_carrying_state.t)
+      (new_pcd: Proof_carrying_state.t)
+      (ledger_builder_transition: Ledger_builder_transition.t) =
     let ledger_builder_valid () =
-      let ledger_builder = old_t.ledger_builder in
-      match%map Ledger_builder.apply ledger_builder ledger_builder_diff with
+      let ledger_builder = ledger_builder_transition.old in
+      match%map
+        Ledger_builder.apply ledger_builder ledger_builder_transition.diff
+      with
       | Error _ -> false
       | Ok maybe_new_ledger ->
           let new_ledger_hash =
-            Option.value_map maybe_new_ledger
-              ~default:old_state.data.ledger_hash ~f:(fun _proof ->
+            Option.value_map maybe_new_ledger ~default:old_pcd.data.ledger_hash
+              ~f:(fun _proof ->
                 Ledger.merkle_root (Ledger_builder.ledger ledger_builder) )
           in
           (* TODO soon: these checks are irrelevant and should be handled inside of
@@ -590,25 +607,24 @@ struct
           let margin = Ledger_builder.margin ledger_builder in
           Ledger_builder_hash.equal
             (Ledger_builder.hash ledger_builder)
-            new_state.data.ledger_builder_hash
+            new_pcd.data.ledger_builder_hash
           && Int.( >= ) margin Ledger_builder.max_margin
-          && Ledger_hash.equal new_ledger_hash new_state.data.ledger_hash
+          && Ledger_hash.equal new_ledger_hash new_pcd.data.ledger_hash
     in
-    let new_strength = new_state.data.strength in
-    let old_strength = old_state.data.strength in
+    let new_strength = new_pcd.data.strength in
+    let old_strength = old_pcd.data.strength in
     if
       Strength.(new_strength > old_strength)
-      && Time_close_validator.validate new_state.data.timestamp
+      && Time_close_validator.validate new_pcd.data.timestamp
     then
       let%bind b = ledger_builder_valid () in
-      if b then State.Proof.verify new_state.proof new_state.data
-      else return false
+      if b then State.Proof.verify new_pcd.proof new_pcd.data else return false
     else return false
 
   let step (t: t) = function
     | Event.Found transition -> step' t transition
-    | Event.New_state (pcd, ledger_builder_diff) ->
-        match%map check_state t pcd ledger_builder_diff with
-        | true -> {t with state= pcd}
+    | Event.New_state (pcd, ledger_builder_transition) ->
+        match%map check_state t.state pcd ledger_builder_transition with
+        | true -> {state= pcd}
         | false -> t
 end
