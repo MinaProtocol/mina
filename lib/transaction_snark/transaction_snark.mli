@@ -3,7 +3,7 @@ open Nanobit_base
 open Snark_params
 
 module Proof_type : sig
-  type t = Base | Merge [@@deriving bin_io]
+  type t = Base | Merge [@@deriving bin_io, sexp]
 end
 
 module Transition : sig
@@ -13,7 +13,7 @@ module Transition : sig
   [@@deriving bin_io, sexp]
 end
 
-type t [@@deriving bin_io]
+type t [@@deriving bin_io, sexp]
 
 val create :
      source:Ledger_hash.t

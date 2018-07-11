@@ -109,7 +109,7 @@ module Transition = struct
 end
 
 module Proof_type = struct
-  type t = Base | Merge [@@deriving bin_io]
+  type t = Base | Merge [@@deriving bin_io, sexp]
 
   let is_base = function Base -> true | Merge -> false
 end
@@ -120,7 +120,7 @@ type t =
   ; proof_type: Proof_type.t
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
-[@@deriving fields, bin_io]
+[@@deriving fields, sexp, bin_io]
 
 let create = Fields.create
 
