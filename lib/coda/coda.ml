@@ -88,10 +88,6 @@ end
 module type Snark_pool_intf = sig
   type t
 
-  type snark_pool_proof
-
-  val add : t -> snark_pool_proof -> t
-
   val load : disk_location:string -> t Deferred.t
 end
 
@@ -120,9 +116,7 @@ module type Ledger_builder_controller_intf = sig
       ; parent_log: Logger.t
       ; net_deferred: net Deferred.t
       ; ledger_builder_transitions:
-          ( transaction_with_valid_signature list
-          * state
-          * ledger_builder_transition )
+          (transaction_with_valid_signature list * state * ledger_builder_transition)
           Linear_pipe.Reader.t
       ; genesis_ledger: ledger
       ; disk_location: string
@@ -271,8 +265,7 @@ module type Inputs_intf = sig
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type state := State.t
 
-  module Snark_pool :
-    Snark_pool_intf with type snark_pool_proof := Snark_pool_proof.t
+  module Snark_pool : Snark_pool_intf
 
   module Ledger_builder_controller :
     Ledger_builder_controller_intf
@@ -307,6 +300,8 @@ module type Inputs_intf = sig
     val ledger : Ledger.t
 
     val proof : State.Proof.t
+
+    val ledger_builder : unit -> Ledger_builder.t
   end
 end
 
@@ -418,7 +413,8 @@ struct
   let run t =
     Logger.info t.log "Starting to run Coda" ;
     let p : Protocol.t =
-      Protocol.create ~initial:{data= Genesis.state; proof= Genesis.proof}
+      Protocol.create
+        ~state:{data= Genesis.state; proof= Genesis.proof}
     in
     let miner_transitions_protocol = Miner.transitions t.miner in
     let protocol_events =
