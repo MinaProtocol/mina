@@ -66,6 +66,8 @@ val merge_unordered : 'a Reader.t List.t -> 'a Reader.t
 
 val close_read : 'a Reader.t -> unit
 
+val close : 'a Writer.t -> unit
+
 val closed : 'a Reader.t -> unit Deferred.t
 
 val fork : 'a Reader.t -> int -> 'a Reader.t List.t

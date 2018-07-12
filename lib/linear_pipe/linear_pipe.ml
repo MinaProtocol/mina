@@ -31,6 +31,8 @@ let write_or_exn ~capacity writer reader x =
 
 let close_read (reader: 'a Reader.t) = Pipe.close_read reader.pipe
 
+let close = Pipe.close
+
 let closed (reader: 'a Reader.t) = Pipe.closed reader.pipe
 
 let bracket (reader: 'a Reader.t) dx =

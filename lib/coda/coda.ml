@@ -9,14 +9,28 @@ module type Ledger_builder_io_intf = sig
 
   type ledger_builder_hash
 
-  type ledger_builder
+  type ledger_hash
+
+  type ledger_builder_aux
+
+  type sync_ledger_query
+
+  type sync_ledger_answer
 
   type state
 
   val create : net -> t
 
-  val get_ledger_builder_at_hash :
-    t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
+  val get_ledger_builder_aux_at_hash :
+       t
+    -> ledger_builder_hash
+    -> (ledger_builder_aux * state) Deferred.Or_error.t
+
+  val glue_sync_ledger :
+       t
+    -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
+    -> (ledger_hash * sync_ledger_answer) Linear_pipe.Writer.t
+    -> unit
 end
 
 module type State_io_intf = sig
@@ -43,6 +57,8 @@ module type Network_intf = sig
 
   type state
 
+  type ledger_hash
+
   type ledger_builder_hash
 
   module State_io :
@@ -53,8 +69,8 @@ module type Network_intf = sig
   module Ledger_builder_io :
     Ledger_builder_io_intf
     with type t := t
-     and type ledger_builder := ledger_builder
      and type ledger_builder_hash := ledger_builder_hash
+     and type ledger_hash := ledger_hash
      and type state := state
 
   module Config : sig
@@ -110,9 +126,15 @@ module type Ledger_builder_controller_intf = sig
 
   type state
 
-  type snark_pool
-
   type t
+
+  type sync_query
+
+  type sync_answer
+
+  type ledger_proof
+
+  type ledger_hash
 
   module Config : sig
     type t =
@@ -124,9 +146,12 @@ module type Ledger_builder_controller_intf = sig
           * ledger_builder_transition )
           Linear_pipe.Reader.t
       ; genesis_ledger: ledger
-      ; disk_location: string
-      ; snark_pool: snark_pool }
+      ; disk_location: string }
     [@@deriving make]
+  end
+
+  module Aux : sig
+    type t = {root_and_proof: (ledger_hash * ledger_proof) option; state: state}
   end
 
   val create : Config.t -> t Deferred.t
@@ -134,7 +159,9 @@ module type Ledger_builder_controller_intf = sig
   val local_get_ledger :
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
 
-  val strongest_ledgers : t -> (ledger_builder * state) Linear_pipe.Reader.t
+  val strongest_ledgers : t -> (ledger_builder * Aux.t) Linear_pipe.Reader.t
+
+  val handle_sync_ledger_queries : sync_query -> sync_answer
 end
 
 module type Miner_intf = sig
@@ -150,14 +177,11 @@ module type Miner_intf = sig
 
   type transition_with_witness
 
-  type state
+  type aux
 
   module Tip : sig
     type t =
-      { state: state
-      ; ledger: ledger
-      ; ledger_builder: ledger_builder
-      ; transactions: transaction list }
+      {aux: aux; ledger_builder: ledger_builder; transactions: transaction list}
   end
 
   type change = Tip_change of Tip.t
@@ -282,7 +306,6 @@ module type Inputs_intf = sig
      and type ledger_builder_transition := Ledger_builder_transition.t
      and type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
-     and type snark_pool := Snark_pool.t
      and type state := State.t
 
   module Transaction_pool :
@@ -298,7 +321,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type ledger_builder := Ledger_builder.t
      and type transaction := Transaction.With_valid_signature.t
-     and type state := State.t
+     and type aux := Ledger_builder_controller.Aux.t
 
   module Genesis : sig
     val state : State.t
@@ -375,7 +398,7 @@ struct
            ~net_deferred:(Ivar.read net_ivar)
            ~ledger_builder_transitions:ledger_builder_transitions_reader
            ~genesis_ledger:Genesis.ledger
-           ~disk_location:config.ledger_builder_persistant_location ~snark_pool)
+           ~disk_location:config.ledger_builder_persistant_location)
     in
     let miner =
       Miner.create ~parent_log:config.log ~change_feeder:miner_changes_reader
@@ -481,12 +504,11 @@ struct
     don't_wait_for
       (Linear_pipe.transfer
          (Ledger_builder_controller.strongest_ledgers t.ledger_builder)
-         t.miner_changes_writer ~f:(fun (ledger_builder, state) ->
+         t.miner_changes_writer ~f:(fun (ledger_builder, aux) ->
            let ledger = Ledger_builder.ledger ledger_builder in
            let transactions =
              Transaction_pool.get ~k:t.transactions_per_bundle ~ledger
                t.transaction_pool
            in
-           Tip_change {Miner.Tip.transactions; ledger_builder; ledger; state}
-       ))
+           Tip_change {Miner.Tip.transactions; ledger_builder; aux} ))
 end
