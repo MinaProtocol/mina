@@ -427,8 +427,13 @@ module type Inputs_intf = sig
   module Transaction : Transaction_intf with type fee := Fee.Unsigned.t
 
   module Fee_transfer : Fee_transfer_intf
+    with type fee := Fee.Unsigned.t
+     and type public_key := Public_key.Compressed.t
 
   module Super_transaction : Super_transaction_intf
+    with type valid_transaction := Transaction.With_valid_signature.t
+     and type fee_transfer := Fee_transfer.t
+     and type unsigned_fee := Fee.Unsigned.t
 
   module Block_nonce : Nonce_intf
 
@@ -479,9 +484,6 @@ Merge Snark:
       fee_excess_total = fee_excess12 + fee_excess23
   *)
 
-  module Ledger_builder_diff :
-    Ledger_builder_diff_intf with type transaction := Transaction.t
-
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
@@ -494,6 +496,13 @@ Merge Snark:
      and type fee := Fee.Unsigned.t
      and type public_key := Public_key.Compressed.t
 
+  module Ledger_builder_diff :
+    Ledger_builder_diff_intf
+    with type transaction := Transaction.With_valid_signature.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type public_key := Public_key.Compressed.t
+     and type completed_work := Completed_work.t
+
   module Ledger_builder :
     Ledger_builder_intf
     with type diff := Ledger_builder_diff.t
@@ -504,6 +513,7 @@ Merge Snark:
      and type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
      and type statement := Completed_work.Statement.t
+     and type completed_work := Completed_work.t
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf
