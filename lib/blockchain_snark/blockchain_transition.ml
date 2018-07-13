@@ -220,30 +220,5 @@ module Make (T : Transaction_snark.Verification.S) = struct
         }
       in
       (location, t, checksum)
-
-    (*
-    let cached () =
-      let open Async in
-      let%bind step =
-        Cached.create ~directory:Cache_dir.cache_dir ~bin_t:Tick.Keypair.bin_t
-          ~digest_input:
-            (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
-          Tick.R1CS_constraint_system.generate_keypair
-          (Tick.constraint_system ~exposing:(Step_base.input ()) Step_base.main)
-      in
-      let module Wrap = Wrap_base (struct
-        let verification_key = Tick.Keypair.vk step.value
-      end) in
-      let%map wrap =
-        Cached.create ~directory:Cache_dir.cache_dir ~bin_t:Tock.Keypair.bin_t
-          ~digest_input:
-            (Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
-          Tock.R1CS_constraint_system.generate_keypair
-          (Tock.constraint_system ~exposing:(Wrap.input ()) Wrap.main)
-      in
-      let location : Location.t = {step= step.path; wrap= wrap.path} in
-      ( location
-      , {Keys.step= step.value; wrap= wrap.value}
-      , checksum ~step:step.checksum ~wrap:wrap.checksum ) *)
   end
 end

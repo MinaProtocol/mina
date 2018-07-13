@@ -201,23 +201,6 @@ module Keys0 = struct
   let dummy : t = { proving = Proving.dummy; verification = Verification.dummy }
 end
 
-(*
-module Keys0 = struct
-  type t = {base: Tick.Keypair.t; wrap: Tock.Keypair.t; merge: Tick.Keypair.t}
-  [@@deriving bin_io]
-
-  let dummy : t =
-    let tick_keypair =
-      Tick.Keypair.create ~pk:Dummy_values.Tick.proving_key
-        ~vk:Dummy_values.Tick.verification_key
-    in
-    let tock_keypair =
-      Tock.Keypair.create ~pk:Dummy_values.Tock.proving_key
-        ~vk:Dummy_values.Tock.verification_key
-    in
-    {base= tick_keypair; wrap= tock_keypair; merge= tick_keypair}
-   end *)
-
 let handle_with_ledger (ledger: Ledger.t) =
   let open Tick in
   let path_at_index idx =
