@@ -74,6 +74,8 @@ module type Ledger_intf = sig
 
   val apply_transaction : t -> valid_transaction -> unit Or_error.t
 
+  val undo_transaction : t -> valid_transaction -> unit Or_error.t
+
   val apply_super_transaction : t -> super_transaction -> unit Or_error.t
 
   val undo_super_transaction : t -> super_transaction -> unit Or_error.t
@@ -179,8 +181,22 @@ module type Completed_work_intf = sig
     type t = statement list
   end
 
+(* TODO: The SOK message actually should bind the SNARK to
+   be in this particular bundle. The easiest way would be to
+   SOK with
+   H(all_statements_in_bundle || fee || public_key)
+*)
   type t = {fee: fee; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]
+
+  module Checked : sig
+    type t
+    [@@deriving sexp, bin_io]
+  end
+
+  val check : t -> Statement.t -> Checked.t option Deferred.t
+
+  val forget : Checked.t -> t
 
   val proofs_length : int
 end
@@ -188,11 +204,15 @@ end
 module type Ledger_builder_diff_intf = sig
   type transaction
 
+  type transaction_with_valid_signature
+
   type ledger_builder_hash
 
   type public_key
 
   type completed_work
+
+  type completed_work_checked
 
   type t =
     { prev_hash: ledger_builder_hash
@@ -200,14 +220,32 @@ module type Ledger_builder_diff_intf = sig
     ; transactions: transaction list
     ; creator: public_key }
   [@@deriving sexp, bin_io]
+
+  module With_valid_signatures_and_proofs : sig
+    type t =
+      { prev_hash: ledger_builder_hash
+      ; completed_works: completed_work_checked list
+      ; transactions: transaction_with_valid_signature list
+      ; creator: public_key }
+    [@@deriving sexp, bin_io]
+  end
+
+  val forget : With_valid_signatures_and_proofs.t -> t
 end
 
 module type Ledger_builder_transition_intf = sig
   type ledger_builder
 
   type diff
+  type diff_with_valid_signatures_and_proofs
 
   type t = {old: ledger_builder; diff: diff}
+
+  module With_valid_signatures_and_proofs : sig
+    type t = {old: ledger_builder; diff: diff_with_valid_signatures_and_proofs}
+  end
+
+  val forget : With_valid_signatures_and_proofs.t -> t
 end
 
 module type Ledger_builder_intf = sig
@@ -216,6 +254,7 @@ module type Ledger_builder_intf = sig
   type diff
 
   type ledger_builder_hash
+  type ledger_hash
 
   type public_key
 
@@ -250,6 +289,8 @@ module type Ledger_builder_intf = sig
     -> transactions_by_fee:transaction_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
     -> diff
+       * [`Hash_after_applying of ledger_builder_hash * ledger_hash]
+       * [`Ledger_proof of ledger_proof option]
 end
 
 module type Nonce_intf = sig
@@ -325,6 +366,7 @@ end
 
 module type Transition_intf = sig
   type ledger_hash
+  type ledger_builder_hash
 
   type proof
 
@@ -332,12 +374,13 @@ module type Transition_intf = sig
 
   type time
 
-  type ledger_builder_transition
+  type ledger_builder_diff
 
   type t =
     { ledger_hash: ledger_hash (* TODO: I believe this is unused. *)
-    ; ledger_proof: proof
-    ; ledger_builder_transition: ledger_builder_transition
+    ; ledger_builder_hash : ledger_builder_hash
+    ; ledger_proof: proof option
+    ; ledger_builder_transition: ledger_builder_diff
     ; timestamp: time
     ; nonce: nonce }
   [@@deriving fields]
@@ -487,46 +530,61 @@ Merge Snark:
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
-  module Ledger_proof : Proof_intf
+  module Ledger_proof : sig
+    type statement
+
+    type t
+
+    val verify
+      : t
+      -> statement
+      -> message:(Fee.Unsigned.t * Public_key.Compressed.t)
+      -> bool Deferred.t
+  end
 
   module Completed_work :
     Completed_work_intf
     with type proof := Ledger_proof.t
-     and type statement := Ledger_proof.input
+     and type statement := Ledger_proof.statement
      and type fee := Fee.Unsigned.t
      and type public_key := Public_key.Compressed.t
 
   module Ledger_builder_diff :
     Ledger_builder_diff_intf
-    with type transaction := Transaction.With_valid_signature.t
+    with type transaction := Transaction.t
+     and type transaction_with_valid_signature := Transaction.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
+     and type completed_work_checked := Completed_work.Checked.t
 
   module Ledger_builder :
     Ledger_builder_intf
     with type diff := Ledger_builder_diff.t
      and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_hash := Ledger_hash.t
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
      and type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
      and type statement := Completed_work.Statement.t
-     and type completed_work := Completed_work.t
+     and type completed_work := Completed_work.Checked.t
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf
     with type diff := Ledger_builder_diff.t
      and type ledger_builder := Ledger_builder.t
+     and type diff_with_valid_signatures_and_proofs := Ledger_builder_diff.With_valid_signatures_and_proofs.t
 
   module Transition :
     Transition_intf
     with type ledger_hash := Ledger_hash.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
      and type proof := Ledger_proof.t
      and type nonce := Block_nonce.t
      and type time := Time.t
-     and type ledger_builder_transition := Ledger_builder_transition.t
+     and type ledger_builder_diff := Ledger_builder_diff.t
 
   module State : sig
     include State_intf
@@ -568,31 +626,24 @@ struct
   let step' t (transition: Transition.t) : t Deferred.t =
     let state = t.state.data in
     let proof = t.state.proof in
-    let {Ledger_builder_transition.old;diff} = transition.ledger_builder_transition in
-    match%bind Ledger_builder.apply old diff with
-    | Error e -> return t
-    (* TODO: This proof should go somewhere! Also we mutated [old] so not clear
-       if that's ok *)
-    | Ok maybe_new_ledger ->
-        let next_difficulty =
-          Difficulty.next state.next_difficulty ~last:state.timestamp
-            ~this:transition.timestamp
-        in
-        let new_state : State.t =
-          { next_difficulty
-          ; previous_state_hash= State.hash state
-          ; ledger_builder_hash= Ledger_builder.hash old
-          ; ledger_hash= Ledger.merkle_root (Ledger_builder.ledger old)
-          ; strength=
-              Strength.increase state.strength ~by:state.next_difficulty
-          ; timestamp= transition.timestamp }
-        in
-        let%map proof =
-          Block_state_transition_proof.prove_zk_state_valid
-            {old_state= state; old_proof= proof; transition}
-            ~new_state
-        in
-        {state= {data= new_state; proof}}
+    let next_difficulty =
+      Difficulty.next state.next_difficulty ~last:state.timestamp
+        ~this:transition.timestamp
+    in
+    let new_state : State.t =
+      { next_difficulty
+      ; previous_state_hash= State.hash state
+      ; ledger_builder_hash= transition.ledger_builder_hash
+      ; ledger_hash= transition.ledger_hash
+      ; strength= Strength.increase state.strength ~by:state.next_difficulty
+      ; timestamp= transition.timestamp }
+    in
+    let%map proof =
+      Block_state_transition_proof.prove_zk_state_valid
+        {old_state= state; old_proof= proof; transition}
+        ~new_state
+    in
+    {state= {data= new_state; proof}}
 
   let create ~state : t = {state}
 

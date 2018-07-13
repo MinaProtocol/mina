@@ -18,6 +18,7 @@
       protocols
       nanobit_base
       ledger_builder
+      ledger_builder_controller
       proof_of_work
       sparse_ledger
       blockchain_snark
@@ -25,6 +26,8 @@
       transaction_pool
       snarky
       snark_keys
+      snark_pool
+      network_pool
       storage
       logger
       async

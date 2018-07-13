@@ -9,9 +9,9 @@ type ('work, 'priced_proof) diff =
   | Add_solved_work of ('work * 'priced_proof)
 
 module Make
-    (Proof : Proof_intf)
-    (Fee : Comparable.S)
-    (Work : Hashable.S_binable)
+    (Proof : sig type t end)
+    (Fee : sig type t end)
+    (Work : sig type t end)
     (Pool : Snark_pool.S
             with type work := Work.t
              and type proof := Proof.t

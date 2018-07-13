@@ -17,28 +17,26 @@ module type Init_intf = sig
   val fee_public_key : Public_key.Compressed.t
 end
 
-module Transaction_snark_statement = struct
-  type t = 
-    { source : Nanobit_base.Ledger_hash.Stable.V1.t
-    ; target : Nanobit_base.Ledger_hash.Stable.V1.t
-    ; fee_excess : Currency.Fee.Signed.Stable.V1.t
-    ; proof_type : [`Merge | `Base]
-    }
-  [@@deriving sexp, bin_io]
+module type State_proof_intf = sig
+  type t [@@deriving bin_io, sexp]
+
+  include Protocols.Coda_pow.Proof_intf
+    with type input := State.t
+     and type t := t
 end
 
 module Make_inputs0
-    (Init : Init_intf)
     (Ledger_proof : sig
        type t [@@deriving sexp, bin_io]
        val verify
          : t
-         -> Transaction_snark_statement.t
+         -> Transaction_snark.Statement.t
          -> message:(Currency.Fee.t * Public_key.Compressed.t)
          -> bool Deferred.t
      end)
-    (State_proof : Protocols.Coda_pow.Proof_intf with type input := State.t)
+    (State_proof : State_proof_intf)
     (Difficulty : module type of Difficulty)
+    (Init : Init_intf with type proof = State_proof.t)
 =
 struct
   open Protocols.Coda_pow
@@ -68,6 +66,16 @@ struct
   module Ledger_hash = Ledger_hash.Stable.V1
 
   module Pow = Proof_of_work
+
+  module Amount = struct
+    module Signed = struct
+      include Currency.Amount.Signed
+      include (Currency.Amount.Signed.Stable.V1 :
+                 module type of Currency.Amount.Signed.Stable.V1
+               with type t := t
+                and type ('a, 'b) t_ := ('a, 'b) t_)
+    end
+  end
 
   module Fee = struct
     module Unsigned = struct
@@ -124,11 +132,7 @@ struct
     include (Transaction_snark.Transition : module type of Transaction_snark.Transition with type t := t)
   end
 
-  module Ledger : Ledger_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
-     and type super_transaction := Super_transaction.t
-     and type ledger_hash := Ledger_hash.t
-  = struct
+  module Ledger = struct
     include Ledger
 
     let apply_super_transaction l = function
@@ -136,53 +140,100 @@ struct
       | Fee_transfer t -> apply_fee_transfer l t
 
     let undo_super_transaction l = function
-      | Super_transaction.Transaction t -> undo_transaction l (t :> Transaction.t)
+      | Super_transaction.Transaction t -> undo_transaction l t
       | Fee_transfer t -> undo_fee_transfer l t
   end
 
   module Transaction_snark = struct
-    module Statement = Transaction_snark_statement
+    module Statement = Transaction_snark.Statement
 
     include Ledger_proof
   end
 
-  module Completed_work : Completed_work_intf
-    with type fee := Fee.Unsigned.t
-     and type proof := Transaction_snark.t
-     and type statement := Transaction_snark.Statement.t
-     and type public_key := Public_key.Compressed.t
+  module Ledger_proof = struct
+    include Ledger_proof
+    type statement = Transaction_snark.Statement.t
+  end
+
+  module Completed_work 
   = struct
     let proofs_length = 2
 
     module Statement = struct
-      type t = Transaction_snark.Statement.t list
+      module T = struct
+        type t = Transaction_snark.Statement.t list
+        [@@deriving bin_io, sexp, hash, compare]
+      end
+      include T
+      include Hashable.Make_binable(T)
+
+      let gen =
+        Quickcheck.Generator.list_with_length proofs_length
+          Transaction_snark.Statement.gen
+    end
+
+    module Proof = struct
+      type t = Transaction_snark.t list
       [@@deriving bin_io, sexp]
     end
 
-    type t =
-      { fee: Fee.Unsigned.t
-      ; proofs: Transaction_snark.t list
-      ; prover: Public_key.Compressed.t }
-    [@@deriving sexp, bin_io]
+    module T = struct
+      type t =
+        { fee: Fee.Unsigned.t
+        ; proofs: Proof.t
+        ; prover: Public_key.Compressed.t }
+      [@@deriving sexp, bin_io]
+    end
+
+    include T
+
+    module Checked = struct
+      include T
+    end
+
+    let forget = Fn.id
+
+    let check ({ fee; prover; proofs } as t) stmts =
+      let message = (fee, prover) in
+      match List.zip proofs stmts with
+      | None -> return None
+      | Some ps ->
+        let%map good =
+          Deferred.List.for_all ps ~f:(fun (proof, stmt) ->
+            Transaction_snark.verify ~message proof stmt)
+        in
+        Option.some_if good t
   end
 
   module Difficulty = Difficulty
-
-  module Ledger_proof = struct
-    include Ledger_proof
-    type input = Transaction_snark.Statement.t
-  end
 
   module Ledger_builder_diff = struct
     type t =
       { prev_hash: Ledger_builder_hash.t
       ; completed_works: Completed_work.t list
-      ; transactions: Transaction.With_valid_signature.t list
+      ; transactions: Transaction.t list
       ; creator: Public_key.Compressed.t }
     [@@deriving sexp, bin_io]
+
+    module With_valid_signatures_and_proofs = struct
+      type t =
+        { prev_hash: Ledger_builder_hash.t
+        ; completed_works: Completed_work.Checked.t list
+        ; transactions: Transaction.With_valid_signature.t list
+        ; creator: Public_key.Compressed.t }
+      [@@deriving sexp, bin_io]
+    end
+
+    let forget { With_valid_signatures_and_proofs.prev_hash; completed_works; transactions; creator } =
+      { prev_hash
+      ; completed_works = List.map ~f:Completed_work.forget completed_works
+      ; transactions = (transactions :> Transaction.t list)
+      ; creator
+      }
   end
 
   module Ledger_builder = Ledger_builder.Make(struct
+    module Amount = Amount
     module Fee = Fee
     module Public_key = Public_key.Compressed
     module Transaction = Transaction
@@ -198,271 +249,224 @@ struct
 
   module Ledger_builder_transition = struct
     type t = {old: Ledger_builder.t; diff: Ledger_builder_diff.t}
+    [@@deriving sexp, bin_io]
+
+    module With_valid_signatures_and_proofs = struct
+      type t = {old: Ledger_builder.t; diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t}
+      [@@deriving sexp, bin_io]
+    end
+
+    let forget { With_valid_signatures_and_proofs.old; diff } =
+      { old; diff = Ledger_builder_diff.forget diff }
   end
 
   module Transition = struct
     type t =
       { ledger_hash: Ledger_hash.t
-      ; ledger_proof: Transaction_snark.t
-      ; ledger_builder_transition : Ledger_builder_transition.t
+      ; ledger_builder_hash : Ledger_builder_hash.t
+      ; ledger_proof: Ledger_proof.t option
+      ; ledger_builder_transition: Ledger_builder_diff.t
       ; timestamp: Time.t
       ; nonce: Block_nonce.t }
-    [@@deriving fields]
+    [@@deriving fields, sexp]
   end
 
+  module Transition_with_witness = struct
+    type t =
+      { previous_ledger_hash: Ledger_hash.t
+      ; transition: Transition.t }
+    [@@deriving sexp]
+
+    let forget_witness { transition; _ } = transition
+  end
 end
 
-(*
 module Make_inputs
-    (Init : Init_intf)
-    (Ledger_proof : Protocols.Minibit_pow.Proof_intf) (State_proof : sig
-        type t = Init.proof [@@deriving bin_io]
-
-        include Protocols.Minibit_pow.Proof_intf
-                with type input = State.t
-                 and type t := t
-    end) (Difficulty : module type of Difficulty)
+    (Ledger_proof0 : sig
+       type t [@@deriving sexp, bin_io]
+       val statement : t -> Transaction_snark.Statement.t
+       val verify
+         : t
+         -> Transaction_snark.Statement.t
+         -> message:(Currency.Fee.t * Public_key.Compressed.t)
+         -> bool Deferred.t
+     end)
+    (State_proof : State_proof_intf)
+    (Difficulty : module type of Difficulty)
+    (Init : Init_intf with type proof = State_proof.t)
     (Store : Storage.With_checksum_intf)
-    (Bundle : Bundle.S0 with type proof := Ledger_proof.t) =
+    ()
+=
 struct
-  module Inputs0 =
-    Make_inputs0 (Init) (Ledger_proof) (State_proof) (Difficulty)
+  module Inputs0 = Make_inputs0(Ledger_proof0)(State_proof)(Difficulty)(Init)
   include Inputs0
 
-  module Net = Minibit_networking.Make (struct
-    module State_with_witness = State_with_witness
-    module Ledger_hash = Ledger_hash
-    module Ledger = Ledger
-    module State = State
-  end)
-
-  module Ledger_fetcher_io = Net.Ledger_fetcher_io
-  module State_io = Net.State_io
-
-  module Bundle = struct
-    include Bundle
-
-    let create ledger ts =
-      create ledger ~conf_dir:Init.conf_dir ts Init.fee_public_key
+  module Proof_carrying_state = struct
+    type t = (State.t, State.Proof.t) Protocols.Coda_pow.Proof_carrying_data.t
+    [@@deriving sexp, bin_io]
   end
 
-  module Transaction_pool = Transaction_pool.Make (Transaction) (Ledger)
+  module State_with_witness = struct
+    type t =
+      { ledger_builder_transition: Ledger_builder_transition.With_valid_signatures_and_proofs.t
+      ; state: Proof_carrying_state.t }
+    [@@deriving sexp]
+
+    module Stripped = struct
+      type t =
+        { ledger_builder_transition: Ledger_builder_transition.t
+        ; state: Proof_carrying_state.t }
+      [@@deriving bin_io]
+    end
+
+    let strip { ledger_builder_transition; state } =
+      { Stripped.ledger_builder_transition = Ledger_builder_transition.forget ledger_builder_transition
+      ; state }
+
+    (*
+    let check
+          { Stripped.transactions; ledger_builder_transition; state } =
+      let open Option.Let_syntax in
+      let%map transactions = Option.all (List.map ~f:Transaction.check transactions) in
+      { transactions
+      ; ledger_builder_transition
+      ; state
+      } *)
+
+    let forget_witness { ledger_builder_transition; state } = state
+
+    let add_witness_exn = failwith "TODO?"
+
+    let add_witness = failwith "TODO?"
+  end
 
   module Genesis = struct
-    let state : State.t = State.zero
-
+    let state = State.zero
+    let ledger = Genesis_ledger.ledger
     let proof = Init.genesis_proof
   end
 
-  module Ledger_fetcher = Ledger_fetcher.Make (struct
-    include Inputs0
-    module Net = Net
-    module Store = Store
-    module Genesis = Genesis
-    module Genesis_ledger = Genesis_ledger
-  end)
+  module Snark_pool = struct
+    module Work = Completed_work.Statement
+    module Proof = Completed_work.Proof
 
-  module Miner = Minibit_miner.Make (struct
-    include Inputs0
-    module Bundle = Bundle
-  end)
-end
+    module Fee = struct
+      module T = struct
+        type t = { fee: Fee.Unsigned.t; prover: Public_key.Compressed.t }
+        [@@deriving bin_io, sexp]
 
-module Main_without_snark (Init : Init_intf) = struct
-  module Init = struct
-    type proof = () [@@deriving bin_io]
-
-    let conf_dir = Init.conf_dir
-
-    let prover = Init.prover
-
-    let fee_public_key = Init.fee_public_key
-
-    let genesis_proof = ()
-  end
-
-  module Ledger_proof = Ledger_proof.Debug
-  module State_proof = State_proof.Make_debug (Init)
-
-  module Bundle = struct
-    type t = Ledger_hash.t
-
-    let create ~conf_dir ledger ts _fee_pk =
-      Ledger.merkle_root_after_transactions ledger ts
-
-    let cancel (t: t) : unit = ()
-
-    let target_hash t = t
-
-    let result (t: t) =
-      (* I need this local variable to convince the type checker *)
-      let p : Ledger_proof.t = () in
-      Deferred.Option.return p
-  end
-
-  module Inputs =
-    Make_inputs (Init) (Ledger_proof) (State_proof) (Difficulty) (Storage.Disk)
-      (Bundle)
-
-  module Main =
-    Minibit.Make (Inputs)
-      (struct
-        module Witness = struct
-          type t =
-            { old_state: Inputs.State.t
-            ; old_proof: Inputs.State.Proof.t
-            ; transition: Inputs.Transition.t }
-        end
-
-        let prove_zk_state_valid _ ~new_state:_ = return Inputs.Genesis.proof
-      end)
-end
-
-module Main_with_snark
-    (Storage : Storage.With_checksum_intf)
-    (Init : Init_intf with type proof = Proof.t) =
-struct
-  module Ledger_proof = Ledger_proof.Make_prod (Init)
-  module State_proof = State_proof.Make_prod (Init)
-
-  module Bundle = struct
-    include Bundle
-
-    let result t = Deferred.Option.(result t >>| Transaction_snark.proof)
-  end
-
-  module Inputs =
-    Make_inputs (Init) (Ledger_proof) (State_proof) (Difficulty) (Storage)
-      (Bundle)
-
-  module Main =
-    Minibit.Make (Inputs)
-      (struct
-        module Witness = struct
-          type t =
-            { old_state: Inputs.State.t
-            ; old_proof: Inputs.State.Proof.t
-            ; transition: Inputs.Transition.t }
-        end
-
-        let prove_zk_state_valid
-            ({old_state; old_proof; transition}: Witness.t) ~new_state:_ =
-          Prover.extend_blockchain Init.prover
-            {state= State.to_blockchain_state old_state; proof= old_proof}
-            { header= {time= transition.timestamp; nonce= transition.nonce}
-            ; body=
-                { target_hash= transition.ledger_hash
-                ; proof= transition.ledger_proof } }
-          >>| Or_error.ok_exn >>| Blockchain.proof
-      end)
-end
-
-module type Main_intf = sig
-  module Inputs : sig
-    module Ledger_fetcher : sig
-      type t
-
-      val best_ledger : t -> Ledger.t
-    end
-
-    module Transaction_pool : sig
-      type t
-
-      val add : t -> Transaction.With_valid_signature.t -> t
-    end
-
-    module Net : sig
-      open Kademlia
-
-      module Gossip_net : sig
-        module Params : sig
-          type t =
-            {timeout: Time.Span.t; target_peer_count: int; address: Peer.t}
-        end
+        (* TODO: Compare in a better way than with public key, like in transaction pool *)
+        let compare t1 t2 =
+          let r = compare t1.fee t2.fee in
+          if Int.(<>) r 0
+          then r
+          else Public_key.Compressed.compare t1.prover t2.prover
       end
+      include T
+      include Comparable.Make(T)
 
-      module Config : sig
-        type t =
-          { parent_log: Logger.t
-          ; gossip_net_params: Gossip_net.Params.t
-          ; initial_peers: Peer.t list
-          ; me: Peer.t
-          ; remap_addr_port: Peer.t -> Peer.t }
+      let gen =
+        (* This isn't really a valid public key, but good enough for testing *)
+        let pk =
+          let open Snark_params.Tick in
+          let open Quickcheck.Generator.Let_syntax in
+          let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
+          and is_odd = Bool.gen
+          in
+          let x = Bigint.(to_field (of_bignum_bigint x)) in
+          { Public_key.Compressed.x; is_odd }
+        in
+        Quickcheck.Generator.map2 Fee.Unsigned.gen pk ~f:(fun fee prover ->
+          { fee; prover })
+    end
+
+    module Pool = Snark_pool.Make
+        (Proof)
+        (Fee)
+        (Work)
+
+    module Diff = Network_pool.Snark_pool_diff.Make(Proof)(Fee)(Work)(Pool)
+
+    type pool_diff = Diff.t
+
+    include Network_pool.Make(Pool)(Diff)
+
+    let get_completed_work t statement =
+      Option.map (Pool.request_proof (pool t) statement) ~f:(fun {proof; fee = { fee; prover }} ->
+        { Completed_work.fee; proofs = proof; prover })
+
+    let load ~disk_location ~incoming_diffs =
+      match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
+      | Ok pool ->
+        of_pool_and_diffs pool ~incoming_diffs
+      | Error _e ->
+        create ~incoming_diffs
+  end
+
+  module type S_tmp = Coda.Network_intf
+    with type state_with_witness := State_with_witness.t
+     and type ledger_builder := Ledger_builder.t
+     and type state := State.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+  module Net = (val (failwith "TODO" : (module S_tmp)))
+
+  module Ledger_builder_controller = struct
+    module Inputs = struct
+      module Store = Store
+      module Snark_pool = Snark_pool
+      module Net = struct
+        type net = Net.t
+        include Net.Ledger_builder_io
       end
+      module Ledger_hash = Ledger_hash
+      module Ledger_builder_hash = Ledger_builder_hash
+      module Ledger = Ledger
+      module Ledger_builder_diff = Ledger_builder_diff
+      module Ledger_builder = struct
+        include Ledger_builder
+        type proof = Ledger_proof.t
+        let create ledger = create ~ledger ~self:Init.fee_public_key
+        let apply t diff =
+          Deferred.Or_error.map (Ledger_builder.apply t diff) ~f:(
+            Option.map ~f:(fun proof ->
+              ((Ledger_proof0.statement proof).target, proof)))
+
+      end
+      module State = State
+      module State_hash = State_hash
+      module Valid_transaction = Transaction.With_valid_signature
     end
+
+    include Ledger_builder_controller.Make(Inputs)
   end
 
-  module Main : sig
-    module Config : sig
-      type t =
-        { log: Logger.t
-        ; net_config: Inputs.Net.Config.t
-        ; ledger_disk_location: string
-        ; pool_disk_location: string }
-    end
+  module Transaction_pool = Transaction_pool.Make(Transaction.With_valid_signature)
 
-    type t
-
-    val ledger_fetcher : t -> Inputs.Ledger_fetcher.t
-
-    val modify_transaction_pool :
-      t -> f:(Inputs.Transaction_pool.t -> Inputs.Transaction_pool.t) -> unit
-
-    val create : Config.t -> t Deferred.t
-
-    val run : t -> unit
-  end
+  module Miner = Minibit_miner.Make(Inputs0)
 end
 
-module Run (Program : Main_intf) = struct
-  open Program
+module Coda_with_snark
+    (Ledger_proof0 : sig
+       type t [@@deriving sexp, bin_io]
+       val statement : t -> Transaction_snark.Statement.t
+       val verify
+         : t
+         -> Transaction_snark.Statement.t
+         -> message:(Currency.Fee.t * Public_key.Compressed.t)
+         -> bool Deferred.t
+     end)
+    (State_proof : State_proof_intf)
+    (Init : Init_intf with type proof = State_proof.t)
+    (Store : Storage.With_checksum_intf)
+    () = struct
 
-  let get_balance t (addr: Public_key.Compressed.t) =
-    let ledger = Inputs.Ledger_fetcher.best_ledger (Main.ledger_fetcher t) in
-    let maybe_balance =
-      Option.map (Ledger.get ledger addr) ~f:(fun account ->
-          account.Account.balance )
-    in
-    return maybe_balance
+  module Ledger_proof0 = struct
+    type t = Transaction_snark.t [@@deriving bin_io, sexp]
+    let statement = Transaction_snark.statement
+    let verify
+  end
 
-  let send_txn log t txn =
-    let ledger = Inputs.Ledger_fetcher.best_ledger (Main.ledger_fetcher t) in
-    match Transaction.check txn with
-    | Some txn ->
-        let ledger' = Ledger.copy ledger in
-        let () = Ledger.apply_transaction ledger' txn |> Or_error.ok_exn in
-        Main.modify_transaction_pool t ~f:(fun pool ->
-            Inputs.Transaction_pool.add pool txn ) ;
-        Logger.info log
-          !"Added transaction %{sexp: Transaction.With_valid_signature.t} to \
-            pool successfully"
-          txn ;
-        return (Some ())
-    | None -> return None
+  module Inputs = Make_inputs(Ledger_proof0)(State_proof)(Difficulty)(Init)(Store)()
 
-  let get_nonce t (addr: Public_key.Compressed.t) =
-    let ledger = Inputs.Ledger_fetcher.best_ledger (Main.ledger_fetcher t) in
-    let maybe_nonce =
-      Option.map (Ledger.get ledger addr) ~f:(fun account ->
-          account.Account.nonce )
-    in
-    return maybe_nonce
-
-  let setup_client_server ~minibit ~log ~client_port =
-    (* Setup RPC server for client interactions *)
-    let module Client_server = Client.Rpc_server (struct
-      type t = Main.t
-
-      let get_balance = get_balance
-
-      let get_nonce = get_nonce
-
-      let send_txn = send_txn log
-    end) in
-    Client_server.init_server ~parent_log:log ~minibit ~port:client_port
-
-  let run ~minibit ~log =
-    Logger.debug log "Created minibit\n%!" ;
-    Main.run minibit ;
-    Logger.debug log "Ran minibit\n%!"
-   end *)
+  module Coda = Coda.Make(Inputs)
+end

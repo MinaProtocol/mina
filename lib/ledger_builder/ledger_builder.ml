@@ -3,6 +3,12 @@ open Async_kernel
 open Protocols
 
 module type Inputs_intf = sig
+  module Amount : sig
+    module Signed : sig
+      type t [@@deriving sexp_of]
+    end
+  end
+
   module Fee : sig
     module Unsigned : sig
       type t [@@deriving sexp_of, eq]
@@ -48,7 +54,7 @@ module type Inputs_intf = sig
   module Transaction_snark :
     Coda_pow.Transaction_snark_intf
     with type message := Fee.Unsigned.t * Public_key.t
-     and type fee_excess := Fee.Signed.t
+     and type fee_excess := Amount.Signed.t
      and type ledger_hash := Ledger_hash.t
 
   module Ledger :
@@ -69,7 +75,9 @@ module type Inputs_intf = sig
   module Ledger_builder_diff :
     Coda_pow.Ledger_builder_diff_intf
     with type completed_work := Completed_work.t
-     and type transaction := Transaction.With_valid_signature.t
+     and type completed_work_checked := Completed_work.Checked.t
+     and type transaction := Transaction.t
+     and type transaction_with_valid_signature := Transaction.With_valid_signature.t
      and type public_key := Public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 end
@@ -77,6 +85,7 @@ end
 module Make (Inputs : Inputs_intf) :
   Coda_pow.Ledger_builder_intf
   with type diff := Inputs.Ledger_builder_diff.t
+   and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
    and type public_key := Inputs.Public_key.t
    and type ledger := Inputs.Ledger.t
@@ -84,7 +93,7 @@ module Make (Inputs : Inputs_intf) :
    and type transaction_with_valid_signature :=
               Inputs.Transaction.With_valid_signature.t
    and type statement := Inputs.Completed_work.Statement.t
-   and type completed_work := Inputs.Completed_work.t =
+   and type completed_work := Inputs.Completed_work.Checked.t =
 struct
   type t = unit [@@deriving sexp, bin_io]
 

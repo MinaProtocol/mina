@@ -4,8 +4,10 @@ include Schnorr.Private_key
 
 let create () =
   if Insecure.private_key_generation then
-    Bignum_bigint.random Snark_params.Tick.Hash_curve.Params.order
+    Bignum_bigint.random Snark_params.Tick.Signature_curve.Params.order
   else failwith "Insecure.private_key_generation"
+
+let gen = Bignum_bigint.(gen_incl zero (Snark_params.Tick.Signature_curve.Params.order - one))
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in

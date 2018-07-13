@@ -21,9 +21,9 @@ struct
 end
 
 module Debug = struct
-  type t = ()
+  type t = unit [@@deriving sexp, bin_io]
 
   type input = ()
 
-  let verify _ _ = return true
+  let verify _ _ ~message = return true
 end

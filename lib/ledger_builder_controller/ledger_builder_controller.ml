@@ -10,8 +10,8 @@ module type Inputs_intf = sig
     type t [@@deriving bin_io]
   end
 
-  module Ledger_builder_transition : sig
-    type t [@@deriving eq, sexp, compare, bin_io]
+  module Ledger_builder_diff : sig
+    type t [@@deriving sexp, bin_io]
   end
 
   module Ledger : sig
@@ -35,7 +35,7 @@ module type Inputs_intf = sig
 
     val apply :
          t
-      -> Ledger_builder_transition.t
+      -> Ledger_builder_diff.t
       -> (Ledger_hash.t * proof) option Deferred.Or_error.t
   end
 
@@ -51,10 +51,6 @@ module type Inputs_intf = sig
     val hash : t -> State_hash.t
 
     val previous_state_hash : t -> State_hash.t
-  end
-
-  module Valid_transaction : sig
-    type t [@@deriving eq, sexp, compare, bin_io]
   end
 
   module Net : sig
@@ -75,9 +71,8 @@ module Make (Inputs : Inputs_intf) :
   Coda.Ledger_builder_controller_intf
   with type ledger_builder := Inputs.Ledger_builder.t
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
-   and type ledger_builder_transition := Inputs.Ledger_builder_transition.t
+   and type ledger_builder_diff := Inputs.Ledger_builder_diff.t
    and type ledger := Inputs.Ledger.t
-   and type transaction_with_valid_signature := Inputs.Valid_transaction.t
    and type net := Inputs.Net.net
    and type state := Inputs.State.t
    and type snark_pool := Inputs.Snark_pool.t =
@@ -89,8 +84,8 @@ struct
       { keep_count: int [@default 50]
       ; parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
-      ; ledger_builder_transitions:
-          (Valid_transaction.t list * State.t * Ledger_builder_transition.t)
+      ; ledger_builder_diffs:
+          (State.t * Ledger_builder_diff.t)
           Linear_pipe.Reader.t
       ; genesis_ledger: Ledger.t
       ; disk_location: string

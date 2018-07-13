@@ -4,6 +4,8 @@ open Snark_params.Tick
 module type Basic = sig
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
+  val gen : t Quickcheck.Generator.t
+
   val length_in_bits : int
 
   val ( = ) : t -> t -> bool

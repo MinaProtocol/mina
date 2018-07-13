@@ -4,6 +4,8 @@ open Snark_params.Tick
 module type Basic = sig
   type t [@@deriving sexp, compare, eq, hash]
 
+  val gen : t Quickcheck.Generator.t
+
   module Stable : sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
@@ -66,13 +68,15 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
-  type t = (magnitude, Sgn.t) t_ [@@deriving sexp]
+  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare]
+
+  val gen : t Quickcheck.Generator.t
 
   module Stable : sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare]
     end
   end
 

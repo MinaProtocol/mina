@@ -103,7 +103,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
       Ledger_hash.equal state.ledger_hash block.body.target_hash
       || T.verify
            (Transaction_snark.create ~source:state.ledger_hash
-              ~target:block.body.target_hash ~proof_type:Merge
+              ~target:block.body.target_hash ~proof_type:`Merge
               ~fee_excess:Currency.Amount.Signed.zero ~proof:block.body.proof)
     in
     let open Or_error.Let_syntax in
