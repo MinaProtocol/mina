@@ -10,8 +10,8 @@ open Unsigned
    (input and output locations)
 *)
 
-module Procedure = struct
-  type 'a t = 'a -> unit
+module Function = struct
+  type ('a, 'b) t = 'a -> 'b
 end
 
 module Location : sig
@@ -78,7 +78,7 @@ module Typ = struct
     | Tuple2  : 'a Scalar.t * 'b Scalar.t -> ('a * 'b) t
     | Arith_result  : uint32 Arith_result.t t
     | Struct : 'a struct_spec -> 'a Struct.t t
-    | Procedure : 'a t -> 'a Procedure.t t
+    | Function : 'a t * 'b t -> ('a, 'b) Function.t t
   and _ struct_spec =
     | [] : unit struct_spec
     | (::) : 'a t * 'b struct_spec -> ('a * 'b) struct_spec
@@ -280,17 +280,17 @@ end
 module T = struct
   type 'a t =
     | Set_prefix of string * 'a t
-    | Declare_procedure
+    | Declare_function
       : string
-        * ('f, 'for_id, 'g) Arguments_spec.t
-        * ('g, unit t) Local_variables_spec.t
+        * ('f, 'args, 'g) Arguments_spec.t
+        * ('g, 'ret Id.t t) Local_variables_spec.t
         * 'f
-        * ('for_id Procedure.t Id.t -> 'a t)
+        * (('args, 'ret) Function.t Id.t -> 'a t)
         -> 'a t
-    | Call_procedure
-      : 's Procedure.t Id.t
-        * 's Struct.t
-        * (unit -> 'a t)
+    | Call_function
+      : ('args, 'ret) Function.t Id.t
+        * 'args Struct.t
+        * ('ret Id.t -> 'a t)
       -> 'a t
     | Create_pointer
       : 'c Typ.Scalar.t * string
@@ -323,10 +323,10 @@ module T = struct
 
   let rec map t ~f =
     match t with
-    | Call_procedure (id, arg, k) ->
-      Call_procedure (id, arg, fun () -> map (k ()) ~f)
-    | Declare_procedure (name, args, vars, body, k) ->
-      Declare_procedure (name, args, vars, body, fun x -> map (k x) ~f)
+    | Call_function (id, arg, k) ->
+      Call_function (id, arg, fun x -> map (k x) ~f)
+    | Declare_function (name, args, vars, body, k) ->
+      Declare_function (name, args, vars, body, fun x -> map (k x) ~f)
     | Pure x -> Pure (f x)
     | Set_prefix (s, k) -> Set_prefix (s, map k ~f)
     | Declare_constant (typ, x, lab, k) ->
@@ -348,10 +348,10 @@ module T = struct
   let rec bind : type a b. a t -> f:(a -> b t) -> b t =
     fun t ~f ->
       match t with
-      | Declare_procedure (name, args, vars, body, k) ->
-        Declare_procedure (name, args, vars, body, fun x -> bind (k x) ~f)
-      | Call_procedure (id, arg, k) ->
-        Call_procedure (id, arg, fun () -> bind (k ()) ~f)
+      | Declare_function (name, args, vars, body, k) ->
+        Declare_function (name, args, vars, body, fun x -> bind (k x) ~f)
+      | Call_function (id, arg, k) ->
+        Call_function (id, arg, fun x -> bind (k x) ~f)
       | Pure x -> f x
       | Set_prefix (s, k) -> Set_prefix (s, bind k ~f)
       | Create_pointer (typ, s, k) ->
@@ -388,8 +388,8 @@ module T = struct
   let constant ?label typ x =
     Declare_constant (typ, x, label, return)
 
-  let declare_procedure name ~args ~vars body =
-    Declare_procedure (name, args, vars, body, return)
+  let declare_function name ~args ~vars body =
+    Declare_function (name, args, vars, body, return)
 end
 
 include Monad.Make(struct
@@ -735,52 +735,64 @@ let bitwise_or x y lab =
 let equal_uint32 x y lab =
   do_value (Op.Value.Equal (x, y)) lab
 
-let bigint_add n ~carry_pointer:carryp rs xs ys =
-  let%bind () = set_prefix "bigint_add" in
-(*   let%bind carryp = create_pointer Typ.Scalar.Uint32 "carryp" in *)
-  let%bind () = constant Typ.uint32 UInt32.zero >>= store carryp in
-  let%bind start = constant Typ.uint32 Unsigned.UInt32.zero in
-  let%bind stop = constant Typ.uint32 Unsigned.UInt32.(sub n one) in
-  for_ (start, stop) (fun i ->
-    let%bind x = array_get "x" xs i
-    and y = array_get "y" ys i
-    in
-    let%bind { high_bits=carry1; low_bits=x_plus_y } =
-      add x y "x_plus_y"
-    in
-    let%bind carry = load carryp "carry" in
-    let%bind {low_bits=x_plus_y_with_prev_carry; high_bits=carry2 } =
-      add x_plus_y carry "x_plus_y_with_prev_carry"
-    in
+let bigint = Typ.Array Uint32
+
+let bigint_add n=
+  declare_function "bigint_add"
+    ~args:Arguments_spec.([ bigint; bigint; bigint ])
+    ~vars:Local_variables_spec.([ Typ.uint32 ]) (fun rs xs ys carryp ->
+    let%bind () = set_prefix "bigint_add" in
+    let%bind () = constant Typ.uint32 UInt32.zero >>= store carryp in
+    let%bind start = constant Typ.uint32 Unsigned.UInt32.zero in
+    let%bind stop = constant Typ.uint32 Unsigned.UInt32.(sub n one) in
     let%bind () =
-      let%bind new_carry = bitwise_or carry1 carry2 "new_carry" in
-      store carryp new_carry
+      for_ (start, stop) (fun i ->
+        let%bind x = array_get "x" xs i
+        and y = array_get "y" ys i
+        in
+        let%bind { high_bits=carry1; low_bits=x_plus_y } =
+          add x y "x_plus_y"
+        in
+        let%bind carry = load carryp "carry" in
+        let%bind {low_bits=x_plus_y_with_prev_carry; high_bits=carry2 } =
+          add x_plus_y carry "x_plus_y_with_prev_carry"
+        in
+        let%bind () =
+          let%bind new_carry = bitwise_or carry1 carry2 "new_carry" in
+          store carryp new_carry
+        in
+        array_set rs i x_plus_y_with_prev_carry)
     in
-    array_set rs i x_plus_y_with_prev_carry)
+    load carryp "return_carry")
 
 (* NB: This only works when ys <= xs *)
 let bigint_sub n ~carry_pointer:carryp rs xs ys =
-  let%bind () = set_prefix "bigint_sub" in
-(*   let%bind carryp = create_pointer Typ.Scalar.Uint32 "carryp" in *)
-  let%bind () = constant Typ.uint32 UInt32.zero >>= store carryp in
-  let%bind start = constant Typ.uint32 Unsigned.UInt32.zero in
-  let%bind stop = constant Typ.uint32 Unsigned.UInt32.(sub n one) in
-  for_ (start, stop) (fun i ->
-    let%bind x = array_get "x" xs i
-    and y = array_get "y" ys i
-    in
-    let%bind { high_bits=carry1; low_bits=x_plus_y } =
-      sub x y "x_plus_y"
-    in
-    let%bind carry = load carryp "carry" in
-    let%bind {low_bits=x_plus_y_with_prev_carry; high_bits=carry2 } =
-      sub x_plus_y carry "x_plus_y_with_prev_carry"
-    in
+  declare_function "bigint_sub"
+    ~args:Arguments_spec.([ bigint; bigint; bigint ])
+    ~vars:Local_variables_spec.([ Typ.uint32 ]) (fun rs xs ys carryp ->
+    let%bind () = set_prefix "bigint_sub" in
+    let%bind () = constant Typ.uint32 UInt32.zero >>= store carryp in
+    let%bind start = constant Typ.uint32 Unsigned.UInt32.zero in
+    let%bind stop = constant Typ.uint32 Unsigned.UInt32.(sub n one) in
     let%bind () =
-      let%bind new_carry = bitwise_or carry1 carry2 "new_carry" in
-      store carryp new_carry
+      for_ (start, stop) (fun i ->
+        let%bind x = array_get "x" xs i
+        and y = array_get "y" ys i
+        in
+        let%bind { high_bits=carry1; low_bits=x_plus_y } =
+          sub x y "x_plus_y"
+        in
+        let%bind carry = load carryp "carry" in
+        let%bind {low_bits=x_plus_y_with_prev_carry; high_bits=carry2 } =
+          sub x_plus_y carry "x_plus_y_with_prev_carry"
+        in
+        let%bind () =
+          let%bind new_carry = bitwise_or carry1 carry2 "new_carry" in
+          store carryp new_carry
+        in
+        array_set rs i x_plus_y_with_prev_carry)
     in
-    array_set rs i x_plus_y_with_prev_carry)
+    load carryp "sub_return_carry")
 
 (* Assumption: 2*p > 2^n *)
 let bigint_add_mod ~p n rs xs ys =
