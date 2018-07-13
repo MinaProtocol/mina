@@ -135,7 +135,13 @@ module Value = struct
   type t =
     | T : 'a Typ.t * 'a -> t
 
-  let rec sexp_of_t (T (typ, x)) =
+  let rec sexp_of_struct : type a. a Typ.struct_spec -> a Struct.t -> Sexp.t list =
+    fun spec s ->
+      match spec, s with
+      | Typ.[], Struct.[] -> []
+      | Typ.(::) (t, spec), Struct.(::) (x, s) ->
+        sexp_of_t (T (t, x)) :: sexp_of_struct spec s
+  and sexp_of_t (T (typ, x)) =
     let open Typ in
     let open Scalar in
     match typ with
@@ -151,6 +157,8 @@ module Value = struct
       [%sexp_of: string array]
       (Array.map x ~f:Unsigned.UInt32.to_string)
     | Array Bool -> [%sexp_of: bool array] x
+    | Struct spec -> Sexp.List (sexp_of_struct spec x)
+    | Function _ -> [%sexp_of: unit sexp_opaque] ()
 
   let conv : type a. t -> a Typ.t -> a option =
     fun (T (typ0, x)) typ1 ->
@@ -284,6 +292,7 @@ module T = struct
       : string
         * ('f, 'args, 'g) Arguments_spec.t
         * ('g, 'ret Id.t t) Local_variables_spec.t
+        * 'ret Typ.t
         * 'f
         * (('args, 'ret) Function.t Id.t -> 'a t)
         -> 'a t
@@ -325,8 +334,8 @@ module T = struct
     match t with
     | Call_function (id, arg, k) ->
       Call_function (id, arg, fun x -> map (k x) ~f)
-    | Declare_function (name, args, vars, body, k) ->
-      Declare_function (name, args, vars, body, fun x -> map (k x) ~f)
+    | Declare_function (name, args, vars, ret, body, k) ->
+      Declare_function (name, args, vars, ret, body, fun x -> map (k x) ~f)
     | Pure x -> Pure (f x)
     | Set_prefix (s, k) -> Set_prefix (s, map k ~f)
     | Declare_constant (typ, x, lab, k) ->
@@ -348,8 +357,8 @@ module T = struct
   let rec bind : type a b. a t -> f:(a -> b t) -> b t =
     fun t ~f ->
       match t with
-      | Declare_function (name, args, vars, body, k) ->
-        Declare_function (name, args, vars, body, fun x -> bind (k x) ~f)
+      | Declare_function (name, args, vars, ret, body, k) ->
+        Declare_function (name, args, vars, ret, body, fun x -> bind (k x) ~f)
       | Call_function (id, arg, k) ->
         Call_function (id, arg, fun x -> bind (k x) ~f)
       | Pure x -> f x
@@ -388,8 +397,8 @@ module T = struct
   let constant ?label typ x =
     Declare_constant (typ, x, label, return)
 
-  let declare_function name ~args ~vars body =
-    Declare_function (name, args, vars, body, return)
+  let declare_function name ~args ~vars ~returning body =
+    Declare_function (name, args, vars, returning, body, return)
 end
 
 include Monad.Make(struct
@@ -739,6 +748,7 @@ let bigint = Typ.Array Uint32
 
 let bigint_add n=
   declare_function "bigint_add"
+    ~returning:Typ.uint32
     ~args:Arguments_spec.([ bigint; bigint; bigint ])
     ~vars:Local_variables_spec.([ Typ.uint32 ]) (fun rs xs ys carryp ->
     let%bind () = set_prefix "bigint_add" in
@@ -766,8 +776,9 @@ let bigint_add n=
     load carryp "return_carry")
 
 (* NB: This only works when ys <= xs *)
-let bigint_sub n ~carry_pointer:carryp rs xs ys =
+let bigint_sub n =
   declare_function "bigint_sub"
+    ~returning:Typ.uint32
     ~args:Arguments_spec.([ bigint; bigint; bigint ])
     ~vars:Local_variables_spec.([ Typ.uint32 ]) (fun rs xs ys carryp ->
     let%bind () = set_prefix "bigint_sub" in
@@ -795,96 +806,111 @@ let bigint_sub n ~carry_pointer:carryp rs xs ys =
     load carryp "sub_return_carry")
 
 (* Assumption: 2*p > 2^n *)
-let bigint_add_mod ~p n rs xs ys =
-  let%bind one = constant Typ.uint32 UInt32.one in
-  let%bind zero = constant Typ.uint32 UInt32.zero in
-  let%bind carry_pointer = create_pointer Typ.Scalar.Uint32 "carryp" in
-  let%bind () = bigint_add ~carry_pointer n rs xs ys in
-  let%bind carry_after_add = load carry_pointer "carry_after_add" in
-  let%bind overflow = equal_uint32 carry_after_add one "overflow" in
-  do_if overflow begin
-    let%bind () = bigint_sub ~carry_pointer n rs rs p in
-    let%bind last_carry = load carry_pointer "last_carry" in
-    let%bind didn't_kill_top_bit = equal_uint32 last_carry zero "didnt_kill_top_bit" in
-    do_if didn't_kill_top_bit
-      (bigint_sub ~carry_pointer n rs rs p)
-  end
+let bigint_add_mod ~bigint_add ~bigint_sub ~p n =
+  declare_function "bigint_add_mod"
+    ~args:Arguments_spec.([ bigint; bigint; bigint ])
+    ~vars:Local_variables_spec.([])
+    ~returning:Typ.uint32
+    (fun rs xs ys ->
+      let%bind one = constant Typ.uint32 UInt32.one in
+      let%bind zero = constant Typ.uint32 UInt32.zero in
+      let%bind carry_after_add = bigint_add rs xs ys in
+      let%bind overflow = equal_uint32 carry_after_add one "overflow" in
+      let%bind () =
+        do_if overflow begin
+          let%bind last_carry = bigint_sub rs rs p in
+          let%bind didn't_kill_top_bit = equal_uint32 last_carry zero "didnt_kill_top_bit" in
+          do_if didn't_kill_top_bit
+            (bigint_sub rs rs p >>| ignore)
+        end
+      in
+      return zero)
 
-let bigint_sub_mod ~p n rs xs ys =
-  let%bind one = constant Typ.uint32 UInt32.one in
-  let%bind zero = constant Typ.uint32 UInt32.zero in
-  let%bind carry_pointer = create_pointer Typ.Scalar.Uint32 "carryp" in
-  let%bind () = bigint_sub ~carry_pointer n rs xs ys in
-  let%bind carry_after_sub = load carry_pointer "carry_after_sub" in
-  let%bind underflow = equal_uint32 carry_after_sub one "underflow" in
-  do_if underflow begin
-    let%bind () = bigint_add ~carry_pointer n rs rs p in
-    let%bind last_carry = load carry_pointer "last_carry" in
-    let%bind didn't_kill_top_bit = equal_uint32 last_carry zero "didnt_kill_top_bit" in
-    do_if didn't_kill_top_bit
-      (bigint_add ~carry_pointer n rs rs p)
-  end
+let bigint_sub_mod ~bigint_add ~bigint_sub ~p n =
+  declare_function "bigint_sub_mod" 
+    ~args:Arguments_spec.([ bigint; bigint; bigint ])
+    ~vars:Local_variables_spec.([])
+    (fun rs xs ys ->
+      let%bind one = constant Typ.uint32 UInt32.one in
+      let%bind zero = constant Typ.uint32 UInt32.zero in
+      let%bind carry_after_sub = bigint_sub rs xs ys in
+      let%bind underflow = equal_uint32 carry_after_sub one "underflow" in
+      let%bind () =
+        do_if underflow begin
+          let%bind last_carry = bigint_add rs rs p in
+          let%bind didn't_kill_top_bit = equal_uint32 last_carry zero "didnt_kill_top_bit" in
+          do_if didn't_kill_top_bit
+            (bigint_add rs rs p >>| ignore)
+        end
+      in
+      return zero)
 
 let bigint_mul n ws xs ys =
-  let%bind () = set_prefix "bigint_mul" in
-  let%bind zero = constant Typ.uint32 UInt32.zero
-  and num_limbs = constant Typ.uint32 n
-  and stop = constant Typ.uint32 UInt32.(sub n one)
-  in
-  let start = zero in
-  let%bind kp = create_pointer Typ.Scalar.Uint32 "kp" in
-  for_ (start, stop) (fun j ->
-    let%bind y = array_get "y" ys j in
-    let%bind () = store kp zero in
-    let%bind () =
-      for_ (start, stop) (fun i ->
-        let%bind i_plus_j = add_ignore_overflow i j "i_plus_j" in
-        let%bind k = load kp "k_in_i_loop" in
-        let%bind t =
-          let%bind x = array_get "x" xs i in
-          let%bind xy = mul x y "xy" in
-          let%bind w = array_get "w" ws i_plus_j in
-          (* Claim:
-             x*y + w + k < 2^(2 * 32) (i.e., it will fit in 2 uint32s).
+  declare_function "bigint_mul"
+    ~args:Arguments_spec.([bigint; bigint; bigint])
+    ~vars:Local_variables_spec.([ Typ.uint32 ])
+    ~returning:Typ.uint32
+    (fun ws xs ys kp ->
+      let%bind () = set_prefix "bigint_mul" in
+      let%bind zero = constant Typ.uint32 UInt32.zero
+      and num_limbs = constant Typ.uint32 n
+      and stop = constant Typ.uint32 UInt32.(sub n one)
+      in
+      let start = zero in
+      for_ (start, stop) (fun j ->
+        let%bind y = array_get "y" ys j in
+        let%bind () = store kp zero in
+        let%bind () =
+          for_ (start, stop) (fun i ->
+            let%bind i_plus_j = add_ignore_overflow i j "i_plus_j" in
+            let%bind k = load kp "k_in_i_loop" in
+            let%bind t =
+              let%bind x = array_get "x" xs i in
+              let%bind xy = mul x y "xy" in
+              let%bind w = array_get "w" ws i_plus_j in
+              (* Claim:
+                x*y + w + k < 2^(2 * 32) (i.e., it will fit in 2 uint32s).
 
-             We have
-             x, y, w, k <= 2^32 - 1
-             xy <= (2^32 - 1)(2^32 - 1) = 2^64 - 2 * 2^32 + 1
+                We have
+                x, y, w, k <= 2^32 - 1
+                xy <= (2^32 - 1)(2^32 - 1) = 2^64 - 2 * 2^32 + 1
 
-             so
-             xy + w + k
-             <= 2^64 - 2 * 2^32 + 1 + 2*(2^32 - 1)
-             = 2^64 - 2 * 2^32 + 1 + 2 * 2^32 - 2
-             = 2^64 - 2 * 2^32 + 2 * 2^32 + 1 - 2
-             = 2^64 + 1 - 2
-             = 2^64 - 1
-          *)
-          let%bind k_plus_w = add k w "k_plus_w" in
-          let%bind xy_plus_k_plus_w_low_bits =
-            add xy.low_bits k_plus_w.low_bits "xy_plus_k_plus_w_low_bits"
-          in
-          (* By the above there should be no overflow here *)
-          let%map high_bits =
-            let%bind intermediate =
-              add_ignore_overflow
-                xy.high_bits
-                xy_plus_k_plus_w_low_bits.high_bits
-                "intermediate"
+                so
+                xy + w + k
+                <= 2^64 - 2 * 2^32 + 1 + 2*(2^32 - 1)
+                = 2^64 - 2 * 2^32 + 1 + 2 * 2^32 - 2
+                = 2^64 - 2 * 2^32 + 2 * 2^32 + 1 - 2
+                = 2^64 + 1 - 2
+                = 2^64 - 1
+              *)
+              let%bind k_plus_w = add k w "k_plus_w" in
+              let%bind xy_plus_k_plus_w_low_bits =
+                add xy.low_bits k_plus_w.low_bits "xy_plus_k_plus_w_low_bits"
+              in
+              (* By the above there should be no overflow here *)
+              let%map high_bits =
+                let%bind intermediate =
+                  add_ignore_overflow
+                    xy.high_bits
+                    xy_plus_k_plus_w_low_bits.high_bits
+                    "intermediate"
+                in
+                add_ignore_overflow intermediate k_plus_w.high_bits
+                  "high_bits"
+              in
+              { Arith_result.high_bits
+              ; low_bits = xy_plus_k_plus_w_low_bits.low_bits }
             in
-            add_ignore_overflow intermediate k_plus_w.high_bits
-              "high_bits"
-          in
-          { Arith_result.high_bits
-          ; low_bits = xy_plus_k_plus_w_low_bits.low_bits }
+            let%bind () = array_set ws i_plus_j t.low_bits in
+            store kp t.high_bits
+          )
         in
-        let%bind () = array_set ws i_plus_j t.low_bits in
-        store kp t.high_bits
+        let%bind k = load kp "k_in_j_loop" in
+        let%bind j_plus_n = add_ignore_overflow j num_limbs "j_plus_n" in
+        array_set ws j_plus_n k
       )
-    in
-    let%bind k = load kp "k_in_j_loop" in
-    let%bind j_plus_n = add_ignore_overflow j num_limbs "j_plus_n" in
-    array_set ws j_plus_n k
-  )
+      >>| fun () -> zero
+    )
 
 let bignum_limbs = 24
 let bignum_bytes = 4 * bignum_limbs
