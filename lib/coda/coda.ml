@@ -126,6 +126,8 @@ module type Ledger_builder_controller_intf = sig
 
   type state
 
+  type state_with_proof_checked
+
   type t
 
   type sync_query

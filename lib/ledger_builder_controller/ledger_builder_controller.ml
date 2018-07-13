@@ -17,6 +17,8 @@ module type Inputs_intf = sig
   module Ledger : sig
     type t
 
+    val copy : t -> t
+
     val merkle_root : t -> Ledger_hash.t
   end
 
@@ -71,6 +73,14 @@ module type Inputs_intf = sig
     val ledger_hash : t -> Ledger_hash.t
   end
 
+  (* TODO: Figure out where to plumb this *)
+
+  module State_with_proof_checked : sig
+    type t [@@deriving eq, sexp, compare, bin_io]
+
+    val state : t -> State.t
+  end
+
   module Valid_transaction : sig
     type t [@@deriving eq, sexp, compare, bin_io]
   end
@@ -96,6 +106,15 @@ module type Inputs_intf = sig
       t -> Ledger_hash.t -> [`Ok of Ledger.t | `Target_changed] Deferred.t
   end
 
+  module Step : sig
+    (* This checks the SNARKs in State/LB and does the transition *)
+
+    val step :
+         Ledger_builder.t * State.t
+      -> Ledger_builder_transition.t
+      -> State.t Deferred.Or_error.t
+  end
+
   module Net : sig
     include Coda.Ledger_builder_io_intf
             with type sync_ledger_query := Sync_ledger.query
@@ -104,17 +123,19 @@ module type Inputs_intf = sig
              and type ledger_builder_aux := Ledger_builder.aux_data
              and type ledger_hash := Ledger_hash.t
              and type state := State.t
+             and type state_with_proof_checked := State_with_proof_checked.t
   end
 
   module Store : Storage.With_checksum_intf
 end
 
+(* TODO: Give clear semantics for and fix impl of this, see #300 *)
 module Interruptible = struct
   module T = struct
     type ('a, 's) t =
       { stopped: bool ref
       ; interrupter: ('s -> unit) ref (* Invariant: this is idempotent *)
-      ; d: 'a Deferred.t option }
+      ; d: 'a Deferred.Option.t }
 
     let local t ~f =
       { stopped= t.stopped
@@ -122,18 +143,20 @@ module Interruptible = struct
       ; d= t.d }
 
     let bind t ~f =
-      if !(t.stopped) then {t with d= None}
+      if !(t.stopped) then {t with d= Deferred.return None}
       else
         let d' =
-          Deferred.bind (Option.value_exn t.d) ~f:(fun a ->
-              let t' = f a in
-              t.stopped := !(t.stopped) || !(t'.stopped) ;
-              let last_interrupter = !(t.interrupter) in
-              (t.interrupter :=
-                 fun s -> last_interrupter s ; !(t'.interrupter) s) ;
-              Option.value_exn t'.d )
+          Deferred.Option.bind t.d ~f:(fun a ->
+              if !(t.stopped) then Deferred.return None
+              else
+                let t' = f a in
+                t.stopped := !(t.stopped) || !(t'.stopped) ;
+                let last_interrupter = !(t.interrupter) in
+                (t.interrupter :=
+                   fun s -> last_interrupter s ; !(t'.interrupter) s) ;
+                t'.d )
         in
-        {t with d= Some d'}
+        {t with d= d'}
 
     let interrupt t s =
       t.stopped := true ;
@@ -141,11 +164,13 @@ module Interruptible = struct
 
     let return a =
       { stopped= ref false
-      ; d= Some (Deferred.return a)
+      ; d= Deferred.Option.return a
       ; interrupter= ref (fun s -> ()) }
 
     let uninterruptible d =
-      {stopped= ref false; d= Some d; interrupter= ref Fn.id}
+      { stopped= ref false
+      ; d= Deferred.map d ~f:(fun x -> Some x)
+      ; interrupter= ref Fn.id }
 
     let lift d interrupter =
       (* Make it idempotent *)
@@ -157,7 +182,9 @@ module Interruptible = struct
             called := true ;
             f s )
       in
-      {stopped= ref false; d= Some d; interrupter= ref (once interrupter)}
+      { stopped= ref false
+      ; d= Deferred.map d ~f:(fun x -> Some x)
+      ; interrupter= ref (once interrupter) }
 
     let map = `Define_using_bind
   end
@@ -167,7 +194,7 @@ module Interruptible = struct
   include M
 end
 
-module Make (Inputs : Inputs_intf) (*: sig
+module Make (Inputs : Inputs_intf) : sig
   include Coda.Ledger_builder_controller_intf
           with type ledger_builder := Inputs.Ledger_builder.t
            and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
@@ -184,7 +211,7 @@ module Make (Inputs : Inputs_intf) (*: sig
            and type sync_answer := Inputs.Sync_ledger.answer
 
   val ledger_builder_io : t -> Inputs.Net.t
-end*) = struct
+end = struct
   open Inputs
 
   module Config = struct
@@ -199,8 +226,8 @@ end*) = struct
     [@@deriving make]
   end
 
-  module Tagged_transition = struct
-    type t = {transition: Ledger_builder_transition.t; state: State.t}
+  module Transition_with_target = struct
+    type t = {transition: Ledger_builder_transition.t; target_state: State.t}
     [@@deriving eq, compare, bin_io, sexp, fields]
 
     let ledger_builder_hash {state} = State.ledger_builder_hash state
@@ -219,8 +246,8 @@ end*) = struct
       {transition; state}
   end
 
-  module Tagged_transition_tree =
-    Ktree.Make (Tagged_transition)
+  module Transition_with_target_tree =
+    Ktree.Make (Transition_with_target)
       (struct
         let k = 50
       end)
@@ -229,7 +256,7 @@ end*) = struct
     type t =
       { mutable locked_ledger_builder: Ledger_builder.t
       ; mutable longest_branch_tip: Ledger_builder.t
-      ; mutable ktree: Tagged_transition_tree.t option
+      ; mutable ktree: Transition_with_target_tree.t option
       (* TODO: This impl assumes we have the original Ouroboros assumption. In
          order to work with the Praos assumption we'll need to keep a linked
          list as well at the prefix of size (#blocks possible out of order)
@@ -249,25 +276,42 @@ end*) = struct
       ; state: Inputs.State.t }
   end
 
+  module Path = struct
+    type t = {source: Inputs.State.t; path: Transition_with_target.t list}
+    [@@deriving fields]
+
+    let of_tree_path = function
+      | [] -> failwith "Path can't be empty"
+      | source :: path ->
+          {source= Transition_with_target.target_state source; path}
+
+    let findi t ~f = List.findi t.path ~f
+
+    let drop t i =
+      match List.drop t.path (i - 1) with
+      | x :: xs -> {source= Transition_with_target.target_state x; path= xs}
+      | [] -> failwith "Since we (i-1) this is impossible"
+  end
+
   type t =
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; state: State.t
-    ; strongest_ledgers: (Ledger_builder.t * Aux.t) Linear_pipe.Reader.t }
+    ; strongest_ledgers: (Ledger_builder.t * State.t) Linear_pipe.Reader.t }
 
   let ledger_builder_io {ledger_builder_io} = ledger_builder_io
 
-  let best_tip tree = Tagged_transition_tree.longest_path tree |> List.last_exn
-
-  let locked_head tree = Tagged_transition_tree.longest_path tree |> List.hd_exn
+  let locked_and_best tree =
+    let path = Transition_with_target_tree.longest_path tree in
+    (List.hd_exn path, List.last_exn path)
 
   (* The following assertion will always pass without extra checks because
      we're supposed to have validated the witness upstream this pipe (see
      coda.ml) *)
-  let assert_valid_state (witness: Tagged_transition.t) builder =
+  let assert_valid_state (witness: Transition_with_target.t) builder =
     assert (
       Ledger_builder_hash.equal
-        (Tagged_transition.ledger_builder_hash witness)
+        (Transition_with_target.ledger_builder_hash witness)
         (Ledger_builder.hash builder) ) ;
     ()
 
@@ -294,29 +338,51 @@ end*) = struct
     let ledger_builder_io = Net.create net in
     (* Here we effectfully listen to transitions and emit what we belive are
        the strongest ledger_builders *)
+    let force_apply_transitions lb transitions =
+      Deferred.List.fold ~init:() transitions ~f:(fun () w ->
+          let open Deferred.Let_syntax in
+          match%map
+            Ledger_builder.apply lb w.Transition_with_target.transition
+          with
+          | Ok None -> ()
+          | Ok (Some _) -> ()
+          (* We've already verified that all the patches can be
+            applied successfully before we added to the ktree, so we
+            can force-unwrap here *)
+          | Error e ->
+              failwithf
+                "We should have already verified patches can be applied: %s"
+                (Error.to_string_hum e) () )
+    in
     let possibly_works =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.ledger_builder_transitions ~f:(fun (_, s, transition) ->
           match state.ktree with
-          (* If we've seen no data from the network, we can only do nothing here *)
+          (* TODO: Initialize this with state we queried from our neighbors,
+             see #301 *)
           | None ->
-              state.ktree <- Some (Tagged_transition_tree.single {transition; state= s}) ;
+              state.ktree
+              <- Some
+                   (Transition_with_target_tree.single {transition; state= s}) ;
               return None
           | Some old_tree ->
-              let witness_to_add : Tagged_transition.t = {transition; state= s} in
-              let p_eq_previous_state_hash (w: Tagged_transition.t) =
-                State_hash.equal (Tagged_transition.state_hash w)
-                  (Tagged_transition.previous_state_hash witness_to_add)
+              let witness_to_add : Transition_with_target.t =
+                {transition; state= s}
+              in
+              let p_eq_previous_state_hash (w: Transition_with_target.t) =
+                State_hash.equal
+                  (Transition_with_target.state_hash w)
+                  (Transition_with_target.previous_state_hash witness_to_add)
               in
               (* When we get a new transition adjust our ktree *)
               match
-                Tagged_transition_tree.add old_tree witness_to_add
+                Transition_with_target_tree.add old_tree witness_to_add
                   ~parent:p_eq_previous_state_hash
               with
               | `No_parent ->
                   if
                     Strength.( > ) (Inputs.State.strength s)
-                      (Tagged_transition.strength (best_tip old_tree))
+                      (Transition_with_target.strength (best_tip old_tree))
                   then
                     return
                       (Some (`Sync (transition, s), Inputs.State.ledger_hash s))
@@ -326,40 +392,40 @@ end*) = struct
                   (* Adjust the locked_ledger if necessary *)
                   let%map () =
                     let new_head = locked_head new_tree in
-                    if Tagged_transition.equal (locked_head old_tree) new_head then (
+                    if
+                      Transition_with_target.equal (locked_head old_tree)
+                        new_head
+                    then (
                       state.ktree <- Some new_tree ;
-                      return ()
-                    ) else
+                      return () )
+                    else
                       let lb = state.locked_ledger_builder in
-                      match%map
-                        Ledger_builder.apply lb (Tagged_transition.transition new_head)
-                      with
-                      | Ok _ ->
-                          state.ktree <- Some new_tree ;
-                          assert_valid_state new_head lb
-                      | Error e ->
-                          (* TODO: Punish sender *)
-                          (* Not updating tree *)
-                          Logger.info log "Recieved malicious transition %s"
-                            (Error.to_string_hum e)
+                      let%map () =
+                        force_apply_transitions lb
+                          (Transition_with_target.transition new_head)
+                      in
+                      state.ktree <- Some new_tree ;
+                      assert_valid_state new_head lb
                   in
                   (* Push the longest_branch_tip adjustment work if necessary *)
-                  let new_best_path = Tagged_transition_tree.longest_path new_tree in
+                  let new_best_path =
+                    Transition_with_target_tree.longest_path new_tree
+                    |> Path.of_tree_path
+                  in
                   let new_tip = List.last_exn new_best_path in
-                  if Tagged_transition.equal (best_tip old_tree) new_tip then None
+                  if Transition_with_target.equal (best_tip old_tree) new_tip
+                  then None
                   else
                     Some
                       ( `Path_traversal new_best_path
-                      , Tagged_transition.ledger_hash new_tip ) )
+                      , Transition_with_target.ledger_hash new_tip ) )
     in
     let fold_and_interrupt p ~init ~f =
-      let w : ('a, 's) Interruptible.t option ref = ref None in
-      Linear_pipe.fold p ~init ~f:(fun acc (a, s) ->
-          Option.iter !w ~f:(fun w -> Interruptible.interrupt w s) ;
+      Linear_pipe.fold p ~init:(None, init) ~f:(fun (w, acc) (a, s) ->
+          Option.iter w ~f:(fun w -> Interruptible.interrupt w s) ;
           let w', d, acc' = f (acc, a) in
-          w := Some w' ;
           let%map () = d in
-          acc' )
+          (w', acc') )
       >>| ignore
     in
     let strongest_ledgers_reader, strongest_ledgers_writer =
@@ -387,7 +453,9 @@ end*) = struct
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
             | Ok lb ->
-                let new_tree = Tagged_transition_tree.single {transition; state= s} in
+                let new_tree =
+                  Transition_with_target_tree.single {transition; state= s}
+                in
                 state.ktree <- Some new_tree ;
                 state.locked_ledger_builder <- lb ;
                 Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
@@ -412,48 +480,55 @@ end*) = struct
           instead remember which sub-paths we've validated, and apply
           those without rechecking the SNARKs (see issue #297)
           validated *)
-      let apply lb transition =
-        Interruptible.uninterruptible
-          (Ledger_builder.apply lb transition)
+      let step lb_and_src transition =
+        Interruptible.uninterruptible (Step.step lb_and_src transition)
       in
       let best_lb, path =
         match
-          List.findi new_best_path ~f:(fun i tip ->
-              is_lb_hash_curr_tip tip )
+          Path.findi new_best_path ~f:(fun i tip -> is_lb_hash_curr_tip tip)
         with
         | None ->
-            ( Ledger_builder.copy state.locked_ledger_builder
-            , new_best_path )
+            (Ledger_builder.copy state.locked_ledger_builder, new_best_path)
         | Some (i, _) ->
             ( Ledger_builder.copy state.longest_branch_tip
-            , List.drop new_best_path i )
+            , Path.drop new_best_path i )
       in
       let open Interruptible.Let_syntax in
       let lb = best_lb in
       let%map result =
         List.fold path
-          ~init:(Interruptible.return (`Continue None))
-          ~f:(fun acc w ->
-            match%bind acc with
-            | `Abort -> return `Abort
-            | `Continue _ ->
-                match%map apply lb w.Tagged_transition.transition with
-                | Ok maybe_output -> `Continue maybe_output
-                | Error e ->
-                    (* TODO: Punish sender *)
-                    Logger.info log "Recieved malicious transition %s"
-                      (Error.to_string_hum e) ;
-                    `Abort )
+          ~init:(Interruptible.return (`Continue None), Path.source path)
+          ~f:(fun (work, source_state) next ->
+            let w =
+              match%bind work with
+              | `Abort -> return `Abort
+              | `Continue _ ->
+                  match%map
+                    step (lb, source_state)
+                      next.Transition_with_target.transition
+                  with
+                  | Ok maybe_output ->
+                      (* TODO: Should this assertion be here, or should we handle failure with punishment *)
+                      assert_valid_state lb
+                        next.Transition_with_target.target_state ;
+                      `Continue maybe_output
+                  | Error e ->
+                      (* TODO: Punish sender *)
+                      Logger.info log "Recieved malicious transition %s"
+                        (Error.to_string_hum e) ;
+                      `Abort
+            in
+            (w, Path.source next) )
       in
       match result with
-      | `Continue maybe_output ->
+      | `Continue maybe_output, _ ->
           state.longest_branch_tip <- lb ;
-          Linear_pipe.write_or_exn ~capacity:10
-            strongest_ledgers_writer strongest_ledgers_reader
+          Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
+            strongest_ledgers_reader
             ( lb
             , { Aux.root_and_proof= maybe_output
-              ; state= Tagged_transition.state new_tip } )
-      | `Abort -> ()
+              ; state= Transition_with_target.state new_tip } )
+      | `Abort, _ -> ()
     in
     let d =
       (* TODO: Don't just interrupt blindly, if the work we've done so far is a
@@ -462,22 +537,19 @@ end*) = struct
         | sl_ref, `Sync (transition, s) ->
             let h = Inputs.State.ledger_hash s in
             (* Lazily recreate the sync_ledger if necessary *)
-            let lazy_sl_opt = Option.map !sl_ref ~f:(fun x -> lazy x) in
             let sl : Sync_ledger.t =
-              Option.value lazy_sl_opt
-                ~default:
-                  ( lazy
-                    (let ledger =
-                       Ledger_builder.copy state.locked_ledger_builder
-                       |> Ledger_builder.ledger
-                     in
-                     let sl = Sync_ledger.create ~goal:h ledger in
-                     Net.glue_sync_ledger ledger_builder_io
-                       (Sync_ledger.query_reader sl)
-                       (Sync_ledger.answer_writer sl) ;
-                     Sync_ledger.new_goal sl h ;
-                     sl) )
-              |> Lazy.force
+              match !sl_ref with
+              | None ->
+                  let ledger =
+                    Ledger_builder.ledger state.locked_ledger_builder
+                    |> Ledger.copy
+                  in
+                  let sl = Sync_ledger.create ~goal:h ledger in
+                  Net.glue_sync_ledger ledger_builder_io
+                    (Sync_ledger.query_reader sl)
+                    (Sync_ledger.answer_writer sl) ;
+                  sl
+              | Some sl -> sl
             in
             let w = do_sync sl_ref sl transition s in
             (w, Deferred.return (), sl_ref)
@@ -485,7 +557,7 @@ end*) = struct
             let curr_tip_hash = Ledger_builder.hash state.longest_branch_tip in
             let is_lb_hash_curr_tip w =
               Ledger_builder_hash.equal curr_tip_hash
-                (Tagged_transition.ledger_builder_hash w)
+                (Transition_with_target.ledger_builder_hash w)
             in
             let w = do_path_traversal new_best_path is_lb_hash_curr_tip in
             (Interruptible.local w ~f:ignore, Deferred.return (), sl_ref) )
@@ -496,33 +568,21 @@ end*) = struct
     ; strongest_ledgers= strongest_ledgers_reader
     ; state }
 
+  (* TODO: implement this when sync-ledger merges *)
   let handle_sync_ledger_queries query = failwith "TODO"
 
   let strongest_ledgers {strongest_ledgers} = strongest_ledgers
-
-  let force_apply_transitions lb transitions =
-     Deferred.List.fold ~init:() transitions ~f:(fun () w ->
-       let open Deferred.Let_syntax in
-       match%map Ledger_builder.apply lb w.Tagged_transition.transition with
-       | Ok None -> ()
-       | Ok (Some _) -> ()
-       (* We've already verified that all the patches can be
-          applied successfully before we added to the ktree, so we
-          can force-unwrap here *)
-       | Error e ->
-           failwithf
-             "We should have already verified patches can be \
-              applied: %s"
-             (Error.to_string_hum e) () )
-
 
   (** Returns a reference to a ledger_builder with hash [hash], materialize a
    fresh ledger at a specific hash if necessary *)
   let local_get_ledger t hash =
     let find_state tree lb_hash =
-      Tagged_transition_tree.find_map tree ~f:(fun w ->
-          if Ledger_builder_hash.equal (Tagged_transition.ledger_builder_hash w) lb_hash
-          then Some (Tagged_transition.state w)
+      Transition_with_target_tree.find_map tree ~f:(fun w ->
+          if
+            Ledger_builder_hash.equal
+              (Transition_with_target.ledger_builder_hash w)
+              lb_hash
+          then Some (Transition_with_target.state w)
           else None )
     in
     Option.map t.state.ktree ~f:(fun tree ->
@@ -545,20 +605,20 @@ end*) = struct
         else
           (* Now we need to materialize it *)
           match
-            Tagged_transition_tree.path tree ~f:(fun w ->
-                Ledger_builder_hash.equal hash (Tagged_transition.ledger_builder_hash w)
-            )
+            Transition_with_target_tree.path tree ~f:(fun w ->
+                Ledger_builder_hash.equal hash
+                  (Transition_with_target.ledger_builder_hash w) )
           with
           | Some [] ->
-              failwith "Tagged_transition_trees are always non-empty"
-          | Some ((start::rest_path) as path) ->
+              failwith "Transition_with_target_trees are always non-empty"
+          | Some (start :: rest_path as path) ->
               let lb_start = t.state.locked_ledger_builder in
               assert_valid_state start lb_start ;
               let lb = Ledger_builder.copy lb_start in
               (* Fast-forward the lb *)
               let%map () = force_apply_transitions lb rest_path in
               assert (Ledger_builder_hash.equal (Ledger_builder.hash lb) hash) ;
-              Ok (lb, List.last_exn path |> Tagged_transition.state)
+              Ok (lb, List.last_exn path |> Transition_with_target.state)
           | None -> return (Or_error.error_string "Hash not found locally") )
     |> Option.value
          ~default:(return @@ Or_error.error_string "Haven't seen any nodes yet")
@@ -761,7 +821,7 @@ let%test_module "test" =
       assert_strongest_ledgers lbc_deferred ~transitions ~expected:[1; 2; 3; 5]
 
     let%test_unit "local_get_ledger can materialize a ledger locally" =
-      Backtrace.elide := false;
+      Backtrace.elide := false ;
       let transitions =
         let f = transition in
         [ f 0 (-1) 0
@@ -777,9 +837,7 @@ let%test_module "test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = Lbc.create config in
           (* Drain the first few strongest_ledgers *)
-          let%bind _ =
-            take_map (Lbc.strongest_ledgers lbc) 4 ~f:ignore
-          in
+          let%bind _ = take_map (Lbc.strongest_ledgers lbc) 4 ~f:ignore in
           match%map Lbc.local_get_ledger lbc 6 with
           | Ok (lb, s) -> assert (!lb = 6)
           | Error e ->
