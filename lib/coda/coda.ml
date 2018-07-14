@@ -116,7 +116,9 @@ module type Ledger_builder_controller_intf = sig
       ; parent_log: Logger.t
       ; net_deferred: net Deferred.t
       ; ledger_builder_transitions:
-          (transaction_with_valid_signature list * state * ledger_builder_transition)
+          ( transaction_with_valid_signature list
+          * state
+          * ledger_builder_transition )
           Linear_pipe.Reader.t
       ; genesis_ledger: ledger
       ; disk_location: string
@@ -413,8 +415,7 @@ struct
   let run t =
     Logger.info t.log "Starting to run Coda" ;
     let p : Protocol.t =
-      Protocol.create
-        ~state:{data= Genesis.state; proof= Genesis.proof}
+      Protocol.create ~state:{data= Genesis.state; proof= Genesis.proof}
     in
     let miner_transitions_protocol = Miner.transitions t.miner in
     let protocol_events =

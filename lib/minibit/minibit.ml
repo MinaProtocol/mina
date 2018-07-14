@@ -30,11 +30,13 @@ module type Ledger_builder_io_intf = sig
 
   val create : net -> t
 
-  val get_ledger_builder_aux_at_hash :
-    t -> hash -> aux Deferred.t
+  val get_ledger_builder_aux_at_hash : t -> hash -> aux Deferred.t
 
   val glue_sync_ledger :
-    t -> sync_ledger_query Linear_pipe.Reader.t -> sync_ledger_answer Linear_pipe.Writer.t -> unit
+       t
+    -> sync_ledger_query Linear_pipe.Reader.t
+    -> sync_ledger_answer Linear_pipe.Writer.t
+    -> unit
 end
 
 module type Network_intf = sig
@@ -71,8 +73,10 @@ module type Network_intf = sig
 
   val create :
        Config.t
-    -> get_ledger_builder_aux_at_hash:(ledger_builder_hash -> ledger_builder_aux option Deferred.t)
-    -> answer_sync_ledger_query:(sync_ledger_query -> sync_ledger_answer Deferred.t)
+    -> get_ledger_builder_aux_at_hash:(   ledger_builder_hash
+                                       -> ledger_builder_aux option Deferred.t)
+    -> answer_sync_ledger_query:(   sync_ledger_query
+                                 -> sync_ledger_answer Deferred.t)
     -> t Deferred.t
 end
 
@@ -188,6 +192,7 @@ module type Inputs_intf = sig
   include Minibit_pow.Inputs_intf
 
   type ledger_builder_hash
+
   type ledger_builder_aux
 
   module Proof_carrying_state : sig
@@ -197,6 +202,7 @@ module type Inputs_intf = sig
 
   module Sync_ledger : sig
     type query [@@deriving bin_io]
+
     type answer [@@deriving bin_io]
   end
 
@@ -262,8 +268,9 @@ struct
     ; net: Net.t
     ; state_io: Net.State_io.t
     ; miner_changes_writer: Miner.change Linear_pipe.Writer.t
-    ; miner_broadcast_writer: State_with_witness.t Linear_pipe.Writer.t
-    (* TODO: Is this the best spot for the transaction_pool ref? *)
+    ; miner_broadcast_writer:
+        State_with_witness.t Linear_pipe.Writer.t
+        (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; mutable transaction_pool: Transaction_pool.t
     ; log: Logger.t }
 

@@ -4,6 +4,7 @@ open Kademlia
 
 module type Sync_ledger_intf = sig
   type query [@@deriving bin_io]
+
   type response [@@deriving bin_io]
 end
 
@@ -56,7 +57,6 @@ struct
       let name = "answer_sync_ledger_query"
 
       module T = Sync_ledger
-
       module Caller = T
       module Callee = T
     end
@@ -171,7 +171,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     Gossip_net.create peer_events params log implementations
 
-  let create (config: Config.t) ~get_ledger_builder_aux_at_hash ~answer_sync_ledger_query =
+  let create (config: Config.t) ~get_ledger_builder_aux_at_hash
+      ~answer_sync_ledger_query =
     let log = Logger.child config.parent_log "minibit networking" in
     let get_ledger_builder_aux_at_hash_rpc () ~version hash =
       get_ledger_builder_aux_at_hash
@@ -181,8 +182,10 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let implementations =
       List.append
-        (Rpcs.Get_ledger_builder_aux_at_hash.implement_multi get_ledger_builder_aux_at_hash_rpc)
-        (Rpcs.Answer_sync_ledger_query.implement_multi answer_sync_ledger_query_rpc)
+        (Rpcs.Get_ledger_builder_aux_at_hash.implement_multi
+           get_ledger_builder_aux_at_hash_rpc)
+        (Rpcs.Answer_sync_ledger_query.implement_multi
+           answer_sync_ledger_query_rpc)
     in
     let%map gossip_net =
       init_gossip_net config.gossip_net_params config.initial_peers config.me
@@ -195,7 +198,7 @@ module Make (Inputs : Inputs_intf) = struct
            Linear_pipe.write_or_drop new_state_writer new_state_reader
              ~capacity:1024 s ;
            Deferred.unit )) ;
-    { gossip_net; log; new_state_reader; new_state_writer }
+    {gossip_net; log; new_state_reader; new_state_writer}
 
   module State_io = struct
     type net = t
@@ -222,28 +225,37 @@ module Make (Inputs : Inputs_intf) = struct
 
     let get_ledger_builder_aux_at_hash t hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
-      Deferred.any (List.map peers ~f:(fun peer ->
-        match%map
-          Gossip_net.query_peer t.gossip_net peer
-            Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi hash
-        with
-        | Ok (Some ledger_builder_aux) -> Some ledger_builder_aux
-        | Ok None -> Logger.info t.log "no ledger builder aux found"; None
-        | Error err -> Logger.warn t.log "%s" (Error.to_string_mach err); None))
+      Deferred.any
+        (List.map peers ~f:(fun peer ->
+             match%map
+               Gossip_net.query_peer t.gossip_net peer
+                 Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi hash
+             with
+             | Ok (Some ledger_builder_aux) -> Some ledger_builder_aux
+             | Ok None ->
+                 Logger.info t.log "no ledger builder aux found" ;
+                 None
+             | Error err ->
+                 Logger.warn t.log "%s" (Error.to_string_mach err) ;
+                 None ))
 
     let glue_sync_ledger t query_reader response_writer =
       let peers = Gossip_net.random_peers t.gossip_net 3 in
-      Linear_pipe.iter_unordered ~max_concurrency:8 query_reader ~f:(fun query ->
-        match%bind
-          Deferred.any (List.map peers ~f:(fun peer ->
-            match%map
-              Gossip_net.query_peer t.gossip_net peer
-                Rpcs.Answer_sync_ledger_query.dispatch_multi query
-            with
-            | Ok answer -> Some answer
-            | Error err -> Logger.warn t.log "%s" (Error.to_string_mach err); None))
-        with
-        | Some answer -> Linear_pipe.write response_writer answer
-        | None -> Deferred.return ())
+      Linear_pipe.iter_unordered ~max_concurrency:8 query_reader ~f:
+        (fun query ->
+          match%bind
+            Deferred.any
+              (List.map peers ~f:(fun peer ->
+                   match%map
+                     Gossip_net.query_peer t.gossip_net peer
+                       Rpcs.Answer_sync_ledger_query.dispatch_multi query
+                   with
+                   | Ok answer -> Some answer
+                   | Error err ->
+                       Logger.warn t.log "%s" (Error.to_string_mach err) ;
+                       None ))
+          with
+          | Some answer -> Linear_pipe.write response_writer answer
+          | None -> Deferred.return () )
   end
 end

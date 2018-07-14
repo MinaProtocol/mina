@@ -179,11 +179,14 @@ struct
   module Net = Minibit_networking.Make (struct
     module State_with_witness = State_with_witness
     module Ledger_hash = Ledger_hash
+
     (* TODO: replace with sync ledger interface once that PR is merged *)
     module Sync_ledger = struct
       type query = unit [@@deriving bin_io]
+
       type response = unit [@@deriving bin_io]
     end
+
     module State = State
   end)
 
