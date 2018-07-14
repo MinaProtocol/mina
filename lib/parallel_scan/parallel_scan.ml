@@ -180,7 +180,7 @@ module State1 = struct
     | Merge_up None -> false
     | _ -> true
 
-  let step_twice : type a b d.
+  let step_once : type a b d.
       (a, b, d) t -> (a, b) State.Completed_job.t Queue.t -> bool Or_error.t =
    fun t completed_jobs_q ->
     let open Or_error.Let_syntax in
@@ -210,14 +210,7 @@ module State1 = struct
       (* Note: We don't have to worry about position overflow because
          * we always have an even number of elems in the ring buffer *)
       let work_done = ref false in
-      (*Printf.printf "Reset work:%s " (Bool.to_string !work_done) ;*)
       let work i job : (a, d) Job.t Or_error.t =
-        (*Printf.printf "In Work: Job: %s Completed Job %s \n"
-          (Job.sexp_of_t sexpa sexpd job |> Sexp.to_string_hum)
-          ( Option.sexp_of_t
-              (Completed_job.sexp_of_t sexpa sexpb)
-              (Queue.peek completed_jobs_q)
-          |> Sexp.to_string_hum ) ;*)
         match (job, Queue.peek completed_jobs_q) with
         | Merge_up None, _ -> Ok job
         | Merge (None, None), _ -> Ok job
@@ -289,7 +282,7 @@ module State1 = struct
     let%map enough_steps =
       List.fold ~init:(return ()) iter_list ~f:(fun acc cj ->
           let%bind () = acc in
-          let%map work_done = step_twice t completed_jobs_q in
+          let%map work_done = step_once t completed_jobs_q in
           () )
     in
     if not (fst last_acc = fst t.acc) then Some (snd t.acc) else None
@@ -298,12 +291,6 @@ end
 let start : type a b d.
     parallelism_log_2:int -> init:b -> seed:d -> (a, b, d) State.t =
   State1.create
-
-let step : type a b d.
-       state:(a, b, d) State.t
-    -> data:(a, b) State1.Completed_job.t list
-    -> b option Or_error.t =
- fun ~state ~data -> State1.consume state data
 
 let next_jobs : state:('a, 'b, 'd) State1.t -> ('a, 'd) State1.Job.t list =
  fun ~state -> List.filter (State1.read_all state) State1.is_ready
@@ -366,7 +353,7 @@ let gen :
       let jobs = next_jobs ~state:acc in
       let jobs_done = List.map jobs (f_job_done acc) in
       let _ = Or_error.ok_exn @@ enqueue_data acc chunk in
-      let _ = Or_error.ok_exn @@ step ~state:acc ~data:jobs_done in
+      let _ = Or_error.ok_exn @@ State1.consume acc jobs_done in
       return acc )
 
 let%test_module "scans" =
@@ -389,7 +376,7 @@ let%test_module "scans" =
       in
       let jobs = next_jobs ~state in
       let works = List.map jobs (f state) in
-      let x = Or_error.ok_exn @@ step ~state ~data:works in
+      let x = Or_error.ok_exn @@ State1.consume state works in
       let%bind () = Linear_pipe.write w x in
       if List.length rem_ds > 0 then step_on_free_space state w rem_ds f
       else return ()
