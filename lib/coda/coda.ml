@@ -159,7 +159,7 @@ module type Ledger_builder_controller_intf = sig
   val local_get_ledger :
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
 
-  val strongest_ledgers : t -> (ledger_builder * Aux.t) Linear_pipe.Reader.t
+  val strongest_ledgers : t -> (ledger_builder * state) Linear_pipe.Reader.t
 
   val handle_sync_ledger_queries : sync_query -> sync_answer
 end
@@ -177,11 +177,13 @@ module type Miner_intf = sig
 
   type transition_with_witness
 
-  type aux
+  type state
 
   module Tip : sig
     type t =
-      {aux: aux; ledger_builder: ledger_builder; transactions: transaction list}
+      { state: state
+      ; ledger_builder: ledger_builder
+      ; transactions: transaction list }
   end
 
   type change = Tip_change of Tip.t
@@ -321,7 +323,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type ledger_builder := Ledger_builder.t
      and type transaction := Transaction.With_valid_signature.t
-     and type aux := Ledger_builder_controller.Aux.t
+     and type state := State.t
 
   module Genesis : sig
     val state : State.t
@@ -504,11 +506,11 @@ struct
     don't_wait_for
       (Linear_pipe.transfer
          (Ledger_builder_controller.strongest_ledgers t.ledger_builder)
-         t.miner_changes_writer ~f:(fun (ledger_builder, aux) ->
+         t.miner_changes_writer ~f:(fun (ledger_builder, state) ->
            let ledger = Ledger_builder.ledger ledger_builder in
            let transactions =
              Transaction_pool.get ~k:t.transactions_per_bundle ~ledger
                t.transaction_pool
            in
-           Tip_change {Miner.Tip.transactions; ledger_builder; aux} ))
+           Tip_change {Miner.Tip.transactions; ledger_builder; state} ))
 end
