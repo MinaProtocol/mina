@@ -9,14 +9,10 @@ let check label b = if not b then Or_error.error_string label else Ok ()
 
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
-    match xs, ys with
+    match (xs, ys) with
     | [], [] -> Ok (List.rev acc)
-    | x :: xs, y :: ys ->
-      begin match f x y with
-      | Error e -> Error e
-      | Ok z ->
-        go xs ys (z :: acc)
-      end
+    | x :: xs, y :: ys -> (
+      match f x y with Error e -> Error e | Ok z -> go xs ys (z :: acc) )
     | _, _ -> Or_error.error_string "Length mismatch"
   in
   go xs ys []
@@ -38,7 +34,7 @@ struct
   type 'a with_statement = 'a * Transaction_snark.Statement.t
   [@@deriving sexp, bin_io]
 
-(* TODO: This is redundant right now, the transaction snark has the statement
+  (* TODO: This is redundant right now, the transaction snark has the statement
    inside of it. *)
   module Snark_with_statement = struct
     type t = Transaction_snark.t with_statement [@@deriving sexp, bin_io]
@@ -69,7 +65,8 @@ struct
   [@@deriving sexp, bin_io]
 
   type t =
-    { scan_state: scan_state
+    { scan_state:
+        scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
     ; ledger: Ledger.t
@@ -81,26 +78,25 @@ struct
     ; ledger= Ledger.copy ledger
     ; public_key }
 
-  let hash { scan_state; ledger; public_key=_} : Ledger_builder_hash.t =
+  let hash {scan_state; ledger; public_key= _} : Ledger_builder_hash.t =
     let h =
       Parallel_scan.State.hash scan_state
         (Binable.to_string (module Snark_with_statement))
         (Binable.to_string (module Snark_with_statement))
         (Binable.to_string (module Super_transaction_with_statement))
     in
-    h#add_string (Ledger_hash.to_bits (Ledger.merkle_root ledger));
+    h#add_string (Ledger_hash.to_bits (Ledger.merkle_root ledger)) ;
     Ledger_builder_hash.of_bits h#result
 
-  let ledger { ledger; _ } = ledger
+  let ledger {ledger; _} = ledger
 
   let create ~ledger ~self : t =
     let open Config in
-    { scan_state =
+    { scan_state=
         Parallel_scan.start ~parallelism_log_2 ~init:(failwith "TODO")
           ~seed:(failwith "TODO")
     ; ledger
-    ; public_key = self
-    }
+    ; public_key= self }
 
   let statement_of_job : job -> Transaction_snark.Statement.t option = function
     | Base (Some (_, statement)) -> Some statement
@@ -143,23 +139,20 @@ struct
     | None -> return false
     | Some statement -> Transaction_snark.verify proof statement ~message
 
-  let fill_in_completed_work
-        (state: scan_state)
-        (works: Completed_work.t list)
-      : Transaction_snark.t with_statement option Result_with_rollback.t
-      =
+  let fill_in_completed_work (state: scan_state) (works: Completed_work.t list)
+      : Transaction_snark.t with_statement option Result_with_rollback.t =
     Result_with_rollback.of_or_error
       (let open Or_error.Let_syntax in
-      let next_jobs =
+      let%bind next_jobs =
         Parallel_scan.next_k_jobs ~state
           ~k:(List.length works * Completed_work.proofs_length)
       in
       let%bind scanable_work_list =
-            map2_or_error next_jobs (List.concat_map works (fun work -> work.proofs))
-                ~f:completed_work_to_scanable_work
-          in
-          Parallel_scan.fill_in_completed_jobs state scanable_work_list
-     )
+        map2_or_error next_jobs
+          (List.concat_map works (fun work -> work.proofs))
+          ~f:completed_work_to_scanable_work
+      in
+      Parallel_scan.fill_in_completed_jobs state scanable_work_list)
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data state data
@@ -205,10 +198,14 @@ struct
   let check_completed_works t (completed_works: Completed_work.t list) =
     Result_with_rollback.with_no_rollback
       (let open Deferred.Or_error.Let_syntax in
-      let jobses =
-        Parallel_scan.next_k_jobs ~state:t.scan_state
-          ~k:(List.length completed_works * Completed_work.proofs_length)
-        |> chunks_of ~n:Completed_work.proofs_length
+      let%bind jobses =
+        Deferred.return
+          (let open Or_error.Let_syntax in
+          let%map jobs =
+            Parallel_scan.next_k_jobs ~state:t.scan_state
+              ~k:(List.length completed_works * Completed_work.proofs_length)
+          in
+          chunks_of jobs ~n:Completed_work.proofs_length)
       in
       Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:
         (fun (jobs, work) ->

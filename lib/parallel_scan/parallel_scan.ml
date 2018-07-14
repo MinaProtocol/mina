@@ -271,6 +271,7 @@ module State1 = struct
     let completed_jobs_q = Queue.of_list completed_jobs in
     let last_acc = t.acc in
     let data_list = Queue.to_list t.data_buffer in
+    (* TODO: Why is this here? *)
     let iter_list =
       if List.length completed_jobs = 0 then
         List.init (List.length data_list) ident
@@ -293,11 +294,25 @@ let start : type a b d.
   State1.create
 
 let next_jobs : state:('a, 'b, 'd) State1.t -> ('a, 'd) State1.Job.t list =
- fun ~state -> List.filter (State1.read_all state) State1.is_ready
+ fun ~state ->
+  let max = State1.parallelism state in
+  List.filter (List.take (State1.read_all state) max) ~f:State1.is_ready
 
 let next_k_jobs :
-    state:('a, 'b, 'd) State1.t -> k:int -> ('a, 'd) State1.Job.t list =
- fun ~state ~k -> List.take (next_jobs state) k
+       state:('a, 'b, 'd) State1.t
+    -> k:int
+    -> ('a, 'd) State1.Job.t list Or_error.t =
+ fun ~state ~k ->
+  if k > State1.parallelism state then
+    Or_error.errorf "You asked for %d jobs, but it's only safe to ask for %d" k
+      (State1.parallelism state)
+  else
+    let possible_jobs = List.take (next_jobs state) k in
+    let len = List.length possible_jobs in
+    if Int.equal len k then Or_error.return possible_jobs
+    else
+      Or_error.errorf "You asked for %d jobs, but I only have %d available" k
+        len
 
 let free_space : state:('a, 'b, 'd) State1.t -> int =
  fun ~state ->
@@ -310,8 +325,7 @@ let enqueue_data :
   if free_space state < List.length data then
     Or_error.error_string
       (sprintf
-         "data list larger than allowed. Current number of items allowed to \
-          be enqueued = %d, current list length:%d"
+         "Data list too large. Max available is %d, current list length is %d"
          (free_space state) (List.length data))
   else (
     state.current_data_length <- state.current_data_length + List.length data ;
@@ -328,13 +342,14 @@ let fill_in_completed_jobs :
 let gen :
        init:'b
     -> gen_data:'d Quickcheck.Generator.t
+    -> parallelism_log_2:int
     -> f_job_done:(   ('a, 'b, 'd) State.t
                    -> ('a, 'd) State.Job.t
                    -> ('a, 'b) State.Completed_job.t)
-    -> ('a, 'b, 'd) State.t Deferred.t Quickcheck.Generator.t =
- fun ~init ~gen_data ~f_job_done ->
+    -> ('a, 'b, 'd) State.t Quickcheck.Generator.t =
+ fun ~init ~gen_data ~parallelism_log_2 ~f_job_done ->
   let open Quickcheck.Generator.Let_syntax in
-  let%bind seed = gen_data and parallelism_log_2 = Int.gen_incl 2 3 in
+  let%bind seed = gen_data in
   let s = State1.create ~parallelism_log_2 ~init ~seed in
   let parallelism = Int.pow 2 parallelism_log_2 in
   let free_space = free_space s in
@@ -348,13 +363,12 @@ let gen :
     in
     go datas []
   in
-  Deferred.List.fold data_chunks ~init:s ~f:(fun acc chunk ->
-      let open Deferred.Let_syntax in
+  List.fold data_chunks ~init:s ~f:(fun acc chunk ->
       let jobs = next_jobs ~state:acc in
       let jobs_done = List.map jobs (f_job_done acc) in
       let _ = Or_error.ok_exn @@ enqueue_data acc chunk in
       let _ = Or_error.ok_exn @@ State1.consume acc jobs_done in
-      return acc )
+      acc )
 
 let%test_module "scans" =
   ( module struct
@@ -413,57 +427,57 @@ let%test_module "scans" =
           | Base (Some x) -> Lifted x
           | Merge (Some x, Some y) -> Merged (Int64.( + ) x y)
           | Merge_up (Some x) -> Merged_up (Int64.( + ) (snd state.acc) x)
-          | _ -> Lifted Int64.zero (*Dummy*)
+          | _ -> Lifted Int64.zero
 
-        (* Once again Quickcheck is foiled by slow CPUs :( *)
         let%test_unit "scan can be initialized from intermediate state" =
           let g =
-            gen ~init:Int64.zero
+            gen ~init:Int64.zero ~parallelism_log_2:7
               ~gen_data:
                 Quickcheck.Generator.Let_syntax.(Int.gen >>| Int64.of_int)
               ~f_job_done:job_done
           in
-          let s = Quickcheck.random_value ~seed:Quickcheck.default_seed g in
-          Async.Thread_safe.block_on_async_exn (fun () ->
-              let%bind s = s in
-              let do_one_next = ref false in
-              (* For any arbitrary intermediate state *)
-              let parallelism = State1.parallelism s in
-              (* if we then add 1 and a bunch of zeros *)
-              let one_then_zeros =
-                Linear_pipe.create_reader ~close_on_exception:true (fun w ->
-                    let rec go () =
-                      let next =
-                        if !do_one_next then (
-                          do_one_next := false ;
-                          Int64.one )
-                        else Int64.zero
-                      in
-                      let%bind () = Pipe.write w next in
-                      go ()
-                    in
-                    go () )
-              in
-              let pipe s =
-                step_repeatedly ~state:s ~data:one_then_zeros ~f:job_done
-              in
-              let fill_some_zeros v s =
-                List.init (parallelism * parallelism) ~f:(fun _ -> ())
-                |> Deferred.List.foldi ~init:v ~f:(fun i v _ ->
-                       match%map Linear_pipe.read (pipe s) with
-                       | `Eof -> v
-                       | `Ok (Some v') -> v'
-                       | `Ok None -> v )
-              in
-              (* after we flush intermediate work *)
-              let old_acc = State1.acc s in
-              let%bind v = fill_some_zeros Int64.zero s in
-              do_one_next := true ;
-              let acc = State1.acc s in
-              assert (acc <> old_acc) ;
-              (* eventually we'll emit the acc+1 element *)
-              let%map acc_plus_one = fill_some_zeros v s in
-              assert (Int64.(equal acc_plus_one (acc + one))) )
+          Quickcheck.test g ~sexp_of:[%sexp_of : (int64, int64, int64) State.t]
+            ~trials:10 ~f:(fun s ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let do_one_next = ref false in
+                  (* For any arbitrary intermediate state *)
+                  let parallelism = State1.parallelism s in
+                  (* if we then add 1 and a bunch of zeros *)
+                  let one_then_zeros =
+                    Linear_pipe.create_reader ~close_on_exception:true
+                      (fun w ->
+                        let rec go () =
+                          let next =
+                            if !do_one_next then (
+                              do_one_next := false ;
+                              Int64.one )
+                            else Int64.zero
+                          in
+                          let%bind () = Pipe.write w next in
+                          go ()
+                        in
+                        go () )
+                  in
+                  let pipe s =
+                    step_repeatedly ~state:s ~data:one_then_zeros ~f:job_done
+                  in
+                  let fill_some_zeros v s =
+                    List.init (parallelism * parallelism) ~f:(fun _ -> ())
+                    |> Deferred.List.foldi ~init:v ~f:(fun i v _ ->
+                           match%map Linear_pipe.read (pipe s) with
+                           | `Eof -> v
+                           | `Ok (Some v') -> v'
+                           | `Ok None -> v )
+                  in
+                  (* after we flush intermediate work *)
+                  let old_acc = State1.acc s in
+                  let%bind v = fill_some_zeros Int64.zero s in
+                  do_one_next := true ;
+                  let acc = State1.acc s in
+                  assert (acc <> old_acc) ;
+                  (* eventually we'll emit the acc+1 element *)
+                  let%map acc_plus_one = fill_some_zeros v s in
+                  assert (Int64.(equal acc_plus_one (acc + one))) ) )
       end )
 
     let%test_module "scan (+) over ints, map from string" =
@@ -475,7 +489,7 @@ let%test_module "scans" =
           | Base (Some x) -> Lifted (Int64.of_string x)
           | Merge (Some x, Some y) -> Merged (Int64.( + ) x y)
           | Merge_up (Some x) -> Merged_up (Int64.( + ) (snd state.acc) x)
-          | _ -> Lifted Int64.zero (*Dummy*)
+          | _ -> Lifted Int64.zero
 
         let%test_unit "scan behaves like a fold long-term" =
           let a_bunch_of_ones_then_zeros x =
@@ -519,7 +533,7 @@ let%test_module "scans" =
           | Base (Some x) -> Lifted x
           | Merge (Some x, Some y) -> Merged (String.( ^ ) x y)
           | Merge_up (Some x) -> Merged_up (String.( ^ ) (snd state.acc) x)
-          | _ -> Lifted "X" (*Dummy*)
+          | _ -> Lifted "X"
 
         let%test_unit "scan performs operation in correct order with \
                        non-commutative semigroup" =

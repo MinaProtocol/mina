@@ -33,7 +33,12 @@ module State : sig
     type t = Cryptokit.hash
   end
 
-  val hash : ('a, 'b, 'd) t -> ('a -> string) -> ('b -> string) -> ('d -> string) -> Hash.t
+  val hash :
+       ('a, 'b, 'd) t
+    -> ('a -> string)
+    -> ('b -> string)
+    -> ('d -> string)
+    -> Hash.t
 end
 
 module type Spec_intf = sig
@@ -47,7 +52,7 @@ end
 val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
 
 val next_k_jobs :
-  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list
+  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t
 
 val next_jobs : state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t list
 
