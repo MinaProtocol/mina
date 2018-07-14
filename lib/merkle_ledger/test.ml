@@ -193,3 +193,31 @@ let%test_unit "merkle_path_edits" =
       let account = L16.get ledger key |> Option.value_exn in
       let root = L16.merkle_root ledger in
       assert (check_path account path root) )
+
+let%test_unit "set_inner_can_copy_correctly" =
+  let rec all_inner_of a =
+    if L3.Addr.depth a = L3.depth - 1 then []
+    else
+      let lc = L3.Addr.child a `Left in
+      let rc = L3.Addr.child a `Right in
+      match (lc, rc) with
+      | Some lc, Some rc -> [lc; rc] @ all_inner_of lc @ all_inner_of rc
+      | _ -> []
+  in
+  let n = 8 in
+  let b1 = 1 in
+  let b2 = 2 in
+  let ledger1, keys1 = L3.load_ledger n b1 in
+  let ledger2, keys2 = L3.load_ledger n b2 in
+  L3.set_syncing ledger1 ;
+  L3.set_syncing ledger2 ;
+  let all_children = all_inner_of L3.Addr.root in
+  List.iter all_children ~f:(fun x ->
+      let src = L3.get_inner_hash_at_addr_exn ledger2 x in
+      L3.set_inner_hash_at_addr_exn ledger1 x src ) ;
+  List.iter (List.range 0 8) ~f:(fun x ->
+      let src = L3.get_at_index_exn ledger2 x in
+      L3.set_at_index_exn ledger1 x src ) ;
+  L3.clear_syncing ledger1 ;
+  L3.clear_syncing ledger2 ;
+  assert (L3.merkle_root ledger1 = L3.merkle_root ledger2)

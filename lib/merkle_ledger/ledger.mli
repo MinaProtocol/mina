@@ -27,6 +27,28 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
+  module Addr : sig
+    type t [@@deriving sexp, bin_io, hash, compare]
+
+    include Hashable.S with type t := t
+
+    val depth : t -> int
+
+    val parent : t -> t option
+
+    val parent_exn : t -> t
+
+    val child : t -> [`Left | `Right] -> t option
+
+    val child_exn : t -> [`Left | `Right] -> t
+
+    val unpeel : t -> ([`Left | `Right] * t) option
+
+    val unpeel_exn : t -> [`Left | `Right] * t
+
+    val root : t
+  end
+
   val create : unit -> t
 
   val length : t -> int
@@ -66,12 +88,41 @@ module type S = sig
 
   val set_at_index_exn : t -> index -> account -> unit
 
+  val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
+
   val merkle_path_at_index_exn : t -> index -> Path.t
+
+  val addr_of_index : t -> index -> Addr.t
+
+  val set_at_addr_exn : t -> Addr.t -> account -> unit
+
+  val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
+
+  val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
+
+  val extend_with_empty_to_fit : t -> int -> unit
+
+  val set_syncing : t -> unit
+
+  val clear_syncing : t -> unit
+
+  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
+
+  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
 end
 
-module type F = functor (Account :sig
-                                    
-                                    type t [@@deriving sexp, eq, bin_io]
+module type F = functor (Key :sig
+                                
+                                type t [@@deriving sexp, bin_io]
+
+                                val empty : t
+
+                                include Hashable.S_binable with type t := t
+end) -> functor (Account :sig
+                            
+                            type t [@@deriving sexp, eq, bin_io]
+
+                            val pubkey : t -> Key.t
 end) -> functor (Hash :sig
                          
                          type hash [@@deriving sexp, hash, compare, bin_io]
@@ -81,11 +132,6 @@ end) -> functor (Hash :sig
                          val empty_hash : hash
 
                          val merge : height:int -> hash -> hash -> hash
-end) -> functor (Key :sig
-                        
-                        type t [@@deriving sexp, bin_io]
-
-                        include Hashable.S_binable with type t := t
 end) -> functor (Depth :sig
                           
                           val depth : int
