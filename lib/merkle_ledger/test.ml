@@ -201,7 +201,7 @@ let%test_unit "set_inner_can_copy_correctly" =
       let lc = L3.Addr.child a `Left in
       let rc = L3.Addr.child a `Right in
       match (lc, rc) with
-      | Some lc, Some rc -> [lc; rc] @ all_inner_of lc @ all_inner_of rc
+      | Ok lc, Ok rc -> [lc; rc] @ all_inner_of lc @ all_inner_of rc
       | _ -> []
   in
   let n = 8 in

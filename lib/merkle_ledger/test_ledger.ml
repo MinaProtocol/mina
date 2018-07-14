@@ -4,7 +4,7 @@ open Ledger
 module Account = struct
   type t = int [@@deriving sexp, eq, bin_io]
 
-  let pubkey t = ""
+  let public_key t = Int.to_string t
 end
 
 module Hash = struct

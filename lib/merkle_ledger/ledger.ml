@@ -37,17 +37,15 @@ module type S = sig
 
     val depth : t -> int
 
-    val parent : t -> t option
+    val parent : t -> t Or_error.t
 
     val parent_exn : t -> t
 
-    val child : t -> [`Left | `Right] -> t option
+    val child : t -> [`Left | `Right] -> t Or_error.t
 
     val child_exn : t -> [`Left | `Right] -> t
 
-    val unpeel : t -> ([`Left | `Right] * t) option
-
-    val unpeel_exn : t -> [`Left | `Right] * t
+    val dirs_from_root : t -> [ `Left | `Right ] list
 
     val root : t
   end
@@ -125,7 +123,7 @@ end) -> functor (Account :sig
                             
                             type t [@@deriving sexp, eq, bin_io]
 
-                            val pubkey : t -> Key.t
+                            val public_key : t -> Key.t
 end) -> functor (Hash :sig
                          
                          type hash [@@deriving sexp, hash, compare, bin_io]
@@ -152,7 +150,7 @@ module Make (Key : sig
 end) (Account : sig
   type t [@@deriving sexp, eq, bin_io]
 
-  val pubkey : t -> Key.t
+  val public_key : t -> Key.t
 end) (Hash : sig
   type hash [@@deriving sexp, hash, compare, bin_io]
 
@@ -186,27 +184,40 @@ struct
 
     let child {depth; index} d =
       if depth + 1 < Depth.depth then
-        Some {depth= depth + 1; index= index lor (bit_val d lsl depth)}
-      else None
+        Ok {depth= depth + 1; index= index lor (bit_val d lsl depth)}
+      else Or_error.error_string "Addr.child: Depth was too large"
 
-    let child_exn a d = child a d |> Option.value_exn
+    let child_exn a d = child a d |> Or_error.ok_exn
 
-    let unpeel {depth; index} =
-      if depth > 0 then
-        let dir = if index land (1 lsl depth) = 0 then `Left else `Right in
-        Some
-          ( dir
-          , {depth= depth - 1; index= index land (1 - (bit_val dir lsl depth))}
-          )
-      else None
+    let dirs_from_root { depth; index } =
+      List.init depth ~f:(fun i ->
+        if (index lsr i) land 1 = 1 then `Right else `Left)
 
-    let unpeel_exn a = unpeel a |> Option.value_exn
+    let clear_all_but_first k i =
+      i land ((1 lsl k) - 1)
 
-    let parent a = Option.map (unpeel a) ~f:snd
+    let parent { depth; index } =
+      if depth > 0
+      then
+        Ok { depth = depth - 1; index = clear_all_but_first (depth - 1) index }
+      else Or_error.error_string "Addr.parent: depth <= 0"
 
-    let parent_exn a = unpeel_exn a |> snd
+    let parent_exn a = Or_error.ok_exn (parent a)
 
     let root = {depth= 0; index= 0}
+
+    let%test_unit "dirs_from_root" =
+      let dir_list =
+        let open Quickcheck.Generator in
+        let open Let_syntax in
+        let%bind l = Int.gen_incl 0 (Depth.depth - 1) in
+        list_with_length l
+          (Bool.gen >>| fun b  -> if b then `Right else `Left)
+      in
+      Quickcheck.test dir_list ~f:(fun dirs ->
+        assert (
+        dirs_from_root (List.fold dirs ~f:child_exn ~init:root)
+          = dirs))
   end
 
   type entry = {merkle_index: int; account: Account.t}
@@ -250,7 +261,7 @@ struct
   let copy t =
     let copy_tree tree =
       { leafs= Dyn_array.copy tree.leafs
-      ; dirty= false
+      ; dirty= tree.dirty
       ; syncing= false
       ; nodes_height= tree.nodes_height
       ; nodes= tree.nodes
@@ -416,7 +427,7 @@ struct
       failwith "recompute tree while syncing -- logic error!" ;
     if not (List.is_empty t.tree.dirty_indices) || t.tree.dirty then (
       extend_tree t.tree ;
-      (t.tree).dirty <- false ;
+      t.tree.dirty <- false ;
       let layer_dirty_indices =
         Int.Set.to_list
           (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
@@ -534,7 +545,7 @@ struct
 
   let set_syncing t =
     recompute_tree t ;
-    (t.tree).syncing <- true
+    t.tree.syncing <- true
 
   let clear_syncing t = (t.tree).syncing <- false
 
@@ -544,7 +555,7 @@ struct
     let first_index = index lsl effective_depth in
     assert (List.length accounts = count) ;
     List.iteri accounts ~f:(fun i a ->
-        let pk = Account.pubkey a in
+        let pk = Account.public_key a in
         let entry = {merkle_index= first_index + i; account= a} in
         Key.Table.set t.accounts pk entry ;
         Dyn_array.set t.tree.leafs (first_index + i) pk )

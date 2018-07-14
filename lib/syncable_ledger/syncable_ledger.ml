@@ -8,27 +8,25 @@ module type Addr_intf = sig
 
   val depth : t -> int
 
-  val parent : t -> t option
+  val parent : t -> t Or_error.t
 
   val parent_exn : t -> t
 
-  val child : t -> [`Left | `Right] -> t option
+  val child : t -> [`Left | `Right] -> t Or_error.t
 
   val child_exn : t -> [`Left | `Right] -> t
 
-  val unpeel : t -> ([`Left | `Right] * t) option
-
-  val unpeel_exn : t -> [`Left | `Right] * t
+  val dirs_from_root : t -> [ `Left | `Right ] list
 
   val root : t
 end
 
 module type Hash_intf = sig
-  type hash [@@deriving sexp, hash, compare, bin_io]
+  type t [@@deriving sexp, hash, compare, bin_io, eq]
 
-  val empty_hash : hash
+  val empty_hash : t
 
-  val merge : height:int -> hash -> hash -> hash
+  val merge : height:int -> t -> t -> t
 end
 
 module type Merkle_tree_intf = sig
@@ -146,16 +144,7 @@ struct
 
   let create i = ref (Leaf `Unknown)
 
-  let unpeel_all a =
-    let rec unpeel_aux a acc =
-      match Addr.unpeel a with
-      | Some (d, a') -> unpeel_aux a' (d :: acc)
-      | None -> acc
-    in
-    List.rev (unpeel_aux a [])
-
   let mark_known_good t a =
-    let dirs = unpeel_all a in
     let rec mark_helper node dir =
       match dir with
       | d :: ds -> (
@@ -173,7 +162,7 @@ struct
             failwith
               "sanity: by the time we get here, we should be at a Leaf `Unknown"
     in
-    mark_helper t dirs
+    mark_helper t (Addr.dirs_from_root a)
 
   let rec fully_valid t =
     match !t with
@@ -202,12 +191,12 @@ module Make
     end)
     (Hash : Hash_intf)
     (MT : Merkle_tree_intf
-          with type hash := Hash.hash
+          with type hash := Hash.t
            and type addr := Addr.t
            and type key := Key.t) :
   S
   with type merkle_tree := MT.t
-   and type hash := Hash.hash
+   and type hash := Hash.t
    and type addr := Addr.t
    and type merkle_path := MT.path
    and type account := MT.account
@@ -220,7 +209,7 @@ struct
   type index = int
 
   type answer =
-    | Has_hash of Addr.t * Hash.hash
+    | Has_hash of Addr.t * Hash.t
     | Contents_are of Addr.t * MT.account list
     | Num_accounts of int
     (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
@@ -231,15 +220,15 @@ struct
   [@@deriving bin_io]
 
   type t =
-    { mutable desired_root: Hash.hash
+    { mutable desired_root: Hash.t
     ; tree: MT.t
     ; validity: Valid.t
-    ; answers: (Hash.hash * answer) Linear_pipe.Reader.t
-    ; answer_writer: (Hash.hash * answer) Linear_pipe.Writer.t
-    ; queries: (Hash.hash * query) Linear_pipe.Writer.t
-    ; query_reader: (Hash.hash * query) Linear_pipe.Reader.t
-    ; waiting_parents: (Addr.t * Hash.hash) list Addr.Table.t
-    ; mutable validity_listeners: [`Ok | `Target_changed] Ivar.t list }
+    ; answers: (Hash.t * answer) Linear_pipe.Reader.t
+    ; answer_writer: (Hash.t * answer) Linear_pipe.Writer.t
+    ; queries: (Hash.t * query) Linear_pipe.Writer.t
+    ; query_reader: (Hash.t * query) Linear_pipe.Reader.t
+    ; waiting_parents: (Addr.t * Hash.t) list Addr.Table.t
+    ; mutable validity_listener: [`Ok | `Target_changed] Ivar.t }
 
   let create mt h =
     let qr, qw = Linear_pipe.create () in
@@ -253,7 +242,7 @@ struct
       ; queries= qw
       ; query_reader= qr
       ; waiting_parents= Addr.Table.create ()
-      ; validity_listeners= [] }
+      ; validity_listener= Ivar.create () }
     in
     let r = Addr.root in
     let lr = Addr.child_exn r `Left in
@@ -266,33 +255,33 @@ struct
 
   let query_reader t = t.query_reader
 
-  let hash_eq h1 h2 = Hash.compare_hash h1 h2 = 0
-
   let add_child_hash_to :
          t
       -> Addr.t
-      -> Hash.hash
-      -> [`Good of Addr.t list | `More | `Hash_mismatch] =
+      -> Hash.t
+      -> [`Good of Addr.t list | `More | `Hash_mismatch] Or_error.t
+    =
    fun t child_addr h ->
     (* lots of _exn called on attacker data. it's not clear how to handle these regardless *)
-    let parent = Addr.parent_exn child_addr in
+    let open Or_error.Let_syntax in
+    let%map parent = Addr.parent child_addr in
     Addr.Table.add_multi t.waiting_parents parent (child_addr, h) ;
     let l = Addr.Table.find_multi t.waiting_parents parent in
     match l with
     | [(l1, h1); (l2, h2)] ->
         if
-          hash_eq
+          Hash.equal
             (Hash.merge ~height:(Addr.depth l1) h1 h2)
             (MT.get_inner_hash_at_addr_exn t.tree parent)
         then (
           Addr.Table.remove t.waiting_parents parent ;
           let children_to_verify =
             List.rev_append
-              ( if hash_eq (MT.get_inner_hash_at_addr_exn t.tree l1) h1 then (
+              ( if Hash.equal (MT.get_inner_hash_at_addr_exn t.tree l1) h1 then (
                   Valid.mark_known_good t.validity l1 ;
                   [] )
               else [l1] )
-              ( if hash_eq (MT.get_inner_hash_at_addr_exn t.tree l2) h2 then (
+              ( if Hash.equal (MT.get_inner_hash_at_addr_exn t.tree l2) h2 then (
                   Valid.mark_known_good t.validity l2 ;
                   [] )
               else [l2] )
@@ -305,10 +294,10 @@ struct
 
   let all_done t res =
     MT.clear_syncing t.tree ;
-    if not (hash_eq (MT.merkle_root t.tree) t.desired_root) then
+    (if not (Hash.equal (MT.merkle_root t.tree) t.desired_root) then
       failwith "We finished syncing, but made a mistake somewhere :("
-    else List.iter t.validity_listeners ~f:(fun i -> Ivar.fill i `Ok) ;
-    t.validity_listeners <- [] ;
+    else
+      Ivar.fill t.validity_listener `Ok);
     res
 
   (* Assumption: only ever one answer is received for a given query
@@ -317,66 +306,72 @@ struct
      node to never be verified *)
   let main_loop t =
     let handle_answer (root_hash, a) =
-      if root_hash <> t.desired_root then return ()
+      if not (Hash.equal root_hash t.desired_root)
+      then ()
       else
         let res =
           match a with
-          | Has_hash (addr, h') -> (
-            match add_child_hash_to t addr h' with
-            | `Good children_to_verify ->
-                Deferred.List.iter children_to_verify ~f:(fun addr ->
-                    if Addr.depth addr = MT.depth - subtree_height then
-                      Linear_pipe.write t.queries
-                        (t.desired_root, What_contents addr)
-                    else
-                      let%bind () =
-                        Linear_pipe.write t.queries
-                          ( t.desired_root
-                          , What_hash (Addr.child_exn addr `Left) )
-                      in
-                      Linear_pipe.write t.queries
-                        (t.desired_root, What_hash (Addr.child_exn addr `Right))
-                )
-            | `More -> return () (* wait for the other answer to come in *)
-            | `Hash_mismatch ->
+          | Has_hash (addr, h') ->
+            begin match add_child_hash_to t addr h' with
+            (* TODO: Stick this in a log, punish the sender *)
+            | Error _e -> ()
+            | Ok (`Good children_to_verify) ->
+              (* TODO: Make sure we don't write too much *)
+              List.iter children_to_verify ~f:(fun addr ->
+                if Addr.depth addr = MT.depth - subtree_height then
+                  Linear_pipe.write_without_pushback t.queries
+                    (t.desired_root, What_contents addr)
+                else begin
+                  Linear_pipe.write_without_pushback t.queries
+                    ( t.desired_root
+                    , What_hash (Addr.child_exn addr `Left) );
+                  Linear_pipe.write_without_pushback t.queries
+                    (t.desired_root
+                    , What_hash (Addr.child_exn addr `Right))
+                end)
+
+            | Ok `More ->
+              () (* wait for the other answer to come in *)
+            | Ok `Hash_mismatch ->
                 (* just ask again for both children of the parent?
              this is the only case where we can't immediately
              pin blame on a single node. *)
-                failwith "figure out how to handle peers lying" )
+                failwith "figure out how to handle peers lying"
+            end
+
           | Contents_are (addr, leafs) ->
               (* TODO: verify the hash matches what we expect *)
               MT.set_all_entries_rooted_at t.tree addr leafs ;
               Valid.mark_known_good t.validity addr ;
-              return ()
+              ()
           | Num_accounts n ->
               MT.extend_with_empty_to_fit t.tree n ;
-              return ()
+              ()
         in
         if Valid.fully_valid t.validity then all_done t res else res
     in
-    Linear_pipe.iter t.answers ~f:handle_answer
+    Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a; Deferred.unit)
 
   let destroy t =
     Linear_pipe.close_read t.answers ;
     Linear_pipe.close_read t.query_reader
 
   let new_goal t h =
-    List.iter t.validity_listeners ~f:(fun i -> Ivar.fill i `Target_changed) ;
-    t.validity_listeners <- [] ;
+    Ivar.fill_if_empty t.validity_listener `Target_changed;
+    t.validity_listener <- Ivar.create ();
     t.desired_root <- h
 
   let wait_until_valid t h =
-    if not (hash_eq h t.desired_root) then return `Target_changed
+    if not (Hash.equal h t.desired_root)
+    then return `Target_changed
     else
-      let iv = Ivar.create () in
-      t.validity_listeners <- iv :: t.validity_listeners ;
-      Ivar.read iv
+      Ivar.read t.validity_listener
 
   let apply_or_queue_diff t d =
     (* Need some interface for the diffs, not sure the layering is right here. *)
     failwith "todo"
 
-  let merkle_path_at_addr = failwith "no"
+  let merkle_path_at_addr _ = failwith "no"
 
-  let get_account_at_addr = failwith "no"
+  let get_account_at_addr _ = failwith "no"
 end

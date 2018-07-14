@@ -34,17 +34,15 @@ module type S = sig
 
     val depth : t -> int
 
-    val parent : t -> t option
+    val parent : t -> t Or_error.t
 
     val parent_exn : t -> t
 
-    val child : t -> [`Left | `Right] -> t option
+    val child : t -> [`Left | `Right] -> t Or_error.t
 
     val child_exn : t -> [`Left | `Right] -> t
 
-    val unpeel : t -> ([`Left | `Right] * t) option
-
-    val unpeel_exn : t -> [`Left | `Right] * t
+    val dirs_from_root : t -> [ `Left | `Right ] list
 
     val root : t
   end
@@ -122,7 +120,7 @@ end) -> functor (Account :sig
                             
                             type t [@@deriving sexp, eq, bin_io]
 
-                            val pubkey : t -> Key.t
+                            val public_key : t -> Key.t
 end) -> functor (Hash :sig
                          
                          type hash [@@deriving sexp, hash, compare, bin_io]
