@@ -444,13 +444,13 @@ let%test_module "scans" =
                     in
                     go () )
               in
-              let pipe =
+              let pipe s =
                 step_repeatedly ~state:s ~data:one_then_zeros ~f:job_done
               in
               let fill_some_zeros v s =
                 List.init (parallelism * parallelism) ~f:(fun _ -> ())
                 |> Deferred.List.foldi ~init:v ~f:(fun i v _ ->
-                       match%map Linear_pipe.read pipe with
+                       match%map Linear_pipe.read (pipe s) with
                        | `Eof -> v
                        | `Ok (Some v') -> v'
                        | `Ok None -> v )
@@ -463,7 +463,7 @@ let%test_module "scans" =
               assert (acc <> old_acc) ;
               (* eventually we'll emit the acc+1 element *)
               let%map acc_plus_one = fill_some_zeros v s in
-              assert (acc_plus_one = acc) )
+              assert (Int64.(equal acc_plus_one (acc + one))) )
       end )
 
     let%test_module "scan (+) over ints, map from string" =
