@@ -16,7 +16,7 @@ module type Addr_intf = sig
 
   val child_exn : t -> [`Left | `Right] -> t
 
-  val dirs_from_root : t -> [ `Left | `Right ] list
+  val dirs_from_root : t -> [`Left | `Right] list
 
   val root : t
 end
@@ -259,8 +259,7 @@ struct
          t
       -> Addr.t
       -> Hash.t
-      -> [`Good of Addr.t list | `More | `Hash_mismatch] Or_error.t
-    =
+      -> [`Good of Addr.t list | `More | `Hash_mismatch] Or_error.t =
    fun t child_addr h ->
     (* lots of _exn called on attacker data. it's not clear how to handle these regardless *)
     let open Or_error.Let_syntax in
@@ -294,10 +293,9 @@ struct
 
   let all_done t res =
     MT.clear_syncing t.tree ;
-    (if not (Hash.equal (MT.merkle_root t.tree) t.desired_root) then
+    if not (Hash.equal (MT.merkle_root t.tree) t.desired_root) then
       failwith "We finished syncing, but made a mistake somewhere :("
-    else
-      Ivar.fill t.validity_listener `Ok);
+    else Ivar.fill t.validity_listener `Ok ;
     res
 
   (* Assumption: only ever one answer is received for a given query
@@ -306,39 +304,32 @@ struct
      node to never be verified *)
   let main_loop t =
     let handle_answer (root_hash, a) =
-      if not (Hash.equal root_hash t.desired_root)
-      then ()
+      if not (Hash.equal root_hash t.desired_root) then ()
       else
         let res =
           match a with
-          | Has_hash (addr, h') ->
-            begin match add_child_hash_to t addr h' with
+          | Has_hash (addr, h') -> (
+            match add_child_hash_to t addr h' with
             (* TODO: Stick this in a log, punish the sender *)
             | Error _e -> ()
             | Ok (`Good children_to_verify) ->
-              (* TODO: Make sure we don't write too much *)
-              List.iter children_to_verify ~f:(fun addr ->
-                if Addr.depth addr = MT.depth - subtree_height then
-                  Linear_pipe.write_without_pushback t.queries
-                    (t.desired_root, What_contents addr)
-                else begin
-                  Linear_pipe.write_without_pushback t.queries
-                    ( t.desired_root
-                    , What_hash (Addr.child_exn addr `Left) );
-                  Linear_pipe.write_without_pushback t.queries
-                    (t.desired_root
-                    , What_hash (Addr.child_exn addr `Right))
-                end)
-
-            | Ok `More ->
-              () (* wait for the other answer to come in *)
+                (* TODO: Make sure we don't write too much *)
+                List.iter children_to_verify ~f:(fun addr ->
+                    if Addr.depth addr = MT.depth - subtree_height then
+                      Linear_pipe.write_without_pushback t.queries
+                        (t.desired_root, What_contents addr)
+                    else (
+                      Linear_pipe.write_without_pushback t.queries
+                        (t.desired_root, What_hash (Addr.child_exn addr `Left)) ;
+                      Linear_pipe.write_without_pushback t.queries
+                        (t.desired_root, What_hash (Addr.child_exn addr `Right)) )
+                )
+            | Ok `More -> () (* wait for the other answer to come in *)
             | Ok `Hash_mismatch ->
                 (* just ask again for both children of the parent?
              this is the only case where we can't immediately
              pin blame on a single node. *)
-                failwith "figure out how to handle peers lying"
-            end
-
+                failwith "figure out how to handle peers lying" )
           | Contents_are (addr, leafs) ->
               (* TODO: verify the hash matches what we expect *)
               MT.set_all_entries_rooted_at t.tree addr leafs ;
@@ -350,22 +341,20 @@ struct
         in
         if Valid.fully_valid t.validity then all_done t res else res
     in
-    Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a; Deferred.unit)
+    Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a ; Deferred.unit)
 
   let destroy t =
     Linear_pipe.close_read t.answers ;
     Linear_pipe.close_read t.query_reader
 
   let new_goal t h =
-    Ivar.fill_if_empty t.validity_listener `Target_changed;
-    t.validity_listener <- Ivar.create ();
+    Ivar.fill_if_empty t.validity_listener `Target_changed ;
+    t.validity_listener <- Ivar.create () ;
     t.desired_root <- h
 
   let wait_until_valid t h =
-    if not (Hash.equal h t.desired_root)
-    then return `Target_changed
-    else
-      Ivar.read t.validity_listener
+    if not (Hash.equal h t.desired_root) then return `Target_changed
+    else Ivar.read t.validity_listener
 
   let apply_or_queue_diff t d =
     (* Need some interface for the diffs, not sure the layering is right here. *)

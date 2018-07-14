@@ -45,7 +45,7 @@ module type S = sig
 
     val child_exn : t -> [`Left | `Right] -> t
 
-    val dirs_from_root : t -> [ `Left | `Right ] list
+    val dirs_from_root : t -> [`Left | `Right] list
 
     val root : t
   end
@@ -189,17 +189,15 @@ struct
 
     let child_exn a d = child a d |> Or_error.ok_exn
 
-    let dirs_from_root { depth; index } =
+    let dirs_from_root {depth; index} =
       List.init depth ~f:(fun i ->
-        if (index lsr i) land 1 = 1 then `Right else `Left)
+          if (index lsr i) land 1 = 1 then `Right else `Left )
 
-    let clear_all_but_first k i =
-      i land ((1 lsl k) - 1)
+    let clear_all_but_first k i = i land ((1 lsl k) - 1)
 
-    let parent { depth; index } =
-      if depth > 0
-      then
-        Ok { depth = depth - 1; index = clear_all_but_first (depth - 1) index }
+    let parent {depth; index} =
+      if depth > 0 then
+        Ok {depth= depth - 1; index= clear_all_but_first (depth - 1) index}
       else Or_error.error_string "Addr.parent: depth <= 0"
 
     let parent_exn a = Or_error.ok_exn (parent a)
@@ -211,13 +209,11 @@ struct
         let open Quickcheck.Generator in
         let open Let_syntax in
         let%bind l = Int.gen_incl 0 (Depth.depth - 1) in
-        list_with_length l
-          (Bool.gen >>| fun b  -> if b then `Right else `Left)
+        list_with_length l (Bool.gen >>| fun b -> if b then `Right else `Left)
       in
       Quickcheck.test dir_list ~f:(fun dirs ->
-        assert (
-        dirs_from_root (List.fold dirs ~f:child_exn ~init:root)
-          = dirs))
+          assert (
+            dirs_from_root (List.fold dirs ~f:child_exn ~init:root) = dirs ) )
   end
 
   type entry = {merkle_index: int; account: Account.t}
@@ -427,7 +423,7 @@ struct
       failwith "recompute tree while syncing -- logic error!" ;
     if not (List.is_empty t.tree.dirty_indices) || t.tree.dirty then (
       extend_tree t.tree ;
-      t.tree.dirty <- false ;
+      (t.tree).dirty <- false ;
       let layer_dirty_indices =
         Int.Set.to_list
           (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
@@ -545,7 +541,7 @@ struct
 
   let set_syncing t =
     recompute_tree t ;
-    t.tree.syncing <- true
+    (t.tree).syncing <- true
 
   let clear_syncing t = (t.tree).syncing <- false
 

@@ -42,7 +42,7 @@ module type S = sig
 
     val child_exn : t -> [`Left | `Right] -> t
 
-    val dirs_from_root : t -> [ `Left | `Right ] list
+    val dirs_from_root : t -> [`Left | `Right] list
 
     val root : t
   end
