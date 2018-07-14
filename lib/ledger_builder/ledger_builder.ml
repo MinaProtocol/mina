@@ -2,6 +2,25 @@ open Core_kernel
 open Async_kernel
 open Protocols
 
+let option lab =
+  Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
+
+let check label b = if not b then Or_error.error_string label else Ok ()
+
+let map2_or_error xs ys ~f =
+  let rec go xs ys acc =
+    match xs, ys with
+    | [], [] -> Ok (List.rev acc)
+    | x :: xs, y :: ys ->
+      begin match f x y with
+      | Error e -> Error e
+      | Ok z ->
+        go xs ys (z :: acc)
+      end
+    | _, _ -> Or_error.error_string "Length mismatch"
+  in
+  go xs ys []
+
 module Make (Inputs : Inputs.S) :
   Coda_pow.Ledger_builder_intf
   with type diff := Inputs.Ledger_builder_diff.t
@@ -83,11 +102,6 @@ struct
     ; public_key = self
     }
 
-  let option lab =
-    Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
-
-  let check label b = if not b then Or_error.error_string label else Ok ()
-
   let statement_of_job : job -> Transaction_snark.Statement.t option = function
     | Base (Some (_, statement)) -> Some statement
     | Merge_up (Some (_, statement)) -> Some statement
@@ -129,32 +143,26 @@ struct
     | None -> return false
     | Some statement -> Transaction_snark.verify proof statement ~message
 
-  let rec mapM_2 = function
-    | [], [] -> Ok []
-    | job :: jobs', work :: works' ->
-        let open Or_error.Let_syntax in
-        let%bind scanable_work = completed_work_to_scanable_work job work in
-        let%bind scanable_works = mapM_2 (jobs', works') in
-        Ok (scanable_work :: scanable_works)
-    | _, _ -> Error (Error.of_string "Lengths mismatch")
-
-  let fill_in_completed_work (state: scan_state) (works: Completed_work.t list)
-      : Transaction_snark.t with_statement option Result_with_rollback.t =
-    Result_with_rollback.with_no_rollback
-      (let open Deferred.Or_error.Let_syntax in
+  let fill_in_completed_work
+        (state: scan_state)
+        (works: Completed_work.t list)
+      : Transaction_snark.t with_statement option Result_with_rollback.t
+      =
+    Result_with_rollback.of_or_error
+      (let open Or_error.Let_syntax in
       let next_jobs =
         Parallel_scan.next_k_jobs ~state
           ~k:(List.length works * Completed_work.proofs_length)
       in
       match next_jobs with
-      | Error e -> Deferred.return (Error e)
+      | Error e -> Error e
       | Ok jobs ->
           let%bind scanable_work_list =
-            Deferred.return
-            @@ mapM_2 (jobs, List.concat_map works (fun work -> work.proofs))
+            map2_or_error jobs (List.concat_map works (fun work -> work.proofs))
+                ~f:completed_work_to_scanable_work
           in
-          Deferred.return
-          @@ Parallel_scan.fill_in_completed_jobs state scanable_work_list)
+          Parallel_scan.fill_in_completed_jobs state scanable_work_list
+     )
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data state data
