@@ -20,9 +20,9 @@ module type Ledger_builder_io_intf = sig
 
   type t
 
-  type ledger_hash
+  type hash
 
-  type ledger_builder_aux
+  type aux
 
   type sync_ledger_query
 
@@ -31,7 +31,7 @@ module type Ledger_builder_io_intf = sig
   val create : net -> t
 
   val get_ledger_builder_aux_at_hash :
-    t -> ledger_hash -> ledger_builder_aux Deferred.t
+    t -> hash -> aux Deferred.t
 
   val glue_sync_ledger :
     t -> sync_ledger_query Linear_pipe.Reader.t -> sync_ledger_answer Linear_pipe.Writer.t -> unit
@@ -44,7 +44,7 @@ module type Network_intf = sig
 
   type state
 
-  type ledger_hash
+  type ledger_builder_hash
 
   type ledger_builder_aux
 
@@ -60,8 +60,8 @@ module type Network_intf = sig
   module Ledger_builder_io :
     Ledger_builder_io_intf
     with type net := t
-     and type ledger_hash := ledger_hash
-     and type ledger_builder_aux := ledger_builder_aux
+     and type hash := ledger_builder_hash
+     and type aux := ledger_builder_aux
      and type sync_ledger_query := sync_ledger_query
      and type sync_ledger_answer := sync_ledger_answer
 
@@ -71,8 +71,8 @@ module type Network_intf = sig
 
   val create :
        Config.t
-    -> (ledger_hash -> ledger_builder_aux option Deferred.t)
-    -> (sync_ledger_query -> sync_ledger_answer Deferred.t)
+    -> get_ledger_builder_aux_at_hash:(ledger_builder_hash -> ledger_builder_aux option Deferred.t)
+    -> answer_sync_ledger_query:(sync_ledger_query -> sync_ledger_answer Deferred.t)
     -> t Deferred.t
 end
 
@@ -187,6 +187,9 @@ end
 module type Inputs_intf = sig
   include Minibit_pow.Inputs_intf
 
+  type ledger_builder_hash
+  type ledger_builder_aux
+
   module Proof_carrying_state : sig
     type t = (State.t, State.Proof.t) Minibit_pow.Proof_carrying_data.t
     [@@deriving sexp, bin_io]
@@ -215,9 +218,9 @@ module type Inputs_intf = sig
   module Net :
     Network_intf
     with type state_with_witness := State_with_witness.t
-     and type ledger_hash := Ledger_hash.t
+     and type ledger_builder_hash := ledger_builder_hash
+     and type ledger_builder_aux := ledger_builder_aux
      and type state := State.t
-     and type ledger_builder_aux := State.t
      and type sync_ledger_query := Sync_ledger.query
      and type sync_ledger_answer := Sync_ledger.answer
 

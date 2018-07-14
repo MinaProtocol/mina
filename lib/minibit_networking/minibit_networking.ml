@@ -220,39 +220,28 @@ module Make (Inputs : Inputs_intf) = struct
 
     let create = Fn.id
 
-    let par_find_map xs ~f =
-      Deferred.create (fun ivar ->
-        don't_wait_for
-          (let%map () =
-             Deferred.List.iter ~how:`Parallel xs ~f:(fun x ->
-                 match%map f x with
-                 | Some r -> Ivar.fill_if_empty ivar (Some r)
-                 | None -> () )
-           in
-           Ivar.fill_if_empty ivar None))
-
     let get_ledger_builder_aux_at_hash t hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
-      par_find_map peers ~f:(fun peer ->
+      Deferred.any (List.map peers ~f:(fun peer ->
         match%map
           Gossip_net.query_peer t.gossip_net peer
             Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi hash
         with
         | Ok (Some ledger_builder_aux) -> Some ledger_builder_aux
         | Ok None -> Logger.info t.log "no ledger builder aux found"; None
-        | Error err -> Logger.warn t.log "%s" (Error.to_string_mach err); None)
+        | Error err -> Logger.warn t.log "%s" (Error.to_string_mach err); None))
 
     let glue_sync_ledger t query_reader response_writer =
       let peers = Gossip_net.random_peers t.gossip_net 3 in
       Linear_pipe.iter_unordered ~max_concurrency:8 query_reader ~f:(fun query ->
         match%bind
-          par_find_map peers ~f:(fun peer ->
+          Deferred.any (List.map peers ~f:(fun peer ->
             match%map
               Gossip_net.query_peer t.gossip_net peer
                 Rpcs.Answer_sync_ledger_query.dispatch_multi query
             with
             | Ok answer -> Some answer
-            | Error err -> Logger.warn t.log "%s" (Error.to_string_mach err); None)
+            | Error err -> Logger.warn t.log "%s" (Error.to_string_mach err); None))
         with
         | Some answer -> Linear_pipe.write response_writer answer
         | None -> Deferred.return ())
