@@ -141,7 +141,7 @@ struct
 
   let fill_in_completed_work (state: scan_state) (works: Completed_work.t list)
       : Transaction_snark.t with_statement option Or_error.t =
-    (let open Or_error.Let_syntax in
+    let open Or_error.Let_syntax in
     let%bind next_jobs =
       Parallel_scan.next_k_jobs ~state
         ~k:(List.length works * Completed_work.proofs_length)
@@ -151,7 +151,7 @@ struct
         (List.concat_map works (fun work -> work.proofs))
         ~f:completed_work_to_scanable_work
     in
-    Parallel_scan.fill_in_completed_jobs state scanable_work_list)
+    Parallel_scan.fill_in_completed_jobs state scanable_work_list
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data state data
@@ -242,10 +242,11 @@ struct
         @ List.map completed_works ~f:(fun {fee; prover} -> (prover, fee))
       in
       Or_error.try_with (fun () ->
-        Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
-          Option.value_exn (Fee.Unsigned.add f1 f2))
-        |> Map.to_alist ~key_order:`Increasing (* TODO: This creates a weird incentive to have a small pubkey *)
-        |> Fee_transfer.of_single_list)
+          Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+              Option.value_exn (Fee.Unsigned.add f1 f2) )
+          |> Map.to_alist ~key_order:`Increasing
+          (* TODO: This creates a weird incentive to have a small pubkey *)
+          |> Fee_transfer.of_single_list )
       |> Result_with_rollback.of_or_error
     in
     let super_transactions =
@@ -255,28 +256,20 @@ struct
     let%bind new_data =
       update_ledger_and_get_statements t.ledger super_transactions
     in
-    let%bind () =
-      check_completed_works t completed_works
-    in
+    let%bind () = check_completed_works t completed_works in
     let%bind res_opt =
       (* TODO: Add rollback *)
-      let r =
-        fill_in_completed_work
-          t.scan_state completed_works
-      in
+      let r = fill_in_completed_work t.scan_state completed_works in
       Or_error.iter_error r ~f:(fun e ->
-        (* TODO: Pass a logger here *)
-        eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!"
-          __LOC__ e);
+          (* TODO: Pass a logger here *)
+          eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
       Result_with_rollback.of_or_error r
     in
     let%map () =
       (* TODO: Add rollback *)
       enqueue_data_with_rollback t.scan_state new_data
     in
-    match res_opt with
-    | None -> None
-    | Some (snark, stmt) -> Some snark
+    match res_opt with None -> None | Some (snark, stmt) -> Some snark
 
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
 
@@ -302,37 +295,33 @@ struct
 
   module Resources = struct
     module Queue_consumption = struct
-      type t =
-        { fee_transfers : Public_key.Compressed.Set.t
-        ; transactions : int
-        }
+      type t = {fee_transfers: Public_key.Compressed.Set.t; transactions: int}
 
-      let count { fee_transfers; transactions } =
+      let count {fee_transfers; transactions} =
         (* This is ceil(Set.length fee_transfers / 2) *)
         transactions + ((Set.length fee_transfers + 1) / 2)
 
-      let add_transaction t = { t with transactions = t.transactions + 1 }
+      let add_transaction t = {t with transactions= t.transactions + 1}
 
       let add_fee_transfer t public_key =
-        { t with fee_transfers = Set.add t.fee_transfers public_key }
+        {t with fee_transfers= Set.add t.fee_transfers public_key}
 
-      let (+) t1 t2 =
-        { fee_transfers = Set.union t1.fee_transfers t2.fee_transfers
-        ; transactions = t1.transactions + t2.transactions
-        }
+      let ( + ) t1 t2 =
+        { fee_transfers= Set.union t1.fee_transfers t2.fee_transfers
+        ; transactions= t1.transactions + t2.transactions }
 
-      let empty = { transactions = 0; fee_transfers = Public_key.Compressed.Set.empty }
+      let empty =
+        {transactions= 0; fee_transfers= Public_key.Compressed.Set.empty}
     end
 
     type t =
-      { budget : Fee.Unsigned.t
-      ; queue_consumption : Queue_consumption.t
-      ; available_queue_space : int
-      ; transactions : Transaction.With_valid_signature.t list
-      ; completed_works : Completed_work.t list
-      }
+      { budget: Fee.Unsigned.t
+      ; queue_consumption: Queue_consumption.t
+      ; available_queue_space: int
+      ; transactions: Transaction.With_valid_signature.t list
+      ; completed_works: Completed_work.t list }
 
-    let add_transaction t (txv : Transaction.With_valid_signature.t) =
+    let add_transaction t (txv: Transaction.With_valid_signature.t) =
       let tx = (txv :> Transaction.t) in
       let open Or_error.Let_syntax in
       let%bind budget =
@@ -343,52 +332,53 @@ struct
       in
       if Queue_consumption.count queue_consumption > t.available_queue_space
       then Or_error.error_string "Insufficient space"
-      else Ok { t with budget; queue_consumption; transactions = txv :: t.transactions }
+      else
+        Ok
+          { t with
+            budget; queue_consumption; transactions= txv :: t.transactions }
 
-    let add_work t (w : Completed_work.t) =
+    let add_work t (w: Completed_work.t) =
       let open Or_error.Let_syntax in
-      let%bind budget =
-        option "overflow" (Fee.Unsigned.sub t.budget w.fee)
-      in
+      let%bind budget = option "overflow" (Fee.Unsigned.sub t.budget w.fee) in
       let queue_consumption =
         Queue_consumption.add_fee_transfer t.queue_consumption w.prover
       in
       if Queue_consumption.count queue_consumption > t.available_queue_space
       then Or_error.error_string "Insufficient space"
-      else Ok { t with budget; queue_consumption; completed_works = w :: t.completed_works }
+      else
+        Ok
+          { t with
+            budget; queue_consumption; completed_works= w :: t.completed_works
+          }
 
     let empty ~available_queue_space =
       { available_queue_space
-      ; queue_consumption = Queue_consumption.empty
+      ; queue_consumption= Queue_consumption.empty
       ; budget= Fee.Unsigned.zero
-      ; transactions = []
-      ; completed_works = []
-      }
+      ; transactions= []
+      ; completed_works= [] }
   end
 
   let fold_until_error xs ~init ~f =
-    List.fold_until xs ~init ~f:(fun acc x ->
-      match f acc x with
-      | Ok acc -> Continue acc
-      | Error _ -> Stop acc)
+    List.fold_until xs ~init
+      ~f:(fun acc x ->
+        match f acc x with Ok acc -> Continue acc | Error _ -> Stop acc )
       ~finish:Fn.id
 
   let fold_sequence_until_error seq ~init ~f =
     let rec go (processed, acc) seq =
       let finish () =
-        begin match processed with
+        match processed with
         | `Processed_none -> `Processed_none
         | `At_least_one -> `Processed_at_least_one (acc, seq)
-        end
       in
       match Sequence.next seq with
       | None -> finish ()
       | Some (x, seq') ->
-        begin match f acc x with
+        match f acc x with
         | `Ok acc -> go (`At_least_one, acc) seq'
         | `Error e -> finish ()
         | `Skip -> go (processed, acc) seq'
-        end
     in
     go (`Processed_none, init) seq
 
@@ -398,80 +388,71 @@ struct
          Completed_work.Statement.t -> Completed_work.t option) =
     (* TODO: Don't copy *)
     let ledger = Ledger.copy t.ledger in
-    let or_error = function
-      | Ok x -> `Ok x
-      | Error e -> `Error e
-    in
+    let or_error = function Ok x -> `Ok x | Error e -> `Error e in
     let add_work resources work_to_do =
-      fold_sequence_until_error work_to_do
-        ~init:resources ~f:(fun resources w ->
+      fold_sequence_until_error work_to_do ~init:resources ~f:
+        (fun resources w ->
           match get_completed_work w with
           | Some w ->
-            (* TODO: There is a subtle error here.
+              (* TODO: There is a subtle error here.
                You should not add work if it would cause the person's
                balance to overflow *)
-            or_error (Resources.add_work resources w)
-          | None ->
-            `Error (Error.of_string "Work not found"))
+              or_error (Resources.add_work resources w)
+          | None -> `Error (Error.of_string "Work not found") )
     in
     let add_transactions resources transactions_to_do =
-      fold_sequence_until_error transactions_to_do
-        ~init:resources ~f:(fun resources txn ->
+      fold_sequence_until_error transactions_to_do ~init:resources ~f:
+        (fun resources txn ->
           match Ledger.apply_transaction ledger txn with
           | Error _ -> `Skip
           | Ok () ->
-            begin match Resources.add_transaction resources txn with
+            match Resources.add_transaction resources txn with
             | Ok resources -> `Ok resources
             | Error e ->
-              Or_error.ok_exn (Ledger.undo_transaction ledger txn);
-              `Error e
-            end)
+                Or_error.ok_exn (Ledger.undo_transaction ledger txn) ;
+                `Error e )
     in
     let rec add_many_work ~adding_transactions_failed resources ts_seq ws_seq =
       match add_work resources ws_seq with
       | `Processed_at_least_one (resources, ws_seq) ->
-        add_many_transaction ~adding_work_failed:false resources ts_seq ws_seq
+          add_many_transaction ~adding_work_failed:false resources ts_seq
+            ws_seq
       | `Processed_none ->
-        if adding_transactions_failed
-        then resources
-        else
-          add_many_transaction ~adding_work_failed:true resources ts_seq ws_seq
+          if adding_transactions_failed then resources
+          else
+            add_many_transaction ~adding_work_failed:true resources ts_seq
+              ws_seq
     and add_many_transaction ~adding_work_failed resources ts_seq ws_seq =
       match add_transactions resources ts_seq with
       | `Processed_at_least_one (resources, ts_seq) ->
-        add_many_work ~adding_transactions_failed:false resources ts_seq ws_seq
+          add_many_work ~adding_transactions_failed:false resources ts_seq
+            ws_seq
       | `Processed_none ->
-        if adding_work_failed
-        then resources
-        else
-          add_many_work ~adding_transactions_failed:true resources ts_seq ws_seq
+          if adding_work_failed then resources
+          else
+            add_many_work ~adding_transactions_failed:true resources ts_seq
+              ws_seq
     in
-    let resources, t_rest  =
-      let resources =
-        Resources.empty
-          ~available_queue_space:(free_space t)
-      in
+    let resources, t_rest =
+      let resources = Resources.empty ~available_queue_space:(free_space t) in
       let ts, t_rest =
-        Sequence.split_n transactions_by_fee
-          resources.available_queue_space
+        Sequence.split_n transactions_by_fee resources.available_queue_space
       in
       let resources =
         fold_until_error ts ~init:resources ~f:Resources.add_transaction
       in
-      resources, t_rest
+      (resources, t_rest)
     in
     let resources =
-      add_many_work ~adding_transactions_failed:false resources
-        t_rest (work_to_do t.scan_state)
+      add_many_work ~adding_transactions_failed:false resources t_rest
+        (work_to_do t.scan_state)
     in
     { Ledger_builder_diff.transactions=
         (* We have to reverse here because we only know they work in THIS order *)
         List.rev resources.transactions
-    ; completed_works=
-        List.rev resources.completed_works
+    ; completed_works= List.rev resources.completed_works
     ; creator= t.public_key
-    ; prev_hash= hash t
-    }
+    ; prev_hash= hash t }
 end
 
 let%test_module "ledger_builder" =

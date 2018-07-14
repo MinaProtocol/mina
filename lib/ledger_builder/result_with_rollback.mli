@@ -18,4 +18,3 @@ val error : Error.t -> 'a t
 val of_or_error : 'a Or_error.t -> 'a t
 
 val with_no_rollback : 'a Or_error.t Deferred.t -> 'a t
-

@@ -29,8 +29,7 @@ module T = struct
                 ; rollback= Rollback.compose rollback ty.rollback } ) )
 
   let map t ~f =
-    Deferred.map t ~f:(fun res ->
-        {res with result= Or_error.map ~f res.result} )
+    Deferred.map t ~f:(fun res -> {res with result= Or_error.map ~f res.result})
 
   let map = `Custom map
 end
@@ -39,8 +38,7 @@ include T
 include Monad.Make (T)
 
 let run t =
-  Deferred.map t ~f:(fun {result; rollback} ->
-      Rollback.run rollback ; result )
+  Deferred.map t ~f:(fun {result; rollback} -> Rollback.run rollback ; result)
 
 let error e = Deferred.return {result= Error e; rollback= Do_nothing}
 
@@ -48,4 +46,3 @@ let of_or_error result = Deferred.return {result; rollback= Do_nothing}
 
 let with_no_rollback dresult =
   Deferred.map dresult ~f:(fun result -> {result; rollback= Do_nothing})
-

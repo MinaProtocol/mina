@@ -33,9 +33,7 @@ let swap t i j =
 
 let iter t ~f =
   let n = Array.length t.data in
-  for i = 0 to n - 1 do
-    f t.data.((t.position + i) mod n)
-  done
+  for i = 0 to n - 1 do f (t.data).((t.position + i) mod n) done
 
 let read t = (t.data).(t.position)
 
