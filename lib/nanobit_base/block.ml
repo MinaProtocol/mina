@@ -50,7 +50,7 @@ module Body = struct
       type ('ledger_hash, 'ledger_builder_hash) t_ =
         { target_hash: 'ledger_hash
         ; ledger_builder_hash: 'ledger_builder_hash
-        ; proof: Proof.Stable.V1.t }
+        ; proof: Proof.Stable.V1.t option }
       [@@deriving bin_io, sexp]
 
       type t = (Ledger_hash.Stable.V1.t, Ledger_builder_hash.Stable.V1.t) t_
@@ -90,7 +90,7 @@ module Body = struct
     let alloc =
       Alloc.map relevant_data_typ.alloc ~f:
         (fun (target_hash, ledger_builder_hash) ->
-          {target_hash; ledger_builder_hash; proof= Tock.Proof.dummy} )
+          {target_hash; ledger_builder_hash; proof= None} )
     in
     let check t =
       relevant_data_typ.check (t.target_hash, t.ledger_builder_hash)
@@ -132,7 +132,7 @@ let genesis : t =
   in
   { header= {nonce= Nonce.of_int 20; time}
   ; body=
-      { proof= Tock.Proof.dummy (* TODO: Fix this before merge *)
+      { proof= None
       ; ledger_builder_hash= Ledger_builder_hash.of_hash Pedersen.zero_hash
       ; target_hash= Ledger.(merkle_root Genesis_ledger.ledger) } }
 
@@ -163,7 +163,7 @@ module With_transactions = struct
         type t =
           { target_hash: Ledger_hash.Stable.V1.t
           ; ledger_builder_hash: Ledger_builder_hash.Stable.V1.t
-          ; proof: Proof.Stable.V1.t
+          ; proof: Proof.Stable.V1.t option
           ; transactions: Transaction.Stable.V1.t list }
         [@@deriving bin_io, sexp]
       end
@@ -179,7 +179,7 @@ module With_transactions = struct
       { target_hash= Ledger_hash.of_hash Tick.Pedersen.zero_hash
       ; ledger_builder_hash=
           Ledger_builder_hash.of_hash Tick.Pedersen.zero_hash
-      ; proof= Tock.Proof.dummy
+      ; proof= None
       ; transactions= [] }
   end
 

@@ -88,6 +88,8 @@ module Keys : sig
 
   type t = { proving : Proving.t; verification: Verification.t }
 
+  val create : unit -> t
+
   val cached :
     unit -> (Location.t * t * Checksum.t) Async.Deferred.t
 end

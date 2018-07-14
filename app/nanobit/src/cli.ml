@@ -3,7 +3,7 @@ open Async
 open Nanobit_base
 open Blockchain_snark
 open Cli_common
-open Main
+open Coda_main
 
 let daemon =
   let open Command.Let_syntax in
@@ -75,15 +75,15 @@ let daemon =
 
          let fee_public_key = Genesis_ledger.rich_pk
        end in
-       let module Main = ( val if Insecure.key_generation then ( module Main_without_snark
+       let module M = ( val if Insecure.key_generation then ( module Main_without_snark
                                                                           (Init)
                                  : Main_intf )
                                else
                                  (module Main_with_snark (Storage.Disk) (Init)
                                  : Main_intf ) ) in
-       let module Run = Run (Main) in
+       let module Run = Run (M) in
        let%bind () =
-         let open Main in
+         let open M in
          let net_config =
            { Inputs.Net.Config.parent_log= log
            ; gossip_net_params=
@@ -96,7 +96,7 @@ let daemon =
            ; remap_addr_port }
          in
          let%map minibit =
-           Main.create
+           M.create
              { log
              ; net_config
              ; ledger_disk_location= conf_dir ^/ "ledgers"

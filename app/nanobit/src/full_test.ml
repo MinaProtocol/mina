@@ -1,18 +1,23 @@
 open Core_kernel
 open Async_kernel
 open Nanobit_base
-open Main
+open Coda_main
 
 let run_test with_snark : unit -> unit Deferred.t =
  fun () ->
   let log = Logger.create () in
   let conf_dir = "/tmp" in
   let%bind prover = Prover.create ~conf_dir in
+  let%bind verifier = Verifier.create ~conf_dir in
   let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
   let module Init = struct
-    type proof = Proof.Stable.V1.t [@@deriving bin_io]
+    type proof = Proof.Stable.V1.t [@@deriving bin_io, sexp]
+
+    let logger = log
 
     let conf_dir = conf_dir
+
+    let verifier = verifier
 
     let prover = prover
 
@@ -21,9 +26,9 @@ let run_test with_snark : unit -> unit Deferred.t =
     let fee_public_key = Genesis_ledger.rich_pk
   end in
   let module Main = ( val if with_snark then
-                            (module Main_with_snark (Storage.Memory) (Init)
+                            (module Coda_with_snark (Storage.Memory) (Init) ()
                             : Main_intf )
-                          else (module Main_without_snark (Init) : Main_intf)
+                          else (module Coda_without_snark (Init) () : Main_intf)
   ) in
   let module Run = Run (Main) in
   let open Main in

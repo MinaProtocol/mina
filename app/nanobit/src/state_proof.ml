@@ -3,26 +3,27 @@ open Async_kernel
 open Nanobit_base
 
 module Make_prod (Init : sig
-  val prover : Prover.t
+  val logger : Logger.t
+  val verifier : Verifier.t
 end) =
 struct
-  type input = State.t
+  include Proof.Stable.V1
 
-  type t = Proof.Stable.V1.t [@@deriving bin_io]
-
-  let verify proof s =
-    Prover.verify_blockchain Init.prover
-      {Blockchain_snark.Blockchain.state= State.to_blockchain_state s; proof}
-    >>| Or_error.ok_exn
+  let verify t state =
+    let open Deferred.Let_syntax in
+    let state = State.to_blockchain_state state in
+    match%map Verifier.verify_blockchain Init.verifier { proof = t; state } with
+    | Ok b -> b
+    | Error e ->
+      Logger.warn Init.logger !"Bad blockchain snark: %{sexp: Error.t}" e;
+      false
 end
 
 module Make_debug (Init : sig
-  type proof [@@deriving bin_io]
+  type t [@@deriving bin_io, sexp]
 end) =
 struct
-  type input = State.t
-
-  type t = Init.proof [@@deriving bin_io]
+  include Init
 
   let verify _ _ = return true
 end

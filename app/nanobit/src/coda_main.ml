@@ -4,11 +4,15 @@ open Nanobit_base
 open Blockchain_snark
 
 module type Init_intf = sig
-  type proof [@@deriving bin_io]
+  type proof [@@deriving bin_io, sexp]
+
+  val logger : Logger.t
 
   val conf_dir : string
 
   val prover : Prover.t
+
+  val verifier : Verifier.t
 
   val genesis_proof : proof
 
@@ -446,27 +450,61 @@ struct
 end
 
 module Coda_with_snark
-    (Ledger_proof0 : sig
-       type t [@@deriving sexp, bin_io]
-       val statement : t -> Transaction_snark.Statement.t
-       val verify
-         : t
-         -> Transaction_snark.Statement.t
-         -> message:(Currency.Fee.t * Public_key.Compressed.t)
-         -> bool Deferred.t
-     end)
-    (State_proof : State_proof_intf)
-    (Init : Init_intf with type proof = State_proof.t)
     (Store : Storage.With_checksum_intf)
+    (Init : Init_intf with type proof = Proof.t)
     () = struct
 
-  module Ledger_proof0 = struct
-    type t = Transaction_snark.t [@@deriving bin_io, sexp]
-    let statement = Transaction_snark.statement
-    let verify
+  module Ledger_proof = Ledger_proof.Make_prod(Init)
+
+  module State_proof = State_proof.Make_prod(Init)
+
+  module Inputs = Make_inputs(Ledger_proof)(State_proof)(Difficulty)(Init)(Store)()
+
+  module Block_state_transition_proof = struct
+    module Witness = struct
+      type t = { old_state : State.t; old_proof : Proof.t; transition : Inputs.Transition.t }
+    end
+
+    let prove_zk_state_valid { Witness.old_state; old_proof; transition } ~new_state:_ =
+      Prover.extend_blockchain Init.prover
+        { proof = old_proof; state = State.to_blockchain_state old_state }
+        { header = { time = transition.timestamp; nonce = transition.nonce }
+        ; body =
+            { target_hash = transition.ledger_hash
+            ; ledger_builder_hash = transition.ledger_builder_hash
+            ; proof = Option.map ~f:Transaction_snark.proof transition.ledger_proof
+            }
+        }
+      >>| Or_error.ok_exn
+      >>| fun { Blockchain_snark.Blockchain.proof; _ } -> proof
   end
 
-  module Inputs = Make_inputs(Ledger_proof0)(State_proof)(Difficulty)(Init)(Store)()
-
-  module Coda = Coda.Make(Inputs)
+  include Coda.Make(Inputs)(Block_state_transition_proof)
 end
+
+module Coda_without_snark
+    (Init : Init_intf)
+    () = struct
+  module Store = Storage.Memory
+
+  module Ledger_proof = Ledger_proof.Debug
+
+  module State_proof = State_proof.Make_debug(struct type t = Init.proof [@@deriving bin_io, sexp] end)
+
+  module Inputs = Make_inputs(Ledger_proof)(State_proof)(Difficulty)(Init)(Store)()
+
+  module Block_state_transition_proof = struct
+    module Witness = struct
+      type t = { old_state : State.t; old_proof : State_proof.t; transition : Inputs.Transition.t }
+    end
+
+    let prove_zk_state_valid { Witness.old_state; old_proof; transition } ~new_state:_ = return old_proof
+  end
+
+  include Coda.Make(Inputs)(Block_state_transition_proof)
+end
+
+module type Main_intf = sig
+  module Inputs : Coda.Inputs_intf
+end
+

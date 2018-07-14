@@ -453,6 +453,7 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
     hash(new_hash||nonce) < target(old.next_difficulty)
   *)
 
+  (* TODO: Why is this taking new_state? *)
   val prove_zk_state_valid : Witness.t -> new_state:state -> proof Deferred.t
 end
 
