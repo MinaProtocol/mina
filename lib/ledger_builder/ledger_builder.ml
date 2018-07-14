@@ -77,7 +77,8 @@ module type Inputs_intf = sig
     with type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
      and type transaction := Transaction.t
-     and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+     and type transaction_with_valid_signature :=
+                Transaction.With_valid_signature.t
      and type public_key := Public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 end

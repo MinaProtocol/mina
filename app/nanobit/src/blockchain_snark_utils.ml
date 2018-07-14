@@ -5,16 +5,15 @@ open Util
 open Blockchain_snark
 open Snark_params
 
-module Verification
-    (Wrap : sig
-        val key : Tock.Verification_key.t
+module Verification (Wrap : sig
+  val key : Tock.Verification_key.t
 
-        val key_to_bool_list : Tock.Verification_key.t -> bool list
+  val key_to_bool_list : Tock.Verification_key.t -> bool list
 
-        val input :
-            unit
-          -> ('a, 'b, Tock.Field.var -> 'a, Tock.Field.t -> 'b) Tock.Data_spec.t
-      end) = struct
+  val input :
+    unit -> ('a, 'b, Tock.Field.var -> 'a, Tock.Field.t -> 'b) Tock.Data_spec.t
+end) =
+struct
   let instance_hash =
     let self = Wrap.key_to_bool_list Wrap.key in
     fun state ->
@@ -33,8 +32,5 @@ module Verification
     go Tock.Field.one Tock.Field.zero 0
 
   let verify_wrap state proof =
-    Tock.verify proof
-      Wrap.key
-      (Wrap.input ())
-      (embed (instance_hash state))
+    Tock.verify proof Wrap.key (Wrap.input ()) (embed (instance_hash state))
 end

@@ -25,7 +25,8 @@ module type Network_pool_intf = sig
 
   val create : incoming_diffs:pool_diff Linear_pipe.Reader.t -> t
 
-  val of_pool_and_diffs : pool -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t
+  val of_pool_and_diffs :
+    pool -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t
 
   val pool : t -> pool
 
@@ -55,6 +56,7 @@ struct
     | Ok () -> Linear_pipe.write t.write_broadcasts pool_diff
     | Error e -> (* TODO: Log error *)
                  Deferred.unit
+
   let of_pool_and_diffs pool ~incoming_diffs =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool = {pool; read_broadcasts; write_broadcasts} in

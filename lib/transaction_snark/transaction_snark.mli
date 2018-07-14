@@ -3,7 +3,7 @@ open Nanobit_base
 open Snark_params
 
 module Proof_type : sig
-  type t = [ `Merge | `Base ] [@@deriving bin_io, sexp]
+  type t = [`Merge | `Base] [@@deriving bin_io, sexp]
 end
 
 module Transition : sig
@@ -14,12 +14,11 @@ module Transition : sig
 end
 
 module Statement : sig
-  type t = 
-    { source : Nanobit_base.Ledger_hash.Stable.V1.t
-    ; target : Nanobit_base.Ledger_hash.Stable.V1.t
-    ; fee_excess : Currency.Amount.Signed.Stable.V1.t
-    ; proof_type : Proof_type.t
-    }
+  type t =
+    { source: Nanobit_base.Ledger_hash.Stable.V1.t
+    ; target: Nanobit_base.Ledger_hash.Stable.V1.t
+    ; fee_excess: Currency.Amount.Signed.Stable.V1.t
+    ; proof_type: Proof_type.t }
   [@@deriving sexp, bin_io, hash, compare]
 
   val gen : t Quickcheck.Generator.t
@@ -72,26 +71,20 @@ module Keys : sig
 
   module Location : sig
     type t =
-      { proving : Proving.Location.t
-      ; verification : Verification.Location.t
-      }
+      {proving: Proving.Location.t; verification: Verification.Location.t}
 
     include Stringable.S with type t := t
   end
 
   module Checksum : sig
-    type t =
-      { proving : Md5.t
-      ; verification : Md5.t
-      }
+    type t = {proving: Md5.t; verification: Md5.t}
   end
 
-  type t = { proving : Proving.t; verification: Verification.t }
+  type t = {proving: Proving.t; verification: Verification.t}
 
   val create : unit -> t
 
-  val cached :
-    unit -> (Location.t * t * Checksum.t) Async.Deferred.t
+  val cached : unit -> (Location.t * t * Checksum.t) Async.Deferred.t
 end
 
 module Verification : sig

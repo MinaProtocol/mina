@@ -5,9 +5,7 @@ module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
 
   module Transition_with_witness : sig
-    type t =
-      { previous_ledger_hash: Ledger_hash.t
-      ; transition: Transition.t }
+    type t = {previous_ledger_hash: Ledger_hash.t; transition: Transition.t}
     [@@deriving sexp]
   end
 end
@@ -20,15 +18,18 @@ module Make (Inputs : Inputs_intf) :
    and type transaction := Inputs.Transaction.With_valid_signature.t
    and type state := Inputs.State.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
-   and type completed_work_checked := Inputs.Completed_work.Checked.t
-=
+   and type completed_work_checked := Inputs.Completed_work.Checked.t =
 struct
   open Inputs
 
   module Hashing_result : sig
     type t
 
-    val create : State.t -> next_ledger_hash:Ledger_hash.t -> next_ledger_builder_hash:Ledger_builder_hash.t -> t
+    val create :
+         State.t
+      -> next_ledger_hash:Ledger_hash.t
+      -> next_ledger_builder_hash:Ledger_builder_hash.t
+      -> t
 
     val result : t -> [`Ok of State.t * Block_nonce.t | `Cancelled] Deferred.t
 
@@ -42,8 +43,8 @@ struct
 
     let cancel t = t.cancelled := true
 
-    let find_block (previous: State.t) ~(next_ledger_hash: Ledger_hash.t) ~next_ledger_builder_hash :
-        (State.t * Block_nonce.t) option =
+    let find_block (previous: State.t) ~(next_ledger_hash: Ledger_hash.t)
+        ~next_ledger_builder_hash : (State.t * Block_nonce.t) option =
       let iterations = 10 in
       let now = Time.now () in
       let difficulty = previous.next_difficulty in
@@ -54,7 +55,7 @@ struct
         { next_difficulty
         ; previous_state_hash= State.hash previous
         ; ledger_hash= next_ledger_hash
-        ; ledger_builder_hash =next_ledger_builder_hash
+        ; ledger_builder_hash= next_ledger_builder_hash
         ; timestamp= now
         ; strength= Strength.increase previous.strength difficulty }
       in
@@ -74,7 +75,9 @@ struct
       let rec go () =
         if !cancelled then return `Cancelled
         else
-          match find_block previous ~next_ledger_hash ~next_ledger_builder_hash with
+          match
+            find_block previous ~next_ledger_hash ~next_ledger_builder_hash
+          with
           | None ->
               let%bind () = after (sec 0.01) in
               go ()
@@ -92,8 +95,8 @@ struct
          state:State.t
       -> ledger_builder:Ledger_builder.t
       -> transactions:Transaction.With_valid_signature.t Sequence.t
-      -> get_completed_work:(
-        Completed_work.Statement.t -> Completed_work.Checked.t option)
+      -> get_completed_work:(   Completed_work.Statement.t
+                             -> Completed_work.Checked.t option)
       -> t
 
     val result : t -> Transition_with_witness.t Deferred.Or_error.t
@@ -110,14 +113,11 @@ struct
       Ivar.fill_if_empty t.cancellation ()
 
     let create ~state ~ledger_builder ~transactions ~get_completed_work =
-      let diff,
-          `Hash_after_applying (next_ledger_builder_hash, next_ledger_hash),
-          `Ledger_proof ledger_proof_opt
-        =
-        Ledger_builder.create_diff
-          ledger_builder
-          ~transactions_by_fee:transactions
-          ~get_completed_work
+      let ( diff
+          , `Hash_after_applying (next_ledger_builder_hash, next_ledger_hash)
+          , `Ledger_proof ledger_proof_opt ) =
+        Ledger_builder.create_diff ledger_builder
+          ~transactions_by_fee:transactions ~get_completed_work
       in
       let hashing_result =
         Hashing_result.create state ~next_ledger_hash ~next_ledger_builder_hash
@@ -131,9 +131,9 @@ struct
               Ok
                 { Transition_with_witness.transition=
                     { ledger_hash= next_ledger_hash
-                    ; ledger_builder_hash =next_ledger_builder_hash
-                    ; ledger_proof = ledger_proof_opt
-                    ; ledger_builder_transition = diff
+                    ; ledger_builder_hash= next_ledger_builder_hash
+                    ; ledger_proof= ledger_proof_opt
+                    ; ledger_builder_transition= diff
                     ; timestamp= new_state.timestamp
                     ; nonce }
                 ; previous_ledger_hash= state.Inputs.State.ledger_hash }
@@ -144,7 +144,7 @@ struct
             >>| fun () -> Or_error.error_string "Mining cancelled" )
           ; result ]
       in
-      { hashing_result; result; cancellation}
+      {hashing_result; result; cancellation}
   end
 
   module Tip = struct
@@ -172,10 +172,10 @@ struct
       | Error e ->
           Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
     in
-
     let create_result {Tip.state; transactions; ledger_builder} =
       let result =
-        Mining_result.create ~state ~ledger_builder ~transactions ~get_completed_work
+        Mining_result.create ~state ~ledger_builder ~transactions
+          ~get_completed_work
       in
       upon (Mining_result.result result) write_result ;
       result

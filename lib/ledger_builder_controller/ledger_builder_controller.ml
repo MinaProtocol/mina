@@ -85,8 +85,7 @@ struct
       ; parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
       ; ledger_builder_diffs:
-          (State.t * Ledger_builder_diff.t)
-          Linear_pipe.Reader.t
+          (State.t * Ledger_builder_diff.t) Linear_pipe.Reader.t
       ; genesis_ledger: Ledger.t
       ; disk_location: string
       ; snark_pool: Snark_pool.t }

@@ -181,17 +181,17 @@ module type Completed_work_intf = sig
     type t = statement list
   end
 
-(* TODO: The SOK message actually should bind the SNARK to
+  (* TODO: The SOK message actually should bind the SNARK to
    be in this particular bundle. The easiest way would be to
    SOK with
    H(all_statements_in_bundle || fee || public_key)
 *)
+
   type t = {fee: fee; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]
 
   module Checked : sig
-    type t
-    [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, bin_io]
   end
 
   val check : t -> Statement.t -> Checked.t option Deferred.t
@@ -237,6 +237,7 @@ module type Ledger_builder_transition_intf = sig
   type ledger_builder
 
   type diff
+
   type diff_with_valid_signatures_and_proofs
 
   type t = {old: ledger_builder; diff: diff}
@@ -254,6 +255,7 @@ module type Ledger_builder_intf = sig
   type diff
 
   type ledger_builder_hash
+
   type ledger_hash
 
   type public_key
@@ -366,6 +368,7 @@ end
 
 module type Transition_intf = sig
   type ledger_hash
+
   type ledger_builder_hash
 
   type proof
@@ -378,7 +381,7 @@ module type Transition_intf = sig
 
   type t =
     { ledger_hash: ledger_hash (* TODO: I believe this is unused. *)
-    ; ledger_builder_hash : ledger_builder_hash
+    ; ledger_builder_hash: ledger_builder_hash
     ; ledger_proof: proof option
     ; ledger_builder_transition: ledger_builder_diff
     ; timestamp: time
@@ -452,8 +455,8 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
     new.timestamp > old.timestamp
     hash(new_hash||nonce) < target(old.next_difficulty)
   *)
-
   (* TODO: Why is this taking new_state? *)
+
   val prove_zk_state_valid : Witness.t -> new_state:state -> proof Deferred.t
 end
 
@@ -470,11 +473,13 @@ module type Inputs_intf = sig
 
   module Transaction : Transaction_intf with type fee := Fee.Unsigned.t
 
-  module Fee_transfer : Fee_transfer_intf
+  module Fee_transfer :
+    Fee_transfer_intf
     with type fee := Fee.Unsigned.t
      and type public_key := Public_key.Compressed.t
 
-  module Super_transaction : Super_transaction_intf
+  module Super_transaction :
+    Super_transaction_intf
     with type valid_transaction := Transaction.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
      and type unsigned_fee := Fee.Unsigned.t
@@ -536,10 +541,10 @@ Merge Snark:
 
     type t
 
-    val verify
-      : t
+    val verify :
+         t
       -> statement
-      -> message:(Fee.Unsigned.t * Public_key.Compressed.t)
+      -> message:Fee.Unsigned.t * Public_key.Compressed.t
       -> bool Deferred.t
   end
 
@@ -553,7 +558,8 @@ Merge Snark:
   module Ledger_builder_diff :
     Ledger_builder_diff_intf
     with type transaction := Transaction.t
-     and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+     and type transaction_with_valid_signature :=
+                Transaction.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
@@ -576,7 +582,8 @@ Merge Snark:
     Ledger_builder_transition_intf
     with type diff := Ledger_builder_diff.t
      and type ledger_builder := Ledger_builder.t
-     and type diff_with_valid_signatures_and_proofs := Ledger_builder_diff.With_valid_signatures_and_proofs.t
+     and type diff_with_valid_signatures_and_proofs :=
+                Ledger_builder_diff.With_valid_signatures_and_proofs.t
 
   module Transition :
     Transition_intf
@@ -621,8 +628,7 @@ struct
       | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
   end
 
-  type t = {state: Proof_carrying_state.t}
-  [@@deriving fields]
+  type t = {state: Proof_carrying_state.t} [@@deriving fields]
 
   let step' t (transition: Transition.t) : t Deferred.t =
     let state = t.state.data in

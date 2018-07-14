@@ -48,9 +48,11 @@ module type S = sig
 end
 
 let tx_pk = lazy (Snark_keys.transaction_proving ())
+
 let tx_vk = lazy (Snark_keys.transaction_verification ())
 
 let bc_pk = lazy (Snark_keys.blockchain_proving ())
+
 let bc_vk = lazy (Snark_keys.blockchain_verification ())
 
 let keys = Set_once.create ()
@@ -63,9 +65,10 @@ let create () =
       let%map tx_pk = Lazy.force tx_pk
       and tx_vk = Lazy.force tx_vk
       and bc_pk = Lazy.force bc_pk
-      and bc_vk = Lazy.force bc_vk
+      and bc_vk = Lazy.force bc_vk in
+      let tx_keys =
+        {Transaction_snark.Keys.proving= tx_pk; verification= tx_vk}
       in
-      let tx_keys = {Transaction_snark.Keys.proving=tx_pk; verification=tx_vk} in
       let module T = Transaction_snark.Make (struct
         let keys = tx_keys
       end) in

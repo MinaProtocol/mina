@@ -169,8 +169,9 @@ end = struct
 
   let gen : t Quickcheck.Generator.t =
     let m = Bignum_bigint.of_string Unsigned.(to_string max_int) in
-    Quickcheck.Generator.map Bignum_bigint.(gen_incl zero m) ~f:(fun n ->
-      of_string (Bignum_bigint.to_string n))
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl zero m)
+      ~f:(fun n -> of_string (Bignum_bigint.to_string n))
 
   module Vector = struct
     include M
@@ -233,7 +234,7 @@ end = struct
 
     let gen =
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
-        create ~magnitude ~sgn)
+          create ~magnitude ~sgn )
 
     type nonrec var = (var, Sgn.var) t_
 

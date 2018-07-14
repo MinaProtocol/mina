@@ -109,23 +109,23 @@ module Transition = struct
 end
 
 module Proof_type = struct
-  type t = [ `Merge | `Base ] [@@deriving bin_io, sexp, hash, compare]
+  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare]
 
   let is_base = function `Base -> true | `Merge -> false
 end
 
 module Statement = struct
   module T = struct
-    type t = 
-      { source : Nanobit_base.Ledger_hash.Stable.V1.t
-      ; target : Nanobit_base.Ledger_hash.Stable.V1.t
-      ; fee_excess : Currency.Amount.Signed.Stable.V1.t
-      ; proof_type : Proof_type.t
-      }
+    type t =
+      { source: Nanobit_base.Ledger_hash.Stable.V1.t
+      ; target: Nanobit_base.Ledger_hash.Stable.V1.t
+      ; fee_excess: Currency.Amount.Signed.Stable.V1.t
+      ; proof_type: Proof_type.t }
     [@@deriving sexp, bin_io, hash, compare]
   end
+
   include T
-  include Hashable.Make_binable(T)
+  include Hashable.Make_binable (T)
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -133,7 +133,7 @@ module Statement = struct
     and target = Nanobit_base.Ledger_hash.gen
     and fee_excess = Currency.Amount.Signed.gen
     and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
-    { source; target; fee_excess; proof_type }
+    {source; target; fee_excess; proof_type}
 end
 
 type t =
@@ -144,8 +144,8 @@ type t =
   ; proof: Proof.Stable.V1.t }
 [@@deriving fields, sexp, bin_io]
 
-let statement { source; target; proof_type; fee_excess; proof=_} =
-  { Statement.source; target; proof_type; fee_excess }
+let statement {source; target; proof_type; fee_excess; proof= _} =
+  {Statement.source; target; proof_type; fee_excess}
 
 let create = Fields.create
 
@@ -169,11 +169,10 @@ module Verification_keys = struct
     ; merge: Tick.Verification_key.t }
   [@@deriving bin_io]
 
-  let dummy : t=
-    { merge = Dummy_values.Tick.verification_key
-    ; base = Dummy_values.Tick.verification_key
-    ; wrap = Dummy_values.Tock.verification_key
-    }
+  let dummy : t =
+    { merge= Dummy_values.Tick.verification_key
+    ; base= Dummy_values.Tick.verification_key
+    ; wrap= Dummy_values.Tock.verification_key }
 end
 
 module Keys0 = struct
@@ -187,18 +186,18 @@ module Keys0 = struct
     [@@deriving bin_io]
 
     let dummy =
-      { merge = Dummy_values.Tick.proving_key
-      ; base = Dummy_values.Tick.proving_key
-      ; wrap = Dummy_values.Tock.proving_key
-      }
+      { merge= Dummy_values.Tick.proving_key
+      ; base= Dummy_values.Tick.proving_key
+      ; wrap= Dummy_values.Tock.proving_key }
   end
 
   module T = struct
-    type t = { proving : Proving.t; verification: Verification.t }
+    type t = {proving: Proving.t; verification: Verification.t}
   end
+
   include T
 
-  let dummy : t = { proving = Proving.dummy; verification = Verification.dummy }
+  let dummy : t = {proving= Proving.dummy; verification= Verification.dummy}
 end
 
 let handle_with_ledger (ledger: Ledger.t) =
@@ -383,8 +382,7 @@ module Base = struct
         Cached.component ~label:"verification" ~f:Keypair.vk
           Verification_key.bin_t
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk
-          Proving_key.bin_t
+        Cached.component ~label:"proving" ~f:Keypair.pk Proving_key.bin_t
       in
       (verification, proving)
     in
@@ -524,8 +522,7 @@ module Merge = struct
         Cached.component ~label:"verification" ~f:Keypair.vk
           Verification_key.bin_t
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk
-          Proving_key.bin_t
+        Cached.component ~label:"proving" ~f:Keypair.pk Proving_key.bin_t
       in
       (verification, proving)
     in
@@ -727,8 +724,7 @@ struct
         Cached.component ~label:"verification" ~f:Keypair.vk
           Verification_key.bin_t
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk
-          Proving_key.bin_t
+        Cached.component ~label:"proving" ~f:Keypair.pk Proving_key.bin_t
       in
       (verification, proving)
     in
@@ -797,9 +793,7 @@ struct
   end)
 
   let wrap proof_type proof input =
-    Tock.prove
-      keys.proving.wrap
-      (wrap_input ())
+    Tock.prove keys.proving.wrap (wrap_input ())
       {Wrap.Prover_state.proof; proof_type}
       Wrap.main (embed input)
 
@@ -813,9 +807,7 @@ struct
     in
     let to_bits = Ledger_hash.to_bits in
     ( top_hash
-    , Tick.prove
-        keys.proving.merge
-        (tick_input ())
+    , Tick.prove keys.proving.merge (tick_input ())
         { Merge.Prover_state.ledger_hash1= to_bits ledger_hash1
         ; ledger_hash2= to_bits ledger_hash2
         ; ledger_hash3= to_bits ledger_hash3
@@ -828,9 +820,8 @@ struct
 
   let of_tagged_transaction source target transaction handler =
     let top_hash, proof =
-      Base.tagged_transaction_proof
-        ~proving_key: keys.proving.base
-        source target transaction handler
+      Base.tagged_transaction_proof ~proving_key:keys.proving.base source
+        target transaction handler
     in
     { source
     ; target
@@ -898,7 +889,6 @@ module Keys = struct
 
   module Verification = struct
     include Keys0.Verification
-
     module Location = Per_snark_location
 
     let checksum ~base ~merge ~wrap =
@@ -907,8 +897,12 @@ module Keys = struct
     let load ({merge; base; wrap}: Location.t) =
       let open Storage.Disk in
       let parent_log = Logger.create () in
-      let tick_controller = Controller.create ~parent_log Tick.Verification_key.bin_t in
-      let tock_controller = Controller.create ~parent_log Tock.Verification_key.bin_t in
+      let tick_controller =
+        Controller.create ~parent_log Tick.Verification_key.bin_t
+      in
+      let tock_controller =
+        Controller.create ~parent_log Tock.Verification_key.bin_t
+      in
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
@@ -919,12 +913,13 @@ module Keys = struct
       and merge = load tick_controller merge
       and wrap = load tock_controller wrap in
       let t = {base= base.data; merge= merge.data; wrap= wrap.data} in
-      (t, checksum ~base:base.checksum ~merge:merge.checksum ~wrap:wrap.checksum)
+      ( t
+      , checksum ~base:base.checksum ~merge:merge.checksum ~wrap:wrap.checksum
+      )
   end
 
   module Proving = struct
     include Keys0.Proving
-
     module Location = Per_snark_location
 
     let checksum ~base ~merge ~wrap =
@@ -933,8 +928,12 @@ module Keys = struct
     let load ({merge; base; wrap}: Location.t) =
       let open Storage.Disk in
       let parent_log = Logger.create () in
-      let tick_controller = Controller.create ~parent_log Tick.Proving_key.bin_t in
-      let tock_controller = Controller.create ~parent_log Tock.Proving_key.bin_t in
+      let tick_controller =
+        Controller.create ~parent_log Tick.Proving_key.bin_t
+      in
+      let tock_controller =
+        Controller.create ~parent_log Tock.Proving_key.bin_t
+      in
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
@@ -945,14 +944,18 @@ module Keys = struct
       and merge = load tick_controller merge
       and wrap = load tock_controller wrap in
       let t = {base= base.data; merge= merge.data; wrap= wrap.data} in
-      (t, checksum ~base:base.checksum ~merge:merge.checksum ~wrap:wrap.checksum)
+      ( t
+      , checksum ~base:base.checksum ~merge:merge.checksum ~wrap:wrap.checksum
+      )
   end
 
   let verification_keys = verification_keys_of_keys
 
   module Location = struct
     module T = struct
-      type t = {proving: Proving.Location.t; verification: Verification.Location.t} [@@deriving sexp]
+      type t =
+        {proving: Proving.Location.t; verification: Verification.Location.t}
+      [@@deriving sexp]
     end
 
     include T
@@ -962,19 +965,17 @@ module Keys = struct
   include Keys0.T
 
   module Checksum = struct
-    type t =
-      { proving : Md5.t
-      ; verification : Md5.t
-      }
+    type t = {proving: Md5.t; verification: Md5.t}
   end
 
-  let load ({ proving; verification }: Location.t) =
+  let load ({proving; verification}: Location.t) =
     let open Storage.Disk in
     let open Async in
-    let%map (proving, proving_checksum) = Proving.load proving
-    and (verification, verification_checksum) = Verification.load verification
-    in
-    ({ proving; verification }, { Checksum.proving=proving_checksum; verification=verification_checksum })
+    let%map proving, proving_checksum = Proving.load proving
+    and verification, verification_checksum = Verification.load verification in
+    ( {proving; verification}
+    , {Checksum.proving= proving_checksum; verification= verification_checksum}
+    )
 
   let create () =
     let base = Base.create_keys () in
@@ -987,24 +988,20 @@ module Keys = struct
       end) in
       Wrap.create_keys ()
     in
-    { proving =
-        { base = Tick.Keypair.pk base
-        ; merge = Tick.Keypair.pk merge
-        ; wrap = Tock.Keypair.pk wrap
-        }
-    ; verification =
-        { base = Tick.Keypair.vk base
-        ; merge = Tick.Keypair.vk merge
-        ; wrap = Tock.Keypair.vk wrap
-        }
-    }
+    { proving=
+        { base= Tick.Keypair.pk base
+        ; merge= Tick.Keypair.pk merge
+        ; wrap= Tock.Keypair.pk wrap }
+    ; verification=
+        { base= Tick.Keypair.vk base
+        ; merge= Tick.Keypair.vk merge
+        ; wrap= Tock.Keypair.vk wrap } }
 
   let cached () =
     let open Async in
-    let%bind (base_vk, base_pk) = Cached.run Base.cached
-    and (merge_vk, merge_pk) = Cached.run Merge.cached
-    in
-    let%map (wrap_vk, wrap_pk) =
+    let%bind base_vk, base_pk = Cached.run Base.cached
+    and merge_vk, merge_pk = Cached.run Merge.cached in
+    let%map wrap_vk, wrap_pk =
       let module Wrap = Wrap (struct
         let base = base_vk.value
 
@@ -1013,43 +1010,23 @@ module Keys = struct
       Cached.run Wrap.cached
     in
     let t =
-      { proving =
-          { base = base_pk.value
-          ; merge = merge_pk.value
-          ; wrap = wrap_pk.value
-          }
-      ; verification =
-          { base = base_vk.value
-          ; merge = merge_vk.value
-          ; wrap = wrap_vk.value
-          }
-      }
+      { proving=
+          {base= base_pk.value; merge= merge_pk.value; wrap= wrap_pk.value}
+      ; verification=
+          {base= base_vk.value; merge= merge_vk.value; wrap= wrap_vk.value} }
     in
     let location : Location.t =
-      { proving =
-          { base = base_pk.path
-          ; merge = merge_pk.path
-          ; wrap = wrap_pk.path
-          }
-      ; verification =
-          { base = base_vk.path
-          ; merge = merge_vk.path
-          ; wrap = wrap_vk.path
-          }
-      }
+      { proving= {base= base_pk.path; merge= merge_pk.path; wrap= wrap_pk.path}
+      ; verification=
+          {base= base_vk.path; merge= merge_vk.path; wrap= wrap_vk.path} }
     in
     let checksum =
-      { Checksum.proving =
-          Proving.checksum
-            ~base:base_pk.checksum
-            ~merge:merge_pk.checksum
+      { Checksum.proving=
+          Proving.checksum ~base:base_pk.checksum ~merge:merge_pk.checksum
             ~wrap:wrap_pk.checksum
-      ; verification =
-          Verification.checksum
-            ~base:base_vk.checksum
-            ~merge:merge_vk.checksum
-            ~wrap:wrap_vk.checksum
-      }
+      ; verification=
+          Verification.checksum ~base:base_vk.checksum ~merge:merge_vk.checksum
+            ~wrap:wrap_vk.checksum }
     in
     (location, t, checksum)
 end
@@ -1132,8 +1109,6 @@ let%test_module "transaction_snark" =
           in
           let state3 = Ledger.merkle_root ledger in
           let proof13 = merge proof12 proof23 |> Or_error.ok_exn in
-          Tock.verify proof13.proof
-            keys.verification.wrap
-            (wrap_input ())
+          Tock.verify proof13.proof keys.verification.wrap (wrap_input ())
             (embed (merge_top_hash state1 state3 total_fees wrap_vk_bits)) )
   end )

@@ -75,12 +75,13 @@ struct
 
   let gen : t Quickcheck.Generator.t =
     let m =
-      if length_in_bits = Field.size_in_bits
-      then Bignum_bigint.(Field.size - one)
+      if length_in_bits = Field.size_in_bits then
+        Bignum_bigint.(Field.size - one)
       else Bignum_bigint.(pow (of_int 2) (of_int length_in_bits) - one)
     in
-    Quickcheck.Generator.map (Bignum_bigint.(gen_incl zero m)) ~f:(fun x ->
-      Bigint.(to_field (of_bignum_bigint x)))
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl zero m)
+      ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
   let ( = ) = equal
 

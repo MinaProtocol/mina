@@ -68,7 +68,7 @@ let apply_transaction_unchecked ledger ({payload; sender}: Transaction.t) =
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
   apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
-let undo_transaction ledger (transaction : Transaction.With_valid_signature.t) =
+let undo_transaction ledger (transaction: Transaction.With_valid_signature.t) =
   let {Transaction.payload; sender} = (transaction :> Transaction.t) in
   let sender = Public_key.compress sender in
   let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
@@ -101,8 +101,7 @@ let merkle_root_after_transactions t ts =
         txn )
   in
   let root = merkle_root t in
-  List.iter ts_rev ~f:(fun txn ->
-      ignore (undo_transaction t txn) ) ;
+  List.iter ts_rev ~f:(fun txn -> ignore (undo_transaction t txn)) ;
   root
 
 let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =

@@ -7,7 +7,9 @@ let create () =
     Bignum_bigint.random Snark_params.Tick.Signature_curve.Params.order
   else failwith "Insecure.private_key_generation"
 
-let gen = Bignum_bigint.(gen_incl zero (Snark_params.Tick.Signature_curve.Params.order - one))
+let gen =
+  let open Bignum_bigint in
+  gen_incl zero (Snark_params.Tick.Signature_curve.Params.order - one)
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in

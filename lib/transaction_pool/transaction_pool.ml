@@ -18,7 +18,9 @@ open Async_kernel
  *
  * For now we are removing lazily when we look for the next transactions
  *)
-module Make (Txn : sig type t [@@deriving compare] end) =
+module Make (Txn : sig
+  type t [@@deriving compare]
+end) =
 struct
   type t = Txn.t Fheap.t
 

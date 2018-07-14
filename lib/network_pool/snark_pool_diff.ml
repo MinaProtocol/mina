@@ -8,14 +8,17 @@ type ('work, 'priced_proof) diff =
   | Add_unsolved of 'work
   | Add_solved_work of ('work * 'priced_proof)
 
-module Make
-    (Proof : sig type t end)
-    (Fee : sig type t end)
-    (Work : sig type t end)
-    (Pool : Snark_pool.S
-            with type work := Work.t
-             and type proof := Proof.t
-             and type fee := Fee.t) =
+module Make (Proof : sig
+  type t
+end) (Fee : sig
+  type t
+end) (Work : sig
+  type t
+end)
+(Pool : Snark_pool.S
+        with type work := Work.t
+         and type proof := Proof.t
+         and type fee := Fee.t) =
 struct
   type priced_proof = {proof: Proof.t; fee: Fee.t}
 

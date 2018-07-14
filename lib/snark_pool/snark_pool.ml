@@ -15,8 +15,7 @@ module type S = sig
 
   type fee
 
-  type t
-  [@@deriving bin_io]
+  type t [@@deriving bin_io]
 
   val create_pool : unit -> t
 

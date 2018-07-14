@@ -9,6 +9,7 @@ open Snark_params
 module Worker_state = struct
   module type S = sig
     val verify_wrap : Blockchain_state.t -> Tock.Proof.t -> bool
+
     val verify_transaction_snark : Transaction_snark.t -> bool
   end
 
@@ -18,22 +19,23 @@ module Worker_state = struct
 
   let create () : t Deferred.t =
     let%map bc_vk = Snark_keys.blockchain_verification ()
-    and tx_vk = Snark_keys.transaction_verification ()
-    in
-    let module T = Transaction_snark.Verification.Make(struct let keys = tx_vk end) in
-    let module B = Blockchain_transition.Make(T) in
-    let module U =
-      Blockchain_snark_utils.Verification(struct
-        let key = bc_vk.wrap
-        let key_to_bool_list = B.Step_base.Verifier.Verification_key.to_bool_list
-        let input = B.wrap_input
-      end)
-    in
+    and tx_vk = Snark_keys.transaction_verification () in
+    let module T = Transaction_snark.Verification.Make (struct
+      let keys = tx_vk
+    end) in
+    let module B = Blockchain_transition.Make (T) in
+    let module U = Blockchain_snark_utils.Verification (struct
+      let key = bc_vk.wrap
+
+      let key_to_bool_list = B.Step_base.Verifier.Verification_key.to_bool_list
+
+      let input = B.wrap_input
+    end) in
     let module M = struct
       let verify_wrap = U.verify_wrap
+
       let verify_transaction_snark = T.verify
-    end
-    in
+    end in
     (module M : S)
 end
 
@@ -58,10 +60,11 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      let verify_blockchain (module M : Worker_state.S) (chain : Blockchain.t) =
+      let verify_blockchain (module M : Worker_state.S) (chain: Blockchain.t) =
         return (M.verify_wrap chain.state chain.proof)
 
-      let verify_transaction_snark (module M : Worker_state.S) (s : Transaction_snark.t) =
+      let verify_transaction_snark (module M : Worker_state.S)
+          (s: Transaction_snark.t) =
         return (M.verify_transaction_snark s)
 
       let functions =
@@ -70,8 +73,11 @@ module Worker = struct
             ~f:(fun ~worker_state ~conn_state i -> f worker_state i)
             ~bin_input:i ~bin_output:o ()
         in
-        { verify_blockchain= f (Blockchain.Stable.V1.bin_t, Bool.bin_t, verify_blockchain)
-        ; verify_transaction_snark= f (Transaction_snark.bin_t, Bool.bin_t, verify_transaction_snark) }
+        { verify_blockchain=
+            f (Blockchain.Stable.V1.bin_t, Bool.bin_t, verify_blockchain)
+        ; verify_transaction_snark=
+            f (Transaction_snark.bin_t, Bool.bin_t, verify_transaction_snark)
+        }
 
       let init_worker_state () = Worker_state.create ()
 
