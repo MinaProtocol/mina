@@ -56,6 +56,7 @@ module type S = sig
     Coda_pow.Ledger_intf
     with type ledger_hash := Ledger_hash.t
      and type super_transaction := Super_transaction.t
+     and type valid_transaction := Transaction.With_valid_signature.t
 
   module Ledger_builder_hash : Coda_pow.Ledger_builder_hash_intf
 

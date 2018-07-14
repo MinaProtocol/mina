@@ -81,6 +81,8 @@ module type Ledger_intf = sig
   val apply_super_transaction : t -> super_transaction -> unit Or_error.t
 
   val undo_super_transaction : t -> super_transaction -> unit Or_error.t
+
+  val undo_transaction : t -> valid_transaction -> unit Or_error.t
 end
 
 module type Snark_pool_proof_intf = sig
@@ -110,7 +112,9 @@ module type Public_key_intf = sig
   type t
 
   module Compressed : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, bin_io, compare]
+
+    include Comparable.S with type t := t
   end
 end
 
