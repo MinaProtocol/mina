@@ -28,6 +28,12 @@ module State : sig
   (* val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t *)
 
   val copy : ('a, 'b, 'd) t -> ('a, 'b, 'd) t
+
+  module Hash : sig
+    type t = Cryptokit.hash
+  end
+
+  val hash : ('a, 'b, 'd) t -> ('a -> string) -> ('b -> string) -> ('d -> string) -> Hash.t
 end
 
 module type Spec_intf = sig

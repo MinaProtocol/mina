@@ -38,6 +38,46 @@ type ('a, 'b, 'd) t =
   ; mutable enough_steps: bool }
 [@@deriving sexp, bin_io]
 
+module Hash = struct
+  type t = Cryptokit.hash
+end
+
+(* TODO: This should really be computed iteratively *)
+let hash { jobs; data_buffer; acc; current_data_length; enough_steps }
+      a_to_string
+      b_to_string
+      d_to_string
+  =
+  let h = Cryptokit.Hash.sha3 256 in
+  Ring_buffer.iter jobs ~f:(function
+    | Base None -> h#add_string "Base None"
+    | Base (Some x) ->
+      h#add_string ("Base Some " ^ d_to_string x)
+    | Merge_up None -> h#add_string "Merge_up None"
+    | Merge_up (Some a) ->
+      h#add_string ("Merge_up Some " ^ a_to_string a)
+    | Merge (None, None) ->
+      h#add_string "Merge None None"
+    | Merge (None, Some a) ->
+      h#add_string ("Merge None Some " ^ a_to_string a)
+    | Merge (Some a, None) ->
+      h#add_string ("Merge Some " ^ a_to_string a ^ " None")
+    | Merge (Some a1, Some a2) ->
+      h#add_string
+        ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2)
+  );
+  Queue.iter data_buffer ~f:(fun d ->
+    h#add_string (d_to_string d));
+  begin
+    let (i, b) = acc in
+    h#add_string (Int.to_string i);
+    h#add_string (b_to_string b)
+  end;
+  h#add_string (Int.to_string current_data_length);
+  h#add_string (Bool.to_string enough_steps);
+  h
+;;
+
 let acc {acc} = snd acc
 
 let jobs {jobs} = jobs

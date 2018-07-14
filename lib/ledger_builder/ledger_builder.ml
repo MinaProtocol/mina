@@ -2,80 +2,26 @@ open Core_kernel
 open Async_kernel
 open Protocols
 
-module type Inputs_intf = sig
-  module Fee : sig
-    module Unsigned : sig
-      type t [@@deriving sexp_of, eq]
+let option lab =
+  Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-      val add : t -> t -> t option
+let check label b = if not b then Or_error.error_string label else Ok ()
 
-      val sub : t -> t -> t option
+let map2_or_error xs ys ~f =
+  let rec go xs ys acc =
+    match xs, ys with
+    | [], [] -> Ok (List.rev acc)
+    | x :: xs, y :: ys ->
+      begin match f x y with
+      | Error e -> Error e
+      | Ok z ->
+        go xs ys (z :: acc)
+      end
+    | _, _ -> Or_error.error_string "Length mismatch"
+  in
+  go xs ys []
 
-      val zero : t
-    end
-
-    module Signed : sig
-      type t [@@deriving sexp_of]
-
-      val add : t -> t -> t option
-
-      val negate : t -> t
-
-      val of_unsigned : Unsigned.t -> t
-    end
-  end
-
-  module Public_key : Coda_pow.Public_key_intf
-
-  module Transaction :
-    Coda_pow.Transaction_intf with type fee := Fee.Unsigned.t
-
-  module Fee_transfer :
-    Coda_pow.Fee_transfer_intf
-    with type public_key := Public_key.Compressed.t
-     and type fee := Fee.Unsigned.t
-
-  module Super_transaction :
-    Coda_pow.Super_transaction_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
-     and type fee_transfer := Fee_transfer.t
-     and type signed_fee := Fee.Signed.t
-
-  module Ledger_proof : Coda_pow.Proof_intf
-
-  module Ledger_hash : Coda_pow.Ledger_hash_intf
-
-  module Snark_pool_proof : Coda_pow.Snark_pool_proof_intf
-
-  module Transaction_snark :
-    Coda_pow.Transaction_snark_intf
-    with type fee := Fee.Signed.t
-     and type ledger_hash := Ledger_hash.t
-     and type message := Fee.Unsigned.t * Public_key.Compressed.t
-
-  module Ledger :
-    Coda_pow.Ledger_intf
-    with type ledger_hash := Ledger_hash.t
-     and type super_transaction := Super_transaction.t
-
-  module Ledger_builder_hash : Coda_pow.Ledger_builder_hash_intf
-
-  module Completed_work :
-    Coda_pow.Completed_work_intf
-    with type proof := Transaction_snark.t
-     and type statement := Transaction_snark.Statement.t
-     and type fee := Fee.Unsigned.t
-     and type public_key := Public_key.Compressed.t
-
-  module Ledger_builder_diff :
-    Coda_pow.Ledger_builder_diff_intf
-    with type completed_work := Completed_work.t
-     and type transaction := Transaction.With_valid_signature.t
-     and type public_key := Public_key.Compressed.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-end
-
-module Make (Inputs : Inputs_intf) :
+module Make (Inputs : Inputs.S) :
   Coda_pow.Ledger_builder_intf
   with type diff := Inputs.Ledger_builder_diff.t
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
@@ -87,29 +33,20 @@ module Make (Inputs : Inputs_intf) :
    and type completed_work := Inputs.Completed_work.t
    and type statement := Inputs.Completed_work.Statement.t =
 struct
-  (* Assume you have
-
-  enqueue_data
-  : Paralell_scan.State.t -> Transition,t list -> unit
-
-  complete_jobs
-  : Paralell_scan.State.t -> Accum.t list -> unit
-  
-  Alternatively,
-  change the intf of parallel scan to take a function
-  check_work : Job.t -> Accum.t -> bool Deferred,t
-
-  and then have in parallel scan
-
-  validate_and_apply_work
-  : Parallel_scan.State.t -> Accum.t list -> unit Or_error.t Deferred.t
-
-  *)
-
   open Inputs
 
   type 'a with_statement = 'a * Transaction_snark.Statement.t
   [@@deriving sexp, bin_io]
+
+(* TODO: This is redundant right now, the transaction snark has the statement
+   inside of it. *)
+  module Snark_with_statement = struct
+    type t = Transaction_snark.t with_statement [@@deriving sexp, bin_io]
+  end
+
+  module Super_transaction_with_statement = struct
+    type t = Super_transaction.t with_statement [@@deriving sexp, bin_io]
+  end
 
   type job =
     ( Transaction_snark.t with_statement
@@ -132,8 +69,7 @@ struct
   [@@deriving sexp, bin_io]
 
   type t =
-    { scan_state:
-        scan_state
+    { scan_state: scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
     ; ledger: Ledger.t
@@ -145,55 +81,26 @@ struct
     ; ledger= Ledger.copy ledger
     ; public_key }
 
-  module Job_hash = struct
-    type t = job [@@deriving sexp_of]
-  end
+  let hash { scan_state; ledger; public_key=_} : Ledger_builder_hash.t =
+    let h =
+      Parallel_scan.State.hash scan_state
+        (Binable.to_string (module Snark_with_statement))
+        (Binable.to_string (module Snark_with_statement))
+        (Binable.to_string (module Super_transaction_with_statement))
+    in
+    h#add_string (Ledger_hash.to_bits (Ledger.merkle_root ledger));
+    Ledger_builder_hash.of_bits h#result
 
-  let hash t : Ledger_builder_hash.t = failwith "TODO"
+  let ledger { ledger; _ } = ledger
 
-  let ledger t = failwith "TODO"
-
-  let max_margin : int = failwith "TODO"
-
-  let margin t : int = failwith "TODO"
-
-  let create ~ledger ~self : t = failwith "TODO"
-
-  (*
-  module Spec = struct
-    module Accum = struct
-      type t = Proof.t With_statement.t [@@deriving sexp_of]
-
-      let ( + ) t t' : t = failwith "TODO"
-    end
-
-    module Data = struct
-      type t = transaction With_statement.t [@@deriving sexp_of]
-    end
-
-    module Output = struct
-      type t = Proof.t With_statement.t [@@deriving sexp_of]
-    end
-
-    let merge t t' = t'
-
-    let map (x: Data.t) : Accum.t =
-      failwith
-        "Create a transaction snark from a transaction. Needs to look up some \
-         ds that stores all the proofs that the witness has"
-  end
-
-  let spec =
-    ( module Spec
-    : Parallel_scan.Spec_intf with type Data.t = transaction With_statement.t and type 
-      Accum.t = Proof.t With_statement.t and type Output.t = Proof.t
-                                                             With_statement.t
-    ) *)
-
-  let option lab =
-    Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
-
-  let check label b = if not b then Or_error.error_string label else Ok ()
+  let create ~ledger ~self : t =
+    let open Config in
+    { scan_state =
+        Parallel_scan.start ~parallelism_log_2 ~init:(failwith "TODO")
+          ~seed:(failwith "TODO")
+    ; ledger
+    ; public_key = self
+    }
 
   let statement_of_job : job -> Transaction_snark.Statement.t option = function
     | Base (Some (_, statement)) -> Some statement
@@ -236,79 +143,23 @@ struct
     | None -> return false
     | Some statement -> Transaction_snark.verify proof statement ~message
 
-  module Result_with_rollback = struct
-    module Rollback = struct
-      type t = Do_nothing | Call of (unit -> unit)
-
-      let compose t1 t2 =
-        match (t1, t2) with
-        | Do_nothing, t | t, Do_nothing -> t
-        | Call f1, Call f2 -> Call (fun () -> f1 () ; f2 ())
-
-      let run = function Do_nothing -> () | Call f -> f ()
-    end
-
-    module T = struct
-      type 'a result = {result: 'a Or_error.t; rollback: Rollback.t}
-
-      type 'a t = 'a result Deferred.t
-
-      let return x = Deferred.return {result= Ok x; rollback= Do_nothing}
-
-      let bind tx ~f =
-        Deferred.bind tx ~f:(fun {result; rollback} ->
-            match result with
-            | Error e -> Deferred.return {result= Error e; rollback}
-            | Ok x ->
-                Deferred.map (f x) ~f:(fun ty ->
-                    { result= ty.result
-                    ; rollback= Rollback.compose rollback ty.rollback } ) )
-
-      let map t ~f =
-        Deferred.map t ~f:(fun res ->
-            {res with result= Or_error.map ~f res.result} )
-
-      let map = `Custom map
-    end
-
-    include T
-    include Monad.Make (T)
-
-    let run t =
-      Deferred.map t ~f:(fun {result; rollback} ->
-          Rollback.run rollback ; result )
-
-    let error e = Deferred.return {result= Error e; rollback= Do_nothing}
-
-    let of_or_error result = Deferred.return {result; rollback= Do_nothing}
-
-    let with_no_rollback dresult =
-      Deferred.map dresult ~f:(fun result -> {result; rollback= Do_nothing})
-  end
-
-  let rec mapM_2 = function
-    | [], [] -> Ok []
-    | job :: jobs', work :: works' ->
-        let open Or_error.Let_syntax in
-        let%bind scanable_work = completed_work_to_scanable_work job work in
-        let%bind scanable_works = mapM_2 (jobs', works') in
-        Ok (scanable_work :: scanable_works)
-    | _, _ -> Error (Error.of_string "Lengths mismatch")
-
-  let fill_in_completed_work (state: scan_state) (works: Completed_work.t list)
-      : Transaction_snark.t with_statement option Result_with_rollback.t =
-    Result_with_rollback.with_no_rollback
-      (let open Deferred.Or_error.Let_syntax in
+  let fill_in_completed_work
+        (state: scan_state)
+        (works: Completed_work.t list)
+      : Transaction_snark.t with_statement option Result_with_rollback.t
+      =
+    Result_with_rollback.of_or_error
+      (let open Or_error.Let_syntax in
       let next_jobs =
         Parallel_scan.next_k_jobs ~state
           ~k:(List.length works * Completed_work.proofs_length)
       in
       let%bind scanable_work_list =
-        Deferred.return
-        @@ mapM_2 (next_jobs, List.concat_map works (fun work -> work.proofs))
-      in
-      Deferred.return
-      @@ Parallel_scan.fill_in_completed_jobs state scanable_work_list)
+            map2_or_error next_jobs (List.concat_map works (fun work -> work.proofs))
+                ~f:completed_work_to_scanable_work
+          in
+          Parallel_scan.fill_in_completed_jobs state scanable_work_list
+     )
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data state data
