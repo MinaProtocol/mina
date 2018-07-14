@@ -34,6 +34,8 @@ end
 module type Ledger_hash_intf = sig
   type t [@@deriving bin_io, eq, sexp]
 
+  val to_bits : t -> string
+
   include Hashable.S_binable with type t := t
 end
 
@@ -45,6 +47,8 @@ end
 
 module type Ledger_builder_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
+
+  val of_bits : string -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -215,11 +219,7 @@ module type Ledger_builder_intf = sig
 
   val copy : t -> t
 
-  val max_margin : int
-
   val hash : t -> ledger_builder_hash
-
-  val margin : t -> int
 
   val create : ledger:ledger -> self:public_key -> t
 
@@ -588,11 +588,9 @@ struct
           (* TODO soon: these checks are irrelevant and should be handled inside of
              Ledger_builder.apply.
           *)
-          let margin = Ledger_builder.margin ledger_builder in
           Ledger_builder_hash.equal
             (Ledger_builder.hash ledger_builder)
             new_pcd.data.ledger_builder_hash
-          && Int.( >= ) margin Ledger_builder.max_margin
           && Ledger_hash.equal new_ledger_hash new_pcd.data.ledger_hash
     in
     let new_strength = new_pcd.data.strength in

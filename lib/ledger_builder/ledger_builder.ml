@@ -73,6 +73,10 @@ module type Inputs_intf = sig
      and type transaction := Transaction.With_valid_signature.t
      and type public_key := Public_key.Compressed.t
      and type ledger_builder_hash := Ledger_builder_hash.t
+
+  module Config : sig
+    val parallelism_log_2 : int
+  end
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -87,29 +91,20 @@ module Make (Inputs : Inputs_intf) :
    and type completed_work := Inputs.Completed_work.t
    and type statement := Inputs.Completed_work.Statement.t =
 struct
-  (* Assume you have
-
-  enqueue_data
-  : Paralell_scan.State.t -> Transition,t list -> unit
-
-  complete_jobs
-  : Paralell_scan.State.t -> Accum.t list -> unit
-  
-  Alternatively,
-  change the intf of parallel scan to take a function
-  check_work : Job.t -> Accum.t -> bool Deferred,t
-
-  and then have in parallel scan
-
-  validate_and_apply_work
-  : Parallel_scan.State.t -> Accum.t list -> unit Or_error.t Deferred.t
-
-  *)
-
   open Inputs
 
   type 'a with_statement = 'a * Transaction_snark.Statement.t
   [@@deriving sexp, bin_io]
+
+(* TODO: This is redundant right now, the transaction snark has the statement
+   inside of it. *)
+  module Snark_with_statement = struct
+    type t = Transaction_snark.t with_statement [@@deriving sexp, bin_io]
+  end
+
+  module Super_transaction_with_statement = struct
+    type t = Super_transaction.t with_statement [@@deriving sexp, bin_io]
+  end
 
   type job =
     ( Transaction_snark.t with_statement
@@ -132,8 +127,7 @@ struct
   [@@deriving sexp, bin_io]
 
   type t =
-    { scan_state:
-        scan_state
+    { scan_state: scan_state
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
     ; ledger: Ledger.t
@@ -149,46 +143,26 @@ struct
     type t = job [@@deriving sexp_of]
   end
 
-  let hash t : Ledger_builder_hash.t = failwith "TODO"
+  let hash { scan_state; ledger; public_key=_} : Ledger_builder_hash.t =
+    let h =
+      Parallel_scan.State.hash scan_state
+        (Binable.to_string (module Snark_with_statement))
+        (Binable.to_string (module Snark_with_statement))
+        (Binable.to_string (module Super_transaction_with_statement))
+    in
+    h#add_string (Ledger_hash.to_bits (Ledger.merkle_root ledger));
+    Ledger_builder_hash.of_bits h#result
 
-  let ledger t = failwith "TODO"
+  let ledger { ledger; _ } = ledger
 
-  let max_margin : int = failwith "TODO"
-
-  let margin t : int = failwith "TODO"
-
-  let create ~ledger ~self : t = failwith "TODO"
-
-  (*
-  module Spec = struct
-    module Accum = struct
-      type t = Proof.t With_statement.t [@@deriving sexp_of]
-
-      let ( + ) t t' : t = failwith "TODO"
-    end
-
-    module Data = struct
-      type t = transaction With_statement.t [@@deriving sexp_of]
-    end
-
-    module Output = struct
-      type t = Proof.t With_statement.t [@@deriving sexp_of]
-    end
-
-    let merge t t' = t'
-
-    let map (x: Data.t) : Accum.t =
-      failwith
-        "Create a transaction snark from a transaction. Needs to look up some \
-         ds that stores all the proofs that the witness has"
-  end
-
-  let spec =
-    ( module Spec
-    : Parallel_scan.Spec_intf with type Data.t = transaction With_statement.t and type 
-      Accum.t = Proof.t With_statement.t and type Output.t = Proof.t
-                                                             With_statement.t
-    ) *)
+  let create ~ledger ~self : t =
+    let open Config in
+    { scan_state =
+        Parallel_scan.start ~parallelism_log_2 ~init:(failwith "TODO")
+          ~seed:(failwith "TODO")
+    ; ledger
+    ; public_key = self
+    }
 
   let option lab =
     Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)

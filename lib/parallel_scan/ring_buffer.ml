@@ -31,6 +31,12 @@ let swap t i j =
   (t.data).(i) <- (t.data).(j) ;
   (t.data).(j) <- temp
 
+let iter t ~f =
+  let n = Array.length t.data in
+  for i = 0 to n - 1 do
+    f t.data.((t.position + i) mod n)
+  done
+
 (*Read element in the ith positon*)
 
 let read t = (t.data).(t.position)
