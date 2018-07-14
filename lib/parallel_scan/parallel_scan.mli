@@ -31,46 +31,19 @@ module State : sig
 end
 
 module type Spec_intf = sig
-  module Data : sig
-    type t [@@deriving sexp_of]
-  end
+  type data [@@deriving sexp_of]
 
-  module Accum : sig
-    type t [@@deriving sexp_of]
+  type accum [@@deriving sexp_of]
 
-    (* Semigroup+deferred *)
-
-    val ( + ) : t -> t -> t
-  end
-
-  module Output : sig
-    type t [@@deriving sexp_of]
-  end
-
-  val map : Data.t -> Accum.t
-
-  val merge : Output.t -> Accum.t -> Output.t
+  type output [@@deriving sexp_of]
 end
 
 val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
 
-(*
-val step :
-     state:('a, 'b, 'd) State.t
-  -> data:'d list
-  -> spec:(module
-           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                          t = 'b)
-  -> 'b option
-*)
-
-val next_job : state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t option
-
 val next_k_jobs :
-  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t
+  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list
 
-val next_jobs :
-  state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t list Or_error.t
+val next_jobs : state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t list
 
 val enqueue_data :
   state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t

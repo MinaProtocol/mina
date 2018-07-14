@@ -303,15 +303,12 @@ struct
         Parallel_scan.next_k_jobs ~state
           ~k:(List.length works * Completed_work.proofs_length)
       in
-      match next_jobs with
-      | Error e -> Deferred.return (Error e)
-      | Ok jobs ->
-          let%bind scanable_work_list =
-            Deferred.return
-            @@ mapM_2 (jobs, List.concat_map works (fun work -> work.proofs))
-          in
-          Deferred.return
-          @@ Parallel_scan.fill_in_completed_jobs state scanable_work_list)
+      let%bind scanable_work_list =
+        Deferred.return
+        @@ mapM_2 (next_jobs, List.concat_map works (fun work -> work.proofs))
+      in
+      Deferred.return
+      @@ Parallel_scan.fill_in_completed_jobs state scanable_work_list)
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data state data
@@ -356,20 +353,18 @@ struct
 
   let check_completed_works t (completed_works: Completed_work.t list) =
     Result_with_rollback.with_no_rollback
-      Deferred.Or_error.Let_syntax.(
-        match
-          Parallel_scan.next_k_jobs ~state:t.scan_state
-            ~k:(List.length completed_works * Completed_work.proofs_length)
-          |> Or_error.map ~f:(chunks_of ~n:Completed_work.proofs_length)
-        with
-        | Error e -> Deferred.return (Error e)
-        | Ok jobses ->
-            Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:
-              (fun (jobs, work) ->
-                let message = (work.fee, work.prover) in
-                Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:
-                  (fun (job, proof) -> verify ~message job proof ) )
-            |> Deferred.map ~f:(check "proofs did not verify"))
+      (let open Deferred.Or_error.Let_syntax in
+      let jobses =
+        Parallel_scan.next_k_jobs ~state:t.scan_state
+          ~k:(List.length completed_works * Completed_work.proofs_length)
+        |> chunks_of ~n:Completed_work.proofs_length
+      in
+      Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:
+        (fun (jobs, work) ->
+          let message = (work.fee, work.prover) in
+          Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:
+            (fun (job, proof) -> verify ~message job proof ) )
+      |> Deferred.map ~f:(check "proofs did not verify"))
 
   let apply_diff t (diff: Ledger_builder_diff.t) =
     let payments = diff.transactions in
@@ -408,8 +403,8 @@ struct
       update_ledger_and_get_statements t.ledger super_transactions
     in
     let%bind () = check_completed_works t completed_works in
-    let%bind res_opt = fill_in_completed_work t.scan_state completed_works in
-    let%map () = enqueue_data_with_rollback t.scan_state new_data in
+    let%bind () = enqueue_data_with_rollback t.scan_state new_data in
+    let%map res_opt = fill_in_completed_work t.scan_state completed_works in
     match res_opt with None -> None | Some (snark, stmt) -> Some snark
 
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
@@ -425,14 +420,12 @@ struct
           | Some (x, seq) -> Skip (x :: acc, i + 1, seq) )
 
   let work_to_do scan_state : Transaction_snark.Statement.t Sequence.t =
-    match Parallel_scan.next_jobs scan_state with
-    | Error e -> failwith @@ Error.to_string_hum e
-    | Ok work_list ->
-        Sequence.of_list
-        @@ List.map work_list (fun maybe_work ->
-               match statement_of_job maybe_work with
-               | None -> failwith "Error extracting statement from job"
-               | Some work -> work )
+    let work_list = Parallel_scan.next_jobs scan_state in
+    Sequence.of_list
+    @@ List.map work_list (fun maybe_work ->
+           match statement_of_job maybe_work with
+           | None -> failwith "Error extracting statement from job"
+           | Some work -> work )
 
   (* First, if there's any free space on the queue, put transactions there *)
   let create_diff t

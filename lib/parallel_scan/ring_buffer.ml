@@ -16,7 +16,6 @@ let length {data} = Array.length data
 let copy {data; position} = {data= Array.copy data; position}
 
 let direct_update t i ~f =
-  (*    ('a -> 'a Or_error.t) =*)
   let open Or_error.Let_syntax in
   let x : 'a = (t.data).(i) in
   let%bind v = f x in
@@ -24,14 +23,13 @@ let direct_update t i ~f =
 
 let update t ~f = direct_update t t.position (fun x -> f t.position x)
 
+(*Read element from the ith positon*)
 let read_i t i = (t.data).(i)
 
 let swap t i j =
   let temp = read_i t i in
   (t.data).(i) <- (t.data).(j) ;
   (t.data).(j) <- temp
-
-(*Read element in the ith positon*)
 
 let read t = (t.data).(t.position)
 
