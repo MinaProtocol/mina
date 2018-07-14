@@ -7,7 +7,6 @@
     ( base64
       core
       client_lib
-      ledger_fetcher
       linear_pipe
       minibit_networking
       minibit_miner

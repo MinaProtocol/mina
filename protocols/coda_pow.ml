@@ -552,13 +552,14 @@ struct
       | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
   end
 
-  type t = {state: Proof_carrying_state.t}
-  [@@deriving fields]
+  type t = {state: Proof_carrying_state.t} [@@deriving fields]
 
   let step' t (transition: Transition.t) : t Deferred.t =
     let state = t.state.data in
     let proof = t.state.proof in
-    let {Ledger_builder_transition.old;diff} = transition.ledger_builder_transition in
+    let {Ledger_builder_transition.old; diff} =
+      transition.ledger_builder_transition
+    in
     match%bind Ledger_builder.apply old diff with
     | Error e -> return t
     (* TODO: This proof should go somewhere! Also we mutated [old] so not clear
