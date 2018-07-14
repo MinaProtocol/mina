@@ -158,20 +158,14 @@ struct
     let dirs = unpeel_all a in
     let rec mark_helper node dir =
       match dir with
-      | `Left :: ds -> (
-        match !node with
-        (* sanity assert: we shouldn't ever be recursing under valid parts of the tree *)
-        | Leaf v ->
-            assert (v = `Unknown) ;
-            node := Node (ref !node, ref !node)
-        | Node (l, r) -> mark_helper l ds )
-      | `Right :: ds -> (
-        match !node with
-        (* sanity assert: we shouldn't ever be recursing under valid parts of the tree *)
-        | Leaf v ->
-            assert (v = `Unknown) ;
-            node := Node (ref !node, ref !node)
-        | Node (l, r) -> mark_helper r ds )
+      | d :: ds -> (
+          let accessor = match d with `Left -> fst | `Right -> snd in
+          match !node with
+          (* sanity assert: we shouldn't ever be recursing under valid parts of the tree *)
+          | Leaf v ->
+              assert (v = `Unknown) ;
+              node := Node (ref !node, ref !node)
+          | Node (l, r) -> mark_helper (accessor (l, r)) ds )
       | [] ->
         match !node with
         | Leaf `Unknown -> node := Leaf `Valid
