@@ -24,10 +24,19 @@ let direct_update t i ~f =
 
 let update t ~f = direct_update t t.position (fun x -> f t.position x)
 
+let read_i t i = (t.data).(i)
+
+let swap t i j =
+  let temp = read_i t i in
+  (t.data).(i) <- (t.data).(j) ;
+  (t.data).(j) <- temp
+
+(*Read element in the ith positon*)
+
 let read t = (t.data).(t.position)
 
-let read_k t k =
-  let curr_position_neg_one = mod_ (t.position - 1) k in
+let read_all t =
+  let curr_position_neg_one = mod_ (t.position - 1) (Array.length t.data) in
   Sequence.unfold ~init:(`More t.position) ~f:(fun pos ->
       match pos with
       | `Stop -> None
@@ -38,7 +47,8 @@ let read_k t k =
   )
   |> Sequence.to_list
 
-let read_all t = read_k t (Array.length t.data)
+(*read k elements from the current position*)
+let read_k t k = List.take (read_all t) k
 
 let forwards ~n t = t.position <- mod_ (t.position + n) (Array.length t.data)
 

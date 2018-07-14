@@ -34,7 +34,8 @@ type ('a, 'b, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
   ; data_buffer: 'd Queue.t
   ; mutable acc: int * 'b
-  ; mutable current_data_length: int }
+  ; mutable current_data_length: int
+  ; mutable enough_steps: bool }
 [@@deriving sexp, bin_io]
 
 let acc {acc} = snd acc
@@ -45,8 +46,11 @@ let data_buffer {data_buffer} = data_buffer
 
 let current_data_length {current_data_length} = current_data_length
 
-let copy {jobs; data_buffer; acc; current_data_length} =
+let enough_steps {enough_steps} = enough_steps
+
+let copy {jobs; data_buffer; acc; current_data_length; enough_steps} =
   { jobs= Ring_buffer.copy jobs
   ; data_buffer= Queue.copy data_buffer
   ; acc
-  ; current_data_length }
+  ; current_data_length
+  ; enough_steps }
