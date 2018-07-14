@@ -314,6 +314,8 @@ module type Inputs_intf = sig
     val ledger : Ledger.t
 
     val proof : State.Proof.t
+
+    val ledger_builder : unit -> Ledger_builder.t
   end
 end
 
@@ -437,7 +439,8 @@ struct
   let run t =
     Logger.info t.log "Starting to run Coda" ;
     let p : Protocol.t =
-      Protocol.create ~state:{data= Genesis.state; proof= Genesis.proof}
+      Protocol.create
+        ~state:{data= Genesis.state; proof= Genesis.proof}
     in
     let miner_transitions_protocol = Miner.transitions t.miner in
     let protocol_events =

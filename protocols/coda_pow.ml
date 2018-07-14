@@ -628,7 +628,8 @@ struct
       | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
   end
 
-  type t = {state: Proof_carrying_state.t} [@@deriving fields]
+  type t = {state: Proof_carrying_state.t}
+  [@@deriving fields]
 
   let step' t (transition: Transition.t) : t Deferred.t =
     let state = t.state.data in
