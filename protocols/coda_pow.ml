@@ -219,11 +219,11 @@ module type Ledger_builder_intf = sig
 
   type completed_work
 
-  val ledger : t -> ledger
-
   val copy : t -> t
 
   val hash : t -> ledger_builder_hash
+
+  val ledger : t -> ledger
 
   val create : ledger:ledger -> self:public_key -> t
 
