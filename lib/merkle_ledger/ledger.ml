@@ -91,9 +91,13 @@ module type S = sig
 
   val set_at_index_exn : t -> index -> account -> unit
 
+  val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
+
   val merkle_path_at_index_exn : t -> index -> Path.t
 
   val addr_of_index : t -> index -> Addr.t
+
+  val set_at_addr_exn : t -> Addr.t -> account -> unit
 
   val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
 
@@ -104,11 +108,24 @@ module type S = sig
   val set_syncing : t -> unit
 
   val clear_syncing : t -> unit
+
+  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
+
+  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
 end
 
-module type F = functor (Account :sig
-                                    
-                                    type t [@@deriving sexp, eq, bin_io]
+module type F = functor (Key :sig
+                                
+                                type t [@@deriving sexp, bin_io]
+
+                                val empty : t
+
+                                include Hashable.S_binable with type t := t
+end) -> functor (Account :sig
+                            
+                            type t [@@deriving sexp, eq, bin_io]
+
+                            val pubkey : t -> Key.t
 end) -> functor (Hash :sig
                          
                          type hash [@@deriving sexp, hash, compare, bin_io]
@@ -118,13 +135,6 @@ end) -> functor (Hash :sig
                          val empty_hash : hash
 
                          val merge : height:int -> hash -> hash -> hash
-end) -> functor (Key :sig
-                        
-                        type t [@@deriving sexp, bin_io]
-
-                        val empty : t
-
-                        include Hashable.S_binable with type t := t
 end) -> functor (Depth :sig
                           
                           val depth : int
@@ -133,8 +143,16 @@ end) -> S
          and type account := Account.t
          and type key := Key.t
 
-module Make (Account : sig
+module Make (Key : sig
+  type t [@@deriving sexp, bin_io]
+
+  val empty : t
+
+  include Hashable.S_binable with type t := t
+end) (Account : sig
   type t [@@deriving sexp, eq, bin_io]
+
+  val pubkey : t -> Key.t
 end) (Hash : sig
   type hash [@@deriving sexp, hash, compare, bin_io]
 
@@ -143,12 +161,6 @@ end) (Hash : sig
   val empty_hash : hash
 
   val merge : height:int -> hash -> hash -> hash
-end) (Key : sig
-  type t [@@deriving sexp, bin_io]
-
-  val empty : t
-
-  include Hashable.S_binable with type t := t
 end) (Depth : sig
   val depth : int
 end) :
@@ -158,11 +170,6 @@ end) :
    and type key := Key.t =
 struct
   include Depth
-
-  type entry = {merkle_index: int; account: Account.t}
-  [@@deriving sexp, bin_io]
-
-  type accounts = entry Key.Table.t [@@deriving sexp, bin_io]
 
   module Addr = struct
     module T = struct
@@ -201,6 +208,11 @@ struct
 
     let root = {depth= 0; index= 0}
   end
+
+  type entry = {merkle_index: int; account: Account.t}
+  [@@deriving sexp, bin_io]
+
+  type accounts = entry Key.Table.t [@@deriving sexp, bin_io]
 
   type index = int
 
@@ -500,6 +512,14 @@ struct
         (DynArray.init (new_size - len) (fun x -> Key.empty)) ;
     recompute_tree t
 
+  let merkle_path_at_addr_exn t {Addr.index; depth} =
+    assert (depth = Depth.depth - 1) ;
+    merkle_path_at_index_exn t index
+
+  let set_at_addr_exn t {Addr.index; depth} a =
+    assert (depth = Depth.depth - 1) ;
+    set_at_index_exn t index a
+
   let get_inner_hash_at_addr_exn t {Addr.index; depth= adepth} =
     assert (adepth < depth) ;
     let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
@@ -517,4 +537,25 @@ struct
     (t.tree).syncing <- true
 
   let clear_syncing t = (t.tree).syncing <- false
+
+  let set_all_accounts_rooted_at_exn t {Addr.index; depth= adepth} accounts =
+    let effective_depth = depth - adepth in
+    let count = 1 lsl effective_depth in
+    let first_index = index lsl effective_depth in
+    assert (List.length accounts = count) ;
+    List.iteri accounts ~f:(fun i a ->
+        let pk = Account.pubkey a in
+        let entry = {merkle_index= first_index + i; account= a} in
+        Key.Table.set t.accounts pk entry ;
+        Dyn_array.set t.tree.leafs (first_index + i) pk )
+
+  let get_all_accounts_rooted_at_exn t {Addr.index; depth= adepth} =
+    let effective_depth = depth - adepth in
+    let count = 1 lsl effective_depth in
+    let first_index = index lsl effective_depth in
+    let subarr = Dyn_array.sub t.tree.leafs first_index count in
+    Dyn_array.to_list
+      (Dyn_array.map
+         (fun key -> (Key.Table.find_exn t.accounts key).account)
+         subarr)
 end

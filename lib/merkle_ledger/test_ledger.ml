@@ -3,6 +3,8 @@ open Ledger
 
 module Account = struct
   type t = int [@@deriving sexp, eq, bin_io]
+
+  let pubkey t = ""
 end
 
 module Hash = struct
@@ -34,4 +36,4 @@ module Key = struct
   include Hashable.Make_binable (T)
 end
 
-module Make = Ledger.Make (Account) (Hash) (Key)
+module Make = Ledger.Make (Key) (Account) (Hash)

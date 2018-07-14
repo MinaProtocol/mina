@@ -88,9 +88,13 @@ module type S = sig
 
   val set_at_index_exn : t -> index -> account -> unit
 
+  val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
+
   val merkle_path_at_index_exn : t -> index -> Path.t
 
   val addr_of_index : t -> index -> Addr.t
+
+  val set_at_addr_exn : t -> Addr.t -> account -> unit
 
   val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
 
@@ -101,11 +105,24 @@ module type S = sig
   val set_syncing : t -> unit
 
   val clear_syncing : t -> unit
+
+  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
+
+  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
 end
 
-module type F = functor (Account :sig
-                                    
-                                    type t [@@deriving sexp, eq, bin_io]
+module type F = functor (Key :sig
+                                
+                                type t [@@deriving sexp, bin_io]
+
+                                val empty : t
+
+                                include Hashable.S_binable with type t := t
+end) -> functor (Account :sig
+                            
+                            type t [@@deriving sexp, eq, bin_io]
+
+                            val pubkey : t -> Key.t
 end) -> functor (Hash :sig
                          
                          type hash [@@deriving sexp, hash, compare, bin_io]
@@ -115,13 +132,6 @@ end) -> functor (Hash :sig
                          val empty_hash : hash
 
                          val merge : height:int -> hash -> hash -> hash
-end) -> functor (Key :sig
-                        
-                        type t [@@deriving sexp, bin_io]
-
-                        val empty : t
-
-                        include Hashable.S_binable with type t := t
 end) -> functor (Depth :sig
                           
                           val depth : int
