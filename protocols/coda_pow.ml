@@ -186,8 +186,6 @@ module type Ledger_builder_intf = sig
 
   type completed_work
 
-  val ledger : t -> ledger
-
   val copy : t -> t
 
   val max_margin : int
@@ -195,6 +193,8 @@ module type Ledger_builder_intf = sig
   val hash : t -> ledger_builder_hash
 
   val margin : t -> int
+
+  val ledger : t -> ledger
 
   val create : ledger:ledger -> self:public_key -> t
 
