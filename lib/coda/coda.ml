@@ -314,8 +314,6 @@ module type Inputs_intf = sig
     val ledger : Ledger.t
 
     val proof : State.Proof.t
-
-    val ledger_builder : unit -> Ledger_builder.t
   end
 end
 
