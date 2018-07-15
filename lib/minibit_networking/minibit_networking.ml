@@ -9,18 +9,18 @@ module type Sync_ledger_intf = sig
 end
 
 module Rpcs
-    (Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf)
+    (Ledger_builder_aux_hash : Protocols.Coda_pow.Ledger_builder_aux_hash_intf)
     (Sync_ledger : Sync_ledger_intf)
-    (State : Binable.S) =
+    (Ledger_builder_aux : Binable.S) =
 struct
   module Get_ledger_builder_aux_at_hash = struct
     module T = struct
       let name = "get_ledger_builder_aux_at_hash"
 
       module T = struct
-        type query = Ledger_hash.t
+        type query = Ledger_builder_aux_hash.t
 
-        type response = State.t option
+        type response = Ledger_builder_aux.t option
       end
 
       module Caller = T
@@ -32,9 +32,9 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Ledger_hash.t [@@deriving bin_io]
+        type query = Ledger_builder_aux_hash.t [@@deriving bin_io]
 
-        type response = State.t option [@@deriving bin_io]
+        type response = Ledger_builder_aux.t option [@@deriving bin_io]
 
         let version = 1
 
@@ -85,10 +85,19 @@ struct
   end
 end
 
-module Message (State_with_witness : Minibit.State_with_witness_intf) = struct
+module Message (Inputs : sig
+    module Snark_pool_diff : Binable.S
+    module Transaction_pool_diff : Binable.S
+    module State_with_witness : Coda.State_with_witness_intf
+  end)
+= struct
+  open Inputs
   module T = struct
     module T = struct
-      type msg = New_state of State_with_witness.Stripped.t
+      type msg =
+        | New_state of State_with_witness.Stripped.t
+        | Snark_pool_diff of Snark_pool_diff.t
+        | Transaction_pool_diff of Transaction_pool_diff.t
       [@@deriving bin_io]
     end
 
@@ -117,18 +126,24 @@ module Message (State_with_witness : Minibit.State_with_witness_intf) = struct
 end
 
 module type Inputs_intf = sig
-  module State_with_witness : Minibit.State_with_witness_intf
+  module State_with_witness : Coda.State_with_witness_intf
 
-  module Ledger_hash : Protocols.Minibit_pow.Ledger_hash_intf
+  module Ledger_builder_aux_hash : Protocols.Coda_pow.Ledger_builder_aux_hash_intf
 
   module Sync_ledger : Sync_ledger_intf
 
-  module State : Binable.S
+  module Ledger_builder_aux : sig
+    type t [@@deriving bin_io]
+    val hash : t -> Ledger_builder_aux_hash.t
+  end
+
+  module Snark_pool_diff : Binable.S
+  module Transaction_pool_diff : Binable.S
 end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
-  module Message = Message (State_with_witness)
+  module Message = Message (Inputs)
   module Gossip_net = Gossip_net.Make (Message)
 
   module Config = struct
@@ -140,14 +155,16 @@ module Make (Inputs : Inputs_intf) = struct
       ; remap_addr_port: Peer.t -> Peer.t }
   end
 
-  module Rpcs = Rpcs (Ledger_hash) (Sync_ledger) (State)
+  module Rpcs = Rpcs (Ledger_builder_aux_hash) (Sync_ledger) (Ledger_builder_aux)
   module Membership = Membership.Haskell
 
   type t =
     { gossip_net: Gossip_net.t
     ; log: Logger.t
-    ; new_state_reader: State_with_witness.Stripped.t Linear_pipe.Reader.t
-    ; new_state_writer: State_with_witness.Stripped.t Linear_pipe.Writer.t }
+    ; new_states: State_with_witness.Stripped.t Linear_pipe.Reader.t
+    ; transaction_pool_diffs: Transaction_pool_diff.t Linear_pipe.Reader.t
+    ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t
+    }
 
   type state_with_witness = State_with_witness.t
 
@@ -191,70 +208,87 @@ module Make (Inputs : Inputs_intf) = struct
       init_gossip_net config.gossip_net_params config.initial_peers config.me
         log config.remap_addr_port implementations
     in
-    let new_state_reader, new_state_writer = Linear_pipe.create () in
-    don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:64
-           (Gossip_net.received gossip_net) ~f:(function New_state s ->
-           Linear_pipe.write_or_drop new_state_writer new_state_reader
-             ~capacity:1024 s ;
-           Deferred.unit )) ;
-    {gossip_net; log; new_state_reader; new_state_writer}
+    (* TODO: Think about buffering:
+       I.e., what do we do when too many messages are coming in, or going out.
+       For example, some things you really want to not drop (like your outgoing
+       block announcment).
+    *)
+    let new_states, snark_pool_diffs, transaction_pool_diffs =
+      Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(function
+        | New_state s -> `Fst s
+        | Snark_pool_diff d -> `Snd d
+        | Transaction_pool_diff d -> `Trd d)
+    in
+    {gossip_net; log; new_states; snark_pool_diffs; transaction_pool_diffs}
 
-  module State_io = struct
-    type net = t
+  (* TODO: Have better pushback behavior *)
+  let broadcast t x =
+    Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
-    type t = unit
+  let broadcast_state t x = broadcast t (New_state x)
+  let broadcast_transaction_pool_diff t x = broadcast t (Transaction_pool_diff x)
+  let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
 
-    let create net ~broadcast_state =
-      (* TODO: Don't rebroadcast until checked *)
-      don't_wait_for
-        (Linear_pipe.iter_unordered ~max_concurrency:64
-           (Linear_pipe.map broadcast_state ~f:State_with_witness.strip) ~f:
-           (fun x ->
-             Pipe.write (Gossip_net.broadcast net.gossip_net) (New_state x) )) ;
-      ()
-
-    (* TODO: Punish sources that send invalid transactions *)
-    let new_states net t =
-      Linear_pipe.map net.new_state_reader ~f:State_with_witness.check
-  end
+  (* TODO: Have better pushback behavior *)
+  let broadcast_state t s =
+    Linear_pipe.write_without_pushback
+      (Gossip_net.broadcast t.gossip_net) (New_state s)
 
   module Ledger_builder_io = struct
     type nonrec t = t
 
     let create = Fn.id
 
+    (* TODO: This is kinda inefficient *)
+    let find_map xs ~f =
+      let open Async in
+      let ds = List.map xs ~f in
+      let filter ~f =
+        Deferred.bind ~f:(fun x ->
+          if f x then return x else Deferred.never ())
+      in
+      let none_worked =
+        Deferred.bind (Deferred.all ds) ~f:(fun ds ->
+          if List.for_all ds ~f:Option.is_none
+          then return None
+          else Deferred.never ())
+      in
+      Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
+
     let get_ledger_builder_aux_at_hash t hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
-      Deferred.any
-        (List.map peers ~f:(fun peer ->
-             match%map
-               Gossip_net.query_peer t.gossip_net peer
-                 Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi hash
-             with
-             | Ok (Some ledger_builder_aux) -> Some ledger_builder_aux
-             | Ok None ->
-                 Logger.info t.log "no ledger builder aux found" ;
-                 None
-             | Error err ->
-                 Logger.warn t.log "%s" (Error.to_string_mach err) ;
-                 None ))
+      find_map peers ~f:(fun peer ->
+        match%map
+          Gossip_net.query_peer t.gossip_net peer
+            Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi hash
+        with
+        | Ok (Some ledger_builder_aux) ->
+          if Ledger_builder_aux_hash.equal
+               (Ledger_builder_aux.hash ledger_builder_aux) hash
+          then Some ledger_builder_aux
+          else None
+        | Ok None ->
+            Logger.info t.log "no ledger builder aux found" ;
+            None
+        | Error err ->
+            Logger.warn t.log "%s" (Error.to_string_mach err) ;
+            None)
 
+    (* TODO: Check whether responses are good or not. *)
     let glue_sync_ledger t query_reader response_writer =
       let peers = Gossip_net.random_peers t.gossip_net 3 in
       Linear_pipe.iter_unordered ~max_concurrency:8 query_reader ~f:
         (fun query ->
           match%bind
-            Deferred.any
-              (List.map peers ~f:(fun peer ->
-                   match%map
-                     Gossip_net.query_peer t.gossip_net peer
-                       Rpcs.Answer_sync_ledger_query.dispatch_multi query
-                   with
-                   | Ok answer -> Some answer
-                   | Error err ->
-                       Logger.warn t.log "%s" (Error.to_string_mach err) ;
-                       None ))
+            find_map peers ~f:(fun peer ->
+              match%map
+                Gossip_net.query_peer t.gossip_net peer
+                  Rpcs.Answer_sync_ledger_query.dispatch_multi query
+              with
+              | Ok answer -> Some answer
+              | Error err ->
+                  Logger.warn t.log "%s" (Error.to_string_mach err) ;
+                  None )
           with
           | Some answer -> Linear_pipe.write response_writer answer
           | None -> Deferred.return () )

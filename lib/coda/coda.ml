@@ -33,21 +33,6 @@ module type Ledger_builder_io_intf = sig
     -> unit
 end
 
-module type State_io_intf = sig
-  type net
-
-  type t
-
-  type state_with_witness
-
-  val create :
-    net -> broadcast_state:state_with_witness Linear_pipe.Reader.t -> t
-
-  (* Over the wire we should be passing ledger_builder_hash, this function needs to preimage the hash also *)
-
-  val new_states : net -> t -> state_with_witness Linear_pipe.Reader.t
-end
-
 module type Network_intf = sig
   type t
 
@@ -63,10 +48,7 @@ module type Network_intf = sig
 
   type parallel_scan_state
 
-  module State_io :
-    State_io_intf
-    with type state_with_witness := state_with_witness
-     and type net := t
+  val new_states : t -> state_with_witness Linear_pipe.Reader.t
 
   module Ledger_builder_io :
     Ledger_builder_io_intf
@@ -359,7 +341,6 @@ struct
   type t =
     { miner: Miner.t
     ; net: Net.t
-    ; state_io: Net.State_io.t
     ; miner_changes_writer: Miner.change Linear_pipe.Writer.t
     ; miner_broadcast_writer: State_with_witness.t Linear_pipe.Writer.t
     ; transitions:
@@ -430,16 +411,12 @@ struct
           | _ -> None )
     in
     Ivar.fill net_ivar net ;
-    let state_io =
-      Net.State_io.create net ~broadcast_state:miner_broadcast_reader
-    in
     let%map transaction_pool =
       Transaction_pool.load
         ~disk_location:config.transaction_pool_disk_location
     in
     { miner
     ; net
-    ; state_io
     ; miner_broadcast_writer
     ; miner_changes_writer
     ; transitions= transitions_writer
@@ -478,6 +455,7 @@ struct
     *)
 
     (* Miner, ledger_builder, Net.State_io, snark_pool, transaction_pool *)
+    (*
     let protocol_events =
       Linear_pipe.merge_unordered
         [ Linear_pipe.map miner_transitions_protocol ~f:(fun transition ->
@@ -485,7 +463,6 @@ struct
         ; Linear_pipe.map (Net.State_io.new_states t.net t.state_io) ~f:
             (fun s -> `Remote s ) ]
     in
-    (*
     let updated_state_network, updated_state_ledger =
       Linear_pipe.fork2
         ( Linear_pipe.scan protocol_events ~init:(p, None) ~f:(fun (p, _) ->
@@ -522,7 +499,7 @@ struct
                State_with_witness.add_witness_exn p.state
                  (transactions, Option.value_exn ledger_builder_transition) *)
            ) )
-       in *)
+       in
     don't_wait_for
       (Linear_pipe.transfer_id updated_state_network t.miner_broadcast_writer) ;
     don't_wait_for
@@ -548,4 +525,6 @@ struct
              Transaction_pool.transactions t.transaction_pool
            in
            Tip_change {Miner.Tip.transactions; ledger_builder; state} ))
+ *)
+    failwith ""
 end

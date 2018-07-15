@@ -133,7 +133,7 @@ struct
                       { ledger_hash= next_ledger_hash
                       ; ledger_builder_hash= next_ledger_builder_hash
                       ; ledger_proof= ledger_proof_opt
-                      ; ledger_builder_transition= diff
+                      ; ledger_builder_diff= Ledger_builder_diff.forget diff
                       ; timestamp= new_state.timestamp
                       ; nonce }
                   ; previous_ledger_hash= state.Inputs.State.ledger_hash }

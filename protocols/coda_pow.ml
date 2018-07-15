@@ -45,6 +45,10 @@ module type State_hash_intf = sig
   include Hashable.S_binable with type t := t
 end
 
+module type Ledger_builder_aux_hash_intf = sig
+  type t [@@deriving bin_io, sexp, eq]
+end
+
 module type Ledger_builder_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
 
@@ -384,7 +388,7 @@ module type Transition_intf = sig
     ; ledger_builder_diff: ledger_builder_diff
     ; timestamp: time
     ; nonce: nonce }
-  [@@deriving fields]
+  [@@deriving compare, fields, eq, bin_io, sexp]
 end
 
 module type Time_close_validator_intf = sig
