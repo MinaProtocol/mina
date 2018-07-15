@@ -30,6 +30,26 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
+  module Addr : sig
+    type t [@@deriving sexp, bin_io, hash, compare]
+
+    include Hashable.S with type t := t
+
+    val depth : t -> int
+
+    val parent : t -> t Or_error.t
+
+    val parent_exn : t -> t
+
+    val child : t -> [`Left | `Right] -> t Or_error.t
+
+    val child_exn : t -> [`Left | `Right] -> t
+
+    val dirs_from_root : t -> [`Left | `Right] list
+
+    val root : t
+  end
+
   val create : unit -> t
 
   val length : t -> int
@@ -69,12 +89,41 @@ module type S = sig
 
   val set_at_index_exn : t -> index -> account -> unit
 
+  val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
+
   val merkle_path_at_index_exn : t -> index -> Path.t
+
+  val addr_of_index : t -> index -> Addr.t
+
+  val set_at_addr_exn : t -> Addr.t -> account -> unit
+
+  val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
+
+  val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
+
+  val extend_with_empty_to_fit : t -> int -> unit
+
+  val set_syncing : t -> unit
+
+  val clear_syncing : t -> unit
+
+  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
+
+  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
 end
 
-module type F = functor (Account :sig
-                                    
-                                    type t [@@deriving sexp, eq, bin_io]
+module type F = functor (Key :sig
+                                
+                                type t [@@deriving sexp, bin_io]
+
+                                val empty : t
+
+                                include Hashable.S_binable with type t := t
+end) -> functor (Account :sig
+                            
+                            type t [@@deriving sexp, eq, bin_io]
+
+                            val public_key : t -> Key.t
 end) -> functor (Hash :sig
                          
                          type hash [@@deriving sexp, hash, compare, bin_io]
@@ -84,11 +133,6 @@ end) -> functor (Hash :sig
                          val empty_hash : hash
 
                          val merge : height:int -> hash -> hash -> hash
-end) -> functor (Key :sig
-                        
-                        type t [@@deriving sexp, bin_io]
-
-                        include Hashable.S_binable with type t := t
 end) -> functor (Depth :sig
                           
                           val depth : int
@@ -97,8 +141,16 @@ end) -> S
          and type account := Account.t
          and type key := Key.t
 
-module Make (Account : sig
+module Make (Key : sig
+  type t [@@deriving sexp, bin_io]
+
+  val empty : t
+
+  include Hashable.S_binable with type t := t
+end) (Account : sig
   type t [@@deriving sexp, eq, bin_io]
+
+  val public_key : t -> Key.t
 end) (Hash : sig
   type hash [@@deriving sexp, hash, compare, bin_io]
 
@@ -107,10 +159,6 @@ end) (Hash : sig
   val empty_hash : hash
 
   val merge : height:int -> hash -> hash -> hash
-end) (Key : sig
-  type t [@@deriving sexp, bin_io]
-
-  include Hashable.S_binable with type t := t
 end) (Depth : sig
   val depth : int
 end) :
@@ -120,6 +168,53 @@ end) :
    and type key := Key.t =
 struct
   include Depth
+
+  module Addr = struct
+    module T = struct
+      type t = {depth: int; index: int}
+      [@@deriving sexp, bin_io, hash, compare]
+    end
+
+    include T
+    include Hashable.Make (T)
+
+    let depth {depth; _} = depth
+
+    let bit_val = function `Left -> 0 | `Right -> 1
+
+    let child {depth; index} d =
+      if depth + 1 < Depth.depth then
+        Ok {depth= depth + 1; index= index lor (bit_val d lsl depth)}
+      else Or_error.error_string "Addr.child: Depth was too large"
+
+    let child_exn a d = child a d |> Or_error.ok_exn
+
+    let dirs_from_root {depth; index} =
+      List.init depth ~f:(fun i ->
+          if (index lsr i) land 1 = 1 then `Right else `Left )
+
+    let clear_all_but_first k i = i land ((1 lsl k) - 1)
+
+    let parent {depth; index} =
+      if depth > 0 then
+        Ok {depth= depth - 1; index= clear_all_but_first (depth - 1) index}
+      else Or_error.error_string "Addr.parent: depth <= 0"
+
+    let parent_exn a = Or_error.ok_exn (parent a)
+
+    let root = {depth= 0; index= 0}
+
+    let%test_unit "dirs_from_root" =
+      let dir_list =
+        let open Quickcheck.Generator in
+        let open Let_syntax in
+        let%bind l = Int.gen_incl 0 (Depth.depth - 1) in
+        list_with_length l (Bool.gen >>| fun b -> if b then `Right else `Left)
+      in
+      Quickcheck.test dir_list ~f:(fun dirs ->
+          assert (
+            dirs_from_root (List.fold dirs ~f:child_exn ~init:root) = dirs ) )
+  end
 
   type entry = {merkle_index: int; account: Account.t}
   [@@deriving sexp, bin_io]
@@ -134,6 +229,8 @@ struct
 
   type tree =
     { leafs: leafs
+    ; mutable dirty: bool
+    ; mutable syncing: bool
     ; mutable nodes_height: int
     ; mutable nodes: nodes
     ; mutable dirty_indices: int list }
@@ -160,6 +257,8 @@ struct
   let copy t =
     let copy_tree tree =
       { leafs= Dyn_array.copy tree.leafs
+      ; dirty= tree.dirty
+      ; syncing= false
       ; nodes_height= tree.nodes_height
       ; nodes= tree.nodes
       ; dirty_indices= tree.dirty_indices }
@@ -205,6 +304,8 @@ struct
     { accounts= create_account_table ()
     ; tree=
         { leafs= Dyn_array.create ()
+        ; dirty= false
+        ; syncing= false
         ; nodes_height= 0
         ; nodes= []
         ; dirty_indices= [] } }
@@ -318,8 +419,11 @@ struct
         recompute_layers (curr_height + 1) get_curr_hash layers dirty_indices
 
   let recompute_tree t =
-    if not (List.is_empty t.tree.dirty_indices) then (
+    if t.tree.syncing then
+      failwith "recompute tree while syncing -- logic error!" ;
+    if not (List.is_empty t.tree.dirty_indices) || t.tree.dirty then (
       extend_tree t.tree ;
+      (t.tree).dirty <- false ;
       let layer_dirty_indices =
         Int.Set.to_list
           (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
@@ -404,4 +508,61 @@ struct
     match merkle_path_at_index t index with
     | `Ok path -> path
     | `Index_not_found -> index_not_found "merkle_path_at_index_exn" index
+
+  let addr_of_index t index = {Addr.depth; index}
+
+  let extend_with_empty_to_fit t new_size =
+    let tree = t.tree in
+    let len = DynArray.length tree.leafs in
+    if new_size > len then
+      DynArray.append tree.leafs
+        (DynArray.init (new_size - len) (fun x -> Key.empty)) ;
+    recompute_tree t
+
+  let merkle_path_at_addr_exn t {Addr.index; depth} =
+    assert (depth = Depth.depth - 1) ;
+    merkle_path_at_index_exn t index
+
+  let set_at_addr_exn t {Addr.index; depth} a =
+    assert (depth = Depth.depth - 1) ;
+    set_at_index_exn t index a
+
+  let get_inner_hash_at_addr_exn t {Addr.index; depth= adepth} =
+    assert (adepth < depth) ;
+    let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
+    DynArray.get l index
+
+  let set_inner_hash_at_addr_exn t {Addr.index; depth= adepth}
+      (hash: Hash.hash) =
+    assert (adepth < depth) ;
+    (t.tree).dirty <- true ;
+    let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
+    DynArray.set l index hash
+
+  let set_syncing t =
+    recompute_tree t ;
+    (t.tree).syncing <- true
+
+  let clear_syncing t = (t.tree).syncing <- false
+
+  let set_all_accounts_rooted_at_exn t {Addr.index; depth= adepth} accounts =
+    let effective_depth = depth - adepth in
+    let count = 1 lsl effective_depth in
+    let first_index = index lsl effective_depth in
+    assert (List.length accounts = count) ;
+    List.iteri accounts ~f:(fun i a ->
+        let pk = Account.public_key a in
+        let entry = {merkle_index= first_index + i; account= a} in
+        Key.Table.set t.accounts pk entry ;
+        Dyn_array.set t.tree.leafs (first_index + i) pk )
+
+  let get_all_accounts_rooted_at_exn t {Addr.index; depth= adepth} =
+    let effective_depth = depth - adepth in
+    let count = 1 lsl effective_depth in
+    let first_index = index lsl effective_depth in
+    let subarr = Dyn_array.sub t.tree.leafs first_index count in
+    Dyn_array.to_list
+      (Dyn_array.map
+         (fun key -> (Key.Table.find_exn t.accounts key).account)
+         subarr)
 end
