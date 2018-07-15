@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(library
+ ((name syncable_ledger)
+  (public_name syncable_ledger)
+  (inline_tests)
+  (library_flags (-linkall))
+  (libraries (core async async_extra linear_pipe))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (synopsis "Synchronization of Merkle-tree backed ledgers")))
+

@@ -81,6 +81,8 @@ let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
 
 let digest t = Pedersen.State.digest (hash t)
 
+let pubkey t = t.public_key
+
 module Checked = struct
   let hash t = var_to_bits t >>= hash_bits ~init:hash_prefix
 
