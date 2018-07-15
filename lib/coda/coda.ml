@@ -173,7 +173,7 @@ module type Miner_intf = sig
     -> change_feeder:change Linear_pipe.Reader.t
     -> t
 
-  val transitions : t -> transition_with_witness Linear_pipe.Reader.t
+  val transitions : t -> (transition_with_witness * state) Linear_pipe.Reader.t
 end
 
 module type Witness_change_intf = sig
@@ -452,7 +452,7 @@ struct
       Linear_pipe.fork2
         ( Linear_pipe.scan protocol_events ~init:(p, None) ~f:(fun (p, _) ->
               function
-            | `Local transition ->
+            | `Local (transition, _) ->
                 Logger.info t.log
                   !"Stepping with local transition %{sexp: \
                     Transition_with_witness.t}"

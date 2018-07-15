@@ -99,13 +99,13 @@ struct
                              -> Completed_work.Checked.t option)
       -> t
 
-    val result : t -> Transition_with_witness.t Deferred.Or_error.t
+    val result : t -> (Transition_with_witness.t * State.t) Deferred.Or_error.t
   end = struct
     (* TODO: No need to have our own Ivar since we got rid of Bundle_result *)
     type t =
       { hashing_result: Hashing_result.t
       ; cancellation: unit Ivar.t
-      ; result: Transition_with_witness.t Deferred.Or_error.t }
+      ; result: (Transition_with_witness.t * State.t) Deferred.Or_error.t }
     [@@deriving fields]
 
     let cancel t =
@@ -129,14 +129,16 @@ struct
           match%map Hashing_result.result hashing_result with
           | `Ok (new_state, nonce) ->
               Ok
-                { Transition_with_witness.transition=
-                    { ledger_hash= next_ledger_hash
-                    ; ledger_builder_hash= next_ledger_builder_hash
-                    ; ledger_proof= ledger_proof_opt
-                    ; ledger_builder_transition= diff
-                    ; timestamp= new_state.timestamp
-                    ; nonce }
-                ; previous_ledger_hash= state.Inputs.State.ledger_hash }
+                ( { Transition_with_witness.transition=
+                      { ledger_hash= next_ledger_hash
+                      ; ledger_builder_hash= next_ledger_builder_hash
+                      ; ledger_proof= ledger_proof_opt
+                      ; ledger_builder_transition= diff
+                      ; timestamp= new_state.timestamp
+                      ; nonce }
+                  ; previous_ledger_hash= state.Inputs.State.ledger_hash }
+                , new_state
+                )
           | `Cancelled -> Or_error.error_string "Mining cancelled"
         in
         Deferred.any
@@ -159,7 +161,7 @@ struct
 
   type state = {tip: Tip.t; result: Mining_result.t}
 
-  type t = {transitions: Transition_with_witness.t Linear_pipe.Reader.t}
+  type t = {transitions: (Transition_with_witness.t * State.t) Linear_pipe.Reader.t}
   [@@deriving fields]
 
   let transition_capacity = 64
