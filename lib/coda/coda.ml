@@ -9,14 +9,28 @@ module type Ledger_builder_io_intf = sig
 
   type ledger_builder_hash
 
-  type ledger_builder
+  type ledger_hash
+
+  type ledger_builder_aux
+
+  type sync_ledger_query
+
+  type sync_ledger_answer
 
   type state
 
   val create : net -> t
 
-  val get_ledger_builder_at_hash :
-    t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
+  val get_ledger_builder_aux_at_hash :
+       t
+    -> ledger_builder_hash
+    -> (ledger_builder_aux * state) Deferred.Or_error.t
+
+  val glue_sync_ledger :
+       t
+    -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
+    -> (ledger_hash * sync_ledger_answer) Linear_pipe.Writer.t
+    -> unit
 end
 
 module type State_io_intf = sig
@@ -43,7 +57,11 @@ module type Network_intf = sig
 
   type state
 
+  type ledger_hash
+
   type ledger_builder_hash
+
+  type parallel_scan_state
 
   module State_io :
     State_io_intf
@@ -53,8 +71,9 @@ module type Network_intf = sig
   module Ledger_builder_io :
     Ledger_builder_io_intf
     with type net := t
-     and type ledger_builder := ledger_builder
+     and type ledger_builder_aux := parallel_scan_state
      and type ledger_builder_hash := ledger_builder_hash
+     and type ledger_hash := ledger_hash
      and type state := state
 
   module Config : sig
@@ -107,7 +126,7 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger_builder_hash
 
-  type ledger_builder_diff
+  type transition
 
   type ledger
 
@@ -115,21 +134,29 @@ module type Ledger_builder_controller_intf = sig
 
   type state
 
-  type snark_pool
-
   type t
+
+  type sync_query
+
+  type sync_answer
+
+  type ledger_proof
+
+  type ledger_hash
 
   module Config : sig
     type t =
-      { keep_count: int [@default 50]
-      ; parent_log: Logger.t
+      { parent_log: Logger.t
       ; net_deferred: net Deferred.t
-      ; ledger_builder_diffs:
-          (state * ledger_builder_diff) Linear_pipe.Reader.t
+      ; transitions:
+          (state * transition) Linear_pipe.Reader.t
       ; genesis_ledger: ledger
-      ; disk_location: string
-      ; snark_pool: snark_pool }
+      ; disk_location: string }
     [@@deriving make]
+  end
+
+  module Aux : sig
+    type t = {root_and_proof: (ledger_hash * ledger_proof) option; state: state}
   end
 
   val create : Config.t -> t Deferred.t
@@ -138,6 +165,8 @@ module type Ledger_builder_controller_intf = sig
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
 
   val strongest_ledgers : t -> (ledger_builder * state) Linear_pipe.Reader.t
+
+  val handle_sync_ledger_queries : sync_query -> sync_answer
 end
 
 module type Miner_intf = sig
@@ -288,8 +317,7 @@ module type Inputs_intf = sig
      and type ledger := Ledger.t
      and type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
-     and type snark_pool := Snark_pool.t
+     and type transition := Transition.t
      and type state := State.t
 
   module Transaction_pool :
@@ -334,8 +362,8 @@ struct
     ; state_io: Net.State_io.t
     ; miner_changes_writer: Miner.change Linear_pipe.Writer.t
     ; miner_broadcast_writer: State_with_witness.t Linear_pipe.Writer.t
-    ; ledger_builder_transitions:
-        (State.t * Ledger_builder_transition.t) Linear_pipe.Writer.t
+    ; transitions:
+        (State.t * Transition.t) Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; mutable transaction_pool: Transaction_pool.t
     ; mutable snark_pool: Snark_pool.t
@@ -365,7 +393,7 @@ struct
     let miner_broadcast_reader, miner_broadcast_writer =
       Linear_pipe.create ()
     in
-    let ledger_builder_transitions_reader, ledger_builder_transitions_writer =
+    let transitions_reader, transitions_writer =
       Linear_pipe.create ()
     in
     let net_ivar = Ivar.create () in
@@ -375,13 +403,15 @@ struct
     in
     let%map ledger_builder =
       Ledger_builder_controller.create
-        (Ledger_builder_controller.Config.make ~snark_pool
-           ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
+        (Ledger_builder_controller.Config.make ~parent_log:config.log
+           ~net_deferred:(Ivar.read net_ivar)
            ~genesis_ledger:Genesis.ledger
+           ~disk_location:config.ledger_builder_persistant_location
+           ~transitions:transitions_reader)
+           (* TODO
            ~ledger_builder_diffs:
              (Linear_pipe.map ledger_builder_transitions_reader ~f:
-                (fun (s, {Ledger_builder_transition.diff; _}) -> (s, diff) ))
-           ~disk_location:config.ledger_builder_persistant_location ())
+                (fun (s, {Ledger_builder_transition.diff; _}) -> (s, diff) ))) *)
     in
     let miner =
       Miner.create ~parent_log:config.log ~change_feeder:miner_changes_reader
@@ -412,7 +442,7 @@ struct
     ; state_io
     ; miner_broadcast_writer
     ; miner_changes_writer
-    ; ledger_builder_transitions= ledger_builder_transitions_writer
+    ; transitions= transitions_writer
     ; transaction_pool
     ; snark_pool
     ; ledger_builder
@@ -437,10 +467,17 @@ struct
   let run t =
     Logger.info t.log "Starting to run Coda" ;
     let p : Protocol.t =
-      Protocol.create
-        ~state:{data= Genesis.state; proof= Genesis.proof}
+      Protocol.create ~state:{data= Genesis.state; proof= Genesis.proof}
     in
     let miner_transitions_protocol = Miner.transitions t.miner in
+    (* transaction_pool, snark_pool: self contained, and feed into network *)
+    (* network states-> lbc
+       mining states -> lbc
+       lbc -> strongest_ledgers -> miner
+       strongest_ledgers -> network
+    *)
+
+    (* Miner, ledger_builder, Net.State_io, snark_pool, transaction_pool *)
     let protocol_events =
       Linear_pipe.merge_unordered
         [ Linear_pipe.map miner_transitions_protocol ~f:(fun transition ->
@@ -448,6 +485,7 @@ struct
         ; Linear_pipe.map (Net.State_io.new_states t.net t.state_io) ~f:
             (fun s -> `Remote s ) ]
     in
+    (*
     let updated_state_network, updated_state_ledger =
       Linear_pipe.fork2
         ( Linear_pipe.scan protocol_events ~init:(p, None) ~f:(fun (p, _) ->
@@ -484,7 +522,7 @@ struct
                State_with_witness.add_witness_exn p.state
                  (transactions, Option.value_exn ledger_builder_transition) *)
            ) )
-    in
+       in *)
     don't_wait_for
       (Linear_pipe.transfer_id updated_state_network t.miner_broadcast_writer) ;
     don't_wait_for
@@ -499,7 +537,7 @@ struct
          *       backed up. We should fix this see issues #178 and #177 *)
            Linear_pipe.write_or_exn
              ~capacity:t.ledger_builder_transition_backup_capacity
-             t.ledger_builder_transitions updated_state_ledger
+             t.transitions updated_state_ledger
              (state.data, forget_transition_validity ledger_builder_transition) ;
            return () )) ;
     don't_wait_for

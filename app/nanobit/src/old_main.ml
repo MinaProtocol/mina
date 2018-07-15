@@ -179,12 +179,19 @@ struct
   module Net = Minibit_networking.Make (struct
     module State_with_witness = State_with_witness
     module Ledger_hash = Ledger_hash
-    module Ledger = Ledger
+
+    (* TODO: replace with sync ledger interface once that PR is merged *)
+    module Sync_ledger = struct
+      type query = unit [@@deriving bin_io]
+
+      type response = unit [@@deriving bin_io]
+    end
+
     module State = State
   end)
 
-  module Ledger_fetcher_io = Net.Ledger_fetcher_io
   module State_io = Net.State_io
+  module Ledger_builder_io = Net.Ledger_builder_io
 
   module Bundle = struct
     include Bundle
@@ -200,14 +207,6 @@ struct
 
     let proof = Init.genesis_proof
   end
-
-  module Ledger_fetcher = Ledger_fetcher.Make (struct
-    include Inputs0
-    module Net = Net
-    module Store = Store
-    module Genesis = Genesis
-    module Genesis_ledger = Genesis_ledger
-  end)
 
   module Miner = Minibit_miner.Make (struct
     include Inputs0

@@ -34,6 +34,8 @@ end
 module type Ledger_hash_intf = sig
   type t [@@deriving bin_io, eq, sexp]
 
+  val to_bits : t -> string
+
   include Hashable.S_binable with type t := t
 end
 
@@ -45,6 +47,8 @@ end
 
 module type Ledger_builder_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
+
+  val of_bits : string -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -79,6 +83,8 @@ module type Ledger_intf = sig
   val apply_super_transaction : t -> super_transaction -> unit Or_error.t
 
   val undo_super_transaction : t -> super_transaction -> unit Or_error.t
+
+  val undo_transaction : t -> valid_transaction -> unit Or_error.t
 end
 
 module type Snark_pool_proof_intf = sig
@@ -90,12 +96,12 @@ module type Snark_pool_proof_intf = sig
 end
 
 module type Transaction_intf = sig
-  type t [@@deriving sexp, compare, eq]
+  type t [@@deriving sexp, compare, eq, bin_io]
 
   type fee
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, compare, eq, bin_io]
+    type nonrec t = private t [@@deriving sexp, compare, eq]
   end
 
   val check : t -> With_valid_signature.t option
@@ -108,7 +114,9 @@ module type Public_key_intf = sig
   type t
 
   module Compressed : sig
-    type t
+    type t [@@deriving sexp, bin_io, compare]
+
+    include Comparable.S with type t := t
   end
 end
 
@@ -141,31 +149,23 @@ module type Super_transaction_intf = sig
 
   type unsigned_fee
 
-  type t = Transaction of valid_transaction | Fee_transfer of fee_transfer
-  [@@deriving sexp, compare, eq]
+  type t = Fee_transfer of fee_transfer | Transaction of valid_transaction
+  [@@deriving sexp, compare, eq, bin_io]
 
   val fee_excess : t -> unsigned_fee Or_error.t
 end
 
-module type Transaction_snark_intf = sig
-  type ledger_hash
-
-  type fee_excess
-
+module type Ledger_proof_intf = sig
+  type statement
   type message
 
-  type t [@@deriving sexp, bin_io]
+  type t
 
-  module Statement : sig
-    type t =
-      { source: ledger_hash
-      ; target: ledger_hash
-      ; fee_excess: fee_excess
-      ; proof_type: [`Merge | `Base] }
-    [@@deriving sexp, bin_io]
-  end
-
-  val verify : t -> Statement.t -> message:message -> bool Deferred.t
+  val verify :
+        t
+    -> statement
+    -> message:message
+    -> bool Deferred.t
 end
 
 module type Completed_work_intf = sig
@@ -191,7 +191,7 @@ module type Completed_work_intf = sig
   [@@deriving sexp, bin_io]
 
   module Checked : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
   end
 
   val check : t -> Statement.t -> Checked.t option Deferred.t
@@ -227,7 +227,7 @@ module type Ledger_builder_diff_intf = sig
       ; completed_works: completed_work_checked list
       ; transactions: transaction_with_valid_signature list
       ; creator: public_key }
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp]
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
@@ -254,6 +254,8 @@ module type Ledger_builder_intf = sig
 
   type diff
 
+  type valid_diff
+
   type ledger_builder_hash
 
   type ledger_hash
@@ -270,15 +272,11 @@ module type Ledger_builder_intf = sig
 
   type completed_work
 
-  val ledger : t -> ledger
-
   val copy : t -> t
-
-  val max_margin : int
 
   val hash : t -> ledger_builder_hash
 
-  val margin : t -> int
+  val ledger : t -> ledger
 
   val create : ledger:ledger -> self:public_key -> t
 
@@ -290,7 +288,7 @@ module type Ledger_builder_intf = sig
        t
     -> transactions_by_fee:transaction_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
-    -> diff
+    -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash * ledger_hash]
        * [`Ledger_proof of ledger_proof option]
 end
@@ -383,7 +381,7 @@ module type Transition_intf = sig
     { ledger_hash: ledger_hash (* TODO: I believe this is unused. *)
     ; ledger_builder_hash: ledger_builder_hash
     ; ledger_proof: proof option
-    ; ledger_builder_transition: ledger_builder_diff
+    ; ledger_builder_diff: ledger_builder_diff
     ; timestamp: time
     ; nonce: nonce }
   [@@deriving fields]
@@ -488,6 +486,9 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
 
+  module Ledger_proof : Ledger_proof_intf
+    with type message := Fee.Unsigned.t * Public_key.Compressed.t
+
   module Ledger :
     Ledger_intf
     with type valid_transaction := Transaction.With_valid_signature.t
@@ -536,18 +537,6 @@ Merge Snark:
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
-  module Ledger_proof : sig
-    type statement
-
-    type t
-
-    val verify :
-         t
-      -> statement
-      -> message:Fee.Unsigned.t * Public_key.Compressed.t
-      -> bool Deferred.t
-  end
-
   module Completed_work :
     Completed_work_intf
     with type proof := Ledger_proof.t
@@ -568,6 +557,7 @@ Merge Snark:
   module Ledger_builder :
     Ledger_builder_intf
     with type diff := Ledger_builder_diff.t
+     and type valid_diff := Ledger_builder_diff.With_valid_signatures_and_proofs.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_hash := Ledger_hash.t
      and type public_key := Public_key.Compressed.t
@@ -628,8 +618,7 @@ struct
       | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
   end
 
-  type t = {state: Proof_carrying_state.t}
-  [@@deriving fields]
+  type t = {state: Proof_carrying_state.t} [@@deriving fields]
 
   let step' t (transition: Transition.t) : t Deferred.t =
     let state = t.state.data in
@@ -673,11 +662,9 @@ struct
           (* TODO soon: these checks are irrelevant and should be handled inside of
              Ledger_builder.apply.
           *)
-          let margin = Ledger_builder.margin ledger_builder in
           Ledger_builder_hash.equal
             (Ledger_builder.hash ledger_builder)
             new_pcd.data.ledger_builder_hash
-          && Int.( >= ) margin Ledger_builder.max_margin
           && Ledger_hash.equal new_ledger_hash new_pcd.data.ledger_hash
     in
     let new_strength = new_pcd.data.strength in

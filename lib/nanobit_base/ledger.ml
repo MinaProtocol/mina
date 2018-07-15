@@ -2,7 +2,7 @@ open Core
 open Snark_params
 open Currency
 
-include Merkle_ledger.Ledger.Make (Account)
+include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
           (struct
             type hash = Tick.Pedersen.Digest.t
             [@@deriving sexp, hash, compare, bin_io]
@@ -15,7 +15,6 @@ include Merkle_ledger.Ledger.Make (Account)
 
             let hash_account = Account.digest
           end)
-          (Public_key.Compressed)
           (struct
             let depth = ledger_depth
           end)
