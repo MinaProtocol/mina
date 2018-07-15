@@ -9,14 +9,28 @@ module type Ledger_builder_io_intf = sig
 
   type ledger_builder_hash
 
-  type ledger_builder
+  type ledger_hash
+
+  type ledger_builder_aux
+
+  type sync_ledger_query
+
+  type sync_ledger_answer
 
   type state
 
   val create : net -> t
 
-  val get_ledger_builder_at_hash :
-    t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
+  val get_ledger_builder_aux_at_hash :
+       t
+    -> ledger_builder_hash
+    -> (ledger_builder_aux * state) Deferred.Or_error.t
+
+  val glue_sync_ledger :
+       t
+    -> (ledger_hash * sync_ledger_query) Linear_pipe.Reader.t
+    -> (ledger_hash * sync_ledger_answer) Linear_pipe.Writer.t
+    -> unit
 end
 
 module type State_io_intf = sig
@@ -43,6 +57,8 @@ module type Network_intf = sig
 
   type state
 
+  type ledger_hash
+
   type ledger_builder_hash
 
   module State_io :
@@ -53,8 +69,8 @@ module type Network_intf = sig
   module Ledger_builder_io :
     Ledger_builder_io_intf
     with type t := t
-     and type ledger_builder := ledger_builder
      and type ledger_builder_hash := ledger_builder_hash
+     and type ledger_hash := ledger_hash
      and type state := state
 
   module Config : sig
@@ -106,14 +122,19 @@ module type Ledger_builder_controller_intf = sig
 
   type state
 
-  type snark_pool
-
   type t
+
+  type sync_query
+
+  type sync_answer
+
+  type ledger_proof
+
+  type ledger_hash
 
   module Config : sig
     type t =
-      { keep_count: int [@default 50]
-      ; parent_log: Logger.t
+      { parent_log: Logger.t
       ; net_deferred: net Deferred.t
       ; ledger_builder_transitions:
           ( transaction_with_valid_signature list
@@ -121,9 +142,12 @@ module type Ledger_builder_controller_intf = sig
           * ledger_builder_transition )
           Linear_pipe.Reader.t
       ; genesis_ledger: ledger
-      ; disk_location: string
-      ; snark_pool: snark_pool }
+      ; disk_location: string }
     [@@deriving make]
+  end
+
+  module Aux : sig
+    type t = {root_and_proof: (ledger_hash * ledger_proof) option; state: state}
   end
 
   val create : Config.t -> t Deferred.t
@@ -132,6 +156,8 @@ module type Ledger_builder_controller_intf = sig
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
 
   val strongest_ledgers : t -> (ledger_builder * state) Linear_pipe.Reader.t
+
+  val handle_sync_ledger_queries : sync_query -> sync_answer
 end
 
 module type Miner_intf = sig
@@ -152,7 +178,6 @@ module type Miner_intf = sig
   module Tip : sig
     type t =
       { state: state
-      ; ledger: ledger
       ; ledger_builder: ledger_builder
       ; transactions: transaction list }
   end
@@ -278,7 +303,6 @@ module type Inputs_intf = sig
      and type ledger_builder_transition := Ledger_builder_transition.t
      and type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
-     and type snark_pool := Snark_pool.t
      and type state := State.t
 
   module Transaction_pool :
@@ -369,11 +393,11 @@ struct
     in
     let%map ledger_builder =
       Ledger_builder_controller.create
-        (Ledger_builder_controller.Config.make ~snark_pool
-           ~parent_log:config.log ~net_deferred:(Ivar.read net_ivar)
-           ~genesis_ledger:Genesis.ledger
+        (Ledger_builder_controller.Config.make ~parent_log:config.log
+           ~net_deferred:(Ivar.read net_ivar)
            ~ledger_builder_transitions:ledger_builder_transitions_reader
-           ~disk_location:config.ledger_builder_persistant_location ())
+           ~genesis_ledger:Genesis.ledger
+           ~disk_location:config.ledger_builder_persistant_location)
     in
     let miner =
       Miner.create ~parent_log:config.log ~change_feeder:miner_changes_reader
@@ -485,6 +509,5 @@ struct
              Transaction_pool.get ~k:t.transactions_per_bundle ~ledger
                t.transaction_pool
            in
-           Tip_change {Miner.Tip.transactions; ledger_builder; ledger; state}
-       ))
+           Tip_change {Miner.Tip.transactions; ledger_builder; state} ))
 end

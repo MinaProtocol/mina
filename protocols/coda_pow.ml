@@ -34,6 +34,8 @@ end
 module type Ledger_hash_intf = sig
   type t [@@deriving bin_io, eq, sexp]
 
+  val to_bits : t -> string
+
   include Hashable.S_binable with type t := t
 end
 
@@ -45,6 +47,8 @@ end
 
 module type Ledger_builder_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
+
+  val of_bits : string -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -77,6 +81,8 @@ module type Ledger_intf = sig
   val apply_super_transaction : t -> super_transaction -> unit Or_error.t
 
   val undo_super_transaction : t -> super_transaction -> unit Or_error.t
+
+  val undo_transaction : t -> valid_transaction -> unit Or_error.t
 end
 
 module type Snark_pool_proof_intf = sig
@@ -106,7 +112,9 @@ module type Public_key_intf = sig
   type t
 
   module Compressed : sig
-    type t
+    type t [@@deriving sexp, bin_io, compare]
+
+    include Comparable.S with type t := t
   end
 end
 
@@ -139,8 +147,8 @@ module type Super_transaction_intf = sig
 
   type unsigned_fee
 
-  type t = Transaction of valid_transaction | Fee_transfer of fee_transfer
-  [@@deriving sexp, compare, eq]
+  type t = Fee_transfer of fee_transfer | Transaction of valid_transaction
+  [@@deriving sexp, compare, eq, bin_io]
 
   val fee_excess : t -> unsigned_fee Or_error.t
 end
@@ -221,7 +229,7 @@ module type Ledger_builder_intf = sig
 
   type ledger
 
-  type ledger_proof
+  type transaction_snark
 
   type transaction_with_valid_signature
 
@@ -229,19 +237,15 @@ module type Ledger_builder_intf = sig
 
   type completed_work
 
-  val ledger : t -> ledger
-
   val copy : t -> t
-
-  val max_margin : int
 
   val hash : t -> ledger_builder_hash
 
-  val margin : t -> int
+  val ledger : t -> ledger
 
   val create : ledger:ledger -> self:public_key -> t
 
-  val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
+  val apply : t -> diff -> transaction_snark option Deferred.Or_error.t
 
   (* This should memoize the snark verifications *)
 
@@ -434,6 +438,10 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
 
+  module Ledger_proof : Proof_intf
+
+  module Transaction_snark : Transaction_snark_intf
+
   module Ledger :
     Ledger_intf
     with type valid_transaction := Transaction.With_valid_signature.t
@@ -485,8 +493,6 @@ Merge Snark:
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
-  module Ledger_proof : Proof_intf
-
   module Completed_work :
     Completed_work_intf
     with type proof := Ledger_proof.t
@@ -500,7 +506,7 @@ Merge Snark:
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
-     and type ledger_proof := Ledger_proof.t
+     and type transaction_snark := Transaction_snark.t
      and type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
      and type statement := Completed_work.Statement.t
@@ -605,11 +611,9 @@ struct
           (* TODO soon: these checks are irrelevant and should be handled inside of
              Ledger_builder.apply.
           *)
-          let margin = Ledger_builder.margin ledger_builder in
           Ledger_builder_hash.equal
             (Ledger_builder.hash ledger_builder)
             new_pcd.data.ledger_builder_hash
-          && Int.( >= ) margin Ledger_builder.max_margin
           && Ledger_hash.equal new_ledger_hash new_pcd.data.ledger_hash
     in
     let new_strength = new_pcd.data.strength in
