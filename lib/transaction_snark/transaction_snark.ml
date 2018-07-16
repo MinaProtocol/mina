@@ -106,10 +106,7 @@ module Fee_transfer = struct
 end
 
 module Transition = struct
-  type t =
-    | Transaction of Transaction.With_valid_signature.t
-    | Fee_transfer of Fee_transfer.t
-  [@@deriving bin_io, sexp]
+  include Super_transaction
 
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t

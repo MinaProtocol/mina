@@ -9,6 +9,8 @@ type var = private Field.Checked.t
 
 val typ : (var, t) Typ.t
 
+val negate : t -> t
+
 module Checked : sig
   val neg : var
 
@@ -21,4 +23,6 @@ module Checked : sig
   val pos_if_true : Boolean.var -> var
 
   val neg_if_true : Boolean.var -> var
+
+  val negate : var -> var
 end

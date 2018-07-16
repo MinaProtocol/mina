@@ -118,6 +118,8 @@ public:
     std::vector<std::shared_ptr<Fqk_sqr_gadget<ppT> > > dbl_sqrs;
     std::vector<std::shared_ptr<Fqk_special_mul_gadget<ppT> > > add_muls;
 
+    std::shared_ptr<Fqk_variable<ppT> > result_before_potential_negation;
+
     size_t f_count;
     size_t add_count;
     size_t dbl_count;
@@ -164,6 +166,8 @@ public:
     std::vector<std::shared_ptr<Fqk_special_mul_gadget<ppT> > > add_muls1;
     std::vector<std::shared_ptr<Fqk_special_mul_gadget<ppT> > > dbl_muls2;
     std::vector<std::shared_ptr<Fqk_special_mul_gadget<ppT> > > add_muls2;
+
+    std::shared_ptr<Fqk_variable<ppT> > result_before_potential_negation;
 
     size_t f_count;
     size_t add_count;
@@ -221,6 +225,8 @@ public:
     std::vector<std::shared_ptr<Fqk_special_mul_gadget<ppT> > > add_muls2;
     std::vector<std::shared_ptr<Fqk_special_mul_gadget<ppT> > > dbl_muls3;
     std::vector<std::shared_ptr<Fqk_special_mul_gadget<ppT> > > add_muls3;
+
+    std::shared_ptr<Fqk_variable<ppT> > result_before_potential_negation;
 
     size_t f_count;
     size_t add_count;

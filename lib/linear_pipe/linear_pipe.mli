@@ -18,6 +18,8 @@ val wrap_reader : 'a Pipe.Reader.t -> 'a Reader.t
 
 val write : 'a Writer.t -> 'a -> unit Deferred.t
 
+val write_without_pushback : 'a Writer.t -> 'a -> unit
+
 val write_or_drop : capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
 
 val write_or_exn : capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
@@ -52,6 +54,8 @@ val scan :
 
 val of_list : 'a List.t -> 'a Reader.t
 
+val to_list : 'a Reader.t -> 'a list Deferred.t
+
 val map : 'a Reader.t -> f:('a -> 'b) -> 'b Reader.t
 
 val filter_map : 'a Reader.t -> f:('a -> 'b option) -> 'b Reader.t
@@ -63,6 +67,8 @@ val transfer_id : 'a Reader.t -> 'a Writer.t -> unit Deferred.t
 val merge_unordered : 'a Reader.t List.t -> 'a Reader.t
 
 val close_read : 'a Reader.t -> unit
+
+val close : 'a Writer.t -> unit
 
 val closed : 'a Reader.t -> unit Deferred.t
 

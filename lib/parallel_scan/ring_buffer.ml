@@ -3,6 +3,8 @@ open Async_kernel
 
 type 'a t = {data: 'a Array.t; mutable position: int} [@@deriving sexp, bin_io]
 
+let filter_map t = Array.filter_map t.data
+
 let mod_ x y =
   let r = x mod y in
   if r >= 0 then r else y + r
@@ -14,11 +16,24 @@ let length {data} = Array.length data
 let copy {data; position} = {data= Array.copy data; position}
 
 let direct_update t i ~f =
+  let open Or_error.Let_syntax in
   let x : 'a = (t.data).(i) in
-  let%map v = f x in
-  (t.data).(i) <- v
+  let%bind v = f x in
+  return @@ (t.data).(i) <- v
 
-let update t ~f = direct_update t t.position ~f:(fun x -> f t.position x)
+let update t ~f = direct_update t t.position (fun x -> f t.position x)
+
+(*Read element from the ith positon*)
+let read_i t i = (t.data).(i)
+
+let swap t i j =
+  let temp = read_i t i in
+  (t.data).(i) <- (t.data).(j) ;
+  (t.data).(j) <- temp
+
+let iter t ~f =
+  let n = Array.length t.data in
+  for i = 0 to n - 1 do f (t.data).((t.position + i) mod n) done
 
 let read t = (t.data).(t.position)
 
@@ -33,6 +48,9 @@ let read_all t =
             Some ((t.data).(pos), `More (mod_ (pos + 1) (Array.length t.data)))
   )
   |> Sequence.to_list
+
+(*read k elements from the current position*)
+let read_k t k = List.take (read_all t) k
 
 let forwards ~n t = t.position <- mod_ (t.position + n) (Array.length t.data)
 

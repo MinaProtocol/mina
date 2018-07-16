@@ -36,6 +36,8 @@ module Compressed = struct
   include Stable.V1
   include Hashable.Make_binable (Stable.V1)
 
+  let empty = {x= Field.zero; is_odd= false}
+
   type var = (Field.var, Boolean.var) t_
 
   let to_hlist {x; is_odd} = H_list.[x; is_odd]
