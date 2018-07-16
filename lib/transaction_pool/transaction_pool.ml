@@ -45,7 +45,7 @@ struct
 
   let add t_ref txn = t_ref := add' !t_ref txn
 
-  let transactions t = Sequence.unfold ~init:!t ~f:Fheap.pop
+  let transactions t = Sequence.unfold ~init:!t.heap ~f:Fheap.pop
 
   module Diff = struct
     type t = Transaction.t list [@@deriving bin_io]

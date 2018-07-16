@@ -33,19 +33,7 @@ module Make (Inputs : Inputs.S) : sig
    and type statement := Inputs.Completed_work.Statement.t
    and type completed_work := Inputs.Completed_work.Checked.t
    and type ledger_proof := Inputs.Ledger_proof.t
-
-  module Aux : sig
-    type t [@@deriving bin_io]
-    val hash : t -> Ledger_builder_aux_hash.t
-  end
-
-  val aux : t -> Aux.t
-
-  val make :
-    public_key:Public_key.t
-    -> ledger:Ledger.t
-    -> aux:Aux.t
-    -> t
+   and type ledger_builder_aux_hash := Inputs.Ledger_builder_aux_hash.t
 end
 = struct
   open Inputs

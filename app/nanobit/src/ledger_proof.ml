@@ -12,6 +12,8 @@ struct
 
   let statement = Transaction_snark.statement
 
+  let proof = Transaction_snark.proof
+
   (* TODO: Use the message once SOK is implemented *)
   let verify t stmt ~message:_ =
     if

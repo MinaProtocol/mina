@@ -296,7 +296,7 @@ end = struct
     ; log: Logger.t
     ; state: State.t
     ; strongest_ledgers:
-        (Ledger_builder.t * Inputs.State.t) Linear_pipe.Reader.t }
+        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
 
   let ledger_builder_io {ledger_builder_io} = ledger_builder_io
 
@@ -455,7 +455,7 @@ end = struct
                 state.locked_ledger_builder <- lb ;
                 Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
                   strongest_ledgers_reader
-                  (lb, External_transition.state transition) ;
+                  (lb, transition) ;
                 Option.iter !sl_ref ~f:Sync_ledger.destroy ;
                 sl_ref := None
             | Error e ->
@@ -516,7 +516,7 @@ end = struct
             Inputs.State.equal s (External_transition.target_state new_tip) ) ;
           state.longest_branch_tip <- lb ;
           Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
-            strongest_ledgers_reader (lb, s)
+            strongest_ledgers_reader (lb, new_tip)
       | `Abort -> ()
     in
     let d =

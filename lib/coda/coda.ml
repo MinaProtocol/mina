@@ -48,7 +48,16 @@ module type Network_intf = sig
 
   type parallel_scan_state
 
-  val new_states : t -> state_with_witness Linear_pipe.Reader.t
+  type snark_pool_diff
+  type transaction_pool_diff
+
+  val states : t -> state_with_witness Linear_pipe.Reader.t
+  val snark_pool_diffs : t -> snark_pool_diff Linear_pipe.Reader.t
+  val transaction_pool_diffs : t -> transaction_pool_diff Linear_pipe.Reader.t
+
+  val broadcast_state : t -> state_with_witness -> unit
+  val broadcast_snark_pool_diff : t -> snark_pool_diff -> unit
+  val broadcast_transaction_pool_diff : t -> transaction_pool_diff -> unit
 
   module Ledger_builder_io :
     Ledger_builder_io_intf
@@ -73,16 +82,14 @@ end
 
 module type Transaction_pool_intf = sig
   type t
-
-  type transaction_with_valid_signature
-
-  type ledger
-
-  val add : t -> transaction_with_valid_signature -> t
+  type pool_diff
+  type transaction_with_valid_signature 
 
   val transactions : t -> transaction_with_valid_signature Sequence.t
 
-  val load : disk_location:string -> t Deferred.t
+  val broadcasts : t -> pool_diff Linear_pipe.Reader.t
+
+  val load : disk_location:string -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t Deferred.t
 end
 
 module type Snark_pool_intf = sig
@@ -93,6 +100,8 @@ module type Snark_pool_intf = sig
   type completed_work_checked
 
   type pool_diff
+
+  val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
        disk_location:string
@@ -147,7 +156,10 @@ module type Ledger_builder_controller_intf = sig
   val local_get_ledger :
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
 
-  val strongest_ledgers : t -> (ledger_builder * state) Linear_pipe.Reader.t
+  val strongest_ledgers
+    : t
+    -> (ledger_builder * external_transition)
+         Linear_pipe.Reader.t
 
   val handle_sync_ledger_queries : sync_query -> sync_answer
 end
@@ -257,17 +269,31 @@ module type Inputs_intf = sig
 
   (*      and type witness := Ledger_builder_transition.With_valid_signatures_and_proofs.t *)
 
-  module Net :
-    Network_intf
-    with type state_with_witness := State_with_witness.t
-     and type ledger_builder := Ledger_builder.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-     and type state := State.t
-
   module Snark_pool :
     Snark_pool_intf
     with type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
+
+  module Transaction_pool :
+    Transaction_pool_intf
+    with type transaction_with_valid_signature :=
+                Transaction.With_valid_signature.t
+
+  module Sync_ledger : sig
+    type query
+    type answer
+  end
+
+  module Net :
+    Network_intf
+    with type state_with_witness := External_transition.t
+     and type ledger_builder := Ledger_builder.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type state := State.t
+     and type snark_pool_diff := Snark_pool.pool_diff
+     and type transaction_pool_diff := Transaction_pool.pool_diff
+     and type parallel_scan_state := Ledger_builder.Aux.t
+     and type ledger_hash := Ledger_hash.t
 
   module Ledger_builder_controller :
     Ledger_builder_controller_intf
@@ -279,12 +305,6 @@ module type Inputs_intf = sig
      and type external_transition := External_transition.t
      and type state := State.t
 
-  module Transaction_pool :
-    Transaction_pool_intf
-    with type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
-     and type ledger := Ledger.t
-
   module Miner :
     Miner_intf
     with type ledger_hash := Ledger_hash.t
@@ -294,6 +314,7 @@ module type Inputs_intf = sig
      and type state_proof := State.Proof.t
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
+     and type external_transition := External_transition.t
 
   module Genesis : sig
     val state : State.t
@@ -307,20 +328,19 @@ end
 (* TODO: Lift Block_state_transition_proof out of the functor and inline it *)
 module Make
     (Inputs : Inputs_intf)
+    (* TODO
     (Block_state_transition_proof : Coda_pow.Block_state_transition_proof_intf
                                     with type state := Inputs.State.t
                                      and type proof := Inputs.State.Proof.t
                                      and type transition :=
-                                                Inputs.Internal_transition.t) =
+       Inputs.Internal_transition.t)
+       *) =
 struct
-  module Protocol = Coda_pow.Make (Inputs) (Block_state_transition_proof)
   open Inputs
 
   type t =
     { miner: Miner.t
     ; net: Net.t
-    ; miner_changes_writer: Miner.change Linear_pipe.Writer.t
-    ; miner_broadcast_writer: State_with_witness.t Linear_pipe.Writer.t
     ; external_transitions:
         External_transition.t Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
@@ -348,32 +368,16 @@ struct
   end
 
   let create (config: Config.t) =
-    let miner_changes_reader, miner_changes_writer = Linear_pipe.create () in
-    let miner_broadcast_reader, miner_broadcast_writer =
-      Linear_pipe.create ()
-    in
     let external_transitions_reader, external_transitions_writer =
       Linear_pipe.create ()
     in
     let net_ivar = Ivar.create () in
-    let%bind snark_pool =
-      Snark_pool.load ~disk_location:config.snark_pool_disk_location
-        ~incoming_diffs:(failwith "TODO")
-    in
-    let%map ledger_builder =
+    let%bind ledger_builder =
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make ~parent_log:config.log
            ~net_deferred:(Ivar.read net_ivar) ~genesis_ledger:Genesis.ledger
            ~disk_location:config.ledger_builder_persistant_location
            ~external_transitions:external_transitions_reader)
-      (* TODO
-           ~ledger_builder_diffs:
-             (Linear_pipe.map ledger_builder_transitions_reader ~f:
-                (fun (s, {Ledger_builder_transition.diff; _}) -> (s, diff) ))) *)
-    in
-    let miner =
-      Miner.create ~parent_log:config.log ~change_feeder:miner_changes_reader
-        ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
     in
     let%bind net =
       Net.create config.net_config
@@ -388,14 +392,44 @@ struct
           | _ -> None )
     in
     Ivar.fill net_ivar net ;
+    don't_wait_for (Linear_pipe.transfer_id (Net.states net) external_transitions_writer);
     let%map transaction_pool =
       Transaction_pool.load
         ~disk_location:config.transaction_pool_disk_location
+        ~incoming_diffs:(Net.transaction_pool_diffs net)
     in
+    don't_wait_for
+      (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
+         ~f:(fun x -> Net.broadcast_transaction_pool_diff net x; Deferred.unit));
+    let%bind snark_pool =
+      Snark_pool.load ~disk_location:config.snark_pool_disk_location
+        ~incoming_diffs:(Net.snark_pool_diffs net)
+    in
+    don't_wait_for
+      (Linear_pipe.iter (Snark_pool.broadcasts snark_pool)
+         ~f:(fun x -> Net.broadcast_snark_pool_diff net x; Deferred.unit));
+    let strongest_ledgers_for_miner, strongest_ledgers_for_network =
+      Linear_pipe.fork2 (Ledger_builder_controller.strongest_ledgers ledger_builder)
+    in
+    Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
+      Net.broadcast_state net t; Deferred.unit)
+    |> don't_wait_for;
+    let miner =
+      Miner.create ~parent_log:config.log
+        ~change_feeder:(
+          Linear_pipe.map strongest_ledgers_for_miner
+            ~f:(fun (ledger_builder, { state; state_proof; _ }) ->
+              Miner.Tip_change
+                { state = (state, state_proof)
+                ; ledger_builder
+                ; transactions = Transaction_pool.transactions transaction_pool
+                }))
+        ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
+    in
+    don't_wait_for (Linear_pipe.transfer_id (Miner.transitions miner) external_transitions_writer);
+    return
     { miner
     ; net
-    ; miner_broadcast_writer
-    ; miner_changes_writer
     ; external_transitions= external_transitions_writer
     ; transaction_pool
     ; snark_pool
@@ -420,16 +454,14 @@ struct
 
   let run t =
     Logger.info t.log "Starting to run Coda" ;
-    let p : Protocol.t =
-      Protocol.create ~state:{data= Genesis.state; proof= Genesis.proof}
-    in
-    let miner_transitions_protocol = Miner.transitions t.miner in
+    failwith "TODO"
     (* transaction_pool, snark_pool: self contained, and feed into network *)
     (* network states-> lbc
        mining states -> lbc
        lbc -> strongest_ledgers -> miner
        strongest_ledgers -> network
     *)
+
     (* Miner, ledger_builder, Net.State_io, snark_pool, transaction_pool *)
     (*
     let protocol_events =
@@ -502,5 +534,4 @@ struct
            in
            Tip_change {Miner.Tip.transactions; ledger_builder; state} ))
  *)
-    failwith ""
 end

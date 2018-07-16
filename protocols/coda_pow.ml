@@ -266,6 +266,8 @@ module type Ledger_builder_intf = sig
 
   type valid_diff
 
+  type ledger_builder_aux_hash
+
   type ledger_builder_hash
 
   type ledger_hash
@@ -301,6 +303,19 @@ module type Ledger_builder_intf = sig
     -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash * ledger_hash]
        * [`Ledger_proof of ledger_proof option]
+
+  module Aux : sig
+    type t [@@deriving bin_io]
+    val hash : t -> ledger_builder_aux_hash
+  end
+
+  val aux : t -> Aux.t
+
+  val make :
+    public_key:public_key
+    -> ledger:ledger
+    -> aux:Aux.t
+    -> t
 end
 
 module type Nonce_intf = sig
@@ -590,6 +605,7 @@ Merge Snark:
      and type valid_diff :=
                 Ledger_builder_diff.With_valid_signatures_and_proofs.t
      and type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
