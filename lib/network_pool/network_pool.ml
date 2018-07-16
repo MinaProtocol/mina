@@ -13,7 +13,7 @@ module type Pool_diff_intf = sig
 
   type t
 
-  val apply : pool -> t -> unit Or_error.t Deferred.t
+  val apply : pool -> t -> t Or_error.t Deferred.t
 end
 
 module type Network_pool_intf = sig
@@ -53,7 +53,7 @@ struct
 
   let apply_and_broadcast t pool_diff =
     match%bind Pool_diff.apply t.pool pool_diff with
-    | Ok () -> Linear_pipe.write t.write_broadcasts pool_diff
+    | Ok diff' -> Linear_pipe.write t.write_broadcasts diff'
     | Error e -> (* TODO: Log error *)
                  Deferred.unit
 

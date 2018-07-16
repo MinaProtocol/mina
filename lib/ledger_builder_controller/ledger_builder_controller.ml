@@ -37,13 +37,15 @@ module type Inputs_intf = sig
 
     type proof
 
-    type aux_data [@@deriving bin_io]
+    module Aux : sig
+      type t [@@deriving bin_io]
+    end
 
     val ledger : t -> Ledger.t
 
     val create : Ledger.t -> t
 
-    val of_aux_and_ledger : Ledger.t -> aux_data -> t Or_error.t
+    val of_aux_and_ledger : Ledger.t -> Aux.t -> t Or_error.t
 
     val copy : t -> t
 
@@ -94,7 +96,7 @@ module type Inputs_intf = sig
 
     type query [@@deriving bin_io]
 
-    val create : Ledger.t -> goal:Ledger_hash.t -> t
+    val create : Ledger.t -> Ledger_hash.t -> t
 
     val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
 
@@ -122,7 +124,7 @@ module type Inputs_intf = sig
             with type sync_ledger_query := Sync_ledger.query
              and type sync_ledger_answer := Sync_ledger.answer
              and type ledger_builder_hash := Ledger_builder_hash.t
-             and type ledger_builder_aux := Ledger_builder.aux_data
+             and type ledger_builder_aux := Ledger_builder.Aux.t
              and type ledger_hash := Ledger_hash.t
              and type state := State.t
   end
@@ -512,9 +514,6 @@ end = struct
                       curr.Transition_with_target.transition
                   with
                   | Ok next_state ->
-                      (* TODO: Should this assertion be here, or should we handle failure with punishment *)
-                      assert_valid_state' next_state lb ;
-                      assert_valid_state curr lb ;
                       `Continue (Some next_state)
                   | Error e ->
                       (* TODO: Punish sender *)
@@ -550,7 +549,7 @@ end = struct
                     Ledger_builder.ledger state.locked_ledger_builder
                     |> Ledger.copy
                   in
-                  let sl = Sync_ledger.create ~goal:h ledger in
+                  let sl = Sync_ledger.create ledger h in
                   Net.glue_sync_ledger ledger_builder_io
                     (Sync_ledger.query_reader sl)
                     (Sync_ledger.answer_writer sl) ;
@@ -660,7 +659,9 @@ let%test_module "test" =
       module Ledger_builder = struct
         type t = int ref [@@deriving eq, sexp, bin_io]
 
-        type aux_data = int [@@deriving bin_io]
+        module Aux = struct
+          type t = int [@@deriving bin_io]
+        end
 
         type proof = ()
 
@@ -728,7 +729,7 @@ let%test_module "test" =
               (Ledger_hash.t * query) Linear_pipe.Reader.t
               * (Ledger_hash.t * query) Linear_pipe.Writer.t }
 
-        let create ledger ~goal =
+        let create ledger goal =
           let t =
             { ledger
             ; answer_pipe= Linear_pipe.create ()

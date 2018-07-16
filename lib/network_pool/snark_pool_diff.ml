@@ -24,11 +24,11 @@ struct
 
   type t = (Work.t, priced_proof) diff
 
-  let apply (pool: Pool.t) (t: t) : unit Or_error.t Deferred.t =
+  let apply (pool: Pool.t) (t: t) : t Or_error.t Deferred.t =
     let to_or_error = function
       | `Don't_rebroadcast ->
           Or_error.error_string "Worse fee or already in pool"
-      | `Rebroadcast -> Ok ()
+      | `Rebroadcast -> Ok t
     in
     ( match t with
     | Add_unsolved work -> Pool.add_unsolved_work pool work

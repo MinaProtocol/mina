@@ -18,18 +18,58 @@ open Async_kernel
  *
  * For now we are removing lazily when we look for the next transactions
  *)
-module Make (Txn : sig
-  type t [@@deriving compare]
+module Make (Transaction : sig
+  type t [@@deriving compare, bin_io, sexp]
+
+  module With_valid_signature : sig
+    type t
+    include Comparable with type t := t
+  end
 end) =
 struct
-  type t = Txn.t Fheap.t
+  type pool =
+    { heap : Transaction.With_valid_signature.t Fheap.t
+    ; set : Transaction.With_valid_signature.Set.t
+    }
 
-  let empty = Fheap.create ~cmp:Txn.compare
+  type t = pool ref
 
-  let add t txn = Fheap.add t txn
+  let create () =
+    ref
+      { heap = Fheap.create ~cmp:Transaction.With_valid_signature.compare
+      ; set = Transaction.With_valid_signature.Set.empty
+      }
 
-  let transactions t = Sequence.unfold ~init:t ~f:Fheap.pop
+  let add' t txn =
+    { heap = Fheap.add t.heap txn
+    ; set = Set.add t.set txn
+    }
+
+  let add t_ref txn =
+    t_ref := add' !t_ref txn
+
+  let transactions t =
+    Sequence.unfold ~init:!t ~f:Fheap.pop
+
+  module Diff = struct
+    type t = Transaction.t list
+    [@@deriving bin_io]
+
+    (* TODO: Check signatures *)
+    let apply t_ref txns =
+      let t0 = !t_ref in
+      let t, res =
+        List.fold txns ~init:(t0, []) ~f:(fun (t, acc) txn ->
+          if Set.mem t.set txn
+          then (t, acc)
+          else (add' t txn, txn :: acc))
+      in
+      t_ref := t;
+      match res with
+      | [] -> Or_error.error_string "No new transactions"
+      | xs -> Ok xs
+  end
 
   (* TODO: Actually back this by the file-system *)
-  let load ~disk_location = return empty
+  let load ~disk_location = return (create ())
 end

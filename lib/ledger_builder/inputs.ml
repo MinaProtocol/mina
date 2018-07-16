@@ -70,6 +70,7 @@ module type S = sig
      and type valid_transaction := Transaction.With_valid_signature.t
 
   module Ledger_builder_hash : Coda_pow.Ledger_builder_hash_intf
+  module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
 
   module Completed_work :
     Coda_pow.Completed_work_intf

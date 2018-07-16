@@ -4,8 +4,6 @@ open Nanobit_base
 open Blockchain_snark
 
 module type Init_intf = sig
-  type proof [@@deriving bin_io, sexp]
-
   val logger : Logger.t
 
   val conf_dir : string
@@ -14,7 +12,7 @@ module type Init_intf = sig
 
   val verifier : Verifier.t
 
-  val genesis_proof : proof
+  val genesis_proof : Proof.t
 
   (* Public key to allocate fees to *)
 
@@ -39,8 +37,8 @@ module Make_inputs0 (Ledger_proof : sig
     -> bool Deferred.t
 end)
 (State_proof : State_proof_intf) (Difficulty : module type of Difficulty)
-(Init : Init_intf with type proof = State_proof.t) =
-struct
+(Init : Init_intf)
+= struct
   open Protocols.Coda_pow
 
   module Time : Time_intf with type t = Block_time.t = Block_time
@@ -62,6 +60,7 @@ struct
     include Ledger_builder_hash.Stable.V1
     let of_bytes = Ledger_builder_hash.of_bytes
   end
+  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf = Ledger_builder_hash
   module Ledger_hash = struct
     include Ledger_hash.Stable.V1
     let to_bytes = Ledger_hash.to_bytes
@@ -124,9 +123,13 @@ struct
     let compare t1 t2 = Transaction.Stable.V1.compare ~seed t1 t2
 
     module With_valid_signature = struct
-      include Transaction.With_valid_signature
+      module T = struct
+        include Transaction.With_valid_signature
 
-      let compare t1 t2 = Transaction.With_valid_signature.compare ~seed t1 t2
+        let compare t1 t2 = Transaction.With_valid_signature.compare ~seed t1 t2
+      end
+      include T
+      include Comparable.Make(T)
     end
   end
 
@@ -251,22 +254,30 @@ struct
       ; creator }
   end
 
-  module Ledger_builder = Ledger_builder.Make (struct
-    module Amount = Amount
-    module Fee = Fee
-    module Public_key = Public_key.Compressed
-    module Transaction = Transaction
-    module Fee_transfer = Fee_transfer
-    module Super_transaction = Super_transaction
-    module Ledger = Ledger
-    module Ledger_proof = Ledger_proof
-    module Ledger_proof_statement = Transaction_snark.Statement
-    module Ledger_hash = Ledger_hash
-    module Ledger_builder_hash = Ledger_builder_hash
-    module Ledger_builder_diff = Ledger_builder_diff
-    module Completed_work = Completed_work
-    module Config = Protocol_constants
-  end)
+  module Ledger_builder = struct
+    include Ledger_builder.Make (struct
+      module Amount = Amount
+      module Fee = Fee
+      module Public_key = Public_key.Compressed
+      module Transaction = Transaction
+      module Fee_transfer = Fee_transfer
+      module Super_transaction = Super_transaction
+      module Ledger = Ledger
+      module Ledger_proof = Ledger_proof
+      module Ledger_proof_statement = Transaction_snark.Statement
+      module Ledger_hash = Ledger_hash
+      module Ledger_builder_hash = Ledger_builder_hash
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+      module Ledger_builder_diff = Ledger_builder_diff
+      module Completed_work = Completed_work
+      module Config = Protocol_constants
+    end)
+
+    let of_aux_and_ledger ledger aux =
+      Ok (make ~public_key:Init.fee_public_key ~aux ~ledger)
+  end
+
+  module Ledger_builder_aux = Ledger_builder.Aux
 
   module Ledger_builder_transition = struct
     type t = {old: Ledger_builder.t; diff: Ledger_builder_diff.t}
@@ -304,6 +315,8 @@ struct
       ; nonce: Block_nonce.t }
     [@@deriving fields, sexp]
   end
+
+  module Transaction_pool = Transaction_pool.Make (Transaction)
 end
 
 module Make_inputs (Ledger_proof0 : sig
@@ -318,7 +331,7 @@ module Make_inputs (Ledger_proof0 : sig
     -> bool Deferred.t
 end)
 (State_proof : State_proof_intf) (Difficulty : module type of Difficulty)
-(Init : Init_intf with type proof = State_proof.t)
+(Init : Init_intf)
 (Store : Storage.With_checksum_intf)
 () =
 struct
@@ -434,7 +447,7 @@ struct
      and type state := State.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 
-  module Net = (val (failwith "TODO" : (module S_tmp)))
+  module Net = Minibit_networking.Make(Inputs0)
 
   module Sync_ledger =
     Syncable_ledger.Make
@@ -486,18 +499,31 @@ struct
       module External_transition = External_transition
       (* TODO: Move into coda_pow or something *)
       module Step = struct
-        (*
-        let step (lb, s) t =
-          let%map bc_good =
-            Verifier.verify_blockchain s.blockchain *)
+        let step (lb, old_state) ({state_proof; ledger_builder_diff;state=new_state} : External_transition.t) =
+          let open Deferred.Or_error.Let_syntax in
+          let%bind bc_good =
+            Deferred.map (State_proof.verify state_proof new_state) ~f:(fun x -> Ok x)
+          and ledger_hash =
+            match%map Ledger_builder.apply lb ledger_builder_diff with
+            | Some (h, _) -> h
+            | None -> old_state.State.ledger_hash
+          in
+          let ledger_builder_hash = Ledger_builder.hash lb in
+          let%map () =
+            if Ledger_builder_hash.equal ledger_builder_hash
+                 new_state.ledger_builder_hash
+            && Ledger_hash.equal ledger_hash new_state.ledger_hash
+            && State_hash.equal (State.hash old_state) new_state.previous_state_hash
+            then Deferred.return (Ok ())
+            else Deferred.Or_error.error_string "TODO: Punish"
+          in
+          new_state
       end
     end
 
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Transaction_pool = Transaction_pool.Make (Transaction.
-                                                   With_valid_signature)
   module Miner = Minibit_miner.Make (Inputs0)
 end
 

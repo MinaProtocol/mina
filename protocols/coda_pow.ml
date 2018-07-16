@@ -47,6 +47,8 @@ end
 
 module type Ledger_builder_aux_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
+
+  val of_bytes : string -> t
 end
 
 module type Ledger_builder_hash_intf = sig

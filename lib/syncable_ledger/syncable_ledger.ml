@@ -103,7 +103,7 @@ module type S = sig
 
   val new_goal : t -> root_hash -> unit
 
-  val wait_until_valid : t -> root_hash -> [`Ok | `Target_changed] Deferred.t
+  val wait_until_valid : t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
 
   val apply_or_queue_diff : t -> diff -> unit
 
@@ -364,7 +364,9 @@ struct
 
   let wait_until_valid t h =
     if not (Root_hash.equal h t.desired_root) then return `Target_changed
-    else Ivar.read t.validity_listener
+    else Deferred.map (Ivar.read t.validity_listener) ~f:(function
+      | `Target_changed -> `Target_changed
+      | `Ok -> `Ok t.tree)
 
   let apply_or_queue_diff t d =
     (* Need some interface for the diffs, not sure the layering is right here. *)

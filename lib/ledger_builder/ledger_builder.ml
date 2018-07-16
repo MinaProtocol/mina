@@ -17,8 +17,10 @@ let map2_or_error xs ys ~f =
   in
   go xs ys []
 
-module Make (Inputs : Inputs.S) :
-  Coda_pow.Ledger_builder_intf
+module Make (Inputs : Inputs.S) : sig
+  open Inputs
+  include Coda_pow.Ledger_builder_intf
+
   with type diff := Inputs.Ledger_builder_diff.t
    and type valid_diff :=
               Inputs.Ledger_builder_diff.With_valid_signatures_and_proofs.t
@@ -30,8 +32,22 @@ module Make (Inputs : Inputs.S) :
               Inputs.Transaction.With_valid_signature.t
    and type statement := Inputs.Completed_work.Statement.t
    and type completed_work := Inputs.Completed_work.Checked.t
-   and type ledger_proof := Inputs.Ledger_proof.t =
-struct
+   and type ledger_proof := Inputs.Ledger_proof.t
+
+  module Aux : sig
+    type t [@@deriving bin_io]
+    val hash : t -> Ledger_builder_aux_hash.t
+  end
+
+  val aux : t -> Aux.t
+
+  val make :
+    public_key:Public_key.t
+    -> ledger:Ledger.t
+    -> aux:Aux.t
+    -> t
+end
+= struct
   open Inputs
 
   type 'a with_statement = 'a * Ledger_proof_statement.t
@@ -60,11 +76,28 @@ struct
     Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
-  type scan_state =
-    ( Ledger_proof.t with_statement
-    , Ledger_proof.t with_statement
-    , Super_transaction.t with_statement )
-    Parallel_scan.State.t
+  module Aux = struct
+    type t =
+      ( Ledger_proof.t with_statement
+      , Ledger_proof.t with_statement
+      , Super_transaction.t with_statement )
+      Parallel_scan.State.t
+    [@@deriving sexp, bin_io]
+
+    let hash_to_string scan_state = 
+      let h =
+        Parallel_scan.State.hash scan_state
+          (Binable.to_string (module Snark_with_statement))
+          (Binable.to_string (module Snark_with_statement))
+          (Binable.to_string (module Super_transaction_with_statement))
+      in
+      h#result
+
+    let hash t =
+      Ledger_builder_aux_hash.of_bytes (hash_to_string t)
+  end
+
+  type scan_state = Aux.t
   [@@deriving sexp, bin_io]
 
   type t =
@@ -76,22 +109,20 @@ struct
     ; public_key: Public_key.t }
   [@@deriving sexp, bin_io]
 
+  let aux { scan_state; _ } = scan_state
+
+  let make ~public_key ~ledger ~aux =
+    { public_key; ledger; scan_state = aux }
+
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
     ; ledger= Ledger.copy ledger
     ; public_key }
 
   let hash {scan_state; ledger; public_key= _} : Ledger_builder_hash.t =
-    let h =
-      Parallel_scan.State.hash scan_state
-        (Binable.to_string (module Snark_with_statement))
-        (Binable.to_string (module Snark_with_statement))
-        (Binable.to_string (module Super_transaction_with_statement))
-    in
-    let aux_hash = h#result in
     let h = Cryptokit.Hash.sha3 256 in
     h#add_string (Ledger_hash.to_bytes (Ledger.merkle_root ledger)) ;
-    h#add_string aux_hash ;
+    h#add_string (Aux.hash_to_string scan_state);
     Ledger_builder_hash.of_bytes h#result
 
   let ledger {ledger; _} = ledger
