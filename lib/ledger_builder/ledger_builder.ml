@@ -20,7 +20,8 @@ let map2_or_error xs ys ~f =
 module Make (Inputs : Inputs.S) :
   Coda_pow.Ledger_builder_intf
   with type diff := Inputs.Ledger_builder_diff.t
-   and type valid_diff := Inputs.Ledger_builder_diff.With_valid_signatures_and_proofs.t
+   and type valid_diff :=
+              Inputs.Ledger_builder_diff.With_valid_signatures_and_proofs.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
    and type public_key := Inputs.Public_key.t
@@ -29,8 +30,7 @@ module Make (Inputs : Inputs.S) :
               Inputs.Transaction.With_valid_signature.t
    and type statement := Inputs.Completed_work.Statement.t
    and type completed_work := Inputs.Completed_work.Checked.t
-   and type ledger_proof := Inputs.Ledger_proof.t
-=
+   and type ledger_proof := Inputs.Ledger_proof.t =
 struct
   open Inputs
 
@@ -91,7 +91,7 @@ struct
     let aux_hash = h#result in
     let h = Cryptokit.Hash.sha3 256 in
     h#add_string (Ledger_hash.to_bytes (Ledger.merkle_root ledger)) ;
-    h#add_string aux_hash;
+    h#add_string aux_hash ;
     Ledger_builder_hash.of_bytes h#result
 
   let ledger {ledger; _} = ledger
@@ -103,6 +103,10 @@ struct
           ~seed:(failwith "TODO")
     ; ledger
     ; public_key= self }
+
+  let of_aux_and_ledger ~self ledger scan_state =
+    (* TODO: Actually check the validity? *)
+    {scan_state; ledger; public_key= self}
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base (Some (_, statement)) -> Some statement
@@ -176,7 +180,7 @@ struct
     let source = Ledger.merkle_root ledger in
     let%map () = Ledger.apply_super_transaction ledger s in
     { Ledger_proof_statement.source
-    ; target = Ledger.merkle_root ledger
+    ; target= Ledger.merkle_root ledger
     ; fee_excess= Fee.Signed.of_unsigned fee_excess
     ; proof_type= `Base }
 
@@ -191,13 +195,11 @@ struct
             { Result_with_rollback.result= Ok (List.rev acc)
             ; rollback= Call (fun () -> undo_transactions processed) }
       | t :: ts ->
-        begin match apply_super_transaction_and_get_statement ledger t with
+        match apply_super_transaction_and_get_statement ledger t with
         | Error e ->
-          undo_transactions processed ;
-          Result_with_rollback.error e
-        | Ok stmt ->
-          go (t :: processed) ((t, stmt) :: acc) ts
-        end
+            undo_transactions processed ;
+            Result_with_rollback.error e
+        | Ok stmt -> go (t :: processed) ((t, stmt) :: acc) ts
     in
     go [] [] ts
 
@@ -224,18 +226,19 @@ struct
 
   let create_fee_transfers completed_works delta public_key =
     let singles =
-      ( if Fee.Unsigned.(equal zero delta) then []
-      else [(public_key, delta)] )
-      @ List.map completed_works ~f:(fun {Completed_work.fee; prover} -> (prover, fee))
+      (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
+      @ List.map completed_works ~f:(fun {Completed_work.fee; prover} ->
+            (prover, fee) )
     in
     Or_error.try_with (fun () ->
-      Public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
-          Option.value_exn (Fee.Unsigned.add f1 f2) )
-      (* TODO: This creates a weird incentive to have a small public_key *)
-      |> Map.to_alist ~key_order:`Increasing
-      |> Fee_transfer.of_single_list )
+        Public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+            Option.value_exn (Fee.Unsigned.add f1 f2) )
+        (* TODO: This creates a weird incentive to have a small public_key *)
+        |> Map.to_alist ~key_order:`Increasing
+        |> Fee_transfer.of_single_list )
 
-  let fee_remainder (payments : Transaction.With_valid_signature.t list) completed_works =
+  let fee_remainder (payments: Transaction.With_valid_signature.t list)
+      completed_works =
     let open Or_error.Let_syntax in
     let%bind budget =
       sum_fees payments ~f:(fun t -> Transaction.fee (t :> Transaction.t))
@@ -249,12 +252,13 @@ struct
   let apply_diff t (diff: Ledger_builder_diff.t) =
     let open Result_with_rollback.Let_syntax in
     let%bind payments =
-      List.fold_until diff.transactions ~init:[] ~f:(fun acc t ->
-        match Transaction.check t with
-        | Some t -> Continue (t :: acc)
-        | None ->
-          (* TODO: punish *)
-          Stop (Or_error.error_string "Bad signature"))
+      List.fold_until diff.transactions ~init:[]
+        ~f:(fun acc t ->
+          match Transaction.check t with
+          | Some t -> Continue (t :: acc)
+          | None ->
+              (* TODO: punish *)
+              Stop (Or_error.error_string "Bad signature") )
         ~finish:Or_error.return
       |> Result_with_rollback.of_or_error
     in
@@ -297,9 +301,11 @@ struct
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
 
   let apply_diff_unchecked t
-        (diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
+      (diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
     let payments = diff.transactions in
-    let completed_works = List.map ~f:Completed_work.forget diff.completed_works in
+    let completed_works =
+      List.map ~f:Completed_work.forget diff.completed_works
+    in
     let delta = Or_error.ok_exn (fee_remainder payments completed_works) in
     let fee_transfers =
       Or_error.ok_exn (create_fee_transfers completed_works delta t.public_key)
@@ -310,13 +316,15 @@ struct
     in
     let new_data =
       List.map super_transactions ~f:(fun s ->
-        (s, Or_error.ok_exn (apply_super_transaction_and_get_statement t.ledger s)))
+          ( s
+          , Or_error.ok_exn
+              (apply_super_transaction_and_get_statement t.ledger s) ) )
     in
     let res_opt =
-      Or_error.ok_exn
-        (fill_in_completed_work t.scan_state completed_works)
+      Or_error.ok_exn (fill_in_completed_work t.scan_state completed_works)
     in
-    Or_error.ok_exn (Parallel_scan.enqueue_data ~state:t.scan_state ~data:new_data);
+    Or_error.ok_exn
+      (Parallel_scan.enqueue_data ~state:t.scan_state ~data:new_data) ;
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
   let free_space t : int = Parallel_scan.free_space t.scan_state
@@ -356,8 +364,7 @@ struct
         { fee_transfers= Set.union t1.fee_transfers t2.fee_transfers
         ; transactions= t1.transactions + t2.transactions }
 
-      let empty =
-        {transactions= 0; fee_transfers= Public_key.Set.empty}
+      let empty = {transactions= 0; fee_transfers= Public_key.Set.empty}
     end
 
     type t =
@@ -504,7 +511,9 @@ struct
       ; prev_hash= hash t }
     in
     let ledger_proof = apply_diff_unchecked t diff in
-    ( diff, `Hash_after_applying (hash t, Ledger.merkle_root t.ledger), `Ledger_proof ledger_proof)
+    ( diff
+    , `Hash_after_applying (hash t, Ledger.merkle_root t.ledger)
+    , `Ledger_proof ledger_proof )
 end
 
 let%test_module "ledger_builder" =

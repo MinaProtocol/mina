@@ -153,9 +153,7 @@ module type Super_transaction_intf = sig
 
   type unsigned_fee
 
-  type t =
-    | Transaction of valid_transaction
-    | Fee_transfer of fee_transfer
+  type t = Transaction of valid_transaction | Fee_transfer of fee_transfer
   [@@deriving sexp, compare, eq, bin_io]
 
   val fee_excess : t -> unsigned_fee Or_error.t
@@ -163,15 +161,12 @@ end
 
 module type Ledger_proof_intf = sig
   type statement
+
   type message
 
   type t
 
-  val verify :
-        t
-    -> statement
-    -> message:message
-    -> bool Deferred.t
+  val verify : t -> statement -> message:message -> bool Deferred.t
 end
 
 module type Completed_work_intf = sig
@@ -395,13 +390,15 @@ end
 
 module type External_transition_intf = sig
   type state_proof
+
   type state
+
   type ledger_builder_diff
 
   type t =
-    { state_proof : state_proof
-    ; state : state
-    ; ledger_builder_diff : ledger_builder_diff }
+    { state_proof: state_proof
+    ; state: state
+    ; ledger_builder_diff: ledger_builder_diff }
   [@@deriving compare, fields, eq, bin_io, sexp]
 end
 
@@ -504,7 +501,8 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
 
-  module Ledger_proof : Ledger_proof_intf
+  module Ledger_proof :
+    Ledger_proof_intf
     with type message := Fee.Unsigned.t * Public_key.Compressed.t
 
   module Ledger :
@@ -575,7 +573,8 @@ Merge Snark:
   module Ledger_builder :
     Ledger_builder_intf
     with type diff := Ledger_builder_diff.t
-     and type valid_diff := Ledger_builder_diff.With_valid_signatures_and_proofs.t
+     and type valid_diff :=
+                Ledger_builder_diff.With_valid_signatures_and_proofs.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_hash := Ledger_hash.t
      and type public_key := Public_key.Compressed.t
@@ -628,7 +627,8 @@ module Make
     (Block_state_transition_proof : Block_state_transition_proof_intf
                                     with type state := Inputs.State.t
                                      and type proof := Inputs.State.Proof.t
-                                     and type transition := Inputs.Internal_transition.t) =
+                                     and type transition :=
+                                                Inputs.Internal_transition.t) =
 struct
   open Inputs
 

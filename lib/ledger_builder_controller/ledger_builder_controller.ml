@@ -15,15 +15,13 @@ module type Inputs_intf = sig
   end
 
   module External_transition : sig
-    type t
-    [@@deriving bin_io, eq, compare, sexp]
+    type t [@@deriving bin_io, eq, compare, sexp]
 
     val ledger_builder_diff : t -> Ledger_builder_diff.t
   end
 
   module Internal_transition : sig
-    type t
-    [@@deriving bin_io, eq, compare, sexp]
+    type t [@@deriving sexp]
   end
 
   module Ledger : sig
@@ -327,7 +325,8 @@ end = struct
         let open Deferred.Let_syntax in
         match%map
           Ledger_builder.apply lb
-            (External_transition.ledger_builder_diff w.Transition_with_target.transition)
+            (External_transition.ledger_builder_diff
+               w.Transition_with_target.transition)
         with
         | Ok None -> ()
         | Ok (Some _) -> ()
@@ -644,8 +643,10 @@ let%test_module "test" =
 
       module External_transition = struct
         include Int
+
         let ledger_builder_diff = Fn.id
       end
+
       module Internal_transition = External_transition
 
       module Ledger = struct
@@ -791,8 +792,8 @@ let%test_module "test" =
       let net_input = List.map transitions ~f:(fun (s, _) -> s) in
       Lbc.Config.make ~parent_log:(Logger.create ())
         ~net_deferred:(return net_input)
-        ~external_transitions:ledger_builder_transitions
-        ~genesis_ledger:0 ~disk_location:"/tmp/test_lbc_disk"
+        ~external_transitions:ledger_builder_transitions ~genesis_ledger:0
+        ~disk_location:"/tmp/test_lbc_disk"
 
     let take_map ~f p cnt =
       let rec go acc cnt =
