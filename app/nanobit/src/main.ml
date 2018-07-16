@@ -447,12 +447,14 @@ module Run (Program : Main_intf) = struct
           :: Worker.arguments ~public_key ~daemon_port:client_port )
     in
     let log = Logger.child log "snark_worker" in
-    Pipe.iter_without_pushback (Reader.pipe (Process.stdout p)) ~f:(fun s ->
-      Logger.info log "%s" s)
-    |> don't_wait_for;
-    Pipe.iter_without_pushback (Reader.pipe (Process.stderr p)) ~f:(fun s ->
-      Logger.error log "%s" s)
-    |> don't_wait_for;
+    Pipe.iter_without_pushback
+      (Reader.pipe (Process.stdout p))
+      ~f:(fun s -> Logger.info log "%s" s)
+    |> don't_wait_for ;
+    Pipe.iter_without_pushback
+      (Reader.pipe (Process.stderr p))
+      ~f:(fun s -> Logger.error log "%s" s)
+    |> don't_wait_for ;
     Deferred.unit
 
   let run_snark_worker ~log ~client_port run_snark_worker =
