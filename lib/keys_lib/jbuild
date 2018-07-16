@@ -1,0 +1,18 @@
+(jbuild_version 1)
+
+(library
+ ((name keys_lib)
+  (public_name keys_lib)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core
+      async
+      nanobit_base
+      snark_keys
+      blockchain_snark
+      transaction_snark ))
+  (preprocess (pps (ppx_jane)))
+  (synopsis "SNARK keys")))
+

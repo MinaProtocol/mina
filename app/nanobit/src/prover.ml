@@ -3,22 +3,17 @@ open Async
 open Nanobit_base
 open Util
 open Blockchain_snark
-open Cli_common
+open Cli_lib
 
 module Transition_utils
-    (Keys : Keys.S)
+    (Keys : Keys_lib.Keys.S)
     (Transaction_snark : Transaction_snark.S) =
 struct
   open Snark_params
   open Keys
+  module State = Blockchain_state.Make_update (Transaction_snark)
 
-  let instance_hash =
-    let self =
-      Step.Verifier.Verification_key.to_bool_list (Tock.Keypair.vk Wrap.keys)
-    in
-    fun state ->
-      Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
-        (List.fold self +> State_hash.fold (Blockchain_state.hash state))
+  let update = State.update
 
   let embed (x: Tick.Field.t) : Tock.Field.t =
     let n = Tick.Bigint.of_field x in
@@ -31,29 +26,25 @@ struct
     in
     go Tock.Field.one Tock.Field.zero 0
 
-  let wrap : Tick.Pedersen.Digest.t -> Tick.Proof.t -> Tock.Proof.t =
-   fun hash proof ->
+  let wrap hash proof =
+    let module Wrap = Keys.Wrap in
     Tock.prove
       (Tock.Keypair.pk Wrap.keys)
       (Wrap.input ()) {Wrap.Prover_state.proof} Wrap.main (embed hash)
 
-  module State = Blockchain_state.Make_update (Transaction_snark)
-
-  let update = State.update
-
-  let step ~prev_proof ~prev_state block =
+  let extend_blockchain (chain: Blockchain.t) (block: Nanobit_base.Block.t) =
     let open Or_error.Let_syntax in
-    let%map next_state = update prev_state block in
-    let next_state_top_hash = instance_hash next_state in
+    let%map next_state = update chain.state block in
+    let next_state_top_hash = Keys.Step.instance_hash next_state in
     let prev_proof =
       Tick.prove
-        (Tick.Keypair.pk Step.keys)
-        (Step.input ())
-        { Step.Prover_state.prev_proof
-        ; wrap_vk= Tock.Keypair.vk Wrap.keys
-        ; prev_state
+        (Tick.Keypair.pk Keys.Step.keys)
+        (Keys.Step.input ())
+        { Keys.Step.Prover_state.prev_proof= chain.proof
+        ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
+        ; prev_state= chain.state
         ; update= block }
-        Step.main next_state_top_hash
+        Keys.Step.main next_state_top_hash
     in
     {Blockchain.state= next_state; proof= wrap next_state_top_hash prev_proof}
 
@@ -61,14 +52,14 @@ struct
     Tock.verify proof
       (Tock.Keypair.vk Wrap.keys)
       (Wrap.input ())
-      (embed (instance_hash state))
+      (embed (Keys.Step.instance_hash state))
 
   (* TODO: Hard code base_hash, or in any case make it not depend on
   transition *)
   let base_hash =
     lazy
       ( if Insecure.compute_base_hash then Tick.Field.zero
-      else instance_hash Blockchain.State.zero )
+      else Keys.Step.instance_hash Blockchain.State.zero )
 
   let base_proof =
     if Insecure.compute_base_proof then Lazy.return Tock.Proof.dummy
@@ -93,11 +84,7 @@ module Worker_state = struct
 
     val base_proof : Proof.t Lazy.t
 
-    val step :
-         prev_proof:Proof.t
-      -> prev_state:Blockchain_state.t
-      -> Block.t
-      -> Blockchain.t Or_error.t
+    val extend_blockchain : Blockchain.t -> Block.t -> Blockchain.t Or_error.t
 
     val verify : Blockchain_state.t -> Proof.t -> bool
 
@@ -109,7 +96,7 @@ module Worker_state = struct
   type t = (module S)
 
   let create () : t Deferred.t =
-    let%map keys = Keys.create () in
+    let%map keys = Keys_lib.Keys.create () in
     let module M = struct
       open Snark_params
 
@@ -148,14 +135,14 @@ module Functions = struct
       Blockchain.Stable.V1.bin_t
       (fun ( module
       W )
-      ({Blockchain.state= prev_state; proof= prev_proof}, block)
+      (({Blockchain.state= prev_state; proof= prev_proof} as chain), block)
       ->
         return
           ( if Insecure.extend_blockchain then
               let proof = Lazy.force W.base_proof in
               { Blockchain.proof
               ; state= Or_error.ok_exn (W.update prev_state block) }
-          else Or_error.ok_exn (W.step ~prev_proof ~prev_state block) ) )
+          else Or_error.ok_exn (W.extend_blockchain chain block) ) )
 
   let verify_blockchain =
     create Blockchain.Stable.V1.bin_t bin_bool
