@@ -37,8 +37,8 @@ module Make_inputs0 (Ledger_proof : sig
     -> bool Deferred.t
 end)
 (State_proof : State_proof_intf) (Difficulty : module type of Difficulty)
-(Init : Init_intf)
-= struct
+(Init : Init_intf) =
+struct
   open Protocols.Coda_pow
 
   module Time : Time_intf with type t = Block_time.t = Block_time
@@ -56,13 +56,26 @@ end)
   module State_hash = State_hash.Stable.V1
   module Strength = Strength
   module Block_nonce = Block.Nonce
+
+  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf = Ledger_builder_hash.
+                                                                  Aux_hash
+
   module Ledger_builder_hash = struct
     include Ledger_builder_hash.Stable.V1
-    let of_bytes = Ledger_builder_hash.of_bytes
+
+    type sibling_hash = Ledger_builder_hash.sibling_hash [@@deriving bin_io]
+
+    type ledger_builder_aux_hash = Ledger_builder_hash.Aux_hash.Stable.V1.t
+    [@@deriving bin_io]
+
+    let of_aux_and_sibling_hash = Ledger_builder_hash.of_aux_and_sibling_hash
+
+    let to_bytes = Ledger_builder_hash.to_bytes
   end
-  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf = Ledger_builder_hash
+
   module Ledger_hash = struct
     include Ledger_hash.Stable.V1
+
     let to_bytes = Ledger_hash.to_bytes
   end
 
@@ -126,10 +139,12 @@ end)
       module T = struct
         include Transaction.With_valid_signature
 
-        let compare t1 t2 = Transaction.With_valid_signature.compare ~seed t1 t2
+        let compare t1 t2 =
+          Transaction.With_valid_signature.compare ~seed t1 t2
       end
+
       include T
-      include Comparable.Make(T)
+      include Comparable.Make (T)
     end
   end
 
@@ -296,12 +311,13 @@ end)
 
   module External_transition = struct
     type t =
-      { state_proof : State.Proof.t
-      ; state : State.t
-      ; ledger_builder_diff : Ledger_builder_diff.t }
+      { state_proof: State.Proof.t
+      ; state: State.t
+      ; ledger_builder_diff: Ledger_builder_diff.t }
     [@@deriving fields, bin_io, sexp]
 
     let compare t1 t2 = State.compare t1.state t2.state
+
     let equal t1 t2 = State.equal t1.state t2.state
   end
 
@@ -318,8 +334,10 @@ end)
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (Transaction)
-    include Network_pool.Make(Pool)(Pool.Diff)
+    include Network_pool.Make (Pool) (Pool.Diff)
   end
+
+  module Transaction_pool_diff = Transaction_pool.Pool.Diff
 end
 
 module Make_inputs (Ledger_proof0 : sig
@@ -450,17 +468,28 @@ struct
      and type state := State.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 
-  module Net = Minibit_networking.Make(Inputs0)
-
   module Sync_ledger =
-    Syncable_ledger.Make
-      (Ledger.Addr)
-      (Public_key.Compressed)
-      (Syncable_ledger.Valid(Ledger.Addr))
+    Syncable_ledger.Make (Ledger.Addr) (Public_key.Compressed)
+      (Syncable_ledger.Valid (Ledger.Addr))
       (Account)
       (Merkle_hash)
-      (struct include Ledger_hash let to_hash (h : t) = (h :> Merkle_hash.t) end)
-      (struct include Ledger type path = Path.t end)
+      (struct
+        include Ledger_hash
+
+        let to_hash (h: t) = (h :> Merkle_hash.t)
+      end)
+      (struct
+        include Ledger
+
+        type path = Path.t
+      end)
+
+  module Net = Minibit_networking.Make (struct
+    include Inputs0
+    module Snark_pool = Snark_pool
+    module Snark_pool_diff = Snark_pool.Diff
+    module Sync_ledger = Sync_ledger
+  end)
 
   module Ledger_builder_controller = struct
     module Inputs = struct
@@ -500,12 +529,16 @@ struct
       module Sync_ledger = Sync_ledger
       module Internal_transition = Internal_transition
       module External_transition = External_transition
+
       (* TODO: Move into coda_pow or something *)
       module Step = struct
-        let step (lb, old_state) ({state_proof; ledger_builder_diff;state=new_state} : External_transition.t) =
+        let step (lb, old_state)
+            ({state_proof; ledger_builder_diff; state= new_state}:
+              External_transition.t) =
           let open Deferred.Or_error.Let_syntax in
           let%bind bc_good =
-            Deferred.map (State_proof.verify state_proof new_state) ~f:(fun x -> Ok x)
+            Deferred.map (State_proof.verify state_proof new_state) ~f:
+              (fun x -> Ok x )
           and ledger_hash =
             match%map Ledger_builder.apply lb ledger_builder_diff with
             | Some (h, _) -> h
@@ -513,10 +546,12 @@ struct
           in
           let ledger_builder_hash = Ledger_builder.hash lb in
           let%map () =
-            if Ledger_builder_hash.equal ledger_builder_hash
-                 new_state.ledger_builder_hash
-            && Ledger_hash.equal ledger_hash new_state.ledger_hash
-            && State_hash.equal (State.hash old_state) new_state.previous_state_hash
+            if
+              Ledger_builder_hash.equal ledger_builder_hash
+                new_state.ledger_builder_hash
+              && Ledger_hash.equal ledger_hash new_state.ledger_hash
+              && State_hash.equal (State.hash old_state)
+                   new_state.previous_state_hash
             then Deferred.return (Ok ())
             else Deferred.Or_error.error_string "TODO: Punish"
           in

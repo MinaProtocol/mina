@@ -5,22 +5,44 @@ open Kademlia
 module type Sync_ledger_intf = sig
   type query [@@deriving bin_io]
 
-  type response [@@deriving bin_io]
+  type answer [@@deriving bin_io]
 end
 
-module Rpcs
-    (Ledger_builder_aux_hash : Protocols.Coda_pow.Ledger_builder_aux_hash_intf)
-    (Sync_ledger : Sync_ledger_intf)
-    (Ledger_builder_aux : Binable.S) =
+module Rpcs (Inputs : sig
+  module Ledger_builder_aux_hash :
+    Protocols.Coda_pow.Ledger_builder_aux_hash_intf
+
+  module State_hash : Protocols.Coda_pow.State_hash_intf
+
+  module Ledger_builder_aux : Binable.S
+
+  module Ledger_builder_hash :
+    Protocols.Coda_pow.Ledger_builder_hash_intf
+    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+
+  module State : sig
+    type t [@@deriving bin_io, eq]
+
+    val hash : t -> State_hash.t
+
+    val ledger_builder_hash : t -> Ledger_builder_hash.t
+  end
+
+  module Sync_ledger : Sync_ledger_intf
+end) =
 struct
+  open Inputs
+
   module Get_ledger_builder_aux_at_hash = struct
     module T = struct
       let name = "get_ledger_builder_aux_at_hash"
 
       module T = struct
-        type query = Ledger_builder_aux_hash.t
+        type query = Ledger_builder_hash.t * State_hash.t
 
-        type response = Ledger_builder_aux.t option
+        type response =
+          (Ledger_builder_aux.t * Ledger_builder_hash.sibling_hash * State.t)
+          option
       end
 
       module Caller = T
@@ -32,9 +54,12 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Ledger_builder_aux_hash.t [@@deriving bin_io]
+        type query = Ledger_builder_hash.t * State_hash.t [@@deriving bin_io]
 
-        type response = Ledger_builder_aux.t option [@@deriving bin_io]
+        type response =
+          (Ledger_builder_aux.t * Ledger_builder_hash.sibling_hash * State.t)
+          option
+        [@@deriving bin_io]
 
         let version = 1
 
@@ -56,7 +81,12 @@ struct
     module T = struct
       let name = "answer_sync_ledger_query"
 
-      module T = Sync_ledger
+      module T = struct
+        include Sync_ledger
+
+        type response = Sync_ledger.answer [@@deriving bin_io]
+      end
+
       module Caller = T
       module Callee = T
     end
@@ -66,7 +96,7 @@ struct
 
     module V1 = struct
       module T = struct
-        include Sync_ledger
+        include T.T
 
         let version = 1
 
@@ -86,16 +116,19 @@ struct
 end
 
 module Message (Inputs : sig
-    module Snark_pool_diff : Binable.S
-    module Transaction_pool_diff : Binable.S
-    module State_with_witness : Coda.State_with_witness_intf
-  end)
-= struct
+  module Snark_pool_diff : Binable.S
+
+  module Transaction_pool_diff : Binable.S
+
+  module External_transition : Binable.S
+end) =
+struct
   open Inputs
+
   module T = struct
     module T = struct
       type msg =
-        | New_state of State_with_witness.Stripped.t
+        | New_state of External_transition.t
         | Snark_pool_diff of Snark_pool_diff.t
         | Transaction_pool_diff of Transaction_pool_diff.t
       [@@deriving bin_io]
@@ -126,18 +159,35 @@ module Message (Inputs : sig
 end
 
 module type Inputs_intf = sig
-  module State_with_witness : Coda.State_with_witness_intf
+  module External_transition : Binable.S
 
-  module Ledger_builder_aux_hash : Protocols.Coda_pow.Ledger_builder_aux_hash_intf
+  module State_hash : Protocols.Coda_pow.State_hash_intf
+
+  module Ledger_builder_aux_hash :
+    Protocols.Coda_pow.Ledger_builder_aux_hash_intf
+
+  module Ledger_builder_hash :
+    Protocols.Coda_pow.Ledger_builder_hash_intf
+    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+
+  module State : sig
+    type t [@@deriving bin_io, eq]
+
+    val hash : t -> State_hash.t
+
+    val ledger_builder_hash : t -> Ledger_builder_hash.t
+  end
 
   module Sync_ledger : Sync_ledger_intf
 
   module Ledger_builder_aux : sig
     type t [@@deriving bin_io]
+
     val hash : t -> Ledger_builder_aux_hash.t
   end
 
   module Snark_pool_diff : Binable.S
+
   module Transaction_pool_diff : Binable.S
 end
 
@@ -155,18 +205,15 @@ module Make (Inputs : Inputs_intf) = struct
       ; remap_addr_port: Peer.t -> Peer.t }
   end
 
-  module Rpcs = Rpcs (Ledger_builder_aux_hash) (Sync_ledger) (Ledger_builder_aux)
+  module Rpcs = Rpcs (Inputs)
   module Membership = Membership.Haskell
 
   type t =
     { gossip_net: Gossip_net.t
     ; log: Logger.t
-    ; new_states: State_with_witness.Stripped.t Linear_pipe.Reader.t
+    ; new_states: External_transition.t Linear_pipe.Reader.t
     ; transaction_pool_diffs: Transaction_pool_diff.t Linear_pipe.Reader.t
-    ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t
-    }
-
-  type state_with_witness = State_with_witness.t
+    ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t }
 
   let init_gossip_net params initial_peers me log remap_addr_port
       implementations =
@@ -217,7 +264,7 @@ module Make (Inputs : Inputs_intf) = struct
       Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(function
         | New_state s -> `Fst s
         | Snark_pool_diff d -> `Snd d
-        | Transaction_pool_diff d -> `Trd d)
+        | Transaction_pool_diff d -> `Trd d )
     in
     {gossip_net; log; new_states; snark_pool_diffs; transaction_pool_diffs}
 
@@ -226,13 +273,17 @@ module Make (Inputs : Inputs_intf) = struct
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
   let broadcast_state t x = broadcast t (New_state x)
-  let broadcast_transaction_pool_diff t x = broadcast t (Transaction_pool_diff x)
+
+  let broadcast_transaction_pool_diff t x =
+    broadcast t (Transaction_pool_diff x)
+
   let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
 
   (* TODO: Have better pushback behavior *)
   let broadcast_state t s =
     Linear_pipe.write_without_pushback
-      (Gossip_net.broadcast t.gossip_net) (New_state s)
+      (Gossip_net.broadcast t.gossip_net)
+      (New_state s)
 
   module Ledger_builder_io = struct
     type nonrec t = t
@@ -244,35 +295,56 @@ module Make (Inputs : Inputs_intf) = struct
       let open Async in
       let ds = List.map xs ~f in
       let filter ~f =
-        Deferred.bind ~f:(fun x ->
-          if f x then return x else Deferred.never ())
+        Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
       in
       let none_worked =
         Deferred.bind (Deferred.all ds) ~f:(fun ds ->
-          if List.for_all ds ~f:Option.is_none
-          then return None
-          else Deferred.never ())
+            if List.for_all ds ~f:Option.is_none then return None
+            else Deferred.never () )
       in
       Deferred.any (none_worked :: List.map ~f:(filter ~f:Option.is_some) ds)
 
-    let get_ledger_builder_aux_at_hash t hash =
+    (* TODO: Don't copy and paste *)
+    let find_map' xs ~f =
+      let open Async in
+      let ds = List.map xs ~f in
+      let filter ~f =
+        Deferred.bind ~f:(fun x -> if f x then return x else Deferred.never ())
+      in
+      let none_worked =
+        Deferred.bind (Deferred.all ds) ~f:(fun ds ->
+            (* TODO: Validation applicative here *)
+            if List.for_all ds ~f:Or_error.is_error then
+              return (Or_error.error_string "all none")
+            else Deferred.never () )
+      in
+      Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
+
+    let get_ledger_builder_aux_at_hash t (ledger_builder_hash, state_hash) =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
-      find_map peers ~f:(fun peer ->
-        match%map
-          Gossip_net.query_peer t.gossip_net peer
-            Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi hash
-        with
-        | Ok (Some ledger_builder_aux) ->
-          if Ledger_builder_aux_hash.equal
-               (Ledger_builder_aux.hash ledger_builder_aux) hash
-          then Some ledger_builder_aux
-          else None
-        | Ok None ->
-            Logger.info t.log "no ledger builder aux found" ;
-            None
-        | Error err ->
-            Logger.warn t.log "%s" (Error.to_string_mach err) ;
-            None)
+      find_map' peers ~f:(fun peer ->
+          match%map
+            Gossip_net.query_peer t.gossip_net peer
+              Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
+              (ledger_builder_hash, state_hash)
+          with
+          | Ok
+              (Some
+                (ledger_builder_aux, ledger_builder_aux_merkle_sibling, state)) ->
+              if
+                Ledger_builder_hash.equal
+                  (Ledger_builder_hash.of_aux_and_sibling_hash
+                     (Ledger_builder_aux.hash ledger_builder_aux)
+                     ledger_builder_aux_merkle_sibling)
+                  ledger_builder_hash
+                && State_hash.equal state_hash (State.hash state)
+                && Ledger_builder_hash.equal
+                     (State.ledger_builder_hash state)
+                     ledger_builder_hash
+              then Ok (ledger_builder_aux, state)
+              else Or_error.error_string "Evil! TODO: Punish"
+          | Ok None -> Or_error.error_string "no ledger builder aux found"
+          | Error err -> Error err )
 
     (* TODO: Check whether responses are good or not. *)
     let glue_sync_ledger t query_reader response_writer =
@@ -281,14 +353,14 @@ module Make (Inputs : Inputs_intf) = struct
         (fun query ->
           match%bind
             find_map peers ~f:(fun peer ->
-              match%map
-                Gossip_net.query_peer t.gossip_net peer
-                  Rpcs.Answer_sync_ledger_query.dispatch_multi query
-              with
-              | Ok answer -> Some answer
-              | Error err ->
-                  Logger.warn t.log "%s" (Error.to_string_mach err) ;
-                  None )
+                match%map
+                  Gossip_net.query_peer t.gossip_net peer
+                    Rpcs.Answer_sync_ledger_query.dispatch_multi query
+                with
+                | Ok answer -> Some answer
+                | Error err ->
+                    Logger.warn t.log "%s" (Error.to_string_mach err) ;
+                    None )
           with
           | Some answer -> Linear_pipe.write response_writer answer
           | None -> Deferred.return () )

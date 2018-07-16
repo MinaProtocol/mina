@@ -109,6 +109,7 @@ module type Ledger_builder_controller_intf = sig
   type ledger_builder_hash
 
   type internal_transition
+
   type external_transition
 
   type ledger
@@ -131,8 +132,7 @@ module type Ledger_builder_controller_intf = sig
     type t =
       { parent_log: Logger.t
       ; net_deferred: net Deferred.t
-      ; external_transitions:
-          (state * external_transition) Linear_pipe.Reader.t
+      ; external_transitions: external_transition Linear_pipe.Reader.t
       ; genesis_ledger: ledger
       ; disk_location: string }
     [@@deriving make]
@@ -307,7 +307,8 @@ module Make
     (Block_state_transition_proof : Coda_pow.Block_state_transition_proof_intf
                                     with type state := Inputs.State.t
                                      and type proof := Inputs.State.Proof.t
-                                     and type transition := Inputs.Internal_transition.t) =
+                                     and type transition :=
+                                                Inputs.Internal_transition.t) =
 struct
   module Protocol = Coda_pow.Make (Inputs) (Block_state_transition_proof)
   open Inputs
@@ -318,7 +319,7 @@ struct
     ; miner_changes_writer: Miner.change Linear_pipe.Writer.t
     ; miner_broadcast_writer: State_with_witness.t Linear_pipe.Writer.t
     ; external_transitions:
-        (State.t * External_transition.t) Linear_pipe.Writer.t
+        External_transition.t Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; mutable transaction_pool: Transaction_pool.t
     ; mutable snark_pool: Snark_pool.t
@@ -359,11 +360,10 @@ struct
     let%map ledger_builder =
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make ~parent_log:config.log
-           ~net_deferred:(Ivar.read net_ivar)
-           ~genesis_ledger:Genesis.ledger
+           ~net_deferred:(Ivar.read net_ivar) ~genesis_ledger:Genesis.ledger
            ~disk_location:config.ledger_builder_persistant_location
            ~external_transitions:external_transitions_reader)
-           (* TODO
+      (* TODO
            ~ledger_builder_diffs:
              (Linear_pipe.map ledger_builder_transitions_reader ~f:
                 (fun (s, {Ledger_builder_transition.diff; _}) -> (s, diff) ))) *)
@@ -427,7 +427,6 @@ struct
        lbc -> strongest_ledgers -> miner
        strongest_ledgers -> network
     *)
-
     (* Miner, ledger_builder, Net.State_io, snark_pool, transaction_pool *)
     (*
     let protocol_events =

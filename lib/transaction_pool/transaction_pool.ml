@@ -23,6 +23,7 @@ module Make (Transaction : sig
 
   module With_valid_signature : sig
     type nonrec t = private t
+
     include Comparable with type t := t
   end
 
@@ -30,50 +31,41 @@ module Make (Transaction : sig
 end) =
 struct
   type pool =
-    { heap : Transaction.With_valid_signature.t Fheap.t
-    ; set : Transaction.With_valid_signature.Set.t
-    }
+    { heap: Transaction.With_valid_signature.t Fheap.t
+    ; set: Transaction.With_valid_signature.Set.t }
 
   type t = pool ref
 
   let create () =
     ref
-      { heap = Fheap.create ~cmp:Transaction.With_valid_signature.compare
-      ; set = Transaction.With_valid_signature.Set.empty
-      }
+      { heap= Fheap.create ~cmp:Transaction.With_valid_signature.compare
+      ; set= Transaction.With_valid_signature.Set.empty }
 
-  let add' t txn =
-    { heap = Fheap.add t.heap txn
-    ; set = Set.add t.set txn
-    }
+  let add' t txn = {heap= Fheap.add t.heap txn; set= Set.add t.set txn}
 
-  let add t_ref txn =
-    t_ref := add' !t_ref txn
+  let add t_ref txn = t_ref := add' !t_ref txn
 
-  let transactions t =
-    Sequence.unfold ~init:!t ~f:Fheap.pop
+  let transactions t = Sequence.unfold ~init:!t ~f:Fheap.pop
 
   module Diff = struct
-    type t = Transaction.t list
-    [@@deriving bin_io]
+    type t = Transaction.t list [@@deriving bin_io]
 
     (* TODO: Check signatures *)
     let apply t_ref txns =
       let t0 = !t_ref in
       let t, res =
         List.fold txns ~init:(t0, []) ~f:(fun (t, acc) txn ->
-          match Transaction.check txn with
-          | None -> (* TODO Punish *)
-            (t, acc)
-          | Some txn ->
-            if Set.mem t.set txn
-            then (t, acc)
-            else (add' t txn, (txn :> Transaction.t) :: acc))
+            match Transaction.check txn with
+            | None -> (* TODO Punish *)
+                      (t, acc)
+            | Some txn ->
+                if Set.mem t.set txn then (t, acc)
+                else (add' t txn, (txn :> Transaction.t) :: acc) )
       in
-      t_ref := t;
+      t_ref := t ;
       match res with
-      | [] -> Or_error.error_string "No new transactions"
-      | xs -> Ok xs
+      | [] -> Deferred.Or_error.error_string "No new transactions"
+      | xs -> Deferred.Or_error.return xs
   end
 
   (* TODO: Actually back this by the file-system *)

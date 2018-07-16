@@ -40,7 +40,7 @@ module type Ledger_hash_intf = sig
 end
 
 module type State_hash_intf = sig
-  type t [@@deriving bin_io, sexp]
+  type t [@@deriving bin_io, sexp, eq]
 
   include Hashable.S_binable with type t := t
 end
@@ -54,7 +54,13 @@ end
 module type Ledger_builder_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
 
+  type sibling_hash [@@deriving bin_io]
+
+  type ledger_builder_aux_hash
+
   val of_bytes : string -> t
+
+  val of_aux_and_sibling_hash : ledger_builder_aux_hash -> sibling_hash -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -522,7 +528,11 @@ module type Inputs_intf = sig
 
   module State_hash : State_hash_intf
 
-  module Ledger_builder_hash : Ledger_builder_hash_intf
+  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
+
+  module Ledger_builder_hash :
+    Ledger_builder_hash_intf
+    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
 
   (*
 Bundle Snark:

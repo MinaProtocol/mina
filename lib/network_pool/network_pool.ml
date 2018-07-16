@@ -13,7 +13,7 @@ module type Pool_diff_intf = sig
 
   type t
 
-  val apply : pool -> t -> t Or_error.t Deferred.t
+  val apply : pool -> t -> t Deferred.Or_error.t
 end
 
 module type Network_pool_intf = sig
