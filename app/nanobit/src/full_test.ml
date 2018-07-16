@@ -67,7 +67,7 @@ let run_test with_snark : unit -> unit Deferred.t =
             balance amount ()
     | None -> failwith "No balance in ledger"
   in
-  let client_port = 8010 + Random.int 1000 in
+  let client_port = 8123 in
   let run_snark_worker = `With_public_key Genesis_ledger.rich_pk in
   Run.setup_local_server ~client_port ~minibit ~log ;
   Run.run_snark_worker ~client_port run_snark_worker ;

@@ -437,20 +437,29 @@ module Run (Program : Main_intf) = struct
                    Logger.error log "%s" (Exn.to_string_mach exn) ;
                    Deferred.unit )) ))
 
-  let create_snark_worker ~public_key ~client_port =
+  let create_snark_worker ~log ~public_key ~client_port =
     let open Snark_worker_lib in
     let our_binary = Sys.argv.(0) in
-    Process.create_exn () ~prog:our_binary
-      ~args:
-        ( Worker.command_name
-        :: Worker.arguments ~public_key ~daemon_port:client_port )
-    >>| ignore
+    let%map p =
+      Process.create_exn () ~prog:our_binary
+        ~args:
+          ( Worker.command_name
+          :: Worker.arguments ~public_key ~daemon_port:client_port )
+    in
+    let log = Logger.child log "snark_worker" in
+    Pipe.iter_without_pushback (Reader.pipe (Process.stdout p)) ~f:(fun s ->
+      Logger.info log "%s" s)
+    |> don't_wait_for;
+    Pipe.iter_without_pushback (Reader.pipe (Process.stderr p)) ~f:(fun s ->
+      Logger.error log "%s" s)
+    |> don't_wait_for;
+    Deferred.unit
 
-  let run_snark_worker ~client_port run_snark_worker =
+  let run_snark_worker ~log ~client_port run_snark_worker =
     match run_snark_worker with
     | `Don't_run -> ()
     | `With_public_key public_key ->
-        create_snark_worker ~public_key ~client_port |> ignore
+        create_snark_worker ~log ~public_key ~client_port |> ignore
 
   let run ~minibit ~log =
     Logger.debug log "Created minibit\n%!" ;
