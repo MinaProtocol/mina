@@ -35,7 +35,7 @@ let run_test with_snark : unit -> unit Deferred.t =
   let net_config =
     { Inputs.Net.Config.parent_log= log
     ; gossip_net_params=
-        { timeout= Time.Span.of_sec 1.
+        { Inputs.Net.Gossip_net.Params.timeout= Time.Span.of_sec 1.
         ; target_peer_count= 8
         ; address= Host_and_port.of_string "127.0.0.1:8001" }
     ; initial_peers= []
@@ -44,10 +44,10 @@ let run_test with_snark : unit -> unit Deferred.t =
   in
   let%bind minibit =
     Main.create
-      { log
-      ; net_config
-      ; ledger_disk_location= "ledgers"
-      ; pool_disk_location= "transaction_pool" }
+      (Main.Config.make ~log ~net_config
+         ~ledger_builder_persistant_location:"ledger_builder"
+         ~transaction_pool_disk_location:"transaction_pool"
+         ~snark_pool_disk_location:"snark_pool" ())
   in
   let balance_change_or_timeout =
     let rec go () =
@@ -72,7 +72,6 @@ let run_test with_snark : unit -> unit Deferred.t =
             balance amount ()
     | None -> failwith "No balance in ledger"
   in
-  Run.run ~minibit ~log ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
   (* Check if rich-man has some balance *)

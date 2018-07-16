@@ -95,6 +95,8 @@ module type Transaction_pool_intf = sig
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load : disk_location:string -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t Deferred.t
+
+  val add : t -> transaction_with_valid_signature -> unit
 end
 
 module type Snark_pool_intf = sig
@@ -354,17 +356,16 @@ struct
     ; external_transitions:
         External_transition.t Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
-    ; mutable transaction_pool: Transaction_pool.t
-    ; mutable snark_pool: Snark_pool.t
+    ; transaction_pool: Transaction_pool.t
+    ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
+    ; best_lb : Ledger_builder.t option ref
     ; log: Logger.t
     ; ledger_builder_transition_backup_capacity: int }
 
-  let ledger_builder_controller t = t.ledger_builder
+  let best_ledger t = Option.map !(t.best_lb) ~f:Ledger_builder.ledger
 
-  let modify_transaction_pool t ~f = t.transaction_pool <- f t.transaction_pool
-
-  let modify_snark_pool t ~f = t.snark_pool <- f t.snark_pool
+  let transaction_pool t = t.transaction_pool
 
   module Config = struct
     type t =
@@ -404,7 +405,7 @@ struct
     in
     Ivar.fill net_ivar net ;
     don't_wait_for (Linear_pipe.transfer_id (Net.states net) external_transitions_writer);
-    let%map transaction_pool =
+    let%bind transaction_pool =
       Transaction_pool.load
         ~disk_location:config.transaction_pool_disk_location
         ~incoming_diffs:(Net.transaction_pool_diffs net)
@@ -422,7 +423,10 @@ struct
     let strongest_ledgers_for_miner, strongest_ledgers_for_network =
       Linear_pipe.fork2 (Ledger_builder_controller.strongest_ledgers ledger_builder)
     in
+    let best_lb : Ledger_builder.t option ref = ref None in
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
+      (* TODO: Don't just hack this here *)
+      best_lb := Some lb;
       Net.broadcast_state net t; Deferred.unit)
     |> don't_wait_for;
     let miner =
@@ -441,6 +445,7 @@ struct
     return
     { miner
     ; net
+    ; best_lb
     ; external_transitions= external_transitions_writer
     ; transaction_pool
     ; snark_pool
@@ -462,87 +467,4 @@ struct
   let forget_transition_validity
       {Ledger_builder_transition.With_valid_signatures_and_proofs.old; diff} =
     {Ledger_builder_transition.old; diff= forget_diff_validity diff}
-
-  let run t =
-    Logger.info t.log "Starting to run Coda" ;
-    failwith "TODO"
-    (* transaction_pool, snark_pool: self contained, and feed into network *)
-    (* network states-> lbc
-       mining states -> lbc
-       lbc -> strongest_ledgers -> miner
-       strongest_ledgers -> network
-    *)
-
-    (* Miner, ledger_builder, Net.State_io, snark_pool, transaction_pool *)
-    (*
-    let protocol_events =
-      Linear_pipe.merge_unordered
-        [ Linear_pipe.map miner_transitions_protocol ~f:(fun transition ->
-              `Local transition )
-        ; Linear_pipe.map (Net.State_io.new_states t.net t.state_io) ~f:
-            (fun s -> `Remote s ) ]
-    in
-    let updated_state_network, updated_state_ledger =
-      Linear_pipe.fork2
-        ( Linear_pipe.scan protocol_events ~init:(p, None) ~f:(fun (p, _) ->
-              function
-            | `Local (transition, _) ->
-                Logger.info t.log
-                  !"Stepping with local transition %{sexp: \
-                    Transition_with_witness.t}"
-                  transition ;
-                let%map p' =
-                  Protocol.step p
-                    (Protocol.Event.Found
-                       (Transition_with_witness.forget_witness transition))
-                in
-                (p', Some transition.transition.ledger_builder_transition)
-            | `Remote pcd ->
-                Logger.info t.log
-                  !"Stepping with remote pcd %{sexp: \
-                    Inputs.State_with_witness.t}"
-                  pcd ;
-                let transition =
-                  forget_transition_validity
-                    pcd.State_with_witness.ledger_builder_transition
-                in
-                let%map p' =
-                  Protocol.step p
-                    (Protocol.Event.New_state
-                       (State_with_witness.forget_witness pcd, transition))
-                in
-                (p', Some transition.diff) )
-        |> Linear_pipe.map ~f:(fun (p, ledger_builder_transition) ->
-               failwith "Ask brandon"
-               (*
-               State_with_witness.add_witness_exn p.state
-                 (transactions, Option.value_exn ledger_builder_transition) *)
-           ) )
-       in
-    don't_wait_for
-      (Linear_pipe.transfer_id updated_state_network t.miner_broadcast_writer) ;
-    don't_wait_for
-      (Linear_pipe.iter updated_state_ledger ~f:
-         (fun {state; ledger_builder_transition} ->
-           Logger.info t.log
-             !"Ledger has new %{sexp: Proof_carrying_state.t} and %{sexp: \
-               Inputs.Ledger_builder_diff.t}"
-             state
-             (forget_diff_validity ledger_builder_transition.diff) ;
-           (* TODO: Right now we're crashing on purpose if we even get a tiny bit
-         *       backed up. We should fix this see issues #178 and #177 *)
-           Linear_pipe.write_or_exn
-             ~capacity:t.ledger_builder_transition_backup_capacity
-             t.transitions updated_state_ledger
-             (state.data, forget_transition_validity ledger_builder_transition) ;
-           return () )) ;
-    don't_wait_for
-      (Linear_pipe.transfer
-         (Ledger_builder_controller.strongest_ledgers t.ledger_builder)
-         t.miner_changes_writer ~f:(fun (ledger_builder, state) ->
-           let transactions =
-             Transaction_pool.transactions t.transaction_pool
-           in
-           Tip_change {Miner.Tip.transactions; ledger_builder; state} ))
- *)
 end

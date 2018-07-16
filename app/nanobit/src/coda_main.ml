@@ -354,6 +354,8 @@ struct
     let load ~disk_location:_ ~incoming_diffs = return (create ~incoming_diffs)
 
     let transactions t = Pool.transactions (pool t)
+
+    let add t = Pool.add (pool t)
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
@@ -623,5 +625,122 @@ module Coda_without_snark (Init : Init_intf) () = struct
 end
 
 module type Main_intf = sig
-  module Inputs : Coda.Inputs_intf
+  module Inputs : sig
+    module Ledger : sig
+      type t
+
+      val copy : t -> t
+
+      val get : t -> Public_key.Compressed.t -> Account.t option
+
+      val apply_transaction :
+        t -> Transaction.With_valid_signature.t -> unit Or_error.t
+    end
+
+    module External_transition : sig
+      type t
+    end
+
+    module Net : sig
+      type t
+
+      module Peer : sig
+        type t = Host_and_port.Stable.V1.t
+        [@@deriving bin_io, sexp, compare, hash]
+      end
+
+      module Gossip_net : sig
+        module Params : sig
+          type t =
+            {timeout: Time.Span.t; target_peer_count: int; address: Peer.t}
+        end
+      end
+
+      module Config : sig
+        type t =
+          { parent_log: Logger.t
+          ; gossip_net_params: Gossip_net.Params.t
+          ; initial_peers: Peer.t list
+          ; me: Peer.t
+          ; remap_addr_port: Peer.t -> Peer.t }
+      end
+    end
+
+    module Transaction_pool : sig
+      type t
+
+      val add : t -> Transaction.With_valid_signature.t -> unit
+    end
+  end
+
+  module Config : sig
+    type t =
+      { log: Logger.t
+      ; net_config: Inputs.Net.Config.t
+      ; ledger_builder_persistant_location: string
+      ; transaction_pool_disk_location: string
+      ; snark_pool_disk_location: string
+      ; ledger_builder_transition_backup_capacity: int [@default 10] }
+    [@@deriving make]
+  end
+
+  type t
+
+  val best_ledger : t -> Inputs.Ledger.t option
+
+  val transaction_pool : t -> Inputs.Transaction_pool.t
+
+  val create : Config.t -> t Deferred.t
+end
+
+module Run (Program : Main_intf) = struct
+  include Program
+  open Inputs
+
+  let get_balance t (addr: Public_key.Compressed.t) =
+    let maybe_balance =
+      let open Option.Let_syntax in
+      let%bind ledger = best_ledger t in
+      let%map account = Ledger.get ledger addr in
+      account.Account.balance
+    in
+    Deferred.return maybe_balance
+
+  let send_txn log t txn =
+    let maybe_sent =
+      let open Option.Let_syntax in
+      let%bind ledger = best_ledger t in
+      let%map txn = Transaction.check txn in
+      let ledger' = Ledger.copy ledger in
+      let () = Ledger.apply_transaction ledger' txn |> Or_error.ok_exn in
+      let txn_pool = transaction_pool t in
+      Transaction_pool.add txn_pool txn ;
+      Logger.info log
+        !"Added transaction %{sexp: Transaction.With_valid_signature.t} to \
+          pool successfully"
+        txn
+    in
+    Deferred.return maybe_sent
+
+  let get_nonce t (addr: Public_key.Compressed.t) =
+    let maybe_nonce =
+      let open Option.Let_syntax in
+      let%bind ledger = best_ledger t in
+      let%map account = Ledger.get ledger addr in
+      account.Account.nonce
+    in
+    Deferred.return maybe_nonce
+
+  let setup_client_server ~minibit ~log ~client_port =
+    (* Setup RPC server for client interactions *)
+    let module Client_server = Client.Rpc_server (struct
+      type nonrec t = t
+
+      let get_balance = get_balance
+
+      let get_nonce = get_nonce
+
+      let send_txn = send_txn log
+    end) in
+    Client_server.init_server ~parent_log:log ~minibit ~port:client_port
 end

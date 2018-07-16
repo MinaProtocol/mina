@@ -60,8 +60,7 @@ module type Ledger_builder_hash_intf = sig
 
   val of_bytes : string -> t
 
-  val of_aux_and_ledger_hash
-    : ledger_builder_aux_hash -> ledger_hash -> t
+  val of_aux_and_ledger_hash : ledger_builder_aux_hash -> ledger_hash -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -306,16 +305,13 @@ module type Ledger_builder_intf = sig
 
   module Aux : sig
     type t [@@deriving bin_io]
+
     val hash : t -> ledger_builder_aux_hash
   end
 
   val aux : t -> Aux.t
 
-  val make :
-    public_key:public_key
-    -> ledger:ledger
-    -> aux:Aux.t
-    -> t
+  val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
 end
 
 module type Nonce_intf = sig
@@ -644,6 +640,7 @@ Merge Snark:
 
     module Proof : sig
       include Proof_intf with type input = t
+
       include Sexpable.S with type t := t
     end
   end

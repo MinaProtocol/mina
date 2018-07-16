@@ -197,6 +197,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Message = Message (Inputs)
   module Gossip_net = Gossip_net.Make (Message)
+  module Peer = Peer
 
   module Config = struct
     type t =
