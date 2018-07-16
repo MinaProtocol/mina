@@ -58,8 +58,15 @@ struct
   module State_hash = State_hash.Stable.V1
   module Strength = Strength
   module Block_nonce = Block.Nonce
-  module Ledger_builder_hash = Ledger_builder_hash.Stable.V1
-  module Ledger_hash = Ledger_hash.Stable.V1
+  module Ledger_builder_hash = struct
+    include Ledger_builder_hash.Stable.V1
+    let of_bytes = Ledger_builder_hash.of_bytes
+  end
+  module Ledger_hash = struct
+    include Ledger_hash.Stable.V1
+    let to_bytes = Ledger_hash.to_bytes
+  end
+
   module Pow = Proof_of_work
 
   module Amount = struct
@@ -252,11 +259,13 @@ struct
     module Fee_transfer = Fee_transfer
     module Super_transaction = Super_transaction
     module Ledger = Ledger
-    module Transaction_snark = Transaction_snark
+    module Ledger_proof = Ledger_proof
+    module Ledger_proof_statement = Transaction_snark.Statement
     module Ledger_hash = Ledger_hash
     module Ledger_builder_hash = Ledger_builder_hash
     module Ledger_builder_diff = Ledger_builder_diff
     module Completed_work = Completed_work
+    module Config = Protocol_constants
   end)
 
   module Ledger_builder_transition = struct
@@ -274,7 +283,18 @@ struct
       {old; diff= Ledger_builder_diff.forget diff}
   end
 
-  module Transition = struct
+  module External_transition = struct
+    type t =
+      { state_proof : State.Proof.t
+      ; state : State.t
+      ; ledger_builder_diff : Ledger_builder_diff.t }
+    [@@deriving fields, bin_io, sexp]
+
+    let compare t1 t2 = State.compare t1.state t2.state
+    let equal t1 t2 = State.equal t1.state t2.state
+  end
+
+  module Internal_transition = struct
     type t =
       { ledger_hash: Ledger_hash.t
       ; ledger_builder_hash: Ledger_builder_hash.t
@@ -283,13 +303,6 @@ struct
       ; timestamp: Time.t
       ; nonce: Block_nonce.t }
     [@@deriving fields, sexp]
-  end
-
-  module Transition_with_witness = struct
-    type t = {previous_ledger_hash: Ledger_hash.t; transition: Transition.t}
-    [@@deriving sexp]
-
-    let forget_witness {transition; _} = transition
   end
 end
 
@@ -423,6 +436,16 @@ struct
 
   module Net = (val (failwith "TODO" : (module S_tmp)))
 
+  module Sync_ledger =
+    Syncable_ledger.Make
+      (Ledger.Addr)
+      (Public_key.Compressed)
+      (Syncable_ledger.Valid(Ledger.Addr))
+      (Account)
+      (Merkle_hash)
+      (struct include Ledger_hash let to_hash (h : t) = (h :> Merkle_hash.t) end)
+      (struct include Ledger type path = Path.t end)
+
   module Ledger_builder_controller = struct
     module Inputs = struct
       module Store = Store
@@ -457,6 +480,17 @@ struct
       module State = State
       module State_hash = State_hash
       module Valid_transaction = Transaction.With_valid_signature
+      module Strength = Strength
+      module Sync_ledger = Sync_ledger
+      module Internal_transition = Internal_transition
+      module External_transition = External_transition
+      (* TODO: Move into coda_pow or something *)
+      module Step = struct
+        (*
+        let step (lb, s) t =
+          let%map bc_good =
+            Verifier.verify_blockchain s.blockchain *)
+      end
     end
 
     include Ledger_builder_controller.Make (Inputs)

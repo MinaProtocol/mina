@@ -7,11 +7,9 @@ include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
             type hash = Tick.Pedersen.Digest.t
             [@@deriving sexp, hash, compare, bin_io]
 
-            let empty_hash =
-              Tick.Pedersen.hash_bigstring
-                (Bigstring.of_string "nothing up my sleeve")
-
             let merge = Merkle_hash.merge
+
+            let empty_hash = Merkle_hash.empty_hash
 
             let hash_account = Account.digest
           end)

@@ -116,7 +116,7 @@ module Statement = struct
     type t =
       { source: Nanobit_base.Ledger_hash.Stable.V1.t
       ; target: Nanobit_base.Ledger_hash.Stable.V1.t
-      ; fee_excess: Currency.Amount.Signed.Stable.V1.t
+      ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
     [@@deriving sexp, bin_io, hash, compare]
   end
@@ -128,7 +128,7 @@ module Statement = struct
     let open Quickcheck.Generator.Let_syntax in
     let%map source = Nanobit_base.Ledger_hash.gen
     and target = Nanobit_base.Ledger_hash.gen
-    and fee_excess = Currency.Amount.Signed.gen
+    and fee_excess = Currency.Fee.Signed.gen
     and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
     {source; target; fee_excess; proof_type}
 end
@@ -142,7 +142,12 @@ type t =
 [@@deriving fields, sexp, bin_io]
 
 let statement {source; target; proof_type; fee_excess; proof= _} =
-  {Statement.source; target; proof_type; fee_excess}
+  { Statement.source; target; proof_type
+  ; fee_excess =
+      Currency.Fee.Signed.create
+        ~magnitude:(Currency.Amount.(to_fee (Signed.magnitude fee_excess)))
+        ~sgn:(Currency.Amount.Signed.sgn fee_excess)
+  }
 
 let create = Fields.create
 

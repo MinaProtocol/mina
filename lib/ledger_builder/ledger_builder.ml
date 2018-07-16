@@ -23,7 +23,7 @@ module Make (Inputs : Inputs.S) :
    and type valid_diff := Inputs.Ledger_builder_diff.With_valid_signatures_and_proofs.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
-   and type public_key := Inputs.Public_key.Compressed.t
+   and type public_key := Inputs.Public_key.t
    and type ledger := Inputs.Ledger.t
    and type transaction_with_valid_signature :=
               Inputs.Transaction.With_valid_signature.t
@@ -73,7 +73,7 @@ struct
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
     ; ledger: Ledger.t
-    ; public_key: Public_key.Compressed.t }
+    ; public_key: Public_key.t }
   [@@deriving sexp, bin_io]
 
   let copy {scan_state; ledger; public_key} =
@@ -88,8 +88,11 @@ struct
         (Binable.to_string (module Snark_with_statement))
         (Binable.to_string (module Super_transaction_with_statement))
     in
-    h#add_string (Ledger_hash.to_bits (Ledger.merkle_root ledger)) ;
-    Ledger_builder_hash.of_bits h#result
+    let aux_hash = h#result in
+    let h = Cryptokit.Hash.sha3 256 in
+    h#add_string (Ledger_hash.to_bytes (Ledger.merkle_root ledger)) ;
+    h#add_string aux_hash;
+    Ledger_builder_hash.of_bytes h#result
 
   let ledger {ledger; _} = ledger
 
@@ -226,7 +229,7 @@ struct
       @ List.map completed_works ~f:(fun {Completed_work.fee; prover} -> (prover, fee))
     in
     Or_error.try_with (fun () ->
-      Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+      Public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
           Option.value_exn (Fee.Unsigned.add f1 f2) )
       (* TODO: This creates a weird incentive to have a small public_key *)
       |> Map.to_alist ~key_order:`Increasing
@@ -338,7 +341,7 @@ struct
 
   module Resources = struct
     module Queue_consumption = struct
-      type t = {fee_transfers: Public_key.Compressed.Set.t; transactions: int}
+      type t = {fee_transfers: Public_key.Set.t; transactions: int}
 
       let count {fee_transfers; transactions} =
         (* This is ceil(Set.length fee_transfers / 2) *)
@@ -354,7 +357,7 @@ struct
         ; transactions= t1.transactions + t2.transactions }
 
       let empty =
-        {transactions= 0; fee_transfers= Public_key.Compressed.Set.empty}
+        {transactions= 0; fee_transfers= Public_key.Set.empty}
     end
 
     type t =

@@ -34,7 +34,7 @@ end
 module type Ledger_hash_intf = sig
   type t [@@deriving bin_io, eq, sexp]
 
-  val to_bits : t -> string
+  val to_bytes : t -> string
 
   include Hashable.S_binable with type t := t
 end
@@ -52,7 +52,7 @@ end
 module type Ledger_builder_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
 
-  val of_bits : string -> t
+  val of_bytes : string -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -153,7 +153,9 @@ module type Super_transaction_intf = sig
 
   type unsigned_fee
 
-  type t = Fee_transfer of fee_transfer | Transaction of valid_transaction
+  type t =
+    | Transaction of valid_transaction
+    | Fee_transfer of fee_transfer
   [@@deriving sexp, compare, eq, bin_io]
 
   val fee_excess : t -> unsigned_fee Or_error.t
@@ -368,7 +370,7 @@ module type State_intf = sig
   val create_pow : t -> nonce -> pow Or_error.t
 end
 
-module type Transition_intf = sig
+module type Internal_transition_intf = sig
   type ledger_hash
 
   type ledger_builder_hash
@@ -388,6 +390,18 @@ module type Transition_intf = sig
     ; ledger_builder_diff: ledger_builder_diff
     ; timestamp: time
     ; nonce: nonce }
+  [@@deriving fields, sexp]
+end
+
+module type External_transition_intf = sig
+  type state_proof
+  type state
+  type ledger_builder_diff
+
+  type t =
+    { state_proof : state_proof
+    ; state : state
+    ; ledger_builder_diff : ledger_builder_diff }
   [@@deriving compare, fields, eq, bin_io, sexp]
 end
 
@@ -579,8 +593,8 @@ Merge Snark:
      and type diff_with_valid_signatures_and_proofs :=
                 Ledger_builder_diff.With_valid_signatures_and_proofs.t
 
-  module Transition :
-    Transition_intf
+  module Internal_transition :
+    Internal_transition_intf
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type proof := Ledger_proof.t
@@ -601,6 +615,12 @@ Merge Snark:
 
     module Proof : Proof_intf with type input = t
   end
+
+  module External_transition :
+    External_transition_intf
+    with type state_proof := State.Proof.t
+     and type ledger_builder_diff := Ledger_builder_diff.t
+     and type state := State.t
 end
 
 module Make
@@ -608,7 +628,7 @@ module Make
     (Block_state_transition_proof : Block_state_transition_proof_intf
                                     with type state := Inputs.State.t
                                      and type proof := Inputs.State.Proof.t
-                                     and type transition := Inputs.Transition.t) =
+                                     and type transition := Inputs.Internal_transition.t) =
 struct
   open Inputs
 
@@ -618,13 +638,13 @@ struct
 
   module Event = struct
     type t =
-      | Found of Transition.t
+      | Found of Internal_transition.t
       | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
   end
 
   type t = {state: Proof_carrying_state.t} [@@deriving fields]
 
-  let step' t (transition: Transition.t) : t Deferred.t =
+  let step' t (transition: Internal_transition.t) : t Deferred.t =
     let state = t.state.data in
     let proof = t.state.proof in
     let next_difficulty =

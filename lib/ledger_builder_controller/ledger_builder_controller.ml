@@ -14,11 +14,16 @@ module type Inputs_intf = sig
     type t [@@deriving sexp, bin_io]
   end
 
-  module Transition : sig
+  module External_transition : sig
     type t
     [@@deriving bin_io, eq, compare, sexp]
 
     val ledger_builder_diff : t -> Ledger_builder_diff.t
+  end
+
+  module Internal_transition : sig
+    type t
+    [@@deriving bin_io, eq, compare, sexp]
   end
 
   module Ledger : sig
@@ -80,14 +85,6 @@ module type Inputs_intf = sig
     val ledger_hash : t -> Ledger_hash.t
   end
 
-  (* TODO: Figure out where to plumb this *)
-
-  module State_with_proof_checked : sig
-    type t [@@deriving eq, sexp, compare, bin_io]
-
-    val state : t -> State.t
-  end
-
   module Valid_transaction : sig
     type t [@@deriving eq, sexp, compare, bin_io]
   end
@@ -118,7 +115,7 @@ module type Inputs_intf = sig
 
     val step :
          Ledger_builder.t * State.t
-      -> Transition.t
+      -> External_transition.t
       -> State.t Deferred.Or_error.t
   end
 
@@ -204,7 +201,7 @@ module Make (Inputs : Inputs_intf) : sig
   include Coda.Ledger_builder_controller_intf
           with type ledger_builder := Inputs.Ledger_builder.t
            and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
-           and type transition := Inputs.Transition.t
+           and type internal_transition := Inputs.Internal_transition.t
            and type ledger := Inputs.Ledger.t
            and type ledger_proof := Inputs.Ledger_builder.proof
            and type net := Inputs.Net.net
@@ -212,6 +209,7 @@ module Make (Inputs : Inputs_intf) : sig
            and type ledger_hash := Inputs.Ledger_hash.t
            and type sync_query := Inputs.Sync_ledger.query
            and type sync_answer := Inputs.Sync_ledger.answer
+           and type external_transition := Inputs.External_transition.t
 
   val ledger_builder_io : t -> Inputs.Net.t
 end = struct
@@ -221,15 +219,15 @@ end = struct
     type t =
       { parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
-      ; transitions:
-          (State.t * Transition.t) Linear_pipe.Reader.t
+      ; external_transitions:
+          (State.t * External_transition.t) Linear_pipe.Reader.t
       ; genesis_ledger: Ledger.t
       ; disk_location: string }
     [@@deriving make]
   end
 
   module Transition_with_target = struct
-    type t = {transition: Transition.t; target_state: State.t}
+    type t = {transition: External_transition.t; target_state: State.t}
     [@@deriving eq, compare, bin_io, sexp, fields]
 
     let ledger_builder_hash {target_state= s} = State.ledger_builder_hash s
@@ -329,7 +327,7 @@ end = struct
         let open Deferred.Let_syntax in
         match%map
           Ledger_builder.apply lb
-            (Transition.ledger_builder_diff w.Transition_with_target.transition)
+            (External_transition.ledger_builder_diff w.Transition_with_target.transition)
         with
         | Ok None -> ()
         | Ok (Some _) -> ()
@@ -366,7 +364,7 @@ end = struct
        the strongest ledger_builders *)
     let possibly_works =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
-        config.transitions ~f:(fun (s, transition) ->
+        config.external_transitions ~f:(fun (s, transition) ->
           match state.ktree with
           (* TODO: Initialize this with state we queried from our neighbors,
              see #301 *)
@@ -644,10 +642,11 @@ let%test_module "test" =
       (* A ledger_builder transition will just add to a "ledger" integer *)
       module Ledger_builder_diff = Int
 
-      module Transition = struct
+      module External_transition = struct
         include Int
         let ledger_builder_diff = Fn.id
       end
+      module Internal_transition = External_transition
 
       module Ledger = struct
         include Int
@@ -753,11 +752,6 @@ let%test_module "test" =
 
       module Store = Storage.Memory
 
-      module State_with_proof_checked = struct
-        type t = {state: State.t}
-        [@@deriving fields, bin_io, compare, eq, sexp]
-      end
-
       module Step = struct
         (* This checks the SNARKs in State/LB and does the transition *)
 
@@ -797,7 +791,7 @@ let%test_module "test" =
       let net_input = List.map transitions ~f:(fun (s, _) -> s) in
       Lbc.Config.make ~parent_log:(Logger.create ())
         ~net_deferred:(return net_input)
-        ~transitions:ledger_builder_transitions
+        ~external_transitions:ledger_builder_transitions
         ~genesis_ledger:0 ~disk_location:"/tmp/test_lbc_disk"
 
     let take_map ~f p cnt =

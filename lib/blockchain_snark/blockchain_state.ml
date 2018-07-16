@@ -55,7 +55,7 @@ let negative_one =
   in
   { next_difficulty
   ; previous_state_hash= State_hash.of_hash Pedersen.zero_hash
-  ; ledger_builder_hash= Ledger_builder_hash.of_hash Pedersen.zero_hash
+  ; ledger_builder_hash= Ledger_builder_hash.dummy
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
   ; strength= Strength.zero
   ; timestamp }

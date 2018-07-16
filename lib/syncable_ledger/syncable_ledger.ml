@@ -30,15 +30,15 @@ module type Hash_intf = sig
 end
 
 module type Merkle_tree_intf = sig
-  type hash [@@deriving bin_io, compare]
+  type root_hash
 
-  type account [@@deriving bin_io]
+  type hash
+
+  type account
 
   type key
 
   type addr
-
-  type node
 
   type t
 
@@ -54,9 +54,9 @@ module type Merkle_tree_intf = sig
 
   val extend_with_empty_to_fit : t -> int -> unit
 
-  val set_all_entries_rooted_at : t -> addr -> account list -> unit
+  val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
-  val merkle_root : t -> hash
+  val merkle_root : t -> root_hash
 
   val set_syncing : t -> unit
 
@@ -71,6 +71,8 @@ module type S = sig
   type merkle_path
 
   type hash
+
+  type root_hash
 
   type addr
 
@@ -91,17 +93,17 @@ module type S = sig
   type query = What_hash of addr | What_contents of addr | Num_accounts
   [@@deriving bin_io]
 
-  val create : merkle_tree -> hash -> t
+  val create : merkle_tree -> root_hash -> t
 
-  val answer_writer : t -> (hash * answer) Linear_pipe.Writer.t
+  val answer_writer : t -> (root_hash * answer) Linear_pipe.Writer.t
 
-  val query_reader : t -> (hash * query) Linear_pipe.Reader.t
+  val query_reader : t -> (root_hash * query) Linear_pipe.Reader.t
 
   val destroy : t -> unit
 
-  val new_goal : t -> hash -> unit
+  val new_goal : t -> root_hash -> unit
 
-  val wait_until_valid : t -> hash -> [`Ok | `Target_changed] Deferred.t
+  val wait_until_valid : t -> root_hash -> [`Ok | `Target_changed] Deferred.t
 
   val apply_or_queue_diff : t -> diff -> unit
 
@@ -135,6 +137,7 @@ For a given addr, there are three possibilities:
 We want all_valid when every leaf of the tree is `Valid
 *)
 
+(* TODO: This is a waste of memory *)
 module Valid (Addr : Addr_intf) :
   Validity_intf with type addr := Addr.t =
 struct
@@ -190,16 +193,23 @@ module Make
         type t [@@deriving bin_io]
     end)
     (Hash : Hash_intf)
+    (Root_hash : sig
+       type t [@@deriving eq]
+       val to_hash : t -> Hash.t
+     end)
     (MT : Merkle_tree_intf
           with type hash := Hash.t
+           and type root_hash := Root_hash.t
            and type addr := Addr.t
-           and type key := Key.t) :
+           and type key := Key.t
+           and type account := Account.t) :
   S
   with type merkle_tree := MT.t
    and type hash := Hash.t
+   and type root_hash := Root_hash.t
    and type addr := Addr.t
    and type merkle_path := MT.path
-   and type account := MT.account
+   and type account := Account.t
    and type key := Key.t =
 struct
   type account = unit
@@ -210,7 +220,7 @@ struct
 
   type answer =
     | Has_hash of Addr.t * Hash.t
-    | Contents_are of Addr.t * MT.account list
+    | Contents_are of Addr.t * Account.t list
     | Num_accounts of int
     (* idea: make this verifiable by including the merkle path to the rightmost account, and verify that
        filling in empty hashes for the rest amounts to the correct hash. *)
@@ -220,13 +230,13 @@ struct
   [@@deriving bin_io]
 
   type t =
-    { mutable desired_root: Hash.t
+    { mutable desired_root: Root_hash.t
     ; tree: MT.t
     ; validity: Valid.t
-    ; answers: (Hash.t * answer) Linear_pipe.Reader.t
-    ; answer_writer: (Hash.t * answer) Linear_pipe.Writer.t
-    ; queries: (Hash.t * query) Linear_pipe.Writer.t
-    ; query_reader: (Hash.t * query) Linear_pipe.Reader.t
+    ; answers: (Root_hash.t * answer) Linear_pipe.Reader.t
+    ; answer_writer: (Root_hash.t * answer) Linear_pipe.Writer.t
+    ; queries: (Root_hash.t * query) Linear_pipe.Writer.t
+    ; query_reader: (Root_hash.t * query) Linear_pipe.Reader.t
     ; waiting_parents: (Addr.t * Hash.t) list Addr.Table.t
     ; mutable validity_listener: [`Ok | `Target_changed] Ivar.t }
 
@@ -293,7 +303,7 @@ struct
 
   let all_done t res =
     MT.clear_syncing t.tree ;
-    if not (Hash.equal (MT.merkle_root t.tree) t.desired_root) then
+    if not (Root_hash.equal (MT.merkle_root t.tree) t.desired_root) then
       failwith "We finished syncing, but made a mistake somewhere :("
     else Ivar.fill t.validity_listener `Ok ;
     res
@@ -304,7 +314,7 @@ struct
      node to never be verified *)
   let main_loop t =
     let handle_answer (root_hash, a) =
-      if not (Hash.equal root_hash t.desired_root) then ()
+      if not (Root_hash.equal root_hash t.desired_root) then ()
       else
         let res =
           match a with
@@ -332,7 +342,7 @@ struct
                 failwith "figure out how to handle peers lying" )
           | Contents_are (addr, leafs) ->
               (* TODO: verify the hash matches what we expect *)
-              MT.set_all_entries_rooted_at t.tree addr leafs ;
+              MT.set_all_accounts_rooted_at_exn t.tree addr leafs ;
               Valid.mark_known_good t.validity addr ;
               ()
           | Num_accounts n ->
@@ -353,7 +363,7 @@ struct
     t.desired_root <- h
 
   let wait_until_valid t h =
-    if not (Hash.equal h t.desired_root) then return `Target_changed
+    if not (Root_hash.equal h t.desired_root) then return `Target_changed
     else Ivar.read t.validity_listener
 
   let apply_or_queue_diff t d =

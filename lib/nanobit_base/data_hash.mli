@@ -6,7 +6,7 @@ module type Basic = sig
 
   val gen : t Quickcheck.Generator.t
 
-  val to_bits : t -> string
+  val to_bytes : t -> string
 
   val length_in_bits : int
 

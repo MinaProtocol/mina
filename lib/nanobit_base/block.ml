@@ -133,7 +133,7 @@ let genesis : t =
   { header= {nonce= Nonce.of_int 20; time}
   ; body=
       { proof= None
-      ; ledger_builder_hash= Ledger_builder_hash.of_hash Pedersen.zero_hash
+      ; ledger_builder_hash= Ledger_builder_hash.dummy
       ; target_hash= Ledger.(merkle_root Genesis_ledger.ledger) } }
 
 let to_hlist {header; body} = H_list.[header; body]
@@ -173,14 +173,6 @@ module With_transactions = struct
 
     let forget ({target_hash; ledger_builder_hash; proof; _}: t) : Body.t =
       {target_hash; ledger_builder_hash; proof}
-
-    (* TODO: Remove in PR implementing miner *)
-    let dummy : t =
-      { target_hash= Ledger_hash.of_hash Tick.Pedersen.zero_hash
-      ; ledger_builder_hash=
-          Ledger_builder_hash.of_hash Tick.Pedersen.zero_hash
-      ; proof= None
-      ; transactions= [] }
   end
 
   module Stable = struct

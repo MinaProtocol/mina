@@ -24,14 +24,18 @@ module type S = sig
     end
   end
 
-  module Public_key : Coda_pow.Public_key_intf
+  module Public_key : sig
+    type t
+    [@@deriving sexp, bin_io, compare]
+    include Comparable.S with type t := t
+  end
 
   module Transaction :
     Coda_pow.Transaction_intf with type fee := Fee.Unsigned.t
 
   module Fee_transfer :
     Coda_pow.Fee_transfer_intf
-    with type public_key := Public_key.Compressed.t
+    with type public_key := Public_key.t
      and type fee := Fee.Unsigned.t
 
   module Super_transaction :
@@ -54,12 +58,10 @@ module type S = sig
   module Ledger_proof : sig
     include Coda_pow.Ledger_proof_intf
       with type statement := Ledger_proof_statement.t
-       and type message := Fee.Unsigned.t * Public_key.Compressed.t
+       and type message := Fee.Unsigned.t * Public_key.t
     include Binable.S with type t := t
     include Sexpable.S with type t := t
   end
-
-  module Snark_pool_proof : Coda_pow.Snark_pool_proof_intf
 
   module Ledger :
     Coda_pow.Ledger_intf
@@ -74,7 +76,7 @@ module type S = sig
     with type proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
      and type fee := Fee.Unsigned.t
-     and type public_key := Public_key.Compressed.t
+     and type public_key := Public_key.t
 
   module Ledger_builder_diff :
     Coda_pow.Ledger_builder_diff_intf
@@ -82,7 +84,7 @@ module type S = sig
      and type completed_work_checked := Completed_work.Checked.t
      and type transaction := Transaction.t
      and type transaction_with_valid_signature := Transaction.With_valid_signature.t
-     and type public_key := Public_key.Compressed.t
+     and type public_key := Public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Config : sig

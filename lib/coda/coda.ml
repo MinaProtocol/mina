@@ -108,7 +108,8 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger_builder_hash
 
-  type transition
+  type internal_transition
+  type external_transition
 
   type ledger
 
@@ -130,8 +131,8 @@ module type Ledger_builder_controller_intf = sig
     type t =
       { parent_log: Logger.t
       ; net_deferred: net Deferred.t
-      ; transitions:
-          (state * transition) Linear_pipe.Reader.t
+      ; external_transitions:
+          (state * external_transition) Linear_pipe.Reader.t
       ; genesis_ledger: ledger
       ; disk_location: string }
     [@@deriving make]
@@ -160,7 +161,7 @@ module type Miner_intf = sig
 
   type transaction
 
-  type transition_with_witness
+  type external_transition
 
   type completed_work_statement
 
@@ -184,7 +185,7 @@ module type Miner_intf = sig
     -> change_feeder:change Linear_pipe.Reader.t
     -> t
 
-  val transitions : t -> (transition_with_witness * state) Linear_pipe.Reader.t
+  val transitions : t -> external_transition Linear_pipe.Reader.t
 end
 
 module type Witness_change_intf = sig
@@ -199,26 +200,6 @@ module type Witness_change_intf = sig
   val add_witness_exn : t -> witness -> t_with_witness
 
   val add_witness : t -> witness -> t_with_witness Or_error.t
-end
-
-(* TODO imeckler: Something funky going on with this module *)
-module type Transition_with_witness_intf = sig
-  type transition
-
-  type transaction_with_valid_signature
-
-  type ledger_hash
-
-  type t = {previous_ledger_hash: ledger_hash; transition: transition}
-  [@@deriving sexp]
-
-  val forget_witness : t -> transition
-  (*
-  include Witness_change_intf
-          with type t_with_witness := t
-           and type witness =
-                      transaction_with_valid_signature list * ledger_hash
-           and type t := transition *)
 end
 
 (* TODO imeckler: talk with brandon about when transitions get checked and what this intf is
@@ -274,13 +255,6 @@ module type Inputs_intf = sig
 
   (*      and type witness := Ledger_builder_transition.With_valid_signatures_and_proofs.t *)
 
-  module Transition_with_witness :
-    Transition_with_witness_intf
-    with type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
-     and type transition := Transition.t
-     and type ledger_hash := Ledger_hash.t
-
   module Net :
     Network_intf
     with type state_with_witness := State_with_witness.t
@@ -299,7 +273,8 @@ module type Inputs_intf = sig
      and type ledger := Ledger.t
      and type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type transition := Transition.t
+     and type internal_transition := Internal_transition.t
+     and type external_transition := External_transition.t
      and type state := State.t
 
   module Transaction_pool :
@@ -310,8 +285,7 @@ module type Inputs_intf = sig
 
   module Miner :
     Miner_intf
-    with type transition_with_witness := Transition_with_witness.t
-     and type ledger_hash := Ledger_hash.t
+    with type ledger_hash := Ledger_hash.t
      and type ledger_builder := Ledger_builder.t
      and type transaction := Transaction.With_valid_signature.t
      and type state := State.t
@@ -333,7 +307,7 @@ module Make
     (Block_state_transition_proof : Coda_pow.Block_state_transition_proof_intf
                                     with type state := Inputs.State.t
                                      and type proof := Inputs.State.Proof.t
-                                     and type transition := Inputs.Transition.t) =
+                                     and type transition := Inputs.Internal_transition.t) =
 struct
   module Protocol = Coda_pow.Make (Inputs) (Block_state_transition_proof)
   open Inputs
@@ -343,8 +317,8 @@ struct
     ; net: Net.t
     ; miner_changes_writer: Miner.change Linear_pipe.Writer.t
     ; miner_broadcast_writer: State_with_witness.t Linear_pipe.Writer.t
-    ; transitions:
-        (State.t * Transition.t) Linear_pipe.Writer.t
+    ; external_transitions:
+        (State.t * External_transition.t) Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; mutable transaction_pool: Transaction_pool.t
     ; mutable snark_pool: Snark_pool.t
@@ -374,7 +348,7 @@ struct
     let miner_broadcast_reader, miner_broadcast_writer =
       Linear_pipe.create ()
     in
-    let transitions_reader, transitions_writer =
+    let external_transitions_reader, external_transitions_writer =
       Linear_pipe.create ()
     in
     let net_ivar = Ivar.create () in
@@ -388,7 +362,7 @@ struct
            ~net_deferred:(Ivar.read net_ivar)
            ~genesis_ledger:Genesis.ledger
            ~disk_location:config.ledger_builder_persistant_location
-           ~transitions:transitions_reader)
+           ~external_transitions:external_transitions_reader)
            (* TODO
            ~ledger_builder_diffs:
              (Linear_pipe.map ledger_builder_transitions_reader ~f:
@@ -419,7 +393,7 @@ struct
     ; net
     ; miner_broadcast_writer
     ; miner_changes_writer
-    ; transitions= transitions_writer
+    ; external_transitions= external_transitions_writer
     ; transaction_pool
     ; snark_pool
     ; ledger_builder

@@ -4,15 +4,14 @@ open Async
 module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
 
-  module Transition_with_witness : sig
-    type t = {previous_ledger_hash: Ledger_hash.t; transition: Transition.t}
-    [@@deriving sexp]
+  module Prover : sig
+    val prove : State.t -> Internal_transition.t -> State.Proof.t Deferred.Or_error.t
   end
 end
 
 module Make (Inputs : Inputs_intf) :
   Coda.Miner_intf
-  with type transition_with_witness := Inputs.Transition_with_witness.t
+  with type external_transition := Inputs.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder := Inputs.Ledger_builder.t
    and type transaction := Inputs.Transaction.With_valid_signature.t
@@ -99,13 +98,13 @@ struct
                              -> Completed_work.Checked.t option)
       -> t
 
-    val result : t -> (Transition_with_witness.t * State.t) Deferred.Or_error.t
+    val result : t -> External_transition.t Deferred.Or_error.t
   end = struct
     (* TODO: No need to have our own Ivar since we got rid of Bundle_result *)
     type t =
       { hashing_result: Hashing_result.t
       ; cancellation: unit Ivar.t
-      ; result: (Transition_with_witness.t * State.t) Deferred.Or_error.t }
+      ; result: External_transition.t Deferred.Or_error.t }
     [@@deriving fields]
 
     let cancel t =
@@ -126,20 +125,23 @@ struct
       (* Someday: If bundle finishes first you can stuff more transactions in the bundle *)
       let result =
         let result =
-          match%map Hashing_result.result hashing_result with
+          match%bind Hashing_result.result hashing_result with
           | `Ok (new_state, nonce) ->
-              Ok
-                ( { Transition_with_witness.transition=
-                      { ledger_hash= next_ledger_hash
-                      ; ledger_builder_hash= next_ledger_builder_hash
-                      ; ledger_proof= ledger_proof_opt
-                      ; ledger_builder_diff= Ledger_builder_diff.forget diff
-                      ; timestamp= new_state.timestamp
-                      ; nonce }
-                  ; previous_ledger_hash= state.Inputs.State.ledger_hash }
-                , new_state
-                )
-          | `Cancelled -> Or_error.error_string "Mining cancelled"
+            let transition = 
+              { Internal_transition.ledger_hash= next_ledger_hash
+              ; ledger_builder_hash= next_ledger_builder_hash
+              ; ledger_proof= ledger_proof_opt
+              ; ledger_builder_diff= Ledger_builder_diff.forget diff
+              ; timestamp= new_state.timestamp
+              ; nonce }
+            in
+            let open Deferred.Or_error.Let_syntax in
+            let%map state_proof = Prover.prove state transition in
+            { External_transition.state_proof
+            ; state = new_state
+            ; ledger_builder_diff = Ledger_builder_diff.forget diff
+            }
+          | `Cancelled -> Deferred.return (Or_error.error_string "Mining cancelled")
         in
         Deferred.any
           [ ( Ivar.read cancellation
@@ -161,7 +163,7 @@ struct
 
   type state = {tip: Tip.t; result: Mining_result.t}
 
-  type t = {transitions: (Transition_with_witness.t * State.t) Linear_pipe.Reader.t}
+  type t = {transitions: External_transition.t Linear_pipe.Reader.t}
   [@@deriving fields]
 
   let transition_capacity = 64

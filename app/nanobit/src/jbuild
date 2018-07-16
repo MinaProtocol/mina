@@ -20,6 +20,7 @@
       ledger_builder_controller
       proof_of_work
       sparse_ledger
+      syncable_ledger
       blockchain_snark
       transaction_snark
       transaction_pool

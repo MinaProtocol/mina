@@ -7,7 +7,7 @@ module type Basic = sig
 
   val gen : t Quickcheck.Generator.t
 
-  val to_bits : t -> string
+  val to_bytes : t -> string
 
   val length_in_bits : int
 
@@ -71,7 +71,7 @@ struct
 
   include Stable.V1
 
-  let to_bits t =
+  let to_bytes t =
     Z.to_bits
       (Bignum_bigint.to_zarith_bigint Bigint.(to_bignum_bigint (of_field t)))
 
