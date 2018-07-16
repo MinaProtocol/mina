@@ -5,7 +5,7 @@ open Snark_pool
 module type Pool_intf = sig
   type t
 
-  val create_pool : unit -> t
+  val create : unit -> t
 end
 
 module type Pool_diff_intf = sig
@@ -66,7 +66,7 @@ struct
     network_pool
 
   let create ~incoming_diffs =
-    of_pool_and_diffs (Pool.create_pool ()) ~incoming_diffs
+    of_pool_and_diffs (Pool.create ()) ~incoming_diffs
 end
 
 let%test_module "network pool test" =

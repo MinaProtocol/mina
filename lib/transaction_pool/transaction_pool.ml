@@ -22,9 +22,11 @@ module Make (Transaction : sig
   type t [@@deriving compare, bin_io, sexp]
 
   module With_valid_signature : sig
-    type t
+    type nonrec t = private t
     include Comparable with type t := t
   end
+
+  val check : t -> With_valid_signature.t option
 end) =
 struct
   type pool =
@@ -60,9 +62,13 @@ struct
       let t0 = !t_ref in
       let t, res =
         List.fold txns ~init:(t0, []) ~f:(fun (t, acc) txn ->
-          if Set.mem t.set txn
-          then (t, acc)
-          else (add' t txn, txn :: acc))
+          match Transaction.check txn with
+          | None -> (* TODO Punish *)
+            (t, acc)
+          | Some txn ->
+            if Set.mem t.set txn
+            then (t, acc)
+            else (add' t txn, (txn :> Transaction.t) :: acc))
       in
       t_ref := t;
       match res with

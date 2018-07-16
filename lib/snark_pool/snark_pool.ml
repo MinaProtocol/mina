@@ -17,7 +17,7 @@ module type S = sig
 
   type t [@@deriving bin_io]
 
-  val create_pool : unit -> t
+  val create : unit -> t
 
   val add_snark :
        t
@@ -84,7 +84,7 @@ struct
     ; unsolved_work: Work_random_set.t }
   [@@deriving sexp, bin_io]
 
-  let create_pool () =
+  let create () =
     { proofs= Work.Table.create ()
     ; solved_work= Work_random_set.create ()
     ; unsolved_work= Work_random_set.create () }
@@ -171,7 +171,7 @@ let%test_module "random set test" =
       and sample_unsolved_solved_work =
         Quickcheck.Generator.list Mock_work.gen
       in
-      let pool = Mock_snark_pool.create_pool () in
+      let pool = Mock_snark_pool.create () in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
           ignore (Mock_snark_pool.add_snark pool work proof fee) ) ;
       List.iter sample_unsolved_solved_work ~f:(fun work ->

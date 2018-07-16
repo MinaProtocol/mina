@@ -17,7 +17,7 @@ module type S = sig
 
   type t [@@deriving bin_io]
 
-  val create_pool : unit -> t
+  val create : unit -> t
 
   val add_snark :
        t

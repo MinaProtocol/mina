@@ -316,7 +316,10 @@ end)
     [@@deriving fields, sexp]
   end
 
-  module Transaction_pool = Transaction_pool.Make (Transaction)
+  module Transaction_pool = struct
+    module Pool = Transaction_pool.Make (Transaction)
+    include Network_pool.Make(Pool)(Pool.Diff)
+  end
 end
 
 module Make_inputs (Ledger_proof0 : sig
