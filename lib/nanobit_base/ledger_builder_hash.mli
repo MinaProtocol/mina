@@ -12,8 +12,4 @@ module Aux_hash : sig
   val dummy : t
 end
 
-type sibling_hash [@@deriving bin_io]
-
-type ledger_builder_aux_hash [@@deriving bin_io]
-
-val of_aux_and_sibling_hash : Aux_hash.t -> sibling_hash -> t
+val of_aux_and_ledger_hash : Aux_hash.t -> Ledger_hash.t -> t

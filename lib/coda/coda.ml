@@ -24,7 +24,7 @@ module type Ledger_builder_io_intf = sig
   val get_ledger_builder_aux_at_hash :
        t
     -> ledger_builder_hash
-    -> (ledger_builder_aux * state) Deferred.Or_error.t
+    -> ledger_builder_aux Deferred.Or_error.t
 
   val glue_sync_ledger :
        t
@@ -169,9 +169,11 @@ module type Miner_intf = sig
 
   type state
 
+  type state_proof
+
   module Tip : sig
     type t =
-      { state: state
+      { state: state * state_proof
       ; ledger_builder: ledger_builder
       ; transactions: transaction Sequence.t }
   end
@@ -289,6 +291,7 @@ module type Inputs_intf = sig
      and type ledger_builder := Ledger_builder.t
      and type transaction := Transaction.With_valid_signature.t
      and type state := State.t
+     and type state_proof := State.Proof.t
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
 

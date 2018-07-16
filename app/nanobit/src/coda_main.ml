@@ -30,13 +30,15 @@ end
 module Make_inputs0 (Ledger_proof : sig
   type t [@@deriving sexp, bin_io]
 
+  val proof : t -> Proof.t
+
   val verify :
        t
     -> Transaction_snark.Statement.t
     -> message:Currency.Fee.t * Public_key.Compressed.t
     -> bool Deferred.t
 end)
-(State_proof : State_proof_intf) (Difficulty : module type of Difficulty)
+    (Difficulty : module type of Difficulty)
 (Init : Init_intf) =
 struct
   open Protocols.Coda_pow
@@ -57,20 +59,18 @@ struct
   module Strength = Strength
   module Block_nonce = Block.Nonce
 
-  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf = Ledger_builder_hash.
-                                                                  Aux_hash
+  module Ledger_builder_aux_hash = struct
+    include Ledger_builder_hash.Aux_hash.Stable.V1
+    let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+  end
 
   module Ledger_builder_hash = struct
     include Ledger_builder_hash.Stable.V1
 
-    type sibling_hash = Ledger_builder_hash.sibling_hash [@@deriving bin_io]
-
-    type ledger_builder_aux_hash = Ledger_builder_hash.Aux_hash.Stable.V1.t
-    [@@deriving bin_io]
-
-    let of_aux_and_sibling_hash = Ledger_builder_hash.of_aux_and_sibling_hash
+    let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
 
     let to_bytes = Ledger_builder_hash.to_bytes
+    let of_bytes = Ledger_builder_hash.of_bytes
   end
 
   module Ledger_hash = struct
@@ -117,7 +117,7 @@ struct
     include State
 
     module Proof = struct
-      include State_proof
+      include Proof.Stable.V1
 
       type input = State.t
     end
@@ -326,7 +326,7 @@ struct
       { ledger_hash: Ledger_hash.t
       ; ledger_builder_hash: Ledger_builder_hash.t
       ; ledger_proof: Ledger_proof.t option
-      ; ledger_builder_transition: Ledger_builder_diff.t
+      ; ledger_builder_diff: Ledger_builder_diff.t
       ; timestamp: Time.t
       ; nonce: Block_nonce.t }
     [@@deriving fields, sexp]
@@ -344,6 +344,8 @@ module Make_inputs (Ledger_proof0 : sig
   type t [@@deriving sexp, bin_io]
 
   val statement : t -> Transaction_snark.Statement.t
+
+  val proof : t -> Proof.t
 
   val verify :
        t
@@ -488,7 +490,10 @@ struct
     include Inputs0
     module Snark_pool = Snark_pool
     module Snark_pool_diff = Snark_pool.Diff
-    module Sync_ledger = Sync_ledger
+    module Sync_ledger = struct
+      type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
+      type answer = Ledger_hash.t * Sync_ledger.answer [@@deriving bin_io]
+    end
   end)
 
   module Ledger_builder_controller = struct
@@ -562,7 +567,24 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Miner = Minibit_miner.Make (Inputs0)
+  module Miner = Minibit_miner.Make (struct
+      include Inputs0
+
+      module Prover = struct
+        let prove ~prev_state:(old_state, old_proof) (transition : Internal_transition.t) =
+          Prover.extend_blockchain Init.prover
+            {proof= old_proof; state= State.to_blockchain_state old_state}
+            { header= {time= transition.timestamp; nonce= transition.nonce}
+            ; body=
+                { target_hash= transition.ledger_hash
+                ; ledger_builder_hash= transition.ledger_builder_hash
+                ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof
+                } }
+          >>| Or_error.ok_exn
+          >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
+          end
+    end)
+
 end
 
 module Coda_with_snark

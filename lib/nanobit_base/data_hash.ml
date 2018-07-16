@@ -71,6 +71,7 @@ struct
 
   include Stable.V1
 
+  (* TODO: Pad with zeroes *)
   let to_bytes t =
     Z.to_bits
       (Bignum_bigint.to_zarith_bigint Bigint.(to_bignum_bigint (of_field t)))

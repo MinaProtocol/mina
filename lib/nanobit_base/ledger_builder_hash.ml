@@ -16,9 +16,12 @@ end
 module Aux_hash = Hash
 include Hash
 
-type sibling_hash = Hash.t [@@deriving bin_io]
+type sibling_hash = Hash.Stable.V1.t [@@deriving bin_io]
 
-type ledger_builder_aux_hash = Aux_hash.t [@@deriving bin_io]
+type ledger_builder_aux_hash = Aux_hash.Stable.V1.t [@@deriving bin_io]
 
-let of_aux_and_sibling_hash ledger_builder_aux_hash sibling_hash =
-  failwith "TODO IZZY"
+let of_aux_and_ledger_hash ledger_builder_aux_hash ledger_hash =
+  let h = Cryptokit.Hash.sha3 256 in
+  h#add_string (Ledger_hash.to_bytes ledger_hash) ;
+  h#add_string (to_bytes ledger_builder_aux_hash);
+  of_bytes h#result

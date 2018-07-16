@@ -54,13 +54,14 @@ end
 module type Ledger_builder_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
 
-  type sibling_hash [@@deriving bin_io]
+  type ledger_hash
 
   type ledger_builder_aux_hash
 
   val of_bytes : string -> t
 
-  val of_aux_and_sibling_hash : ledger_builder_aux_hash -> sibling_hash -> t
+  val of_aux_and_ledger_hash
+    : ledger_builder_aux_hash -> ledger_hash -> t
 
   include Hashable.S_binable with type t := t
 end
@@ -533,6 +534,7 @@ module type Inputs_intf = sig
   module Ledger_builder_hash :
     Ledger_builder_hash_intf
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type ledger_hash := Ledger_hash.t
 
   (*
 Bundle Snark:
@@ -624,7 +626,10 @@ Merge Snark:
              and type ledger_builder_hash := Ledger_builder_hash.t
              and type pow := Pow.t
 
-    module Proof : Proof_intf with type input = t
+    module Proof : sig
+      include Proof_intf with type input = t
+      include Sexpable.S with type t := t
+    end
   end
 
   module External_transition :

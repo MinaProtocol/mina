@@ -16,9 +16,12 @@ module Rpcs (Inputs : sig
 
   module Ledger_builder_aux : Binable.S
 
+  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
+
   module Ledger_builder_hash :
     Protocols.Coda_pow.Ledger_builder_hash_intf
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type ledger_hash := Ledger_hash.t
 
   module State : sig
     type t [@@deriving bin_io, eq]
@@ -38,10 +41,10 @@ struct
       let name = "get_ledger_builder_aux_at_hash"
 
       module T = struct
-        type query = Ledger_builder_hash.t * State_hash.t
+        type query = Ledger_builder_hash.t
 
         type response =
-          (Ledger_builder_aux.t * Ledger_builder_hash.sibling_hash * State.t)
+          (Ledger_builder_aux.t * Ledger_hash.t)
           option
       end
 
@@ -54,10 +57,10 @@ struct
 
     module V1 = struct
       module T = struct
-        type query = Ledger_builder_hash.t * State_hash.t [@@deriving bin_io]
+        type query = Ledger_builder_hash.t [@@deriving bin_io]
 
         type response =
-          (Ledger_builder_aux.t * Ledger_builder_hash.sibling_hash * State.t)
+          (Ledger_builder_aux.t * Ledger_hash.t)
           option
         [@@deriving bin_io]
 
@@ -166,9 +169,12 @@ module type Inputs_intf = sig
   module Ledger_builder_aux_hash :
     Protocols.Coda_pow.Ledger_builder_aux_hash_intf
 
+  module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
+
   module Ledger_builder_hash :
     Protocols.Coda_pow.Ledger_builder_hash_intf
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type ledger_hash := Ledger_hash.t
 
   module State : sig
     type t [@@deriving bin_io, eq]
@@ -320,28 +326,24 @@ module Make (Inputs : Inputs_intf) = struct
       in
       Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
-    let get_ledger_builder_aux_at_hash t (ledger_builder_hash, state_hash) =
+    let get_ledger_builder_aux_at_hash t ledger_builder_hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
       find_map' peers ~f:(fun peer ->
           match%map
             Gossip_net.query_peer t.gossip_net peer
               Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
-              (ledger_builder_hash, state_hash)
+              ledger_builder_hash
           with
           | Ok
               (Some
-                (ledger_builder_aux, ledger_builder_aux_merkle_sibling, state)) ->
+                (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
               if
                 Ledger_builder_hash.equal
-                  (Ledger_builder_hash.of_aux_and_sibling_hash
+                  (Ledger_builder_hash.of_aux_and_ledger_hash
                      (Ledger_builder_aux.hash ledger_builder_aux)
                      ledger_builder_aux_merkle_sibling)
                   ledger_builder_hash
-                && State_hash.equal state_hash (State.hash state)
-                && Ledger_builder_hash.equal
-                     (State.ledger_builder_hash state)
-                     ledger_builder_hash
-              then Ok (ledger_builder_aux, state)
+              then Ok ledger_builder_aux
               else Or_error.error_string "Evil! TODO: Punish"
           | Ok None -> Or_error.error_string "no ledger builder aux found"
           | Error err -> Error err )
@@ -364,5 +366,6 @@ module Make (Inputs : Inputs_intf) = struct
           with
           | Some answer -> Linear_pipe.write response_writer answer
           | None -> Deferred.return () )
+      |> don't_wait_for
   end
 end

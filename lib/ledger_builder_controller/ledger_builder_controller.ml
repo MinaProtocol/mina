@@ -445,7 +445,7 @@ end = struct
                  (External_transition.ledger_builder_hash transition))
             |> Interruptible.local ~f:ignore
           with
-          | Ok (aux, _) -> (
+          | Ok aux -> (
             match Ledger_builder.of_aux_and_ledger ledger aux with
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
@@ -693,7 +693,7 @@ let%test_module "test" =
           tbl
 
         let get_ledger_builder_aux_at_hash t hash =
-          return (Ok (hash, State_hash.Table.find_exn t hash))
+          return (Ok hash)
 
         let glue_sync_ledger t q a =
           don't_wait_for
