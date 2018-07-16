@@ -35,6 +35,8 @@ end
 module Debug = struct
   type t = unit [@@deriving sexp, bin_io]
 
+  let proof () = Proof.dummy
+
   let statement _ =
     Quickcheck.Generator.generate ~size:0 Transaction_snark.Statement.gen
       (Splittable_random.State.of_int 0)

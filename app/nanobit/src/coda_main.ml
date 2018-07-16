@@ -60,6 +60,7 @@ struct
 
   module Ledger_builder_aux_hash = struct
     include Ledger_builder_hash.Aux_hash.Stable.V1
+
     let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
   end
 
@@ -69,6 +70,7 @@ struct
     let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
 
     let to_bytes = Ledger_builder_hash.to_bytes
+
     let of_bytes = Ledger_builder_hash.of_bytes
   end
 
@@ -79,7 +81,6 @@ struct
   end
 
   module Pow = Proof_of_work
-
   module Difficulty = Difficulty
 
   module Amount = struct
@@ -125,13 +126,14 @@ struct
       let verify state_proof state =
         match%map
           Verifier.verify_blockchain Init.verifier
-              { proof = state_proof; state = State.to_blockchain_state state }
+            {proof= state_proof; state= State.to_blockchain_state state}
         with
         | Ok b -> b
         | Error e ->
-          Logger.error Init.logger
-            !"Could not connect to verifier: %{sexp:Error.t}" e;
-          false
+            Logger.error Init.logger
+              !"Could not connect to verifier: %{sexp:Error.t}"
+              e ;
+            false
     end
   end
 
@@ -345,14 +347,13 @@ struct
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (Transaction)
     include Network_pool.Make (Pool) (Pool.Diff)
+
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
-    let load ~disk_location:_ ~incoming_diffs =
-      return (create ~incoming_diffs)
+    let load ~disk_location:_ ~incoming_diffs = return (create ~incoming_diffs)
 
-    let transactions t =
-      Pool.transactions (pool t)
+    let transactions t = Pool.transactions (pool t)
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
@@ -375,8 +376,7 @@ end)
 (Store : Storage.With_checksum_intf)
 () =
 struct
-  module Inputs0 =
-    Make_inputs0 (Ledger_proof0)  (Init)
+  module Inputs0 = Make_inputs0 (Ledger_proof0) (Init)
   include Inputs0
 
   module Proof_carrying_state = struct
@@ -503,19 +503,12 @@ struct
         type path = Path.t
       end)
 
-  module Net = struct
-    type sync_ledger_query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
-    type sync_ledger_answer = Ledger_hash.t * Sync_ledger.answer [@@deriving bin_io]
-    include Minibit_networking.Make (struct
-      include Inputs0
-      module Snark_pool = Snark_pool
-      module Snark_pool_diff = Snark_pool.Diff
-      module Sync_ledger = struct
-        type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
-        type answer = Ledger_hash.t * Sync_ledger.answer [@@deriving bin_io]
-      end
-    end)
-  end
+  module Net = Minibit_networking.Make (struct
+    include Inputs0
+    module Snark_pool = Snark_pool
+    module Snark_pool_diff = Snark_pool.Diff
+    module Sync_ledger = Sync_ledger
+  end)
 
   module Ledger_builder_controller = struct
     module Inputs = struct
@@ -564,7 +557,7 @@ struct
           let open Deferred.Or_error.Let_syntax in
           let%bind bc_good =
             Verifier.verify_blockchain Init.verifier
-                { proof = state_proof; state = State.to_blockchain_state new_state }
+              {proof= state_proof; state= State.to_blockchain_state new_state}
           and ledger_hash =
             match%map Ledger_builder.apply lb ledger_builder_diff with
             | Some (h, _) -> h
@@ -589,23 +582,23 @@ struct
   end
 
   module Miner = Minibit_miner.Make (struct
-      include Inputs0
+    include Inputs0
 
-      module Prover = struct
-        let prove ~prev_state:(old_state, old_proof) (transition : Internal_transition.t) =
-          let open Deferred.Or_error.Let_syntax in
-          Prover.extend_blockchain Init.prover
-            {proof= old_proof; state= State.to_blockchain_state old_state}
-            { header= {time= transition.timestamp; nonce= transition.nonce}
-            ; body=
-                { target_hash= transition.ledger_hash
-                ; ledger_builder_hash= transition.ledger_builder_hash
-                ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof
-                } }
-          >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
-          end
-    end)
-
+    module Prover = struct
+      let prove ~prev_state:(old_state, old_proof)
+          (transition: Internal_transition.t) =
+        let open Deferred.Or_error.Let_syntax in
+        Prover.extend_blockchain Init.prover
+          {proof= old_proof; state= State.to_blockchain_state old_state}
+          { header= {time= transition.timestamp; nonce= transition.nonce}
+          ; body=
+              { target_hash= transition.ledger_hash
+              ; ledger_builder_hash= transition.ledger_builder_hash
+              ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof
+              } }
+        >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
+    end
+  end)
 end
 
 module Coda_with_snark
@@ -614,34 +607,8 @@ module Coda_with_snark
     () =
 struct
   module Ledger_proof = Ledger_proof.Make_prod (Init)
-  module State_proof = State_proof.Make_prod (Init)
 
-  module Inputs =
-    Make_inputs (Ledger_proof)  (Init) (Store) ()
-
-  (*
-  module Block_state_transition_proof = struct
-    module Witness = struct
-      type t =
-        { old_state: State.t
-        ; old_proof: Proof.t
-        ; transition: Inputs.Transition.t }
-    end
-
-    let prove_zk_state_valid {Witness.old_state; old_proof; transition}
-        ~new_state:_ =
-      Prover.extend_blockchain Init.prover
-        {proof= old_proof; state= State.to_blockchain_state old_state}
-        { header= {time= transition.timestamp; nonce= transition.nonce}
-        ; body=
-            { target_hash= transition.ledger_hash
-            ; ledger_builder_hash= transition.ledger_builder_hash
-            ; proof=
-                Option.map ~f:Transaction_snark.proof transition.ledger_proof
-            } }
-      >>| Or_error.ok_exn
-      >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
-     end *)
+  module Inputs = Make_inputs (Ledger_proof) (Init) (Store) ()
 
   include Coda.Make (Inputs)
 end
@@ -650,27 +617,9 @@ module Coda_without_snark (Init : Init_intf) () = struct
   module Store = Storage.Memory
   module Ledger_proof = Ledger_proof.Debug
 
-  module State_proof = State_proof.Make_debug (struct
-    type t = Init.proof [@@deriving bin_io, sexp]
-  end)
+  module Inputs = Make_inputs (Ledger_proof) (Init) (Store) ()
 
-  module Inputs =
-    Make_inputs (Ledger_proof) (State_proof) (Difficulty) (Init) (Store) ()
-
-  module Block_state_transition_proof = struct
-    module Witness = struct
-      type t =
-        { old_state: State.t
-        ; old_proof: State_proof.t
-        ; transition: Inputs.Transition.t }
-    end
-
-    let prove_zk_state_valid {Witness.old_state; old_proof; transition}
-        ~new_state:_ =
-      return old_proof
-  end
-
-  include Coda.Make (Inputs) (Block_state_transition_proof)
+  include Coda.Make (Inputs)
 end
 
 module type Main_intf = sig

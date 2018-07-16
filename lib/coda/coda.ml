@@ -48,6 +48,9 @@ module type Network_intf = sig
 
   type parallel_scan_state
 
+  type sync_ledger_query
+  type sync_ledger_answer
+
   type snark_pool_diff
   type transaction_pool_diff
 
@@ -66,6 +69,8 @@ module type Network_intf = sig
      and type ledger_builder_hash := ledger_builder_hash
      and type ledger_hash := ledger_hash
      and type state := state
+     and type sync_ledger_query := sync_ledger_query
+     and type sync_ledger_answer := sync_ledger_answer
 
   module Config : sig
     type t
@@ -73,10 +78,10 @@ module type Network_intf = sig
 
   val create :
        Config.t
-    -> check_ledger_builder_at_hash:(ledger_builder_hash -> bool Deferred.t)
-    -> get_ledger_builder_at_hash:(   ledger_builder_hash
-                                   -> (ledger_builder * state) option
+    -> get_ledger_builder_aux_at_hash:(   ledger_builder_hash
+                                   -> (parallel_scan_state * ledger_hash) option
                                       Deferred.t)
+    -> answer_sync_ledger_query: ( ledger_hash * sync_ledger_query -> (ledger_hash * sync_ledger_answer) Deferred.t)
     -> t Deferred.t
 end
 
@@ -161,7 +166,7 @@ module type Ledger_builder_controller_intf = sig
     -> (ledger_builder * external_transition)
          Linear_pipe.Reader.t
 
-  val handle_sync_ledger_queries : sync_query -> sync_answer
+  val handle_sync_ledger_queries : ledger_hash * sync_query -> ledger_hash * sync_answer
 end
 
 module type Miner_intf = sig
@@ -280,10 +285,9 @@ module type Inputs_intf = sig
                 Transaction.With_valid_signature.t
 
   module Sync_ledger : sig
-    type query
-    type answer
+    type query [@@deriving bin_io]
+    type answer [@@deriving bin_io]
   end
-
   module Net :
     Network_intf
     with type state_with_witness := External_transition.t
@@ -294,6 +298,8 @@ module type Inputs_intf = sig
      and type transaction_pool_diff := Transaction_pool.pool_diff
      and type parallel_scan_state := Ledger_builder.Aux.t
      and type ledger_hash := Ledger_hash.t
+     and type sync_ledger_query := Sync_ledger.query
+     and type sync_ledger_answer := Sync_ledger.answer
 
   module Ledger_builder_controller :
     Ledger_builder_controller_intf
@@ -304,6 +310,10 @@ module type Inputs_intf = sig
      and type internal_transition := Internal_transition.t
      and type external_transition := External_transition.t
      and type state := State.t
+     and type sync_query := Sync_ledger.query
+     and type sync_answer := Sync_ledger.answer
+     and type ledger_hash := Ledger_hash.t
+     and type ledger_proof := Ledger_proof.t
 
   module Miner :
     Miner_intf
@@ -381,15 +391,16 @@ struct
     in
     let%bind net =
       Net.create config.net_config
-        (fun hash ->
-          Ledger_builder_controller.local_get_ledger ledger_builder hash
-          >>| Or_error.is_ok )
-        (fun hash ->
+        ~get_ledger_builder_aux_at_hash:(fun hash ->
+          (* TODO: Just make lbc do this *)
           match%map
             Ledger_builder_controller.local_get_ledger ledger_builder hash
           with
-          | Ok ledger_and_state -> Some ledger_and_state
+          | Ok (lb, state) ->
+              Some ((Ledger_builder.aux lb), Ledger.merkle_root (Ledger_builder.ledger lb))
           | _ -> None )
+        ~answer_sync_ledger_query:(fun query ->
+          return (Ledger_builder_controller.handle_sync_ledger_queries query))
     in
     Ivar.fill net_ivar net ;
     don't_wait_for (Linear_pipe.transfer_id (Net.states net) external_transitions_writer);

@@ -43,9 +43,7 @@ struct
       module T = struct
         type query = Ledger_builder_hash.t
 
-        type response =
-          (Ledger_builder_aux.t * Ledger_hash.t)
-          option
+        type response = (Ledger_builder_aux.t * Ledger_hash.t) option
       end
 
       module Caller = T
@@ -59,9 +57,7 @@ struct
       module T = struct
         type query = Ledger_builder_hash.t [@@deriving bin_io]
 
-        type response =
-          (Ledger_builder_aux.t * Ledger_hash.t)
-          option
+        type response = (Ledger_builder_aux.t * Ledger_hash.t) option
         [@@deriving bin_io]
 
         let version = 1
@@ -85,9 +81,9 @@ struct
       let name = "answer_sync_ledger_query"
 
       module T = struct
-        include Sync_ledger
+        type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
 
-        type response = Sync_ledger.answer [@@deriving bin_io]
+        type response = Ledger_hash.t * Sync_ledger.answer [@@deriving bin_io]
       end
 
       module Caller = T
@@ -242,11 +238,16 @@ module Make (Inputs : Inputs_intf) = struct
     in
     Gossip_net.create peer_events params log implementations
 
-  let create (config: Config.t) ~get_ledger_builder_aux_at_hash
-      ~answer_sync_ledger_query =
+  let create (config: Config.t)
+      ~(get_ledger_builder_aux_at_hash:
+            Ledger_builder_hash.t
+         -> (Ledger_builder_aux.t * Ledger_hash.t) option Deferred.t)
+      ~(answer_sync_ledger_query:
+            Ledger_hash.t * Sync_ledger.query
+         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.t) =
     let log = Logger.child config.parent_log "minibit networking" in
     let get_ledger_builder_aux_at_hash_rpc () ~version hash =
-      get_ledger_builder_aux_at_hash
+      get_ledger_builder_aux_at_hash hash
     in
     let answer_sync_ledger_query_rpc () ~version query =
       answer_sync_ledger_query query
@@ -335,9 +336,7 @@ module Make (Inputs : Inputs_intf) = struct
               Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
               ledger_builder_hash
           with
-          | Ok
-              (Some
-                (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
+          | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
               if
                 Ledger_builder_hash.equal
                   (Ledger_builder_hash.of_aux_and_ledger_hash
