@@ -55,6 +55,7 @@ let negative_one =
   in
   { next_difficulty
   ; previous_state_hash= State_hash.of_hash Pedersen.zero_hash
+  ; ledger_builder_hash= Ledger_builder_hash.dummy
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
   ; strength= Strength.zero
   ; timestamp }
@@ -69,6 +70,7 @@ let update_unchecked : value -> Block.t -> value =
   in
   { next_difficulty
   ; previous_state_hash= hash state
+  ; ledger_builder_hash= block.body.ledger_builder_hash
   ; ledger_hash= block.body.target_hash
   ; strength= Strength.increase state.strength ~by:state.next_difficulty
   ; timestamp= block.header.time }
@@ -77,6 +79,11 @@ let zero =
   let open Or_error.Let_syntax in
   let block = Block.genesis in
   let zero = update_unchecked negative_one block in
+  let rec _find_ok_nonce i =
+    if Or_error.is_ok (Proof_of_work.create zero i) then
+      printf "nonce = %s\n%!" (Block.Nonce.to_string i)
+    else _find_ok_nonce (Block.Nonce.succ i)
+  in
   ignore (Or_error.ok_exn (Proof_of_work.create zero block.header.nonce)) ;
   zero
 
@@ -104,11 +111,14 @@ end
 module Make_update (T : Transaction_snark.Verification.S) = struct
   let update state (block: Block.t) =
     let good_body =
-      Ledger_hash.equal state.ledger_hash block.body.target_hash
-      || T.verify
-           (Transaction_snark.create ~source:state.ledger_hash
-              ~target:block.body.target_hash ~proof_type:Merge
-              ~fee_excess:Currency.Amount.Signed.zero ~proof:block.body.proof)
+      match block.body.proof with
+      | None -> Ledger_hash.equal state.ledger_hash block.body.target_hash
+      | Some proof ->
+          Ledger_hash.equal state.ledger_hash block.body.target_hash
+          || T.verify
+               (Transaction_snark.create ~source:state.ledger_hash
+                  ~target:block.body.target_hash ~proof_type:`Merge
+                  ~fee_excess:Currency.Amount.Signed.zero ~proof)
     in
     let open Or_error.Let_syntax in
     let%bind () = check good_body "Bad body" in
@@ -230,7 +240,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            let%bind correct_transaction_snark =
              T.verify_complete_merge previous_state.ledger_hash
                block.body.target_hash
-               (As_prover.return block.body.proof)
+               (As_prover.return
+                  (Option.value ~default:Tock.Proof.dummy block.body.proof))
            and ledger_hash_didn't_change =
              Ledger_hash.equal_var previous_state.ledger_hash
                block.body.target_hash
@@ -253,6 +264,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            { next_difficulty= new_difficulty
            ; previous_state_hash
            ; ledger_hash= block.body.target_hash
+           ; ledger_builder_hash= block.body.ledger_builder_hash
            ; strength= new_strength
            ; timestamp= time }
          in

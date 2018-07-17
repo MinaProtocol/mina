@@ -3,7 +3,7 @@ open Nanobit_base
 open Snark_params
 
 module Proof_type : sig
-  type t = Base | Merge [@@deriving bin_io]
+  type t = [`Merge | `Base] [@@deriving bin_io, sexp]
 end
 
 module Transition : sig
@@ -13,15 +13,20 @@ module Transition : sig
   [@@deriving bin_io, sexp]
 end
 
-module Input : sig
+module Statement : sig
   type t =
-    { source: Ledger_hash.t
-    ; target: Ledger_hash.t
-    ; fee_excess: Currency.Amount.Signed.t }
-  [@@deriving bin_io]
+    { source: Nanobit_base.Ledger_hash.Stable.V1.t
+    ; target: Nanobit_base.Ledger_hash.Stable.V1.t
+    ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+    ; proof_type: Proof_type.t }
+  [@@deriving sexp, bin_io, hash, compare]
+
+  val gen : t Quickcheck.Generator.t
+
+  include Hashable.S_binable with type t := t
 end
 
-type t [@@deriving bin_io]
+type t [@@deriving bin_io, sexp]
 
 val create :
      source:Ledger_hash.t
@@ -33,13 +38,56 @@ val create :
 
 val proof : t -> Tock.Proof.t
 
-val input : t -> Input.t
+val statement : t -> Statement.t
 
-module Verification : sig
-  module Keys : sig
-    type t
+module Keys : sig
+  module Proving : sig
+    type t =
+      { base: Tick.Proving_key.t
+      ; wrap: Tock.Proving_key.t
+      ; merge: Tick.Proving_key.t }
+    [@@deriving bin_io]
+
+    val dummy : t
+
+    module Location : Stringable.S
+
+    val load : Location.t -> (t * Md5.t) Async.Deferred.t
   end
 
+  module Verification : sig
+    type t =
+      { base: Tick.Verification_key.t
+      ; wrap: Tock.Verification_key.t
+      ; merge: Tick.Verification_key.t }
+    [@@deriving bin_io]
+
+    val dummy : t
+
+    module Location : Stringable.S
+
+    val load : Location.t -> (t * Md5.t) Async.Deferred.t
+  end
+
+  module Location : sig
+    type t =
+      {proving: Proving.Location.t; verification: Verification.Location.t}
+
+    include Stringable.S with type t := t
+  end
+
+  module Checksum : sig
+    type t = {proving: Md5.t; verification: Md5.t}
+  end
+
+  type t = {proving: Proving.t; verification: Verification.t}
+
+  val create : unit -> t
+
+  val cached : unit -> (Location.t * t * Checksum.t) Async.Deferred.t
+end
+
+module Verification : sig
   module type S = sig
     val verify : t -> bool
 
@@ -51,27 +99,9 @@ module Verification : sig
   end
 
   module Make (K : sig
-    val keys : Keys.t
+    val keys : Keys.Verification.t
   end) :
     S
-end
-
-module Keys : sig
-  type t = {base: Tick.Keypair.t; wrap: Tock.Keypair.t; merge: Tick.Keypair.t}
-  [@@deriving bin_io]
-
-  module Location : Stringable.S
-
-  val verification_keys : t -> Verification.Keys.t
-
-  val dummy : t
-
-  val create : unit -> t
-
-  val cached :
-    unit -> (Location.t * Verification.Keys.t * Md5.t) Async.Deferred.t
-
-  val load : Location.t -> (t * Md5.t) Async.Deferred.t
 end
 
 val check_transition :

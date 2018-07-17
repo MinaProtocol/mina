@@ -18,45 +18,56 @@ open Async_kernel
  *
  * For now we are removing lazily when we look for the next transactions
  *)
-module Make
-    (Transaction : Protocols.Minibit_pow.Transaction_intf) (Ledger : sig
-        type t
+module Make (Transaction : sig
+  type t [@@deriving compare, bin_io, sexp]
 
-        val apply_transaction :
-          t -> Transaction.With_valid_signature.t -> unit Or_error.t
+  module With_valid_signature : sig
+    type nonrec t = private t
 
-        val undo_transaction : t -> Transaction.t -> unit Or_error.t
-    end) =
+    include Comparable with type t := t
+  end
+
+  val check : t -> With_valid_signature.t option
+end) =
 struct
-  module Txn = Transaction.With_valid_signature
+  type pool =
+    { heap: Transaction.With_valid_signature.t Fheap.t
+    ; set: Transaction.With_valid_signature.Set.t }
 
-  type t = Txn.t Fheap.t
+  type t = pool ref
 
-  let empty =
-    Fheap.create
-      ~cmp:
-        (Txn.compare ~seed:(Random.float Float.max_value |> string_of_float))
+  let create () =
+    ref
+      { heap= Fheap.create ~cmp:Transaction.With_valid_signature.compare
+      ; set= Transaction.With_valid_signature.Set.empty }
 
-  let add t txn = Fheap.add t txn
+  let add' t txn = {heap= Fheap.add t.heap txn; set= Set.add t.set txn}
 
-  let get t ~k ~ledger =
-    let rec go h i l =
-      match (Fheap.top h, Fheap.remove_top h, i) with
-      | None, _, _ -> l
-      | _, _, 0 -> l
-      | Some txn, Some h', i -> (
-        match Ledger.apply_transaction ledger txn with
-        | Ok () -> go h' (i - 1) (txn :: l)
-        | Error e -> go h' (i - 1) l )
-      | _, None, _ ->
-          failwith "Impossible, top will be none if remove_top is none"
-    in
-    let txns = go t k [] in
-    List.iter txns ~f:(fun txn ->
-        Ledger.undo_transaction ledger (txn :> Transaction.t)
-        |> Or_error.ok_exn ) ;
-    txns
+  let add t_ref txn = t_ref := add' !t_ref txn
+
+  let transactions t = Sequence.unfold ~init:!t.heap ~f:Fheap.pop
+
+  module Diff = struct
+    type t = Transaction.t list [@@deriving bin_io]
+
+    (* TODO: Check signatures *)
+    let apply t_ref txns =
+      let t0 = !t_ref in
+      let t, res =
+        List.fold txns ~init:(t0, []) ~f:(fun (t, acc) txn ->
+            match Transaction.check txn with
+            | None -> (* TODO Punish *)
+                      (t, acc)
+            | Some txn ->
+                if Set.mem t.set txn then (t, acc)
+                else (add' t txn, (txn :> Transaction.t) :: acc) )
+      in
+      t_ref := t ;
+      match res with
+      | [] -> Deferred.Or_error.error_string "No new transactions"
+      | xs -> Deferred.Or_error.return xs
+  end
 
   (* TODO: Actually back this by the file-system *)
-  let load ~disk_location = return empty
+  let load ~disk_location = return (create ())
 end

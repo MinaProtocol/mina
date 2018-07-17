@@ -6,6 +6,8 @@ open Let_syntax
 module type Basic = sig
   type t [@@deriving sexp, compare, eq, hash]
 
+  val gen : t Quickcheck.Generator.t
+
   module Stable : sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
@@ -52,11 +54,25 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
+  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare]
+
+  val gen : t Quickcheck.Generator.t
+
+  module Stable : sig
+    module V1 : sig
+      type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
+
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare]
+    end
+  end
+
   val length : int
 
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
 
-  type nonrec t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp]
+  val sgn : t -> Sgn.t
+
+  val magnitude : t -> magnitude
 
   type nonrec var = (magnitude_var, Sgn.var) t_
 
@@ -73,6 +89,8 @@ module type Signed_intf = sig
   val ( + ) : t -> t -> t option
 
   val negate : t -> t
+
+  val of_unsigned : magnitude -> t
 
   module Checked : sig
     val to_bits : var -> Boolean.var list
@@ -153,6 +171,12 @@ end = struct
 
   let to_string = Unsigned.to_string
 
+  let gen : t Quickcheck.Generator.t =
+    let m = Bignum_bigint.of_string Unsigned.(to_string max_int) in
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl zero m)
+      ~f:(fun n -> of_string (Bignum_bigint.to_string n))
+
   module Vector = struct
     include M
     include Unsigned
@@ -194,17 +218,27 @@ end = struct
   let var_of_t t =
     List.init M.length (fun i -> Boolean.var_of_value (Vector.get t i))
 
-  type magnitude = t [@@deriving sexp, bin_io]
+  type magnitude = t [@@deriving sexp, bin_io, hash, compare]
 
   module Signed = struct
-    type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
-    [@@deriving bin_io, sexp]
+    module Stable = struct
+      module V1 = struct
+        type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
+        [@@deriving bin_io, sexp, hash, compare, fields]
 
-    let create ~magnitude ~sgn = {magnitude; sgn}
+        let create ~magnitude ~sgn = {magnitude; sgn}
 
-    type t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp]
+        type t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp, hash, compare]
+      end
+    end
+
+    include Stable.V1
 
     let zero = create ~magnitude:zero ~sgn:Sgn.Pos
+
+    let gen =
+      Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
+          create ~magnitude ~sgn )
 
     type nonrec var = (var, Sgn.var) t_
 
@@ -236,7 +270,7 @@ end = struct
           let%map magnitude = add x.magnitude y.magnitude in
           {sgn; magnitude}
       | Pos, Neg | Neg, Pos ->
-          let c = compare x.magnitude y.magnitude in
+          let c = compare_magnitude x.magnitude y.magnitude in
           Some
             ( if c < 0 then
                 { sgn= y.sgn
@@ -247,6 +281,8 @@ end = struct
             else zero )
 
     let negate t = {t with sgn= Sgn.negate t.sgn}
+
+    let of_unsigned magnitude = {magnitude; sgn= Sgn.Pos}
 
     let ( + ) = add
 
@@ -334,6 +370,9 @@ end = struct
           Quickcheck.Generator.map ~f:of_bigint
             (Bignum_bigint.gen_incl (to_bigint x) (to_bigint y))
 
+        (* TODO: When we do something to make snarks run fast for tests, increase the trials *)
+        let qc_test_fast = Quickcheck.test ~trials:100
+
         let%test_unit "subtraction_completeness" =
           let generator =
             let open Quickcheck.Generator.Let_syntax in
@@ -341,7 +380,7 @@ end = struct
             let%map y = gen_incl Unsigned.zero x in
             (x, y)
           in
-          Quickcheck.test generator ~f:(fun (lo, hi) ->
+          qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_success
                 (sprintf !"subtraction: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
                 (var_of_t lo - var_of_t hi) )
@@ -353,7 +392,7 @@ end = struct
             let%map y = gen_incl Unsigned.(add x one) Unsigned.max_int in
             (x, y)
           in
-          Quickcheck.test generator ~f:(fun (lo, hi) ->
+          qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_failure
                 (sprintf !"underflow: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
                 (var_of_t lo - var_of_t hi) )
@@ -365,7 +404,7 @@ end = struct
             let%map y = gen_incl Unsigned.zero Unsigned.(sub max_int x) in
             (x, y)
           in
-          Quickcheck.test generator ~f:(fun (x, y) ->
+          qc_test_fast generator ~f:(fun (x, y) ->
               expect_success
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
                 (var_of_t x + var_of_t y) )
@@ -379,7 +418,7 @@ end = struct
             in
             (x, y)
           in
-          Quickcheck.test generator ~f:(fun (x, y) ->
+          qc_test_fast generator ~f:(fun (x, y) ->
               expect_failure
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
                 (var_of_t x + var_of_t y) )
@@ -415,12 +454,16 @@ module Amount = struct
 
   let of_fee (fee: Fee.t) : t = fee
 
+  let to_fee (fee: t) : Fee.t = fee
+
   let add_fee (t: t) (fee: Fee.t) = add t (of_fee fee)
 
   module Checked = struct
     include T.Checked
 
     let of_fee (fee: Fee.var) = var_of_bits (Fee.var_to_bits fee)
+
+    let to_fee (t: var) : Fee.var = Fee.var_of_bits (var_to_bits t)
 
     let add_fee (t: var) (fee: Fee.var) =
       Field.Checked.add (pack_var t) (Fee.pack_var fee) |> unpack_var

@@ -15,11 +15,9 @@ module type S = sig
 
   type fee
 
-  type priced_proof
+  type t [@@deriving bin_io]
 
-  type t
-
-  val create_pool : unit -> t
+  val create : unit -> t
 
   val add_snark :
        t
@@ -28,7 +26,7 @@ module type S = sig
     -> fee:fee
     -> [`Rebroadcast | `Don't_rebroadcast]
 
-  val request_proof : t -> work -> priced_proof option
+  val request_proof : t -> work -> (proof, fee) Priced_proof.t option
 
   val add_unsolved_work : t -> work -> [`Rebroadcast | `Don't_rebroadcast]
 
@@ -41,8 +39,6 @@ end
 
 module Make (Proof : sig
   type t [@@deriving bin_io]
-
-  include Proof_intf with type t := t
 end) (Fee : sig
   type t [@@deriving sexp, bin_io]
 
@@ -64,8 +60,6 @@ end) :
     val unsolved_work_count : t -> int
 
     val remove_solved_work : t -> work -> unit
-
-    val to_record : priced_proof -> (proof, fee) Priced_proof.t
   end
   with type work := Work.t
    and type proof := Proof.t
@@ -84,20 +78,13 @@ struct
     let fee (t: t) = t.fee
   end
 
-  let to_record priced_proof =
-    Priced_proof.create
-      (Priced_proof.proof priced_proof)
-      (Priced_proof.fee priced_proof)
-
-  type priced_proof = Priced_proof.t
-
   type t =
     { proofs: Priced_proof.t Work.Table.t
     ; solved_work: Work_random_set.t
     ; unsolved_work: Work_random_set.t }
   [@@deriving sexp, bin_io]
 
-  let create_pool () =
+  let create () =
     { proofs= Work.Table.create ()
     ; solved_work= Work_random_set.create ()
     ; unsolved_work= Work_random_set.create () }
@@ -184,7 +171,7 @@ let%test_module "random set test" =
       and sample_unsolved_solved_work =
         Quickcheck.Generator.list Mock_work.gen
       in
-      let pool = Mock_snark_pool.create_pool () in
+      let pool = Mock_snark_pool.create () in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
           ignore (Mock_snark_pool.add_snark pool work proof fee) ) ;
       List.iter sample_unsolved_solved_work ~f:(fun work ->
@@ -211,8 +198,7 @@ let%test_module "random set test" =
           ignore (Mock_snark_pool.add_snark t work proof_2 fee_2) ;
           let fee_upper_bound = Mock_fee.min fee_1 fee_2 in
           let {Priced_proof.fee; _} =
-            Mock_snark_pool.to_record
-            @@ Option.value_exn (Mock_snark_pool.request_proof t work)
+            Option.value_exn (Mock_snark_pool.request_proof t work)
           in
           assert (fee <= fee_upper_bound) )
 
@@ -240,8 +226,7 @@ let%test_module "random set test" =
             = `Don't_rebroadcast ) ;
           assert (
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}
-            = Mock_snark_pool.to_record
-              @@ Option.value_exn (Mock_snark_pool.request_proof t work) ) )
+            = Option.value_exn (Mock_snark_pool.request_proof t work) ) )
 
     let%test_unit "Remove unsolved work if unsolved work pool is not empty" =
       Quickcheck.test ~sexp_of:[%sexp_of : Mock_snark_pool.t * Mock_work.t]

@@ -2,30 +2,45 @@ open Core_kernel
 open Snark_params
 open Tick
 
-type ('target, 'state_hash, 'ledger_hash, 'strength, 'time) t_ =
+type ( 'target
+     , 'state_hash
+     , 'ledger_builder_hash
+     , 'ledger_hash
+     , 'strength
+     , 'time ) t_ =
   { next_difficulty: 'target
   ; previous_state_hash: 'state_hash
+  ; ledger_builder_hash: 'ledger_builder_hash
   ; ledger_hash: 'ledger_hash
   ; strength: 'strength
   ; timestamp: 'time }
 [@@deriving fields]
 
-type t = (Target.t, State_hash.t, Ledger_hash.t, Strength.t, Block_time.t) t_
+type t =
+  ( Target.t
+  , State_hash.t
+  , Ledger_builder_hash.t
+  , Ledger_hash.t
+  , Strength.t
+  , Block_time.t )
+  t_
 [@@deriving sexp, eq]
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('a, 'b, 'c, 'd, 'e) t_ = ('a, 'b, 'c, 'd, 'e) t_ =
+    type nonrec ('a, 'b, 'c, 'd, 'e, 'f) t_ = ('a, 'b, 'c, 'd, 'e, 'f) t_ =
       { next_difficulty: 'a
       ; previous_state_hash: 'b
-      ; ledger_hash: 'c
-      ; strength: 'd
-      ; timestamp: 'e }
+      ; ledger_builder_hash: 'c
+      ; ledger_hash: 'd
+      ; strength: 'e
+      ; timestamp: 'f }
     [@@deriving bin_io, sexp, eq]
 
     type nonrec t =
       ( Target.Stable.V1.t
       , State_hash.Stable.V1.t
+      , Ledger_builder_hash.Stable.V1.t
       , Ledger_hash.Stable.V1.t
       , Strength.Stable.V1.t
       , Block_time.Stable.V1.t )
@@ -38,6 +53,7 @@ include Snarkable.S
         with type var =
                     ( Target.Unpacked.var
                     , State_hash.var
+                    , Ledger_builder_hash.var
                     , Ledger_hash.var
                     , Strength.Unpacked.var
                     , Block_time.Unpacked.var )

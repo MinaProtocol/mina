@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+module Checked_data = Checked_data
 
 module type With_checksum_intf = sig
   type 'a t
