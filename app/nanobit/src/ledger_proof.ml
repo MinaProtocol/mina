@@ -38,8 +38,12 @@ module Debug = struct
   let proof () = Proof.dummy
 
   let statement _ =
-    Quickcheck.Generator.generate ~size:0 Transaction_snark.Statement.gen
-      (Splittable_random.State.of_int 0)
+    let x =
+      lazy (
+      Quickcheck.Generator.generate ~size:0 Transaction_snark.Statement.gen
+        (Splittable_random.State.of_int 0))
+    in
+    fun () -> Lazy.force x
 
   let verify _ _ ~message:_ = return true
 end
