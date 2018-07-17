@@ -10,7 +10,7 @@ type t =
   ; ledger_hash: Ledger_hash.Stable.V1.t
   ; strength: Strength.t
   ; timestamp: Block_time.Stable.V1.t }
-[@@deriving sexp, fields, bin_io]
+[@@deriving sexp, fields, bin_io, compare, eq]
 
 let to_blockchain_state
     { next_difficulty

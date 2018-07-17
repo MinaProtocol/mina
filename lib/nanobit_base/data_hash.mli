@@ -2,9 +2,13 @@ open Core
 open Snark_params.Tick
 
 module type Basic = sig
+  (* TODO: Use stable for bin_io *)
+
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
-  val to_bits : t -> string
+  val gen : t Quickcheck.Generator.t
+
+  val to_bytes : t -> string
 
   val length_in_bits : int
 

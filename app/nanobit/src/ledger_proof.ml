@@ -3,27 +3,47 @@ open Async_kernel
 open Nanobit_base
 
 module Make_prod (Init : sig
-  val prover : Prover.t
+  val logger : Logger.t
+
+  val verifier : Verifier.t
 end) =
 struct
-  type t = Proof.t
+  type t = Transaction_snark.t [@@deriving bin_io, sexp]
 
-  type input =
-    { source: Ledger_hash.t
-    ; target: Ledger_hash.t
-    ; proof_type: Transaction_snark.Proof_type.t }
+  let statement = Transaction_snark.statement
 
-  let verify proof {source; target; proof_type} =
-    Prover.verify_transaction_snark Init.prover
-      (Transaction_snark.create ~source ~target ~proof_type
-         ~fee_excess:Currency.Amount.Signed.zero ~proof)
-    >>| Or_error.ok_exn
+  let proof = Transaction_snark.proof
+
+  (* TODO: Use the message once SOK is implemented *)
+  let verify t stmt ~message:_ =
+    if
+      not
+        (Int.( = )
+           (Transaction_snark.Statement.compare
+              (Transaction_snark.statement t)
+              stmt)
+           0)
+    then Deferred.return false
+    else
+      match%map Verifier.verify_transaction_snark Init.verifier t with
+      | Ok b -> b
+      | Error e ->
+          Logger.warn Init.logger !"Bad transaction snark: %{sexp: Error.t}" e ;
+          false
 end
 
 module Debug = struct
-  type t = ()
+  type t = unit [@@deriving sexp, bin_io]
 
-  type input = ()
+  let proof () = Proof.dummy
 
-  let verify _ _ = return true
+  let statement =
+    let x =
+      lazy (
+      Quickcheck.Generator.generate ~size:0 Transaction_snark.Statement.gen
+        (Splittable_random.State.of_int 0))
+    in
+    fun () -> Lazy.force x
+
+  let verify _ _ ~message:_ = return true
 end

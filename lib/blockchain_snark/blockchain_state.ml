@@ -55,7 +55,7 @@ let negative_one =
   in
   { next_difficulty
   ; previous_state_hash= State_hash.of_hash Pedersen.zero_hash
-  ; ledger_builder_hash= Ledger_builder_hash.of_hash Pedersen.zero_hash
+  ; ledger_builder_hash= Ledger_builder_hash.dummy
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
   ; strength= Strength.zero
   ; timestamp }
@@ -111,11 +111,14 @@ end
 module Make_update (T : Transaction_snark.Verification.S) = struct
   let update state (block: Block.t) =
     let good_body =
-      Ledger_hash.equal state.ledger_hash block.body.target_hash
-      || T.verify
-           (Transaction_snark.create ~source:state.ledger_hash
-              ~target:block.body.target_hash ~proof_type:Merge
-              ~fee_excess:Currency.Amount.Signed.zero ~proof:block.body.proof)
+      match block.body.proof with
+      | None -> Ledger_hash.equal state.ledger_hash block.body.target_hash
+      | Some proof ->
+          Ledger_hash.equal state.ledger_hash block.body.target_hash
+          || T.verify
+               (Transaction_snark.create ~source:state.ledger_hash
+                  ~target:block.body.target_hash ~proof_type:`Merge
+                  ~fee_excess:Currency.Amount.Signed.zero ~proof)
     in
     let open Or_error.Let_syntax in
     let%bind () = check good_body "Bad body" in
@@ -237,7 +240,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            let%bind correct_transaction_snark =
              T.verify_complete_merge previous_state.ledger_hash
                block.body.target_hash
-               (As_prover.return block.body.proof)
+               (As_prover.return
+                  (Option.value ~default:Tock.Proof.dummy block.body.proof))
            and ledger_hash_didn't_change =
              Ledger_hash.equal_var previous_state.ledger_hash
                block.body.target_hash

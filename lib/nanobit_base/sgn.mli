@@ -1,9 +1,11 @@
 open Core
 open Snark_params.Tick
 
-type t = Pos | Neg [@@deriving sexp, bin_io]
+type t = Pos | Neg [@@deriving sexp, bin_io, hash, compare, eq]
 
 val to_field : t -> Field.t
+
+val gen : t Quickcheck.Generator.t
 
 type var = private Field.Checked.t
 

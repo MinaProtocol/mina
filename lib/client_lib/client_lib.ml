@@ -5,7 +5,7 @@ open Nanobit_base
 module Send_transaction = struct
   type query = Transaction.Stable.V1.t [@@deriving bin_io]
 
-  type response = unit option [@@deriving bin_io]
+  type response = unit [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 

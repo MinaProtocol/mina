@@ -112,8 +112,7 @@ let create ~conf_dir ledger
           Or_error.ok_exn
             ( match transition with
             | Fee_transfer t -> Ledger.undo_fee_transfer ledger t
-            | Transaction t ->
-                Ledger.undo_transaction ledger (t :> Transaction.t) ) ) ;
+            | Transaction t -> Ledger.undo_transaction ledger t ) ) ;
       (List.rev rev_inputs, target_hash)
     in
     let rec go inputs total_fees = function

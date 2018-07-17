@@ -4,6 +4,8 @@ open Snark_params.Tick
 module type Basic = sig
   type t [@@deriving sexp, compare, eq, hash]
 
+  val gen : t Quickcheck.Generator.t
+
   module Stable : sig
     module V1 : sig
       type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
@@ -66,19 +68,23 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
-  type t = (magnitude, Sgn.t) t_ [@@deriving sexp]
+  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare]
+
+  val gen : t Quickcheck.Generator.t
 
   module Stable : sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare]
     end
   end
 
   val length : int
 
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
+  val sgn : t -> Sgn.t
+  val magnitude : t -> magnitude
 
   type nonrec var = (magnitude_var, Sgn.var) t_
 
@@ -119,6 +125,7 @@ module Fee : sig
 
   include Arithmetic_intf with type t := t
 
+  (* TODO: Get rid of signed fee, use signed amount *)
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
 
@@ -139,7 +146,9 @@ module Amount : sig
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
 
+  (* TODO: Delete these functions *)
   val of_fee : Fee.t -> t
+  val to_fee : t -> Fee.t
 
   val add_fee : t -> Fee.t -> t option
 
@@ -151,6 +160,7 @@ module Amount : sig
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
     val of_fee : Fee.var -> var
+    val to_fee : var -> Fee.var
 
     val add_fee : var -> Fee.var -> (var, _) Checked.t
   end

@@ -2,42 +2,34 @@ open Core
 open Async
 
 module type Inputs_intf = sig
-  include Protocols.Minibit_pow.Inputs_intf
+  include Protocols.Coda_pow.Inputs_intf
 
-  module Transition_with_witness :
-    Minibit.Transition_with_witness_intf
-    with type transition := Transition.t
-     and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
-     and type ledger_hash := Ledger_hash.t
-
-  module Bundle : sig
-    type t
-
-    val create : Ledger.t -> Transaction.With_valid_signature.t list -> t
-
-    val cancel : t -> unit
-
-    val target_hash : t -> Ledger_hash.t
-
-    val result : t -> Ledger_proof.t Deferred.Option.t
+  module Prover : sig
+    val prove : prev_state:(State.t * State.Proof.t) -> Internal_transition.t -> State.Proof.t Deferred.Or_error.t
   end
 end
 
 module Make (Inputs : Inputs_intf) :
-  Minibit.Miner_intf
-  with type transition_with_witness := Inputs.Transition_with_witness.t
+  Coda.Miner_intf
+  with type external_transition := Inputs.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
-   and type ledger := Inputs.Ledger.t
+   and type ledger_builder := Inputs.Ledger_builder.t
    and type transaction := Inputs.Transaction.With_valid_signature.t
-   and type state := Inputs.State.t =
+   and type state := Inputs.State.t
+   and type state_proof := Inputs.State.Proof.t
+   and type completed_work_statement := Inputs.Completed_work.Statement.t
+   and type completed_work_checked := Inputs.Completed_work.Checked.t =
 struct
   open Inputs
 
   module Hashing_result : sig
     type t
 
-    val create : State.t -> next_ledger_hash:Ledger_hash.t -> t
+    val create :
+         State.t
+      -> next_ledger_hash:Ledger_hash.t
+      -> next_ledger_builder_hash:Ledger_builder_hash.t
+      -> t
 
     val result : t -> [`Ok of State.t * Block_nonce.t | `Cancelled] Deferred.t
 
@@ -51,8 +43,8 @@ struct
 
     let cancel t = t.cancelled := true
 
-    let find_block (previous: State.t) ~(next_ledger_hash: Ledger_hash.t) :
-        (State.t * Block_nonce.t) option =
+    let find_block (previous: State.t) ~(next_ledger_hash: Ledger_hash.t)
+        ~next_ledger_builder_hash : (State.t * Block_nonce.t) option =
       let iterations = 10 in
       let now = Time.now () in
       let difficulty = previous.next_difficulty in
@@ -63,6 +55,7 @@ struct
         { next_difficulty
         ; previous_state_hash= State.hash previous
         ; ledger_hash= next_ledger_hash
+        ; ledger_builder_hash= next_ledger_builder_hash
         ; timestamp= now
         ; strength= Strength.increase previous.strength difficulty }
       in
@@ -77,12 +70,14 @@ struct
       in
       go nonce0 0
 
-    let create previous ~next_ledger_hash =
+    let create previous ~next_ledger_hash ~next_ledger_builder_hash =
       let cancelled = ref false in
       let rec go () =
         if !cancelled then return `Cancelled
         else
-          match find_block previous ~next_ledger_hash with
+          match
+            find_block previous ~next_ledger_hash ~next_ledger_builder_hash
+          with
           | None ->
               let%bind () = after (sec 0.01) in
               go ()
@@ -91,117 +86,90 @@ struct
       {cancelled; result= go ()}
   end
 
-  module Bundle_result : sig
-    type t
-
-    val transactions : t -> Transaction.With_valid_signature.t list
-
-    val target_hash : t -> Ledger_hash.t
-
-    val result :
-         t
-      -> (Ledger_proof.t * Transaction.With_valid_signature.t list) option
-         Deferred.t
-
-    val cancel : t -> unit
-
-    val create : Ledger.t -> Transaction.With_valid_signature.t list -> t
-  end = struct
-    type t =
-      {bundle: Bundle.t; transactions: Transaction.With_valid_signature.t list}
-    [@@deriving fields]
-
-    let target_hash t = Bundle.target_hash t.bundle
-
-    let cancel t = Bundle.cancel t.bundle
-
-    let result t =
-      Deferred.Option.map (Bundle.result t.bundle) ~f:(fun proof ->
-          (proof, t.transactions) )
-
-    let create ledger transactions =
-      let bundle = Bundle.create ledger transactions in
-      {bundle; transactions}
-  end
-
   module Mining_result : sig
     type t
 
     val cancel : t -> unit
 
     val create :
-         state:State.t
-      -> ledger:Ledger.t
-      -> transactions:Transaction.With_valid_signature.t list
+         state:(State.t * State.Proof.t)
+      -> ledger_builder:Ledger_builder.t
+      -> transactions:Transaction.With_valid_signature.t Sequence.t
+      -> get_completed_work:(   Completed_work.Statement.t
+                             -> Completed_work.Checked.t option)
       -> t
 
-    val transactions : t -> Transaction.With_valid_signature.t list
-
-    val result : t -> Transition_with_witness.t Deferred.Or_error.t
+    val result : t -> External_transition.t Deferred.Or_error.t
   end = struct
+    (* TODO: No need to have our own Ivar since we got rid of Bundle_result *)
     type t =
       { hashing_result: Hashing_result.t
-      ; bundle_result: Bundle_result.t
       ; cancellation: unit Ivar.t
-      ; result: Transition_with_witness.t Deferred.Or_error.t }
+      ; result: External_transition.t Deferred.Or_error.t }
     [@@deriving fields]
 
     let cancel t =
       Hashing_result.cancel t.hashing_result ;
-      Bundle_result.cancel t.bundle_result ;
       Ivar.fill_if_empty t.cancellation ()
 
-    let transactions t = Bundle_result.transactions t.bundle_result
-
-    let create ~state ~ledger ~transactions =
-      let bundle_result = Bundle_result.create ledger transactions in
-      let next_ledger_hash = Bundle_result.target_hash bundle_result in
-      let hashing_result = Hashing_result.create state ~next_ledger_hash in
+    let create ~state:(state, state_proof) ~ledger_builder ~transactions ~get_completed_work =
+      let ( diff
+          , `Hash_after_applying (next_ledger_builder_hash, next_ledger_hash)
+          , `Ledger_proof ledger_proof_opt ) =
+        Ledger_builder.create_diff ledger_builder
+          ~transactions_by_fee:transactions ~get_completed_work
+      in
+      let hashing_result =
+        Hashing_result.create state ~next_ledger_hash ~next_ledger_builder_hash
+      in
       let cancellation = Ivar.create () in
       (* Someday: If bundle finishes first you can stuff more transactions in the bundle *)
       let result =
         let result =
-          let%map hashing_result = Hashing_result.result hashing_result
-          and bundle_result = Bundle_result.result bundle_result in
-          match (hashing_result, bundle_result) with
-          | `Ok (new_state, nonce), Some (ledger_proof, ts) ->
-              Ok
-                { Transition_with_witness.transition=
-                    { ledger_hash= next_ledger_hash
-                    ; ledger_proof
-                    ; timestamp= new_state.timestamp
-                    ; nonce }
-                ; previous_ledger_hash= state.Inputs.State.ledger_hash
-                ; transactions }
-          | `Cancelled, _ -> Or_error.error_string "Mining cancelled"
-          | _, None -> Or_error.error_string "Transaction bundling failed"
+          match%bind Hashing_result.result hashing_result with
+          | `Ok (new_state, nonce) ->
+            let transition = 
+              { Internal_transition.ledger_hash= next_ledger_hash
+              ; ledger_builder_hash= next_ledger_builder_hash
+              ; ledger_proof= ledger_proof_opt
+              ; ledger_builder_diff= Ledger_builder_diff.forget diff
+              ; timestamp= new_state.timestamp
+              ; nonce }
+            in
+            let open Deferred.Or_error.Let_syntax in
+            let%map state_proof = Prover.prove ~prev_state:(state, state_proof) transition in
+            { External_transition.state_proof
+            ; state = new_state
+            ; ledger_builder_diff = Ledger_builder_diff.forget diff
+            }
+          | `Cancelled -> Deferred.return (Or_error.error_string "Mining cancelled")
         in
         Deferred.any
           [ ( Ivar.read cancellation
             >>| fun () -> Or_error.error_string "Mining cancelled" )
           ; result ]
       in
-      {bundle_result; hashing_result; result; cancellation}
+      {hashing_result; result; cancellation}
   end
 
   module Tip = struct
     type t =
-      { state: State.t
-      ; ledger: Ledger.t sexp_opaque
-      ; transactions: Transaction.With_valid_signature.t list }
-    [@@deriving sexp]
+      { state: State.t * State.Proof.t
+      ; ledger_builder: Ledger_builder.t sexp_opaque
+      ; transactions: Transaction.With_valid_signature.t Sequence.t }
+    [@@deriving sexp_of]
   end
 
   type change = Tip_change of Tip.t
 
   type state = {tip: Tip.t; result: Mining_result.t}
 
-  type t = {transitions: Transition_with_witness.t Linear_pipe.Reader.t}
+  type t = {transitions: External_transition.t Linear_pipe.Reader.t}
   [@@deriving fields]
 
   let transition_capacity = 64
 
-  let create ~parent_log ~change_feeder =
+  let create ~parent_log ~get_completed_work ~change_feeder =
     let logger = Logger.extend parent_log [("module", Atom __MODULE__)] in
     let r, w = Linear_pipe.create () in
     let write_result = function
@@ -209,8 +177,11 @@ struct
       | Error e ->
           Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
     in
-    let create_result {Tip.state; transactions; ledger} =
-      let result = Mining_result.create ~state ~transactions ~ledger in
+    let create_result {Tip.state; transactions; ledger_builder} =
+      let result =
+        Mining_result.create ~state ~ledger_builder ~transactions
+          ~get_completed_work
+      in
       upon (Mining_result.result result) write_result ;
       result
     in

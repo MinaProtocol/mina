@@ -4,22 +4,20 @@ open Currency
 
 include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
           (struct
-            type hash = Tick.Pedersen.Digest.t
+            type hash = Merkle_hash.t
             [@@deriving sexp, hash, compare, bin_io]
-
-            let empty_hash =
-              Tick.Pedersen.hash_bigstring
-                (Bigstring.of_string "nothing up my sleeve")
 
             let merge = Merkle_hash.merge
 
-            let hash_account = Account.digest
+            let empty_hash = Merkle_hash.empty_hash
+
+            let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
           end)
           (struct
             let depth = ledger_depth
           end)
 
-let merkle_root t = Ledger_hash.of_hash (merkle_root t)
+let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t )
 
 let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
 
@@ -67,7 +65,8 @@ let apply_transaction_unchecked ledger ({payload; sender}: Transaction.t) =
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
   apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
-let undo_transaction ledger ({payload; sender}: Transaction.t) =
+let undo_transaction ledger (transaction: Transaction.With_valid_signature.t) =
+  let {Transaction.payload; sender} = (transaction :> Transaction.t) in
   let sender = Public_key.compress sender in
   let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
   let open Or_error.Let_syntax in
@@ -89,7 +88,7 @@ let undo_transaction ledger ({payload; sender}: Transaction.t) =
 let merkle_root_after_transaction_exn ledger transaction =
   Or_error.ok_exn (apply_transaction ledger transaction) ;
   let root = merkle_root ledger in
-  Or_error.ok_exn (undo_transaction ledger (transaction :> Transaction.t)) ;
+  Or_error.ok_exn (undo_transaction ledger transaction) ;
   root
 
 let merkle_root_after_transactions t ts =
@@ -99,8 +98,7 @@ let merkle_root_after_transactions t ts =
         txn )
   in
   let root = merkle_root t in
-  List.iter ts_rev ~f:(fun txn ->
-      ignore (undo_transaction t (txn :> Transaction.t)) ) ;
+  List.iter ts_rev ~f:(fun txn -> ignore (undo_transaction t txn)) ;
   root
 
 let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
