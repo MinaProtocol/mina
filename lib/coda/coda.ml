@@ -224,8 +224,6 @@ module type Witness_change_intf = sig
   val add_witness : t -> witness -> t_with_witness Or_error.t
 end
 
-(* TODO imeckler: talk with brandon about when transitions get checked and what this intf is
-   also the above one. *)
 module type State_with_witness_intf = sig
   type state
 
@@ -250,13 +248,6 @@ module type State_with_witness_intf = sig
   val strip : t -> Stripped.t
 
   val forget_witness : t -> state
-  (*
-  val check : Stripped.t -> t option
-
-  include Witness_change_intf
-          with type t_with_witness := t
-           and type witness = ledger_builder_transition_with_valid_signatures_and_proofs
-           and type t := state *)
 end
 
 module type Inputs_intf = sig
@@ -274,8 +265,6 @@ module type Inputs_intf = sig
      and type ledger_builder_transition := Ledger_builder_transition.t
      and type ledger_builder_transition_with_valid_signatures_and_proofs :=
                 Ledger_builder_transition.With_valid_signatures_and_proofs.t
-
-  (*      and type witness := Ledger_builder_transition.With_valid_signatures_and_proofs.t *)
 
   module Snark_pool :
     Snark_pool_intf
@@ -339,16 +328,9 @@ module type Inputs_intf = sig
   end
 end
 
-(* TODO: Lift Block_state_transition_proof out of the functor and inline it *)
 module Make
     (Inputs : Inputs_intf)
-    (* TODO
-    (Block_state_transition_proof : Coda_pow.Block_state_transition_proof_intf
-                                    with type state := Inputs.State.t
-                                     and type proof := Inputs.State.Proof.t
-                                     and type transition :=
-       Inputs.Internal_transition.t)
-       *) =
+=
 struct
   open Inputs
 
