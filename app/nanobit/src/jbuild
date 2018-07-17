@@ -24,6 +24,8 @@
       transaction_pool
       snarky
       snark_keys
+      snark_worker_lib
+      keys_lib
       storage
       logger
       async

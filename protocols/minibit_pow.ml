@@ -75,6 +75,14 @@ module type Nonce_intf = sig
   val random : unit -> t
 end
 
+module type Public_key_intf = sig
+  module Compressed : sig
+    type t [@@deriving bin_io]
+  end
+
+  type t [@@deriving sexp, eq]
+end
+
 module type Transaction_intf = sig
   type t [@@deriving sexp, eq]
 
@@ -217,6 +225,8 @@ end
 
 module type Inputs_intf = sig
   module Time : Time_intf
+
+  module Public_key : Public_key_intf
 
   module Transaction : Transaction_intf
 

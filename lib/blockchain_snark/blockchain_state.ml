@@ -97,6 +97,17 @@ let bit_length =
     ~strength:(add Strength.bit_length) ~timestamp:(fun acc _ _ ->
       acc + Block_time.bit_length )
 
+module type Update_intf = sig
+  val update : t -> Block.t -> t Or_error.t
+
+  module Checked : sig
+    val update :
+         State_hash.var * var
+      -> Block.var
+      -> (State_hash.var * var * [`Success of Boolean.var], _) Checked.t
+  end
+end
+
 module Make_update (T : Transaction_snark.Verification.S) = struct
   let update state (block: Block.t) =
     let good_body =

@@ -20,6 +20,14 @@ let wrap_input () =
 let provide_witness' typ ~f =
   Tick.(provide_witness typ As_prover.(map get_state ~f))
 
+module Input = struct
+  type t =
+    { source: Ledger_hash.Stable.V1.t
+    ; target: Ledger_hash.Stable.V1.t
+    ; fee_excess: Currency.Amount.Signed.t }
+  [@@deriving bin_io]
+end
+
 module Tag : sig
   open Tick
 
@@ -118,6 +126,8 @@ type t =
   ; fee_excess: Amount.Signed.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
 [@@deriving fields, bin_io]
+
+let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
 
 let create = Fields.create
 
