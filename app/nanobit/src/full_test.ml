@@ -79,8 +79,8 @@ let run_test with_snark : unit -> unit Deferred.t =
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
   (* Check if rich-man has some balance *)
-  assert_balance rich_pk initial_rich_balance;
-  assert_balance poor_pk initial_poor_balance;
+  assert_balance rich_pk initial_rich_balance ;
+  assert_balance poor_pk initial_poor_balance ;
   (* Note: This is much less than half of the rich balance so we can test
    *       transaction replays being prohibited
    *)
@@ -106,10 +106,10 @@ let run_test with_snark : unit -> unit Deferred.t =
   let%bind () = balance_change_or_timeout in
   assert_balance poor_pk
     ( Currency.Balance.( + ) Genesis_ledger.initial_poor_balance send_amount
-      |> Option.value_exn );
+    |> Option.value_exn ) ;
   assert_balance rich_pk
     ( Currency.Balance.( - ) Genesis_ledger.initial_rich_balance send_amount
-      |> Option.value_exn );
+    |> Option.value_exn ) ;
   Deferred.unit
 
 let command =

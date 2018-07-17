@@ -22,9 +22,7 @@ module type Ledger_builder_io_intf = sig
   val create : net -> t
 
   val get_ledger_builder_aux_at_hash :
-       t
-    -> ledger_builder_hash
-    -> ledger_builder_aux Deferred.Or_error.t
+    t -> ledger_builder_hash -> ledger_builder_aux Deferred.Or_error.t
 
   val glue_sync_ledger :
        t
@@ -49,17 +47,23 @@ module type Network_intf = sig
   type parallel_scan_state
 
   type sync_ledger_query
+
   type sync_ledger_answer
 
   type snark_pool_diff
+
   type transaction_pool_diff
 
   val states : t -> state_with_witness Linear_pipe.Reader.t
+
   val snark_pool_diffs : t -> snark_pool_diff Linear_pipe.Reader.t
+
   val transaction_pool_diffs : t -> transaction_pool_diff Linear_pipe.Reader.t
 
   val broadcast_state : t -> state_with_witness -> unit
+
   val broadcast_snark_pool_diff : t -> snark_pool_diff -> unit
+
   val broadcast_transaction_pool_diff : t -> transaction_pool_diff -> unit
 
   module Ledger_builder_io :
@@ -79,23 +83,32 @@ module type Network_intf = sig
   val create :
        Config.t
     -> get_ledger_builder_aux_at_hash:(   ledger_builder_hash
-                                   -> (parallel_scan_state * ledger_hash) option
-                                      Deferred.t)
-    -> answer_sync_ledger_query: ( ledger_hash * sync_ledger_query -> (ledger_hash * sync_ledger_answer) Deferred.t)
+                                       -> (parallel_scan_state * ledger_hash)
+                                          option
+                                          Deferred.t)
+    -> answer_sync_ledger_query:(   ledger_hash * sync_ledger_query
+                                 -> (ledger_hash * sync_ledger_answer)
+                                    Deferred.t)
     -> t Deferred.t
 end
 
 module type Transaction_pool_intf = sig
   type t
+
   type pool_diff
-  type transaction_with_valid_signature 
+
+  type transaction_with_valid_signature
+
   type transaction
 
   val transactions : t -> transaction_with_valid_signature Sequence.t
 
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
-  val load : disk_location:string -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t Deferred.t
+  val load :
+       disk_location:string
+    -> incoming_diffs:pool_diff Linear_pipe.Reader.t
+    -> t Deferred.t
 
   val add : t -> transaction -> unit Deferred.t
 end
@@ -164,12 +177,11 @@ module type Ledger_builder_controller_intf = sig
   val local_get_ledger :
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
 
-  val strongest_ledgers
-    : t
-    -> (ledger_builder * external_transition)
-         Linear_pipe.Reader.t
+  val strongest_ledgers :
+    t -> (ledger_builder * external_transition) Linear_pipe.Reader.t
 
-  val handle_sync_ledger_queries : ledger_hash * sync_query -> ledger_hash * sync_answer
+  val handle_sync_ledger_queries :
+    ledger_hash * sync_query -> ledger_hash * sync_answer
 end
 
 module type Miner_intf = sig
@@ -279,8 +291,10 @@ module type Inputs_intf = sig
 
   module Sync_ledger : sig
     type query [@@deriving bin_io]
+
     type answer [@@deriving bin_io]
   end
+
   module Net :
     Network_intf
     with type state_with_witness := External_transition.t
@@ -328,10 +342,7 @@ module type Inputs_intf = sig
   end
 end
 
-module Make
-    (Inputs : Inputs_intf)
-=
-struct
+module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   type t =
@@ -343,7 +354,7 @@ struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
-    ; best_lb : Ledger_builder.t option ref
+    ; best_lb: Ledger_builder.t option ref
     ; log: Logger.t
     ; ledger_builder_transition_backup_capacity: int }
 
@@ -382,61 +393,72 @@ struct
             Ledger_builder_controller.local_get_ledger ledger_builder hash
           with
           | Ok (lb, state) ->
-              Some ((Ledger_builder.aux lb), Ledger.merkle_root (Ledger_builder.ledger lb))
+              Some
+                ( Ledger_builder.aux lb
+                , Ledger.merkle_root (Ledger_builder.ledger lb) )
           | _ -> None )
         ~answer_sync_ledger_query:(fun query ->
-          return (Ledger_builder_controller.handle_sync_ledger_queries query))
+          return (Ledger_builder_controller.handle_sync_ledger_queries query)
+          )
     in
     Ivar.fill net_ivar net ;
-    don't_wait_for (Linear_pipe.transfer_id (Net.states net) external_transitions_writer);
+    don't_wait_for
+      (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind transaction_pool =
       Transaction_pool.load
         ~disk_location:config.transaction_pool_disk_location
         ~incoming_diffs:(Net.transaction_pool_diffs net)
     in
     don't_wait_for
-      (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
-         ~f:(fun x -> Net.broadcast_transaction_pool_diff net x; Deferred.unit));
+      (Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool) ~f:
+         (fun x ->
+           Net.broadcast_transaction_pool_diff net x ;
+           Deferred.unit )) ;
     let%bind snark_pool =
       Snark_pool.load ~disk_location:config.snark_pool_disk_location
         ~incoming_diffs:(Net.snark_pool_diffs net)
     in
     don't_wait_for
-      (Linear_pipe.iter (Snark_pool.broadcasts snark_pool)
-         ~f:(fun x -> Net.broadcast_snark_pool_diff net x; Deferred.unit));
+      (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
+           Net.broadcast_snark_pool_diff net x ;
+           Deferred.unit )) ;
     let strongest_ledgers_for_miner, strongest_ledgers_for_network =
-      Linear_pipe.fork2 (Ledger_builder_controller.strongest_ledgers ledger_builder)
+      Linear_pipe.fork2
+        (Ledger_builder_controller.strongest_ledgers ledger_builder)
     in
     let best_lb : Ledger_builder.t option ref = ref None in
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
-      (* TODO: Don't just hack this here *)
-      best_lb := Some lb;
-      Net.broadcast_state net t; Deferred.unit)
-    |> don't_wait_for;
+        (* TODO: Don't just hack this here *)
+        best_lb := Some lb ;
+        Net.broadcast_state net t ;
+        Deferred.unit )
+    |> don't_wait_for ;
     let miner =
       Miner.create ~parent_log:config.log
-        ~change_feeder:(
-          Linear_pipe.map strongest_ledgers_for_miner
-            ~f:(fun (ledger_builder, { state; state_proof; _ }) ->
-              Miner.Tip_change
-                { state = (state, state_proof)
-                ; ledger_builder
-                ; transactions = Transaction_pool.transactions transaction_pool
-                }))
+        ~change_feeder:
+          (Linear_pipe.map strongest_ledgers_for_miner ~f:
+             (fun (ledger_builder, {state; state_proof; _}) ->
+               Miner.Tip_change
+                 { state= (state, state_proof)
+                 ; ledger_builder
+                 ; transactions= Transaction_pool.transactions transaction_pool
+                 } ))
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
     in
-    don't_wait_for (Linear_pipe.transfer_id (Miner.transitions miner) external_transitions_writer);
+    don't_wait_for
+      (Linear_pipe.transfer_id (Miner.transitions miner)
+         external_transitions_writer) ;
     return
-    { miner
-    ; net
-    ; best_lb
-    ; external_transitions= external_transitions_writer
-    ; transaction_pool
-    ; snark_pool
-    ; ledger_builder
-    ; log= config.log
-    ; ledger_builder_transition_backup_capacity=
-        config.ledger_builder_transition_backup_capacity }
+      { miner
+      ; net
+      ; best_lb
+      ; external_transitions= external_transitions_writer
+      ; transaction_pool
+      ; snark_pool
+      ; ledger_builder
+      ; log= config.log
+      ; ledger_builder_transition_backup_capacity=
+          config.ledger_builder_transition_backup_capacity }
 
   let forget_diff_validity
       { Ledger_builder_diff.With_valid_signatures_and_proofs.prev_hash

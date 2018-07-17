@@ -103,7 +103,8 @@ module type S = sig
 
   val new_goal : t -> root_hash -> unit
 
-  val wait_until_valid : t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
+  val wait_until_valid :
+    t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
 
   val apply_or_queue_diff : t -> diff -> unit
 
@@ -136,7 +137,6 @@ For a given addr, there are three possibilities:
 
 We want all_valid when every leaf of the tree is `Valid
 *)
-
 (* TODO: This is a waste of memory *)
 module Valid (Addr : Addr_intf) :
   Validity_intf with type addr := Addr.t =
@@ -192,11 +192,11 @@ module Make
     (Valid : Validity_intf with type addr := Addr.t) (Account : sig
         type t [@@deriving bin_io]
     end)
-    (Hash : Hash_intf)
-    (Root_hash : sig
-       type t [@@deriving eq]
-       val to_hash : t -> Hash.t
-     end)
+    (Hash : Hash_intf) (Root_hash : sig
+        type t [@@deriving eq]
+
+        val to_hash : t -> Hash.t
+    end)
     (MT : Merkle_tree_intf
           with type hash := Hash.t
            and type root_hash := Root_hash.t
@@ -364,9 +364,10 @@ struct
 
   let wait_until_valid t h =
     if not (Root_hash.equal h t.desired_root) then return `Target_changed
-    else Deferred.map (Ivar.read t.validity_listener) ~f:(function
-      | `Target_changed -> `Target_changed
-      | `Ok -> `Ok t.tree)
+    else
+      Deferred.map (Ivar.read t.validity_listener) ~f:(function
+        | `Target_changed -> `Target_changed
+        | `Ok -> `Ok t.tree )
 
   let apply_or_queue_diff t d =
     (* Need some interface for the diffs, not sure the layering is right here. *)

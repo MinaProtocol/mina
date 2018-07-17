@@ -69,7 +69,9 @@ module type Signed_intf = sig
   val length : int
 
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
+
   val sgn : t -> Sgn.t
+
   val magnitude : t -> magnitude
 
   type nonrec var = (magnitude_var, Sgn.var) t_
@@ -448,6 +450,7 @@ module Amount = struct
        and module Checked := T.Checked )
 
   let of_fee (fee: Fee.t) : t = fee
+
   let to_fee (fee: t) : Fee.t = fee
 
   let add_fee (t: t) (fee: Fee.t) = add t (of_fee fee)
@@ -456,6 +459,7 @@ module Amount = struct
     include T.Checked
 
     let of_fee (fee: Fee.var) = var_of_bits (Fee.var_to_bits fee)
+
     let to_fee (t: var) : Fee.var = Fee.var_of_bits (var_to_bits t)
 
     let add_fee (t: var) (fee: Fee.var) =

@@ -116,7 +116,7 @@ let daemon =
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool") ())
          in
          Run.setup_local_server ~minibit ~client_port ~log ;
-         Run.run_snark_worker ~log ~client_port run_snark_worker ;
+         Run.run_snark_worker ~log ~client_port run_snark_worker
        in
        Async.never ())
 

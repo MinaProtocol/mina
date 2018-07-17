@@ -39,9 +39,9 @@ module Debug = struct
 
   let statement =
     let x =
-      lazy (
-      Quickcheck.Generator.generate ~size:0 Transaction_snark.Statement.gen
-        (Splittable_random.State.of_int 0))
+      lazy
+        (Quickcheck.Generator.generate ~size:0 Transaction_snark.Statement.gen
+           (Splittable_random.State.of_int 0))
     in
     fun () -> Lazy.force x
 

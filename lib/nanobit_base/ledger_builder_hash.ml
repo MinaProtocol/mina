@@ -23,5 +23,5 @@ type ledger_builder_aux_hash = Aux_hash.Stable.V1.t [@@deriving bin_io]
 let of_aux_and_ledger_hash ledger_builder_aux_hash ledger_hash =
   let h = Cryptokit.Hash.sha3 256 in
   h#add_string (Ledger_hash.to_bytes ledger_hash) ;
-  h#add_string (to_bytes ledger_builder_aux_hash);
+  h#add_string (to_bytes ledger_builder_aux_hash) ;
   of_bytes h#result

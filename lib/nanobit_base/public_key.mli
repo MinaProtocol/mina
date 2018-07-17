@@ -34,6 +34,7 @@ module Compressed : sig
   val typ : (var, t) Typ.t
 
   include Comparable.S_binable with type t := t
+
   include Hashable.S_binable with type t := t
 
   val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc

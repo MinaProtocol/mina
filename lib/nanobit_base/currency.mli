@@ -83,7 +83,9 @@ module type Signed_intf = sig
   val length : int
 
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
+
   val sgn : t -> Sgn.t
+
   val magnitude : t -> magnitude
 
   type nonrec var = (magnitude_var, Sgn.var) t_
@@ -126,6 +128,7 @@ module Fee : sig
   include Arithmetic_intf with type t := t
 
   (* TODO: Get rid of signed fee, use signed amount *)
+
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var
 
@@ -147,7 +150,9 @@ module Amount : sig
     Signed_intf with type magnitude := t and type magnitude_var := var
 
   (* TODO: Delete these functions *)
+
   val of_fee : Fee.t -> t
+
   val to_fee : t -> Fee.t
 
   val add_fee : t -> Fee.t -> t option
@@ -160,6 +165,7 @@ module Amount : sig
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
     val of_fee : Fee.var -> var
+
     val to_fee : var -> Fee.var
 
     val add_fee : var -> Fee.var -> (var, _) Checked.t

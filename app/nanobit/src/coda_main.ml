@@ -355,7 +355,7 @@ struct
 
     let transactions t = Pool.transactions (pool t)
 
-(* TODO: This causes the signature to get checked twice as it is checked
+    (* TODO: This causes the signature to get checked twice as it is checked
    below before feeding it to add *)
     let add t txn = apply_and_broadcast t [txn]
   end
@@ -499,7 +499,8 @@ struct
       (struct
         include Ledger_hash
 
-        let to_hash (h: t) = Merkle_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+        let to_hash (h: t) =
+          Merkle_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
       end)
       (struct
         include Ledger
@@ -705,25 +706,22 @@ module Run (Program : Main_intf) = struct
     let%map account = Ledger.get ledger addr in
     account.Account.balance
 
-  let is_valid_transaction t (txn : Transaction.t) =
+  let is_valid_transaction t (txn: Transaction.t) =
     let remainder =
       let open Option.Let_syntax in
       let%bind balance = get_balance t (Public_key.compress txn.sender)
-      and cost =
-        Currency.Amount.add_fee txn.payload.amount txn.payload.fee
-      in
+      and cost = Currency.Amount.add_fee txn.payload.amount txn.payload.fee in
       Currency.Balance.sub_amount balance cost
     in
     Option.is_some remainder
 
   let send_txn log t txn =
     let open Deferred.Let_syntax in
-    assert (is_valid_transaction t txn);
+    assert (is_valid_transaction t txn) ;
     let txn_pool = transaction_pool t in
     let%map () = Transaction_pool.add txn_pool txn in
     Logger.info log
-      !"Added transaction %{sexp: Transaction.t} to \
-        pool successfully"
+      !"Added transaction %{sexp: Transaction.t} to pool successfully"
       txn
 
   let get_nonce t (addr: Public_key.Compressed.t) =
@@ -740,10 +738,9 @@ module Run (Program : Main_intf) = struct
     (* Setup RPC server for client interactions *)
     let client_impls =
       [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun () ->
-          send_txn log minibit
-        )
+            send_txn log minibit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
-            return (get_balance minibit pk))
+            return (get_balance minibit pk) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () -> get_nonce minibit)
       ]
     in
@@ -796,7 +793,7 @@ module Run (Program : Main_intf) = struct
     | `With_public_key public_key ->
         create_snark_worker ~log ~public_key ~client_port |> ignore
 
-(*
+  (*
   let setup_client_server ~minibit ~log ~client_port =
     (* Setup RPC server for client interactions *)
     let module Client_server = Client.Rpc_server (struct

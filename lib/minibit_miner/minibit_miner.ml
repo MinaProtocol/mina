@@ -5,7 +5,10 @@ module type Inputs_intf = sig
   include Protocols.Coda_pow.Inputs_intf
 
   module Prover : sig
-    val prove : prev_state:(State.t * State.Proof.t) -> Internal_transition.t -> State.Proof.t Deferred.Or_error.t
+    val prove :
+         prev_state:State.t * State.Proof.t
+      -> Internal_transition.t
+      -> State.Proof.t Deferred.Or_error.t
   end
 end
 
@@ -92,7 +95,7 @@ struct
     val cancel : t -> unit
 
     val create :
-         state:(State.t * State.Proof.t)
+         state:State.t * State.Proof.t
       -> ledger_builder:Ledger_builder.t
       -> transactions:Transaction.With_valid_signature.t Sequence.t
       -> get_completed_work:(   Completed_work.Statement.t
@@ -112,7 +115,8 @@ struct
       Hashing_result.cancel t.hashing_result ;
       Ivar.fill_if_empty t.cancellation ()
 
-    let create ~state:(state, state_proof) ~ledger_builder ~transactions ~get_completed_work =
+    let create ~state:(state, state_proof) ~ledger_builder ~transactions
+        ~get_completed_work =
       let ( diff
           , `Hash_after_applying (next_ledger_builder_hash, next_ledger_hash)
           , `Ledger_proof ledger_proof_opt ) =
@@ -128,21 +132,23 @@ struct
         let result =
           match%bind Hashing_result.result hashing_result with
           | `Ok (new_state, nonce) ->
-            let transition = 
-              { Internal_transition.ledger_hash= next_ledger_hash
-              ; ledger_builder_hash= next_ledger_builder_hash
-              ; ledger_proof= ledger_proof_opt
-              ; ledger_builder_diff= Ledger_builder_diff.forget diff
-              ; timestamp= new_state.timestamp
-              ; nonce }
-            in
-            let open Deferred.Or_error.Let_syntax in
-            let%map state_proof = Prover.prove ~prev_state:(state, state_proof) transition in
-            { External_transition.state_proof
-            ; state = new_state
-            ; ledger_builder_diff = Ledger_builder_diff.forget diff
-            }
-          | `Cancelled -> Deferred.return (Or_error.error_string "Mining cancelled")
+              let transition =
+                { Internal_transition.ledger_hash= next_ledger_hash
+                ; ledger_builder_hash= next_ledger_builder_hash
+                ; ledger_proof= ledger_proof_opt
+                ; ledger_builder_diff= Ledger_builder_diff.forget diff
+                ; timestamp= new_state.timestamp
+                ; nonce }
+              in
+              let open Deferred.Or_error.Let_syntax in
+              let%map state_proof =
+                Prover.prove ~prev_state:(state, state_proof) transition
+              in
+              { External_transition.state_proof
+              ; state= new_state
+              ; ledger_builder_diff= Ledger_builder_diff.forget diff }
+          | `Cancelled ->
+              Deferred.return (Or_error.error_string "Mining cancelled")
         in
         Deferred.any
           [ ( Ivar.read cancellation

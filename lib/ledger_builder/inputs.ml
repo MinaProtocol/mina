@@ -25,8 +25,8 @@ module type S = sig
   end
 
   module Public_key : sig
-    type t
-    [@@deriving sexp, bin_io, compare]
+    type t [@@deriving sexp, bin_io, compare]
+
     include Comparable.S with type t := t
   end
 
@@ -51,15 +51,17 @@ module type S = sig
       { source: Ledger_hash.t
       ; target: Ledger_hash.t
       ; fee_excess: Fee.Signed.t
-      ; proof_type: [ `Base | `Merge ] }
+      ; proof_type: [`Base | `Merge] }
     [@@deriving bin_io, sexp]
   end
 
   module Ledger_proof : sig
     include Coda_pow.Ledger_proof_intf
-      with type statement := Ledger_proof_statement.t
-       and type message := Fee.Unsigned.t * Public_key.t
+            with type statement := Ledger_proof_statement.t
+             and type message := Fee.Unsigned.t * Public_key.t
+
     include Binable.S with type t := t
+
     include Sexpable.S with type t := t
   end
 
@@ -71,7 +73,8 @@ module type S = sig
 
   module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
 
-  module Ledger_builder_hash : Coda_pow.Ledger_builder_hash_intf
+  module Ledger_builder_hash :
+    Coda_pow.Ledger_builder_hash_intf
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
 
@@ -87,7 +90,8 @@ module type S = sig
     with type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
      and type transaction := Transaction.t
-     and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+     and type transaction_with_valid_signature :=
+                Transaction.With_valid_signature.t
      and type public_key := Public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 

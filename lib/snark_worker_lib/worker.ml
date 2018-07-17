@@ -10,10 +10,9 @@ module State = struct
   let create () =
     let open Async in
     let%map proving = Snark_keys.transaction_proving ()
-    and verification = Snark_keys.transaction_verification ()
-    in
+    and verification = Snark_keys.transaction_verification () in
     ( module Transaction_snark.Make (struct
-          let keys = { Transaction_snark.Keys.proving; verification }
+      let keys = {Transaction_snark.Keys.proving; verification}
     end)
     : S )
 end

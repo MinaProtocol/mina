@@ -150,12 +150,13 @@ type t =
 [@@deriving fields, sexp, bin_io]
 
 let statement {source; target; proof_type; fee_excess; proof= _} =
-  { Statement.source; target; proof_type
-  ; fee_excess =
+  { Statement.source
+  ; target
+  ; proof_type
+  ; fee_excess=
       Currency.Fee.Signed.create
-        ~magnitude:(Currency.Amount.(to_fee (Signed.magnitude fee_excess)))
-        ~sgn:(Currency.Amount.Signed.sgn fee_excess)
-  }
+        ~magnitude:Currency.Amount.(to_fee (Signed.magnitude fee_excess))
+        ~sgn:(Currency.Amount.Signed.sgn fee_excess) }
 
 let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
 

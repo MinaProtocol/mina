@@ -454,8 +454,7 @@ end = struct
                 state.ktree <- Some new_tree ;
                 state.locked_ledger_builder <- lb ;
                 Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
-                  strongest_ledgers_reader
-                  (lb, transition) ;
+                  strongest_ledgers_reader (lb, transition) ;
                 Option.iter !sl_ref ~f:Sync_ledger.destroy ;
                 sl_ref := None
             | Error e ->
@@ -692,8 +691,7 @@ let%test_module "test" =
               State_hash.Table.add_exn tbl ~key:(State.hash s) ~data:s ) ;
           tbl
 
-        let get_ledger_builder_aux_at_hash t hash =
-          return (Ok hash)
+        let get_ledger_builder_aux_at_hash t hash = return (Ok hash)
 
         let glue_sync_ledger t q a =
           don't_wait_for
