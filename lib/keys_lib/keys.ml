@@ -31,6 +31,8 @@ module type S = sig
 
     module Prover_state = Step_prover_state
 
+    val instance_hash : Blockchain_snark.Blockchain_state.t -> Tick.Field.t
+
     val main : Tick.Field.var -> (unit, Prover_state.t) Tick.Checked.t
   end
 
@@ -92,6 +94,19 @@ let create () =
               module type of Step with module Prover_state := Step.Prover_state )
 
           module Prover_state = Step_prover_state
+
+          let instance_hash =
+            let open Nanobit_base in
+            let s =
+              let wrap_vk = Tock.Keypair.vk Wrap.keys in
+              Tick.Pedersen.State.update_fold
+                Hash_prefix.transition_system_snark
+                (List.fold
+                   (Step.Verifier.Verification_key.to_bool_list wrap_vk))
+            in
+            fun state ->
+              Tick.Pedersen.digest_fold s
+                (State_hash.fold (Blockchain_state.hash state))
 
           let main x =
             let there {Prover_state.wrap_vk; prev_proof; prev_state; update} =

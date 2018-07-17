@@ -28,6 +28,8 @@
       snark_keys
       snark_pool
       network_pool
+      snark_worker_lib
+      keys_lib
       storage
       logger
       async

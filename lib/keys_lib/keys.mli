@@ -30,6 +30,8 @@ module type S = sig
 
     module Prover_state = Step_prover_state
 
+    val instance_hash : Blockchain_snark.Blockchain_state.t -> Tick.Field.t
+
     val main : Tick.Field.var -> (unit, Prover_state.t) Tick.Checked.t
   end
 

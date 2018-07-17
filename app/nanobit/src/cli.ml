@@ -2,7 +2,7 @@ open Core
 open Async
 open Nanobit_base
 open Blockchain_snark
-open Cli_common
+open Cli_lib
 open Coda_main
 
 let daemon =
@@ -11,6 +11,9 @@ let daemon =
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"Configuration directory" (optional file)
      and should_mine = flag "mine" ~doc:"Run the miner" (optional bool)
+     and run_snark_worker =
+       flag "run-snark-worker" ~doc:"Run the SNARK worker"
+         (optional public_key_compressed)
      and port =
        flag "port"
          ~doc:
@@ -89,6 +92,10 @@ let daemon =
        let module Run = Run (M) in
        let%bind () =
          let open M in
+         let run_snark_worker =
+           Option.value_map run_snark_worker ~default:`Don't_run ~f:(fun k ->
+               `With_public_key k )
+         in
          let net_config =
            { Inputs.Net.Config.parent_log= log
            ; gossip_net_params=
@@ -108,7 +115,8 @@ let daemon =
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool") ())
          in
-         Run.setup_client_server ~minibit ~client_port ~log
+         Run.setup_local_server ~minibit ~client_port ~log ;
+         Run.run_snark_worker ~log ~client_port run_snark_worker ;
        in
        Async.never ())
 
