@@ -89,6 +89,7 @@ module type Transaction_pool_intf = sig
   type t
   type pool_diff
   type transaction_with_valid_signature 
+  type transaction
 
   val transactions : t -> transaction_with_valid_signature Sequence.t
 
@@ -96,7 +97,7 @@ module type Transaction_pool_intf = sig
 
   val load : disk_location:string -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t Deferred.t
 
-  val add : t -> transaction_with_valid_signature -> unit
+  val add : t -> transaction -> unit Deferred.t
 end
 
 module type Snark_pool_intf = sig
@@ -285,6 +286,7 @@ module type Inputs_intf = sig
     Transaction_pool_intf
     with type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
+     and type transaction := Transaction.t
 
   module Sync_ledger : sig
     type query [@@deriving bin_io]

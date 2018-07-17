@@ -4,20 +4,20 @@ open Currency
 
 include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
           (struct
-            type hash = Tick.Pedersen.Digest.t
+            type hash = Merkle_hash.t
             [@@deriving sexp, hash, compare, bin_io]
 
             let merge = Merkle_hash.merge
 
             let empty_hash = Merkle_hash.empty_hash
 
-            let hash_account = Account.digest
+            let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
           end)
           (struct
             let depth = ledger_depth
           end)
 
-let merkle_root t = Ledger_hash.of_hash (merkle_root t)
+let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t )
 
 let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
 

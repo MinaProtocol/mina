@@ -87,8 +87,7 @@ let send_txn =
               (txn :> Transaction.t)
               port
           with
-          | Ok (Some ()) -> printf "Successfully enqueued txn in pool\n"
-          | Ok None -> printf "Txn can't be signed properly\n"
+          | Ok () -> printf "Successfully enqueued txn in pool\n"
           | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e))
 
 let command =

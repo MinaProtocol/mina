@@ -3,11 +3,7 @@ open Nanobit_base
 open Snark_params.Tick
 
 include Sparse_ledger.Make (struct
-            include Pedersen.Digest
-
-            let equal = Pedersen.Digest.( = )
-
-            let merge = Merkle_hash.merge
+            include Merkle_hash
           end)
           (Public_key.Compressed.Stable.V1)
           (struct
@@ -15,7 +11,7 @@ include Sparse_ledger.Make (struct
 
             let key {Account.public_key} = public_key
 
-            let hash = Account.digest
+            let hash = Fn.compose Merkle_hash.of_digest Account.digest
           end)
 
 let of_ledger_subset_exn ledger keys =
@@ -26,7 +22,7 @@ let of_ledger_subset_exn ledger keys =
         (Option.value_exn (Ledger.get ledger key)) )
     ~init:
       (of_hash ~depth:Ledger.depth
-         (Ledger.merkle_root ledger :> Pedersen.Digest.t))
+         (Merkle_hash.of_digest (Ledger.merkle_root ledger :> Pedersen.Digest.t)))
 
 let apply_transaction_exn t
     ({sender; payload= {amount; fee; receiver}}: Transaction.t) =
@@ -73,7 +69,7 @@ let apply_transition_exn t transition =
   | Transaction_snark.Transition.Fee_transfer tr -> apply_fee_transfer_exn t tr
   | Transaction tr -> apply_transaction_exn t (tr :> Transaction.t)
 
-let merkle_root t = Ledger_hash.of_hash (merkle_root t)
+let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 
 let handler t =
   let ledger = ref t in
@@ -84,10 +80,10 @@ let handler t =
       match request with
       | Ledger_hash.Get_element idx ->
           let elt = get_exn !ledger idx in
-          let path = path_exn idx in
+          let path = (path_exn idx :> Pedersen.Digest.t list) in
           respond (Provide (elt, path))
       | Ledger_hash.Get_path idx ->
-          let path = path_exn idx in
+          let path = (path_exn idx :> Pedersen.Digest.t list) in
           respond (Provide path)
       | Ledger_hash.Set (idx, account) ->
           ledger := set_exn !ledger idx account ;

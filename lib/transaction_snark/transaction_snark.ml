@@ -224,10 +224,10 @@ let handle_with_ledger (ledger: Ledger.t) =
     | Get_element idx ->
         let elt = Ledger.get_at_index_exn ledger idx in
         let path = path_at_index idx in
-        respond (Provide (elt, path))
+        respond (Provide (elt, (path :> Pedersen.Digest.t list)))
     | Get_path idx ->
         let path = path_at_index idx in
-        respond (Provide path)
+        respond (Provide (path :> Pedersen.Digest.t list))
     | Set (idx, account) ->
         Ledger.set_at_index_exn ledger idx account ;
         respond (Provide ())

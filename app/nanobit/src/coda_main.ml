@@ -355,7 +355,9 @@ struct
 
     let transactions t = Pool.transactions (pool t)
 
-    let add t = Pool.add (pool t)
+(* TODO: This causes the signature to get checked twice as it is checked
+   below before feeding it to add *)
+    let add t txn = apply_and_broadcast t [txn]
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
@@ -497,7 +499,7 @@ struct
       (struct
         include Ledger_hash
 
-        let to_hash (h: t) = (h :> Merkle_hash.t)
+        let to_hash (h: t) = Merkle_hash.of_digest (h :> Snark_params.Tick.Pedersen.Digest.t)
       end)
       (struct
         include Ledger
@@ -669,7 +671,7 @@ module type Main_intf = sig
     module Transaction_pool : sig
       type t
 
-      val add : t -> Transaction.With_valid_signature.t -> unit
+      val add : t -> Transaction.t -> unit Deferred.t
     end
   end
 
@@ -698,29 +700,31 @@ module Run (Program : Main_intf) = struct
   open Inputs
 
   let get_balance t (addr: Public_key.Compressed.t) =
-    let maybe_balance =
+    let open Option.Let_syntax in
+    let%bind ledger = best_ledger t in
+    let%map account = Ledger.get ledger addr in
+    account.Account.balance
+
+  let is_valid_transaction t (txn : Transaction.t) =
+    let remainder =
       let open Option.Let_syntax in
-      let%bind ledger = best_ledger t in
-      let%map account = Ledger.get ledger addr in
-      account.Account.balance
+      let%bind balance = get_balance t (Public_key.compress txn.sender)
+      and cost =
+        Currency.Amount.add_fee txn.payload.amount txn.payload.fee
+      in
+      Currency.Balance.sub_amount balance cost
     in
-    Deferred.return maybe_balance
+    Option.is_some remainder
 
   let send_txn log t txn =
-    let maybe_sent =
-      let open Option.Let_syntax in
-      let%bind ledger = best_ledger t in
-      let%map txn = Transaction.check txn in
-      let ledger' = Ledger.copy ledger in
-      let () = Ledger.apply_transaction ledger' txn |> Or_error.ok_exn in
-      let txn_pool = transaction_pool t in
-      Transaction_pool.add txn_pool txn ;
-      Logger.info log
-        !"Added transaction %{sexp: Transaction.With_valid_signature.t} to \
-          pool successfully"
-        txn
-    in
-    Deferred.return maybe_sent
+    let open Deferred.Let_syntax in
+    assert (is_valid_transaction t txn);
+    let txn_pool = transaction_pool t in
+    let%map () = Transaction_pool.add txn_pool txn in
+    Logger.info log
+      !"Added transaction %{sexp: Transaction.t} to \
+        pool successfully"
+      txn
 
   let get_nonce t (addr: Public_key.Compressed.t) =
     let maybe_nonce =
@@ -731,6 +735,68 @@ module Run (Program : Main_intf) = struct
     in
     Deferred.return maybe_nonce
 
+  let setup_local_server ~minibit ~log ~client_port =
+    let log = Logger.child log "client" in
+    (* Setup RPC server for client interactions *)
+    let client_impls =
+      [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun () ->
+          send_txn log minibit
+        )
+      ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
+            return (get_balance minibit pk))
+      ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () -> get_nonce minibit)
+      ]
+    in
+    let snark_worker_impls = [] in
+    let where_to_listen =
+      Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
+    in
+    ignore
+      (Tcp.Server.create
+         ~on_handler_error:
+           (`Call
+             (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+         where_to_listen
+         (fun address reader writer ->
+           Rpc.Connection.server_with_close reader writer
+             ~implementations:
+               (Rpc.Implementations.create_exn
+                  ~implementations:(client_impls @ snark_worker_impls)
+                  ~on_unknown_rpc:`Raise)
+             ~connection_state:(fun _ -> ())
+             ~on_handshake_error:
+               (`Call
+                 (fun exn ->
+                   Logger.error log "%s" (Exn.to_string_mach exn) ;
+                   Deferred.unit )) ))
+
+  let create_snark_worker ~log ~public_key ~client_port =
+    let open Snark_worker_lib in
+    let our_binary = Sys.argv.(0) in
+    let%map p =
+      Process.create_exn () ~prog:our_binary
+        ~args:
+          ( Worker.command_name
+          :: Worker.arguments ~public_key ~daemon_port:client_port )
+    in
+    let log = Logger.child log "snark_worker" in
+    Pipe.iter_without_pushback
+      (Reader.pipe (Process.stdout p))
+      ~f:(fun s -> Logger.info log "%s" s)
+    |> don't_wait_for ;
+    Pipe.iter_without_pushback
+      (Reader.pipe (Process.stderr p))
+      ~f:(fun s -> Logger.error log "%s" s)
+    |> don't_wait_for ;
+    Deferred.unit
+
+  let run_snark_worker ~log ~client_port run_snark_worker =
+    match run_snark_worker with
+    | `Don't_run -> ()
+    | `With_public_key public_key ->
+        create_snark_worker ~log ~public_key ~client_port |> ignore
+
+(*
   let setup_client_server ~minibit ~log ~client_port =
     (* Setup RPC server for client interactions *)
     let module Client_server = Client.Rpc_server (struct
@@ -743,4 +809,5 @@ module Run (Program : Main_intf) = struct
       let send_txn = send_txn log
     end) in
     Client_server.init_server ~parent_log:log ~minibit ~port:client_port
+*)
 end

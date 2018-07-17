@@ -16,3 +16,4 @@ let empty_hash =
   Tick.Pedersen.hash_bigstring
     (Bigstring.of_string "nothing up my sleeve")
 
+let of_digest = Fn.id

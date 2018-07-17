@@ -3,7 +3,7 @@ open Async
 open Nanobit_base
 open Util
 open Blockchain_snark
-open Cli_common
+open Cli_lib
 open Snark_params
 
 module Worker_state = struct
