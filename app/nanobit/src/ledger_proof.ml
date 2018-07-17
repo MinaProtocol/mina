@@ -37,7 +37,7 @@ module Debug = struct
 
   let proof () = Proof.dummy
 
-  let statement _ =
+  let statement =
     let x =
       lazy (
       Quickcheck.Generator.generate ~size:0 Transaction_snark.Statement.gen
