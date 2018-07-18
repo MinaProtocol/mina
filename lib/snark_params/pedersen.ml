@@ -1,4 +1,5 @@
 open Core_kernel
+open Snark_bits
 
 module type S = sig
   type curve

@@ -2,6 +2,8 @@ open Core
 open Snark_params
 open Tick
 open Let_syntax
+open Snark_bits
+open Bitstring_lib
 
 module type Basic = sig
   type t [@@deriving sexp, compare, eq, hash]
@@ -54,7 +56,7 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
-  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare]
+  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare, eq]
 
   val gen : t Quickcheck.Generator.t
 
@@ -62,7 +64,7 @@ module type Signed_intf = sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq]
     end
   end
 
@@ -218,17 +220,17 @@ end = struct
   let var_of_t t =
     List.init M.length (fun i -> Boolean.var_of_value (Vector.get t i))
 
-  type magnitude = t [@@deriving sexp, bin_io, hash, compare]
+  type magnitude = t [@@deriving sexp, bin_io, hash, compare, eq]
 
   module Signed = struct
     module Stable = struct
       module V1 = struct
         type ('magnitude, 'sgn) t_ = {magnitude: 'magnitude; sgn: 'sgn}
-        [@@deriving bin_io, sexp, hash, compare, fields]
+        [@@deriving bin_io, sexp, hash, compare, fields, eq]
 
         let create ~magnitude ~sgn = {magnitude; sgn}
 
-        type t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp, hash, compare]
+        type t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp, hash, compare, eq]
       end
     end
 
@@ -244,10 +246,10 @@ end = struct
 
     let length = Int.( + ) length 1
 
-    let of_hlist : (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
-      H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
+    let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
+      Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
 
-    let to_hlist {magnitude; sgn} = H_list.[magnitude; sgn]
+    let to_hlist {magnitude; sgn} = Snarky.H_list.[magnitude; sgn]
 
     let typ =
       Typ.of_hlistable

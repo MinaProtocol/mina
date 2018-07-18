@@ -1,0 +1,18 @@
+(jbuild_version 1)
+
+(library
+ ((name currency)
+  (public_name currency)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core
+      snark_bits
+      sgn
+      snark_params
+      unsigned_extended
+      ))
+  (preprocess (pps (ppx_jane ppx_deriving.std)))
+  (synopsis "Currency types")))
+
