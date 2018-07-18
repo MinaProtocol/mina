@@ -186,11 +186,9 @@ end = struct
       let%bind a, b = Interval_union.to_interval t.support in
       let%map () =
         if a <> 0 then
-          Or_error.error_string
-            (Printf.sprintf
-               "to_initial_segment: Left endpoint was not zero interval: (%d, \
-                %d)"
-               a b)
+          Or_error.errorf
+            "to_initial_segment: Left endpoint was not zero interval: (%d, %d)"
+            a b
         else Ok ()
       in
       (digest (acc t), `Length b)
