@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name sparse_ledger)
-  (public_name sparse_ledger)
+ ((name sparse_ledger_lib)
+  (public_name sparse_ledger_lib)
   (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)

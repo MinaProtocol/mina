@@ -2,27 +2,7 @@ open Core
 open Protocols
 
 module type S = sig
-  module Fee : sig
-    module Unsigned : sig
-      type t [@@deriving sexp_of, eq]
-
-      val add : t -> t -> t option
-
-      val sub : t -> t -> t option
-
-      val zero : t
-    end
-
-    module Signed : sig
-      type t [@@deriving sexp_of]
-
-      val add : t -> t -> t option
-
-      val negate : t -> t
-
-      val of_unsigned : Unsigned.t -> t
-    end
-  end
+  open Coda_pow
 
   module Public_key : sig
     type t [@@deriving sexp, bin_io, compare]
@@ -31,18 +11,17 @@ module type S = sig
   end
 
   module Transaction :
-    Coda_pow.Transaction_intf with type fee := Fee.Unsigned.t
+    Coda_pow.Transaction_intf
+    with type public_key := Public_key.t
 
   module Fee_transfer :
     Coda_pow.Fee_transfer_intf
     with type public_key := Public_key.t
-     and type fee := Fee.Unsigned.t
 
   module Super_transaction :
     Coda_pow.Super_transaction_intf
     with type valid_transaction := Transaction.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
-     and type unsigned_fee := Fee.Unsigned.t
 
   module Ledger_hash : Coda_pow.Ledger_hash_intf
 
@@ -52,7 +31,7 @@ module type S = sig
       ; target: Ledger_hash.t
       ; fee_excess: Fee.Signed.t
       ; proof_type: [`Base | `Merge] }
-    [@@deriving bin_io, sexp]
+    [@@deriving bin_io, sexp, eq]
   end
 
   module Ledger_proof : sig
@@ -71,6 +50,13 @@ module type S = sig
      and type super_transaction := Super_transaction.t
      and type valid_transaction := Transaction.With_valid_signature.t
 
+  module Sparse_ledger : sig
+    type t
+    [@@deriving sexp, bin_io]
+
+    val of_ledger_subset_exn : Ledger.t -> Public_key.t list -> t
+  end
+
   module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
 
   module Ledger_builder_hash :
@@ -82,7 +68,6 @@ module type S = sig
     Coda_pow.Completed_work_intf
     with type proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
-     and type fee := Fee.Unsigned.t
      and type public_key := Public_key.t
 
   module Ledger_builder_diff :

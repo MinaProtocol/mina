@@ -114,6 +114,7 @@ struct
     Work_random_set.remove t.solved_work work ;
     Work.Table.remove t.proofs work
 
+  (* TODO imeckler for reviewer: I don't think this should be removing the work *)
   (* TODO: We request a random piece of work if there is unsolved work. 
            If there is no unsolved work, then we choose a uniformly random 
            piece of work from the solved work pool. We need to use different

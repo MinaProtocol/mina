@@ -1,8 +1,7 @@
 open Core
-open Nanobit_base
 open Snark_params.Tick
 
-include Sparse_ledger.Make (struct
+include Sparse_ledger_lib.Sparse_ledger.Make (struct
             include Merkle_hash
           end)
           (Public_key.Compressed.Stable.V1)
@@ -64,9 +63,9 @@ let apply_fee_transfer_exn =
   fun t transfer ->
     List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
 
-let apply_transition_exn t transition =
+let apply_super_transaction_exn t transition =
   match transition with
-  | Transaction_snark.Transition.Fee_transfer tr -> apply_fee_transfer_exn t tr
+  | Super_transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
   | Transaction tr -> apply_transaction_exn t (tr :> Transaction.t)
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)

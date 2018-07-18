@@ -1,5 +1,6 @@
 open Core
 open Snark_params.Tick
+open Snark_bits
 
 module type Basic = sig
   (* TODO: Use stable for bin_io *)

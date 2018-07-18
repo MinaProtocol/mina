@@ -22,3 +22,5 @@ let fee_excess = function
     match Currency.Fee.add fee1 fee2 with
     | None -> Or_error.error_string "Fee_transfer.fee_excess: overflow"
     | Some res -> Ok res
+
+let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)

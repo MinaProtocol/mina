@@ -1,5 +1,6 @@
 open Core_kernel
 open Snark_params
+open Snark_bits
 
 type t [@@deriving sexp, eq]
 
