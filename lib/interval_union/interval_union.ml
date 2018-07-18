@@ -19,8 +19,7 @@ module Interval = struct
     (x, y)
 
   let%test_unit "gen is correct" =
-    Quickcheck.test gen ~f:(fun (x, y) ->
-      assert (x <= y))
+    Quickcheck.test gen ~f:(fun (x, y) -> assert (x <= y))
 end
 
 (* Simplest possible implementation. Should be an increasing list of
@@ -43,11 +42,10 @@ let of_interval i = [i]
 
 let rec canonicalize = function
   | [] -> []
-  | [ i1 ] -> [ i1 ]
+  | [i1] -> [i1]
   | (a1, a2) :: (a3, a4) :: t ->
-    if a2 = a3
-    then canonicalize ((a1, a4) :: t)
-    else (a1, a2) :: canonicalize ((a3, a4) :: t)
+      if a2 = a3 then canonicalize ((a1, a4) :: t)
+      else (a1, a2) :: canonicalize ((a3, a4) :: t)
 
 let rec disjoint_union_exn t1 t2 =
   match (t1, t2) with
@@ -58,8 +56,7 @@ let rec disjoint_union_exn t1 t2 =
     | `Disjoint_ordered -> i1 :: disjoint_union_exn t1' t2
     | `Disjoint_inverted -> i2 :: disjoint_union_exn t1 t2'
 
-let disjoint_union_exn t1 t2 =
-  canonicalize (disjoint_union_exn t1 t2)
+let disjoint_union_exn t1 t2 = canonicalize (disjoint_union_exn t1 t2)
 
 let rec disjoint t1 t2 =
   match (t1, t2) with
@@ -88,20 +85,19 @@ let to_interval = function
 
 let invariant t =
   let rec go = function
-    | [ (a, b) ] -> assert (a <= b)
+    | [(a, b)] -> assert (a <= b)
     | [] -> ()
-    | (a1, b1) :: (((a2, _) :: _) as t) ->
-      assert (a1 <= b1);
-      assert (b1 < a2);
-      go t
+    | (a1, b1) :: ((a2, _) :: _ as t) ->
+        assert (a1 <= b1) ;
+        assert (b1 < a2) ;
+        go t
   in
   go t
 
-let gen_from ?(min_size=0) start =
+let gen_from ?(min_size= 0) start =
   let open Quickcheck.Generator.Let_syntax in
   let rec go acc size start =
-    if size = 0
-    then return (of_intervals_exn (List.rev acc))
+    if size = 0 then return (of_intervals_exn (List.rev acc))
     else
       let%bind ((_, y) as i) = Interval.gen_from start in
       go (i :: acc) (size - 1) y
@@ -111,8 +107,7 @@ let gen_from ?(min_size=0) start =
 
 let gen = gen_from Int.min_value
 
-let%test_unit "check invariant" =
-  Quickcheck.test gen ~f:invariant
+let%test_unit "check invariant" = Quickcheck.test gen ~f:invariant
 
 let gen_disjoint_pair =
   let open Quickcheck.Generator.Let_syntax in
@@ -121,28 +116,24 @@ let gen_disjoint_pair =
   let%map t2 = gen_from y in
   (t1, t2)
 
-let%test_unit "canonicalize" =
-  assert (canonicalize [(1, 2); (2, 3)] = [(1, 3)])
+let%test_unit "canonicalize" = assert (canonicalize [(1, 2); (2, 3)] = [(1, 3)])
 
 let%test_unit "disjoint union doesn't care about order" =
   Quickcheck.test gen_disjoint_pair ~f:(fun (a, b) ->
-    assert (disjoint_union_exn a b = disjoint_union_exn b a)
-  )
+      assert (disjoint_union_exn a b = disjoint_union_exn b a) )
 
 let%test_unit "check invariant on disjoint union" =
   Quickcheck.test gen_disjoint_pair ~f:(fun (a, b) ->
-    invariant (disjoint_union_exn a b)
-  )
+      invariant (disjoint_union_exn a b) )
 
 let%test_unit "disjoint_union works with holes" =
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let s = 1000000  in
+    let s = 1000000 in
     let%bind y0 = Int.gen_incl 0 s in
-    let%bind y1 = Int.gen_incl (y0 + 1) (y0 +  s) in
+    let%bind y1 = Int.gen_incl (y0 + 1) (y0 + s) in
     let%bind y2 = Int.gen_incl (y1 + 1) (y1 + s) in
     let%bind y3 = Int.gen_incl (y2 + 1) (y2 + s) in
     return (of_interval (y1, y2), of_intervals_exn [(y0, y1); (y2, y3)])
   in
-  Quickcheck.test gen ~f:(fun (x, y) ->
-    invariant(disjoint_union_exn x y))
+  Quickcheck.test gen ~f:(fun (x, y) -> invariant (disjoint_union_exn x y))
