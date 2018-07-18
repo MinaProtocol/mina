@@ -3,6 +3,7 @@ module Make
             type t
 
             val hash : bool list -> t
+            val equals: t -> t -> bool
           end)
          (Scalar : sig
             type t
@@ -47,10 +48,12 @@ module Make
   end
   module P_EQDL : sig
     type t
+
+    val toScalar : t -> Scalar.t
   end
 
   val eval : bool list -> Private_key.t -> evaluation
-  (*l verify : Evaluation.t -> bool *)
+  val verify : evaluation -> bool
 
 end =
   struct
@@ -67,6 +70,10 @@ end =
 
     module P_EQDL = struct
       type t = Hash.t * Scalar.t
+
+      let toScalar eqdl =
+        let (c,s) = eqdl in
+        Scalar.from_hash c
     end
 
     type proof = Group.t * P_EQDL.t
@@ -87,5 +94,22 @@ end =
       let eqdl = (proof1, s) in
       let proof = (u, eqdl) in
       (m,y,proof,v)
+
+    let verify (m,y,proof,v) =
+      let (u, eqdl) = proof in
+      let (proof1, s) = eqdl in
+      let y1 = Hash.hash (List.append m (Group.toBits u)) in
+      let g = Group.generator in
+      let gs = Group.scale g s in
+      let c = P_EQDL.toScalar eqdl in
+      let vnegc = Group.scale (Group.inv v) c in
+      let gsvc = Group.add gs vnegc in
+      let hms = Group.scale (Hash_to_group.hash m) s in
+      let unegc = Group.scale (Group.inv u) c in
+      let hmsuc = Group.add hms unegc in
+      let c1 = Hash.hash (List.append (List.append m (Group.toBits v)) (List.append (Group.toBits gsvc) (Group.toBits hmsuc))) in
+      let b1 = Hash.equals y y1 in
+      let b2 = Hash.equals proof1 c1 in
+      b1 && b2
 
   end
