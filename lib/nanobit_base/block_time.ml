@@ -3,6 +3,7 @@ open Snark_params
 open Tick
 open Let_syntax
 open Unsigned_extended
+open Snark_bits
 
 (* Milliseconds since epoch *)
 module Stable = struct

@@ -3,6 +3,7 @@ open Snark_params
 open Tick
 open Let_syntax
 open Currency
+open Snark_bits
 
 module Index = struct
   type t = int [@@deriving bin_io]

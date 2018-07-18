@@ -1,4 +1,5 @@
 open Core_kernel
+open Snark_bits
 
 module type S = sig
   type t [@@deriving sexp, compare, eq, hash]

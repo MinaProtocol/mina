@@ -7,7 +7,7 @@ module Proof_type : sig
 end
 
 module Transition : sig
-  type t =
+  type t = Super_transaction.t =
     | Transaction of Transaction.With_valid_signature.t
     | Fee_transfer of Fee_transfer.t
   [@@deriving bin_io, sexp]
@@ -19,7 +19,7 @@ module Statement : sig
     ; target: Nanobit_base.Ledger_hash.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
-  [@@deriving sexp, bin_io, hash, compare]
+  [@@deriving sexp, bin_io, hash, compare, eq]
 
   val gen : t Quickcheck.Generator.t
 
