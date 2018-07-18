@@ -30,6 +30,8 @@ let s:ocamlmerlin="/Users/bkase/.opam/4.06.0/share/merlin"
 execute "set rtp+=".s:ocamlmerlin."/vim"
 execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
+filetype plugin on
+au FileType ocaml set omnifunc=merlin#Complete
 ```
 
 3. In your home directory `opam init`
