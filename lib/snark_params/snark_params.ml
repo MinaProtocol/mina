@@ -1,6 +1,5 @@
 open Core_kernel
 open Snark_bits
-
 module Tick_curve = Crypto_params.Tick_curve
 module Tock_curve = Crypto_params.Tock_curve
 

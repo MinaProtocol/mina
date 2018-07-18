@@ -39,7 +39,7 @@ type ('a, 'b, 'd) t =
 [@@deriving sexp, bin_io]
 
 let iter t ~f =
-  Ring_buffer.iter t.jobs ~f:(fun j -> f (`Job j));
+  Ring_buffer.iter t.jobs ~f:(fun j -> f (`Job j)) ;
   Queue.iter t.data_buffer ~f:(fun d -> f (`Data d))
 
 module Hash = struct

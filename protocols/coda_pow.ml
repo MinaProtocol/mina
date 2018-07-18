@@ -115,7 +115,7 @@ module Fee = struct
       Currency.Fee.Signed.Stable.V1 :
         module type of Currency.Fee.Signed.Stable.V1
         with type t := t
-          and type ('a, 'b) t_ := ('a, 'b) t_ )
+         and type ('a, 'b) t_ := ('a, 'b) t_ )
   end
 end
 
@@ -141,6 +141,7 @@ module type Transaction_intf = sig
   val fee : t -> Fee.Unsigned.t
 
   val sender : t -> public_key
+
   val receiver : t -> public_key
 end
 
@@ -327,11 +328,15 @@ module type Ledger_builder_intf = sig
 
   val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
 
-  val statement_to_work_spec
-    : t
+  val statement_to_work_spec :
+       t
     -> ledger_proof_statement
-    -> (ledger_proof_statement, super_transaction, sparse_ledger, ledger_proof)
-         Snark_work_lib.Work.Single.Spec.t Or_error.t
+    -> ( ledger_proof_statement
+       , super_transaction
+       , sparse_ledger
+       , ledger_proof )
+       Snark_work_lib.Work.Single.Spec.t
+       Or_error.t
 end
 
 module type Nonce_intf = sig
@@ -522,12 +527,11 @@ module type Inputs_intf = sig
 
   module Public_key : Public_key_intf
 
-  module Transaction : Transaction_intf
-    with type public_key := Public_key.Compressed.t
+  module Transaction :
+    Transaction_intf with type public_key := Public_key.Compressed.t
 
   module Fee_transfer :
-    Fee_transfer_intf
-    with type public_key := Public_key.Compressed.t
+    Fee_transfer_intf with type public_key := Public_key.Compressed.t
 
   module Super_transaction :
     Super_transaction_intf

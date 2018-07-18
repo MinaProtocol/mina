@@ -230,7 +230,8 @@ end = struct
 
         let create ~magnitude ~sgn = {magnitude; sgn}
 
-        type t = (magnitude, Sgn.t) t_ [@@deriving bin_io, sexp, hash, compare, eq]
+        type t = (magnitude, Sgn.t) t_
+        [@@deriving bin_io, sexp, hash, compare, eq]
       end
     end
 

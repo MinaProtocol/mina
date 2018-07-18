@@ -32,25 +32,35 @@ module type Inputs_intf = sig
     val create : unit -> t Deferred.t
   end
 
-  val perform_single
-    : Worker_state.t
-    -> message:(Currency.Fee.t * Public_key.t)
-    -> (Statement.t, Super_transaction.t, Sparse_ledger.t, Proof.t) Work.Single.Spec.t
+  val perform_single :
+       Worker_state.t
+    -> message:Currency.Fee.t * Public_key.t
+    -> ( Statement.t
+       , Super_transaction.t
+       , Sparse_ledger.t
+       , Proof.t )
+       Work.Single.Spec.t
     -> Proof.t Or_error.t
 end
 
 module type S = sig
   type proof
+
   type statement
+
   type transition
+
   type sparse_ledger
+
   type public_key
 
   module Work : sig
     open Snark_work_lib
+
     module Single : sig
       module Spec : sig
-        type t = (statement, transition, sparse_ledger, proof) Work.Single.Spec.t
+        type t =
+          (statement, transition, sparse_ledger, proof) Work.Single.Spec.t
       end
     end
 
@@ -66,12 +76,15 @@ module type S = sig
   module Rpcs : sig
     module Get_work : sig
       type query = unit
+
       type response = Work.Spec.t Or_error.t
+
       val rpc : (query, response) Rpc.Rpc.t
     end
 
     module Submit_work : sig
       type msg = Work.Result.t
+
       val rpc : msg Rpc.One_way.t
     end
   end

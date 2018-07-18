@@ -11,12 +11,10 @@ module type S = sig
   end
 
   module Transaction :
-    Coda_pow.Transaction_intf
-    with type public_key := Public_key.t
+    Coda_pow.Transaction_intf with type public_key := Public_key.t
 
   module Fee_transfer :
-    Coda_pow.Fee_transfer_intf
-    with type public_key := Public_key.t
+    Coda_pow.Fee_transfer_intf with type public_key := Public_key.t
 
   module Super_transaction :
     Coda_pow.Super_transaction_intf
@@ -51,8 +49,7 @@ module type S = sig
      and type valid_transaction := Transaction.With_valid_signature.t
 
   module Sparse_ledger : sig
-    type t
-    [@@deriving sexp, bin_io]
+    type t [@@deriving sexp, bin_io]
 
     val of_ledger_subset_exn : Ledger.t -> Public_key.t list -> t
   end

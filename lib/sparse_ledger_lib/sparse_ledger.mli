@@ -1,16 +1,17 @@
 open Core
 
-type ('hash, 'key, 'account) t
-[@@deriving bin_io, sexp]
+type ('hash, 'key, 'account) t [@@deriving bin_io, sexp]
 
 type index = int
 
 module type S = sig
   type hash
+
   type key
+
   type account
-  type nonrec t = (hash, key, account) t
-  [@@deriving bin_io, sexp]
+
+  type nonrec t = (hash, key, account) t [@@deriving bin_io, sexp]
 
   val of_hash : depth:int -> hash -> t
 
@@ -22,8 +23,7 @@ module type S = sig
 
   val find_index_exn : t -> key -> index
 
-  val add_path :
-    t -> [`Left of hash | `Right of hash] list -> account -> t
+  val add_path : t -> [`Left of hash | `Right of hash] list -> account -> t
 
   val merkle_root : t -> hash
 end
@@ -40,7 +40,8 @@ end) (Account : sig
   val hash : t -> Hash.t
 
   val key : t -> Key.t
-end) : 
-  S with type hash := Hash.t
-     and type key := Key.t
-     and type account := Account.t
+end) :
+  S
+  with type hash := Hash.t
+   and type key := Key.t
+   and type account := Account.t

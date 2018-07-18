@@ -47,10 +47,9 @@ end = struct
 
   module Super_transaction_with_witness = struct
     type t =
-      { transaction : Super_transaction.t 
-      ; statement : Ledger_proof_statement.t
-      ; witness : Inputs.Sparse_ledger.t
-      }
+      { transaction: Super_transaction.t
+      ; statement: Ledger_proof_statement.t
+      ; witness: Inputs.Sparse_ledger.t }
     [@@deriving sexp, bin_io]
   end
 
@@ -104,43 +103,42 @@ end = struct
     ; public_key: Public_key.t }
   [@@deriving sexp, bin_io]
 
-  let merge_statement (s1 : Ledger_proof_statement.t) (s2 : Ledger_proof_statement.t) =
+  let merge_statement (s1: Ledger_proof_statement.t)
+      (s2: Ledger_proof_statement.t) =
     let open Or_error.Let_syntax in
     let%map fee_excess =
-      Fee.Signed.add s1.fee_excess s2.fee_excess
-      |> option "Error adding fees"
+      Fee.Signed.add s1.fee_excess s2.fee_excess |> option "Error adding fees"
     in
     { Ledger_proof_statement.source= s1.source
     ; target= s2.target
     ; fee_excess
     ; proof_type= `Merge }
 
-(* TODO someday: Have this take a predicate and return all work specs with
+  (* TODO someday: Have this take a predicate and return all work specs with
    statements matching that predicate? *)
   let statement_to_work_spec t statement =
-    with_return_option (fun { return } ->
-      let maybe_return_transition (d : Super_transaction_with_witness.t) =
-        if Ledger_proof_statement.equal d.statement statement
-        then
-          return 
-          (Snark_work_lib.Work.Single.Spec.Transition
-            (statement, d.transaction, d.witness))
-      in
-      Parallel_scan.State.iter t.scan_state ~f:(function
-        | `Job j ->
-          begin match j with
-          | Base d -> Option.iter d ~f:maybe_return_transition
-          | Merge (Some (p1, s1), Some (p2, s2)) ->
-            Or_error.iter (merge_statement s1 s2) ~f:(fun new_statement ->
-              if Ledger_proof_statement.equal statement new_statement
-              then
-                return
-                  (Snark_work_lib.Work.Single.Spec.Merge (statement, p1, p2))
-              else ())
-          | Merge (None, _) | Merge (_, None) -> ()
-          | Merge_up _ -> ()
-          end
-        | `Data d -> maybe_return_transition d))
+    with_return_option (fun {return} ->
+        let maybe_return_transition (d: Super_transaction_with_witness.t) =
+          if Ledger_proof_statement.equal d.statement statement then
+            return
+              (Snark_work_lib.Work.Single.Spec.Transition
+                 (statement, d.transaction, d.witness))
+        in
+        Parallel_scan.State.iter t.scan_state ~f:(function
+          | `Job j -> (
+            match j with
+            | Base d -> Option.iter d ~f:maybe_return_transition
+            | Merge (Some (p1, s1), Some (p2, s2)) ->
+                Or_error.iter (merge_statement s1 s2) ~f:(fun new_statement ->
+                    if Ledger_proof_statement.equal statement new_statement
+                    then
+                      return
+                        (Snark_work_lib.Work.Single.Spec.Merge
+                           (statement, p1, p2))
+                    else () )
+            | Merge (None, _) | Merge (_, None) -> ()
+            | Merge_up _ -> () )
+          | `Data d -> maybe_return_transition d ) )
     |> option "Ledger_builder.statement_to_work_spec: not found"
 
   let aux {scan_state; _} = scan_state
@@ -192,7 +190,7 @@ end = struct
   let completed_work_to_scanable_work (job: job) (proof: Ledger_proof.t) :
       parallel_scan_completed_job Or_error.t =
     match job with
-    | Base (Some { statement; _ }) -> Ok (Lifted (proof, statement))
+    | Base (Some {statement; _}) -> Ok (Lifted (proof, statement))
     | Merge_up (Some (t, s)) -> Ok (Merged_up (proof, s))
     | Merge (Some (t, s), Some (t', s')) ->
         let open Or_error.Let_syntax in
@@ -252,15 +250,13 @@ end = struct
     let public_keys = function
       | Super_transaction.Fee_transfer t -> Fee_transfer.receivers t
       | Transaction t ->
-        let t = (t :> Transaction.t) in
-        [ Transaction.sender t; Transaction.receiver t ]
+          let t = (t :> Transaction.t) in
+          [Transaction.sender t; Transaction.receiver t]
     in
     let open Or_error.Let_syntax in
     let%map statement = apply_super_transaction_and_get_statement ledger s in
-    let witness =
-      Sparse_ledger.of_ledger_subset_exn ledger (public_keys s)
-    in
-    { Super_transaction_with_witness.transaction=s; witness; statement }
+    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
+    {Super_transaction_with_witness.transaction= s; witness; statement}
 
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions =
@@ -277,8 +273,7 @@ end = struct
         | Error e ->
             undo_transactions processed ;
             Result_with_rollback.error e
-        | Ok res ->
-          go (t :: processed) (res :: acc) ts
+        | Ok res -> go (t :: processed) (res :: acc) ts
     in
     go [] [] ts
 
@@ -395,8 +390,8 @@ end = struct
     in
     let new_data =
       List.map super_transactions ~f:(fun s ->
-        Or_error.ok_exn
-            (apply_super_transaction_and_get_witness t.ledger s) )
+          Or_error.ok_exn (apply_super_transaction_and_get_witness t.ledger s)
+      )
     in
     let res_opt =
       Or_error.ok_exn (fill_in_completed_work t.scan_state completed_works)

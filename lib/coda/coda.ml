@@ -359,7 +359,9 @@ module Make (Inputs : Inputs_intf) = struct
     ; ledger_builder_transition_backup_capacity: int }
 
   let best_ledger_builder t = !(t.best_lb)
-  let best_ledger t = Option.map (best_ledger_builder t) ~f:Ledger_builder.ledger
+
+  let best_ledger t =
+    Option.map (best_ledger_builder t) ~f:Ledger_builder.ledger
 
   let transaction_pool t = t.transaction_pool
 

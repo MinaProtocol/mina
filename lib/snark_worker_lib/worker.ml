@@ -2,13 +2,14 @@ open Core
 open Async
 open Blockchain_snark
 
-module Make (Inputs : Intf.Inputs_intf) : Intf.S
+module Make (Inputs : Intf.Inputs_intf) :
+  Intf.S
   with type transition := Inputs.Super_transaction.t
    and type sparse_ledger := Inputs.Sparse_ledger.t
    and type public_key := Inputs.Public_key.t
    and type statement := Inputs.Statement.t
-   and type proof := Inputs.Proof.t
-= struct
+   and type proof := Inputs.Proof.t =
+struct
   open Inputs
 
   module Work = struct
@@ -16,7 +17,12 @@ module Make (Inputs : Intf.Inputs_intf) : Intf.S
 
     module Single = struct
       module Spec = struct
-        type t = (Statement.t, Super_transaction.t, Sparse_ledger.t, Proof.t) Work.Single.Spec.t
+        type t =
+          ( Statement.t
+          , Super_transaction.t
+          , Sparse_ledger.t
+          , Proof.t )
+          Work.Single.Spec.t
       end
     end
 
@@ -29,18 +35,17 @@ module Make (Inputs : Intf.Inputs_intf) : Intf.S
     end
   end
 
-  module Rpcs = Rpcs.Make(Inputs)
+  module Rpcs = Rpcs.Make (Inputs)
 
-  let perform (s : Worker_state.t) public_key ({ instances; fee } as spec : Work.Spec.t) =
-      List.fold_until instances ~init:[] ~f:(fun acc w ->
+  let perform (s: Worker_state.t) public_key
+      ({instances; fee} as spec: Work.Spec.t) =
+    List.fold_until instances ~init:[]
+      ~f:(fun acc w ->
         match perform_single s ~message:(fee, public_key) w with
         | Ok res -> Continue (res :: acc)
-        | Error e -> Stop (Error e))
-        ~finish:(fun res ->
-          Ok
-            { Snark_work_lib.Work.Result.proofs = List.rev res
-            ; spec
-            })
+        | Error e -> Stop (Error e) )
+      ~finish:(fun res ->
+        Ok {Snark_work_lib.Work.Result.proofs= List.rev res; spec} )
 
   let shutdown_on_disconnect log connection =
     upon (Rpc.Connection.close_finished connection) (fun () ->
@@ -51,7 +56,7 @@ module Make (Inputs : Intf.Inputs_intf) : Intf.S
     let%bind conn =
       Rpc.Connection.client
         (Tcp.Where_to_connect.of_host_and_port
-          (Host_and_port.create ~host:"127.0.0.1" ~port:daemon_port))
+           (Host_and_port.create ~host:"127.0.0.1" ~port:daemon_port))
       >>| Result.ok_exn
     in
     let log = Logger.create () in
@@ -66,12 +71,10 @@ module Make (Inputs : Intf.Inputs_intf) : Intf.S
       in
       match%bind Rpc.Rpc.dispatch Rpcs.Get_work.rpc conn () with
       | Error e -> log_and_retry "getting work" e
-      | Ok (Error e) ->
-        log_and_retry ~sec:5. "getting work" e
+      | Ok (Error e) -> log_and_retry ~sec:5. "getting work" e
       | Ok (Ok work) ->
         match perform state public_key work with
-        | Error e ->
-          log_and_retry "performing work" e
+        | Error e -> log_and_retry "performing work" e
         | Ok result ->
           match Rpc.One_way.dispatch Rpcs.Submit_work.rpc conn result with
           | Error e -> log_and_retry "submitting work" e
@@ -96,8 +99,7 @@ module Make (Inputs : Intf.Inputs_intf) : Intf.S
 
   let arguments ~public_key ~daemon_port =
     [ "-public-key"
-    ; Cli_lib.base64_of_binable (module Public_key)
-        public_key
+    ; Cli_lib.base64_of_binable (module Public_key) public_key
     ; "-daemon-port"
     ; Int.to_string daemon_port ]
 end

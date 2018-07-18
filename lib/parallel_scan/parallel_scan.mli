@@ -25,8 +25,8 @@ module State : sig
 
   type ('a, 'b, 'd) t [@@deriving sexp, bin_io]
 
-  val iter
-    : ('a, 'b, 'd) t
+  val iter :
+       ('a, 'b, 'd) t
     -> f:([`Job of ('a, 'd) Job.t | `Data of 'd] -> unit)
     -> unit
 

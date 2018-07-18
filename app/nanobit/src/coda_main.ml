@@ -2,7 +2,6 @@ open Core
 open Async
 open Nanobit_base
 open Blockchain_snark
-
 module Fee = Protocols.Coda_pow.Fee
 
 module type Init_intf = sig
@@ -126,8 +125,10 @@ struct
         with module With_valid_signature := Transaction.With_valid_signature )
 
     let fee (t: t) = t.payload.Transaction.Payload.fee
-    let receiver (t : t) = t.payload.receiver
-    let sender (t : t) = Public_key.compress t.sender
+
+    let receiver (t: t) = t.payload.receiver
+
+    let sender (t: t) = Public_key.compress t.sender
 
     let seed = Secure_random.string ()
 
@@ -471,13 +472,13 @@ struct
 
     open Snark_work_lib.Work
 
-    let add_completed_work t (res : ( ('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
-      apply_and_broadcast t 
+    let add_completed_work t
+        (res: (('a, 'b, 'c, 'd) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
+      apply_and_broadcast t
         (Add_solved_work
-        ( List.map res.spec.instances ~f:Single.Spec.statement
-        , { proof = res.proofs
-          ; fee = {  fee = res.spec.fee; prover = Init.fee_public_key }
-          }))
+           ( List.map res.spec.instances ~f:Single.Spec.statement
+           , { proof= res.proofs
+             ; fee= {fee= res.spec.fee; prover= Init.fee_public_key} } ))
   end
 
   module type S_tmp =
@@ -602,21 +603,22 @@ struct
   end)
 
   let request_work ~snark_pool ~best_ledger_builder t =
-    let option s = Option.value_map ~f:Or_error.return ~default:(Or_error.error_string s) in
+    let option s =
+      Option.value_map ~f:Or_error.return ~default:(Or_error.error_string s)
+    in
     let open Or_error.Let_syntax in
     let%bind work =
       Snark_pool.Pool.request_work (Snark_pool.pool (snark_pool t))
       |> option "no work found"
-      (* TODO: Perhaps we should really be looking in ALL of the lbs rather than
+    (* TODO: Perhaps we should really be looking in ALL of the lbs rather than
         the best one. *)
     and lb = best_ledger_builder t |> option "no best ledger builder" in
     let%map instances =
       List.map ~f:(Ledger_builder.statement_to_work_spec lb) work
       |> Or_error.all
     in
-    {Snark_work_lib.Work.Spec.instances; fee = Fee.Unsigned.zero }
+    {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
 end
-
 
 module Coda_with_snark
     (Store : Storage.With_checksum_intf)
@@ -647,6 +649,7 @@ module Coda_without_snark (Init : Init_intf) () = struct
       module Inputs = struct
         module Worker_state = struct
           include Unit
+
           let create () = Deferred.unit
         end
 
@@ -655,15 +658,17 @@ module Coda_without_snark (Init : Init_intf) () = struct
 
         module Public_key = struct
           include Nanobit_base.Public_key.Compressed
+
           let arg_type = Cli_lib.public_key_compressed
         end
+
         module Sparse_ledger = Sparse_ledger
         module Super_transaction = Super_transaction
 
         let perform_single () ~message:_ _ = Ok ()
       end
 
-      include Snark_worker_lib.Worker.Make(Inputs)
+      include Snark_worker_lib.Worker.Make (Inputs)
     end
   end
 
@@ -714,10 +719,13 @@ module type Main_intf = sig
       end
     end
 
-    module Sparse_ledger : sig type t end
+    module Sparse_ledger : sig
+      type t
+    end
 
     module Ledger_proof : sig
       type t
+
       type statement
     end
 
@@ -725,7 +733,8 @@ module type Main_intf = sig
       type t
     end
 
-    module Snark_worker : Snark_worker_lib.Intf.S
+    module Snark_worker :
+      Snark_worker_lib.Intf.S
       with type proof := Ledger_proof.t
        and type statement := Ledger_proof.statement
        and type public_key := Public_key.Compressed.t
@@ -735,7 +744,8 @@ module type Main_intf = sig
     module Snark_pool : sig
       type t
 
-      val add_completed_work : t -> Snark_worker.Work.Result.t -> unit Deferred.t
+      val add_completed_work :
+        t -> Snark_worker.Work.Result.t -> unit Deferred.t
     end
 
     module Transaction_pool : sig
@@ -819,11 +829,10 @@ module Run (Program : Main_intf) = struct
     in
     let snark_worker_impls =
       [ Rpc.One_way.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
-          don't_wait_for (Snark_pool.add_completed_work (snark_pool minibit) work))
+            don't_wait_for
+              (Snark_pool.add_completed_work (snark_pool minibit) work) )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
-          Deferred.return (request_work minibit)
-        )
-      ]
+            Deferred.return (request_work minibit) ) ]
     in
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
