@@ -1,14 +1,35 @@
 open Core_kernel
-open Blockchain_snark
 
-module Spec = struct
-  type t =
-    | Transition of
-        Transaction_snark.Statement.t
-        * Transaction_snark.Transition.t
-        * Ledger.t
-    | Merge of Transaction_snark.t * Transaction_snark.t
-  [@@deriving bin_io]
+module Single = struct
+  module Spec = struct
+    type ('statement, 'transition, 'sparse_ledger, 'ledger_proof) t =
+      | Transition of
+          'statement
+          * 'transition
+          * 'sparse_ledger
+      | Merge of 'statement * 'ledger_proof * 'ledger_proof
+    [@@deriving bin_io]
+
+    let statement = function
+      | Transition (s, _, _) -> s
+      | Merge (s, _, _) -> s
+  end
 end
 
-module Result = Transaction_snark
+module Spec = struct
+  type 'single t =
+    { instances : 'single list
+    ; fee : Currency.Fee.Stable.V1.t
+    }
+  [@@deriving bin_io, fields]
+end
+
+module Result = struct
+  type ('spec, 'single) t =
+    { proofs : 'single list
+    ; spec : 'spec
+    }
+  [@@deriving bin_io, fields]
+end
+
+let proofs_per_work = 2
