@@ -25,7 +25,10 @@ module State : sig
 
   type ('a, 'b, 'd) t [@@deriving sexp, bin_io]
 
-  (* val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t *)
+  val iter :
+       ('a, 'b, 'd) t
+    -> f:([`Job of ('a, 'd) Job.t | `Data of 'd] -> unit)
+    -> unit
 
   val copy : ('a, 'b, 'd) t -> ('a, 'b, 'd) t
 

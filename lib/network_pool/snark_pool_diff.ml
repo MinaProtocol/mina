@@ -6,7 +6,7 @@ open Async
 
 type ('work, 'priced_proof) diff =
   | Add_unsolved of 'work
-  | Add_solved_work of ('work * 'priced_proof)
+  | Add_solved_work of 'work * 'priced_proof
 [@@deriving bin_io]
 
 module Make (Proof : sig

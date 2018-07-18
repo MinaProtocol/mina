@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Protocols
+open Coda_pow
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -35,11 +36,22 @@ module Make (Inputs : Inputs.S) : sig
            and type completed_work := Inputs.Completed_work.Checked.t
            and type ledger_proof := Inputs.Ledger_proof.t
            and type ledger_builder_aux_hash := Inputs.Ledger_builder_aux_hash.t
+           and type sparse_ledger := Inputs.Sparse_ledger.t
+           and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
+           and type super_transaction := Inputs.Super_transaction.t
 end = struct
   open Inputs
 
   type 'a with_statement = 'a * Ledger_proof_statement.t
   [@@deriving sexp, bin_io]
+
+  module Super_transaction_with_witness = struct
+    type t =
+      { transaction: Super_transaction.t
+      ; statement: Ledger_proof_statement.t
+      ; witness: Inputs.Sparse_ledger.t }
+    [@@deriving sexp, bin_io]
+  end
 
   (* TODO: This is redundant right now, the transaction snark has the statement
    inside of it. *)
@@ -47,13 +59,9 @@ end = struct
     type t = Ledger_proof.t with_statement [@@deriving sexp, bin_io]
   end
 
-  module Super_transaction_with_statement = struct
-    type t = Super_transaction.t with_statement [@@deriving sexp, bin_io]
-  end
-
   type job =
     ( Ledger_proof.t with_statement
-    , Super_transaction.t with_statement )
+    , Super_transaction_with_witness.t )
     Parallel_scan.State.Job.t
   [@@deriving sexp_of]
 
@@ -68,7 +76,7 @@ end = struct
     type t =
       ( Ledger_proof.t with_statement
       , Ledger_proof.t with_statement
-      , Super_transaction.t with_statement )
+      , Super_transaction_with_witness.t )
       Parallel_scan.State.t
     [@@deriving sexp, bin_io]
 
@@ -77,7 +85,7 @@ end = struct
         Parallel_scan.State.hash scan_state
           (Binable.to_string (module Snark_with_statement))
           (Binable.to_string (module Snark_with_statement))
-          (Binable.to_string (module Super_transaction_with_statement))
+          (Binable.to_string (module Super_transaction_with_witness))
       in
       h#result
 
@@ -94,6 +102,44 @@ end = struct
     ; ledger: Ledger.t
     ; public_key: Public_key.t }
   [@@deriving sexp, bin_io]
+
+  let merge_statement (s1: Ledger_proof_statement.t)
+      (s2: Ledger_proof_statement.t) =
+    let open Or_error.Let_syntax in
+    let%map fee_excess =
+      Fee.Signed.add s1.fee_excess s2.fee_excess |> option "Error adding fees"
+    in
+    { Ledger_proof_statement.source= s1.source
+    ; target= s2.target
+    ; fee_excess
+    ; proof_type= `Merge }
+
+  (* TODO someday: Have this take a predicate and return all work specs with
+   statements matching that predicate? *)
+  let statement_to_work_spec t statement =
+    with_return_option (fun {return} ->
+        let maybe_return_transition (d: Super_transaction_with_witness.t) =
+          if Ledger_proof_statement.equal d.statement statement then
+            return
+              (Snark_work_lib.Work.Single.Spec.Transition
+                 (statement, d.transaction, d.witness))
+        in
+        Parallel_scan.State.iter t.scan_state ~f:(function
+          | `Job j -> (
+            match j with
+            | Base d -> Option.iter d ~f:maybe_return_transition
+            | Merge (Some (p1, s1), Some (p2, s2)) ->
+                Or_error.iter (merge_statement s1 s2) ~f:(fun new_statement ->
+                    if Ledger_proof_statement.equal statement new_statement
+                    then
+                      return
+                        (Snark_work_lib.Work.Single.Spec.Merge
+                           (statement, p1, p2))
+                    else () )
+            | Merge (None, _) | Merge (_, None) -> ()
+            | Merge_up _ -> () )
+          | `Data d -> maybe_return_transition d ) )
+    |> option "Ledger_builder.statement_to_work_spec: not found"
 
   let aux {scan_state; _} = scan_state
 
@@ -125,7 +171,7 @@ end = struct
     {scan_state; ledger; public_key= self}
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
-    | Base (Some (_, statement)) -> Some statement
+    | Base (Some {statement; _}) -> Some statement
     | Merge_up (Some (_, statement)) -> Some statement
     | Merge (Some (_, stmt1), Some (_, stmt2)) ->
         let open Option.Let_syntax in
@@ -144,7 +190,7 @@ end = struct
   let completed_work_to_scanable_work (job: job) (proof: Ledger_proof.t) :
       parallel_scan_completed_job Or_error.t =
     match job with
-    | Base (Some (t, s)) -> Ok (Lifted (proof, s))
+    | Base (Some {statement; _}) -> Ok (Lifted (proof, statement))
     | Merge_up (Some (t, s)) -> Ok (Merged_up (proof, s))
     | Merge (Some (t, s), Some (t', s')) ->
         let open Or_error.Let_syntax in
@@ -200,6 +246,18 @@ end = struct
     ; fee_excess= Fee.Signed.of_unsigned fee_excess
     ; proof_type= `Base }
 
+  let apply_super_transaction_and_get_witness ledger s =
+    let public_keys = function
+      | Super_transaction.Fee_transfer t -> Fee_transfer.receivers t
+      | Transaction t ->
+          let t = (t :> Transaction.t) in
+          [Transaction.sender t; Transaction.receiver t]
+    in
+    let open Or_error.Let_syntax in
+    let%map statement = apply_super_transaction_and_get_statement ledger s in
+    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
+    {Super_transaction_with_witness.transaction= s; witness; statement}
+
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions =
       List.iter ~f:(fun t ->
@@ -211,11 +269,11 @@ end = struct
             { Result_with_rollback.result= Ok (List.rev acc)
             ; rollback= Call (fun () -> undo_transactions processed) }
       | t :: ts ->
-        match apply_super_transaction_and_get_statement ledger t with
+        match apply_super_transaction_and_get_witness ledger t with
         | Error e ->
             undo_transactions processed ;
             Result_with_rollback.error e
-        | Ok stmt -> go (t :: processed) ((t, stmt) :: acc) ts
+        | Ok res -> go (t :: processed) (res :: acc) ts
     in
     go [] [] ts
 
@@ -332,9 +390,8 @@ end = struct
     in
     let new_data =
       List.map super_transactions ~f:(fun s ->
-          ( s
-          , Or_error.ok_exn
-              (apply_super_transaction_and_get_statement t.ledger s) ) )
+          Or_error.ok_exn (apply_super_transaction_and_get_witness t.ledger s)
+      )
     in
     let res_opt =
       Or_error.ok_exn (fill_in_completed_work t.scan_state completed_works)

@@ -99,6 +99,26 @@ module type Ledger_intf = sig
   val undo_transaction : t -> valid_transaction -> unit Or_error.t
 end
 
+module Fee = struct
+  module Unsigned = struct
+    include Currency.Fee
+
+    include (
+      Currency.Fee.Stable.V1 :
+        module type of Currency.Fee.Stable.V1 with type t := t )
+  end
+
+  module Signed = struct
+    include Currency.Fee.Signed
+
+    include (
+      Currency.Fee.Signed.Stable.V1 :
+        module type of Currency.Fee.Signed.Stable.V1
+        with type t := t
+         and type ('a, 'b) t_ := ('a, 'b) t_ )
+  end
+end
+
 module type Snark_pool_proof_intf = sig
   module Statement : sig
     type t [@@deriving sexp, bin_io]
@@ -110,7 +130,7 @@ end
 module type Transaction_intf = sig
   type t [@@deriving sexp, compare, eq, bin_io]
 
-  type fee
+  type public_key
 
   module With_valid_signature : sig
     type nonrec t = private t [@@deriving sexp, compare, eq]
@@ -118,8 +138,11 @@ module type Transaction_intf = sig
 
   val check : t -> With_valid_signature.t option
 
-  val fee : t -> fee
-  (*Fee excess*)
+  val fee : t -> Fee.Unsigned.t
+
+  val sender : t -> public_key
+
+  val receiver : t -> public_key
 end
 
 module type Public_key_intf = sig
@@ -137,21 +160,11 @@ module type Fee_transfer_intf = sig
 
   type public_key
 
-  type fee
+  type single = public_key * Fee.Unsigned.t
 
-  type single = public_key * fee
+  val of_single_list : (public_key * Fee.Unsigned.t) list -> t list
 
-  val of_single_list : (public_key * fee) list -> t list
-end
-
-module type Fee_intf = sig
-  module Signed : sig
-    type t [@@deriving bin_io]
-  end
-
-  module Unsigned : sig
-    type t [@@deriving bin_io]
-  end
+  val receivers : t -> public_key list
 end
 
 module type Super_transaction_intf = sig
@@ -159,12 +172,10 @@ module type Super_transaction_intf = sig
 
   type fee_transfer
 
-  type unsigned_fee
-
   type t = Transaction of valid_transaction | Fee_transfer of fee_transfer
   [@@deriving sexp, compare, eq, bin_io]
 
-  val fee_excess : t -> unsigned_fee Or_error.t
+  val fee_excess : t -> Fee.Unsigned.t Or_error.t
 end
 
 module type Ledger_proof_intf = sig
@@ -182,8 +193,6 @@ module type Completed_work_intf = sig
 
   type statement
 
-  type fee
-
   type public_key
 
   module Statement : sig
@@ -196,7 +205,7 @@ module type Completed_work_intf = sig
    H(all_statements_in_bundle || fee || public_key)
 *)
 
-  type t = {fee: fee; proofs: proof list; prover: public_key}
+  type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]
 
   module Checked : sig
@@ -277,9 +286,15 @@ module type Ledger_builder_intf = sig
 
   type ledger_proof
 
+  type super_transaction
+
   type transaction_with_valid_signature
 
   type statement
+
+  type ledger_proof_statement
+
+  type sparse_ledger
 
   type completed_work
 
@@ -312,6 +327,16 @@ module type Ledger_builder_intf = sig
   val aux : t -> Aux.t
 
   val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
+
+  val statement_to_work_spec :
+       t
+    -> ledger_proof_statement
+    -> ( ledger_proof_statement
+       , super_transaction
+       , sparse_ledger
+       , ledger_proof )
+       Snark_work_lib.Work.Single.Spec.t
+       Or_error.t
 end
 
 module type Nonce_intf = sig
@@ -502,20 +527,16 @@ module type Inputs_intf = sig
 
   module Public_key : Public_key_intf
 
-  module Fee : Fee_intf
-
-  module Transaction : Transaction_intf with type fee := Fee.Unsigned.t
+  module Transaction :
+    Transaction_intf with type public_key := Public_key.Compressed.t
 
   module Fee_transfer :
-    Fee_transfer_intf
-    with type fee := Fee.Unsigned.t
-     and type public_key := Public_key.Compressed.t
+    Fee_transfer_intf with type public_key := Public_key.Compressed.t
 
   module Super_transaction :
     Super_transaction_intf
     with type valid_transaction := Transaction.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
-     and type unsigned_fee := Fee.Unsigned.t
 
   module Block_nonce : Nonce_intf
 
@@ -582,7 +603,6 @@ Merge Snark:
     Completed_work_intf
     with type proof := Ledger_proof.t
      and type statement := Ledger_proof.statement
-     and type fee := Fee.Unsigned.t
      and type public_key := Public_key.Compressed.t
 
   module Ledger_builder_diff :
@@ -594,6 +614,10 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
+
+  module Sparse_ledger : sig
+    type t
+  end
 
   module Ledger_builder :
     Ledger_builder_intf
@@ -610,6 +634,9 @@ Merge Snark:
                 Transaction.With_valid_signature.t
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
+     and type sparse_ledger := Sparse_ledger.t
+     and type ledger_proof_statement := Ledger_proof.statement
+     and type super_transaction := Super_transaction.t
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf

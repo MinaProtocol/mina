@@ -1,5 +1,4 @@
 open Core_kernel
-open Util
 
 (* Someday: Make more efficient by giving Field.unpack a length argument in
 camlsnark *)
