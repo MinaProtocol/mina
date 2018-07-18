@@ -1,8 +1,10 @@
 (jbuild_version 1)
 
-(executables
- ((names (spawner))
-  (modes (native))
-  (preprocess (pps (ppx_jane)))
-  (libraries
-    (unix core async rpc_parallel linear_pipe))))
+(library
+ ((name spawner)
+  (public_name spawner)
+  (library_flags (-linkall))
+  (libraries (core async rpc_parallel linear_pipe))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (flags (:standard -short-paths))
+  (synopsis "Spawner lets you run multiple workers on different nodes")))

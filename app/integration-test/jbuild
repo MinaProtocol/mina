@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(executables
+ ((names (simple_worker different_pid))
+  (modes (native))
+  (preprocess (pps (ppx_jane)))
+  (libraries
+    (core async spawner parallel))))
