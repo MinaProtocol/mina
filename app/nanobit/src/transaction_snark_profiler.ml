@@ -91,7 +91,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:
       (fun (max_span, sparse_ledger) t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transition_exn sparse_ledger t
+          Sparse_ledger.apply_super_transaction_exn sparse_ledger t
         in
         let span, proof =
           time (fun () ->
@@ -126,7 +126,7 @@ let check_base_snarks sparse_ledger0
   let _ =
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transition_exn sparse_ledger t
+          Sparse_ledger.apply_super_transaction_exn sparse_ledger t
         in
         let () =
           Transaction_snark.check_transition
