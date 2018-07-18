@@ -221,12 +221,12 @@ let%test_module "random set test" =
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}
             = Option.value_exn (Mock_snark_pool.request_proof t work) ) )
 
-    let%test_unit "Remove unsolved work if unsolved work pool is not empty" =
+    let%test_unit "request work does not remove from the pool" =
       Quickcheck.test ~sexp_of:[%sexp_of : Mock_snark_pool.t * Mock_work.t]
         (Quickcheck.Generator.tuple2 gen Mock_work.gen) ~f:(fun (t, work) ->
           let open Quickcheck.Generator.Let_syntax in
           ignore (Mock_snark_pool.add_unsolved_work t work) ;
           let size = Mock_snark_pool.unsolved_work_count t in
           ignore @@ Mock_snark_pool.request_work t ;
-          assert (size - 1 = Mock_snark_pool.unsolved_work_count t) )
+          assert (size = Mock_snark_pool.unsolved_work_count t) )
   end )
