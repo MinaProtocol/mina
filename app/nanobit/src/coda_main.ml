@@ -635,6 +635,8 @@ struct
 
   include Coda.Make (Inputs)
 
+  let snark_worker_command_name = Snark_worker_lib.Prod.command_name
+
   let request_work = Inputs.request_work ~snark_pool ~best_ledger_builder
 end
 
@@ -645,36 +647,14 @@ module Coda_without_snark (Init : Init_intf) () = struct
   module Inputs = struct
     include Make_inputs (Ledger_proof) (Init) (Store) ()
 
-    module Snark_worker = struct
-      module Inputs = struct
-        module Worker_state = struct
-          include Unit
-
-          let create () = Deferred.unit
-        end
-
-        module Proof = Ledger_proof
-        module Statement = Transaction_snark.Statement
-
-        module Public_key = struct
-          include Nanobit_base.Public_key.Compressed
-
-          let arg_type = Cli_lib.public_key_compressed
-        end
-
-        module Sparse_ledger = Sparse_ledger
-        module Super_transaction = Super_transaction
-
-        let perform_single () ~message:_ _ = Ok ()
-      end
-
-      include Snark_worker_lib.Worker.Make (Inputs)
-    end
+    module Snark_worker = Snark_worker_lib.Debug.Worker
   end
 
   include Coda.Make (Inputs)
 
   let request_work = Inputs.request_work ~snark_pool ~best_ledger_builder
+
+  let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
 
 module type Main_intf = sig
@@ -777,6 +757,8 @@ module type Main_intf = sig
   val snark_pool : t -> Inputs.Snark_pool.t
 
   val create : Config.t -> t Deferred.t
+
+  val snark_worker_command_name : string
 end
 
 module Run (Program : Main_intf) = struct
@@ -856,15 +838,13 @@ module Run (Program : Main_intf) = struct
                    Logger.error log "%s" (Exn.to_string_mach exn) ;
                    Deferred.unit )) ))
 
-  let snark_worker_command_name = "snark-worker"
-
   let create_snark_worker ~log ~public_key ~client_port =
     let open Snark_worker_lib in
     let our_binary = Sys.argv.(0) in
     let%map p =
       Process.create_exn () ~prog:our_binary
         ~args:
-          ( snark_worker_command_name
+          ( Program.snark_worker_command_name
           :: Snark_worker.arguments ~public_key ~daemon_port:client_port )
     in
     let log = Logger.child log "snark_worker" in
