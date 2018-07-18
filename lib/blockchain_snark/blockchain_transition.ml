@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
-open Nanobit_base.Snark_params
+open Snark_params
+open Snark_bits
 module Digest = Tick.Pedersen.Digest
 
 module Keys = struct

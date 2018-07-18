@@ -1,5 +1,7 @@
 open Core
 open Snark_params.Tick
+open Snark_bits
+open Bitstring_lib
 
 module type Basic = sig
   type t [@@deriving sexp, compare, eq, hash]
@@ -68,7 +70,7 @@ module type Signed_intf = sig
 
   type ('magnitude, 'sgn) t_
 
-  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare]
+  type t = (magnitude, Sgn.t) t_ [@@deriving sexp, hash, bin_io, compare, eq]
 
   val gen : t Quickcheck.Generator.t
 
@@ -76,7 +78,7 @@ module type Signed_intf = sig
     module V1 : sig
       type nonrec ('magnitude, 'sgn) t_ = ('magnitude, 'sgn) t_
 
-      type nonrec t = t [@@deriving bin_io, sexp, hash, compare]
+      type nonrec t = t [@@deriving bin_io, sexp, hash, compare, eq]
     end
   end
 

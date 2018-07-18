@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name sparse_ledger_lib)
+  (public_name sparse_ledger_lib)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries (core extlib))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (synopsis "sparse Ledger implementation")))
+

@@ -1,0 +1,16 @@
+(jbuild_version 1)
+
+(library
+ ((name unsigned_extended)
+  (public_name unsigned_extended)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core
+      integers
+      snark_params
+      ))
+  (preprocess (pps (ppx_jane ppx_deriving.std)))
+  (synopsis "Unsigned integer functions")))
+

@@ -1,0 +1,13 @@
+(jbuild_version 1)
+
+(library
+ ((name snark_bits)
+  (public_name snark_bits)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core_kernel snarky ))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (synopsis "Snark parameters")))
+

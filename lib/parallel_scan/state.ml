@@ -39,6 +39,10 @@ type ('a, 'd) t =
   ; mutable enough_steps: bool }
 [@@deriving sexp, bin_io]
 
+let iter t ~f =
+  Ring_buffer.iter t.jobs ~f:(fun j -> f (`Job j)) ;
+  Queue.iter t.data_buffer ~f:(fun d -> f (`Data d))
+
 module Hash = struct
   type t = Cryptokit.hash
 end

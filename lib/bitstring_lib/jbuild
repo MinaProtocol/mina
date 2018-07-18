@@ -1,0 +1,13 @@
+(jbuild_version 1)
+
+(library
+ ((name bitstring_lib)
+  (public_name bitstring_lib)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core_kernel ))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (synopsis "Bitstring library")))
+

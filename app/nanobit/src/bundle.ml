@@ -26,7 +26,7 @@ end
 module type S = sig
   include S0
 
-  module Sparse_ledger = Snark_worker_lib.Ledger
+  module Sparse_ledger = Nanobit_base.Sparse_ledger
 end
 
 module T = struct
@@ -49,7 +49,7 @@ module Worker_state = struct
     : t )
 end
 
-module Sparse_ledger = Snark_worker_lib.Ledger
+module Sparse_ledger = Nanobit_base.Sparse_ledger
 
 module Input = struct
   type t =

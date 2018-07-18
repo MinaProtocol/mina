@@ -1,5 +1,6 @@
 open Core_kernel
 open Snark_params
+open Snark_bits
 
 module Stable = struct
   module V1 = struct
