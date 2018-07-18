@@ -67,15 +67,12 @@ end = struct
 
   type parallel_scan_completed_job =
     (*For the parallel scan*)
-    ( Ledger_proof.t with_statement
-    , Ledger_proof.t with_statement )
-    Parallel_scan.State.Completed_job.t
+    Ledger_proof.t with_statement Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
   module Aux = struct
     type t =
       ( Ledger_proof.t with_statement
-      , Ledger_proof.t with_statement
       , Super_transaction_with_witness.t )
       Parallel_scan.State.t
     [@@deriving sexp, bin_io]
@@ -83,7 +80,6 @@ end = struct
     let hash_to_string scan_state =
       let h =
         Parallel_scan.State.hash scan_state
-          (Binable.to_string (module Snark_with_statement))
           (Binable.to_string (module Snark_with_statement))
           (Binable.to_string (module Super_transaction_with_witness))
       in
@@ -160,9 +156,7 @@ end = struct
 
   let create ~ledger ~self : t =
     let open Config in
-    { scan_state=
-        Parallel_scan.start ~parallelism_log_2 ~init:(failwith "TODO")
-          ~seed:(failwith "TODO")
+    { scan_state= Parallel_scan.start ~parallelism_log_2
     ; ledger
     ; public_key= self }
 

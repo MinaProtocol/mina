@@ -26,14 +26,15 @@ module Job = struct
 end
 
 module Completed_job = struct
-  type ('a, 'b) t = Lifted of 'a | Merged of 'a | Merged_up of 'b
+  type 'a t = Lifted of 'a | Merged of 'a | Merged_up of 'a
   [@@deriving bin_io, sexp]
 end
 
-type ('a, 'b, 'd) t =
+type ('a, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
   ; data_buffer: 'd Queue.t
-  ; mutable acc: int * 'b
+  ; was_seeded: bool
+  ; mutable acc: int * 'a option
   ; mutable current_data_length: int
   ; mutable enough_steps: bool }
 [@@deriving sexp, bin_io]
@@ -48,7 +49,7 @@ end
 
 (* TODO: This should really be computed iteratively *)
 let hash {jobs; data_buffer; acc; current_data_length; enough_steps}
-    a_to_string b_to_string d_to_string =
+    a_to_string d_to_string =
   let h = Cryptokit.Hash.sha3 256 in
   Ring_buffer.iter jobs ~f:(function
     | Base None -> h#add_string "Base None"
@@ -63,9 +64,11 @@ let hash {jobs; data_buffer; acc; current_data_length; enough_steps}
         h#add_string
           ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2) ) ;
   Queue.iter data_buffer ~f:(fun d -> h#add_string (d_to_string d)) ;
-  (let i, b = acc in
-   h#add_string (Int.to_string i) ;
-   h#add_string (b_to_string b)) ;
+  let i, a = acc in
+  h#add_string (Int.to_string i) ;
+  ( match a with
+  | None -> h#add_string "None"
+  | Some a -> h#add_string (a_to_string a) ) ;
   h#add_string (Int.to_string current_data_length) ;
   h#add_string (Bool.to_string enough_steps) ;
   h
@@ -80,9 +83,13 @@ let current_data_length {current_data_length} = current_data_length
 
 let enough_steps {enough_steps} = enough_steps
 
-let copy {jobs; data_buffer; acc; current_data_length; enough_steps} =
+let was_seeded {was_seeded} = was_seeded
+
+let copy
+    {jobs; data_buffer; acc; current_data_length; enough_steps; was_seeded} =
   { jobs= Ring_buffer.copy jobs
   ; data_buffer= Queue.copy data_buffer
+  ; was_seeded
   ; acc
   ; current_data_length
   ; enough_steps }

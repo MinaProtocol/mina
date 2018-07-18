@@ -19,29 +19,22 @@ module State : sig
   end
 
   module Completed_job : sig
-    type ('a, 'b) t = Lifted of 'a | Merged of 'a | Merged_up of 'b
+    type 'a t = Lifted of 'a | Merged of 'a | Merged_up of 'a
     [@@deriving bin_io, sexp]
   end
 
-  type ('a, 'b, 'd) t [@@deriving sexp, bin_io]
+  type ('a, 'd) t [@@deriving sexp, bin_io]
 
   val iter :
-       ('a, 'b, 'd) t
-    -> f:([`Job of ('a, 'd) Job.t | `Data of 'd] -> unit)
-    -> unit
+    ('a, 'd) t -> f:([`Job of ('a, 'd) Job.t | `Data of 'd] -> unit) -> unit
 
-  val copy : ('a, 'b, 'd) t -> ('a, 'b, 'd) t
+  val copy : ('a, 'd) t -> ('a, 'd) t
 
   module Hash : sig
     type t = Cryptokit.hash
   end
 
-  val hash :
-       ('a, 'b, 'd) t
-    -> ('a -> string)
-    -> ('b -> string)
-    -> ('d -> string)
-    -> Hash.t
+  val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
 end
 
 module type Spec_intf = sig
@@ -52,19 +45,18 @@ module type Spec_intf = sig
   type output [@@deriving sexp_of]
 end
 
-val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
+val start : parallelism_log_2:int -> ('a, 'd) State.t
 
 val next_k_jobs :
-  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t
+  state:('a, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t
 
-val next_jobs : state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t list
+val next_jobs : state:('a, 'd) State.t -> ('a, 'd) State.Job.t list
 
-val enqueue_data :
-  state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t
+val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
 
-val free_space : state:('a, 'b, 'd) State.t -> int
+val free_space : state:('a, 'd) State.t -> int
 
 val fill_in_completed_jobs :
-     state:('a, 'b, 'd) State.t
-  -> jobs:('a, 'b) State.Completed_job.t list
-  -> 'b option Or_error.t
+     state:('a, 'd) State.t
+  -> jobs:'a State.Completed_job.t list
+  -> 'a option Or_error.t
