@@ -810,11 +810,18 @@ module Run (Program : Main_intf) = struct
       ]
     in
     let snark_worker_impls =
-      [ Rpc.One_way.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
-            don't_wait_for
-              (Snark_pool.add_completed_work (snark_pool minibit) work) )
-      ; Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
-            Deferred.return (request_work minibit) ) ]
+      let solved_work_reader, solved_work_writer = Linear_pipe.create () in
+      Linear_pipe.write_without_pushback solved_work_writer ();
+      [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
+          match%map Linear_pipe.read solved_work_reader  with
+          | `Ok () -> request_work minibit
+          | `Eof -> assert false)
+      ; Rpc.One_way.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
+          don't_wait_for begin
+            let%map () = Snark_pool.add_completed_work (snark_pool minibit) work in
+            Linear_pipe.write_without_pushback solved_work_writer ()
+          end)
+      ]
     in
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
