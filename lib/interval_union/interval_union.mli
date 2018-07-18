@@ -1,10 +1,10 @@
 open Core_kernel
 
 module Interval : sig
-  type t = int * int [@@deriving eq]
+  type t = int * int [@@deriving eq, sexp]
 end
 
-type t [@@deriving eq]
+type t [@@deriving eq, sexp]
 
 val empty : t
 
