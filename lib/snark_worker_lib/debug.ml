@@ -4,6 +4,7 @@ open Async
 module Inputs = struct
   module Worker_state = struct
     include Unit
+
     let create () = Deferred.unit
   end
 
@@ -17,12 +18,11 @@ module Inputs = struct
   end
 
   module Super_transaction = Nanobit_base.Super_transaction
-
   module Sparse_ledger = Nanobit_base.Sparse_ledger
 
   let perform_single () ~message:_ _ = Ok ()
 end
 
-module Worker = Worker.Make(Inputs)
+module Worker = Worker.Make (Inputs)
 
 let command_name = "snark-worker-debug"

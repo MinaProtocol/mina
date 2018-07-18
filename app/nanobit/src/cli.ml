@@ -125,7 +125,8 @@ let () =
   Command.group ~summary:"Current"
     [ ("daemon", daemon)
     ; (Parallel.worker_command_name, Parallel.worker_command)
-    ; (Snark_worker_lib.Debug.command_name, Snark_worker_lib.Debug.Worker.command)
+    ; ( Snark_worker_lib.Debug.command_name
+      , Snark_worker_lib.Debug.Worker.command )
     ; (Snark_worker_lib.Prod.command_name, Snark_worker_lib.Prod.Worker.command)
     ; ("full-test", Full_test.command)
     ; ("client", Client.command)
