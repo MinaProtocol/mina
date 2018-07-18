@@ -95,11 +95,6 @@ end =
     type proof = Group.t * P_EQDL.t
     type evaluation = bool list * Hash.t * proof * Public_key.t
 
-
-    type t = { x : int; y : string }
-
-     let a = { x = 34; y  = "a" }
-
     let eval m prk =
       let k = Private_key.to_scalar prk in
       let hgm = Hash_to_group.hash m in
