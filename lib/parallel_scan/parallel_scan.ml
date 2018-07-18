@@ -23,9 +23,8 @@ module State1 = struct
   (* Creates state that placeholders-out all the right jobs in the right spot
    * also we need to seed the buffer with exactly one piece of work
    *)
-  let create : type a b d.
-      parallelism_log_2:int -> init:b -> seed:d -> (a, b, d) t =
-   fun ~parallelism_log_2 ~init ~seed ->
+  let create : type a b d. parallelism_log_2:int -> init:b -> (a, b, d) t =
+   fun ~parallelism_log_2 ~init ->
     let open Job in
     let parallelism = Int.pow 2 parallelism_log_2 in
     let jobs =
@@ -41,9 +40,9 @@ module State1 = struct
       ~f:(Ring_buffer.add_many jobs) ;
     assert (jobs.Ring_buffer.position = 0) ;
     let data_buffer = Queue.create ~capacity:parallelism () in
-    Queue.enqueue data_buffer seed ;
     { jobs
     ; data_buffer
+    ; was_seeded= false
     ; acc= (0, init)
     ; current_data_length= 1
     ; enough_steps= false }
@@ -54,7 +53,7 @@ module State1 = struct
 
   let%test_unit "parallelism derived from jobs" =
     let of_parallelism_log_2 x =
-      let s = create ~parallelism_log_2:x ~init:0 ~seed:0 in
+      let s = create ~parallelism_log_2:x ~init:0 in
       assert (parallelism s = Int.pow 2 x)
     in
     of_parallelism_log_2 1 ;
@@ -289,8 +288,7 @@ module State1 = struct
     if not (fst last_acc = fst t.acc) then Some (snd t.acc) else None
 end
 
-let start : type a b d.
-    parallelism_log_2:int -> init:b -> seed:d -> (a, b, d) State.t =
+let start : type a b d. parallelism_log_2:int -> init:b -> (a, b, d) State.t =
   State1.create
 
 let next_jobs : state:('a, 'b, 'd) State1.t -> ('a, 'd) State1.Job.t list =
@@ -317,7 +315,9 @@ let next_k_jobs :
 let free_space : state:('a, 'b, 'd) State1.t -> int =
  fun ~state ->
   let buff = State1.data_buffer state in
-  Queue.capacity buff - State.current_data_length state
+  Queue.capacity buff
+  - State.current_data_length state
+  + if State1.was_seeded state then 0 else 1
 
 let enqueue_data :
     state:('a, 'b, 'd) State1.t -> data:'d list -> unit Or_error.t =
@@ -350,7 +350,8 @@ let gen :
  fun ~init ~gen_data ~parallelism_log_2 ~f_job_done ->
   let open Quickcheck.Generator.Let_syntax in
   let%bind seed = gen_data in
-  let s = State1.create ~parallelism_log_2 ~init ~seed in
+  let s = State1.create ~parallelism_log_2 ~init in
+  Or_error.ok_exn @@ enqueue_data ~state:s ~data:[seed] ;
   let parallelism = Int.pow 2 parallelism_log_2 in
   let free_space = free_space s in
   let%map datas = Quickcheck.Generator.list_with_length free_space gen_data in
@@ -411,7 +412,8 @@ let%test_module "scans" =
           match%bind Linear_pipe.read data with
           | `Eof -> return ()
           | `Ok seed ->
-              let s = start ~init ~seed ~parallelism_log_2 in
+              let s = start ~init ~parallelism_log_2 in
+              Or_error.ok_exn @@ enqueue_data ~state:s ~data:[seed] ;
               do_steps ~state:s ~data ~f w )
 
     let step_repeatedly ~state ~data ~f =

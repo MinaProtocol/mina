@@ -49,7 +49,7 @@ module type Spec_intf = sig
   type output [@@deriving sexp_of]
 end
 
-val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
+val start : parallelism_log_2:int -> init:'b -> ('a, 'b, 'd) State.t
 
 val next_k_jobs :
   state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t

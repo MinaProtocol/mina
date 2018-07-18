@@ -2,7 +2,7 @@ open Core_kernel
 
 module Interval = struct
   (* Semantically (a, b) : t is the closed interval [a, b] *)
-  type t = int * int [@@deriving eq]
+  type t = int * int [@@deriving eq, sexp]
 
   let before (_, b1) (a2, _) = b1 <= a2
 end
@@ -50,7 +50,11 @@ let of_intervals_exn is =
       List.fold is ~init:(of_interval i) ~f:(fun acc x ->
           disjoint_union_exn (of_interval x) acc )
 
-let to_interval = function
+let rec to_interval = function
   | [i] -> Ok i
-  | [] | _ :: _ :: _ ->
-      Or_error.error_string "Interval_union.to_interval: was not an interval"
+  | ([] | _ :: _ :: _) as xs ->
+      Or_error.error_string
+        (Printf.sprintf
+           !"Interval_union.to_interval: was not an interval %{sexp: \
+             Interval.t list}\n"
+           xs)

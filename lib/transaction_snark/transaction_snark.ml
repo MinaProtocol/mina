@@ -621,12 +621,25 @@ module Verification = struct
           Or_error.ok_exn
             (Pedersen_hash.Section.to_initial_segment_digest top_hash_section)
         in
-        assert (
+        if
           n
           = Hash_prefix.length_in_bits
             + (2 * Ledger_hash.length_in_bits)
-            + Amount.Signed.length + List.length wrap_vk_bits ) ;
-        digest
+            + Amount.Signed.length + List.length wrap_vk_bits
+        then digest
+        else
+          failwithf
+            !"%d = Hash_prefix.length_in_bits aka %d\n            \
+              + (2 * Ledger_hash.length_in_bits) aka %d \n            \
+              + Amount.Signed.length aka %d + List.length wrap_vk_bits aka %d \
+              ) aka %d"
+            n Hash_prefix.length_in_bits
+            (2 * Ledger_hash.length_in_bits)
+            Amount.Signed.length (List.length wrap_vk_bits)
+            ( Hash_prefix.length_in_bits
+            + (2 * Ledger_hash.length_in_bits)
+            + Amount.Signed.length + List.length wrap_vk_bits )
+            ()
       in
       let%bind top_hash =
         Pedersen.Digest.choose_preimage_var digest

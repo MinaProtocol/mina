@@ -419,9 +419,11 @@ struct
 
     let forget_witness {ledger_builder_transition; state} = state
 
-    let add_witness_exn = failwith "TODO?"
+    (* TODO: How do we check this *)
+    let add_witness ledger_builder_transition state =
+      Or_error.return {ledger_builder_transition; state}
 
-    let add_witness = failwith "TODO?"
+    let add_witness_exn l s = add_witness l s |> Or_error.ok_exn
   end
 
   module Genesis = struct

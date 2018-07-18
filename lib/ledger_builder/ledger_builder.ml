@@ -60,14 +60,14 @@ end = struct
   type parallel_scan_completed_job =
     (*For the parallel scan*)
     ( Ledger_proof.t with_statement
-    , Ledger_proof.t with_statement )
+    , Ledger_proof.t with_statement option )
     Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
   module Aux = struct
     type t =
       ( Ledger_proof.t with_statement
-      , Ledger_proof.t with_statement
+      , Ledger_proof.t with_statement option
       , Super_transaction.t with_statement )
       Parallel_scan.State.t
     [@@deriving sexp, bin_io]
@@ -76,7 +76,10 @@ end = struct
       let h =
         Parallel_scan.State.hash scan_state
           (Binable.to_string (module Snark_with_statement))
-          (Binable.to_string (module Snark_with_statement))
+          (Binable.to_string
+             ( module struct
+               type t = Snark_with_statement.t option [@@deriving bin_io]
+             end ))
           (Binable.to_string (module Super_transaction_with_statement))
       in
       h#result
@@ -114,9 +117,7 @@ end = struct
 
   let create ~ledger ~self : t =
     let open Config in
-    { scan_state=
-        Parallel_scan.start ~parallelism_log_2 ~init:(failwith "TODO")
-          ~seed:(failwith "TODO")
+    { scan_state= Parallel_scan.start ~parallelism_log_2 ~init:None
     ; ledger
     ; public_key= self }
 
@@ -145,7 +146,7 @@ end = struct
       parallel_scan_completed_job Or_error.t =
     match job with
     | Base (Some (t, s)) -> Ok (Lifted (proof, s))
-    | Merge_up (Some (t, s)) -> Ok (Merged_up (proof, s))
+    | Merge_up (Some (t, s)) -> Ok (Merged_up (Some (proof, s)))
     | Merge (Some (t, s), Some (t', s')) ->
         let open Or_error.Let_syntax in
         let%map fee_excess =
@@ -177,7 +178,12 @@ end = struct
         (List.concat_map works (fun work -> work.proofs))
         ~f:completed_work_to_scanable_work
     in
-    Parallel_scan.fill_in_completed_jobs state scanable_work_list
+    match%map
+      Parallel_scan.fill_in_completed_jobs state scanable_work_list
+    with
+    | Some (Some x) -> Some x
+    | Some None -> failwith "Impossible"
+    | None -> None
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data state data
