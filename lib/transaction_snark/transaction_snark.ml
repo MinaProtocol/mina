@@ -590,12 +590,17 @@ module Verification = struct
             let init = Amount.Signed.(fold zero ~init ~f) in
             List.fold wrap_vk_bits ~init ~f )
       in
+      let hash_interval = (0, Hash_prefix.length_in_bits) in
+      let amount_begin =
+        Hash_prefix.length_in_bits + (2 * Ledger_hash.length_in_bits)
+      in
+      let amount_end = amount_begin + Amount.Signed.length in
+      let amount_interval = (amount_begin, amount_end) in
+      let vk_interval = (amount_end, amount_end + List.length wrap_vk_bits) in
       Tick.Pedersen_hash.Section.create ~acc:(`Value s.acc)
         ~support:
           (Interval_union.of_intervals_exn
-             [ (0, Hash_prefix.length_in_bits)
-             ; ( (2 * Ledger_hash.length_in_bits) + Hash_prefix.length_in_bits
-               , Amount.Signed.length + List.length wrap_vk_bits ) ])
+             [hash_interval; amount_interval; vk_interval])
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
