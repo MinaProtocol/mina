@@ -98,15 +98,17 @@ module Type = struct
 
   module Enum = struct
     module T = struct
-      type e = 
+      type e =
         | T : 'a t -> e
       type t = e sexp_opaque [@@deriving sexp]
 
       let compare = compare
+      let hash = Hashtbl.hash
     end
 
     include T
     include Comparable.Make(T)
+    module Table = Hashtbl.Make(T)
   end
 
   let fst : type a b. (a * b) t -> a t = function
@@ -239,13 +241,18 @@ module Arguments_spec = struct
 
   type id_generator = { f : 'a. 'a Type.t -> 'a Id.t }
 
+  let rec types : type acc arg_type k. (acc, arg_type, k) t -> Type.Enum.t list =
+    function
+      | [] -> []
+      | typ :: xs -> Type.Enum.T typ :: types xs
+
   let rec apply : type acc arg_type k. id_generator -> (acc, arg_type, k) t -> acc -> k =
     fun gen t acc ->
       match t with
-      | [] -> acc
-      | typ :: xs ->
-          let id = gen.f typ in 
-          apply gen xs (acc id)
+        | [] -> acc
+        | typ :: xs ->
+            let id = gen.f typ in
+            apply gen xs (acc id)
 end
 
 module Local_variables_spec = struct
@@ -260,7 +267,7 @@ module Local_variables_spec = struct
       match t with
       | [] -> acc
       | typ :: xs ->
-          let id = gen.f typ in 
+          let id = gen.f typ in
           apply gen xs (acc id)
 end
 
@@ -297,14 +304,14 @@ module T = struct
     | Do_if :
         { cond : bool Id.t
         ; then_ : unit t
-        ; after : (unit -> 'a t) 
+        ; after : (unit -> 'a t)
         }
         -> 'a t
     | If :
         { cond : bool Id.t
         ; then_ : 'b Id.t
         ; else_ : 'b Id.t
-        ; after : ('b Id.t -> 'a t) 
+        ; after : ('b Id.t -> 'a t)
         }
         -> 'a t
     | Pure of 'a
@@ -386,3 +393,49 @@ include Monad.Make(struct
 end)
 
 include T
+open Let_syntax
+
+let array_get label xs i =
+  let open Op.Value in
+  do_value (Array_get (xs, i)) label
+
+let array_set xs i x =
+  do_ (Array_set (xs, i, x))
+
+let less_than lab x y = do_value (Less_than (x, y)) lab
+
+let create_pointer typ label =
+  Create_pointer (typ, label, return)
+
+let load ptr label =
+  Load (ptr, label, return)
+
+let store ptr value =
+  Action_op (Op.Action.Store (ptr, value), return)
+
+let high_bits x lab = do_value (High_bits x) lab
+let low_bits x lab = do_value (Low_bits x) lab
+
+let or_ x y lab = do_value (Or (x, y)) lab
+
+let arith_op name k =
+  stage
+    (fun x y lab ->
+      let%bind r = do_value (k x y) (sprintf "%s_%s_result" lab name) in
+      let%map high_bits = high_bits r (lab ^ "_high_bits")
+      and low_bits = low_bits r (lab ^ "_low_bits")
+      in
+      { Arith_result.high_bits; low_bits })
+
+let add = unstage (arith_op "add" (fun x y -> Add (x, y)))
+let sub = unstage (arith_op "sub" (fun x y -> Sub (x, y)))
+let mul = unstage (arith_op "mul" (fun x y -> Mul (x, y)))
+
+let add_ignore_overflow x y lab =
+  do_value (Op.Value.Add_ignore_overflow (x, y)) lab
+
+let bitwise_or x y lab =
+  do_value (Op.Value.Bitwise_or (x, y)) lab
+
+let equal_uint32 x y lab =
+  do_value (Op.Value.Equal (x, y)) lab

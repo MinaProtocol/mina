@@ -5,35 +5,40 @@ let (!^) id = Batteries.Int32.of_int (Id.value id)
 
 module Constant = struct
   module T = struct
-    type t = SpirV.id * int
+    type t = SpirV.id sexp_opaque * int [@@deriving sexp]
     let compare = compare
+    let hash = Hashtbl.hash
   end
 
   include T
   include Comparable.Make(T)
+  module Table = Hashtbl.Make(T)
 end
 
 module type Program_intf = sig
-  val gen_id : type a. a Type.t -> string -> a Id.t
-  val register_typ : type a. a Type.t -> unit Id.t
-  val register_constant : type a. a Type.t -> int -> unit Id.t
+  val gen_id : 'a Type.t -> string -> 'a Id.t
+  val register_type : 'a Type.t -> unit Id.t
+  val register_constant : 'a Type.t -> int -> 'a Id.t
 
   val push_op : SpirV.op -> unit
-  val push_block : branch:Spirv_module.branch -> next_label:SpirV.id
-  val begin_function : type a b f g h. string -> (f, a, g) Arguments_spec.t -> (g, h) Local_variables_spec.t -> b Type.t -> unit
-  val finalize_function : unit -> unit
+  val push_block : branch:Spirv_module.branch -> next_label:SpirV.id -> unit
+  val begin_function : string -> ('f, 'a, 'g) Arguments_spec.t -> ('g, 'h) Local_variables_spec.t -> 'b Type.t -> unit
+  val end_function : unit -> unit
 
   val extract : unit -> Spirv_module.t
 end
 
 module MakeProgram(Unit : sig end) : Program_intf = struct
+  let defining_function : bool ref = ref false
   let next_id : int ref = ref 0
   let blocks : Spirv_module.basic_block list ref = ref []
   let curr_block_label : SpirV.id ref = ref 0l
   let curr_block_ops : SpirV.op list ref = ref []
+
   let name_table : (string, int) Hashtbl.t = String.Table.create ()
   let type_table : (Type.Enum.t, SpirV.id) Hashtbl.t = Type.Enum.Table.create ()
   let constant_table : (Constant.t, SpirV.id) Hashtbl.t = Constant.Table.create ()
+  let function_table : (string, Spirv_module.function_definition) Hashtbl.t = String.Table.create ()
 
   let gen_id type_ name =
     let id = !next_id in
@@ -70,26 +75,21 @@ module MakeProgram(Unit : sig end) : Program_intf = struct
 
   let push_op op = curr_block_ops := op :: !curr_block_ops
   let push_block ~branch ~next_label =
-    let block =
+    let block = Spirv_module.(
       { basic_block_label = !curr_block_label;
         basic_block_body = List.rev !curr_block_ops;
-        basic_block_branch = branch }
+        basic_block_branch = branch })
     in
     blocks := block :: !blocks;
     curr_block_label := next_label;
     curr_block_ops := []
 
-  let begin_function name args return_type =
-    let type_ = Type.Function (Arguments_spec.types args, return_type) in
-    let type_id = register_type type_ in
-    ()
+  let define_function name return_type args vars ~f =
+    assert (not !defining_function);
+    defining_function := true;
 
-  let finalize_function () =
-    let (function_parameters, function_return_type) = match !curr_function_spec with
-      | Some x -> x
-      | None -> failwith "cannot finalize function that has never begun!"
-    in
 
+    f ();
     push_block ~branch:FunctionEnd ~next_label:!^(gen_id Type.Label "fn_start");
 
     let fn =
@@ -100,8 +100,8 @@ module MakeProgram(Unit : sig end) : Program_intf = struct
       ; function_parameters
       ; function_body = List.rev !blocks }
     in
-
     functions := fn :: !functions
+    defining_function := false
 
   let extract () =
     { capabilities = []
@@ -122,7 +122,6 @@ end
 module MakeCompiler(Program : Program_intf) = struct
   module Program = Program
   open Program
-  type program = Program.t
 
   let compile_value_op : type a b. a Op.Value.t -> a Id.t = fun op ->
     let open Type in
@@ -255,4 +254,20 @@ end
 let compile dsl =
   let Compiler = MakeCompiler(MakeProgram(struct end)) in
   Compiler.compile dsl;
-  Spirv_module.compile (Compiler.Program.extract ())
+  let words =
+    Compile.Program.extract ()
+      |> Spirv_module.compile
+      |> SpirV.compile_to_words
+  in
+
+  let ch = Unix.open_process_out "spirv-val" in
+  List.map words ~f:(Out_channel.output_value ch);
+  Out_channel.flush ch;
+  (match close_process_in ch with
+    | Ok () -> ()
+    | Error (`Exit_non_zero exit) ->
+        failwith (Printf.sprintf "compiled spirv failed validation (exit code %d)" exit)
+    | Error (`Signal signal) ->
+        failwith (Printf.sprintf "spirv-val process received unexpected signal (%s)" (Signal.to_string signal)));
+
+  words

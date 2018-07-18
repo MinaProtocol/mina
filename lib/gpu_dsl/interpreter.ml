@@ -240,7 +240,7 @@ let rec eval : type a. State.t -> a T.t -> State.t * a =
     (* TODO: Prefixes interact incorrectly with constants *)
     | Set_prefix (prefix, k) -> eval { s with prefix } k
     | Load (ptr, lab, k) ->
-      let Pointer.Pointer loc = State.get_exn s ptr in 
+      let Pointer.Pointer loc = State.get_exn s ptr in
       let typ =
         match Id.typ ptr with
         | Type.Pointer t -> Type.Scalar t

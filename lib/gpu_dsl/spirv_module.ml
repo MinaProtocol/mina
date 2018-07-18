@@ -85,11 +85,14 @@ let compile_variable_declaration_op (v : variable_declaration) : SpirV.op =
 type branch =
   | Branch of SpirV.id
   | BranchConditional of SpirV.id * SpirV.id * SpirV.id
+  | FunctionEnd
 let compile_branch_op : branch -> SpirV.op = function
   | Branch label                                  ->
       `OpBranch label
   | BranchConditional (cond, true_label, f_label) ->
       `OpBranchConditional (cond, true_label, f_label, [])
+  | FunctionEnd ->
+      `OpFunctionEnd
 
 type basic_block =
   { basic_block_label: SpirV.id
