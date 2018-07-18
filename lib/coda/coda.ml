@@ -383,7 +383,7 @@ module Make (Inputs : Inputs_intf) = struct
       Linear_pipe.create ()
     in
     let net_ivar = Ivar.create () in
-    let%bind ledger_builder =
+    let lbc_deferred =
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make ~parent_log:config.log
            ~net_deferred:(Ivar.read net_ivar) ~genesis_ledger:Genesis.ledger
@@ -393,10 +393,9 @@ module Make (Inputs : Inputs_intf) = struct
     let%bind net =
       Net.create config.net_config
         ~get_ledger_builder_aux_at_hash:(fun hash ->
+          let%bind lbc = lbc_deferred in
           (* TODO: Just make lbc do this *)
-          match%map
-            Ledger_builder_controller.local_get_ledger ledger_builder hash
-          with
+          match%map Ledger_builder_controller.local_get_ledger lbc hash with
           | Ok (lb, state) ->
               Some
                 ( Ledger_builder.aux lb
@@ -407,6 +406,7 @@ module Make (Inputs : Inputs_intf) = struct
           )
     in
     Ivar.fill net_ivar net ;
+    let%bind ledger_builder = lbc_deferred in
     don't_wait_for
       (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind transaction_pool =
