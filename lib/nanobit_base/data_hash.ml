@@ -1,6 +1,8 @@
 open Core
 open Util
 open Snark_params.Tick
+open Snark_bits
+open Bitstring_lib
 
 module type Basic = sig
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]

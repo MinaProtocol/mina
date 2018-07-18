@@ -1,4 +1,5 @@
 open Core_kernel
+open Snark_bits
 module Tick_curve = Crypto_params.Tick_curve
 module Tock_curve = Crypto_params.Tock_curve
 
@@ -143,7 +144,7 @@ module Tick = struct
 
     let params =
       let f s = Tick_curve.Bigint.R.(to_field (of_decimal_string s)) in
-      Array.map Pedersen_params.t ~f:(fun (x, y) -> (f x, f y))
+      Array.map Crypto_params.Pedersen_params.t ~f:(fun (x, y) -> (f x, f y))
 
     let hash_bigstring x : Digest.t =
       let s = State.create params in
@@ -205,3 +206,5 @@ let ledger_depth = 3
    to clamp the easiness. To something not-to-quick on a personal laptop from mid 2010s.
 *)
 let target_bit_length = Tick.Field.size_in_bits - 8
+
+module type Snark_intf = Snark_intf.S

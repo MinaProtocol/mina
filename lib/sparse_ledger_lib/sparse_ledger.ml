@@ -1,5 +1,43 @@
 open Core
 
+type ('hash, 'account) tree =
+  | Account of 'account
+  | Hash of 'hash
+  | Node of 'hash * ('hash, 'account) tree * ('hash, 'account) tree
+[@@deriving bin_io, eq, sexp]
+
+type index = int [@@deriving bin_io, sexp]
+
+type ('hash, 'key, 'account) t =
+  { indexes: ('key, index) List.Assoc.t
+  ; depth: int
+  ; tree: ('hash, 'account) tree }
+[@@deriving bin_io, sexp]
+
+module type S = sig
+  type hash
+
+  type key
+
+  type account
+
+  type nonrec t = (hash, key, account) t [@@deriving bin_io, sexp]
+
+  val of_hash : depth:int -> hash -> t
+
+  val get_exn : t -> index -> account
+
+  val path_exn : t -> index -> [`Left of hash | `Right of hash] list
+
+  val set_exn : t -> index -> account -> t
+
+  val find_index_exn : t -> key -> index
+
+  val add_path : t -> [`Left of hash | `Right of hash] list -> account -> t
+
+  val merkle_root : t -> hash
+end
+
 module Make (Hash : sig
   type t [@@deriving bin_io, eq, sexp]
 
@@ -14,11 +52,13 @@ end) (Account : sig
   val hash : t -> Hash.t
 end) =
 struct
-  type tree =
-    | Account of Account.t
-    | Hash of Hash.t
-    | Node of Hash.t * tree * tree
-  [@@deriving bin_io, eq, sexp]
+  type tree_tmp = (Hash.t, Account.t) tree [@@deriving eq]
+
+  type tree = tree_tmp [@@deriving eq]
+
+  type t_tmp = (Hash.t, Key.t, Account.t) t [@@deriving bin_io, sexp]
+
+  type t = t_tmp [@@deriving bin_io, sexp]
 
   let hash = function
     | Account a -> Account.hash a
@@ -26,9 +66,6 @@ struct
     | Node (h, _, _) -> h
 
   type index = int [@@deriving bin_io, sexp]
-
-  type t = {indexes: (Key.t, index) List.Assoc.t; depth: int; tree: tree}
-  [@@deriving bin_io, sexp]
 
   let of_hash ~depth h = {indexes= []; depth; tree= Hash h}
 

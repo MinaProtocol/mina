@@ -1,12 +1,13 @@
 (jbuild_version 1)
 
 (library
- ((name sparse_ledger)
-  (public_name sparse_ledger)
+ ((name sgn)
+  (public_name sgn)
   (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core extlib))
+  (libraries
+    ( snark_params core_kernel ))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
-  (synopsis "sparse Ledger implementation")))
+  (synopsis "sgn library")))
 

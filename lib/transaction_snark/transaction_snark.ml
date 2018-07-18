@@ -114,7 +114,7 @@ module Transition = struct
 end
 
 module Proof_type = struct
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare]
+  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare, eq]
 
   let is_base = function `Base -> true | `Merge -> false
 end
@@ -126,7 +126,7 @@ module Statement = struct
       ; target: Nanobit_base.Ledger_hash.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
-    [@@deriving sexp, bin_io, hash, compare]
+    [@@deriving sexp, bin_io, hash, compare, eq]
   end
 
   include T

@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Snark_params.Tick
 
 type t = Pos | Neg [@@deriving sexp, bin_io, hash, compare, eq]
