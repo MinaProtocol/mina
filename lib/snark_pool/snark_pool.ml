@@ -114,23 +114,15 @@ struct
     Work_random_set.remove t.solved_work work ;
     Work.Table.remove t.proofs work
 
-  (* TODO imeckler for reviewer: I don't think this should be removing the work *)
   (* TODO: We request a random piece of work if there is unsolved work. 
            If there is no unsolved work, then we choose a uniformly random 
            piece of work from the solved work pool. We need to use different
            heuristics since there will be high contention when the work pool is small.
            See issue #276 *)
   let request_work t =
-    let ( |? ) maybe default =
-      match maybe with Some v -> Some v | None -> Lazy.force default
-    in
-    let open Option.Let_syntax in
-    (let%map work = Work_random_set.get_random t.unsolved_work in
-     Work_random_set.remove t.unsolved_work work ;
-     work)
-    |? lazy
-         (let%map work = Work_random_set.get_random t.solved_work in
-          remove_solved_work t work ; work)
+    match Work_random_set.get_random t.unsolved_work with
+    | Some work -> Some work
+    | None -> Work_random_set.get_random t.solved_work
 
   let unsolved_work_count t = Work_random_set.length t.unsolved_work
 end
