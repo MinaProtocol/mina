@@ -14,8 +14,8 @@ module Make
 
             val from_hash: Hash.t -> t
 
-            val forward: bool list -> t
-            val backward: t   -> bool list
+            val fromBits: bool list -> t
+            val toBits: t   -> bool list
           end)
 
            (Group : sig
@@ -27,8 +27,8 @@ module Make
 
             val generator : t
 
-            val forward: bool list -> t
-            val backward: t   -> bool list
+            val fromBits: bool list -> t
+            val toBits: t   -> bool list
           end)
          (Hash_to_group : sig
             val hash : bool list -> Group.t
@@ -43,7 +43,7 @@ module Make
   module Private_key : sig
     type t
 
-       val toScalar: t -> Scalar.t
+    val toScalar: t -> Scalar.t
   end
   module P_EQDL : sig
     type t
@@ -62,7 +62,7 @@ end =
     module Private_key = struct
       type t = bool list
 
-      let toScalar = Scalar.forward
+      let toScalar = Scalar.fromBits
     end
 
     module P_EQDL = struct
@@ -76,13 +76,13 @@ end =
       let k = Private_key.toScalar prk in
       let hgm = Hash_to_group.hash m in
       let u = (Group.scale hgm k) in
-      let y = Hash.hash (List.append m (Group.backward u)) in
+      let y = Hash.hash (List.append m (Group.toBits u)) in
       let g = Group.generator in
       let v = Group.scale g k in
       let r = Scalar.random in
       let gr = Group.scale g r in
       let hmr = Group.scale hgm r in
-      let proof1 = Hash.hash (List.append (List.append m (Group.backward v)) (List.append (Group.backward gr) (Group.backward hmr))) in
+      let proof1 = Hash.hash (List.append (List.append m (Group.toBits v)) (List.append (Group.toBits gr) (Group.toBits hmr))) in
       let s = (Scalar.add r (Scalar.mul k (Scalar.from_hash proof1))) in
       let eqdl = (proof1, s) in
       let proof = (u, eqdl) in
