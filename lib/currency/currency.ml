@@ -373,6 +373,9 @@ end = struct
           Quickcheck.Generator.map ~f:of_bigint
             (Bignum_bigint.gen_incl (to_bigint x) (to_bigint y))
 
+        (* TODO: When we do something to make snarks run fast for tests, increase the trials *)
+        let qc_test_fast = Quickcheck.test ~trials:100
+
         let%test_unit "subtraction_completeness" =
           let generator =
             let open Quickcheck.Generator.Let_syntax in
@@ -380,7 +383,7 @@ end = struct
             let%map y = gen_incl Unsigned.zero x in
             (x, y)
           in
-          Quickcheck.test generator ~f:(fun (lo, hi) ->
+          qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_success
                 (sprintf !"subtraction: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
                 (var_of_t lo - var_of_t hi) )
@@ -392,7 +395,7 @@ end = struct
             let%map y = gen_incl Unsigned.(add x one) Unsigned.max_int in
             (x, y)
           in
-          Quickcheck.test generator ~f:(fun (lo, hi) ->
+          qc_test_fast generator ~f:(fun (lo, hi) ->
               expect_failure
                 (sprintf !"underflow: lo=%{Unsigned} hi=%{Unsigned}" lo hi)
                 (var_of_t lo - var_of_t hi) )
@@ -404,7 +407,7 @@ end = struct
             let%map y = gen_incl Unsigned.zero Unsigned.(sub max_int x) in
             (x, y)
           in
-          Quickcheck.test generator ~f:(fun (x, y) ->
+          qc_test_fast generator ~f:(fun (x, y) ->
               expect_success
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
                 (var_of_t x + var_of_t y) )
@@ -418,7 +421,7 @@ end = struct
             in
             (x, y)
           in
-          Quickcheck.test generator ~f:(fun (x, y) ->
+          qc_test_fast generator ~f:(fun (x, y) ->
               expect_failure
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
                 (var_of_t x + var_of_t y) )

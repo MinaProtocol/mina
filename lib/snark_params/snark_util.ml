@@ -217,6 +217,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     let random_biased_bitstring p length =
       List.init length ~f:(fun _ -> if Random.float 1. < p then false else true)
 
+    (* TODO: Quickcheck this *)
     let%test_unit "lt_bitstring_value" =
       let length = Field.size_in_bits + 5 in
       let test p =
@@ -235,11 +236,11 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         in
         assert (lt = correct_answer)
       in
-      for _ = 1 to 50 do test 0.5 done;
-      for _ = 1 to 50 do test 0.1 done;
-      for _ = 1 to 50 do test 0.9 done;
-      for _ = 1 to 50 do test 0.02 done;
-      for _ = 1 to 50 do test 0.98 done
+      for _ = 1 to 20 do test 0.5 done;
+      for _ = 1 to 20 do test 0.1 done;
+      for _ = 1 to 20 do test 0.9 done;
+      for _ = 1 to 20 do test 0.02 done;
+      for _ = 1 to 20 do test 0.98 done
     ;;
 
     let%test_unit "compare" =
