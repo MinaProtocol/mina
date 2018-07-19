@@ -83,7 +83,8 @@ module type Inputs_intf = sig
     end
   end
 
-  module Tip : Protocols.Coda_pow.Tip_intf
+  module Tip :
+    Protocols.Coda_pow.Tip_intf
     with type ledger_builder := Ledger_builder.t
      and type state := State.t
      and type state_proof := State.Proof.t
@@ -224,6 +225,7 @@ module Make (Inputs : Inputs_intf) : sig
            and type sync_answer := Inputs.Sync_ledger.answer
            and type external_transition := Inputs.External_transition.t
            and type tip := Inputs.Tip.t
+
   val ledger_builder_io : t -> Inputs.Net.t
 end = struct
   open Inputs
@@ -273,7 +275,7 @@ end = struct
       }
     [@@deriving bin_io]
 
-    let create (genesis_tip : Tip.t) : t =
+    let create (genesis_tip: Tip.t) : t =
       { locked_ledger_builder= genesis_tip.ledger_builder
       ; longest_branch_tip= genesis_tip
       ; ktree= None }
@@ -526,11 +528,10 @@ end = struct
       | `Continue (Some s) ->
           assert (
             Inputs.State.equal s (External_transition.target_state new_tip) ) ;
-          state.longest_branch_tip <-
-            { state = External_transition.target_state new_tip
-            ; proof = External_transition.state_proof new_tip
-            ; ledger_builder = lb
-            };
+          state.longest_branch_tip
+          <- { state= External_transition.target_state new_tip
+             ; proof= External_transition.state_proof new_tip
+             ; ledger_builder= lb } ;
           Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
             strongest_ledgers_reader (lb, new_tip)
       | `Abort -> ()
@@ -559,7 +560,9 @@ end = struct
             let w = do_sync sl_ref sl transition in
             (w, Deferred.return (), sl_ref)
         | sl_ref, `Path_traversal new_best_path ->
-            let curr_tip_hash = Ledger_builder.hash state.longest_branch_tip.ledger_builder in
+            let curr_tip_hash =
+              Ledger_builder.hash state.longest_branch_tip.ledger_builder
+            in
             let is_lb_hash_curr_tip w =
               Ledger_builder_hash.equal curr_tip_hash
                 (External_transition.ledger_builder_hash w)
@@ -605,8 +608,10 @@ end = struct
         in
         if Ledger_builder_hash.equal hash (Ledger_builder.hash locked) then
           attempt_easy locked "locked_head"
-        else if Ledger_builder_hash.equal hash (Ledger_builder.hash tip.ledger_builder) then
-          attempt_easy tip.ledger_builder "tip"
+        else if
+          Ledger_builder_hash.equal hash
+            (Ledger_builder.hash tip.ledger_builder)
+        then attempt_easy tip.ledger_builder "tip"
         else
           (* Now we need to materialize it *)
           match
@@ -685,22 +690,20 @@ let%test_module "test" =
         [@@deriving eq, sexp, compare, bin_io, fields]
 
         let genesis =
-          { ledger_builder_hash = 0
-          ; hash = 0
-          ; strength = 0
-          ; previous_state_hash = 0
-          ; ledger_hash = 0
-          }
+          { ledger_builder_hash= 0
+          ; hash= 0
+          ; strength= 0
+          ; previous_state_hash= 0
+          ; ledger_hash= 0 }
 
         module Proof = Unit
       end
 
       module Tip = struct
         type t =
-          { state : State.t
-          ; proof : State.Proof.t
-          ; ledger_builder : Ledger_builder.t
-          }
+          { state: State.t
+          ; proof: State.Proof.t
+          ; ledger_builder: Ledger_builder.t }
         [@@deriving bin_io, sexp, fields]
       end
 
@@ -817,10 +820,10 @@ let%test_module "test" =
       Lbc.Config.make ~parent_log:(Logger.create ())
         ~net_deferred:(return net_input)
         ~external_transitions:ledger_builder_transitions
-        ~genesis_tip:{
-          state=Inputs.State.genesis; proof = ()
-          ; ledger_builder =Inputs.Ledger_builder.create 0
-        }
+        ~genesis_tip:
+          { state= Inputs.State.genesis
+          ; proof= ()
+          ; ledger_builder= Inputs.Ledger_builder.create 0 }
         ~disk_location:"/tmp/test_lbc_disk"
 
     let take_map ~f p cnt =

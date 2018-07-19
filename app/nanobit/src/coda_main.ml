@@ -351,10 +351,7 @@ struct
 
   module Tip = struct
     type t =
-      { state : State.t
-      ; proof : State.Proof.t
-      ; ledger_builder : Ledger_builder.t
-      }
+      {state: State.t; proof: State.Proof.t; ledger_builder: Ledger_builder.t}
     [@@deriving bin_io, sexp]
   end
 
@@ -624,7 +621,7 @@ struct
     let%bind work =
       Snark_pool.Pool.request_work (Snark_pool.pool (snark_pool t))
       |> option "no work found"
-    (* TODO: Perhaps we should really be looking in ALL of the lbs rather than
+      (* TODO: Perhaps we should really be looking in ALL of the lbs rather than
         the best one. *)
     in
     let lb = best_ledger_builder t in
@@ -783,7 +780,7 @@ module Run (Program : Main_intf) = struct
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    Core.printf !"Ledger: %{sexp:Ledger.t}\n%!" ledger;
+    Core.printf !"Ledger: %{sexp:Ledger.t}\n%!" ledger ;
     let%map account = Ledger.get ledger addr in
     account.Account.balance
 
@@ -800,10 +797,10 @@ module Run (Program : Main_intf) = struct
     let open Deferred.Let_syntax in
     assert (is_valid_transaction t txn) ;
     let txn_pool = transaction_pool t in
-    don't_wait_for (Transaction_pool.add txn_pool txn);
+    don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
-      txn;
+      txn ;
     Deferred.unit
 
   let get_nonce t (addr: Public_key.Compressed.t) =
