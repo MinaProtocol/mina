@@ -44,19 +44,25 @@ let compile_decoration_op : decoration -> SpirV.op = function
         , d.member_decoration_value )
 
 type spirv_type =
+  | TypeVoid
+  | TypeBool
   | TypeInt of SpirV.literal_integer * bool
   | TypeFloat of SpirV.literal_integer
   | TypeVector of SpirV.id * SpirV.literal_integer
   | TypeRuntimeArray of SpirV.id
   | TypeStruct of SpirV.id list
   | TypePointer of SpirV.storage_class * SpirV.id
+  | TypeFunction of SpirV.id * SpirV.id list
 let compile_spirv_type_op (id : SpirV.id) : spirv_type -> SpirV.op = function
-  | TypeInt (width, sign) -> `OpTypeInt (id, width, if sign then 1l else 0l)
-  | TypeFloat width       -> `OpTypeFloat (id, width)
-  | TypeVector (t, size)  -> `OpTypeVector (id, t, size)
-  | TypeRuntimeArray t    -> `OpTypeRuntimeArray (id, t)
-  | TypeStruct ts         -> `OpTypeStruct (id, ts)
-  | TypePointer (sc, t)   -> `OpTypePointer (id, sc, t)
+  | TypeVoid               -> `OpTypeVoid id
+  | TypeBool               -> `OpTypeBool id
+  | TypeInt (width, sign)  -> `OpTypeInt (id, width, if sign then 1l else 0l)
+  | TypeFloat width        -> `OpTypeFloat (id, width)
+  | TypeVector (t, size)   -> `OpTypeVector (id, t, size)
+  | TypeRuntimeArray t     -> `OpTypeRuntimeArray (id, t)
+  | TypeStruct ts          -> `OpTypeStruct (id, ts)
+  | TypePointer (sc, t)    -> `OpTypePointer (id, sc, t)
+  | TypeFunction (rt, ats) -> `OpTypeFunction (id, rt, ats)
 type type_declaration =
   { type_id: SpirV.id
   ; type_value: spirv_type }
@@ -85,14 +91,17 @@ let compile_variable_declaration_op (v : variable_declaration) : SpirV.op =
 type branch =
   | Branch of SpirV.id
   | BranchConditional of SpirV.id * SpirV.id * SpirV.id
-  | FunctionEnd
+  | Return
+  | ReturnValue of SpirV.id
 let compile_branch_op : branch -> SpirV.op = function
   | Branch label                                  ->
       `OpBranch label
   | BranchConditional (cond, true_label, f_label) ->
       `OpBranchConditional (cond, true_label, f_label, [])
-  | FunctionEnd ->
-      `OpFunctionEnd
+  | Return ->
+      `OpReturn
+  | ReturnValue v ->
+      `OpReturnValue v
 
 type basic_block =
   { basic_block_label: SpirV.id
@@ -118,6 +127,7 @@ type function_definition =
   ; function_control: SpirV.function_control list
   ; function_type: SpirV.id
   ; function_parameters: function_parameter list
+  ; function_variables: variable_declaration list
   ; function_body: basic_block list }
 let compile_function_header_op (fn_def : function_definition) : SpirV.op =
   `OpFunction
@@ -129,6 +139,7 @@ let compile_function_definition_ops (fn_def : function_definition) : SpirV.op li
   List.concat
     [ [compile_function_header_op fn_def]
     ; List.map fn_def.function_parameters ~f:compile_function_parameter_op
+    ; List.map fn_def.function_variables ~f:compile_variable_declaration_op
     ; List.concat (List.map fn_def.function_body ~f:compile_basic_block_ops)
     ; [`OpFunctionEnd] ]
 

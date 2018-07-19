@@ -1,14 +1,23 @@
 (jbuild_version 1)
 
 (executable
- ((name compiler)
-  (library_flags (-linkall))
-  (inline_tests)
+ ((name test)
   (libraries (core integers bignum gpu_dsl))
   (preprocess (pps (ppx_jane)))
   (modes (native))))
 
 (rule
- ((targets (exponentiate.spv))
-  (deps (compiler.exe))
-  (actions (run $(<) exponentiate))))
+ ((targets (test.spv))
+  (deps (test.exe))
+  (action (run ${<} ${@}))))
+
+; (executable
+;  ((name exponentiation)
+;   (libraries (core integers bignum gpu_dsl))
+;   (preprocess (pps (ppx_jane)))
+;   (modes (native))))
+; 
+; (rule
+;  ((targets (exponentiation.spv))
+;   (deps (compiler.exe))
+;   (action (run ${<} ${@}))))

@@ -22,20 +22,20 @@ module type Program_intf = sig
 
   val push_op : SpirV.op -> unit
   val push_block : branch:Spirv_module.branch -> next_label:SpirV.id -> unit
-  val begin_function : string -> ('f, 'a, 'g) Arguments_spec.t -> ('g, 'h) Local_variables_spec.t -> 'b Type.t -> unit
-  val end_function : unit -> unit
+  val define_function : string -> ('types, 'args, 'f, 'g) Arguments_spec.t -> ('vars, 'g, 'h) Local_variables_spec.t -> 'ret Type.t -> 'f -> f:('h -> unit) -> ('types Type.list, 'ret) Function.t Id.t
 
   val extract : unit -> Spirv_module.t
 end
 
 module MakeProgram(Unit : sig end) : Program_intf = struct
   let defining_function : bool ref = ref false
-  let next_id : int ref = ref 0
+  let next_id : int ref = ref 1
   let blocks : Spirv_module.basic_block list ref = ref []
   let curr_block_label : SpirV.id ref = ref 0l
   let curr_block_ops : SpirV.op list ref = ref []
 
   let name_table : (string, int) Hashtbl.t = String.Table.create ()
+  let types : (Type.Enum.t * SpirV.id) list ref = ref []
   let type_table : (Type.Enum.t, SpirV.id) Hashtbl.t = Type.Enum.Table.create ()
   let constant_table : (Constant.t, SpirV.id) Hashtbl.t = Constant.Table.create ()
   let function_table : (string, Spirv_module.function_definition) Hashtbl.t = String.Table.create ()
@@ -59,12 +59,18 @@ module MakeProgram(Unit : sig end) : Program_intf = struct
     in
     register_name name;
 
+    Printf.printf "id: %s %d\n" (Type.to_string type_) id;
+
     Id.Id (type_, name, id)
 
 
   let register_type type_ : unit Id.t =
     let name = Type.to_string type_ in
-    let id_value = Hashtbl.find_or_add type_table (Type.Enum.T type_) ~default:(fun () -> !^(gen_id type_ name)) in
+    let id_value = Hashtbl.find_or_add type_table (Type.Enum.T type_) ~default:(fun () ->
+        let id = gen_id Type.Type name in
+        types := (Type.Enum.T type_, !^id) :: !types;
+        !^id)
+    in
     Id.Id (Type.Type, name, Batteries.Int32.to_int id_value)
 
   let register_constant type_ val_ =
@@ -84,37 +90,95 @@ module MakeProgram(Unit : sig end) : Program_intf = struct
     curr_block_label := next_label;
     curr_block_ops := []
 
-  let define_function name return_type args vars ~f =
+  let define_function name args vars return_type body ~f =
     assert (not !defining_function);
     defining_function := true;
 
+    let (arg_types, arg_ids, body_with_args) = Arguments_spec.(apply args { generate = fun t -> gen_id t (name ^ "_arg_0") } body) in
+    let (var_ids, applied_body) = Local_variables_spec.(apply vars { generate = fun t -> gen_id (Type.Pointer t) (name ^ "_var_0") } body_with_args) in
 
-    f ();
-    push_block ~branch:FunctionEnd ~next_label:!^(gen_id Type.Label "fn_start");
-
-    let fn =
-      { function_return_type
-      ; function_id
-      ; function_control = SpirV.FunctionControlNone
-      ; function_type
-      ; function_parameters
-      ; function_body = List.rev !blocks }
+    let function_parameters = Arguments_spec.(map_ids args arg_ids { map_id = fun id ->
+      Spirv_module.(
+        { function_parameter_type = !^(register_type (Id.typ id))
+        ; function_parameter_id = !^id }) })
     in
-    functions := fn :: !functions
-    defining_function := false
+    let function_variables = Local_variables_spec.(map_ids vars var_ids { map_id = fun id ->
+      Spirv_module.(
+        { variable_type = !^(register_type (Id.typ id))
+        ; variable_id = !^id
+        ; variable_storage_class = SpirV.StorageClassFunction
+        ; variable_initializer = None }) })
+    in
+
+    let return_type_id = register_type return_type in
+    let type_ = Type.Function (arg_types, return_type) in
+    let type_id = register_type type_ in
+    let id = gen_id type_ name in
+
+    blocks := [];
+    curr_block_label := !^(gen_id Type.Label "fn_start");
+    curr_block_ops := [];
+
+    f applied_body;
+    push_block ~branch:Return ~next_label:!^(gen_id Type.Label "fn_start");
+
+    let fn = Spirv_module.(
+      { function_return_type = !^return_type_id
+      ; function_id = !^id
+      ; function_control = []
+      ; function_type = !^type_id
+      ; function_parameters
+      ; function_variables
+      ; function_body = List.rev !blocks })
+    in
+    (if Hashtbl.add function_table ~key:name ~data:fn = `Duplicate then
+      failwith (Printf.sprintf "function with name %s already exists" name));
+
+    defining_function := false;
+    id
+
+  let rec spirv_type_value : Type.Enum.t -> Spirv_module.spirv_type =
+    let open Spirv_module in
+    let open Type in
+    let open Type.Scalar in
+    let open Type.Enum in
+    function
+      | T (Scalar Uint32) -> TypeInt (32l, false)
+      | T (Scalar Bool) -> TypeBool
+      (* TODO: pointers of different storage classes *)
+      | T (Pointer t) -> TypePointer (SpirV.StorageClassFunction, !^(register_type t))
+      | T (Array _) -> failwith "spirv_type_value: Array unimplemented"
+      | T (Tuple2 _) -> failwith "spirv_type_value: Tuple2 unimplemented"
+      | T Arith_result -> failwith "spirv_type_value: Arith_result unimplemented"
+      | T (Struct _) -> failwith "spirv_type_value: Struct unimplemented"
+      | T (Function (arg_types, return_type)) ->
+           let arg_type_ids = Type.(map arg_types { f = fun t ->
+             !^(register_type t) })
+           in
+           TypeFunction (!^(register_type return_type), arg_type_ids)
+
+      | T Type -> failwith "spirv_type_value: cannot create spirv type from Type.Type"
+      | T Label -> failwith "spirv_type_value: cannot create spirv type from Type.Label"
+      | T Void -> TypeVoid
 
   let extract () =
-    { capabilities = []
-    ; memory_model = (SpirV.AddressingModelLogical, SpirV.MemoryModelSimple)
+    let open SpirV in
+    let open Spirv_module in
+
+    { capabilities = [CapabilityShader]
+    ; memory_model = (AddressingModelLogical, MemoryModelSimple)
     ; entry_points =
-        [ { entry_point_execution_mode = SpirV.ExecutionModeLocalSize (1l, 1l, 1l)
-          ; entry_point_execution_model = SpirV.ExecutionModelGLCompute
-          ; entry_point_id = Hashtbl.find_exn functions "main"
+        [ { entry_point_execution_mode = ExecutionModeLocalSize (1l, 1l, 1l)
+          ; entry_point_execution_model = ExecutionModelGLCompute
+          ; entry_point_id = Spirv_module.((Hashtbl.find_exn function_table "main").function_id)
           ; entry_point_name = "main"
           ; entry_point_interfaces = [] } ]
     ; decorations = []
-    ; types = Hashtbl.to_alist type_table |> List.map ~f:(fun (type_, type_id) -> { type_id; type_value = spirv_type_value type_ })
-    ; constants = Hashtbl.to_alist constant_table |> List.map ~f:(fun ((constant_type, constant_value), constant_id) -> { constant_type; constant_value; constant_id })
+    ; types = List.map (List.rev !types) ~f:(fun (type_, type_id) -> { type_id; type_value = spirv_type_value type_ })
+    ; constants =
+        Hashtbl.to_alist constant_table
+          |> List.map ~f:(fun ((constant_type, value), constant_id) ->
+            { constant_type; constant_value = BigInt (Batteries.Big_int.of_int value); constant_id })
     ; global_variables = []
     ; functions = Hashtbl.data function_table }
 end
@@ -123,11 +187,11 @@ module MakeCompiler(Program : Program_intf) = struct
   module Program = Program
   open Program
 
-  let compile_value_op : type a b. a Op.Value.t -> a Id.t = fun op ->
+  let compile_value_op : type a. a Op.Value.t -> a Id.t = fun op ->
     let open Type in
     let open Op.Value in
 
-    let f : type a b. a Id.t -> b Id.t -> b Type.t -> (unit Id.t -> b Id.t -> SpirV.op) -> b Id.t = fun x y type_ create_fn ->
+    let f : type a b. a Id.t -> a Id.t -> b Type.t -> (unit Id.t -> b Id.t -> SpirV.op) -> b Id.t = fun x y type_ create_fn ->
       let type_id = register_type type_ in
       let result_id = gen_id type_ op.result_name in
       push_op (create_fn type_id result_id);
@@ -136,7 +200,7 @@ module MakeCompiler(Program : Program_intf) = struct
 
     match op.op with
       | Or (x, y) -> f x y (Scalar Scalar.Bool) (fun t r -> `OpLogicalOr (!^t, !^r, !^x, !^y))
-      | Add (x, y) ->f x y Arith_result (fun t r -> `OpIAddCarry (!^t, !^r, !^x, !^y))
+      | Add (x, y) -> f x y Arith_result (fun t r -> `OpIAddCarry (!^t, !^r, !^x, !^y))
       | Add_ignore_overflow (x, y) -> f x y (Scalar Scalar.Uint32) (fun t r -> `OpIAdd (!^t, !^r, !^x, !^y))
       | _ -> failwith "compile_value_op not fully implemented"
 
@@ -146,20 +210,26 @@ module MakeCompiler(Program : Program_intf) = struct
       | Array_set _ -> failwith "Op.Action.Array_set: unimplemented"
       | Store (ptr, value) -> push_op (`OpStore (!^ptr, !^value, None))
 
-  let rec compile = function
+  let rec compile : type a. a Dsl.t -> unit = function
     | Declare_function (name, args, vars, return_type, body, continuation) ->
-        begin_function name args return_type;
+        let id = define_function name args vars return_type body ~f:compile in
+        compile (continuation id)
 
-        let gen_arg = Arguments_spec.({ f = fun t -> gen_id t (name ^ "_arg_0") }) in
-        let gen_var = Local_variables_spec.({ f = fun t -> gen_id (Type.Pointer t) (name ^ "_var_0") }) in
+    | Declare_constant (Type.Scalar Type.Scalar.Uint32, value, continuation) ->
+        compile @@ continuation @@ register_constant (Type.Scalar Type.Scalar.Uint32) (Unsigned.UInt32.to_int value)
+    | Declare_constant (Type.Scalar Type.Scalar.Bool, value, continuation) ->
+        compile @@ continuation @@ register_constant (Type.Scalar Type.Scalar.Bool) (if value then 1 else 0)
+    | Declare_constant _ ->
+        failwith "Declare_constant: cannot declare non-scalar constants"
 
-        body
-          |> Arguments_spec.apply gen_arg args
-          |> Local_variables_spec.apply gen_var vars
-          |> compile;
+    | Load _ ->
+        failwith "Load: unimplemented"
 
-        finalize_function ();
-        compile (continuation function_id)
+    | Create_pointer _ ->
+        failwith "Create_pointer: unimplemented"
+
+    | Call_function _ ->
+        failwith "Call_function: unimplemented"
 
     | Value_op (op, continuation) ->
         compile (continuation (compile_value_op op))
@@ -182,6 +252,9 @@ module MakeCompiler(Program : Program_intf) = struct
           ~next_label:!^after_label;
 
         compile (after ())
+
+  | If _ ->
+      failwith "If: unimplemented"
 
   (*
     | If { cond; then_; after } ->
@@ -244,30 +317,28 @@ module MakeCompiler(Program : Program_intf) = struct
         compile (after ())
 
     | Set_prefix _ ->
-        failwith "not implemented: Dsl.Set_prefix"
+        failwith "Set_prefix: unimplemented"
     | Phi _ ->
-        failwith "not implemented: Dsl.Phi"
+        failwith "Phi: unimplemented"
     | Pure _ ->
         ()
 end
 
-let compile dsl =
-  let Compiler = MakeCompiler(MakeProgram(struct end)) in
+let compile dsl out_file =
+  let module Compiler = MakeCompiler(MakeProgram(struct end)) in
   Compiler.compile dsl;
-  let words =
-    Compile.Program.extract ()
-      |> Spirv_module.compile
-      |> SpirV.compile_to_words
-  in
+  let ops = Spirv_module.compile (Compiler.Program.extract ()) in
+  let words = SpirV.compile_to_words ops in
 
-  let ch = Unix.open_process_out "spirv-val" in
-  List.map words ~f:(Out_channel.output_value ch);
+  (* List.iter words ~f:(fun i32 -> Printf.printf "%d - %x\n" (Batteries.Int32.to_int i32) (Batteries.Int32.to_int i32)); *)
+
+  let ch = Out_channel.create ~binary:true out_file in
+  List.iter words ~f:(fun i32 -> Out_channel.output_binary_int ch (Batteries.Int32.to_int i32));
   Out_channel.flush ch;
-  (match close_process_in ch with
+
+  (match Unix.system (Printf.sprintf "spirv-val %s" out_file) with
     | Ok () -> ()
     | Error (`Exit_non_zero exit) ->
         failwith (Printf.sprintf "compiled spirv failed validation (exit code %d)" exit)
     | Error (`Signal signal) ->
         failwith (Printf.sprintf "spirv-val process received unexpected signal (%s)" (Signal.to_string signal)));
-
-  words

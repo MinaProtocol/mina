@@ -71,11 +71,11 @@ let bigint_add_mod ~bigint_add ~bigint_sub ~p n =
     (fun rs xs ys ->
       let%bind one = constant Type.uint32 UInt32.one in
       let%bind zero = constant Type.uint32 UInt32.zero in
-      let%bind carry_after_add = bigint_add rs xs ys in
+      let%bind carry_after_add = call_function bigint_add Struct.([rs; xs; ys]) in
       let%bind overflow = equal_uint32 carry_after_add one "overflow" in
       let%bind () =
         do_if overflow begin
-          let%bind last_carry = bigint_sub rs rs p in
+          let%bind last_carry = call_function bigint_sub Struct.([rs; rs; p]) in
           let%bind didn't_kill_top_bit = equal_uint32 last_carry zero "didnt_kill_top_bit" in
           do_if didn't_kill_top_bit
             (bigint_sub rs rs p >>| ignore)

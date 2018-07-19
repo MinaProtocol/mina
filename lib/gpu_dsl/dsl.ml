@@ -37,7 +37,7 @@ module Arith_result = struct
     }
 end
 
-module Struct = struct
+module PolyTuple = struct
   type 'a t =
     | [] : unit t
     | (::) : 'a * 'b t -> ('a * 'b) t
@@ -73,21 +73,30 @@ module Type = struct
 
   type _ t =
     | Scalar  : 'a Scalar.t -> 'a t
-    | Pointer : 'a Scalar.t -> 'a Pointer.t t
+    | Pointer : 'a t -> 'a Pointer.t t
     | Array   : 'a Scalar.t -> 'a array t
     | Tuple2  : 'a Scalar.t * 'b Scalar.t -> ('a * 'b) t
     | Arith_result  : uint32 Arith_result.t t
-    | Struct : 'a struct_spec -> 'a Struct.t t
-    | Function : 'a t * 'b t -> ('a, 'b) Function.t t
+    | Struct : 'a list -> 'a list t
+    | Function : 'a list * 'b t -> ('a list, 'b) Function.t t
     | Type : unit t
     | Label : unit t
-  and _ struct_spec =
-    | [] : unit struct_spec
-    | (::) : 'a t * 'b struct_spec -> ('a * 'b) struct_spec
+    | Void : unit t
+  and _ list =
+    | [] : unit list
+    | (::) : 'a t * 'b list -> ('a * 'b) list
 
-  let to_string : type a. a t -> string = function
+  type 'b mapper = { f : 'a. 'a t -> 'b }
+
+  let rec map : type a. a list -> 'b mapper -> 'b List.t =
+    fun ls mapper ->
+      match ls with
+        | [] -> []
+        | h :: t -> List.cons (mapper.f h) (map t mapper)
+
+  let rec to_string : type a. a t -> string = function
     | Scalar s -> Scalar.to_string s
-    | Pointer s -> Scalar.to_string s ^ "_ptr"
+    | Pointer t -> to_string t ^ "_ptr"
     | Array s -> Scalar.to_string s ^ "_array"
     | Tuple2 (s0, s1) -> "tuple2_" ^ Scalar.to_string s0 ^ "_" ^ Scalar.to_string s1
     | Arith_result -> "u32_arith_result"
@@ -95,6 +104,7 @@ module Type = struct
     | Function _ -> "fn" (* TODO *)
     | Type -> "type"
     | Label -> "label"
+    | Void -> "void"
 
   module Enum = struct
     module T = struct
@@ -120,18 +130,18 @@ module Type = struct
     | _ -> assert false
 
   let pointer_elt : type a. a Pointer.t t -> a t = function
-    | Pointer scalar -> Scalar scalar
+    | Pointer elt -> elt
     | _ -> assert false
 
   let array_elt : type a. a array t -> a t = function
     | Array scalar -> Scalar scalar
     | _ -> assert false
 
-  let equality : type a b. a t -> b t -> (a, b) Type_equal.t option =
+  let rec equality : type a b. a t -> b t -> (a, b) Type_equal.t option =
     fun x y ->
       match x, y with
       | Pointer a1, Pointer a2 ->
-        begin match Scalar.equality a1 a2 with
+        begin match equality a1 a2 with
         | Some Type_equal.T -> Some Type_equal.T
         | None -> None
         end
@@ -184,7 +194,7 @@ module Op = struct
       | Less_than : uint32 Id.t * uint32 Id.t -> bool op
       | Equal : uint32 Id.t * uint32 Id.t -> bool op
       | Array_get : 'b array Id.t * uint32 Id.t -> 'b op
-      | Struct_access : 's Struct.t Id.t * ('a, 's) Struct_location.t -> 'a op
+      | Struct_access : 's Type.list Id.t * ('a, 's) Struct_location.t -> 'a op
       | Fst : ('a * 'b) Id.t -> 'a op
       | Snd : ('a * 'b) Id.t -> 'b op
       | High_bits : uint32 Arith_result.t Id.t -> uint32 op
@@ -193,7 +203,7 @@ module Op = struct
     type 'a t = { op : 'a op; result_name : string }
 
     let rec struct_access
-      : type a s. s Type.struct_spec -> (a, s) Struct_location.t -> a Type.t
+      : type a s. s Type.list -> (a, s) Struct_location.t -> a Type.t
       =
       let open Type in
       let open Struct_location in
@@ -221,10 +231,10 @@ module Op = struct
       | Fst t -> Type.fst (Id.typ t)
       | Snd t -> Type.snd (Id.typ t)
       | Struct_access (id, loc) ->
-        begin match Id.typ id with
-        | Type.Struct spec -> struct_access spec loc
-        | _ -> assert false
-        end
+          begin match Id.typ id with
+          | Type.Struct spec -> struct_access spec loc
+          | _ -> assert false
+          end
   end
 
   module Action = struct
@@ -235,40 +245,55 @@ module Op = struct
 end
 
 module Arguments_spec = struct
-  type ('acc, 'arg_type, 'k) t =
-    | [] : ('k, unit, 'k) t
-    | (::) : 'a Type.t * ('b, 'at, 'k) t -> ('a Id.t -> 'b, 'a Id.t * 'at, 'k) t
+  type ('types, 'args, 'f, 'k) t =
+    | [] : (unit, unit, 'k, 'k) t
+    | (::) : 'a Type.t * ('ts, 'ats, 'b, 'k) t -> ('a * 'ts, 'a Id.t * 'ats, 'a Id.t -> 'b, 'k) t
 
-  type id_generator = { f : 'a. 'a Type.t -> 'a Id.t }
+  type 'b id_mapper = { map_id : 'a. 'a Id.t -> 'b }
 
-  let rec types : type acc arg_type k. (acc, arg_type, k) t -> Type.Enum.t list =
-    function
-      | [] -> []
-      | typ :: xs -> Type.Enum.T typ :: types xs
+  let rec map_ids : type types args f k. (types, args, f, k) t -> args PolyTuple.t -> 'r id_mapper -> 'r list  =
+    fun t args id_mapper ->
+      match t, args with 
+      | ([], PolyTuple.([])) -> []
+      | (_ :: arg_spec_tail, PolyTuple.(arg :: arg_tail)) ->
+           List.(id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper)
 
-  let rec apply : type acc arg_type k. id_generator -> (acc, arg_type, k) t -> acc -> k =
-    fun gen t acc ->
+  type generator = { generate : 'a. 'a Type.t -> 'a Id.t }
+
+  let rec apply : type types args f k. (types, args, f, k) t -> generator -> f -> types Type.list * args PolyTuple.t * k =
+    fun t gen f ->
       match t with
-        | [] -> acc
-        | typ :: xs ->
-            let id = gen.f typ in
-            apply gen xs (acc id)
+        | [] -> (Type.([]), PolyTuple.([]), f)
+        | head :: tail ->
+            let c = gen.generate head in
+            let (ts, ats, k) = apply tail gen (f c) in
+            (Type.(head :: ts), PolyTuple.(c :: ats), k)
 end
 
 module Local_variables_spec = struct
-  type ('acc, 'k) t =
-    | [] : ('k, 'k) t
-    | (::) : 'a Type.t * ('b, 'k) t -> ('a Pointer.t Id.t -> 'b, 'k) t
+  type ('vars, 'f, 'k) t =
+    | [] : (unit, unit -> 'k, 'k) t
+    | (::) : 'a Type.t * ('vs, 'b, 'k) t -> ('a Pointer.t Id.t * 'vs, 'a Pointer.t Id.t -> 'b, 'k) t
 
-  type id_generator = { f : 'a. 'a Type.t -> 'a Pointer.t Id.t }
+  type 'b id_mapper = { map_id : 'a. 'a Pointer.t Id.t -> 'b }
 
-  let rec apply : type acc k. id_generator -> (acc, k) t -> acc -> k =
-    fun gen t acc ->
+  let rec map_ids : type vars f k. (vars, f, k) t -> vars PolyTuple.t -> 'r id_mapper -> 'r list  =
+    fun t args id_mapper ->
+      match t, args with 
+      | ([], PolyTuple.([])) -> []
+      | (_ :: arg_spec_tail, PolyTuple.(arg :: arg_tail)) ->
+           List.(id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper)
+
+  type generator = { generate : 'a. 'a Type.t -> 'a Pointer.t Id.t }
+
+  let rec apply : type vars f k. (vars, f, k) t -> generator -> f -> vars PolyTuple.t * k =
+    fun t gen f ->
       match t with
-      | [] -> acc
-      | typ :: xs ->
-          let id = gen.f typ in
-          apply gen xs (acc id)
+        | [] -> (PolyTuple.([]), f ())
+        | head :: tail ->
+            let c = gen.generate head in
+            let (str, k) = apply tail gen (f c) in
+            (PolyTuple.(c :: str), k)
 end
 
 module T = struct
@@ -276,24 +301,24 @@ module T = struct
     | Set_prefix of string * 'a t
     | Declare_function
       : string
-        * ('f, 'args, 'g) Arguments_spec.t
-        * ('g, 'ret Id.t t) Local_variables_spec.t
+        * ('types, 'args, 'f, 'g) Arguments_spec.t
+        * ('vars, 'g, 'ret t) Local_variables_spec.t
         * 'ret Type.t
         * 'f
-        * (('args, 'ret) Function.t Id.t -> 'a t)
+        * (('types Type.list, 'ret) Function.t Id.t -> 'a t)
         -> 'a t
     | Call_function
       : ('args, 'ret) Function.t Id.t
-        * 'args Struct.t
+        * 'args PolyTuple.t
         * ('ret Id.t -> 'a t)
       -> 'a t
     | Create_pointer
-      : 'c Type.Scalar.t * string
+      : 'c Type.t * string
         * ('c Pointer.t Id.t -> 'b t) ->  'b t
     | Load : 'c Pointer.t Id.t * string * ('c Id.t -> 'a t) -> 'a t
     | Value_op : 'a Op.Value.t * ('a Id.t -> 'b t) -> 'b t
     | Action_op of Op.Action.t * (unit -> 'a t)
-    | Declare_constant : 'a Type.t * 'a * string option * ('a Id.t -> 'b t) -> 'b t
+    | Declare_constant : 'a Type.t * 'a * ('a Id.t -> 'b t) -> 'b t
     | For of
         { var_ptr : uint32 Pointer.t Id.t
         ; range: uint32 Id.t * uint32 Id.t
@@ -324,8 +349,8 @@ module T = struct
       Declare_function (name, args, vars, ret, body, fun x -> map (k x) ~f)
     | Pure x -> Pure (f x)
     | Set_prefix (s, k) -> Set_prefix (s, map k ~f)
-    | Declare_constant (typ, x, lab, k) ->
-      Declare_constant (typ, x, lab, fun v -> map (k v) ~f)
+    | Declare_constant (typ, x, k) ->
+      Declare_constant (typ, x, fun v -> map (k v) ~f)
     | Create_pointer (typ, s, k) ->
       Create_pointer (typ, s, fun v -> map (k v) ~f)
     | Load (ptr, lab, k) ->
@@ -351,8 +376,8 @@ module T = struct
       | Set_prefix (s, k) -> Set_prefix (s, bind k ~f)
       | Create_pointer (typ, s, k) ->
         Create_pointer (typ, s, fun v -> bind (k v) ~f)
-      | Declare_constant (typ, x, lab, k) ->
-        Declare_constant (typ, x, lab, fun v -> bind (k v) ~f)
+      | Declare_constant (typ, x, k) ->
+        Declare_constant (typ, x, fun v -> bind (k v) ~f)
       | Load (ptr, lab, k) ->
         Load (ptr, lab, fun v -> bind (k v) ~f)
       | Action_op (op, k) -> Action_op (op, fun () -> bind (k ()) ~f)
@@ -366,25 +391,6 @@ module T = struct
         Do_if { cond; then_; after = fun x -> bind (after x) ~f }
 
   let return x = Pure x
-
-  (* TODO: Compute closure from the body *)
-  let for_ var_ptr range body = For { var_ptr; range; body; after = fun _ -> return () }
-  let if_ cond ~then_ ~else_ = If { cond; then_; else_; after = fun v -> return v }
-  let do_if cond then_ = Do_if { cond; then_; after = fun v -> return v }
-
-  let set_prefix prefix = Set_prefix (prefix, return ())
-
-  let array_get result_name arr i =
-    Value_op ({ op = Array_get (arr, i); result_name }, return)
-
-  let do_value op result_name = Value_op ({ op; result_name }, return)
-  let do_ op = Action_op (op, fun () -> return ())
-
-  let constant ?label typ x =
-    Declare_constant (typ, x, label, return)
-
-  let declare_function name ~args ~vars ~returning body =
-    Declare_function (name, args, vars, returning, body, return)
 end
 
 include Monad.Make(struct
@@ -394,6 +400,24 @@ end)
 
 include T
 open Let_syntax
+
+let for_ var_ptr range body = For { var_ptr; range; body; after = fun _ -> return () }
+let if_ cond ~then_ ~else_ = If { cond; then_; else_; after = fun v -> return v }
+let do_if cond then_ = Do_if { cond; then_; after = fun v -> return v }
+
+let set_prefix prefix = Set_prefix (prefix, return ())
+
+let array_get result_name arr i =
+  Value_op ({ op = Array_get (arr, i); result_name }, return)
+
+let do_value op result_name = Value_op ({ op; result_name }, return)
+let do_ op = Action_op (op, fun () -> return ())
+
+let constant typ x =
+  Declare_constant (typ, x, return)
+
+let declare_function name ~args ~vars ~returning body =
+  Declare_function (name, args, vars, returning, body, return)
 
 let array_get label xs i =
   let open Op.Value in
