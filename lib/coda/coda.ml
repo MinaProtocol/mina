@@ -143,6 +143,7 @@ module type Ledger_builder_controller_intf = sig
   type external_transition
 
   type ledger
+  type tip
 
   type net
 
@@ -163,7 +164,7 @@ module type Ledger_builder_controller_intf = sig
       { parent_log: Logger.t
       ; net_deferred: net Deferred.t
       ; external_transitions: external_transition Linear_pipe.Reader.t
-      ; genesis_ledger: ledger
+      ; genesis_tip: tip
       ; disk_location: string }
     [@@deriving make]
   end
@@ -173,6 +174,8 @@ module type Ledger_builder_controller_intf = sig
   end
 
   val create : Config.t -> t Deferred.t
+
+  val strongest_tip : t -> tip
 
   val local_get_ledger :
     t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
@@ -205,9 +208,10 @@ module type Miner_intf = sig
 
   module Tip : sig
     type t =
-      { state: state * state_proof
-      ; ledger_builder: ledger_builder
-      ; transactions: transaction Sequence.t }
+      { state : state * state_proof
+      ; ledger_builder : ledger_builder
+      ; transactions : transaction Sequence.t
+      }
   end
 
   type change = Tip_change of Tip.t
@@ -321,6 +325,7 @@ module type Inputs_intf = sig
      and type sync_answer := Sync_ledger.answer
      and type ledger_hash := Ledger_hash.t
      and type ledger_proof := Ledger_proof.t
+     and type tip := Tip.t
 
   module Miner :
     Miner_intf
@@ -340,6 +345,8 @@ module type Inputs_intf = sig
 
     val proof : State.Proof.t
   end
+
+  val fee_public_key : Public_key.Compressed.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -354,14 +361,14 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
-    ; best_lb: Ledger_builder.t option ref
     ; log: Logger.t
     ; ledger_builder_transition_backup_capacity: int }
 
-  let best_ledger_builder t = !(t.best_lb)
+  let best_ledger_builder t =
+    (Ledger_builder_controller.strongest_tip t.ledger_builder).ledger_builder
 
   let best_ledger t =
-    Option.map (best_ledger_builder t) ~f:Ledger_builder.ledger
+    Ledger_builder.ledger (best_ledger_builder t)
 
   let transaction_pool t = t.transaction_pool
 
@@ -386,7 +393,12 @@ module Make (Inputs : Inputs_intf) = struct
     let lbc_deferred =
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make ~parent_log:config.log
-           ~net_deferred:(Ivar.read net_ivar) ~genesis_ledger:Genesis.ledger
+           ~net_deferred:(Ivar.read net_ivar)
+           ~genesis_tip:{
+             ledger_builder = Ledger_builder.create ~ledger:Genesis.ledger ~self:fee_public_key;
+             state = Genesis.state;
+             proof = Genesis.proof
+           }
            ~disk_location:config.ledger_builder_persistant_location
            ~external_transitions:external_transitions_reader)
     in
@@ -405,10 +417,6 @@ module Make (Inputs : Inputs_intf) = struct
           return (Ledger_builder_controller.handle_sync_ledger_queries query)
           )
     in
-    Ivar.fill net_ivar net ;
-    let%bind ledger_builder = lbc_deferred in
-    don't_wait_for
-      (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind transaction_pool =
       Transaction_pool.load
         ~disk_location:config.transaction_pool_disk_location
@@ -419,6 +427,21 @@ module Make (Inputs : Inputs_intf) = struct
          (fun x ->
            Net.broadcast_transaction_pool_diff net x ;
            Deferred.unit )) ;
+    Ivar.fill net_ivar net ;
+
+    let%bind ledger_builder = lbc_deferred in
+    let tips_r, tips_w = Linear_pipe.create () in
+    begin
+      let tip = Ledger_builder_controller.strongest_tip ledger_builder in
+      Linear_pipe.write_without_pushback tips_w
+        (Miner.Tip_change
+           { state = (tip.state, tip.proof)
+           ; transactions = Transaction_pool.transactions transaction_pool
+           ; ledger_builder = tip.ledger_builder
+           })
+    end;
+    don't_wait_for
+      (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind snark_pool =
       Snark_pool.load ~disk_location:config.snark_pool_disk_location
         ~incoming_diffs:(Net.snark_pool_diffs net)
@@ -431,23 +454,21 @@ module Make (Inputs : Inputs_intf) = struct
       Linear_pipe.fork2
         (Ledger_builder_controller.strongest_ledgers ledger_builder)
     in
-    let best_lb : Ledger_builder.t option ref = ref None in
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
-        (* TODO: Don't just hack this here *)
-        best_lb := Some lb ;
         Net.broadcast_state net t ;
         Deferred.unit )
     |> don't_wait_for ;
     let miner =
+      Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:(
+        (fun (ledger_builder, {state; state_proof; _}) ->
+          Miner.Tip_change
+            { state= (state, state_proof)
+            ; ledger_builder
+            ; transactions= Transaction_pool.transactions transaction_pool
+            } ))
+      |> don't_wait_for;
       Miner.create ~parent_log:config.log
-        ~change_feeder:
-          (Linear_pipe.map strongest_ledgers_for_miner ~f:
-             (fun (ledger_builder, {state; state_proof; _}) ->
-               Miner.Tip_change
-                 { state= (state, state_proof)
-                 ; ledger_builder
-                 ; transactions= Transaction_pool.transactions transaction_pool
-                 } ))
+        ~change_feeder:tips_r
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
     in
     don't_wait_for
@@ -456,7 +477,6 @@ module Make (Inputs : Inputs_intf) = struct
     return
       { miner
       ; net
-      ; best_lb
       ; external_transitions= external_transitions_writer
       ; transaction_pool
       ; snark_pool

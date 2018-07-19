@@ -339,6 +339,18 @@ module type Ledger_builder_intf = sig
        Or_error.t
 end
 
+module type Tip_intf = sig
+  type state
+  type state_proof
+  type ledger_builder
+  type t =
+    { state : state
+    ; proof : state_proof
+    ; ledger_builder : ledger_builder
+    }
+  [@@deriving sexp, bin_io]
+end
+
 module type Nonce_intf = sig
   type t
 
@@ -671,6 +683,11 @@ Merge Snark:
       include Sexpable.S with type t := t
     end
   end
+
+  module Tip : Tip_intf
+    with type ledger_builder := Ledger_builder.t
+     and type state := State.t
+     and type state_proof := State.Proof.t
 
   module External_transition :
     External_transition_intf
