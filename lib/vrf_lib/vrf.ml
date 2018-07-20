@@ -32,7 +32,7 @@ module Make
 
               type var
 
-              val from_hash: Hash.Checked.var -> var
+              val from_hash: Hash.Checked.var -> (var,_) Checked.t
             end
 
           end)
@@ -203,7 +203,7 @@ end =
         let%bind uc = Group.Checked.to_bits u in
         let%bind y1 = Hash.Checked.hash (m @ uc) in
         let%bind gs = Group.Checked.scale_known Group.generator s in
-        let c = EQDL.Checked.to_scalar eqdl in
+        let%bind c = EQDL.Checked.to_scalar eqdl in
         let%bind vi = Group.Checked.inv v in
         let%bind vnegc = Group.Checked.scale vi c in
         let%bind gsvc = Group.Checked.add gs vnegc in
