@@ -616,8 +616,9 @@ struct
   end)
 
   let request_work ~best_ledger_builder t =
+    let open Option.Let_syntax in
     let lb = best_ledger_builder t in
-    let instances = Ledger_builder.random_work_spec_chunk lb in
+    let%map instances = Ledger_builder.random_work_spec_chunk lb in
     {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
 end
 
@@ -749,7 +750,7 @@ module type Main_intf = sig
 
   type t
 
-  val request_work : t -> Inputs.Snark_worker.Work.Spec.t
+  val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
   val best_ledger : t -> Inputs.Ledger.t
 

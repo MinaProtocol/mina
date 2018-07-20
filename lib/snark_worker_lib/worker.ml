@@ -71,11 +71,11 @@ struct
       in
       match%bind Rpc.Rpc.dispatch Rpcs.Get_work.rpc conn () with
       | Error e -> log_and_retry "getting work" e
-      | Ok {instances= []; _} ->
+      | Ok None ->
           Logger.info log "No work; waiting a few seconds before retrying" ;
           let%bind () = wait ~sec:5. () in
           go ()
-      | Ok work ->
+      | Ok (Some work) ->
         match perform state public_key work with
         | Error e -> log_and_retry "performing work" e
         | Ok result ->
