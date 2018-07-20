@@ -328,15 +328,14 @@ module type Ledger_builder_intf = sig
 
   val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
 
-  val statement_to_work_spec :
+  val random_work_spec_chunk :
        t
-    -> ledger_proof_statement
     -> ( ledger_proof_statement
        , super_transaction
        , sparse_ledger
        , ledger_proof )
        Snark_work_lib.Work.Single.Spec.t
-       Or_error.t
+       list
 end
 
 module type Nonce_intf = sig

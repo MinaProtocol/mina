@@ -26,22 +26,16 @@ module Job = struct
 end
 
 module Completed_job = struct
-  type 'a t = Lifted of 'a | Merged of 'a | Merged_up of 'a
-  [@@deriving bin_io, sexp]
+  type 'a t = Lifted of 'a | Merged of 'a [@@deriving bin_io, sexp]
 end
 
 type ('a, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
   ; data_buffer: 'd Queue.t
-  ; was_seeded: bool
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
   ; mutable enough_steps: bool }
 [@@deriving sexp, bin_io]
-
-let iter t ~f =
-  Ring_buffer.iter t.jobs ~f:(fun j -> f (`Job j)) ;
-  Queue.iter t.data_buffer ~f:(fun d -> f (`Data d))
 
 module Hash = struct
   type t = Cryptokit.hash
@@ -83,13 +77,9 @@ let current_data_length {current_data_length} = current_data_length
 
 let enough_steps {enough_steps} = enough_steps
 
-let was_seeded {was_seeded} = was_seeded
-
-let copy
-    {jobs; data_buffer; acc; current_data_length; enough_steps; was_seeded} =
+let copy {jobs; data_buffer; acc; current_data_length; enough_steps} =
   { jobs= Ring_buffer.copy jobs
   ; data_buffer= Queue.copy data_buffer
-  ; was_seeded
   ; acc
   ; current_data_length
   ; enough_steps }

@@ -609,16 +609,10 @@ struct
       Option.value_map ~f:Or_error.return ~default:(Or_error.error_string s)
     in
     let open Or_error.Let_syntax in
-    let%bind work =
-      Snark_pool.Pool.request_work (Snark_pool.pool (snark_pool t))
-      |> option "no work found"
     (* TODO: Perhaps we should really be looking in ALL of the lbs rather than
         the best one. *)
-    and lb = best_ledger_builder t |> option "no best ledger builder" in
-    let%map instances =
-      List.map ~f:(Ledger_builder.statement_to_work_spec lb) work
-      |> Or_error.all
-    in
+    let%map lb = best_ledger_builder t |> option "no best ledger builder" in
+    let instances = Ledger_builder.random_work_spec_chunk lb in
     {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
 end
 
