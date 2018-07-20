@@ -20,13 +20,13 @@ end = struct
 end
 
 module Pointer = struct
-  type 'a t =
-    | Pointer of Location.t
-    | Array_pointer of Location.t * int
+  type 'a t = Pointer of Location.t | Array_pointer of Location.t * int
 
   let sexp_of_t = function
     | Pointer loc -> Sexp.List [Atom "pointer"; Location.sexp_of_t loc]
-    | Array_pointer (loc, index) -> Sexp.List [Atom "array_pointer"; Location.sexp_of_t loc; Int.sexp_of_t index]
+    | Array_pointer (loc, index) ->
+        Sexp.List
+          [Atom "array_pointer"; Location.sexp_of_t loc; Int.sexp_of_t index]
 end
 
 module Function = struct
@@ -46,8 +46,8 @@ end
 module Type = struct
   module rec T : sig
     type _ t =
-      | Uint32: uint32 t
-      | Bool: bool t
+      | Uint32 : uint32 t
+      | Bool : bool t
       | Pointer: 'a t -> 'a Pointer.t t
       | Array: 'a t -> 'a array t
       | Struct: 'a List.t -> 'a t
@@ -56,27 +56,38 @@ module Type = struct
       | Label : unit t
       | Void : unit t
   end = T
+  
   and List : sig
     type _ t = [] : unit t | ( :: ): 'a T.t * 'b t -> ('a * 'b) t
+
     type 'b mapper = {f: 'a. 'a T.t -> 'b}
+
     val map : 'a t -> 'b mapper -> 'b Core.List.t
+
     val get : 'a t -> ('b, 'a) Elem.t -> 'b T.t
   end = struct
     type _ t = [] : unit t | ( :: ): 'a T.t * 'b t -> ('a * 'b) t
+
     type 'b mapper = {f: 'a. 'a T.t -> 'b}
+
     let rec map : type a. a t -> 'b mapper -> 'b Core.List.t =
      fun ls mapper ->
-      match ls with [] -> [] | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
-    let rec get : type a b. a t -> (b, a) Elem.t -> b T.t = fun ls elem ->
+      match ls with
+      | [] -> []
+      | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
+
+    let rec get : type a b. a t -> (b, a) Elem.t -> b T.t =
+     fun ls elem ->
       match (ls, elem) with
-      | (h :: _, Elem.Here) -> h
-      | (_ :: t, Elem.There e) -> get t e
+      | h :: _, Elem.Here -> h
+      | _ :: t, Elem.There e -> get t e
       | _ -> .
   end
 
   include T
 
-  type 'a arithmetic_result = ('a * ('a * unit))
+  type 'a arithmetic_result = 'a * ('a * unit)
+
   let arithmetic_result = Struct [Uint32; Uint32]
 
   module E = struct
@@ -108,8 +119,8 @@ module Type = struct
 
   let is_void : type a. a t -> bool = function Void -> true | _ -> false
 
-  let function_return_type : type args rt. (args List.t, rt) Function.t t -> rt t =
-    function
+  let function_return_type : type args rt.
+      (args List.t, rt) Function.t t -> rt t = function
     | Function (_, rt) -> rt
     | _ -> assert false
 
@@ -158,8 +169,10 @@ module Id = struct
     type 'b mapper = {f: 'a. 'a T.t -> 'b}
 
     let rec map : type a. a t -> 'b mapper -> 'b Core.List.t =
-      fun ls mapper ->
-        match ls with [] -> [] | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
+     fun ls mapper ->
+      match ls with
+      | [] -> []
+      | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
   end
 
   module PointerList = struct
@@ -168,8 +181,10 @@ module Id = struct
     type 'b mapper = {f: 'a. 'a Pointer.t T.t -> 'b}
 
     let rec map : type a. a t -> 'b mapper -> 'b Core.List.t =
-      fun ls mapper ->
-        match ls with [] -> [] | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
+     fun ls mapper ->
+      match ls with
+      | [] -> []
+      | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
   end
 
   let sexp_of_t (Id (_, name, value)) =
@@ -220,26 +235,24 @@ module Op = struct
       | Bitwise_or _ -> Type.Uint32
       | Less_than _ -> Type.Bool
       | Equal _ -> Type.Bool
-      | Array_access (arr, _) -> Type.Pointer (Type.array_elt @@ Type.pointer_elt @@ Id.typ arr)
-      | Struct_get (id, loc) ->
-        (match Id.typ id with
+      | Array_access (arr, _) ->
+          Type.Pointer (Type.array_elt @@ Type.pointer_elt @@ Id.typ arr)
+      | Struct_get (id, loc) -> (
+        match Id.typ id with
         | Type.Struct spec -> Type.List.get spec loc
-        | _ -> assert false)
+        | _ -> assert false )
       | Load ptr -> Type.pointer_elt (Id.typ ptr)
   end
 
   module Action = struct
-    type t =
-      | Store: 'a Pointer.t Id.t * 'a Id.t -> t
+    type t = Store: 'a Pointer.t Id.t * 'a Id.t -> t
   end
 end
 
 module Arguments_spec = struct
   type ('types, 'f, 'k) t =
     | [] : (unit, 'k, 'k) t
-    | ( :: ):
-        'a Type.t * ('ts, 'b, 'k) t
-        -> ('a * 'ts, 'a Id.t -> 'b, 'k) t
+    | ( :: ): 'a Type.t * ('ts, 'b, 'k) t -> ('a * 'ts, 'a Id.t -> 'b, 'k) t
 
   type 'b id_mapper = {map_id: 'a. 'a Id.t -> 'b}
 
@@ -247,7 +260,7 @@ module Arguments_spec = struct
       (types, f, k) t -> types Id.List.t -> 'r id_mapper -> 'r list =
    fun t args id_mapper ->
     match (t, args) with
-    | [], Id.List.[] -> []
+    | [], Id.List.([]) -> []
     | _ :: arg_spec_tail, Id.List.(arg :: arg_tail) ->
         List.(id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper)
 
@@ -280,7 +293,7 @@ module Local_variables_spec = struct
       (vars, f, k) t -> vars Id.PointerList.t -> 'r id_mapper -> 'r list =
    fun t args id_mapper ->
     match (t, args) with
-    | [], Id.PointerList.[] -> []
+    | [], Id.PointerList.([]) -> []
     | _ :: arg_spec_tail, Id.PointerList.(arg :: arg_tail) ->
         List.(id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper)
 
@@ -396,7 +409,8 @@ let do_if cond then_ = Do_if {cond; then_; after= (fun v -> return v)}
 
 let set_prefix prefix = Set_prefix (prefix, return ())
 
-let do_value ?name op = Value_op ({ op; result_name= Option.value ~default:"anonymous" name }, return)
+let do_value ?name op =
+  Value_op ({op; result_name= Option.value ~default:"anonymous" name}, return)
 
 let do_ op = Action_op (op, fun () -> return ())
 
@@ -421,7 +435,7 @@ let arith_op op_name k =
       let%bind r = do_value ?name (k x y) in
       let%map low_bits = struct_get r Elem.Here in
       let%map high_bits = struct_get r Elem.(There Here) in
-      (low_bits, high_bits))
+      (low_bits, high_bits) )
 
 let add = unstage (arith_op "add" (fun x y -> Add (x, y)))
 

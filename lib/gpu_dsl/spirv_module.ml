@@ -2,6 +2,7 @@ open Core
 
 module Capability = struct
   type t = SpirV.capability
+
   let to_op t : SpirV.op = `OpCapability t
 end
 
@@ -21,16 +22,15 @@ module Entry_point = struct
     ; interfaces: SpirV.id list }
 
   let to_entry_point_op t : SpirV.op =
-    `OpEntryPoint (t.execution_model , t.id , t.name , t.interfaces) 
+    `OpEntryPoint (t.execution_model, t.id, t.name, t.interfaces)
+
   let to_execution_mode_op t : SpirV.op =
     `OpExecutionMode (t.id, t.execution_mode)
 end
 
 module Decoration = struct
   type t =
-    | Decoration of
-        { target: SpirV.id
-        ; value: SpirV.decoration }
+    | Decoration of {target: SpirV.id; value: SpirV.decoration}
     | MemberDecoration of
         { target: SpirV.id
         ; member: SpirV.literal_integer
@@ -68,15 +68,11 @@ end
 module Type_declaration = struct
   type t = {id: SpirV.id; value: Type.t}
 
-  let to_op t : SpirV.op =
-    Type.to_op t.id t.value
+  let to_op t : SpirV.op = Type.to_op t.id t.value
 end
 
 module Constant_declaration = struct
-  type t =
-    { type_: SpirV.id
-    ; id: SpirV.id
-    ; value: SpirV.big_int_or_float }
+  type t = {type_: SpirV.id; id: SpirV.id; value: SpirV.big_int_or_float}
 
   let to_op t : SpirV.op = `OpConstant (t.type_, t.id, t.value)
 end
@@ -108,17 +104,15 @@ module Branch = struct
 end
 
 module Basic_block = struct
-  type t =
-    { label: SpirV.id
-    ; body: SpirV.op list
-    ; branch: Branch.t }
+  type t = {label: SpirV.id; body: SpirV.op list; branch: Branch.t}
 
   let to_ops t : SpirV.op list =
-    List.concat [ [`OpLabel t.label]; t.body; [Branch.to_op t.branch] ] 
+    List.concat [[`OpLabel t.label]; t.body; [Branch.to_op t.branch]]
 end
 
 module Function_parameter = struct
   type t = {type_: SpirV.id; id: SpirV.id}
+
   let to_op t : SpirV.op = `OpFunctionParameter (t.type_, t.id)
 end
 

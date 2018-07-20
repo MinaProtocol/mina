@@ -8,8 +8,8 @@ module Value = struct
   let rec sexp_of_struct : type a. a Type.List.t -> a -> Sexp.t list =
    fun spec s ->
     match (spec, s) with
-    | (Type.List.[], ()) -> []
-    | (Type.List.(t :: spec), (x, s)) ->
+    | Type.List.([]), () -> []
+    | Type.List.(t :: spec), (x, s) ->
         sexp_of_t (T (t, x)) :: sexp_of_struct spec s
 
   and sexp_of_t (T (typ, x)) =
@@ -47,8 +47,7 @@ let name_of_constant : ?label:string -> Value.t -> string =
   | Some l -> l
   | None ->
     match v with
-    | Value.T (Type.Bool, x) ->
-        sprintf "c_bool_%s" (Bool.to_string x)
+    | Value.T (Type.Bool, x) -> sprintf "c_bool_%s" (Bool.to_string x)
     | Value.T (Type.Uint32, x) ->
         sprintf "c_uint32_%s" (Unsigned.UInt32.to_string x)
     | _ -> sprintf "c_%d" (get_id ())
@@ -101,11 +100,12 @@ module State = struct
       {s with bindings= Map.set ~key ~data:(Value.T (typ, x)) s.bindings}
 end
 
-let rec struct_get : type a b c. b Type.List.t -> b -> (a, b) Elem.t -> a = fun witness str elem ->
-    match (witness, str, elem) with
-    | (Type.List.(_ :: _), (x, _), Elem.Here) -> x
-    | (Type.List.(_ :: t), (_, x), Elem.There e) -> struct_get t x e
-    | _ -> .
+let rec struct_get : type a b c. b Type.List.t -> b -> (a, b) Elem.t -> a =
+ fun witness str elem ->
+  match (witness, str, elem) with
+  | Type.List.(_ :: _), (x, _), Elem.Here -> x
+  | Type.List.(_ :: t), (_, x), Elem.There e -> struct_get t x e
+  | _ -> .
 
 let eval_op (type a) (s: State.t) ({op; result_name}: a Op.Value.t) :
     State.t * a Id.t =
@@ -188,23 +188,30 @@ let eval_op (type a) (s: State.t) ({op; result_name}: a Op.Value.t) :
       let str_type = Id.typ str_id in
       let types = Type.struct_types str_type in
       let elt = struct_get types str str_elem in
-      let id = State.create_id s (Type.struct_elt str_type str_elem) result_name in
+      let id =
+        State.create_id s (Type.struct_elt str_type str_elem) result_name
+      in
       (State.set_exn s id elt, id)
   | Array_access (arr_ptr_id, idx_id) ->
-      let loc = match State.get_exn s arr_ptr_id with
+      let loc =
+        match State.get_exn s arr_ptr_id with
         | Pointer.Pointer loc -> loc
-        | Pointer.Array_pointer _ -> failwith "interpreter does not support nested array pointers"
+        | Pointer.Array_pointer _ ->
+            failwith "interpreter does not support nested array pointers"
       in
       let idx = State.get_exn s idx_id in
-      let typ = Type.Pointer (Type.array_elt @@ Type.pointer_elt @@ Id.typ arr_ptr_id) in
+      let typ =
+        Type.Pointer (Type.array_elt @@ Type.pointer_elt @@ Id.typ arr_ptr_id)
+      in
       let ptr = Pointer.Array_pointer (loc, UInt32.to_int idx) in
       let id = State.create_id s typ result_name in
       (State.set_exn s id ptr, id)
   | Load ptr ->
       let typ = Type.pointer_elt (Id.typ ptr) in
-      let value = match State.get_exn s ptr with
-          | Pointer.Pointer loc -> State.deref_exn s loc typ
-          | Pointer.Array_pointer (loc, index) ->
+      let value =
+        match State.get_exn s ptr with
+        | Pointer.Pointer loc -> State.deref_exn s loc typ
+        | Pointer.Array_pointer (loc, index) ->
             let arr = State.deref_exn s loc (Type.Array typ) in
             arr.(index)
       in
@@ -215,15 +222,14 @@ let ptr_value_id ptr = Id.Id (Type.pointer_elt (Id.typ ptr), Id.name ptr, 0)
 
 let eval_action_op s (op: Op.Action.t) =
   let open Op.Action in
-  match op with
-  | Store (ptr, value) ->
+  match op with Store (ptr, value) ->
     let typ = Type.pointer_elt (Id.typ ptr) in
-    (match State.get_exn s ptr with
-      | Pointer.Pointer loc -> State.set_pointer_value s loc value
-      | Pointer.Array_pointer (loc, index) ->
+    match State.get_exn s ptr with
+    | Pointer.Pointer loc -> State.set_pointer_value s loc value
+    | Pointer.Array_pointer (loc, index) ->
         let arr = State.deref_exn s loc (Type.Array typ) in
-        arr.(index) <- State.get_exn s value;
-        s)
+        arr.(index) <- State.get_exn s value ;
+        s
 
 let rec eval : type a. State.t -> a T.t -> State.t * a =
  fun s t ->
@@ -235,8 +241,7 @@ let rec eval : type a. State.t -> a T.t -> State.t * a =
       eval {s with prefix} k
   | Declare_function _ ->
       failwith "Declare_function not implemented in interpreter"
-  | Call_function _ ->
-      failwith "Call_function not implemented in interpreter"
+  | Call_function _ -> failwith "Call_function not implemented in interpreter"
   | Declare_constant (typ, x, k) ->
       let id = Id.Id (typ, name_of_constant (Value.T (typ, x)), 0) in
       let s = State.set_ignore_duplicate_exn s id x in

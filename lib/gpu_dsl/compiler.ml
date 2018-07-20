@@ -40,9 +40,7 @@ module type Program_intf = sig
   val extract : unit -> Spirv_module.t
 end
 
-module Make_program () :
-  Program_intf =
-struct
+module Make_program () : Program_intf = struct
   let defining_function : bool ref = ref false
 
   let next_id : int ref = ref 1
@@ -57,8 +55,7 @@ struct
 
   let types : (Type.E.t * SpirV.id) list ref = ref []
 
-  let type_table : (Type.E.t, SpirV.id) Hashtbl.t =
-    Type.E.Table.create ()
+  let type_table : (Type.E.t, SpirV.id) Hashtbl.t = Type.E.Table.create ()
 
   let constant_table : (Constant.t, SpirV.id) Hashtbl.t =
     Constant.Table.create ()
@@ -68,7 +65,7 @@ struct
 
   let gen_id type_ name =
     let id = !next_id in
-    incr next_id;
+    incr next_id ;
     let next_name name =
       if Str.string_match (Str.regexp {|_\([0-9]+\)$|}) name 0 then
         let num = Str.matched_group 1 name in
@@ -107,10 +104,9 @@ struct
   let push_op op = curr_block_ops := op :: !curr_block_ops
 
   let push_block ~branch ~next_label =
-    let block = Spirv_module.Basic_block.(
-      { label= !curr_block_label
-      ; body= List.rev !curr_block_ops
-      ; branch= branch })
+    let block =
+      let open Spirv_module.Basic_block in
+      {label= !curr_block_label; body= List.rev !curr_block_ops; branch}
     in
     blocks := block :: !blocks ;
     curr_block_label := next_label ;
@@ -143,8 +139,7 @@ struct
         { map_id=
             (fun id ->
               let open Spirv_module.Function_parameter in
-              { type_= !^ (register_type (Id.typ id))
-              ; id= !^id } ) }
+              {type_= !^ (register_type (Id.typ id)); id= !^id} ) }
     in
     let variables =
       let open Local_variables_spec in
@@ -197,7 +192,9 @@ struct
           SMT.Pointer (SpirV.StorageClassFunction, !^(register_type t))
       | T (Array _) -> failwith "spirv_type_value: Array unimplemented"
       | T (Struct types) ->
-          let type_ids = Type.List.(map types {f= (fun t -> !^(register_type t))}) in
+          let type_ids =
+            Type.List.(map types {f= (fun t -> !^(register_type t))})
+          in
           SMT.Struct type_ids
       | T (Function (arg_types, return_type)) ->
           let arg_type_ids =
@@ -215,8 +212,8 @@ struct
     let open Spirv_module in
     { capabilities= [CapabilityShader]
     ; memory_model= (AddressingModelLogical, MemoryModelSimple)
-    ; entry_points= (
-        let open Spirv_module.Entry_point in
+    ; entry_points=
+        (let open Spirv_module.Entry_point in
         [ { execution_mode= ExecutionModeLocalSize (1l, 1l, 1l)
           ; execution_model= ExecutionModelGLCompute
           ; id=
@@ -225,17 +222,15 @@ struct
           ; name= "main"
           ; interfaces= [] } ])
     ; decorations= []
-    ; types= (
-        let open Spirv_module.Type_declaration in
+    ; types=
+        (let open Spirv_module.Type_declaration in
         List.map (List.rev !types) ~f:(fun (type_, id) ->
             {id; value= spirv_type_value type_} ))
-    ; constants= (
-        let open Spirv_module.Constant_declaration in
+    ; constants=
+        (let open Spirv_module.Constant_declaration in
         Hashtbl.to_alist constant_table
         |> List.map ~f:(fun ((type_, value), id) ->
-               { type_
-               ; value= BigInt (Batteries.Big_int.of_int value)
-               ; id } ))
+               {type_; value= BigInt (Batteries.Big_int.of_int value); id} ))
     ; global_variables= []
     ; functions= Hashtbl.data function_table }
 end
@@ -244,39 +239,44 @@ module Make_compiler (Program : Program_intf) = struct
   module Program = Program
   open Program
 
-  let create_value_op : type a. a Op.Value.op -> unit Id.t -> a Id.t -> SpirV.op =
+  let create_value_op : type a.
+      a Op.Value.op -> unit Id.t -> a Id.t -> SpirV.op =
     let open Op.Value in
     function
-    | Or (x, y) -> (fun t r -> `OpLogicalOr (!^t, !^r, !^x, !^y) )
-    | Add (x, y) -> (fun t r -> `OpIAddCarry (!^t, !^r, !^x, !^y))
-    | Add_ignore_overflow (x, y) -> (fun t r -> `OpIAdd (!^t, !^r, !^x, !^y))
-    | Sub (x, y) -> (fun t r -> `OpISubBorrow (!^t, !^r, !^x, !^y))
-    | Sub_ignore_overflow (x, y) -> (fun t r -> `OpISub (!^t, !^r, !^x, !^y))
-    | Mul (x, y) -> (fun t r -> `OpUMulExtended (!^t, !^r, !^x, !^y))
-    | Mul_ignore_overflow (x, y) -> (fun t r -> `OpIMul (!^t, !^r, !^x, !^y))
-    | Div_ignore_remainder (x, y) -> (fun t r -> `OpUDiv (!^t, !^r, !^x, !^y))
-    | Bitwise_or (x, y) -> (fun t r -> `OpBitwiseOr (!^t, !^r, !^x, !^y) )
-    | Less_than (x, y) -> (fun t r -> `OpULessThan (!^t, !^r, !^x, !^y) )
-    | Equal (x, y) -> (fun t r -> `OpIEqual (!^t, !^r, !^x, !^y))
-    | Array_access (a, i) -> (fun t r -> `OpAccessChain (!^t, !^r, !^a, [!^i]))
-    | Struct_get (s, i) -> (fun t r -> `OpCompositeExtract (!^t, !^r, !^s, [!^(register_constant Type.Uint32 (Elem.index i))]))
-    | Load p -> (fun t r -> `OpLoad (!^t, !^r, !^p, None))
+      | Or (x, y) -> fun t r -> `OpLogicalOr (!^t, !^r, !^x, !^y)
+      | Add (x, y) -> fun t r -> `OpIAddCarry (!^t, !^r, !^x, !^y)
+      | Add_ignore_overflow (x, y) -> fun t r -> `OpIAdd (!^t, !^r, !^x, !^y)
+      | Sub (x, y) -> fun t r -> `OpISubBorrow (!^t, !^r, !^x, !^y)
+      | Sub_ignore_overflow (x, y) -> fun t r -> `OpISub (!^t, !^r, !^x, !^y)
+      | Mul (x, y) -> fun t r -> `OpUMulExtended (!^t, !^r, !^x, !^y)
+      | Mul_ignore_overflow (x, y) -> fun t r -> `OpIMul (!^t, !^r, !^x, !^y)
+      | Div_ignore_remainder (x, y) -> fun t r -> `OpUDiv (!^t, !^r, !^x, !^y)
+      | Bitwise_or (x, y) -> fun t r -> `OpBitwiseOr (!^t, !^r, !^x, !^y)
+      | Less_than (x, y) -> fun t r -> `OpULessThan (!^t, !^r, !^x, !^y)
+      | Equal (x, y) -> fun t r -> `OpIEqual (!^t, !^r, !^x, !^y)
+      | Array_access (a, i) -> fun t r -> `OpAccessChain (!^t, !^r, !^a, [!^i])
+      | Struct_get (s, i) ->
+          fun t r ->
+            `OpCompositeExtract
+              ( !^t
+              , !^r
+              , !^s
+              , [!^ (register_constant Type.Uint32 (Elem.index i))] )
+      | Load p -> fun t r -> `OpLoad (!^t, !^r, !^p, None)
 
   let compile_value_op : type a. a Op.Value.t -> a Id.t =
    fun op ->
     let open Type in
     let open Op.Value in
-
     let type_ = Op.Value.typ op.op in
     let type_id = register_type type_ in
     let result_id = gen_id type_ op.result_name in
-    push_op (create_value_op op.op type_id result_id);
+    push_op (create_value_op op.op type_id result_id) ;
     result_id
 
   let compile_action_op =
     let open Op.Action in
-    function
-      | Store (ptr, value) -> push_op (`OpStore (!^ptr, !^value, None))
+    function Store (ptr, value) -> push_op (`OpStore (!^ptr, !^value, None))
 
   let rec compile : type a. a Id.t Dsl.t -> a Id.t = function
     | Declare_function (name, args, vars, return_type, body, continuation) ->
@@ -284,12 +284,10 @@ module Make_compiler (Program : Program_intf) = struct
         compile (continuation id)
     | Declare_constant (Type.Uint32, value, continuation) ->
         compile @@ continuation
-        @@ register_constant (Type.Uint32)
-             (Unsigned.UInt32.to_int value)
+        @@ register_constant Type.Uint32 (Unsigned.UInt32.to_int value)
     | Declare_constant (Type.Bool, value, continuation) ->
         compile @@ continuation
-        @@ register_constant (Type.Bool)
-             (if value then 1 else 0)
+        @@ register_constant Type.Bool (if value then 1 else 0)
     | Declare_constant _ ->
         failwith "Declare_constant: cannot declare non-scalar constants"
     | Call_function (fn, arg_ids, continuation) ->
@@ -310,22 +308,29 @@ module Make_compiler (Program : Program_intf) = struct
         let then_label = gen_id Type.Label "if_then" in
         let after_label = gen_id Type.Label "if_after" in
         push_block
-          ~branch:(Spirv_module.Branch.Conditional (!^cond, !^then_label, !^after_label))
+          ~branch:
+            (Spirv_module.Branch.Conditional
+               (!^cond, !^then_label, !^after_label))
           ~next_label:!^then_label ;
         ignore (compile (then_ ())) ;
-        push_block ~branch:(Spirv_module.Branch.Unconditional !^after_label) ~next_label:!^after_label ;
+        push_block ~branch:(Spirv_module.Branch.Unconditional !^after_label)
+          ~next_label:!^after_label ;
         compile (after ())
     | If {cond; then_; else_; after} ->
         let then_label = gen_id Type.Label "if_then" in
         let else_label = gen_id Type.Label "if_else" in
         let after_label = gen_id Type.Label "if_after" in
         push_block
-          ~branch:(Spirv_module.Branch.Conditional (!^cond, !^then_label, !^else_label))
+          ~branch:
+            (Spirv_module.Branch.Conditional
+               (!^cond, !^then_label, !^else_label))
           ~next_label:!^then_label ;
         let then_id = compile (then_ ()) in
-        push_block ~branch:(Spirv_module.Branch.Unconditional !^after_label) ~next_label:!^else_label ;
+        push_block ~branch:(Spirv_module.Branch.Unconditional !^after_label)
+          ~next_label:!^else_label ;
         let else_id = compile (else_ ()) in
-        push_block ~branch:(Spirv_module.Branch.Unconditional !^after_label) ~next_label:!^after_label ;
+        push_block ~branch:(Spirv_module.Branch.Unconditional !^after_label)
+          ~next_label:!^after_label ;
         let type_ = Id.typ then_id in
         let type_id = register_type type_ in
         let phi_id = gen_id type_ "phi" in
@@ -338,7 +343,7 @@ module Make_compiler (Program : Program_intf) = struct
     | For {var_ptr; range= low, high; body; after} ->
         let var_type = Type.pointer_elt (Id.typ var_ptr) in
         let var_type_id = register_type var_type in
-        let bool_type_id = register_type (Type.Bool) in
+        let bool_type_id = register_type Type.Bool in
         let const_1 = register_constant var_type 1 in
         let header_label = gen_id Type.Label "loop_header" in
         let merge_label = gen_id Type.Label "loop_merge" in
@@ -347,22 +352,27 @@ module Make_compiler (Program : Program_intf) = struct
         let after_label = gen_id Type.Label "loop_after" in
         let var_0 = gen_id var_type "var_0" in
         let var_1 = gen_id var_type "var_1" in
-        let cond = gen_id (Type.Bool) "cond" in
+        let cond = gen_id Type.Bool "cond" in
         push_op (`OpStore (!^var_ptr, !^low, None)) ;
-        push_block ~branch:(Spirv_module.Branch.Unconditional !^header_label) ~next_label:!^header_label ;
+        push_block ~branch:(Spirv_module.Branch.Unconditional !^header_label)
+          ~next_label:!^header_label ;
         push_op (`OpLoopMerge (!^merge_label, !^continue_label, [])) ;
-        push_block ~branch:(Spirv_module.Branch.Unconditional !^merge_label) ~next_label:!^merge_label ;
+        push_block ~branch:(Spirv_module.Branch.Unconditional !^merge_label)
+          ~next_label:!^merge_label ;
         push_op (`OpLoad (!^var_type_id, !^var_0, !^var_ptr, None)) ;
         push_op (`OpSLessThanEqual (!^bool_type_id, !^cond, !^var_0, !^high)) ;
         push_block
-          ~branch:(Spirv_module.Branch.Conditional (!^cond, !^body_label, !^after_label))
+          ~branch:
+            (Spirv_module.Branch.Conditional
+               (!^cond, !^body_label, !^after_label))
           ~next_label:!^after_label ;
         ignore (compile (body var_0)) ;
         push_block ~branch:(Spirv_module.Branch.Unconditional !^continue_label)
           ~next_label:!^continue_label ;
         push_op (`OpIAdd (!^var_type_id, !^var_1, !^var_0, !^const_1)) ;
         push_op (`OpStore (!^var_ptr, !^var_1, None)) ;
-        push_block ~branch:(Spirv_module.Branch.Unconditional !^header_label) ~next_label:!^after_label ;
+        push_block ~branch:(Spirv_module.Branch.Unconditional !^header_label)
+          ~next_label:!^after_label ;
         compile (after ())
     | Set_prefix _ -> failwith "Set_prefix: unimplemented"
     | Pure x -> x
