@@ -780,7 +780,6 @@ module Run (Program : Main_intf) = struct
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    Core.printf !"Ledger: %{sexp:Ledger.t}\n%!" ledger ;
     let%map account = Ledger.get ledger addr in
     account.Account.balance
 
