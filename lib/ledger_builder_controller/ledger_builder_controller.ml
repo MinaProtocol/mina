@@ -77,12 +77,24 @@ module type Inputs_intf = sig
     val previous_state_hash : t -> State_hash.t
 
     val ledger_hash : t -> Ledger_hash.t
+
+    module Proof : sig
+      type t [@@deriving bin_io]
+    end
   end
+
+  module Tip :
+    Protocols.Coda_pow.Tip_intf
+    with type ledger_builder := Ledger_builder.t
+     and type state := State.t
+     and type state_proof := State.Proof.t
 
   module External_transition : sig
     type t [@@deriving bin_io, eq, compare, sexp]
 
     val state : t -> State.t
+
+    val state_proof : t -> State.Proof.t
 
     val ledger_builder_diff : t -> Ledger_builder_diff.t
   end
@@ -212,6 +224,7 @@ module Make (Inputs : Inputs_intf) : sig
            and type sync_query := Inputs.Sync_ledger.query
            and type sync_answer := Inputs.Sync_ledger.answer
            and type external_transition := Inputs.External_transition.t
+           and type tip := Inputs.Tip.t
 
   val ledger_builder_io : t -> Inputs.Net.t
 end = struct
@@ -222,7 +235,7 @@ end = struct
       { parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
       ; external_transitions: External_transition.t Linear_pipe.Reader.t
-      ; genesis_ledger: Ledger.t
+      ; genesis_tip: Tip.t
       ; disk_location: string }
     [@@deriving make]
   end
@@ -253,7 +266,7 @@ end = struct
   module State = struct
     type t =
       { mutable locked_ledger_builder: Ledger_builder.t
-      ; mutable longest_branch_tip: Ledger_builder.t
+      ; mutable longest_branch_tip: Tip.t
       ; mutable ktree: Transition_tree.t option
       (* TODO: This impl assumes we have the original Ouroboros assumption. In
          order to work with the Praos assumption we'll need to keep a linked
@@ -262,9 +275,9 @@ end = struct
       }
     [@@deriving bin_io]
 
-    let create genesis_ledger : t =
-      { locked_ledger_builder= Ledger_builder.create genesis_ledger
-      ; longest_branch_tip= Ledger_builder.create genesis_ledger
+    let create (genesis_tip: Tip.t) : t =
+      { locked_ledger_builder= genesis_tip.ledger_builder
+      ; longest_branch_tip= genesis_tip
       ; ktree= None }
   end
 
@@ -297,6 +310,8 @@ end = struct
     ; state: State.t
     ; strongest_ledgers:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
+
+  let strongest_tip t = t.state.longest_branch_tip
 
   let ledger_builder_io {ledger_builder_io} = ledger_builder_io
 
@@ -347,13 +362,13 @@ end = struct
       | Error (`IO_error e) ->
           Logger.info log "Ledger failed to load from storage %s; recreating"
             (Error.to_string_hum e) ;
-          State.create config.genesis_ledger
+          State.create config.genesis_tip
       | Error `No_exist ->
           Logger.info log "Ledger doesn't exist in storage; recreating" ;
-          State.create config.genesis_ledger
+          State.create config.genesis_tip
       | Error `Checksum_no_match ->
           Logger.warn log "Checksum failed when loading ledger, recreating" ;
-          State.create config.genesis_ledger
+          State.create config.genesis_tip
     in
     let%map net = config.net_deferred in
     let ledger_builder_io = Net.create net in
@@ -484,7 +499,7 @@ end = struct
         | None ->
             (Ledger_builder.copy state.locked_ledger_builder, new_best_path)
         | Some (i, _) ->
-            ( Ledger_builder.copy state.longest_branch_tip
+            ( Ledger_builder.copy state.longest_branch_tip.ledger_builder
             , Path.drop new_best_path i )
       in
       let open Interruptible.Let_syntax in
@@ -513,7 +528,10 @@ end = struct
       | `Continue (Some s) ->
           assert (
             Inputs.State.equal s (External_transition.target_state new_tip) ) ;
-          state.longest_branch_tip <- lb ;
+          state.longest_branch_tip
+          <- { state= External_transition.target_state new_tip
+             ; proof= External_transition.state_proof new_tip
+             ; ledger_builder= lb } ;
           Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
             strongest_ledgers_reader (lb, new_tip)
       | `Abort -> ()
@@ -542,7 +560,9 @@ end = struct
             let w = do_sync sl_ref sl transition in
             (w, Deferred.return (), sl_ref)
         | sl_ref, `Path_traversal new_best_path ->
-            let curr_tip_hash = Ledger_builder.hash state.longest_branch_tip in
+            let curr_tip_hash =
+              Ledger_builder.hash state.longest_branch_tip.ledger_builder
+            in
             let is_lb_hash_curr_tip w =
               Ledger_builder_hash.equal curr_tip_hash
                 (External_transition.ledger_builder_hash w)
@@ -588,8 +608,10 @@ end = struct
         in
         if Ledger_builder_hash.equal hash (Ledger_builder.hash locked) then
           attempt_easy locked "locked_head"
-        else if Ledger_builder_hash.equal hash (Ledger_builder.hash tip) then
-          attempt_easy tip "tip"
+        else if
+          Ledger_builder_hash.equal hash
+            (Ledger_builder.hash tip.ledger_builder)
+        then attempt_easy tip.ledger_builder "tip"
         else
           (* Now we need to materialize it *)
           match
@@ -666,6 +688,23 @@ let%test_module "test" =
           ; previous_state_hash: State_hash.t
           ; ledger_hash: Ledger_hash.t }
         [@@deriving eq, sexp, compare, bin_io, fields]
+
+        let genesis =
+          { ledger_builder_hash= 0
+          ; hash= 0
+          ; strength= 0
+          ; previous_state_hash= 0
+          ; ledger_hash= 0 }
+
+        module Proof = Unit
+      end
+
+      module Tip = struct
+        type t =
+          { state: State.t
+          ; proof: State.Proof.t
+          ; ledger_builder: Ledger_builder.t }
+        [@@deriving bin_io, sexp, fields]
       end
 
       module External_transition = struct
@@ -674,6 +713,8 @@ let%test_module "test" =
         let state = Fn.id
 
         let ledger_builder_diff = State.hash
+
+        let state_proof _ = ()
       end
 
       module Internal_transition = External_transition
@@ -778,7 +819,11 @@ let%test_module "test" =
       let net_input = transitions in
       Lbc.Config.make ~parent_log:(Logger.create ())
         ~net_deferred:(return net_input)
-        ~external_transitions:ledger_builder_transitions ~genesis_ledger:0
+        ~external_transitions:ledger_builder_transitions
+        ~genesis_tip:
+          { state= Inputs.State.genesis
+          ; proof= ()
+          ; ledger_builder= Inputs.Ledger_builder.create 0 }
         ~disk_location:"/tmp/test_lbc_disk"
 
     let take_map ~f p cnt =
