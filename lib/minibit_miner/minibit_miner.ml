@@ -128,7 +128,6 @@ struct
           ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
           ~default:state.State.ledger_hash
       in
-      Core.printf "Diff created\n%!";
       let hashing_result =
         Hashing_result.create state
           ~next_ledger_hash ~next_ledger_builder_hash
@@ -139,7 +138,6 @@ struct
         let result =
           match%bind Hashing_result.result hashing_result with
           | `Ok (new_state, nonce) ->
-        Core.printf "Hasning finishig\n%!";
               let transition =
                 { Internal_transition.ledger_hash= next_ledger_hash
                 ; ledger_builder_hash= next_ledger_builder_hash
@@ -152,7 +150,6 @@ struct
               let%map state_proof =
                 Prover.prove ~prev_state:(state, state_proof) transition
               in
-                Core.printf "Diff created\n%!";
               { External_transition.state_proof
               ; state= new_state
               ; ledger_builder_diff= Ledger_builder_diff.forget diff }
@@ -169,7 +166,7 @@ struct
 
   module Tip = struct
     type t =
-      { state: State.t * State.Proof.t
+      { state: State.t * State.Proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
       ; transactions: Transaction.With_valid_signature.t Sequence.t }
     [@@deriving sexp_of]
@@ -189,10 +186,8 @@ struct
     let r, w = Linear_pipe.create () in
     let write_result = function
       | Ok t ->
-        Core.printf "Writing result\n%!";
         Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
       | Error e ->
-        Core.printf "error result\n%!";
           Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
     in
     let create_result {Tip.state; transactions; ledger_builder} =
