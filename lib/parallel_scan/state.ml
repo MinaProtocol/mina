@@ -32,6 +32,7 @@ end
 type ('a, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
   ; data_buffer: 'd Queue.t
+  ; capacity: int
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
   ; mutable enough_steps: bool }
@@ -77,9 +78,10 @@ let current_data_length {current_data_length} = current_data_length
 
 let enough_steps {enough_steps} = enough_steps
 
-let copy {jobs; data_buffer; acc; current_data_length; enough_steps} =
+let copy {jobs; data_buffer; acc; current_data_length; enough_steps; capacity} =
   { jobs= Ring_buffer.copy jobs
   ; data_buffer= Queue.copy data_buffer
   ; acc
+  ; capacity
   ; current_data_length
   ; enough_steps }

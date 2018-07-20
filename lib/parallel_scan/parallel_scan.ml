@@ -42,6 +42,7 @@ module State1 = struct
     let data_buffer = Queue.create ~capacity:parallelism () in
     { jobs
     ; data_buffer
+    ; capacity= parallelism
     ; acc= (0, None)
     ; current_data_length= 0
     ; enough_steps= false }
@@ -316,9 +317,7 @@ let next_k_jobs :
         len
 
 let free_space : state:('a, 'd) State1.t -> int =
- fun ~state ->
-  let buff = State1.data_buffer state in
-  Queue.capacity buff - State.current_data_length state
+ fun ~state -> state.State1.capacity - State.current_data_length state
 
 let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
  fun ~state ~data ->
