@@ -114,22 +114,25 @@ end = struct
     let module A = Parallel_scan.Available_job in
     let jobs = Parallel_scan.next_jobs ~state:t.scan_state in
     let n = List.length jobs in
-    (* TODO: Should we break these up in such a way that the following
-     * situation can't happen:
-     * A gets 0,1 ; B gets 1,2
-     * Essentially you "can't" buy B if you buy A
-     *)
-    let i = Random.int n in
-    (* TODO: This assertion will always pass once we implement #305 *)
-    assert (n > 1) ;
-    let chunk = [List.nth_exn jobs i; List.nth_exn jobs ((i + 1) % n)] in
-    List.map chunk ~f:(function
-      | A.Base d ->
-          Snark_work_lib.Work.Single.Spec.Transition
-            (d.statement, d.transaction, d.witness)
-      | A.Merge ((p1, s1), (p2, s2)) ->
-          let merged = merge_statement s1 s2 |> Or_error.ok_exn in
-          Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2) )
+    if n = 0 then None
+    else
+      (* TODO: Should we break these up in such a way that the following
+       * situation can't happen:
+       * A gets 0,1 ; B gets 1,2
+       * Essentially you "can't" buy B if you buy A
+       *)
+      let i = Random.int n in
+      (* TODO: This assertion will always pass once we implement #305 *)
+      assert (n > 1) ;
+      let chunk = [List.nth_exn jobs i; List.nth_exn jobs ((i + 1) % n)] in
+      Some
+        (List.map chunk ~f:(function
+          | A.Base d ->
+              Snark_work_lib.Work.Single.Spec.Transition
+                (d.statement, d.transaction, d.witness)
+          | A.Merge ((p1, s1), (p2, s2)) ->
+              let merged = merge_statement s1 s2 |> Or_error.ok_exn in
+              Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2) ))
 
   let aux {scan_state; _} = scan_state
 

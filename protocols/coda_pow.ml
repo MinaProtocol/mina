@@ -336,6 +336,7 @@ module type Ledger_builder_intf = sig
        , ledger_proof )
        Snark_work_lib.Work.Single.Spec.t
        list
+       option
 end
 
 module type Tip_intf = sig
