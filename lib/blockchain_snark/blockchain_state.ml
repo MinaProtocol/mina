@@ -114,14 +114,16 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
     let%bind () =
       match block.body.proof with
       | None ->
-        check (Ledger_hash.equal state.ledger_hash block.body.target_hash)
-          "Body proof was none but tried to update ledger hash"
+          check
+            (Ledger_hash.equal state.ledger_hash block.body.target_hash)
+            "Body proof was none but tried to update ledger hash"
       | Some proof ->
-        check
-          (T.verify (Transaction_snark.create ~source:state.ledger_hash
-            ~target:block.body.target_hash ~proof_type:`Merge
-            ~fee_excess:Currency.Amount.Signed.zero ~proof))
-          "Proof did not verify"
+          check
+            (T.verify
+               (Transaction_snark.create ~source:state.ledger_hash
+                  ~target:block.body.target_hash ~proof_type:`Merge
+                  ~fee_excess:Currency.Amount.Signed.zero ~proof))
+            "Proof did not verify"
     in
     let next_state = update_unchecked state block in
     let%map () =

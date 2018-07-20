@@ -180,7 +180,9 @@ end
 
 module type Ledger_proof_intf = sig
   type ledger_hash
+
   type statement
+
   type message
 
   type t

@@ -261,8 +261,7 @@ end = struct
       | [] ->
           Deferred.return
             { Result_with_rollback.result= Ok (List.rev acc)
-            ; rollback= Call (fun () ->
-                undo_transactions processed) }
+            ; rollback= Call (fun () -> undo_transactions processed) }
       | t :: ts ->
         match apply_super_transaction_and_get_witness ledger t with
         | Error e ->
@@ -335,7 +334,9 @@ end = struct
     let%bind () =
       let curr_hash = hash t in
       check
-        (sprintf !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got %{sexp:Ledger_builder_hash.t}"
+        (sprintf
+           !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got \
+             %{sexp:Ledger_builder_hash.t}"
            curr_hash diff.prev_hash)
         (Ledger_builder_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
@@ -370,8 +371,7 @@ end = struct
     in
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
-  let apply t witness =
-    Result_with_rollback.run (apply_diff t witness)
+  let apply t witness = Result_with_rollback.run (apply_diff t witness)
 
   let apply_diff_unchecked t
       (diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
@@ -584,9 +584,7 @@ end = struct
       ; prev_hash= curr_hash }
     in
     let ledger_proof = apply_diff_unchecked t diff in
-    ( diff
-    , `Hash_after_applying (hash t)
-    , `Ledger_proof ledger_proof )
+    (diff, `Hash_after_applying (hash t), `Ledger_proof ledger_proof)
 end
 
 let%test_module "ledger_builder" =

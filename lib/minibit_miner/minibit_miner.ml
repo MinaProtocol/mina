@@ -129,8 +129,7 @@ struct
           ~default:state.State.ledger_hash
       in
       let hashing_result =
-        Hashing_result.create state
-          ~next_ledger_hash ~next_ledger_builder_hash
+        Hashing_result.create state ~next_ledger_hash ~next_ledger_builder_hash
       in
       let cancellation = Ivar.create () in
       (* Someday: If bundle finishes first you can stuff more transactions in the bundle *)
@@ -141,7 +140,7 @@ struct
               let transition =
                 { Internal_transition.ledger_hash= next_ledger_hash
                 ; ledger_builder_hash= next_ledger_builder_hash
-                ; ledger_proof=Option.map ledger_proof_opt ~f:fst
+                ; ledger_proof= Option.map ledger_proof_opt ~f:fst
                 ; ledger_builder_diff= Ledger_builder_diff.forget diff
                 ; timestamp= new_state.timestamp
                 ; nonce }
@@ -185,8 +184,7 @@ struct
     let logger = Logger.extend parent_log [("module", Atom __MODULE__)] in
     let r, w = Linear_pipe.create () in
     let write_result = function
-      | Ok t ->
-        Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
+      | Ok t -> Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
       | Error e ->
           Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
     in

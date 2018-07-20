@@ -276,9 +276,7 @@ end = struct
     [@@deriving bin_io]
 
     let create (genesis_tip: Tip.t) : t =
-      { locked_tip= genesis_tip
-      ; longest_branch_tip= genesis_tip
-      ; ktree= None }
+      {locked_tip= genesis_tip; longest_branch_tip= genesis_tip; ktree= None}
   end
 
   module Aux = struct
@@ -389,30 +387,30 @@ end = struct
                 State_hash.equal
                   (Inputs.State.hash state.locked_tip.state)
                   (External_transition.previous_state_hash transition)
-              then begin
+              then (
                 let lb = Ledger_builder.copy state.locked_tip.ledger_builder in
                 match%map
                   Step.step (lb, state.locked_tip.state) transition
                 with
                 | Ok next_state ->
-                  assert (
-                    Inputs.State.equal next_state
-                      (External_transition.target_state transition) ) ;
-                  state.longest_branch_tip
-                  <- { state= External_transition.target_state transition
-                    ; proof= External_transition.state_proof transition
-                    ; ledger_builder= lb } ;
-                  Linear_pipe.write_or_exn ~capacity:10
-                    strongest_ledgers_writer
-                    strongest_ledgers_reader (lb, transition);
-                  None
+                    assert (
+                      Inputs.State.equal next_state
+                        (External_transition.target_state transition) ) ;
+                    state.longest_branch_tip
+                    <- { state= External_transition.target_state transition
+                       ; proof= External_transition.state_proof transition
+                       ; ledger_builder= lb } ;
+                    Linear_pipe.write_or_exn ~capacity:10
+                      strongest_ledgers_writer strongest_ledgers_reader
+                      (lb, transition) ;
+                    None
                 | Error e ->
-                  (* TODO: Punish *)
-                  Logger.error log
-                    !"Initial transition was bad: %{sexp:Error.t}"
-                    e;
-                  None
-              end else begin
+                    (* TODO: Punish *)
+                    Logger.error log
+                      !"Initial transition was bad: %{sexp:Error.t}"
+                      e ;
+                    None )
+              else
                 let best_tip = state.locked_tip in
                 if
                   Strength.( > )
@@ -421,10 +419,9 @@ end = struct
                 then
                   return
                     (Some
-                        ( `Sync transition
-                        , External_transition.ledger_hash transition ))
+                       ( `Sync transition
+                       , External_transition.ledger_hash transition ))
                 else return None
-              end
           | Some old_tree ->
               let p_eq_previous_state_hash (w: External_transition.t) =
                 State_hash.equal
@@ -469,10 +466,10 @@ end = struct
                     Transition_tree.longest_path new_tree |> Path.of_tree_path
                   in
                   if External_transition.equal old_best_tip new_tip then None
-                  else (
+                  else
                     Some
                       ( `Path_traversal new_best_path
-                      , External_transition.ledger_hash new_tip ) ))
+                      , External_transition.ledger_hash new_tip ) )
     in
     let fold_and_interrupt p ~init ~f =
       Linear_pipe.fold p ~init:(None, init) ~f:(fun (w, acc) (a, s) ->
@@ -506,11 +503,10 @@ end = struct
             | Ok lb ->
                 let new_tree = Transition_tree.single transition in
                 state.ktree <- Some new_tree ;
-                state.locked_tip <-
-                  { ledger_builder = lb
-                  ; state = External_transition.target_state transition
-                  ; proof = External_transition.state_proof transition
-                  };
+                state.locked_tip
+                <- { ledger_builder= lb
+                   ; state= External_transition.target_state transition
+                   ; proof= External_transition.state_proof transition } ;
                 Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
                   strongest_ledgers_reader (lb, transition) ;
                 Option.iter !sl_ref ~f:Sync_ledger.destroy ;
