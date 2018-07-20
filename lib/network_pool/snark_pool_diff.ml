@@ -4,9 +4,7 @@ open Core_kernel
 open Snark_pool
 open Async
 
-type ('work, 'priced_proof) diff =
-  | Add_unsolved of 'work
-  | Add_solved_work of 'work * 'priced_proof
+type ('work, 'priced_proof) diff = Add_solved_work of 'work * 'priced_proof
 [@@deriving bin_io]
 
 module Make (Proof : sig
@@ -31,9 +29,7 @@ struct
           Or_error.error_string "Worse fee or already in pool"
       | `Rebroadcast -> Ok t
     in
-    ( match t with
-    | Add_unsolved work -> Pool.add_unsolved_work pool work
-    | Add_solved_work (work, {proof; fee}) ->
+    ( match t with Add_solved_work (work, {proof; fee}) ->
         Pool.add_snark pool ~work ~proof ~fee )
     |> to_or_error |> Deferred.return
 end
