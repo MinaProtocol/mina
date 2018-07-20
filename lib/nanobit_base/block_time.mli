@@ -1,5 +1,6 @@
 open Core_kernel
 open Snark_params
+open Snark_bits
 
 type t [@@deriving sexp, eq]
 
@@ -16,7 +17,7 @@ module Bits : Bits_intf.S with type t := t
 include Tick.Snarkable.Bits.Faithful
         with type Unpacked.value = t
          and type Packed.value = t
-         and type Packed.var = private Tick.Cvar.t
+         and type Packed.var = private Tick.Field.Checked.t
 
 module Span : sig
   type t [@@deriving sexp]
@@ -46,7 +47,8 @@ module Span : sig
   val ( >= ) : t -> t -> bool
 end
 
-val field_var_to_unpacked : Tick.Cvar.t -> (Unpacked.var, _) Tick.Checked.t
+val field_var_to_unpacked :
+  Tick.Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t
 
 val diff_checked :
   Unpacked.var -> Unpacked.var -> (Span.Unpacked.var, _) Tick.Checked.t

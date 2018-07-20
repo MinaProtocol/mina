@@ -1,11 +1,17 @@
 open Core
 open Util
 open Snark_params.Tick
+open Snark_bits
+open Bitstring_lib
 
 module type Basic = sig
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
-  val bit_length : int
+  val gen : t Quickcheck.Generator.t
+
+  val to_bytes : t -> string
+
+  val length_in_bits : int
 
   val ( = ) : t -> t -> bool
 
@@ -51,7 +57,7 @@ module type Small = sig
 end
 
 module Make_basic (M : sig
-  val bit_length : int
+  val length_in_bits : int
 end) =
 struct
   module Stable = struct
@@ -67,7 +73,24 @@ struct
 
   include Stable.V1
 
-  let bit_length = M.bit_length
+  (* TODO: Pad with zeroes *)
+  let to_bytes t =
+    Z.to_bits
+      (Bignum_bigint.to_zarith_bigint Bigint.(to_bignum_bigint (of_field t)))
+
+  let length_in_bits = M.length_in_bits
+
+  let () = assert (length_in_bits <= Field.size_in_bits)
+
+  let gen : t Quickcheck.Generator.t =
+    let m =
+      if length_in_bits = Field.size_in_bits then
+        Bignum_bigint.(Field.size - one)
+      else Bignum_bigint.(pow (of_int 2) (of_int length_in_bits) - one)
+    in
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl zero m)
+      ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
   let ( = ) = equal
 
@@ -88,10 +111,10 @@ struct
 
   (* TODO: Audit this usage of choose_preimage *)
   let unpack =
-    if Int.( = ) bit_length Field.size_in_bits then fun x ->
+    if Int.( = ) length_in_bits Field.size_in_bits then fun x ->
       Pedersen.Digest.choose_preimage_var x
       >>| Pedersen.Digest.Unpacked.var_to_bits
-    else Checked.unpack ~length:bit_length
+    else Field.Checked.unpack ~length:length_in_bits
 
   let var_to_bits t =
     with_label __LOC__
@@ -104,9 +127,9 @@ struct
 
   include Pedersen.Digest.Bits
 
-  let assert_equal x y = assert_equal x.digest y.digest
+  let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 
-  let equal_var x y = Checked.equal x.digest y.digest
+  let equal_var x y = Field.Checked.equal x.digest y.digest
 
   let typ : (var, t) Typ.t =
     let store (t: t) =
@@ -119,7 +142,8 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Checked.project (bits :> Boolean.var list)}
+      { bits= Some bits
+      ; digest= Field.Checked.project (bits :> Boolean.var list) }
     in
     let read (t: var) = Field.typ.read t.digest in
     let alloc =
@@ -131,7 +155,8 @@ struct
           go (i - 1) (b :: acc)
       in
       let%map bits = go (Field.size_in_bits - 1) [] in
-      {bits= Some bits; digest= Checked.project (bits :> Boolean.var list)}
+      { bits= Some bits
+      ; digest= Field.Checked.project (bits :> Boolean.var list) }
     in
     let check {bits; _} =
       Checked.List.iter
@@ -143,7 +168,7 @@ end
 
 module Make_full_size () = struct
   include Make_basic (struct
-    let bit_length = Field.size_in_bits
+    let length_in_bits = Field.size_in_bits
   end)
 
   let var_of_hash_packed digest = {digest; bits= None}
@@ -152,10 +177,10 @@ module Make_full_size () = struct
 end
 
 module Make_small (M : sig
-  val bit_length : int
+  val length_in_bits : int
 end) =
 struct
-  let () = assert (M.bit_length < Field.size_in_bits)
+  let () = assert (M.length_in_bits < Field.size_in_bits)
 
   include Make_basic (M)
   open Let_syntax
@@ -164,7 +189,7 @@ struct
     let%map bits = unpack digest in
     {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
 
-  let max = Bignum_bigint.(two_to_the bit_length - one)
+  let max = Bignum_bigint.(two_to_the length_in_bits - one)
 
   let of_hash x =
     if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max then

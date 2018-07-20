@@ -1,18 +1,23 @@
 open Core_kernel
 open Async_kernel
 open Nanobit_base
-open Main
+open Coda_main
 
 let run_test with_snark : unit -> unit Deferred.t =
  fun () ->
   let log = Logger.create () in
   let conf_dir = "/tmp" in
   let%bind prover = Prover.create ~conf_dir in
+  let%bind verifier = Verifier.create ~conf_dir in
   let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
   let module Init = struct
-    type proof = Proof.Stable.V1.t [@@deriving bin_io]
+    type proof = Proof.Stable.V1.t [@@deriving bin_io, sexp]
+
+    let logger = log
 
     let conf_dir = conf_dir
+
+    let verifier = verifier
 
     let prover = prover
 
@@ -21,16 +26,16 @@ let run_test with_snark : unit -> unit Deferred.t =
     let fee_public_key = Genesis_ledger.rich_pk
   end in
   let module Main = ( val if with_snark then
-                            (module Main_with_snark (Storage.Memory) (Init)
+                            (module Coda_with_snark (Storage.Memory) (Init) ()
                             : Main_intf )
-                          else (module Main_without_snark (Init) : Main_intf)
+                          else (module Coda_without_snark (Init) () : Main_intf)
   ) in
   let module Run = Run (Main) in
   let open Main in
   let net_config =
     { Inputs.Net.Config.parent_log= log
     ; gossip_net_params=
-        { timeout= Time.Span.of_sec 1.
+        { Inputs.Net.Gossip_net.Params.timeout= Time.Span.of_sec 1.
         ; target_peer_count= 8
         ; address= Host_and_port.of_string "127.0.0.1:8001" }
     ; initial_peers= []
@@ -39,14 +44,14 @@ let run_test with_snark : unit -> unit Deferred.t =
   in
   let%bind minibit =
     Main.create
-      { log
-      ; net_config
-      ; ledger_disk_location= "ledgers"
-      ; pool_disk_location= "transaction_pool" }
+      (Main.Config.make ~log ~net_config
+         ~ledger_builder_persistant_location:"ledger_builder"
+         ~transaction_pool_disk_location:"transaction_pool"
+         ~snark_pool_disk_location:"snark_pool" ())
   in
   let balance_change_or_timeout =
     let rec go () =
-      match%bind Run.get_balance minibit Genesis_ledger.poor_pk with
+      match Run.get_balance minibit Genesis_ledger.poor_pk with
       | Some b
         when not (Currency.Balance.equal b Genesis_ledger.initial_poor_balance) ->
           return ()
@@ -58,7 +63,7 @@ let run_test with_snark : unit -> unit Deferred.t =
   in
   let open Genesis_ledger in
   let assert_balance pk amount =
-    match%map Run.get_balance minibit pk with
+    match Run.get_balance minibit pk with
     | Some balance ->
         if not (Currency.Balance.equal balance amount) then
           failwithf
@@ -67,12 +72,15 @@ let run_test with_snark : unit -> unit Deferred.t =
             balance amount ()
     | None -> failwith "No balance in ledger"
   in
-  Run.run ~minibit ~log ;
+  let client_port = 8123 in
+  let run_snark_worker = `With_public_key Genesis_ledger.rich_pk in
+  Run.setup_local_server ~client_port ~minibit ~log ;
+  Run.run_snark_worker ~log ~client_port run_snark_worker ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
   (* Check if rich-man has some balance *)
-  let%bind () = assert_balance rich_pk initial_rich_balance in
-  let%bind () = assert_balance poor_pk initial_poor_balance in
+  assert_balance rich_pk initial_rich_balance ;
+  assert_balance poor_pk initial_poor_balance ;
   (* Note: This is much less than half of the rich balance so we can test
    *       transaction replays being prohibited
    *)
@@ -89,26 +97,20 @@ let run_test with_snark : unit -> unit Deferred.t =
     Transaction.sign (Signature_keypair.of_private_key rich_sk) payload
   in
   let transaction = build_txn send_amount in
-  let%bind o = Run.send_txn log minibit (transaction :> Transaction.t) in
-  let () = Option.value_exn o in
+  let%bind () = Run.send_txn log minibit (transaction :> Transaction.t) in
   (* Send a similar the transaction twice on purpose; this second one
    * will be rejected because the nonce is wrong *)
   let transaction' = build_txn Currency.Amount.(send_amount + of_int 1) in
-  let%bind o = Run.send_txn log minibit (transaction' :> Transaction.t) in
-  let () = Option.value_exn o in
+  let%bind () = Run.send_txn log minibit (transaction' :> Transaction.t) in
   (* Let the system settle, mine some blocks *)
   let%bind () = balance_change_or_timeout in
-  let%bind () =
-    assert_balance poor_pk
-      ( Currency.Balance.( + ) Genesis_ledger.initial_poor_balance send_amount
-      |> Option.value_exn )
-  in
-  let%map () =
-    assert_balance rich_pk
-      ( Currency.Balance.( - ) Genesis_ledger.initial_rich_balance send_amount
-      |> Option.value_exn )
-  in
-  ()
+  assert_balance poor_pk
+    ( Currency.Balance.( + ) Genesis_ledger.initial_poor_balance send_amount
+    |> Option.value_exn ) ;
+  assert_balance rich_pk
+    ( Currency.Balance.( - ) Genesis_ledger.initial_rich_balance send_amount
+    |> Option.value_exn ) ;
+  Deferred.unit
 
 let command =
   let open Core in

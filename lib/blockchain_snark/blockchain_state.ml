@@ -55,6 +55,7 @@ let negative_one =
   in
   { next_difficulty
   ; previous_state_hash= State_hash.of_hash Pedersen.zero_hash
+  ; ledger_builder_hash= Ledger_builder_hash.dummy
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
   ; strength= Strength.zero
   ; timestamp }
@@ -69,6 +70,7 @@ let update_unchecked : value -> Block.t -> value =
   in
   { next_difficulty
   ; previous_state_hash= hash state
+  ; ledger_builder_hash= block.body.ledger_builder_hash
   ; ledger_hash= block.body.target_hash
   ; strength= Strength.increase state.strength ~by:state.next_difficulty
   ; timestamp= block.header.time }
@@ -77,6 +79,11 @@ let zero =
   let open Or_error.Let_syntax in
   let block = Block.genesis in
   let zero = update_unchecked negative_one block in
+  let rec _find_ok_nonce i =
+    if Or_error.is_ok (Proof_of_work.create zero i) then
+      printf "nonce = %s\n%!" (Block.Nonce.to_string i)
+    else _find_ok_nonce (Block.Nonce.succ i)
+  in
   ignore (Or_error.ok_exn (Proof_of_work.create zero block.header.nonce)) ;
   zero
 
@@ -85,22 +92,39 @@ let zero_hash = hash zero
 let bit_length =
   let add bit_length acc _field = acc + bit_length in
   Fields_of_t_.fold zero ~init:0 ~next_difficulty:(add Target.bit_length)
-    ~previous_state_hash:(add State_hash.bit_length)
-    ~ledger_hash:(add Ledger_hash.bit_length)
+    ~previous_state_hash:(add State_hash.length_in_bits)
+    ~ledger_hash:(add Ledger_hash.length_in_bits)
     ~strength:(add Strength.bit_length) ~timestamp:(fun acc _ _ ->
       acc + Block_time.bit_length )
 
-module Make_update (T : Transaction_snark.S) = struct
+module type Update_intf = sig
+  val update : t -> Block.t -> t Or_error.t
+
+  module Checked : sig
+    val update :
+         State_hash.var * var
+      -> Block.var
+      -> (State_hash.var * var * [`Success of Boolean.var], _) Checked.t
+  end
+end
+
+module Make_update (T : Transaction_snark.Verification.S) = struct
   let update state (block: Block.t) =
-    let good_body =
-      Ledger_hash.equal state.ledger_hash block.body.target_hash
-      || T.verify
-           (Transaction_snark.create ~source:state.ledger_hash
-              ~target:block.body.target_hash ~proof_type:Merge
-              ~fee_excess:Currency.Amount.Signed.zero ~proof:block.body.proof)
-    in
     let open Or_error.Let_syntax in
-    let%bind () = check good_body "Bad body" in
+    let%bind () =
+      match block.body.proof with
+      | None ->
+          check
+            (Ledger_hash.equal state.ledger_hash block.body.target_hash)
+            "Body proof was none but tried to update ledger hash"
+      | Some proof ->
+          check
+            (T.verify
+               (Transaction_snark.create ~source:state.ledger_hash
+                  ~target:block.body.target_hash ~proof_type:`Merge
+                  ~fee_excess:Currency.Amount.Signed.zero ~proof))
+            "Proof did not verify"
+    in
     let next_state = update_unchecked state block in
     let%map () =
       let%bind proof_of_work =
@@ -140,18 +164,20 @@ module Make_update (T : Transaction_snark.S) = struct
              ((* There used to be a trickier version of this code that did this in 2 fewer constraints,
               might be worth going back to if there is ever a reason. *)
               let n = List.length delta in
-              let d = Checked.pack delta in
+              let d = Field.Checked.pack delta in
               let%bind delta_is_zero =
-                Checked.equal d (Cvar.constant Field.zero)
+                Field.Checked.equal d (Field.Checked.constant Field.zero)
               in
               let%map delta_minus_one =
-                Checked.if_ delta_is_zero ~then_:(Cvar.constant Field.zero)
+                Field.Checked.if_ delta_is_zero
+                  ~then_:(Field.Checked.constant Field.zero)
                   ~else_:
-                    (let open Cvar in
+                    (let open Field.Checked in
                     Infix.(d - constant Field.one))
                 (* We convert to bits here because we will in [clamp_to_n_bits] anyway, and
                 this gives us the upper bound we need for multiplying with [rate_multiplier]. *)
-                >>= Checked.unpack ~length:n >>| Number.of_bits
+                >>= Field.Checked.unpack ~length:n
+                >>| Number.of_bits
               in
               (delta_is_zero, delta_minus_one))
          in
@@ -168,15 +194,16 @@ module Make_update (T : Transaction_snark.S) = struct
            (* This could be more efficient *)
            with_label __LOC__
              (let%bind less = Number.(prev_target_n < rate_multiplier) in
-              Checked.if_ less ~then_:(Cvar.constant Field.one)
+              Field.Checked.if_ less
+                ~then_:(Field.Checked.constant Field.one)
                 ~else_:
-                  (Cvar.sub
+                  (Field.Checked.sub
                      (Number.to_var prev_target_n)
                      (Number.to_var rate_multiplier)))
          in
          let%bind res =
            with_label __LOC__
-             (Checked.if_ delta_is_zero ~then_:zero_case
+             (Field.Checked.if_ delta_is_zero ~then_:zero_case
                 ~else_:(Number.to_var nonzero_case))
          in
          Target.var_to_unpacked res)
@@ -216,7 +243,8 @@ module Make_update (T : Transaction_snark.S) = struct
            let%bind correct_transaction_snark =
              T.verify_complete_merge previous_state.ledger_hash
                block.body.target_hash
-               (As_prover.return block.body.proof)
+               (As_prover.return
+                  (Option.value ~default:Tock.Proof.dummy block.body.proof))
            and ledger_hash_didn't_change =
              Ledger_hash.equal_var previous_state.ledger_hash
                block.body.target_hash
@@ -239,12 +267,13 @@ module Make_update (T : Transaction_snark.S) = struct
            { next_difficulty= new_difficulty
            ; previous_state_hash
            ; ledger_hash= block.body.target_hash
+           ; ledger_builder_hash= block.body.ledger_builder_hash
            ; strength= new_strength
            ; timestamp= time }
          in
          let%bind state_bits = to_bits new_state in
          let%bind state_partial =
-           Pedersen_hash.hash state_bits ~params:Pedersen.params
+           Pedersen_hash.hash state_bits
              ~init:(Hash_prefix.length_in_bits, Hash_curve.Checked.identity)
          in
          let%bind state_hash =
@@ -258,7 +287,6 @@ module Make_update (T : Transaction_snark.S) = struct
            in
            Pedersen_hash.hash
              (Block.Nonce.Unpacked.var_to_bits block.header.nonce)
-             ~params:Pedersen.params
              ~init:
                (Hash_prefix.length_in_bits + List.length state_bits, pow_init)
            >>| Pedersen_hash.digest >>= Proof_of_work.var_of_hash_packed
@@ -274,8 +302,8 @@ end
 module Checked = struct
   let is_base_hash h =
     with_label __LOC__
-      (Checked.equal
-         (Cvar.constant (zero_hash :> Field.t))
+      (Field.Checked.equal
+         (Field.Checked.constant (zero_hash :> Field.t))
          (State_hash.var_to_hash_packed h))
 
   let hash (t: var) =

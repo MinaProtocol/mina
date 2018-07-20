@@ -17,9 +17,9 @@ module Merkle_tree = Snarky.Merkle_tree.Checked(Tick)(struct
       Tick.digest_bits ~init:Hash_prefix.merkle_tree.(height)
         (Unpacked.var_to_bits h1 @ Unpacked.var_to_bits h2)
 
-    let assert_equal h1 h2 = assert_equal h1 h2
+    let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
-    let if_ = Checked.if_
+    let if_ = Field.Checked.if_
   end)
     (struct
       include Account
@@ -88,7 +88,7 @@ let create_account t pk =
   in
   let%bind () =
     Merkle_tree.implied_root
-      (Cvar.constant Account.empty_hash) (* Could save some boolean constraints by unpacking this outside the snark *)
+      (Field.Checked.constant Account.empty_hash) (* Could save some boolean constraints by unpacking this outside the snark *)
       addr
       path
     >>| var_of_hash_packed

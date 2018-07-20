@@ -1,0 +1,14 @@
+(jbuild_version 1)
+
+(library
+ ((name cli_lib)
+  (public_name cli_lib)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core
+      nanobit_base ))
+  (preprocess (pps (ppx_jane)))
+  (synopsis "Some cli utilities")))
+

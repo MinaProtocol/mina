@@ -37,15 +37,11 @@ module type S = sig
 end
 
 module type Tick_keypair_intf = sig
-  val verification_key : Tick.Verification_key.t
-
-  val proving_key : Tick.Proving_key.t
+  val keys : Tick.Keypair.t
 end
 
 module type Tock_keypair_intf = sig
-  val verification_key : Tock.Verification_key.t
-
-  val proving_key : Tock.Proving_key.t
+  val keys : Tock.Keypair.t
 end
 
 (* Someday:
@@ -54,7 +50,7 @@ end
 module Make (Digest : sig
   module Tick :
     Tick.Snarkable.Bits.Lossy
-    with type Packed.var = Tick.Cvar.t
+    with type Packed.var = Tick.Field.Checked.t
      and type Packed.value = Tick.Pedersen.Digest.t
 
   module Tock : Tock.Snarkable.Bits.Lossy with type Packed.value = Tock.Field.t
@@ -143,8 +139,7 @@ struct
              (let%bind sh = State.Hash.var_to_bits next_state_hash in
               (* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
-              Hash.hash (wrap_vk @ sh)
-              >>= assert_equal ~label:"equal_to_top_hash" top_hash)
+              Hash.hash (wrap_vk @ sh) >>= Field.Checked.Assert.equal top_hash)
          in
          let%bind prev_state_valid =
            prev_state_valid wrap_vk prev_state_hash

@@ -3,6 +3,7 @@ open Util
 open Snark_params
 open Tick
 open Let_syntax
+open Snark_bits
 
 module Stable = struct
   module V1 = struct
@@ -26,8 +27,8 @@ let of_field x =
   assert (Field.compare x max <= 0) ;
   x
 
-let field_var_to_unpacked (x: Tick.Cvar.t) =
-  Tick.Checked.unpack ~length:bit_length x
+let field_var_to_unpacked (x: Tick.Field.Checked.t) =
+  Tick.Field.Checked.unpack ~length:bit_length x
 
 include Bits.Snarkable.Small (Tick)
           (struct
@@ -92,18 +93,19 @@ let floor_divide ~numerator:(`Two_to_the (b: int) as numerator) y y_unpacked =
        equal to a sum of [b] booleans, but we add an explicit check here since it
        is relatively cheap and the internals of that function might change. *)
     let%bind () =
-      Checked.Assert.lte ~bit_length:(Util.num_bits_int b) k
-        (Cvar.constant (Field.of_int b))
+      Field.Checked.Assert.lte ~bit_length:(Util.num_bits_int b) k
+        (Field.Checked.constant (Field.of_int b))
     in
-    let m = Cvar.(sub (constant (Field.of_int (b + 1))) k) in
-    let%bind z_unpacked = Checked.unpack z ~length:b in
+    let m = Field.Checked.(sub (constant (Field.of_int (b + 1))) k) in
+    let%bind z_unpacked = Field.Checked.unpack z ~length:b in
     Util.assert_num_bits_upper_bound z_unpacked m
   in
-  let%bind zy = Checked.mul z y in
-  let numerator = Cvar.constant (two_to_the b) in
-  let%map () = Checked.Assert.lte ~bit_length:(b + 1) zy numerator
+  let%bind zy = Field.Checked.mul z y in
+  let numerator = Field.Checked.constant (two_to_the b) in
+  let%map () = Field.Checked.Assert.lte ~bit_length:(b + 1) zy numerator
   and () =
-    Checked.Assert.lt ~bit_length:(b + 1) numerator Cvar.Infix.(zy + y)
+    Field.Checked.Assert.lt ~bit_length:(b + 1) numerator
+      Field.Checked.Infix.(zy + y)
   in
   z
 
@@ -134,4 +136,4 @@ let increase (t: t) ~(by: Target.t) : t =
 
 let increase_checked t ~by:(target_packed, target_unpacked) =
   let%map incr = of_target target_packed target_unpacked in
-  Cvar.Infix.(t + incr)
+  Field.Checked.Infix.(t + incr)

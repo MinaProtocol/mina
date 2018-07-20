@@ -3,8 +3,9 @@
 (library
  ((name blockchain_snark)
   (public_name blockchain_snark)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
-  (libraries (core protocols snarky nanobit_base proof_of_work transaction_snark bignum_bigint))
+  (libraries (core cached cache_dir protocols snarky snark_params nanobit_base proof_of_work transaction_snark bignum_bigint))
   (inline_tests)
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "blockchain state transition snarking library")))

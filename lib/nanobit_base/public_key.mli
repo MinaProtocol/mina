@@ -27,9 +27,13 @@ module Compressed : sig
     end
   end
 
+  val empty : t
+
   type var = (Field.var, Boolean.var) t_
 
   val typ : (var, t) Typ.t
+
+  include Comparable.S_binable with type t := t
 
   include Hashable.S_binable with type t := t
 

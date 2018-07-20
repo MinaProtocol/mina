@@ -3,9 +3,10 @@
 (library
  ((name parallel_scan)
   (public_name parallel_scan)
+  (flags (:standard -short-paths))
   (inline_tests)
   (library_flags (-linkall))
-  (libraries (linear_pipe core async async_extra))
+  (libraries (linear_pipe cryptokit core async async_extra))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Parallel scan over an infinite stream (incremental map-reduce)")))
 

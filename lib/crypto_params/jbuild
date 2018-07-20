@@ -1,0 +1,13 @@
+(jbuild_version 1)
+
+(library
+ ((name crypto_params)
+  (public_name crypto_params)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( snarky bignum_bigint ))
+  (preprocess (pps (ppx_jane)))
+  (synopsis "Cryptographic parameters")))
+

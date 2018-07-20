@@ -10,7 +10,7 @@
   (modes (native))
   (public_name snarky.c)
   (preprocess no_preprocessing)
-  (flags (:standard -safe-string))
+  (flags (:standard -short-paths -safe-string))
   (c_library_flags (:standard -Wl,-E -Wl,-whole-archive -lcamlsnark_c_stubs -Wl,-no-whole-archive -lssl -lcrypto -lprocps -lgmp -lstdc++ 
   ))
   (self_build_stubs_archive (camlsnark_c))))

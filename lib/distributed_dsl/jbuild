@@ -3,6 +3,7 @@
 (library
  ((name distributed_dsl)
   (public_name distributed_dsl)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (logger core linear_pipe async async_extra extlib))

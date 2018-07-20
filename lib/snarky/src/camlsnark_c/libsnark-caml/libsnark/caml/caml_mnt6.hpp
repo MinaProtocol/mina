@@ -11,6 +11,7 @@
 #include <libff/algebra/fields/bigint.hpp>
 #include <libff/algebra/scalar_multiplication/wnaf.hpp>
 #include <gmp.h>
+#include <openssl/md5.h>
 
 typedef libff::mnt6_pp ppT;
 typedef libff::mnt4_pp other_curve_ppT;

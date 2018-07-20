@@ -3,7 +3,8 @@ open Async
 
 (* Ocamlformat breaks on the following files, so we ignore those for now *)
 let whitelist =
-  [ "lib/nanobit_base/snark_util.ml"
+  [ "lib/snark_params/snark_util.ml"
+  ; "lib/dummy_values/gen_values/gen_values.ml"
   ; "lib/nanobit_base/ledger_hash.ml"
   ; "lib/nanobit_base/blockchain_state.ml"
   ; "lib/snarky/src/request.ml"

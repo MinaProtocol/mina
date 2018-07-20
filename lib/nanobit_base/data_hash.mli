@@ -1,10 +1,17 @@
 open Core
 open Snark_params.Tick
+open Snark_bits
 
 module type Basic = sig
+  (* TODO: Use stable for bin_io *)
+
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
-  val bit_length : int
+  val gen : t Quickcheck.Generator.t
+
+  val to_bytes : t -> string
+
+  val length_in_bits : int
 
   val ( = ) : t -> t -> bool
 
@@ -50,7 +57,7 @@ module type Small = sig
 end
 
 module Make_small (M : sig
-  val bit_length : int
+  val length_in_bits : int
 end) :
   Small
 

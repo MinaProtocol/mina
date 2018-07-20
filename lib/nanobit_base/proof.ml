@@ -29,4 +29,6 @@ module Stable = struct
   end
 end
 
+let dummy = Tock.Proof.dummy
+
 include Stable.V1

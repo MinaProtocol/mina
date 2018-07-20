@@ -13,7 +13,7 @@ val zero_hash : State_hash.t
 
 val compute_target : Block_time.t -> Target.t -> Block_time.t -> Target.t
 
-module Make_update (T : Transaction_snark.S) : sig
+module type Update_intf = sig
   val update : t -> Block.t -> t Or_error.t
 
   module Checked : sig
@@ -23,6 +23,8 @@ module Make_update (T : Transaction_snark.S) : sig
       -> (State_hash.var * var * [`Success of Boolean.var], _) Checked.t
   end
 end
+
+module Make_update (T : Transaction_snark.Verification.S) : Update_intf
 
 module Checked : sig
   val hash : var -> (State_hash.var, _) Checked.t

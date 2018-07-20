@@ -3,9 +3,10 @@
 (library
  ((name transaction_snark)
   (public_name transaction_snark)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core snarky nanobit_base bignum))
-  (preprocess (pps (ppx_jane)))
+  (libraries (core cache_dir cached snarky nanobit_base bignum))
+  (preprocess (pps (ppx_jane ppx_deriving.std)))
   (synopsis "Transaction state transition snarking library")))
 

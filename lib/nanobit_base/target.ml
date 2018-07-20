@@ -1,9 +1,10 @@
 open Core_kernel
 open Snark_params
+open Snark_bits
 
 module Stable = struct
   module V1 = struct
-    type t = Tick.Field.t [@@deriving bin_io, sexp, eq]
+    type t = Tick.Field.t [@@deriving bin_io, sexp, eq, compare]
   end
 end
 
@@ -19,7 +20,7 @@ let max_bigint =
 
 let max = Bigint.to_field max_bigint
 
-let constant = Tick.Cvar.constant
+let constant = Tick.Field.Checked.constant
 
 let of_field x =
   assert (Bigint.compare (Bigint.of_field x) max_bigint <= 0) ;
@@ -38,7 +39,7 @@ let assert_mem x xs =
   let rec go acc = function
     | [] -> Boolean.Assert.any acc
     | y :: ys ->
-        let%bind e = Checked.equal x y in
+        let%bind e = Field.Checked.equal x y in
         go (e :: acc) ys
   in
   go [] xs
@@ -59,4 +60,5 @@ module Bits =
 open Tick
 open Let_syntax
 
-let var_to_unpacked (x: Cvar.t) = Checked.unpack ~length:bit_length x
+let var_to_unpacked (x: Field.Checked.t) =
+  Field.Checked.unpack ~length:bit_length x

@@ -5,6 +5,8 @@ module Ring_buffer : sig
   type 'a t [@@deriving sexp, bin_io]
 
   val read_all : 'a t -> 'a list
+
+  val read_k : 'a t -> int -> 'a list
 end
 
 module State : sig
@@ -16,39 +18,45 @@ module State : sig
     [@@deriving bin_io, sexp]
   end
 
-  type ('a, 'b, 'd) t [@@deriving bin_io]
+  module Completed_job : sig
+    type 'a t = Lifted of 'a | Merged of 'a [@@deriving bin_io, sexp]
+  end
 
-  val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t
+  type ('a, 'd) t [@@deriving sexp, bin_io]
+
+  val copy : ('a, 'd) t -> ('a, 'd) t
+
+  module Hash : sig
+    type t = Cryptokit.hash
+  end
+
+  val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
 end
 
 module type Spec_intf = sig
-  module Data : sig
-    type t [@@deriving sexp_of]
-  end
+  type data [@@deriving sexp_of]
 
-  module Accum : sig
-    type t [@@deriving sexp_of]
+  type accum [@@deriving sexp_of]
 
-    (* Semigroup+deferred *)
-
-    val ( + ) : t -> t -> t Deferred.t
-  end
-
-  module Output : sig
-    type t [@@deriving sexp_of, eq]
-  end
-
-  val map : Data.t -> Accum.t Deferred.t
-
-  val merge : Output.t -> Accum.t -> Output.t Deferred.t
+  type output [@@deriving sexp_of]
 end
 
-val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
+module Available_job : sig
+  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+end
 
-val step :
-     state:('a, 'b, 'd) State.t
-  -> data:'d list
-  -> spec:(module
-           Spec_intf with type Data.t = 'd and type Accum.t = 'a and type Output.
-                                                                          t = 'b)
-  -> 'b option Deferred.t
+val start : parallelism_log_2:int -> ('a, 'd) State.t
+
+val next_k_jobs :
+  state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
+
+val next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list
+
+val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
+
+val free_space : state:('a, 'd) State.t -> int
+
+val fill_in_completed_jobs :
+     state:('a, 'd) State.t
+  -> jobs:'a State.Completed_job.t list
+  -> 'a option Or_error.t

@@ -3,7 +3,7 @@ jobs:
   build:
     resource_class: xlarge
     docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:428d7e58a25fbedf20e5d184c772fdc53ea7e949
+      - image: gcr.io/o1labs-192920/ocaml-base:cb142209e77e4e3f4fe05d192bdb1e85cc879d6d
         # ENV variable is located in circleci
         auth:
           username: _json_key

@@ -32,3 +32,7 @@ ADD ./app/kademlia-haskell/prefetch /prefetch
 RUN sudo chown -R opam /prefetch
 RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix
 RUN opam install ocamlformat
+RUN sudo apt-get install --yes librocksdb4.5 librocksdb-dev
+RUN opam install bitstring orocksdb
+RUN sudo apt-get install --yes zlib1g-dev
+RUN opam install cryptokit

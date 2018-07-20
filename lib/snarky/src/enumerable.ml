@@ -24,30 +24,31 @@ struct
     assert (n < Field.size_in_bits) ;
     n
 
-  type var = Cvar.t
+  type var = Field.Checked.t
 
   let to_field t = Field.of_int (to_enum t)
 
   let of_field x = Option.value_exn (of_enum (field_to_int x))
 
-  let assert_equal x y = assert_equal x y
+  let assert_equal x y = Field.Checked.Assert.equal x y
 
   let typ : (var, t) Typ.t =
     let check =
       if M.max = 1 then fun x -> assert_ (Constraint.boolean x)
       else fun x ->
-        Checked.Assert.lte ~bit_length x (Cvar.constant (Field.of_int M.max))
+        Field.Checked.Assert.lte ~bit_length x
+          (Field.Checked.constant (Field.of_int M.max))
     in
     {(Typ.transport Field.typ ~there:to_field ~back:of_field) with check}
 
   let var_to_bits : var -> (Boolean.var list, _) Checked.t =
-    Checked.unpack ~length:bit_length
+    Field.Checked.unpack ~length:bit_length
 
   let to_bits t = int_to_bits ~length:bit_length (to_enum t)
 
-  let if_ b ~(then_: var) ~(else_: var) = Checked.if_ b ~then_ ~else_
+  let if_ b ~(then_: var) ~(else_: var) = Field.Checked.if_ b ~then_ ~else_
 
-  let var t : var = Cvar.constant (to_field t)
+  let var t : var = Field.Checked.constant (to_field t)
 
-  let ( = ) = Checked.equal
+  let ( = ) = Field.Checked.equal
 end

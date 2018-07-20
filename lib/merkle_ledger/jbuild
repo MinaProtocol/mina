@@ -3,9 +3,10 @@
 (library
  ((name merkle_ledger)
   (public_name merkle_ledger)
+  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core extlib))
+  (libraries (core extlib dyn_array))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Merkle Ledger implementation")))
 

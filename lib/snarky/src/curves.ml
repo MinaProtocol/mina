@@ -49,7 +49,7 @@ module Make_intf (Impl : Snark_intf.S) = struct
 
     type 'a t = 'a * 'a
 
-    type var = Cvar.t t
+    type var = Field.Checked.t t
 
     type value = Field.t t
 
@@ -237,7 +237,7 @@ module Edwards = struct
      and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type boolean_var := Impl.Boolean.var
      and type field := Impl.Field.t
-     and type var = Impl.Cvar.t * Impl.Cvar.t
+     and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
      and type value = Impl.Field.t * Impl.Field.t
      and module Scalar = Scalar =
   struct
@@ -247,11 +247,12 @@ module Edwards = struct
 
     type 'a tup = 'a * 'a
 
-    type var = Cvar.t tup
+    type var = Field.Checked.t tup
 
     type value = Field.t tup
 
-    let var_of_value (x, y) = (Cvar.constant x, Cvar.constant y)
+    let var_of_value (x, y) =
+      (Field.Checked.constant x, Field.Checked.constant y)
 
     let identity_value = identity
 
@@ -270,9 +271,10 @@ module Edwards = struct
 
     let assert_on_curve (x, y) =
       let open Let_syntax in
-      let%bind x2 = Checked.mul x x and y2 = Checked.mul y y in
-      let open Cvar.Infix in
-      assert_r1cs (Params.d * x2) y2 (x2 + y2 - Cvar.constant Field.one)
+      let%bind x2 = Field.Checked.mul x x and y2 = Field.Checked.mul y y in
+      let open Field.Checked.Infix in
+      assert_r1cs (Params.d * x2) y2
+        (x2 + y2 - Field.Checked.constant Field.one)
 
     let typ_unchecked : (var, value) Typ.t = Typ.(tuple2 field field)
 
@@ -293,7 +295,8 @@ module Edwards = struct
         let on_curve = assert_on_curve
 
         let equal (x1, y1) (x2, y2) =
-          let%map () = assert_equal x1 x2 and () = assert_equal y1 y2 in
+          let%map () = Field.Checked.Assert.equal x1 x2
+          and () = Field.Checked.Assert.equal y1 y2 in
           ()
 
         let not_identity (x, y) = failwith ""
@@ -301,47 +304,59 @@ module Edwards = struct
 
       let add_known (x1, y1) (x2, y2) =
         with_label __LOC__
-          (let x1x2 = Cvar.scale x1 x2
-           and y1y2 = Cvar.scale y1 y2
-           and x1y2 = Cvar.scale x1 y2
-           and y1x2 = Cvar.scale y1 x2 in
-           let%bind p = Checked.mul x1x2 y1y2 in
-           let open Cvar.Infix in
+          (let x1x2 = Field.Checked.scale x1 x2
+           and y1y2 = Field.Checked.scale y1 y2
+           and x1y2 = Field.Checked.scale x1 y2
+           and y1x2 = Field.Checked.scale y1 x2 in
+           let%bind p = Field.Checked.mul x1x2 y1y2 in
+           let open Field.Checked.Infix in
            let p = Params.d * p in
-           let%map a = Checked.div (x1y2 + y1x2) (Cvar.constant Field.one + p)
-           and b = Checked.div (y1y2 - x1x2) (Cvar.constant Field.one - p) in
+           let%map a =
+             Field.Checked.div (x1y2 + y1x2)
+               (Field.Checked.constant Field.one + p)
+           and b =
+             Field.Checked.div (y1y2 - x1x2)
+               (Field.Checked.constant Field.one - p)
+           in
            (a, b))
 
       (* TODO: Optimize -- could probably shave off one constraint. *)
       let add (x1, y1) (x2, y2) =
         with_label __LOC__
-          (let%bind x1x2 = Checked.mul x1 x2
-           and y1y2 = Checked.mul y1 y2
-           and x1y2 = Checked.mul x1 y2
-           and x2y1 = Checked.mul x2 y1 in
-           let%bind p = Checked.mul x1x2 y1y2 in
-           let open Cvar.Infix in
+          (let%bind x1x2 = Field.Checked.mul x1 x2
+           and y1y2 = Field.Checked.mul y1 y2
+           and x1y2 = Field.Checked.mul x1 y2
+           and x2y1 = Field.Checked.mul x2 y1 in
+           let%bind p = Field.Checked.mul x1x2 y1y2 in
+           let open Field.Checked.Infix in
            let p = Params.d * p in
-           let%map a = Checked.div (x1y2 + x2y1) (Cvar.constant Field.one + p)
-           and b = Checked.div (y1y2 - x1x2) (Cvar.constant Field.one - p) in
+           let%map a =
+             Field.Checked.div (x1y2 + x2y1)
+               (Field.Checked.constant Field.one + p)
+           and b =
+             Field.Checked.div (y1y2 - x1x2)
+               (Field.Checked.constant Field.one - p)
+           in
            (a, b))
 
       let double (x, y) =
         with_label __LOC__
-          (let%bind xy = Checked.mul x y
-           and xx = Checked.mul x x
-           and yy = Checked.mul y y in
-           let open Cvar.Infix in
+          (let%bind xy = Field.Checked.mul x y
+           and xx = Field.Checked.mul x x
+           and yy = Field.Checked.mul y y in
+           let open Field.Checked.Infix in
            let two = Field.of_int 2 in
-           let%map a = Checked.div (two * xy) (xx + yy)
-           and b = Checked.div (yy - xx) (Cvar.constant two - xx - yy) in
+           let%map a = Field.Checked.div (two * xy) (xx + yy)
+           and b =
+             Field.Checked.div (yy - xx) (Field.Checked.constant two - xx - yy)
+           in
            (a, b))
 
       let if_value (b: Boolean.var) ~then_:(x1, y1) ~else_:(x2, y2) =
-        let not_b = (Boolean.not b :> Cvar.t) in
-        let b = (b :> Cvar.t) in
+        let not_b = (Boolean.not b :> Field.Checked.t) in
+        let b = (b :> Field.Checked.t) in
         let choose_field t e =
-          let open Cvar in
+          let open Field.Checked in
           Infix.((t * b) + (e * not_b))
         in
         (choose_field x1 x2, choose_field y1 y2)
@@ -372,9 +387,9 @@ module Edwards = struct
              let%map () =
                rev_map3i_exn (to_list r) (to_list then_) (to_list else_) ~f:
                  (fun i r t e ->
-                   let open Cvar.Infix in
+                   let open Field.Checked.Infix in
                    Constraint.r1cs ~label:(sprintf "main_%d" i)
-                     (b :> Cvar.t)
+                     (b :> Field.Checked.t)
                      (t - e) (r - e) )
                |> assert_all
              in
@@ -404,10 +419,10 @@ module Edwards = struct
       let cond_add ((x2, y2): value) ~to_:((x1, y1): var) ~if_:(b: Boolean.var)
           : (var, _) Checked.t =
         with_label __LOC__
-          (let one = Cvar.constant Field.one in
-           let b = (b :> Cvar.t) in
+          (let one = Field.Checked.constant Field.one in
+           let b = (b :> Field.Checked.t) in
            let open Let_syntax in
-           let open Cvar.Infix in
+           let open Field.Checked.Infix in
            let res a1 a3 =
              let%bind a =
                provide_witness Typ.field
@@ -422,10 +437,10 @@ module Edwards = struct
              let%map () = assert_r1cs b (a3 - a1) (a - a1) in
              a
            in
-           let%bind beta = Checked.mul x1 y1 in
+           let%bind beta = Field.Checked.mul x1 y1 in
            let p = Field.Infix.(Params.d * x2 * y2) * beta in
-           let%bind x3 = Checked.div ((y2 * x1) + (x2 * y1)) (one + p)
-           and y3 = Checked.div ((y2 * y1) - (x2 * x1)) (one - p) in
+           let%bind x3 = Field.Checked.div ((y2 * x1) + (x2 * y1)) (one + p)
+           and y3 = Field.Checked.div ((y2 * y1) - (x2 * x1)) (one - p) in
            let%map x_res = res x1 x3 and y_res = res y1 y3 in
            (x_res, y_res))
 
@@ -444,12 +459,13 @@ module Edwards = struct
            | [] -> failwith "scale_known: Empty bits"
            | b :: bs ->
                let acc =
-                 let b = (b :> Cvar.t) in
+                 let b = (b :> Field.Checked.t) in
                  let x_id, y_id = identity_value in
                  let x_t, y_t = t in
-                 let open Cvar.Infix in
-                 ( (Field.Infix.(x_t - x_id) * b) + Cvar.constant x_id
-                 , (Field.Infix.(y_t - y_id) * b) + Cvar.constant y_id )
+                 let open Field.Checked.Infix in
+                 ( (Field.Infix.(x_t - x_id) * b) + Field.Checked.constant x_id
+                 , (Field.Infix.(y_t - y_id) * b) + Field.Checked.constant y_id
+                 )
                in
                go 1 acc (double_value t) bs)
     end
@@ -478,7 +494,7 @@ module Edwards = struct
      and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type boolean_var := Impl.Boolean.var
      and type field := Impl.Field.t
-     and type var = Impl.Cvar.t * Impl.Cvar.t
+     and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
      and type value = Impl.Field.t * Impl.Field.t =
     Extend (Impl) (Scalar) (Basic.Make (Impl.Field) (Params))
 end
@@ -499,7 +515,7 @@ struct
 
   type 'a t = 'a * 'a
 
-  type var = Cvar.t t
+  type var = Field.Checked.t t
 
   type value = Field.t t
 
@@ -511,10 +527,11 @@ struct
   module Scalar = struct
     include Scalar
 
-    let assert_equal = Checked.Assert.equal_bitstrings
+    let assert_equal = Bitstring_checked.Assert.equal
   end
 
-  let value_to_var ((x, y): value) : var = Cvar.(constant x, constant y)
+  let value_to_var ((x, y): value) : var =
+    Field.Checked.(constant x, constant y)
 
   let add (ax, ay) (bx, by) =
     let lambda =
@@ -551,18 +568,20 @@ struct
     let assert_on_curve (x, y) =
       with_label __LOC__
         (let open Let_syntax in
-        let%bind x_squared = Checked.mul x x in
-        let%bind y_squared = Checked.mul y y in
-        let open Cvar.Infix in
+        let%bind x_squared = Field.Checked.mul x x in
+        let%bind y_squared = Field.Checked.mul y y in
+        let open Field.Checked.Infix in
         assert_r1cs ~label:"main" x
-          (x_squared + Cvar.constant Coefficients.a)
-          (y_squared - Cvar.constant Coefficients.b))
+          (x_squared + Field.Checked.constant Coefficients.a)
+          (y_squared - Field.Checked.constant Coefficients.b))
 
     let add (ax, ay) (bx, by) =
       with_label __LOC__
         (let open Let_syntax in
-        let%bind denom = Checked.inv Cvar.Infix.(bx - ax) in
-        let%bind lambda = Checked.mul Cvar.Infix.(by - ay) denom in
+        let%bind denom = Field.Checked.inv Field.Checked.Infix.(bx - ax) in
+        let%bind lambda =
+          Field.Checked.mul Field.Checked.Infix.(by - ay) denom
+        in
         let%bind cx =
           provide_witness Typ.field
             (let open As_prover in
@@ -573,7 +592,8 @@ struct
             Field.(sub (square lambda) (add ax bx)))
         in
         let%bind () =
-          assert_r1cs ~label:"c1" lambda lambda Cvar.Infix.(cx + ax + bx)
+          assert_r1cs ~label:"c1" lambda lambda
+            Field.Checked.Infix.(cx + ax + bx)
         in
         let%bind cy =
           provide_witness Typ.field
@@ -586,14 +606,15 @@ struct
             Field.(sub (mul lambda (sub ax cx)) ay))
         in
         let%map () =
-          Cvar.Infix.(assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
+          let open Field.Checked.Infix in
+          assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay)
         in
         (cx, cy))
 
     let double (ax, ay) =
       with_label __LOC__
         (let open Let_syntax in
-        let%bind x_squared = Checked.mul ax ax in
+        let%bind x_squared = Field.Checked.mul ax ax in
         let%bind lambda =
           provide_witness Typ.field
             As_prover.(
@@ -621,10 +642,11 @@ struct
             Field.Infix.((lambda * (ax - bx)) - ay))
         in
         let two = Field.of_int 2 in
-        let open Cvar.Infix in
+        let open Field.Checked.Infix in
         let%map () =
           assert_r1cs (two * lambda) ay
-            ((Field.of_int 3 * x_squared) + Cvar.constant Coefficients.a)
+            ( (Field.of_int 3 * x_squared)
+            + Field.Checked.constant Coefficients.a )
         and () = assert_r1cs lambda lambda (bx + (two * ax))
         and () = assert_r1cs lambda (ax - bx) (by + ay) in
         (bx, by))
@@ -654,9 +676,9 @@ struct
         let%map () =
           rev_map3i_exn (to_list r) (to_list then_) (to_list else_) ~f:
             (fun i r t e ->
-              let open Cvar.Infix in
+              let open Field.Checked.Infix in
               Constraint.r1cs ~label:(sprintf "main_%d" i)
-                (b :> Cvar.t)
+                (b :> Field.Checked.t)
                 (t - e) (r - e) )
           |> assert_all
         in
