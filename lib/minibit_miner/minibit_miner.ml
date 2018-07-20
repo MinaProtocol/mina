@@ -118,10 +118,15 @@ struct
     let create ~state:(state, state_proof) ~ledger_builder ~transactions
         ~get_completed_work =
       let ( diff
-          , `Hash_after_applying (next_ledger_builder_hash, next_ledger_hash)
+          , `Hash_after_applying next_ledger_builder_hash
           , `Ledger_proof ledger_proof_opt ) =
         Ledger_builder.create_diff ledger_builder
           ~transactions_by_fee:transactions ~get_completed_work
+      in
+      let next_ledger_hash =
+        Option.value_map ledger_proof_opt
+          ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
+          ~default:state.State.ledger_hash
       in
       let hashing_result =
         Hashing_result.create state ~next_ledger_hash ~next_ledger_builder_hash
@@ -135,7 +140,7 @@ struct
               let transition =
                 { Internal_transition.ledger_hash= next_ledger_hash
                 ; ledger_builder_hash= next_ledger_builder_hash
-                ; ledger_proof= ledger_proof_opt
+                ; ledger_proof= Option.map ledger_proof_opt ~f:fst
                 ; ledger_builder_diff= Ledger_builder_diff.forget diff
                 ; timestamp= new_state.timestamp
                 ; nonce }
@@ -160,7 +165,7 @@ struct
 
   module Tip = struct
     type t =
-      { state: State.t * State.Proof.t
+      { state: State.t * State.Proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
       ; transactions: Transaction.With_valid_signature.t Sequence.t }
     [@@deriving sexp_of]

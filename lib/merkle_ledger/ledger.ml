@@ -260,7 +260,7 @@ struct
       ; dirty= tree.dirty
       ; syncing= false
       ; nodes_height= tree.nodes_height
-      ; nodes= tree.nodes
+      ; nodes= List.map tree.nodes ~f:Dyn_array.copy
       ; dirty_indices= tree.dirty_indices }
     in
     {accounts= Key.Table.copy t.accounts; tree= copy_tree t.tree}

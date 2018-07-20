@@ -265,7 +265,7 @@ end = struct
 
   module State = struct
     type t =
-      { mutable locked_ledger_builder: Ledger_builder.t
+      { mutable locked_tip: Tip.t
       ; mutable longest_branch_tip: Tip.t
       ; mutable ktree: Transition_tree.t option
       (* TODO: This impl assumes we have the original Ouroboros assumption. In
@@ -276,9 +276,7 @@ end = struct
     [@@deriving bin_io]
 
     let create (genesis_tip: Tip.t) : t =
-      { locked_ledger_builder= genesis_tip.ledger_builder
-      ; longest_branch_tip= genesis_tip
-      ; ktree= None }
+      {locked_tip= genesis_tip; longest_branch_tip= genesis_tip; ktree= None}
   end
 
   module Aux = struct
@@ -374,6 +372,9 @@ end = struct
     let ledger_builder_io = Net.create net in
     (* Here we effectfully listen to transitions and emit what we belive are
        the strongest ledger_builders *)
+    let strongest_ledgers_reader, strongest_ledgers_writer =
+      Linear_pipe.create ()
+    in
     let possibly_works =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.external_transitions ~f:(fun transition ->
@@ -382,7 +383,45 @@ end = struct
              see #301 *)
           | None ->
               state.ktree <- Some (Transition_tree.single transition) ;
-              return None
+              if
+                State_hash.equal
+                  (Inputs.State.hash state.locked_tip.state)
+                  (External_transition.previous_state_hash transition)
+              then (
+                let lb = Ledger_builder.copy state.locked_tip.ledger_builder in
+                match%map
+                  Step.step (lb, state.locked_tip.state) transition
+                with
+                | Ok next_state ->
+                    assert (
+                      Inputs.State.equal next_state
+                        (External_transition.target_state transition) ) ;
+                    state.longest_branch_tip
+                    <- { state= External_transition.target_state transition
+                       ; proof= External_transition.state_proof transition
+                       ; ledger_builder= lb } ;
+                    Linear_pipe.write_or_exn ~capacity:10
+                      strongest_ledgers_writer strongest_ledgers_reader
+                      (lb, transition) ;
+                    None
+                | Error e ->
+                    (* TODO: Punish *)
+                    Logger.error log
+                      !"Initial transition was bad: %{sexp:Error.t}"
+                      e ;
+                    None )
+              else
+                let best_tip = state.locked_tip in
+                if
+                  Strength.( > )
+                    (External_transition.strength transition)
+                    (Inputs.State.strength best_tip.state)
+                then
+                  return
+                    (Some
+                       ( `Sync transition
+                       , External_transition.ledger_hash transition ))
+                else return None
           | Some old_tree ->
               let p_eq_previous_state_hash (w: External_transition.t) =
                 State_hash.equal
@@ -395,11 +434,11 @@ end = struct
                   ~parent:p_eq_previous_state_hash
               with
               | `No_parent ->
-                  let best_tip t = locked_and_best t |> snd in
+                  let best_tip = locked_and_best old_tree |> snd in
                   if
                     Strength.( > )
                       (External_transition.strength transition)
-                      (External_transition.strength (best_tip old_tree))
+                      (External_transition.strength best_tip)
                   then
                     return
                       (Some
@@ -418,7 +457,7 @@ end = struct
                     if External_transition.equal old_locked_head new_head then
                       return ()
                     else
-                      let lb = state.locked_ledger_builder in
+                      let lb = state.locked_tip.ledger_builder in
                       let%map () = force_apply_transitions lb [new_head] in
                       assert_valid_state new_head lb
                   in
@@ -439,9 +478,6 @@ end = struct
           let%map () = d in
           (Some w', acc') )
       >>| ignore
-    in
-    let strongest_ledgers_reader, strongest_ledgers_writer =
-      Linear_pipe.create ()
     in
     (* Perform the `Sync interruptible work *)
     let do_sync sl_ref sl transition =
@@ -467,7 +503,10 @@ end = struct
             | Ok lb ->
                 let new_tree = Transition_tree.single transition in
                 state.ktree <- Some new_tree ;
-                state.locked_ledger_builder <- lb ;
+                state.locked_tip
+                <- { ledger_builder= lb
+                   ; state= External_transition.target_state transition
+                   ; proof= External_transition.state_proof transition } ;
                 Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
                   strongest_ledgers_reader (lb, transition) ;
                 Option.iter !sl_ref ~f:Sync_ledger.destroy ;
@@ -497,7 +536,7 @@ end = struct
           Path.findi new_best_path ~f:(fun i tip -> is_lb_hash_curr_tip tip)
         with
         | None ->
-            (Ledger_builder.copy state.locked_ledger_builder, new_best_path)
+            (Ledger_builder.copy state.locked_tip.ledger_builder, new_best_path)
         | Some (i, _) ->
             ( Ledger_builder.copy state.longest_branch_tip.ledger_builder
             , Path.drop new_best_path i )
@@ -547,7 +586,7 @@ end = struct
               match !sl_ref with
               | None ->
                   let ledger =
-                    Ledger_builder.ledger state.locked_ledger_builder
+                    Ledger_builder.ledger state.locked_tip.ledger_builder
                     |> Ledger.copy
                   in
                   let sl = Sync_ledger.create ledger h in
@@ -595,7 +634,7 @@ end = struct
     in
     Option.map t.state.ktree ~f:(fun tree ->
         (* First let's see if we have an easy case *)
-        let locked = t.state.locked_ledger_builder in
+        let locked = t.state.locked_tip.ledger_builder in
         let tip = t.state.longest_branch_tip in
         let attempt_easy w err_msg_name =
           match find_state tree (Ledger_builder.hash w) with
@@ -622,7 +661,7 @@ end = struct
               ~f:Path.of_tree_path
           with
           | Some path ->
-              let lb_start = t.state.locked_ledger_builder in
+              let lb_start = t.state.locked_tip.ledger_builder in
               assert_valid_state' (Path.source path) lb_start ;
               let lb = Ledger_builder.copy lb_start in
               (* Fast-forward the lb *)

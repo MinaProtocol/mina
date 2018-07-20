@@ -179,6 +179,8 @@ module type Super_transaction_intf = sig
 end
 
 module type Ledger_proof_intf = sig
+  type ledger_hash
+
   type statement
 
   type message
@@ -186,6 +188,8 @@ module type Ledger_proof_intf = sig
   type t
 
   val verify : t -> statement -> message:message -> bool Deferred.t
+
+  val statement_target : statement -> ledger_hash
 end
 
 module type Completed_work_intf = sig
@@ -315,8 +319,8 @@ module type Ledger_builder_intf = sig
     -> transactions_by_fee:transaction_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
-       * [`Hash_after_applying of ledger_builder_hash * ledger_hash]
-       * [`Ledger_proof of ledger_proof option]
+       * [`Hash_after_applying of ledger_builder_hash]
+       * [`Ledger_proof of (ledger_proof * ledger_proof_statement) option]
 
   module Aux : sig
     type t [@@deriving bin_io]
@@ -555,6 +559,7 @@ module type Inputs_intf = sig
   module Ledger_proof :
     Ledger_proof_intf
     with type message := Fee.Unsigned.t * Public_key.Compressed.t
+     and type ledger_hash := Ledger_hash.t
 
   module Ledger :
     Ledger_intf

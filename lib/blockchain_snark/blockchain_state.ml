@@ -110,18 +110,21 @@ end
 
 module Make_update (T : Transaction_snark.Verification.S) = struct
   let update state (block: Block.t) =
-    let good_body =
+    let open Or_error.Let_syntax in
+    let%bind () =
       match block.body.proof with
-      | None -> Ledger_hash.equal state.ledger_hash block.body.target_hash
+      | None ->
+          check
+            (Ledger_hash.equal state.ledger_hash block.body.target_hash)
+            "Body proof was none but tried to update ledger hash"
       | Some proof ->
-          Ledger_hash.equal state.ledger_hash block.body.target_hash
-          || T.verify
+          check
+            (T.verify
                (Transaction_snark.create ~source:state.ledger_hash
                   ~target:block.body.target_hash ~proof_type:`Merge
-                  ~fee_excess:Currency.Amount.Signed.zero ~proof)
+                  ~fee_excess:Currency.Amount.Signed.zero ~proof))
+            "Proof did not verify"
     in
-    let open Or_error.Let_syntax in
-    let%bind () = check good_body "Bad body" in
     let next_state = update_unchecked state block in
     let%map () =
       let%bind proof_of_work =
