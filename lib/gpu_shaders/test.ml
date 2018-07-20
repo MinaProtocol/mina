@@ -14,7 +14,7 @@ let program =
       let%bind x = constant (Scalar Scalar.Uint32) (UInt32.of_int 2) in
       let%bind y = constant (Scalar Scalar.Uint32) (UInt32.of_int 5) in
       let%bind r = add_ignore_overflow x y "r" in
-      Pure ())
+      Pure void)
 
 let () =
   assert (Array.length Sys.argv >= 2);

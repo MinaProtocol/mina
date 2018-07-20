@@ -30,8 +30,9 @@ module Value = struct
     | Array Bool -> [%sexp_of: bool array] x
     | Struct spec -> [%sexp_of: unit sexp_opaque] () (* TODO: Sexp.List (sexp_of_struct spec x) *)
     | Function _ -> [%sexp_of: unit sexp_opaque] ()
-    | Type -> [%sexp_of: unit sexp_opaque] ()
-    | Label -> [%sexp_of: unit sexp_opaque] ()
+    | Type -> Sexp.of_string "Type"
+    | Label -> Sexp.of_string "Label"
+    | Void -> Sexp.of_string "Void"
 
   let conv : type a. t -> a Type.t -> a option =
     fun (T (typ0, x)) typ1 ->
@@ -263,7 +264,6 @@ let rec eval : type a. State.t -> a T.t -> State.t * a =
       let loc = Location.create () in
       let s = State.set_exn s id (Pointer loc) in
       eval s (k id)
-    | Phi (_, k) -> eval s (k ())
     | For { range=(a, b); body; after } ->
       let a = Unsigned.UInt32.to_int (State.get_exn s a) in
       let b = Unsigned.UInt32.to_int (State.get_exn s b) in
@@ -274,7 +274,7 @@ let rec eval : type a. State.t -> a T.t -> State.t * a =
         then eval s0 (after ())
         else
           let s_in_body = State.set_exn s0 id (Unsigned.UInt32.of_int i) in
-          let (s, ()) = eval s_in_body (body id) in
+          let (s, _) = eval s_in_body (body id) in
           go { s with bindings = s0.bindings } (i + 1)
       in
       go s a
@@ -286,11 +286,12 @@ let rec eval : type a. State.t -> a T.t -> State.t * a =
       eval s (k id)
     | If { cond; then_; else_; after } ->
       let cond = State.get_exn s cond in
-      eval s (after (if cond then then_ else else_))
+      let (s, value) = (if cond then eval s (then_ ()) else eval s (else_ ())) in
+      eval s (after value)
     | Do_if { cond; then_; after } ->
       let cond = State.get_exn s cond in
       if cond
       then
-        let (s, ()) = eval s then_ in
+        let (s, _) = eval s (then_ ()) in
         eval s (after ())
       else eval s (after ())

@@ -87,7 +87,6 @@ module Type = struct
     | (::) : 'a t * 'b list -> ('a * 'b) list
 
   type 'b mapper = { f : 'a. 'a t -> 'b }
-
   let rec map : type a. a list -> 'b mapper -> 'b List.t =
     fun ls mapper ->
       match ls with
@@ -121,12 +120,20 @@ module Type = struct
     module Table = Hashtbl.Make(T)
   end
 
+  let is_void : type a. a t -> bool = function
+    | Void -> true
+    | _ -> false
+
   let fst : type a b. (a * b) t -> a t = function
     | Tuple2 (x,_) -> Scalar x
     | _ -> assert false
 
   let snd : type a b. (a * b) t -> b t = function
     | Tuple2 (x, y) -> Scalar y
+    | _ -> assert false
+
+  let function_return_type : type args rt. (args list, rt) Function.t t -> rt t = function
+    | Function (_, rt) -> rt
     | _ -> assert false
 
   let pointer_elt : type a. a Pointer.t t -> a t = function
@@ -166,6 +173,17 @@ end
 module Id = struct
   type 'a t =
     | Id : 'a Type.t * string * int -> 'a t
+
+  type _ list =
+    | [] : unit list
+    | (::) : 'a t * 'b list -> ('a * 'b) list
+
+  type 'b mapper = { f : 'a. 'a t -> 'b }
+  let rec map : type a. a list -> 'b mapper -> 'b List.t =
+    fun ls mapper ->
+      match ls with
+        | [] -> []
+        | h :: t -> List.cons (mapper.f h) (map t mapper)
 
   let sexp_of_t (Id (_, name, value)) =
     Sexp.List [ Atom "Id"; List [Atom "<opaque>"; Atom name; Atom (string_of_int value)]]
@@ -302,14 +320,14 @@ module T = struct
     | Declare_function
       : string
         * ('types, 'args, 'f, 'g) Arguments_spec.t
-        * ('vars, 'g, 'ret t) Local_variables_spec.t
+        * ('vars, 'g, 'ret Id.t t) Local_variables_spec.t
         * 'ret Type.t
         * 'f
         * (('types Type.list, 'ret) Function.t Id.t -> 'a t)
         -> 'a t
     | Call_function
-      : ('args, 'ret) Function.t Id.t
-        * 'args PolyTuple.t
+      : ('args Type.list, 'ret) Function.t Id.t
+        * 'args Id.list
         * ('ret Id.t -> 'a t)
       -> 'a t
     | Create_pointer
@@ -322,20 +340,19 @@ module T = struct
     | For of
         { var_ptr : uint32 Pointer.t Id.t
         ; range: uint32 Id.t * uint32 Id.t
-        ; body : uint32 Id.t -> unit t
+        ; body : uint32 Id.t -> unit Id.t t
         ; after : unit -> 'a t
         }
-    | Phi of string list * (unit -> 'a t)
     | Do_if :
         { cond : bool Id.t
-        ; then_ : unit t
+        ; then_ : (unit -> unit Id.t t)
         ; after : (unit -> 'a t)
         }
         -> 'a t
     | If :
         { cond : bool Id.t
-        ; then_ : 'b Id.t
-        ; else_ : 'b Id.t
+        ; then_ : (unit -> 'b Id.t t)
+        ; else_ : (unit -> 'b Id.t t)
         ; after : ('b Id.t -> 'a t)
         }
         -> 'a t
@@ -359,7 +376,6 @@ module T = struct
     | Value_op (op, k) -> Value_op (op, fun v -> map (k v) ~f)
     | For { var_ptr; range; body; after } ->
       For { var_ptr; range; body; after = fun ctx -> map (after ctx) ~f }
-    | Phi (vs, k) -> Phi (vs, fun () -> map (k ()) ~f)
     | If { cond; then_; else_; after } ->
       If { cond; then_; else_; after = fun v -> map (after v) ~f }
     | Do_if { cond; then_; after } ->
@@ -384,7 +400,6 @@ module T = struct
       | Value_op (op, k) -> Value_op (op, fun v -> bind (k v) ~f)
       | For { var_ptr; range; body; after } ->
         For { var_ptr; range; body; after = fun ctx -> bind (after ctx) ~f }
-      | Phi (vs, k) -> Phi (vs, fun () -> bind (k ()) ~f)
       | If { cond; then_; else_; after } ->
         If { cond; then_; else_; after = fun v -> bind (after v) ~f }
       | Do_if { cond; then_; after } ->
@@ -400,6 +415,8 @@ end)
 
 include T
 open Let_syntax
+
+let void = Id.Id (Type.Void, "void", 0)
 
 let for_ var_ptr range body = For { var_ptr; range; body; after = fun _ -> return () }
 let if_ cond ~then_ ~else_ = If { cond; then_; else_; after = fun v -> return v }

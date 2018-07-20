@@ -22,7 +22,7 @@ module type Program_intf = sig
 
   val push_op : SpirV.op -> unit
   val push_block : branch:Spirv_module.branch -> next_label:SpirV.id -> unit
-  val define_function : string -> ('types, 'args, 'f, 'g) Arguments_spec.t -> ('vars, 'g, 'h) Local_variables_spec.t -> 'ret Type.t -> 'f -> f:('h -> unit) -> ('types Type.list, 'ret) Function.t Id.t
+  val define_function : string -> ('types, 'args, 'f, 'g) Arguments_spec.t -> ('vars, 'g, 'h Id.t Dsl.t) Local_variables_spec.t -> 'ret Type.t -> 'f -> f:('h Id.t Dsl.t -> 'ret Id.t) -> ('types Type.list, 'ret) Function.t Id.t
 
   val extract : unit -> Spirv_module.t
 end
@@ -90,52 +90,54 @@ module MakeProgram(Unit : sig end) : Program_intf = struct
     curr_block_label := next_label;
     curr_block_ops := []
 
-  let define_function name args vars return_type body ~f =
-    assert (not !defining_function);
-    defining_function := true;
+  let define_function : type types args vars f g h ret. string -> (types, args, f, g) Arguments_spec.t -> (vars, g, h Id.t Dsl.t) Local_variables_spec.t -> ret Type.t -> f -> f:(h Id.t Dsl.t -> ret Id.t) -> (types Type.list, ret) Function.t Id.t =
+    fun name args vars return_type body ~f ->
+      assert (not !defining_function);
+      defining_function := true;
 
-    let (arg_types, arg_ids, body_with_args) = Arguments_spec.(apply args { generate = fun t -> gen_id t (name ^ "_arg_0") } body) in
-    let (var_ids, applied_body) = Local_variables_spec.(apply vars { generate = fun t -> gen_id (Type.Pointer t) (name ^ "_var_0") } body_with_args) in
+      let (arg_types, arg_ids, body_with_args) = Arguments_spec.(apply args { generate = fun t -> gen_id t (name ^ "_arg_0") } body) in
+      let (var_ids, applied_body) = Local_variables_spec.(apply vars { generate = fun t -> gen_id (Type.Pointer t) (name ^ "_var_0") } body_with_args) in
 
-    let function_parameters = Arguments_spec.(map_ids args arg_ids { map_id = fun id ->
-      Spirv_module.(
-        { function_parameter_type = !^(register_type (Id.typ id))
-        ; function_parameter_id = !^id }) })
-    in
-    let function_variables = Local_variables_spec.(map_ids vars var_ids { map_id = fun id ->
-      Spirv_module.(
-        { variable_type = !^(register_type (Id.typ id))
-        ; variable_id = !^id
-        ; variable_storage_class = SpirV.StorageClassFunction
-        ; variable_initializer = None }) })
-    in
+      let function_parameters = Arguments_spec.(map_ids args arg_ids { map_id = fun id ->
+        Spirv_module.(
+          { function_parameter_type = !^(register_type (Id.typ id))
+          ; function_parameter_id = !^id }) })
+      in
+      let function_variables = Local_variables_spec.(map_ids vars var_ids { map_id = fun id ->
+        Spirv_module.(
+          { variable_type = !^(register_type (Id.typ id))
+          ; variable_id = !^id
+          ; variable_storage_class = SpirV.StorageClassFunction
+          ; variable_initializer = None }) })
+      in
 
-    let return_type_id = register_type return_type in
-    let type_ = Type.Function (arg_types, return_type) in
-    let type_id = register_type type_ in
-    let id = gen_id type_ name in
+      let return_type_id = register_type return_type in
+      let type_ = Type.Function (arg_types, return_type) in
+      let type_id = register_type type_ in
+      let id = gen_id type_ name in
 
-    blocks := [];
-    curr_block_label := !^(gen_id Type.Label "fn_start");
-    curr_block_ops := [];
+      blocks := [];
+      curr_block_label := !^(gen_id Type.Label "fn_start");
+      curr_block_ops := [];
 
-    f applied_body;
-    push_block ~branch:Return ~next_label:!^(gen_id Type.Label "fn_start");
+      let return_id = f applied_body in
+      let branch = if Type.is_void (Id.typ return_id) then Spirv_module.Return else Spirv_module.ReturnValue !^return_id in
+      push_block ~branch ~next_label:!^(gen_id Type.Label "fn_start");
 
-    let fn = Spirv_module.(
-      { function_return_type = !^return_type_id
-      ; function_id = !^id
-      ; function_control = []
-      ; function_type = !^type_id
-      ; function_parameters
-      ; function_variables
-      ; function_body = List.rev !blocks })
-    in
-    (if Hashtbl.add function_table ~key:name ~data:fn = `Duplicate then
-      failwith (Printf.sprintf "function with name %s already exists" name));
+      let fn = Spirv_module.(
+        { function_return_type = !^return_type_id
+        ; function_id = !^id
+        ; function_control = []
+        ; function_type = !^type_id
+        ; function_parameters
+        ; function_variables
+        ; function_body = List.rev !blocks })
+      in
+      (if Hashtbl.add function_table ~key:name ~data:fn = `Duplicate then
+        failwith (Printf.sprintf "function with name %s already exists" name));
 
-    defining_function := false;
-    id
+      defining_function := false;
+      id
 
   let rec spirv_type_value : Type.Enum.t -> Spirv_module.spirv_type =
     let open Spirv_module in
@@ -199,10 +201,23 @@ module MakeCompiler(Program : Program_intf) = struct
     in
 
     match op.op with
-      | Or (x, y) -> f x y (Scalar Scalar.Bool) (fun t r -> `OpLogicalOr (!^t, !^r, !^x, !^y))
-      | Add (x, y) -> f x y Arith_result (fun t r -> `OpIAddCarry (!^t, !^r, !^x, !^y))
-      | Add_ignore_overflow (x, y) -> f x y (Scalar Scalar.Uint32) (fun t r -> `OpIAdd (!^t, !^r, !^x, !^y))
-      | _ -> failwith "compile_value_op not fully implemented"
+      | Or (x, y)                   -> f x y (Scalar Scalar.Bool) (fun t r -> `OpLogicalOr (!^t, !^r, !^x, !^y))
+      | Add (x, y)                  -> f x y Arith_result (fun t r -> `OpIAddCarry (!^t, !^r, !^x, !^y))
+      | Add_ignore_overflow (x, y)  -> f x y (Scalar Scalar.Uint32) (fun t r -> `OpIAdd (!^t, !^r, !^x, !^y))
+      | Sub (x, y)                  -> f x y Arith_result (fun t r -> `OpISubBorrow (!^t, !^r, !^x, !^y))
+      | Sub_ignore_overflow (x, y)  -> f x y (Scalar Scalar.Uint32) (fun t r -> `OpISub (!^t, !^r, !^x, !^y))
+      | Mul (x, y)                  -> f x y Arith_result (fun t r -> `OpUMulExtended (!^t, !^r, !^x, !^y))
+      | Mul_ignore_overflow (x, y)  -> f x y (Scalar Scalar.Uint32) (fun t r -> `OpIMul (!^t, !^r, !^x, !^y))
+      | Div_ignore_remainder (x, y) -> f x y (Scalar Scalar.Uint32) (fun t r -> `OpUDiv (!^t, !^r, !^x, !^y))
+      | Bitwise_or (x, y)           -> f x y (Scalar Scalar.Uint32) (fun t r -> `OpBitwiseOr (!^t, !^r, !^x, !^y))
+      | Less_than (x, y)            -> f x y (Scalar Scalar.Bool) (fun t r -> `OpULessThan (!^t, !^r, !^x, !^y))
+      | Equal (x, y)                -> f x y (Scalar Scalar.Bool) (fun t r -> `OpIEqual (!^t, !^r, !^x, !^y))
+      | Array_get (a, i)            -> failwith "Array_get: unimplemented"
+      | Struct_access (s, i)        -> failwith "Struct_access: unimplemented"
+      | Fst p                       -> failwith "Fst: unimplemented"
+      | Snd p                       -> failwith "Snd: unimplemented"
+      | High_bits ar                -> failwith "High_bits: unimplemented"
+      | Low_bits ar                 -> failwith "Low_bits: unimplmented"
 
   let compile_action_op =
     let open Op.Action in
@@ -210,7 +225,7 @@ module MakeCompiler(Program : Program_intf) = struct
       | Array_set _ -> failwith "Op.Action.Array_set: unimplemented"
       | Store (ptr, value) -> push_op (`OpStore (!^ptr, !^value, None))
 
-  let rec compile : type a. a Dsl.t -> unit = function
+  let rec compile : type a. a Id.t Dsl.t -> a Id.t = function
     | Declare_function (name, args, vars, return_type, body, continuation) ->
         let id = define_function name args vars return_type body ~f:compile in
         compile (continuation id)
@@ -228,8 +243,13 @@ module MakeCompiler(Program : Program_intf) = struct
     | Create_pointer _ ->
         failwith "Create_pointer: unimplemented"
 
-    | Call_function _ ->
-        failwith "Call_function: unimplemented"
+    | Call_function (fn, arg_ids, continuation) ->
+        let return_type = Type.function_return_type (Id.typ fn) in
+        let return_type_id = register_type return_type in
+        let return_id = gen_id return_type "fn_return" in
+        let arg_id_values = Id.(map arg_ids { f = fun id -> !^id }) in
+        push_op (`OpFunctionCall (!^return_type_id, !^return_id, !^fn, arg_id_values));
+        compile (continuation return_id)
 
     | Value_op (op, continuation) ->
         compile (continuation (compile_value_op op))
@@ -246,30 +266,39 @@ module MakeCompiler(Program : Program_intf) = struct
           ~branch:(BranchConditional (!^cond, !^then_label, !^after_label))
           ~next_label:!^then_label;
 
-        compile then_;
+        ignore (compile (then_ ()));
         push_block
           ~branch:(Branch !^after_label)
           ~next_label:!^after_label;
 
         compile (after ())
 
-  | If _ ->
-      failwith "If: unimplemented"
 
-  (*
-    | If { cond; then_; after } ->
+    | If { cond; then_; else_; after } ->
         let then_label = gen_id Type.Label "if_then" in
+        let else_label = gen_id Type.Label "if_else" in
         let after_label = gen_id Type.Label "if_after" in
 
         push_block
-          ~branch:(BranchConditional (!^cond, !^then_label, !^after_label))
+          ~branch:(BranchConditional (!^cond, !^then_label, !^else_label))
           ~next_label:!^then_label;
 
-        then_;
+        let then_id = compile (then_ ()) in
+        push_block
+          ~branch:(Branch !^after_label)
+          ~next_label:!^else_label;
+
+        let else_id = compile (else_ ()) in
         push_block
           ~branch:(Branch !^after_label)
           ~next_label:!^after_label;
-   *)
+
+        let type_ = Id.typ then_id in
+        let type_id = register_type type_ in
+        let phi_id = gen_id type_ "phi" in
+        push_op (`OpPhi (!^type_id, !^phi_id, [(!^then_id, !^then_label); (!^else_id, !^else_label)]));
+
+        compile (after phi_id)
 
     | For { var_ptr; range = (low, high); body; after } ->
         let var_type = Type.pointer_elt (Id.typ var_ptr) in
@@ -303,7 +332,7 @@ module MakeCompiler(Program : Program_intf) = struct
           ~branch:(BranchConditional (!^cond, !^body_label, !^after_label))
           ~next_label:!^after_label;
 
-        compile (body var_0);
+        ignore (compile (body var_0));
         push_block
           ~branch:(Branch !^continue_label)
           ~next_label:!^continue_label;
@@ -318,15 +347,14 @@ module MakeCompiler(Program : Program_intf) = struct
 
     | Set_prefix _ ->
         failwith "Set_prefix: unimplemented"
-    | Phi _ ->
-        failwith "Phi: unimplemented"
-    | Pure _ ->
-        ()
+
+    | Pure x ->
+        x
 end
 
 let compile dsl out_file =
   let module Compiler = MakeCompiler(MakeProgram(struct end)) in
-  Compiler.compile dsl;
+  ignore (Compiler.compile dsl);
   let ops = Spirv_module.compile (Compiler.Program.extract ()) in
   let words = SpirV.compile_to_words ops in
 
