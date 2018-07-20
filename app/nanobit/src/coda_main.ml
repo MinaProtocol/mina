@@ -189,6 +189,9 @@ struct
     include Ledger_proof
 
     type statement = Transaction_snark.Statement.t
+
+    let statement_target (t: Transaction_snark.Statement.t) =
+      t.target
   end
 
   module Completed_work = struct
@@ -570,7 +573,8 @@ struct
           let open Deferred.Or_error.Let_syntax in
           let%bind bc_good =
             Verifier.verify_blockchain Init.verifier
-              {proof= state_proof; state= State.to_blockchain_state new_state}
+              { proof= state_proof
+              ; state= State.to_blockchain_state new_state }
           and ledger_hash =
             match%map Ledger_builder.apply lb ledger_builder_diff with
             | Some (h, _) -> h
@@ -780,7 +784,6 @@ module Run (Program : Main_intf) = struct
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    Core.printf !"Ledger: %{sexp:Ledger.t}\n%!" ledger ;
     let%map account = Ledger.get ledger addr in
     account.Account.balance
 

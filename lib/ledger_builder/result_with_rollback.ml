@@ -38,7 +38,12 @@ include T
 include Monad.Make (T)
 
 let run t =
-  Deferred.map t ~f:(fun {result; rollback} -> Rollback.run rollback ; result)
+  Deferred.map t ~f:(fun {result; rollback} ->
+    begin match result with
+    | Error _ ->  Rollback.run rollback 
+    | Ok _ -> ()
+    end;
+    result)
 
 let error e = Deferred.return {result= Error e; rollback= Do_nothing}
 

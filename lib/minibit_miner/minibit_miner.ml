@@ -118,13 +118,20 @@ struct
     let create ~state:(state, state_proof) ~ledger_builder ~transactions
         ~get_completed_work =
       let ( diff
-          , `Hash_after_applying (next_ledger_builder_hash, next_ledger_hash)
+          , `Hash_after_applying next_ledger_builder_hash
           , `Ledger_proof ledger_proof_opt ) =
         Ledger_builder.create_diff ledger_builder
           ~transactions_by_fee:transactions ~get_completed_work
       in
+      let next_ledger_hash =
+        Option.value_map ledger_proof_opt
+          ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
+          ~default:state.State.ledger_hash
+      in
+      Core.printf "Diff created\n%!";
       let hashing_result =
-        Hashing_result.create state ~next_ledger_hash ~next_ledger_builder_hash
+        Hashing_result.create state
+          ~next_ledger_hash ~next_ledger_builder_hash
       in
       let cancellation = Ivar.create () in
       (* Someday: If bundle finishes first you can stuff more transactions in the bundle *)
@@ -132,10 +139,11 @@ struct
         let result =
           match%bind Hashing_result.result hashing_result with
           | `Ok (new_state, nonce) ->
+        Core.printf "Hasning finishig\n%!";
               let transition =
                 { Internal_transition.ledger_hash= next_ledger_hash
                 ; ledger_builder_hash= next_ledger_builder_hash
-                ; ledger_proof= ledger_proof_opt
+                ; ledger_proof=Option.map ledger_proof_opt ~f:fst
                 ; ledger_builder_diff= Ledger_builder_diff.forget diff
                 ; timestamp= new_state.timestamp
                 ; nonce }
@@ -144,6 +152,7 @@ struct
               let%map state_proof =
                 Prover.prove ~prev_state:(state, state_proof) transition
               in
+                Core.printf "Diff created\n%!";
               { External_transition.state_proof
               ; state= new_state
               ; ledger_builder_diff= Ledger_builder_diff.forget diff }
@@ -179,8 +188,11 @@ struct
     let logger = Logger.extend parent_log [("module", Atom __MODULE__)] in
     let r, w = Linear_pipe.create () in
     let write_result = function
-      | Ok t -> Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
+      | Ok t ->
+        Core.printf "Writing result\n%!";
+        Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
       | Error e ->
+        Core.printf "error result\n%!";
           Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
     in
     let create_result {Tip.state; transactions; ledger_builder} =

@@ -261,7 +261,9 @@ end = struct
       | [] ->
           Deferred.return
             { Result_with_rollback.result= Ok (List.rev acc)
-            ; rollback= Call (fun () -> undo_transactions processed) }
+            ; rollback= Call (fun () ->
+                Core.printf "Called!\n%!";
+                undo_transactions processed) }
       | t :: ts ->
         match apply_super_transaction_and_get_witness ledger t with
         | Error e ->
@@ -332,8 +334,11 @@ end = struct
     in
     let completed_works = diff.completed_works in
     let%bind () =
-      check "bad hash"
-        (not (Ledger_builder_hash.equal diff.prev_hash (hash t)))
+      let curr_hash = hash t in
+      check
+        (sprintf !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got %{sexp:Ledger_builder_hash.t}"
+           curr_hash diff.prev_hash)
+        (Ledger_builder_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
     let%bind delta =
@@ -366,7 +371,18 @@ end = struct
     in
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
-  let apply t witness = Result_with_rollback.run (apply_diff t witness)
+  let apply t witness =
+    for i = 1 to 10 do
+                 Core.printf "Apply called\n%!"
+    done;
+  Core.printf !"Hash before = %{sexp:Ledger_builder_hash.t}\n%!" (hash t);
+
+    let r = Result_with_rollback.run (apply_diff t witness) in
+  Deferred.map r ~f:(fun r ->
+  Core.printf !"Hash after = %{sexp:Ledger_builder_hash.t}\n%!" (hash t);
+  (match r with
+   | Ok _ -> Core.printf "It worked!\n%!"
+   | Error _ -> Core.printf "It failed!\n%!"); r)
 
   let apply_diff_unchecked t
       (diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
@@ -392,7 +408,16 @@ end = struct
     in
     Or_error.ok_exn
       (Parallel_scan.enqueue_data ~state:t.scan_state ~data:new_data) ;
-    Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
+    res_opt
+
+  let apply_diff_unchecked t diff =
+    for i = 1 to 10 do Core.printf "Apply unchecked called!\n%!" done;
+    Core.printf !"Hash before: %{sexp:Ledger_builder_hash.t}\n%!"
+      (hash t);
+    let r = apply_diff_unchecked t diff in
+    Core.printf !"Hash after: %{sexp:Ledger_builder_hash.t}\n%!"
+      (hash t);
+    r
 
   let free_space t : int = Parallel_scan.free_space t.scan_state
 
@@ -509,6 +534,7 @@ end = struct
          Completed_work.Statement.t -> Completed_work.Checked.t option) =
     (* TODO: Don't copy *)
     let t = copy t in
+    let curr_hash = hash t in
     let ledger = ledger t in
     let or_error = function Ok x -> `Ok x | Error e -> `Error e in
     let add_work resources work_to_do =
@@ -575,11 +601,11 @@ end = struct
           List.rev resources.transactions
       ; completed_works= List.rev resources.completed_works
       ; creator= t.public_key
-      ; prev_hash= hash t }
+      ; prev_hash= curr_hash }
     in
     let ledger_proof = apply_diff_unchecked t diff in
     ( diff
-    , `Hash_after_applying (hash t, Ledger.merkle_root t.ledger)
+    , `Hash_after_applying (hash t)
     , `Ledger_proof ledger_proof )
 end
 

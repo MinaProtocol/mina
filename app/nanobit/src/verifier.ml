@@ -6,6 +6,18 @@ open Blockchain_snark
 open Cli_lib
 open Snark_params
 
+module type S = sig
+  type t
+
+  val create : conf_dir:string -> t Deferred.t
+
+  val verify_blockchain :
+    t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
+
+  val verify_transaction_snark :
+    t -> Transaction_snark.t -> bool Or_error.t Deferred.t
+end
+
 module Worker_state = struct
   module type S = sig
     val verify_wrap : Blockchain_state.t -> Tock.Proof.t -> bool
