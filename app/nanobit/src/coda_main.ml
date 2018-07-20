@@ -348,6 +348,14 @@ struct
   end
 
   module Transaction_pool_diff = Transaction_pool.Pool.Diff
+
+  module Tip = struct
+    type t =
+      {state: State.t; proof: State.Proof.t; ledger_builder: Ledger_builder.t}
+    [@@deriving bin_io, sexp]
+  end
+
+  let fee_public_key = Init.fee_public_key
 end
 
 module Make_inputs (Ledger_proof0 : sig
@@ -516,6 +524,7 @@ struct
 
   module Ledger_builder_controller = struct
     module Inputs = struct
+      module Tip = Tip
       module Store = Store
       module Snark_pool = Snark_pool
 
@@ -604,14 +613,8 @@ struct
     end
   end)
 
-  let request_work ~snark_pool ~best_ledger_builder t =
-    let option s =
-      Option.value_map ~f:Or_error.return ~default:(Or_error.error_string s)
-    in
-    let open Or_error.Let_syntax in
-    (* TODO: Perhaps we should really be looking in ALL of the lbs rather than
-        the best one. *)
-    let%map lb = best_ledger_builder t |> option "no best ledger builder" in
+  let request_work ~best_ledger_builder t =
+    let lb = best_ledger_builder t in
     let instances = Ledger_builder.random_work_spec_chunk lb in
     {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
 end
@@ -633,7 +636,7 @@ struct
 
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
-  let request_work = Inputs.request_work ~snark_pool ~best_ledger_builder
+  let request_work = Inputs.request_work ~best_ledger_builder
 end
 
 module Coda_without_snark (Init : Init_intf) () = struct
@@ -648,7 +651,7 @@ module Coda_without_snark (Init : Init_intf) () = struct
 
   include Coda.Make (Inputs)
 
-  let request_work = Inputs.request_work ~snark_pool ~best_ledger_builder
+  let request_work = Inputs.request_work ~best_ledger_builder
 
   let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
@@ -656,7 +659,7 @@ end
 module type Main_intf = sig
   module Inputs : sig
     module Ledger : sig
-      type t
+      type t [@@deriving sexp]
 
       val copy : t -> t
 
@@ -744,9 +747,9 @@ module type Main_intf = sig
 
   type t
 
-  val request_work : t -> Inputs.Snark_worker.Work.Spec.t Or_error.t
+  val request_work : t -> Inputs.Snark_worker.Work.Spec.t
 
-  val best_ledger : t -> Inputs.Ledger.t option
+  val best_ledger : t -> Inputs.Ledger.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
@@ -763,7 +766,7 @@ module Run (Program : Main_intf) = struct
 
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
-    let%bind ledger = best_ledger t in
+    let ledger = best_ledger t in
     let%map account = Ledger.get ledger addr in
     account.Account.balance
 
@@ -780,15 +783,16 @@ module Run (Program : Main_intf) = struct
     let open Deferred.Let_syntax in
     assert (is_valid_transaction t txn) ;
     let txn_pool = transaction_pool t in
-    let%map () = Transaction_pool.add txn_pool txn in
+    don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
-      txn
+      txn ;
+    Deferred.unit
 
   let get_nonce t (addr: Public_key.Compressed.t) =
     let maybe_nonce =
       let open Option.Let_syntax in
-      let%bind ledger = best_ledger t in
+      let ledger = best_ledger t in
       let%map account = Ledger.get ledger addr in
       account.Account.nonce
     in

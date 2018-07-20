@@ -71,8 +71,7 @@ struct
       in
       match%bind Rpc.Rpc.dispatch Rpcs.Get_work.rpc conn () with
       | Error e -> log_and_retry "getting work" e
-      | Ok (Error e) -> log_and_retry ~sec:5. "getting work" e
-      | Ok (Ok work) ->
+      | Ok work ->
         match perform state public_key work with
         | Error e -> log_and_retry "performing work" e
         | Ok result ->
