@@ -36,6 +36,7 @@ module type S = sig
     include Coda_pow.Ledger_proof_intf
             with type statement := Ledger_proof_statement.t
              and type message := Fee.Unsigned.t * Public_key.t
+             and type ledger_hash := Ledger_hash.t
 
     include Binable.S with type t := t
 

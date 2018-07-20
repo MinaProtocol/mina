@@ -189,6 +189,8 @@ struct
     include Ledger_proof
 
     type statement = Transaction_snark.Statement.t
+
+    let statement_target (t: Transaction_snark.Statement.t) = t.target
   end
 
   module Completed_work = struct

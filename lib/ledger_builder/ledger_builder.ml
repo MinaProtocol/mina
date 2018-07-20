@@ -325,8 +325,13 @@ end = struct
     in
     let completed_works = diff.completed_works in
     let%bind () =
-      check "bad hash"
-        (not (Ledger_builder_hash.equal diff.prev_hash (hash t)))
+      let curr_hash = hash t in
+      check
+        (sprintf
+           !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got \
+             %{sexp:Ledger_builder_hash.t}"
+           curr_hash diff.prev_hash)
+        (Ledger_builder_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
     let%bind delta =
@@ -385,7 +390,7 @@ end = struct
     in
     Or_error.ok_exn
       (Parallel_scan.enqueue_data ~state:t.scan_state ~data:new_data) ;
-    Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
+    res_opt
 
   let free_space t : int = Parallel_scan.free_space t.scan_state
 
@@ -501,6 +506,7 @@ end = struct
       ~(get_completed_work:
          Completed_work.Statement.t -> Completed_work.Checked.t option) =
     (* TODO: Don't copy *)
+    let curr_hash = hash t in
     let t = copy t in
     let ledger = ledger t in
     let or_error = function Ok x -> `Ok x | Error e -> `Error e in
@@ -568,12 +574,10 @@ end = struct
           List.rev resources.transactions
       ; completed_works= List.rev resources.completed_works
       ; creator= t.public_key
-      ; prev_hash= hash t }
+      ; prev_hash= curr_hash }
     in
     let ledger_proof = apply_diff_unchecked t diff in
-    ( diff
-    , `Hash_after_applying (hash t, Ledger.merkle_root t.ledger)
-    , `Ledger_proof ledger_proof )
+    (diff, `Hash_after_applying (hash t), `Ledger_proof ledger_proof)
 end
 
 let%test_module "ledger_builder" =
