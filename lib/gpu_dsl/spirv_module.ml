@@ -1,169 +1,164 @@
 open Core
 
-type capability = SpirV.capability
+module Capability = struct
+  type t = SpirV.capability
+  let to_op t : SpirV.op = `OpCapability t
+end
 
-let compile_capability_op (c: capability) : SpirV.op = `OpCapability c
+module Memory_model = struct
+  type t = SpirV.addressing_model * SpirV.memory_model
 
-type memory_model = SpirV.addressing_model * SpirV.memory_model
+  let to_op (addr_model, mem_model) : SpirV.op =
+    `OpMemoryModel (addr_model, mem_model)
+end
 
-let compile_memory_model_op ((addr_model, mem_model): memory_model) : SpirV.op =
-  `OpMemoryModel (addr_model, mem_model)
+module Entry_point = struct
+  type t =
+    { execution_mode: SpirV.execution_mode
+    ; execution_model: SpirV.execution_model
+    ; id: SpirV.id
+    ; name: string
+    ; interfaces: SpirV.id list }
 
-type entry_point =
-  { entry_point_execution_mode: SpirV.execution_mode
-  ; entry_point_execution_model: SpirV.execution_model
-  ; entry_point_id: SpirV.id
-  ; entry_point_name: string
-  ; entry_point_interfaces: SpirV.id list }
+  let to_entry_point_op t : SpirV.op =
+    `OpEntryPoint (t.execution_model , t.id , t.name , t.interfaces) 
+  let to_execution_mode_op t : SpirV.op =
+    `OpExecutionMode (t.id, t.execution_mode)
+end
 
-let compile_entry_point_op (ep: entry_point) : SpirV.op =
-  `OpEntryPoint
-    ( ep.entry_point_execution_model
-    , ep.entry_point_id
-    , ep.entry_point_name
-    , ep.entry_point_interfaces )
+module Decoration = struct
+  type t =
+    | Decoration of
+        { target: SpirV.id
+        ; value: SpirV.decoration }
+    | MemberDecoration of
+        { target: SpirV.id
+        ; member: SpirV.literal_integer
+        ; value: SpirV.decoration }
 
-let compile_execution_mode_op (ep: entry_point) : SpirV.op =
-  `OpExecutionMode (ep.entry_point_id, ep.entry_point_execution_mode)
+  let to_op : t -> SpirV.op = function
+    | Decoration d -> `OpDecorate (d.target, d.value)
+    | MemberDecoration d -> `OpMemberDecorate (d.target, d.member, d.value)
+end
 
-type decoration =
-  | Decoration of
-      { decoration_target: SpirV.id
-      ; decoration_value: SpirV.decoration }
-  | MemberDecoration of
-      { member_decoration_target: SpirV.id
-      ; member_decoration_member: SpirV.literal_integer
-      ; member_decoration_value: SpirV.decoration }
+module Type = struct
+  type t =
+    | Void
+    | Bool
+    | Int of SpirV.literal_integer * bool
+    | Float of SpirV.literal_integer
+    | Vector of SpirV.id * SpirV.literal_integer
+    | RuntimeArray of SpirV.id
+    | Struct of SpirV.id list
+    | Pointer of SpirV.storage_class * SpirV.id
+    | Function of SpirV.id * SpirV.id list
 
-let compile_decoration_op : decoration -> SpirV.op = function
-  | Decoration d -> `OpDecorate (d.decoration_target, d.decoration_value)
-  | MemberDecoration d ->
-      `OpMemberDecorate
-        ( d.member_decoration_target
-        , d.member_decoration_member
-        , d.member_decoration_value )
+  let to_op id : t -> SpirV.op = function
+    | Void -> `OpTypeVoid id
+    | Bool -> `OpTypeBool id
+    | Int (width, sign) -> `OpTypeInt (id, width, if sign then 1l else 0l)
+    | Float width -> `OpTypeFloat (id, width)
+    | Vector (t, size) -> `OpTypeVector (id, t, size)
+    | RuntimeArray t -> `OpTypeRuntimeArray (id, t)
+    | Struct ts -> `OpTypeStruct (id, ts)
+    | Pointer (sc, t) -> `OpTypePointer (id, sc, t)
+    | Function (rt, ats) -> `OpTypeFunction (id, rt, ats)
+end
 
-type spirv_type =
-  | TypeVoid
-  | TypeBool
-  | TypeInt of SpirV.literal_integer * bool
-  | TypeFloat of SpirV.literal_integer
-  | TypeVector of SpirV.id * SpirV.literal_integer
-  | TypeRuntimeArray of SpirV.id
-  | TypeStruct of SpirV.id list
-  | TypePointer of SpirV.storage_class * SpirV.id
-  | TypeFunction of SpirV.id * SpirV.id list
+module Type_declaration = struct
+  type t = {id: SpirV.id; value: Type.t}
 
-let compile_spirv_type_op (id: SpirV.id) : spirv_type -> SpirV.op = function
-  | TypeVoid -> `OpTypeVoid id
-  | TypeBool -> `OpTypeBool id
-  | TypeInt (width, sign) -> `OpTypeInt (id, width, if sign then 1l else 0l)
-  | TypeFloat width -> `OpTypeFloat (id, width)
-  | TypeVector (t, size) -> `OpTypeVector (id, t, size)
-  | TypeRuntimeArray t -> `OpTypeRuntimeArray (id, t)
-  | TypeStruct ts -> `OpTypeStruct (id, ts)
-  | TypePointer (sc, t) -> `OpTypePointer (id, sc, t)
-  | TypeFunction (rt, ats) -> `OpTypeFunction (id, rt, ats)
+  let to_op t : SpirV.op =
+    Type.to_op t.id t.value
+end
 
-type type_declaration = {type_id: SpirV.id; type_value: spirv_type}
+module Constant_declaration = struct
+  type t =
+    { type_: SpirV.id
+    ; id: SpirV.id
+    ; value: SpirV.big_int_or_float }
 
-let compile_type_declaration_op (td: type_declaration) : SpirV.op =
-  compile_spirv_type_op td.type_id td.type_value
+  let to_op t : SpirV.op = `OpConstant (t.type_, t.id, t.value)
+end
 
-type constant_declaration =
-  { constant_type: SpirV.id
-  ; constant_id: SpirV.id
-  ; constant_value: SpirV.big_int_or_float }
+module Variable_declaration = struct
+  type t =
+    { type_: SpirV.id
+    ; id: SpirV.id
+    ; storage_class: SpirV.storage_class
+    ; initializer_: SpirV.id option }
 
-let compile_constant_declaration_op (c: constant_declaration) : SpirV.op =
-  `OpConstant (c.constant_type, c.constant_id, c.constant_value)
+  let to_op t : SpirV.op =
+    `OpVariable (t.type_, t.id, t.storage_class, t.initializer_)
+end
 
-type variable_declaration =
-  { variable_type: SpirV.id
-  ; variable_id: SpirV.id
-  ; variable_storage_class: SpirV.storage_class
-  ; variable_initializer: SpirV.id option }
+module Branch = struct
+  type t =
+    | Unconditional of SpirV.id
+    | Conditional of SpirV.id * SpirV.id * SpirV.id
+    | Return
+    | ReturnValue of SpirV.id
 
-let compile_variable_declaration_op (v: variable_declaration) : SpirV.op =
-  `OpVariable
-    ( v.variable_type
-    , v.variable_id
-    , v.variable_storage_class
-    , v.variable_initializer )
+  let to_op : t -> SpirV.op = function
+    | Unconditional label -> `OpBranch label
+    | Conditional (cond, true_label, f_label) ->
+        `OpBranchConditional (cond, true_label, f_label, [])
+    | Return -> `OpReturn
+    | ReturnValue v -> `OpReturnValue v
+end
 
-type branch =
-  | Branch of SpirV.id
-  | BranchConditional of SpirV.id * SpirV.id * SpirV.id
-  | Return
-  | ReturnValue of SpirV.id
+module Basic_block = struct
+  type t =
+    { label: SpirV.id
+    ; body: SpirV.op list
+    ; branch: Branch.t }
 
-let compile_branch_op : branch -> SpirV.op = function
-  | Branch label -> `OpBranch label
-  | BranchConditional (cond, true_label, f_label) ->
-      `OpBranchConditional (cond, true_label, f_label, [])
-  | Return -> `OpReturn
-  | ReturnValue v -> `OpReturnValue v
+  let to_ops t : SpirV.op list =
+    List.concat [ [`OpLabel t.label]; t.body; [Branch.to_op t.branch] ] 
+end
 
-type basic_block =
-  { basic_block_label: SpirV.id
-  ; basic_block_body: SpirV.op list
-  ; basic_block_branch: branch }
+module Function_parameter = struct
+  type t = {type_: SpirV.id; id: SpirV.id}
+  let to_op t : SpirV.op = `OpFunctionParameter (t.type_, t.id)
+end
 
-let compile_basic_block_ops (block: basic_block) : SpirV.op list =
-  List.concat
-    [ [`OpLabel block.basic_block_label]
-    ; block.basic_block_body
-    ; [compile_branch_op block.basic_block_branch] ]
+module Function_definition = struct
+  type t =
+    { return_type: SpirV.id
+    ; id: SpirV.id
+    ; control: SpirV.function_control list
+    ; type_: SpirV.id
+    ; parameters: Function_parameter.t list
+    ; variables: Variable_declaration.t list
+    ; body: Basic_block.t list }
 
-type function_parameter =
-  {function_parameter_type: SpirV.id; function_parameter_id: SpirV.id}
-
-let compile_function_parameter_op (fp: function_parameter) : SpirV.op =
-  `OpFunctionParameter (fp.function_parameter_type, fp.function_parameter_id)
-
-type function_definition =
-  { function_return_type: SpirV.id
-  ; function_id: SpirV.id
-  ; function_control: SpirV.function_control list
-  ; function_type: SpirV.id
-  ; function_parameters: function_parameter list
-  ; function_variables: variable_declaration list
-  ; function_body: basic_block list }
-
-let compile_function_header_op (fn_def: function_definition) : SpirV.op =
-  `OpFunction
-    ( fn_def.function_return_type
-    , fn_def.function_id
-    , fn_def.function_control
-    , fn_def.function_type )
-
-let compile_function_definition_ops (fn_def: function_definition) :
-    SpirV.op list =
-  List.concat
-    [ [compile_function_header_op fn_def]
-    ; List.map fn_def.function_parameters ~f:compile_function_parameter_op
-    ; List.map fn_def.function_variables ~f:compile_variable_declaration_op
-    ; List.concat (List.map fn_def.function_body ~f:compile_basic_block_ops)
-    ; [`OpFunctionEnd] ]
+  let to_ops t : SpirV.op list =
+    List.concat
+      [ [`OpFunction (t.return_type, t.id, t.control, t.type_)]
+      ; List.map t.parameters ~f:Function_parameter.to_op
+      ; List.map t.variables ~f:Variable_declaration.to_op
+      ; List.concat (List.map t.body ~f:Basic_block.to_ops)
+      ; [`OpFunctionEnd] ]
+end
 
 type t =
-  { capabilities: SpirV.capability list
-  ; memory_model: memory_model
-  ; entry_points: entry_point list (* ;  debug_info: debug_info list *)
-  ; decorations: decoration list
-  ; types: type_declaration list
-  ; constants: constant_declaration list
-  ; global_variables: variable_declaration list
-  ; functions: function_definition list }
+  { capabilities: Capability.t list
+  ; memory_model: Memory_model.t
+  ; entry_points: Entry_point.t list (* ;  debug_info: debug_info list *)
+  ; decorations: Decoration.t list
+  ; types: Type_declaration.t list
+  ; constants: Constant_declaration.t list
+  ; global_variables: Variable_declaration.t list
+  ; functions: Function_definition.t list }
 
-let compile (m: t) : SpirV.op list =
+let compile t : SpirV.op list =
   List.concat
-    [ List.map m.capabilities ~f:compile_capability_op
-    ; [compile_memory_model_op m.memory_model]
-    ; List.map m.entry_points ~f:compile_entry_point_op
-    ; List.map m.entry_points ~f:compile_execution_mode_op
-    ; List.map m.decorations ~f:compile_decoration_op
-    ; List.map m.types ~f:compile_type_declaration_op
-    ; List.map m.constants ~f:compile_constant_declaration_op
-    ; List.map m.global_variables ~f:compile_variable_declaration_op
-    ; List.concat (List.map m.functions ~f:compile_function_definition_ops) ]
+    [ List.map t.capabilities ~f:Capability.to_op
+    ; [Memory_model.to_op t.memory_model]
+    ; List.map t.entry_points ~f:Entry_point.to_entry_point_op
+    ; List.map t.entry_points ~f:Entry_point.to_execution_mode_op
+    ; List.map t.decorations ~f:Decoration.to_op
+    ; List.map t.types ~f:Type_declaration.to_op
+    ; List.map t.constants ~f:Constant_declaration.to_op
+    ; List.map t.global_variables ~f:Variable_declaration.to_op
+    ; List.concat (List.map t.functions ~f:Function_definition.to_ops) ]

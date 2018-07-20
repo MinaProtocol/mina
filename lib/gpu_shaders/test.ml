@@ -9,11 +9,11 @@ let program =
   declare_function "main"
     ~args:Arguments_spec.[]
     ~vars:Local_variables_spec.[]
-    ~returning:Type.Void
+    ~returning:Void
     (fun () ->
-      let%bind x = constant (Scalar Scalar.Uint32) (UInt32.of_int 2) in
-      let%bind y = constant (Scalar Scalar.Uint32) (UInt32.of_int 5) in
-      let%bind r = add_ignore_overflow x y "r" in
+      let%bind x = constant (Uint32) (UInt32.of_int 2) in
+      let%bind y = constant (Uint32) (UInt32.of_int 5) in
+      let%bind r = add_ignore_overflow ~name:"r" x y in
       Pure void )
 
 let () =

@@ -20,83 +20,66 @@ end = struct
 end
 
 module Pointer = struct
-  type 'a t = Pointer of Location.t
+  type 'a t =
+    | Pointer of Location.t
+    | Array_pointer of Location.t * int
 
-  let sexp_of_t (Pointer loc) =
-    Sexp.List [Atom "pointer"; Location.sexp_of_t loc]
+  let sexp_of_t = function
+    | Pointer loc -> Sexp.List [Atom "pointer"; Location.sexp_of_t loc]
+    | Array_pointer (loc, index) -> Sexp.List [Atom "array_pointer"; Location.sexp_of_t loc; Int.sexp_of_t index]
 end
 
 module Function = struct
   type ('a, 'b) t = 'a -> 'b
 end
 
-module Arith_result = struct
-  type 'a t = {low_bits: 'a; high_bits: 'a}
-end
-
-module PolyTuple = struct
-  type 'a t = [] : unit t | ( :: ): 'a * 'b t -> ('a * 'b) t
-end
-
-module Struct_location = struct
+module Elem = struct
   type ('a, 's) t =
     | Here : ('a, 'a * 'b) t
     | There: ('a, 's) t -> ('a, 'b * 's) t
+
+  let rec index : type a b. (a, b) t -> int = function
+    | Here -> 0
+    | There t -> 1 + index t
 end
 
 module Type = struct
-  module Scalar = struct
-    type 'a t = Uint32 : uint32 t | Bool : bool t [@@deriving hash]
-
-    let to_string : type a. a t -> string = function
-      | Uint32 -> "u32"
-      | Bool -> "bool"
-
-    let equality : type a b. a t -> b t -> (a, b) Type_equal.t option =
-     fun x y ->
-      match (x, y) with
-      | Uint32, Uint32 -> Some Type_equal.T
-      | Bool, Bool -> Some Type_equal.T
-      | _, _ -> None
-
-    let equal : type a b. a t -> b t -> bool =
-     fun x y -> Option.is_some (equality x y)
+  module rec T : sig
+    type _ t =
+      | Uint32: uint32 t
+      | Bool: bool t
+      | Pointer: 'a t -> 'a Pointer.t t
+      | Array: 'a t -> 'a array t
+      | Struct: 'a List.t -> 'a t
+      | Function: 'a List.t * 'b t -> ('a List.t, 'b) Function.t t
+      | Type : unit t
+      | Label : unit t
+      | Void : unit t
+  end = T
+  and List : sig
+    type _ t = [] : unit t | ( :: ): 'a T.t * 'b t -> ('a * 'b) t
+    type 'b mapper = {f: 'a. 'a T.t -> 'b}
+    val map : 'a t -> 'b mapper -> 'b Core.List.t
+    val get : 'a t -> ('b, 'a) Elem.t -> 'b T.t
+  end = struct
+    type _ t = [] : unit t | ( :: ): 'a T.t * 'b t -> ('a * 'b) t
+    type 'b mapper = {f: 'a. 'a T.t -> 'b}
+    let rec map : type a. a t -> 'b mapper -> 'b Core.List.t =
+     fun ls mapper ->
+      match ls with [] -> [] | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
+    let rec get : type a b. a t -> (b, a) Elem.t -> b T.t = fun ls elem ->
+      match (ls, elem) with
+      | (h :: _, Elem.Here) -> h
+      | (_ :: t, Elem.There e) -> get t e
+      | _ -> .
   end
 
-  type _ t =
-    | Scalar: 'a Scalar.t -> 'a t
-    | Pointer: 'a t -> 'a Pointer.t t
-    | Array: 'a Scalar.t -> 'a array t
-    | Tuple2: 'a Scalar.t * 'b Scalar.t -> ('a * 'b) t
-    | Arith_result : uint32 Arith_result.t t
-    | Struct: 'a list -> 'a list t
-    | Function: 'a list * 'b t -> ('a list, 'b) Function.t t
-    | Type : unit t
-    | Label : unit t
-    | Void : unit t
+  include T
 
-  and _ list = [] : unit list | ( :: ): 'a t * 'b list -> ('a * 'b) list
+  type 'a arithmetic_result = ('a * ('a * unit))
+  let arithmetic_result = Struct [Uint32; Uint32]
 
-  type 'b mapper = {f: 'a. 'a t -> 'b}
-
-  let rec map : type a. a list -> 'b mapper -> 'b List.t =
-   fun ls mapper ->
-    match ls with [] -> [] | h :: t -> List.cons (mapper.f h) (map t mapper)
-
-  let rec to_string : type a. a t -> string = function
-    | Scalar s -> Scalar.to_string s
-    | Pointer t -> to_string t ^ "_ptr"
-    | Array s -> Scalar.to_string s ^ "_array"
-    | Tuple2 (s0, s1) ->
-        "tuple2_" ^ Scalar.to_string s0 ^ "_" ^ Scalar.to_string s1
-    | Arith_result -> "u32_arith_result"
-    | Struct _ -> "struct" (* TODO *)
-    | Function _ -> "fn" (* TODO *)
-    | Type -> "type"
-    | Label -> "label"
-    | Void -> "void"
-
-  module Enum = struct
+  module E = struct
     module T = struct
       type e = T: 'a t -> e
 
@@ -112,19 +95,30 @@ module Type = struct
     module Table = Hashtbl.Make (T)
   end
 
+  let rec to_string : type a. a t -> string = function
+    | Uint32 -> "u32"
+    | Bool -> "bool"
+    | Pointer t -> to_string t ^ "_ptr"
+    | Array s -> to_string s ^ "_array"
+    | Struct _ -> "struct" (* TODO *)
+    | Function _ -> "fn" (* TODO *)
+    | Type -> "type"
+    | Label -> "label"
+    | Void -> "void"
+
   let is_void : type a. a t -> bool = function Void -> true | _ -> false
 
-  let fst : type a b. (a * b) t -> a t = function
-    | Tuple2 (x, _) -> Scalar x
-    | _ -> assert false
-
-  let snd : type a b. (a * b) t -> b t = function
-    | Tuple2 (x, y) -> Scalar y
-    | _ -> assert false
-
-  let function_return_type : type args rt. (args list, rt) Function.t t -> rt t =
+  let function_return_type : type args rt. (args List.t, rt) Function.t t -> rt t =
     function
     | Function (_, rt) -> rt
+    | _ -> assert false
+
+  let struct_types : type a. a t -> a List.t = function
+    | Struct types -> types
+    | _ -> assert false
+
+  let struct_elt : type a. a t -> ('b, a) Elem.t -> 'b t = function
+    | Struct types -> List.get types
     | _ -> assert false
 
   let pointer_elt : type a. a Pointer.t t -> a t = function
@@ -132,7 +126,7 @@ module Type = struct
     | _ -> assert false
 
   let array_elt : type a. a array t -> a t = function
-    | Array scalar -> Scalar scalar
+    | Array elt -> elt
     | _ -> assert false
 
   let rec equality : type a b. a t -> b t -> (a, b) Type_equal.t option =
@@ -142,33 +136,41 @@ module Type = struct
       match equality a1 a2 with
       | Some Type_equal.T -> Some Type_equal.T
       | None -> None )
-    | Arith_result, Arith_result -> Some Type_equal.T
-    | Tuple2 (a1, b1), Tuple2 (a2, b2) -> (
-      match (Scalar.equality a1 a2, Scalar.equality b1 b2) with
-      | Some Type_equal.T, Some Type_equal.T -> Some Type_equal.T
-      | _ -> None )
-    | Scalar a, Scalar b -> Scalar.equality a b
+    | Uint32, Uint32 -> Some Type_equal.T
+    | Bool, Bool -> Some Type_equal.T
     | Array a, Array b -> (
-      match Scalar.equality a b with
+      match equality a b with
       | Some Type_equal.T -> Some Type_equal.T
       | None -> None )
     | _, _ -> None
-
-  let uint32 = Scalar Uint32
-
-  let bool = Scalar Bool
 end
 
 module Id = struct
-  type 'a t = Id: 'a Type.t * string * int -> 'a t
+  module T = struct
+    type 'a t = Id: 'a Type.t * string * int -> 'a t
+  end
 
-  type _ list = [] : unit list | ( :: ): 'a t * 'b list -> ('a * 'b) list
+  include T
 
-  type 'b mapper = {f: 'a. 'a t -> 'b}
+  module List = struct
+    type _ t = [] : unit t | ( :: ): 'a T.t * 'b t -> ('a * 'b) t
 
-  let rec map : type a. a list -> 'b mapper -> 'b List.t =
-   fun ls mapper ->
-    match ls with [] -> [] | h :: t -> List.cons (mapper.f h) (map t mapper)
+    type 'b mapper = {f: 'a. 'a T.t -> 'b}
+
+    let rec map : type a. a t -> 'b mapper -> 'b Core.List.t =
+      fun ls mapper ->
+        match ls with [] -> [] | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
+  end
+
+  module PointerList = struct
+    type _ t = [] : unit t | ( :: ): 'a Pointer.t T.t * 'b t -> ('a * 'b) t
+
+    type 'b mapper = {f: 'a. 'a Pointer.t T.t -> 'b}
+
+    let rec map : type a. a t -> 'b mapper -> 'b Core.List.t =
+      fun ls mapper ->
+        match ls with [] -> [] | h :: t -> Core.List.cons (mapper.f h) (map t mapper)
+  end
 
   let sexp_of_t (Id (_, name, value)) =
     Sexp.List
@@ -188,128 +190,111 @@ end
 module Op = struct
   (* First arg is the result *)
   module Value = struct
-    type 'a op =
+    type _ op =
       | Or: bool Id.t * bool Id.t -> bool op
-      | Add: uint32 Id.t * uint32 Id.t -> uint32 Arith_result.t op
+      | Add: uint32 Id.t * uint32 Id.t -> uint32 Type.arithmetic_result op
       | Add_ignore_overflow: uint32 Id.t * uint32 Id.t -> uint32 op
-      | Sub: uint32 Id.t * uint32 Id.t -> uint32 Arith_result.t op
+      | Sub: uint32 Id.t * uint32 Id.t -> uint32 Type.arithmetic_result op
       | Sub_ignore_overflow: uint32 Id.t * uint32 Id.t -> uint32 op
-      | Mul: uint32 Id.t * uint32 Id.t -> uint32 Arith_result.t op
+      | Mul: uint32 Id.t * uint32 Id.t -> uint32 Type.arithmetic_result op
       | Mul_ignore_overflow: uint32 Id.t * uint32 Id.t -> uint32 op
       | Div_ignore_remainder: uint32 Id.t * uint32 Id.t -> uint32 op
       | Bitwise_or: uint32 Id.t * uint32 Id.t -> uint32 op
       | Less_than: uint32 Id.t * uint32 Id.t -> bool op
       | Equal: uint32 Id.t * uint32 Id.t -> bool op
-      | Array_get: 'b array Id.t * uint32 Id.t -> 'b op
-      | Struct_access: 's Type.list Id.t * ('a, 's) Struct_location.t -> 'a op
-      | Fst: ('a * 'b) Id.t -> 'a op
-      | Snd: ('a * 'b) Id.t -> 'b op
-      | High_bits: uint32 Arith_result.t Id.t -> uint32 op
-      | Low_bits: uint32 Arith_result.t Id.t -> uint32 op
+      | Array_access: 'a array Pointer.t Id.t * uint32 Id.t -> 'a Pointer.t op
+      | Struct_get: 's Id.t * ('a, 's) Elem.t -> 'a op
+      | Load: 'a Pointer.t Id.t -> 'a op
 
     type 'a t = {op: 'a op; result_name: string}
 
-    let rec struct_access : type a s.
-        s Type.list -> (a, s) Struct_location.t -> a Type.t =
-      let open Type in
-      let open Struct_location in
-      fun spec loc ->
-        match (spec, loc) with
-        | typ :: _, Here -> typ
-        | _ :: spec, There loc -> struct_access spec loc
-        | [], _ -> .
-
     let typ : type a. a op -> a Type.t = function
-      | Or _ -> Type.bool
-      | Add _ -> Type.Arith_result
-      | Add_ignore_overflow _ -> Type.uint32
-      | Sub _ -> Type.Arith_result
-      | Sub_ignore_overflow _ -> Type.uint32
-      | Mul _ -> Type.Arith_result
-      | Mul_ignore_overflow _ -> Type.uint32
-      | Div_ignore_remainder _ -> Type.uint32
-      | Bitwise_or _ -> Type.uint32
-      | Less_than _ -> Type.bool
-      | Equal _ -> Type.bool
-      | High_bits _ -> Type.uint32
-      | Low_bits _ -> Type.uint32
-      | Array_get (arr, _) -> Type.array_elt (Id.typ arr)
-      | Fst t -> Type.fst (Id.typ t)
-      | Snd t -> Type.snd (Id.typ t)
-      | Struct_access (id, loc) ->
-        match Id.typ id with
-        | Type.Struct spec -> struct_access spec loc
-        | _ -> assert false
+      | Or _ -> Type.Bool
+      | Add _ -> Type.arithmetic_result
+      | Add_ignore_overflow _ -> Type.Uint32
+      | Sub _ -> Type.arithmetic_result
+      | Sub_ignore_overflow _ -> Type.Uint32
+      | Mul _ -> Type.arithmetic_result
+      | Mul_ignore_overflow _ -> Type.Uint32
+      | Div_ignore_remainder _ -> Type.Uint32
+      | Bitwise_or _ -> Type.Uint32
+      | Less_than _ -> Type.Bool
+      | Equal _ -> Type.Bool
+      | Array_access (arr, _) -> Type.Pointer (Type.array_elt @@ Type.pointer_elt @@ Id.typ arr)
+      | Struct_get (id, loc) ->
+        (match Id.typ id with
+        | Type.Struct spec -> Type.List.get spec loc
+        | _ -> assert false)
+      | Load ptr -> Type.pointer_elt (Id.typ ptr)
   end
 
   module Action = struct
     type t =
-      | Array_set: 'b array Id.t * uint32 Id.t * 'b Id.t -> t
       | Store: 'a Pointer.t Id.t * 'a Id.t -> t
   end
 end
 
 module Arguments_spec = struct
-  type ('types, 'args, 'f, 'k) t =
-    | [] : (unit, unit, 'k, 'k) t
+  type ('types, 'f, 'k) t =
+    | [] : (unit, 'k, 'k) t
     | ( :: ):
-        'a Type.t * ('ts, 'ats, 'b, 'k) t
-        -> ('a * 'ts, 'a Id.t * 'ats, 'a Id.t -> 'b, 'k) t
+        'a Type.t * ('ts, 'b, 'k) t
+        -> ('a * 'ts, 'a Id.t -> 'b, 'k) t
 
   type 'b id_mapper = {map_id: 'a. 'a Id.t -> 'b}
 
   let rec map_ids : type types args f k.
-      (types, args, f, k) t -> args PolyTuple.t -> 'r id_mapper -> 'r list =
+      (types, f, k) t -> types Id.List.t -> 'r id_mapper -> 'r list =
    fun t args id_mapper ->
     match (t, args) with
-    | [], PolyTuple.([]) -> []
-    | _ :: arg_spec_tail, PolyTuple.(arg :: arg_tail) ->
+    | [], Id.List.[] -> []
+    | _ :: arg_spec_tail, Id.List.(arg :: arg_tail) ->
         List.(id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper)
 
   type generator = {generate: 'a. 'a Type.t -> 'a Id.t}
 
   let rec apply : type types args f k.
-         (types, args, f, k) t
+         (types, f, k) t
       -> generator
       -> f
-      -> types Type.list * args PolyTuple.t * k =
+      -> types Type.List.t * types Id.List.t * k =
    fun t gen f ->
     match t with
-    | [] -> (Type.[], PolyTuple.[], f)
+    | [] -> (Type.[], Id.List.[], f)
     | head :: tail ->
         let c = gen.generate head in
         let ts, ats, k = apply tail gen (f c) in
-        (Type.(head :: ts), PolyTuple.(c :: ats), k)
+        (Type.(head :: ts), Id.List.(c :: ats), k)
 end
 
 module Local_variables_spec = struct
-  type ('vars, 'f, 'k) t =
+  type ('types, 'f, 'k) t =
     | [] : (unit, unit -> 'k, 'k) t
     | ( :: ):
         'a Type.t * ('vs, 'b, 'k) t
-        -> ('a Pointer.t Id.t * 'vs, 'a Pointer.t Id.t -> 'b, 'k) t
+        -> ('a * 'vs, 'a Pointer.t Id.t -> 'b, 'k) t
 
   type 'b id_mapper = {map_id: 'a. 'a Pointer.t Id.t -> 'b}
 
   let rec map_ids : type vars f k.
-      (vars, f, k) t -> vars PolyTuple.t -> 'r id_mapper -> 'r list =
+      (vars, f, k) t -> vars Id.PointerList.t -> 'r id_mapper -> 'r list =
    fun t args id_mapper ->
     match (t, args) with
-    | [], PolyTuple.([]) -> []
-    | _ :: arg_spec_tail, PolyTuple.(arg :: arg_tail) ->
+    | [], Id.PointerList.[] -> []
+    | _ :: arg_spec_tail, Id.PointerList.(arg :: arg_tail) ->
         List.(id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper)
 
   type generator = {generate: 'a. 'a Type.t -> 'a Pointer.t Id.t}
 
   let rec apply : type vars f k.
-      (vars, f, k) t -> generator -> f -> vars PolyTuple.t * k =
+      (vars, f, k) t -> generator -> f -> vars Id.PointerList.t * k =
    fun t gen f ->
     match t with
-    | [] -> (PolyTuple.[], f ())
+    | [] -> (Id.PointerList.[], f ())
     | head :: tail ->
         let c = gen.generate head in
         let str, k = apply tail gen (f c) in
-        (PolyTuple.(c :: str), k)
+        (Id.PointerList.(c :: str), k)
 end
 
 module T = struct
@@ -317,19 +302,17 @@ module T = struct
     | Set_prefix of string * 'a t
     | Declare_function:
         string
-        * ('types, 'args, 'f, 'g) Arguments_spec.t
+        * ('types, 'f, 'g) Arguments_spec.t
         * ('vars, 'g, 'ret Id.t t) Local_variables_spec.t
         * 'ret Type.t
         * 'f
-        * (('types Type.list, 'ret) Function.t Id.t -> 'a t)
+        * (('types Type.List.t, 'ret) Function.t Id.t -> 'a t)
         -> 'a t
     | Call_function:
-        ('args Type.list, 'ret) Function.t Id.t
-        * 'args Id.list
+        ('args Type.List.t, 'ret) Function.t Id.t
+        * 'args Id.List.t
         * ('ret Id.t -> 'a t)
         -> 'a t
-    | Create_pointer: 'c Type.t * string * ('c Pointer.t Id.t -> 'b t) -> 'b t
-    | Load: 'c Pointer.t Id.t * string * ('c Id.t -> 'a t) -> 'a t
     | Value_op: 'a Op.Value.t * ('a Id.t -> 'b t) -> 'b t
     | Action_op of Op.Action.t * (unit -> 'a t)
     | Declare_constant: 'a Type.t * 'a * ('a Id.t -> 'b t) -> 'b t
@@ -361,9 +344,6 @@ module T = struct
     | Set_prefix (s, k) -> Set_prefix (s, map k ~f)
     | Declare_constant (typ, x, k) ->
         Declare_constant (typ, x, fun v -> map (k v) ~f)
-    | Create_pointer (typ, s, k) ->
-        Create_pointer (typ, s, fun v -> map (k v) ~f)
-    | Load (ptr, lab, k) -> Load (ptr, lab, fun v -> map (k v) ~f)
     | Action_op (op, k) -> Action_op (op, fun () -> map (k ()) ~f)
     | Value_op (op, k) -> Value_op (op, fun v -> map (k v) ~f)
     | For {var_ptr; range; body; after} ->
@@ -382,11 +362,8 @@ module T = struct
         Call_function (id, arg, fun x -> bind (k x) ~f)
     | Pure x -> f x
     | Set_prefix (s, k) -> Set_prefix (s, bind k ~f)
-    | Create_pointer (typ, s, k) ->
-        Create_pointer (typ, s, fun v -> bind (k v) ~f)
     | Declare_constant (typ, x, k) ->
         Declare_constant (typ, x, fun v -> bind (k v) ~f)
-    | Load (ptr, lab, k) -> Load (ptr, lab, fun v -> bind (k v) ~f)
     | Action_op (op, k) -> Action_op (op, fun () -> bind (k ()) ~f)
     | Value_op (op, k) -> Value_op (op, fun v -> bind (k v) ~f)
     | For {var_ptr; range; body; after} ->
@@ -419,10 +396,7 @@ let do_if cond then_ = Do_if {cond; then_; after= (fun v -> return v)}
 
 let set_prefix prefix = Set_prefix (prefix, return ())
 
-let array_get result_name arr i =
-  Value_op ({op= Array_get (arr, i); result_name}, return)
-
-let do_value op result_name = Value_op ({op; result_name}, return)
+let do_value ?name op = Value_op ({ op; result_name= Option.value ~default:"anonymous" name }, return)
 
 let do_ op = Action_op (op, fun () -> return ())
 
@@ -431,30 +405,23 @@ let constant typ x = Declare_constant (typ, x, return)
 let declare_function name ~args ~vars ~returning body =
   Declare_function (name, args, vars, returning, body, return)
 
-let array_get label xs i = Op.Value.(do_value (Array_get (xs, i)) label)
+let array_access ?name xs i = do_value ?name (Array_access (xs, i))
 
-let array_set xs i x = do_ (Array_set (xs, i, x))
+let struct_get ?name str elem = do_value ?name (Struct_get (str, elem))
 
-let less_than lab x y = do_value (Less_than (x, y)) lab
-
-let create_pointer typ label = Create_pointer (typ, label, return)
-
-let load ptr label = Load (ptr, label, return)
+let less_than ?name x y = do_value ?name (Less_than (x, y))
 
 let store ptr value = Action_op (Op.Action.Store (ptr, value), return)
 
-let high_bits x lab = do_value (High_bits x) lab
+let or_ ?name x y = do_value ?name (Or (x, y))
 
-let low_bits x lab = do_value (Low_bits x) lab
-
-let or_ x y lab = do_value (Or (x, y)) lab
-
-let arith_op name k =
-  stage (fun x y lab ->
-      let%bind r = do_value (k x y) (sprintf "%s_%s_result" lab name) in
-      let%map high_bits = high_bits r (lab ^ "_high_bits")
-      and low_bits = low_bits r (lab ^ "_low_bits") in
-      {Arith_result.high_bits; low_bits} )
+let arith_op op_name k =
+  stage (fun x y name ->
+      let name = Option.map name ~f:(sprintf "%s_%s_result" op_name) in
+      let%bind r = do_value ?name (k x y) in
+      let%map low_bits = struct_get r Elem.Here in
+      let%map high_bits = struct_get r Elem.(There Here) in
+      (low_bits, high_bits))
 
 let add = unstage (arith_op "add" (fun x y -> Add (x, y)))
 
@@ -462,9 +429,9 @@ let sub = unstage (arith_op "sub" (fun x y -> Sub (x, y)))
 
 let mul = unstage (arith_op "mul" (fun x y -> Mul (x, y)))
 
-let add_ignore_overflow x y lab =
-  do_value (Op.Value.Add_ignore_overflow (x, y)) lab
+let add_ignore_overflow ?name x y =
+  do_value ?name (Op.Value.Add_ignore_overflow (x, y))
 
-let bitwise_or x y lab = do_value (Op.Value.Bitwise_or (x, y)) lab
+let bitwise_or ?name x y = do_value ?name (Op.Value.Bitwise_or (x, y))
 
-let equal_uint32 x y lab = do_value (Op.Value.Equal (x, y)) lab
+let equal_uint32 ?name x y = do_value ?name (Op.Value.Equal (x, y))
