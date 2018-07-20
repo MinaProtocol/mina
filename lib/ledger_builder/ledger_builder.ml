@@ -62,7 +62,7 @@ end = struct
   type job =
     ( Ledger_proof.t with_statement
     , Super_transaction_with_witness.t )
-    Parallel_scan.State.Job.t
+    Parallel_scan.Available_job.t
   [@@deriving sexp_of]
 
   type parallel_scan_completed_job =
@@ -110,32 +110,26 @@ end = struct
     ; fee_excess
     ; proof_type= `Merge }
 
-  (* TODO someday: Have this take a predicate and return all work specs with
-   statements matching that predicate? *)
-  let statement_to_work_spec t statement =
-    with_return_option (fun {return} ->
-        let maybe_return_transition (d: Super_transaction_with_witness.t) =
-          if Ledger_proof_statement.equal d.statement statement then
-            return
-              (Snark_work_lib.Work.Single.Spec.Transition
-                 (statement, d.transaction, d.witness))
-        in
-        Parallel_scan.State.iter t.scan_state ~f:(function
-          | `Job j -> (
-            match j with
-            | Base d -> Option.iter d ~f:maybe_return_transition
-            | Merge (Some (p1, s1), Some (p2, s2)) ->
-                Or_error.iter (merge_statement s1 s2) ~f:(fun new_statement ->
-                    if Ledger_proof_statement.equal statement new_statement
-                    then
-                      return
-                        (Snark_work_lib.Work.Single.Spec.Merge
-                           (statement, p1, p2))
-                    else () )
-            | Merge (None, _) | Merge (_, None) -> ()
-            | Merge_up _ -> () )
-          | `Data d -> maybe_return_transition d ) )
-    |> option "Ledger_builder.statement_to_work_spec: not found"
+  let random_work_spec_chunk t =
+    let module A = Parallel_scan.Available_job in
+    let jobs = Parallel_scan.next_jobs ~state:t.scan_state in
+    let n = List.length jobs in
+    (* TODO: Should we break these up in such a way that the following
+     * situation can't happen:
+     * A gets 0,1 ; B gets 1,2
+     * Essentially you "can't" buy B if you buy A
+     *)
+    let i = Random.int n in
+    (* TODO: This assertion will always pass once we implement #305 *)
+    assert (n > 1) ;
+    let chunk = [List.nth_exn jobs i; List.nth_exn jobs ((i + 1) % n)] in
+    List.map chunk ~f:(function
+      | A.Base d ->
+          Snark_work_lib.Work.Single.Spec.Transition
+            (d.statement, d.transaction, d.witness)
+      | A.Merge ((p1, s1), (p2, s2)) ->
+          let merged = merge_statement s1 s2 |> Or_error.ok_exn in
+          Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2) )
 
   let aux {scan_state; _} = scan_state
 
@@ -165,9 +159,8 @@ end = struct
     {scan_state; ledger; public_key= self}
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
-    | Base (Some {statement; _}) -> Some statement
-    | Merge_up (Some (_, statement)) -> Some statement
-    | Merge (Some (_, stmt1), Some (_, stmt2)) ->
+    | Base {statement; _} -> Some statement
+    | Merge ((_, stmt1), (_, stmt2)) ->
         let open Option.Let_syntax in
         let%bind () =
           Option.some_if (Ledger_hash.equal stmt1.target stmt2.source) ()
@@ -179,14 +172,12 @@ end = struct
         ; target= stmt2.target
         ; fee_excess
         ; proof_type= `Merge }
-    | _ -> None
 
   let completed_work_to_scanable_work (job: job) (proof: Ledger_proof.t) :
       parallel_scan_completed_job Or_error.t =
     match job with
-    | Base (Some {statement; _}) -> Ok (Lifted (proof, statement))
-    | Merge_up (Some (t, s)) -> Ok (Merged_up (proof, s))
-    | Merge (Some (t, s), Some (t', s')) ->
+    | Base {statement; _} -> Ok (Lifted (proof, statement))
+    | Merge ((t, s), (t', s')) ->
         let open Or_error.Let_syntax in
         let%map fee_excess =
           Fee.Signed.add s.fee_excess s'.fee_excess
@@ -198,7 +189,6 @@ end = struct
             ; target= s'.target
             ; fee_excess
             ; proof_type= `Merge } )
-    | _ -> Error (Error.of_thunk (fun () -> sprintf "Invalid job"))
 
   let verify ~message job proof =
     match statement_of_job job with

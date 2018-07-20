@@ -27,14 +27,6 @@ module type S = sig
     -> [`Rebroadcast | `Don't_rebroadcast]
 
   val request_proof : t -> work -> (proof, fee) Priced_proof.t option
-
-  val add_unsolved_work : t -> work -> [`Rebroadcast | `Don't_rebroadcast]
-
-  (* TODO: Include my_fee as a paramter for request work and 
-          return work that has a fee less than my_fee if the 
-          returned work does not have any unsolved work *)
-
-  val request_work : t -> work option
 end
 
 module Make (Proof : sig

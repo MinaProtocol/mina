@@ -19,14 +19,10 @@ module State : sig
   end
 
   module Completed_job : sig
-    type 'a t = Lifted of 'a | Merged of 'a | Merged_up of 'a
-    [@@deriving bin_io, sexp]
+    type 'a t = Lifted of 'a | Merged of 'a [@@deriving bin_io, sexp]
   end
 
   type ('a, 'd) t [@@deriving sexp, bin_io]
-
-  val iter :
-    ('a, 'd) t -> f:([`Job of ('a, 'd) Job.t | `Data of 'd] -> unit) -> unit
 
   val copy : ('a, 'd) t -> ('a, 'd) t
 
@@ -45,12 +41,16 @@ module type Spec_intf = sig
   type output [@@deriving sexp_of]
 end
 
+module Available_job : sig
+  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+end
+
 val start : parallelism_log_2:int -> ('a, 'd) State.t
 
 val next_k_jobs :
-  state:('a, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t
+  state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
 
-val next_jobs : state:('a, 'd) State.t -> ('a, 'd) State.Job.t list
+val next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list
 
 val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
 

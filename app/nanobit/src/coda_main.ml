@@ -615,22 +615,9 @@ struct
     end
   end)
 
-  let request_work ~snark_pool ~best_ledger_builder t =
-    let option s =
-      Option.value_map ~f:Or_error.return ~default:(Or_error.error_string s)
-    in
-    let open Or_error.Let_syntax in
-    let%bind work =
-      Snark_pool.Pool.request_work (Snark_pool.pool (snark_pool t))
-      |> option "no work found"
-      (* TODO: Perhaps we should really be looking in ALL of the lbs rather than
-        the best one. *)
-    in
+  let request_work ~best_ledger_builder t =
     let lb = best_ledger_builder t in
-    let%map instances =
-      List.map ~f:(Ledger_builder.statement_to_work_spec lb) work
-      |> Or_error.all
-    in
+    let instances = Ledger_builder.random_work_spec_chunk lb in
     {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
 end
 
@@ -651,7 +638,7 @@ struct
 
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
-  let request_work = Inputs.request_work ~snark_pool ~best_ledger_builder
+  let request_work = Inputs.request_work ~best_ledger_builder
 end
 
 module Coda_without_snark (Init : Init_intf) () = struct
@@ -666,7 +653,7 @@ module Coda_without_snark (Init : Init_intf) () = struct
 
   include Coda.Make (Inputs)
 
-  let request_work = Inputs.request_work ~snark_pool ~best_ledger_builder
+  let request_work = Inputs.request_work ~best_ledger_builder
 
   let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
@@ -762,7 +749,7 @@ module type Main_intf = sig
 
   type t
 
-  val request_work : t -> Inputs.Snark_worker.Work.Spec.t Or_error.t
+  val request_work : t -> Inputs.Snark_worker.Work.Spec.t
 
   val best_ledger : t -> Inputs.Ledger.t
 

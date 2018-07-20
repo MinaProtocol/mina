@@ -42,9 +42,9 @@ module State1 = struct
     let data_buffer = Queue.create ~capacity:parallelism () in
     { jobs
     ; data_buffer
-    ; was_seeded= false
+    ; capacity= parallelism
     ; acc= (0, None)
-    ; current_data_length= 1
+    ; current_data_length= 0
     ; enough_steps= false }
 
   (* TODO Initial count cannot be zero, what should it be then?*)
@@ -171,14 +171,6 @@ module State1 = struct
     )
     |> Sequence.to_list
 
-  let is_ready (job: ('a, 'd) Job.t) =
-    match job with
-    | Base None -> false
-    | Merge (None, _) -> false
-    | Merge (_, None) -> false
-    | Merge_up None -> false
-    | _ -> true
-
   let step_once : type a d.
       (a, d) t -> a State.Completed_job.t Queue.t -> bool Or_error.t =
    fun t completed_jobs_q ->
@@ -223,9 +215,8 @@ module State1 = struct
               t.current_data_length <- t.current_data_length - 1 ;
               work_done := true ;
               Ok (Base (Some x)) )
-        | Merge_up (Some x), Some (Merged_up acc') ->
-            t.acc <- (fst t.acc |> Int.( + ) 1, Some acc') ;
-            let _ = Queue.dequeue completed_jobs_q in
+        | Merge_up (Some x), _ ->
+            t.acc <- (fst t.acc |> Int.( + ) 1, Some x) ;
             work_done := true ;
             Ok (Merge_up None)
         | Merge (Some _, None), _ -> Ok job
@@ -288,15 +279,31 @@ module State1 = struct
     if not (fst last_acc = fst t.acc) then snd t.acc else None
 end
 
+module Available_job = struct
+  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+end
+
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State1.create
 
-let next_jobs : state:('a, 'd) State1.t -> ('a, 'd) State1.Job.t list =
+let next_jobs : state:('a, 'd) State1.t -> ('a, 'd) Available_job.t list =
  fun ~state ->
   let max = State1.parallelism state in
-  List.filter (List.take (State1.read_all state) max) ~f:State1.is_ready
+  List.filter_map (State1.read_all state) ~f:(fun job ->
+      let module J = State1.Job in
+      let module A = Available_job in
+      match job with
+      | J.Base (Some d) -> Some (A.Base d)
+      | J.Base None -> None
+      | J.Merge (None, _) -> None
+      | J.Merge (_, None) -> None
+      | J.Merge (Some a, Some b) -> Some (A.Merge (a, b))
+      | J.Merge_up _ -> None )
+  |> Fn.flip List.take max
 
 let next_k_jobs :
-    state:('a, 'd) State1.t -> k:int -> ('a, 'd) State1.Job.t list Or_error.t =
+       state:('a, 'd) State1.t
+    -> k:int
+    -> ('a, 'd) Available_job.t list Or_error.t =
  fun ~state ~k ->
   if k > State1.parallelism state then
     Or_error.errorf "You asked for %d jobs, but it's only safe to ask for %d" k
@@ -310,11 +317,7 @@ let next_k_jobs :
         len
 
 let free_space : state:('a, 'd) State1.t -> int =
- fun ~state ->
-  let buff = State1.data_buffer state in
-  Queue.capacity buff
-  - State.current_data_length state
-  + if State1.was_seeded state then 0 else 1
+ fun ~state -> state.State1.capacity - State.current_data_length state
 
 let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
  fun ~state ~data ->
@@ -339,10 +342,11 @@ let gen :
        gen_data:'d Quickcheck.Generator.t
     -> parallelism_log_2:int
     -> f_job_done:(   ('a, 'd) State.t
-                   -> ('a, 'd) State.Job.t
+                   -> ('a, 'd) Available_job.t
                    -> 'a State.Completed_job.t)
+    -> f_acc:(int * 'a option -> 'a -> 'a option)
     -> ('a, 'd) State.t Quickcheck.Generator.t =
- fun ~gen_data ~parallelism_log_2 ~f_job_done ->
+ fun ~gen_data ~parallelism_log_2 ~f_job_done ~f_acc ->
   let open Quickcheck.Generator.Let_syntax in
   let%bind seed = gen_data in
   let s = State1.create ~parallelism_log_2 in
@@ -359,12 +363,19 @@ let gen :
     in
     go datas []
   in
-  List.fold data_chunks ~init:s ~f:(fun acc chunk ->
-      let jobs = next_jobs ~state:acc in
-      let jobs_done = List.map jobs (f_job_done acc) in
-      let _ = Or_error.ok_exn @@ enqueue_data acc chunk in
-      let _ = Or_error.ok_exn @@ State1.consume acc jobs_done in
-      acc )
+  List.fold data_chunks ~init:s ~f:(fun s chunk ->
+      let jobs = next_jobs ~state:s in
+      let jobs_done = List.map jobs (f_job_done s) in
+      let old_tuple = s.acc in
+      let _ = Or_error.ok_exn @@ enqueue_data s chunk in
+      Option.iter
+        (Or_error.ok_exn @@ State1.consume s jobs_done)
+        ~f:(fun x ->
+          let tuple =
+            if Option.is_some (snd old_tuple) then old_tuple else s.acc
+          in
+          s.acc <- (fst s.acc, f_acc tuple x) ) ;
+      s )
 
 let%test_module "scans" =
   ( module struct
@@ -377,7 +388,7 @@ let%test_module "scans" =
         Or_error.ok_exn @@ enqueue_data state (List.take ds free_space) ;
         List.drop ds free_space )
 
-    let rec step_on_free_space state w ds f =
+    let rec step_on_free_space state w ds f f_acc =
       let rem_ds =
         if List.length ds > 0 then
           let new_ds = enqueue state ds in
@@ -386,47 +397,59 @@ let%test_module "scans" =
       in
       let jobs = next_jobs ~state in
       let works = List.map jobs (f state) in
-      let x = Or_error.ok_exn @@ State1.consume state works in
-      let%bind () = Linear_pipe.write w x in
-      if List.length rem_ds > 0 then step_on_free_space state w rem_ds f
+      let old_tuple = state.acc in
+      let x' =
+        Option.bind
+          (Or_error.ok_exn @@ State1.consume state works)
+          ~f:(fun x ->
+            let merged =
+              if Option.is_some (snd old_tuple) then f_acc old_tuple x
+              else snd state.acc
+            in
+            state.acc <- (fst state.acc, merged) ;
+            merged )
+      in
+      let%bind () = Linear_pipe.write w x' in
+      if List.length rem_ds > 0 then step_on_free_space state w rem_ds f f_acc
       else return ()
 
-    let do_steps ~state ~data ~f w =
+    let do_steps ~state ~data ~f ~f_acc w =
       let rec go () =
         match%bind Linear_pipe.read' data with
         | `Eof -> return ()
         | `Ok q ->
             let ds = Queue.to_list q in
-            let%bind () = step_on_free_space state w ds f in
+            let%bind () = step_on_free_space state w ds f f_acc in
             go ()
       in
       go ()
 
-    let scan ~data ~parallelism_log_2 ~f =
+    let scan ~data ~parallelism_log_2 ~f ~f_acc =
       Linear_pipe.create_reader ~close_on_exception:true (fun w ->
           match%bind Linear_pipe.read data with
           | `Eof -> return ()
           | `Ok seed ->
               let s = start ~parallelism_log_2 in
               Or_error.ok_exn @@ enqueue_data ~state:s ~data:[seed] ;
-              do_steps ~state:s ~data ~f w )
+              do_steps ~state:s ~data ~f w ~f_acc )
 
-    let step_repeatedly ~state ~data ~f =
+    let step_repeatedly ~state ~data ~f ~f_acc =
       Linear_pipe.create_reader ~close_on_exception:true (fun w ->
-          do_steps ~state ~data ~f w )
+          do_steps ~state ~data ~f w ~f_acc )
 
     let%test_module "scan (+) over ints" =
       ( module struct
+        let f_merge_up (state: int * int64 option) x =
+          let open Option.Let_syntax in
+          let%map acc = snd state in
+          Int64.( + ) acc x
+
         let job_done (state: ('a, 'd) State1.t)
-            (job: (Int64.t, Int64.t) State.Job.t) :
+            (job: (Int64.t, Int64.t) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
-          | Base (Some x) -> Lifted x
-          | Merge (Some x, Some y) -> Merged (Int64.( + ) x y)
-          | Merge_up (Some x) ->
-              let acc = Option.value (snd state.acc) ~default:Int64.zero in
-              Merged_up (Int64.( + ) acc x)
-          | _ -> Lifted Int64.zero
+          | Base x -> Lifted x
+          | Merge (x, y) -> Merged (Int64.( + ) x y)
 
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;
@@ -434,7 +457,7 @@ let%test_module "scans" =
             gen ~parallelism_log_2:7
               ~gen_data:
                 Quickcheck.Generator.Let_syntax.(Int.gen >>| Int64.of_int)
-              ~f_job_done:job_done
+              ~f_job_done:job_done ~f_acc:f_merge_up
           in
           Quickcheck.test g ~sexp_of:[%sexp_of : (int64, int64) State.t]
             ~trials:10 ~f:(fun s ->
@@ -460,6 +483,7 @@ let%test_module "scans" =
                   in
                   let pipe s =
                     step_repeatedly ~state:s ~data:one_then_zeros ~f:job_done
+                      ~f_acc:f_merge_up
                   in
                   let fill_some_zeros v s =
                     List.init (parallelism * parallelism) ~f:(fun _ -> ())
@@ -484,16 +508,17 @@ let%test_module "scans" =
 
     let%test_module "scan (+) over ints, map from string" =
       ( module struct
+        let f_merge_up (tuple: int * int64 option) x =
+          let open Option.Let_syntax in
+          let%map acc = snd tuple in
+          Int64.( + ) acc x
+
         let job_done (state: ('a, 'd) State1.t)
-            (job: (Int64.t, string) State.Job.t) :
+            (job: (Int64.t, string) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
-          | Base (Some x) -> Lifted (Int64.of_string x)
-          | Merge (Some x, Some y) -> Merged (Int64.( + ) x y)
-          | Merge_up (Some x) ->
-              let acc = Option.value (snd state.acc) ~default:Int64.zero in
-              Merged_up (Int64.( + ) acc x)
-          | _ -> Lifted Int64.zero
+          | Base x -> Lifted (Int64.of_string x)
+          | Merge (x, y) -> Merged (Int64.( + ) x y)
 
         let%test_unit "scan behaves like a fold long-term" =
           let a_bunch_of_ones_then_zeros x =
@@ -509,7 +534,7 @@ let%test_module "scans" =
           let result =
             scan
               ~data:(a_bunch_of_ones_then_zeros n)
-              ~parallelism_log_2:3 ~f:job_done
+              ~parallelism_log_2:3 ~f:job_done ~f_acc:f_merge_up
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%map after_3n =
@@ -530,15 +555,17 @@ let%test_module "scans" =
 
     let%test_module "scan (concat) over strings" =
       ( module struct
+        let f_merge_up (tuple: int * string option) x =
+          let open Option.Let_syntax in
+          let%map acc = snd tuple in
+          String.( ^ ) acc x
+
         let job_done (state: ('a, 'd) State1.t)
-            (job: (string, string) State.Job.t) : string State.Completed_job.t =
+            (job: (string, string) Available_job.t) :
+            string State.Completed_job.t =
           match job with
-          | Base (Some x) -> Lifted x
-          | Merge (Some x, Some y) -> Merged (String.( ^ ) x y)
-          | Merge_up (Some x) ->
-              let acc = Option.value (snd state.acc) ~default:"" in
-              Merged_up (String.( ^ ) acc x)
-          | _ -> Lifted "X"
+          | Base x -> Lifted x
+          | Merge (x, y) -> Merged (String.( ^ ) x y)
 
         let%test_unit "scan performs operation in correct order with \
                        non-commutative semigroup" =
@@ -557,7 +584,7 @@ let%test_module "scans" =
           let result =
             scan
               ~data:(a_bunch_of_nums_then_empties n)
-              ~parallelism_log_2:4 ~f:job_done
+              ~parallelism_log_2:4 ~f:job_done ~f_acc:f_merge_up
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%map after_3n =

@@ -77,7 +77,7 @@ module type S = sig
     module Get_work : sig
       type query = unit
 
-      type response = Work.Spec.t Or_error.t
+      type response = Work.Spec.t
 
       val rpc : (query, response) Rpc.Rpc.t
     end
