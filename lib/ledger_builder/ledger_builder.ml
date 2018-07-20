@@ -120,6 +120,8 @@ end = struct
      * Essentially you "can't" buy B if you buy A
      *)
     let i = Random.int n in
+    (* TODO: This assertion will always pass once we implement #305 *)
+    assert (List.length jobs > 1) ;
     let chunk = [List.nth_exn jobs i; List.nth_exn jobs (i + (1 % n))] in
     List.map chunk ~f:(function
       | A.Base d ->

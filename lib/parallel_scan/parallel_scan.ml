@@ -287,9 +287,7 @@ let start : type a d. parallelism_log_2:int -> (a, d) State.t = State1.create
 let next_jobs : state:('a, 'd) State1.t -> ('a, 'd) Available_job.t list =
  fun ~state ->
   let max = State1.parallelism state in
-  List.filter_map
-    (List.take (State1.read_all state) max)
-    ~f:(fun job ->
+  List.filter_map (State1.read_all state) ~f:(fun job ->
       let module J = State1.Job in
       let module A = Available_job in
       match job with
@@ -299,6 +297,7 @@ let next_jobs : state:('a, 'd) State1.t -> ('a, 'd) Available_job.t list =
       | J.Merge (_, None) -> None
       | J.Merge (Some a, Some b) -> Some (A.Merge (a, b))
       | J.Merge_up _ -> None )
+  |> Fn.flip List.take max
 
 let next_k_jobs :
        state:('a, 'd) State1.t
