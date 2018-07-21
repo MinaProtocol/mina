@@ -36,14 +36,17 @@ struct
     let open Or_error.Let_syntax in
     let%map next_state = update chain.state block in
     let next_state_top_hash = Keys.Step.instance_hash next_state in
+    let prover_state =
+      { Keys.Step.Prover_state.prev_proof= chain.proof
+      ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
+      ; prev_state= chain.state
+      ; update= block }
+    in
     let prev_proof =
       Tick.prove
         (Tick.Keypair.pk Keys.Step.keys)
         (Keys.Step.input ())
-        { Keys.Step.Prover_state.prev_proof= chain.proof
-        ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-        ; prev_state= chain.state
-        ; update= block }
+        prover_state
         Keys.Step.main next_state_top_hash
     in
     {Blockchain.state= next_state; proof= wrap next_state_top_hash prev_proof}
@@ -65,14 +68,17 @@ struct
     if Insecure.compute_base_proof then Lazy.return Tock.Proof.dummy
     else
       Lazy.map base_hash ~f:(fun base_hash ->
+          let prover_state =
+                { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
+                ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
+                ; prev_state= Blockchain.State.negative_one
+                ; update= Block.genesis }
+          in
           let tick =
             Tick.prove
               (Tick.Keypair.pk Keys.Step.keys)
               (Keys.Step.input ())
-              { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
-              ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-              ; prev_state= Blockchain.State.negative_one
-              ; update= Block.genesis }
+              prover_state
               Keys.Step.main base_hash
           in
           wrap base_hash tick )
