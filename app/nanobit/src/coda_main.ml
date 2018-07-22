@@ -829,7 +829,11 @@ module Run (Program : Main_intf) = struct
       Linear_pipe.write_without_pushback solved_work_writer () ;
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
             match%map Linear_pipe.read solved_work_reader with
-            | `Ok () -> request_work minibit
+            | `Ok () ->
+              let r = request_work minibit in
+              Or_error.iter_error r ~f:(fun _ ->
+                Linear_pipe.write_without_pushback solved_work_writer ());
+              r
             | `Eof -> assert false )
       ; Rpc.One_way.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
             don't_wait_for
