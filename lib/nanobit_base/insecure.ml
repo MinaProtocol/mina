@@ -16,12 +16,12 @@ let private_key_generation = true
 let randomness = true
 
 (* Enabling this will SPEED UP builds as keys are generated at compile-time *)
-let key_generation = false
+let key_generation = true
 
-let verify_blockchain = false
+let verify_blockchain = true
 
-let compute_base_hash = false
+let compute_base_hash = true
 
-let compute_base_proof = false
+let compute_base_proof = true
 
-let extend_blockchain = false
+let extend_blockchain = true
