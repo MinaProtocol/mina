@@ -4,88 +4,14 @@ open Util
 open Snark_params
 open Tick
 open Let_syntax
-include Blockchain_state
+include Common.Blockchain_state
 
-let bound_divisor = `Two_to_the 11
-
-let delta_minus_one_max_bits = 7
-
-let target_time_ms = `Two_to_the 13
-
-(* 8.192 seconds *)
-
-let compute_target timestamp (previous_target: Target.t) time =
-  let target_time_ms =
-    let (`Two_to_the k) = target_time_ms in
-    Bignum_bigint.(pow (of_int 2) (of_int k))
-  in
-  let target_max = Target.(to_bigint max) in
-  let delta_minus_one_max =
-    Bignum_bigint.(pow (of_int 2) (of_int delta_minus_one_max_bits) - one)
-  in
-  let div_pow_2 x (`Two_to_the k) = Bignum_bigint.shift_right x k in
-  let previous_target = Target.to_bigint previous_target in
-  assert (Block_time.(time > timestamp)) ;
-  let rate_multiplier =
-    div_pow_2 Bignum_bigint.(target_max - previous_target) bound_divisor
-  in
-  let delta =
-    let open Bignum_bigint in
-    of_int64 Block_time.(Span.to_ms (diff time timestamp)) / target_time_ms
-  in
-  let open Bignum_bigint in
-  Target.of_bigint
-    ( if delta = zero then
-        if previous_target < rate_multiplier then one
-        else previous_target - rate_multiplier
-    else
-      let gamma = min (delta - one) delta_minus_one_max in
-      previous_target + (rate_multiplier * gamma) )
-
-let negative_one =
-  let next_difficulty : Target.Unpacked.value =
-    if Insecure.initial_difficulty then Target.max
-    else
-      Target.of_bigint
-        Bignum_bigint.(Target.(to_bigint max) / pow (of_int 2) (of_int 4))
-  in
-  let timestamp =
-    Block_time.of_time
-      (Time.sub (Block_time.to_time Block.genesis.header.time) Time.Span.second)
-  in
-  { next_difficulty
-  ; previous_state_hash= State_hash.of_hash Pedersen.zero_hash
-  ; ledger_builder_hash= Ledger_builder_hash.dummy
-  ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
-  ; strength= Strength.zero
-  ; timestamp }
+let negative_one = Generated_at_compile_time.negative_one
+let zero = Generated_at_compile_time.zero
+let genesis_block = Generated_at_compile_time.genesis_block
 
 let check cond msg =
   if not cond then Or_error.errorf "Blockchain_state.update: %s" msg else Ok ()
-
-let update_unchecked : value -> Block.t -> value =
- fun state block ->
-  let next_difficulty =
-    compute_target state.timestamp state.next_difficulty block.header.time
-  in
-  { next_difficulty
-  ; previous_state_hash= hash state
-  ; ledger_builder_hash= block.body.ledger_builder_hash
-  ; ledger_hash= block.body.target_hash
-  ; strength= Strength.increase state.strength ~by:state.next_difficulty
-  ; timestamp= block.header.time }
-
-let zero =
-  let open Or_error.Let_syntax in
-  let block = Block.genesis in
-  let zero = update_unchecked negative_one block in
-  let rec _find_ok_nonce i =
-    if Or_error.is_ok (Proof_of_work.create zero i) then
-      printf "nonce = %s\n%!" (Block.Nonce.to_string i)
-    else _find_ok_nonce (Block.Nonce.succ i)
-  in
-  ignore (Or_error.ok_exn (Proof_of_work.create zero block.header.nonce)) ;
-  zero
 
 let zero_hash = hash zero
 
