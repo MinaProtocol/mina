@@ -7,9 +7,9 @@ let run_test with_snark : unit -> unit Deferred.t =
  fun () ->
   let log = Logger.create () in
   let conf_dir = "/tmp" in
-  let%bind prover = Prover.create ~conf_dir in
-  let%bind verifier = Verifier.create ~conf_dir in
-  let%bind genesis_proof = Prover.genesis_proof prover >>| Or_error.ok_exn in
+  let%bind prover = Prover.create ~conf_dir
+  and verifier = Verifier.create ~conf_dir
+  in
   let module Init = struct
     type proof = Proof.Stable.V1.t [@@deriving bin_io, sexp]
 
@@ -21,7 +21,7 @@ let run_test with_snark : unit -> unit Deferred.t =
 
     let prover = prover
 
-    let genesis_proof = genesis_proof
+    let genesis_proof = Precomputed_values.base_proof
 
     let fee_public_key = Genesis_ledger.rich_pk
   end in

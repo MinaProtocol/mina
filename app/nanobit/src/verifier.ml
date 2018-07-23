@@ -27,28 +27,34 @@ module Worker_state = struct
 
   type init_arg = unit [@@deriving bin_io]
 
-  type t = (module S)
+  type t = (module S) Ivar.t
 
   let create () : t Deferred.t =
-    let%map bc_vk = Snark_keys.blockchain_verification ()
-    and tx_vk = Snark_keys.transaction_verification () in
-    let module T = Transaction_snark.Verification.Make (struct
-      let keys = tx_vk
-    end) in
-    let module B = Blockchain_transition.Make (T) in
-    let module U = Blockchain_snark_utils.Verification (struct
-      let key = bc_vk.wrap
+    let res = Ivar.create () in
+    don't_wait_for begin
+      let%map bc_vk = Snark_keys.blockchain_verification ()
+      and tx_vk = Snark_keys.transaction_verification () in
+      let module T = Transaction_snark.Verification.Make (struct
+        let keys = tx_vk
+      end) in
+      let module B = Blockchain_transition.Make (T) in
+      let module U = Blockchain_snark_utils.Verification (struct
+        let key = bc_vk.wrap
 
-      let key_to_bool_list = B.Step_base.Verifier.Verification_key.to_bool_list
+        let key_to_bool_list = B.Step_base.Verifier.Verification_key.to_bool_list
 
-      let input = B.wrap_input
-    end) in
-    let module M = struct
-      let verify_wrap = U.verify_wrap
+        let input = B.wrap_input
+      end) in
+      let module M = struct
+        let verify_wrap = U.verify_wrap
 
-      let verify_transaction_snark = T.verify
-    end in
-    (module M : S)
+        let verify_transaction_snark = T.verify
+      end in
+      Ivar.fill res (module M : S)
+    end;
+    Deferred.return res
+
+  let get = Ivar.read
 end
 
 module Worker = struct
@@ -72,12 +78,14 @@ module Worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      let verify_blockchain (module M : Worker_state.S) (chain: Blockchain.t) =
-        return (M.verify_wrap chain.state chain.proof)
+      let verify_blockchain (w : Worker_state.t) (chain: Blockchain.t) =
+        let%map (module M) = Worker_state.get w in
+        M.verify_wrap chain.state chain.proof
 
-      let verify_transaction_snark (module M : Worker_state.S)
+      let verify_transaction_snark (w : Worker_state.t)
           (s: Transaction_snark.t) =
-        return (M.verify_transaction_snark s)
+        let%map (module M) = Worker_state.get w in
+        (M.verify_transaction_snark s)
 
       let functions =
         let f (i, o, f) =

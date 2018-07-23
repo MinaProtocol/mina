@@ -27,6 +27,7 @@
       snarky
       snark_keys
       snark_pool
+      precomputed_values
       network_pool
       snark_worker_lib
       keys_lib
