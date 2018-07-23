@@ -1,0 +1,11 @@
+(jbuild_version 1)
+
+(library
+ ((name common)
+  (public_name blockchain_snark.common)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (libraries (core cached cache_dir protocols snarky snark_params nanobit_base proof_of_work transaction_snark bignum_bigint))
+  (inline_tests)
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (synopsis "blockchain state transition snarking library (common)")))

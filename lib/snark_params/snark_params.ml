@@ -193,6 +193,17 @@ module Tick = struct
   module Util = Snark_util.Make (Tick0)
 end
 
+let embed (x: Tick.Field.t) : Tock.Field.t =
+  let n = Tick.Bigint.of_field x in
+  let rec go pt acc i =
+    if i = Tick.Field.size_in_bits then acc
+    else
+      go (Tock.Field.add pt pt)
+        (if Tick.Bigint.test_bit n i then Tock.Field.add pt acc else acc)
+        (i + 1)
+  in
+  go Tock.Field.one Tock.Field.zero 0
+
 let ledger_depth = 3
 
 (* Let n = Tick.Field.size_in_bits.
