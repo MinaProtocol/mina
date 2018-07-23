@@ -27,11 +27,10 @@ module Worker_state = struct
 
   type init_arg = unit [@@deriving bin_io]
 
-  type t = (module S) Ivar.t
+  type t = (module S) Deferred.t
 
   let create () : t Deferred.t =
-    let res = Ivar.create () in
-    don't_wait_for
+    Deferred.return
       (let%map bc_vk = Snark_keys.blockchain_verification ()
        and tx_vk = Snark_keys.transaction_verification () in
        let module T = Transaction_snark.Verification.Make (struct
@@ -51,10 +50,9 @@ module Worker_state = struct
 
          let verify_transaction_snark = T.verify
        end in
-       Ivar.fill res (module M : S)) ;
-    Deferred.return res
+       (module M : S))
 
-  let get = Ivar.read
+  let get = Fn.id
 end
 
 module Worker = struct

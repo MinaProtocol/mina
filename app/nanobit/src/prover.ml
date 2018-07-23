@@ -58,11 +58,10 @@ module Worker_state = struct
 
   type init_arg = unit [@@deriving bin_io]
 
-  type t = (module S) Ivar.t
+  type t = (module S) Deferred.t
 
   let create () : t Deferred.t =
-    let res = Ivar.create () in
-    don't_wait_for
+    Deferred.return
       (let%map keys = Keys_lib.Keys.create () in
        let module M = struct
          open Snark_params
@@ -75,10 +74,9 @@ module Worker_state = struct
 
          include Transition_utils (Keys) (Transaction_snark)
        end in
-       Ivar.fill res (module M : S)) ;
-    Deferred.return res
+       (module M : S))
 
-  let get = Ivar.read
+  let get = Fn.id
 end
 
 open Snark_params

@@ -8,9 +8,8 @@ module Blockchain_state = struct
 
   let delta_minus_one_max_bits = 7
 
+  (** 8.192 seconds *)
   let target_time_ms = `Two_to_the 13
-
-  (* 8.192 seconds *)
 
   let compute_target timestamp (previous_target: Target.t) time =
     let target_time_ms =
