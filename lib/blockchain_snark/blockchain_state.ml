@@ -7,7 +7,9 @@ open Let_syntax
 include Common.Blockchain_state
 
 let negative_one = Generated_at_compile_time.negative_one
+
 let zero = Generated_at_compile_time.zero
+
 let genesis_block = Generated_at_compile_time.genesis_block
 
 let check cond msg =
@@ -199,20 +201,17 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
          in
          let%bind state_bits = to_bits new_state in
          let%bind state_partial =
-           Pedersen_hash.Section.extend
-             Pedersen_hash.Section.empty
-             ~start:Hash_prefix.length_in_bits
-             state_bits
+           Pedersen_hash.Section.extend Pedersen_hash.Section.empty
+             ~start:Hash_prefix.length_in_bits state_bits
          in
-         let hash_prefix_section (prefix : Pedersen.State.t) =
-           Pedersen_hash.Section.create
-             ~acc:(`Value prefix.acc)
-            ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_bits))
+         let hash_prefix_section (prefix: Pedersen.State.t) =
+           Pedersen_hash.Section.create ~acc:(`Value prefix.acc)
+             ~support:
+               (Interval_union.of_interval (0, Hash_prefix.length_in_bits))
          in
          let%bind pow =
            let%bind init =
-             Pedersen_hash.Section.disjoint_union_exn
-               state_partial
+             Pedersen_hash.Section.disjoint_union_exn state_partial
                (hash_prefix_section Hash_prefix.proof_of_work)
            in
            Pedersen_hash.Section.extend init
@@ -221,21 +220,22 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            >>| Pedersen_hash.Section.to_initial_segment_digest
            >>| Or_error.ok_exn
            >>= fun (pow, `Length n) ->
-           assert (Int.equal n (Hash_prefix.length_in_bits + 64 + List.length state_bits));
+           assert (
+             Int.equal n
+               (Hash_prefix.length_in_bits + 64 + List.length state_bits) ) ;
            Proof_of_work.var_of_hash_packed pow
          in
          let%bind state_hash =
-          Pedersen_hash.Section.create ~acc:(`Value Hash_prefix.blockchain_state.acc)
-            ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_bits))
-          |> Pedersen_hash.Section.disjoint_union_exn state_partial
-          >>| Pedersen_hash.Section.acc
-          >>| Pedersen_hash.digest
+           Pedersen_hash.Section.create
+             ~acc:(`Value Hash_prefix.blockchain_state.acc)
+             ~support:
+               (Interval_union.of_interval (0, Hash_prefix.length_in_bits))
+           |> Pedersen_hash.Section.disjoint_union_exn state_partial
+           >>| Pedersen_hash.Section.acc >>| Pedersen_hash.digest
          in
          let%bind meets_target = meets_target difficulty_packed pow in
          let%map success = Boolean.(good_body && meets_target) in
-         ( State_hash.var_of_hash_packed state_hash
-         , new_state
-         , `Success success ))
+         (State_hash.var_of_hash_packed state_hash, new_state, `Success success))
   end
 end
 

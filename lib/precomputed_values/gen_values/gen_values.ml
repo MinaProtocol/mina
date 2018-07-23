@@ -6,6 +6,7 @@ open Core
 
 module type S = sig
   val base_hash_expr : Parsetree.expression
+
   val base_proof_expr : Parsetree.expression
 end
 
@@ -20,13 +21,15 @@ end
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let base_hash = Keys.Step.instance_hash Blockchain_snark.Blockchain_state.zero
+  let base_hash =
+    Keys.Step.instance_hash Blockchain_snark.Blockchain_state.zero
 
   let base_hash_expr =
     [%expr
       Snark_params.Tick.Field.t_of_sexp
-        [%e Ppx_util.expr_of_sexp ~loc (Snark_params.Tick.Field.sexp_of_t base_hash) ]
-    ]
+        [%e
+          Ppx_util.expr_of_sexp ~loc
+            (Snark_params.Tick.Field.sexp_of_t base_hash)]]
 
   let wrap hash proof =
     let open Snark_params in
@@ -46,15 +49,14 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let tick =
       Tick.prove
         (Tick.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ())
-        prover_state
-        Keys.Step.main base_hash
+        (Keys.Step.input ()) prover_state Keys.Step.main base_hash
     in
     let proof = wrap base_hash tick in
-    [%expr Nanobit_base.Proof.Stable.V1.t_of_sexp
-              [%e Ppx_util.expr_of_sexp ~loc
-                    (Nanobit_base.Proof.Stable.V1.sexp_of_t proof)]
-    ]
+    [%expr
+      Nanobit_base.Proof.Stable.V1.t_of_sexp
+        [%e
+          Ppx_util.expr_of_sexp ~loc
+            (Nanobit_base.Proof.Stable.V1.sexp_of_t proof)]]
 end
 
 open Async
@@ -65,23 +67,20 @@ let main () =
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
   let loc = Ppxlib.Location.none in
   let%bind (module M) =
-    if use_dummy_values
-    then return (module Dummy : S)
+    if use_dummy_values then return (module Dummy : S)
     else
       let%map (module K) = Keys_lib.Keys.create () in
-      (module Make_real(K) : S)
+      (module Make_real (K) : S)
   in
-  let structure = 
+  let structure =
     [%str
       let base_hash = [%e M.base_hash_expr]
-      let base_proof = [%e M.base_proof_expr]
-    ]
+
+      let base_proof = [%e M.base_proof_expr]]
   in
-  Pprintast.top_phrase fmt (Ptop_def structure);
+  Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0
-;;
 
 let () =
-  don't_wait_for (main ());
+  don't_wait_for (main ()) ;
   never_returns (Scheduler.go ())
-;;

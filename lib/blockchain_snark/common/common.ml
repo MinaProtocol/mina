@@ -41,14 +41,14 @@ module Blockchain_state = struct
         previous_target + (rate_multiplier * gamma) )
 
   let update_unchecked : Blockchain_state.t -> Block.t -> Blockchain_state.t =
-    fun state block ->
-      let next_difficulty =
-        compute_target state.timestamp state.next_difficulty block.header.time
-      in
-      { next_difficulty
-      ; previous_state_hash= hash state
-      ; ledger_builder_hash= block.body.ledger_builder_hash
-      ; ledger_hash= block.body.target_hash
-      ; strength= Strength.increase state.strength ~by:state.next_difficulty
-      ; timestamp= block.header.time }
+   fun state block ->
+    let next_difficulty =
+      compute_target state.timestamp state.next_difficulty block.header.time
+    in
+    { next_difficulty
+    ; previous_state_hash= hash state
+    ; ledger_builder_hash= block.body.ledger_builder_hash
+    ; ledger_hash= block.body.target_hash
+    ; strength= Strength.increase state.strength ~by:state.next_difficulty
+    ; timestamp= block.header.time }
 end

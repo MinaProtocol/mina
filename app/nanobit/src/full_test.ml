@@ -8,8 +8,7 @@ let run_test with_snark : unit -> unit Deferred.t =
   let log = Logger.create () in
   let conf_dir = "/tmp" in
   let%bind prover = Prover.create ~conf_dir
-  and verifier = Verifier.create ~conf_dir
-  in
+  and verifier = Verifier.create ~conf_dir in
   let module Init = struct
     type proof = Proof.Stable.V1.t [@@deriving bin_io, sexp]
 

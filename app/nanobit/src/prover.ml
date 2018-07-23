@@ -34,9 +34,7 @@ struct
     let prev_proof =
       Tick.prove
         (Tick.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ())
-        prover_state
-        Keys.Step.main next_state_top_hash
+        (Keys.Step.input ()) prover_state Keys.Step.main next_state_top_hash
     in
     {Blockchain.state= next_state; proof= wrap next_state_top_hash prev_proof}
 
@@ -64,21 +62,20 @@ module Worker_state = struct
 
   let create () : t Deferred.t =
     let res = Ivar.create () in
-    don't_wait_for begin
-      let%map keys = Keys_lib.Keys.create () in
-      let module M = struct
-        open Snark_params
+    don't_wait_for
+      (let%map keys = Keys_lib.Keys.create () in
+       let module M = struct
+         open Snark_params
 
-        module Keys = (val keys)
+         module Keys = (val keys)
 
-        module Transaction_snark = Transaction_snark.Make (struct
-          let keys = Keys.transaction_snark_keys
-        end)
+         module Transaction_snark = Transaction_snark.Make (struct
+           let keys = Keys.transaction_snark_keys
+         end)
 
-        include Transition_utils (Keys) (Transaction_snark)
-      end in
-      Ivar.fill res (module M : S)
-    end;
+         include Transition_utils (Keys) (Transaction_snark)
+       end in
+       Ivar.fill res (module M : S)) ;
     Deferred.return res
 
   let get = Ivar.read
@@ -96,8 +93,8 @@ module Functions = struct
 
   let initialized =
     create bin_unit [%bin_type_class : [`Initialized]] (fun w () ->
-      let%map (module W) = Worker_state.get w in
-      `Initialized )
+        let%map (module W) = Worker_state.get w in
+        `Initialized )
 
   let extend_blockchain =
     create [%bin_type_class : Blockchain.Stable.V1.t * Block.Stable.V1.t]
@@ -106,23 +103,21 @@ module Functions = struct
       (({Blockchain.state= prev_state; proof= prev_proof} as chain), block)
       ->
         let%map (module W) = Worker_state.get w in
-           if Insecure.extend_blockchain then
-              let proof = Precomputed_values.base_proof in
-              { Blockchain.proof
-              ; state= Or_error.ok_exn (W.update prev_state block) }
-          else Or_error.ok_exn (W.extend_blockchain chain block) )
+        if Insecure.extend_blockchain then
+          let proof = Precomputed_values.base_proof in
+          {Blockchain.proof; state= Or_error.ok_exn (W.update prev_state block)}
+        else Or_error.ok_exn (W.extend_blockchain chain block) )
 
   let verify_blockchain =
     create Blockchain.Stable.V1.bin_t bin_bool
       (fun w {Blockchain.state; proof} ->
-         let%map (module W) = Worker_state.get w in
-        if Insecure.verify_blockchain then true
-        else W.verify state proof)
+        let%map (module W) = Worker_state.get w in
+        if Insecure.verify_blockchain then true else W.verify state proof )
 
   let verify_transaction_snark =
     create Transaction_snark.bin_t bin_bool (fun w proof ->
-      let%map (module W) = Worker_state.get w in
-      W.Transaction_snark.verify proof)
+        let%map (module W) = Worker_state.get w in
+        W.Transaction_snark.verify proof )
 end
 
 module Worker = struct
@@ -169,27 +164,27 @@ module Worker = struct
   include Rpc_parallel.Make (T)
 end
 
-type t = { connection : Worker.Connection.t; process : Process.t }
+type t = {connection: Worker.Connection.t; process: Process.t}
 
 let create ~conf_dir =
   Parallel.init_master () ;
-  let%map (connection, process) =
-    Worker.spawn_in_foreground_exn
-      ~on_failure:Error.raise ~shutdown_on:Disconnect
-      ~connection_state_init_arg:() ()
+  let%map connection, process =
+    Worker.spawn_in_foreground_exn ~on_failure:Error.raise
+      ~shutdown_on:Disconnect ~connection_state_init_arg:() ()
   in
-  { connection; process }
+  {connection; process}
 
-let initialized { connection; _ } =
+let initialized {connection; _} =
   Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
 
-let extend_blockchain { connection; _ } chain block =
+let extend_blockchain {connection; _} chain block =
   Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
     ~arg:(chain, block)
 
-let verify_blockchain { connection; _ } chain =
-  Worker.Connection.run connection ~f:Worker.functions.verify_blockchain ~arg:chain
+let verify_blockchain {connection; _} chain =
+  Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
+    ~arg:chain
 
-let verify_transaction_snark { connection; _ } snark =
+let verify_transaction_snark {connection; _} snark =
   Worker.Connection.run connection ~f:Worker.functions.verify_transaction_snark
     ~arg:snark
