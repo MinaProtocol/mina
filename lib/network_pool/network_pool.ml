@@ -82,18 +82,6 @@ let%test_module "network pool test" =
     end
 
     module Mock_work = Int
-
-    module Mock_Priced_proof = struct
-      type t = {proof: Mock_proof.t; fee: Int.t}
-      [@@deriving sexp, bin_io, fields]
-
-      let proof t = t.proof
-
-      type proof = Mock_proof.t
-
-      type fee = Int.t
-    end
-
     module Mock_snark_pool = Snark_pool.Make (Mock_proof) (Mock_work) (Int)
     module Mock_snark_pool_diff =
       Snark_pool_diff.Make (Mock_proof) (Mock_work) (Int) (Mock_snark_pool)
@@ -104,14 +92,16 @@ let%test_module "network pool test" =
       let pool_reader, pool_writer = Linear_pipe.create () in
       let network_pool = Mock_network_pool.create pool_reader in
       let work = 1 in
-      let command = Snark_pool_diff.Add_unsolved work in
+      let priced_proof = {Mock_snark_pool_diff.proof= 0; fee= 0} in
+      let command = Snark_pool_diff.Add_solved_work (work, priced_proof) in
       (fun () ->
         don't_wait_for
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool) ~f:
              (fun _ ->
                let pool = Mock_network_pool.pool network_pool in
-               let requested_work = Mock_snark_pool.request_work pool in
-               assert (requested_work = Some work) ;
+               ( match Mock_snark_pool.request_proof pool 1 with
+               | Some {proof} -> assert (proof = priced_proof.proof)
+               | None -> failwith "There should have been a proof here" ) ;
                Deferred.unit ) ;
         Mock_network_pool.apply_and_broadcast network_pool command )
       |> Async.Thread_safe.block_on_async_exn
@@ -121,7 +111,9 @@ let%test_module "network pool test" =
       let works = List.range 0 10 in
       let verify_unsolved_work () =
         let work_diffs =
-          List.map works ~f:(fun work -> Snark_pool_diff.Add_unsolved work)
+          List.map works ~f:(fun work ->
+              Snark_pool_diff.Add_solved_work
+                (work, {Mock_snark_pool_diff.proof= 0; fee= 0}) )
           |> Linear_pipe.of_list
         in
         let network_pool = Mock_network_pool.create work_diffs in
@@ -129,9 +121,8 @@ let%test_module "network pool test" =
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool) ~f:
              (fun work_command ->
                let work =
-                 match work_command with
-                 | Snark_pool_diff.Add_unsolved work -> work
-                 | Snark_pool_diff.Add_solved_work (work, _) -> work
+                 match work_command
+                 with Snark_pool_diff.Add_solved_work (work, _) -> work
                in
                assert (List.mem works work ~equal:( = )) ;
                Deferred.unit ) ;

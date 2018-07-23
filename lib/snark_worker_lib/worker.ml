@@ -64,7 +64,7 @@ struct
     let%bind state = Worker_state.create () in
     let wait ?(sec= 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
-      let log_and_retry ?sec label error =
+      let log_and_retry label error =
         Logger.error log !"Error %s:\n%{sexp:Error.t}" label error ;
         let%bind () = wait () in
         go ()
@@ -72,8 +72,11 @@ struct
       Logger.info log "Asking for work again...";
       match%bind Rpc.Rpc.dispatch Rpcs.Get_work.rpc conn () with
       | Error e -> log_and_retry "getting work" e
-      | Ok (Error e) -> log_and_retry ~sec:5. "getting work" e
-      | Ok (Ok work) ->
+      | Ok None ->
+          Logger.info log "No work; waiting a few seconds before retrying" ;
+          let%bind () = wait ~sec:5. () in
+          go ()
+      | Ok (Some work) ->
         Logger.info log "Got some work";
         match perform state public_key work with
         | Error e -> log_and_retry "performing work" e

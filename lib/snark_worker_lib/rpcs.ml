@@ -15,7 +15,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       , Proof.t )
       Work.Single.Spec.t
       Work.Spec.t
-      Or_error.t
+      option
     [@@deriving bin_io]
 
     let rpc : (query, response) Rpc.Rpc.t =

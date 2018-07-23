@@ -615,22 +615,10 @@ struct
     end
   end)
 
-  let request_work ~snark_pool ~best_ledger_builder t =
-    let option s =
-      Option.value_map ~f:Or_error.return ~default:(Or_error.error_string s)
-    in
-    let open Or_error.Let_syntax in
-    let%bind work =
-      Snark_pool.Pool.request_work (Snark_pool.pool (snark_pool t))
-      |> option "no work found"
-      (* TODO: Perhaps we should really be looking in ALL of the lbs rather than
-        the best one. *)
-    in
+  let request_work ~best_ledger_builder t =
+    let open Option.Let_syntax in
     let lb = best_ledger_builder t in
-    let%map instances =
-      List.map ~f:(Ledger_builder.statement_to_work_spec lb) work
-      |> Or_error.all
-    in
+    let%map instances = Ledger_builder.random_work_spec_chunk lb in
     {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
 end
 
@@ -651,7 +639,7 @@ struct
 
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
-  let request_work = Inputs.request_work ~snark_pool ~best_ledger_builder
+  let request_work = Inputs.request_work ~best_ledger_builder
 end
 
 module Coda_without_snark (Init : Init_intf) () = struct
@@ -666,7 +654,7 @@ module Coda_without_snark (Init : Init_intf) () = struct
 
   include Coda.Make (Inputs)
 
-  let request_work = Inputs.request_work ~snark_pool ~best_ledger_builder
+  let request_work = Inputs.request_work ~best_ledger_builder
 
   let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
@@ -762,7 +750,7 @@ module type Main_intf = sig
 
   type t
 
-  val request_work : t -> Inputs.Snark_worker.Work.Spec.t Or_error.t
+  val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
   val best_ledger : t -> Inputs.Ledger.t
 
@@ -831,8 +819,10 @@ module Run (Program : Main_intf) = struct
             match%map Linear_pipe.read solved_work_reader with
             | `Ok () ->
               let r = request_work minibit in
-              Or_error.iter_error r ~f:(fun _ ->
-                Linear_pipe.write_without_pushback solved_work_writer ());
+              begin match r with
+              | None -> Linear_pipe.write_without_pushback solved_work_writer ()
+              | Some _ -> ()
+              end;
               r
             | `Eof -> assert false )
       ; Rpc.One_way.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
