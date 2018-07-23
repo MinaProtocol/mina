@@ -61,12 +61,14 @@ let typ : (var, value) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let to_bits ({ next_difficulty; previous_state_hash; ledger_hash; strength; timestamp } : var) =
+let to_bits ({ next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; timestamp } : var) =
   let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash
   and previous_state_hash_bits = State_hash.var_to_bits previous_state_hash
+  and ledger_builder_hash_bits = Ledger_builder_hash.var_to_bits ledger_builder_hash
   in
   Target.Unpacked.var_to_bits next_difficulty
   @ previous_state_hash_bits
+  @ ledger_builder_hash_bits
   @ ledger_hash_bits
   @ Strength.Unpacked.var_to_bits strength
   @ Block_time.Unpacked.var_to_bits timestamp

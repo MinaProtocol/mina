@@ -69,6 +69,7 @@ struct
         let%bind () = wait () in
         go ()
       in
+      Logger.info log "Asking for work again..." ;
       match%bind Rpc.Rpc.dispatch Rpcs.Get_work.rpc conn () with
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
@@ -76,14 +77,15 @@ struct
           let%bind () = wait ~sec:5. () in
           go ()
       | Ok (Some work) ->
-        match perform state public_key work with
-        | Error e -> log_and_retry "performing work" e
-        | Ok result ->
-          match Rpc.One_way.dispatch Rpcs.Submit_work.rpc conn result with
-          | Error e -> log_and_retry "submitting work" e
-          | Ok () ->
-              let%bind () = wait ~sec:0.1 () in
-              go ()
+          Logger.info log "Got some work" ;
+          match perform state public_key work with
+          | Error e -> log_and_retry "performing work" e
+          | Ok result ->
+            match Rpc.One_way.dispatch Rpcs.Submit_work.rpc conn result with
+            | Error e -> log_and_retry "submitting work" e
+            | Ok () ->
+                let%bind () = wait ~sec:0.1 () in
+                go ()
     in
     go ()
 
