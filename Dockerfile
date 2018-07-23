@@ -1,4 +1,4 @@
-FROM gcr.io/o1labs-192920/ocaml-base:cb142209e77e4e3f4fe05d192bdb1e85cc879d6d
+FROM gcr.io/o1labs-192920/ocaml-base:f8c4c3877c7cd492ab120b26e0d5faae213fa9cb
 
 ENV PATH "/home/opam/.opam/4.06.1/bin:$PATH"
 ENV CAML_LD_LIBRARY_PATH "/home/opam/.opam/4.06.1/lib/stublibs"

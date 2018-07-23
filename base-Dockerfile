@@ -36,3 +36,4 @@ RUN sudo apt-get install --yes librocksdb4.5 librocksdb-dev
 RUN opam install bitstring orocksdb
 RUN sudo apt-get install --yes zlib1g-dev
 RUN opam install cryptokit
+RUN opam install spirv
