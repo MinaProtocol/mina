@@ -25,5 +25,5 @@ jobs:
 
       - run:
           name: Run All Tests
-          command: source ~/.profile && nix-shell . --run "make test"
+          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test
 
