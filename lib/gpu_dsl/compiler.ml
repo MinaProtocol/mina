@@ -5,7 +5,7 @@ let ( !^ ) id = Batteries.Int32.of_int (Id.value id)
 
 module Constant = struct
   module T = struct
-    type t = SpirV.id sexp_opaque * int [@@deriving sexp]
+    type t = Spirv.id sexp_opaque * int [@@deriving sexp]
 
     let compare = compare
 
@@ -24,9 +24,9 @@ module type Program_intf = sig
 
   val register_constant : 'a Type.t -> int -> 'a Id.t
 
-  val push_op : SpirV.op -> unit
+  val push_op : Spirv.op -> unit
 
-  val push_block : branch:Spirv_module.Branch.t -> next_label:SpirV.id -> unit
+  val push_block : branch:Spirv_module.Branch.t -> next_label:Spirv.id -> unit
 
   val define_function :
        string
@@ -47,17 +47,17 @@ module Make_program () : Program_intf = struct
 
   let blocks : Spirv_module.Basic_block.t list ref = ref []
 
-  let curr_block_label : SpirV.id ref = ref 0l
+  let curr_block_label : Spirv.id ref = ref 0l
 
-  let curr_block_ops : SpirV.op list ref = ref []
+  let curr_block_ops : Spirv.op list ref = ref []
 
   let name_table : (string, int) Hashtbl.t = String.Table.create ()
 
-  let types : (Type.E.t * SpirV.id) list ref = ref []
+  let types : (Type.E.t * Spirv.id) list ref = ref []
 
-  let type_table : (Type.E.t, SpirV.id) Hashtbl.t = Type.E.Table.create ()
+  let type_table : (Type.E.t, Spirv.id) Hashtbl.t = Type.E.Table.create ()
 
-  let constant_table : (Constant.t, SpirV.id) Hashtbl.t =
+  let constant_table : (Constant.t, Spirv.id) Hashtbl.t =
     Constant.Table.create ()
 
   let function_table : (string, Spirv_module.Function_definition.t) Hashtbl.t =
@@ -149,7 +149,7 @@ module Make_program () : Program_intf = struct
               let open Spirv_module.Variable_declaration in
               { type_= !^ (register_type (Id.typ id))
               ; id= !^id
-              ; storage_class= SpirV.StorageClassFunction
+              ; storage_class= Spirv.StorageClassFunction
               ; initializer_= None } ) }
     in
     let return_type_id = register_type return_type in
@@ -189,7 +189,7 @@ module Make_program () : Program_intf = struct
       | T Bool -> SMT.Bool
       (* TODO: pointers of different storage classes *)
       | T (Pointer t) ->
-          SMT.Pointer (SpirV.StorageClassFunction, !^(register_type t))
+          SMT.Pointer (Spirv.StorageClassFunction, !^(register_type t))
       | T (Array _) -> failwith "spirv_type_value: Array unimplemented"
       | T (Struct types) ->
           let type_ids =
@@ -208,7 +208,7 @@ module Make_program () : Program_intf = struct
       | T Void -> SMT.Void
 
   let extract () =
-    let open SpirV in
+    let open Spirv in
     let open Spirv_module in
     { capabilities= [CapabilityShader]
     ; memory_model= (AddressingModelLogical, MemoryModelSimple)
@@ -240,7 +240,7 @@ module Make_compiler (Program : Program_intf) = struct
   open Program
 
   let create_value_op : type a.
-      a Op.Value.op -> unit Id.t -> a Id.t -> SpirV.op =
+      a Op.Value.op -> unit Id.t -> a Id.t -> Spirv.op =
     let open Op.Value in
     function
       | Or (x, y) -> fun t r -> `OpLogicalOr (!^t, !^r, !^x, !^y)
@@ -382,7 +382,7 @@ let compile dsl out_file =
   let module Compiler = Make_compiler (Make_program ()) in
   ignore (Compiler.compile dsl) ;
   let ops = Spirv_module.compile (Compiler.Program.extract ()) in
-  let words = SpirV.compile_to_words ops in
+  let words = Spirv.compile_to_words ops in
   let ch = Out_channel.create ~binary:true out_file in
   List.iter words ~f:(fun i32 ->
       Out_channel.output_binary_int ch (Batteries.Int32.to_int i32) ) ;
