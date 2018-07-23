@@ -16,6 +16,7 @@ bignum	v0.11.0	root
 bin_prot	v0.11.0	installed
 biniou	1.2.0	installed
 bitstring	3.0.0	root
+camlp4	4.06+1	root
 cmdliner	1.0.2	root
 cohttp	1.1.0	root
 cohttp-async	1.0.2	installed
@@ -108,7 +109,6 @@ rpc_parallel	v0.11.0	root
 sexplib	v0.11.0	installed
 sexplib0	v0.11.0	installed
 spawn	v0.12.0	installed
-spirv	1.1.2	root
 splittable_random	v0.11.0	installed
 stdio	v0.11.0	installed
 stringext	1.5.0	installed
