@@ -35,6 +35,7 @@ type ('a, 'd) t =
   ; capacity: int
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
+  ; mutable base_none_pos: int option
   ; mutable enough_steps: bool }
 [@@deriving sexp, bin_io]
 
@@ -43,7 +44,7 @@ module Hash = struct
 end
 
 (* TODO: This should really be computed iteratively *)
-let hash {jobs; data_buffer; acc; current_data_length; enough_steps}
+let hash {jobs; data_buffer; acc; current_data_length; base_none_pos; enough_steps}
     a_to_string d_to_string =
   let h = Cryptokit.Hash.sha3 256 in
   Ring_buffer.iter jobs ~f:(function
@@ -60,11 +61,15 @@ let hash {jobs; data_buffer; acc; current_data_length; enough_steps}
           ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2) ) ;
   Queue.iter data_buffer ~f:(fun d -> h#add_string (d_to_string d)) ;
   let i, a = acc in
+  let x = base_none_pos in
   h#add_string (Int.to_string i) ;
   ( match a with
   | None -> h#add_string "None"
   | Some a -> h#add_string (a_to_string a) ) ;
   h#add_string (Int.to_string current_data_length) ;
+  (match x with
+  | None  -> h#add_string "None"
+  | Some a -> h#add_string (Int.to_string a) ) ;
   h#add_string (Bool.to_string enough_steps) ;
   h
 
@@ -78,10 +83,13 @@ let current_data_length {current_data_length} = current_data_length
 
 let enough_steps {enough_steps} = enough_steps
 
-let copy {jobs; data_buffer; acc; current_data_length; enough_steps; capacity} =
+let base_none_pos {base_none_pos} = base_none_pos
+
+let copy {jobs; data_buffer; acc; current_data_length; base_none_pos; enough_steps; capacity} =
   { jobs= Ring_buffer.copy jobs
   ; data_buffer= Queue.copy data_buffer
   ; acc
   ; capacity
   ; current_data_length
+  ; base_none_pos
   ; enough_steps }

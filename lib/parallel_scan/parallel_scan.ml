@@ -45,12 +45,31 @@ module State1 = struct
     ; capacity= parallelism
     ; acc= (0, None)
     ; current_data_length= 0
+    ; base_none_pos= Some (parallelism / 2)
     ; enough_steps= false }
 
   (* TODO Initial count cannot be zero, what should it be then?*)
 
   let parallelism {jobs} = Ring_buffer.length jobs / 2
 
+  (*leaves are in two different chunks on the buffer*)
+  let next_pos p cur_pos =   
+    let first_start = p/2 in
+    let first_end = p-1 in
+    let sec_start = 3*p/2 in 
+    let sec_end = 2*p-1 in
+    if cur_pos = first_end then sec_start
+      else if cur_pos = sec_end then first_start
+      else cur_pos + 1
+
+  let next_base_none_pos state cur_pos = 
+    let p = parallelism state in
+    let new_pos = next_pos p cur_pos in
+    match Ring_buffer.read_i state.jobs new_pos with
+    | Base None -> Some new_pos
+    | _         -> None (*Assuming that Base Somes are picked in the same order*)
+
+    
   let%test_unit "parallelism derived from jobs" =
     let of_parallelism_log_2 x =
       let s = create ~parallelism_log_2:x in
@@ -206,15 +225,9 @@ module State1 = struct
         | Merge_up None, _ -> Ok job
         | Merge (None, None), _ -> Ok job
         | Merge (None, Some _), _ -> Ok job
-        | Base None, _ -> (
-          match Queue.dequeue t.data_buffer with
-          | None ->
-              Or_error.error_string
-                (sprintf "Data buffer empty. Cannot proceed. %d" i)
-          | Some x ->
-              t.current_data_length <- t.current_data_length - 1 ;
-              work_done := true ;
-              Ok (Base (Some x)) )
+        | Base None, _ ->
+              Or_error.error_string 
+                (sprintf "Parallel scan: Not enough data to proceed. Buffer index %d" i)
         | Merge_up (Some x), _ ->
             t.acc <- (fst t.acc |> Int.( + ) 1, Some x) ;
             work_done := true ;
@@ -227,13 +240,12 @@ module State1 = struct
             Ok (Merge (None, None))
         | Base (Some d), Some (Lifted z) -> (
             let%bind () = rewrite i z in
+            let _ = Queue.dequeue completed_jobs_q in
             work_done := true ;
-            match Queue.dequeue t.data_buffer with
-            | None -> Ok (Base None)
-            | Some x ->
-                t.current_data_length <- t.current_data_length - 1 ;
-                let _ = Queue.dequeue completed_jobs_q in
-                Ok (Base (Some x)) )
+            if Option.is_none t.base_none_pos then
+            begin t.base_none_pos <- Some i end;
+            t.current_data_length <- t.current_data_length - 1 ;
+            Ok (Base None))
         | Merge (Some x, Some x'), _ -> Ok job
         | x, y -> failwith @@ "Doesn't happen\n"
         (*( Job.sexp_of_t (*Spec.Accum.sexp_of_t Spec.Data.sexp_of_t x*)
@@ -260,23 +272,33 @@ module State1 = struct
     let open Completed_job in
     let completed_jobs_q = Queue.of_list completed_jobs in
     let last_acc = t.acc in
-    let data_list = Queue.to_list t.data_buffer in
-    (* TODO: Why is this here? *)
-    let iter_list =
-      if List.length completed_jobs = 0 then
-        List.init (List.length data_list) ident
-      else
-        List.init
-          (Int.min (List.length data_list) (List.length completed_jobs))
-          ident
-    in
     let%map enough_steps =
-      List.fold ~init:(return ()) iter_list ~f:(fun acc cj ->
+      List.fold ~init:(return ()) completed_jobs ~f:(fun acc cj ->
           let%bind () = acc in
           let%map work_done = step_once t completed_jobs_q in
           () )
     in
     if not (fst last_acc = fst t.acc) then snd t.acc else None
+
+
+
+  let include_one state value base_pos : unit Or_error.t=
+    let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t= match job with
+      | Base None -> Ok (Base (Some value));
+      | _         -> Or_error.error_string "Invalid job encountered while enqueuing data"
+    in
+    Ring_buffer.direct_update (State.jobs state) base_pos ~f
+  
+  let include_many (state :('a, 'd) State.t) data : unit Or_error.t= 
+    List.fold ~init:(Ok ()) data ~f: (fun b a ->
+      let open Or_error.Let_syntax in
+      let base_pos = State.base_none_pos state in
+      match base_pos with
+      | None     -> Or_error.error_string "No empty leaves"
+      | Some pos -> let%bind () = include_one state a pos in
+        state.base_none_pos <- next_base_none_pos state pos;
+        Ok ()
+      )
 end
 
 module Available_job = struct
@@ -321,6 +343,7 @@ let free_space : state:('a, 'd) State1.t -> int =
 
 let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
  fun ~state ~data ->
+ let open Or_error.Let_syntax in
   if free_space state < List.length data then
     Or_error.error_string
       (sprintf
@@ -328,9 +351,8 @@ let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
          (free_space state) (List.length data))
   else (
     state.current_data_length <- state.current_data_length + List.length data ;
-    Ok
-      (List.fold ~init:() data ~f:(fun () d ->
-           Queue.enqueue state.data_buffer d )) )
+    State1.include_many state data
+    )
 
 let fill_in_completed_jobs :
        state:('a, 'd) State1.t
@@ -350,7 +372,9 @@ let gen :
   let open Quickcheck.Generator.Let_syntax in
   let%bind seed = gen_data in
   let s = State1.create ~parallelism_log_2 in
+  (*Printf.printf !"1. State before enqueuing %{sexp: (Int64.t, Int64.t) State1.t}\n" s;*)
   Or_error.ok_exn @@ enqueue_data ~state:s ~data:[seed] ;
+  (*Printf.printf !"2. State after enqueuing %{sexp: (Int64.t, Int64.t) State1.t}\n" s;*)
   let parallelism = Int.pow 2 parallelism_log_2 in
   let free_space = free_space s in
   let%map datas = Quickcheck.Generator.list_with_length free_space gen_data in
@@ -367,7 +391,9 @@ let gen :
       let jobs = next_jobs ~state:s in
       let jobs_done = List.map jobs (f_job_done s) in
       let old_tuple = s.acc in
+      (*Printf.printf !"3. State before enqueuing %{sexp: (Int64.t, Int64.t) State1.t}\nData: %{sexp: Int64.t list}\n" s chunk;*)
       let _ = Or_error.ok_exn @@ enqueue_data s chunk in
+      (*Printf.printf !"4. State after enqueuing %{sexp: (Int64.t, Int64.t) State1.t}\nJobs: %{sexp: Int64.t  State1.Completed_job.t list}\n" s jobs_done;*)
       Option.iter
         (Or_error.ok_exn @@ State1.consume s jobs_done)
         ~f:(fun x ->
@@ -375,18 +401,20 @@ let gen :
             if Option.is_some (snd old_tuple) then old_tuple else s.acc
           in
           s.acc <- (fst s.acc, f_acc tuple x) ) ;
+      (*Printf.printf !"5. State after consume %{sexp: (Int64.t, Int64.t) State1.t}\n" s;*)
       s )
 
 let%test_module "scans" =
   ( module struct
     let enqueue state ds =
       let free_space = free_space state in
-      if free_space > List.length ds then (
+      if free_space >= List.length ds then (
         Or_error.ok_exn @@ enqueue_data state ds ;
         [] )
       else (
         Or_error.ok_exn @@ enqueue_data state (List.take ds free_space) ;
         List.drop ds free_space )
+        
 
     let rec step_on_free_space state w ds f f_acc =
       let rem_ds =
@@ -395,7 +423,7 @@ let%test_module "scans" =
           new_ds
         else []
       in
-      let jobs = next_jobs ~state in
+      let jobs = List.take (next_jobs ~state) 2 in
       let works = List.map jobs (f state) in
       let old_tuple = state.acc in
       let x' =
@@ -454,7 +482,7 @@ let%test_module "scans" =
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;
           let g =
-            gen ~parallelism_log_2:7
+            gen ~parallelism_log_2:3
               ~gen_data:
                 Quickcheck.Generator.Let_syntax.(Int.gen >>| Int64.of_int)
               ~f_job_done:job_done ~f_acc:f_merge_up
@@ -502,8 +530,9 @@ let%test_module "scans" =
                   let acc = State1.acc s |> Option.value_exn in
                   assert (acc <> old_acc) ;
                   (* eventually we'll emit the acc+1 element *)
-                  let%map acc_plus_one = fill_some_zeros v s in
-                  assert (Int64.(equal acc_plus_one (acc + one))) ) )
+                  let%bind v' = fill_some_zeros v s in
+                  let acc_plus_one = State1.acc s |> Option.value_exn in
+                  return @@ assert (Int64.(equal acc_plus_one (acc + one))) ) )
       end )
 
     let%test_module "scan (+) over ints, map from string" =
