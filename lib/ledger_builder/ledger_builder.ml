@@ -554,6 +554,16 @@ end = struct
             add_many_work ~adding_transactions_failed:true resources ts_seq
               ws_seq
     in
+    (* Only handle transactions that work on this ledger-builder *)
+    let transactions_by_fee =
+      (* TODO: Is this copy wasteful? *)
+      let t = copy t in
+      let ledger = t.ledger in
+      Sequence.filter transactions_by_fee ~f:(fun txn ->
+          match Ledger.apply_transaction ledger txn with
+          | Error e -> false
+          | Ok () -> true )
+    in
     let resources, t_rest =
       let resources = Resources.empty ~available_queue_space:(free_space t) in
       let ts, t_rest =
