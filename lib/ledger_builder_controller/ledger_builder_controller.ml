@@ -149,59 +149,50 @@ end
 (* TODO: Give clear semantics for and fix impl of this, see #300 *)
 module Interruptible = struct
   module T = struct
-    type ('a, 's) t =
-      { stopped: bool ref
-      ; interrupter: ('s -> unit) ref (* Invariant: this is idempotent *)
-      ; d: 'a Deferred.Option.t }
+    type ('a, 's) t = {sigint: 's Deferred.t; d: ('a, 's) Deferred.Result.t}
 
-    let local t ~f =
-      { stopped= t.stopped
-      ; interrupter= ref (fun s' -> !(t.interrupter) (f s'))
-      ; d= t.d }
+    let local t ~f = {sigint= Deferred.map ~f t.sigint; d= t.d}
 
     let bind t ~f =
-      if !(t.stopped) then {t with d= Deferred.return None}
-      else
-        let d' =
-          Deferred.Option.bind t.d ~f:(fun a ->
-              if !(t.stopped) then Deferred.return None
-              else
+      match Deferred.peek t.d with
+      | None ->
+          let sigint_to_res = t.sigint >>| fun s -> Error s in
+          let maybe_sig_d =
+            let w : ('a, 's) Deferred.Result.t =
+              Deferred.any [t.d; sigint_to_res]
+            in
+            Deferred.Result.map w ~f:(fun a ->
                 let t' = f a in
-                t.stopped := !(t.stopped) || !(t'.stopped) ;
-                let last_interrupter = !(t.interrupter) in
-                (t.interrupter :=
-                   fun s -> last_interrupter s ; !(t'.interrupter) s) ;
-                t'.d )
-        in
-        {t with d= d'}
+                (t'.sigint, t'.d) )
+          in
+          let sigint' =
+            Deferred.any
+              [ t.sigint
+              ; ( maybe_sig_d
+                >>= function
+                  | Ok (sigint, _) -> sigint | Error e -> Deferred.return e )
+              ]
+          in
+          let d' =
+            Deferred.any
+              [ sigint_to_res
+              ; ( maybe_sig_d
+                >>= fun m ->
+                match m with
+                | Ok (_, d) -> d
+                | Error e -> Deferred.return (Error e) ) ]
+          in
+          {sigint= sigint'; d= d'}
+      | Some (Ok a) ->
+          let t' = f a in
+          {sigint= Deferred.any [t'.sigint; t.sigint]; d= t'.d}
+      | Some (Error e) -> {t with d= Deferred.return (Error e)}
 
-    let interrupt t s =
-      t.stopped := true ;
-      !(t.interrupter) s
+    let return a = {sigint= Deferred.never (); d= Deferred.Result.return a}
 
-    let return a =
-      { stopped= ref false
-      ; d= Deferred.Option.return a
-      ; interrupter= ref (fun s -> ()) }
+    let uninterruptible d = {sigint= Deferred.never (); d}
 
-    let uninterruptible d =
-      { stopped= ref false
-      ; d= Deferred.map d ~f:(fun x -> Some x)
-      ; interrupter= ref Fn.id }
-
-    let lift d interrupter =
-      (* Make it idempotent *)
-      let once f =
-        let called = ref false in
-        fun s ->
-          if !called then ()
-          else (
-            called := true ;
-            f s )
-      in
-      { stopped= ref false
-      ; d= Deferred.map d ~f:(fun x -> Some x)
-      ; interrupter= ref (once interrupter) }
+    let lift d sigint = {d= Deferred.map d ~f:(fun x -> Ok x); sigint}
 
     let map = `Define_using_bind
   end
@@ -473,7 +464,7 @@ end = struct
     in
     let fold_and_interrupt p ~init ~f =
       Linear_pipe.fold p ~init:(None, init) ~f:(fun (w, acc) (a, s) ->
-          Option.iter w ~f:(fun w -> Interruptible.interrupt w s) ;
+          Option.iter w ~f:(fun w -> Ivar.fill_if_empty w s) ;
           let w', d, acc' = f (acc, a) in
           let%map () = d in
           (Some w', acc') )
