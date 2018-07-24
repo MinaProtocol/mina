@@ -123,19 +123,6 @@ let hash t =
   let s = Pedersen.State.create Pedersen.params in
   Pedersen.State.update_fold s (fold_bits t) |> Pedersen.State.digest
 
-let genesis : t =
-  let time =
-    Time.of_date_ofday ~zone:Time.Zone.utc
-      (Date.create_exn ~y:2018 ~m:Month.Feb ~d:2)
-      Time.Ofday.start_of_day
-    |> Block_time.of_time
-  in
-  { header= {nonce= Nonce.of_int 20; time}
-  ; body=
-      { proof= None
-      ; ledger_builder_hash= Ledger_builder_hash.dummy
-      ; target_hash= Ledger.(merkle_root Genesis_ledger.ledger) } }
-
 let to_hlist {header; body} = H_list.[header; body]
 
 let of_hlist : (unit, 'h -> 'b -> unit) H_list.t -> ('h, 'b) t_ =

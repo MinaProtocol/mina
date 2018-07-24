@@ -64,9 +64,6 @@ let daemon =
        let remap_addr_port = Fn.id in
        let me = Host_and_port.create ~host:ip ~port in
        let%bind prover = Prover.create ~conf_dir in
-       let%bind genesis_proof =
-         Prover.genesis_proof prover >>| Or_error.ok_exn
-       in
        let%bind verifier = Verifier.create ~conf_dir in
        let module Init = struct
          type proof = Proof.Stable.V1.t [@@deriving bin_io]
@@ -79,7 +76,7 @@ let daemon =
 
          let prover = prover
 
-         let genesis_proof = genesis_proof
+         let genesis_proof = Precomputed_values.base_proof
 
          let fee_public_key = Genesis_ledger.rich_pk
        end in
