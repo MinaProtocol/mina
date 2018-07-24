@@ -212,3 +212,8 @@ let read' ?max_queue_length ({pipe}: 'a Reader.t) =
   Pipe.read' ?max_queue_length pipe
 
 let read ({pipe}: 'a Reader.t) = Pipe.read pipe
+
+let read_exn reader =
+  match%map read reader with
+  | `Eof -> failwith "Expecting a value from reader"
+  | `Ok value -> value

@@ -116,3 +116,5 @@ val read' :
   ?max_queue_length:int -> 'a Reader.t -> [`Eof | `Ok of 'a Queue.t] Deferred.t
 
 val read : 'a Reader.t -> [`Eof | `Ok of 'a] Deferred.t
+
+val read_exn : 'a Reader.t -> 'a Deferred.t
