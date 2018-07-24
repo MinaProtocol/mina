@@ -37,7 +37,7 @@ let master_command =
     let%bind () = add t 1 process ~config in
     let%bind () = Option.value_exn (run t process) in
     let reader = new_states t and expected_state = 2 in
-    let%map (_, actual_state) = Linear_pipe.read_exn reader in
+    let%map _, actual_state = Linear_pipe.read_exn reader in
     assert (expected_state = actual_state)
 
 let () = Command_util.run master_command

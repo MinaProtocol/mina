@@ -39,7 +39,8 @@ let master_command =
     let%bind () = Option.value_exn (run t process1)
     and () = Option.value_exn (run t process2) in
     let reader = new_states t in
-    let%map (_, pid1) = Linear_pipe.read_exn reader and (_, pid2) = Linear_pipe.read_exn reader in
+    let%map _, pid1 = Linear_pipe.read_exn reader
+    and _, pid2 = Linear_pipe.read_exn reader in
     assert (pid1 <> pid2)
 
 let () = Command_util.run master_command
