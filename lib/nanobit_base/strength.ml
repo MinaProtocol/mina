@@ -3,6 +3,7 @@ open Util
 open Snark_params
 open Tick
 open Let_syntax
+open Snark_bits
 
 module Stable = struct
   module V1 = struct

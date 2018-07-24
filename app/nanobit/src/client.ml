@@ -1,51 +1,7 @@
 open Core
 open Async
-open Cli_common
+open Cli_lib
 open Nanobit_base
-
-module Rpc_server (Main : sig
-  type t
-
-  val get_balance :
-       t
-    -> Public_key.Compressed.Stable.V1.t
-    -> Currency.Balance.Stable.V1.t option Deferred.t
-
-  val send_txn : t -> Transaction.Stable.V1.t -> unit option Deferred.t
-
-  val get_nonce :
-       t
-    -> Public_key.Compressed.Stable.V1.t
-    -> Account.Nonce.Stable.V1.t option Deferred.t
-end) =
-struct
-  let init_server ~parent_log ~minibit ~port =
-    let log = Logger.child parent_log "client" in
-    ignore
-      (Tcp.Server.create
-         ~on_handler_error:
-           (`Call
-             (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-         (Tcp.Where_to_listen.of_port port)
-         (fun address reader writer ->
-           Rpc.Connection.server_with_close reader writer
-             ~implementations:
-               (Rpc.Implementations.create_exn
-                  ~implementations:
-                    [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc
-                        (fun _ -> Main.send_txn minibit )
-                    ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun _ ->
-                          Main.get_balance minibit )
-                    ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun _ ->
-                          Main.get_nonce minibit ) ]
-                  ~on_unknown_rpc:`Raise)
-             ~connection_state:(fun _ -> ())
-             ~on_handshake_error:
-               (`Call
-                 (fun exn ->
-                   Logger.error log "%s" (Exn.to_string_mach exn) ;
-                   Deferred.unit )) ))
-end
 
 let dispatch rpc query port =
   Tcp.with_connection
@@ -131,8 +87,7 @@ let send_txn =
               (txn :> Transaction.t)
               port
           with
-          | Ok (Some ()) -> printf "Successfully enqueued txn in pool\n"
-          | Ok None -> printf "Txn can't be signed properly\n"
+          | Ok () -> printf "Successfully enqueued txn in pool\n"
           | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e))
 
 let command =

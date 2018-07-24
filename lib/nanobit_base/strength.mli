@@ -1,7 +1,8 @@
 open Core_kernel
 open Snark_params
+open Snark_bits
 
-type t = private Tick.Field.t [@@deriving sexp, bin_io]
+type t = private Tick.Field.t [@@deriving sexp, bin_io, eq]
 
 module Stable : sig
   module V1 : sig

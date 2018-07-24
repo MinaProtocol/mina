@@ -34,7 +34,10 @@ module Compressed = struct
   end
 
   include Stable.V1
+  include Comparable.Make_binable (Stable.V1)
   include Hashable.Make_binable (Stable.V1)
+
+  let empty = {x= Field.zero; is_odd= false}
 
   type var = (Field.var, Boolean.var) t_
 

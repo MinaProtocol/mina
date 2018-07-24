@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core cache_dir cached snarky nanobit_base bignum))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane ppx_deriving.std)))
   (synopsis "Transaction state transition snarking library")))
 

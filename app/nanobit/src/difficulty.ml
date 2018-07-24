@@ -1,7 +1,7 @@
 open Nanobit_base
 open Blockchain_snark
 
-type t = Target.t [@@deriving sexp, bin_io]
+type t = Target.t [@@deriving sexp, bin_io, compare, eq]
 
 let next t ~last ~this = Blockchain_state.compute_target last t this
 

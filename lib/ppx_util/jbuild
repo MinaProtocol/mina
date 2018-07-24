@@ -1,0 +1,13 @@
+(jbuild_version 1)
+
+(library
+ ((name ppx_util)
+  (public_name ppx_util)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+    ( core ppxlib ))
+  (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))
+  (synopsis "PPX utilities")))
+

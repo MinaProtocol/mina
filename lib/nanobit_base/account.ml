@@ -3,6 +3,7 @@ open Snark_params
 open Tick
 open Let_syntax
 open Currency
+open Snark_bits
 
 module Index = struct
   type t = int [@@deriving bin_io]
@@ -80,6 +81,8 @@ let hash_prefix = Hash_prefix.account
 let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
 
 let digest t = Pedersen.State.digest (hash t)
+
+let pubkey t = t.public_key
 
 module Checked = struct
   let hash t = var_to_bits t >>= hash_bits ~init:hash_prefix

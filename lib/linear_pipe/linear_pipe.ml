@@ -23,6 +23,8 @@ let create_reader ~close_on_exception f =
 
 let write = Pipe.write
 
+let write_without_pushback = Pipe.write_without_pushback
+
 exception Overflow
 
 let write_or_exn ~capacity writer reader x =
@@ -30,6 +32,8 @@ let write_or_exn ~capacity writer reader x =
   else Pipe.write_without_pushback writer x
 
 let close_read (reader: 'a Reader.t) = Pipe.close_read reader.pipe
+
+let close = Pipe.close
 
 let closed (reader: 'a Reader.t) = Pipe.closed reader.pipe
 
@@ -64,6 +68,8 @@ let length reader = Pipe.length reader.Reader.pipe
 let of_list xs =
   let reader = wrap_reader (Pipe.of_list xs) in
   reader
+
+let to_list reader = Pipe.to_list reader.Reader.pipe
 
 let fold reader ~init ~f =
   bracket reader (Pipe.fold reader.Reader.pipe ~init ~f)
@@ -112,7 +118,7 @@ let merge_unordered rs =
      Pipe.close merged_writer) ;
   merged_reader
 
-(* TODO following are all more efficient with iter', 
+(* TODO following are all more efficient with iter',
  * but I get write' doesn't exist on my version of ocaml *)
 
 let fork reader n =

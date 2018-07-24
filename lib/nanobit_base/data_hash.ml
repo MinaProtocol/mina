@@ -1,9 +1,15 @@
 open Core
 open Util
 open Snark_params.Tick
+open Snark_bits
+open Bitstring_lib
 
 module type Basic = sig
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
+
+  val gen : t Quickcheck.Generator.t
+
+  val to_bytes : t -> string
 
   val length_in_bits : int
 
@@ -67,7 +73,24 @@ struct
 
   include Stable.V1
 
+  (* TODO: Pad with zeroes *)
+  let to_bytes t =
+    Z.to_bits
+      (Bignum_bigint.to_zarith_bigint Bigint.(to_bignum_bigint (of_field t)))
+
   let length_in_bits = M.length_in_bits
+
+  let () = assert (length_in_bits <= Field.size_in_bits)
+
+  let gen : t Quickcheck.Generator.t =
+    let m =
+      if length_in_bits = Field.size_in_bits then
+        Bignum_bigint.(Field.size - one)
+      else Bignum_bigint.(pow (of_int 2) (of_int length_in_bits) - one)
+    in
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl zero m)
+      ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
   let ( = ) = equal
 

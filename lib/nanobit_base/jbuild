@@ -6,6 +6,6 @@
   (flags (:standard -short-paths))
   (inline_tests)
   (library_flags (-linkall))
-  (libraries (base64 protocols core dummy_values merkle_ledger snarky crypto_params async async_extra bignum_bigint))
+  (libraries (base64 snark_bits currency snark_params unsigned_extended sparse_ledger_lib cryptokit protocols core dummy_values merkle_ledger snarky crypto_params async async_extra bignum_bigint))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Snarks and friends necessary for keypair generation")))
