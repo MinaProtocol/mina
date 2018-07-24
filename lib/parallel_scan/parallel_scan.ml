@@ -51,23 +51,24 @@ module State1 = struct
   let parallelism {jobs} = Ring_buffer.length jobs / 2
 
   (*leaves are in two different chunks on the buffer*)
-  let next_pos p cur_pos =   
-    let first_start = p/2 in
-    let first_end = p-1 in
-    let sec_start = 3*p/2 in 
-    let sec_end = 2*p-1 in
+  let next_pos p cur_pos =
+    let first_start = p / 2 in
+    let first_end = p - 1 in
+    let sec_start = 3 * p / 2 in
+    let sec_end = (2 * p) - 1 in
     if cur_pos = first_end then sec_start
-      else if cur_pos = sec_end then first_start
-      else cur_pos + 1
+    else if cur_pos = sec_end then first_start
+    else cur_pos + 1
 
-  let next_base_none_pos state cur_pos = 
+  let next_base_none_pos state cur_pos =
     let p = parallelism state in
     let new_pos = next_pos p cur_pos in
     match Ring_buffer.read_i state.jobs new_pos with
     | Base None -> Some new_pos
-    | _         -> None (*Assuming that Base Somes are picked in the same order*)
+    | _ -> None
 
-    
+  (*Assuming that Base Somes are picked in the same order*)
+
   let%test_unit "parallelism derived from jobs" =
     let of_parallelism_log_2 x =
       let s = create ~parallelism_log_2:x in
@@ -224,8 +225,9 @@ module State1 = struct
         | Merge (None, None), _ -> Ok job
         | Merge (None, Some _), _ -> Ok job
         | Base None, _ ->
-              Or_error.error_string 
-                (sprintf "Parallel scan: Not enough data to proceed. Buffer index %d" i)
+            Or_error.error_string
+              (sprintf
+                 "Parallel scan: Not enough data to proceed. Buffer index %d" i)
         | Merge_up (Some x), _ ->
             t.acc <- (fst t.acc |> Int.( + ) 1, Some x) ;
             work_done := true ;
@@ -236,14 +238,13 @@ module State1 = struct
             work_done := true ;
             let _ = Queue.dequeue completed_jobs_q in
             Ok (Merge (None, None))
-        | Base (Some d), Some (Lifted z) -> (
+        | Base (Some d), Some (Lifted z) ->
             let%bind () = rewrite i z in
             let _ = Queue.dequeue completed_jobs_q in
             work_done := true ;
-            if Option.is_none t.base_none_pos then
-            begin t.base_none_pos <- Some i end;
+            if Option.is_none t.base_none_pos then t.base_none_pos <- Some i ;
             t.current_data_length <- t.current_data_length - 1 ;
-            Ok (Base None))
+            Ok (Base None)
         | Merge (Some x, Some x'), _ -> Ok job
         | x, y -> failwith @@ "Doesn't happen\n"
         (*( Job.sexp_of_t (*Spec.Accum.sexp_of_t Spec.Data.sexp_of_t x*)
@@ -278,25 +279,25 @@ module State1 = struct
     in
     if not (fst last_acc = fst t.acc) then snd t.acc else None
 
-
-
-  let include_one state value base_pos : unit Or_error.t=
-    let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t= match job with
-      | Base None -> Ok (Base (Some value));
-      | _         -> Or_error.error_string "Invalid job encountered while enqueuing data"
+  let include_one state value base_pos : unit Or_error.t =
+    let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
+      match job with
+      | Base None -> Ok (Base (Some value))
+      | _ ->
+          Or_error.error_string "Invalid job encountered while enqueuing data"
     in
     Ring_buffer.direct_update (State.jobs state) base_pos ~f
-  
-  let include_many (state :('a, 'd) State.t) data : unit Or_error.t= 
-    List.fold ~init:(Ok ()) data ~f: (fun b a ->
-      let open Or_error.Let_syntax in
-      let base_pos = State.base_none_pos state in
-      match base_pos with
-      | None     -> Or_error.error_string "No empty leaves"
-      | Some pos -> let%bind () = include_one state a pos in
-        state.base_none_pos <- next_base_none_pos state pos;
-        Ok ()
-      )
+
+  let include_many (state: ('a, 'd) State.t) data : unit Or_error.t =
+    List.fold ~init:(Ok ()) data ~f:(fun b a ->
+        let open Or_error.Let_syntax in
+        let base_pos = State.base_none_pos state in
+        match base_pos with
+        | None -> Or_error.error_string "No empty leaves"
+        | Some pos ->
+            let%bind () = include_one state a pos in
+            state.base_none_pos <- next_base_none_pos state pos ;
+            Ok () )
 end
 
 module Available_job = struct
@@ -341,7 +342,7 @@ let free_space : state:('a, 'd) State1.t -> int =
 
 let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
  fun ~state ~data ->
- let open Or_error.Let_syntax in
+  let open Or_error.Let_syntax in
   if free_space state < List.length data then
     Or_error.error_string
       (sprintf
@@ -349,8 +350,7 @@ let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
          (free_space state) (List.length data))
   else (
     state.current_data_length <- state.current_data_length + List.length data ;
-    State1.include_many state data
-    )
+    State1.include_many state data )
 
 let fill_in_completed_jobs :
        state:('a, 'd) State1.t
@@ -412,7 +412,6 @@ let%test_module "scans" =
       else (
         Or_error.ok_exn @@ enqueue_data state (List.take ds free_space) ;
         List.drop ds free_space )
-        
 
     let rec step_on_free_space state w ds f f_acc =
       let rem_ds =
@@ -530,7 +529,8 @@ let%test_module "scans" =
                   (* eventually we'll emit the acc+1 element *)
                   let%bind v' = fill_some_zeros v s in
                   let acc_plus_one = State1.acc s |> Option.value_exn in
-                  return @@ assert (Int64.(equal acc_plus_one (acc + one))) ) )
+                  return @@ assert (Int64.(equal acc_plus_one (acc + one))) )
+          )
       end )
 
     let%test_module "scan (+) over ints, map from string" =

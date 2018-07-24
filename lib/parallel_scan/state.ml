@@ -30,8 +30,7 @@ module Completed_job = struct
 end
 
 type ('a, 'd) t =
-  { jobs: ('a, 'd) Job.t Ring_buffer.t
-  (*; data_buffer: 'd Queue.t*)
+  { jobs: ('a, 'd) Job.t Ring_buffer.t (*; data_buffer: 'd Queue.t*)
   ; capacity: int
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
@@ -66,8 +65,8 @@ let hash {jobs; acc; current_data_length; base_none_pos; enough_steps}
   | None -> h#add_string "None"
   | Some a -> h#add_string (a_to_string a) ) ;
   h#add_string (Int.to_string current_data_length) ;
-  (match x with
-  | None  -> h#add_string "None"
+  ( match x with
+  | None -> h#add_string "None"
   | Some a -> h#add_string (Int.to_string a) ) ;
   h#add_string (Bool.to_string enough_steps) ;
   h
@@ -82,7 +81,8 @@ let enough_steps {enough_steps} = enough_steps
 
 let base_none_pos {base_none_pos} = base_none_pos
 
-let copy {jobs; acc; current_data_length; base_none_pos; enough_steps; capacity} =
+let copy
+    {jobs; acc; current_data_length; base_none_pos; enough_steps; capacity} =
   { jobs= Ring_buffer.copy jobs
   ; acc
   ; capacity
