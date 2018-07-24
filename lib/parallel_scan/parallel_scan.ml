@@ -39,9 +39,7 @@ module State1 = struct
     List.iter [merges1; bases1; merges2; bases2; [top]]
       ~f:(Ring_buffer.add_many jobs) ;
     assert (jobs.Ring_buffer.position = 0) ;
-    let data_buffer = Queue.create ~capacity:parallelism () in
     { jobs
-    ; data_buffer
     ; capacity= parallelism
     ; acc= (0, None)
     ; current_data_length= 0
