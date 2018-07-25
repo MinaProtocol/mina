@@ -9,7 +9,7 @@ module type Worker_intf = sig
 
   type state [@@deriving bin_io]
 
-  val create : input -> t
+  val create : input -> t Deferred.t
 
   val new_states : t -> state Pipe.Reader.t
 

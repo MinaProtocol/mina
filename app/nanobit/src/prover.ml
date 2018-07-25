@@ -165,7 +165,6 @@ end
 type t = {connection: Worker.Connection.t; process: Process.t}
 
 let create ~conf_dir =
-  Parallel.init_master () ;
   let%map connection, process =
     Worker.spawn_in_foreground_exn ~on_failure:Error.raise
       ~shutdown_on:Disconnect ~connection_state_init_arg:() ()

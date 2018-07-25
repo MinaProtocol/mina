@@ -52,6 +52,7 @@ end
 
 let main () =
   Random.self_init () ;
+  Parallel.init_master () ;
   let rand_name () =
     let rand_char () = Char.of_int_exn (Char.to_int 'a' + Random.int 26) in
     String.init 10 ~f:(fun _ -> rand_char ())

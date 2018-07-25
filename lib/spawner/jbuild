@@ -4,7 +4,7 @@
  ((name spawner)
   (public_name spawner)
   (library_flags (-linkall))
-  (libraries (core async rpc_parallel linear_pipe))
+  (libraries (core async rpc_parallel linear_pipe parallel))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (flags (:standard -short-paths))
   (synopsis "Spawner lets you run multiple workers on different nodes")))

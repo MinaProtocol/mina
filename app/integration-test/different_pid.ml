@@ -1,5 +1,6 @@
 open Core
 open Async
+open Spawner
 
 module Pid_worker = struct
   type t = {reader: int Pipe.Reader.t; writer: int Pipe.Writer.t}
@@ -10,7 +11,7 @@ module Pid_worker = struct
 
   let create () =
     let reader, writer = Pipe.create () in
-    {reader; writer}
+    return @@ {reader; writer}
 
   let new_states {reader} = reader
 
@@ -19,8 +20,8 @@ module Pid_worker = struct
     Pipe.write t.writer pid
 end
 
-module Worker = Spawner.Parallel_worker.Make (Pid_worker)
-module Master = Spawner.Master.Make (Worker) (Int)
+module Worker = Parallel_worker.Make (Pid_worker)
+module Master = Master.Make (Worker) (Int)
 
 let master_command =
   let open Command.Let_syntax in
@@ -28,7 +29,6 @@ let master_command =
   fun () ->
     let open Deferred.Let_syntax in
     let open Master in
-    Parallel.init_master () ;
     let t = create () in
     let%bind log_dir = File_system.create_dir log_dir in
     let config = {Spawner.Config.host; executable_path; log_dir}
@@ -43,4 +43,9 @@ let master_command =
     and _, pid2 = Linear_pipe.read_exn reader in
     assert (pid1 <> pid2)
 
-let () = Command_util.run master_command
+let name = "different-pid"
+
+let command =
+  Command.async master_command
+    ~summary:
+      "Tests that running multiple parallel workers run in different processes"

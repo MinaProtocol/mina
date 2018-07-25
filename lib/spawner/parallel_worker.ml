@@ -9,7 +9,7 @@ module type Worker_intf = sig
 
   type state [@@deriving bin_io]
 
-  val create : input -> t
+  val create : input -> t Deferred.t
 
   val new_states : t -> state Pipe.Reader.t
 
@@ -79,8 +79,7 @@ struct
 
         let functions = {new_states; run}
 
-        let init_worker_state (input: Worker.input) : Worker.t Deferred.t =
-          return @@ Worker.create input
+        let init_worker_state = Worker.create
 
         let init_connection_state ~connection:_ ~worker_state:_ = return
       end

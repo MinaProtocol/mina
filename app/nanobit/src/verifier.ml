@@ -108,7 +108,6 @@ end
 type t = Worker.Connection.t
 
 let create ~conf_dir =
-  Parallel.init_master () ;
   Worker.spawn_exn ~on_failure:Error.raise ~shutdown_on:Disconnect
     ~redirect_stdout:(`File_append (conf_dir ^/ "verifier-stdout"))
     ~redirect_stderr:(`File_append (conf_dir ^/ "verifier-stderr"))

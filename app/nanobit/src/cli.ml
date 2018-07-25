@@ -34,6 +34,7 @@ let daemon =
          (optional string)
      in
      fun () ->
+       Parallel.init_master () ;
        let open Deferred.Let_syntax in
        let%bind home = Sys.home_directory () in
        let conf_dir =
@@ -127,7 +128,8 @@ let () =
     ; (Snark_worker_lib.Prod.command_name, Snark_worker_lib.Prod.Worker.command)
     ; ("full-test", Full_test.command)
     ; ("client", Client.command)
-    ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
+    ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
+    ; ("rpc-integration-test", Coda_test.command) ]
   |> Command.run
 
 let () = never_returns (Scheduler.go ())

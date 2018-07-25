@@ -5,6 +5,7 @@ open Coda_main
 
 let run_test with_snark : unit -> unit Deferred.t =
  fun () ->
+  Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
   let%bind prover = Prover.create ~conf_dir

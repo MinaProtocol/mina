@@ -39,6 +39,7 @@ struct
   let new_states {read_new_states} = read_new_states
 
   let create () =
+    Parallel.init_master () ;
     let table = Id.Table.create () in
     let read_new_states, write_new_states = Linear_pipe.create () in
     {workers= table; read_new_states; write_new_states}
