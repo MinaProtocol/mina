@@ -152,14 +152,26 @@ module State1 = struct
     type t = Work_done | Not_done
   end
 
+  let isleft c = c mod 2 = 1
+
+  let rec parent_empty (t: ('a, 'b) Job.t Ring_buffer.t) pos =
+    match pos with
+    | 0 -> true
+    | pos ->
+      match (isleft pos, Ring_buffer.read_i t ((pos - 1) / 2)) with
+      | true, Merge (None, _) -> true
+      | false, Merge (_, None) -> true
+      | _, Merge (Some _, Some _) -> parent_empty t ((pos - 1) / 2)
+      | _, Base _ -> failwith "This shouldn't have occured"
+      | _ -> false
+
   let update_new_job t z is_left pos =
     let new_job (cur_job: ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
       match (is_left, cur_job) with
       | true, Merge (None, r) -> Ok (Merge (Some z, r))
       | false, Merge (l, None) -> Ok (Merge (l, Some z))
       | true, Merge (Some _, _) | false, Merge (_, Some _) ->
-          failwith
-            "impossible: the side of merge we want will be empty TODO show sexp"
+          failwith "impossible: the side of merge we want is not empty"
       | _, Base _ -> Error (Error.of_string "impossible: we never fill base")
     in
     Ring_buffer.direct_update t.jobs pos new_job
@@ -168,26 +180,24 @@ module State1 = struct
     Ring_buffer.direct_update t.jobs pos (fun _ -> Ok job)
 
   let work : ('a, 'd) t -> 'a Completed_job.t -> Work.t Or_error.t =
-   fun t job ->
+   fun t completed_job ->
     let open Or_error.Let_syntax in
     let cur_job = Ring_buffer.read t.jobs in
-    match (cur_job, job) with
-    | Merge (Some x, Some x'), Merged z ->
-        let cur_pos = t.jobs.position in
+    let cur_pos = t.jobs.position in
+    match (parent_empty t.jobs cur_pos, cur_job, completed_job) with
+    | true, Merge (Some x, Some x'), Merged z ->
         let%bind () =
           match cur_pos with
           | 0 (*Root node*) ->
               t.acc <- (fst t.acc |> Int.( + ) 1, Some z) ;
               Ok ()
-          | cur_pos ->
-              update_new_job t z (cur_pos mod 2 = 1) ((cur_pos - 1) / 2)
+          | cur_pos -> update_new_job t z (isleft cur_pos) ((cur_pos - 1) / 2)
         in
         let%map () = update_cur_job t (Merge (None, None)) cur_pos in
         Work.Work_done
-    | Base (Some d), Lifted z ->
-        let cur_pos = t.jobs.position in
+    | true, Base (Some d), Lifted z ->
         let%bind () =
-          update_new_job t z (cur_pos mod 2 = 1) ((cur_pos - 1) / 2)
+          update_new_job t z (isleft cur_pos) ((cur_pos - 1) / 2)
         in
         let%bind () = update_cur_job t (Base None) cur_pos in
         t.base_none_pos <- Some (Option.value t.base_none_pos ~default:cur_pos) ;
@@ -227,6 +237,25 @@ module State1 = struct
         | Some pos ->
             let%map () = include_one_datum state a pos in
             state.base_none_pos <- next_base_none_pos state pos )
+
+  let read_jobs (t: ('a, 'b) Job.t Ring_buffer.t) =
+    let curr_position_neg_one =
+      Ring_buffer.mod_ (t.position - 1) (Array.length t.data)
+    in
+    Sequence.unfold ~init:(`More t.position) ~f:(fun pos ->
+        match pos with
+        | `Stop -> None
+        | `More pos ->
+            if pos = curr_position_neg_one then
+              Some (Some (t.data).(pos), `Stop)
+            else if not (parent_empty t pos) then
+              Some
+                (None, `More (Ring_buffer.mod_ (pos + 1) (Array.length t.data)))
+            else
+              Some
+                ( Some (t.data).(pos)
+                , `More (Ring_buffer.mod_ (pos + 1) (Array.length t.data)) ) )
+    |> Sequence.to_list |> List.filter_map ~f:ident
 end
 
 module Available_job = struct
@@ -237,7 +266,7 @@ let start : type a d. parallelism_log_2:int -> (a, d) State.t = State1.create
 
 let next_jobs : state:('a, 'd) State1.t -> ('a, 'd) Available_job.t list =
  fun ~state ->
-  List.filter_map (Ring_buffer.read_all state.jobs) ~f:(fun job ->
+  List.filter_map (State1.read_jobs state.jobs) ~f:(fun job ->
       let module J = State1.Job in
       let module A = Available_job in
       match job with
@@ -299,13 +328,17 @@ let gen :
   let%bind parallelism_log_2 = Int.gen_incl 2 7 in
   let s = State1.create ~parallelism_log_2 in
   let parallelism = State1.parallelism s in
-  let free_space = free_space s in
-  let%map datas = Quickcheck.Generator.list_with_length free_space gen_data in
+  let%bind data_chunk_size =
+    Int.gen_incl ((parallelism / 2) - 1) (parallelism / 2)
+  in
+  let%map datas =
+    Quickcheck.Generator.list_with_length ((parallelism * 2) + 3) gen_data
+  in
   let data_chunks =
     let rec go datas chunks =
-      if List.length datas < parallelism then List.rev (datas :: chunks)
+      if List.length datas <= data_chunk_size then List.rev (datas :: chunks)
       else
-        let chunk, rest = List.split_n datas parallelism in
+        let chunk, rest = List.split_n datas data_chunk_size in
         go rest (chunk :: chunks)
     in
     go datas []
@@ -339,7 +372,7 @@ let%test_module "scans" =
     let rec step_on_free_space state w ds f f_acc =
       let enq ds' =
         if List.length ds' > 0 then
-          let rem_ds = enqueue state ds in
+          let rem_ds = enqueue state ds' in
           rem_ds
         else []
       in
