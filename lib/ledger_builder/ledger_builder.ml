@@ -402,6 +402,20 @@ end = struct
           | None -> Done
           | Some (x, seq) -> Skip (x :: acc, i + 1, seq) )
 
+  let split_n_filter_map seq n ~f =
+    let rec go i acc seq =
+      if i = n
+      then (List.rev acc, seq)
+      else
+        match Sequence.next seq with
+        | None -> (List.rev acc, seq)
+        | Some (x, seq') ->
+          match f x with
+          | None -> go i acc seq'
+          | Some y -> go (i + 1) (y :: acc) seq'
+    in
+    go 0 [] seq
+
   (* TODO: Make this actually return a sequence *)
   let work_to_do scan_state : Completed_work.Statement.t Sequence.t =
     let work_list = Parallel_scan.next_jobs scan_state in
@@ -415,6 +429,7 @@ end = struct
   module Resources = struct
     module Queue_consumption = struct
       type t = {fee_transfers: Public_key.Set.t; transactions: int}
+      [@@deriving sexp]
 
       let count {fee_transfers; transactions} =
         (* This is ceil(Set.length fee_transfers / 2) *)
@@ -438,6 +453,7 @@ end = struct
       ; available_queue_space: int
       ; transactions: Transaction.With_valid_signature.t list
       ; completed_works: Completed_work.Checked.t list }
+      [@@deriving sexp]
 
     let add_transaction t (txv: Transaction.With_valid_signature.t) =
       let tx = (txv :> Transaction.t) in
@@ -525,7 +541,8 @@ end = struct
       fold_sequence_until_error transactions_to_do ~init:resources ~f:
         (fun resources txn ->
           match Ledger.apply_transaction ledger txn with
-          | Error _ -> `Skip
+          | Error _ ->
+              `Skip
           | Ok () ->
             match Resources.add_transaction resources txn with
             | Ok resources -> `Ok resources
@@ -557,7 +574,12 @@ end = struct
     let resources, t_rest =
       let resources = Resources.empty ~available_queue_space:(free_space t) in
       let ts, t_rest =
-        Sequence.split_n transactions_by_fee resources.available_queue_space
+        split_n_filter_map transactions_by_fee
+          resources.available_queue_space
+          ~f:(fun txn ->
+            match Ledger.apply_transaction ledger txn with
+            | Error _ -> None
+            | Ok () -> Some txn)
       in
       let resources =
         fold_until_error ts ~init:resources ~f:Resources.add_transaction
@@ -568,10 +590,15 @@ end = struct
       add_many_work ~adding_transactions_failed:false resources t_rest
         (work_to_do t.scan_state)
     in
+    let transactions = 
+      List.rev_map resources.transactions ~f:(fun t ->
+        Or_error.ok_exn (Ledger.undo_transaction ledger t);
+        t)
+    in
     let diff =
       { Ledger_builder_diff.With_valid_signatures_and_proofs.transactions=
           (* We have to reverse here because we only know they work in THIS order *)
-          List.rev resources.transactions
+          transactions
       ; completed_works= List.rev resources.completed_works
       ; creator= t.public_key
       ; prev_hash= curr_hash }
