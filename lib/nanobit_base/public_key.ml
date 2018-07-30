@@ -39,6 +39,8 @@ module Compressed = struct
 
   let empty = {x= Field.zero; is_odd= false}
 
+  let length_in_bits = 1 + Field.size_in_bits
+
   type var = (Field.var, Boolean.var) t_
 
   let to_hlist {x; is_odd} = H_list.[x; is_odd]

@@ -23,9 +23,11 @@ let ledger =
   Ledger.set ledger rich_pk
     { Account.public_key= rich_pk
     ; balance= initial_rich_balance
+    ; receipt_chain_hash = Receipt.Chain_hash.empty
     ; nonce= Account.Nonce.zero } ;
   Ledger.set ledger poor_pk
     { Account.public_key= poor_pk
     ; balance= initial_poor_balance
+    ; receipt_chain_hash = Receipt.Chain_hash.empty
     ; nonce= Account.Nonce.zero } ;
   ledger

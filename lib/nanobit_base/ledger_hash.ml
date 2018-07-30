@@ -94,7 +94,13 @@ let create_account t pk =
     >>| var_of_hash_packed
     >>= assert_equal t
   in
-  let account : Account.var = { public_key = pk; balance = Balance.(var_of_t zero); nonce = Account.Nonce.(Unpacked.var_of_value zero) } in
+  let account : Account.var =
+    { public_key = pk
+    ; balance = Balance.(var_of_t zero)
+    ; nonce = Account.Nonce.(Unpacked.var_of_value zero)
+    ; receipt_chain_hash = Receipt.Chain_hash.(Checked.constant empty)
+    }
+  in
   (* Could save some constraints applying Account.Balance.zero to the hash
      (since it's a no-op) *)
   let%bind account_hash = Account.Checked.digest account in

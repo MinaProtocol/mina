@@ -10,6 +10,8 @@ module type S = sig
     end
   end
 
+  val length_in_bits : int
+
   val zero : t
 
   val succ : t -> t

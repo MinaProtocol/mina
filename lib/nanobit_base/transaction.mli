@@ -10,7 +10,7 @@ module Payload : sig
     ( Public_key.Compressed.t
     , Currency.Amount.t
     , Currency.Fee.t
-    , Account.Nonce.t )
+    , Account_nonce.t )
     t_
   [@@deriving bin_io, eq, sexp, hash]
 
@@ -29,7 +29,7 @@ module Payload : sig
         ( Public_key.Compressed.Stable.V1.t
         , Currency.Amount.Stable.V1.t
         , Currency.Fee.Stable.V1.t
-        , Account.Nonce.t )
+        , Account_nonce.t )
         t_
       [@@deriving bin_io, eq, sexp, hash]
     end
@@ -39,12 +39,16 @@ module Payload : sig
     ( Public_key.Compressed.var
     , Currency.Amount.var
     , Currency.Fee.var
-    , Account.Nonce.Unpacked.var )
+    , Account_nonce.Unpacked.var )
     t_
+
+  val length_in_bits : int
 
   val typ : (var, t) Typ.t
 
   val to_bits : t -> bool list
+
+  val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
 
   val var_to_bits : var -> (Boolean.var list, _) Checked.t
 end

@@ -29,6 +29,8 @@ module Compressed : sig
 
   val empty : t
 
+  val length_in_bits : int
+
   type var = (Field.var, Boolean.var) t_
 
   val typ : (var, t) Typ.t

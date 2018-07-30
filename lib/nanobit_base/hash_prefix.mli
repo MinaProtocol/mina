@@ -17,3 +17,5 @@ val merge_snark : Tick.Pedersen.State.t
 val base_snark : Tick.Pedersen.State.t
 
 val transition_system_snark : Tick.Pedersen.State.t
+
+val receipt_chain : Tick.Pedersen.State.t

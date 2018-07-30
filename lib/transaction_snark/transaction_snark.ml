@@ -1078,6 +1078,7 @@ let%test_module "transaction_snark" =
             { public_key=
                 Public_key.compress (Public_key.of_private_key private_key)
             ; balance= Balance.of_int (10 + Random.int 100)
+            ; receipt_chain_hash = Receipt.Chain_hash.empty
             ; nonce= Account.Nonce.zero } }
       in
       let n = Int.pow 2 ledger_depth in
