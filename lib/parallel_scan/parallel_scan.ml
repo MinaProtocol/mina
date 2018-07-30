@@ -523,11 +523,11 @@ let%test_module "scans" =
           let result =
             scan
               ~data:(a_bunch_of_nums_then_empties n)
-              ~parallelism_log_2:9 ~f:job_done ~f_acc:f_merge_up
+              ~parallelism_log_2:12 ~f:job_done ~f_acc:f_merge_up
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%map after_3n =
-                List.init (6 * n) ~f:(fun _ -> ())
+                List.init (48 * n) ~f:(fun _ -> ())
                 |> Deferred.List.foldi ~init:"" ~f:(fun i acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc
