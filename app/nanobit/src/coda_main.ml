@@ -807,8 +807,7 @@ module Run (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance minibit pk) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
-          return (get_nonce minibit pk))
-      ]
+            return (get_nonce minibit pk) ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in
