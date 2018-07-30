@@ -526,8 +526,8 @@ let%test_module "scans" =
               ~parallelism_log_2:12 ~f:job_done ~f_acc:f_merge_up
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
-              let%map after_3n =
-                List.init (48 * n) ~f:(fun _ -> ())
+              let%map after_42n =
+                List.init (42 * n) ~f:(fun _ -> ())
                 |> Deferred.List.foldi ~init:"" ~f:(fun i acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc
@@ -539,6 +539,6 @@ let%test_module "scans" =
                   (List.init n ~f:(fun i -> Int.to_string i ^ ","))
                   ~init:"" ~f:String.( ^ )
               in
-              assert (after_3n = expected) )
+              assert (after_42n = expected) )
       end )
   end )
