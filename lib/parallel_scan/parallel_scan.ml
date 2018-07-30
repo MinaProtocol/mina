@@ -40,22 +40,17 @@ module State1 = struct
     ; capacity= parallelism
     ; acc= (0, None)
     ; current_data_length= 0
-    ; base_none_pos= Some (parallelism - 1)
-    ; parallelism }
-
-  (* TODO Initial count cannot be zero, what should it be then?*)
-  (*let parallelism {jobs} = Ring_buffer.length jobs / 2*)
+    ; base_none_pos= Some (parallelism - 1) }
 
   let next_pos p cur_pos = if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
 
+  (*Assuming that Base Somes are picked in the same order*)
   let next_base_none_pos state cur_pos =
     let p = parallelism state in
     let new_pos = next_pos p cur_pos in
     match Ring_buffer.read_i state.jobs new_pos with
     | Base None -> Some new_pos
     | _ -> None
-
-  (*Assuming that Base Somes are picked in the same order*)
 
   let%test_unit "parallelism derived from jobs" =
     let of_parallelism_log_2 x =
@@ -69,109 +64,92 @@ module State1 = struct
     of_parallelism_log_2 5 ;
     of_parallelism_log_2 10
 
-  (* let ptr n i =
-    let open Direction in
-    match i with
-    | 0 -> failwith "Undefined, nothing to rewrite"
-    | 1 -> (n, Right)
-    | x when x = n -> (0, Left)
-    | x when x = n + 1 -> (n, Left)
-    | _ ->
-        let x = i % n in
-        let offset = if i >= n then 0 else n in
-        ((x / 2) + offset, if x % 2 = 0 then Left else Right)
-
-  let%test_unit "ptr points properly" =
-    (*              0
-     *             [8]
-     *  ;    [9      ;      1]
-     *  ;  [2 ;   3  ;  10   ;   11]
-     *  ;[12 ;13;14;15;4 ; 5; 6 ;  7]
-     *
-     *)
-    let open Direction in
-    let p = ptr 8 in
-    assert (p 8 = (0, Left)) ;
-    assert (p 9 = (8, Left)) ;
-    assert (p 1 = (8, Right)) ;
-    assert (p 2 = (9, Left)) ;
-    assert (p 3 = (9, Right)) ;
-    assert (p 10 = (1, Left)) ;
-    assert (p 11 = (1, Right)) ;
-    assert (p 12 = (2, Left)) ;
-    assert (p 13 = (2, Right)) ;
-    assert (p 14 = (3, Left)) ;
-    assert (p 15 = (3, Right)) ;
-    assert (p 4 = (10, Left)) ;
-    assert (p 5 = (10, Right)) ;
-    assert (p 6 = (11, Left)) ;
-    assert (p 7 = (11, Right))
-*)
-  (** Compute the ptr to update inside the ring buffer with the work completed
-   * at position i. Assume size of buffer is exactly 2*n.
-   *
-   * Why does this work?
-   *
-   * Think of the ring buffer's 2*n elements as holding two steps of execution
-   * at parallelism of size n. Assume we're always working on the second step,
-   * and can refer to the work done at the prior step
-   *
-   * Example trace: (where n=8), U = Merge_up, M = Merge, T = Base
-   *      0        1          2         3        4    5    6    7
-   *  1. M_{1-8}  M_{9-12}  M_{13,14} M_{15,16} T_17 T_18 T_19 T_20
-   *  2. U_{1-8}  M_{13-16} M_{17,18} M_{19,20} T_21 T_22 T_23 T_24
-   *  3. M_{9-16} M_{17-20} M_{21,22} M_{23,24} T_25 T_26 T_27 T_28
-   *
-   * Start on line (2) above assuming line (1) has been completed.
-   *
-   * Notice that col (0) updates nothing as this is merge up
-   * col (1) updates from (2) (left) and (3) (right)
-   * col (2) updates from (4) (left) and (5) (right)
-   * Moreover, for i!=0, i is updated by i/2 and direction is given by i%2
-   * This is very similar to how the Heap datastructure is built. Children
-   * nodes for a node i are located at index 2*i and 2*i+1.
-   *
-   * On line (3), col (0) updates the col (0) on even lines (the merge_up)
-   * and col (1) of the prior two lines feeds col (0). We can just special
-   * case this behavior.
-   *
-   * However, the ringbuffer packs 2*n elements in and reuses the same memory
-   * for future lines:
-   *   0         1        2          3        4    5    6   7
-   * U_{1-8}  M_{13-16} M_{17,18} M_{19,20} T_21 T_22 T_23 T_24
-   *   8         9         10        11       12  13   14   15
-   * M_{9-16} M_{17-20} M_{21,22} M_{23,24} T_25 T_26 T_27 T_28
-   *
-   * So we need to adjust by n sometimes. Specifically we flip between the
-   * lines, so if we start on the top row we need to update the bottom and
-   * vice versa. For example, index 1 is actually updated by 10 and 11 not 2
-   * and 3. Similarly, 9 is updated by 2 and 3. We can conditionally add offset
-   * after mod-ing by n to oscillate between the two lines.
-   *)
+  (**  A parallel scan state holds a sequence of jobs that needs to be completed.
+  *  A job can be a base job (Base d) or a merge job (Merge (a, a)).
+  *
+  *  The jobs are stored using a ring buffer impl of a breadth-first order
+  *  binary tree where the root node is at 0, it's left child is at 1, right
+  *  child at 2 and so on.
+  *
+  *  The leaves are at indices p-1 to 2p - 2 and the parent of each node is at
+  *  (node_index-1)/2. For example, with parallelism of size 8 (p=8) the tree
+  *  looks like this: (M = Merge, B = Base)
+  *
+  *                      0
+  *                      M
+  *             1                 2
+  *             M                 M
+  *         3        4        5        6
+  *         M        M        M        M
+  *      7    8   9    10  11   12  13   14
+  *      B    B   B    B   B    B   B    B
+  *
+  * When a job (base or merge) is completed, its result is put into a new merge
+  * job at it's parent index and a vacancy is created at the current job's
+  * position. New base jobs are added separately (by enqueue_data).
+  * Parallel scan starts at the root, traverses in the breadth-first order, and
+  * completes the jobs as and when they are available.
+  * When the merge job at the root node is completed, the result is returned.
+  *
+  * Think of the ring buffer's 2*n-1 elements as holding (almost) two steps of
+  * execution at parallelism of size n. Assume we're always working on the
+  * second step, and can refer to the work done at the prior step.
+  *
+  * 
+  * Example trace: Jobs buffer at some state t
+  *                      0
+  *                   M(1,8)
+  *
+  *             1                 2
+  *           M(9,12)           M(13,16)
+  *
+  *         3        4        5        6
+  *     M(17,18)  M(19,20) M(21,22)  M(23,24)
+  *
+  *      7    8   9    10  11   12  13   14
+  *     B25  B26 B27   B28 B29  B30 B31  B32
+  *
+  * After one iteration (assuming all the available jobs from state t are
+  * completed):
+  *                      0
+  *                   M(9,16)
+  *
+  *             1                 2
+  *         M(17,20)           M(21,24)
+  *
+  *        3         4        5        6
+  *     M(25,26)  M(27,28) M(29,30)  M(31,32)
+  *
+  *      7    8   9    10  11   12  13   14
+  *    B()   B() B()   B() B()  B() B()  B()
+  *
+  *)
   module Work = struct
     type t = Work_done | Not_done
   end
 
-  let isleft c = c mod 2 = 1
+  let dir c = if c mod 2 = 1 then `Left else `Right
 
   let rec parent_empty (t: ('a, 'b) Job.t Ring_buffer.t) pos =
     match pos with
     | 0 -> true
     | pos ->
-      match (isleft pos, Ring_buffer.read_i t ((pos - 1) / 2)) with
-      | true, Merge (None, _) -> true
-      | false, Merge (_, None) -> true
+      match (dir pos, Ring_buffer.read_i t ((pos - 1) / 2)) with
+      | `Left, Merge (None, _) -> true
+      | `Right, Merge (_, None) -> true
       | _, Merge (Some _, Some _) -> parent_empty t ((pos - 1) / 2)
       | _, Base _ -> failwith "This shouldn't have occured"
       | _ -> false
 
-  let update_new_job t z is_left pos =
+  let update_new_job t z dir pos =
     let new_job (cur_job: ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
-      match (is_left, cur_job) with
-      | true, Merge (None, r) -> Ok (Merge (Some z, r))
-      | false, Merge (l, None) -> Ok (Merge (l, Some z))
-      | true, Merge (Some _, _) | false, Merge (_, Some _) ->
-          failwith "impossible: the side of merge we want is not empty"
+      match (dir, cur_job) with
+      | `Left, Merge (None, r) -> Ok (Merge (Some z, r))
+      | `Right, Merge (l, None) -> Ok (Merge (l, Some z))
+      | `Left, Merge (Some _, _) | `Right, Merge (_, Some _) ->
+          (*TODO: punish the sender*)
+          Or_error.error_string
+            "Impossible: the side of merge we want is not empty"
       | _, Base _ -> Error (Error.of_string "impossible: we never fill base")
     in
     Ring_buffer.direct_update t.jobs pos new_job
@@ -187,18 +165,15 @@ module State1 = struct
     match (parent_empty t.jobs cur_pos, cur_job, completed_job) with
     | true, Merge (Some x, Some x'), Merged z ->
         let%bind () =
-          match cur_pos with
-          | 0 (*Root node*) ->
-              t.acc <- (fst t.acc |> Int.( + ) 1, Some z) ;
-              Ok ()
-          | cur_pos -> update_new_job t z (isleft cur_pos) ((cur_pos - 1) / 2)
+          if cur_pos = 0 then (
+            t.acc <- (fst t.acc |> Int.( + ) 1, Some z) ;
+            Ok () )
+          else update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2)
         in
         let%map () = update_cur_job t (Merge (None, None)) cur_pos in
         Work.Work_done
     | true, Base (Some d), Lifted z ->
-        let%bind () =
-          update_new_job t z (isleft cur_pos) ((cur_pos - 1) / 2)
-        in
+        let%bind () = update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2) in
         let%bind () = update_cur_job t (Base None) cur_pos in
         t.base_none_pos <- Some (Option.value t.base_none_pos ~default:cur_pos) ;
         t.current_data_length <- t.current_data_length - 1 ;
@@ -239,23 +214,7 @@ module State1 = struct
             state.base_none_pos <- next_base_none_pos state pos )
 
   let read_jobs (t: ('a, 'b) Job.t Ring_buffer.t) =
-    let curr_position_neg_one =
-      Ring_buffer.mod_ (t.position - 1) (Array.length t.data)
-    in
-    Sequence.unfold ~init:(`More t.position) ~f:(fun pos ->
-        match pos with
-        | `Stop -> None
-        | `More pos ->
-            if pos = curr_position_neg_one then
-              Some (Some (t.data).(pos), `Stop)
-            else if not (parent_empty t pos) then
-              Some
-                (None, `More (Ring_buffer.mod_ (pos + 1) (Array.length t.data)))
-            else
-              Some
-                ( Some (t.data).(pos)
-                , `More (Ring_buffer.mod_ (pos + 1) (Array.length t.data)) ) )
-    |> Sequence.to_list |> List.filter_map ~f:ident
+    Ring_buffer.filter t ~f:(parent_empty t)
 end
 
 module Available_job = struct
@@ -438,7 +397,7 @@ let%test_module "scans" =
               ~f_job_done:job_done ~f_acc:f_merge_up
           in
           Quickcheck.test g ~sexp_of:[%sexp_of : (int64, int64) State.t]
-            ~trials:10 ~f:(fun s ->
+            ~trials:20 ~f:(fun s ->
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let do_one_next = ref false in
                   (* For any arbitrary intermediate state *)
@@ -564,11 +523,11 @@ let%test_module "scans" =
           let result =
             scan
               ~data:(a_bunch_of_nums_then_empties n)
-              ~parallelism_log_2:8 ~f:job_done ~f_acc:f_merge_up
+              ~parallelism_log_2:9 ~f:job_done ~f_acc:f_merge_up
           in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%map after_3n =
-                List.init (3 * n) ~f:(fun _ -> ())
+                List.init (6 * n) ~f:(fun _ -> ())
                 |> Deferred.List.foldi ~init:"" ~f:(fun i acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc

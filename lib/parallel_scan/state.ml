@@ -29,8 +29,7 @@ type ('a, 'd) t =
   ; capacity: int
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
-  ; mutable base_none_pos: int option
-  ; parallelism: int }
+  ; mutable base_none_pos: int option }
 [@@deriving sexp, bin_io]
 
 module Hash = struct
@@ -38,8 +37,8 @@ module Hash = struct
 end
 
 (* TODO: This should really be computed iteratively *)
-let hash {jobs; acc; current_data_length; base_none_pos; parallelism}
-    a_to_string d_to_string =
+let hash {jobs; acc; current_data_length; base_none_pos} a_to_string
+    d_to_string =
   let h = Cryptokit.Hash.sha3 256 in
   Ring_buffer.iter jobs ~f:(function
     | Base None -> h#add_string "Base None"
@@ -61,7 +60,6 @@ let hash {jobs; acc; current_data_length; base_none_pos; parallelism}
   ( match x with
   | None -> h#add_string "None"
   | Some a -> h#add_string (Int.to_string a) ) ;
-  h#add_string (Int.to_string parallelism) ;
   h
 
 let acc {acc} = snd acc
@@ -70,14 +68,13 @@ let jobs {jobs} = jobs
 
 let current_data_length {current_data_length} = current_data_length
 
-let parallelism {parallelism} = parallelism
+let parallelism {jobs} = (Ring_buffer.length jobs + 1) / 2
 
 let base_none_pos {base_none_pos} = base_none_pos
 
-let copy {jobs; acc; current_data_length; base_none_pos; parallelism; capacity} =
+let copy {jobs; acc; current_data_length; base_none_pos; capacity} =
   { jobs= Ring_buffer.copy jobs
   ; acc
   ; capacity
   ; current_data_length
-  ; base_none_pos
-  ; parallelism }
+  ; base_none_pos }
