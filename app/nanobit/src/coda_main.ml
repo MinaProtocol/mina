@@ -793,13 +793,10 @@ module Run (Program : Main_intf) = struct
     Deferred.unit
 
   let get_nonce t (addr: Public_key.Compressed.t) =
-    let maybe_nonce =
-      let open Option.Let_syntax in
-      let ledger = best_ledger t in
-      let%map account = Ledger.get ledger addr in
-      account.Account.nonce
-    in
-    Deferred.return maybe_nonce
+    let open Option.Let_syntax in
+    let ledger = best_ledger t in
+    let%map account = Ledger.get ledger addr in
+    account.Account.nonce
 
   let setup_local_server ~minibit ~log ~client_port =
     let log = Logger.child log "client" in
@@ -809,7 +806,8 @@ module Run (Program : Main_intf) = struct
             send_txn log minibit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance minibit pk) )
-      ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () -> get_nonce minibit)
+      ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
+          return (get_nonce minibit pk))
       ]
     in
     let snark_worker_impls =
