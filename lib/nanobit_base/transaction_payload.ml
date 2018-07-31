@@ -2,7 +2,6 @@ open Core
 open Util
 open Snark_params.Tick
 open Let_syntax
-
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
@@ -25,11 +24,10 @@ end
 include Stable.V1
 
 let dummy =
-  { receiver = Public_key.Compressed.empty
-  ; amount = Amount.zero
-  ; fee = Fee.zero
-  ; nonce = Account_nonce.zero
-  }
+  { receiver= Public_key.Compressed.empty
+  ; amount= Amount.zero
+  ; fee= Fee.zero
+  ; nonce= Account_nonce.zero }
 
 type value = t
 
@@ -43,10 +41,7 @@ type var =
 let typ : (var, t) Typ.t =
   let spec =
     let open Data_spec in
-    [ Public_key.Compressed.typ
-    ; Amount.typ
-    ; Fee.typ
-    ; Account_nonce.Unpacked.typ ]
+    [Public_key.Compressed.typ; Amount.typ; Fee.typ; Account_nonce.Unpacked.typ]
   in
   let of_hlist
         : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) H_list.t
@@ -68,17 +63,18 @@ let fold {receiver; amount; fee; nonce} =
 let var_to_bits {receiver; amount; fee; nonce} =
   with_label __LOC__
     (let%map receiver = Public_key.Compressed.var_to_bits receiver in
-      let amount = (Amount.var_to_bits amount :> Boolean.var list) in
-      let fee = (Fee.var_to_bits fee :> Boolean.var list) in
-      let nonce = Account_nonce.Unpacked.var_to_bits nonce in
-      receiver @ amount @ fee @ nonce)
+     let amount = (Amount.var_to_bits amount :> Boolean.var list) in
+     let fee = (Fee.var_to_bits fee :> Boolean.var list) in
+     let nonce = Account_nonce.Unpacked.var_to_bits nonce in
+     receiver @ amount @ fee @ nonce)
 
-let length_in_bits = Public_key.Compressed.length_in_bits + Amount.length + Fee.length + Account_nonce.length_in_bits
+let length_in_bits =
+  Public_key.Compressed.length_in_bits + Amount.length + Fee.length
+  + Account_nonce.length_in_bits
 
 let to_bits {receiver; amount; fee; nonce} =
   Public_key.Compressed.to_bits receiver
-  @ Amount.to_bits amount
-  @ Fee.to_bits fee
+  @ Amount.to_bits amount @ Fee.to_bits fee
   @ Account_nonce.Bits.to_bits nonce
 
 let gen =
@@ -86,9 +82,8 @@ let gen =
   let%map receiver = Public_key.Compressed.gen
   and amount = Amount.gen
   and fee = Fee.gen
-  and nonce = Account_nonce.gen
-  in
-  { receiver; amount; fee; nonce }
+  and nonce = Account_nonce.gen in
+  {receiver; amount; fee; nonce}
 
 let%test_unit "to_bits" =
   let open Test_util in
@@ -102,9 +97,8 @@ let%test_unit "to_bits" =
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random () } )
 
-let var_of_t ({ receiver; amount; fee; nonce } :t ) : var =
-  { receiver = Public_key.Compressed.var_of_t receiver
-  ; amount = Amount.var_of_t amount
-  ; fee = Fee.var_of_t fee
-  ; nonce= Account_nonce.Unpacked.var_of_value nonce
-  }
+let var_of_t ({receiver; amount; fee; nonce}: t) : var =
+  { receiver= Public_key.Compressed.var_of_t receiver
+  ; amount= Amount.var_of_t amount
+  ; fee= Fee.var_of_t fee
+  ; nonce= Account_nonce.Unpacked.var_of_value nonce }

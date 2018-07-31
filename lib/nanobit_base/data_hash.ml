@@ -104,13 +104,12 @@ struct
 
   let var_of_t t =
     let n = Bigint.of_field t in
-    { digest = Field.Checked.constant t
-    ; bits =
+    { digest= Field.Checked.constant t
+    ; bits=
         Some
           (Bitstring.Lsb_first.of_list
-             (List.init M.length_in_bits
-                ~f:(fun i -> Boolean.var_of_value (Bigint.test_bit n i))))
-    }
+             (List.init M.length_in_bits ~f:(fun i ->
+                  Boolean.var_of_value (Bigint.test_bit n i) ))) }
 
   open Let_syntax
 
@@ -192,11 +191,9 @@ module Make_full_size () = struct
   let if_ cond ~then_ ~else_ =
     let open Let_syntax in
     let%map digest =
-      Field.Checked.if_ cond
-        ~then_:then_.digest
-        ~else_:else_.digest
+      Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
     in
-    { digest; bits = None }
+    {digest; bits= None}
 end
 
 module Make_small (M : sig

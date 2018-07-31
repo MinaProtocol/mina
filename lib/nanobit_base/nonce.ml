@@ -78,7 +78,8 @@ struct
   module Bits = Bits
 
   let gen =
-    Quickcheck.Generator.map ~f:(fun n -> N.of_string (Bignum_bigint.to_string n))
+    Quickcheck.Generator.map
+      ~f:(fun n -> N.of_string (Bignum_bigint.to_string n))
       (Bignum_bigint.gen_incl Bignum_bigint.zero
          (Bignum_bigint.of_string N.(to_string max_int)))
 end

@@ -20,11 +20,11 @@ val gen : t Quickcheck.Generator.t
 module Stable : sig
   module V1 : sig
     type nonrec ('pk, 'amount, 'fee, 'nonce) t_ =
-                                                  ( 'pk
-                                                  , 'amount
-                                                  , 'fee
-                                                  , 'nonce )
-                                                  t_ =
+                                                 ( 'pk
+                                                 , 'amount
+                                                 , 'fee
+                                                 , 'nonce )
+                                                 t_ =
       {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
     [@@deriving bin_io, eq, sexp, hash]
 

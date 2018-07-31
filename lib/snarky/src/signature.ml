@@ -9,13 +9,17 @@ module Schnorr
               and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
               and type boolean_var := Impl.Boolean.var
               and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
-              and type field := Impl.Field.t)
-    (Message : sig
-      type t
-      type var
+              and type field := Impl.Field.t) (Message : sig
+        type t
 
-      val hash : t -> nonce:bool list -> Bignum_bigint.t
-      val hash_checked : var -> nonce:Impl.Boolean.var list -> (Curve.Scalar.var, _) Impl.Checked.t
+        type var
+
+        val hash : t -> nonce:bool list -> Bignum_bigint.t
+
+        val hash_checked :
+             var
+          -> nonce:Impl.Boolean.var list
+          -> (Curve.Scalar.var, _) Impl.Checked.t
     end) =
 struct
   open Impl
@@ -102,8 +106,7 @@ struct
            and h_pk = Curve.Checked.scale public_key h in
            Checked.bind ~f:compress (Curve.Checked.add s_g h_pk)
          in
-         Message.hash_checked m ~nonce:r
-        )
+         Message.hash_checked m ~nonce:r)
 
     let verifies ((_, h) as signature) pk m =
       with_label __LOC__

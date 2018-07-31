@@ -61,8 +61,8 @@ let apply_transaction_unchecked ledger ({payload; sender}: Transaction.t) =
       { sender_account with
         balance= sender_balance'
       ; nonce= Account.Nonce.succ nonce
-      ; receipt_chain_hash = Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash
-      } ;
+      ; receipt_chain_hash=
+          Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash } ;
     set ledger receiver {receiver_account with balance= receiver_balance'}
 
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =

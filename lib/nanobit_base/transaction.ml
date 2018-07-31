@@ -4,7 +4,6 @@ open Snark_params
 open Tick
 open Let_syntax
 module Fee = Currency.Fee
-
 module Payload = Transaction_payload
 
 module Stable = struct

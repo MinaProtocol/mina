@@ -1,6 +1,5 @@
 open Core
 open Snark_params.Tick
-
 module Payload = Transaction_payload
 
 type ('payload, 'pk, 'signature) t_ =
