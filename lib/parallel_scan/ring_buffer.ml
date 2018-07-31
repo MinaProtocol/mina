@@ -37,6 +37,23 @@ let iter t ~f =
 
 let read t = (t.data).(t.position)
 
+let filter t ~f =
+  let curr_position_neg_one = mod_ (t.position - 1) (Array.length t.data) in
+  Sequence.unfold ~init:(`More t.position) ~f:(fun pos ->
+      match pos with
+      | `Stop -> None
+      | `More pos ->
+          if pos = curr_position_neg_one then
+            if not (f pos) then Some (None, `Stop)
+            else Some (Some (t.data).(pos), `Stop)
+          else if not (f pos) then
+            Some (None, `More (mod_ (pos + 1) (Array.length t.data)))
+          else
+            Some
+              ( Some (t.data).(pos)
+              , `More (mod_ (pos + 1) (Array.length t.data)) ) )
+  |> Sequence.to_list |> List.filter_map ~f:ident
+
 let read_all t =
   let curr_position_neg_one = mod_ (t.position - 1) (Array.length t.data) in
   Sequence.unfold ~init:(`More t.position) ~f:(fun pos ->
