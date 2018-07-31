@@ -88,7 +88,8 @@ module Fee_transfer = struct
   include Fee_transfer
 
   let dummy_signature =
-    Schnorr.sign (Private_key.create ()) (List.init 256 ~f:(fun _ -> true))
+    Schnorr.sign (Private_key.create ())
+      Transaction_payload.dummy
 
   let two (pk1, fee1) (pk2, fee2) : Tagged_transaction.t =
     ( Fee_transfer
@@ -270,9 +271,11 @@ module Base = struct
         let {Transaction.Payload.receiver; amount; fee; nonce} = payload in
         let is_fee_transfer = Tag.Checked.is_fee_transfer tag in
         let is_normal = Tag.Checked.is_normal tag in
+        let%bind payload_section =
+          Schnorr.Message.var_of_payload payload
+        in
         let%bind () =
-          let%bind bs = Transaction.Payload.var_to_bits payload in
-          let%bind verifies = Schnorr.Checked.verifies signature sender bs in
+          let%bind verifies = Schnorr.Checked.verifies signature sender payload_section in
           (* Should only assert_verifies if the tag is Normal *)
           Boolean.Assert.any [is_fee_transfer; verifies]
         in
@@ -307,6 +310,17 @@ module Base = struct
                      Account.Nonce.equal_var nonce account.nonce
                    in
                    Boolean.Assert.any [is_fee_transfer; nonce_matches])
+              in
+              let%bind receipt_chain_hash =
+                let current = account.receipt_chain_hash in
+                let%bind r =
+                  Receipt.Chain_hash.Checked.cons
+                    ~payload:payload_section
+                    current
+                in
+                Receipt.Chain_hash.Checked.if_ is_fee_transfer
+                  ~then_:current
+                  ~else_:r
               in
               let%map balance =
                 Balance.Checked.add_signed_amount account.balance sender_delta
@@ -1094,7 +1108,7 @@ let%test_module "transaction_snark" =
         ; nonce }
       in
       let signature =
-        Schnorr.sign sender.private_key (Transaction.Payload.to_bits payload)
+        Schnorr.sign sender.private_key payload
       in
       Transaction.check
         { Transaction.payload

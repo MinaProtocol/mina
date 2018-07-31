@@ -43,6 +43,8 @@ end
 module type Full_size = sig
   include Basic
 
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
   val var_of_hash_packed : Pedersen.Digest.Packed.var -> var
 
   val of_hash : Pedersen.Digest.t -> t

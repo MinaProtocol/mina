@@ -19,6 +19,8 @@ module Chain_hash = struct
 
     type t = var
 
+    let if_ = if_
+
     let cons ~payload t =
       let open Let_syntax in
       let init =

@@ -1,6 +1,8 @@
 open Core_kernel
 open Async_kernel
-include Schnorr.Private_key
+
+type t = Bignum_bigint.Stable.V1.t
+[@@deriving bin_io, sexp]
 
 let create () =
   if Insecure.private_key_generation then

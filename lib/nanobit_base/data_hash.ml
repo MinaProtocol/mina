@@ -43,6 +43,8 @@ end
 module type Full_size = sig
   include Basic
 
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
   val var_of_hash_packed : Pedersen.Digest.Packed.var -> var
 
   val of_hash : Pedersen.Digest.t -> t
@@ -174,6 +176,15 @@ module Make_full_size () = struct
   let var_of_hash_packed digest = {digest; bits= None}
 
   let of_hash = Fn.id
+
+  let if_ cond ~then_ ~else_ =
+    let open Let_syntax in
+    let%map digest =
+      Field.Checked.if_ cond
+        ~then_:then_.digest
+        ~else_:else_.digest
+    in
+    { digest; bits = None }
 end
 
 module Make_small (M : sig
