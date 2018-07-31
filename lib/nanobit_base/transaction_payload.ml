@@ -81,6 +81,15 @@ let to_bits {receiver; amount; fee; nonce} =
   @ Fee.to_bits fee
   @ Account_nonce.Bits.to_bits nonce
 
+let gen =
+  let open Quickcheck.Generator.Let_syntax in
+  let%map receiver = Public_key.Compressed.gen
+  and amount = Amount.gen
+  and fee = Fee.gen
+  and nonce = Account_nonce.gen
+  in
+  { receiver; amount; fee; nonce }
+
 let%test_unit "to_bits" =
   let open Test_util in
   with_randomness 123456789 (fun () ->
@@ -93,3 +102,9 @@ let%test_unit "to_bits" =
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random () } )
 
+let var_of_t ({ receiver; amount; fee; nonce } :t ) : var =
+  { receiver = Public_key.Compressed.var_of_t receiver
+  ; amount = Amount.var_of_t amount
+  ; fee = Fee.var_of_t fee
+  ; nonce= Account_nonce.Unpacked.var_of_value nonce
+  }

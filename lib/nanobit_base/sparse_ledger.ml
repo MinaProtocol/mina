@@ -23,8 +23,8 @@ let of_ledger_subset_exn ledger keys =
       (of_hash ~depth:Ledger.depth
          (Merkle_hash.of_digest (Ledger.merkle_root ledger :> Pedersen.Digest.t)))
 
-let apply_transaction_exn t
-    ({sender; payload= {amount; fee; receiver}}: Transaction.t) =
+let apply_transaction_exn t ({sender; payload}: Transaction.t) =
+  let {Transaction_payload.amount; fee; receiver} = payload in
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in
@@ -40,7 +40,11 @@ let apply_transaction_exn t
           value_exn
             (let open Let_syntax in
             let%bind total = Amount.add_fee amount fee in
-            Balance.sub_amount sender_account.balance total)) }
+             Balance.sub_amount sender_account.balance total))
+      ; receipt_chain_hash =
+          Receipt.Chain_hash.cons payload
+            sender_account.receipt_chain_hash
+      }
   in
   let receiver_account = get_exn t receiver_idx in
   set_exn t receiver_idx

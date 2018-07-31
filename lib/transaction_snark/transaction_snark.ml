@@ -325,7 +325,8 @@ module Base = struct
               let%map balance =
                 Balance.Checked.add_signed_amount account.balance sender_delta
               in
-              {account with balance; nonce= next_nonce} )
+              {account with balance; nonce= next_nonce; receipt_chain_hash}
+          )
         in
         let%map root =
           Ledger_hash.modify_account root receiver ~f:(fun account ->
@@ -809,8 +810,10 @@ let check_tagged_transaction source target transaction handler =
   let excess = Tagged_transaction.excess transaction in
   let top_hash = base_top_hash source target excess in
   let open Tick in
-  let main = handle (Base.main (Field.Checked.constant top_hash)) handler in
-  assert (check main prover_state)
+  let main =
+    handle (Checked.map (Base.main (Field.Checked.constant top_hash)) ~f:As_prover.return) handler in
+  Or_error.ok_exn (run_and_check main prover_state) |> ignore
+;;
 
 let check_transition source target (t: Transition.t) handler =
   check_tagged_transaction source target

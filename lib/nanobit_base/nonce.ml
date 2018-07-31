@@ -12,6 +12,8 @@ module type S = sig
 
   val length_in_bits : int
 
+  val gen : t Quickcheck.Generator.t
+
   val zero : t
 
   val succ : t -> t
@@ -74,6 +76,11 @@ struct
 
   include Bits_snarkable
   module Bits = Bits
+
+  let gen =
+    Quickcheck.Generator.map ~f:(fun n -> N.of_string (Bignum_bigint.to_string n))
+      (Bignum_bigint.gen_incl Bignum_bigint.zero
+         (Bignum_bigint.of_string N.(to_string max_int)))
 end
 
 module Make32 () : S with type t = Unsigned_extended.UInt32.t =

@@ -15,6 +15,8 @@ type t =
 
 val dummy : t
 
+val gen : t Quickcheck.Generator.t
+
 module Stable : sig
   module V1 : sig
     type nonrec ('pk, 'amount, 'fee, 'nonce) t_ =
@@ -52,3 +54,5 @@ val to_bits : t -> bool list
 val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
 
 val var_to_bits : var -> (Boolean.var list, _) Checked.t
+
+val var_of_t : t -> var

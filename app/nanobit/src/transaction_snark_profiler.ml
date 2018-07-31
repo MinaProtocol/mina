@@ -179,7 +179,7 @@ let command =
      and check_only =
        flag "check-only"
          ~doc:"Just check base snarks, don't keys or time anything"
-         (required bool)
+         no_arg
      in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))

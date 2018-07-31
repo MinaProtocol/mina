@@ -12,6 +12,8 @@ module type S = sig
 
   val length_in_bits : int
 
+  val gen : t Quickcheck.Generator.t
+
   val zero : t
 
   val succ : t -> t
