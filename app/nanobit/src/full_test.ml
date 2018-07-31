@@ -48,11 +48,10 @@ let run_test with_snark : unit -> unit Deferred.t =
          ~transaction_pool_disk_location:"transaction_pool"
          ~snark_pool_disk_location:"snark_pool" ())
   in
-  let balance_change_or_timeout =
+  let balance_change_or_timeout ~initial_receiver_balance =
     let rec go () =
       match Run.get_balance minibit Genesis_ledger.poor_pk with
-      | Some b
-        when not (Currency.Balance.equal b Genesis_ledger.initial_poor_balance) ->
+      | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
           return ()
       | _ ->
           let%bind () = after (Time_ns.Span.of_sec 10.) in
@@ -86,29 +85,41 @@ let run_test with_snark : unit -> unit Deferred.t =
   let send_amount = Currency.Amount.of_int 10 in
   (* Send money to someone *)
   let build_txn amount =
-    let poor_pk = Genesis_ledger.poor_pk in
+    let receiver = Genesis_ledger.poor_pk in
+    let nonce =
+      Run.get_nonce minibit Genesis_ledger.rich_pk |> Option.value_exn
+    in
     let payload : Transaction.Payload.t =
-      { receiver= poor_pk
-      ; amount= send_amount
-      ; fee= Currency.Fee.of_int 0
-      ; nonce= Account.Nonce.zero }
+      {receiver; amount= send_amount; fee= Currency.Fee.of_int 0; nonce}
     in
     Transaction.sign (Signature_keypair.of_private_key rich_sk) payload
   in
-  let transaction = build_txn send_amount in
-  let%bind () = Run.send_txn log minibit (transaction :> Transaction.t) in
-  (* Send a similar the transaction twice on purpose; this second one
-   * will be rejected because the nonce is wrong *)
-  let transaction' = build_txn Currency.Amount.(send_amount + of_int 1) in
-  let%bind () = Run.send_txn log minibit (transaction' :> Transaction.t) in
-  (* Let the system settle, mine some blocks *)
-  let%bind () = balance_change_or_timeout in
-  assert_balance poor_pk
-    ( Currency.Balance.( + ) Genesis_ledger.initial_poor_balance send_amount
-    |> Option.value_exn ) ;
-  assert_balance rich_pk
-    ( Currency.Balance.( - ) Genesis_ledger.initial_rich_balance send_amount
-    |> Option.value_exn ) ;
+  let test_sending_transaction () =
+    let transaction = build_txn send_amount in
+    let prev_sender_balance =
+      Run.get_balance minibit Genesis_ledger.rich_pk |> Option.value_exn
+    in
+    let prev_receiver_balance =
+      Run.get_balance minibit Genesis_ledger.poor_pk |> Option.value_exn
+    in
+    let%bind () = Run.send_txn log minibit (transaction :> Transaction.t) in
+    (* Send a similar the transaction twice on purpose; this second one
+    * will be rejected because the nonce is wrong *)
+    let transaction' = build_txn Currency.Amount.(send_amount + of_int 1) in
+    let%bind () = Run.send_txn log minibit (transaction' :> Transaction.t) in
+    (* Let the system settle, mine some blocks *)
+    let%map () =
+      balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
+    in
+    assert_balance poor_pk
+      ( Currency.Balance.( + ) prev_receiver_balance send_amount
+      |> Option.value_exn ) ;
+    assert_balance rich_pk
+      ( Currency.Balance.( - ) prev_sender_balance send_amount
+      |> Option.value_exn )
+  in
+  let%bind () = test_sending_transaction () in
+  let%bind () = test_sending_transaction () in
   Deferred.unit
 
 let command =
