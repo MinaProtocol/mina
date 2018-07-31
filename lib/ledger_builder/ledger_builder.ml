@@ -310,6 +310,7 @@ end = struct
     option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
 
   (* TODO: This must be updated when we add coinbases *)
+  (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_diff t (diff: Ledger_builder_diff.t) =
     let open Result_with_rollback.Let_syntax in
     let%bind payments =
