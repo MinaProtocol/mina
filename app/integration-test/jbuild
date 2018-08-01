@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
-(executables
- ((names (cli))
+(executable
+ ((name cli)
   (modes (native))
   (preprocess (pps (ppx_jane)))
   (libraries

@@ -34,6 +34,7 @@ let run_test with_snark : unit -> unit Deferred.t =
   let open Main in
   let net_config =
     { Inputs.Net.Config.parent_log= log
+    ; conf_dir
     ; gossip_net_params=
         { Inputs.Net.Gossip_net.Params.timeout= Time.Span.of_sec 1.
         ; target_peer_count= 8

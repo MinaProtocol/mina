@@ -96,6 +96,7 @@ let daemon =
          in
          let net_config =
            { Inputs.Net.Config.parent_log= log
+           ; conf_dir
            ; gossip_net_params=
                { timeout= Time.Span.of_sec 1.
                ; target_peer_count= 8
@@ -129,7 +130,7 @@ let () =
     ; ("full-test", Full_test.command)
     ; ("client", Client.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
-    ; ("rpc-integration-test", Coda_test.command) ]
+    ; (Coda_sample_test.name, Coda_sample_test.command) ]
   |> Command.run
 
 let () = never_returns (Scheduler.go ())

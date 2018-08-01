@@ -20,5 +20,6 @@ let () =
            let module Program = (val (test : (module Test))) in
            (Program.name, Program.command) )
   in
-  Command.group test_arguments ~summary:"Task" |> Command.run ;
-  never_returns (Scheduler.go ())
+  Command.group test_arguments ~summary:"Task" |> Command.run
+
+let () = never_returns (Scheduler.go ())

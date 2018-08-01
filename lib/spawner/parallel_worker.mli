@@ -32,8 +32,14 @@ module type Parallel_worker_intf = sig
   val run : t -> unit Deferred.t
 end
 
-module Make (Worker : Worker_intf) :
+module type Id_intf = sig
+  type t
+
+  val to_string : t -> string
+end
+
+module Make (Worker : Worker_intf) (Id : Id_intf) :
   Parallel_worker_intf
   with type input = Worker.input
    and type state = Worker.state
-   and type config = (string, string, string) Config.t
+   and type config = (Id.t, string, string, string) Config.t

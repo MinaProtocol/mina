@@ -8,6 +8,7 @@ module type S = sig
        initial_peers:Peer.t list
     -> me:Peer.t
     -> parent_log:Logger.t
+    -> conf_dir:string
     -> t Deferred.Or_error.t
 
   val peers : t -> Peer.t list
@@ -23,38 +24,30 @@ end
  * directory, this prefix normalizes it to working-dir *)
 let test_prefix = "../../../../"
 
+let lock_file = "kademlia.lock"
+
+let write_lock_file lock_path pid =
+  Out_channel.write_all lock_path ~data:(Pid.to_string pid)
+
 module Haskell_process = struct
   open Async
 
-  type t = Process.t
+  type t = {process: Process.t; lock_path: string}
 
-  let kill t =
-    let%map _ =
-      Process.run_exn ~prog:"kill" ~args:[Pid.to_string (Process.pid t)] ()
+  let kill {process; lock_path} =
+    let%bind _ =
+      Process.run_exn ~prog:"kill"
+        ~args:[Pid.to_string (Process.pid process)]
+        ()
     in
-    ()
-
-  (* HACK:
-    * We "killall kademlia" immediately before starting up the kademlia process
-    *
-    * The right way to handle this is to have some option for the Process
-    * to automatically cleanup after itself. ie: When this OCaml process dies,
-    * the process we spawned is also killed.
-    *
-    * Core's "Process" module doesn't do this for us. We'll need to write
-    * something custom. See issue #125
-    *)
-  let kill_kademlias () =
-    let open Deferred.Let_syntax in
-    match%map Process.run ~prog:"killall" ~args:["kademlia"] () with
-    | Ok _ -> Ok ()
-    | Error _ -> Ok ()
+    Sys.remove lock_path
 
   let cli_format (addr: Host_and_port.t) : string =
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
       (Host_and_port.port addr)
 
-  let create ~initial_peers ~me ~log =
+  let create ~initial_peers ~me ~log ~conf_dir =
+    let lock_path = Filename.concat conf_dir lock_file in
     let run_kademlia () =
       let args =
         ["test"; cli_format me] @ List.map initial_peers ~f:cli_format
@@ -65,10 +58,27 @@ module Haskell_process = struct
       let kademlia_binary = "app/kademlia-haskell/result/bin/kademlia" in
       let open Deferred.Let_syntax in
       (* Try kademlia, then prepend test_prefix if it's missing *)
-      match%bind Process.create ~prog:kademlia_binary ~args () with
-      | Ok p -> return (Or_error.return p)
-      | Error _ ->
-          Process.create ~prog:(test_prefix ^ kademlia_binary) ~args ()
+      Deferred.Or_error.map
+        ~f:(fun process -> {process; lock_path})
+        ( match%bind Process.create ~prog:kademlia_binary ~args () with
+        | Ok p -> return (Or_error.return p)
+        | Error _ ->
+            Process.create ~prog:(test_prefix ^ kademlia_binary) ~args () )
+    in
+    let kill_locked_process ~log ~conf_dir =
+      match%bind Sys.file_exists lock_path with
+      | `Yes -> (
+          let%bind p = Reader.file_contents lock_path in
+          match%bind Process.run ~prog:"kill" ~args:[p] () with
+          | Ok _ ->
+              Logger.debug log "Killing Dead Kademlia Process %s" p ;
+              let%map () = Sys.remove lock_path in
+              Ok ()
+          | Error _ ->
+              Logger.debug log
+                "Process %s does not exists and will not be killed" p ;
+              return @@ Ok () )
+      | _ -> return @@ Ok ()
     in
     let open Deferred.Or_error.Let_syntax in
     let args =
@@ -76,17 +86,22 @@ module Haskell_process = struct
     in
     Logger.debug log "Args: %s\n"
       (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
-    let%bind () = kill_kademlias () in
-    let%map p = run_kademlia () in
-    don't_wait_for
-      (Pipe.iter_without_pushback
-         (Reader.pipe (Process.stderr p))
-         ~f:(fun str -> Logger.error log "%s" str)) ;
-    p
+    let%bind () = kill_locked_process ~log ~conf_dir in
+    match%bind Deferred.(Sys.is_directory conf_dir >>= Or_error.return) with
+    | `Yes ->
+        let%map t = run_kademlia () in
+        let {process; lock_path} = t in
+        write_lock_file lock_path (Process.pid process) ;
+        don't_wait_for
+          (Pipe.iter_without_pushback
+             (Reader.pipe (Process.stderr process))
+             ~f:(fun str -> Logger.error log "%s" str)) ;
+        t
+    | _ -> Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
-  let output t ~log =
+  let output {process} ~log =
     Pipe.map
-      (Reader.pipe (Process.stdout t))
+      (Reader.pipe (Process.stdout process))
       ~f:(fun str ->
         List.filter_map (String.split_lines str) ~f:(fun line ->
             let prefix_name_size = 4 in
@@ -121,6 +136,7 @@ module Make (P : sig
        initial_peers:Peer.t list
     -> me:Peer.t
     -> log:Logger.t
+    -> conf_dir:string
     -> t Deferred.Or_error.t
 
   val output : t -> log:Logger.t -> string list Pipe.Reader.t
@@ -152,10 +168,10 @@ struct
         (Peer.Event.Disconnect deads)
     else ()
 
-  let connect ~initial_peers ~me ~parent_log =
+  let connect ~initial_peers ~me ~parent_log ~conf_dir =
     let open Deferred.Or_error.Let_syntax in
     let log = Logger.child parent_log "membership" in
-    let%map p = P.create ~initial_peers ~me ~log in
+    let%map p = P.create ~initial_peers ~me ~log ~conf_dir in
     let peers = Peer.Table.create () in
     let changes_reader, changes_writer = Linear_pipe.create () in
     let first_peers_ivar = ref None in
@@ -204,7 +220,7 @@ let%test_module "Tests" =
           match%bind
             M.connect ~initial_peers:[]
               ~me:(Host_and_port.create ~host:"127.0.0.1" ~port:3000)
-              ~parent_log:(Logger.create ())
+              ~parent_log:(Logger.create ()) ~conf_dir:"/tmp/membership-test"
           with
           | Ok t ->
               let acc = ref init in
@@ -225,7 +241,7 @@ let%test_module "Tests" =
 
       let kill t = return ()
 
-      let create ~initial_peers ~me ~log =
+      let create ~initial_peers ~me ~log ~conf_dir =
         let on p = Printf.sprintf "127.0.0.1:%d key on" p in
         let off p = Printf.sprintf "127.0.0.1:%d key off" p in
         let render cmds =
@@ -250,7 +266,7 @@ let%test_module "Tests" =
         in
         ()
 
-      let create ~initial_peers ~me ~log =
+      let create ~initial_peers ~me ~log ~conf_dir =
         let open Deferred.Let_syntax in
         (* Try kademlia, then prepend test_prefix if it's missing *)
         match%bind Process.create ~prog:"./dummy.sh" ~args:[] () with
@@ -309,20 +325,31 @@ let%test_module "Tests" =
 
 module Haskell = Make (Haskell_process)
 
+let addr i = Host_and_port.of_string (Printf.sprintf "127.0.0.1:%d" (3005 + i))
+
+let node me peers conf_dir =
+  Haskell.connect ~initial_peers:peers ~me ~parent_log:(Logger.create ())
+    ~conf_dir
+
+let conf_dir = "/tmp/.kademlia-test-"
+
+let clean_tests directories =
+  let open Async in
+  let%map _ = Process.run_exn ~prog:"rm" ~args:("-rf" :: directories) () in
+  ()
+
 let%test_unit "connect" =
-  let addr i =
-    Host_and_port.of_string (Printf.sprintf "127.0.0.1:%d" (3005 + i))
-  in
-  let node me peers =
-    Haskell.connect ~initial_peers:peers ~me ~parent_log:(Logger.create ())
-  in
-  let wait_sec s =
-    let open Core in
-    Async.(after (Time.Span.of_sec s))
-  in
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
-      let%bind _n0 = node (addr 0) [] and _n1 = node (addr 1) [addr 0] in
+      let conf_dir_1 = conf_dir ^ "1" and conf_dir_2 = conf_dir ^ "2" in
+      let wait_sec s =
+        let open Core in
+        Async.(after (Time.Span.of_sec s))
+      in
+      let%bind () = Async.Unix.mkdir ~p:() conf_dir_1 in
+      let%bind () = Async.Unix.mkdir ~p:() conf_dir_2 in
+      let%bind _n0 = node (addr 0) [] conf_dir_1
+      and _n1 = node (addr 1) [addr 0] conf_dir_2 in
       let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
       let%bind n0_peers =
         Deferred.any
@@ -338,5 +365,35 @@ let%test_unit "connect" =
       assert (
         Host_and_port.(List.hd_exn n0_peers = addr 1)
         && Host_and_port.(List.hd_exn n1_peers = addr 0) ) ;
-      let%map () = Haskell.stop n0 and () = Haskell.stop n1 in
-      () )
+      let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
+      clean_tests [conf_dir_1; conf_dir_2] )
+
+let lock_path = Filename.concat conf_dir lock_file
+
+let%test_unit "killing a nonexistent pid" =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      let open Async in
+      let open Deferred.Let_syntax in
+      match Core.Unix.fork () with
+      | `In_the_child -> Deferred.unit
+      | `In_the_parent nonexistent_process ->
+          let%bind () = Unix.mkdir ~p:() conf_dir in
+          write_lock_file lock_path nonexistent_process ;
+          let%bind n = node (addr 1) [] conf_dir >>| Or_error.ok_exn in
+          let%bind string_process = Reader.file_contents lock_path in
+          assert (nonexistent_process <> Pid.of_string string_process) ;
+          let%bind () = Haskell.stop n in
+          clean_tests [conf_dir] )
+
+let%test_unit "lockfile does not exist after connection calling stop" =
+  Async.Thread_safe.block_on_async_exn (fun () ->
+      let open Async in
+      let open Deferred.Let_syntax in
+      let%bind () = Unix.mkdir ~p:() conf_dir in
+      let%bind n = node (addr 1) [] conf_dir >>| Or_error.ok_exn in
+      let%bind yes_result = Sys.file_exists lock_path in
+      assert (`Yes = yes_result) ;
+      let%bind () = Haskell.stop n in
+      let%bind no_result = Sys.file_exists lock_path in
+      assert (`No = no_result) ;
+      clean_tests [conf_dir] )

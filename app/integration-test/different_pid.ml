@@ -21,7 +21,7 @@ module Pid_worker = struct
 end
 
 module Worker = Parallel_worker.Make (Pid_worker)
-module Master = Master.Make (Worker) (Int)
+module Master = Master.Make (Worker (Int)) (Int)
 
 let master_command =
   let open Command.Let_syntax in
@@ -30,8 +30,8 @@ let master_command =
     let open Deferred.Let_syntax in
     let open Master in
     let t = create () in
-    let%bind log_dir = File_system.create_dir log_dir in
-    let config = {Spawner.Config.host; executable_path; log_dir}
+    let%bind () = File_system.create_dir log_dir in
+    let config = {Spawner.Config.id= 1; host; executable_path; log_dir}
     and process1 = 1
     and process2 = 2 in
     let%bind () = add t () process1 ~config

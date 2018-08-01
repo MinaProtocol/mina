@@ -32,17 +32,23 @@ module type Parallel_worker_intf = sig
   val run : t -> unit Deferred.t
 end
 
-module Make (Worker : Worker_intf) :
+module type Id_intf = sig
+  type t
+
+  val to_string : t -> string
+end
+
+module Make (Worker : Worker_intf) (Id : Id_intf) :
   Parallel_worker_intf
   with type input = Worker.input
    and type state = Worker.state
-   and type config = (string, string, string) Config.t =
+   and type config = (Id.t, string, string, string) Config.t =
 struct
   type input = Worker.input
 
   type state = Worker.state
 
-  type config = (string, string, string) Config.t
+  type config = (Id.t, string, string, string) Config.t
 
   module Rpc_worker = struct
     module T = struct
@@ -90,27 +96,30 @@ struct
 
   type t = Rpc_worker.Connection.t
 
-  let create input {Config.host; executable_path; log_dir} =
-    let worker_id = "worker-" ^ host in
-    let%bind worker =
+  let create input {Config.id; host; executable_path; log_dir} =
+    let worker_id = sprintf "worker-%s-%s" host (Id.to_string id) in
+    match%bind
       (* TODO: This will not work on an host other than 127.0.0.1. Trying to find a configuration setup (via Docker) to do this *)
-      Rpc_worker.spawn_exn input ~on_failure:Error.raise
-        ~shutdown_on:Heartbeater_timeout
+      Rpc_worker.spawn input ~on_failure:Error.raise ~shutdown_on:Disconnect
+        ~connection_state_init_arg:()
         ~redirect_stdout:(`File_append (log_dir ^/ worker_id ^ "-stdout"))
-        ~redirect_stderr:(`File_append (log_dir ^/ worker_id ^ "-stdout"))
-        ~name:worker_id
+        ~redirect_stderr:(`File_append (log_dir ^/ worker_id ^ "-stderr"))
+        ~connection_timeout:(Time.Span.of_min 1.) ~name:worker_id
         ~where:
           (Rpc_parallel.Executable_location.Remote
              (Rpc_parallel.Remote_executable.existing_on_host ~executable_path
                 ~strict_host_key_checking:`No host))
-    in
-    Rpc_worker.Connection.client_exn worker ()
+    with
+    | Ok worker -> return worker
+    | Error e ->
+        failwith
+          (sprintf "Could not create %s\n%s\n" worker_id
+             (Error.to_string_hum e))
 
-  let execute_command ~connection input ~f =
-    Rpc_worker.Connection.run_exn connection ~f ~arg:input
+  let execute_command t input ~f =
+    Rpc_worker.Connection.run_exn t ~f ~arg:input
 
-  let run t = execute_command () ~f:Rpc_worker.functions.run ~connection:t
+  let run t = execute_command t () ~f:Rpc_worker.functions.run
 
-  let new_states t =
-    execute_command () ~f:Rpc_worker.functions.new_states ~connection:t
+  let new_states t = execute_command t () ~f:Rpc_worker.functions.new_states
 end

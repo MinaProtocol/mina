@@ -5,6 +5,8 @@ open Linear_pipe
 module type S = sig
   type t
 
+  type worker
+
   type state
 
   type id
@@ -26,7 +28,8 @@ module Make
     (Worker : Parallel_worker.Parallel_worker_intf)
     (Id : Hashable.S_binable) :
   S
-  with type state := Worker.state
+  with type worker := Worker.t
+   and type state := Worker.state
    and type input := Worker.input
    and type server_config := Worker.config
    and type id := Id.t =
@@ -52,5 +55,8 @@ struct
     @@ Pipe.iter state_pipe ~f:(fun state ->
            Linear_pipe.write write_new_states (id, state) )
 
-  let run {workers} id = Option.map ~f:Worker.run @@ Id.Table.find workers id
+  let map {workers} id ~f ~args =
+    Option.map ~f:(fun worker -> f worker args) @@ Id.Table.find workers id
+
+  let run = map ~f:(fun worker () -> Worker.run worker) ~args:()
 end

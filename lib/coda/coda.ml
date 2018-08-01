@@ -56,6 +56,8 @@ module type Network_intf = sig
 
   val states : t -> state_with_witness Linear_pipe.Reader.t
 
+  val peers : t -> Host_and_port.t list
+
   val snark_pool_diffs : t -> snark_pool_diff Linear_pipe.Reader.t
 
   val transaction_pool_diffs : t -> transaction_pool_diff Linear_pipe.Reader.t
@@ -372,6 +374,8 @@ module Make (Inputs : Inputs_intf) = struct
   let transaction_pool t = t.transaction_pool
 
   let snark_pool t = t.snark_pool
+
+  let peers t = Net.peers t.net
 
   module Config = struct
     type t =

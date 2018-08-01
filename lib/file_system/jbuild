@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name file_system)
+  (public_name file_system)
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries (core async))
+  (flags (:standard -short-paths))
+  (synopsis "Interface to make system calls to the Unix file system")))

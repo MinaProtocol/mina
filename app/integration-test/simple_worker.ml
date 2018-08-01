@@ -22,7 +22,7 @@ module State_worker = struct
 end
 
 module Worker = Parallel_worker.Make (State_worker)
-module Master = Master.Make (Worker) (Int)
+module Master = Master.Make (Worker (Int)) (Int)
 
 let master_command =
   let open Command.Let_syntax in
@@ -31,9 +31,10 @@ let master_command =
     let open Deferred.Let_syntax in
     let open Master in
     let t = create () in
-    let%bind log_dir = File_system.create_dir log_dir in
-    let config = {Config.host; executable_path; log_dir} and process = 1 in
-    let%bind () = add t 1 process ~config in
+    let%bind () = File_system.create_dir log_dir in
+    let id = 1 in
+    let config = {Config.id; host; executable_path; log_dir} and process = 1 in
+    let%bind () = add t id process ~config in
     let%bind () = Option.value_exn (run t process) in
     let reader = new_states t and expected_state = 2 in
     let%map _, actual_state = Linear_pipe.read_exn reader in
