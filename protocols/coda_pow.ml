@@ -76,6 +76,11 @@ end
 module type Ledger_intf = sig
   type t [@@deriving sexp, compare, hash, bin_io]
 
+  module Undo : sig
+    type t
+    [@@deriving sexp]
+  end
+
   type valid_transaction
 
   type super_transaction
@@ -88,15 +93,9 @@ module type Ledger_intf = sig
 
   val merkle_root : t -> ledger_hash
 
-  val apply_transaction : t -> valid_transaction -> unit Or_error.t
+  val apply_super_transaction : t -> super_transaction -> Undo.t Or_error.t
 
-  val undo_transaction : t -> valid_transaction -> unit Or_error.t
-
-  val apply_super_transaction : t -> super_transaction -> unit Or_error.t
-
-  val undo_super_transaction : t -> super_transaction -> unit Or_error.t
-
-  val undo_transaction : t -> valid_transaction -> unit Or_error.t
+  val undo : t -> Undo.t -> unit Or_error.t
 end
 
 module Fee = struct

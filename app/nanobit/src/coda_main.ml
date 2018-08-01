@@ -168,17 +168,7 @@ struct
         module type of Transaction_snark.Transition with type t := t )
   end
 
-  module Ledger = struct
-    include Ledger
-
-    let apply_super_transaction l = function
-      | Super_transaction.Transaction t -> apply_transaction l t
-      | Fee_transfer t -> apply_fee_transfer l t
-
-    let undo_super_transaction l = function
-      | Super_transaction.Transaction t -> undo_transaction l t
-      | Fee_transfer t -> undo_fee_transfer l t
-  end
+  module Ledger = Ledger
 
   module Transaction_snark = struct
     module Statement = Transaction_snark.Statement
@@ -667,9 +657,6 @@ module type Main_intf = sig
       val copy : t -> t
 
       val get : t -> Public_key.Compressed.t -> Account.t option
-
-      val apply_transaction :
-        t -> Transaction.With_valid_signature.t -> unit Or_error.t
     end
 
     module External_transition : sig
