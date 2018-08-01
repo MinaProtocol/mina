@@ -100,7 +100,10 @@ let create ~conf_dir ledger
       let sparse_ledger = Sparse_ledger.of_ledger_subset_exn ledger [fee_pk] in
       (* We assume that the ledger and transactions passed in are constructed such that
          an overflow will not occur here. *)
-      let fee_undo = Or_error.ok_exn (Ledger.apply_super_transaction ledger (Fee_transfer fee_collection)) in
+      let fee_undo =
+        Or_error.ok_exn
+          (Ledger.apply_super_transaction ledger (Fee_transfer fee_collection))
+      in
       let target_hash = Ledger.merkle_root ledger in
       let fee_collection =
         { Input.transition= Fee_transfer fee_collection
@@ -109,7 +112,7 @@ let create ~conf_dir ledger
       in
       let rev_inputs = fee_collection :: inputs in
       List.iter (fee_undo :: undos) ~f:(fun undo ->
-        Or_error.ok_exn (Ledger.undo ledger undo));
+          Or_error.ok_exn (Ledger.undo ledger undo) ) ;
       (List.rev rev_inputs, target_hash)
     in
     let rec go inputs undos total_fees = function

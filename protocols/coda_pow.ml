@@ -77,8 +77,7 @@ module type Ledger_intf = sig
   type t [@@deriving sexp, compare, hash, bin_io]
 
   module Undo : sig
-    type t
-    [@@deriving sexp]
+    type t [@@deriving sexp]
   end
 
   type valid_transaction

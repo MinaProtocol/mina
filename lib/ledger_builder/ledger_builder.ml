@@ -232,7 +232,7 @@ end = struct
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger
       ; fee_excess= Fee.Signed.of_unsigned fee_excess
-      ; proof_type= `Base })
+      ; proof_type= `Base } )
 
   let apply_super_transaction_and_get_witness ledger s =
     let public_keys = function
@@ -242,14 +242,15 @@ end = struct
           [Transaction.sender t; Transaction.receiver t]
     in
     let open Or_error.Let_syntax in
-    let%map undo, statement = apply_super_transaction_and_get_statement ledger s in
+    let%map undo, statement =
+      apply_super_transaction_and_get_statement ledger s
+    in
     let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
     (undo, {Super_transaction_with_witness.transaction= s; witness; statement})
 
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions undos =
-      List.iter undos ~f:(fun u ->
-          Or_error.ok_exn (Ledger.undo ledger u) )
+      List.iter undos ~f:(fun u -> Or_error.ok_exn (Ledger.undo ledger u))
     in
     let rec go processed acc = function
       | [] ->
@@ -261,8 +262,7 @@ end = struct
         | Error e ->
             undo_transactions processed ;
             Result_with_rollback.error e
-        | Ok (undo, res) ->
-          go (undo :: processed) (res :: acc) ts
+        | Ok (undo, res) -> go (undo :: processed) (res :: acc) ts
     in
     go [] [] ts
 
@@ -385,9 +385,11 @@ end = struct
     in
     let new_data =
       List.map super_transactions ~f:(fun s ->
-        let (_undo, t) = Or_error.ok_exn (apply_super_transaction_and_get_witness t.ledger s) in
-        t
-      )
+          let _undo, t =
+            Or_error.ok_exn
+              (apply_super_transaction_and_get_witness t.ledger s)
+          in
+          t )
     in
     let res_opt =
       Or_error.ok_exn (fill_in_completed_work t.scan_state completed_works)
@@ -472,7 +474,9 @@ end = struct
       else
         Ok
           { t with
-            budget; queue_consumption; transactions= (txv, undo) :: t.transactions }
+            budget
+          ; queue_consumption
+          ; transactions= (txv, undo) :: t.transactions }
 
     let add_work t (wc: Completed_work.Checked.t) =
       let open Or_error.Let_syntax in
@@ -520,9 +524,7 @@ end = struct
     in
     go (`Processed_none, init) seq
 
-  let uncons_exn = function
-    | [] -> failwith "uncons_exn"
-    | x :: xs -> (x, xs)
+  let uncons_exn = function [] -> failwith "uncons_exn" | x :: xs -> (x, xs)
 
   let create_diff t
       ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
@@ -584,21 +586,19 @@ end = struct
           ~f:(fun txn ->
             match Ledger.apply_super_transaction ledger (Transaction txn) with
             | Error _ -> None
-            | Ok undo -> Some (txn, undo))
+            | Ok undo -> Some (txn, undo) )
       in
       let ts, undos = List.unzip ts_with_undos in
       let resources, undos_of_unapplied =
-        fold_until_error ts ~init:(resources, undos)
-          ~f:(fun (res, remaining_undos) txn ->
-            let (undo, remaining_undos) = uncons_exn remaining_undos in
+        fold_until_error ts ~init:(resources, undos) ~f:
+          (fun (res, remaining_undos) txn ->
+            let undo, remaining_undos = uncons_exn remaining_undos in
             match Resources.add_transaction res (txn, undo) with
-            | Error e ->
-              Error e
-            | Ok res ->
-              Ok (res, remaining_undos))
+            | Error e -> Error e
+            | Ok res -> Ok (res, remaining_undos) )
       in
-      List.iter (List.rev undos_of_unapplied)
-        ~f:(fun u -> Or_error.ok_exn (Ledger.undo ledger u));
+      List.iter (List.rev undos_of_unapplied) ~f:(fun u ->
+          Or_error.ok_exn (Ledger.undo ledger u) ) ;
       (resources, t_rest)
     in
     let resources =
