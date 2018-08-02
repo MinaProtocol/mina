@@ -1,4 +1,5 @@
 open Core
+open Snark_params
 
 module T = struct
   type t = Load_both of {step: string; wrap: string} | Generate_both
@@ -11,7 +12,7 @@ include T
 let arg_type = Command.Arg_type.create of_string
 
 let obtain_keys (type vk pk kp) (module Impl
-    : Snark_intf.S with type Verification_key.t = vk and type Proving_key.t = pk and type 
+    : Snark_intf with type Verification_key.t = vk and type Proving_key.t = pk and type 
       Keypair.t = kp) t f =
   let keypair_of_sexp s =
     let x, y = [%of_sexp : string * string] s in

@@ -47,39 +47,54 @@ end
 module Body = struct
   module Stable = struct
     module V1 = struct
-      type 'ledger_hash t_ =
-        {target_hash: 'ledger_hash; proof: Proof.Stable.V1.t}
+      type ('ledger_hash, 'ledger_builder_hash) t_ =
+        { target_hash: 'ledger_hash
+        ; ledger_builder_hash: 'ledger_builder_hash
+        ; proof: Proof.Stable.V1.t option }
       [@@deriving bin_io, sexp]
 
-      type t = Ledger_hash.Stable.V1.t t_ [@@deriving bin_io, sexp]
+      type t = (Ledger_hash.Stable.V1.t, Ledger_builder_hash.Stable.V1.t) t_
+      [@@deriving bin_io, sexp]
     end
   end
 
   include Stable.V1
 
-  let fold {target_hash} ~init ~f = Ledger_hash.fold target_hash ~init ~f
+  let fold {target_hash; ledger_builder_hash; proof= _} =
+    let open Util in
+    Ledger_hash.fold target_hash
+    +> Ledger_builder_hash.fold ledger_builder_hash
 
   (* For now, the var does not track of the proof. This is due to
    how the verifier gadget is currently structured and can be changed
    once the verifier is reimplemented in snarky *)
-  type var = Ledger_hash.var t_
+  type var = (Ledger_hash.var, Ledger_builder_hash.var) t_
 
   let typ : (var, t) Tick.Typ.t =
+    let relevant_data_typ =
+      Tick.Typ.(Ledger_hash.typ * Ledger_builder_hash.typ)
+    in
     let open Tick.Typ in
-    let typ = Ledger_hash.typ in
     let store t =
-      Store.map (typ.store t.target_hash) ~f:(fun target_hash ->
-          {t with target_hash} )
+      Store.map
+        (relevant_data_typ.store (t.target_hash, t.ledger_builder_hash))
+        ~f:(fun (target_hash, ledger_builder_hash) ->
+          {t with target_hash; ledger_builder_hash} )
     in
     let read t =
-      Read.map (typ.read t.target_hash) ~f:(fun target_hash ->
-          {t with target_hash} )
+      Read.map
+        (relevant_data_typ.read (t.target_hash, t.ledger_builder_hash))
+        ~f:(fun (target_hash, ledger_builder_hash) ->
+          {t with target_hash; ledger_builder_hash} )
     in
     let alloc =
-      Alloc.map typ.alloc ~f:(fun target_hash ->
-          {target_hash; proof= Tock.Proof.dummy} )
+      Alloc.map relevant_data_typ.alloc ~f:
+        (fun (target_hash, ledger_builder_hash) ->
+          {target_hash; ledger_builder_hash; proof= None} )
     in
-    let check t = typ.check t.target_hash in
+    let check t =
+      relevant_data_typ.check (t.target_hash, t.ledger_builder_hash)
+    in
     {store; read; alloc; check}
 
   let var_to_bits ({target_hash}: var) :
@@ -108,18 +123,6 @@ let hash t =
   let s = Pedersen.State.create Pedersen.params in
   Pedersen.State.update_fold s (fold_bits t) |> Pedersen.State.digest
 
-let genesis : t =
-  let time =
-    Time.of_date_ofday ~zone:Time.Zone.utc
-      (Date.create_exn ~y:2018 ~m:Month.Feb ~d:2)
-      Time.Ofday.start_of_day
-    |> Block_time.of_time
-  in
-  { header= {nonce= Nonce.of_int 193; time}
-  ; body=
-      { proof= Tock.Proof.dummy
-      ; target_hash= Ledger.(merkle_root Genesis_ledger.ledger) } }
-
 let to_hlist {header; body} = H_list.[header; body]
 
 let of_hlist : (unit, 'h -> 'b -> unit) H_list.t -> ('h, 'b) t_ =
@@ -146,7 +149,8 @@ module With_transactions = struct
       module V1 = struct
         type t =
           { target_hash: Ledger_hash.Stable.V1.t
-          ; proof: Proof.Stable.V1.t
+          ; ledger_builder_hash: Ledger_builder_hash.Stable.V1.t
+          ; proof: Proof.Stable.V1.t option
           ; transactions: Transaction.Stable.V1.t list }
         [@@deriving bin_io, sexp]
       end
@@ -154,13 +158,8 @@ module With_transactions = struct
 
     include Stable.V1
 
-    let forget ({target_hash; proof; _}: t) : Body.t = {target_hash; proof}
-
-    (* TODO: Remove in PR implementing miner *)
-    let dummy : t =
-      { target_hash= Ledger_hash.of_hash Tick.Pedersen.zero_hash
-      ; proof= Tock.Proof.dummy
-      ; transactions= [] }
+    let forget ({target_hash; ledger_builder_hash; proof; _}: t) : Body.t =
+      {target_hash; ledger_builder_hash; proof}
   end
 
   module Stable = struct

@@ -1,11 +1,15 @@
 open Core
 open Util
 open Snark_params.Tick
+open Snark_bits
+open Bitstring_lib
 
 module type Basic = sig
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
-  val to_bits : t -> string
+  val gen : t Quickcheck.Generator.t
+
+  val to_bytes : t -> string
 
   val length_in_bits : int
 
@@ -33,11 +37,15 @@ module type Basic = sig
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
 
+  val var_of_t : t -> var
+
   include Bits_intf.S with type t := t
 end
 
 module type Full_size = sig
   include Basic
+
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
   val var_of_hash_packed : Pedersen.Digest.Packed.var -> var
 
@@ -69,17 +77,39 @@ struct
 
   include Stable.V1
 
-  let to_bits t =
+  (* TODO: Pad with zeroes *)
+  let to_bytes t =
     Z.to_bits
       (Bignum_bigint.to_zarith_bigint Bigint.(to_bignum_bigint (of_field t)))
 
   let length_in_bits = M.length_in_bits
+
+  let () = assert (length_in_bits <= Field.size_in_bits)
+
+  let gen : t Quickcheck.Generator.t =
+    let m =
+      if length_in_bits = Field.size_in_bits then
+        Bignum_bigint.(Field.size - one)
+      else Bignum_bigint.(pow (of_int 2) (of_int length_in_bits) - one)
+    in
+    Quickcheck.Generator.map
+      Bignum_bigint.(gen_incl zero m)
+      ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
   let ( = ) = equal
 
   type var =
     { digest: Pedersen.Digest.Packed.var
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
+
+  let var_of_t t =
+    let n = Bigint.of_field t in
+    { digest= Field.Checked.constant t
+    ; bits=
+        Some
+          (Bitstring.Lsb_first.of_list
+             (List.init M.length_in_bits ~f:(fun i ->
+                  Boolean.var_of_value (Bigint.test_bit n i) ))) }
 
   open Let_syntax
 
@@ -157,6 +187,13 @@ module Make_full_size () = struct
   let var_of_hash_packed digest = {digest; bits= None}
 
   let of_hash = Fn.id
+
+  let if_ cond ~then_ ~else_ =
+    let open Let_syntax in
+    let%map digest =
+      Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
+    in
+    {digest; bits= None}
 end
 
 module Make_small (M : sig

@@ -1,12 +1,13 @@
 open Core_kernel
 open Snark_params
 open Tick
+open Snark_bits
 
-type t = private Field.t [@@deriving sexp, bin_io, eq]
+type t = private Field.t [@@deriving sexp, bin_io, eq, compare]
 
 module Stable : sig
   module V1 : sig
-    type nonrec t = t [@@deriving bin_io, sexp, eq]
+    type nonrec t = t [@@deriving bin_io, sexp, eq, compare]
   end
 end
 

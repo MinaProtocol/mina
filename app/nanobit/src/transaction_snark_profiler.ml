@@ -14,6 +14,7 @@ let create_ledger_and_transactions num_transitions =
       Ledger.set ledger public_key
         { public_key
         ; balance= Currency.Balance.of_int 10_000
+        ; receipt_chain_hash= Receipt.Chain_hash.empty
         ; nonce= Account.Nonce.zero } ) ;
   let txn from_kp (to_kp: Signature_keypair.t) amount fee nonce =
     let payload : Transaction.Payload.t =
@@ -91,7 +92,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:
       (fun (max_span, sparse_ledger) t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transition_exn sparse_ledger t
+          Sparse_ledger.apply_super_transaction_exn sparse_ledger t
         in
         let span, proof =
           time (fun () ->
@@ -126,7 +127,7 @@ let check_base_snarks sparse_ledger0
   let _ =
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_transition_exn sparse_ledger t
+          Sparse_ledger.apply_super_transaction_exn sparse_ledger t
         in
         let () =
           Transaction_snark.check_transition
@@ -177,8 +178,7 @@ let command =
          (optional int)
      and check_only =
        flag "check-only"
-         ~doc:"Just check base snarks, don't keys or time anything"
-         (required bool)
+         ~doc:"Just check base snarks, don't keys or time anything" no_arg
      in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))

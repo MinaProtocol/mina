@@ -26,7 +26,7 @@ end
 module type S = sig
   include S0
 
-  module Sparse_ledger = Snark_worker_lib.Ledger
+  module Sparse_ledger = Nanobit_base.Sparse_ledger
 end
 
 module T = struct
@@ -49,7 +49,7 @@ module Worker_state = struct
     : t )
 end
 
-module Sparse_ledger = Snark_worker_lib.Ledger
+module Sparse_ledger = Nanobit_base.Sparse_ledger
 
 module Input = struct
   type t =
@@ -95,12 +95,15 @@ let create ~conf_dir ledger
       ()
   in
   let inputs, target_hash =
-    let finalize_with_fees inputs total_fees =
+    let finalize_with_fees inputs undos total_fees =
       let fee_collection = Fee_transfer.One (fee_pk, total_fees) in
       let sparse_ledger = Sparse_ledger.of_ledger_subset_exn ledger [fee_pk] in
       (* We assume that the ledger and transactions passed in are constructed such that
          an overflow will not occur here. *)
-      Or_error.ok_exn (Ledger.apply_fee_transfer ledger fee_collection) ;
+      let fee_undo =
+        Or_error.ok_exn
+          (Ledger.apply_super_transaction ledger (Fee_transfer fee_collection))
+      in
       let target_hash = Ledger.merkle_root ledger in
       let fee_collection =
         { Input.transition= Fee_transfer fee_collection
@@ -108,16 +111,12 @@ let create ~conf_dir ledger
         ; target_hash }
       in
       let rev_inputs = fee_collection :: inputs in
-      List.iter rev_inputs ~f:(fun {transition; _} ->
-          Or_error.ok_exn
-            ( match transition with
-            | Fee_transfer t -> Ledger.undo_fee_transfer ledger t
-            | Transaction t ->
-                Ledger.undo_transaction ledger (t :> Transaction.t) ) ) ;
+      List.iter (fee_undo :: undos) ~f:(fun undo ->
+          Or_error.ok_exn (Ledger.undo ledger undo) ) ;
       (List.rev rev_inputs, target_hash)
     in
-    let rec go inputs total_fees = function
-      | [] -> finalize_with_fees inputs total_fees
+    let rec go inputs undos total_fees = function
+      | [] -> finalize_with_fees inputs undos total_fees
       | (tx: Transaction.With_valid_signature.t) :: txs ->
           let ({Transaction.sender; payload} as transaction) =
             (tx :> Transaction.t)
@@ -125,7 +124,7 @@ let create ~conf_dir ledger
           match Currency.Fee.add payload.fee total_fees with
           | None ->
               (* We have hit max fees, truncate the list *)
-              finalize_with_fees inputs total_fees
+              finalize_with_fees inputs undos total_fees
           | Some total_fees' ->
               (* TODO: Bad transactions should get thrown away earlier.
              That is, the error case here is actually unexpected and we
@@ -135,17 +134,17 @@ let create ~conf_dir ledger
                 Sparse_ledger.of_ledger_subset_exn ledger
                   [Public_key.compress sender; payload.receiver]
               in
-              match Ledger.apply_transaction ledger tx with
-              | Error _s -> go inputs total_fees txs
-              | Ok () ->
+              match Ledger.apply_super_transaction ledger (Transaction tx) with
+              | Error _s -> go inputs undos total_fees txs
+              | Ok undo ->
                   let input : Input.t =
                     { transition= Transaction tx
                     ; ledger= sparse_ledger
                     ; target_hash= Ledger.merkle_root ledger }
                   in
-                  go (input :: inputs) total_fees' txs
+                  go (input :: inputs) (undo :: undos) total_fees' txs
     in
-    go [] Currency.Fee.zero transactions
+    go [] [] Currency.Fee.zero transactions
   in
   { result=
       Map_reduce.map_reduce config (Pipe.of_list inputs)

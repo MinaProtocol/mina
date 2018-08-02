@@ -1,9 +1,10 @@
 open Core
 
 type single = Public_key.Compressed.t * Currency.Fee.Stable.V1.t
-[@@deriving bin_io, sexp]
+[@@deriving bin_io, sexp, compare, eq]
 
-type t = One of single | Two of single * single [@@deriving bin_io, sexp]
+type t = One of single | Two of single * single
+[@@deriving bin_io, sexp, compare, eq]
 
 let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 
@@ -14,3 +15,12 @@ let of_single_list xs =
     | [x] -> One x :: acc
   in
   go [] xs
+
+let fee_excess = function
+  | One (_, fee) -> Ok fee
+  | Two ((_, fee1), (_, fee2)) ->
+    match Currency.Fee.add fee1 fee2 with
+    | None -> Or_error.error_string "Fee_transfer.fee_excess: overflow"
+    | Some res -> Ok res
+
+let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)

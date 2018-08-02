@@ -3,7 +3,7 @@ open Async
 open Nanobit_base
 open Blockchain_snark
 open Cli_lib
-open Main
+open Coda_main
 
 let daemon =
   let open Command.Let_syntax in
@@ -64,29 +64,31 @@ let daemon =
        let remap_addr_port = Fn.id in
        let me = Host_and_port.create ~host:ip ~port in
        let%bind prover = Prover.create ~conf_dir in
-       let%bind genesis_proof =
-         Prover.genesis_proof prover >>| Or_error.ok_exn
-       in
+       let%bind verifier = Verifier.create ~conf_dir in
        let module Init = struct
          type proof = Proof.Stable.V1.t [@@deriving bin_io]
+
+         let logger = log
+
+         let verifier = verifier
 
          let conf_dir = conf_dir
 
          let prover = prover
 
-         let genesis_proof = genesis_proof
+         let genesis_proof = Precomputed_values.base_proof
 
          let fee_public_key = Genesis_ledger.rich_pk
        end in
-       let module Main = ( val if Insecure.key_generation then ( module Main_without_snark
-                                                                          (Init)
-                                 : Main_intf )
-                               else
-                                 (module Main_with_snark (Storage.Disk) (Init)
-                                 : Main_intf ) ) in
-       let module Run = Run (Main) in
+       let module M = ( val if Insecure.key_generation then
+                              (module Coda_without_snark (Init) () : Main_intf
+                              )
+                            else
+                              (module Coda_with_snark (Storage.Disk) (Init) ()
+                              : Main_intf ) ) in
+       let module Run = Run (M) in
        let%bind () =
-         let open Main in
+         let open M in
          let run_snark_worker =
            Option.value_map run_snark_worker ~default:`Don't_run ~f:(fun k ->
                `With_public_key k )
@@ -103,15 +105,15 @@ let daemon =
            ; remap_addr_port }
          in
          let%map minibit =
-           Main.create
-             { log
-             ; net_config
-             ; ledger_disk_location= conf_dir ^/ "ledgers"
-             ; pool_disk_location= conf_dir ^/ "transaction_pool" }
+           Run.create
+             (Run.Config.make ~log ~net_config
+                ~ledger_builder_persistant_location:
+                  (conf_dir ^/ "ledger_builder")
+                ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
+                ~snark_pool_disk_location:(conf_dir ^/ "snark_pool") ())
          in
          Run.setup_local_server ~minibit ~client_port ~log ;
-         Run.run_snark_worker ~client_port run_snark_worker ;
-         Run.run ~minibit ~log
+         Run.run_snark_worker ~log ~client_port run_snark_worker
        in
        Async.never ())
 
@@ -120,6 +122,9 @@ let () =
   Command.group ~summary:"Current"
     [ ("daemon", daemon)
     ; (Parallel.worker_command_name, Parallel.worker_command)
+    ; ( Snark_worker_lib.Debug.command_name
+      , Snark_worker_lib.Debug.Worker.command )
+    ; (Snark_worker_lib.Prod.command_name, Snark_worker_lib.Prod.Worker.command)
     ; ("full-test", Full_test.command)
     ; ("client", Client.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]

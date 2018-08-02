@@ -1,10 +1,15 @@
 open Core
 open Snark_params.Tick
+open Snark_bits
 
 module type Basic = sig
+  (* TODO: Use stable for bin_io *)
+
   type t = private Pedersen.Digest.t [@@deriving sexp, eq]
 
-  val to_bits : t -> string
+  val gen : t Quickcheck.Generator.t
+
+  val to_bytes : t -> string
 
   val length_in_bits : int
 
@@ -32,11 +37,15 @@ module type Basic = sig
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
 
+  val var_of_t : t -> var
+
   include Bits_intf.S with type t := t
 end
 
 module type Full_size = sig
   include Basic
+
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
   val var_of_hash_packed : Pedersen.Digest.Packed.var -> var
 

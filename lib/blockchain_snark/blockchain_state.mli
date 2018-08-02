@@ -11,6 +11,8 @@ val zero : t
 
 val zero_hash : State_hash.t
 
+val genesis_block : Block.t
+
 val compute_target : Block_time.t -> Target.t -> Block_time.t -> Target.t
 
 module type Update_intf = sig

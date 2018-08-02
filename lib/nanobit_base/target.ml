@@ -1,9 +1,10 @@
 open Core_kernel
 open Snark_params
+open Snark_bits
 
 module Stable = struct
   module V1 = struct
-    type t = Tick.Field.t [@@deriving bin_io, sexp, eq]
+    type t = Tick.Field.t [@@deriving bin_io, sexp, eq, compare]
   end
 end
 

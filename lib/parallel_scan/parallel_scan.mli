@@ -11,34 +11,23 @@ end
 
 module State : sig
   module Job : sig
-    type ('a, 'd) t =
-      | Merge_up of 'a option
-      | Merge of 'a option * 'a option
-      | Base of 'd option
+    type ('a, 'd) t = Merge of 'a option * 'a option | Base of 'd option
     [@@deriving bin_io, sexp]
   end
 
   module Completed_job : sig
-    type ('a, 'b) t = Lifted of 'a | Merged of 'a | Merged_up of 'b
-    [@@deriving bin_io, sexp]
+    type 'a t = Lifted of 'a | Merged of 'a [@@deriving bin_io, sexp]
   end
 
-  type ('a, 'b, 'd) t [@@deriving sexp, bin_io]
+  type ('a, 'd) t [@@deriving sexp, bin_io]
 
-  (* val jobs : ('a, 'b, 'd) t -> ('a, 'd) Job.t Ring_buffer.t *)
-
-  val copy : ('a, 'b, 'd) t -> ('a, 'b, 'd) t
+  val copy : ('a, 'd) t -> ('a, 'd) t
 
   module Hash : sig
     type t = Cryptokit.hash
   end
 
-  val hash :
-       ('a, 'b, 'd) t
-    -> ('a -> string)
-    -> ('b -> string)
-    -> ('d -> string)
-    -> Hash.t
+  val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
 end
 
 module type Spec_intf = sig
@@ -49,19 +38,22 @@ module type Spec_intf = sig
   type output [@@deriving sexp_of]
 end
 
-val start : parallelism_log_2:int -> init:'b -> seed:'d -> ('a, 'b, 'd) State.t
+module Available_job : sig
+  type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
+end
+
+val start : parallelism_log_2:int -> ('a, 'd) State.t
 
 val next_k_jobs :
-  state:('a, 'b, 'd) State.t -> k:int -> ('a, 'd) State.Job.t list Or_error.t
+  state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t
 
-val next_jobs : state:('a, 'b, 'd) State.t -> ('a, 'd) State.Job.t list
+val next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list
 
-val enqueue_data :
-  state:('a, 'b, 'd) State.t -> data:'d list -> unit Or_error.t
+val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
 
-val free_space : state:('a, 'b, 'd) State.t -> int
+val free_space : state:('a, 'd) State.t -> int
 
 val fill_in_completed_jobs :
-     state:('a, 'b, 'd) State.t
-  -> jobs:('a, 'b) State.Completed_job.t list
-  -> 'b option Or_error.t
+     state:('a, 'd) State.t
+  -> jobs:'a State.Completed_job.t list
+  -> 'a option Or_error.t

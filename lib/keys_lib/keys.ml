@@ -1,5 +1,5 @@
 open Core
-open Nanobit_base.Snark_params
+open Snark_params
 
 module Step_prover_state = struct
   type t =
@@ -49,9 +49,13 @@ module type S = sig
   end
 end
 
-let transaction_snark_keys = lazy (Snark_keys.transaction ())
+let tx_pk = lazy (Snark_keys.transaction_proving ())
 
-let blockchain_snark_keys = lazy (Snark_keys.blockchain ())
+let tx_vk = lazy (Snark_keys.transaction_verification ())
+
+let bc_pk = lazy (Snark_keys.blockchain_proving ())
+
+let bc_vk = lazy (Snark_keys.blockchain_verification ())
 
 let keys = Set_once.create ()
 
@@ -60,21 +64,26 @@ let create () =
   | Some x -> x
   | None ->
       let open Async in
-      let%map tx_keys = Lazy.force transaction_snark_keys
-      and bc_keys = Lazy.force blockchain_snark_keys in
+      let%map tx_pk = Lazy.force tx_pk
+      and tx_vk = Lazy.force tx_vk
+      and bc_pk = Lazy.force bc_pk
+      and bc_vk = Lazy.force bc_vk in
+      let tx_keys =
+        {Transaction_snark.Keys.proving= tx_pk; verification= tx_vk}
+      in
       let module T = Transaction_snark.Make (struct
         let keys = tx_keys
       end) in
       let module B = Blockchain_snark.Blockchain_transition.Make (T) in
       let module Step = B.Step (struct
-        let keys = bc_keys.step
+        let keys = Tick.Keypair.create ~pk:bc_pk.step ~vk:bc_vk.step
       end) in
       let module Wrap =
         B.Wrap (struct
-            let verification_key = Tick.Keypair.vk bc_keys.step
+            let verification_key = bc_vk.step
           end)
           (struct
-            let keys = bc_keys.wrap
+            let keys = Tock.Keypair.create ~pk:bc_pk.wrap ~vk:bc_vk.wrap
           end) in
       let module M = struct
         let transaction_snark_keys = tx_keys

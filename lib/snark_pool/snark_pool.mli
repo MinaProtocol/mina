@@ -3,6 +3,11 @@ open Core_kernel
 open Async_kernel
 open Coda_pow
 
+module Priced_proof : sig
+  type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
+  [@@deriving bin_io, sexp, fields]
+end
+
 module type S = sig
   type work
 
@@ -10,11 +15,9 @@ module type S = sig
 
   type fee
 
-  type priced_proof
+  type t [@@deriving bin_io]
 
-  type t
-
-  val create_pool : unit -> t
+  val create : unit -> t
 
   val add_snark :
        t
@@ -23,21 +26,11 @@ module type S = sig
     -> fee:fee
     -> [`Rebroadcast | `Don't_rebroadcast]
 
-  val request_proof : t -> work -> priced_proof option
-
-  val add_unsolved_work : t -> work -> [`Rebroadcast | `Don't_rebroadcast]
-
-  (* TODO: Include my_fee as a paramter for request work and 
-          return work that has a fee less than my_fee if the 
-          returned work does not have any unsolved work *)
-
-  val request_work : t -> work option
+  val request_proof : t -> work -> (proof, fee) Priced_proof.t option
 end
 
 module Make (Proof : sig
   type t [@@deriving bin_io]
-
-  include Proof_intf with type t := t
 end) (Fee : sig
   type t [@@deriving sexp, bin_io]
 

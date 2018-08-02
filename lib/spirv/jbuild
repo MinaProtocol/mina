@@ -1,0 +1,33 @@
+(jbuild_version 1)
+
+(executable
+ ((name generator)
+  (package spirv)
+  (modes (byte))
+  (modules (generator))
+  (flags (dynlink.cma camlp4fulllib.cma))
+  (libraries (batteries camlp4 yojson))
+  (preprocess (action (system "camlp4of ${<}")))))
+
+(rule
+ ((targets (spirv.ml))
+  (deps (
+   generator.exe
+   (file spirv.core.grammar.json)
+   (file spirv.supplemental.json)))
+  (action (with-stdout-to ${@} (run ${<} implem)))))
+
+(rule
+ ((targets (spirv.mli))
+  (deps (
+   generator.exe
+   (file spirv.core.grammar.json)
+   (file spirv.supplemental.json)))
+  (action (with-stdout-to ${@} (run ${<} interf)))))
+
+(library
+ ((name        spirv)
+  (public_name spirv)
+  (modules (spirv))
+  (flags (:standard -short-paths))
+  (libraries (batteries))))

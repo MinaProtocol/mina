@@ -9,11 +9,17 @@ module Schnorr
               and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
               and type boolean_var := Impl.Boolean.var
               and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
-              and type field := Impl.Field.t) (Hash : sig
-        val hash : bool list -> Bignum_bigint.t
+              and type field := Impl.Field.t) (Message : sig
+        type t
+
+        type var
+
+        val hash : t -> nonce:bool list -> Bignum_bigint.t
 
         val hash_checked :
-          Impl.Boolean.var list -> (Curve.Scalar.var, _) Impl.Checked.t
+             var
+          -> nonce:Impl.Boolean.var list
+          -> (Curve.Scalar.var, _) Impl.Checked.t
     end) =
 struct
   open Impl
@@ -48,7 +54,7 @@ struct
   let sign (k: Private_key.t) m =
     let e_r = Scalar.random Curve.Params.order in
     let r = compress (Curve.scale Curve.generator e_r) in
-    let h = Hash.hash (r @ m) in
+    let h = Message.hash ~nonce:r m in
     let s = Scalar.((e_r - (k * h)) % Curve.Params.order) in
     (s, h)
 
@@ -72,9 +78,9 @@ struct
     in
     go (Curve.Scalar.length_in_bits - 1) Curve.identity
 
-  let verify ((s, h): Signature.value) (pk: Public_key.value) (m: bool list) =
+  let verify ((s, h): Signature.value) (pk: Public_key.value) (m: Message.t) =
     let r = compress (shamir_sum (s, Curve.generator) (h, pk)) in
-    let h' = Hash.hash (r @ m) in
+    let h' = Message.hash ~nonce:r m in
     Scalar.equal h' h
 
   module Keypair = struct
@@ -93,14 +99,14 @@ struct
     open Impl.Let_syntax
 
     let verification_hash ((s, h): Signature.var) (public_key: Public_key.var)
-        (m: Boolean.var list) =
+        (m: Message.var) =
       with_label __LOC__
         (let%bind r =
            let%bind s_g = Curve.Checked.scale_known Curve.generator s
            and h_pk = Curve.Checked.scale public_key h in
            Checked.bind ~f:compress (Curve.Checked.add s_g h_pk)
          in
-         Hash.hash_checked (r @ m))
+         Message.hash_checked m ~nonce:r)
 
     let verifies ((_, h) as signature) pk m =
       with_label __LOC__
