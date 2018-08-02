@@ -9,13 +9,22 @@ end
 
 let tests = [(module Different_pid : Test); (module Simple_worker : Test)]
 
+let run_all_tests () =
+  Deferred.List.iter tests ~f:(fun test ->
+      let module Program = (val (test : (module Test))) in
+      Process.run_exn ~prog:Sys.executable_name ~args:[Program.name] ()
+      |> Deferred.ignore )
+
 let () =
   Random.self_init () ;
-  let worker_argument =
-    (Parallel.worker_command_name, Parallel.worker_command)
+  let worker_argument = (Parallel.worker_command_name, Parallel.worker_command)
+  and all_test_argument =
+    ( "all-tests"
+    , Command.async ~summary:"Runs all integration tests"
+        (Command.Param.return run_all_tests) )
   in
   let test_arguments =
-    worker_argument
+    worker_argument :: all_test_argument
     :: List.map tests ~f:(fun test ->
            let module Program = (val (test : (module Test))) in
            (Program.name, Program.command) )

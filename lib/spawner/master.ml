@@ -55,8 +55,8 @@ struct
     @@ Pipe.iter state_pipe ~f:(fun state ->
            Linear_pipe.write write_new_states (id, state) )
 
-  let map {workers} id ~f ~args =
-    Option.map ~f:(fun worker -> f worker args) @@ Id.Table.find workers id
+  let map {workers} id ~f =
+    Option.map ~f:(fun worker -> f worker) @@ Id.Table.find workers id
 
-  let run = map ~f:(fun worker () -> Worker.run worker) ~args:()
+  let run = map ~f:Worker.run
 end

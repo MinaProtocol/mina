@@ -860,9 +860,8 @@ module Run (Program : Main_intf) = struct
   let create_snark_worker ~log ~public_key ~client_port =
     let open Snark_worker_lib in
     let%map p =
-      Process.create_exn ()
-        ~prog:
-          "/home/o1labs/Documents/nanobit/_build/default/app/integration-test/cli.exe"
+      let our_binary = Sys.executable_name in
+      Process.create_exn () ~prog:our_binary
         ~args:
           ( Program.snark_worker_command_name
           :: Snark_worker.arguments ~public_key ~daemon_port:client_port )

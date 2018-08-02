@@ -27,7 +27,7 @@ let test_prefix = "../../../../"
 let lock_file = "kademlia.lock"
 
 let write_lock_file lock_path pid =
-  Out_channel.write_all lock_path ~data:(Pid.to_string pid)
+  Async.Writer.save lock_path ~contents:(Pid.to_string pid)
 
 module Haskell_process = struct
   open Async
@@ -87,11 +87,16 @@ module Haskell_process = struct
     Logger.debug log "Args: %s\n"
       (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
     let%bind () = kill_locked_process ~log ~conf_dir in
-    match%bind Deferred.(Sys.is_directory conf_dir >>= Or_error.return) with
+    match%bind
+      Sys.is_directory conf_dir |> Deferred.map ~f:Or_error.return
+    with
     | `Yes ->
-        let%map t = run_kademlia () in
+        let%bind t = run_kademlia () in
         let {process; lock_path} = t in
-        write_lock_file lock_path (Process.pid process) ;
+        let%map () =
+          write_lock_file lock_path (Process.pid process)
+          |> Deferred.map ~f:Or_error.return
+        in
         don't_wait_for
           (Pipe.iter_without_pushback
              (Reader.pipe (Process.stderr process))
@@ -333,11 +338,6 @@ let node me peers conf_dir =
 
 let conf_dir = "/tmp/.kademlia-test-"
 
-let clean_tests directories =
-  let open Async in
-  let%map _ = Process.run_exn ~prog:"rm" ~args:("-rf" :: directories) () in
-  ()
-
 let%test_unit "connect" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Deferred.Let_syntax in
@@ -348,52 +348,37 @@ let%test_unit "connect" =
       in
       let%bind () = Async.Unix.mkdir ~p:() conf_dir_1 in
       let%bind () = Async.Unix.mkdir ~p:() conf_dir_2 in
-      let%bind _n0 = node (addr 0) [] conf_dir_1
-      and _n1 = node (addr 1) [addr 0] conf_dir_2 in
-      let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
-      let%bind n0_peers =
-        Deferred.any
-          [ Haskell.first_peers n0
-          ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
-      in
-      assert (List.length n0_peers <> 0) ;
-      let%bind n1_peers =
-        Deferred.any
-          [Haskell.first_peers n1; Deferred.map (wait_sec 5.) ~f:(fun () -> [])]
-      in
-      assert (List.length n1_peers <> 0) ;
-      assert (
-        Host_and_port.(List.hd_exn n0_peers = addr 1)
-        && Host_and_port.(List.hd_exn n1_peers = addr 0) ) ;
-      let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
-      clean_tests [conf_dir_1; conf_dir_2] )
-
-let lock_path = Filename.concat conf_dir lock_file
-
-let%test_unit "killing a nonexistent pid" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
-      let open Async in
-      let open Deferred.Let_syntax in
-      match Core.Unix.fork () with
-      | `In_the_child -> Deferred.unit
-      | `In_the_parent nonexistent_process ->
-          let%bind () = Unix.mkdir ~p:() conf_dir in
-          write_lock_file lock_path nonexistent_process ;
-          let%bind n = node (addr 1) [] conf_dir >>| Or_error.ok_exn in
-          let%bind string_process = Reader.file_contents lock_path in
-          assert (nonexistent_process <> Pid.of_string string_process) ;
-          let%bind () = Haskell.stop n in
-          clean_tests [conf_dir] )
+      File_system.open_temp_directories [conf_dir_1; conf_dir_2] ~f:(fun () ->
+          let%bind _n0 = node (addr 0) [] conf_dir_1
+          and _n1 = node (addr 1) [addr 0] conf_dir_2 in
+          let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
+          let%bind n0_peers =
+            Deferred.any
+              [ Haskell.first_peers n0
+              ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
+          in
+          assert (List.length n0_peers <> 0) ;
+          let%bind n1_peers =
+            Deferred.any
+              [ Haskell.first_peers n1
+              ; Deferred.map (wait_sec 5.) ~f:(fun () -> []) ]
+          in
+          assert (List.length n1_peers <> 0) ;
+          assert (
+            Host_and_port.(List.hd_exn n0_peers = addr 1)
+            && Host_and_port.(List.hd_exn n1_peers = addr 0) ) ;
+          let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
+          Deferred.unit ) )
 
 let%test_unit "lockfile does not exist after connection calling stop" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Async in
       let open Deferred.Let_syntax in
-      let%bind () = Unix.mkdir ~p:() conf_dir in
-      let%bind n = node (addr 1) [] conf_dir >>| Or_error.ok_exn in
-      let%bind yes_result = Sys.file_exists lock_path in
-      assert (`Yes = yes_result) ;
-      let%bind () = Haskell.stop n in
-      let%bind no_result = Sys.file_exists lock_path in
-      assert (`No = no_result) ;
-      clean_tests [conf_dir] )
+      File_system.open_temp_directories [conf_dir] ~f:(fun () ->
+          let%bind n = node (addr 1) [] conf_dir >>| Or_error.ok_exn in
+          let lock_path = Filename.concat conf_dir lock_file in
+          let%bind yes_result = Sys.file_exists lock_path in
+          assert (`Yes = yes_result) ;
+          let%bind () = Haskell.stop n in
+          let%bind no_result = Sys.file_exists lock_path in
+          return (assert (`No = no_result)) ) )

@@ -4,8 +4,6 @@ open Nanobit_base
 open Coda_main
 open Spawner
 
-(* let () = Printexc.record_backtrace true *)
-
 module Coda_worker = struct
   type coda = {peers: unit -> Host_and_port.t list}
 
@@ -28,7 +26,6 @@ module Coda_worker = struct
 
   let make {host; log_dir; program_dir; my_port; peers; gossip_port} =
     let log = Logger.create () in
-    let%bind location = Unix.getcwd () in
     let%bind () = Sys.chdir program_dir in
     let%bind location = Unix.getcwd () in
     let conf_dir = log_dir in
@@ -80,13 +77,7 @@ module Coda_worker = struct
 
   let run {input; writer} =
     let%bind coda = make input in
-    Log.Global.info "Created Coda" ;
-    let time_to_wait =
-      if input.should_wait then (
-        Log.Global.info "Waiting to connect Coda" ;
-        10. )
-      else 0.0
-    in
+    let time_to_wait = if input.should_wait then 3. else 0.0 in
     let%bind () = after (Time.Span.of_sec time_to_wait) in
     Pipe.write writer @@ coda.peers ()
 end
@@ -109,29 +100,25 @@ let run =
       Option.value_map program_dir ~default:(Unix.getcwd ()) ~f:return
     in
     let setup_peers log_dir peers =
-      Out_channel.write_all
+      Writer.save
         (Filename.concat log_dir "peers")
-        ~data:([%sexp_of : Host_and_port.t list] peers |> Sexp.to_string)
+        ~contents:([%sexp_of : Host_and_port.t list] peers |> Sexp.to_string)
     in
     let init_coda t ~config ~my_port ~peers ~gossip_port ~should_wait =
       let {Spawner.Config.host; log_dir; id} = config in
-      setup_peers log_dir peers ;
+      let%bind () = setup_peers log_dir peers in
       let%bind () =
         add t
-          ( { host
-            ; my_port
-            ; peers
-            ; log_dir
-            ; program_dir
-            ; gossip_port
-            ; should_wait }
-          : Coda_worker.input )
+          { Coda_worker.host
+          ; my_port
+          ; peers
+          ; log_dir
+          ; program_dir
+          ; gossip_port
+          ; should_wait }
           id ~config
       in
       Deferred.unit
-    in
-    let clean_coda log_dirs =
-      Process.run_exn ~prog:"rm" ~args:("-rf" :: log_dirs) ()
     in
     let t = create () in
     let log_dir_1 = "/tmp/current_config_1"
@@ -160,7 +147,7 @@ let run =
     in
     let%bind () = Option.value_exn (run t process2) in
     let%bind _, coda_2_peers = Linear_pipe.read_exn reader in
-    let%map _ = clean_coda [log_dir_1; log_dir_2] in
+    let%map _ = File_system.remove_dirs [log_dir_1; log_dir_2] in
     assert (expected_peers = coda_2_peers)
 
 let name = "coda-sample-test"
