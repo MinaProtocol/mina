@@ -415,7 +415,7 @@ module Base = struct
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
       ~create_env:(fun x ->
-        R1CS_constraint_system.generate_keypair (Lazy.force x) )
+        Keypair.generate (Lazy.force x) )
 end
 
 module Merge = struct
@@ -557,7 +557,7 @@ module Merge = struct
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(input ()) main))
       ~create_env:(fun x ->
-        R1CS_constraint_system.generate_keypair (Lazy.force x) )
+        Keypair.generate (Lazy.force x) )
 end
 
 module Verification = struct
@@ -777,7 +777,7 @@ struct
     Cached.Spec.create ~load ~directory:Cache_dir.cache_dir
       ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
       ~input:(constraint_system ~exposing:(wrap_input ()) main)
-      ~create_env:R1CS_constraint_system.generate_keypair
+      ~create_env:Keypair.generate
 end
 
 module type S = sig

@@ -390,63 +390,6 @@ linear_term<FieldT>* camlsnark_bn128_linear_combination_term_vector_get(std::vec
   return new linear_term<FieldT>(res);
 }
 
-r1cs_constraint_system<FieldT>* camlsnark_bn128_proving_key_r1cs_constraint_system(
-    r1cs_ppzksnark_proving_key<ppT>* pk) {
-  return &pk->constraint_system;
-}
-
-r1cs_ppzksnark_proving_key<ppT>* camlsnark_bn128_keypair_pk(r1cs_ppzksnark_keypair<ppT>* keypair) {
-  return new r1cs_ppzksnark_proving_key<ppT>(keypair->pk);
-}
-
-r1cs_ppzksnark_verification_key<ppT>* camlsnark_bn128_keypair_vk(r1cs_ppzksnark_keypair<ppT>* keypair) {
-  return new r1cs_ppzksnark_verification_key<ppT>(keypair->vk);
-}
-
-void camlsnark_bn128_keypair_delete(r1cs_ppzksnark_keypair<ppT>* keypair) {
-  delete keypair;
-}
-
-void camlsnark_bn128_proving_key_delete(r1cs_ppzksnark_proving_key<ppT>* pk) {
-  delete pk;
-}
-
-std::string* camlsnark_bn128_proving_key_to_string(r1cs_ppzksnark_proving_key<ppT>* pk) {
-  std::stringstream stream;
-  stream << *pk;
-  return new std::string(stream.str());
-}
-
-r1cs_ppzksnark_proving_key<ppT>* camlsnark_bn128_proving_key_of_string(std::string* s) {
-  r1cs_ppzksnark_proving_key<ppT>*  pk = new r1cs_ppzksnark_proving_key<ppT>();
-  std::stringstream stream(*s);
-  stream >> *pk;
-  return pk;
-}
-
-void camlsnark_bn128_verification_key_delete(r1cs_ppzksnark_verification_key<ppT>* vk) {
-  delete vk;
-}
-
-int camlsnark_bn128_verification_key_size_in_bits(
-    r1cs_ppzksnark_verification_key<ppT>* vk
-) {
-  return vk->size_in_bits();
-}
-
-std::string* camlsnark_bn128_verification_key_to_string(r1cs_ppzksnark_verification_key<ppT>* vk) {
-  std::stringstream stream;
-  stream << *vk;
-  return new std::string(stream.str());
-}
-
-r1cs_ppzksnark_verification_key<ppT>* camlsnark_bn128_verification_key_of_string(std::string* s) {
-  r1cs_ppzksnark_verification_key<ppT>*  vk = new r1cs_ppzksnark_verification_key<ppT>();
-  std::stringstream stream(*s);
-  stream >> *vk;
-  return vk;
-}
-
 r1cs_constraint<FieldT>* camlsnark_bn128_r1cs_constraint_create(
     linear_combination<FieldT>* a,
     linear_combination<FieldT>* b,
@@ -571,9 +514,89 @@ int camlsnark_bn128_r1cs_constraint_system_get_auxiliary_input_size(
   return sys->auxiliary_input_size;
 }
 
-r1cs_ppzksnark_keypair<ppT>* camlsnark_bn128_r1cs_constraint_system_create_keypair(
+std::vector<FieldT>* camlsnark_bn128_field_vector_create() {
+  return new std::vector<FieldT>();
+}
+
+int camlsnark_bn128_field_vector_length(std::vector<FieldT> *v) {
+  return v->size();
+}
+
+// Not too sure what's going on here memory-wise...
+void camlsnark_bn128_field_vector_emplace_back(std::vector<FieldT>* v, FieldT* x) {
+  v->emplace_back(*x);
+}
+
+FieldT* camlsnark_bn128_field_vector_get(std::vector<FieldT>* v, int i) {
+  FieldT res = (*v)[i];
+  return new FieldT(res);
+}
+
+void camlsnark_bn128_field_vector_delete(std::vector<FieldT>* v) {
+  delete v;
+}
+
+// Begin ppzksnark specific code
+r1cs_constraint_system<FieldT>* camlsnark_bn128_proving_key_r1cs_constraint_system(
+    r1cs_ppzksnark_proving_key<ppT>* pk) {
+  return &pk->constraint_system;
+}
+
+std::string* camlsnark_bn128_proving_key_to_string(r1cs_ppzksnark_proving_key<ppT>* pk) {
+  std::stringstream stream;
+  stream << *pk;
+  return new std::string(stream.str());
+}
+
+r1cs_ppzksnark_proving_key<ppT>* camlsnark_bn128_proving_key_of_string(std::string* s) {
+  r1cs_ppzksnark_proving_key<ppT>*  pk = new r1cs_ppzksnark_proving_key<ppT>();
+  std::stringstream stream(*s);
+  stream >> *pk;
+  return pk;
+}
+
+void camlsnark_bn128_proving_key_delete(r1cs_ppzksnark_proving_key<ppT>* pk) {
+  delete pk;
+}
+
+void camlsnark_bn128_verification_key_delete(r1cs_ppzksnark_verification_key<ppT>* vk) {
+  delete vk;
+}
+
+int camlsnark_bn128_verification_key_size_in_bits(
+    r1cs_ppzksnark_verification_key<ppT>* vk
+) {
+  return vk->size_in_bits();
+}
+
+std::string* camlsnark_bn128_verification_key_to_string(r1cs_ppzksnark_verification_key<ppT>* vk) {
+  std::stringstream stream;
+  stream << *vk;
+  return new std::string(stream.str());
+}
+
+r1cs_ppzksnark_verification_key<ppT>* camlsnark_bn128_verification_key_of_string(std::string* s) {
+  r1cs_ppzksnark_verification_key<ppT>*  vk = new r1cs_ppzksnark_verification_key<ppT>();
+  std::stringstream stream(*s);
+  stream >> *vk;
+  return vk;
+}
+
+r1cs_ppzksnark_proving_key<ppT>* camlsnark_bn128_keypair_pk(r1cs_ppzksnark_keypair<ppT>* keypair) {
+  return new r1cs_ppzksnark_proving_key<ppT>(keypair->pk);
+}
+
+r1cs_ppzksnark_verification_key<ppT>* camlsnark_bn128_keypair_vk(r1cs_ppzksnark_keypair<ppT>* keypair) {
+  return new r1cs_ppzksnark_verification_key<ppT>(keypair->vk);
+}
+
+void camlsnark_bn128_keypair_delete(r1cs_ppzksnark_keypair<ppT>* keypair) {
+  delete keypair;
+}
+
+r1cs_ppzksnark_keypair<ppT>* camlsnark_bn128_keypair_create(
     r1cs_constraint_system<FieldT>* sys) {
-  auto res = r1cs_ppzksnark_generator<ppT>(*sys);
+  r1cs_ppzksnark_keypair<ppT> res = r1cs_ppzksnark_generator<ppT>(*sys);
   return new r1cs_ppzksnark_keypair<ppT>(res);
 }
 
@@ -609,27 +632,104 @@ bool camlsnark_bn128_proof_verify(
     std::vector<FieldT>* primary_input) {
   return r1cs_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
 }
+// End ppzksnark specific code
 
-std::vector<FieldT>* camlsnark_bn128_field_vector_create() {
-  return new std::vector<FieldT>();
+// Begin Groth-Maller specific code
+r1cs_constraint_system<FieldT>* camlsnark_bn128_gm_proving_key_r1cs_constraint_system(
+    r1cs_se_ppzksnark_proving_key<ppT>* pk) {
+  return &pk->constraint_system;
 }
 
-int camlsnark_bn128_field_vector_length(std::vector<FieldT> *v) {
-  return v->size();
+std::string* camlsnark_bn128_gm_proving_key_to_string(r1cs_se_ppzksnark_proving_key<ppT>* pk) {
+  std::stringstream stream;
+  stream << *pk;
+  return new std::string(stream.str());
 }
 
-// Not too sure what's going on here memory-wise...
-void camlsnark_bn128_field_vector_emplace_back(std::vector<FieldT>* v, FieldT* x) {
-  v->emplace_back(*x);
+r1cs_se_ppzksnark_proving_key<ppT>* camlsnark_bn128_gm_proving_key_of_string(std::string* s) {
+  r1cs_se_ppzksnark_proving_key<ppT>*  pk = new r1cs_se_ppzksnark_proving_key<ppT>();
+  std::stringstream stream(*s);
+  stream >> *pk;
+  return pk;
 }
 
-FieldT* camlsnark_bn128_field_vector_get(std::vector<FieldT>* v, int i) {
-  FieldT res = (*v)[i];
-  return new FieldT(res);
+void camlsnark_bn128_gm_proving_key_delete(r1cs_se_ppzksnark_proving_key<ppT>* pk) {
+  delete pk;
 }
 
-void camlsnark_bn128_field_vector_delete(std::vector<FieldT>* v) {
-  delete v;
+void camlsnark_bn128_gm_verification_key_delete(r1cs_se_ppzksnark_verification_key<ppT>* vk) {
+  delete vk;
 }
+
+int camlsnark_bn128_gm_verification_key_size_in_bits(
+    r1cs_se_ppzksnark_verification_key<ppT>* vk
+) {
+  return vk->size_in_bits();
+}
+
+std::string* camlsnark_bn128_gm_verification_key_to_string(r1cs_se_ppzksnark_verification_key<ppT>* vk) {
+  std::stringstream stream;
+  stream << *vk;
+  return new std::string(stream.str());
+}
+
+r1cs_se_ppzksnark_verification_key<ppT>* camlsnark_bn128_gm_verification_key_of_string(std::string* s) {
+  r1cs_se_ppzksnark_verification_key<ppT>*  vk = new r1cs_se_ppzksnark_verification_key<ppT>();
+  std::stringstream stream(*s);
+  stream >> *vk;
+  return vk;
+}
+
+r1cs_se_ppzksnark_proving_key<ppT>* camlsnark_bn128_gm_keypair_pk(r1cs_se_ppzksnark_keypair<ppT>* keypair) {
+  return new r1cs_se_ppzksnark_proving_key<ppT>(keypair->pk);
+}
+
+r1cs_se_ppzksnark_verification_key<ppT>* camlsnark_bn128_gm_keypair_vk(r1cs_se_ppzksnark_keypair<ppT>* keypair) {
+  return new r1cs_se_ppzksnark_verification_key<ppT>(keypair->vk);
+}
+
+void camlsnark_bn128_gm_keypair_delete(r1cs_se_ppzksnark_keypair<ppT>* keypair) {
+  delete keypair;
+}
+
+r1cs_se_ppzksnark_keypair<ppT>* camlsnark_bn128_gm_keypair_create(
+    r1cs_constraint_system<FieldT>* sys) {
+  r1cs_se_ppzksnark_keypair<ppT> res = r1cs_se_ppzksnark_generator<ppT>(*sys);
+  return new r1cs_se_ppzksnark_keypair<ppT>(res);
+}
+
+std::string* camlsnark_bn128_gm_proof_to_string(
+    r1cs_se_ppzksnark_proof<ppT>* p) {
+  std::stringstream stream;
+  stream << *p;
+  return new std::string(stream.str());
+}
+
+r1cs_se_ppzksnark_proof<ppT>* camlsnark_bn128_gm_proof_of_string(std::string* s) {
+  r1cs_se_ppzksnark_proof<ppT>*  p = new r1cs_se_ppzksnark_proof<ppT>();
+  std::stringstream stream(*s);
+  stream >> *p;
+  return p;
+}
+
+r1cs_se_ppzksnark_proof<ppT>* camlsnark_bn128_gm_proof_create(
+    r1cs_se_ppzksnark_proving_key<ppT>* key,
+    std::vector<FieldT>* primary_input,
+    std::vector<FieldT>* auxiliary_input) {
+  auto res = r1cs_se_ppzksnark_prover(*key, *primary_input, *auxiliary_input);
+  return new r1cs_se_ppzksnark_proof<ppT>(res);
+}
+
+void camlsnark_bn128_gm_proof_delete(r1cs_se_ppzksnark_proof<ppT>* proof) {
+  delete proof;
+}
+
+bool camlsnark_bn128_gm_proof_verify(
+    r1cs_se_ppzksnark_proof<ppT>* proof,
+    r1cs_se_ppzksnark_verification_key<ppT>* key,
+    std::vector<FieldT>* primary_input) {
+  return r1cs_se_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
+}
+// End Groth-Maller specific code
 
 }

@@ -73,6 +73,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let create = Fields.create
 
     let of_backend_keypair kp = {pk= Keypair.pk kp; vk= Keypair.vk kp}
+
+    let generate = Fn.compose of_backend_keypair Backend.Keypair.create
   end
 
   module Var = struct
@@ -1274,7 +1276,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let generate_keypair :
         exposing:((unit, 's) Checked.t, _, 'k_var, _) t -> 'k_var -> Keypair.t =
      fun ~exposing k ->
-      Backend.R1CS_constraint_system.create_keypair
+      Backend.Keypair.create
         (constraint_system ~exposing k)
       |> Keypair.of_backend_keypair
 
@@ -1502,8 +1504,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
   module R1CS_constraint_system = struct
     include R1CS_constraint_system
-
-    let generate_keypair = Fn.compose Keypair.of_backend_keypair create_keypair
   end
 end
 
