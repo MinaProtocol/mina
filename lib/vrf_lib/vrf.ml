@@ -1,44 +1,27 @@
 module Make
-    (Impl : Snarky.Snark_intf.S) (Hash : sig
-        type t
-
-        val hash : bool list -> t
-
-        val equals : t -> t -> bool
-
-        module Checked : sig
-          open Impl
-
-          type var
-
-          val hash : Boolean.var list -> (var, _) Checked.t
-
-          val equals : var -> var -> (Boolean.var, _) Checked.t
-        end
-    end) (Scalar : sig
+    (Impl : Snarky.Snark_intf.S)
+    (Scalar : sig
       type t
+      [@@deriving eq, sexp, bin_io]
 
-      val random : t
+      val random : unit -> t
 
       val add : t -> t -> t
 
       val mul : t -> t -> t
 
-      val from_hash : Hash.t -> t
-
-      val of_bits : bool list -> t
-
-      val to_bits : t -> bool list
+      type var
+      val typ : (var, t) Impl.Typ.t
 
       module Checked : sig
         open Impl
-
-        type var
-
-        val from_hash : Hash.Checked.var -> (var, _) Checked.t
+        module Assert : sig
+          val equal : var -> var -> (unit, _) Checked.t
+        end
       end
-    end) (Group : sig
-      type t
+    end)
+    (Group : sig
+       type t [@@deriving sexp, bin_io]
 
       val add : t -> t -> t
 
@@ -48,182 +31,213 @@ module Make
 
       val generator : t
 
-      val of_bits : bool list -> t
-
-      val to_bits : t -> bool list
+      type var
+      val typ : (var, t) Impl.Typ.t
 
       module Checked : sig
         open Impl
-
-        type var
 
         val add : var -> var -> (var, _) Checked.t
 
-        val inv : var -> (var, _) Checked.t
+        val inv : var -> var
 
-        val scale_known : t -> Scalar.Checked.var -> (var, _) Checked.t
+        val scale_known : t -> Scalar.var -> (var, _) Checked.t
 
-        val scale : var -> Scalar.Checked.var -> (var, _) Checked.t
+        val scale : var -> Scalar.var -> (var, _) Checked.t
 
         val generator : var
-
-        val of_bits : Boolean.var list -> (var, _) Checked.t
-
-        val to_bits : var -> (Boolean.var list, _) Checked.t
       end
-    end) (Hash_to_group : sig
-      val hash : bool list -> Group.t
+    end)
+    (Message : sig
+       open Impl
+       type t
+       type var
+       val typ : (var, t) Typ.t
 
-      module Checked : sig
-        open Impl
+      (* This hash function can be merely collision-resistant *)
+       val hash_to_group : t -> Group.t
+       module Checked : sig
+         val hash_to_group : var -> (Group.var, _) Checked.t
+       end
+     end)
+    (Output_hash : sig
+       type t
+       type var
+       val typ : (var, t) Impl.Typ.t
 
-        type var
-
-        val hash : Boolean.var list -> (Group.Checked.var, _) Checked.t
-      end
-    end) : sig
-  module Evaluation : sig
-    type t
-  end
-
+       (* I believe this has to be a random oracle *)
+       val hash : Message.t -> Group.t -> t
+       module Checked : sig
+        val hash : Message.var -> Group.var -> (var, _) Impl.Checked.t
+       end
+     end)
+    (Hash : sig
+       (* I believe this has to be a random oracle *)
+       val hash_for_proof : Message.t -> Group.t -> Group.t -> Group.t -> Scalar.t
+       module Checked : sig
+        val hash_for_proof : Message.var -> Group.var -> Group.var -> Group.var -> (Scalar.var, _) Impl.Checked.t
+       end
+     end) : sig
   module Public_key : sig
-    type t
+    type t = Group.t
+    type var = Group.var
   end
 
   module Private_key : sig
-    type t
-
-    val to_scalar : t -> Scalar.t
+    type t = Scalar.t
+    type var = Scalar.var
   end
 
-  val eval : bool list -> Private_key.t -> Evaluation.t
+  module Context : sig
+    type ('message, 'pk) t_ =
+      { message : 'message
+      ; public_key : 'pk
+      }
 
-  val verify : Evaluation.t -> bool
+    type t = (Message.t, Public_key.t) t_
+    type var = (Message.var, Public_key.var) t_
+    val typ : (var, t) Impl.Typ.t
+  end
 
-  module Checked : sig
-    open Impl
-
+  module Evaluation : sig
+    type t [@@deriving sexp, bin_io]
     type var
+    val typ : (var, t) Impl.Typ.t
 
-    val verify : var -> (Boolean.var, _) Checked.t
-  end
-end = struct
-  module Public_key = struct
-    type t = Group.t
+    val create : Private_key.t -> Message.t -> t
 
-    module Checked = struct
-      type var = Group.Checked.var
+    val verified_output : t -> Context.t -> Output_hash.t option
+
+    module Checked : sig
+      val verified_output : var -> Context.var -> (Output_hash.var, _) Impl.Checked.t
     end
   end
+end
+ = struct
+  module Public_key = Group
 
-  module Private_key = struct
-    type t = bool list
+  module Context = struct
+    type ('message, 'pk) t_ =
+      { message : 'message
+      ; public_key : 'pk
+      }
 
-    let to_scalar = Scalar.of_bits
+    type t = (Message.t, Public_key.t) t_
+    type var = (Message.var, Public_key.var) t_
+
+    let typ =
+      let open Snarky.H_list in
+      Impl.Typ.of_hlistable [Message.typ; Public_key.typ]
+        ~var_to_hlist:(fun {message; public_key} -> [message; public_key])
+        ~var_of_hlist:(fun [message; public_key] -> {message; public_key})
+        ~value_to_hlist:(fun {message; public_key} -> [message; public_key])
+        ~value_of_hlist:(fun [message; public_key] -> {message; public_key})
   end
 
-  module EQDL = struct
-    type t = Hash.t * Scalar.t
-
-    let to_scalar eqdl =
-      let c, s = eqdl in
-      Scalar.from_hash c
-
-    module Checked = struct
-      type var = Hash.Checked.var * Scalar.Checked.var
-
-      let to_scalar eqdl =
-        let c, s = eqdl in
-        Scalar.Checked.from_hash c
-    end
-  end
-
-  module VRFProof = struct
-    type t = Group.t * EQDL.t
-
-    module Checked = struct
-      type var = Group.Checked.var * EQDL.Checked.var
-    end
-  end
+  module Private_key = Scalar
 
   module Evaluation = struct
-    type t = {m: bool list; y: Hash.t; proof: VRFProof.t; v: Public_key.t}
+    module Discrete_log_equality = struct
+      type 'scalar t_ =
+        { c : 'scalar
+        ; s : 'scalar
+        }
+      [@@deriving sexp, bin_io]
 
-    module Checked = struct
+      type t = Scalar.t t_ [@@deriving sexp, bin_io]
+      type var = Scalar.var t_
+
       open Impl
 
-      type var =
-        { m: Boolean.var list
-        ; y: Hash.Checked.var
-        ; proof: VRFProof.Checked.var
-        ; v: Public_key.Checked.var }
+      let typ : (var, t) Typ.t =
+        let open Snarky.H_list in
+          Typ.of_hlistable [Scalar.typ; Scalar.typ]
+            ~var_to_hlist:(fun {c; s} -> [c; s])
+            ~var_of_hlist:(fun [c; s] -> {c; s})
+            ~value_to_hlist:(fun {c; s} -> [c; s])
+            ~value_of_hlist:(fun [c; s] -> {c; s})
     end
-  end
 
-  let eval m prk =
-    let k = Private_key.to_scalar prk in
-    let hgm = Hash_to_group.hash m in
-    let u = Group.scale hgm k in
-    let y = Hash.hash (m @ Group.to_bits u) in
-    let g = Group.generator in
-    let v = Group.scale g k in
-    let r = Scalar.random in
-    let gr = Group.scale g r in
-    let hmr = Group.scale hgm r in
-    let proof1 =
-      Hash.hash (m @ Group.to_bits v @ Group.to_bits gr @ Group.to_bits hmr)
-    in
-    let s = Scalar.add r (Scalar.mul k (Scalar.from_hash proof1)) in
-    let eqdl = (proof1, s) in
-    let proof = (u, eqdl) in
-    {Evaluation.m; y; proof; v}
+    type ('group, 'dleq) t_ = 
+      { discrete_log_equality : 'dleq
+      ; scaled_message_hash : 'group
+      }
+    [@@deriving sexp, bin_io]
 
-  let verify evaluated =
-    let {Evaluation.m; y; proof; v} = evaluated in
-    let u, eqdl = proof in
-    let proof1, s = eqdl in
-    let y1 = Hash.hash (m @ Group.to_bits u) in
-    let g = Group.generator in
-    let gs = Group.scale g s in
-    let c = EQDL.to_scalar eqdl in
-    let vnegc = Group.scale (Group.inv v) c in
-    let gsvc = Group.add gs vnegc in
-    let hms = Group.scale (Hash_to_group.hash m) s in
-    let unegc = Group.scale (Group.inv u) c in
-    let hmsuc = Group.add hms unegc in
-    let c1 =
-      Hash.hash (m @ Group.to_bits v @ Group.to_bits gsvc @ Group.to_bits hmsuc)
-    in
-    let b1 = Hash.equals y y1 in
-    let b2 = Hash.equals proof1 c1 in
-    b1 && b2
+    type t = (Group.t, Discrete_log_equality.t) t_ [@@deriving sexp, bin_io]
+    type var = (Group.var, Discrete_log_equality.var) t_
 
-  module Checked = struct
-    type var = Evaluation.Checked.var
+    let typ : (var, t) Impl.Typ.t =
+      let open Snarky.H_list in
+      Impl.Typ.of_hlistable [Discrete_log_equality.typ; Group.typ]
+        ~var_to_hlist:(fun {discrete_log_equality; scaled_message_hash} -> [discrete_log_equality; scaled_message_hash])
+        ~value_to_hlist:(fun {discrete_log_equality; scaled_message_hash} -> [discrete_log_equality; scaled_message_hash])
+        ~value_of_hlist:(fun [discrete_log_equality; scaled_message_hash] -> {discrete_log_equality; scaled_message_hash})
+        ~var_of_hlist:(fun [discrete_log_equality; scaled_message_hash] -> {discrete_log_equality; scaled_message_hash})
 
-    let verify evaluated =
-      let open Impl.Checked.Let_syntax in
-      let {Evaluation.Checked.m; y; proof; v} = evaluated in
-      let u, eqdl = proof in
-      let proof1, s = eqdl in
-      let%bind uc = Group.Checked.to_bits u in
-      let%bind y1 = Hash.Checked.hash (m @ uc) in
-      let%bind gs = Group.Checked.scale_known Group.generator s in
-      let%bind c = EQDL.Checked.to_scalar eqdl in
-      let%bind vi = Group.Checked.inv v in
-      let%bind vnegc = Group.Checked.scale vi c in
-      let%bind gsvc = Group.Checked.add gs vnegc in
-      let%bind hm = Hash_to_group.Checked.hash m in
-      let%bind hms = Group.Checked.scale hm s in
-      let%bind ui = Group.Checked.inv u in
-      let%bind unegc = Group.Checked.scale ui c in
-      let%bind hmsuc = Group.Checked.add hms unegc in
-      let%bind vb = Group.Checked.to_bits v in
-      let%bind gsvcb = Group.Checked.to_bits gsvc in
-      let%bind hmsucb = Group.Checked.to_bits hmsuc in
-      let%bind c1 = Hash.Checked.hash (m @ vb @ gsvcb @ hmsucb) in
-      let%bind b1 = Hash.Checked.equals y y1 in
-      let%bind b2 = Hash.Checked.equals proof1 c1 in
-      Impl.Boolean.( && ) b1 b2
+    let create (k : Private_key.t) message : t =
+      let public_key = Group.scale Group.generator k in
+      let g_message = Message.hash_to_group message in
+      let discrete_log_equality : Discrete_log_equality.t =
+        let r = Scalar.random () in
+        let c =
+          Hash.hash_for_proof
+            message
+            public_key
+            Group.(scale generator r)
+            Group.(scale g_message r)
+        in
+        { c
+        ; s = Scalar.(add r (mul k c))
+        }
+      in
+      { discrete_log_equality
+      ; scaled_message_hash = Group.scale g_message k }
+    ;;
+
+    let verified_output ({ scaled_message_hash; discrete_log_equality={c;s} } : t) ({message; public_key} : Context.t) =
+      let g = Group.generator in
+      let ( + ) = Group.add in
+      let ( * ) s g = Group.scale g s in
+      let message_hash = Message.hash_to_group message in
+      let dleq =
+        Scalar.equal c
+          (Hash.hash_for_proof message public_key
+             ((s * g) + (c * (Group.inv public_key)))
+             ((s * message_hash) + (c * (Group.inv scaled_message_hash))))
+      in
+      if dleq
+      then Some (Output_hash.hash message scaled_message_hash)
+      else None
+
+    module Checked = struct
+      let verified_output
+            ({ scaled_message_hash; discrete_log_equality={c;s}} : var)
+            ({ message; public_key } : Context.var)
+        =
+        let open Impl.Let_syntax in
+        let%bind () =
+          let%bind a =
+            (* TODO: Can save one EC add here by passing sg as the initial accumulator
+               to scale *)
+            let%bind sg = Group.Checked.scale_known Group.generator s
+            and neg_c_pk = Group.Checked.(scale (inv public_key) c)
+            in
+            Group.Checked.add sg neg_c_pk
+          and b =
+            let%bind sx =
+              let%bind message_hash = Message.Checked.hash_to_group message in
+              Group.Checked.scale message_hash s
+            and neg_cy = Group.Checked.(scale (inv scaled_message_hash) c)
+            in
+            Group.Checked.add sx neg_cy
+          in
+          Hash.Checked.hash_for_proof message public_key a b
+          >>= Scalar.Checked.Assert.equal c
+        in
+        (* TODO: This could just hash (message_hash, message_hash^k) instead
+          if it were cheaper *)
+        Output_hash.Checked.hash message scaled_message_hash
+    end
   end
 end
