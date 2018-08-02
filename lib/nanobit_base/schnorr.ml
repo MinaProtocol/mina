@@ -17,7 +17,7 @@ include Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Signature_curve)
                  in
                  List.take
                    (Pedersen.Digest.Unpacked.var_to_bits h)
-                   Scalar.length)
+                   Scalar.length_in_bits)
 
             let hash bs =
               let s =
@@ -26,5 +26,5 @@ include Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Signature_curve)
               Scalar.pack
                 (List.take
                    (Field.unpack (Pedersen.State.digest s))
-                   Scalar.length)
+                   Scalar.length_in_bits)
           end)

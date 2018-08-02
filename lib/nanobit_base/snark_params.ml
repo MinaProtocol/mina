@@ -90,14 +90,14 @@ module Tick = struct
   module Pedersen = struct
     module Curve = struct
       (* someday: Compute this from the number inside of ocaml *)
-      let bit_length = 262
+      let length_in_bits = 262
 
       include Snarky.Curves.Edwards.Basic.Make (Field)
                 (Crypto_params.Hash_curve)
 
-      module Scalar (Impl : Snarky.Snark_intf.S) = struct
+      module Scalar = struct
         (* Someday: Make more efficient *)
-        open Impl
+        open Tick0
 
         type var = Boolean.var list
 
@@ -115,19 +115,22 @@ module Tick = struct
             (List.map ~f:pack_char (List.chunks_of ~length:8 bs))
           |> Z.of_bits |> Bignum_bigint.of_zarith_bigint
 
-        let length = bit_length
+        let length_in_bits = length_in_bits
 
         let typ : (var, value) Typ.t =
           let open Typ in
-          transport (list ~length Boolean.typ)
+          transport (list ~length:length_in_bits Boolean.typ)
             ~there:(fun n ->
-              List.init length
+              List.init length_in_bits
                 ~f:(Z.testbit (Bignum_bigint.to_zarith_bigint n)) )
             ~back:pack
 
-        let equal = Bitstring_checked.equal
-
-        let assert_equal = Bitstring_checked.Assert.equal
+        module Checked = struct
+          let equal = Bitstring_checked.equal
+          module Assert = struct
+            let equal = Bitstring_checked.Assert.equal
+          end
+        end
       end
     end
 
@@ -164,7 +167,7 @@ module Tick = struct
     let zero_hash = hash_bigstring (Bigstring.create 0)
   end
 
-  module Scalar = Pedersen.Curve.Scalar (Tick0)
+  module Scalar = Pedersen.Curve.Scalar
   module Hash_curve =
     Snarky.Curves.Edwards.Extend (Tick0) (Scalar) (Pedersen.Curve)
   module Signature_curve = Hash_curve

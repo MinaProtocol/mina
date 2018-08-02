@@ -70,7 +70,7 @@ struct
         in
         go (i - 1) acc
     in
-    go (Curve.Scalar.length - 1) Curve.identity
+    go (Curve.Scalar.length_in_bits - 1) Curve.identity
 
   let verify ((s, h): Signature.value) (pk: Public_key.value) (m: bool list) =
     let r = compress (shamir_sum (s, Curve.generator) (h, pk)) in
@@ -104,10 +104,10 @@ struct
 
     let verifies ((_, h) as signature) pk m =
       with_label __LOC__
-        (verification_hash signature pk m >>= Curve.Scalar.equal h)
+        (verification_hash signature pk m >>= Curve.Scalar.Checked.equal h)
 
     let assert_verifies ((_, h) as signature) pk m =
       with_label __LOC__
-        (verification_hash signature pk m >>= Curve.Scalar.assert_equal h)
+        (verification_hash signature pk m >>= Curve.Scalar.Checked.Assert.equal h)
   end
 end
