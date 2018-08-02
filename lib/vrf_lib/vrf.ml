@@ -242,9 +242,21 @@ end
   end
 end
 
+open Core
+
 module Bigint_scalar
     (Impl : Snarky.Snark_intf.S)
     (M : sig val modulus : Bigint.t val random : unit -> Bigint.t end) = struct
+  let pack bs =
+    let pack_char bs =
+      Char.of_int_exn
+        (List.foldi bs ~init:0 ~f:(fun i acc b ->
+              if b then acc lor (1 lsl i) else acc ))
+    in
+    String.of_char_list
+      (List.map ~f:pack_char (List.chunks_of ~length:8 bs))
+    |> Z.of_bits |> Bigint.of_zarith_bigint
+
   include Bigint
   include M
 
@@ -260,9 +272,17 @@ module Bigint_scalar
 
   type var = Boolean.var list
 
-  let typ = Typ.list ~length:length_in_bits Boolean.typ
+  let typ : (var, t) Typ.t =
+    let open Typ in
+    transport (list ~length:length_in_bits Boolean.typ)
+      ~there:(fun n ->
+        List.init length_in_bits
+          ~f:(Z.testbit (to_zarith_bigint n)))
+      ~back:pack
+
 
   module Checked = struct
+    let equal = Bitstring_checked.equal
     module Assert = struct
       let equal = Bitstring_checked.Assert.equal
     end
@@ -273,9 +293,24 @@ let%test_module "vrf-test" =
   (module (struct
     module Impl = Snarky.Snark.Make(Snarky.Backends.Bn128)
     module Scalar = Bigint_scalar(Impl)(struct
-        let modulus = failwith "TODO"
+        let modulus = Bigint.of_string "21888242871839275222246405745257275088519243197699903948773788967907889479904"
         let random () = Bigint.random modulus
       end)
-    module Curve = Snarky.Curves.Edwards.Make
+    module Curve = Snarky.Curves.Edwards.Make(Impl)(Scalar)
+        (struct
+          let d = Impl.Field.of_int 17
+          let cofactor = Bigint.of_int 7904
+          let order = Scalar.modulus
+          let generator =
+            let conv = Fn.compose Impl.Bigint.(Fn.compose to_field of_bignum_bigint) Bigint.of_string in
+            ( conv "20903020017843600640837024932004945828697936805232324317859541396751974241115"
+            , conv "5928297205773450620326061200940642731539957901001312077389680166022129346450"
+            )
+        end)
+
+    module Pedersen = Snarky.Pedersen.Make(Impl)
+
+    module Message = struct
+    end
   end))
 
