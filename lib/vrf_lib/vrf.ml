@@ -241,3 +241,41 @@ end
     end
   end
 end
+
+module Bigint_scalar
+    (Impl : Snarky.Snark_intf.S)
+    (M : sig val modulus : Bigint.t val random : unit -> Bigint.t end) = struct
+  include Bigint
+  include M
+
+  let test_bit t i = (shift_right t i land one = one)
+
+  let add = (+)
+
+  let mul x y = (x * y) % modulus
+
+  let length_in_bits = Z.log2up (Bigint.to_zarith_bigint (modulus - one))
+
+  open Impl
+
+  type var = Boolean.var list
+
+  let typ = Typ.list ~length:length_in_bits Boolean.typ
+
+  module Checked = struct
+    module Assert = struct
+      let equal = Bitstring_checked.Assert.equal
+    end
+  end
+end
+
+let%test_module "vrf-test" =
+  (module (struct
+    module Impl = Snarky.Snark.Make(Snarky.Backends.Bn128)
+    module Scalar = Bigint_scalar(Impl)(struct
+        let modulus = failwith "TODO"
+        let random () = Bigint.random modulus
+      end)
+    module Curve = Snarky.Curves.Edwards.Make
+  end))
+
