@@ -10,6 +10,10 @@ module type S = sig
     end
   end
 
+  val length_in_bits : int
+
+  val gen : t Quickcheck.Generator.t
+
   val zero : t
 
   val succ : t -> t

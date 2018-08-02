@@ -4,6 +4,8 @@ open Snark_params
 module type S = sig
   type t [@@deriving bin_io, sexp, hash, compare, eq]
 
+  val length_in_bits : int
+
   include Hashable.S with type t := t
 
   include Unsigned.S with type t := t
@@ -69,6 +71,8 @@ module Extend
     end) =
 struct
   ;; assert (M.length < Tick.Field.size_in_bits - 3)
+
+  let length_in_bits = M.length
 
   module T = struct
     include Sexpable.Of_stringable (Unsigned)

@@ -88,7 +88,7 @@ module Fee_transfer = struct
   include Fee_transfer
 
   let dummy_signature =
-    Schnorr.sign (Private_key.create ()) (List.init 256 ~f:(fun _ -> true))
+    Schnorr.sign (Private_key.create ()) Transaction_payload.dummy
 
   let two (pk1, fee1) (pk2, fee2) : Tagged_transaction.t =
     ( Fee_transfer
@@ -270,9 +270,11 @@ module Base = struct
         let {Transaction.Payload.receiver; amount; fee; nonce} = payload in
         let is_fee_transfer = Tag.Checked.is_fee_transfer tag in
         let is_normal = Tag.Checked.is_normal tag in
+        let%bind payload_section = Schnorr.Message.var_of_payload payload in
         let%bind () =
-          let%bind bs = Transaction.Payload.var_to_bits payload in
-          let%bind verifies = Schnorr.Checked.verifies signature sender bs in
+          let%bind verifies =
+            Schnorr.Checked.verifies signature sender payload_section
+          in
           (* Should only assert_verifies if the tag is Normal *)
           Boolean.Assert.any [is_fee_transfer; verifies]
         in
@@ -308,10 +310,19 @@ module Base = struct
                    in
                    Boolean.Assert.any [is_fee_transfer; nonce_matches])
               in
+              let%bind receipt_chain_hash =
+                let current = account.receipt_chain_hash in
+                let%bind r =
+                  Receipt.Chain_hash.Checked.cons ~payload:payload_section
+                    current
+                in
+                Receipt.Chain_hash.Checked.if_ is_fee_transfer ~then_:current
+                  ~else_:r
+              in
               let%map balance =
                 Balance.Checked.add_signed_amount account.balance sender_delta
               in
-              {account with balance; nonce= next_nonce} )
+              {account with balance; nonce= next_nonce; receipt_chain_hash} )
         in
         let%map root =
           Ledger_hash.modify_account root receiver ~f:(fun account ->
@@ -795,8 +806,14 @@ let check_tagged_transaction source target transaction handler =
   let excess = Tagged_transaction.excess transaction in
   let top_hash = base_top_hash source target excess in
   let open Tick in
-  let main = handle (Base.main (Field.Checked.constant top_hash)) handler in
-  assert (check main prover_state)
+  let main =
+    handle
+      (Checked.map
+         (Base.main (Field.Checked.constant top_hash))
+         ~f:As_prover.return)
+      handler
+  in
+  Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
 let check_transition source target (t: Transition.t) handler =
   check_tagged_transaction source target
@@ -1078,6 +1095,7 @@ let%test_module "transaction_snark" =
             { public_key=
                 Public_key.compress (Public_key.of_private_key private_key)
             ; balance= Balance.of_int (10 + Random.int 100)
+            ; receipt_chain_hash= Receipt.Chain_hash.empty
             ; nonce= Account.Nonce.zero } }
       in
       let n = Int.pow 2 ledger_depth in
@@ -1092,9 +1110,7 @@ let%test_module "transaction_snark" =
         ; amount= Amount.of_int amt
         ; nonce }
       in
-      let signature =
-        Schnorr.sign sender.private_key (Transaction.Payload.to_bits payload)
-      in
+      let signature = Schnorr.sign sender.private_key payload in
       Transaction.check
         { Transaction.payload
         ; sender= Public_key.of_private_key sender.private_key

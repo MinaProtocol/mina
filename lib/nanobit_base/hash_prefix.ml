@@ -42,3 +42,5 @@ let base_snark = salt "CodaBaseSnark"
 let transition_system_snark = salt "CodaTransitionSnark"
 
 let signature = salt "CodaSignature"
+
+let receipt_chain = salt "CodaReceiptChain"

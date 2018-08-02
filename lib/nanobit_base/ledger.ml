@@ -43,7 +43,21 @@ let validate_nonces txn_nonce account_nonce =
         transaction %{sexp: Account.Nonce.t}"
       account_nonce txn_nonce
 
-let apply_transaction_unchecked ledger ({payload; sender}: Transaction.t) =
+module Undo = struct
+  type transaction =
+    { transaction: Transaction.t
+    ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+  [@@deriving sexp]
+
+  type t = Transaction of transaction | Fee_transfer of Fee_transfer.t
+  [@@deriving sexp]
+end
+
+(* someday: It would probably be better if we didn't modify the receipt chain hash
+   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
+   we don't for now. *)
+let apply_transaction_unchecked ledger
+    ({payload; sender} as transaction: Transaction.t) =
   let sender = Public_key.compress sender in
   let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
   let open Or_error.Let_syntax in
@@ -53,53 +67,29 @@ let apply_transaction_unchecked ledger ({payload; sender}: Transaction.t) =
     let%bind amount_and_fee = add_fee amount fee in
     sub_amount sender_account.balance amount_and_fee
   in
-  if Public_key.Compressed.equal sender receiver then return ()
+  let sender_account_without_balance_modified =
+    { sender_account with
+      nonce= Account.Nonce.succ sender_account.nonce
+    ; receipt_chain_hash=
+        Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
+  in
+  let undo =
+    { Undo.transaction
+    ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
+  in
+  if Public_key.Compressed.equal sender receiver then (
+    set ledger sender sender_account_without_balance_modified ;
+    return undo )
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
     let%map receiver_balance' = add_amount receiver_account.balance amount in
     set ledger sender
-      { sender_account with
-        balance= sender_balance'; nonce= Account.Nonce.succ nonce } ;
-    set ledger receiver {receiver_account with balance= receiver_balance'}
+      {sender_account_without_balance_modified with balance= sender_balance'} ;
+    set ledger receiver {receiver_account with balance= receiver_balance'} ;
+    undo
 
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
   apply_transaction_unchecked ledger (transaction :> Transaction.t)
-
-let undo_transaction ledger (transaction: Transaction.With_valid_signature.t) =
-  let {Transaction.payload; sender} = (transaction :> Transaction.t) in
-  let sender = Public_key.compress sender in
-  let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
-  let open Or_error.Let_syntax in
-  let%bind sender_account = get' ledger "sender" sender in
-  let%bind sender_balance' =
-    let%bind amount_and_fee = add_fee amount fee in
-    add_amount sender_account.balance amount_and_fee
-  in
-  let%bind () =
-    validate_nonces (Account.Nonce.succ nonce) sender_account.nonce
-  in
-  if Public_key.Compressed.equal sender receiver then return ()
-  else
-    let%bind receiver_account = get' ledger "receiver" receiver in
-    let%map receiver_balance' = sub_amount receiver_account.balance amount in
-    set ledger sender {sender_account with balance= sender_balance'; nonce} ;
-    set ledger receiver {receiver_account with balance= receiver_balance'}
-
-let merkle_root_after_transaction_exn ledger transaction =
-  Or_error.ok_exn (apply_transaction ledger transaction) ;
-  let root = merkle_root ledger in
-  Or_error.ok_exn (undo_transaction ledger transaction) ;
-  root
-
-let merkle_root_after_transactions t ts =
-  let ts_rev =
-    List.rev_map ts ~f:(fun txn ->
-        ignore (apply_transaction t txn) ;
-        txn )
-  in
-  let root = merkle_root t in
-  List.iter ts_rev ~f:(fun txn -> ignore (undo_transaction t txn)) ;
-  root
 
 let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
   let open Or_error.Let_syntax in
@@ -119,3 +109,59 @@ let apply_fee_transfer t transfer =
 let undo_fee_transfer t transfer =
   process_fee_transfer t transfer ~modify_balance:(fun b f ->
       Option.value_exn (Balance.sub_amount b (Amount.of_fee f)) )
+
+let undo_transaction ledger
+    {Undo.transaction= {payload; sender}; previous_receipt_chain_hash} =
+  let sender = Public_key.compress sender in
+  let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
+  let open Or_error.Let_syntax in
+  let%bind sender_account = get' ledger "sender" sender in
+  let%bind sender_balance' =
+    let%bind amount_and_fee = add_fee amount fee in
+    add_amount sender_account.balance amount_and_fee
+  in
+  let%bind () =
+    validate_nonces (Account.Nonce.succ nonce) sender_account.nonce
+  in
+  let sender_account_without_balance_modified =
+    {sender_account with nonce; receipt_chain_hash= previous_receipt_chain_hash}
+  in
+  if Public_key.Compressed.equal sender receiver then (
+    set ledger sender sender_account_without_balance_modified ;
+    return () )
+  else
+    let%bind receiver_account = get' ledger "receiver" receiver in
+    let%map receiver_balance' = sub_amount receiver_account.balance amount in
+    set ledger sender
+      {sender_account_without_balance_modified with balance= sender_balance'} ;
+    set ledger receiver {receiver_account with balance= receiver_balance'}
+
+let undo : t -> Undo.t -> unit Or_error.t =
+ fun ledger undo ->
+  let open Or_error.Let_syntax in
+  match undo with
+  | Fee_transfer t -> undo_fee_transfer ledger t
+  | Transaction u -> undo_transaction ledger u
+
+let apply_super_transaction ledger (t: Super_transaction.t) =
+  match t with
+  | Transaction txn ->
+      Or_error.map (apply_transaction ledger txn) ~f:(fun u ->
+          Undo.Transaction u )
+  | Fee_transfer t ->
+      Or_error.map (apply_fee_transfer ledger t) ~f:(fun () ->
+          Undo.Fee_transfer t )
+
+let merkle_root_after_transaction_exn ledger transaction =
+  let undo = Or_error.ok_exn (apply_transaction ledger transaction) in
+  let root = merkle_root ledger in
+  Or_error.ok_exn (undo_transaction ledger undo) ;
+  root
+
+let merkle_root_after_transactions t ts =
+  let undos_rev =
+    List.rev_map ts ~f:(fun txn -> Or_error.ok_exn (apply_transaction t txn))
+  in
+  let root = merkle_root t in
+  List.iter undos_rev ~f:(fun u -> Or_error.ok_exn (undo_transaction t u)) ;
+  root
