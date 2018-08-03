@@ -5,7 +5,7 @@ module Schnorr
     (Impl : Snark_intf.S)
     (Curve : Curves.Edwards.S
              with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-              and type Scalar.value = Bignum_bigint.t
+              and type Scalar.t = Bignum_bigint.t
               and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
               and type boolean_var := Impl.Boolean.var
               and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
@@ -26,13 +26,13 @@ struct
   module Scalar = Bignum_bigint
 
   module Signature = struct
-    type 'a t = 'a * 'a [@@deriving eq]
+    type 'a t_ = 'a * 'a [@@deriving eq]
 
-    type var = Curve.Scalar.var t
+    type var = Curve.Scalar.var t_
 
-    type value = Curve.Scalar.value t
+    type t = Curve.Scalar.t t_
 
-    let typ : (var, value) Typ.t =
+    let typ : (var, t) Typ.t =
       let typ = Curve.Scalar.typ in
       Typ.tuple2 typ typ
   end
@@ -78,7 +78,7 @@ struct
     in
     go (Curve.Scalar.length_in_bits - 1) Curve.identity
 
-  let verify ((s, h): Signature.value) (pk: Public_key.value) (m: Message.t) =
+  let verify ((s, h): Signature.t) (pk: Public_key.value) (m: Message.t) =
     let r = compress (shamir_sum (s, Curve.generator) (h, pk)) in
     let h' = Message.hash ~nonce:r m in
     Scalar.equal h' h

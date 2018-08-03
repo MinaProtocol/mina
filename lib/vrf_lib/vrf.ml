@@ -308,9 +308,44 @@ let%test_module "vrf-test" =
             )
         end)
 
+    module Group = struct
+      open Impl
+      module T = struct
+        type t = Field.t * Field.t
+        [@@deriving sexp]
+      end
+      include T
+      include Binable.Of_sexpable(T)
+
+      let add = Curve.add
+      let inv (x, y) = (x, Field.negate y)
+      let scale = Curve.scale
+      let generator = Curve.generator
+
+      type var = Curve.var
+
+      module Checked = struct
+        let add = Curve.Checked.add
+        let inv (x, y) = (x, Field.Checked.scale y Field.(negate one))
+        let scale_known = Curve.Checked.scale_known
+        let scale = Curve.Checked.scale
+        let generator = Curve.Checked.generator
+      end
+    end
+
     module Pedersen = Snarky.Pedersen.Make(Impl)
 
     module Message = struct
+      type t = Curve.t
+      type var = Curve.var
+      let typ = Curve.typ
+
+      let hash_to_group x = x
+
+      module Checked = struct
+        let hash_to_group = Impl.Checked.return
+      end
     end
+
   end))
 

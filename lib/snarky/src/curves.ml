@@ -22,13 +22,13 @@ module type Scalar_intf = sig
 
   type var
 
-  type value
+  type t
 
-  val typ : (var, value) typ
+  val typ : (var, t) typ
 
   val length_in_bits : int
 
-  val test_bit : value -> int -> bool
+  val test_bit : t -> int -> bool
 
   module Checked : sig
     val equal : var -> var -> (boolean_var, _) checked
@@ -199,7 +199,7 @@ module Edwards = struct
 
     val generator : value
 
-    val scale : value -> Scalar.value -> value
+    val scale : value -> Scalar.t -> value
 
     module Checked : sig
       val generator : var
@@ -485,7 +485,7 @@ module Edwards = struct
       (Params : Params_intf with type field := Impl.Field.t) :
     S
     with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-     and type Scalar.value = Scalar.value
+     and type Scalar.t = Scalar.t
      and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type boolean_var := Impl.Boolean.var
      and type field := Impl.Field.t
