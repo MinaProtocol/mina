@@ -54,7 +54,9 @@ public:
 
     linear_combination<FieldT> a, b, c;
 
-    r1cs_constraint() {};
+    bool is_square;
+
+    r1cs_constraint() : is_square(false) {};
     r1cs_constraint(const linear_combination<FieldT> &a,
                     const linear_combination<FieldT> &b,
                     const linear_combination<FieldT> &c);
