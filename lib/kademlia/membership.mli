@@ -7,6 +7,7 @@ module type S = sig
        initial_peers:Peer.t list
     -> me:Peer.t
     -> parent_log:Logger.t
+    -> conf_dir:string
     -> t Deferred.Or_error.t
 
   val peers : t -> Peer.t list

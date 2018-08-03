@@ -1,0 +1,9 @@
+(jbuild_version 1)
+
+(executable
+ ((name integration_test)
+  (public_name integration_test)
+  (modes (native))
+  (preprocess (pps (ppx_jane)))
+  (libraries
+    (core async spawner parallel))))

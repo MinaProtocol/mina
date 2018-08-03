@@ -43,6 +43,8 @@ module type Gossip_net_intf = sig
 
   val random_peers : t -> int -> peer list
 
+  val peers : t -> Peer.t list
+
   val query_peer :
     t -> peer -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t
 
@@ -84,6 +86,8 @@ module type S = functor (Message : Message_intf) -> sig
     t -> Message.msg -> (unit -> [`Done | `Continue] Deferred.t) Staged.t
 
   val random_peers : t -> int -> Peer.t list
+
+  val peers : t -> Peer.t list
 
   val query_peer :
     t -> Peer.t -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t

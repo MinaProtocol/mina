@@ -5,6 +5,7 @@ open Coda_main
 
 let run_test with_snark : unit -> unit Deferred.t =
  fun () ->
+  Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
   let%bind prover = Prover.create ~conf_dir
@@ -33,6 +34,7 @@ let run_test with_snark : unit -> unit Deferred.t =
   let open Main in
   let net_config =
     { Inputs.Net.Config.parent_log= log
+    ; conf_dir
     ; gossip_net_params=
         { Inputs.Net.Gossip_net.Params.timeout= Time.Span.of_sec 1.
         ; target_peer_count= 8

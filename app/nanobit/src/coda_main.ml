@@ -681,6 +681,7 @@ module type Main_intf = sig
       module Config : sig
         type t =
           { parent_log: Logger.t
+          ; conf_dir: string
           ; gossip_net_params: Gossip_net.Params.t
           ; initial_peers: Peer.t list
           ; me: Peer.t
@@ -740,6 +741,8 @@ module type Main_intf = sig
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
   val best_ledger : t -> Inputs.Ledger.t
+
+  val peers : t -> Host_and_port.t list
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
@@ -840,8 +843,8 @@ module Run (Program : Main_intf) = struct
 
   let create_snark_worker ~log ~public_key ~client_port =
     let open Snark_worker_lib in
-    let our_binary = Sys.argv.(0) in
     let%map p =
+      let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
           ( Program.snark_worker_command_name

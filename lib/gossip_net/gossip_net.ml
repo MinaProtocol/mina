@@ -43,6 +43,8 @@ module type Gossip_net_intf = sig
 
   val random_peers : t -> int -> peer list
 
+  val peers : t -> Peer.t list
+
   val query_peer :
     t -> peer -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t
 
@@ -79,6 +81,8 @@ module type S = functor (Message : Message_intf) -> sig
     t -> Message.msg -> (unit -> [`Done | `Continue] Deferred.t) Staged.t
 
   val random_peers : t -> int -> Peer.t list
+
+  val peers : t -> Peer.t list
 
   val query_peer :
     t -> Peer.t -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t
@@ -200,6 +204,8 @@ module Make (Message : Message_intf) = struct
   let broadcast t = t.broadcast_writer
 
   let new_peers t = t.new_peer_reader
+
+  let peers t = Hash_set.to_list t.peers
 
   let broadcast_all t msg =
     let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in
