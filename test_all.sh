@@ -11,5 +11,6 @@ jbuilder runtest --verbose -j8
 # TODO: Test crashes with "impossible" error
 # jbuilder exec cli -- coda-sample-test
 jbuilder exec integration_test -- all-test
-jbuilder exec cli -- transaction-snark-profiler -check-only true
+jbuilder exec cli -- transaction-snark-profiler -check-only
+
 

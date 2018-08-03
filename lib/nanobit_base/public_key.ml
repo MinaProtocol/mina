@@ -39,6 +39,13 @@ module Compressed = struct
 
   let empty = {x= Field.zero; is_odd= false}
 
+  let gen =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map x = Field.gen and is_odd = Bool.gen in
+    {x; is_odd}
+
+  let length_in_bits = 1 + Field.size_in_bits
+
   type var = (Field.var, Boolean.var) t_
 
   let to_hlist {x; is_odd} = H_list.[x; is_odd]
@@ -51,6 +58,9 @@ module Compressed = struct
       Data_spec.[Field.typ; Boolean.typ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
+
+  let var_of_t ({x; is_odd}: t) : var =
+    {x= Field.Checked.constant x; is_odd= Boolean.var_of_value is_odd}
 
   let assert_equal (t1: var) (t2: var) =
     let open Let_syntax in

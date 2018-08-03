@@ -168,17 +168,7 @@ struct
         module type of Transaction_snark.Transition with type t := t )
   end
 
-  module Ledger = struct
-    include Ledger
-
-    let apply_super_transaction l = function
-      | Super_transaction.Transaction t -> apply_transaction l t
-      | Fee_transfer t -> apply_fee_transfer l t
-
-    let undo_super_transaction l = function
-      | Super_transaction.Transaction t -> undo_transaction l t
-      | Fee_transfer t -> undo_fee_transfer l t
-  end
+  module Ledger = Ledger
 
   module Transaction_snark = struct
     module Statement = Transaction_snark.Statement
@@ -667,9 +657,6 @@ module type Main_intf = sig
       val copy : t -> t
 
       val get : t -> Public_key.Compressed.t -> Account.t option
-
-      val apply_transaction :
-        t -> Transaction.With_valid_signature.t -> unit Or_error.t
     end
 
     module External_transition : sig
@@ -796,13 +783,10 @@ module Run (Program : Main_intf) = struct
     Deferred.unit
 
   let get_nonce t (addr: Public_key.Compressed.t) =
-    let maybe_nonce =
-      let open Option.Let_syntax in
-      let ledger = best_ledger t in
-      let%map account = Ledger.get ledger addr in
-      account.Account.nonce
-    in
-    Deferred.return maybe_nonce
+    let open Option.Let_syntax in
+    let ledger = best_ledger t in
+    let%map account = Ledger.get ledger addr in
+    account.Account.nonce
 
   let setup_local_server ~minibit ~log ~client_port =
     let log = Logger.child log "client" in
@@ -812,8 +796,8 @@ module Run (Program : Main_intf) = struct
             send_txn log minibit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance minibit pk) )
-      ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () -> get_nonce minibit)
-      ]
+      ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
+            return (get_nonce minibit pk) ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in

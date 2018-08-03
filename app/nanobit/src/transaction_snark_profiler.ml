@@ -14,6 +14,7 @@ let create_ledger_and_transactions num_transitions =
       Ledger.set ledger public_key
         { public_key
         ; balance= Currency.Balance.of_int 10_000
+        ; receipt_chain_hash= Receipt.Chain_hash.empty
         ; nonce= Account.Nonce.zero } ) ;
   let txn from_kp (to_kp: Signature_keypair.t) amount fee nonce =
     let payload : Transaction.Payload.t =
@@ -177,8 +178,7 @@ let command =
          (optional int)
      and check_only =
        flag "check-only"
-         ~doc:"Just check base snarks, don't keys or time anything"
-         (required bool)
+         ~doc:"Just check base snarks, don't keys or time anything" no_arg
      in
      let num_transactions =
        Option.map n ~f:(fun n -> `Count (Int.pow 2 n))

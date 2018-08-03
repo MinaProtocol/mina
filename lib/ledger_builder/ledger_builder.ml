@@ -227,11 +227,12 @@ end = struct
     let open Or_error.Let_syntax in
     let%bind fee_excess = Super_transaction.fee_excess s in
     let source = Ledger.merkle_root ledger in
-    let%map () = Ledger.apply_super_transaction ledger s in
-    { Ledger_proof_statement.source
-    ; target= Ledger.merkle_root ledger
-    ; fee_excess= Fee.Signed.of_unsigned fee_excess
-    ; proof_type= `Base }
+    let%map undo = Ledger.apply_super_transaction ledger s in
+    ( undo
+    , { Ledger_proof_statement.source
+      ; target= Ledger.merkle_root ledger
+      ; fee_excess= Fee.Signed.of_unsigned fee_excess
+      ; proof_type= `Base } )
 
   let apply_super_transaction_and_get_witness ledger s =
     let public_keys = function
@@ -241,14 +242,15 @@ end = struct
           [Transaction.sender t; Transaction.receiver t]
     in
     let open Or_error.Let_syntax in
-    let%map statement = apply_super_transaction_and_get_statement ledger s in
+    let%map undo, statement =
+      apply_super_transaction_and_get_statement ledger s
+    in
     let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
-    {Super_transaction_with_witness.transaction= s; witness; statement}
+    (undo, {Super_transaction_with_witness.transaction= s; witness; statement})
 
   let update_ledger_and_get_statements ledger ts =
-    let undo_transactions =
-      List.iter ~f:(fun t ->
-          Or_error.ok_exn (Ledger.undo_super_transaction ledger t) )
+    let undo_transactions undos =
+      List.iter undos ~f:(fun u -> Or_error.ok_exn (Ledger.undo ledger u))
     in
     let rec go processed acc = function
       | [] ->
@@ -260,7 +262,7 @@ end = struct
         | Error e ->
             undo_transactions processed ;
             Result_with_rollback.error e
-        | Ok res -> go (t :: processed) (res :: acc) ts
+        | Ok (undo, res) -> go (undo :: processed) (res :: acc) ts
     in
     go [] [] ts
 
@@ -310,6 +312,7 @@ end = struct
     option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
 
   (* TODO: This must be updated when we add coinbases *)
+  (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_diff t (diff: Ledger_builder_diff.t) =
     let open Result_with_rollback.Let_syntax in
     let%bind payments =
@@ -382,8 +385,11 @@ end = struct
     in
     let new_data =
       List.map super_transactions ~f:(fun s ->
-          Or_error.ok_exn (apply_super_transaction_and_get_witness t.ledger s)
-      )
+          let _undo, t =
+            Or_error.ok_exn
+              (apply_super_transaction_and_get_witness t.ledger s)
+          in
+          t )
     in
     let res_opt =
       Or_error.ok_exn (fill_in_completed_work t.scan_state completed_works)
@@ -402,6 +408,19 @@ end = struct
           | None -> Done
           | Some (x, seq) -> Skip (x :: acc, i + 1, seq) )
 
+  let split_n_filter_map seq n ~f =
+    let rec go i acc seq =
+      if i = n then (List.rev acc, seq)
+      else
+        match Sequence.next seq with
+        | None -> (List.rev acc, seq)
+        | Some (x, seq') ->
+          match f x with
+          | None -> go i acc seq'
+          | Some y -> go (i + 1) (y :: acc) seq'
+    in
+    go 0 [] seq
+
   (* TODO: Make this actually return a sequence *)
   let work_to_do scan_state : Completed_work.Statement.t Sequence.t =
     let work_list = Parallel_scan.next_jobs scan_state in
@@ -415,6 +434,7 @@ end = struct
   module Resources = struct
     module Queue_consumption = struct
       type t = {fee_transfers: Public_key.Set.t; transactions: int}
+      [@@deriving sexp]
 
       let count {fee_transfers; transactions} =
         (* This is ceil(Set.length fee_transfers / 2) *)
@@ -436,10 +456,11 @@ end = struct
       { budget: Fee.Unsigned.t
       ; queue_consumption: Queue_consumption.t
       ; available_queue_space: int
-      ; transactions: Transaction.With_valid_signature.t list
+      ; transactions: (Transaction.With_valid_signature.t * Ledger.Undo.t) list
       ; completed_works: Completed_work.Checked.t list }
+    [@@deriving sexp]
 
-    let add_transaction t (txv: Transaction.With_valid_signature.t) =
+    let add_transaction t ((txv: Transaction.With_valid_signature.t), undo) =
       let tx = (txv :> Transaction.t) in
       let open Or_error.Let_syntax in
       let%bind budget =
@@ -453,7 +474,9 @@ end = struct
       else
         Ok
           { t with
-            budget; queue_consumption; transactions= txv :: t.transactions }
+            budget
+          ; queue_consumption
+          ; transactions= (txv, undo) :: t.transactions }
 
     let add_work t (wc: Completed_work.Checked.t) =
       let open Or_error.Let_syntax in
@@ -501,6 +524,8 @@ end = struct
     in
     go (`Processed_none, init) seq
 
+  let uncons_exn = function [] -> failwith "uncons_exn" | x :: xs -> (x, xs)
+
   let create_diff t
       ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
       ~(get_completed_work:
@@ -524,13 +549,13 @@ end = struct
     let add_transactions resources transactions_to_do =
       fold_sequence_until_error transactions_to_do ~init:resources ~f:
         (fun resources txn ->
-          match Ledger.apply_transaction ledger txn with
+          match Ledger.apply_super_transaction ledger (Transaction txn) with
           | Error _ -> `Skip
-          | Ok () ->
-            match Resources.add_transaction resources txn with
+          | Ok undo ->
+            match Resources.add_transaction resources (txn, undo) with
             | Ok resources -> `Ok resources
             | Error e ->
-                Or_error.ok_exn (Ledger.undo_transaction ledger txn) ;
+                Or_error.ok_exn (Ledger.undo ledger undo) ;
                 `Error e )
     in
     let rec add_many_work ~adding_transactions_failed resources ts_seq ws_seq =
@@ -556,22 +581,38 @@ end = struct
     in
     let resources, t_rest =
       let resources = Resources.empty ~available_queue_space:(free_space t) in
-      let ts, t_rest =
-        Sequence.split_n transactions_by_fee resources.available_queue_space
+      let ts_with_undos, t_rest =
+        split_n_filter_map transactions_by_fee resources.available_queue_space
+          ~f:(fun txn ->
+            match Ledger.apply_super_transaction ledger (Transaction txn) with
+            | Error _ -> None
+            | Ok undo -> Some (txn, undo) )
       in
-      let resources =
-        fold_until_error ts ~init:resources ~f:Resources.add_transaction
+      let ts, undos = List.unzip ts_with_undos in
+      let resources, undos_of_unapplied =
+        fold_until_error ts ~init:(resources, undos) ~f:
+          (fun (res, remaining_undos) txn ->
+            let undo, remaining_undos = uncons_exn remaining_undos in
+            match Resources.add_transaction res (txn, undo) with
+            | Error e -> Error e
+            | Ok res -> Ok (res, remaining_undos) )
       in
+      List.iter (List.rev undos_of_unapplied) ~f:(fun u ->
+          Or_error.ok_exn (Ledger.undo ledger u) ) ;
       (resources, t_rest)
     in
     let resources =
       add_many_work ~adding_transactions_failed:false resources t_rest
         (work_to_do t.scan_state)
     in
+    let transactions =
+      List.rev_map resources.transactions ~f:(fun (t, u) ->
+          Or_error.ok_exn (Ledger.undo ledger u) ;
+          t )
+    in
     let diff =
-      { Ledger_builder_diff.With_valid_signatures_and_proofs.transactions=
-          (* We have to reverse here because we only know they work in THIS order *)
-          List.rev resources.transactions
+      { (* We have to reverse here because we only know they work in THIS order *)
+      Ledger_builder_diff.With_valid_signatures_and_proofs.transactions
       ; completed_works= List.rev resources.completed_works
       ; creator= t.public_key
       ; prev_hash= curr_hash }

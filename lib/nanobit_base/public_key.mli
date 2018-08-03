@@ -27,11 +27,17 @@ module Compressed : sig
     end
   end
 
+  val gen : t Quickcheck.Generator.t
+
   val empty : t
+
+  val length_in_bits : int
 
   type var = (Field.var, Boolean.var) t_
 
   val typ : (var, t) Typ.t
+
+  val var_of_t : t -> var
 
   include Comparable.S_binable with type t := t
 

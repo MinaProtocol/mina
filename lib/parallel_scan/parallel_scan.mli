@@ -11,10 +11,7 @@ end
 
 module State : sig
   module Job : sig
-    type ('a, 'd) t =
-      | Merge_up of 'a option
-      | Merge of 'a option * 'a option
-      | Base of 'd option
+    type ('a, 'd) t = Merge of 'a option * 'a option | Base of 'd option
     [@@deriving bin_io, sexp]
   end
 

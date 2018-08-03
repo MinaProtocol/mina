@@ -3,6 +3,8 @@ open Core_kernel
 module type S = sig
   type t [@@deriving bin_io, sexp, hash, compare, eq]
 
+  val length_in_bits : int
+
   include Hashable.S with type t := t
 
   include Unsigned.S with type t := t
