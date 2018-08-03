@@ -10,6 +10,6 @@ jbuilder runtest --verbose -j8
 
 # TODO: Test crashes with "impossible" error
 # jbuilder exec cli -- coda-sample-test
-jbuilder exec app/integration-test/cli.exe all-test
-jbuilder exec app/nanobit/src/cli.exe -- transaction-snark-profiler -check-only true
+jbuilder exec integration_test -- all-test
+jbuilder exec cli -- transaction-snark-profiler -check-only true
 
