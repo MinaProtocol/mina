@@ -348,7 +348,7 @@ let%test_unit "connect" =
       in
       let%bind () = Async.Unix.mkdir ~p:() conf_dir_1 in
       let%bind () = Async.Unix.mkdir ~p:() conf_dir_2 in
-      File_system.open_temp_directories [conf_dir_1; conf_dir_2] ~f:(fun () ->
+      File_system.with_temp_dirs [conf_dir_1; conf_dir_2] ~f:(fun () ->
           let%bind _n0 = node (addr 0) [] conf_dir_1
           and _n1 = node (addr 1) [addr 0] conf_dir_2 in
           let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
@@ -374,7 +374,7 @@ let%test_unit "lockfile does not exist after connection calling stop" =
   Async.Thread_safe.block_on_async_exn (fun () ->
       let open Async in
       let open Deferred.Let_syntax in
-      File_system.open_temp_directories [conf_dir] ~f:(fun () ->
+      File_system.with_temp_dirs [conf_dir] ~f:(fun () ->
           let%bind n = node (addr 1) [] conf_dir >>| Or_error.ok_exn in
           let lock_path = Filename.concat conf_dir lock_file in
           let%bind yes_result = Sys.file_exists lock_path in

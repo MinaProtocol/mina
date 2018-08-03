@@ -10,9 +10,8 @@ end
 let tests = [(module Different_pid : Test); (module Simple_worker : Test)]
 
 let run_all_tests () =
-  Deferred.List.iter tests ~f:(fun test ->
-      let module Program = (val (test : (module Test))) in
-      Process.run_exn ~prog:Sys.executable_name ~args:[Program.name] ()
+  Deferred.List.iter tests ~f:(fun (module T : Test) ->
+      Process.run_exn ~prog:Sys.executable_name ~args:[T.name] ()
       |> Deferred.ignore )
 
 let () =
@@ -25,9 +24,7 @@ let () =
   in
   let test_arguments =
     worker_argument :: all_test_argument
-    :: List.map tests ~f:(fun test ->
-           let module Program = (val (test : (module Test))) in
-           (Program.name, Program.command) )
+    :: List.map tests ~f:(fun (module T : Test) -> (T.name, T.command))
   in
   Command.group test_arguments ~summary:"Task" |> Command.run
 

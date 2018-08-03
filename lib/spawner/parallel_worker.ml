@@ -97,18 +97,22 @@ struct
   type t = Rpc_worker.Connection.t
 
   let create input {Config.id; host; executable_path; log_dir} =
-    let worker_id = sprintf "worker-%s-%s" host (Id.to_string id) in
+    let worker_id = sprintf "worker-%s-%s" host (Id.to_string id)
+    and worker_location =
+      if host = Command_util.local_machine_host then
+        Rpc_parallel.Executable_location.Local
+      else
+        Rpc_parallel.Executable_location.Remote
+          (Rpc_parallel.Remote_executable.existing_on_host ~executable_path
+             ~strict_host_key_checking:`No host)
+    in
     match%bind
-      (* TODO: This will not work on an host other than 127.0.0.1. Trying to find a configuration setup (via Docker) to do this *)
       Rpc_worker.spawn input ~on_failure:Error.raise ~shutdown_on:Disconnect
         ~connection_state_init_arg:()
         ~redirect_stdout:(`File_append (log_dir ^/ worker_id ^ "-stdout"))
         ~redirect_stderr:(`File_append (log_dir ^/ worker_id ^ "-stderr"))
         ~connection_timeout:(Time.Span.of_min 1.) ~name:worker_id
-        ~where:
-          (Rpc_parallel.Executable_location.Remote
-             (Rpc_parallel.Remote_executable.existing_on_host ~executable_path
-                ~strict_host_key_checking:`No host))
+        ~where:worker_location
     with
     | Ok worker -> return worker
     | Error e ->
