@@ -151,7 +151,8 @@ module Interruptible = struct
   module T = struct
     type ('a, 's) t = {sigint: 's Deferred.t; d: ('a, 's) Deferred.Result.t}
 
-    let local t ~f = {sigint= Deferred.map ~f t.sigint; d= t.d}
+    let map_signal {sigint; d} ~f =
+      {sigint= Deferred.map sigint ~f; d= Deferred.Result.map_error d ~f}
 
     let bind t ~f =
       match Deferred.peek t.d with
@@ -190,7 +191,8 @@ module Interruptible = struct
 
     let return a = {sigint= Deferred.never (); d= Deferred.Result.return a}
 
-    let uninterruptible d = {sigint= Deferred.never (); d}
+    let uninterruptible d =
+      {sigint= Deferred.never (); d= Deferred.map d ~f:(fun x -> Ok x)}
 
     let lift d sigint = {d= Deferred.map d ~f:(fun x -> Ok x); sigint}
 
@@ -200,6 +202,25 @@ module Interruptible = struct
   module M = Monad.Make2 (T)
   include T
   include M
+
+  let%test_unit "monad gets interrupted" =
+    Async.Thread_safe.block_on_async_exn (fun () ->
+        let r = ref 0 in
+        let wait i = Async.after (Core.Time.Span.of_ms i) in
+        let change () = Deferred.return (r := 1) in
+        let ivar = Ivar.create () in
+        let _w =
+          let change () = lift (change ()) (Ivar.read ivar) in
+          let wait x = lift (wait x) (Ivar.read ivar) in
+          let open Let_syntax in
+          let%bind () = wait 100. in
+          change ()
+        in
+        let open Deferred.Let_syntax in
+        let%bind () = wait 30. in
+        Ivar.fill ivar () ;
+        let%map () = wait 100. in
+        assert (!r = 0) )
 end
 
 module Make (Inputs : Inputs_intf) : sig
@@ -464,7 +485,7 @@ end = struct
     in
     let fold_and_interrupt p ~init ~f =
       Linear_pipe.fold p ~init:(None, init) ~f:(fun (w, acc) (a, s) ->
-          Option.iter w ~f:(fun w -> Ivar.fill_if_empty w s) ;
+          Option.iter w ~f:(fun w -> w s) ;
           let w', d, acc' = f (acc, a) in
           let%map () = d in
           (Some w', acc') )
@@ -474,44 +495,48 @@ end = struct
     let do_sync sl_ref sl transition =
       let h = External_transition.ledger_hash transition in
       let open Interruptible.Let_syntax in
-      match%bind
-        Interruptible.lift
-          (Sync_ledger.wait_until_valid sl h)
-          (Sync_ledger.new_goal sl)
-      with
-      | `Ok ledger -> (
-          (* TODO: This should be parallelized with the syncing *)
-          match%map
-            Interruptible.uninterruptible
-              (Net.get_ledger_builder_aux_at_hash ledger_builder_io
-                 (External_transition.ledger_builder_hash transition))
-            |> Interruptible.local ~f:ignore
-          with
-          | Ok aux -> (
-            match Ledger_builder.of_aux_and_ledger ledger aux with
-            (* TODO: We'll need the full history in order to trust that
-               the ledger builder we get is actually valid. See #285 *)
-            | Ok lb ->
-                let new_tree = Transition_tree.single transition in
-                state.ktree <- Some new_tree ;
-                state.locked_tip
-                <- { ledger_builder= lb
-                   ; state= External_transition.target_state transition
-                   ; proof= External_transition.state_proof transition } ;
-                Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
-                  strongest_ledgers_reader (lb, transition) ;
-                Option.iter !sl_ref ~f:Sync_ledger.destroy ;
-                sl_ref := None
+      let ivar = Ivar.create () in
+      let _work =
+        match%bind
+          Interruptible.lift
+            (Sync_ledger.wait_until_valid sl h)
+            (Deferred.map (Ivar.read ivar) ~f:(Sync_ledger.new_goal sl))
+        with
+        | `Ok ledger -> (
+            (* TODO: This should be parallelized with the syncing *)
+            match%map
+              Interruptible.uninterruptible
+                (Net.get_ledger_builder_aux_at_hash ledger_builder_io
+                   (External_transition.ledger_builder_hash transition))
+            with
+            | Ok aux -> (
+              match Ledger_builder.of_aux_and_ledger ledger aux with
+              (* TODO: We'll need the full history in order to trust that
+                 the ledger builder we get is actually valid. See #285 *)
+              | Ok lb ->
+                  let new_tree = Transition_tree.single transition in
+                  state.ktree <- Some new_tree ;
+                  state.locked_tip
+                  <- { ledger_builder= lb
+                     ; state= External_transition.target_state transition
+                     ; proof= External_transition.state_proof transition } ;
+                  Linear_pipe.write_or_exn ~capacity:10
+                    strongest_ledgers_writer strongest_ledgers_reader
+                    (lb, transition) ;
+                  Option.iter !sl_ref ~f:Sync_ledger.destroy ;
+                  sl_ref := None
+              | Error e ->
+                  Logger.info log "Malicious aux data received from net %s"
+                    (Error.to_string_hum e) ;
+                  (* TODO: Retry? *)
+                  () )
             | Error e ->
-                Logger.info log "Malicious aux data received from net %s"
+                Logger.info log "Network failed to send aux %s"
                   (Error.to_string_hum e) ;
-                (* TODO: Retry? *)
                 () )
-          | Error e ->
-              Logger.info log "Network failed to send aux %s"
-                (Error.to_string_hum e) ;
-              () )
-      | `Target_changed -> return ()
+        | `Target_changed -> return ()
+      in
+      ivar
     in
     let do_path_traversal new_best_path is_lb_hash_curr_tip =
       let new_tip = new_best_path.Path.path |> List.last_exn in
@@ -519,8 +544,9 @@ end = struct
           instead remember which sub-paths we've validated, and apply
           those without rechecking the SNARKs (see issue #297)
           validated *)
+      let ivar = Ivar.create () in
       let step lb_and_src transition =
-        Interruptible.uninterruptible (Step.step lb_and_src transition)
+        Interruptible.lift (Step.step lb_and_src transition) (Ivar.read ivar)
       in
       let best_lb, path =
         match
@@ -534,37 +560,42 @@ end = struct
       in
       let open Interruptible.Let_syntax in
       let lb = best_lb in
-      let%map result =
-        List.fold path.Path.path
-          ~init:(Interruptible.return (`Continue None), Path.source path)
-          ~f:(fun (work, source_state) curr ->
-            let w =
-              match%bind work with
-              | `Abort -> return `Abort
-              | `Continue _ ->
-                  match%map step (lb, source_state) curr with
-                  | Ok next_state -> `Continue (Some next_state)
-                  | Error e ->
-                      (* TODO: Punish sender *)
-                      Logger.info log "Recieved malicious transition %s"
-                        (Error.to_string_hum e) ;
-                      `Abort
-            in
-            (w, External_transition.target_state curr) )
-        |> fst
+      let _work =
+        let%map result =
+          List.fold path.Path.path
+            ~init:
+              ( Interruptible.return (`Continue (Path.source path))
+              , Path.source path )
+            ~f:(fun (work, source_state) curr ->
+              let w =
+                match%bind work with
+                | `Abort -> return `Abort
+                | `Continue _ ->
+                    match%map step (lb, source_state) curr with
+                    | Ok next_state -> `Continue next_state
+                    | Error e ->
+                        (* TODO: Punish sender *)
+                        Logger.info log "Recieved malicious transition %s"
+                          (Error.to_string_hum e) ;
+                        `Abort
+              in
+              (w, External_transition.target_state curr) )
+          |> fst
+        in
+        match result with
+        | `Continue s ->
+            assert (
+              Inputs.State.equal s (External_transition.target_state new_tip)
+            ) ;
+            state.longest_branch_tip
+            <- { state= External_transition.target_state new_tip
+               ; proof= External_transition.state_proof new_tip
+               ; ledger_builder= lb } ;
+            Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
+              strongest_ledgers_reader (lb, new_tip)
+        | `Abort -> ()
       in
-      match result with
-      | `Continue None -> failwith "Impossible"
-      | `Continue (Some s) ->
-          assert (
-            Inputs.State.equal s (External_transition.target_state new_tip) ) ;
-          state.longest_branch_tip
-          <- { state= External_transition.target_state new_tip
-             ; proof= External_transition.state_proof new_tip
-             ; ledger_builder= lb } ;
-          Linear_pipe.write_or_exn ~capacity:10 strongest_ledgers_writer
-            strongest_ledgers_reader (lb, new_tip)
-      | `Abort -> ()
+      ivar
     in
     let d =
       (* TODO: Don't just interrupt blindly, if the work we've done so far is a
@@ -588,7 +619,7 @@ end = struct
               | Some sl -> sl
             in
             let w = do_sync sl_ref sl transition in
-            (w, Deferred.return (), sl_ref)
+            (Ivar.fill_if_empty w, Deferred.return (), sl_ref)
         | sl_ref, `Path_traversal new_best_path ->
             let curr_tip_hash =
               Ledger_builder.hash state.longest_branch_tip.ledger_builder
@@ -598,7 +629,7 @@ end = struct
                 (External_transition.ledger_builder_hash w)
             in
             let w = do_path_traversal new_best_path is_lb_hash_curr_tip in
-            (Interruptible.local w ~f:ignore, Deferred.return (), sl_ref) )
+            ((fun _ -> Ivar.fill_if_empty w ()), Deferred.return (), sl_ref) )
     in
     don't_wait_for d ;
     { ledger_builder_io
