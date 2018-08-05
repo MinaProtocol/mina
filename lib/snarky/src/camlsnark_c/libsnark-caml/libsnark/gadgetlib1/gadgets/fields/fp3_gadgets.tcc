@@ -133,6 +133,16 @@ Fp3_variable<Fp3T> Fp3_variable<Fp3T>::operator+(const Fp3_variable<Fp3T> &other
 }
 
 template<typename Fp3T>
+Fp3_variable<Fp3T> Fp3_variable<Fp3T>::operator-(const Fp3_variable<Fp3T> &other) const
+{
+    pb_linear_combination<FieldT> new_c0, new_c1, new_c2;
+    new_c0.assign(this->pb, this->c0 - other.c0);
+    new_c1.assign(this->pb, this->c1 - other.c1);
+    new_c2.assign(this->pb, this->c2 - other.c2);
+    return Fp3_variable<Fp3T>(this->pb, new_c0, new_c1, new_c2, FMT(this->annotation_prefix, " operator-"));
+}
+
+template<typename Fp3T>
 Fp3_variable<Fp3T> Fp3_variable<Fp3T>::operator+(const Fp3T &other) const
 {
     pb_linear_combination<FieldT> new_c0, new_c1, new_c2;
@@ -248,10 +258,16 @@ void Fp3_mul_gadget<Fp3T>::generate_r1cs_constraints()
 }
 
 template<typename Fp3T>
-void Fp3_mul_gadget<Fp3T>::generate_r1cs_witness()
+void Fp3_mul_gadget<Fp3T>::generate_r1cs_witness_internal()
 {
     this->pb.val(v0) = this->pb.lc_val(A.c0) * this->pb.lc_val(B.c0);
     this->pb.val(v4) = this->pb.lc_val(A.c2) * this->pb.lc_val(B.c2);
+}
+
+template<typename Fp3T>
+void Fp3_mul_gadget<Fp3T>::generate_r1cs_witness()
+{
+    this->generate_r1cs_witness_internal();
 
     const Fp3T Aval = A.get_element();
     const Fp3T Bval = B.get_element();
