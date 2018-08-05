@@ -82,6 +82,7 @@ public:
 
     std::vector<std::shared_ptr<G1_variable<ppT> > > all_G1_vars;
     std::vector<std::shared_ptr<G2_variable<ppT> > > all_G2_vars;
+    std::vector<std::shared_ptr<Fqk_variable<ppT> > > all_GT_vars;
 
     // Unfortunately, g++ 4.9 and g++ 5.0 have a bug related to
     // incorrect inlining of small functions:
@@ -265,6 +266,6 @@ public:
 
 } // libsnark
 
-#include <libsnark/gadgetlib1/gadgets/verifiers/r1cs_ppzksnark_verifier_gadget.tcc>
+#include <libsnark/gadgetlib1/gadgets/verifiers/r1cs_se_ppzksnark_verifier_gadget.tcc>
 
 #endif // R1CS_SE_PPZKSNARK_VERIFIER_GADGET_HPP_

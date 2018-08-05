@@ -30,7 +30,7 @@ r1cs_se_ppzksnark_proof_variable<ppT>::r1cs_se_ppzksnark_proof_variable(protoboa
     B.reset(new G2_variable<ppT>(pb, FMT(annotation_prefix, " B")));
     C.reset(new G1_variable<ppT>(pb, FMT(annotation_prefix, " C")));
 
-    all_G1_vars = { A; C };
+    all_G1_vars = { A, C };
     all_G2_vars = { B };
 
     all_G1_checkers.resize(all_G1_vars.size());
@@ -103,7 +103,7 @@ r1cs_se_ppzksnark_verification_key_variable<ppT>::r1cs_se_ppzksnark_verification
 {
     const size_t num_G1 = 2 + (input_size + 1);
     const size_t num_G2 = 3;
-    const size_t_num_GT = 1;
+    const size_t num_GT = 1;
 
     this->H.reset(new G2_variable<ppT>(pb, FMT(annotation_prefix, " H")));
     this->G_alpha.reset(new G1_variable<ppT>(pb, FMT(annotation_prefix, " G_alpha")));
@@ -166,15 +166,14 @@ void r1cs_se_ppzksnark_verification_key_variable<ppT>::generate_r1cs_witness(con
     // TODO: We should really have this take a processed verification key so we don't have
     // to do a pairing here (or just stick the final exp'd value in the vk, which is probably
     // better anyway).
-    libff::Fqk< other_curve<ppT> > G_alpha_H_beta_inv = ppT::reduced_pairing(vk.G_alpha, vk.H_beta).unitary_inverse();
+    libff::Fqk< other_curve<ppT> > G_alpha_H_beta_inv = other_curve<ppT>::reduced_pairing(vk.G_alpha, vk.H_beta).unitary_inverse();
     GT_elems = { G_alpha_H_beta_inv };
 
-    assert(vk.query.rest.indices.size() == input_size);
-    G1_elems.emplace_back(vk.query.first);
+    assert(vk.query.size() == input_size + 1);
+    G1_elems.emplace_back(vk.query[0]);
     for (size_t i = 0; i < input_size; ++i)
     {
-        assert(vk.query.rest.indices[i] == i);
-        G1_elems.emplace_back(vk.query.rest.values[i]);
+        G1_elems.emplace_back(vk.query[i+1]);
     }
 
     assert(G1_elems.size() == all_G1_vars.size());
@@ -238,20 +237,21 @@ r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key_variable<ppT>:
                                                                                                                                                 const r1cs_se_ppzksnark_verification_key<other_curve<ppT> > &r1cs_vk,
                                                                                                                                                 const std::string &annotation_prefix)
 {
-    query_base.reset(new G1_variable<ppT>(pb, r1cs_vk.query.first, FMT(annotation_prefix, " query_base")));
+    query_base.reset(new G1_variable<ppT>(pb, r1cs_vk.query[0], FMT(annotation_prefix, " query_base")));
 
-    query.resize(r1cs_vk.query.rest.indices.size());
-    for (size_t i = 0; i < r1cs_vk.query.rest.indices.size(); ++i)
+    size_t input_size = r1cs_vk.query.size() - 1;
+    query.resize(input_size);
+    for (size_t i = 0; i < input_size; ++i)
     {
-        assert(r1cs_vk.query.rest.indices[i] == i);
-        query[i].reset(new G1_variable<ppT>(pb, r1cs_vk.query.rest.values[i], FMT(annotation_prefix, " query")));
+        query[i].reset(new G1_variable<ppT>(pb, r1cs_vk.query[i + 1], FMT(annotation_prefix, " query")));
     }
 
     G_alpha.reset(new G1_variable<ppT>(pb, r1cs_vk.G_alpha, FMT(annotation_prefix, " G_alpha")));
     H_beta.reset(new G2_variable<ppT>(pb, r1cs_vk.H_beta, FMT(annotation_prefix, " G_alpha")));
     G_alpha_H_beta_inv.reset(
         new Fqk_variable<ppT>(pb,
-          ppT::reduced_pairing(r1cs_vk.G_alpha, r1cs_vk.H_beta).unitary_inverse()));
+          other_curve<ppT>::reduced_pairing(r1cs_vk.G_alpha, r1cs_vk.H_beta).unitary_inverse(),
+          FMT(annotation_prefix, " G_alpha_H_beta_inv")));
 
     G_gamma_pc.reset(
         new G1_precomputation<ppT>(pb,
@@ -328,16 +328,18 @@ r1cs_se_ppzksnark_online_verifier_gadget<ppT>::r1cs_se_ppzksnark_online_verifier
     input_len(input.size())
 {
     // accumulate input and store base in acc
+    // TODO: Check why base (i.e., pvk.query[0]) goes in this vector
     acc.reset(new G1_variable<ppT>(pb, FMT(annotation_prefix, " acc")));
     std::vector<G1_variable<ppT> > IC_terms;
     for (size_t i = 0; i < pvk.query.size(); ++i)
     {
         IC_terms.emplace_back(*(pvk.query[i]));
     }
-    accumulate_input.reset(new G1_multiscalar_mul_gadget<ppT>(pb, *(pvk.query_base), input, elt_size, IC_terms, *acc, FMT(annotation_prefix, " accumulate_input")));
+    accumulate_input.reset(
+        new G1_multiscalar_mul_gadget<ppT>(pb, *(pvk.query_base), input, elt_size, IC_terms, *acc, FMT(annotation_prefix, " accumulate_input")));
 
     // allocate results for precomputation
-    proof_A_G_alpha_precomp(new G1_precomputation<ppT>());
+    proof_A_G_alpha_precomp.reset(new G1_precomputation<ppT>());
     proof_B_H_beta_precomp.reset(new G2_precomputation<ppT>());
 
     acc_precomp.reset(new G1_precomputation<ppT>());
@@ -350,13 +352,18 @@ r1cs_se_ppzksnark_online_verifier_gadget<ppT>::r1cs_se_ppzksnark_online_verifier
     proof_A_G_alpha.reset(new G1_variable<ppT>(pb, FMT(annotation_prefix, " proof_A_G_alpha")));
     compute_proof_A_G_alpha.reset(new G1_add_gadget<ppT>(pb, *(proof.A), *pvk.G_alpha , *proof_A_G_alpha, FMT(annotation_prefix, " compute_proof_A_G_alpha")));
     proof_B_H_beta.reset(new G2_variable<ppT>(pb, FMT(annotation_prefix, " proof_B_H_beta")));
-    compute_proof_B_H_beta.reset(new G2_add_gadget<ppT>(pb, *(proof.B), *pvk.H_beta , *proof_A_G_alpha, FMT(annotation_prefix, " compute_proof_B_H_beta")));
+    compute_proof_B_H_beta.reset(
+        new G2_add_gadget<ppT>(pb,
+          *(proof.B),
+          *pvk.H_beta,
+          *proof_B_H_beta,
+          FMT(annotation_prefix, " compute_proof_B_H_beta")));
 
     compute_proof_A_G_alpha_precomp.reset(
         new precompute_G1_gadget<ppT>(pb, *proof_A_G_alpha, *proof_A_G_alpha_precomp,
           FMT(annotation_prefix, " compute_proof_A_G_alpha_precomp")));
     compute_proof_B_H_beta_precomp.reset(
-        new precompute_G2_gadget<ppT>(pb, *proof_B_H_beta, *proof_B_H_beta_precomp
+        new precompute_G2_gadget<ppT>(pb, *proof_B_H_beta, *proof_B_H_beta_precomp,
           FMT(annotation_prefix, " compute_proof_B_H_beta_precomp")));
 
     compute_acc_precomp.reset(
@@ -395,12 +402,12 @@ r1cs_se_ppzksnark_online_verifier_gadget<ppT>::r1cs_se_ppzksnark_online_verifier
     /**
      * e(A, H^{gamma}) = e(G^{gamma}, B)
      */
-    second_check.allocate(pb, FMT(annotation_prefix, " second_check_passed"));
+    second_check_passed.allocate(pb, FMT(annotation_prefix, " second_check_passed"));
     second_check.reset(
-        new check_e_equals_e_gadget(pb,
+        new check_e_equals_e_gadget<ppT>(pb,
           *proof_A_precomp, *(pvk.H_gamma_pc),
           *(pvk.G_gamma_pc), *proof_B_precomp,
-          second_check,
+          second_check_passed,
           FMT(annotation_prefix, " second_check")));
 
     // final constraint
