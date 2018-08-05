@@ -368,6 +368,18 @@ target_link_libraries(
 )
 
 add_executable(
+  gadgetlib1_r1cs_se_ppzksnark_verifier_gadget_test
+  EXCLUDE_FROM_ALL
+
+  gadgetlib1/gadgets/verifiers/tests/test_r1cs_se_ppzksnark_verifier_gadget.cpp
+)
+target_link_libraries(
+  gadgetlib1_r1cs_se_ppzksnark_verifier_gadget_test
+
+  snark
+)
+
+add_executable(
   gadgetlib1_r1cs_ppzksnark_verifier_gadget_test
   EXCLUDE_FROM_ALL
 
