@@ -222,8 +222,14 @@ struct
 
       val create : Field.t -> Var.t -> t
 
+      val coeff : t -> Field.t
+
+      val var : t -> Var.t
+
       module Vector : Vector.S with type elt = t
     end
+
+    val terms : t -> Term.Vector.t
 
     module Vector : Vector.S with type elt = t
 
@@ -255,6 +261,22 @@ struct
         fun x v ->
           let t = stub x v in
           Caml.Gc.finalise delete t ; t
+
+      let coeff =
+        let stub =
+          foreign (func_name "coeff") (typ @-> returning Field.typ)
+        in
+        fun t ->
+          let x = stub t in
+          Caml.Gc.finalise Field.delete x ;
+          x
+
+      let var =
+        let stub =
+          foreign (func_name "index") (typ @-> returning int)
+        in
+        fun t ->
+          Var.create (stub t)
 
       module Vector = Vector.Make (struct
         type elt = t
@@ -306,6 +328,16 @@ struct
     let add_term =
       foreign (func_name "add_term")
         (typ @-> Field.typ @-> Var.typ @-> returning void)
+
+    let terms =
+      let stub =
+        foreign (func_name "terms")
+          (typ @-> returning Term.Vector.typ)
+      in
+      fun t ->
+        let v = stub t in
+        Caml.Gc.finalise Term.Vector.delete v;
+        v
 
     let of_field : Field.t -> t =
       let stub =
@@ -466,6 +498,8 @@ struct
       val delete : t -> unit
 
       val index : t -> int
+
+      val of_int : int -> t
     end
 
     module Variable_array : sig
@@ -501,6 +535,8 @@ struct
 
       val delete : t -> unit
 
+      val of_int : int -> t
+
       val index : t -> int
     end = struct
       type t = unit ptr
@@ -511,6 +547,17 @@ struct
         foreign
           (with_prefix M.prefix "protoboard_variable_delete")
           (typ @-> returning void)
+
+      let of_int =
+        let stub =
+          foreign
+            (with_prefix M.prefix "protoboard_variable_of_int")
+            (int @-> returning typ)
+        in
+        fun i ->
+          let t = stub i in
+          Caml.Gc.finalise delete t;
+          t
 
       let index =
         foreign
@@ -1108,6 +1155,8 @@ module type S = sig
         sig
           type t
           val create : Field.t -> Var.t -> t
+          val coeff : t -> Field.t
+          val var : t -> Var.t
           module Vector :
             sig
               type elt = t
@@ -1120,6 +1169,9 @@ module type S = sig
               val length : t -> int
             end
         end
+
+      val terms : t -> Term.Vector.t
+
       module Vector :
         sig
           type elt = t
@@ -1180,6 +1232,7 @@ module type S = sig
           val typ : t Ctypes.typ
           val delete : t -> unit
           val index : t -> int
+          val of_int : int -> t
         end
       module Variable_array :
         sig
