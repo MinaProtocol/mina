@@ -44,6 +44,11 @@ pb_variable_array<FieldT>* camlsnark_mnt4_protoboard_allocate_variable_array(pro
   return x;
 }
 
+pb_variable<FieldT>* 
+camlsnark_mnt4_protoboard_variable_of_int(int i) {
+  return new pb_variable<FieldT>(i);
+}
+
 void camlsnark_mnt4_protoboard_variable_delete(pb_variable<FieldT>* v) {
   delete v;
 }
@@ -343,6 +348,10 @@ void camlsnark_mnt4_linear_combination_print(linear_combination<FieldT>* lc) {
   lc->print();
 }
 
+std::vector<linear_term<FieldT> >* camlsnark_mnt4_linear_combination_terms(linear_combination<FieldT>* lc) {
+  return new std::vector<linear_term<FieldT>>(lc->terms);
+}
+
 linear_combination<FieldT>* camlsnark_mnt4_linear_combination_var_add(variable<FieldT>* v, linear_combination<FieldT>* other) {
   linear_combination<FieldT>* result = new linear_combination<FieldT>();
 
@@ -366,6 +375,14 @@ linear_term<FieldT>* camlsnark_mnt4_linear_combination_term_create(FieldT* x, va
 
 void camlsnark_mnt4_linear_combination_term_delete(linear_term<FieldT>* lt) {
   delete lt;
+}
+
+FieldT* camlsnark_mnt4_linear_combination_term_coeff(linear_term<FieldT>* lt) {
+  return new FieldT(lt->coeff);
+}
+
+int camlsnark_mnt4_linear_combination_term_index(linear_term<FieldT>* lt) {
+  return lt->index;
 }
 
 std::vector<linear_term<FieldT>>* camlsnark_mnt4_linear_combination_term_vector_create() {
