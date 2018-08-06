@@ -3,7 +3,7 @@
   (public_name snarky)
   (flags (:standard -short-paths))
   (inline_tests)
-  (libraries (core_kernel interval_union bignum camlsnark_c))
+  (libraries (core_kernel bitstring_lib interval_union bignum camlsnark_c))
   (c_library_flags (:standard -lstdc++ -lpthread))
   (flags (:standard -safe-string))
   (cxx_flags

@@ -288,6 +288,8 @@ module type Basic = sig
 
       val unpack : t -> length:int -> (Boolean.var list, _) Checked.t
 
+      val unpack_full : t -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
+
       val choose_preimage_var :
         t -> length:int -> (Boolean.var list, _) Checked.t
 
