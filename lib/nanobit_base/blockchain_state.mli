@@ -1,4 +1,5 @@
 open Core_kernel
+open Coda_numbers
 open Snark_params
 open Tick
 
@@ -7,12 +8,14 @@ type ( 'target
      , 'ledger_builder_hash
      , 'ledger_hash
      , 'strength
+     , 'length
      , 'time ) t_ =
   { next_difficulty: 'target
   ; previous_state_hash: 'state_hash
   ; ledger_builder_hash: 'ledger_builder_hash
   ; ledger_hash: 'ledger_hash
   ; strength: 'strength
+  ; length: 'length
   ; timestamp: 'time }
 [@@deriving fields]
 
@@ -22,19 +25,29 @@ type t =
   , Ledger_builder_hash.t
   , Ledger_hash.t
   , Strength.t
+  , Length.t
   , Block_time.t )
   t_
 [@@deriving sexp, eq]
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('a, 'b, 'c, 'd, 'e, 'f) t_ = ('a, 'b, 'c, 'd, 'e, 'f) t_ =
+    type nonrec ('a, 'b, 'c, 'd, 'e, 'f, 'g) t_ =
+                                                 ( 'a
+                                                 , 'b
+                                                 , 'c
+                                                 , 'd
+                                                 , 'e
+                                                 , 'f
+                                                 , 'g )
+                                                 t_ =
       { next_difficulty: 'a
       ; previous_state_hash: 'b
       ; ledger_builder_hash: 'c
       ; ledger_hash: 'd
       ; strength: 'e
-      ; timestamp: 'f }
+      ; length: 'f
+      ; timestamp: 'g }
     [@@deriving bin_io, sexp, eq]
 
     type nonrec t =
@@ -43,6 +56,7 @@ module Stable : sig
       , Ledger_builder_hash.Stable.V1.t
       , Ledger_hash.Stable.V1.t
       , Strength.Stable.V1.t
+      , Length.Stable.V1.t
       , Block_time.Stable.V1.t )
       t_
     [@@deriving bin_io, sexp, eq]
@@ -56,6 +70,7 @@ include Snarkable.S
                     , Ledger_builder_hash.var
                     , Ledger_hash.var
                     , Strength.Unpacked.var
+                    , Length.Unpacked.var
                     , Block_time.Unpacked.var )
                     t_
          and type value = t

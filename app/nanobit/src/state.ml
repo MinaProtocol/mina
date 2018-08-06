@@ -1,4 +1,5 @@
 open Core
+open Coda_numbers
 open Async
 open Nanobit_base
 open Blockchain_snark
@@ -9,6 +10,7 @@ type t =
   ; ledger_builder_hash: Ledger_builder_hash.Stable.V1.t
   ; ledger_hash: Ledger_hash.Stable.V1.t
   ; strength: Strength.t
+  ; length: Length.Stable.V1.t
   ; timestamp: Block_time.Stable.V1.t }
 [@@deriving sexp, fields, bin_io, compare, eq]
 
@@ -18,12 +20,14 @@ let to_blockchain_state
     ; ledger_builder_hash
     ; ledger_hash
     ; strength
+    ; length
     ; timestamp } : Blockchain_state.t =
   { next_difficulty
   ; previous_state_hash
   ; ledger_builder_hash
   ; ledger_hash
   ; strength
+  ; length
   ; timestamp }
 
 let of_blockchain_state
@@ -32,12 +36,14 @@ let of_blockchain_state
     ; ledger_builder_hash
     ; ledger_hash
     ; strength
+    ; length
     ; timestamp } : t =
   { next_difficulty
   ; previous_state_hash
   ; ledger_builder_hash
   ; ledger_hash
   ; strength
+  ; length
   ; timestamp }
 
 let zero = of_blockchain_state Blockchain_state.zero

@@ -3,6 +3,7 @@ open Asttypes
 open Parsetree
 open Longident
 open Core
+open Coda_numbers
 open Common.Blockchain_state
 
 let expr_of_t ~loc
@@ -11,6 +12,7 @@ let expr_of_t ~loc
      ; ledger_builder_hash
      ; ledger_hash
      ; strength
+     ; length
      ; timestamp }:
       t) =
   let open Nanobit_base in
@@ -19,24 +21,26 @@ let expr_of_t ~loc
     let loc = loc
   end) in
   let open E in
+  let n s = "Nanobit_base." ^ s in
   let e (type a) name (module M : Sexpable.S with type t = a) (x: a) =
     [%expr
-      [%e pexp_ident (ident (sprintf "Nanobit_base.%s.t_of_sexp" name))]
+      [%e pexp_ident (ident (sprintf "%s.t_of_sexp" name))]
         [%e Ppx_util.expr_of_sexp ~loc (M.sexp_of_t x)]]
   in
   [%expr
     { Nanobit_base.Blockchain_state.next_difficulty=
-        [%e e "Target" (module Target) next_difficulty]
+        [%e e (n "Target") (module Target) next_difficulty]
     ; previous_state_hash=
-        [%e e "State_hash" (module State_hash) previous_state_hash]
+        [%e e (n "State_hash") (module State_hash) previous_state_hash]
     ; ledger_builder_hash=
         [%e
-          e "Ledger_builder_hash"
+          e (n "Ledger_builder_hash")
             (module Ledger_builder_hash)
             ledger_builder_hash]
-    ; ledger_hash= [%e e "Ledger_hash" (module Ledger_hash) ledger_hash]
-    ; strength= [%e e "Strength" (module Strength) strength]
-    ; timestamp= [%e e "Block_time" (module Block_time) timestamp] }]
+    ; ledger_hash= [%e e (n "Ledger_hash") (module Ledger_hash) ledger_hash]
+    ; strength= [%e e (n "Strength") (module Strength) strength]
+    ; length= [%e e "Coda_numbers.Length" (module Length) length]
+    ; timestamp= [%e e (n "Block_time") (module Block_time) timestamp] }]
 
 let genesis_time =
   Time.of_date_ofday ~zone:Time.Zone.utc
@@ -62,6 +66,7 @@ let negative_one =
   ; ledger_builder_hash= Ledger_builder_hash.dummy
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
   ; strength= Strength.zero
+  ; length= Length.zero
   ; timestamp }
 
 let genesis_block, zero =

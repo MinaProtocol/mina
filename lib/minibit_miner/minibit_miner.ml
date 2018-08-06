@@ -60,6 +60,7 @@ struct
         ; ledger_hash= next_ledger_hash
         ; ledger_builder_hash= next_ledger_builder_hash
         ; timestamp= now
+        ; length= Length.succ (State.length previous)
         ; strength= Strength.increase previous.strength difficulty }
       in
       let nonce0 = Block_nonce.random () in

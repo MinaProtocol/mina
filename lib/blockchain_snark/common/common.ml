@@ -1,4 +1,5 @@
 open Core
+open Coda_numbers
 
 module Blockchain_state = struct
   open Nanobit_base
@@ -49,5 +50,6 @@ module Blockchain_state = struct
     ; ledger_builder_hash= block.body.ledger_builder_hash
     ; ledger_hash= block.body.target_hash
     ; strength= Strength.increase state.strength ~by:state.next_difficulty
+    ; length= Length.succ state.length
     ; timestamp= block.header.time }
 end

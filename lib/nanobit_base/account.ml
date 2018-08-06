@@ -1,4 +1,5 @@
 open Core
+open Coda_numbers
 open Util
 open Snark_params
 open Tick

@@ -1,5 +1,6 @@
 open Core_kernel
 open Snark_params
+open Coda_numbers
 module Pedersen = Tick.Pedersen
 
 module Nonce = Nonce.Make64 ()

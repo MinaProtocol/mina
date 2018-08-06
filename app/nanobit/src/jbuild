@@ -14,6 +14,7 @@
       kademlia
       minibit
       coda
+      coda_numbers
       protocols
       nanobit_base
       ledger_builder
