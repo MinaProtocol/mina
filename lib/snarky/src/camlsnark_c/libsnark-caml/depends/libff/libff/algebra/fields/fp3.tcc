@@ -15,6 +15,12 @@
 namespace libff {
 
 template<mp_size_t n, const bigint<n>& modulus>
+std::vector<Fp_model<n, modulus>> Fp3_model<n,modulus>::all_base_field_elements()
+{
+    return {c0, c1, c2};
+}
+
+template<mp_size_t n, const bigint<n>& modulus>
 Fp3_model<n,modulus> Fp3_model<n,modulus>::zero()
 {
     return Fp3_model<n, modulus>(my_Fp::zero(), my_Fp::zero(), my_Fp::zero());
