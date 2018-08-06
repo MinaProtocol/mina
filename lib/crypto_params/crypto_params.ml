@@ -1,5 +1,5 @@
-module Tick_curve = Snarky.Backends.Mnt4.Default
-module Tock_curve = Snarky.Backends.Mnt6.Default
+module Tick_curve = Snarky.Backends.Mnt4.GM
+module Tock_curve = Snarky.Backends.Mnt6.GM
 
 module Hash_curve = struct
   (*

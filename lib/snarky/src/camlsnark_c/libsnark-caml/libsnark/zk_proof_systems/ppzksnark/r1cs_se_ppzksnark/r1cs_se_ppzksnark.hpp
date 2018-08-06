@@ -226,6 +226,7 @@ public:
         return 3;
     }
 
+    // TODO: The GT size also
     size_t size_in_bits() const
     {
         return (G1_size() * libff::G1<ppT>::size_in_bits() +
