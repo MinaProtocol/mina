@@ -326,13 +326,13 @@ camlsnark_mnt4_r1cs_se_ppzksnark_verification_key_variable_sign_vars(
     return res;
 }
 
-std::vector< libff::Fq<ppT> >*
-camlsnark_mnt4_gm_verification_characterizing_elts_up_to_sign(
-    r1cs_se_ppzksnark_verification_key<ppT> *vk)
+std::vector< FieldT >*
+camlsnark_mnt4_gm_verification_key_characterizing_elts_up_to_sign(
+    r1cs_se_ppzksnark_verification_key<other_curve<ppT>> *vk)
 {
-    std::vector<libff::G1<ppT>> all_G1_elts = { vk->G_alpha, vk->G_gamma };
-    std::vector<libff::G2<ppT>> all_G2_elts = { vk->H, vk->H_beta, vk->H_gamma };
-    std::vector<libff::Fqk<ppT>> all_GT_elts = { vk->G_alpha_H_beta.unitary_inverse() };
+    std::vector<libff::G1<other_curve<ppT>>> all_G1_elts = { vk->G_alpha, vk->G_gamma };
+    std::vector<libff::G2<other_curve<ppT>>> all_G2_elts = { vk->H, vk->H_beta, vk->H_gamma };
+    std::vector<libff::Fqk<other_curve<ppT>>> all_GT_elts = { vk->G_alpha_H_beta.unitary_inverse() };
 
     all_G1_elts.emplace_back(vk->query[0]);
     size_t input_size = vk->query.size() - 1;
@@ -340,16 +340,18 @@ camlsnark_mnt4_gm_verification_characterizing_elts_up_to_sign(
         all_G1_elts.emplace_back(vk->query[i+1]);
     }
 
-    std::vector<libff::Fq<ppT>>* res = new std::vector<libff::Fq<ppT>>();
+    std::vector<FieldT>* res = new std::vector<FieldT>();
 
     // Get all the G1 X coordinates
     for (size_t i = 0; i < all_G1_elts.size(); ++i) {
+      all_G1_elts[i].to_affine_coordinates();
       res->emplace_back(all_G1_elts[i].X());
     }
 
     // Get all the G2 X coordinates
     for (size_t i = 0; i < all_G2_elts.size(); ++i) {
-      std::vector<libff::Fq<ppT>> elts = all_G2_elts[i].X().all_base_field_elements();
+      all_G2_elts[i].to_affine_coordinates();
+      std::vector<FieldT> elts = all_G2_elts[i].X().all_base_field_elements();
       for (size_t j = 0; j < elts.size(); ++j) {
         res->emplace_back(elts[j]);
       }
@@ -357,7 +359,7 @@ camlsnark_mnt4_gm_verification_characterizing_elts_up_to_sign(
 
     // Get all the GT c0 coordinates
     for (size_t i = 0; i < all_GT_elts.size(); ++i) {
-      std::vector<libff::Fq<ppT>> elts = all_GT_elts[i].c0.all_base_field_elements();
+      std::vector<FieldT> elts = all_GT_elts[i].c0.all_base_field_elements();
       for (size_t j = 0; j < elts.size(); ++j) {
         res->emplace_back(elts[j]);
       }
@@ -366,13 +368,13 @@ camlsnark_mnt4_gm_verification_characterizing_elts_up_to_sign(
     return res;
 }
 
-std::vector< libff::Fq<ppT> >*
+std::vector<FieldT>*
 camlsnark_mnt4_gm_verification_key_sign_elts(
-    r1cs_se_ppzksnark_verification_key<ppT> *vk)
+    r1cs_se_ppzksnark_verification_key<other_curve<ppT>> *vk)
 {
-    std::vector<libff::G1<ppT>> all_G1_elts = { vk->G_alpha, vk->G_gamma };
-    std::vector<libff::G2<ppT>> all_G2_elts = { vk->H, vk->H_beta, vk->H_gamma };
-    std::vector<libff::Fqk<ppT>> all_GT_elts = { vk->G_alpha_H_beta.unitary_inverse() };
+    std::vector<libff::G1<other_curve<ppT>>> all_G1_elts = { vk->G_alpha, vk->G_gamma };
+    std::vector<libff::G2<other_curve<ppT>>> all_G2_elts = { vk->H, vk->H_beta, vk->H_gamma };
+    std::vector<libff::Fqk<other_curve<ppT>>> all_GT_elts = { vk->G_alpha_H_beta.unitary_inverse() };
 
     all_G1_elts.emplace_back(vk->query[0]);
     size_t input_size = vk->query.size() - 1;
@@ -380,13 +382,15 @@ camlsnark_mnt4_gm_verification_key_sign_elts(
         all_G1_elts.emplace_back(vk->query[i+1]);
     }
 
-    std::vector<libff::Fq<ppT>>* res = new std::vector<libff::Fq<ppT>>();
+    std::vector<FieldT>* res = new std::vector<FieldT>();
 
     for (size_t i = 0; i < all_G1_elts.size(); ++i) {
+      all_G1_elts[i].to_affine_coordinates();
       res->emplace_back(all_G1_elts[i].Y());
     }
 
     for (size_t i = 0; i < all_G2_elts.size(); ++i) {
+      all_G2_elts[i].to_affine_coordinates();
       res->emplace_back(all_G2_elts[i].Y().c0);
     }
 
