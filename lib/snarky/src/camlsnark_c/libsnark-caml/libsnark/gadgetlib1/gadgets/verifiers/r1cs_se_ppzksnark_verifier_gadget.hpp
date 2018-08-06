@@ -97,7 +97,6 @@ public:
     __attribute__((noinline)) r1cs_se_ppzksnark_verification_key_variable(protoboard<FieldT> &pb,
                                                                        const size_t input_size,
                                                                        const std::string &annotation_prefix);
-    void generate_r1cs_constraints();
     void generate_r1cs_witness(const r1cs_se_ppzksnark_verification_key<other_curve<ppT> > &vk);
     /* void generate_r1cs_witness(const libff::bit_vector &vk_bits); */
     /*

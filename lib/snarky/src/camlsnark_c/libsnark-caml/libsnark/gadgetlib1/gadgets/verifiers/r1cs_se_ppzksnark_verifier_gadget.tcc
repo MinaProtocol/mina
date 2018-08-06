@@ -149,11 +149,6 @@ r1cs_se_ppzksnark_verification_key_variable<ppT>::r1cs_se_ppzksnark_verification
 }
 
 template<typename ppT>
-void r1cs_se_ppzksnark_verification_key_variable<ppT>::generate_r1cs_constraints()
-{
-}
-
-template<typename ppT>
 void r1cs_se_ppzksnark_verification_key_variable<ppT>::generate_r1cs_witness(const r1cs_se_ppzksnark_verification_key<other_curve<ppT> > &vk)
 {
     std::vector<libff::G1<other_curve<ppT> > > G1_elems;
