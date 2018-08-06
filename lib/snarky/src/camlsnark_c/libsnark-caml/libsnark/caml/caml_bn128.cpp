@@ -368,6 +368,14 @@ void camlsnark_bn128_linear_combination_term_delete(linear_term<FieldT>* lt) {
   delete lt;
 }
 
+FieldT* camlsnark_bn128_linear_combination_term_coeff(linear_term<FieldT>* lt) {
+  return new FieldT(lt->coeff);
+}
+
+int camlsnark_bn128_linear_combination_term_index(linear_term<FieldT>* lt) {
+  return lt->index;
+}
+
 std::vector<linear_term<FieldT>>* camlsnark_bn128_linear_combination_term_vector_create() {
   return new std::vector<linear_term<FieldT>>();
 }
