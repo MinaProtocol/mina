@@ -101,6 +101,7 @@ std::ostream& operator<<(std::ostream &out, const r1cs_se_ppzksnark_verification
     out << vk.H_beta << OUTPUT_NEWLINE;
     out << vk.G_gamma << OUTPUT_NEWLINE;
     out << vk.H_gamma << OUTPUT_NEWLINE;
+    out << vk.G_alpha_H_beta << OUTPUT_NEWLINE;
     out << vk.query << OUTPUT_NEWLINE;
 
     return out;
@@ -119,6 +120,8 @@ std::istream& operator>>(std::istream &in, r1cs_se_ppzksnark_verification_key<pp
     libff::consume_OUTPUT_NEWLINE(in);
     in >> vk.H_gamma;
     libff::consume_OUTPUT_NEWLINE(in);
+    in >> vk.G_alpha_H_beta;
+    libff::consume_OUTPUT_NEWLINE(in);
     in >> vk.query;
     libff::consume_OUTPUT_NEWLINE(in);
 
@@ -130,7 +133,7 @@ bool r1cs_se_ppzksnark_processed_verification_key<ppT>::operator==(const r1cs_se
 {
     return (this->G_alpha == other.G_alpha &&
             this->H_beta == other.H_beta &&
-            this->G_alpha_H_beta_ml == other.G_alpha_H_beta_ml &&
+            this->G_alpha_H_beta == other.G_alpha_H_beta &&
             this->G_gamma_pc == other.G_gamma_pc &&
             this->H_gamma_pc == other.H_gamma_pc &&
             this->H_pc == other.H_pc &&
@@ -142,7 +145,7 @@ std::ostream& operator<<(std::ostream &out, const r1cs_se_ppzksnark_processed_ve
 {
     out << pvk.G_alpha << OUTPUT_NEWLINE;
     out << pvk.H_beta << OUTPUT_NEWLINE;
-    out << pvk.G_alpha_H_beta_ml << OUTPUT_NEWLINE;
+    out << pvk.G_alpha_H_beta << OUTPUT_NEWLINE;
     out << pvk.G_gamma_pc << OUTPUT_NEWLINE;
     out << pvk.H_gamma_pc << OUTPUT_NEWLINE;
     out << pvk.H_pc << OUTPUT_NEWLINE;
@@ -158,7 +161,7 @@ std::istream& operator>>(std::istream &in, r1cs_se_ppzksnark_processed_verificat
     libff::consume_OUTPUT_NEWLINE(in);
     in >> pvk.H_beta;
     libff::consume_OUTPUT_NEWLINE(in);
-    in >> pvk.G_alpha_H_beta_ml;
+    in >> pvk.G_alpha_H_beta;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> pvk.G_gamma_pc;
     libff::consume_OUTPUT_NEWLINE(in);
@@ -212,6 +215,7 @@ r1cs_se_ppzksnark_verification_key<ppT> r1cs_se_ppzksnark_verification_key<ppT>:
     result.H_beta = libff::Fr<ppT>::random_element() * libff::G2<ppT>::one();
     result.G_gamma = libff::Fr<ppT>::random_element() * libff::G1<ppT>::one();
     result.H_gamma = libff::Fr<ppT>::random_element() * libff::G2<ppT>::one();
+    result.G_alpha_H_beta = ppT::reduced_pairing(result.G_alpha, result.H_beta);
 
     libff::G1_vector<ppT> v;
     for (size_t i = 0; i < input_size + 1; ++i)
@@ -582,7 +586,7 @@ r1cs_se_ppzksnark_processed_verification_key<ppT> r1cs_se_ppzksnark_verifier_pro
     r1cs_se_ppzksnark_processed_verification_key<ppT> pvk;
     pvk.G_alpha = vk.G_alpha;
     pvk.H_beta = vk.H_beta;
-    pvk.G_alpha_H_beta_ml = ppT::miller_loop(G_alpha_pc, H_beta_pc);
+    pvk.G_alpha_H_beta = ppT::final_exponentiation(ppT::miller_loop(G_alpha_pc, H_beta_pc));
     pvk.G_gamma_pc = ppT::precompute_G1(vk.G_gamma);
     pvk.H_gamma_pc = ppT::precompute_G2(vk.H_gamma);
     pvk.H_pc = ppT::precompute_G2(vk.H);
@@ -638,13 +642,13 @@ bool r1cs_se_ppzksnark_online_verifier_weak_IC(const r1cs_se_ppzksnark_processed
 
     libff::Fqk<ppT> test1_l = ppT::miller_loop(ppT::precompute_G1(proof.A + pvk.G_alpha),
                                                ppT::precompute_G2(proof.B + pvk.H_beta)),
-                    test1_r1 = pvk.G_alpha_H_beta_ml,
+                    test1_r1 = pvk.G_alpha_H_beta,
                     test1_r2 = ppT::miller_loop(ppT::precompute_G1(G_psi),
                                                 pvk.H_gamma_pc),
                     test1_r3 = ppT::miller_loop(ppT::precompute_G1(proof.C),
                                                 pvk.H_pc);
     libff::GT<ppT> test1 = ppT::final_exponentiation(
-        test1_l.unitary_inverse() * test1_r1 * test1_r2 * test1_r3);
+        test1_l.unitary_inverse() * test1_r2 * test1_r3) * test1_r1;
 
     if (test1 != libff::GT<ppT>::one())
     {
