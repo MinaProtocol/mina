@@ -161,7 +161,7 @@ void r1cs_se_ppzksnark_verification_key_variable<ppT>::generate_r1cs_witness(con
     // TODO: We should really have this take a processed verification key so we don't have
     // to do a pairing here (or just stick the final exp'd value in the vk, which is probably
     // better anyway).
-    libff::Fqk< other_curve<ppT> > G_alpha_H_beta_inv = other_curve<ppT>::reduced_pairing(vk.G_alpha, vk.H_beta).unitary_inverse();
+    libff::Fqk< other_curve<ppT> > G_alpha_H_beta_inv = vk.G_alpha_H_beta.unitary_inverse();
     GT_elems = { G_alpha_H_beta_inv };
 
     assert(vk.query.size() == input_size + 1);
@@ -244,8 +244,7 @@ r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key_variable<ppT>:
     G_alpha.reset(new G1_variable<ppT>(pb, r1cs_vk.G_alpha, FMT(annotation_prefix, " G_alpha")));
     H_beta.reset(new G2_variable<ppT>(pb, r1cs_vk.H_beta, FMT(annotation_prefix, " G_alpha")));
     G_alpha_H_beta_inv.reset(
-        new Fqk_variable<ppT>(pb,
-          other_curve<ppT>::reduced_pairing(r1cs_vk.G_alpha, r1cs_vk.H_beta).unitary_inverse(),
+        new Fqk_variable<ppT>(pb, r1cs_vk.G_alpha_H_beta.unitary_inverse(),
           FMT(annotation_prefix, " G_alpha_H_beta_inv")));
 
     G_gamma_pc.reset(
