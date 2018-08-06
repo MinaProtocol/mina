@@ -51,6 +51,8 @@ public:
     Fp3_model() {};
     Fp3_model(const my_Fp& c0, const my_Fp& c1, const my_Fp& c2) : c0(c0), c1(c1), c2(c2) {};
 
+    std::vector<my_Fp> all_base_field_elements();
+
     void clear() { c0.clear(); c1.clear(); c2.clear(); }
     void print() const { printf("c0/c1/c2:\n"); c0.print(); c1.print(); c2.print(); }
 
