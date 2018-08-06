@@ -138,6 +138,35 @@ camlsnark_mnt4_r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key
     delete vk;
 }
 
+// verifier
+r1cs_se_ppzksnark_verifier_gadget<ppT>*
+camlsnark_mnt4_r1cs_se_ppzksnark_verifier_gadget_create(
+    protoboard<FieldT>* pb,
+    r1cs_se_ppzksnark_verification_key_variable<ppT>* vk,
+    pb_variable_array<FieldT>* input,
+    int elt_size,
+    r1cs_se_ppzksnark_proof_variable<ppT>* proof,
+    pb_variable<FieldT>* result) {
+  return new r1cs_se_ppzksnark_verifier_gadget<ppT>(
+      *pb, *vk, *input, elt_size, *proof, *result,
+      "se_verifier_gadget");
+}
+
+void camlsnark_mnt4_r1cs_se_ppzksnark_verifier_gadget_delete(
+    r1cs_se_ppzksnark_verifier_gadget<ppT>* g) {
+  delete g;
+}
+
+void camlsnark_mnt4_r1cs_se_ppzksnark_verifier_gadget_generate_r1cs_constraints(
+    r1cs_se_ppzksnark_verifier_gadget<ppT>* g) {
+  g->generate_r1cs_constraints();
+}
+
+void camlsnark_mnt4_r1cs_se_ppzksnark_verifier_gadget_generate_r1cs_witness(
+    r1cs_se_ppzksnark_verifier_gadget<ppT>* g) {
+  g->generate_r1cs_witness();
+}
+
 // online verifier
 r1cs_se_ppzksnark_online_verifier_gadget<ppT>*
 camlsnark_mnt4_r1cs_se_ppzksnark_online_verifier_gadget_create(
