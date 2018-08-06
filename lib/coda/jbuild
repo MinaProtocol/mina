@@ -3,7 +3,6 @@
 (library
  ((name coda)
   (public_name coda)
-  (flags (:standard -short-paths))
   (library_flags (-linkall))
   (flags (:standard -short-paths))
   (inline_tests)

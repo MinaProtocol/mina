@@ -2,7 +2,6 @@
 
 (executable
  ((name generator)
-  (package spirv)
   (modes (byte))
   (modules (generator))
   (flags (dynlink.cma camlp4fulllib.cma))

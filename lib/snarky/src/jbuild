@@ -1,11 +1,10 @@
 (library
  ((name snarky)
   (public_name snarky)
-  (flags (:standard -short-paths))
+  (flags (:standard -short-paths -safe-string))
   (inline_tests)
   (libraries (core_kernel interval_union bignum camlsnark_c))
   (c_library_flags (:standard -lstdc++ -lpthread))
-  (flags (:standard -safe-string))
   (cxx_flags
     (
       (:standard "\\" -pedantic)

@@ -10,10 +10,14 @@ module type Inputs_intf = sig
       -> Internal_transition.t
       -> State.Proof.t Deferred.Or_error.t
   end
+
+  module Transaction_interval : sig
+    val t : Time.Span.t
+  end
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda.Miner_intf
+  Coda.Signer_intf
   with type external_transition := Inputs.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder := Inputs.Ledger_builder.t
@@ -28,6 +32,8 @@ struct
   module Hashing_result : sig
     type t
 
+    val empty : unit -> t
+
     val create :
          State.t
       -> next_ledger_hash:Ledger_hash.t
@@ -41,6 +47,8 @@ struct
     type t =
       { cancelled: bool ref
       ; result: [`Ok of State.t * Block_nonce.t | `Cancelled] Deferred.t }
+
+    let empty () = {cancelled= ref false; result= Deferred.return `Cancelled}
 
     let result t = t.result
 
@@ -89,8 +97,10 @@ struct
       {cancelled; result= go ()}
   end
 
-  module Mining_result : sig
+  module Signing_result : sig
     type t
+
+    val empty : unit -> t
 
     val cancel : t -> unit
 
@@ -110,6 +120,11 @@ struct
       ; cancellation: unit Ivar.t
       ; result: External_transition.t Deferred.Or_error.t }
     [@@deriving fields]
+
+    let empty () =
+      { hashing_result= Hashing_result.empty ()
+      ; cancellation= Ivar.create ()
+      ; result= Deferred.Or_error.error_string "empty" }
 
     let cancel t =
       Hashing_result.cancel t.hashing_result ;
@@ -153,11 +168,11 @@ struct
               ; state= new_state
               ; ledger_builder_diff= Ledger_builder_diff.forget diff }
           | `Cancelled ->
-              Deferred.return (Or_error.error_string "Mining cancelled")
+              Deferred.return (Or_error.error_string "Signing cancelled")
         in
         Deferred.any
           [ ( Ivar.read cancellation
-            >>| fun () -> Or_error.error_string "Mining cancelled" )
+            >>| fun () -> Or_error.error_string "Signing cancelled" )
           ; result ]
       in
       {hashing_result; result; cancellation}
@@ -173,7 +188,7 @@ struct
 
   type change = Tip_change of Tip.t
 
-  type state = {tip: Tip.t; result: Mining_result.t}
+  type state = {tip: Tip.t; result: Signing_result.t}
 
   type t = {transitions: External_transition.t Linear_pipe.Reader.t}
   [@@deriving fields]
@@ -186,32 +201,42 @@ struct
     let write_result = function
       | Ok t -> Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
       | Error e ->
-          Logger.error logger "%s\n" Error.(to_string_hum (tag e ~tag:"miner"))
+          Logger.error logger "%s\n"
+            Error.(to_string_hum (tag e ~tag:"signer"))
     in
     let create_result {Tip.state; transactions; ledger_builder} =
       let result =
-        Mining_result.create ~state ~ledger_builder ~transactions
+        Signing_result.create ~state ~ledger_builder ~transactions
           ~get_completed_work
       in
-      upon (Mining_result.result result) write_result ;
+      upon (Signing_result.result result) write_result ;
       result
+    in
+    let schedule_transaction tip =
+      let time_till_transaction =
+        Time.modulus (Time.now ()) Transaction_interval.t
+      in
+      Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
+      Time.Timeout.create time_till_transaction (fun () ->
+          Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
+          create_result tip )
     in
     don't_wait_for
       ( match%bind Pipe.read change_feeder.Linear_pipe.Reader.pipe with
       | `Eof -> failwith "change_feeder was empty"
       | `Ok (Tip_change initial_tip) ->
-          let state0 = {result= create_result initial_tip; tip= initial_tip} in
           Logger.info logger
-            !"Got initial change with tip %{sexp: Tip.t}"
+            !"Signer got initial change with tip %{sexp: Tip.t}"
             initial_tip ;
-          Linear_pipe.fold change_feeder ~init:state0 ~f:(fun s u ->
-              match u with Tip_change tip ->
-                Logger.info logger
-                  !"Starting to mine on a new tip %{sexp: Tip.t}"
-                  tip ;
-                Mining_result.cancel s.result ;
-                let result = create_result tip in
-                return {result; tip} )
+          Linear_pipe.fold change_feeder
+            ~init:(schedule_transaction initial_tip) ~f:
+            (fun scheduled_transaction (Tip_change tip) ->
+              ( match Time.Timeout.peek scheduled_transaction with
+              | None ->
+                  Time.Timeout.cancel scheduled_transaction
+                    (Signing_result.empty ())
+              | Some result -> Signing_result.cancel result ) ;
+              return (schedule_transaction tip) )
           >>| ignore ) ;
     {transitions= r}
 end
