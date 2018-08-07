@@ -194,6 +194,7 @@ public:
     // H^{gamma}
     libff::G2<ppT> H_gamma;
 
+    // e (G^{alpha}, H^{beta})
     libff::Fqk<ppT> G_alpha_H_beta;
 
     // G^{gamma * A_i(t) + (alpha + beta) * A_i(t)}

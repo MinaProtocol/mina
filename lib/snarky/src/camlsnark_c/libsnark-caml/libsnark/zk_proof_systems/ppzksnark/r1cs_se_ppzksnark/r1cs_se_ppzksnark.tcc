@@ -101,6 +101,7 @@ std::ostream& operator<<(std::ostream &out, const r1cs_se_ppzksnark_verification
     out << vk.H_beta << OUTPUT_NEWLINE;
     out << vk.G_gamma << OUTPUT_NEWLINE;
     out << vk.H_gamma << OUTPUT_NEWLINE;
+    out << vk.G_alpha_H_beta << OUTPUT_NEWLINE;
     out << vk.query << OUTPUT_NEWLINE;
 
     return out;
@@ -118,6 +119,8 @@ std::istream& operator>>(std::istream &in, r1cs_se_ppzksnark_verification_key<pp
     in >> vk.G_gamma;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> vk.H_gamma;
+    libff::consume_OUTPUT_NEWLINE(in);
+    in >> vk.G_alpha_H_beta;
     libff::consume_OUTPUT_NEWLINE(in);
     in >> vk.query;
     libff::consume_OUTPUT_NEWLINE(in);
@@ -212,6 +215,7 @@ r1cs_se_ppzksnark_verification_key<ppT> r1cs_se_ppzksnark_verification_key<ppT>:
     result.H_beta = libff::Fr<ppT>::random_element() * libff::G2<ppT>::one();
     result.G_gamma = libff::Fr<ppT>::random_element() * libff::G1<ppT>::one();
     result.H_gamma = libff::Fr<ppT>::random_element() * libff::G2<ppT>::one();
+    result.G_alpha_H_beta = ppT::reduced_pairing(result.G_alpha, result.H_beta);
 
     libff::G1_vector<ppT> v;
     for (size_t i = 0; i < input_size + 1; ++i)
