@@ -191,13 +191,22 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
              ~by:(difficulty_packed, difficulty)
            >>= Strength.unpack_var
          in
+         let global_signer_public_key =
+           Global_signer_private_key.t |> Public_key.of_private_key
+           |> Public_key.compress |> Public_key.Compressed.var_of_t
+         in
+         let%bind () =
+           Public_key.Compressed.assert_equal previous_state.signer_public_key
+             global_signer_public_key
+         in
          let new_state =
            { next_difficulty= new_difficulty
            ; previous_state_hash
            ; ledger_hash= block.body.target_hash
            ; ledger_builder_hash= block.body.ledger_builder_hash
            ; strength= new_strength
-           ; timestamp= time }
+           ; timestamp= time
+           ; signer_public_key= global_signer_public_key }
          in
          let%bind state_bits = to_bits new_state in
          let%bind state_partial =

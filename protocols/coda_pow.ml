@@ -157,7 +157,13 @@ module type Transaction_intf = sig
   val receiver : t -> public_key
 end
 
+module type Private_key_intf = sig
+  type t
+end
+
 module type Public_key_intf = sig
+  module Private_key : Private_key_intf
+
   type t
 
   module Compressed : sig
@@ -165,6 +171,8 @@ module type Public_key_intf = sig
 
     include Comparable.S with type t := t
   end
+
+  val of_private_key : Private_key.t -> t
 end
 
 module type Fee_transfer_intf = sig
@@ -423,13 +431,16 @@ module type State_intf = sig
 
   type time
 
+  type public_key
+
   type t =
     { next_difficulty: difficulty
     ; previous_state_hash: state_hash
     ; ledger_builder_hash: ledger_builder_hash
     ; ledger_hash: ledger_hash
     ; strength: strength
-    ; timestamp: time }
+    ; timestamp: time
+    ; signer_public_key: public_key }
   [@@deriving sexp, bin_io, fields]
 
   val hash : t -> state_hash
@@ -552,7 +563,9 @@ end
 module type Inputs_intf = sig
   module Time : Time_intf
 
-  module Public_key : Public_key_intf
+  module Private_key : Private_key_intf
+
+  module Public_key : Public_key_intf with module Private_key := Private_key
 
   module Transaction :
     Transaction_intf with type public_key := Public_key.Compressed.t
@@ -692,6 +705,7 @@ Merge Snark:
              and type nonce := Block_nonce.t
              and type ledger_builder_hash := Ledger_builder_hash.t
              and type pow := Pow.t
+             and type public_key := Public_key.t
 
     module Proof : sig
       include Proof_intf with type input = t
