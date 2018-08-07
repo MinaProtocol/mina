@@ -44,6 +44,8 @@ module Coda_worker = struct
 
       let genesis_proof = Precomputed_values.base_proof
 
+      let transaction_interval = Time.Span.of_ms 100.0
+
       let fee_public_key = Genesis_ledger.rich_pk
     end in
     let module Main : Main_intf = Coda_without_snark (Init) () in

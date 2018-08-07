@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name minibit_miner)
-  (public_name minibit_miner)
+ ((name signer)
+  (public_name signer)
   (flags (:standard -short-paths -warn-error -6))
   (library_flags (-linkall))
   (inline_tests)
@@ -15,5 +15,5 @@
       protocols
       async_extra ))
   (preprocess (pps (ppx_jane)))
-  (synopsis "Miner layer for Minibit")))
+  (synopsis "Coda signer")))
 

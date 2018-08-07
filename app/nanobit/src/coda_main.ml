@@ -15,6 +15,8 @@ module type Init_intf = sig
 
   val genesis_proof : Proof.t
 
+  val transaction_interval : Time.Span.t
+
   (* Public key to allocate fees to *)
 
   val fee_public_key : Public_key.Compressed.t
@@ -587,7 +589,7 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Miner = Minibit_miner.Make (struct
+  module Signer = Signer.Make (struct
     include Inputs0
 
     module Prover = struct
@@ -606,6 +608,10 @@ struct
     end
 
     module Signer_private_key = Nanobit_base.Global_signer_private_key
+
+    module Transaction_interval = struct
+      let t = Time.Span.of_time_span Init.transaction_interval
+    end
   end)
 
   let request_work ~best_ledger_builder t =
