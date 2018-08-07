@@ -1,1 +1,1 @@
-include Nonce.Make32 ()
+include Nat.Make32 ()
