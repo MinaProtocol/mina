@@ -47,6 +47,18 @@ module Span : sig
   val ( >= ) : t -> t -> bool
 end
 
+module Timeout : sig
+  type 'a t
+
+  val create : Span.t -> (unit -> 'a) -> 'a t
+
+  val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
+
+  val peek : 'a t -> 'a option
+
+  val cancel : 'a t -> 'a -> unit
+end
+
 val field_var_to_unpacked :
   Tick.Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t
 
@@ -56,6 +68,8 @@ val diff_checked :
 val unpacked_to_number : Span.Unpacked.var -> Tick.Number.t
 
 val diff : t -> t -> Span.t
+
+val modulus : t -> Span.t -> Span.t
 
 val of_time : Time.t -> t
 

@@ -15,6 +15,8 @@ module type Init_intf = sig
 
   val genesis_proof : Proof.t
 
+  val transaction_interval : Time.Span.t
+
   (* Public key to allocate fees to *)
 
   val fee_public_key : Public_key.Compressed.t
@@ -54,6 +56,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Private_key = Private_key
   module Public_key = Public_key
   module State_hash = State_hash.Stable.V1
   module Strength = Strength
@@ -586,7 +589,7 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Miner = Minibit_miner.Make (struct
+  module Signer = Signer.Make (struct
     include Inputs0
 
     module Prover = struct
@@ -602,6 +605,12 @@ struct
               ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof
               } }
         >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
+    end
+
+    module Signer_private_key = Nanobit_base.Global_signer_private_key
+
+    module Transaction_interval = struct
+      let t = Time.Span.of_time_span Init.transaction_interval
     end
   end)
 
