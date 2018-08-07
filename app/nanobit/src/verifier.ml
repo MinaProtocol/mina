@@ -41,7 +41,8 @@ module Worker_state = struct
          let key = bc_vk.wrap
 
          let key_to_bool_list =
-           B.Step_base.Verifier.Verification_key.to_bool_list
+           B.Step_base.Verifier.Verification_key_data.(
+             Fn.compose to_bits of_verification_key)
 
          let input = B.wrap_input
        end) in
