@@ -13,7 +13,8 @@ let expr_of_t ~loc
      ; ledger_hash
      ; strength
      ; length
-     ; timestamp }:
+     ; timestamp
+     ; signer_public_key }:
       t) =
   let open Nanobit_base in
   let ident str = Loc.make loc (Longident.parse str) in
@@ -40,7 +41,13 @@ let expr_of_t ~loc
     ; ledger_hash= [%e e (n "Ledger_hash") (module Ledger_hash) ledger_hash]
     ; strength= [%e e (n "Strength") (module Strength) strength]
     ; length= [%e e "Coda_numbers.Length" (module Length) length]
-    ; timestamp= [%e e (n "Block_time") (module Block_time) timestamp] }]
+    ; timestamp= [%e e (n "Block_time") (module Block_time) timestamp]
+    ; signer_public_key=
+        [%e
+          e
+            (n "Public_key.Compressed")
+            (module Public_key.Compressed)
+            signer_public_key] }]
 
 let genesis_time =
   Time.of_date_ofday ~zone:Time.Zone.utc
@@ -67,7 +74,10 @@ let negative_one =
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
   ; strength= Strength.zero
   ; length= Length.zero
-  ; timestamp }
+  ; timestamp
+  ; signer_public_key=
+      Public_key.compress
+      @@ Public_key.of_private_key Global_signer_private_key.t }
 
 let genesis_block, zero =
   let open Nanobit_base in

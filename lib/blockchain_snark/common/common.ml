@@ -51,5 +51,6 @@ module Blockchain_state = struct
     ; ledger_hash= block.body.target_hash
     ; strength= Strength.increase state.strength ~by:state.next_difficulty
     ; length= Length.succ state.length
-    ; timestamp= block.header.time }
+    ; timestamp= block.header.time
+    ; signer_public_key= state.signer_public_key }
 end

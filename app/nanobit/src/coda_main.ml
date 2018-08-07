@@ -56,6 +56,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Private_key = Private_key
   module Public_key = Public_key
   module State_hash = State_hash.Stable.V1
   module Strength = Strength
@@ -611,6 +612,8 @@ struct
               } }
         >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
     end
+
+    module Signer_private_key = Nanobit_base.Global_signer_private_key
 
     module Transaction_interval = struct
       let t = Time.Span.of_time_span Init.transaction_interval

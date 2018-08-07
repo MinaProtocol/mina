@@ -9,14 +9,16 @@ type ( 'target
      , 'ledger_hash
      , 'strength
      , 'length
-     , 'time ) t_ =
+     , 'time
+     , 'signer_public_key ) t_ =
   { next_difficulty: 'target
   ; previous_state_hash: 'state_hash
   ; ledger_builder_hash: 'ledger_builder_hash
   ; ledger_hash: 'ledger_hash
   ; strength: 'strength
   ; length: 'length
-  ; timestamp: 'time }
+  ; timestamp: 'time
+  ; signer_public_key: 'signer_public_key }
 [@@deriving fields]
 
 type t =
@@ -26,28 +28,31 @@ type t =
   , Ledger_hash.t
   , Strength.t
   , Length.t
-  , Block_time.t )
+  , Block_time.t
+  , Public_key.Compressed.t )
   t_
 [@@deriving sexp, eq]
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('a, 'b, 'c, 'd, 'e, 'f, 'g) t_ =
-                                                 ( 'a
-                                                 , 'b
-                                                 , 'c
-                                                 , 'd
-                                                 , 'e
-                                                 , 'f
-                                                 , 'g )
-                                                 t_ =
+    type nonrec ('a, 'b, 'c, 'd, 'e, 'f, 'g, 'h) t_ =
+                                                     ( 'a
+                                                     , 'b
+                                                     , 'c
+                                                     , 'd
+                                                     , 'e
+                                                     , 'f
+                                                     , 'g
+                                                     , 'h )
+                                                     t_ =
       { next_difficulty: 'a
       ; previous_state_hash: 'b
       ; ledger_builder_hash: 'c
       ; ledger_hash: 'd
       ; strength: 'e
       ; length: 'f
-      ; timestamp: 'g }
+      ; timestamp: 'g
+      ; signer_public_key: 'h }
     [@@deriving bin_io, sexp, eq]
 
     type nonrec t =
@@ -57,7 +62,8 @@ module Stable : sig
       , Ledger_hash.Stable.V1.t
       , Strength.Stable.V1.t
       , Length.Stable.V1.t
-      , Block_time.Stable.V1.t )
+      , Block_time.Stable.V1.t
+      , Public_key.Compressed.Stable.V1.t )
       t_
     [@@deriving bin_io, sexp, eq]
   end
@@ -71,7 +77,8 @@ include Snarkable.S
                     , Ledger_hash.var
                     , Strength.Unpacked.var
                     , Length.Unpacked.var
-                    , Block_time.Unpacked.var )
+                    , Block_time.Unpacked.var
+                    , Public_key.Compressed.var )
                     t_
          and type value = t
 

@@ -11,6 +11,10 @@ module type Inputs_intf = sig
       -> State.Proof.t Deferred.Or_error.t
   end
 
+  module Signer_private_key : sig
+    val t : Private_key.t
+  end
+
   module Transaction_interval : sig
     val t : Time.Span.t
   end
@@ -69,7 +73,8 @@ struct
         ; ledger_builder_hash= next_ledger_builder_hash
         ; timestamp= now
         ; length= Length.succ (State.length previous)
-        ; strength= Strength.increase previous.strength ~by:difficulty }
+        ; strength= Strength.increase previous.strength ~by:difficulty
+        ; signer_public_key= Public_key.of_private_key Signer_private_key.t }
       in
       let nonce0 = Block_nonce.random () in
       let rec go nonce i =
