@@ -69,7 +69,7 @@ struct
         ; ledger_builder_hash= next_ledger_builder_hash
         ; timestamp= now
         ; length= Length.succ (State.length previous)
-        ; strength= Strength.increase previous.strength difficulty }
+        ; strength= Strength.increase previous.strength ~by:difficulty }
       in
       let nonce0 = Block_nonce.random () in
       let rec go nonce i =
@@ -188,8 +188,6 @@ struct
   end
 
   type change = Tip_change of Tip.t
-
-  type state = {tip: Tip.t; result: Signing_result.t}
 
   type t = {transitions: External_transition.t Linear_pipe.Reader.t}
   [@@deriving fields]
