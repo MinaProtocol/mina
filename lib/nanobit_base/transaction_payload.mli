@@ -1,4 +1,5 @@
 open Core
+open Coda_numbers
 open Snark_params.Tick
 
 type ('pk, 'amount, 'fee, 'nonce) t_ =

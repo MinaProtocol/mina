@@ -1,8 +1,9 @@
 open Core_kernel
 open Snark_params
+open Coda_numbers
 module Pedersen = Tick.Pedersen
 
-module Nonce = Nonce.Make64 ()
+module Nonce = Nat.Make64 ()
 
 module Header = struct
   module Stable = struct
@@ -97,9 +98,14 @@ module Body = struct
     in
     {store; read; alloc; check}
 
-  let var_to_bits ({target_hash}: var) :
+  let var_to_bits ({target_hash; ledger_builder_hash; proof= _}: var) :
       (Tick.Boolean.var list, _) Tick.Checked.t =
-    Ledger_hash.var_to_bits target_hash
+    let open Tick.Let_syntax in
+    let%map target_hash = Ledger_hash.var_to_bits target_hash
+    and ledger_builder_hash =
+      Ledger_builder_hash.var_to_bits ledger_builder_hash
+    in
+    target_hash @ ledger_builder_hash
 end
 
 module Stable = struct

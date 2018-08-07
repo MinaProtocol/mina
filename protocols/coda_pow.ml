@@ -398,6 +398,14 @@ module type Strength_intf = sig
   val increase : t -> by:difficulty -> t
 end
 
+module type Length_intf = sig
+  type t [@@deriving compare, bin_io]
+
+  val zero : t
+
+  val succ : t -> t
+end
+
 module type Pow_intf = sig
   type t
 end
@@ -429,6 +437,8 @@ module type State_intf = sig
 
   type strength
 
+  type length
+
   type time
 
   type public_key
@@ -439,6 +449,7 @@ module type State_intf = sig
     ; ledger_builder_hash: ledger_builder_hash
     ; ledger_hash: ledger_hash
     ; strength: strength
+    ; length: length
     ; timestamp: time
     ; signer_public_key: public_key }
   [@@deriving sexp, bin_io, fields]
@@ -600,6 +611,8 @@ module type Inputs_intf = sig
 
   module Strength : Strength_intf with type difficulty := Difficulty.t
 
+  module Length : Length_intf
+
   module State_hash : State_hash_intf
 
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
@@ -705,6 +718,7 @@ Merge Snark:
              and type nonce := Block_nonce.t
              and type ledger_builder_hash := Ledger_builder_hash.t
              and type pow := Pow.t
+             and type length := Length.t
              and type public_key := Public_key.t
 
     module Proof : sig

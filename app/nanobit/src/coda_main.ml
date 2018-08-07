@@ -87,6 +87,12 @@ struct
   module Pow = Proof_of_work
   module Difficulty = Difficulty
 
+  module Length = struct
+    include Coda_numbers.Length
+
+    include (Stable.V1 : module type of Stable.V1 with type t := t)
+  end
+
   module Amount = struct
     module Signed = struct
       include Currency.Amount.Signed
