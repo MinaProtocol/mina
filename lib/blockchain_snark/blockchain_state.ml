@@ -1,5 +1,6 @@
 open Core_kernel
 open Nanobit_base
+open Coda_numbers
 open Util
 open Snark_params
 open Tick
@@ -22,8 +23,8 @@ let bit_length =
   Fields_of_t_.fold zero ~init:0 ~next_difficulty:(add Target.bit_length)
     ~previous_state_hash:(add State_hash.length_in_bits)
     ~ledger_hash:(add Ledger_hash.length_in_bits)
-    ~strength:(add Strength.bit_length) ~timestamp:(fun acc _ _ ->
-      acc + Block_time.bit_length )
+    ~strength:(add Strength.bit_length) ~length:(add Length.length_in_bits)
+    ~timestamp:(fun acc _ _ -> acc + Block_time.bit_length )
 
 module type Update_intf = sig
   val update : t -> Block.t -> t Or_error.t
@@ -202,6 +203,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
          let%bind new_difficulty =
            compute_target previous_state.timestamp difficulty time
          in
+         let%bind new_length = Length.increment_var previous_state.length in
          let%bind new_strength =
            Strength.increase_checked
              (Strength.pack_var previous_state.strength)
@@ -219,6 +221,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            ; ledger_builder_hash=
                block.state_transition_data.ledger_builder_hash
            ; strength= new_strength
+           ; length= new_length
            ; timestamp= time
            ; signer_public_key= global_signer_public_key }
          in

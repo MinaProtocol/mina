@@ -38,8 +38,7 @@ end
 
 module type F = functor (N :sig
                               
-                              type t
-                              [@@deriving bin_io, sexp, eq, compare, hash]
+                              type t [@@deriving bin_io, sexp, compare, hash]
 
                               include Unsigned_extended.S with type t := t
 
@@ -53,7 +52,7 @@ end) -> functor (Bits :
                                       and module Bits := Bits
 
 module Make (N : sig
-  type t [@@deriving bin_io, sexp, eq, compare, hash]
+  type t [@@deriving bin_io, sexp, compare, hash]
 
   include Unsigned_extended.S with type t := t
 

@@ -1,8 +1,9 @@
 open Core_kernel
 open Snark_params
+open Coda_numbers
 module Pedersen = Tick.Pedersen
 
-module Nonce = Nonce.Make64 ()
+module Nonce = Nat.Make64 ()
 
 module State_transition_data = struct
   module T = struct
@@ -187,40 +188,3 @@ let data_spec = Tick.Data_spec.[Auxillary_data.typ; State_transition_data.typ]
 let typ : (var, t) Tick.Typ.t =
   Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-(*
-module With_transactions = struct
-  module Body = struct
-    module Stable = struct
-      module V1 = struct
-        type t =
-          { target_hash: Ledger_hash.Stable.V1.t
-          ; ledger_builder_hash: Ledger_builder_hash.Stable.V1.t
-          ; proof: Proof.Stable.V1.t option
-          ; transactions: Transaction.Stable.V1.t list }
-        [@@deriving bin_io, sexp]
-      end
-    end
-
-    include Stable.V1
-
-    let forget ({target_hash; ledger_builder_hash; proof; _}: t) : Body.t =
-      {target_hash; ledger_builder_hash; proof}
-  end
-
-  module Stable = struct
-    module V1 = struct
-      type t = (Header.Stable.V1.t, Body.Stable.V1.t) Stable.V1.t_
-      [@@deriving bin_io, sexp]
-    end
-  end
-
-  type block = t
-
-  include Stable.V1
-
-  let forget (t: t) : block = {t with body= Body.forget t.body}
-
-  let hash t = hash (forget t)
-end
-*)
