@@ -1,6 +1,5 @@
 open Core
 open Async
-open Linear_pipe
 
 module type Worker_intf = sig
   type t

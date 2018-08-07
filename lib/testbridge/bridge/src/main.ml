@@ -54,7 +54,7 @@ let get_pods image_host container_count containers_per_machine
       let new_containers = List.take available_slots container_count in
       let rand_char () = Char.of_int_exn (Char.to_int 'a' + Random.int 26) in
       let rand_name () = String.init 10 ~f:(fun _ -> rand_char ()) in
-      Deferred.all_ignore
+      Deferred.all_unit
         (List.map new_containers ~f:(fun node ->
              Kubernetes.run_pod
                ~pod_name:("testbridge-" ^ rand_name ())

@@ -11,6 +11,5 @@ let try_finally ~(f: unit -> unit Deferred.t) ~finally =
   try_with f >>= (fun () -> ok_unit) |> ok_exn |> Deferred.bind ~f:finally
 
 let with_temp_dirs ~f dirs =
-  let open Let_syntax in
   let%bind () = Deferred.List.iter ~f:create_dir dirs in
   try_finally ~f ~finally:(fun () -> remove_dirs dirs)

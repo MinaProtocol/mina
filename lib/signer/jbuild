@@ -3,7 +3,7 @@
 (library
  ((name signer)
   (public_name signer)
-  (flags (:standard -short-paths))
+  (flags (:standard -short-paths -warn-error -6))
   (library_flags (-linkall))
   (inline_tests)
   (libraries
