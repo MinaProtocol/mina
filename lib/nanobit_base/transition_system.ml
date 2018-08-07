@@ -87,7 +87,7 @@ struct
     let wrap_vk_typ = Typ.list ~length:wrap_vk_length Boolean.typ
 
     module Verifier =
-      Snarky.Gm_verifier_gadget.Mnt4(Tick)
+      Snarky.Gm_verifier_gadget.Mnt4 (Tick)
         (struct
           let input_size = Tock.Data_spec.size (wrap_input ())
         end)
@@ -97,17 +97,17 @@ struct
     let hash_vk_data data =
       let%bind bs = Verifier.Verification_key_data.Checked.to_bits data in
       Pedersen_hash.Section.extend
-        (Pedersen_hash.Section.create ~acc:(`Value Hash_prefix.transition_system_snark.acc)
-           ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_bits)))
-        ~start:Hash_prefix.length_in_bits
-        bs
+        (Pedersen_hash.Section.create
+           ~acc:(`Value Hash_prefix.transition_system_snark.acc)
+           ~support:
+             (Interval_union.of_interval (0, Hash_prefix.length_in_bits)))
+        ~start:Hash_prefix.length_in_bits bs
 
     let compute_top_hash wrap_vk_section state_hash_bits =
       Pedersen_hash.Section.extend wrap_vk_section
         ~start:(Hash_prefix.length_in_bits + wrap_vk_bit_length)
         state_hash_bits
-      >>| Pedersen_hash.Section.to_initial_segment_digest
-      >>| Or_error.ok_exn
+      >>| Pedersen_hash.Section.to_initial_segment_digest >>| Or_error.ok_exn
       >>| fst
 
     let prev_state_valid wrap_vk_section wrap_vk_data prev_state_hash =
@@ -119,18 +119,22 @@ struct
          in
          let%bind prev_top_hash =
            compute_top_hash wrap_vk_section prev_state_hash_bits
-            >>= Digest.Tick.choose_preimage_var
-            >>| Digest.Tick.Unpacked.var_to_bits
+           >>= Digest.Tick.choose_preimage_var
+           >>| Digest.Tick.Unpacked.var_to_bits
          in
          let%bind other_wrap_vk_data, result =
-          Verifier.All_in_one.choose_verification_key_data_and_proof_and_check_result
-            prev_top_hash
-              As_prover.(
-                map get_state ~f:(fun {Prover_state.prev_proof; wrap_vk} ->
-                    { Verifier.All_in_one.verification_key= wrap_vk
-                    ; proof= prev_proof } ))
+           Verifier.All_in_one.
+           choose_verification_key_data_and_proof_and_check_result
+             prev_top_hash
+             As_prover.(
+               map get_state ~f:(fun {Prover_state.prev_proof; wrap_vk} ->
+                   { Verifier.All_in_one.verification_key= wrap_vk
+                   ; proof= prev_proof } ))
          in
-         let%map () = Verifier.Verification_key_data.Checked.Assert.equal wrap_vk_data other_wrap_vk_data in
+         let%map () =
+           Verifier.Verification_key_data.Checked.Assert.equal wrap_vk_data
+             other_wrap_vk_data
+         in
          result)
 
     let provide_witness' typ ~f =
@@ -147,8 +151,9 @@ struct
              (State.Checked.update (prev_state_hash, prev_state) update)
          in
          let%bind wrap_vk_data =
-           provide_witness' Verifier.Verification_key_data.typ ~f:(fun { Prover_state.wrap_vk; _ } ->
-             Verifier.Verification_key_data.of_verification_key wrap_vk)
+           provide_witness' Verifier.Verification_key_data.typ ~f:
+             (fun {Prover_state.wrap_vk; _} ->
+               Verifier.Verification_key_data.of_verification_key wrap_vk )
          in
          let%bind wrap_vk_section = hash_vk_data wrap_vk_data in
          let%bind () =
@@ -195,10 +200,10 @@ struct
     end
 
     let step_vk_data =
-      Verifier.Verification_key_data.of_verification_key Step_vk.verification_key
+      Verifier.Verification_key_data.of_verification_key
+        Step_vk.verification_key
 
-    let step_vk_bits =
-      Verifier.Verification_key_data.to_bits step_vk_data
+    let step_vk_bits = Verifier.Verification_key_data.to_bits step_vk_data
 
     (* TODO: Use an online verifier here *)
     let main (input: Digest.Tock.Packed.var) =
@@ -210,7 +215,8 @@ struct
            let%bind input =
              Digest.Tock.(choose_preimage_var input >>| Unpacked.var_to_bits)
            in
-           Verifier.All_in_one.choose_verification_key_data_and_proof_and_check_result input
+           Verifier.All_in_one.
+           choose_verification_key_data_and_proof_and_check_result input
              As_prover.(
                map get_state ~f:(fun {Prover_state.proof} ->
                    { Verifier.All_in_one.verification_key=
@@ -221,8 +227,7 @@ struct
            let open Verifier.Verification_key_data.Checked in
            Assert.equal vk_data (constant step_vk_data)
          in
-         with_label __LOC__
-           (Boolean.Assert.is_true result))
+         with_label __LOC__ (Boolean.Assert.is_true result))
   end
 
   module Wrap (Step_vk : Step_vk_intf) (Tock_keypair : Tock_keypair_intf) =

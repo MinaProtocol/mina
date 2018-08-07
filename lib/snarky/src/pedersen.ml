@@ -68,7 +68,7 @@ module Make
     val to_initial_segment_digest :
       t -> (Digest.var * [`Length of int]) Or_error.t
 
-    val to_initial_segment_digest_exn : t -> (Digest.var * [`Length of int])
+    val to_initial_segment_digest_exn : t -> Digest.var * [`Length of int]
   end
 
   val hash :
@@ -195,6 +195,7 @@ end = struct
       in
       (digest (acc t), `Length b)
 
-    let to_initial_segment_digest_exn t = Or_error.ok_exn (to_initial_segment_digest t)
+    let to_initial_segment_digest_exn t =
+      Or_error.ok_exn (to_initial_segment_digest t)
   end
 end

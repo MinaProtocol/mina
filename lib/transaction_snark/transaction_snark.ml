@@ -414,8 +414,7 @@ module Base = struct
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
-      ~create_env:(fun x ->
-        Keypair.generate (Lazy.force x) )
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module Merge = struct
@@ -448,7 +447,8 @@ module Merge = struct
   let disjoint_union_sections = function
     | [] -> failwith "empty list"
     | s :: ss ->
-      Checked.List.fold ~f:Pedersen_hash.Section.disjoint_union_exn ~init:s ss
+        Checked.List.fold ~f:Pedersen_hash.Section.disjoint_union_exn ~init:s
+          ss
 
   let state_hash_size_in_bits = Field.size_in_bits
 
@@ -460,22 +460,27 @@ module Merge = struct
 
   let check_snark ~get_proof tock_vk_data input =
     let%bind vk_data, result =
-      Verifier.All_in_one.choose_verification_key_data_and_proof_and_check_result input
+      Verifier.All_in_one.
+      choose_verification_key_data_and_proof_and_check_result input
         As_prover.(
           map get_state ~f:(fun s ->
               { Verifier.All_in_one.verification_key= s.Prover_state.tock_vk
               ; proof= get_proof s } ))
     in
-    let%map () = Verifier.Verification_key_data.Checked.Assert.equal vk_data tock_vk_data in
+    let%map () =
+      Verifier.Verification_key_data.Checked.Assert.equal vk_data tock_vk_data
+    in
     result
 
-  let input_bits_length_excluding_vk = 2 * Tock.Field.size_in_bits + Amount.Signed.length
+  let input_bits_length_excluding_vk =
+    (2 * Tock.Field.size_in_bits) + Amount.Signed.length
 
   (* spec for [verify_transition tock_vk proof_field s1 s2]:
      returns a bool which is true iff
      there is a snark proving making tock_vk
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
-  let verify_transition tock_vk_data tock_vk_section proof_field s1 s2 fee_excess =
+  let verify_transition tock_vk_data tock_vk_section proof_field s1 s2
+      fee_excess =
     let open Let_syntax in
     let get_proof s =
       let _t, proof = proof_field s in
@@ -505,27 +510,24 @@ module Merge = struct
         Pedersen_hash.Section.create ~acc:(`Var acc)
           ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_bits))
       in
-      let%bind sec =
-        disjoint_union_sections
-          [ prefix
-          ; s1
-          ; s2
-          ]
-      in
-      Pedersen_hash.Section.extend sec (Amount.Signed.Checked.to_bits fee_excess)
-        ~start:(Hash_prefix.length_in_bits + 2 * state_hash_size_in_bits)
+      let%bind sec = disjoint_union_sections [prefix; s1; s2] in
+      Pedersen_hash.Section.extend sec
+        (Amount.Signed.Checked.to_bits fee_excess)
+        ~start:(Hash_prefix.length_in_bits + (2 * state_hash_size_in_bits))
     in
     let%bind states_and_excess_and_vk_hash =
       with_label __LOC__
-        (Pedersen_hash.Section.disjoint_union_exn tock_vk_section states_and_excess_hash)
-      >>| Pedersen_hash.Section.to_initial_segment_digest_exn
-      >>| fst
+        (Pedersen_hash.Section.disjoint_union_exn tock_vk_section
+           states_and_excess_hash)
+      >>| Pedersen_hash.Section.to_initial_segment_digest_exn >>| fst
     in
     let%bind input =
       with_label __LOC__
         ( Field.Checked.if_ is_base
-            ~then_:(states_and_excess_hash |> Pedersen_hash.Section.to_initial_segment_digest_exn |> fst)
-            ~else_:(states_and_excess_and_vk_hash)
+            ~then_:
+              ( states_and_excess_hash
+              |> Pedersen_hash.Section.to_initial_segment_digest_exn |> fst )
+            ~else_:states_and_excess_and_vk_hash
         >>= Pedersen.Digest.choose_preimage_var
         >>| Pedersen.Digest.Unpacked.var_to_bits )
     in
@@ -540,7 +542,8 @@ module Merge = struct
   *)
   let main (top_hash: Pedersen.Digest.Packed.var) =
     let%bind tock_vk_data =
-      provide_witness' Verifier.Verification_key_data.typ ~f:(fun {Prover_state.tock_vk} ->
+      provide_witness' Verifier.Verification_key_data.typ ~f:
+        (fun {Prover_state.tock_vk} ->
           Verifier.Verification_key_data.of_verification_key tock_vk )
     and s1 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash1
     and s2 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash2
@@ -551,17 +554,18 @@ module Merge = struct
       provide_witness' Amount.Signed.typ ~f:Prover_state.fee_excess23
     in
     let%bind s1_section =
-      let open Pedersen_hash.Section in
-      extend empty ~start:Hash_prefix.length_in_bits
-        s1
+      Pedersen_hash.Section.(extend empty ~start:Hash_prefix.length_in_bits s1)
     in
     let%bind s3_section =
       let open Pedersen_hash.Section in
-      extend empty ~start:(Hash_prefix.length_in_bits + state_hash_size_in_bits)
+      extend empty
+        ~start:(Hash_prefix.length_in_bits + state_hash_size_in_bits)
         s3
     in
     let%bind tock_vk_section =
-      let%bind bs = Verifier.Verification_key_data.Checked.to_bits tock_vk_data in
+      let%bind bs =
+        Verifier.Verification_key_data.Checked.to_bits tock_vk_data
+      in
       Pedersen_hash.Section.extend Pedersen_hash.Section.empty
         ~start:(Hash_prefix.length_in_bits + input_bits_length_excluding_vk)
         bs
@@ -572,35 +576,39 @@ module Merge = struct
       in
       let%bind sec =
         let%bind fee_section =
-          Pedersen_hash.Section.(
-            extend empty ~start:(Hash_prefix.length_in_bits + 2 * state_hash_size_in_bits)
-              (Amount.Signed.Checked.to_bits total_fees))
+          let open Pedersen_hash.Section in
+          extend empty
+            ~start:(Hash_prefix.length_in_bits + (2 * state_hash_size_in_bits))
+            (Amount.Signed.Checked.to_bits total_fees)
         in
         disjoint_union_sections
-          [ Pedersen_hash.Section.create ~acc:(`Value Hash_prefix.merge_snark.acc)
-              ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_bits))
+          [ Pedersen_hash.Section.create
+              ~acc:(`Value Hash_prefix.merge_snark.acc)
+              ~support:
+                (Interval_union.of_interval (0, Hash_prefix.length_in_bits))
           ; s1_section
           ; s3_section
           ; fee_section
-          ; tock_vk_section
-          ]
+          ; tock_vk_section ]
       in
       Field.Checked.Assert.equal top_hash
         (fst (Pedersen_hash.Section.to_initial_segment_digest_exn sec))
     and verify_12 =
       let%bind s2_section =
-        Pedersen_hash.Section.(
-          extend empty ~start:(Hash_prefix.length_in_bits + state_hash_size_in_bits) s2)
+        let open Pedersen_hash.Section in
+        extend empty
+          ~start:(Hash_prefix.length_in_bits + state_hash_size_in_bits)
+          s2
       in
-      verify_transition tock_vk_data tock_vk_section
-        Prover_state.proof12 s1_section s2_section fee_excess12
+      verify_transition tock_vk_data tock_vk_section Prover_state.proof12
+        s1_section s2_section fee_excess12
     and verify_23 =
       let%bind s2_section =
-        Pedersen_hash.Section.(
-          extend empty ~start:Hash_prefix.length_in_bits s2)
+        let open Pedersen_hash.Section in
+        extend empty ~start:Hash_prefix.length_in_bits s2
       in
-      verify_transition tock_vk_data tock_vk_section
-        Prover_state.proof23 s2_section s3_section fee_excess23
+      verify_transition tock_vk_data tock_vk_section Prover_state.proof23
+        s2_section s3_section fee_excess23
     in
     Boolean.Assert.all [verify_12; verify_23]
 
@@ -621,8 +629,7 @@ module Merge = struct
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
       ~input:(lazy (constraint_system ~exposing:(input ()) main))
-      ~create_env:(fun x ->
-        Keypair.generate (Lazy.force x) )
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module Verification = struct
@@ -645,8 +652,7 @@ module Verification = struct
     open K
 
     let wrap_vk_data =
-      Merge.Verifier.Verification_key_data.of_verification_key
-        keys.wrap
+      Merge.Verifier.Verification_key_data.of_verification_key keys.wrap
 
     let wrap_vk_bits =
       Merge.Verifier.Verification_key_data.to_bits wrap_vk_data
@@ -737,13 +743,15 @@ module Verification = struct
       in
       let%map result =
         let%bind vk_data, result =
-          Merge.Verifier.All_in_one.choose_verification_key_data_and_proof_and_check_result
-            top_hash
-          (As_prover.map get_proof ~f:(fun proof ->
-              {Merge.Verifier.All_in_one.proof; verification_key= keys.wrap} ))
+          Merge.Verifier.All_in_one.
+          choose_verification_key_data_and_proof_and_check_result top_hash
+            (As_prover.map get_proof ~f:(fun proof ->
+                 {Merge.Verifier.All_in_one.proof; verification_key= keys.wrap}
+             ))
         in
         let%map () =
-          Merge.Verifier.Verification_key_data.Checked.(Assert.equal vk_data (constant wrap_vk_data))
+          let open Merge.Verifier.Verification_key_data.Checked in
+          Assert.equal vk_data (constant wrap_vk_data)
         in
         result
       in
@@ -791,25 +799,19 @@ struct
   let merge_vk_data =
     Verifier.Verification_key_data.of_verification_key Vk.merge
 
-  let base_vk_data =
-    Verifier.Verification_key_data.of_verification_key Vk.base
+  let base_vk_data = Verifier.Verification_key_data.of_verification_key Vk.base
 
   let if_vk (choice: Boolean.var) ~then_:t1 ~else_:t2 =
     let if_value x y =
       let choice = (choice :> Field.Checked.t) in
-      Field.Checked.(Infix.(x * choice + y * (constant Field.one - choice)))
+      let open Field.Checked in
+      Infix.((x * choice) + (y * (constant Field.one - choice)))
     in
     let if_list xs ys = List.map2_exn ~f:if_value xs ys in
     let open Verifier.Verification_key_data in
-    { characterizing_up_to_sign =
-        if_list
-          t1.characterizing_up_to_sign
-          t2.characterizing_up_to_sign
-    ; sign =
-        if_list
-          t1.sign
-          t2.sign
-    }
+    { characterizing_up_to_sign=
+        if_list t1.characterizing_up_to_sign t2.characterizing_up_to_sign
+    ; sign= if_list t1.sign t2.sign }
 
   module Prover_state = struct
     type t = {proof_type: Proof_type.t; proof: Tick_curve.Proof.t}
@@ -839,7 +841,8 @@ struct
     let%bind vk_data, result =
       (* someday: Probably an opportunity for optimization here since
           we are passing in one of two known verification keys. *)
-      Verifier.All_in_one.choose_verification_key_data_and_proof_and_check_result input
+      Verifier.All_in_one.
+      choose_verification_key_data_and_proof_and_check_result input
         As_prover.(
           map get_state ~f:(fun {Prover_state.proof_type; proof} ->
               let verification_key =
@@ -847,7 +850,10 @@ struct
               in
               {Verifier.All_in_one.verification_key; proof} ))
     in
-    let%bind () = Verifier.Verification_key_data.Checked.Assert.equal verification_key vk_data in
+    let%bind () =
+      Verifier.Verification_key_data.Checked.Assert.equal verification_key
+        vk_data
+    in
     Boolean.Assert.is_true result
 
   let create_keys () = generate_keypair ~exposing:(wrap_input ()) main
@@ -934,10 +940,9 @@ struct
   end)
 
   let wrap proof_type proof input =
-    let prover_state = { Wrap.Prover_state.proof; proof_type } in
-    Tock.prove keys.proving.wrap (wrap_input ())
-      prover_state
-      Wrap.main (embed input)
+    let prover_state = {Wrap.Prover_state.proof; proof_type} in
+    Tock.prove keys.proving.wrap (wrap_input ()) prover_state Wrap.main
+      (embed input)
 
   let merge_proof ledger_hash1 ledger_hash2 ledger_hash3 proof12 proof23
       fee_excess12 fee_excess23 =
@@ -959,9 +964,8 @@ struct
       ; tock_vk= keys.verification.wrap }
     in
     ( top_hash
-    , Tick.prove keys.proving.merge (tick_input ())
-        prover_state
-        Merge.main top_hash )
+    , Tick.prove keys.proving.merge (tick_input ()) prover_state Merge.main
+        top_hash )
 
   let of_tagged_transaction source target transaction handler =
     let top_hash, proof =

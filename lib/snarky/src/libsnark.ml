@@ -263,20 +263,15 @@ struct
           Caml.Gc.finalise delete t ; t
 
       let coeff =
-        let stub =
-          foreign (func_name "coeff") (typ @-> returning Field.typ)
-        in
+        let stub = foreign (func_name "coeff") (typ @-> returning Field.typ) in
         fun t ->
           let x = stub t in
           Caml.Gc.finalise Field.delete x ;
           x
 
       let var =
-        let stub =
-          foreign (func_name "index") (typ @-> returning int)
-        in
-        fun t ->
-          Var.create (stub t)
+        let stub = foreign (func_name "index") (typ @-> returning int) in
+        fun t -> Var.create (stub t)
 
       module Vector = Vector.Make (struct
         type elt = t
@@ -331,12 +326,11 @@ struct
 
     let terms =
       let stub =
-        foreign (func_name "terms")
-          (typ @-> returning Term.Vector.typ)
+        foreign (func_name "terms") (typ @-> returning Term.Vector.typ)
       in
       fun t ->
         let v = stub t in
-        Caml.Gc.finalise Term.Vector.delete v;
+        Caml.Gc.finalise Term.Vector.delete v ;
         v
 
     let of_field : Field.t -> t =
@@ -556,8 +550,7 @@ struct
         in
         fun i ->
           let t = stub i in
-          Caml.Gc.finalise delete t;
-          t
+          Caml.Gc.finalise delete t ; t
 
       let index =
         foreign
@@ -790,23 +783,24 @@ struct
     stub ()
 end
 
-module Make_proof_system
-    (M : sig
-       val prefix : string
+module Make_proof_system (M : sig
+  val prefix : string
 
-       module R1CS_constraint_system : sig
-         type t
-         val typ : t Ctypes.typ
-       end
+  module R1CS_constraint_system : sig
+    type t
 
-       module Field : sig
-         module Vector : sig
-           type t
-           val typ : t Ctypes.typ
-         end
-       end
-     end)
-= struct
+    val typ : t Ctypes.typ
+  end
+
+  module Field : sig
+    module Vector : sig
+      type t
+
+      val typ : t Ctypes.typ
+    end
+  end
+end) =
+struct
   module Proving_key : sig
     type t
 
@@ -1006,12 +1000,12 @@ module Make_proof_system
 
     let create =
       let stub =
-        foreign (func_name "create") (M.R1CS_constraint_system.typ @-> returning typ)
+        foreign (func_name "create")
+          (M.R1CS_constraint_system.typ @-> returning typ)
       in
       fun sys ->
         let t = stub sys in
-        Caml.Gc.finalise delete t;
-        t
+        Caml.Gc.finalise delete t ; t
   end
 
   module Proof : sig
@@ -1020,7 +1014,10 @@ module Make_proof_system
     val typ : t Ctypes.typ
 
     val create :
-      Proving_key.t -> primary:M.Field.Vector.t -> auxiliary:M.Field.Vector.t -> t
+         Proving_key.t
+      -> primary:M.Field.Vector.t
+      -> auxiliary:M.Field.Vector.t
+      -> t
 
     val verify : t -> Verification_key.t -> M.Field.Vector.t -> bool
 
@@ -1074,250 +1071,380 @@ module Make_proof_system
   end
 end
 
-module Make_full(M : sig val prefix : string end) = struct
-  module Common = Make_common (struct let prefix = M.prefix end)
+module Make_full (M : sig
+  val prefix : string
+end) =
+struct
+  module Common = Make_common (struct
+    let prefix = M.prefix
+  end)
 
   module type Common_intf = module type of Common
 
   module Default = struct
     include Common
-    include Make_proof_system(Common)
+    include Make_proof_system (Common)
   end
 
   module GM = struct
     include Common
-    include Make_proof_system(struct
-        include Common
-        let prefix = with_prefix M.prefix "gm"
-      end)
+
+    include Make_proof_system (struct
+      include Common
+
+      let prefix = with_prefix M.prefix "gm"
+    end)
   end
 
   include Common
 end
 
-module Bn128 = Make_full(struct let prefix = "camlsnark_bn128" end)
-module Mnt4 = Make_full(struct let prefix = "camlsnark_mnt4" end)
-module Mnt6 = Make_full(struct let prefix = "camlsnark_mnt6" end)
+module Bn128 = Make_full (struct
+  let prefix = "camlsnark_bn128"
+end)
+
+module Mnt4 = Make_full (struct
+  let prefix = "camlsnark_mnt4"
+end)
+
+module Mnt6 = Make_full (struct
+  let prefix = "camlsnark_mnt6"
+end)
 
 module type S = sig
   val prefix : string
 
   val init : unit -> unit
 
-  module Field :
-    sig
+  module Field : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val add : t -> t -> t
+
+    val sub : t -> t -> t
+
+    val mul : t -> t -> t
+
+    val inv : t -> t
+
+    val is_square : t -> bool
+
+    val sqrt : t -> t
+
+    val square : t -> t
+
+    val of_int : int -> t
+
+    val one : t
+
+    val zero : t
+
+    val equal : t -> t -> bool
+
+    val size_in_bits : int
+
+    val random : unit -> t
+
+    val delete : t -> unit
+
+    val print : t -> unit
+
+    module Vector : sig
+      type elt = t
+
       type t
+
       val typ : t Ctypes.typ
-      val add : t -> t -> t
-      val sub : t -> t -> t
-      val mul : t -> t -> t
-      val inv : t -> t
-      val is_square : t -> bool
-      val sqrt : t -> t
-      val square : t -> t
-      val of_int : int -> t
-      val one : t
-      val zero : t
-      val equal : t -> t -> bool
-      val size_in_bits : int
-      val random : unit -> t
+
       val delete : t -> unit
-      val print : t -> unit
-      module Vector :
-        sig
-          type elt = t
-          type t
-          val typ : t Ctypes.typ
-          val delete : t -> unit
-          val create : unit -> t
-          val get : t -> int -> elt
-          val emplace_back : t -> elt -> unit
-          val length : t -> int
-        end
+
+      val create : unit -> t
+
+      val get : t -> int -> elt
+
+      val emplace_back : t -> elt -> unit
+
+      val length : t -> int
     end
-  module Var :
-    sig
+  end
+
+  module Var : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val index : t -> int
+
+    val create : int -> t
+  end
+
+  module Linear_combination : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val create : unit -> t
+
+    val of_var : Var.t -> t
+
+    val of_int : int -> t
+
+    val of_field : Field.t -> t
+
+    val print : t -> unit
+
+    module Term : sig
       type t
+
+      val create : Field.t -> Var.t -> t
+
+      val coeff : t -> Field.t
+
+      val var : t -> Var.t
+
+      module Vector : sig
+        type elt = t
+
+        type t
+
+        val typ : t Ctypes.typ
+
+        val delete : t -> unit
+
+        val create : unit -> t
+
+        val get : t -> int -> elt
+
+        val emplace_back : t -> elt -> unit
+
+        val length : t -> int
+      end
+    end
+
+    val terms : t -> Term.Vector.t
+
+    module Vector : sig
+      type elt = t
+
+      type t
+
       val typ : t Ctypes.typ
+
+      val delete : t -> unit
+
+      val create : unit -> t
+
+      val get : t -> int -> elt
+
+      val emplace_back : t -> elt -> unit
+
+      val length : t -> int
+    end
+
+    val add_term : t -> Field.t -> Var.t -> unit
+  end
+
+  module R1CS_constraint : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val create :
+      Linear_combination.t -> Linear_combination.t -> Linear_combination.t -> t
+  end
+
+  module R1CS_constraint_system : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val create : unit -> t
+
+    val delete : t -> unit
+
+    val report_statistics : t -> unit
+
+    val add_constraint : t -> R1CS_constraint.t -> unit
+
+    val add_constraint_with_annotation :
+      t -> R1CS_constraint.t -> string -> unit
+
+    val set_primary_input_size : t -> int -> unit
+
+    val set_auxiliary_input_size : t -> int -> unit
+
+    val get_primary_input_size : t -> int
+
+    val get_auxiliary_input_size : t -> int
+
+    val check_exn : t -> unit
+
+    val is_satisfied :
+         t
+      -> primary_input:Field.Vector.t
+      -> auxiliary_input:Field.Vector.t
+      -> bool
+
+    val digest : t -> Core.Md5.t
+  end
+
+  module Protoboard : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val create : unit -> t
+
+    val auxiliary_input : t -> Field.Vector.t
+
+    val num_variables : t -> int
+
+    val set_input_sizes : t -> int -> unit
+
+    val renumber_and_append_constraints :
+         t
+      -> R1CS_constraint_system.t
+      -> Linear_combination.Vector.t
+      -> int
+      -> unit
+
+    module Variable : sig
+      type t
+
+      val typ : t Ctypes.typ
+
+      val delete : t -> unit
+
       val index : t -> int
-      val create : int -> t
-    end
-  module Linear_combination :
-    sig
-      type t
-      val typ : t Ctypes.typ
-      val create : unit -> t
-      val of_var : Var.t -> t
+
       val of_int : int -> t
-      val of_field : Field.t -> t
-      val print : t -> unit
-      module Term :
-        sig
-          type t
-          val create : Field.t -> Var.t -> t
-          val coeff : t -> Field.t
-          val var : t -> Var.t
-          module Vector :
-            sig
-              type elt = t
-              type t
-              val typ : t Ctypes.typ
-              val delete : t -> unit
-              val create : unit -> t
-              val get : t -> int -> elt
-              val emplace_back : t -> elt -> unit
-              val length : t -> int
-            end
-        end
-
-      val terms : t -> Term.Vector.t
-
-      module Vector :
-        sig
-          type elt = t
-          type t
-          val typ : t Ctypes.typ
-          val delete : t -> unit
-          val create : unit -> t
-          val get : t -> int -> elt
-          val emplace_back : t -> elt -> unit
-          val length : t -> int
-        end
-      val add_term : t -> Field.t -> Var.t -> unit
     end
-  module R1CS_constraint :
-    sig
+
+    module Variable_array : sig
       type t
+
       val typ : t Ctypes.typ
-      val create :
-        Linear_combination.t ->
-        Linear_combination.t -> Linear_combination.t -> t
-    end
-  module R1CS_constraint_system :
-    sig
-      type t
-      val typ : t Ctypes.typ
+
+      val emplace_back : t -> Variable.t -> unit
+
       val create : unit -> t
+
       val delete : t -> unit
-      val report_statistics : t -> unit
-      val add_constraint : t -> R1CS_constraint.t -> unit
-      val add_constraint_with_annotation :
-        t -> R1CS_constraint.t -> string -> unit
-      val set_primary_input_size : t -> int -> unit
-      val set_auxiliary_input_size : t -> int -> unit
-      val get_primary_input_size : t -> int
-      val get_auxiliary_input_size : t -> int
-      val check_exn : t -> unit
-      val is_satisfied :
-        t ->
-        primary_input:Field.Vector.t ->
-        auxiliary_input:Field.Vector.t -> bool
-      val digest : t -> Core.Md5.t
     end
-  module Protoboard :
-    sig
+
+    val set_variable : t -> Variable.t -> Field.t -> unit
+
+    val get_variable : t -> Variable.t -> Field.t
+
+    val allocate_variable : t -> Variable.t
+
+    val allocate_variable_array : t -> int -> Variable_array.t
+
+    val augment_variable_annotation : t -> Variable.t -> string -> unit
+  end
+
+  module Bigint : sig
+    module R : sig
       type t
+
       val typ : t Ctypes.typ
-      val create : unit -> t
-      val auxiliary_input : t -> Field.Vector.t
-      val num_variables : t -> int
-      val set_input_sizes : t -> int -> unit
-      val renumber_and_append_constraints :
-        t ->
-        R1CS_constraint_system.t ->
-        Linear_combination.Vector.t -> int -> unit
-      module Variable :
-        sig
-          type t
-          val typ : t Ctypes.typ
-          val delete : t -> unit
-          val index : t -> int
-          val of_int : int -> t
-        end
-      module Variable_array :
-        sig
-          type t
-          val typ : t Ctypes.typ
-          val emplace_back : t -> Variable.t -> unit
-          val create : unit -> t
-          val delete : t -> unit
-        end
-      val set_variable : t -> Variable.t -> Field.t -> unit
-      val get_variable : t -> Variable.t -> Field.t
-      val allocate_variable : t -> Variable.t
-      val allocate_variable_array : t -> int -> Variable_array.t
-      val augment_variable_annotation : t -> Variable.t -> string -> unit
+
+      val of_decimal_string : string -> t
+
+      val of_numeral : string -> base:int -> t
+
+      val of_field : Field.t -> t
+
+      val div : t -> t -> t
+
+      val to_field : t -> Field.t
+
+      val compare : t -> t -> int
+
+      val test_bit : t -> int -> bool
+
+      val find_wnaf : Unsigned.Size_t.t -> t -> Long_vector.t
     end
-  module Bigint :
-    sig
-      module R :
-        sig
-          type t
-          val typ : t Ctypes.typ
-          val of_decimal_string : string -> t
-          val of_numeral : string -> base:int -> t
-          val of_field : Field.t -> t
-          val div : t -> t -> t
-          val to_field : t -> Field.t
-          val compare : t -> t -> int
-          val test_bit : t -> int -> bool
-          val find_wnaf : Unsigned.Size_t.t -> t -> Long_vector.t
-        end
-      module Q :
-        sig
-          type t
-          val typ : t Ctypes.typ
-          val test_bit : t -> int -> bool
-          val find_wnaf : Unsigned.Size_t.t -> t -> Long_vector.t
-        end
+
+    module Q : sig
+      type t
+
+      val typ : t Ctypes.typ
+
+      val test_bit : t -> int -> bool
+
+      val find_wnaf : Unsigned.Size_t.t -> t -> Long_vector.t
     end
+  end
 
   val field_size : Bigint.R.t
 
-  module Proving_key :
-    sig
-      type t
-      val typ : t Ctypes.typ
-      val delete : t -> unit
-      val to_string : t -> string
-      val of_string : string -> t
-      val to_bigstring : t -> Core.Bigstring.t
-      val of_bigstring : Core.Bigstring.t -> t
-      val r1cs_constraint_system : t -> R1CS_constraint_system.t
-    end
-  module Verification_key :
-    sig
-      type t
-      val typ : t Ctypes.typ
-      val delete : t -> unit
-      val to_string : t -> string
-      val of_string : string -> t
-      val to_bigstring : t -> Core.Bigstring.t
-      val of_bigstring : Core.Bigstring.t -> t
-      val size_in_bits : t -> int
-    end
-  module Keypair :
-    sig
-      type t
-      val typ : t Ctypes.typ
-      val delete : t -> unit
-      val pk : t -> Proving_key.t
-      val vk : t -> Verification_key.t
-      val create : R1CS_constraint_system.t -> t
-    end
-  module Proof :
-    sig
-      type t
-      val typ : t Ctypes.typ
-      val create :
-        Proving_key.t ->
-        primary:Field.Vector.t ->
-        auxiliary:Field.Vector.t -> t
-      val verify :
-        t -> Verification_key.t -> Field.Vector.t -> bool
-      val to_string : t -> string
-      val of_string : string -> t
-    end
+  module Proving_key : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val delete : t -> unit
+
+    val to_string : t -> string
+
+    val of_string : string -> t
+
+    val to_bigstring : t -> Core.Bigstring.t
+
+    val of_bigstring : Core.Bigstring.t -> t
+
+    val r1cs_constraint_system : t -> R1CS_constraint_system.t
+  end
+
+  module Verification_key : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val delete : t -> unit
+
+    val to_string : t -> string
+
+    val of_string : string -> t
+
+    val to_bigstring : t -> Core.Bigstring.t
+
+    val of_bigstring : Core.Bigstring.t -> t
+
+    val size_in_bits : t -> int
+  end
+
+  module Keypair : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val delete : t -> unit
+
+    val pk : t -> Proving_key.t
+
+    val vk : t -> Verification_key.t
+
+    val create : R1CS_constraint_system.t -> t
+  end
+
+  module Proof : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val create :
+      Proving_key.t -> primary:Field.Vector.t -> auxiliary:Field.Vector.t -> t
+
+    val verify : t -> Verification_key.t -> Field.Vector.t -> bool
+
+    val to_string : t -> string
+
+    val of_string : string -> t
+  end
 end
 
 module Curves = struct

@@ -100,14 +100,17 @@ let create () =
               Tick.Pedersen.State.update_fold
                 Hash_prefix.transition_system_snark
                 (List.fold
-                   (Step.Verifier.Verification_key_data.(to_bits (of_verification_key wrap_vk))))
+                   Step.Verifier.Verification_key_data.(
+                     to_bits (of_verification_key wrap_vk)))
             in
             fun state ->
               Tick.Pedersen.digest_fold s
                 (State_hash.fold (Blockchain_state.hash state))
 
           module Verification_key = struct
-            let to_bool_list = Step.Verifier.Verification_key_data.(Fn.compose to_bits of_verification_key)
+            let to_bool_list =
+              let open Step.Verifier.Verification_key_data in
+              Fn.compose to_bits of_verification_key
           end
 
           let main x =
