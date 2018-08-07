@@ -137,10 +137,6 @@ module Make (T : Transaction_snark.Verification.S) = struct
               module Tick = Digest
               module Tock = Bits.Snarkable.Field (Tock)
             end)
-            (struct
-              let hash bs =
-                Tick.digest_bits ~init:Hash_prefix.transition_system_snark bs
-            end)
             (System)
 
   module Keys = struct

@@ -54,9 +54,6 @@ module Make (Digest : sig
      and type Packed.value = Tick.Pedersen.Digest.t
 
   module Tock : Tock.Snarkable.Bits.Lossy with type Packed.value = Tock.Field.t
-end) (Hash : sig
-  val hash :
-    Tick.Boolean.var list -> (Digest.Tick.Packed.var, _) Tick.Checked.t
 end)
 (System : S) =
 struct
@@ -90,12 +87,30 @@ struct
     let wrap_vk_typ = Typ.list ~length:wrap_vk_length Boolean.typ
 
     module Verifier =
-      Snarky.Verifier_gadget.Make (Tick) (Tick_curve) (Tock_curve)
+      Snarky.Gm_verifier_gadget.Mnt4(Tick)
         (struct
           let input_size = Tock.Data_spec.size (wrap_input ())
         end)
 
-    let prev_state_valid wrap_vk prev_state_hash =
+    let wrap_vk_bit_length = Verifier.Verification_key_data.bit_length
+
+    let hash_vk_data data =
+      let%bind bs = Verifier.Verification_key_data.Checked.to_bits data in
+      Pedersen_hash.Section.extend
+        (Pedersen_hash.Section.create ~acc:(`Value Hash_prefix.transition_system_snark.acc)
+           ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_bits)))
+        ~start:Hash_prefix.length_in_bits
+        bs
+
+    let compute_top_hash wrap_vk_section state_hash_bits =
+      Pedersen_hash.Section.extend wrap_vk_section
+        ~start:(Hash_prefix.length_in_bits + wrap_vk_bit_length)
+        state_hash_bits
+      >>| Pedersen_hash.Section.to_initial_segment_digest
+      >>| Or_error.ok_exn
+      >>| fst
+
+    let prev_state_valid wrap_vk_section wrap_vk_data prev_state_hash =
       let open Let_syntax in
       with_label __LOC__
         (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
@@ -103,30 +118,27 @@ struct
            State.Hash.var_to_bits prev_state_hash
          in
          let%bind prev_top_hash =
-           Hash.hash (wrap_vk @ prev_state_hash_bits)
-           >>= Digest.Tick.choose_preimage_var
-           >>| Digest.Tick.Unpacked.var_to_bits
+           compute_top_hash wrap_vk_section prev_state_hash_bits
+            >>= Digest.Tick.choose_preimage_var
+            >>| Digest.Tick.Unpacked.var_to_bits
          in
-         let%map v =
-           Verifier.All_in_one.create ~verification_key:wrap_vk
-             ~input:prev_top_hash
-             As_prover.(
-               map get_state ~f:(fun {Prover_state.prev_proof; wrap_vk} ->
-                   { Verifier.All_in_one.verification_key= wrap_vk
-                   ; proof= prev_proof } ))
+         let%bind other_wrap_vk_data, result =
+          Verifier.All_in_one.choose_verification_key_data_and_proof_and_check_result
+            prev_top_hash
+              As_prover.(
+                map get_state ~f:(fun {Prover_state.prev_proof; wrap_vk} ->
+                    { Verifier.All_in_one.verification_key= wrap_vk
+                    ; proof= prev_proof } ))
          in
-         Verifier.All_in_one.result v)
+         let%map () = Verifier.Verification_key_data.Checked.Assert.equal wrap_vk_data other_wrap_vk_data in
+         result)
 
     let provide_witness' typ ~f =
       provide_witness typ As_prover.(map get_state ~f)
 
     let main (top_hash: Digest.Tick.Packed.var) =
       with_label __LOC__
-        (let%bind wrap_vk =
-           provide_witness' wrap_vk_typ ~f:(fun {Prover_state.wrap_vk} ->
-               Verifier.Verification_key.to_bool_list wrap_vk )
-         in
-         let%bind prev_state =
+        (let%bind prev_state =
            provide_witness' State.typ ~f:Prover_state.prev_state
          and update = provide_witness' Update.typ ~f:Prover_state.update in
          let%bind prev_state_hash = State.Checked.hash prev_state in
@@ -134,15 +146,21 @@ struct
            with_label __LOC__
              (State.Checked.update (prev_state_hash, prev_state) update)
          in
+         let%bind wrap_vk_data =
+           provide_witness' Verifier.Verification_key_data.typ ~f:(fun { Prover_state.wrap_vk; _ } ->
+             Verifier.Verification_key_data.of_verification_key wrap_vk)
+         in
+         let%bind wrap_vk_section = hash_vk_data wrap_vk_data in
          let%bind () =
            with_label __LOC__
              (let%bind sh = State.Hash.var_to_bits next_state_hash in
               (* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
-              Hash.hash (wrap_vk @ sh) >>= Field.Checked.Assert.equal top_hash)
+              compute_top_hash wrap_vk_section sh
+              >>= Field.Checked.Assert.equal top_hash)
          in
          let%bind prev_state_valid =
-           prev_state_valid wrap_vk prev_state_hash
+           prev_state_valid wrap_vk_section wrap_vk_data prev_state_hash
          in
          let%bind inductive_case_passed =
            with_label __LOC__ Boolean.(prev_state_valid && success)
@@ -167,7 +185,7 @@ struct
     open Tock
 
     module Verifier =
-      Snarky.Verifier_gadget.Make (Tock) (Tock_curve) (Tick_curve)
+      Snarky.Gm_verifier_gadget.Mnt6 (Tock)
         (struct
           let input_size = step_input_size
         end)
@@ -176,28 +194,35 @@ struct
       type t = {proof: Tick_curve.Proof.t}
     end
 
-    let vk_bits =
-      Verifier.Verification_key.to_bool_list Step_vk.verification_key
+    let step_vk_data =
+      Verifier.Verification_key_data.of_verification_key Step_vk.verification_key
 
+    let step_vk_bits =
+      Verifier.Verification_key_data.to_bits step_vk_data
+
+    (* TODO: Use an online verifier here *)
     let main (input: Digest.Tock.Packed.var) =
       let open Let_syntax in
       with_label __LOC__
-        (let%bind v =
+        (let%bind vk_data, result =
            (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)
            let%bind input =
              Digest.Tock.(choose_preimage_var input >>| Unpacked.var_to_bits)
            in
-           let verification_key = List.map vk_bits ~f:Boolean.var_of_value in
-           Verifier.All_in_one.create ~verification_key ~input
+           Verifier.All_in_one.choose_verification_key_data_and_proof_and_check_result input
              As_prover.(
                map get_state ~f:(fun {Prover_state.proof} ->
                    { Verifier.All_in_one.verification_key=
                        Step_vk.verification_key
                    ; proof } ))
          in
+         let%bind () =
+           let open Verifier.Verification_key_data.Checked in
+           Assert.equal vk_data (constant step_vk_data)
+         in
          with_label __LOC__
-           (Boolean.Assert.is_true (Verifier.All_in_one.result v)))
+           (Boolean.Assert.is_true result))
   end
 
   module Wrap (Step_vk : Step_vk_intf) (Tock_keypair : Tock_keypair_intf) =
