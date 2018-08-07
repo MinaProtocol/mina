@@ -3,7 +3,7 @@
 (library
  ((name snark_bits)
   (public_name snark_bits)
-  (flags (:standard -short-paths))
+  (flags (:standard -short-paths -warn-error -6-33-32))
   (library_flags (-linkall))
   (inline_tests)
   (libraries

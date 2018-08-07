@@ -63,7 +63,7 @@ module Util = struct
 
   let reduce fn = function
     | h1 :: h2 :: t -> List.fold_left fn h1 (h2 :: t)
-    | [scalar]      -> failwith "cannot reduce a list of length 1"
+    | [_scalar]      -> failwith "cannot reduce a list of length 1"
     | []            -> failwith "cannot reduce an empty list"
 
   let rec list_get n = function
@@ -112,7 +112,7 @@ module Util = struct
         let c = String.get str i in
         let replacement =
           if is_uppercase c then
-            (if i = 0 then "" else "_") ^ (string_of_char @@ Char.lowercase c)
+            (if i = 0 then "" else "_") ^ (string_of_char @@ Char.lowercase_ascii c)
           else string_of_char c
         in
         replacement ^ loop (i + 1)
@@ -155,9 +155,10 @@ module Parsing = struct
   let format_and_escape_kind_name name = Util.snake_case_of_camel_case name
   let fix_invalid_enumerant_name prefix name =
     let name =
-      if Str.string_match (Str.regexp "^[a-z]") name 0 then
-        String.capitalize name
-      else
+      (* TODO: Nathan fixme *)
+      (*if Str.string_match (Str.regexp "^[a-z]") name 0 then
+        String.capitalize_ascii name
+      else *)
         name
     in
     prefix ^ name
@@ -232,7 +233,7 @@ module Parsing = struct
       List.map cast_spv_kind kind_names
     in
 
-    let enumerant_has_parameters { enumerant_parameters = p } =
+    let enumerant_has_parameters { enumerant_parameters = p;_ } =
       match p with
         | [] -> false
         | _  -> true
@@ -389,9 +390,9 @@ module Templates = struct
     | [scalar] -> match_case variant_type scalar
     | vec      -> join_match_cases (List.map (match_case variant_type) vec)
 
-  let pattern_match exp variant_type cases =
-    let patterns = match_cases variant_type cases in
-    <:expr< match $exp$ with $patterns$ >>
+  let pattern_match _exp variant_type cases =
+    let _patterns = match_cases variant_type cases in
+    <:expr< match $_exp$ with $_patterns$ >>
 
   (* Expressions *)
   let fn_call name args =
@@ -741,7 +742,7 @@ let build_enum_value_fn (name, (ty, parameterization), enumerants) =
         >>
 
 module StaticElements = struct
-  let open_definitions = [ <:str_item< open Batteries >> ]
+  let open_definitions = []
 
   let module_definitions = [
     <:str_item< module IdMap = Map.Make(Int32) >>
@@ -790,6 +791,8 @@ module StaticElements = struct
     >>;
     <:str_item<
       let word_of_float = fun (f : float) ->
+        failwith "TODO: Nathan fixme"
+        (*
         let open IO in
         let buf = output_string () in
         write_float buf f;
@@ -802,7 +805,7 @@ module StaticElements = struct
                 write_to_int32 (n + 1) acc t
             | []     -> acc
         in
-        write_to_int32 0 0l (String.to_list str) 
+        write_to_int32 0 0l (String.to_list str)  *)
     >>;
     <:str_item<
     >>;
