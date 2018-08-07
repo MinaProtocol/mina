@@ -1,5 +1,4 @@
 open Core_kernel
-open Async_kernel
 
 type 'a t = {checksum: Md5.t; data: 'a} [@@deriving bin_io]
 
