@@ -26,7 +26,21 @@ module type Time_intf = sig
     val ( = ) : t -> t -> bool
   end
 
+  module Timeout : sig
+    type 'a t
+
+    val create : Span.t -> (unit -> 'a) -> 'a t
+
+    val to_deferred : 'a t -> 'a Deferred.t
+
+    val peek : 'a t -> 'a option
+
+    val cancel : 'a t -> 'a -> unit
+  end
+
   val diff : t -> t -> Span.t
+
+  val modulus : t -> Span.t -> Span.t
 
   val now : unit -> t
 end

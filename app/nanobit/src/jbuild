@@ -9,7 +9,7 @@
       client_lib
       linear_pipe
       minibit_networking
-      minibit_miner
+      signer
       gossip_net
       kademlia
       minibit
