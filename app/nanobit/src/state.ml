@@ -27,7 +27,7 @@ let to_blockchain_state
   ; ledger_hash
   ; strength
   ; timestamp
-  ; signer_public_key }
+  ; signer_public_key= Public_key.compress signer_public_key }
 
 let of_blockchain_state
     { Blockchain_state.next_difficulty
@@ -43,7 +43,9 @@ let of_blockchain_state
   ; ledger_hash
   ; strength
   ; timestamp
-  ; signer_public_key }
+  ; signer_public_key=
+      Option.value_exn ~message:"failed to decompress signer public key"
+        (Public_key.decompress signer_public_key) }
 
 let zero = of_blockchain_state Blockchain_state.zero
 

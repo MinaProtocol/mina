@@ -39,7 +39,10 @@ let expr_of_t ~loc
     ; strength= [%e e "Strength" (module Strength) strength]
     ; timestamp= [%e e "Block_time" (module Block_time) timestamp]
     ; signer_public_key=
-        [%e e "Public_key" (module Public_key) signer_public_key] }]
+        [%e
+          e "Public_key.Compressed"
+            (module Public_key.Compressed)
+            signer_public_key] }]
 
 let genesis_time =
   Time.of_date_ofday ~zone:Time.Zone.utc
@@ -66,7 +69,9 @@ let negative_one =
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
   ; strength= Strength.zero
   ; timestamp
-  ; signer_public_key= Public_key.of_private_key Global_signer_private_key.t }
+  ; signer_public_key=
+      Public_key.compress
+      @@ Public_key.of_private_key Global_signer_private_key.t }
 
 let genesis_block, zero =
   let open Nanobit_base in

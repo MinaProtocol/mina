@@ -192,11 +192,11 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            >>= Strength.unpack_var
          in
          let global_signer_public_key =
-           Public_key.to_constant_var
-             (Public_key.of_private_key Global_signer_private_key.t)
+           Global_signer_private_key.t |> Public_key.of_private_key
+           |> Public_key.compress |> Public_key.Compressed.var_of_t
          in
          let%bind () =
-           Public_key.assert_equal previous_state.signer_public_key
+           Public_key.Compressed.assert_equal previous_state.signer_public_key
              global_signer_public_key
          in
          let new_state =

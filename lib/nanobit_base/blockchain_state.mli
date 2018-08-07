@@ -25,7 +25,7 @@ type t =
   , Ledger_hash.t
   , Strength.t
   , Block_time.t
-  , Public_key.t )
+  , Public_key.Compressed.t )
   t_
 [@@deriving sexp, eq]
 
@@ -56,7 +56,7 @@ module Stable : sig
       , Ledger_hash.Stable.V1.t
       , Strength.Stable.V1.t
       , Block_time.Stable.V1.t
-      , Public_key.Stable.V1.t )
+      , Public_key.Compressed.Stable.V1.t )
       t_
     [@@deriving bin_io, sexp, eq]
   end
@@ -70,7 +70,7 @@ include Snarkable.S
                     , Ledger_hash.var
                     , Strength.Unpacked.var
                     , Block_time.Unpacked.var
-                    , Public_key.var )
+                    , Public_key.Compressed.var )
                     t_
          and type value = t
 

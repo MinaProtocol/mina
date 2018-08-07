@@ -24,7 +24,7 @@ module Stable = struct
       ; signer_public_key: 'signer_public_key }
     [@@deriving bin_io, sexp, fields, eq]
 
-    type t = (Target.Stable.V1.t, State_hash.Stable.V1.t, Ledger_builder_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Strength.Stable.V1.t, Block_time.Stable.V1.t, Public_key.Stable.V1.t) t_
+    type t = (Target.Stable.V1.t, State_hash.Stable.V1.t, Ledger_builder_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Strength.Stable.V1.t, Block_time.Stable.V1.t, Public_key.Compressed.Stable.V1.t) t_
     [@@deriving bin_io, sexp, eq]
   end
 end
@@ -38,7 +38,7 @@ type var =
   , Ledger_hash.var
   , Strength.Unpacked.var
   , Block_time.Unpacked.var
-  , Public_key.var
+  , Public_key.Compressed.var
   ) t_
 
 type value = t
@@ -56,7 +56,7 @@ let data_spec =
   ; Ledger_hash.typ
   ; Strength.Unpacked.typ
   ; Block_time.Unpacked.typ
-  ; Public_key.typ
+  ; Public_key.Compressed.typ
   ]
 
 let typ : (var, value) Typ.t =
@@ -68,7 +68,7 @@ let to_bits ({ next_difficulty; previous_state_hash; ledger_builder_hash; ledger
   let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash
   and previous_state_hash_bits = State_hash.var_to_bits previous_state_hash
   and ledger_builder_hash_bits = Ledger_builder_hash.var_to_bits ledger_builder_hash
-  and signer_public_key_bits = Public_key.var_to_bits signer_public_key
+  and signer_public_key_bits = Public_key.Compressed.var_to_bits signer_public_key
   in
   Target.Unpacked.var_to_bits next_difficulty
   @ previous_state_hash_bits
@@ -85,7 +85,7 @@ let fold ({ next_difficulty; previous_state_hash; ledger_builder_hash; ledger_ha
   +> Ledger_hash.fold ledger_hash
   +> Strength.Bits.fold strength
   +> Block_time.Bits.fold timestamp
-  +> Public_key.fold signer_public_key) ~init ~f
+  +> Public_key.Compressed.fold signer_public_key) ~init ~f
 
 let to_bits_unchecked ({ next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; timestamp; signer_public_key } : value) =
   Target.Bits.to_bits next_difficulty
@@ -94,7 +94,7 @@ let to_bits_unchecked ({ next_difficulty; previous_state_hash; ledger_builder_ha
   @ Ledger_hash.to_bits ledger_hash
   @ Strength.Bits.to_bits strength
   @ Block_time.Bits.to_bits timestamp
-  @ Public_key.to_bits signer_public_key
+  @ Public_key.Compressed.to_bits signer_public_key
 
 let hash t =
   Pedersen.State.update_fold Hash_prefix.blockchain_state

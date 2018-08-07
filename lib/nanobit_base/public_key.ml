@@ -16,21 +16,6 @@ type var = Tick.Field.var * Tick.Field.var
 
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
-let to_bits ((x, y) : t) = Tick.Field.Bits.to_bits x @ Tick.Field.Bits.to_bits y
-
-let var_to_bits ((x, y) : var) =
-  let open Tick.Let_syntax in
-  let%map x_bits = Tick.Field.Checked.choose_preimage_var x ~length:Tick.Field.size_in_bits
-  and y_bits = Tick.Field.Checked.choose_preimage_var y ~length:Tick.Field.size_in_bits in
-  x_bits @ y_bits
-
-let fold ((x, y) : t) ~init ~f =
-  let open Util in
-  (Tick.Field.Bits.fold x +> Tick.Field.Bits.fold y) ~init ~f
-
-let to_constant_var ((x, y) : t) : var =
-  (Tick.Field.Checked.constant x, Tick.Field.Checked.constant y)
-
 (* TODO: We can move it onto the subgroup during account creation. No need to check with
   every transaction *)
 
