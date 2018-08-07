@@ -54,11 +54,9 @@ let private_key =
   Sk.arg_type
 
 let txn_fee =
-  let open Nanobit_base in
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_string
 
 let txn_amount =
-  let open Nanobit_base in
   Command.Arg_type.map Command.Param.string ~f:Currency.Amount.of_string
 
 let txn_nonce =

@@ -30,4 +30,4 @@
  ((name        spirv)
   (public_name spirv)
   (modules (spirv))
-  (flags (:standard -short-paths))))
+  (flags (:standard -short-paths -warn-error -32-39-27))))

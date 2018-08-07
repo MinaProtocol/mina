@@ -1,6 +1,19 @@
 open Core
 open Dsl
 
+(* TODO: Nathan fixme *)
+module Batteries = struct
+  module Int32 = struct
+    let of_int _ = failwith "TODO: Nathan fixme"
+
+    let to_int _ = failwith "TODO: Nathan fixme"
+  end
+
+  module Big_int = struct
+    let of_int _ = failwith "TODO"
+  end
+end
+
 let ( !^ ) id = Batteries.Int32.of_int (Id.value id)
 
 module Constant = struct

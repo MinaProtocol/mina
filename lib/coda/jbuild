@@ -3,7 +3,7 @@
 (library
  ((name coda)
   (public_name coda)
-  (flags (:standard -short-paths))
+  (flags (:standard -short-paths -warn-error -27))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core protocols linear_pipe logger async async_extra))
