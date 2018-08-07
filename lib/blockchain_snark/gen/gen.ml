@@ -38,7 +38,8 @@ let expr_of_t ~loc
     ; ledger_hash= [%e e "Ledger_hash" (module Ledger_hash) ledger_hash]
     ; strength= [%e e "Strength" (module Strength) strength]
     ; timestamp= [%e e "Block_time" (module Block_time) timestamp]
-    ; signer_public_key= [%e e "Public_key" (module Public_key) signer_public_key] }]
+    ; signer_public_key=
+        [%e e "Public_key" (module Public_key) signer_public_key] }]
 
 let genesis_time =
   Time.of_date_ofday ~zone:Time.Zone.utc

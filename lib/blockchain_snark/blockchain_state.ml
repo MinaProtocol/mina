@@ -191,8 +191,14 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
              ~by:(difficulty_packed, difficulty)
            >>= Strength.unpack_var
          in
-         let global_signer_public_key = Public_key.to_constant_var (Public_key.of_private_key Global_signer_private_key.t) in
-         let%bind () = Public_key.assert_equal previous_state.signer_public_key global_signer_public_key in
+         let global_signer_public_key =
+           Public_key.to_constant_var
+             (Public_key.of_private_key Global_signer_private_key.t)
+         in
+         let%bind () =
+           Public_key.assert_equal previous_state.signer_public_key
+             global_signer_public_key
+         in
          let new_state =
            { next_difficulty= new_difficulty
            ; previous_state_hash

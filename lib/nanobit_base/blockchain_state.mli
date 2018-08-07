@@ -31,7 +31,15 @@ type t =
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('a, 'b, 'c, 'd, 'e, 'f, 'g) t_ = ('a, 'b, 'c, 'd, 'e, 'f, 'g) t_ =
+    type nonrec ('a, 'b, 'c, 'd, 'e, 'f, 'g) t_ =
+                                                 ( 'a
+                                                 , 'b
+                                                 , 'c
+                                                 , 'd
+                                                 , 'e
+                                                 , 'f
+                                                 , 'g )
+                                                 t_ =
       { next_difficulty: 'a
       ; previous_state_hash: 'b
       ; ledger_builder_hash: 'c
