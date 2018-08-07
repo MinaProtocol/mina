@@ -7,7 +7,7 @@ let create ~directory =
 
 let destroy = Rocks.close
 
-let get t ~key = Rocks.get ?pos:None ?len:None ?opts:None t key
+let get = Rocks.get ?pos:None ?len:None ?opts:None
 
 let set =
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
