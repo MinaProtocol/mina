@@ -149,52 +149,61 @@ end
 (* TODO: Give clear semantics for and fix impl of this, see #300 *)
 module Interruptible = struct
   module T = struct
-    type ('a, 's) t = {sigint: 's Deferred.t; d: ('a, 's) Deferred.Result.t}
+    type ('a, 's) t =
+      {interruption_signal: 's Deferred.t; d: ('a, 's) Deferred.Result.t}
 
-    let map_signal {sigint; d} ~f =
-      {sigint= Deferred.map sigint ~f; d= Deferred.Result.map_error d ~f}
+    let map_signal {interruption_signal; d} ~f =
+      { interruption_signal= Deferred.map interruption_signal ~f
+      ; d= Deferred.Result.map_error d ~f }
 
     let bind t ~f =
       match Deferred.peek t.d with
       | None ->
-          let sigint_to_res = t.sigint >>| fun s -> Error s in
+          let interruption_signal_to_res =
+            t.interruption_signal >>| fun s -> Error s
+          in
           let maybe_sig_d =
             let w : ('a, 's) Deferred.Result.t =
-              Deferred.any [t.d; sigint_to_res]
+              Deferred.any [t.d; interruption_signal_to_res]
             in
             Deferred.Result.map w ~f:(fun a ->
                 let t' = f a in
-                (t'.sigint, t'.d) )
+                (t'.interruption_signal, t'.d) )
           in
-          let sigint' =
+          let interruption_signal' =
             Deferred.any
-              [ t.sigint
+              [ t.interruption_signal
               ; ( maybe_sig_d
                 >>= function
-                  | Ok (sigint, _) -> sigint | Error e -> Deferred.return e )
-              ]
+                  | Ok (interruption_signal, _) -> interruption_signal
+                  | Error e -> Deferred.return e ) ]
           in
           let d' =
             Deferred.any
-              [ sigint_to_res
+              [ interruption_signal_to_res
               ; ( maybe_sig_d
                 >>= fun m ->
                 match m with
                 | Ok (_, d) -> d
                 | Error e -> Deferred.return (Error e) ) ]
           in
-          {sigint= sigint'; d= d'}
+          {interruption_signal= interruption_signal'; d= d'}
       | Some (Ok a) ->
           let t' = f a in
-          {sigint= Deferred.any [t'.sigint; t.sigint]; d= t'.d}
+          { interruption_signal=
+              Deferred.any [t'.interruption_signal; t.interruption_signal]
+          ; d= t'.d }
       | Some (Error e) -> {t with d= Deferred.return (Error e)}
 
-    let return a = {sigint= Deferred.never (); d= Deferred.Result.return a}
+    let return a =
+      {interruption_signal= Deferred.never (); d= Deferred.Result.return a}
 
     let uninterruptible d =
-      {sigint= Deferred.never (); d= Deferred.map d ~f:(fun x -> Ok x)}
+      { interruption_signal= Deferred.never ()
+      ; d= Deferred.map d ~f:(fun x -> Ok x) }
 
-    let lift d sigint = {d= Deferred.map d ~f:(fun x -> Ok x); sigint}
+    let lift d interruption_signal =
+      {d= Deferred.map d ~f:(fun x -> Ok x); interruption_signal}
 
     let map = `Define_using_bind
   end
@@ -323,7 +332,7 @@ end = struct
 
   let strongest_tip t = t.state.longest_branch_tip
 
-  let ledger_builder_io {ledger_builder_io} = ledger_builder_io
+  let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
   let locked_and_best tree =
     let path = Transition_tree.longest_path tree in
@@ -550,7 +559,7 @@ end = struct
       in
       let best_lb, path =
         match
-          Path.findi new_best_path ~f:(fun i tip -> is_lb_hash_curr_tip tip)
+          Path.findi new_best_path ~f:(fun _ tip -> is_lb_hash_curr_tip tip)
         with
         | None ->
             (Ledger_builder.copy state.locked_tip.ledger_builder, new_best_path)
@@ -638,9 +647,9 @@ end = struct
     ; state }
 
   (* TODO: implement this when sync-ledger merges *)
-  let handle_sync_ledger_queries query = failwith "TODO"
+  let handle_sync_ledger_queries _query = failwith "TODO"
 
-  let strongest_ledgers {strongest_ledgers} = strongest_ledgers
+  let strongest_ledgers {strongest_ledgers; _} = strongest_ledgers
 
   (** Returns a reference to a ledger_builder with hash [hash], materialize a
    fresh ledger at a specific hash if necessary *)
@@ -731,7 +740,7 @@ let%test_module "test" =
 
         let hash t = !t
 
-        let of_aux_and_ledger aux l = Ok (create l)
+        let of_aux_and_ledger _aux l = Ok (create l)
 
         let apply (t: t) (x: Ledger_builder_diff.t) =
           t := x ;
@@ -793,9 +802,9 @@ let%test_module "test" =
               State_hash.Table.add_exn tbl ~key:(State.hash s) ~data:s ) ;
           tbl
 
-        let get_ledger_builder_aux_at_hash t hash = return (Ok hash)
+        let get_ledger_builder_aux_at_hash _t hash = return (Ok hash)
 
-        let glue_sync_ledger t q a =
+        let glue_sync_ledger _t q a =
           don't_wait_for
             (Linear_pipe.iter q ~f:(fun (h, _) -> Linear_pipe.write a (h, h)))
       end
@@ -814,27 +823,27 @@ let%test_module "test" =
               (Ledger_hash.t * query) Linear_pipe.Reader.t
               * (Ledger_hash.t * query) Linear_pipe.Writer.t }
 
-        let create ledger goal =
+        let create ledger _goal =
           let t =
             { ledger
             ; answer_pipe= Linear_pipe.create ()
             ; query_pipe= Linear_pipe.create () }
           in
           don't_wait_for
-            (Linear_pipe.iter (fst t.answer_pipe) ~f:(fun (h, l) ->
+            (Linear_pipe.iter (fst t.answer_pipe) ~f:(fun (h, _l) ->
                  t.ledger <- h ;
                  Deferred.return () )) ;
           t
 
-        let answer_writer {answer_pipe} = snd answer_pipe
+        let answer_writer {answer_pipe; _} = snd answer_pipe
 
-        let query_reader {query_pipe} = fst query_pipe
+        let query_reader {query_pipe; _} = fst query_pipe
 
-        let destroy t = ()
+        let destroy _t = ()
 
-        let new_goal t h = ()
+        let new_goal _t _h = ()
 
-        let wait_until_valid t h = return (`Ok t.ledger)
+        let wait_until_valid t _h = return (`Ok t.ledger)
       end
 
       module Store = Storage.Memory
@@ -897,7 +906,7 @@ let%test_module "test" =
       in
       go [] cnt >>| List.rev
 
-    let assert_strongest_ledgers lbc_deferred ~transitions ~expected =
+    let assert_strongest_ledgers lbc_deferred ~transitions:_ ~expected =
       Backtrace.elide := false ;
       let res =
         Async.Thread_safe.block_on_async (fun () ->
@@ -964,7 +973,7 @@ let%test_module "test" =
           (* Drain the first few strongest_ledgers *)
           let%bind _ = take_map (Lbc.strongest_ledgers lbc) 4 ~f:ignore in
           match%map Lbc.local_get_ledger lbc 6 with
-          | Ok (lb, s) -> assert (!lb = 6)
+          | Ok (lb, _s) -> assert (!lb = 6)
           | Error e ->
               failwithf "Unexpected error %s" (Error.to_string_hum e) () )
   end )
