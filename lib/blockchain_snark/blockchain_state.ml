@@ -40,23 +40,25 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
   let update state (block: Block.t) =
     let open Or_error.Let_syntax in
     let%bind () =
-      match block.body.proof with
+      match block.proof with
       | None ->
           check
-            (Ledger_hash.equal state.ledger_hash block.body.target_hash)
+            (Ledger_hash.equal state.ledger_hash
+               block.state_transition_data.target_hash)
             "Body proof was none but tried to update ledger hash"
       | Some proof ->
           check
             (T.verify
                (Transaction_snark.create ~source:state.ledger_hash
-                  ~target:block.body.target_hash ~proof_type:`Merge
-                  ~fee_excess:Currency.Amount.Signed.zero ~proof))
+                  ~target:block.state_transition_data.target_hash
+                  ~proof_type:`Merge ~fee_excess:Currency.Amount.Signed.zero
+                  ~proof))
             "Proof did not verify"
     in
     let next_state = update_unchecked state block in
     let%map () =
       let%bind proof_of_work =
-        Proof_of_work.create next_state block.header.nonce
+        Proof_of_work.create next_state block.auxillary_data.nonce
       in
       check
         (Proof_of_work.meets_target_unchecked proof_of_work
@@ -167,21 +169,36 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         (block: Block.var) :
         (State_hash.var * var * [`Success of Boolean.var], _) Tick.Checked.t =
       with_label __LOC__
-        (let%bind good_body =
+        (let global_signer_public_key_raw =
+           Public_key.of_private_key Global_signer_private_key.t
+         in
+         let global_signer_public_key_uncompressed =
+           Public_key.var_of_t global_signer_public_key_raw
+         in
+         let global_signer_public_key =
+           global_signer_public_key_raw |> Public_key.compress
+           |> Public_key.Compressed.var_of_t
+         in
+         let%bind good_body =
            let%bind correct_transaction_snark =
              T.verify_complete_merge previous_state.ledger_hash
-               block.body.target_hash
+               block.state_transition_data.target_hash
                (As_prover.return
-                  (Option.value ~default:Tock.Proof.dummy block.body.proof))
+                  (Option.value ~default:Tock.Proof.dummy block.proof))
            and ledger_hash_didn't_change =
              Ledger_hash.equal_var previous_state.ledger_hash
-               block.body.target_hash
+               block.state_transition_data.target_hash
+           and signature_is_valid =
+             Block.State_transition_data.Signature.Checked.assert_verifies
+               block.auxillary_data.signature
+               global_signer_public_key_uncompressed
+               block.state_transition_data
            in
            Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
          in
          let difficulty = previous_state.next_difficulty in
          let difficulty_packed = Target.pack_var difficulty in
-         let time = block.header.time in
+         let time = block.state_transition_data.time in
          let%bind new_difficulty =
            compute_target previous_state.timestamp difficulty time
          in
@@ -191,10 +208,6 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
              ~by:(difficulty_packed, difficulty)
            >>= Strength.unpack_var
          in
-         let global_signer_public_key =
-           Global_signer_private_key.t |> Public_key.of_private_key
-           |> Public_key.compress |> Public_key.Compressed.var_of_t
-         in
          let%bind () =
            Public_key.Compressed.assert_equal previous_state.signer_public_key
              global_signer_public_key
@@ -202,8 +215,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
          let new_state =
            { next_difficulty= new_difficulty
            ; previous_state_hash
-           ; ledger_hash= block.body.target_hash
-           ; ledger_builder_hash= block.body.ledger_builder_hash
+           ; ledger_hash= block.state_transition_data.target_hash
+           ; ledger_builder_hash=
+               block.state_transition_data.ledger_builder_hash
            ; strength= new_strength
            ; timestamp= time
            ; signer_public_key= global_signer_public_key }
@@ -225,7 +239,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            in
            Pedersen_hash.Section.extend init
              ~start:(Hash_prefix.length_in_bits + List.length state_bits)
-             (Block.Nonce.Unpacked.var_to_bits block.header.nonce)
+             (Block.Nonce.Unpacked.var_to_bits block.auxillary_data.nonce)
            >>| Pedersen_hash.Section.to_initial_segment_digest
            >>| Or_error.ok_exn
            >>= fun (pow, `Length n) ->

@@ -77,11 +77,20 @@ let genesis_block, zero =
   let open Nanobit_base in
   let block =
     let open Block in
-    { header= {Block.Header.nonce= Nonce.of_int 0; time= genesis_time}
-    ; body=
-        { Block.Body.proof= None
-        ; ledger_builder_hash= Ledger_builder_hash.dummy
-        ; target_hash= Ledger.(merkle_root Genesis_ledger.ledger) } }
+    let state_transition_data =
+      let open State_transition_data in
+      { time= genesis_time
+      ; target_hash= Ledger.merkle_root Genesis_ledger.ledger
+      ; ledger_builder_hash= Ledger_builder_hash.dummy }
+    in
+    { auxillary_data=
+        (let open Auxillary_data in
+        { nonce= Nonce.of_int 0
+        ; signature=
+            State_transition_data.Signature.sign Global_signer_private_key.t
+              state_transition_data })
+    ; state_transition_data
+    ; proof= None }
   in
   let zero = update_unchecked negative_one block in
   let rec find_ok_nonce i =
@@ -89,7 +98,7 @@ let genesis_block, zero =
     else find_ok_nonce (Block.Nonce.succ i)
   in
   let nonce = find_ok_nonce Block.Nonce.zero in
-  ({block with header= {block.header with nonce}}, zero)
+  ({block with auxillary_data= {block.auxillary_data with nonce}}, zero)
 
 let genesis_block_expr ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -98,21 +107,34 @@ let genesis_block_expr ~loc =
   let open E in
   let open Nanobit_base in
   [%expr
-    { Nanobit_base.Block.header=
-        { Nanobit_base.Block.Header.nonce=
+    { Nanobit_base.Block.auxillary_data=
+        { Nanobit_base.Block.Auxillary_data.nonce=
             Nanobit_base.Block.Nonce.of_int
-              [%e eint (Unsigned.UInt64.to_int genesis_block.header.nonce)]
-        ; time=
+              [%e
+                eint
+                  (Unsigned.UInt64.to_int genesis_block.auxillary_data.nonce)]
+        ; signature=
+            Nanobit_base.Block.State_transition_data.Signature.Signature.
+            t_of_sexp
+              Nanobit_base.Block.State_transition_data.Signature.Scalar.
+              t_of_sexp
+              [%e
+                Ppx_util.expr_of_sexp ~loc
+                  (Block.State_transition_data.Signature.Signature.sexp_of_t
+                     Block.State_transition_data.Signature.Scalar.sexp_of_t
+                     genesis_block.auxillary_data.signature)] }
+    ; state_transition_data=
+        { Nanobit_base.Block.State_transition_data.time=
             Nanobit_base.Block_time.t_of_sexp
               [%e
                 Ppx_util.expr_of_sexp ~loc
-                  (Block_time.sexp_of_t genesis_block.header.time)] }
-    ; body=
-        { Nanobit_base.Block.Body.proof= None
+                  (Block_time.sexp_of_t
+                     genesis_block.state_transition_data.time)]
         ; ledger_builder_hash= Nanobit_base.Ledger_builder_hash.dummy
         ; target_hash=
             Nanobit_base.Ledger.merkle_root Nanobit_base.Genesis_ledger.ledger
-        } }]
+        }
+    ; proof= None }]
 
 let main () =
   let target = Sys.argv.(1) in
