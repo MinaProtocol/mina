@@ -4,6 +4,7 @@
  ((name gpu_dsl)
   (public_name gpu_dsl)
   (library_flags (-linkall))
+  (flags (:standard -short-paths -warn-error -34-33-6-9-39-33-27))
   (inline_tests)
   (libraries
     (core integers bignum spirv))

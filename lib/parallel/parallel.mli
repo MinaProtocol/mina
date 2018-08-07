@@ -1,4 +1,3 @@
-open Core
 open Async
 
 val init_master : unit -> unit

@@ -166,8 +166,6 @@ let main () =
   Pprintast.top_phrase fmt
     (Ptop_def
        [%str
-         open Core
-
          let blockchain_proving () = [%e bc_proving]
 
          let blockchain_verification () = [%e bc_verification]
