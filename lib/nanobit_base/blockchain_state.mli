@@ -7,13 +7,15 @@ type ( 'target
      , 'ledger_builder_hash
      , 'ledger_hash
      , 'strength
-     , 'time ) t_ =
+     , 'time
+     , 'signer_public_key ) t_ =
   { next_difficulty: 'target
   ; previous_state_hash: 'state_hash
   ; ledger_builder_hash: 'ledger_builder_hash
   ; ledger_hash: 'ledger_hash
   ; strength: 'strength
-  ; timestamp: 'time }
+  ; timestamp: 'time
+  ; signer_public_key: 'signer_public_key }
 [@@deriving fields]
 
 type t =
@@ -22,19 +24,21 @@ type t =
   , Ledger_builder_hash.t
   , Ledger_hash.t
   , Strength.t
-  , Block_time.t )
+  , Block_time.t
+  , Public_key.t )
   t_
 [@@deriving sexp, eq]
 
 module Stable : sig
   module V1 : sig
-    type nonrec ('a, 'b, 'c, 'd, 'e, 'f) t_ = ('a, 'b, 'c, 'd, 'e, 'f) t_ =
+    type nonrec ('a, 'b, 'c, 'd, 'e, 'f, 'g) t_ = ('a, 'b, 'c, 'd, 'e, 'f, 'g) t_ =
       { next_difficulty: 'a
       ; previous_state_hash: 'b
       ; ledger_builder_hash: 'c
       ; ledger_hash: 'd
       ; strength: 'e
-      ; timestamp: 'f }
+      ; timestamp: 'f
+      ; signer_public_key: 'g }
     [@@deriving bin_io, sexp, eq]
 
     type nonrec t =
@@ -43,7 +47,8 @@ module Stable : sig
       , Ledger_builder_hash.Stable.V1.t
       , Ledger_hash.Stable.V1.t
       , Strength.Stable.V1.t
-      , Block_time.Stable.V1.t )
+      , Block_time.Stable.V1.t
+      , Public_key.Stable.V1.t )
       t_
     [@@deriving bin_io, sexp, eq]
   end
@@ -56,7 +61,8 @@ include Snarkable.S
                     , Ledger_builder_hash.var
                     , Ledger_hash.var
                     , Strength.Unpacked.var
-                    , Block_time.Unpacked.var )
+                    , Block_time.Unpacked.var
+                    , Public_key.var )
                     t_
          and type value = t
 

@@ -16,6 +16,16 @@ val typ : (var, t) Typ.t
 
 val of_private_key : Private_key.t -> t
 
+val to_bits : t -> bool list
+
+val var_to_bits : var -> (Boolean.var list, _) Checked.t
+
+val fold : t -> init:'a -> f:('a -> bool -> 'a) -> 'a
+
+val to_constant_var : t -> var
+
+val assert_equal : var -> var -> (unit, _) Checked.t
+
 module Compressed : sig
   type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
 

@@ -54,6 +54,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Private_key = Private_key
   module Public_key = Public_key
   module State_hash = State_hash.Stable.V1
   module Strength = Strength
@@ -603,6 +604,8 @@ struct
               } }
         >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
     end
+
+    module Signer_private_key = Nanobit_base.Global_signer_private_key
   end)
 
   let request_work ~best_ledger_builder t =
