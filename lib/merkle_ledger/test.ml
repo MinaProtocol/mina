@@ -4,15 +4,21 @@ module type S =
   Ledger.S
   with type key := string
    and type hash := Md5.t
-   and type account := int
+   and type account := Test_ledger.Account.t
 
-module Ledger (L : S) = struct
+module type Ledger_intf = sig
+  include S
+
+  val load_ledger : int -> int -> t * string list
+end
+
+module Ledger (L : S) : Ledger_intf = struct
   include L
 
   let load_ledger n b =
     let ledger = create () in
     let keys = List.init n ~f:(fun i -> Int.to_string i) in
-    List.iter keys ~f:(fun k -> set ledger k b) ;
+    List.iter keys ~f:(fun k -> set ledger k {balance= b; key= k}) ;
     (ledger, keys)
 end
 
@@ -34,15 +40,17 @@ let%test "length" =
   let ledger, keys = L16.load_ledger n b in
   L16.length ledger = n
 
+let gkey = Option.map ~f:(fun {Test_ledger.Account.balance} -> balance)
+
 let%test "key_retrieval" =
   let b = 100 in
   let ledger, keys = L16.load_ledger 10 b in
-  Some 100 = L16.get ledger (List.nth_exn keys 0)
+  Some 100 = gkey (L16.get ledger (List.nth_exn keys 0))
 
 let%test "idx_retrieval" =
   let b = 100 in
   let ledger, _keys = L16.load_ledger 10 b in
-  `Ok 100 = L16.get_at_index ledger 0
+  match L16.get_at_index ledger 0 with `Ok a -> a.balance = 100 | _ -> false
 
 let%test "key_nonexist" =
   let b = 100 in
@@ -58,24 +66,32 @@ let%test_unit "modify_account" =
   let b = 100 in
   let ledger, keys = L16.load_ledger 10 b in
   let key = List.nth_exn keys 0 in
-  assert (Some 100 = L16.get ledger key) ;
-  L16.set ledger key 50 ;
-  assert (Some 50 = L16.get ledger key)
+  assert (Some 100 = gkey @@ L16.get ledger key) ;
+  L16.set ledger key {balance= 50; key} ;
+  assert (Some 50 = gkey @@ L16.get ledger key)
 
 let%test_unit "update_account" =
   let b = 100 in
   let ledger, keys = L16.load_ledger 10 b in
   let key = List.nth_exn keys 0 in
-  L16.update ledger key ~f:(function None -> assert false | Some x -> x + 1) ;
-  assert (Some (b + 1) = L16.get ledger key)
+  L16.update ledger key ~f:(function
+    | None -> assert false
+    | Some {balance; key} -> {balance= balance + 1; key} ) ;
+  assert (Some (b + 1) = gkey @@ L16.get ledger key)
 
 let%test_unit "modify_account_by_idx" =
   let b = 100 in
   let ledger, keys = L16.load_ledger 10 b in
   let idx = 0 in
-  assert (`Ok 100 = L16.get_at_index ledger idx) ;
-  L16.set_at_index_exn ledger idx 50 ;
-  assert (`Ok 50 = L16.get_at_index ledger idx)
+  assert (
+    match L16.get_at_index ledger idx with
+    | `Ok {balance} -> balance = 100
+    | _ -> false ) ;
+  L16.set_at_index_exn ledger idx {balance= 50; key= Int.to_string idx} ;
+  assert (
+    match L16.get_at_index ledger idx with
+    | `Ok {balance} -> balance = 50
+    | _ -> false )
 
 let compose_hash n hash =
   let rec go i hash =
@@ -105,13 +121,13 @@ let%test_unit "merkle_root_edit" =
   let key = List.nth_exn keys 0 in
   let root0 = L16.merkle_root ledger in
   assert (Test_ledger.Hash.empty_hash <> root0) ;
-  L16.set ledger key b2 ;
+  L16.set ledger key {balance= b2; key} ;
   let root1 = L16.merkle_root ledger in
   assert (root1 <> root0) ;
-  L16.set ledger key b1 ;
+  L16.set ledger key {balance= b1; key} ;
   let root2 = L16.merkle_root ledger in
   assert (root2 = root0) ;
-  L16.set ledger key b2 ;
+  L16.set ledger key {balance= b2; key} ;
   let root3 = L16.merkle_root ledger in
   assert (root3 = root1)
 
@@ -188,7 +204,7 @@ let%test_unit "merkle_path_edits" =
   let ledger, keys = L16.load_ledger n b1 in
   List.iter (List.range 0 n) ~f:(fun i ->
       let key = List.nth_exn keys i in
-      L16.set ledger key b2 ;
+      L16.set ledger key {balance= b2; key} ;
       let path = L16.merkle_path ledger key |> Option.value_exn in
       let account = L16.get ledger key |> Option.value_exn in
       let root = L16.merkle_root ledger in
@@ -221,3 +237,43 @@ let%test_unit "set_inner_can_copy_correctly" =
   L3.clear_syncing ledger1 ;
   L3.clear_syncing ledger2 ;
   assert (L3.merkle_root ledger1 = L3.merkle_root ledger2)
+
+let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
+               t a = h" =
+  let rec repeated n f r = if n > 0 then repeated (n - 1) f (f r) else r in
+  let rec mk_addr ix h a =
+    if h = 0 then a
+    else if ix land 1 = 1 then
+      mk_addr (ix lsr 1) (h - 1) (L16.Addr.child_exn a `Right)
+    else mk_addr (ix lsr 1) (h - 1) (L16.Addr.child_exn a `Left)
+  in
+  let count = 8192 in
+  let ledger, keys = L16.load_ledger count 1 in
+  let mr_start = L16.merkle_root ledger in
+  let max_height = Int.ceil_log2 count in
+  L16.set_syncing ledger ;
+  let hash_to_set =
+    Test_ledger.Hash.(merge ~height:80 empty_hash empty_hash)
+  in
+  let open Quickcheck.Generator in
+  Quickcheck.test
+    (tuple2 (Int.gen_incl 0 8192) (Int.gen_incl 0 (max_height - 1)))
+    ~f:(fun (idx, height) ->
+      let a =
+        mk_addr idx height
+          (repeated (L16.depth - max_height)
+             (fun a -> L16.Addr.child_exn a `Left)
+             L16.Addr.root)
+      in
+      let old_hash = L16.get_inner_hash_at_addr_exn ledger a in
+      L16.set_inner_hash_at_addr_exn ledger a hash_to_set ;
+      let res =
+        [%test_result : Test_ledger.Hash.hash]
+          ~equal:Test_ledger.Hash.equal_hash
+          (L16.get_inner_hash_at_addr_exn ledger a)
+          ~expect:hash_to_set
+      in
+      L16.set_inner_hash_at_addr_exn ledger a old_hash ;
+      res ) ;
+  L16.clear_syncing ledger ;
+  assert (mr_start = L16.merkle_root ledger)
