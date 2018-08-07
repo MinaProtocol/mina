@@ -1,6 +1,19 @@
 open Core
 open Dsl
 
+(* TODO: Nathan fixme *)
+module Batteries = struct
+  module Int32 = struct
+    let of_int _ = failwith "TODO: Nathan fixme"
+
+    let to_int _ = failwith "TODO: Nathan fixme"
+  end
+
+  module Big_int = struct
+    let of_int _ = failwith "TODO"
+  end
+end
+
 let ( !^ ) id = Batteries.Int32.of_int (Id.value id)
 
 module Constant = struct
@@ -67,11 +80,12 @@ module Make_program () : Program_intf = struct
     let id = !next_id in
     incr next_id ;
     let next_name name =
-      if Str.string_match (Str.regexp {|_\([0-9]+\)$|}) name 0 then
-        let num = Str.matched_group 1 name in
-        let num = string_of_int (int_of_string num + 1) in
-        Str.replace_matched num name
-      else name ^ "_0"
+      failwith "TODO: Fixme Nathan"
+      (*if Str.string_match (Str.regexp {|_\([0-9]+\)$|}) name 0 then*)
+      (*let num = Str.matched_group 1 name in*)
+      (*let num = string_of_int (int_of_string num + 1) in*)
+      (*Str.replace_matched num name*)
+      (*else name ^ "_0"*)
     in
     let rec register_name name =
       match Hashtbl.add name_table ~key:name ~data:id with

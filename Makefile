@@ -42,11 +42,11 @@ base-minikube :
 base-googlecloud :
 	./rebuild-googlecloud.sh ocaml-base base-Dockerfile $(shell git rev-parse HEAD)
 
-ocaml406-googlecloud:
-	./rebuild-googlecloud.sh ocaml406 ocaml406-Dockerfile
+ocaml407-googlecloud:
+	./rebuild-googlecloud.sh ocaml407 ocaml407-Dockerfile
 
-pull-ocaml406-googlecloud:
-	gcloud docker -- pull gcr.io/o1labs-192920/ocaml406:latest
+pull-ocaml407-googlecloud:
+	gcloud docker -- pull gcr.io/o1labs-192920/ocaml407:latest
 
 ci-base-docker:
 	./rebuild-docker.sh o1labs/ci-base ci-base-Dockerfile

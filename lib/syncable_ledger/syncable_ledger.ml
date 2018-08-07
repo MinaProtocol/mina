@@ -145,7 +145,7 @@ struct
 
   type t = tree ref
 
-  let create i = ref (Leaf `Unknown)
+  let create _ = ref (Leaf `Unknown)
 
   let mark_known_good t a =
     let rec mark_helper node dir =
@@ -274,7 +274,7 @@ struct
     (* lots of _exn called on attacker data. it's not clear how to handle these regardless *)
     let open Or_error.Let_syntax in
     let%map parent = Addr.parent child_addr in
-    Addr.Table.add_multi t.waiting_parents parent (child_addr, h) ;
+    Addr.Table.add_multi t.waiting_parents ~key:parent ~data:(child_addr, h) ;
     let l = Addr.Table.find_multi t.waiting_parents parent in
     match l with
     | [(l1, h1); (l2, h2)] ->

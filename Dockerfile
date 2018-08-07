@@ -1,11 +1,10 @@
-FROM gcr.io/o1labs-192920/ocaml-base:59ddedecf4a99e4b407527875a710ad46104e056
+FROM gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
 
-ENV PATH "/home/opam/.opam/4.06.1/bin:$PATH"
-ENV CAML_LD_LIBRARY_PATH "/home/opam/.opam/4.06.1/lib/stublibs"
-ENV MANPATH "/home/opam/.opam/4.06.1/man:"
-ENV PERL5LIB "/home/opam/.opam/4.06.1/lib/perl5"
-ENV OCAML_TOPLEVEL_PATH "/home/opam/.opam/4.06.1/lib/toplevel"
-ENV FORCE_BUILD 1
+ENV PATH "/home/opam/.opam/4.07.0/bin:$PATH"
+ENV CAML_LD_LIBRARY_PATH "/home/opam/.opam/4.07.0/lib/stublibs"
+ENV MANPATH "/home/opam/.opam/4.07.0/man:"
+ENV PERL5LIB "/home/opam/.opam/4.07.0/lib/perl5"
+ENV OCAML_TOPLEVEL_PATH "/home/opam/.opam/4.07.0/lib/toplevel"
 
 RUN sudo apt-get install --yes python
 RUN CLOUDSDK_CORE_DISABLE_PROMPTS=1 curl https://sdk.cloud.google.com | bash
