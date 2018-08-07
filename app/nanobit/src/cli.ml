@@ -79,6 +79,8 @@ let daemon =
 
          let genesis_proof = Precomputed_values.base_proof
 
+         let transaction_interval = Time.Span.of_sec 5.0
+
          let fee_public_key = Genesis_ledger.rich_pk
        end in
        let module M = ( val if Insecure.key_generation then

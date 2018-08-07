@@ -15,6 +15,8 @@ module type Init_intf = sig
 
   val genesis_proof : Proof.t
 
+  val transaction_interval : Time.Span.t
+
   (* Public key to allocate fees to *)
 
   val fee_public_key : Public_key.Compressed.t
@@ -605,7 +607,7 @@ struct
     end
 
     module Transaction_interval = struct
-      let t = Time.Span.of_time_span @@ Core_kernel.Time.Span.of_sec 5.0
+      let t = Time.Span.of_time_span Init.transaction_interval
     end
   end)
 
