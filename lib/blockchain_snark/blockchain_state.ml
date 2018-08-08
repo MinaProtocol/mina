@@ -190,12 +190,15 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
              Ledger_hash.equal_var previous_state.ledger_hash
                block.state_transition_data.target_hash
            and signature_is_valid =
-             Block.State_transition_data.Signature.Checked.assert_verifies
+             Block.State_transition_data.Signature.Checked.verifies
                block.auxillary_data.signature
                global_signer_public_key_uncompressed
                block.state_transition_data
            in
-           Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
+           let%bind correct_snark_and_signature =
+             Boolean.(correct_transaction_snark && signature_is_valid)
+           in
+           Boolean.(correct_snark_and_signature || ledger_hash_didn't_change)
          in
          let difficulty = previous_state.next_difficulty in
          let difficulty_packed = Target.pack_var difficulty in

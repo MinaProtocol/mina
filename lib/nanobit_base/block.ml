@@ -47,35 +47,22 @@ module State_transition_data = struct
       +> Ledger_hash.fold target_hash
       +> Ledger_builder_hash.fold ledger_builder_hash
 
+    let to_hlist {time; target_hash; ledger_builder_hash} =
+      H_list.[time; target_hash; ledger_builder_hash]
+
+    let of_hlist :
+        (unit, 'ti -> 'th -> 'lbh -> unit) H_list.t -> ('ti, 'th, 'lbh) t_ =
+     fun H_list.([time; target_hash; ledger_builder_hash]) ->
+      {time; target_hash; ledger_builder_hash}
+
+    let data_spec =
+      let open Tick.Data_spec in
+      [Block_time.Unpacked.typ; Ledger_hash.typ; Ledger_builder_hash.typ]
+
     let typ : (var, t) Tick.Typ.t =
-      let relevant_data_typ =
-        let open Tick.Typ in
-        Block_time.Unpacked.typ * Ledger_hash.typ * Ledger_builder_hash.typ
-      in
-      let open Tick.Typ in
-      let store t =
-        Store.map
-          (relevant_data_typ.store
-             ((t.time, t.target_hash), t.ledger_builder_hash))
-          ~f:(fun ((time, target_hash), ledger_builder_hash) ->
-            {time; target_hash; ledger_builder_hash} )
-      in
-      let read t =
-        Read.map
-          (relevant_data_typ.read
-             ((t.time, t.target_hash), t.ledger_builder_hash))
-          ~f:(fun ((time, target_hash), ledger_builder_hash) ->
-            {time; target_hash; ledger_builder_hash} )
-      in
-      let alloc =
-        Alloc.map relevant_data_typ.alloc ~f:
-          (fun ((time, target_hash), ledger_builder_hash) ->
-            {time; target_hash; ledger_builder_hash} )
-      in
-      let check t =
-        relevant_data_typ.check ((t.time, t.target_hash), t.ledger_builder_hash)
-      in
-      {store; read; alloc; check}
+      Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
   end
 
   include T
@@ -89,12 +76,6 @@ module State_transition_data = struct
         type t = T.t
 
         type var = T.var
-
-        let var_of_payload payload =
-          let open Let_syntax in
-          let%bind bs = T.var_to_bits payload in
-          Pedersen_hash.Section.extend Pedersen_hash.Section.empty bs
-            ~start:Hash_prefix.length_in_bits
 
         let hash t ~nonce =
           let d =
@@ -116,7 +97,11 @@ module State_transition_data = struct
                    , Signature_curve.var_of_value Hash_prefix.signature.acc )
                  (bits @ nonce)
              in
-             Pedersen_hash.Digest.choose_preimage @@ Pedersen_hash.digest hash)
+             let%map bs =
+               Pedersen_hash.Digest.choose_preimage
+               @@ Pedersen_hash.digest hash
+             in
+             List.take bs Scalar.length)
       end)
 end
 
