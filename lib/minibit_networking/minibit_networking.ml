@@ -202,6 +202,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Config = struct
     type t =
       { parent_log: Logger.t
+      ; conf_dir: string
       ; gossip_net_params: Gossip_net.Params.t
       ; initial_peers: Peer.t list
       ; me: Peer.t
@@ -219,10 +220,12 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t }
   [@@deriving fields]
 
-  let init_gossip_net params initial_peers me log remap_addr_port
+  let init_gossip_net params conf_dir initial_peers me log remap_addr_port
       implementations =
     let%map membership =
-      match%map Membership.connect ~initial_peers ~me ~parent_log:log with
+      match%map
+        Membership.connect ~initial_peers ~me ~conf_dir ~parent_log:log
+      with
       | Ok membership -> membership
       | Error e ->
           failwith
@@ -261,8 +264,9 @@ module Make (Inputs : Inputs_intf) = struct
            answer_sync_ledger_query_rpc)
     in
     let%map gossip_net =
-      init_gossip_net config.gossip_net_params config.initial_peers config.me
-        log config.remap_addr_port implementations
+      init_gossip_net config.gossip_net_params config.conf_dir
+        config.initial_peers config.me log config.remap_addr_port
+        implementations
     in
     (* TODO: Think about buffering:
        I.e., what do we do when too many messages are coming in, or going out.
@@ -287,6 +291,8 @@ module Make (Inputs : Inputs_intf) = struct
     broadcast t (Transaction_pool_diff x)
 
   let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
+
+  let peers t = Gossip_net.peers t.gossip_net
 
   (* TODO: Have better pushback behavior *)
   let broadcast_state t s =

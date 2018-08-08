@@ -1,5 +1,6 @@
 open Core
 open Util
+open Coda_numbers
 open Snark_params.Tick
 open Let_syntax
 module Amount = Currency.Amount

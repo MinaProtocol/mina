@@ -2,18 +2,19 @@
 
 (executable
   ((name cli)
-   (public_name cli)
+  (public_name cli)
    (libraries
     ( base64
       core
       client_lib
       linear_pipe
       minibit_networking
-      minibit_miner
+      signer
       gossip_net
       kademlia
       minibit
       coda
+      coda_numbers
       protocols
       nanobit_base
       ledger_builder
@@ -38,9 +39,12 @@
       rpc_parallel
       async_ssl
       cohttp
-      cohttp-async))
+      cohttp-async
+      parallel
+      spawner
+      file_system))
    (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.make ppx_inline_test)))
-   (flags (-short-paths -w -40 -g -warn-error +3+4+6+8+9+10+11+12+14+16+20+21+23+24+26+27+29+32..39+56+58+59+60+61))
+   (flags (-short-paths -w -40 -g -warn-error +3+4+6+8+9+10+11+12+14+16+20+21+23+24+26+27+29+32..39+56-58+59+60+61))
    (modes (native))
   ))
 

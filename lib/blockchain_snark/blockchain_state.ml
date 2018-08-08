@@ -1,5 +1,6 @@
 open Core_kernel
 open Nanobit_base
+open Coda_numbers
 open Util
 open Snark_params
 open Tick
@@ -22,8 +23,8 @@ let bit_length =
   Fields_of_t_.fold zero ~init:0 ~next_difficulty:(add Target.bit_length)
     ~previous_state_hash:(add State_hash.length_in_bits)
     ~ledger_hash:(add Ledger_hash.length_in_bits)
-    ~strength:(add Strength.bit_length) ~timestamp:(fun acc _ _ ->
-      acc + Block_time.bit_length )
+    ~strength:(add Strength.bit_length) ~length:(add Length.length_in_bits)
+    ~timestamp:(fun acc _ _ -> acc + Block_time.bit_length )
 
 module type Update_intf = sig
   val update : t -> Block.t -> t Or_error.t
@@ -185,11 +186,20 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
          let%bind new_difficulty =
            compute_target previous_state.timestamp difficulty time
          in
+         let%bind new_length = Length.increment_var previous_state.length in
          let%bind new_strength =
            Strength.increase_checked
              (Strength.pack_var previous_state.strength)
              ~by:(difficulty_packed, difficulty)
            >>= Strength.unpack_var
+         in
+         let global_signer_public_key =
+           Global_signer_private_key.t |> Public_key.of_private_key
+           |> Public_key.compress |> Public_key.Compressed.var_of_t
+         in
+         let%bind () =
+           Public_key.Compressed.assert_equal previous_state.signer_public_key
+             global_signer_public_key
          in
          let new_state =
            { next_difficulty= new_difficulty
@@ -197,7 +207,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
            ; ledger_hash= block.body.target_hash
            ; ledger_builder_hash= block.body.ledger_builder_hash
            ; strength= new_strength
-           ; timestamp= time }
+           ; length= new_length
+           ; timestamp= time
+           ; signer_public_key= global_signer_public_key }
          in
          let%bind state_bits = to_bits new_state in
          let%bind state_partial =
