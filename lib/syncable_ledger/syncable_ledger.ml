@@ -195,17 +195,6 @@ struct
     in
     mark_helper t (Addr.dirs_from_root a)
 
-  let rec to_json_string t ind =
-    match !t with
-    | Leaf `Valid -> sprintf "%s valid" (String.init ind ~f:(fun _ -> ' '))
-    | Leaf `Unknown -> sprintf "%s unkno" (String.init ind ~f:(fun _ -> ' '))
-    | Node (l, r) ->
-        sprintf "%sL:\n%s\n%sR:\n%s\n"
-          (String.init ind ~f:(fun _ -> ' '))
-          (to_json_string l (ind + 2))
-          (String.init ind ~f:(fun _ -> ' '))
-          (to_json_string r (ind + 2))
-
   let fully_valid t =
     let rec fully_valid t =
       match !t with
