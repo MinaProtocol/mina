@@ -602,14 +602,22 @@ struct
       let prove ~prev_state:(old_state, old_proof)
           (transition: Internal_transition.t) =
         let open Deferred.Or_error.Let_syntax in
+        let state_transition_data =
+          let open Block.State_transition_data in
+          { time= transition.timestamp
+          ; target_hash= transition.ledger_hash
+          ; ledger_builder_hash= transition.ledger_builder_hash }
+        in
         Prover.extend_blockchain Init.prover
           {proof= old_proof; state= State.to_blockchain_state old_state}
-          { header= {time= transition.timestamp; nonce= transition.nonce}
-          ; body=
-              { target_hash= transition.ledger_hash
-              ; ledger_builder_hash= transition.ledger_builder_hash
-              ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof
-              } }
+          { auxillary_data=
+              { nonce= transition.nonce
+              ; signature=
+                  Block.State_transition_data.Signature.sign
+                    Nanobit_base.Global_signer_private_key.t
+                    state_transition_data }
+          ; state_transition_data
+          ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof }
         >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
     end
 
