@@ -1,4 +1,5 @@
 open Core_kernel
+open Bitstring_lib
 
 module Make (Impl : Snark_intf.S) = struct
   open Impl
@@ -50,8 +51,9 @@ module Make (Impl : Snark_intf.S) = struct
       let%bind xs = hash_to_field t vs in
       with_label "hash_to_bits"
         (let%map bss =
-           Checked.all
-             (List.map xs ~f:(Field.Checked.unpack ~length:Field.size_in_bits))
+           Checked.List.map xs ~f:(fun x ->
+             Field.Checked.unpack x ~length:Field.size_in_bits
+             >>| Bitstring.Lsb_first.to_list)
          in
          List.concat bss)
   end

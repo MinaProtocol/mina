@@ -93,10 +93,12 @@ struct
   end
 
   module Checked = struct
+    open Impl.Let_syntax
+    open Bitstring_lib
+
     let compress ((x, _): Curve.var) =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
-
-    open Impl.Let_syntax
+      >>| Bitstring.Lsb_first.to_list
 
     let verification_hash ((s, h): Signature.var) (public_key: Public_key.var)
         (m: Message.var) =

@@ -11,6 +11,7 @@ let bigint_num_bits =
   fun n -> go n 0
 
 module Make (Impl : Snark_intf.Basic) = struct
+  open Bitstring_lib
   open Impl
   open Let_syntax
 
@@ -31,14 +32,14 @@ module Make (Impl : Snark_intf.Basic) = struct
     with_label "Number.to_bits"
       ( match bits with
       | Some bs -> return (List.take bs length)
-      | None -> Field.Checked.unpack var ~length )
+      | None -> Field.Checked.unpack var ~length >>| Bitstring.Lsb_first.to_list )
 
   let of_bits bs =
     let n = List.length bs in
     assert (n < Field.size_in_bits) ;
     { upper_bound= Bignum_bigint.(pow2 n - one)
     ; lower_bound= Bignum_bigint.zero
-    ; var= Field.Checked.project bs
+    ; var= Field.Checked.project (Bitstring.Lsb_first.of_list bs)
     ; bits= Some bs }
 
   let div_pow_2 n (`Two_to_the k) =
@@ -60,7 +61,7 @@ module Make (Impl : Snark_intf.Basic) = struct
        else
          let%bind bs = to_bits t in
          let bs' = List.take bs n in
-         let g = Field.Checked.project bs' in
+         let g = Field.Checked.project (Bitstring.Lsb_first.of_list bs') in
          let%bind fits = Field.Checked.equal t.var g in
          let%map r =
            Field.Checked.if_ fits ~then_:g

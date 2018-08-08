@@ -1,4 +1,5 @@
 open Core_kernel
+open Bitstring_lib
 
 (* Someday: Make more efficient by giving Field.unpack a length argument in
 camlsnark *)
@@ -160,6 +161,7 @@ module Snarkable = struct
      and type comparison_result := Impl.Field.Checked.comparison_result =
   struct
     open Impl
+    open Let_syntax
 
     let bit_length = V.length
 
@@ -208,7 +210,7 @@ module Snarkable = struct
       List.foldi vs ~init:V.empty ~f:(fun i acc b ->
           if i < V.length then V.set acc i b else acc )
 
-    let pack_var = Field.Checked.project
+    let pack_var bs = Field.Checked.project (Bitstring.Lsb_first.of_list bs)
 
     let pack_value = Fn.id
 
@@ -228,7 +230,9 @@ module Snarkable = struct
         List.init V.length (fun i -> Boolean.var_of_value (V.get v i))
     end
 
-    let unpack_var x = Impl.Field.Checked.unpack x ~length:bit_length
+    let unpack_var x =
+      Impl.Field.Checked.unpack x ~length:bit_length
+      >>| Bitstring.Lsb_first.to_list
 
     let unpack_value (x: Packed.value) : Unpacked.value = x
 
@@ -238,16 +242,16 @@ module Snarkable = struct
     let increment_if_var bs (b: Boolean.var) =
       let open Impl in
       with_label __LOC__
-        (let v = Field.Checked.pack bs in
+        (let v = pack_var bs in
          let v' = Field.Checked.add v (b :> Field.Checked.t) in
-         Field.Checked.unpack v' ~length:V.length)
+         unpack_var v')
 
     let increment_var bs =
       let open Impl in
       with_label __LOC__
-        (let v = Field.Checked.pack bs in
+        (let v = pack_var bs in
          let v' = Field.Checked.add v (Field.Checked.constant Field.one) in
-         Field.Checked.unpack v' ~length:V.length)
+         unpack_var v')
 
     let equal_var (n: Unpacked.var) (n': Unpacked.var) =
       with_label __LOC__ (Field.Checked.equal (pack_var n) (pack_var n'))
@@ -268,6 +272,7 @@ module Snarkable = struct
       end) =
   struct
     open Impl
+    open Let_syntax
     include M
 
     module Packed = struct
@@ -281,7 +286,7 @@ module Snarkable = struct
     end
 
     module Unpacked = struct
-      type var = Boolean.var list
+      type var = Boolean.var Bitstring.Lsb_first.t
 
       type value = Field.t
 
@@ -300,10 +305,11 @@ module Snarkable = struct
 
     let project_value = Fn.id
 
-    let project_var = Field.Checked.project
+    let project_var bs = Field.Checked.project (Bitstring.Lsb_first.of_list bs)
 
-    let choose_preimage_var : Packed.var -> (Unpacked.var, _) Checked.t =
-      Field.Checked.choose_preimage_var ~length:bit_length
+    let choose_preimage_var (v : Packed.var) : (Unpacked.var, _) Checked.t =
+      Field.Checked.choose_preimage_var ~length:bit_length v
+      >>| Bitstring.Lsb_first.to_list
 
     let unpack_value = Fn.id
   end
@@ -335,6 +341,8 @@ module Snarkable = struct
      and type Unpacked.var = Impl.Boolean.var list
      and type Unpacked.value = Impl.Field.t =
   struct
+    open Impl.Let_syntax
+
     let () = assert (M.bit_length < Impl.Field.size_in_bits)
 
     include Field_backed (Impl) (M)
@@ -345,7 +353,9 @@ module Snarkable = struct
 
     let pack_value = Fn.id
 
-    let unpack_var = Impl.Field.Checked.unpack ~length:M.bit_length
+    let unpack_var v =
+      Impl.Field.Checked.unpack v ~length:M.bit_length
+      >>| Bitstring.Lsb_first.to_list
   end
 end
 

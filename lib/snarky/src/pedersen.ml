@@ -78,6 +78,8 @@ module Make
 end = struct
   open Impl
   open Params
+  open Bitstring_lib
+  open Let_syntax
 
   let hash_length = Field.size_in_bits
 
@@ -98,7 +100,8 @@ end = struct
 
     let choose_preimage x =
       with_label "Pedersen.Digest.choose_preimage"
-        (Field.Checked.choose_preimage_var ~length:Field.size_in_bits x)
+        (Field.Checked.choose_preimage_var ~length:Field.size_in_bits x
+         >>| Bitstring.Lsb_first.to_list)
   end
 
   open Let_syntax

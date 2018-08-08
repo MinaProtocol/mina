@@ -1,5 +1,6 @@
 module Bignum_bigint = Bigint
 open Core_kernel
+open Bitstring_lib
 
 let () = Camlsnark_c.linkme
 
@@ -335,7 +336,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     (* TODO-someday: Consider having an "Assembly" type with only a store constructor for straight up Var.t's
     that this gets compiled into. *)
 
-    type ('a, 's) t =
+    type (+'a, 's) t =
       | Pure: 'a -> ('a, 's) t
       | Add_constraint: Constraint.t * ('a, 's) t -> ('a, 's) t
       | With_constraint_system:
@@ -1198,7 +1199,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     type _ Request.t += Choose_preimage: Field.t * int -> bool list Request.t
 
-    let choose_preimage (v: Cvar.t) ~length : (Boolean.var list, 's) t =
+    let choose_preimage (v: Cvar.t) ~length : (Boolean.var Bitstring.Lsb_first.t, 's) t =
       let open Let_syntax in
       let%bind res =
         exists
@@ -1222,7 +1223,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       let%map () =
         assert_r1cs ~label:"Choose_preimage" lc (Cvar.constant Field.one) v
       in
-      res
+      Bitstring.Lsb_first.of_list res
 
     module List =
       Monad_sequence.List (Checked1)
@@ -1354,15 +1355,15 @@ module Make_basic (Backend : Backend_intf.S) = struct
   module Cvar1 = struct
     include Cvar
 
-    let project (vars: Checked.Boolean.var list) =
+    let project (vars: Checked.Boolean.var Bitstring.Lsb_first.t) =
       let rec go c acc = function
         | [] -> List.rev acc
         | v :: vs -> go (Field.add c c) ((c, v) :: acc) vs
       in
-      Cvar.linear_combination (go Field.one [] vars)
+      Cvar.linear_combination (go Field.one [] (vars :> Checked.Boolean.var list))
 
     let pack vars =
-      assert (List.length vars < Field.size_in_bits) ;
+      assert (Bitstring.Lsb_first.length vars < Field.size_in_bits) ;
       project vars
 
     let unpack v ~length =
@@ -1382,7 +1383,10 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | _, _ ->
             let t1_a, t1_b = List.split_n t1 chunk_size in
             let t2_a, t2_b = List.split_n t2 chunk_size in
-            go ((Cvar1.pack t1_a, Cvar1.pack t2_a) :: acc) t1_b t2_b
+            go
+              ((Cvar1.pack (Bitstring.Lsb_first.of_list t1_a),
+                Cvar1.pack (Bitstring.Lsb_first.of_list t2_a)) :: acc)
+              t1_b t2_b
       in
       go [] t1 t2
 
@@ -1456,7 +1460,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
            in
            let%bind alpha = unpack alpha_packed ~length:(bit_length + 1) in
            let prefix, less_or_equal =
-             match Core_kernel.List.split_n alpha bit_length with
+             match Core_kernel.List.split_n (alpha :> Boolean.var list) bit_length with
              | p, [l] -> (p, l)
              | _ -> failwith "compare: Invalid alpha"
            in
@@ -1542,7 +1546,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let open Checked.Let_syntax in
         let%bind res =
           choose_preimage_var x ~length:Field.size_in_bits
-          >>| Bitstring.Lsb_first.of_list
         in
         let%map () =
           lt_bitstring_value
@@ -1558,10 +1561,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let gen =
       let open Quickcheck.Generator in
       let open Let_syntax in
+      let%bind common_prefix =
+        let%bind common_prefix_length = small_positive_int in
+        list_with_length common_prefix_length bool
+      in
       let%bind length = small_positive_int in
       let%map x = list_with_length length bool
       and y = list_with_length length bool in
-      (x, y)
+      (common_prefix @ x, common_prefix @ y)
     in
     Quickcheck.test gen ~f:(fun (x, y) ->
         let correct_answer = x < y in

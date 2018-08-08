@@ -1,5 +1,6 @@
 module Bignum_bigint = Bigint
 open Core_kernel
+open Bitstring_lib
 
 module type Basic = sig
   module Proving_key : sig
@@ -230,7 +231,9 @@ module type Basic = sig
   end
   
   and Checked : sig
-    include Monad.S2
+    type (+'a, 's) t
+
+    include Monad.S2 with type ('a, 's) t := ('a, 's) t
 
     module List :
       Monad_sequence.S
@@ -282,17 +285,17 @@ module type Basic = sig
 
       val equal : t -> t -> (Boolean.var, 's) Checked.t
 
-      val project : Boolean.var list -> t
+      val project : Boolean.var Bitstring.Lsb_first.t -> t
 
-      val pack : Boolean.var list -> t
+      val pack : Boolean.var Bitstring.Lsb_first.t -> t
 
-      val unpack : t -> length:int -> (Boolean.var list, _) Checked.t
+      val unpack : t -> length:int -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
       val unpack_full :
-        t -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
+        t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
       val choose_preimage_var :
-        t -> length:int -> (Boolean.var list, _) Checked.t
+        t -> length:int -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
       type comparison_result = {less: Boolean.var; less_or_equal: Boolean.var}
 

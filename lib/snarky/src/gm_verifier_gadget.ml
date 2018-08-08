@@ -197,19 +197,22 @@ struct
           ()
       end
 
+      open Bitstring_lib
+
       let to_bits ({characterizing_up_to_sign; sign}: var) =
         let open Checked.Let_syntax in
         let%map bs1 =
           (* It's ok to use choose_preimage here *)
           Checked.List.map characterizing_up_to_sign ~f:(fun x ->
-              Field.Checked.choose_preimage_var x ~length:Field.size_in_bits )
+            Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
+            >>| Bitstring.Lsb_first.to_list)
           >>| List.concat
         and bs2 =
           (* but not here *)
           Checked.List.map sign ~f:(fun x ->
               let%bind () = Field.Checked.Assert.non_zero x in
               Field.Checked.unpack_full x
-              >>| Bitstring_lib.Bitstring.Lsb_first.to_list >>| List.hd_exn )
+              >>| Bitstring.Lsb_first.to_list >>| List.hd_exn )
         in
         bs1 @ bs2
     end
@@ -458,10 +461,13 @@ struct
     include T
     include Gadget.Make (Impl) (Libsnark) (T)
 
-    let choose_verification_key_data_and_proof_and_check_result input
-        get_witness =
+    open Bitstring_lib.Bitstring
+
+    let choose_verification_key_data_and_proof_and_check_result
+          (input : Boolean.var Lsb_first.t)
+          get_witness =
       let open Let_syntax in
-      let%map t = create input get_witness in
+      let%map t = create (Lsb_first.to_list input) get_witness in
       assert (
         List.length t.vk_characterizing_vars_up_to_sign
         = Verification_key_data.characterizing_length ) ;

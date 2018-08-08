@@ -41,8 +41,10 @@ struct
     in
     {(Typ.transport Field.typ ~there:to_field ~back:of_field) with check}
 
-  let var_to_bits : var -> (Boolean.var list, _) Checked.t =
-    Field.Checked.unpack ~length:bit_length
+  let var_to_bits (v : var) : (Boolean.var list, 'a) Checked.t =
+    let open Checked.Let_syntax in
+    Field.Checked.unpack v ~length:bit_length
+    >>| Bitstring_lib.Bitstring.Lsb_first.to_list
 
   let to_bits t = int_to_bits ~length:bit_length (to_enum t)
 

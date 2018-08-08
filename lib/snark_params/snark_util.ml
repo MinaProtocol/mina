@@ -81,6 +81,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     bs
 
   let assert_num_bits_upper_bound bs u =
+    let bs = Bitstring.Lsb_first.to_list bs in
     let total_length = List.length bs in
     assert (total_length < Field.size_in_bits);
     let%bind mask = n_ones ~total_length u in
@@ -116,7 +117,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
     num_bits
 
   (* Someday: this could definitely be made more efficient *)
-  let num_bits_upper_bound_unpacked : Boolean.var list -> (Field.Checked.t, _) Checked.t =
+  let num_bits_upper_bound_unpacked : Boolean.var Bitstring.Lsb_first.t -> (Field.Checked.t, _) Checked.t =
     fun x_unpacked ->
       let%bind res =
         exists Typ.field
