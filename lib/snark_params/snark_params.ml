@@ -53,6 +53,8 @@ end
 module Tick = struct
   module Tick0 = Extend (Snarky.Snark.Make (Tick_curve))
 
+  module Sha256 = Snarky.Sha256.Make(struct let prefix = Tick_curve.prefix end)(Tick0)(Tick_curve)
+
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
   module Field = struct
