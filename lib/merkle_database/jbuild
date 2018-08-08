@@ -6,6 +6,6 @@
   (flags (:standard -short-paths -warn-error -27-32-34-6))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core bitstring integers immutable_array))
+  (libraries (core async bitstring integers immutable_array file_system))
   (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.show bitstring.ppx)))
   (synopsis "RocksDB Database module")))
