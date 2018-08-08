@@ -31,14 +31,15 @@ template<typename FieldT>
 r1cs_constraint<FieldT>::r1cs_constraint(const linear_combination<FieldT> &a,
                                          const linear_combination<FieldT> &b,
                                          const linear_combination<FieldT> &c) :
-    a(a), b(b), c(c)
+    a(a), b(b), c(c), is_square(false)
 {
 }
 
 template<typename FieldT>
 r1cs_constraint<FieldT>::r1cs_constraint(const std::initializer_list<linear_combination<FieldT> > &A,
                                          const std::initializer_list<linear_combination<FieldT> > &B,
-                                         const std::initializer_list<linear_combination<FieldT> > &C)
+                                         const std::initializer_list<linear_combination<FieldT> > &C) :
+  is_square (false)
 {
     for (auto lc_A : A)
     {

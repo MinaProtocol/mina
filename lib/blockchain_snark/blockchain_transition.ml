@@ -137,10 +137,6 @@ module Make (T : Transaction_snark.Verification.S) = struct
               module Tick = Digest
               module Tock = Bits.Snarkable.Field (Tock)
             end)
-            (struct
-              let hash bs =
-                Tick.digest_bits ~init:Hash_prefix.transition_system_snark bs
-            end)
             (System)
 
   module Keys = struct
@@ -161,7 +157,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
       Cached.Spec.create ~load ~directory:Cache_dir.cache_dir
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
-        ~create_env:Tick.R1CS_constraint_system.generate_keypair
+        ~create_env:Tick.Keypair.generate
         ~input:
           (Tick.constraint_system ~exposing:(Step_base.input ()) Step_base.main)
 
@@ -185,7 +181,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
         Cached.Spec.create ~load ~directory:Cache_dir.cache_dir
           ~digest_input:
             (Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
-          ~create_env:Tock.R1CS_constraint_system.generate_keypair
+          ~create_env:Tock.Keypair.generate
           ~input:(Tock.constraint_system ~exposing:(Wrap.input ()) Wrap.main)
       in
       let%map wrap_vk, wrap_pk = Cached.run wrap_cached in

@@ -125,6 +125,102 @@ void test_G2_checker_gadget(const std::string &annotation)
     printf("number of constraints for G2 checker (Fr is %s)  = %zu\n", annotation.c_str(), pb.num_constraints());
 }
 
+template<typename ppT>
+G2_add_gadget<ppT>::G2_add_gadget(protoboard<FieldT> &pb,
+                                  const G2_variable<ppT> &A,
+                                  const G2_variable<ppT> &B,
+                                  const G2_variable<ppT> &C,
+                                  const std::string &annotation_prefix) :
+    gadget<FieldT>(pb, annotation_prefix),
+    A(A),
+    B(B),
+    C(C)
+{
+    /*
+      lambda = (B.y - A.y)/(B.x - A.x)
+      C.x = lambda^2 - A.x - B.x
+      C.y = lambda(A.x - C.x) - A.y
+
+      Special cases:
+
+      doubling: if B.y = A.y and B.x = A.x then lambda is unbound and
+      C = (lambda^2, lambda^3)
+
+      addition of negative point: if B.y = -A.y and B.x = A.x then no
+      lambda can satisfy the first equation unless B.y - A.y = 0. But
+      then this reduces to doubling.
+
+      So we need to check that A.x - B.x != 0, which can be done by
+      enforcing I * (B.x - A.x) = 1
+    */
+
+    lambda.reset(
+      new Fqe_variable<ppT>(pb, FMT(annotation_prefix, " lambda")));
+    inv.reset(
+      new Fqe_variable<ppT>(pb, FMT(annotation_prefix, " lambda")));
+    B_x_sub_A_x.reset(
+      new Fqe_variable<ppT>(*(B.X) - *(A.X)));
+    B_y_sub_A_y.reset(
+      new Fqe_variable<ppT>(*(B.Y) - *(A.Y)));
+    C_x_add_A_x_add_B_x.reset(
+      new Fqe_variable<ppT>(*(C.X) + *(A.X) + *(B.X)));
+    A_x_sub_C_x.reset(
+      new Fqe_variable<ppT>(*(A.X) - *(C.X)));
+    C_y_add_A_y.reset(
+      new Fqe_variable<ppT>(*(C.Y) + *(A.Y)));
+    Fqe_one.reset(
+      new Fqe_variable<ppT>(pb, FqeT::one(), FMT(annotation_prefix, "Fqe_one")));
+
+    calc_lambda.reset(new Fqe_mul_gadget<ppT>(pb,
+          *lambda, *B_x_sub_A_x, *B_y_sub_A_y,
+          FMT(annotation_prefix, " calc_lambda")));
+    calc_X.reset(new Fqe_mul_gadget<ppT>(pb,
+          *lambda, *lambda, *C_x_add_A_x_add_B_x,
+          FMT(annotation_prefix, " calc_X")));
+    calc_Y.reset(new Fqe_mul_gadget<ppT>(pb,
+          *lambda, *A_x_sub_C_x, *C_y_add_A_y,
+          FMT(annotation_prefix, " calc_Y")));
+    no_special_cases.reset(new Fqe_mul_gadget<ppT>(pb,
+          *inv, *B_x_sub_A_x, *Fqe_one,
+          FMT(annotation_prefix, " no_special_cases")));
+}
+
+template<typename ppT>
+void G2_add_gadget<ppT>::generate_r1cs_constraints()
+{
+    calc_lambda->generate_r1cs_constraints();
+    calc_X->generate_r1cs_constraints();
+    calc_Y->generate_r1cs_constraints();
+    no_special_cases->generate_r1cs_constraints();
+}
+
+template<typename ppT>
+void G2_add_gadget<ppT>::generate_r1cs_witness()
+{
+    inv->generate_r1cs_witness(
+      ( B.X->get_element() - A.X->get_element() ).inverse());
+    lambda->generate_r1cs_witness(
+      (B.Y->get_element() - A.Y->get_element())
+      * inv->get_element() );
+
+    C.X->generate_r1cs_witness(
+      lambda->get_element().squared() - A.X->get_element() - B.X->get_element());
+    C.Y->generate_r1cs_witness(
+      lambda->get_element() * ( A.X->get_element() - C.X->get_element()) - A.Y->get_element());
+
+    B_x_sub_A_x->evaluate();
+    B_y_sub_A_y->evaluate();
+    C_x_add_A_x_add_B_x->evaluate();
+    A_x_sub_C_x->evaluate();
+    C_y_add_A_y->evaluate();
+    Fqe_one->evaluate();
+
+    calc_lambda->generate_r1cs_witness_internal();
+    calc_X->generate_r1cs_witness_internal();
+    calc_Y->generate_r1cs_witness_internal();
+    no_special_cases->generate_r1cs_witness_internal();
+}
+
 } // libsnark
 
 #endif // WEIERSTRASS_G2_GADGET_TCC_
