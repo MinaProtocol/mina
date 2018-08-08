@@ -40,7 +40,7 @@ let%test "length" =
   let ledger, keys = L16.load_ledger n b in
   L16.length ledger = n
 
-let gkey = Option.map ~f:(fun {Test_ledger.Account.balance} -> balance)
+let gkey = Option.map ~f:(fun {Test_ledger.Account.balance; _} -> balance)
 
 let%test "key_retrieval" =
   let b = 100 in

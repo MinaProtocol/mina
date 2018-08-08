@@ -436,8 +436,8 @@ struct
         in
         recompute_layers (curr_height + 1) get_curr_hash layers dirty_indices
 
-  let recompute_tree ?allow_sync t =
-    if t.tree.syncing && not (allow_sync = Some true) then
+  let recompute_tree ?(allow_sync= false) t =
+    if t.tree.syncing && not allow_sync then
       failwith "recompute tree while syncing -- logic error!" ;
     if not (List.is_empty t.tree.dirty_indices) || t.tree.dirty then (
       extend_tree t.tree ;

@@ -26,8 +26,6 @@ module Hash = struct
         (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
     in
     res
-
-  (* Printf.printf "merge(%d, %s, %s) = %s\n" height (Sexp.to_string_hum (sexp_of_hash a)) (Sexp.to_string_hum (sexp_of_hash b)) (Sexp.to_string_hum (sexp_of_hash res)); res *)
 end
 
 module Key = struct

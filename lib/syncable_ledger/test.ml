@@ -3,7 +3,7 @@ open Async_kernel
 module TL = Merkle_ledger.Test_ledger
 
 module Tests
-    (L : Merkle_ledger.Test.Ledger_intf) (NumAccts : sig
+    (L : Merkle_ledger.Test.Ledger_intf) (Num_accts : sig
         val num_accts : int
     end) =
 struct
@@ -17,7 +17,7 @@ struct
     let equal h1 h2 = compare_hash h1 h2 = 0
   end
 
-  module MLedger = struct
+  module Ledger' = struct
     include L
 
     type key = unit
@@ -30,18 +30,18 @@ struct
       (TL.Account)
       (Adjhash)
       (Adjhash)
-      (MLedger)
+      (Ledger')
   module SR =
     Syncable_ledger.Make_sync_responder (L.Addr) (TL.Key) (TL.Account)
       (Adjhash)
       (Adjhash)
-      (MLedger)
+      (Ledger')
       (SL)
   module Ugh = Tuple.Sexpable (L.Addr) (Adjhash)
 
   let%test "full_sync_entirely_different" =
-    let l1, k1 = L.load_ledger NumAccts.num_accts 1 in
-    let l2, k2 = L.load_ledger NumAccts.num_accts 2 in
+    let l1, k1 = L.load_ledger Num_accts.num_accts 1 in
+    let l2, k2 = L.load_ledger Num_accts.num_accts 2 in
     L.set_syncing l1 ;
     L.set_syncing l2 ;
     L.clear_syncing l1 ;

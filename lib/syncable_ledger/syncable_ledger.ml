@@ -172,8 +172,6 @@ struct
     if not (Addr.equal a Addr.root) then go t (Addr.dirs_from_root a) ;
     t
 
-  (*Valid.mark_known_good t.validity (Addr.child_exn (Addr.parent_exn r) `Right) ;*)
-
   let mark_known_good t a =
     let rec mark_helper node dirs =
       match dirs with
@@ -215,8 +213,6 @@ with the hashes in the bottomost N-1 internal nodes).
 We rely on clear_syncing to recompute the hashes and
 do any other fixup necessary.
 *)
-
-let dbg s = Sexp.to_string_hum s
 
 module Make
     (Addr : Addr_intf) (Key : sig
