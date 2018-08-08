@@ -32,9 +32,28 @@ module Rose = struct
   let find = C.find
 end
 
+module type S = sig
+  type elem
+
+  type t [@@deriving sexp]
+
+  val gen : elem Quickcheck.Generator.t -> t Quickcheck.Generator.t
+
+  val find_map : t -> f:(elem -> 'a option) -> 'a option
+
+  val path : t -> f:(elem -> bool) -> elem list option
+
+  val single : elem -> t
+
+  val longest_path : t -> elem list
+
+  val add :
+    t -> elem -> parent:(elem -> bool) -> [> `Added of t | `No_parent | `Repeat]
+end
+
 (** A Rose tree with max-depth k. Whenever we want to add a node that would increase the depth past k, we instead move the tree forward and root it at the node towards that path *)
 module Make (Elem : sig
-  type t [@@deriving eq, compare, bin_io, sexp]
+  type t [@@deriving compare, bin_io, sexp]
 end) (Max_depth : sig
   val k : int
   (** The idea is k is "small" in the sense of probability of forking within k is < some nontrivial epsilon (like once a week?) *)
@@ -44,10 +63,10 @@ struct
 
   type t = {tree: Elem.t Rose.t; elems: Elem_set.t} [@@deriving sexp, bin_io]
 
-  let find_map {elems} ~f = Elem_set.find_map elems ~f
+  let find_map {elems; _} ~f = Elem_set.find_map elems ~f
 
   (** Path from the root to the first node where the predicate returns true *)
-  let path {tree} ~f =
+  let path {tree; _} ~f =
     let rec go tree path =
       match tree with
       | Rose.Rose (x, _) when f x -> Some (x :: path)
@@ -77,7 +96,7 @@ struct
     {tree; elems= !r}
 
   (* Note: This won't work in proof-of-work, but it's not a prefix of the proof-of-stakeversion, so I'm just going to use a longest heuristic for now *)
-  let longest_path {tree} =
+  let longest_path {tree; _} =
     let rec go tree depth path =
       match tree with
       | Rose.Rose (x, []) -> (x :: path, depth)
