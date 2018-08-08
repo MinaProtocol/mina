@@ -22,10 +22,8 @@ module type S = sig
          unit
       -> ('a, 'b, Tick.Field.var -> 'a, Tick.Field.t -> 'b) Tick.Data_spec.t
 
-    module Verifier : sig
-      module Verification_key : sig
-        val to_bool_list : Tock.Verification_key.t -> bool list
-      end
+    module Verification_key : sig
+      val to_bool_list : Tock.Verification_key.t -> bool list
     end
 
     module Prover_state = Step_prover_state

@@ -81,6 +81,43 @@ public:
     void generate_r1cs_witness();
 };
 
+/**
+ * Gadget that creates constraints for G2 addition.
+ */
+template<typename ppT>
+class G2_add_gadget : public gadget<libff::Fr<ppT> > {
+public:
+    typedef libff::Fr<ppT> FieldT;
+    typedef libff::Fqe<other_curve<ppT> > FqeT;
+
+    std::shared_ptr<Fqe_variable<ppT>> lambda;
+    std::shared_ptr<Fqe_variable<ppT>> inv;
+
+    G2_variable<ppT> A;
+    G2_variable<ppT> B;
+    G2_variable<ppT> C;
+
+    std::shared_ptr<Fqe_variable<ppT> > B_x_sub_A_x;
+    std::shared_ptr<Fqe_variable<ppT> > B_y_sub_A_y;
+    std::shared_ptr<Fqe_variable<ppT> > C_x_add_A_x_add_B_x;
+    std::shared_ptr<Fqe_variable<ppT> > A_x_sub_C_x;
+    std::shared_ptr<Fqe_variable<ppT> > C_y_add_A_y;
+    std::shared_ptr<Fqe_variable<ppT> > Fqe_one;
+
+    std::shared_ptr<Fqe_mul_gadget<ppT> > calc_lambda;
+    std::shared_ptr<Fqe_mul_gadget<ppT> > calc_X;
+    std::shared_ptr<Fqe_mul_gadget<ppT> > calc_Y;
+    std::shared_ptr<Fqe_mul_gadget<ppT> > no_special_cases;
+
+    G2_add_gadget(protoboard<FieldT> &pb,
+                  const G2_variable<ppT> &A,
+                  const G2_variable<ppT> &B,
+                  const G2_variable<ppT> &C,
+                  const std::string &annotation_prefix);
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+};
+
 } // libsnark
 
 #include <libsnark/gadgetlib1/gadgets/curves/weierstrass_g2_gadget.tcc>

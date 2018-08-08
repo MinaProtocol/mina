@@ -69,14 +69,6 @@ module type S = sig
     val verify : t -> Verification_key.t -> Field.Vector.t -> bool
   end
 
-  module Keypair : sig
-    type t
-
-    val pk : t -> Proving_key.t
-
-    val vk : t -> Verification_key.t
-  end
-
   module R1CS_constraint_system : sig
     type t
 
@@ -97,8 +89,6 @@ module type S = sig
 
     val get_auxiliary_input_size : t -> int
 
-    val create_keypair : t -> Keypair.t
-
     val check_exn : t -> unit
 
     val is_satisfied :
@@ -108,5 +98,15 @@ module type S = sig
       -> bool
 
     val digest : t -> Md5.t
+  end
+
+  module Keypair : sig
+    type t
+
+    val pk : t -> Proving_key.t
+
+    val vk : t -> Verification_key.t
+
+    val create : R1CS_constraint_system.t -> t
   end
 end
