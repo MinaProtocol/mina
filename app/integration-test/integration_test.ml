@@ -11,8 +11,12 @@ let tests = [(module Different_pid : Test); (module Simple_worker : Test)]
 
 let run_all_tests () =
   Deferred.List.iter tests ~f:(fun (module T : Test) ->
-      Process.run_exn ~prog:Sys.executable_name ~args:[T.name] ()
-      |> Deferred.ignore )
+      let%bind process =
+        Process.create_exn ~prog:Sys.executable_name ~args:[T.name] ()
+      in
+      File_system.dup_stdout process ;
+      File_system.dup_stderr process ;
+      Process.wait process |> Deferred.ignore )
 
 let () =
   Random.self_init () ;
