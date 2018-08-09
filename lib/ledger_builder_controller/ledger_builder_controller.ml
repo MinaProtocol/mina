@@ -693,7 +693,7 @@ let%test_module "test" =
             let%bind lbc = lbc_deferred in
             let%map results =
               take_map (Lbc.strongest_ledgers lbc) (List.length expected) ~f:
-                (fun (lb, _) -> printf "Got %d\n%!" !lb ; !lb )
+                (fun (lb, _) -> !lb )
             in
             assert (List.equal results expected ~equal:Int.equal) )
       in

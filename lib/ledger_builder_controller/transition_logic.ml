@@ -183,14 +183,6 @@ struct
         in
         let last_transition = List.last_exn path.Path.path in
         (* Now step over the path *)
-        printf !"************\n%!" ;
-        printf !"LOCKED tip is %{sexp: State.t}" (Tip.state tip) ;
-        printf
-          !"State tip: %{sexp: State.t}; state path: %{sexp: State.t}\n%!"
-          (Tip.state tip) path.Path.source ;
-        printf !"Full path: %{sexp: Path.t}\n%!" path ;
-        printf !"HELLO WORLD\n%!" ;
-        printf !"************\n%!" ;
         assert (State.equal (Tip.state tip) path.Path.source) ;
         let%map result =
           List.fold path.Path.path ~init:(Interruptible.return (Some tip)) ~f:
@@ -219,7 +211,6 @@ struct
 
     let create (t: t0) new_tree old_tree new_best_path
         (transition: Transition.t) : t =
-      printf "Create BT:%s\n%!" (Backtrace.to_string (Backtrace.get ())) ;
       (transition, run t new_tree old_tree new_best_path)
   end
 
