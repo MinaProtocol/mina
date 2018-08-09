@@ -17,7 +17,6 @@ module State_worker = struct
   let new_states {reader} = reader
 
   let run t =
-    printf "Hello World from State worker" ;
     t.state <- 2 * t.state ;
     Pipe.write t.writer t.state
 end
