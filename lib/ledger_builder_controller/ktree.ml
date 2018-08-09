@@ -4,7 +4,7 @@ open Core_kernel
 module Rose = struct
   type 'a t = Rose of 'a * 'a t list [@@deriving eq, sexp, bin_io, fold]
 
-  let single a = Rose (a, [])
+  let singleton a = Rose (a, [])
 
   let extract (Rose (x, _)) = x
 
@@ -43,12 +43,14 @@ module type S = sig
 
   val path : t -> f:(elem -> bool) -> elem list option
 
-  val single : elem -> t
+  val singleton : elem -> t
 
   val longest_path : t -> elem list
 
   val add :
     t -> elem -> parent:(elem -> bool) -> [> `Added of t | `No_parent | `Repeat]
+
+  val root : t -> elem
 end
 
 (** A Rose tree with max-depth k. Whenever we want to add a node that would increase the depth past k, we instead move the tree forward and root it at the node towards that path *)
@@ -63,6 +65,8 @@ struct
 
   type t = {tree: Elem.t Rose.t; elems: Elem_set.t} [@@deriving sexp, bin_io]
 
+  let root {tree; _} = Rose.extract tree
+
   let find_map {elems; _} ~f = Elem_set.find_map elems ~f
 
   (** Path from the root to the first node where the predicate returns true *)
@@ -76,8 +80,8 @@ struct
     in
     go tree [] |> Option.map ~f:List.rev
 
-  let single (e: Elem.t) : t =
-    {tree= Rose.single e; elems= Elem_set.singleton e}
+  let singleton (e: Elem.t) : t =
+    {tree= Rose.singleton e; elems= Elem_set.singleton e}
 
   let gen elem_gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -117,7 +121,7 @@ struct
     else
       let rec go node depth =
         let (Rose.Rose (x, xs)) = node in
-        if parent x then (Rose.Rose (x, Rose.single e :: xs), depth + 1)
+        if parent x then (Rose.Rose (x, Rose.singleton e :: xs), depth + 1)
         else
           let xs, ds =
             List.map xs ~f:(fun x -> go x (depth + 1)) |> List.unzip
@@ -129,7 +133,7 @@ struct
         let children_and_depths =
           List.map root_children ~f:(fun x -> go x 1)
         in
-        if parent root then (root, (Rose.single e, 1) :: children_and_depths)
+        if parent root then (root, (Rose.singleton e, 1) :: children_and_depths)
         else (
           assert (List.length root_children <> 0) ;
           (root, children_and_depths) )
@@ -225,7 +229,7 @@ let%test_module "K-tree" =
           let tree =
             List.fold es
               ~init:(Rose.Rose (e1, []))
-              ~f:(fun r (e, e') -> Rose.Rose (e, [Rose.single e'; r]))
+              ~f:(fun r (e, e') -> Rose.Rose (e, [Rose.singleton e'; r]))
           in
           {tree; elems= Elem_set.of_list (Rose.to_list tree)}
         in
@@ -261,7 +265,7 @@ let%test_module "K-tree" =
 
     let sample_tree =
       { Tree.tree=
-          Rose.Rose (1, [Rose.Rose (2, [Rose.single 3]); Rose.single 4])
+          Rose.Rose (1, [Rose.Rose (2, [Rose.singleton 3]); Rose.singleton 4])
       ; elems= Tree.Elem_set.of_list [1; 2; 3; 4] }
 
     let%test_unit "longest_path finds longest path" =
