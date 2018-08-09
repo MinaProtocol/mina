@@ -134,6 +134,9 @@ module Edwards = struct
       type t = Field.t * Field.t
 
       (* x^2 + y^2 = 1 + dx^2 y^2 *)
+      (* x^2 - d x^2 y^2 = 1 - y^2 *)
+      (* x^2 (1 - d y^2) = 1 - y^2 *)
+      (* x^2 = (1 - y^2)/(1 - d y^2) *)
 
       let generator : t = Params.generator
 
@@ -486,6 +489,7 @@ module Edwards = struct
     S
     with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
      and type Scalar.t = Scalar.t
+     and type Scalar.var = Scalar.var
      and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type boolean_var := Impl.Boolean.var
      and type field := Impl.Field.t

@@ -107,7 +107,7 @@ module Tick = struct
 
         type var = Boolean.var list
 
-        type value = Bignum_bigint.t
+        type t = Bignum_bigint.t
 
         let test_bit t i = Bignum_bigint.(shift_right t i land one = one)
 
@@ -123,7 +123,7 @@ module Tick = struct
 
         let length_in_bits = length_in_bits
 
-        let typ : (var, value) Typ.t =
+        let typ : (var, t) Typ.t =
           let open Typ in
           transport (list ~length:length_in_bits Boolean.typ)
             ~there:(fun n ->
