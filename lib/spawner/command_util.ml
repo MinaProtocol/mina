@@ -19,6 +19,5 @@ let executable_path_flag =
 
 let config_arguments =
   let open Command.Let_syntax in
-  let%map host = host_flag and
-  executable_path = executable_path_flag in
+  let%map host = host_flag and executable_path = executable_path_flag in
   {Config.id= (); host; executable_path}

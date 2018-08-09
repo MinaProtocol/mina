@@ -93,8 +93,7 @@ let run =
   let%map_open program_dir =
     flag "program-directory" ~doc:"base directory of nanobit project "
       (optional file)
-  and {host; executable_path} = Command_util.config_arguments
-  in
+  and {host; executable_path} = Command_util.config_arguments in
   fun () ->
     let open Deferred.Let_syntax in
     let open Master in
@@ -127,20 +126,13 @@ let run =
     and log_dir_2 = "/tmp/current_config_2" in
     File_system.with_temp_dirs [log_dir_1; log_dir_2] ~f:(fun () ->
         let process1 = 1 and process2 = 2 in
-        let config1 =
-          { Spawner.Config.id= process1
-          ; host
-          ; executable_path }
-        and config2 =
-          { Spawner.Config.id= process2
-          ; host
-          ; executable_path }
-        in
+        let config1 = {Spawner.Config.id= process1; host; executable_path}
+        and config2 = {Spawner.Config.id= process2; host; executable_path} in
         let coda_gossip_port = 8000 in
         let coda_my_port = 3000 in
         let%bind () =
-          init_coda t ~config:config1 ~log_dir:log_dir_1 ~my_port:coda_my_port ~peers:[]
-            ~gossip_port:coda_gossip_port ~should_wait:false
+          init_coda t ~config:config1 ~log_dir:log_dir_1 ~my_port:coda_my_port
+            ~peers:[] ~gossip_port:coda_gossip_port ~should_wait:false
         in
         let%bind () = Option.value_exn (run t process1) in
         let reader = new_states t in
