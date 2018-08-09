@@ -25,13 +25,12 @@ module Master = Master.Make (Worker (Int)) (Int)
 
 let master_command =
   let open Command.Let_syntax in
-  let%map {host; executable_path; log_dir} = Command_util.config_arguments in
+  let%map {host; executable_path} = Command_util.config_arguments in
   fun () ->
     let open Deferred.Let_syntax in
     let open Master in
     let t = create () in
-    let%bind () = File_system.create_dir log_dir in
-    let config = {Spawner.Config.id= 1; host; executable_path; log_dir}
+    let config = {Spawner.Config.id= 1; host; executable_path}
     and process1 = 1
     and process2 = 2 in
     let%bind () = add t () process1 ~config

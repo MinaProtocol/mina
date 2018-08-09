@@ -41,4 +41,4 @@ module Make (Worker : Worker_intf) (Id : Id_intf) :
   Parallel_worker_intf
   with type input = Worker.input
    and type state = Worker.state
-   and type config = (Id.t, string, string, string) Config.t
+   and type config = (Id.t, string, string) Config.t
