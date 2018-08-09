@@ -3,10 +3,10 @@
 (library
  ((name kademlia)
   (public_name kademlia)
-  (flags (:standard -short-paths))
+  (flags (:standard -short-paths -warn-error -27-9))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core logger linear_pipe async async_extra))
+  (libraries (core logger linear_pipe async async_extra file_system))
   (preprocess (pps (ppx_jane)))
   (synopsis "Kademlia DHT -- only being used for it's membership")))
 

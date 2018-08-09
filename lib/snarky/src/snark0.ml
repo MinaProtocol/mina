@@ -73,6 +73,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let create = Fields.create
 
     let of_backend_keypair kp = {pk= Keypair.pk kp; vk= Keypair.vk kp}
+
+    let generate = Fn.compose of_backend_keypair Backend.Keypair.create
   end
 
   module Var = struct
@@ -1274,8 +1276,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let generate_keypair :
         exposing:((unit, 's) Checked.t, _, 'k_var, _) t -> 'k_var -> Keypair.t =
      fun ~exposing k ->
-      Backend.R1CS_constraint_system.create_keypair
-        (constraint_system ~exposing k)
+      Backend.Keypair.create (constraint_system ~exposing k)
       |> Keypair.of_backend_keypair
 
     let verify :
@@ -1487,8 +1488,95 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let not_equal (x: t) (y: t) =
           Checked.with_label "Checked.Assert.not_equal" (non_zero (sub x y))
       end
+
+      let lt_bitstring_value =
+        let module Boolean = Checked.Boolean in
+        let module Expr = struct
+          module Binary = struct
+            type 'a t = Lit of 'a | And of 'a * 'a t | Or of 'a * 'a t
+          end
+
+          module Nary = struct
+            type 'a t = Lit of 'a | And of 'a t list | Or of 'a t list
+
+            let rec of_binary : 'a Binary.t -> 'a t = function
+              | Lit x -> Lit x
+              | And (x, And (y, t)) -> And [Lit x; Lit y; of_binary t]
+              | Or (x, Or (y, t)) -> Or [Lit x; Lit y; of_binary t]
+              | And (x, t) -> And [Lit x; of_binary t]
+              | Or (x, t) -> Or [Lit x; of_binary t]
+
+            let rec eval =
+              let open Checked.Let_syntax in
+              function
+                | Lit x -> return x
+                | And xs -> Checked.List.map xs ~f:eval >>= Boolean.all
+                | Or xs -> Checked.List.map xs ~f:eval >>= Boolean.any
+          end
+        end in
+        let rec lt_binary xs ys : Boolean.var Expr.Binary.t =
+          match (xs, ys) with
+          | [], [] -> Lit Boolean.false_
+          | [x], [false] -> Lit Boolean.false_
+          | [x], [true] -> Lit (Boolean.not x)
+          | [x1; x2], [true; false] -> Lit (Boolean.not x1)
+          | [x1; x2], [false; false] -> Lit Boolean.false_
+          | x :: xs, false :: ys -> And (Boolean.not x, lt_binary xs ys)
+          | x :: xs, true :: ys -> Or (Boolean.not x, lt_binary xs ys)
+          | _ :: _, [] | [], _ :: _ ->
+              failwith "lt_bitstring_value: Got unequal length strings"
+        in
+        fun (xs: Boolean.var Bitstring_lib.Bitstring.Msb_first.t)
+            (ys: bool Bitstring_lib.Bitstring.Msb_first.t) ->
+          let open Expr.Nary in
+          eval
+            (of_binary (lt_binary (xs :> Boolean.var list) (ys :> bool list)))
+
+      let field_size_bits =
+        List.init Field.size_in_bits ~f:(fun i ->
+            Bigint.test_bit field_size (Field.size_in_bits - 1 - i) )
+        |> Bitstring_lib.Bitstring.Msb_first.of_list
+
+      let unpack_full x =
+        let module Bitstring = Bitstring_lib.Bitstring in
+        let open Checked.Let_syntax in
+        let%bind res =
+          choose_preimage_var x ~length:Field.size_in_bits
+          >>| Bitstring.Lsb_first.of_list
+        in
+        let%map () =
+          lt_bitstring_value
+            (Bitstring.Msb_first.of_lsb_first res)
+            field_size_bits
+          >>= Checked.Boolean.Assert.is_true
+        in
+        res
     end
   end
+
+  let%test_unit "lt_bitstring_value" =
+    let gen =
+      let open Quickcheck.Generator in
+      let open Let_syntax in
+      let%bind length = small_positive_int in
+      let%map x = list_with_length length bool
+      and y = list_with_length length bool in
+      (x, y)
+    in
+    Quickcheck.test gen ~f:(fun (x, y) ->
+        let correct_answer = x < y in
+        let (), lt =
+          Checked.run_and_check
+            (Checked.map
+               ~f:(As_prover.read Checked.Boolean.typ)
+               (Field.Checked.lt_bitstring_value
+                  (Bitstring_lib.Bitstring.Msb_first.of_list
+                     (List.map ~f:Checked.Boolean.var_of_value x))
+                  (Bitstring_lib.Bitstring.Msb_first.of_list y)))
+            ()
+          |> Or_error.ok_exn
+        in
+        assert (lt = correct_answer) )
 
   include Checked
 
@@ -1502,8 +1590,6 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
   module R1CS_constraint_system = struct
     include R1CS_constraint_system
-
-    let generate_keypair = Fn.compose Keypair.of_backend_keypair create_keypair
   end
 end
 

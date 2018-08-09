@@ -311,7 +311,7 @@ end
 let%test_module "vrf-test" =
   (module (struct
     (* Nothing in here is secure, it's just for the test *)
-    module Impl = Snarky.Snark.Make(Snarky.Backends.Mnt4)
+    module Impl = Snarky.Snark.Make(Snarky.Backends.Mnt4.GM)
 
     module Scalar = Bigint_scalar(Impl)(struct
         let modulus =

@@ -15,6 +15,8 @@ module type Init_intf = sig
 
   val genesis_proof : Proof.t
 
+  val transaction_interval : Time.Span.t
+
   (* Public key to allocate fees to *)
 
   val fee_public_key : Public_key.Compressed.t
@@ -54,6 +56,7 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Private_key = Private_key
   module Public_key = Public_key
   module State_hash = State_hash.Stable.V1
   module Strength = Strength
@@ -83,6 +86,12 @@ struct
 
   module Pow = Proof_of_work
   module Difficulty = Difficulty
+
+  module Length = struct
+    include Coda_numbers.Length
+
+    include (Stable.V1 : module type of Stable.V1 with type t := t)
+  end
 
   module Amount = struct
     module Signed = struct
@@ -586,22 +595,36 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Miner = Minibit_miner.Make (struct
+  module Signer = Signer.Make (struct
     include Inputs0
 
     module Prover = struct
       let prove ~prev_state:(old_state, old_proof)
           (transition: Internal_transition.t) =
         let open Deferred.Or_error.Let_syntax in
+        let state_transition_data =
+          let open Block.State_transition_data in
+          { time= transition.timestamp
+          ; target_hash= transition.ledger_hash
+          ; ledger_builder_hash= transition.ledger_builder_hash }
+        in
         Prover.extend_blockchain Init.prover
           {proof= old_proof; state= State.to_blockchain_state old_state}
-          { header= {time= transition.timestamp; nonce= transition.nonce}
-          ; body=
-              { target_hash= transition.ledger_hash
-              ; ledger_builder_hash= transition.ledger_builder_hash
-              ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof
-              } }
+          { auxillary_data=
+              { nonce= transition.nonce
+              ; signature=
+                  Block.State_transition_data.Signature.sign
+                    Nanobit_base.Global_signer_private_key.t
+                    state_transition_data }
+          ; state_transition_data
+          ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof }
         >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
+    end
+
+    module Signer_private_key = Nanobit_base.Global_signer_private_key
+
+    module Transaction_interval = struct
+      let t = Time.Span.of_time_span Init.transaction_interval
     end
   end)
 
@@ -681,6 +704,7 @@ module type Main_intf = sig
       module Config : sig
         type t =
           { parent_log: Logger.t
+          ; conf_dir: string
           ; gossip_net_params: Gossip_net.Params.t
           ; initial_peers: Peer.t list
           ; me: Peer.t
@@ -740,6 +764,8 @@ module type Main_intf = sig
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
   val best_ledger : t -> Inputs.Ledger.t
+
+  val peers : t -> Host_and_port.t list
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
@@ -840,8 +866,8 @@ module Run (Program : Main_intf) = struct
 
   let create_snark_worker ~log ~public_key ~client_port =
     let open Snark_worker_lib in
-    let our_binary = Sys.argv.(0) in
     let%map p =
+      let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
           ( Program.snark_worker_command_name

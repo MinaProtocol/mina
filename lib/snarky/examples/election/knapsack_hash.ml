@@ -4,7 +4,7 @@ module M = Snarky.Knapsack.Make (Impl)
 
 let dimension = 1
 
-type var = Cvar.t list
+type var = Field.Checked.t list
 
 type t = Field.t list
 
@@ -15,12 +15,13 @@ let to_bits xs = List.concat_map ~f:Field.unpack xs
 let var_to_bits xs =
   Checked.map ~f:List.concat
     (Checked.all
-       (List.map xs ~f:(Checked.choose_preimage ~length:Field.size_in_bits)))
+       (List.map xs
+          ~f:(Field.Checked.choose_preimage_var ~length:Field.size_in_bits)))
 
 let knapsack = M.create ~dimension ~max_input_length:1000
 
 let assert_equal xs ys =
-  Checked.all_ignore (List.map2_exn ~f:assert_equal xs ys)
+  Checked.all_unit (List.map2_exn ~f:Field.Checked.Assert.equal xs ys)
 
 let hash bs = M.hash_to_field knapsack bs
 

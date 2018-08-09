@@ -240,7 +240,7 @@ module Mnt4
                         Libsnark.Mnt4.R1CS_constraint_system.t) (Info : sig
         val input_size : int
     end) =
-  Make (Impl) (Libsnark.Mnt4) (Libsnark.Mnt6) (Info)
+  Make (Impl) (Libsnark.Mnt4.Default) (Libsnark.Mnt6.Default) (Info)
 module Mnt6
     (Impl : Snark_intf.S
             with type field = Libsnark.Mnt6.Field.t
@@ -250,4 +250,4 @@ module Mnt6
                         Libsnark.Mnt6.R1CS_constraint_system.t) (Info : sig
         val input_size : int
     end) =
-  Make (Impl) (Libsnark.Mnt6) (Libsnark.Mnt4) (Info)
+  Make (Impl) (Libsnark.Mnt6.Default) (Libsnark.Mnt4.Default) (Info)

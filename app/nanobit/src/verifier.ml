@@ -41,7 +41,8 @@ module Worker_state = struct
          let key = bc_vk.wrap
 
          let key_to_bool_list =
-           B.Step_base.Verifier.Verification_key.to_bool_list
+           let open B.Step_base.Verifier.Verification_key_data in
+           Fn.compose to_bits of_verification_key
 
          let input = B.wrap_input
        end) in
@@ -108,7 +109,6 @@ end
 type t = Worker.Connection.t
 
 let create ~conf_dir =
-  Parallel.init_master () ;
   Worker.spawn_exn ~on_failure:Error.raise ~shutdown_on:Disconnect
     ~redirect_stdout:(`File_append (conf_dir ^/ "verifier-stdout"))
     ~redirect_stderr:(`File_append (conf_dir ^/ "verifier-stderr"))

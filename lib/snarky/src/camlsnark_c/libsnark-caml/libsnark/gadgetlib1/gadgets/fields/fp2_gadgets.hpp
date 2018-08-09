@@ -55,6 +55,7 @@ public:
     Fp2_variable<Fp2T> operator*(const FieldT &coeff) const;
     Fp2_variable<Fp2T> operator+(const Fp2_variable<Fp2T> &other) const;
     Fp2_variable<Fp2T> operator+(const Fp2T &other) const;
+    Fp2_variable<Fp2T> operator-(const Fp2_variable<Fp2T> &other) const;
     Fp2_variable<Fp2T> mul_by_X() const;
     void evaluate() const;
     bool is_constant() const;
@@ -83,6 +84,7 @@ public:
                    const Fp2_variable<Fp2T> &result,
                    const std::string &annotation_prefix);
     void generate_r1cs_constraints();
+    void generate_r1cs_witness_internal();
     void generate_r1cs_witness();
 };
 

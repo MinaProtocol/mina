@@ -1,4 +1,5 @@
 open Core
+open Coda_numbers
 
 module Blockchain_state = struct
   open Nanobit_base
@@ -42,12 +43,15 @@ module Blockchain_state = struct
   let update_unchecked : Blockchain_state.t -> Block.t -> Blockchain_state.t =
    fun state block ->
     let next_difficulty =
-      compute_target state.timestamp state.next_difficulty block.header.time
+      compute_target state.timestamp state.next_difficulty
+        block.state_transition_data.time
     in
     { next_difficulty
     ; previous_state_hash= hash state
-    ; ledger_builder_hash= block.body.ledger_builder_hash
-    ; ledger_hash= block.body.target_hash
+    ; ledger_builder_hash= block.state_transition_data.ledger_builder_hash
+    ; ledger_hash= block.state_transition_data.target_hash
     ; strength= Strength.increase state.strength ~by:state.next_difficulty
-    ; timestamp= block.header.time }
+    ; length= Length.succ state.length
+    ; timestamp= block.state_transition_data.time
+    ; signer_public_key= state.signer_public_key }
 end

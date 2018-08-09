@@ -26,6 +26,12 @@ module type Basic = sig
     val of_bigstring : Bigstring.t -> t
   end
 
+  module R1CS_constraint_system : sig
+    type t
+
+    val digest : t -> Md5.t
+  end
+
   module Keypair : sig
     type t [@@deriving bin_io]
 
@@ -34,14 +40,8 @@ module type Basic = sig
     val pk : t -> Proving_key.t
 
     val vk : t -> Verification_key.t
-  end
 
-  module R1CS_constraint_system : sig
-    type t
-
-    val digest : t -> Md5.t
-
-    val generate_keypair : t -> Keypair.t
+    val generate : R1CS_constraint_system.t -> t
   end
 
   module Var : sig
@@ -287,6 +287,9 @@ module type Basic = sig
       val pack : Boolean.var list -> t
 
       val unpack : t -> length:int -> (Boolean.var list, _) Checked.t
+
+      val unpack_full :
+        t -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t
 
       val choose_preimage_var :
         t -> length:int -> (Boolean.var list, _) Checked.t

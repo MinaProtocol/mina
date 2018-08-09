@@ -14,6 +14,9 @@ let ( = ) = equal
 
 type var = Tick.Field.var * Tick.Field.var
 
+let var_of_t (x, y) =
+  (Tick.Field.Checked.constant x, Tick.Field.Checked.constant y)
+
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
 (* TODO: We can move it onto the subgroup during account creation. No need to check with
@@ -96,8 +99,8 @@ let decompress ({x; is_odd}: Compressed.t) =
 let decompress_exn t = Option.value_exn (decompress t)
 
 let parity_var y =
-  let%map bs = Util.unpack_field_var y in
-  List.hd_exn (bs :> Boolean.var list)
+  let%map bs = Field.Checked.unpack_full y in
+  List.hd_exn (Bitstring_lib.Bitstring.Lsb_first.to_list bs)
 
 let decompress_var ({x; is_odd} as c: Compressed.var) =
   let%bind y =

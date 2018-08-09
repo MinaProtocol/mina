@@ -56,6 +56,8 @@ module type Network_intf = sig
 
   val states : t -> state_with_witness Linear_pipe.Reader.t
 
+  val peers : t -> Host_and_port.t list
+
   val snark_pool_diffs : t -> snark_pool_diff Linear_pipe.Reader.t
 
   val transaction_pool_diffs : t -> transaction_pool_diff Linear_pipe.Reader.t
@@ -188,7 +190,7 @@ module type Ledger_builder_controller_intf = sig
     ledger_hash * sync_query -> ledger_hash * sync_answer
 end
 
-module type Miner_intf = sig
+module type Signer_intf = sig
   type t
 
   type ledger_hash
@@ -327,8 +329,8 @@ module type Inputs_intf = sig
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
 
-  module Miner :
-    Miner_intf
+  module Signer :
+    Signer_intf
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder := Ledger_builder.t
      and type transaction := Transaction.With_valid_signature.t
@@ -353,7 +355,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   type t =
-    { miner: Miner.t
+    { miner: Signer.t
     ; net: Net.t
     ; external_transitions:
         External_transition.t Linear_pipe.Writer.t
@@ -372,6 +374,8 @@ module Make (Inputs : Inputs_intf) = struct
   let transaction_pool t = t.transaction_pool
 
   let snark_pool t = t.snark_pool
+
+  let peers t = Net.peers t.net
 
   module Config = struct
     type t =
@@ -432,7 +436,7 @@ module Make (Inputs : Inputs_intf) = struct
     let tips_r, tips_w = Linear_pipe.create () in
     (let tip = Ledger_builder_controller.strongest_tip ledger_builder in
      Linear_pipe.write_without_pushback tips_w
-       (Miner.Tip_change
+       (Signer.Tip_change
           { state= (tip.state, tip.proof)
           ; transactions= Transaction_pool.transactions transaction_pool
           ; ledger_builder= tip.ledger_builder })) ;
@@ -456,16 +460,16 @@ module Make (Inputs : Inputs_intf) = struct
     let miner =
       Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
         (fun (ledger_builder, {state; state_proof; _}) ->
-          Miner.Tip_change
+          Signer.Tip_change
             { state= (state, state_proof)
             ; ledger_builder
             ; transactions= Transaction_pool.transactions transaction_pool } )
       |> don't_wait_for ;
-      Miner.create ~parent_log:config.log ~change_feeder:tips_r
+      Signer.create ~parent_log:config.log ~change_feeder:tips_r
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
     in
     don't_wait_for
-      (Linear_pipe.transfer_id (Miner.transitions miner)
+      (Linear_pipe.transfer_id (Signer.transitions miner)
          external_transitions_writer) ;
     return
       { miner
