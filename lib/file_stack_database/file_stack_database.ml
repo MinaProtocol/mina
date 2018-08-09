@@ -11,12 +11,15 @@ struct
     let open UnixLabels in
     let mode = [O_RDWR; O_CREAT; O_APPEND] in
     let fd = Unix.openfile ~mode filename in
-    let num_elem = Unsigned.UInt.zero in
+    let char_position = Unix.lseek fd Int64.zero SEEK_END in
+    let num_elem =
+      Unsigned.UInt.div
+        (Unsigned.UInt.of_int64 char_position)
+        (Unsigned.UInt.of_int Element.size)
+    in
     {fd; filename; num_elem}
 
-  let clear t =
-    t.num_elem <- Unsigned.UInt.zero ;
-    ignore @@ Unix.ftruncate t.fd ~len:(Int64.of_int 0)
+  let filename {filename} = filename
 
   let destroy t =
     let {fd; filename} = t in
@@ -97,6 +100,15 @@ let%test_module "file stack database" =
               let expected_stack =
                 List.fold ~init:[] commands ~f:(test_command t)
               in
-              assert_same_stack expected_stack t ;
-              Test.clear t ) )
+              assert_same_stack expected_stack t ) )
+
+    let%test_unit "continue from previous state" =
+      with_test (fun t ->
+          Quickcheck.test ~sexp_of:[%sexp_of : Bigstring.t List.t]
+            (Quickcheck.Generator.list string_gen) ~f:(fun strings ->
+              let killed_t = t in
+              List.iter strings ~f:(Test.push killed_t) ;
+              Test.destroy killed_t ;
+              let new_t = Test.create (Test.filename t) in
+              assert_same_stack (List.rev strings) new_t ) )
   end )
