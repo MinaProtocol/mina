@@ -4,7 +4,8 @@ module Make (Element : sig
   val size : int
 end) =
 struct
-  type t = {fd: Unix.File_descr.t; filename: string; mutable num_elem: Unsigned.UInt.t}
+  type t =
+    {fd: Unix.File_descr.t; filename: string; mutable num_elem: Unsigned.UInt.t}
 
   let create ~filename =
     let open UnixLabels in
@@ -13,30 +14,30 @@ struct
     let num_elem = Unsigned.UInt.zero in
     {fd; filename; num_elem}
 
-  let clear t = 
-  t.num_elem <- Unsigned.UInt.zero ;
-  ignore @@ Unix.ftruncate t.fd ~len:(Int64.of_int 0)
+  let clear t =
+    t.num_elem <- Unsigned.UInt.zero ;
+    ignore @@ Unix.ftruncate t.fd ~len:(Int64.of_int 0)
 
   let destroy t =
     let {fd; filename} = t in
     Unix.close fd
 
   let push t (message: Bigstring.t) =
-    t.num_elem <- Unsigned.UInt.succ t.num_elem;
+    t.num_elem <- Unsigned.UInt.succ t.num_elem ;
     assert (Element.size = Unix.write t.fd (Bigstring.to_bytes message))
 
   let pop t =
     if Unsigned.UInt.compare t.num_elem Unsigned.UInt.zero = 0 then None
     else
-        let buf = Bytes.create Element.size in
-        let file_offset =
-          Unix.lseek t.fd (Int64.of_int @@ (-1 * Element.size)) SEEK_END
-        in
-        let num_chars_read = Unix.read t.fd ~buf ~pos:0 ~len:Element.size in
-        assert (Element.size = num_chars_read) ;
-        Unix.ftruncate t.fd ~len:file_offset ;
-        t.num_elem <- (Unsigned.UInt.pred t.num_elem);
-        Some (Bigstring.of_bytes buf)
+      let buf = Bytes.create Element.size in
+      let file_offset =
+        Unix.lseek t.fd (Int64.of_int @@ (-1 * Element.size)) SEEK_END
+      in
+      let num_chars_read = Unix.read t.fd ~buf ~pos:0 ~len:Element.size in
+      assert (Element.size = num_chars_read) ;
+      Unix.ftruncate t.fd ~len:file_offset ;
+      t.num_elem <- Unsigned.UInt.pred t.num_elem ;
+      Some (Bigstring.of_bytes buf)
 end
 
 let%test_module "file stack database" =
