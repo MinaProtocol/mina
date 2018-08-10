@@ -3,7 +3,7 @@
 (library
  ((name ledger_builder_controller)
   (public_name ledger_builder_controller)
-  (flags (:standard -short-paths -warn-error -9-32-27))
+  (flags (:standard -short-paths -warn-error -9-32-27-58))
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core storage logger protocols coda async async_extra interruptible))

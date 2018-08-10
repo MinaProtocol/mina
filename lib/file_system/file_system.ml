@@ -1,6 +1,6 @@
 open Async
 
-let create_dir dir = Unix.mkdir ~p:() dir
+let create_dir dir = Unix.mkdir dir ~p:()
 
 let remove_dirs dirs =
   let%bind _ = Process.run_exn ~prog:"rm" ~args:("-rf" :: dirs) () in
