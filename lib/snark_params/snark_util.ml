@@ -1,5 +1,4 @@
 open Core_kernel
-open Bitstring_lib
 
 module Make (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -163,7 +162,7 @@ module Make (Impl : Snarky.Snark_intf.S) = struct
         assert (less = (r < 0));
         assert (less_or_equal = (r <= 0))
       in
-      for i = 0 to 100 do
+      for _i = 0 to 100 do
         test ()
       done
 
