@@ -45,7 +45,9 @@ end)
 struct
   open Protocols.Coda_pow
 
-  module Time : Time_intf with type t = Block_time.t = Block_time
+  module Time :
+    Time_intf with type t = Block_time.t and module Controller := Unit =
+  Block_time
 
   module Time_close_validator = struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)

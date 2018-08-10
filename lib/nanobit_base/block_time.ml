@@ -53,7 +53,7 @@ end
 module Timeout = struct
   type 'a t = {deferred: 'a Deferred.t; cancel: 'a -> unit}
 
-  let create span action =
+  let create () span action =
     let open Async_kernel.Deferred.Let_syntax in
     let cancel_ivar = Ivar.create () in
     let timeout = after (Span.to_time_ns_span span) >>| fun () -> None in

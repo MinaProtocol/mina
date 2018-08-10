@@ -50,7 +50,7 @@ end
 module Timeout : sig
   type 'a t
 
-  val create : Span.t -> (unit -> 'a) -> 'a t
+  val create : unit -> Span.t -> (unit -> 'a) -> 'a t
 
   val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
 

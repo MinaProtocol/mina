@@ -8,6 +8,10 @@ module type Time_intf = sig
     end
   end
 
+  module Controller : sig
+    type t
+  end
+
   type t [@@deriving sexp]
 
   module Span : sig
@@ -29,20 +33,20 @@ module type Time_intf = sig
   module Timeout : sig
     type 'a t
 
-    val create : Span.t -> (unit -> 'a) -> 'a t
+    val create : Controller.t -> Span.t -> f:(unit -> 'a) -> 'a t
 
     val to_deferred : 'a t -> 'a Deferred.t
 
     val peek : 'a t -> 'a option
 
-    val cancel : 'a t -> 'a -> unit
+    val cancel : Controller.t -> 'a t -> 'a -> unit
   end
 
   val diff : t -> t -> Span.t
 
   val modulus : t -> Span.t -> Span.t
 
-  val now : unit -> t
+  val now : Controller.t -> t
 end
 
 module type Ledger_hash_intf = sig
