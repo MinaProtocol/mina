@@ -125,7 +125,8 @@ module Tick = struct
 
         let typ : (var, t) Typ.t =
           let open Typ in
-          transport (list ~length:length_in_bits Boolean.typ)
+          transport
+            (list ~length:length_in_bits Boolean.typ)
             ~there:(fun n ->
               List.init length_in_bits
                 ~f:(Z.testbit (Bignum_bigint.to_zarith_bigint n)) )
@@ -133,6 +134,7 @@ module Tick = struct
 
         module Checked = struct
           let equal = Bitstring_checked.equal
+
           module Assert = struct
             let equal = Bitstring_checked.Assert.equal
           end

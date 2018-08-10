@@ -479,7 +479,7 @@ module Edwards = struct
   end
 
   module Make
-      (Impl : Snark_intf.S) 
+      (Impl : Snark_intf.S)
       (Scalar : Scalar_intf
                 with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
                  and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t

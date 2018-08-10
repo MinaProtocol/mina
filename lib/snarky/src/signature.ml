@@ -114,6 +114,7 @@ struct
 
     let assert_verifies ((_, h) as signature) pk m =
       with_label __LOC__
-        (verification_hash signature pk m >>= Curve.Scalar.Checked.Assert.equal h)
+        ( verification_hash signature pk m
+        >>= Curve.Scalar.Checked.Assert.equal h )
   end
 end
