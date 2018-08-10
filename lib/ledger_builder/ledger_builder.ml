@@ -19,7 +19,6 @@ let map2_or_error xs ys ~f =
   go xs ys []
 
 module Make (Inputs : Inputs.S) : sig
-
   include Coda_pow.Ledger_builder_intf
           with type diff := Inputs.Ledger_builder_diff.t
            and type valid_diff :=
