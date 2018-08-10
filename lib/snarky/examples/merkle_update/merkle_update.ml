@@ -4,7 +4,7 @@
    the Bn128-based snark. *)
 open Core
 open Snarky
-module Snark = Snark.Make (Snark.Backends.Bn128)
+module Snark = Snark.Make (Snark.Backends.Bn128.Default)
 module Knapsack = Knapsack.Make (Snark)
 open Snark
 open Let_syntax
@@ -34,9 +34,14 @@ let knapsack =
   Knapsack.create ~dimension
     ~max_input_length:(2 * Field.size_in_bits * dimension)
 
-module Hash = Knapsack.Hash (struct
-  let knapsack = knapsack
-end)
+module Hash = struct
+  include Knapsack.Hash (struct
+    let knapsack = knapsack
+  end)
+
+  (* Don't do this at home *)
+  let hash ~height:_ x y = hash x y
+end
 
 (* Second, we specify the type of values which we'll store in the merkle tree.
    Let's say a value is a bitsring of length 10. *)
@@ -117,7 +122,7 @@ let update_many root_start
 (* Now that we have specified the computation to produce a snark for, we can actually
    produce the snark. *)
 (* First we generate the keypair. *)
-let keypair = generate_keypair (input ()) update_many
+let keypair = generate_keypair ~exposing:(input ()) update_many
 
 (* Next, we can generate a proof on some sample inputs. *)
 (* First the inputs. *)
