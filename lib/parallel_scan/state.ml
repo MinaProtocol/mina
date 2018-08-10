@@ -37,7 +37,7 @@ module Hash = struct
 end
 
 (* TODO: This should really be computed iteratively *)
-let hash {jobs; acc; current_data_length; base_none_pos} a_to_string
+let hash {jobs; acc; current_data_length; base_none_pos; capacity} a_to_string
     d_to_string =
   let h = Cryptokit.Hash.sha3 256 in
   Ring_buffer.iter jobs ~f:(function
@@ -52,6 +52,7 @@ let hash {jobs; acc; current_data_length; base_none_pos} a_to_string
           ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2) ) ;
   let i, a = acc in
   let x = base_none_pos in
+  h#add_string (Int.to_string capacity) ;
   h#add_string (Int.to_string i) ;
   ( match a with
   | None -> h#add_string "None"
@@ -62,15 +63,15 @@ let hash {jobs; acc; current_data_length; base_none_pos} a_to_string
   | Some a -> h#add_string (Int.to_string a) ) ;
   h
 
-let acc {acc} = snd acc
+let acc s = snd s.acc
 
-let jobs {jobs} = jobs
+let jobs s = s.jobs
 
-let current_data_length {current_data_length} = current_data_length
+let current_data_length s = s.current_data_length
 
-let parallelism {jobs} = (Ring_buffer.length jobs + 1) / 2
+let parallelism s = (Ring_buffer.length s.jobs + 1) / 2
 
-let base_none_pos {base_none_pos} = base_none_pos
+let base_none_pos s = s.base_none_pos
 
 let copy {jobs; acc; current_data_length; base_none_pos; capacity} =
   { jobs= Ring_buffer.copy jobs

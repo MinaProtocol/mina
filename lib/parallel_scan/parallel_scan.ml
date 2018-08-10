@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 
 module Direction = struct
-  type t = Left | Right [@@deriving sexp, eq, bin_io]
+  type t = Left | Right [@@deriving sexp, bin_io]
 end
 
 module Ring_buffer = Ring_buffer
@@ -154,7 +154,7 @@ module State1 = struct
       (t.jobs).position <- base_pos
     else if t.jobs.position >= p - 1 then
       (t.jobs).position <- next_pos p t.jobs.position
-    else Ring_buffer.forwards 1 t.jobs
+    else Ring_buffer.forwards ~n:1 t.jobs
 
   let rec go count t =
     if count = (parallelism t * 2) - 1 then []
@@ -171,7 +171,7 @@ module State1 = struct
     js
 
   let read_jobs t =
-    List.filter (jobs_list t) ~f:(fun (j, pos) -> parent_empty t.jobs pos)
+    List.filter (jobs_list t) ~f:(fun (_, pos) -> parent_empty t.jobs pos)
 
   let job_ready job =
     let module J = Job in
@@ -195,10 +195,10 @@ module State1 = struct
             "Impossible: the side of merge we want is not empty"
       | _, Base _ -> Error (Error.of_string "impossible: we never fill base")
     in
-    Ring_buffer.direct_update t.jobs pos new_job
+    Ring_buffer.direct_update t.jobs pos ~f:new_job
 
   let update_cur_job t job pos : unit Or_error.t =
-    Ring_buffer.direct_update t.jobs pos (fun _ -> Ok job)
+    Ring_buffer.direct_update t.jobs pos ~f:(fun _ -> Ok job)
 
   let work :
          ('a, 'd) t
@@ -210,7 +210,7 @@ module State1 = struct
     let cur_job = Ring_buffer.read t.jobs in
     let cur_pos = t.jobs.position in
     match (parent_empty old_jobs cur_pos, cur_job, completed_job) with
-    | true, Merge (Some x, Some x'), Merged z ->
+    | true, Merge (Some _, Some _), Merged z ->
         let%bind () =
           if cur_pos = 0 then (
             t.acc <- (fst t.acc |> Int.( + ) 1, Some z) ;
@@ -219,7 +219,7 @@ module State1 = struct
         in
         let%map () = update_cur_job t (Merge (None, None)) cur_pos in
         Work.Work_done
-    | true, Base (Some d), Lifted z ->
+    | true, Base (Some _), Lifted z ->
         let%bind () = update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2) in
         let%bind () = update_cur_job t (Base None) cur_pos in
         t.base_none_pos <- Some (Option.value t.base_none_pos ~default:cur_pos) ;
@@ -256,7 +256,7 @@ module State1 = struct
     Ring_buffer.direct_update (State.jobs state) base_pos ~f
 
   let include_many_data (state: ('a, 'd) State.t) data : unit Or_error.t =
-    List.fold ~init:(Ok ()) data ~f:(fun b a ->
+    List.fold ~init:(Ok ()) data ~f:(fun _ a ->
         let open Or_error.Let_syntax in
         match State.base_none_pos state with
         | None -> Or_error.error_string "No empty leaves"
@@ -279,7 +279,7 @@ let next_k_jobs :
     Or_error.errorf "You asked for %d jobs, but it's only safe to ask for %d" k
       (State1.parallelism state)
   else
-    let possible_jobs = List.take (next_jobs state) k in
+    let possible_jobs = List.take (next_jobs ~state) k in
     let len = List.length possible_jobs in
     if Int.equal len k then Or_error.return possible_jobs
     else
@@ -291,12 +291,11 @@ let free_space : state:('a, 'd) State1.t -> int =
 
 let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
  fun ~state ~data ->
-  let open Or_error.Let_syntax in
-  if free_space state < List.length data then
+  if free_space ~state < List.length data then
     Or_error.error_string
       (sprintf
          "Data list too large. Max available is %d, current list length is %d"
-         (free_space state) (List.length data))
+         (free_space ~state) (List.length data))
   else (
     state.current_data_length <- state.current_data_length + List.length data ;
     State1.include_many_data state data )
@@ -315,14 +314,13 @@ let fill_in_completed_jobs :
 
 let gen :
        gen_data:'d Quickcheck.Generator.t
-    -> f_job_done:(   ('a, 'd) State.t
-                   -> ('a, 'd) Available_job.t
+    -> f_job_done: (('a, 'd) Available_job.t
                    -> 'a State.Completed_job.t)
     -> f_acc:(int * 'a option -> 'a -> 'a option)
     -> ('a, 'd) State.t Quickcheck.Generator.t =
  fun ~gen_data ~f_job_done ~f_acc ->
   let open Quickcheck.Generator.Let_syntax in
-  let%bind seed = gen_data in
+  (*let%bind seed = gen_data in*)
   let%bind parallelism_log_2 = Int.gen_incl 2 7 in
   let s = State1.create ~parallelism_log_2 in
   let parallelism = State1.parallelism s in
@@ -343,28 +341,28 @@ let gen :
   in
   List.fold data_chunks ~init:s ~f:(fun s chunk ->
       let jobs = next_jobs ~state:s in
-      let jobs_done = List.map jobs (f_job_done s) in
+      let jobs_done = List.map jobs ~f:f_job_done in
       let old_tuple = s.acc in
       Option.iter
-        (Or_error.ok_exn @@ fill_in_completed_jobs s jobs_done)
+        (Or_error.ok_exn @@ fill_in_completed_jobs ~state:s ~completed_jobs:jobs_done)
         ~f:(fun x ->
           let tuple =
             if Option.is_some (snd old_tuple) then old_tuple else s.acc
           in
           s.acc <- (fst s.acc, f_acc tuple x) ) ;
-      Or_error.ok_exn @@ enqueue_data s chunk ;
+      Or_error.ok_exn @@ enqueue_data ~state:s ~data:chunk ;
       s )
 
 let%test_module "scans" =
   ( module struct
     let enqueue state ds =
-      let free_space = free_space state in
+      let free_space = free_space ~state in
       match free_space >= List.length ds with
       | true ->
-          Or_error.ok_exn @@ enqueue_data state ds ;
+          Or_error.ok_exn @@ enqueue_data ~state ~data:ds ;
           []
       | false ->
-          Or_error.ok_exn @@ enqueue_data state (List.take ds free_space) ;
+          Or_error.ok_exn @@ enqueue_data ~state ~data:(List.take ds free_space) ;
           List.drop ds free_space
 
     let rec step_on_free_space state w ds f f_acc =
@@ -375,11 +373,11 @@ let%test_module "scans" =
         else []
       in
       let jobs = next_jobs ~state in
-      let jobs_done = List.map jobs (f state) in
+      let jobs_done = List.map jobs ~f in
       let old_tuple = state.acc in
       let x' =
         Option.bind
-          (Or_error.ok_exn @@ fill_in_completed_jobs state jobs_done)
+          (Or_error.ok_exn @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done)
           ~f:(fun x ->
             let merged =
               if Option.is_some (snd old_tuple) then f_acc old_tuple x
@@ -420,8 +418,7 @@ let%test_module "scans" =
           let%map acc = snd state in
           Int64.( + ) acc x
 
-        let job_done (state: ('a, 'd) State1.t)
-            (job: (Int64.t, Int64.t) Available_job.t) :
+        let job_done (job: (Int64.t, Int64.t) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
           | Base x -> Lifted x
@@ -463,7 +460,7 @@ let%test_module "scans" =
                   in
                   let fill_some_zeros v s =
                     List.init (parallelism * parallelism) ~f:(fun _ -> ())
-                    |> Deferred.List.foldi ~init:v ~f:(fun i v _ ->
+                    |> Deferred.List.fold ~init:v ~f:(fun v _ ->
                            match%map Linear_pipe.read (pipe s) with
                            | `Eof -> v
                            | `Ok (Some v') -> v'
@@ -478,7 +475,7 @@ let%test_module "scans" =
                   let acc = State1.acc s |> Option.value_exn in
                   assert (acc <> old_acc) ;
                   (* eventually we'll emit the acc+1 element *)
-                  let%map v' = fill_some_zeros v s in
+                  let%map _ = fill_some_zeros v s in
                   let acc_plus_one = State1.acc s |> Option.value_exn in
                   assert (Int64.(equal acc_plus_one (acc + one))) ) )
       end )
@@ -490,8 +487,7 @@ let%test_module "scans" =
           let%map acc = snd tuple in
           Int64.( + ) acc x
 
-        let job_done (state: ('a, 'd) State1.t)
-            (job: (Int64.t, string) Available_job.t) :
+        let job_done (job: (Int64.t, string) Available_job.t) :
             Int64.t State.Completed_job.t =
           match job with
           | Base x -> Lifted (Int64.of_string x)
@@ -517,7 +513,7 @@ let%test_module "scans" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%map after_3n =
                 List.init (3 * n) ~f:(fun _ -> ())
-                |> Deferred.List.foldi ~init:Int64.zero ~f:(fun i acc _ ->
+                |> Deferred.List.fold ~init:Int64.zero ~f:(fun acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc
                        | `Ok (Some v) -> v
@@ -538,8 +534,7 @@ let%test_module "scans" =
           let%map acc = snd tuple in
           String.( ^ ) acc x
 
-        let job_done (state: ('a, 'd) State1.t)
-            (job: (string, string) Available_job.t) :
+        let job_done (job: (string, string) Available_job.t) :
             string State.Completed_job.t =
           match job with
           | Base x -> Lifted x
@@ -567,7 +562,7 @@ let%test_module "scans" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%map after_42n =
                 List.init (42 * n) ~f:(fun _ -> ())
-                |> Deferred.List.foldi ~init:"" ~f:(fun i acc _ ->
+                |> Deferred.List.fold ~init:"" ~f:(fun acc _ ->
                        match%map Linear_pipe.read result with
                        | `Eof -> acc
                        | `Ok (Some v) -> v

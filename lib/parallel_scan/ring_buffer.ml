@@ -11,7 +11,7 @@ let mod_ x y =
 
 let create ~len ~default = {data= Array.create ~len default; position= 0}
 
-let length {data} = Array.length data
+let length b = Array.length b.data
 
 let copy {data; position} = {data= Array.copy data; position}
 
@@ -21,7 +21,7 @@ let direct_update t i ~f =
   let%bind v = f x in
   return @@ (t.data).(i) <- v
 
-let update t ~f = direct_update t t.position (fun x -> f t.position x)
+let update t ~f = direct_update t t.position ~f:(fun x -> f t.position x)
 
 (*Read element from the ith positon*)
 let read_i t i = (t.data).(i)
@@ -89,7 +89,7 @@ let gen gen_elem =
   let open Quickcheck.Generator.Let_syntax in
   let%bind len = Quickcheck.Generator.small_positive_int in
   let%map elems = Quickcheck.Generator.list_with_length len gen_elem
-  and default_elem = gen_elem in
+  (*and default_elem = gen_elem*) in
   {data= Array.of_list elems; position= 0}
 
 let%test_unit "buffer wraps around" =

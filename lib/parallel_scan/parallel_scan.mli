@@ -1,5 +1,4 @@
 open Core_kernel
-open Async_kernel
 
 module Ring_buffer : sig
   type 'a t [@@deriving sexp, bin_io]
