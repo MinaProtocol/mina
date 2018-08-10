@@ -31,7 +31,7 @@ module type S = sig
   end
 
   module Addr : sig
-    type t [@@deriving sexp, bin_io, hash, compare]
+    type t [@@deriving sexp, bin_io, hash, eq, compare]
 
     include Hashable.S with type t := t
 
@@ -172,7 +172,7 @@ struct
   module Addr = struct
     module T = struct
       type t = {depth: int; index: int}
-      [@@deriving sexp, bin_io, hash, compare]
+      [@@deriving sexp, bin_io, hash, eq, compare]
     end
 
     include T
@@ -192,6 +192,19 @@ struct
     let dirs_from_root {depth; index} =
       List.init depth ~f:(fun i ->
           if (index lsr i) land 1 = 1 then `Right else `Left )
+
+    (* FIXME: this could be a lot faster. https://graphics.stanford.edu/~seander/bithacks.html#BitReverseObvious etc *)
+    let to_index a =
+      List.foldi
+        (List.rev @@ dirs_from_root a)
+        ~init:0
+        ~f:(fun i acc dir -> acc lor (bit_val dir lsl i))
+
+    let of_index index =
+      let depth = Depth.depth in
+      let bits = List.init depth ~f:(fun i -> (index lsr i) land 1) in
+      (* XXX: LSB first *)
+      {depth; index= List.fold bits ~init:0 ~f:(fun acc b -> (acc lsl 1) lor b)}
 
     let clear_all_but_first k i = i land ((1 lsl k) - 1)
 
@@ -214,6 +227,11 @@ struct
       Quickcheck.test dir_list ~f:(fun dirs ->
           assert (
             dirs_from_root (List.fold dirs ~f:child_exn ~init:root) = dirs ) )
+
+    let%test_unit "to_index (of_index i) = i" =
+      Quickcheck.test ~sexp_of:[%sexp_of : int]
+        (Int.gen_incl 0 (Depth.depth - 1))
+        ~f:(fun i -> [%test_eq : int] (to_index (of_index i)) i)
   end
 
   type entry = {merkle_index: int; account: Account.t}
@@ -418,8 +436,8 @@ struct
         in
         recompute_layers (curr_height + 1) get_curr_hash layers dirty_indices
 
-  let recompute_tree t =
-    if t.tree.syncing then
+  let recompute_tree ?(allow_sync= false) t =
+    if t.tree.syncing && not allow_sync then
       failwith "recompute tree while syncing -- logic error!" ;
     if not (List.is_empty t.tree.dirty_indices) || t.tree.dirty then (
       extend_tree t.tree ;
@@ -517,49 +535,52 @@ struct
     if new_size > len then
       DynArray.append tree.leafs
         (DynArray.init (new_size - len) (fun x -> Key.empty)) ;
-    recompute_tree t
+    recompute_tree ~allow_sync:true t
 
-  let merkle_path_at_addr_exn t {Addr.index; depth} =
-    assert (depth = Depth.depth - 1) ;
-    merkle_path_at_index_exn t index
+  let merkle_path_at_addr_exn t a =
+    assert (a.Addr.depth = Depth.depth - 1) ;
+    merkle_path_at_index_exn t (Addr.to_index a)
 
-  let set_at_addr_exn t {Addr.index; depth} a =
-    assert (depth = Depth.depth - 1) ;
-    set_at_index_exn t index a
+  let set_at_addr_exn t addr acct =
+    assert (addr.Addr.depth = Depth.depth - 1) ;
+    set_at_index_exn t (Addr.to_index addr) acct
 
-  let get_inner_hash_at_addr_exn t {Addr.index; depth= adepth} =
-    assert (adepth < depth) ;
-    let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
-    DynArray.get l index
+  let get_inner_hash_at_addr_exn t a =
+    assert (a.Addr.depth < depth) ;
+    let l = List.nth_exn t.tree.nodes (depth - a.depth - 1) in
+    DynArray.get l (Addr.to_index a)
 
-  let set_inner_hash_at_addr_exn t {Addr.index; depth= adepth}
-      (hash: Hash.hash) =
-    assert (adepth < depth) ;
+  let set_inner_hash_at_addr_exn t a hash =
+    assert (a.Addr.depth < depth) ;
     (t.tree).dirty <- true ;
-    let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
+    let l = List.nth_exn t.tree.nodes (depth - a.depth - 1) in
+    let index = Addr.to_index a in
     DynArray.set l index hash
 
   let set_syncing t =
     recompute_tree t ;
     (t.tree).syncing <- true
 
-  let clear_syncing t = (t.tree).syncing <- false
+  let clear_syncing t =
+    (t.tree).syncing <- false ;
+    recompute_tree t
 
-  let set_all_accounts_rooted_at_exn t {Addr.index; depth= adepth} accounts =
-    let effective_depth = depth - adepth in
-    let count = 1 lsl effective_depth in
-    let first_index = index lsl effective_depth in
+  let set_all_accounts_rooted_at_exn t ({Addr.depth= adepth} as a) accounts =
+    let height = depth - adepth in
+    let first_index = Addr.to_index a lsl height in
+    let count = min (1 lsl height) (length t - first_index) in
     assert (List.length accounts = count) ;
     List.iteri accounts ~f:(fun i a ->
         let pk = Account.public_key a in
         let entry = {merkle_index= first_index + i; account= a} in
+        (t.tree).dirty_indices <- (first_index + i) :: t.tree.dirty_indices ;
         Key.Table.set t.accounts pk entry ;
         Dyn_array.set t.tree.leafs (first_index + i) pk )
 
-  let get_all_accounts_rooted_at_exn t {Addr.index; depth= adepth} =
-    let effective_depth = depth - adepth in
-    let count = 1 lsl effective_depth in
-    let first_index = index lsl effective_depth in
+  let get_all_accounts_rooted_at_exn t a =
+    let height = depth - a.Addr.depth in
+    let first_index = Addr.to_index a lsl height in
+    let count = min (1 lsl height) (length t - first_index) in
     let subarr = Dyn_array.sub t.tree.leafs first_index count in
     Dyn_array.to_list
       (Dyn_array.map

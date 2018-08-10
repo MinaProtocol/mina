@@ -515,6 +515,9 @@ struct
 
         type path = Path.t
       end)
+      (struct
+        let subtree_height = 3
+      end)
 
   module Net = Minibit_networking.Make (struct
     include Inputs0
