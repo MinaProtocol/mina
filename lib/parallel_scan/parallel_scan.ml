@@ -49,7 +49,7 @@ module State1 = struct
   let next_pos p cur_pos = if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
 
   (*Assuming that Base Somes are picked in the same order*)
-  let next_base_none_pos state old_pos cur_pos =
+  let next_base_none_pos state cur_pos =
     let p = parallelism state in
     let new_pos = next_pos p cur_pos in
     match Ring_buffer.read_i state.jobs new_pos with
@@ -262,7 +262,7 @@ module State1 = struct
         | None -> Or_error.error_string "No empty leaves"
         | Some pos ->
             let%map () = include_one_datum state a pos in
-            state.base_none_pos <- next_base_none_pos state pos pos )
+            state.base_none_pos <- next_base_none_pos state pos )
 end
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State1.create
