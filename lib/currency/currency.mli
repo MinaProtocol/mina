@@ -30,6 +30,8 @@ module type Basic = sig
 
   val of_int : int -> t
 
+  val to_int : t -> int
+
   val var_of_t : t -> var
 
   val var_to_bits : var -> Boolean.var Bitstring.Lsb_first.t

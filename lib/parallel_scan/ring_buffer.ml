@@ -26,6 +26,8 @@ let update t ~f = direct_update t t.position (fun x -> f t.position x)
 (*Read element from the ith positon*)
 let read_i t i = (t.data).(i)
 
+let next_i t i = mod_ (i + 1) (Array.length t.data)
+
 let swap t i j =
   let temp = read_i t i in
   (t.data).(i) <- (t.data).(j) ;
