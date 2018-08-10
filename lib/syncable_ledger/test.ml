@@ -31,13 +31,16 @@ struct
       (Adjhash)
       (Adjhash)
       (Ledger')
+      (struct
+        let subtree_height = 3
+      end)
+
   module SR =
     Syncable_ledger.Make_sync_responder (L.Addr) (TL.Key) (TL.Account)
       (Adjhash)
       (Adjhash)
       (Ledger')
       (SL)
-  module Ugh = Tuple.Sexpable (L.Addr) (Adjhash)
 
   let%test "full_sync_entirely_different" =
     let l1, k1 = L.load_ledger Num_accts.num_accts 1 in

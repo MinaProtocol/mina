@@ -231,7 +231,9 @@ module Make
            and type root_hash := Root_hash.t
            and type addr := Addr.t
            and type key := Key.t
-           and type account := Account.t) :
+           and type account := Account.t) (Subtree_height : sig
+        val subtree_height : int
+    end) :
   S
   with type merkle_tree := MT.t
    and type hash := Hash.t
@@ -327,8 +329,6 @@ struct
         else `Hash_mismatch
     | _ -> `More
 
-  let subtree_height = 3
-
   let all_done t res =
     MT.clear_syncing t.tree ;
     if not (Root_hash.equal (MT.merkle_root t.tree) t.desired_root) then
@@ -402,7 +402,10 @@ struct
             | Ok (`Good children_to_verify) ->
                 (* TODO: Make sure we don't write too much *)
                 List.iter children_to_verify ~f:(fun (addr, hash) ->
-                    if Addr.depth addr >= MT.depth - subtree_height then (
+                    if
+                      Addr.depth addr
+                      >= MT.depth - Subtree_height.subtree_height
+                    then (
                       expect_content t addr hash ;
                       Linear_pipe.write_without_pushback t.queries
                         (t.desired_root, What_contents addr) )
