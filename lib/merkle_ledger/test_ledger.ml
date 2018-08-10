@@ -2,13 +2,15 @@ open Core
 open Ledger
 
 module Account = struct
-  type t = int [@@deriving sexp, eq, bin_io]
+  type t = {balance: int; key: string} [@@deriving sexp, eq, bin_io]
 
-  let public_key t = Int.to_string t
+  let public_key {key} = key
+
+  let balance {balance} = balance
 end
 
 module Hash = struct
-  type hash = Md5.t [@@deriving sexp, hash, compare, bin_io]
+  type hash = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
 
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
@@ -19,8 +21,11 @@ module Hash = struct
   let empty_hash = Md5.digest_string ""
 
   let merge ~height a b =
-    Md5.digest_string
-      (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
+    let res =
+      Md5.digest_string
+        (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
+    in
+    res
 end
 
 module Key = struct
