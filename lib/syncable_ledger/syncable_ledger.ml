@@ -243,8 +243,6 @@ module Make
    and type account := Account.t
    and type key := Key.t =
 struct
-  type account = unit
-
   type diff = unit
 
   type index = int
@@ -284,7 +282,8 @@ struct
 
   let expect_children : t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
-    Addr.Table.add_exn t.waiting_parents parent_addr {expected; children= []}
+    Addr.Table.add_exn t.waiting_parents ~key:parent_addr
+      ~data:{expected; children= []}
 
   let add_child_hash_to :
          t
@@ -339,7 +338,8 @@ struct
     res
 
   let expect_content : t -> Addr.t -> Hash.t -> unit =
-   fun t addr expected -> Addr.Table.add_exn t.waiting_content addr expected
+   fun t addr expected ->
+    Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
   (* TODO: verify the hash matches what we expect *)
   let add_content : t -> Addr.t -> Account.t list -> unit =
@@ -466,7 +466,7 @@ struct
         | `Target_changed -> `Target_changed
         | `Ok -> `Ok t.tree )
 
-  let apply_or_queue_diff t d =
+  let apply_or_queue_diff _ _ =
     (* Need some interface for the diffs, not sure the layering is right here. *)
     failwith "todo"
 

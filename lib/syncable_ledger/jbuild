@@ -17,8 +17,3 @@
     (libraries (core async merkle_ledger syncable_ledger))
     (preprocess (pps (ppx_jane ppx_deriving.eq)))
     ))
-
-(alias
-    ((name runtest)
-    (deps (test.exe))
-     (action (run ${<} inline-test-runner))))

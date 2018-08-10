@@ -10,7 +10,7 @@ struct
   module Adjhash = struct
     include TL.Hash
 
-    type t = hash [@@deriving bin_io, compare, hash, sexp, compare, eq]
+    type t = hash [@@deriving bin_io, compare, hash, sexp, compare]
 
     let to_hash (x: t) = x
 
@@ -43,8 +43,8 @@ struct
       (SL)
 
   let%test "full_sync_entirely_different" =
-    let l1, k1 = L.load_ledger Num_accts.num_accts 1 in
-    let l2, k2 = L.load_ledger Num_accts.num_accts 2 in
+    let l1, _k1 = L.load_ledger Num_accts.num_accts 1 in
+    let l2, _k2 = L.load_ledger Num_accts.num_accts 2 in
     L.set_syncing l1 ;
     L.set_syncing l2 ;
     L.clear_syncing l1 ;
@@ -56,7 +56,7 @@ struct
     let seen_queries = ref [] in
     let sr = SR.create l2 (fun q -> seen_queries := q :: !seen_queries) in
     don't_wait_for
-      (Linear_pipe.iter qr ~f:(fun (hash, query) ->
+      (Linear_pipe.iter qr ~f:(fun (_hash, query) ->
            let answ = SR.answer_query sr query in
            Linear_pipe.write aw (desired_root, answ) )) ;
     match
