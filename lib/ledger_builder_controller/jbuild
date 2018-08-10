@@ -6,7 +6,7 @@
   (flags (:standard -short-paths -warn-error -9-32-27))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core storage logger protocols coda async async_extra))
+  (libraries (core storage logger protocols coda async async_extra interruptible))
   (preprocess (pps (ppx_jane ppx_deriving.std)))
   (synopsis "Ledger builder controlelr manages ledger-builders attached to blocks")))
 

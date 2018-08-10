@@ -172,10 +172,6 @@ module type Ledger_builder_controller_intf = sig
     [@@deriving make]
   end
 
-  module Aux : sig
-    type t = {root_and_proof: (ledger_hash * ledger_proof) option; state: state}
-  end
-
   val create : Config.t -> t Deferred.t
 
   val strongest_tip : t -> tip
