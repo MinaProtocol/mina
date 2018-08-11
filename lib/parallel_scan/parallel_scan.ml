@@ -156,15 +156,15 @@ module State1 = struct
       (t.jobs).position <- next_pos p t.jobs.position
     else Ring_buffer.forwards ~n:1 t.jobs
 
-  let rec go count t =
-    if count = (parallelism t * 2) - 1 then []
-    else
-      let j = Ring_buffer.read t.jobs in
-      let pos = t.jobs.position in
-      next_position t ;
-      (j, pos) :: go (count + 1) t
-
   let jobs_list t =
+    let rec go count t =
+      if count = (parallelism t * 2) - 1 then []
+      else
+        let j = Ring_buffer.read t.jobs in
+        let pos = t.jobs.position in
+        next_position t ;
+        (j, pos) :: go (count + 1) t
+    in
     (t.jobs).position <- 0 ;
     let js = go 0 t in
     (t.jobs).position <- 0 ;
