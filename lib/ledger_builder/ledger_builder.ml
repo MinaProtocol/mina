@@ -750,6 +750,7 @@ let%test_module "test" =
       end
 
       module Ledger = struct
+        (*TODO: Test with a ledger that's more comprehensive*)
         type t = int ref [@@deriving sexp, bin_io, compare]
 
         type ledger_hash = Ledger_hash.t
@@ -953,8 +954,10 @@ let%test_module "test" =
               assert (x > 0) ;
               let expected_value =
                 old_ledger
-                + List.fold (List.take all_ts x) ~init:0 ~f:(fun s (t, fee) ->
-                      s + t + fee )
+                + List.sum
+                    (module Int)
+                    (List.take all_ts x)
+                    ~f:(fun (t, fee) -> t + fee)
               in
               assert (!(Lb.ledger lb) = expected_value) ) )
 
@@ -976,8 +979,10 @@ let%test_module "test" =
               assert (x > 0) ;
               let expected_value =
                 old_ledger
-                + List.fold (List.take all_ts x) ~init:0 ~f:(fun s (t, fee) ->
-                      s + t + fee )
+                + List.sum
+                    (module Int)
+                    (List.take all_ts x)
+                    ~f:(fun (t, fee) -> t + fee)
               in
               assert (!(Lb.ledger lb) = expected_value) ) )
   end )

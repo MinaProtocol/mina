@@ -254,8 +254,9 @@ module State1 = struct
     Ring_buffer.direct_update (State.jobs state) base_pos ~f
 
   let include_many_data (state: ('a, 'd) State.t) data : unit Or_error.t =
-    List.fold ~init:(Ok ()) data ~f:(fun _ a ->
+    List.fold ~init:(Ok ()) data ~f:(fun acc a ->
         let open Or_error.Let_syntax in
+        let%bind () = acc in
         match State.base_none_pos state with
         | None -> Or_error.error_string "No empty leaves"
         | Some pos ->
