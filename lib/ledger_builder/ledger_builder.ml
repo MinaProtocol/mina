@@ -157,10 +157,6 @@ end = struct
     ; ledger
     ; public_key= self }
 
-  (*let of_aux_and_ledger ~self ledger scan_state =
-    (* TODO: Actually check the validity? *)
-    {scan_state; ledger; public_key= self} *)
-
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
     | Merge ((_, stmt1), (_, stmt2)) ->
@@ -205,15 +201,15 @@ end = struct
       : Ledger_proof.t with_statement option Or_error.t =
     let open Or_error.Let_syntax in
     let%bind next_jobs =
-      Parallel_scan.next_k_jobs ~state
-        ~k:(total_proofs works )
+      Parallel_scan.next_k_jobs ~state ~k:(total_proofs works)
     in
     let%bind scanable_work_list =
       map2_or_error next_jobs
         (List.concat_map works ~f:(fun work -> work.proofs))
         ~f:completed_work_to_scanable_work
     in
-    Parallel_scan.fill_in_completed_jobs ~state ~completed_jobs:scanable_work_list
+    Parallel_scan.fill_in_completed_jobs ~state
+      ~completed_jobs:scanable_work_list
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data ~state ~data
@@ -271,21 +267,6 @@ end = struct
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
-
-  (*let chunks_of_jobs jobs (works: Completed_work.t list) =
-    let jobses, _ =
-      List.fold works ~init:([], jobs) ~f:(fun (jobses, jobs) _ ->
-      let js, rem = List.split_n jobs Completed_work.proofs_length in
-      (js :: jobses, rem))
-      (*if List.empty jobs then (jobses, [])
-          else
-            ( List.take jobs (List.length w.proofs) :: jobses
-            , List.drop jobs (List.length w.proofs) ) )*)
-    in
-    List.rev jobses*)
-
-    
-
   let check_completed_works t (completed_works: Completed_work.t list) =
     Result_with_rollback.with_no_rollback
       (let open Deferred.Or_error.Let_syntax in
@@ -294,8 +275,7 @@ end = struct
           (let open Or_error.Let_syntax in
           let%map jobs =
             Parallel_scan.next_k_jobs ~state:t.scan_state
-              ~k:
-                (total_proofs completed_works)
+              ~k:(total_proofs completed_works)
           in
           chunks_of jobs ~n:Completed_work.proofs_length)
       in
@@ -309,7 +289,7 @@ end = struct
   let create_fee_transfers completed_works delta public_key =
     let singles =
       (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
-      @ List.map completed_works ~f:(fun {Completed_work.fee; prover;_} ->
+      @ List.map completed_works ~f:(fun {Completed_work.fee; prover; _} ->
             (prover, fee) )
     in
     Or_error.try_with (fun () ->
@@ -421,37 +401,15 @@ end = struct
 
   let sequence_chunks_of seq ~n =
     Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
-      if i = n then Yield (List.rev acc, ([], 0, seq))
-      else
-        match Sequence.next seq with
-        | None          -> Done
-        | Some (x, seq) -> 
-          (*allow chunks of 1 proof as well*)
-          match Sequence.next seq with
-          | None ->  Yield (List.rev (x::acc), ([], 0, seq))
-          | _    ->  Skip (x :: acc, i + 1, seq))
-
-
-        (*if i > 0 && i < n && Sequence.length seq = 0 then
-          Yield (List.rev acc, ([], n + 1, seq))
-        else if i = n then Yield (List.rev acc, ([], 0, seq))
+        if i = n then Yield (List.rev acc, ([], 0, seq))
         else
           match Sequence.next seq with
           | None -> Done
-          | Some (x, seq) -> Skip (x :: acc, i + 1, seq)*)
-
-  (*let split_n_filter_map seq n ~f =
-    let rec go i acc seq =
-      if i = n then (List.rev acc, seq)
-      else
-        match Sequence.next seq with
-        | None -> (List.rev acc, seq)
-        | Some (x, seq') ->
-          match f x with
-          | None -> go i acc seq'
-          | Some y -> go (i + 1) (y :: acc) seq'
-    in
-    go 0 [] seq*)
+          | Some (x, seq) ->
+            (*allow a chunk of 1 proof as well*)
+            match Sequence.next seq with
+            | None -> Yield (List.rev (x :: acc), ([], 0, seq))
+            | _ -> Skip (x :: acc, i + 1, seq) )
 
   (* TODO: Make this actually return a sequence *)
   let work_to_do scan_state : Completed_work.Statement.t Sequence.t =
@@ -477,11 +435,8 @@ end = struct
       let add_fee_transfer t public_key =
         {t with fee_transfers= Set.add t.fee_transfers public_key}
 
-      (*let ( + ) t1 t2 =
-        { fee_transfers= Set.union t1.fee_transfers t2.fee_transfers
-        ; transactions= t1.transactions + t2.transactions }*)
-
-      let init ~self = {transactions= 0; fee_transfers= Public_key.Set.singleton self}
+      let init ~self =
+        {transactions= 0; fee_transfers= Public_key.Set.singleton self}
     end
 
     type t =
@@ -519,10 +474,6 @@ end = struct
           ; queue_consumption
           ; transactions= (txv, undo) :: t.transactions }
 
-    (*let enough_work_added t new_txns =
-      t.work_done
-      = (Queue_consumption.count t.queue_consumption + new_txns) * 2*)
-
     let add_work t (wc: Completed_work.Checked.t) =
       let open Or_error.Let_syntax in
       let w = Completed_work.forget wc in
@@ -541,7 +492,7 @@ end = struct
         ; work_done= t.work_done + List.length w.proofs
         ; completed_works= wc :: t.completed_works }
 
-    let init ~available_queue_space ~max_throughput ~self=
+    let init ~available_queue_space ~max_throughput ~self =
       { available_queue_space
       ; max_throughput
       ; work_done= 0
@@ -550,31 +501,6 @@ end = struct
       ; transactions= []
       ; completed_works= [] }
   end
-
-  (*let fold_until_error xs ~init ~f =
-    List.fold_until xs ~init
-      ~f:(fun acc x ->
-        match f acc x with Ok acc -> Continue acc | Error _ -> Stop acc )
-      ~finish:Fn.id
-
-  let fold_sequence_until_error seq ~init ~f =
-    let rec go (processed, acc) seq =
-      let finish () =
-        match processed with
-        | `Processed_none -> `Processed_none
-        | `At_least_one -> `Processed_at_least_one (acc, seq)
-      in
-      match Sequence.next seq with
-      | None -> finish ()
-      | Some (x, seq') ->
-        match f acc x with
-        | `Ok acc -> go (`At_least_one, acc) seq'
-        | `Error _ -> finish ()
-        | `Skip -> go (processed, acc) seq'
-    in
-    go (`Processed_none, init) seq
-
-  let uncons_exn = function [] -> failwith "uncons_exn" | x :: xs -> (x, xs)*)
 
   let add_work work resources get_completed_work =
     match get_completed_work work with
@@ -629,7 +555,11 @@ end = struct
           check_resources_and_add Sequence.empty ts get_completed_work ledger
             valid r_transaction
     | Some (w, ws), Some (t, ts), true ->
-        let enough_work_added = resources.work_done = (Resources.Queue_consumption.count resources.queue_consumption + 1) * 2 in
+        let enough_work_added =
+          resources.work_done
+          = (Resources.Queue_consumption.count resources.queue_consumption + 1)
+            * 2
+        in
         if enough_work_added then
           let r_transaction =
             log_error_and_return_value
@@ -661,7 +591,7 @@ end = struct
         t )
 
   let process_works_add_txns ws_seq ts_seq ps_free_space max_throughput
-      get_completed_work ledger self: Resources.t =
+      get_completed_work ledger self : Resources.t =
     let resources =
       Resources.init ~available_queue_space:ps_free_space ~max_throughput ~self
     in
@@ -692,8 +622,7 @@ end = struct
           t )
     in
     let diff =
-      { 
-      Ledger_builder_diff.With_valid_signatures_and_proofs.transactions
+      { Ledger_builder_diff.With_valid_signatures_and_proofs.transactions
       ; completed_works= List.rev resources.completed_works
       ; creator= t'.public_key
       ; prev_hash= curr_hash }
@@ -706,17 +635,10 @@ let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
-
-      module Public_key = String (*struct
-        type t = string [@@deriving sexp, bin_io, compare]
-
-        include Comparable.Make (struct
-          type t = string [@@deriving sexp, bin_io, compare]
-        end)
-      end*)
+      module Public_key = String
 
       module Transaction = struct
-        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare ]
+        type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
         type txn_amt = int [@@deriving sexp, bin_io, compare, eq]
 
@@ -762,24 +684,16 @@ let%test_module "test" =
           in
           go [] xs
 
-        let fee_excess t : fee Or_error.t = match t with
+        let fee_excess t : fee Or_error.t =
+          match t with
           | One (_, fee) -> Ok fee
           | Two ((_, fee1), (_, fee2)) ->
             match Fee.Unsigned.add fee1 fee2 with
             | None -> Or_error.error_string "Fee_transfer.fee_excess: overflow"
             | Some res -> Ok res
 
-        let fee_excess_int t = Fee.Unsigned.to_int (Or_error.ok_exn @@ fee_excess t)
-
-        (*function
-          | One (_, fee) -> Ok (Fee.Unsigned.to_int fee)
-          | Two ((_, fee1), (_, fee2)) ->
-              let f1 = Fee.Unsigned.to_int fee1 in
-              let f2 = Fee.Unsigned.to_int fee2 in
-              match Some (f1 + f2) with
-              | None ->
-                  Or_error.error_string "Fee_transfer.fee_excess: overflow"
-              | Some res -> Ok res*)
+        let fee_excess_int t =
+          Fee.Unsigned.to_int (Or_error.ok_exn @@ fee_excess t)
 
         let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)
       end
@@ -791,8 +705,7 @@ let%test_module "test" =
         type fee_transfer = Fee_transfer.t
         [@@deriving sexp, bin_io, compare, eq]
 
-        type unsigned_fee = Fee.Unsigned.t
-        [@@deriving sexp, bin_io, compare]
+        type unsigned_fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
         type t =
           | Transaction of valid_transaction
@@ -829,8 +742,8 @@ let%test_module "test" =
 
         type ledger_hash = Ledger_hash.t
 
-        let verify (_:t) (_:statement)  ~message:_ : bool Deferred.t 
-          = return true
+        let verify (_: t) (_: statement) ~message:_ : bool Deferred.t =
+          return true
 
         let statement_target : statement -> ledger_hash =
          fun statement -> statement.target
@@ -853,21 +766,11 @@ let%test_module "test" =
           type t = super_transaction [@@deriving sexp]
         end
 
-        (*let undo_transaction : t -> valid_transaction -> unit Or_error.t =
-         fun t v ->
-          t := !t - fst v ;
-          Or_error.return ()*)
-
         let create : unit -> t = fun () -> ref 0
 
         let copy : t -> t = fun t -> ref !t
 
         let merkle_root : t -> ledger_hash = fun t -> Int.to_string !t
-
-        (*let apply_transaction : t -> valid_transaction -> unit Or_error.t =
-         fun t v ->
-          t := !t + fst v ;
-          Or_error.return ()*)
 
         let apply_super_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
@@ -896,33 +799,22 @@ let%test_module "test" =
       module Sparse_ledger = struct
         type t = int [@@deriving sexp, bin_io]
 
-        let of_ledger_subset_exn : Ledger.t ->  Public_key.t list -> t =
-          fun ledger _ -> !ledger
+        let of_ledger_subset_exn : Ledger.t -> Public_key.t list -> t =
+         fun ledger _ -> !ledger
       end
 
       module Ledger_builder_aux_hash = struct
         include String
 
         let of_bytes : string -> t = fun s -> s
-
       end
 
       module Ledger_builder_hash = struct
         include String
-        
+
         type ledger_hash = Ledger_hash.t
 
         type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
-
-        (*module T = struct
-          type t = string [@@deriving sexp, bin_io, compare, hash]
-        end
-
-        include T
-
-        let equal = String.equal
-
-        include Hashable.Make_binable (T)*)
 
         let of_bytes : string -> t = fun s -> s
 
@@ -1010,7 +902,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let parallelism_log_2 = 6
+        let parallelism_log_2 = 8
       end
     end
 
@@ -1018,35 +910,22 @@ let%test_module "test" =
 
     let self_pk = "me"
 
-    (*let initial_statement : Test_input1.Ledger_proof_statement.t =
-      {source= 0; target= 0; fee_excess= Fee.Signed.zero; proof_type= `Base}
-
-    let seed_statement : Test_input1.Ledger_proof_statement.t =
-      { source= 0
-      ; target= 1
-      ; fee_excess= Fee.Signed.of_unsigned (Fee.Unsigned.of_int 1)
-      ; proof_type= `Base }
-
-    let initial_proof : Test_input1.Ledger_proof.t =
-      Fee.Unsigned.to_string
-      @@ Fee.Signed.magnitude initial_statement.fee_excess*)
-
     let stmt_to_work (stmts: Test_input1.Completed_work.Statement.t) :
         Test_input1.Completed_work.Checked.t option =
       let proofs = List.map stmts ~f:(fun stmt -> stmt.target) in
       let prover =
-        List.fold stmts ~init:"P" ~f:(fun p stmt ->
-            p ^ stmt.target )
+        List.fold stmts ~init:"P" ~f:(fun p stmt -> p ^ stmt.target)
       in
       Some
         { Test_input1.Completed_work.Checked.fee= Fee.Unsigned.of_int 1
         ; proofs
         ; prover }
 
-    (*let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)*)
-
     let create_and_apply lb txns =
-      let diff, _, _ = Lb.create_diff lb ~transactions_by_fee:txns ~get_completed_work:stmt_to_work in
+      let diff, _, _ =
+        Lb.create_diff lb ~transactions_by_fee:txns
+          ~get_completed_work:stmt_to_work
+      in
       let%map ledger_proof =
         Lb.apply lb (Test_input1.Ledger_builder_diff.forget diff)
       in
@@ -1086,15 +965,13 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
-      Quickcheck.test g ~trials:1000 ~f:(fun i ->
+      Quickcheck.test g ~trials:10000 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
               let old_ledger = !(Lb.ledger lb) in
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
-              let%map _, diff =
-                create_and_apply lb (Sequence.of_list ts)
-              in
+              let%map _, diff = create_and_apply lb (Sequence.of_list ts) in
               let x = List.length diff.transactions in
               assert (x > 0) ;
               let expected_value =
@@ -1102,6 +979,5 @@ let%test_module "test" =
                 + List.fold (List.take all_ts x) ~init:0 ~f:(fun s (t, fee) ->
                       s + t + fee )
               in
-              Printf.printf "Expected value %d \n" expected_value;
               assert (!(Lb.ledger lb) = expected_value) ) )
   end )

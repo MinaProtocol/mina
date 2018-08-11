@@ -242,9 +242,7 @@ module State1 = struct
           | Work.Not_done -> j :: js
           | Work.Work_done -> js
         in
-        next_position t ;
-        (*Ring_buffer.forwards 1 t.jobs ;*)
-        consume t next jobs_copy
+        next_position t ; consume t next jobs_copy
 
   let include_one_datum state value base_pos : unit Or_error.t =
     let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
@@ -314,13 +312,11 @@ let fill_in_completed_jobs :
 
 let gen :
        gen_data:'d Quickcheck.Generator.t
-    -> f_job_done: (('a, 'd) Available_job.t
-                   -> 'a State.Completed_job.t)
+    -> f_job_done:(('a, 'd) Available_job.t -> 'a State.Completed_job.t)
     -> f_acc:(int * 'a option -> 'a -> 'a option)
     -> ('a, 'd) State.t Quickcheck.Generator.t =
  fun ~gen_data ~f_job_done ~f_acc ->
   let open Quickcheck.Generator.Let_syntax in
-  (*let%bind seed = gen_data in*)
   let%bind parallelism_log_2 = Int.gen_incl 2 7 in
   let s = State1.create ~parallelism_log_2 in
   let parallelism = State1.parallelism s in
@@ -344,7 +340,8 @@ let gen :
       let jobs_done = List.map jobs ~f:f_job_done in
       let old_tuple = s.acc in
       Option.iter
-        (Or_error.ok_exn @@ fill_in_completed_jobs ~state:s ~completed_jobs:jobs_done)
+        ( Or_error.ok_exn
+        @@ fill_in_completed_jobs ~state:s ~completed_jobs:jobs_done )
         ~f:(fun x ->
           let tuple =
             if Option.is_some (snd old_tuple) then old_tuple else s.acc
@@ -362,7 +359,8 @@ let%test_module "scans" =
           Or_error.ok_exn @@ enqueue_data ~state ~data:ds ;
           []
       | false ->
-          Or_error.ok_exn @@ enqueue_data ~state ~data:(List.take ds free_space) ;
+          Or_error.ok_exn
+          @@ enqueue_data ~state ~data:(List.take ds free_space) ;
           List.drop ds free_space
 
     let rec step_on_free_space state w ds f f_acc =
@@ -377,7 +375,8 @@ let%test_module "scans" =
       let old_tuple = state.acc in
       let x' =
         Option.bind
-          (Or_error.ok_exn @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done)
+          ( Or_error.ok_exn
+          @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done )
           ~f:(fun x ->
             let merged =
               if Option.is_some (snd old_tuple) then f_acc old_tuple x

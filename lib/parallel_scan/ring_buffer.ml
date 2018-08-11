@@ -88,8 +88,9 @@ let add_many t xs = List.fold xs ~init:() ~f:(fun () x -> add t x)
 let gen gen_elem =
   let open Quickcheck.Generator.Let_syntax in
   let%bind len = Quickcheck.Generator.small_positive_int in
-  let%map elems = Quickcheck.Generator.list_with_length len gen_elem
-  (*and default_elem = gen_elem*) in
+  let%map elems =
+    Quickcheck.Generator.list_with_length len gen_elem
+  in
   {data= Array.of_list elems; position= 0}
 
 let%test_unit "buffer wraps around" =
