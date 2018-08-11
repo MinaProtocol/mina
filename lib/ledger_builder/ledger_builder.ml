@@ -267,6 +267,19 @@ end = struct
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
+  let total_proofs (works: Completed_work.t list) =
+    List.fold works ~init:0 ~f:(fun acc {proofs} -> acc + List.length proofs)
+
+  let rec chunks_of_jobs jobs (works: Completed_work.t list) =
+    let jobses, _ =
+      List.fold works ~init:([], jobs) ~f:(fun (jobses, jobs) {proofs} ->
+          if List.length jobs = 0 then (jobses, [])
+          else
+            ( List.take jobs (List.length proofs) :: jobses
+            , List.drop jobs (List.length proofs) ) )
+    in
+    List.rev jobses
+
   let check_completed_works t (completed_works: Completed_work.t list) =
     Result_with_rollback.with_no_rollback
       (let open Deferred.Or_error.Let_syntax in
@@ -277,7 +290,7 @@ end = struct
             Parallel_scan.next_k_jobs ~state:t.scan_state
               ~k:(total_proofs completed_works)
           in
-          chunks_of jobs ~n:Completed_work.proofs_length)
+          chunks_of_jobs jobs completed_works)
       in
       Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:
         (fun (jobs, work) ->
@@ -401,7 +414,10 @@ end = struct
 
   let sequence_chunks_of seq ~n =
     Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
-        if i = n then Yield (List.rev acc, ([], 0, seq))
+        (*allow chunks of 1 proof as well*)
+        if i > 0 && i < n && Sequence.length seq = 0 then
+          Yield (List.rev acc, ([], n + 1, seq))
+        else if i = n then Yield (List.rev acc, ([], 0, seq))
         else
           match Sequence.next seq with
           | None -> Done
@@ -428,7 +444,8 @@ end = struct
 
       let count {fee_transfers; transactions} =
         (* This is ceil(Set.length fee_transfers / 2) *)
-        transactions + ((Set.length fee_transfers + 1) / 2)
+        (*+1 to accomodate one fee transfer for the transaction fee*)
+        transactions + ((Set.length fee_transfers + 2) / 2)
 
       let add_transaction t = {t with transactions= t.transactions + 1}
 
@@ -473,6 +490,10 @@ end = struct
             budget
           ; queue_consumption
           ; transactions= (txv, undo) :: t.transactions }
+
+    let enough_work_added t new_txns =
+      t.work_done
+      = (Queue_consumption.count t.queue_consumption + new_txns) * 2
 
     let add_work t (wc: Completed_work.Checked.t) =
       let open Or_error.Let_syntax in
@@ -602,7 +623,102 @@ end = struct
     let _ = undo_txns ledger txns_to_undo in
     valid
 
-  let create_diff t
+  let add_work work resources get_completed_work =
+    match get_completed_work work with
+    | Some w ->
+        (* TODO: There is a subtle error here.
+               You should not add work if it would cause the person's
+               balance to overflow *)
+        Resources.add_work resources w
+    | None -> Error (Error.of_string "Work not found")
+
+  let add_transaction ledger txn resources =
+    match Ledger.apply_super_transaction ledger (Transaction txn) with
+    | Error _ -> Ok resources
+    | Ok undo ->
+      match Resources.add_transaction resources (txn, undo) with
+      | Ok resources -> Ok resources
+      | Error e ->
+          Or_error.ok_exn (Ledger.undo ledger undo) ;
+          Error e
+
+  let txns_not_included (valid: Resources.t) (invalid: Resources.t) =
+    let diff =
+      List.length valid.transactions - List.length invalid.transactions
+    in
+    if diff > 0 then List.take invalid.transactions diff else []
+
+  let log_error_and_return_value err_val def_val =
+    match err_val with
+    | Error e ->
+        Printf.printf "%s" (Error.to_string_hum e) ;
+        def_val
+    | Ok value -> value
+
+  let rec check_resources_and_add ws_seq ts_seq get_completed_work ledger
+      (valid: Resources.t) (resources: Resources.t) =
+    match
+      ( Sequence.next ws_seq
+      , Sequence.next ts_seq
+      , Resources.space_available resources )
+    with
+    | None, None, _ -> (valid, txns_not_included valid resources)
+    | None, Some (t, ts), true ->
+        let r_transaction =
+          log_error_and_return_value
+            (add_transaction ledger t resources)
+            resources
+        in
+        if Resources.budget_non_neg r_transaction then
+          check_resources_and_add Sequence.empty ts get_completed_work ledger
+            r_transaction r_transaction
+        else
+          check_resources_and_add Sequence.empty ts get_completed_work ledger
+            valid r_transaction
+    | Some (w, ws), Some (t, ts), true ->
+        if Resources.enough_work_added resources 1 then
+          let r_transaction =
+            log_error_and_return_value
+              (add_transaction ledger t resources)
+              resources
+          in
+          if Resources.budget_non_neg r_transaction then
+            check_resources_and_add
+              (Sequence.append (Sequence.singleton w) ws)
+              ts get_completed_work ledger r_transaction r_transaction
+          else
+            check_resources_and_add
+              (Sequence.append (Sequence.singleton w) ws)
+              ts get_completed_work ledger valid r_transaction
+        else
+          let r_work =
+            log_error_and_return_value
+              (add_work w resources get_completed_work)
+              resources
+          in
+          check_resources_and_add ws
+            (Sequence.append (Sequence.singleton t) ts)
+            get_completed_work ledger valid r_work
+    | _, _, _ -> (valid, txns_not_included valid resources)
+
+  let undo_txns ledger txns =
+    List.map txns ~f:(fun acc (t, u) ->
+        Or_error.ok_exn (Ledger.undo ledger u) ;
+        t )
+
+  let process_works_add_txns ws_seq ts_seq ps_free_space max_throughput
+      get_completed_work ledger : Resources.t =
+    let resources =
+      Resources.empty ~available_queue_space:ps_free_space ~max_throughput
+    in
+    let valid, txns_to_undo =
+      check_resources_and_add ws_seq ts_seq get_completed_work ledger resources
+        resources
+    in
+    let _ = undo_txns ledger txns_to_undo in
+    valid
+
+  let create_diff t'
       ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
       ~(get_completed_work:
          Completed_work.Statement.t -> Completed_work.Checked.t option) =
