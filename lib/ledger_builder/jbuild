@@ -8,6 +8,5 @@
   (inline_tests)
   (libraries (core parallel_scan sgn transaction_snark nanobit_base protocols coda linear_pipe logger async async_extra))
   (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.make)))
-  (synopsis "Ledger builder updates the current ledger with new transactions")
-  (flags (:standard -short-paths -warn-error -32-39-27-6-9))))
+  (synopsis "Ledger builder updates the current ledger with new transactions")))
 
