@@ -613,7 +613,7 @@ end = struct
     let max_throughput = Int.pow 2 (Inputs.Config.parallelism_log_2 - 1) in
     let resources =
       process_works_add_txns (work_to_do t'.scan_state) transactions_by_fee
-        (free_space t') max_throughput get_completed_work ledger t.public_key
+        (free_space t') max_throughput get_completed_work ledger t'.public_key
     in
     (* We have to reverse here because we only know they work in THIS order *)
     let transactions =
