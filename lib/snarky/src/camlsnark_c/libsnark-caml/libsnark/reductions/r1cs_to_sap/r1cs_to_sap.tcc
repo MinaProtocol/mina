@@ -80,32 +80,54 @@ sap_instance<FieldT> r1cs_to_sap_instance_map(const r1cs_constraint_system<Field
      *   (numbered cs.num_variables() + 1 .. cs.num_variables() + cs.num_constraints())
      */
     size_t extra_var_offset = cs.num_variables() + 1;
+    size_t next_square_constraint_index = 0;
+    size_t non_square_constraint_count = 0;
     for (size_t i = 0; i < cs.num_constraints(); ++i)
     {
-        for (size_t j = 0; j < cs.constraints[i].a.terms.size(); ++j)
-        {
-            A_in_Lagrange_basis[cs.constraints[i].a.terms[j].index][2 * i] +=
-                cs.constraints[i].a.terms[j].coeff;
-            A_in_Lagrange_basis[cs.constraints[i].a.terms[j].index][2 * i + 1] +=
-                cs.constraints[i].a.terms[j].coeff;
-        }
+        if (cs.constraints[i].is_square) {
+          for (size_t j = 0; j < cs.constraints[i].a.terms.size(); ++j)
+          {
+            A_in_Lagrange_basis[cs.constraints[i].a.terms[j].index][next_square_constraint_index] +=
+              cs.constraints[i].a.terms[j].coeff;
+          }
 
-        for (size_t j = 0; j < cs.constraints[i].b.terms.size(); ++j)
-        {
-            A_in_Lagrange_basis[cs.constraints[i].b.terms[j].index][2 * i] +=
-                cs.constraints[i].b.terms[j].coeff;
-            A_in_Lagrange_basis[cs.constraints[i].b.terms[j].index][2 * i + 1] -=
-                cs.constraints[i].b.terms[j].coeff;
-        }
+          for (size_t j = 0; j < cs.constraints[i].c.terms.size(); ++j)
+          {
+            C_in_Lagrange_basis[cs.constraints[i].c.terms[j].index][next_square_constraint_index] +=
+              cs.constraints[i].c.terms[j].coeff;
+          }
 
-        for (size_t j = 0; j < cs.constraints[i].c.terms.size(); ++j)
-        {
-            C_in_Lagrange_basis[cs.constraints[i].c.terms[j].index][2 * i] +=
-                  times_four(cs.constraints[i].c.terms[j].coeff);
+          next_square_constraint_index += 1;
         }
+        else {
+          for (size_t j = 0; j < cs.constraints[i].a.terms.size(); ++j)
+          {
+              A_in_Lagrange_basis[cs.constraints[i].a.terms[j].index][next_square_constraint_index] +=
+                  cs.constraints[i].a.terms[j].coeff;
+              A_in_Lagrange_basis[cs.constraints[i].a.terms[j].index][next_square_constraint_index + 1] +=
+                  cs.constraints[i].a.terms[j].coeff;
+          }
 
-        C_in_Lagrange_basis[extra_var_offset + i][2 * i] += FieldT::one();
-        C_in_Lagrange_basis[extra_var_offset + i][2 * i + 1] += FieldT::one();
+          for (size_t j = 0; j < cs.constraints[i].b.terms.size(); ++j)
+          {
+              A_in_Lagrange_basis[cs.constraints[i].b.terms[j].index][next_square_constraint_index] +=
+                  cs.constraints[i].b.terms[j].coeff;
+              A_in_Lagrange_basis[cs.constraints[i].b.terms[j].index][next_square_constraint_index + 1] -=
+                  cs.constraints[i].b.terms[j].coeff;
+          }
+
+          for (size_t j = 0; j < cs.constraints[i].c.terms.size(); ++j)
+          {
+              C_in_Lagrange_basis[cs.constraints[i].c.terms[j].index][next_square_constraint_index] +=
+                    times_four(cs.constraints[i].c.terms[j].coeff);
+          }
+
+          C_in_Lagrange_basis[extra_var_offset + non_square_constraint_count][next_square_constraint_index] += FieldT::one();
+          C_in_Lagrange_basis[extra_var_offset + non_square_constraint_count][next_square_constraint_index + 1] += FieldT::one();
+
+          non_square_constraint_count += 1;
+          next_square_constraint_index += 2;
+        }
     }
 
     /**
@@ -129,8 +151,8 @@ sap_instance<FieldT> r1cs_to_sap_instance_map(const r1cs_constraint_system<Field
      *             cs.num_variables() + cs.num_constraints() + cs.num_inputs())
      */
 
-    size_t extra_constr_offset = 2 * cs.num_constraints();
-    size_t extra_var_offset2 = cs.num_variables() + cs.num_constraints();
+    size_t extra_constr_offset = next_square_constraint_index;
+    size_t extra_var_offset2 = cs.num_variables() + non_square_constraint_count;
     /**
      * NB: extra variables start at (extra_var_offset2 + 1), because i starts at
      *     1 below
@@ -149,7 +171,7 @@ sap_instance<FieldT> r1cs_to_sap_instance_map(const r1cs_constraint_system<Field
 
         A_in_Lagrange_basis[i][extra_constr_offset + 2 * i] += FieldT::one();
         A_in_Lagrange_basis[0][extra_constr_offset + 2 * i] -= FieldT::one();
-        C_in_Lagrange_basis[extra_var_offset2 + i][2 * cs.num_constraints() + 2 * i] += FieldT::one();
+        C_in_Lagrange_basis[extra_var_offset2 + i][extra_constr_offset + 2 * i] += FieldT::one();
     }
 
     libff::leave_block("Compute polynomials A, C in Lagrange basis");
@@ -193,36 +215,57 @@ sap_instance_evaluation<FieldT> r1cs_to_sap_instance_map_with_evaluation(const r
      * add and process all constraints as in r1cs_to_sap_instance_map
      */
     size_t extra_var_offset = cs.num_variables() + 1;
+    size_t next_square_constraint_index = 0;
+    size_t non_square_constraint_count = 0;
     for (size_t i = 0; i < cs.num_constraints(); ++i)
     {
-        for (size_t j = 0; j < cs.constraints[i].a.terms.size(); ++j)
-        {
-            At[cs.constraints[i].a.terms[j].index] +=
-                u[2 * i] * cs.constraints[i].a.terms[j].coeff;
-            At[cs.constraints[i].a.terms[j].index] +=
-                u[2 * i + 1] * cs.constraints[i].a.terms[j].coeff;
-        }
+        if (cs.constraints[i].is_square) {
+          for (size_t j = 0; j < cs.constraints[i].a.terms.size(); ++j)
+          {
+              At[cs.constraints[i].a.terms[j].index] +=
+                  u[next_square_constraint_index] * cs.constraints[i].a.terms[j].coeff;
+          }
 
-        for (size_t j = 0; j < cs.constraints[i].b.terms.size(); ++j)
-        {
-            At[cs.constraints[i].b.terms[j].index] +=
-                u[2 * i] * cs.constraints[i].b.terms[j].coeff;
-            At[cs.constraints[i].b.terms[j].index] -=
-                u[2 * i + 1] * cs.constraints[i].b.terms[j].coeff;
-        }
+          for (size_t j = 0; j < cs.constraints[i].c.terms.size(); ++j)
+          {
+              Ct[cs.constraints[i].c.terms[j].index] +=
+                  u[next_square_constraint_index] * cs.constraints[i].c.terms[j].coeff;
+          }
 
-        for (size_t j = 0; j < cs.constraints[i].c.terms.size(); ++j)
-        {
-            Ct[cs.constraints[i].c.terms[j].index] +=
-                times_four(u[2 * i] * cs.constraints[i].c.terms[j].coeff);
-        }
+          next_square_constraint_index += 2;
+        } else {
+          for (size_t j = 0; j < cs.constraints[i].a.terms.size(); ++j)
+          {
+              At[cs.constraints[i].a.terms[j].index] +=
+                  u[next_square_constraint_index] * cs.constraints[i].a.terms[j].coeff;
+              At[cs.constraints[i].a.terms[j].index] +=
+                  u[next_square_constraint_index + 1] * cs.constraints[i].a.terms[j].coeff;
+          }
 
-        Ct[extra_var_offset + i] += u[2 * i];
-        Ct[extra_var_offset + i] += u[2 * i + 1];
+          for (size_t j = 0; j < cs.constraints[i].b.terms.size(); ++j)
+          {
+              At[cs.constraints[i].b.terms[j].index] +=
+                  u[next_square_constraint_index] * cs.constraints[i].b.terms[j].coeff;
+              At[cs.constraints[i].b.terms[j].index] -=
+                  u[next_square_constraint_index + 1] * cs.constraints[i].b.terms[j].coeff;
+          }
+
+          for (size_t j = 0; j < cs.constraints[i].c.terms.size(); ++j)
+          {
+              Ct[cs.constraints[i].c.terms[j].index] +=
+                  times_four(u[next_square_constraint_index] * cs.constraints[i].c.terms[j].coeff);
+          }
+
+          Ct[extra_var_offset + non_square_constraint_count] += u[next_square_constraint_index];
+          Ct[extra_var_offset + non_square_constraint_count] += u[next_square_constraint_index + 1];
+
+          non_square_constraint_count += 1;
+          next_square_constraint_index += 2;
+        }
     }
 
-    size_t extra_constr_offset = 2 * cs.num_constraints();
-    size_t extra_var_offset2 = cs.num_variables() + cs.num_constraints();
+    size_t extra_constr_offset = next_square_constraint_index;
+    size_t extra_var_offset2 = cs.num_variables() + non_square_constraint_count;
 
     At[0] += u[extra_constr_offset];
     Ct[0] += u[extra_constr_offset];
@@ -324,10 +367,12 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
          * we introduced that is not present in the input.
          * its value is (a - b)^2
          */
-        FieldT extra_var = cs.constraints[i].a.evaluate(full_variable_assignment) -
-            cs.constraints[i].b.evaluate(full_variable_assignment);
-        extra_var = extra_var * extra_var;
-        full_variable_assignment.push_back(extra_var);
+        if (! cs.constraints[i].is_square) {
+          FieldT extra_var = cs.constraints[i].a.evaluate(full_variable_assignment) -
+              cs.constraints[i].b.evaluate(full_variable_assignment);
+          extra_var = extra_var * extra_var;
+          full_variable_assignment.push_back(extra_var);
+        }
     }
     for (size_t i = 1; i <= cs.num_inputs(); ++i)
     {
@@ -345,16 +390,25 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
     std::vector<FieldT> aA(domain->m, FieldT::zero());
 
     /* account for all constraints, as in r1cs_to_sap_instance_map */
+    size_t next_square_constraint_index = 0;
     for (size_t i = 0; i < cs.num_constraints(); ++i)
     {
-        aA[2 * i] += cs.constraints[i].a.evaluate(full_variable_assignment);
-        aA[2 * i] += cs.constraints[i].b.evaluate(full_variable_assignment);
+        if (cs.constraints[i].is_square) {
+          aA[next_square_constraint_index] += cs.constraints[i].a.evaluate(full_variable_assignment);
 
-        aA[2 * i + 1] += cs.constraints[i].a.evaluate(full_variable_assignment);
-        aA[2 * i + 1] -= cs.constraints[i].b.evaluate(full_variable_assignment);
+          next_square_constraint_index += 1;
+        } else {
+          aA[next_square_constraint_index] += cs.constraints[i].a.evaluate(full_variable_assignment);
+          aA[next_square_constraint_index] += cs.constraints[i].b.evaluate(full_variable_assignment);
+
+          aA[next_square_constraint_index + 1] += cs.constraints[i].a.evaluate(full_variable_assignment);
+          aA[next_square_constraint_index + 1] -= cs.constraints[i].b.evaluate(full_variable_assignment);
+
+          next_square_constraint_index += 2;
+        }
     }
 
-    size_t extra_constr_offset = 2 * cs.num_constraints();
+    size_t extra_constr_offset = next_square_constraint_index;
 
     aA[extra_constr_offset] += FieldT::one();
 
@@ -405,16 +459,28 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
     std::vector<FieldT> aC(domain->m, FieldT::zero());
     /* again, accounting for all constraints */
     size_t extra_var_offset = cs.num_variables() + 1;
+    next_square_constraint_index = 0;
+    size_t non_square_constraint_count = 0;
     for (size_t i = 0; i < cs.num_constraints(); ++i)
     {
-        aC[2 * i] +=
-            times_four(cs.constraints[i].c.evaluate(full_variable_assignment));
+        if (cs.constraints[i].is_square) {
+            aC[next_square_constraint_index] +=
+              cs.constraints[i].c.evaluate(full_variable_assignment);
 
-        aC[2 * i] += full_variable_assignment[extra_var_offset + i - 1];
-        aC[2 * i + 1] += full_variable_assignment[extra_var_offset + i - 1];
+            next_square_constraint_index += 1;
+        } else {
+            aC[next_square_constraint_index] +=
+                times_four(cs.constraints[i].c.evaluate(full_variable_assignment));
+
+            aC[next_square_constraint_index] += full_variable_assignment[extra_var_offset + non_square_constraint_count - 1];
+            aC[next_square_constraint_index + 1] += full_variable_assignment[extra_var_offset + non_square_constraint_count - 1];
+
+            next_square_constraint_index += 2;
+            non_square_constraint_count += 1;
+        }
     }
 
-    size_t extra_var_offset2 = cs.num_variables() + cs.num_constraints();
+    size_t extra_var_offset2 = cs.num_variables() + non_square_constraint_count;
     aC[extra_constr_offset] += FieldT::one();
 
     for (size_t i = 1; i <= cs.num_inputs(); ++i)
