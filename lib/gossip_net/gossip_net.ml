@@ -142,7 +142,7 @@ module Make (Message : Message_intf) = struct
   let create (peer_events: Peer.Event.t Linear_pipe.Reader.t)
       (params: Params.t) parent_log implementations =
     let log = Logger.child parent_log "gossip_net" in
-    let new_peer_reader, new_peer_writer = Linear_pipe.create () in
+    let new_peer_reader, _ = Linear_pipe.create () in
     let broadcast_reader, broadcast_writer = Linear_pipe.create () in
     let received_reader, received_writer = Linear_pipe.create () in
     let t =
@@ -163,7 +163,7 @@ module Make (Message : Message_intf) = struct
     let implementations =
       let implementations =
         Versioned_rpc.Menu.add
-          ( Message.implement_multi (fun () ~version msg ->
+          ( Message.implement_multi (fun () ~version:_ msg ->
                 Linear_pipe.write_or_drop ~capacity:broadcast_received_capacity
                   received_writer received_reader msg )
           @ implementations )
@@ -187,9 +187,9 @@ module Make (Message : Message_intf) = struct
       (Tcp.Server.create
          ~on_handler_error:
            (`Call
-             (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
+             (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
          (Tcp.Where_to_listen.of_port (Host_and_port.port params.address))
-         (fun address reader writer ->
+         (fun _ reader writer ->
            Rpc.Connection.server_with_close reader writer ~implementations
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:
@@ -202,8 +202,6 @@ module Make (Message : Message_intf) = struct
   let received t = t.received_reader
 
   let broadcast t = t.broadcast_writer
-
-  let new_peers t = t.new_peer_reader
 
   let peers t = Hash_set.to_list t.peers
 
