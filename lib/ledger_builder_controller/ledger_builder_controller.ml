@@ -388,7 +388,7 @@ end = struct
                 | Ok [] -> return ()
                 | Ok changes ->
                     Linear_pipe.write mutate_state_writer (changes, this_input)
-                | Error _ -> return () )
+                | Error () -> return () )
             in
             return (Some (this_input, this_ivar)) )
       >>| ignore ) ;

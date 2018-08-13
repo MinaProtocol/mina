@@ -128,8 +128,7 @@ module Make (Inputs : Inputs_intf) = struct
         Interruptible.lift
           (Sync_ledger.wait_until_valid sl h)
           (Deferred.map (Ivar.read ivar) ~f:(fun transition ->
-               Sync_ledger.new_goal sl (Transition.ledger_hash transition) ;
-               transition ))
+               Sync_ledger.new_goal sl (Transition.ledger_hash transition) ))
       with
       | `Ok ledger -> (
           (* TODO: This should be parallelized with the syncing *)
