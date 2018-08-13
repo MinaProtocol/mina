@@ -168,8 +168,7 @@ end) :
    and type key := Key.t =
 struct
   include Depth
-
-  module Addr = Address.Make(Depth)
+  module Addr = Address.Make (Depth)
 
   type entry = {merkle_index: int; account: Account.t}
   [@@deriving sexp, bin_io]
