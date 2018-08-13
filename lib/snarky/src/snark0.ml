@@ -171,6 +171,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     type basic =
       | Boolean of Cvar.t
       | Equal of Cvar.t * Cvar.t
+      | Square of Cvar.t * Cvar.t
       | R1CS of Cvar.t * Cvar.t * Cvar.t
     [@@deriving sexp]
 
@@ -186,12 +187,28 @@ module Make_basic (Backend : Backend_intf.S) = struct
       function
         | Boolean v ->
             let lc = of_var v in
-            R1CS_constraint.create lc lc lc
+            let constr = R1CS_constraint.create lc lc lc in
+            R1CS_constraint.set_is_square constr true;
+            constr
         | Equal (v1, v2) ->
-            R1CS_constraint.create Linear_combination.one (of_var v1)
-              (of_var v2)
+          (* 0 * 0 = (v1 - v2) *)
+          let constr =
+            R1CS_constraint.create
+              Linear_combination.zero
+              Linear_combination.zero
+              (of_var (Cvar.sub v1 v2))
+          in
+          R1CS_constraint.set_is_square constr true;
+          constr
+        | Square (a, c) ->
+          let a = of_var a in
+          let constr = R1CS_constraint.create a a (of_var c) in
+          R1CS_constraint.set_is_square constr true;
+          constr
         | R1CS (a, b, c) ->
-            R1CS_constraint.create (of_var a) (of_var b) (of_var c)
+          let constr = R1CS_constraint.create (of_var a) (of_var b) (of_var c) in
+          R1CS_constraint.set_is_square constr false;
+          constr
 
     let create_basic ?label basic = {basic; annotation= label}
 
@@ -203,6 +220,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let boolean ?label x = [create_basic ?label (Boolean x)]
 
     let r1cs ?label a b c = [create_basic ?label (R1CS (a, b, c))]
+
+    let square ?label a c = [create_basic ?label (Square (a, c))]
 
     let stack_to_string = String.concat ~sep:"\n"
 
@@ -221,6 +240,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
       | Equal (v1, v2) -> Field.equal (get_value v1) (get_value v2)
       | R1CS (v1, v2, v3) ->
           Field.(equal (mul (get_value v1) (get_value v2)) (get_value v3))
+      | Square (a, c) ->
+        Field.equal (Field.square (get_value a)) (get_value c)
 
     let eval t get_value =
       List.for_all t ~f:(fun {basic} -> eval_basic basic get_value)
@@ -778,6 +799,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let assert_r1cs ?label a b c = assert_ (Constraint.r1cs ?label a b c)
 
+    let assert_square ?label a c = assert_ (Constraint.square ?label a c)
+
     let assert_all =
       let map_concat_rev xss ~f =
         let rec go acc xs xss =
@@ -1046,6 +1069,18 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let%map () = assert_r1cs x y z in
         z)
 
+    let square ?(label= "Checked.square") x =
+      with_label label
+        (let open Let_syntax in
+        let%bind z =
+          provide_witness Typ.field
+            (let open As_prover.Let_syntax in
+            let%map x = As_prover.read_var x in
+            Field.square x)
+        in
+        let%map () = assert_square x z in
+        z)
+
     let div ?(label= "Checked.div") x y =
       with_label label
         (let open Let_syntax in
@@ -1093,7 +1128,28 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
       let not (x: var) : var = Cvar.Infix.(true_ - x)
 
-      let ( && ) : var -> var -> (var, _) t = mul
+      let ( && ) x y =
+        (* (x + y)^2 = 2 z + x + y
+
+           x^2 + 2 x*y + y^2 = 2 z + x + y
+           x + 2 x*y + y = 2 z + x + y
+           2 x*y = 2 z
+           x * y = z
+        *)
+        let open Let_syntax in
+        let%bind z =
+          provide_witness Typ.field
+            As_prover.(Let_syntax.(
+              let%map x = read_var x and y = read_var y in
+              if Field.(equal one x) && Field.(equal one y)
+              then Field.one
+              else Field.zero))
+        in
+        let%map () =
+          let x_plus_y = Cvar.add x y in
+          assert_square x_plus_y Cvar.Infix.(Field.of_int 2 * z + x_plus_y)
+        in
+        z
 
       let ( || ) x y =
         let open Let_syntax in
@@ -1415,6 +1471,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
       let equal = Checked.equal
 
       let mul x y = Checked.mul ~label:"Field.Checked.mul" x y
+
+      let square x = Checked.square ~label:"Field.Checked.mul" x
 
       let div x y = Checked.div ~label:"Field.Checked.div" x y
 

@@ -72,6 +72,10 @@ module type Basic = sig
     val r1cs :
       (Field.Checked.t -> Field.Checked.t -> Field.Checked.t -> t)
       with_constraint_args
+
+    val square :
+      (Field.Checked.t -> Field.Checked.t -> t)
+      with_constraint_args
   end
   
   and Data_spec : sig
@@ -276,6 +280,8 @@ module type Basic = sig
 
       val mul : t -> t -> (t, _) Checked.t
 
+      val square : t -> (t, _) Checked.t
+
       val div : t -> t -> (t, _) Checked.t
 
       val inv : t -> (t, _) Checked.t
@@ -398,6 +404,12 @@ module type Basic = sig
   val assert_r1cs :
        ?label:string
     -> Field.Checked.t
+    -> Field.Checked.t
+    -> Field.Checked.t
+    -> (unit, _) Checked.t
+
+  val assert_square :
+       ?label:string
     -> Field.Checked.t
     -> Field.Checked.t
     -> (unit, _) Checked.t
