@@ -418,6 +418,10 @@ void camlsnark_mnt6_r1cs_constraint_delete(r1cs_constraint<FieldT>* c) {
   delete c;
 }
 
+void camlsnark_mnt6_r1cs_constraint_set_is_square(r1cs_constraint<FieldT>* c, bool is_square) {
+  c->is_square = is_square;
+}
+
 r1cs_constraint_system<FieldT>* camlsnark_mnt6_r1cs_constraint_system_create() {
   return new r1cs_constraint_system<FieldT>();
 }
