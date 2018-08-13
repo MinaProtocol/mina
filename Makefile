@@ -58,7 +58,7 @@ test:
 	./test_all.sh
 
 reformat:
-	jbuilder exec app/reformat/reformat.exe -- -path .
+	dune exec app/reformat/reformat.exe -- -path .
 
 check-format:
-	jbuilder exec app/reformat/reformat.exe -- -path . -check
+	dune exec app/reformat/reformat.exe -- -path . -check
