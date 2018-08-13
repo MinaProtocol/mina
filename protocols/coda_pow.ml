@@ -1,6 +1,12 @@
 open Core_kernel
 open Async_kernel
 
+module type Time_controller_intf = sig
+  type t
+
+  val create : unit -> t
+end
+
 module type Time_intf = sig
   module Stable : sig
     module V1 : sig
@@ -8,11 +14,11 @@ module type Time_intf = sig
     end
   end
 
-  module Controller : sig
-    type t
-  end
+  module Controller : Time_controller_intf
 
   type t [@@deriving sexp]
+
+  type t0 = t
 
   module Span : sig
     type t
@@ -33,7 +39,7 @@ module type Time_intf = sig
   module Timeout : sig
     type 'a t
 
-    val create : Controller.t -> Span.t -> f:(unit -> 'a) -> 'a t
+    val create : Controller.t -> Span.t -> f:(t0 -> 'a) -> 'a t
 
     val to_deferred : 'a t -> 'a Deferred.t
 

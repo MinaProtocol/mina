@@ -45,9 +45,7 @@ end)
 struct
   open Protocols.Coda_pow
 
-  module Time :
-    Time_intf with type t = Block_time.t and module Controller := Unit =
-  Block_time
+  module Time : Time_intf with type t = Block_time.t = Block_time
 
   module Time_close_validator = struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)
@@ -684,6 +682,8 @@ end
 
 module type Main_intf = sig
   module Inputs : sig
+    module Time : Protocols.Coda_pow.Time_intf
+
     module Ledger : sig
       type t [@@deriving sexp]
 
@@ -707,7 +707,9 @@ module type Main_intf = sig
       module Gossip_net : sig
         module Params : sig
           type t =
-            {timeout: Time.Span.t; target_peer_count: int; address: Peer.t}
+            { timeout: Core_kernel.Time.Span.t
+            ; target_peer_count: int
+            ; address: Peer.t }
         end
       end
 
@@ -765,7 +767,8 @@ module type Main_intf = sig
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10] }
+      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; time_controller: Inputs.Time.Controller.t }
     [@@deriving make]
   end
 

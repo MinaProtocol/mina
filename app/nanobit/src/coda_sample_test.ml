@@ -66,7 +66,9 @@ module Coda_worker = struct
         (Main.Config.make ~log ~net_config
            ~ledger_builder_persistant_location:"ledger_builder"
            ~transaction_pool_disk_location:"transaction_pool"
-           ~snark_pool_disk_location:"snark_pool" ())
+           ~snark_pool_disk_location:"snark_pool"
+           ~time_controller:(Main.Inputs.Time.Controller.create ())
+           ())
     in
     let peers () = Main.peers minibit in
     {peers}

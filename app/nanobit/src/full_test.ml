@@ -50,7 +50,9 @@ let run_test with_snark : unit -> unit Deferred.t =
       (Main.Config.make ~log ~net_config
          ~ledger_builder_persistant_location:"ledger_builder"
          ~transaction_pool_disk_location:"transaction_pool"
-         ~snark_pool_disk_location:"snark_pool" ())
+         ~snark_pool_disk_location:"snark_pool"
+         ~time_controller:(Inputs.Time.Controller.create ())
+         ())
   in
   let balance_change_or_timeout ~initial_receiver_balance =
     let rec go () =
