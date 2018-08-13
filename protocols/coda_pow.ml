@@ -370,8 +370,12 @@ module type Tip_intf = sig
 
   type ledger_builder
 
+  type transition
+
   type t = {state: state; proof: state_proof; ledger_builder: ledger_builder}
   [@@deriving sexp, bin_io]
+
+  val of_transition_and_lb : transition -> ledger_builder -> t
 end
 
 module type Nonce_intf = sig
@@ -728,17 +732,18 @@ Merge Snark:
     end
   end
 
-  module Tip :
-    Tip_intf
-    with type ledger_builder := Ledger_builder.t
-     and type state := State.t
-     and type state_proof := State.Proof.t
-
   module External_transition :
     External_transition_intf
     with type state_proof := State.Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
      and type state := State.t
+
+  module Tip :
+    Tip_intf
+    with type ledger_builder := Ledger_builder.t
+     and type state := State.t
+     and type state_proof := State.Proof.t
+     and type transition := External_transition.t
 end
 
 module Make

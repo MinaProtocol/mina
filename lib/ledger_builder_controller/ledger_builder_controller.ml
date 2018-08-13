@@ -83,12 +83,6 @@ module type Inputs_intf = sig
     end
   end
 
-  module Tip :
-    Protocols.Coda_pow.Tip_intf
-    with type ledger_builder := Ledger_builder.t
-     and type state := State.t
-     and type state_proof := State.Proof.t
-
   module External_transition : sig
     type t [@@deriving bin_io, eq, compare, sexp]
 
@@ -98,6 +92,13 @@ module type Inputs_intf = sig
 
     val ledger_builder_diff : t -> Ledger_builder_diff.t
   end
+
+  module Tip :
+    Protocols.Coda_pow.Tip_intf
+    with type ledger_builder := Ledger_builder.t
+     and type state := State.t
+     and type state_proof := State.Proof.t
+     and type transition := External_transition.t
 
   module Valid_transaction : sig
     type t [@@deriving eq, sexp, compare, bin_io]
@@ -270,85 +271,18 @@ end = struct
     end
 
     (* TODO: Move this logic to a separate Catchup module in a later PR *)
-    module Catchup = struct
-      type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
-
-      let create net parent_log =
-        {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None}
-
-      (* Perform the `Sync interruptible work *)
-      let do_sync {net; log; sl_ref} (state: Transition_logic_state.t)
-          transition =
-        let locked_tip = Transition_logic_state.locked_tip state in
-        let h = Transition.ledger_hash transition in
-        (* Lazily recreate the sync_ledger if necessary *)
-        let sl : Sync_ledger.t =
-          match !sl_ref with
-          | None ->
-              let ledger =
-                Ledger_builder.ledger locked_tip.ledger_builder |> Ledger.copy
-              in
-              let sl = Sync_ledger.create ledger h in
-              Net.glue_sync_ledger net
-                (Sync_ledger.query_reader sl)
-                (Sync_ledger.answer_writer sl) ;
-              sl_ref := Some sl ;
-              sl
-          | Some sl -> sl
-        in
-        let open Interruptible.Let_syntax in
-        let ivar : Transition.t Ivar.t = Ivar.create () in
-        let work =
-          match%bind
-            Interruptible.lift
-              (Sync_ledger.wait_until_valid sl h)
-              (Deferred.map (Ivar.read ivar) ~f:(fun transition ->
-                   Sync_ledger.new_goal sl (Transition.ledger_hash transition) ;
-                   transition ))
-          with
-          | `Ok ledger -> (
-              (* TODO: This should be parallelized with the syncing *)
-              match%map
-                Interruptible.uninterruptible
-                  (Net.get_ledger_builder_aux_at_hash net
-                     (External_transition.ledger_builder_hash transition))
-              with
-              | Ok aux -> (
-                match Ledger_builder.of_aux_and_ledger ledger aux with
-                (* TODO: We'll need the full history in order to trust that
-                   the ledger builder we get is actually valid. See #285 *)
-                | Ok lb ->
-                    let new_tree =
-                      Transition_logic_state.Transition_tree.singleton
-                        transition
-                    in
-                    sl_ref := None ;
-                    Option.iter !sl_ref ~f:Sync_ledger.destroy ;
-                    let new_tip =
-                      { Tip.ledger_builder= lb
-                      ; state= External_transition.target_state transition
-                      ; proof= External_transition.state_proof transition }
-                    in
-                    let open Transition_logic_state.Change in
-                    [ Ktree new_tree
-                    ; Locked_tip new_tip
-                    ; Longest_branch_tip new_tip ]
-                | Error e ->
-                    Logger.info log "Malicious aux data received from net %s"
-                      (Error.to_string_hum e) ;
-                    (* TODO: Retry? see #361 *)
-                    [] )
-              | Error e ->
-                  Logger.info log "Network failed to send aux %s"
-                    (Error.to_string_hum e) ;
-                  [] )
-          | `Target_changed -> return []
-        in
-        (work, ivar)
-
-      let sync (t: t) (state: Transition_logic_state.t) transition =
-        (transition, do_sync t state)
-    end
+    module Catchup = Catchup.Make (struct
+      module Ledger_hash = Ledger_hash
+      module Ledger = Ledger
+      module Ledger_builder_hash = Ledger_builder_hash
+      module Ledger_builder = Ledger_builder
+      module State = State
+      module Transition = External_transition
+      module Tip = Tip
+      module Transition_logic_state = Transition_logic_state
+      module Sync_ledger = Sync_ledger
+      module Net = Net
+    end)
   end
 
   module Transition_logic = Transition_logic.Make (Transition_logic_inputs)
@@ -545,14 +479,6 @@ let%test_module "test" =
         module Proof = Unit
       end
 
-      module Tip = struct
-        type t =
-          { state: State.t
-          ; proof: State.Proof.t
-          ; ledger_builder: Ledger_builder.t }
-        [@@deriving bin_io, sexp, fields]
-      end
-
       module External_transition = struct
         include State
 
@@ -561,6 +487,19 @@ let%test_module "test" =
         let ledger_builder_diff = State.hash
 
         let state_proof _ = ()
+      end
+
+      module Tip = struct
+        type t =
+          { state: State.t
+          ; proof: State.Proof.t
+          ; ledger_builder: Ledger_builder.t }
+        [@@deriving bin_io, sexp, fields]
+
+        let of_transition_and_lb transition ledger_builder =
+          { state= External_transition.state transition
+          ; proof= External_transition.state_proof transition
+          ; ledger_builder }
       end
 
       module Internal_transition = External_transition
