@@ -62,7 +62,6 @@ let daemon =
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
-       let remap_addr_port = Fn.id in
        let me = Host_and_port.create ~host:ip ~port in
        let%bind prover = Prover.create ~conf_dir in
        let%bind verifier = Verifier.create ~conf_dir in
@@ -98,15 +97,14 @@ let daemon =
          in
          let net_config =
            { Inputs.Net.Config.parent_log= log
-           ; conf_dir
            ; gossip_net_params=
                { timeout= Time.Span.of_sec 1.
+               ; parent_log= log
                ; target_peer_count= 8
+               ; conf_dir
                ; address= Host_and_port.create ~host:ip ~port:membership_port
-               }
-           ; initial_peers
-           ; me
-           ; remap_addr_port }
+               ; initial_peers
+               ; me } }
          in
          let%map minibit =
            Run.create
