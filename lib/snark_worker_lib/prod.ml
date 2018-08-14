@@ -15,7 +15,7 @@ module Inputs = struct
       end)
       : S )
 
-    let worker_wait_time = 1.
+    let worker_wait_time = 10.
   end
 
   module Proof = Transaction_snark
