@@ -39,13 +39,14 @@ std::shared_ptr<libfqfft::evaluation_domain<FieldT> > r1cs_to_sap_get_domain(con
 {
     /*
      * the SAP instance will have:
-     * - two constraints for every constraint in the original constraint system
+     * - one constraints for every constraint in the original constraint system
+     * - one additional constraint for every constraint in the original constraint system which is not square
      * - two constraints for every public input, except the 0th, which
      *   contributes just one extra constraint
      * see comments in r1cs_to_sap_instance_map for details on where these
      * constraints come from.
      */
-    return libfqfft::get_evaluation_domain<FieldT>(2 * cs.num_constraints() + 2 * cs.num_inputs() + 1);
+    return libfqfft::get_evaluation_domain<FieldT>(2 * cs.num_constraints() - cs.num_square_constraints + 2 * cs.num_inputs() + 1);
 }
 
 /**
@@ -59,7 +60,7 @@ sap_instance<FieldT> r1cs_to_sap_instance_map(const r1cs_constraint_system<Field
     const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain =
         r1cs_to_sap_get_domain(cs);
 
-    size_t sap_num_variables = cs.num_variables() + cs.num_constraints() + cs.num_inputs();
+    size_t sap_num_variables = cs.num_variables() + (cs.num_constraints() - cs.num_square_constraints) + cs.num_inputs();
 
     std::vector<std::map<size_t, FieldT> > A_in_Lagrange_basis(sap_num_variables + 1);
     std::vector<std::map<size_t, FieldT> > C_in_Lagrange_basis(sap_num_variables + 1);
@@ -199,7 +200,7 @@ sap_instance_evaluation<FieldT> r1cs_to_sap_instance_map_with_evaluation(const r
     const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain =
         r1cs_to_sap_get_domain(cs);
 
-    size_t sap_num_variables = cs.num_variables() + cs.num_constraints() + cs.num_inputs();
+    size_t sap_num_variables = cs.num_variables() + (cs.num_constraints() - cs.num_square_constraints) + cs.num_inputs();
 
     std::vector<FieldT> At, Ct, Ht;
 
