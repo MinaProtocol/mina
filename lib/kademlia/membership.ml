@@ -65,7 +65,7 @@ module Haskell_process = struct
         | Error _ ->
             Process.create ~prog:(test_prefix ^ kademlia_binary) ~args () )
     in
-    let kill_locked_process ~log ~conf_dir =
+    let kill_locked_process ~log =
       match%bind Sys.file_exists lock_path with
       | `Yes -> (
           let%bind p = Reader.file_contents lock_path in
@@ -86,7 +86,7 @@ module Haskell_process = struct
     in
     Logger.debug log "Args: %s\n"
       (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
-    let%bind () = kill_locked_process ~log ~conf_dir in
+    let%bind () = kill_locked_process ~log in
     match%bind
       Sys.is_directory conf_dir |> Deferred.map ~f:Or_error.return
     with
@@ -104,7 +104,7 @@ module Haskell_process = struct
         t
     | _ -> Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
-  let output {process} ~log =
+  let output {process; _} ~log =
     Pipe.map
       (Reader.pipe (Process.stdout process))
       ~f:(fun str ->
@@ -191,8 +191,7 @@ struct
                  match String.split ~on:' ' line with
                  | [addr; kademliaKey; "on"] ->
                      `Fst (Host_and_port.of_string addr, kademliaKey)
-                 | [addr; kademliaKey; "off"] ->
-                     `Snd (Host_and_port.of_string addr)
+                 | [addr; _; "off"] -> `Snd (Host_and_port.of_string addr)
                  | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
              )
            in
@@ -244,9 +243,9 @@ let%test_module "Tests" =
     struct
       type t = string list
 
-      let kill t = return ()
+      let kill _ = return ()
 
-      let create ~initial_peers ~me ~log ~conf_dir =
+      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
         let on p = Printf.sprintf "127.0.0.1:%d key on" p in
         let off p = Printf.sprintf "127.0.0.1:%d key off" p in
         let render cmds =
@@ -271,7 +270,7 @@ let%test_module "Tests" =
         in
         ()
 
-      let create ~initial_peers ~me ~log ~conf_dir =
+      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
         let open Deferred.Let_syntax in
         (* Try kademlia, then prepend test_prefix if it's missing *)
         match%bind Process.create ~prog:"./dummy.sh" ~args:[] () with

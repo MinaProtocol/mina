@@ -161,7 +161,8 @@ struct
       let open Interruptible.Let_syntax in
       let ivar : Transition.t Ivar.t = Ivar.create () in
       let step tip transition =
-        Interruptible.lift (Step.step tip transition) (Ivar.read ivar)
+        Interruptible.lift (Step.step tip transition)
+          (Deferred.map (Ivar.read ivar) ~f:ignore)
       in
       let work =
         (* Adjust the locked_ledger if necessary *)

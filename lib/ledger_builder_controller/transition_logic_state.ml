@@ -29,7 +29,7 @@ module type S = sig
 end
 
 module Make (Transition : sig
-  type t [@@deriving eq, compare, sexp, bin_io]
+  type t [@@deriving compare, sexp, bin_io]
 end) (Tip : sig
   type t [@@deriving bin_io]
 
