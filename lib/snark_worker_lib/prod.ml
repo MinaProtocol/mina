@@ -14,6 +14,8 @@ module Inputs = struct
         let keys = {Transaction_snark.Keys.proving; verification}
       end)
       : S )
+
+    let worker_wait_time = 1.
   end
 
   module Proof = Transaction_snark

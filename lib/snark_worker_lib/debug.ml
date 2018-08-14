@@ -6,6 +6,8 @@ module Inputs = struct
     include Unit
 
     let create () = Deferred.unit
+
+    let worker_wait_time = 1.
   end
 
   module Proof = Unit
