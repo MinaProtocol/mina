@@ -1,7 +1,6 @@
 open Core_kernel
 open Async_kernel
 
-
 module type Inputs_intf = sig
   module Ledger_builder_hash : sig
     type t [@@deriving eq, bin_io]
