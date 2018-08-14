@@ -705,23 +705,12 @@ module type Main_intf = sig
       end
 
       module Gossip_net : sig
-        module Params : sig
-          type t =
-            { timeout: Core_kernel.Time.Span.t
-            ; target_peer_count: int
-            ; address: Peer.t }
-        end
+        module Config : Gossip_net.Config_intf
       end
 
-      module Config : sig
-        type t =
-          { parent_log: Logger.t
-          ; conf_dir: string
-          ; gossip_net_params: Gossip_net.Params.t
-          ; initial_peers: Peer.t list
-          ; me: Peer.t
-          ; remap_addr_port: Peer.t -> Peer.t }
-      end
+      module Config :
+        Minibit_networking.Config_intf
+        with type gossip_config := Gossip_net.Config.t
     end
 
     module Sparse_ledger : sig

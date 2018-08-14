@@ -51,15 +51,15 @@ module Coda_worker = struct
     let module Main : Main_intf = Coda_without_snark (Init) () in
     let module Run = Run (Main) in
     let net_config =
-      { Main.Inputs.Net.Config.conf_dir
-      ; parent_log= log
+      { Main.Inputs.Net.Config.parent_log= log
       ; gossip_net_params=
-          { Main.Inputs.Net.Gossip_net.Params.timeout= Time.Span.of_sec 1.
+          { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
           ; target_peer_count= 8
-          ; address= Host_and_port.create ~host ~port:gossip_port }
-      ; initial_peers= peers
-      ; me= Host_and_port.create ~host ~port:my_port
-      ; remap_addr_port= Fn.id }
+          ; conf_dir
+          ; address= Host_and_port.create ~host ~port:gossip_port
+          ; initial_peers= peers
+          ; me= Host_and_port.create ~host ~port:my_port
+          ; parent_log= log } }
     in
     let%map minibit =
       Main.create
