@@ -36,14 +36,14 @@ let run_test with_snark : unit -> unit Deferred.t =
   let open Main in
   let net_config =
     { Inputs.Net.Config.parent_log= log
-    ; conf_dir
     ; gossip_net_params=
-        { Inputs.Net.Gossip_net.Params.timeout= Time.Span.of_sec 1.
+        { Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
+        ; parent_log= log
         ; target_peer_count= 8
-        ; address= Host_and_port.of_string "127.0.0.1:8001" }
-    ; initial_peers= []
-    ; me= Host_and_port.of_string "127.0.0.1:8000"
-    ; remap_addr_port= Fn.id }
+        ; initial_peers= []
+        ; conf_dir
+        ; address= Host_and_port.of_string "127.0.0.1:8001"
+        ; me= Host_and_port.of_string "127.0.0.1:8000" } }
   in
   let%bind minibit =
     Main.create
