@@ -38,16 +38,19 @@ def H_bytes(x):
     state = pypy_sha256.sha_init()
     state['data'] = words_to_bytes(bytes_to_words(x))
     pypy_sha256.sha_transform(state)
+    print 'direct digest python', state['digest']
     return words_to_bytes(bytes_to_words(words_to_bytes(state['digest'])))
 
 def generate_sha256_gadget_tests():
     left = gen_random_bytes(HASH_BYTES)
     right = gen_random_bytes(HASH_BYTES)
-    hash = H_bytes(left + right)
+    #hash = H_bytes(left + right)
+    hash = H_bytes([ 1 ]*64)
 
-    print "const libff::bit_vector left_bv = %s;" % cpp_val(left)
-    print "const libff::bit_vector right_bv = %s;" % cpp_val(right)
-    print "const libff::bit_vector hash_bv = %s;" % cpp_val(hash)
+    #print "const libff::bit_vector left_bv = %s;" % cpp_val(left)
+    #print "const libff::bit_vector right_bv = %s;" % cpp_val(right)
+    #print_hash(hash)
+    #print "const libff::bit_vector hash_bv = %s;" % cpp_val(hash)
 
 if __name__ == '__main__':
     random.seed(0) # for reproducibility
