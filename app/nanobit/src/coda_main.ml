@@ -354,6 +354,11 @@ struct
     type t =
       {state: State.t; proof: State.Proof.t; ledger_builder: Ledger_builder.t}
     [@@deriving bin_io, sexp]
+
+    let of_transition_and_lb transition ledger_builder =
+      { state= External_transition.state transition
+      ; proof= External_transition.state_proof transition
+      ; ledger_builder }
   end
 
   let fee_public_key = Init.fee_public_key
