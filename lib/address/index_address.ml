@@ -50,20 +50,4 @@ struct
   let parent_exn a = Or_error.ok_exn (parent a)
 
   let root = {depth= 0; index= 0}
-
-  let%test_unit "dirs_from_root" =
-    let dir_list =
-      let open Quickcheck.Generator in
-      let open Let_syntax in
-      let%bind l = Int.gen_incl 0 (Depth.depth - 1) in
-      list_with_length l (Bool.gen >>| fun b -> if b then `Right else `Left)
-    in
-    Quickcheck.test dir_list ~f:(fun dirs ->
-        assert (dirs_from_root (List.fold dirs ~f:child_exn ~init:root) = dirs)
-    )
-
-  let%test_unit "to_index (of_index i) = i" =
-    Quickcheck.test ~sexp_of:[%sexp_of : int]
-      (Int.gen_incl 0 (Depth.depth - 1))
-      ~f:(fun i -> [%test_eq : int] (to_index (of_index i)) i)
 end

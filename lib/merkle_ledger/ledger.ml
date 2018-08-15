@@ -30,25 +30,7 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
-  module Addr : sig
-    type t [@@deriving sexp, bin_io, hash, eq, compare]
-
-    include Hashable.S with type t := t
-
-    val depth : t -> int
-
-    val parent : t -> t Or_error.t
-
-    val parent_exn : t -> t
-
-    val child : t -> [`Left | `Right] -> t Or_error.t
-
-    val child_exn : t -> [`Left | `Right] -> t
-
-    val dirs_from_root : t -> [`Left | `Right] list
-
-    val root : t
-  end
+  module Addr : Address.Intf.S
 
   val create : unit -> t
 
@@ -168,7 +150,7 @@ end) :
    and type key := Key.t =
 struct
   include Depth
-  module Addr = Address.Make (Depth)
+  module Addr = Address.Index_address.Make (Depth)
 
   type entry = {merkle_index: int; account: Account.t}
   [@@deriving sexp, bin_io]
@@ -501,7 +483,7 @@ struct
     (t.tree).syncing <- false ;
     recompute_tree t
 
-  let set_all_accounts_rooted_at_exn t ({Addr.depth= adepth} as a) accounts =
+  let set_all_accounts_rooted_at_exn t ({Addr.depth= adepth; _} as a) accounts =
     let height = depth - adepth in
     let first_index = Addr.to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in
@@ -510,7 +492,7 @@ struct
         let pk = Account.public_key a in
         let entry = {merkle_index= first_index + i; account= a} in
         (t.tree).dirty_indices <- (first_index + i) :: t.tree.dirty_indices ;
-        Key.Table.set t.accounts pk entry ;
+        Key.Table.set t.accounts ~key:pk ~data:entry ;
         Dyn_array.set t.tree.leafs (first_index + i) pk )
 
   let get_all_accounts_rooted_at_exn t a =

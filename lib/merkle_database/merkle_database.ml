@@ -1,6 +1,8 @@
 open Core
 open Unsigned
 
+let gen_list = Address.Direction.gen_list
+
 module type Balance_intf = sig
   type t [@@deriving eq]
 
@@ -79,7 +81,7 @@ module type S = sig
   type address
 
   module MerklePath : sig
-    type t = Direction.t * hash
+    type t = Address.Direction.t * hash
 
     val implied_root : t list -> hash -> hash
   end
@@ -120,9 +122,7 @@ module Make
     val with_test_instance : (t -> 'a) -> 'a
 
     module Address : sig
-      val gen_directions : [`Left | `Right] List.t Quickcheck.Generator.t
-
-      val of_directions : [`Left | `Right] List.t -> address
+      val of_direction : [`Left | `Right] List.t -> address
     end
   end
   with type account := Account.t
@@ -140,14 +140,14 @@ struct
   let exn_of_error err = Error_exception err
 
   module MerklePath = struct
-    type t = Direction.t * Hash.t
+    type t = Address.Direction.t * Hash.t
 
     let implied_root path leaf_hash =
       let rec loop sibling_hash = function
         | [] -> sibling_hash
-        | (Direction.Left, hash) :: t ->
+        | (Address.Direction.Left, hash) :: t ->
             loop (Hash.merge (hash, sibling_hash)) t
-        | (Direction.Right, hash) :: t ->
+        | (Address.Direction.Right, hash) :: t ->
             loop (Hash.merge (sibling_hash, hash)) t
       in
       loop leaf_hash path
@@ -162,125 +162,10 @@ struct
    * any bitstring.
    *)
   module Key = struct
-    let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
 
-    let path_byte_count = byte_count_of_bits Depth.depth
-
-    module Path = struct
-      open Bitstring
-
-      type nonrec t = t
-
-      let show (path: t) : string =
-        let len = bitstring_length path in
-        let bytes = Bytes.create len in
-        for i = 0 to len - 1 do
-          let ch = if is_clear path i then '0' else '1' in
-          Bytes.set bytes i ch
-        done ;
-        Bytes.to_string bytes
-
-      let pp (fmt: Format.formatter) : t -> unit =
-        Fn.compose (Format.pp_print_string fmt) show
-
-      let build (dirs: Direction.t list) =
-        let path = create_bitstring (List.length dirs) in
-        let rec loop i = function
-          | [] -> ()
-          | h :: t ->
-              if Direction.to_bool h then set path i ;
-              loop (i + 1) t
-        in
-        loop 0 dirs ; path
-
-      let length = bitstring_length
-
-      let equals = equals
-
-      let copy (path: t) : t =
-        let%bitstring path = {| path: -1: bitstring |} in
-        path
-
-      let last_direction path =
-        Direction.of_bool (get path (bitstring_length path - 1) = 0)
-
-      (* returns a slice of the original path, so the returned key needs to byte
-       * copied before mutating the path *)
-      let parent (path: t) : t = subbitstring path 0 (bitstring_length path - 1)
-
-      let child (path: t) (dir: Direction.t) : t =
-        let dir_bit = Direction.to_bool dir in
-        let%bitstring path = {| path: -1: bitstring; dir_bit: 1 |} in
-        path
-
-      let sibling (path: t) : t =
-        let path = copy path in
-        let last_bit_index = length path - 1 in
-        let last_bit = get path last_bit_index <> 0 in
-        let flip = if last_bit then clear else set in
-        flip path last_bit_index ; path
-
-      let next (path: t) : t Option.t =
-        let open Option.Let_syntax in
-        let path = copy path in
-        let len = length path in
-        let rec find_first_clear_bit i =
-          if i < 0 then None
-          else if is_clear path i then Some i
-          else find_first_clear_bit (i - 1)
-        in
-        let rec clear_bits i =
-          if i >= len then ()
-          else (
-            clear path i ;
-            clear_bits (i + 1) )
-        in
-        let%map first_clear_index = find_first_clear_bit (len - 1) in
-        set path first_clear_index ;
-        clear_bits (first_clear_index + 1) ;
-        path
-
-      let serialize (path: t) : Bigstring.t =
-        let path =
-          if length path mod 8 = 0 then path
-          else
-            Bitstring.concat
-              [path; Bitstring.zeroes_bitstring (8 - (length path mod 8))]
-        in
-        let path_len = length path in
-        let required_bits = 8 * path_byte_count in
-        assert (path_len <= required_bits) ;
-        let required_padding = required_bits - path_len in
-        Bigstring.of_string @@ Bitstring.string_of_bitstring
-        @@ Bitstring.concat [path; Bitstring.zeroes_bitstring required_padding]
-
-      let rec fold_sequence_exl first last ~init ~f =
-        let comparison = Bitstring.compare first last in
-        if comparison > 0 then
-          raise
-            (Invalid_argument "first address needs to precede last address")
-        else if comparison = 0 then init
-        else
-          fold_sequence_exl
-            (next first |> Option.value_exn)
-            last ~init:(f first init) ~f
-
-      let fold_sequence_incl first last ~init ~f =
-        fold_sequence_exl first last ~init ~f
-
-      let compute_width address =
-        let first_node =
-          Bitstring.concat
-            [ address
-            ; Bitstring.zeroes_bitstring @@ (Depth.depth - length address) ]
-        in
-        let last_node =
-          Bitstring.concat
-            [ address
-            ; Bitstring.ones_bitstring @@ (Depth.depth - length address) ]
-        in
-        (first_node, last_node)
-    end
+    module Path = Address.Bitstring_address.Make (struct
+      let depth = Depth.depth
+    end)
 
     module Prefix = struct
       let generic = UInt8.of_int 0xff
@@ -323,7 +208,7 @@ struct
     let build_empty_account () : t =
       Account (Bitstring.create_bitstring max_depth)
 
-    let build_account (path: Direction.t list) : t =
+    let build_account (path: Address.Direction.t list) : t =
       assert (List.length path = max_depth) ;
       Account (Path.build path)
 
@@ -380,7 +265,7 @@ struct
           assert (Path.length path > 0) ;
           Hash (Path.parent path)
 
-    let child (key: t) (dir: Direction.t) : t =
+    let child (key: t) (dir: Address.Direction.t) : t =
       match key with
       | Generic _ ->
           raise (Invalid_argument "child: generic keys have no child")
@@ -411,77 +296,18 @@ struct
     let gen_account =
       let open Quickcheck.Let_syntax in
       let%map dirs =
-        Quickcheck.Generator.list_with_length Depth.depth Direction.gen
+        Quickcheck.Generator.list_with_length Depth.depth Address.Direction.gen
       in
       build_account dirs
-  end
-
-  (* Addr is an adapter for MerkleDB to be compatible with Syncable ledger.
-  Syncable ledger assumes that the depth of root is 0 and the depth of the leaves is N - 1 *)
-  (* TODO: Refactor Address outside of Merkle_database module so that other modules, like Merkle_ledger, can use this *)
-  (* TODO: Refactor code so that [`Left | `Right] and Direction are the same throughout the codebase *)
-  module Address = struct
-    let of_variant = function
-      | `Left -> Direction.Left
-      | `Right -> Direction.Right
-
-    let to_variant = function
-      | Direction.Left -> `Left
-      | Direction.Right -> `Right
-
-    type t = Key.Path.t [@@deriving show]
-
-    let depth t = Depth.depth - Bitstring.bitstring_length t
-
-    let parent = Fn.compose Or_error.return Key.Path.parent
-
-    let parent_exn = Key.Path.parent
-
-    let child t (dir: [`Left | `Right]) =
-      Key.Path.child t (of_variant dir) |> Or_error.return
-
-    let child_exn t dir = child t dir |> Or_error.ok_exn
-
-    let dirs_from_root t : [`Left | `Right] list =
-      List.init (Key.Path.length t) ~f:(fun pos ->
-          Direction.of_bool (Bitstring.is_set t pos) )
-      |> List.map ~f:to_variant
-
-    let root = Bitstring.create_bitstring 0
-
-    let of_directions dirs = List.fold dirs ~f:child_exn ~init:root
-
-    let%test "the merkle root should have no path" = dirs_from_root root = []
-
-    let gen_directions =
-      let open Quickcheck.Generator in
-      let open Let_syntax in
-      let%bind l = Int.gen_incl 0 (Depth.depth - 1) in
-      list_with_length l (Bool.gen >>| fun b -> if b then `Right else `Left)
-
-    let%test_unit "behaves like Merkle Ledger Address module" =
-      let module Merkle_address = Merkle_ledger.Address.Make (Depth) in
-      Quickcheck.test ~sexp_of:[%sexp_of : [`Left | `Right] List.t]
-        gen_directions ~f:(fun dirs ->
-          assert (
-            let db_result = dirs_from_root @@ of_directions dirs
-            and ledger_result =
-              Merkle_address.dirs_from_root
-                (List.fold dirs ~f:Merkle_address.child_exn
-                   ~init:Merkle_address.root)
-            in
-            db_result = ledger_result ) )
   end
 
   type key = Key.t [@@deriving show]
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
+  module Address = Address.Merkle_db_address_adapter.Make(Depth)
+
   type address = Address.t
-
-  let gen_directions = Address.gen_directions
-
-  let of_directions = Address.of_directions
 
   let create ~key_value_db_dir ~stack_db_file =
     let kvdb = Kvdb.create ~directory:key_value_db_dir in
@@ -836,7 +662,7 @@ let%test_module "test functor on in memory databases" =
     end)
 
     module Mdb_syncable_ledger = struct
-      let max_depth = 23
+      let max_depth = 12
 
       include Mdb_d (struct
         let depth = max_depth
@@ -844,19 +670,14 @@ let%test_module "test functor on in memory databases" =
 
       let gen_non_empty_directions =
         let open Quickcheck.Generator in
-        filter ~f:(Fn.compose not List.is_empty) Address.gen_directions
+        filter
+          ~f:(Fn.compose not List.is_empty)
+          (gen_list max_depth)
 
       (* FIXME: test will fail with a depth greater than 8 due to serialization issues  *)
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =
         with_test_instance (fun mdb ->
-            (* let accounts =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length (1 lsl max_depth)
-                   Account.gen)
-            in
-            List.iter accounts ~f:(fun account ->
-                ignore @@ set_account mdb account ) ; *)
             Quickcheck.test
               (Quickcheck.Generator.tuple2 gen_non_empty_directions Account.gen)
               ~sexp_of:
@@ -864,12 +685,12 @@ let%test_module "test functor on in memory databases" =
               ~f:(fun (direction, account) ->
                 
                 let hash_account = Hash.hash_account account in
-                let address = Address.of_directions direction in
+                let address = Address.of_direction direction in
                 set_inner_hash_at_addr_exn mdb address hash_account ;
                 let result = get_inner_hash_at_addr_exn mdb address in
                 assert (Hash.equal result hash_account) ) )
 
-      (* let%test_unit "If the entire database is full,\n \
+      let%test_unit "If the entire database is full,\n \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
                      = accounts" =
         with_test_instance (fun mdb ->
@@ -880,10 +701,10 @@ let%test_module "test functor on in memory databases" =
             in
             List.iter initial_accounts ~f:(fun account ->
                 ignore @@ set_account mdb account ) ;
-            Quickcheck.test gen_directions
+            Quickcheck.test (gen_list max_depth)
               ~sexp_of:[%sexp_of : [`Left | `Right] List.t] ~f:
               (fun direction ->
-                let address = of_directions direction in
+                let address = Address.of_direction direction in
                 let num_accounts =
                   Int.pow 2 (max_depth - List.length direction)
                 in
@@ -894,7 +715,7 @@ let%test_module "test functor on in memory databases" =
                 in
                 set_all_accounts_rooted_at_exn mdb address accounts ;
                 let result = get_all_accounts_rooted_at_exn mdb address in
-                assert (List.equal ~equal:Account.equal accounts result) ) ) *)
+                assert (List.equal ~equal:Account.equal accounts result) ) )
     end
 
     module Mdb_d30 = Mdb_d (struct

@@ -78,7 +78,7 @@ module type S = sig
   type address
 
   module MerklePath : sig
-    type t = Direction.t * hash
+    type t = Address.Direction.t * hash
 
     val implied_root : t list -> hash -> hash
   end
