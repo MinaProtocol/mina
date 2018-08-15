@@ -142,8 +142,9 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       let implementations =
         Versioned_rpc.Menu.add
           ( Message.implement_multi (fun () ~version:_ msg ->
-                Linear_pipe.force_write_maybe_drop_head ~capacity:broadcast_received_capacity
-                  received_writer received_reader msg )
+                Linear_pipe.force_write_maybe_drop_head
+                  ~capacity:broadcast_received_capacity received_writer
+                  received_reader msg )
           @ implementations )
       in
       Rpc.Implementations.create_exn ~implementations

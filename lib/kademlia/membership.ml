@@ -162,7 +162,8 @@ struct
         let _ = Peer.Table.add ~key:peer ~data:kkey t.peers in
         () ) ;
     if List.length lives > 0 then
-      Linear_pipe.write t.changes_writer (Peer.Event.Connect (List.map lives ~f:fst))
+      Linear_pipe.write t.changes_writer
+        (Peer.Event.Connect (List.map lives ~f:fst))
     else Deferred.unit
 
   let dead t deads =
@@ -193,7 +194,7 @@ struct
                  | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
              )
            in
-            let open Deferred.Let_syntax in
+           let open Deferred.Let_syntax in
            let () =
              if List.length lives <> 0 then
                (* Update the peers *)

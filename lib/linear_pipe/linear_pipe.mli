@@ -20,7 +20,8 @@ val write : 'a Writer.t -> 'a -> unit Deferred.t
 
 val write_without_pushback : 'a Writer.t -> 'a -> unit
 
-val force_write_maybe_drop_head : capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
+val force_write_maybe_drop_head :
+  capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
 
 val write_or_exn : capacity:int -> 'a Writer.t -> 'b Reader.t -> 'a -> unit
 
