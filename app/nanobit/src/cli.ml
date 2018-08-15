@@ -112,7 +112,9 @@ let daemon =
                 ~ledger_builder_persistant_location:
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
-                ~snark_pool_disk_location:(conf_dir ^/ "snark_pool") ())
+                ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                ~time_controller:(Inputs.Time.Controller.create ())
+                ())
          in
          Run.setup_local_server ~minibit ~client_port ~log ;
          Run.run_snark_worker ~log ~client_port run_snark_worker

@@ -682,6 +682,8 @@ end
 
 module type Main_intf = sig
   module Inputs : sig
+    module Time : Protocols.Coda_pow.Time_intf
+
     module Ledger : sig
       type t [@@deriving sexp]
 
@@ -754,7 +756,8 @@ module type Main_intf = sig
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10] }
+      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; time_controller: Inputs.Time.Controller.t }
     [@@deriving make]
   end
 
