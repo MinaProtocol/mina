@@ -18,5 +18,5 @@ else
   NAME=$(docker ps | grep $IMG | head | awk '{ print $1 }')
 fi
 
-run-in-docker jbuilder b
+run-in-docker dune b
 
