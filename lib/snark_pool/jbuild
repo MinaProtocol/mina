@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (libraries (core extlib protocols async linear_pipe nanobit_base dyn_array))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
-  (flags (:standard -short-paths -warn-error -6-33-32-34-58))
+  (flags (:standard -short-paths -warn-error -58))
   (synopsis "Snark pool manages work and snarks amongst all nodes in the network")))
 

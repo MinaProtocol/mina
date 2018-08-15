@@ -3,7 +3,7 @@
 (library
  ((name minibit)
   (public_name minibit)
-  (flags (:standard -short-paths -warn-error -6-27-58))
+  (flags (:standard -short-paths -warn-error -58))
   (inline_tests)
   (library_flags (-linkall))
   (libraries (core protocols linear_pipe logger async async_extra))

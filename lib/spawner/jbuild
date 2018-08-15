@@ -6,5 +6,5 @@
   (library_flags (-linkall))
   (libraries (core async rpc_parallel linear_pipe parallel file_system))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
-  (flags (:standard -short-paths -warn-error -27-33-9-58))
+  (flags (:standard -short-paths -warn-error -58))
   (synopsis "Spawner lets you run multiple workers on different nodes")))
