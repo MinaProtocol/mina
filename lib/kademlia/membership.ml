@@ -162,16 +162,14 @@ struct
         let _ = Peer.Table.add ~key:peer ~data:kkey t.peers in
         () ) ;
     if List.length lives > 0 then
-      Linear_pipe.write_or_drop ~capacity:500 t.changes_writer t.changes_reader
-        (Peer.Event.Connect (List.map lives ~f:fst))
-    else ()
+      Linear_pipe.write t.changes_writer (Peer.Event.Connect (List.map lives ~f:fst))
+    else Deferred.unit
 
   let dead t deads =
     List.iter deads ~f:(fun peer -> Peer.Table.remove t.peers peer) ;
     if List.length deads > 0 then
-      Linear_pipe.write_or_drop ~capacity:500 t.changes_writer t.changes_reader
-        (Peer.Event.Disconnect deads)
-    else ()
+      Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
+    else Deferred.unit
 
   let connect ~initial_peers ~me ~parent_log ~conf_dir =
     let open Deferred.Or_error.Let_syntax in
@@ -185,7 +183,7 @@ struct
     in
     let t = {p; peers; changes_reader; changes_writer; first_peers} in
     don't_wait_for
-      (Pipe.iter_without_pushback (P.output p ~log) ~f:(fun lines ->
+      (Pipe.iter (P.output p ~log) ~f:(fun lines ->
            let lives, deads =
              List.partition_map lines ~f:(fun line ->
                  match String.split ~on:' ' line with
@@ -195,7 +193,7 @@ struct
                  | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
              )
            in
-           live t lives ;
+            let open Deferred.Let_syntax in
            let () =
              if List.length lives <> 0 then
                (* Update the peers *)
@@ -204,7 +202,8 @@ struct
                  (List.map ~f:fst lives)
              else ()
            in
-           dead t deads )) ;
+           let%map () = live t lives and () = dead t deads in
+           () )) ;
     t
 
   let peers t = Peer.Table.keys t.peers

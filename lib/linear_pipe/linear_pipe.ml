@@ -12,7 +12,7 @@ let create () =
 
 let wrap_reader reader = {Reader.pipe= reader; has_reader= false}
 
-let write_or_drop ~capacity writer reader x =
+let force_write_maybe_drop_head ~capacity writer reader x =
   if Pipe.length reader.Reader.pipe > capacity then
     ignore (Pipe.read_now reader.Reader.pipe) ;
   Pipe.write_without_pushback writer x
