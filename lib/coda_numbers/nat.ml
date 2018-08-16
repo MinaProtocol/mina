@@ -2,7 +2,7 @@ open Core_kernel
 open Snark_bits
 
 module type S = sig
-  type t [@@deriving sexp, compare, eq, hash]
+  type t [@@deriving bin_io, sexp, compare, eq, hash]
 
   module Stable : sig
     module V1 : sig
