@@ -116,10 +116,11 @@ class r1cs_constraint_system {
 public:
     size_t primary_input_size;
     size_t auxiliary_input_size;
+    size_t num_square_constraints;
 
     std::vector<r1cs_constraint<FieldT> > constraints;
 
-    r1cs_constraint_system() : primary_input_size(0), auxiliary_input_size(0) {}
+    r1cs_constraint_system() : primary_input_size(0), auxiliary_input_size(0), num_square_constraints(0) {}
 
     size_t num_inputs() const;
     size_t num_variables() const;
