@@ -21,8 +21,7 @@ module Message = struct
       Pedersen.digest_fold Hash_prefix.signature
         (Transaction_payload.fold t +> List.fold nonce)
     in
-    Scalar.pack
-      (Sha256_lib.Sha256.digest (Field.unpack d))
+    Scalar.pack (Sha256_lib.Sha256.digest (Field.unpack d))
 
   let () = assert Insecure.signature_hash_function
 
