@@ -6,51 +6,56 @@ module type Inputs_intf = sig
 
   module Prover : sig
     val prove :
-         prev_state:State.t * State.Proof.t
-      -> Internal_transition.t
-      -> State.Proof.t Deferred.Or_error.t
+         prev_state:Consensus_mechanism.Protocol_state.value
+                    * Protocol_state_proof.t
+      -> Consensus_mechanism.Internal_transition.t
+      -> Protocol_state_proof.t Deferred.Or_error.t
   end
 
-  module Signer_private_key : sig
-    val t : Private_key.t
-  end
-
-  module Transaction_interval : sig
+  module Proposal_interval : sig
     val t : Time.Span.t
   end
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda.Signer_intf
-  with type external_transition := Inputs.External_transition.t
+  Coda.Proposer_intf
+  with type external_transition :=
+              Inputs.Consensus_mechanism.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder := Inputs.Ledger_builder.t
    and type transaction := Inputs.Transaction.With_valid_signature.t
-   and type state := Inputs.State.t
-   and type state_proof := Inputs.State.Proof.t
+   and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
+   and type protocol_state_proof :=
+              Inputs.Protocol_state_proof.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t =
 struct
   open Inputs
 
-  module Hashing_result : sig
+  (* TODO fold signing result and hashing result together? *)
+  module Snark_transition_result : sig
     type t
 
     val empty : unit -> t
 
     val create :
-         State.t
+         Consensus_mechanism.Protocol_state.value
       -> next_ledger_hash:Ledger_hash.t
       -> next_ledger_builder_hash:Ledger_builder_hash.t
       -> t
 
-    val result : t -> [`Ok of State.t * Block_nonce.t | `Cancelled] Deferred.t
+    val result :
+         t
+      -> [`Ok of Consensus_mechanism.Snark_transition.value | `Cancelled]
+         Deferred.t
 
     val cancel : t -> unit
   end = struct
     type t =
       { cancelled: bool ref
-      ; result: [`Ok of State.t * Block_nonce.t | `Cancelled] Deferred.t }
+      ; result:
+          [`Ok of Consensus_mechanism.Snark_transition.value | `Cancelled]
+          Deferred.t }
 
     let empty () = {cancelled= ref false; result= Deferred.return `Cancelled}
 
@@ -58,47 +63,43 @@ struct
 
     let cancel t = t.cancelled := true
 
-    let find_block (previous: State.t) ~(next_ledger_hash: Ledger_hash.t)
-        ~next_ledger_builder_hash : (State.t * Block_nonce.t) option =
-      let iterations = 10 in
-      let now = Time.now () in
-      let difficulty = previous.next_difficulty in
-      let next_difficulty =
-        Difficulty.next difficulty ~last:previous.timestamp ~this:now
+    let generate_next_state previous_state ~next_ledger_hash
+        ~next_ledger_builder_hash :
+        Consensus_mechanism.Snark_transition.value option =
+      let open Option.Let_syntax in
+      let blockchain_state =
+        Blockchain_state.create_value ~timestamp:(Time.now ())
+          ~ledger_hash:next_ledger_hash
+          ~ledger_builder_hash:next_ledger_builder_hash
       in
-      let next_state : State.t =
-        { next_difficulty
-        ; previous_state_hash= State.hash previous
-        ; ledger_hash= next_ledger_hash
-        ; ledger_builder_hash= next_ledger_builder_hash
-        ; timestamp= now
-        ; length= Length.succ (State.length previous)
-        ; strength= Strength.increase previous.strength ~by:difficulty
-        ; signer_public_key= Public_key.of_private_key Signer_private_key.t }
+      let protocol_state =
+        Consensus_mechanism.Protocol_state.create_value
+          ~previous_state_hash:
+            (Consensus_mechanism.Protocol_state.hash previous_state)
+          ~blockchain_state
+          ~consensus_state:
+            (Consensus_mechanism.create_consensus_state previous_state)
       in
-      let nonce0 = Block_nonce.random () in
-      let rec go nonce i =
-        if i = iterations then None
-        else
-          match State.create_pow next_state nonce with
-          | Ok hash when Difficulty.meets difficulty hash ->
-              Some (next_state, nonce)
-          | _ -> go (Block_nonce.succ nonce) (i + 1)
+      let%map consensus_data =
+        Consensus_mechanism.create_consensus_data protocol_state
       in
-      go nonce0 0
+      Consensus_mechanism.Snark_transition.create_value ~protocol_state
+        ~consensus_data
+        ~ledger_proof:None
 
-    let create previous ~next_ledger_hash ~next_ledger_builder_hash =
+    let create previous_state ~next_ledger_hash ~next_ledger_builder_hash =
       let cancelled = ref false in
       let rec go () =
         if !cancelled then return `Cancelled
         else
           match
-            find_block previous ~next_ledger_hash ~next_ledger_builder_hash
+            generate_next_state previous_state ~next_ledger_hash
+              ~next_ledger_builder_hash
           with
           | None ->
               let%bind () = after (sec 0.01) in
               go ()
-          | Some (state, nonce) -> return (`Ok (state, nonce))
+          | Some state -> return (`Ok state)
       in
       {cancelled; result= go ()}
   end
@@ -111,29 +112,32 @@ struct
     val cancel : t -> unit
 
     val create :
-         state:State.t * State.Proof.t
+         state:Consensus_mechanism.Protocol_state.value
+               * Protocol_state_proof.t
       -> ledger_builder:Ledger_builder.t
       -> transactions:Transaction.With_valid_signature.t Sequence.t
       -> get_completed_work:(   Completed_work.Statement.t
                              -> Completed_work.Checked.t option)
       -> t
 
-    val result : t -> External_transition.t Deferred.Or_error.t
+    val result :
+      t -> Consensus_mechanism.External_transition.t Deferred.Or_error.t
   end = struct
     (* TODO: No need to have our own Ivar since we got rid of Bundle_result *)
     type t =
-      { hashing_result: Hashing_result.t
+      { snark_transition_result: Snark_transition_result.t
       ; cancellation: unit Ivar.t
-      ; result: External_transition.t Deferred.Or_error.t }
+      ; result: Consensus_mechanism.External_transition.t Deferred.Or_error.t
+      }
     [@@deriving fields]
 
     let empty () =
-      { hashing_result= Hashing_result.empty ()
+      { snark_transition_result= Snark_transition_result.empty ()
       ; cancellation= Ivar.create ()
       ; result= Deferred.Or_error.error_string "empty" }
 
     let cancel t =
-      Hashing_result.cancel t.hashing_result ;
+      Snark_transition_result.cancel t.snark_transition_result ;
       Ivar.fill_if_empty t.cancellation ()
 
     let create ~state:(state, state_proof) ~ledger_builder ~transactions
@@ -147,32 +151,38 @@ struct
       let next_ledger_hash =
         Option.value_map ledger_proof_opt
           ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
-          ~default:state.State.ledger_hash
+          ~default:
+            ( state |> Consensus_mechanism.Protocol_state.blockchain_state
+            |> Blockchain_state.ledger_hash )
       in
-      let hashing_result =
-        Hashing_result.create state ~next_ledger_hash ~next_ledger_builder_hash
+      let snark_transition_result =
+        Snark_transition_result.create state ~next_ledger_hash
+          ~next_ledger_builder_hash
       in
       let cancellation = Ivar.create () in
       (* Someday: If bundle finishes first you can stuff more transactions in the bundle *)
       let result =
         let result =
-          match%bind Hashing_result.result hashing_result with
-          | `Ok (new_state, nonce) ->
-              let transition =
-                { Internal_transition.ledger_hash= next_ledger_hash
-                ; ledger_builder_hash= next_ledger_builder_hash
-                ; ledger_proof= Option.map ledger_proof_opt ~f:fst
-                ; ledger_builder_diff= Ledger_builder_diff.forget diff
-                ; timestamp= new_state.timestamp
-                ; nonce }
-              in
+          match%bind
+            Snark_transition_result.result snark_transition_result
+          with
+          | `Ok snark_transition ->
               let open Deferred.Or_error.Let_syntax in
-              let%map state_proof =
-                Prover.prove ~prev_state:(state, state_proof) transition
+              let internal_transition =
+                Consensus_mechanism.Internal_transition.create
+                  ~snark_transition
+                  ~ledger_builder_diff:(Ledger_builder_diff.forget diff)
+                  ~ledger_proof:(Option.map ledger_proof_opt ~f:fst)
               in
-              { External_transition.state_proof
-              ; state= new_state
-              ; ledger_builder_diff= Ledger_builder_diff.forget diff }
+              let%map protocol_state_proof =
+                Prover.prove ~prev_state:(state, state_proof)
+                  internal_transition
+              in
+              Consensus_mechanism.External_transition.create
+                ~protocol_state:
+                  (Consensus_mechanism.Snark_transition.protocol_state
+                     snark_transition)
+                ~protocol_state_proof
           | `Cancelled ->
               Deferred.return (Or_error.error_string "Signing cancelled")
         in
@@ -181,12 +191,14 @@ struct
             >>| fun () -> Or_error.error_string "Signing cancelled" )
           ; result ]
       in
-      {hashing_result; result; cancellation}
+      {snark_transition_result; result; cancellation}
   end
 
   module Tip = struct
     type t =
-      { state: State.t * State.Proof.t sexp_opaque
+      { protocol_state:
+          Consensus_mechanism.Protocol_state.value
+          * Protocol_state_proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
       ; transactions: Transaction.With_valid_signature.t Sequence.t }
     [@@deriving sexp_of]
@@ -194,7 +206,9 @@ struct
 
   type change = Tip_change of Tip.t
 
-  type t = {transitions: External_transition.t Linear_pipe.Reader.t}
+  type t =
+    { transitions:
+        Consensus_mechanism.External_transition.t Linear_pipe.Reader.t }
   [@@deriving fields]
 
   let transition_capacity = 64
@@ -208,17 +222,17 @@ struct
           Logger.error logger "%s\n"
             Error.(to_string_hum (tag e ~tag:"signer"))
     in
-    let create_result {Tip.state; transactions; ledger_builder} =
+    let create_result {Tip.protocol_state; transactions; ledger_builder} =
       let result =
-        Signing_result.create ~state ~ledger_builder ~transactions
-          ~get_completed_work
+        Signing_result.create ~state:protocol_state ~ledger_builder
+          ~transactions ~get_completed_work
       in
       upon (Signing_result.result result) write_result ;
       result
     in
     let schedule_transaction tip =
       let time_till_transaction =
-        Time.modulus (Time.now ()) Transaction_interval.t
+        Time.modulus (Time.now ()) Proposal_interval.t
       in
       Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
       Time.Timeout.create time_till_transaction (fun () ->
