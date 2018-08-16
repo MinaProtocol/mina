@@ -131,6 +131,7 @@ module Statement = struct
 
   include T
   include Hashable.Make_binable (T)
+  include Comparable.Make (T)
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in

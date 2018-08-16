@@ -24,6 +24,8 @@ module Statement : sig
   val gen : t Quickcheck.Generator.t
 
   include Hashable.S_binable with type t := t
+
+  include Comparable.S with type t := t
 end
 
 type t [@@deriving bin_io, sexp]
