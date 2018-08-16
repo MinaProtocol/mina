@@ -10,7 +10,7 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
     module type S = sig
       type var
 
-      type value
+      type value [@@deriving bin_io, sexp]
 
       val typ : (var, value) Typ.t
     end
@@ -107,7 +107,7 @@ module Tick = struct
 
         type var = Boolean.var list
 
-        type value = Bignum_bigint.t
+        type value = Bignum_bigint.t [@@deriving eq, bin_io, sexp]
 
         let test_bit t i = Bignum_bigint.(shift_right t i land one = one)
 

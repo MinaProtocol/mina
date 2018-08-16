@@ -7,7 +7,7 @@ module type S = sig
     module type S = sig
       type var
 
-      type value
+      type value [@@deriving bin_io, sexp]
 
       val typ : (var, value) Typ.t
     end

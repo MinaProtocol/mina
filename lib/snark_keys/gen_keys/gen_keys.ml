@@ -142,12 +142,71 @@ let main () =
         let%bind tx_keys_location, tx_keys, tx_keys_checksum =
           Transaction_snark.Keys.cached ()
         in
-        let module M =
-        Blockchain_snark.Blockchain_transition.Make (Transaction_snark.
-                                                     Verification.Make
-                                                       (struct
-          let keys = tx_keys.verification
+        let module Consensus_mechanism =
+        Consensus.Proof_of_signature.Make (Ledger_builder.Make_diff (struct
+          open Nanobit_base
+
+          module Compressed_public_key = Public_key.Compressed
+
+          module Transaction = struct
+            include (
+              Transaction :
+                module type of Transaction
+                with module With_valid_signature := Transaction.
+                                                    With_valid_signature )
+
+            let receiver _ = failwith "stub"
+
+            let sender _ = failwith "stub"
+
+            let fee _ = failwith "stub"
+
+            let compare _ _ = failwith "stub"
+
+            module With_valid_signature = struct
+              include Transaction.With_valid_signature
+
+              let compare _ _ = failwith "stub"
+            end
+          end
+
+          module Ledger_proof = Transaction_snark
+
+          module Completed_work = struct
+            include Ledger_builder.Make_completed_work (Compressed_public_key) (Ledger_proof) (Transaction_snark.Statement)
+
+            let check _ _ = failwith "stub"
+          end
+
+          module Ledger_hash = struct
+            include Ledger_hash.Stable.V1
+
+            let to_bytes = Ledger_hash.to_bytes
+          end
+
+          module Ledger_builder_aux_hash = struct
+            include Ledger_builder_hash.Aux_hash.Stable.V1
+
+            let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+          end
+
+          module Ledger_builder_hash = struct
+            include Ledger_builder_hash.Stable.V1
+
+            let of_aux_and_ledger_hash =
+              Ledger_builder_hash.of_aux_and_ledger_hash
+
+            let to_bytes = Ledger_builder_hash.to_bytes
+
+            let of_bytes = Ledger_builder_hash.of_bytes
+          end
         end)) in
+        let module M =
+          (* TODO make toplevel library to encapsulate consensus params *)
+            Blockchain_snark.Blockchain_transition.Make (Consensus_mechanism)
+            (Transaction_snark.Verification.Make (struct
+              let keys = tx_keys.verification
+            end)) in
         let%map bc_keys_location, _bc_keys, bc_keys_checksum =
           M.Keys.cached ()
         in
