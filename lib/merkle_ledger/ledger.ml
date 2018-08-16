@@ -30,7 +30,7 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
-  module Addr : Address.Intf.S
+  module Addr : Address.S
 
   val create : unit -> t
 
@@ -74,8 +74,6 @@ module type S = sig
   val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
 
   val merkle_path_at_index_exn : t -> index -> Path.t
-
-  val addr_of_index : t -> index -> Addr.t
 
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
@@ -150,7 +148,7 @@ end) :
    and type key := Key.t =
 struct
   include Depth
-  module Addr = Address.Index_address.Make (Depth)
+  module Addr = Address.Make (Depth)
 
   type entry = {merkle_index: int; account: Account.t}
   [@@deriving sexp, bin_io]
@@ -445,8 +443,6 @@ struct
     | `Ok path -> path
     | `Index_not_found -> index_not_found "merkle_path_at_index_exn" index
 
-  let addr_of_index t index = {Addr.depth; index}
-
   let extend_with_empty_to_fit t new_size =
     let tree = t.tree in
     let len = DynArray.length tree.leafs in
@@ -455,23 +451,26 @@ struct
         (DynArray.init (new_size - len) (fun x -> Key.empty)) ;
     recompute_tree ~allow_sync:true t
 
+  (* FIXME: Probably this well cause an error *)
   let merkle_path_at_addr_exn t a =
-    assert (a.Addr.depth = Depth.depth - 1) ;
+    assert (Addr.depth a = Depth.depth - 1) ;
     merkle_path_at_index_exn t (Addr.to_index a)
 
   let set_at_addr_exn t addr acct =
-    assert (addr.Addr.depth = Depth.depth - 1) ;
+    assert (Addr.depth addr = Depth.depth - 1) ;
     set_at_index_exn t (Addr.to_index addr) acct
 
   let get_inner_hash_at_addr_exn t a =
-    assert (a.Addr.depth < depth) ;
-    let l = List.nth_exn t.tree.nodes (depth - a.depth - 1) in
+    let path_length = Addr.depth a in
+    assert (path_length < depth) ;
+    let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
     DynArray.get l (Addr.to_index a)
 
   let set_inner_hash_at_addr_exn t a hash =
-    assert (a.Addr.depth < depth) ;
+    let path_length = Addr.depth a in
+    assert (path_length < depth) ;
     (t.tree).dirty <- true ;
-    let l = List.nth_exn t.tree.nodes (depth - a.depth - 1) in
+    let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
     let index = Addr.to_index a in
     DynArray.set l index hash
 
@@ -483,8 +482,8 @@ struct
     (t.tree).syncing <- false ;
     recompute_tree t
 
-  let set_all_accounts_rooted_at_exn t ({Addr.depth= adepth; _} as a) accounts =
-    let height = depth - adepth in
+  let set_all_accounts_rooted_at_exn t a accounts =
+    let height = depth - Addr.depth a in
     let first_index = Addr.to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in
     assert (List.length accounts = count) ;
@@ -496,7 +495,7 @@ struct
         Dyn_array.set t.tree.leafs (first_index + i) pk )
 
   let get_all_accounts_rooted_at_exn t a =
-    let height = depth - a.Addr.depth in
+    let height = depth - Addr.depth a in
     let first_index = Addr.to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in
     let subarr = Dyn_array.sub t.tree.leafs first_index count in

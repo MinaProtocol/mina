@@ -1,5 +1,6 @@
 open Core
 open Bitstring
+
 module Direction = struct
   type t = Left | Right
 
@@ -54,19 +55,7 @@ struct
 
   let path_byte_count = byte_count_of_bits Input.depth
 
-  type int_rep = (int * string[@deriving hash, bin_io])
-
   let length = bitstring_length
-
-  let to_intermediate_representation bitstring =
-    let size = length bitstring in
-    let padded_bitstring =
-      if size mod 8 = 0 then bitstring
-      else
-        Bitstring.concat
-          [bitstring; Bitstring.zeroes_bitstring (8 - (size mod 8))]
-    in
-    (size, Bitstring.string_of_bitstring padded_bitstring)
 
   let show (path: Bitstring.t) : string =
     let len = bitstring_length path in
@@ -79,44 +68,68 @@ struct
 
   module Stable = struct
     module V1 = struct
-      type t = (Bitstring.t[@deriving sexp, bin_io, eq, compare, hash])
+      let to_tuple bitstring =
+        let size = length bitstring in
+        let padded_bitstring =
+          if size mod 8 = 0 then bitstring
+          else
+            Bitstring.concat
+              [bitstring; Bitstring.zeroes_bitstring (8 - (size mod 8))]
+        in
+        (size, Bitstring.string_of_bitstring padded_bitstring)
 
-      let sexp_of_t = Fn.compose sexp_of_string show
+      let of_tuple (length, string) =
+        Bitstring.subbitstring (Bitstring.bitstring_of_string string) 0 length
 
-      let t_of_sexp =
-        Fn.compose
-          (fun (buf: string) ->
-            let len = String.length buf in
-            let bitstring = Bitstring.create_bitstring (String.length buf) in
-            for i = 0 to len - 1 do
-              match buf.[i] with
-              | '1' -> Bitstring.set bitstring i
-              | '0' -> ()
-              | char ->
-                  failwith
-                  @@ sprintf "cannot convert to address (invalid char: %c)"
-                       char
-            done ;
-            bitstring )
-          string_of_sexp
+      module T = struct
+        type t = (Bitstring.t[@deriving compare])
 
-      let hash =
-        Fn.compose [%hash : int * string] to_intermediate_representation
+        let sexp_of_t = Fn.compose sexp_of_string show
 
-      let hash_fold_t hash_state t =
-        [%hash_fold : int * string] hash_state
-          (to_intermediate_representation t)
+        let t_of_sexp =
+          Fn.compose
+            (fun (buf: string) ->
+              let len = String.length buf in
+              let bitstring = Bitstring.create_bitstring (String.length buf) in
+              for i = 0 to len - 1 do
+                match buf.[i] with
+                | '1' -> Bitstring.set bitstring i
+                | '0' -> ()
+                | char ->
+                    failwith
+                    @@ sprintf "cannot convert to address (invalid char: %c)"
+                         char
+              done ;
+              bitstring )
+            string_of_sexp
 
-      let compare = compare
+        let hash = Fn.compose [%hash : int * string] to_tuple
 
-      let equal = equals
+        let hash_fold_t hash_state t =
+          [%hash_fold : int * string] hash_state (to_tuple t)
+
+        let compare = compare
+
+        let equal = equals
+      end
+
+      include T
+      include Hashable.Make (T)
+
+      include Binable.Of_binable (struct
+                  type t = int * string [@@deriving bin_io]
+                end)
+                (struct
+                  type nonrec t = t
+
+                  let to_binable = to_tuple
+
+                  let of_binable = of_tuple
+                end)
     end
   end
 
   include Stable.V1
-  include Hashable.Make (Stable.V1)
-  (* TODO: Find a better way to do this *)
-  include Binable.Of_sexpable (Stable.V1)
 
   let pp (fmt: Format.formatter) : t -> unit =
     Fn.compose (Format.pp_print_string fmt) show
@@ -189,9 +202,10 @@ struct
     clear_bits (first_clear_index + 1) ;
     path
 
-  let depth t = Input.depth - Bitstring.bitstring_length t
+  let depth t = Bitstring.bitstring_length t
 
-  (* TODO: Put serialize into Merkle Database *)
+  let height t = Input.depth - Bitstring.bitstring_length t
+
   let serialize (path: t) : Bigstring.t =
     let path =
       if length path mod 8 = 0 then path
@@ -229,4 +243,38 @@ struct
         [address; Bitstring.ones_bitstring @@ (Input.depth - length address)]
     in
     (first_node, last_node)
+
+  let of_direction dirs = List.fold dirs ~f:child_exn ~init:root
+
+  let bit_val = function `Left -> 0 | `Right -> 1
+
+  let to_index a =
+    List.foldi
+      (List.rev @@ dirs_from_root a)
+      ~init:0
+      ~f:(fun i acc dir -> acc lor (bit_val dir lsl i))
+
+  let%test "the merkle root should have no path" = dirs_from_root root = []
+
+  let%test_unit "parent_exn(child_exn(node)) = node" =
+    Quickcheck.test
+      ~sexp_of:[%sexp_of : [`Left | `Right] List.t * [`Left | `Right]]
+      Quickcheck.Generator.(
+        tuple2
+          (Direction.gen_list Input.depth)
+          (Bool.gen >>| fun b -> if b then `Right else `Left))
+      ~f:(fun (path, direction) ->
+        let address = of_direction path in
+        [%test_eq : t] (parent_exn (child_exn address direction)) address )
 end
+
+let%test_module "Address" =
+  ( module struct
+    module Test4 = Make (struct
+      let depth = 4
+    end)
+
+    module Test16 = Make (struct
+      let depth = 16
+    end)
+  end )

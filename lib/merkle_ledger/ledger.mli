@@ -1,5 +1,4 @@
 open Core
-open Address
 
 module type S = sig
   type hash
@@ -28,7 +27,7 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
-  module Addr : Address.Intf.S
+  module Addr : Address.S
 
   val create : unit -> t
 
@@ -72,8 +71,6 @@ module type S = sig
   val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
 
   val merkle_path_at_index_exn : t -> index -> Path.t
-
-  val addr_of_index : t -> index -> Addr.t
 
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 

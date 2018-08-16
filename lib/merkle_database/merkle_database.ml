@@ -162,8 +162,7 @@ struct
    * any bitstring.
    *)
   module Key = struct
-
-    module Path = Address.Bitstring_address.Make (struct
+    module Path = Address.Make (struct
       let depth = Depth.depth
     end)
 
@@ -263,7 +262,7 @@ struct
           raise (Invalid_argument "parent: account keys have no parent")
       | Hash path ->
           assert (Path.length path > 0) ;
-          Hash (Path.parent path)
+          Hash (Path.parent_exn path)
 
     let child (key: t) (dir: Address.Direction.t) : t =
       match key with
@@ -273,7 +272,7 @@ struct
           raise (Invalid_argument "child: account keys have no child")
       | Hash path ->
           assert (Path.length path < max_depth) ;
-          Hash (Path.child path dir)
+          Hash (Path.child_exn path (Path.to_variant dir))
 
     let next : t -> t Option.t = function
       | Generic _ ->
@@ -305,7 +304,7 @@ struct
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
-  module Address = Address.Merkle_db_address_adapter.Make(Depth)
+  module Address = Address.Make (Depth)
 
   type address = Address.t
 
@@ -372,17 +371,9 @@ struct
     assert (Key.Path.length address <= Depth.depth) ;
     get_hash mdb (Key.Hash address)
 
-  (* let print_last_byte address =
-     let my_string = (Bitstring.string_of_bitstring address) in
-     Core.printf  !"Length: %i \n" (String.length my_string);
-     Core.printf !"Last char: %s\n" @@ (String.get my_string (String.length my_string - 1 ) |> Char.escaped) *)
-
   let set_inner_hash_at_addr_exn mdb address hash =
     assert (Key.Path.length address <= Depth.depth) ;
     set_bin mdb (Key.Hash address) Hash.bin_size_t Hash.bin_write_t hash
-
-  (* Core.printf !"Serialized Address 2: %{sexp:Bigstring.t}\n" (Key.serialize (Key.Hash address)); *)
-  (* print_last_byte address; *)
 
   module Account_key = struct
     let build_key account =
@@ -579,6 +570,53 @@ struct
         assert (set_account mdb account = Ok ()) ;
         assert (set_account mdb account' = Ok ()) ;
         get_account mdb key = Some account' )
+
+  let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
+                 get_inner_hash_at_addr_exn(address) = hash" =
+    let gen_non_empty_directions =
+      let open Quickcheck.Generator in
+      filter ~f:(Fn.compose not List.is_empty) (gen_list max_depth)
+    in
+    with_test_instance (fun mdb ->
+        Quickcheck.test
+          (Quickcheck.Generator.tuple2 gen_non_empty_directions Account.gen)
+          ~sexp_of:[%sexp_of : [`Left | `Right] List.t * Account.t sexp_opaque]
+          ~f:(fun (direction, account) ->
+            let hash_account = Hash.hash_account account in
+            let address = Address.of_direction direction in
+            set_inner_hash_at_addr_exn mdb address hash_account ;
+            let result = get_inner_hash_at_addr_exn mdb address in
+            assert (Hash.equal result hash_account) ) )
+
+  let%test_unit "If the entire database is full,\n \
+                 set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
+                 = accounts" =
+    with_test_instance (fun mdb ->
+        let max_height = Int.min max_depth 7 in
+        let num_accounts = 1 lsl max_height in
+        let initial_accounts =
+          Quickcheck.random_value
+            (Quickcheck.Generator.list_with_length num_accounts Account.gen)
+        in
+        List.iter initial_accounts ~f:(fun account ->
+            ignore @@ set_account mdb account ) ;
+        Quickcheck.test (gen_list max_height)
+          ~sexp_of:[%sexp_of : [`Left | `Right] List.t] ~f:(fun directions ->
+            let offset =
+              List.init (max_depth - max_height) ~f:(fun _ -> `Left)
+            in
+            let padded_directions = List.concat [offset; directions] in
+            let address = Address.of_direction padded_directions in
+            let num_accounts =
+              1 lsl (max_depth - List.length padded_directions)
+            in
+            let accounts =
+              Quickcheck.random_value
+                (Quickcheck.Generator.list_with_length num_accounts Account.gen)
+            in
+            set_all_accounts_rooted_at_exn mdb address accounts ;
+            let result = get_all_accounts_rooted_at_exn mdb address in
+            assert (List.equal ~equal:Account.equal accounts result) ) )
 end
 
 let%test_module "test functor on in memory databases" =
@@ -660,63 +698,6 @@ let%test_module "test functor on in memory databases" =
     module Mdb_d4 = Mdb_d (struct
       let depth = 4
     end)
-
-    module Mdb_syncable_ledger = struct
-      let max_depth = 12
-
-      include Mdb_d (struct
-        let depth = max_depth
-      end)
-
-      let gen_non_empty_directions =
-        let open Quickcheck.Generator in
-        filter
-          ~f:(Fn.compose not List.is_empty)
-          (gen_list max_depth)
-
-      (* FIXME: test will fail with a depth greater than 8 due to serialization issues  *)
-      let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
-                     get_inner_hash_at_addr_exn(address) = hash" =
-        with_test_instance (fun mdb ->
-            Quickcheck.test
-              (Quickcheck.Generator.tuple2 gen_non_empty_directions Account.gen)
-              ~sexp_of:
-                [%sexp_of : [`Left | `Right] List.t * Account.t sexp_opaque]
-              ~f:(fun (direction, account) ->
-                
-                let hash_account = Hash.hash_account account in
-                let address = Address.of_direction direction in
-                set_inner_hash_at_addr_exn mdb address hash_account ;
-                let result = get_inner_hash_at_addr_exn mdb address in
-                assert (Hash.equal result hash_account) ) )
-
-      let%test_unit "If the entire database is full,\n \
-                     set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
-                     = accounts" =
-        with_test_instance (fun mdb ->
-            let initial_accounts =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length (1 lsl max_depth)
-                   Account.gen)
-            in
-            List.iter initial_accounts ~f:(fun account ->
-                ignore @@ set_account mdb account ) ;
-            Quickcheck.test (gen_list max_depth)
-              ~sexp_of:[%sexp_of : [`Left | `Right] List.t] ~f:
-              (fun direction ->
-                let address = Address.of_direction direction in
-                let num_accounts =
-                  Int.pow 2 (max_depth - List.length direction)
-                in
-                let accounts =
-                  Quickcheck.random_value
-                    (Quickcheck.Generator.list_with_length num_accounts
-                       Account.gen)
-                in
-                set_all_accounts_rooted_at_exn mdb address accounts ;
-                let result = get_all_accounts_rooted_at_exn mdb address in
-                assert (List.equal ~equal:Account.equal accounts result) ) )
-    end
 
     module Mdb_d30 = Mdb_d (struct
       let depth = 30
