@@ -3,6 +3,11 @@ open Async_kernel
 open Nanobit_base
 open Coda_main
 
+let pk sk = Public_key.of_private_key sk |> Public_key.compress
+
+let sk_bigint sk =
+  Private_key.to_bigstring sk |> Private_key.of_bigstring |> Or_error.ok_exn
+
 let run_test with_snark : unit -> unit Deferred.t =
  fun () ->
   Parallel.init_master () ;
@@ -54,16 +59,16 @@ let run_test with_snark : unit -> unit Deferred.t =
          ~time_controller:(Inputs.Time.Controller.create ())
          ())
   in
-  let balance_change_or_timeout ~initial_receiver_balance =
+  let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
     let rec go () =
-      match Run.get_balance minibit Genesis_ledger.poor_pk with
+      match Run.get_balance minibit receiver_pk with
       | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
           return ()
       | _ ->
           let%bind () = after (Time_ns.Span.of_sec 10.) in
           go ()
     in
-    Deferred.any [after (Time_ns.Span.of_min 5.); go ()]
+    Deferred.any [after (Time_ns.Span.of_min 3.); go ()]
   in
   let open Genesis_ledger in
   let assert_balance pk amount =
@@ -74,7 +79,9 @@ let run_test with_snark : unit -> unit Deferred.t =
             !"Balance in account %{sexp: Currency.Balance.t} is not asserted \
               balance %{sexp: Currency.Balance.t}"
             balance amount ()
-    | None -> failwith "No balance in ledger"
+    | None ->
+        failwith
+          (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
   in
   let client_port = 8123 in
   let run_snark_worker = `With_public_key Genesis_ledger.rich_pk in
@@ -90,42 +97,54 @@ let run_test with_snark : unit -> unit Deferred.t =
    *)
   let send_amount = Currency.Amount.of_int 10 in
   (* Send money to someone *)
-  let build_txn amount =
-    let receiver = Genesis_ledger.poor_pk in
-    let nonce =
-      Run.get_nonce minibit Genesis_ledger.rich_pk |> Option.value_exn
-    in
+  let build_txn amount sender_sk receiver_pk =
+    let nonce = Run.get_nonce minibit (pk sender_sk) |> Option.value_exn in
     let payload : Transaction.Payload.t =
-      {receiver; amount= send_amount; fee= Currency.Fee.of_int 0; nonce}
+      { receiver= receiver_pk
+      ; amount= send_amount
+      ; fee= Currency.Fee.of_int 1
+      ; nonce }
     in
-    Transaction.sign (Signature_keypair.of_private_key rich_sk) payload
+    Transaction.sign (Signature_keypair.of_private_key sender_sk) payload
   in
-  let test_sending_transaction () =
-    let transaction = build_txn send_amount in
+  let test_sending_transaction () sender_sk receiver_pk =
+    let transaction = build_txn send_amount sender_sk receiver_pk in
     let prev_sender_balance =
-      Run.get_balance minibit Genesis_ledger.rich_pk |> Option.value_exn
+      Run.get_balance minibit (pk sender_sk) |> Option.value_exn
     in
     let prev_receiver_balance =
-      Run.get_balance minibit Genesis_ledger.poor_pk |> Option.value_exn
+      Run.get_balance minibit receiver_pk
+      |> Option.value ~default:Currency.Balance.zero
     in
     let%bind () = Run.send_txn log minibit (transaction :> Transaction.t) in
     (* Send a similar the transaction twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
-    let transaction' = build_txn Currency.Amount.(send_amount + of_int 1) in
+    let transaction' =
+      build_txn
+        Currency.Amount.(send_amount + of_int 1000)
+        sender_sk receiver_pk
+    in
     let%bind () = Run.send_txn log minibit (transaction' :> Transaction.t) in
     (* Let the system settle, mine some blocks *)
     let%map () =
       balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
+        receiver_pk
     in
-    assert_balance poor_pk
+    assert_balance receiver_pk
       ( Currency.Balance.( + ) prev_receiver_balance send_amount
       |> Option.value_exn ) ;
-    assert_balance rich_pk
+    assert_balance (pk sender_sk)
       ( Currency.Balance.( - ) prev_sender_balance send_amount
       |> Option.value_exn )
   in
-  let%bind () = test_sending_transaction () in
-  let%bind () = test_sending_transaction () in
+  let%bind () =
+    test_sending_transaction () Genesis_ledger.rich_sk Genesis_ledger.poor_pk
+  in
+  let%bind () =
+    test_sending_transaction () Genesis_ledger.rich_sk Genesis_ledger.poor_pk
+  in
+  let%bind () = after (Time_ns.Span.of_sec 10.) in
+  let%bind () = after (Time_ns.Span.of_sec 100.) in
   Deferred.unit
 
 let command =
