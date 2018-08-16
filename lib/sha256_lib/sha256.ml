@@ -1,13 +1,16 @@
 open Core
 open Snark_params
 
+let chunks_of n xs =
+  List.groupi ~break:(fun i _ _ -> i mod n = 0) xs
+
 let bits_to_string bs =
   let bits_to_char_big_endian bs =
     List.foldi bs ~init:0 ~f:(fun i acc b ->
       if b then acc lor (1 lsl (7 - i)) else acc)
     |> Char.of_int_exn
   in
-  List.groupi ~break:(fun i _ _ -> i mod 8 = 0) bs
+  chunks_of 8 bs
   |> List.map ~f:bits_to_char_big_endian
   |> String.of_char_list
 
@@ -18,10 +21,18 @@ module Gadget =
     (Tick)
     (Tick_curve)
 
+let nearest_multiple ~of_:n k =
+  let r = k mod n in
+  if Int.equal r 0
+  then k
+  else k - r + n
+
 let pad zero bits =
   let n = List.length bits in
   assert (n <= Gadget.Block.length_in_bits);
-  let padding_length = Gadget.Block.length_in_bits - n in
+  let padding_length =
+    nearest_multiple ~of_:Gadget.Block.length_in_bits n - n 
+  in
   bits @ List.init padding_length ~f:(fun _ -> zero)
 
 let words_to_bits ws =
@@ -51,9 +62,10 @@ module Checked = struct
 
   let digest bits =
     let open Gadget in
-    State.Checked.update
-      State.Checked.default_init
-      (Block.of_list_exn (pad Boolean.false_ bits))
+    Checked.List.fold ~init:State.Checked.default_init
+      (chunks_of 512 (pad Boolean.false_ bits))
+      ~f:(fun acc xs ->
+        State.Checked.update acc (Block.of_list_exn xs))
     >>| State.Checked.digest
 end
 
@@ -62,7 +74,7 @@ let%test_unit "sha-checked-and-unchecked" =
   let gen =
     let open Quickcheck.Generator in
     let open Let_syntax in
-    let%bind length = Int.gen_incl 0 (Gadget.Block.length_in_bits - 1) in
+    let%bind length = small_positive_int in
     Quickcheck.Generator.list_with_length length Bool.gen
   in
   Quickcheck.test ~trials:30 gen ~f:(fun bits ->
