@@ -4,9 +4,13 @@ open Bitstring
 module type S = sig
   type t [@@deriving sexp, bin_io, hash, eq, compare]
 
-  include Hashable.S with type t := t
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare]
+    end
+  end
 
-  val depth : t -> int
+  include Hashable.S with type t := t
 
   val parent : t -> t Or_error.t
 
@@ -19,6 +23,20 @@ module type S = sig
   val dirs_from_root : t -> Direction.t list
 
   val root : t
+
+  val sibling : t -> t
+
+  val next : t -> t Option.t
+
+  val serialize : t -> Bigstring.t
+
+  val fold_sequence_incl : t -> t -> init:'a -> f:(t -> 'a -> 'a) -> 'a
+
+  val width : t -> t * t
+
+  val depth : t -> int
+
+  val height : t -> int
 end
 
 module Make (Input : sig
@@ -29,7 +47,9 @@ struct
 
   let path_byte_count = byte_count_of_bits Input.depth
 
-  let length = bitstring_length
+  let depth = Bitstring.bitstring_length
+
+  let height path = Input.depth - Bitstring.bitstring_length path
 
   let show (path: Bitstring.t) : string =
     let len = bitstring_length path in
@@ -40,17 +60,18 @@ struct
     done ;
     Bytes.to_string bytes
 
+  let add_padding path =
+    let length = depth path in
+    if length mod 8 = 0 then path
+    else
+      Bitstring.concat [path; Bitstring.zeroes_bitstring (8 - (length mod 8))]
+
   module Stable = struct
     module V1 = struct
-      let to_tuple bitstring =
-        let size = length bitstring in
-        let padded_bitstring =
-          if size mod 8 = 0 then bitstring
-          else
-            Bitstring.concat
-              [bitstring; Bitstring.zeroes_bitstring (8 - (size mod 8))]
-        in
-        (size, Bitstring.string_of_bitstring padded_bitstring)
+      let to_tuple path =
+        let length = depth path in
+        let padded_bitstring = add_padding path in
+        (length, Bitstring.string_of_bitstring padded_bitstring)
 
       let of_tuple (length, string) =
         Bitstring.subbitstring (Bitstring.bitstring_of_string string) 0 length
@@ -142,14 +163,14 @@ struct
   let child_exn (path: t) dir : t = child path dir |> Or_error.ok_exn
 
   let dirs_from_root t =
-    List.init (length t) ~f:(fun pos ->
+    List.init (depth t) ~f:(fun pos ->
         Direction.of_bool (Bitstring.is_set t pos) )
 
   let root = Bitstring.create_bitstring 0
 
   let sibling (path: t) : t =
     let path = copy path in
-    let last_bit_index = length path - 1 in
+    let last_bit_index = depth path - 1 in
     let last_bit = get path last_bit_index <> 0 in
     let flip = if last_bit then clear else set in
     flip path last_bit_index ; path
@@ -157,7 +178,7 @@ struct
   let next (path: t) : t Option.t =
     let open Option.Let_syntax in
     let path = copy path in
-    let len = length path in
+    let len = depth path in
     let rec find_first_clear_bit i =
       if i < 0 then None
       else if is_clear path i then Some i
@@ -174,18 +195,9 @@ struct
     clear_bits (first_clear_index + 1) ;
     path
 
-  let depth t = Bitstring.bitstring_length t
-
-  let height t = Input.depth - Bitstring.bitstring_length t
-
-  let serialize (path: t) : Bigstring.t =
-    let path =
-      if length path mod 8 = 0 then path
-      else
-        Bitstring.concat
-          [path; Bitstring.zeroes_bitstring (8 - (length path mod 8))]
-    in
-    let path_len = length path in
+  let serialize path =
+    let path = add_padding path in
+    let path_len = depth path in
     let required_bits = 8 * path_byte_count in
     assert (path_len <= required_bits) ;
     let required_padding = required_bits - path_len in
@@ -205,18 +217,14 @@ struct
   let fold_sequence_incl first last ~init ~f =
     f last @@ fold_sequence_exl first last ~init ~f
 
-  let compute_width address =
+  let width address =
     let first_node =
-      Bitstring.concat
-        [address; Bitstring.zeroes_bitstring @@ (Input.depth - length address)]
+      Bitstring.concat [address; Bitstring.zeroes_bitstring @@ height address]
     in
     let last_node =
-      Bitstring.concat
-        [address; Bitstring.ones_bitstring @@ (Input.depth - length address)]
+      Bitstring.concat [address; Bitstring.ones_bitstring @@ height address]
     in
     (first_node, last_node)
-
-  let of_direction dirs = List.fold dirs ~f:child_exn ~init:root
 
   let to_index a =
     List.foldi
@@ -232,7 +240,7 @@ struct
          (Direction.gen_list Input.depth)
          Direction.gen)
       ~f:(fun (path, direction) ->
-        let address = of_direction path in
+        let address = build path in
         [%test_eq : t] (parent_exn (child_exn address direction)) address )
 end
 
