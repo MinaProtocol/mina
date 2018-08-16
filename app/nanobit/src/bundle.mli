@@ -27,4 +27,8 @@ module type S = sig
   module Sparse_ledger = Nanobit_base.Sparse_ledger
 end
 
-include S with type proof := Transaction_snark.t
+module Make
+    (Consensus_mechanism : Consensus.Mechanism.S)
+    (Protocol_state : Protocol_state.S
+                      with module Consensus_mechanism := Consensus_mechanism) :
+  S with type proof := Transaction_snark.t

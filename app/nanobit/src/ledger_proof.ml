@@ -2,11 +2,12 @@ open Core_kernel
 open Async_kernel
 open Nanobit_base
 
-module Make_prod (Init : sig
-  val logger : Logger.t
+module Make_prod
+    (Verifier : Verifier.S) (Init : sig
+        val logger : Logger.t
 
-  val verifier : Verifier.t
-end) =
+        val verifier : Verifier.t
+    end) =
 struct
   type t = Transaction_snark.t [@@deriving bin_io, sexp]
 
