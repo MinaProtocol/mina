@@ -1000,7 +1000,7 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
-      Quickcheck.test g ~trials:100 ~f:(fun _ ->
+      Quickcheck.test g ~trials:1000 ~f:(fun _ ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
               let old_ledger = !(Lb.ledger lb) in
@@ -1062,13 +1062,12 @@ let%test_module "test" =
               let%map _, _ = create_and_apply lb (Sequence.of_list ts) in
               (* A bit of a roundabout way to check, but essentially, if it
                * does not give repeats then our loop will not iterate more than
-               * parallelism*3/2 times. See random work description for
+               * parallelism times. See random work description for
                * explanation. *)
               let rec go i seen =
                 [%test_result : Bool.t]
                   ~message:"Exceeded time expected to exhaust random_work"
-                  ~expect:true
-                  (i <= 3 * p / 2) ;
+                  ~expect:true (i <= p) ;
                 let maybe_stuff, seen = Lb.random_work_spec_chunk lb seen in
                 match maybe_stuff with None -> () | Some _ -> go (i + 1) seen
               in
