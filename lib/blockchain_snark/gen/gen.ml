@@ -4,7 +4,6 @@ open Parsetree
 open Longident
 open Core
 open Coda_numbers
-open Common.Blockchain_state
 
 let expr_of_t ~loc
     ({ next_difficulty
