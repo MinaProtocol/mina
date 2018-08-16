@@ -172,10 +172,6 @@ module type Ledger_builder_controller_intf = sig
     [@@deriving make]
   end
 
-  module Aux : sig
-    type t = {root_and_proof: (ledger_hash * ledger_proof) option; state: state}
-  end
-
   val create : Config.t -> t Deferred.t
 
   val strongest_tip : t -> tip
@@ -209,6 +205,8 @@ module type Signer_intf = sig
 
   type state_proof
 
+  type time_controller
+
   module Tip : sig
     type t =
       { state: state * state_proof
@@ -223,6 +221,7 @@ module type Signer_intf = sig
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
     -> change_feeder:change Linear_pipe.Reader.t
+    -> time_controller:time_controller
     -> t
 
   val transitions : t -> external_transition Linear_pipe.Reader.t
@@ -339,6 +338,7 @@ module type Inputs_intf = sig
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
      and type external_transition := External_transition.t
+     and type time_controller := Time.Controller.t
 
   module Genesis : sig
     val state : State.t
@@ -384,7 +384,8 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10] }
+      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; time_controller: Time.Controller.t }
     [@@deriving make]
   end
 
@@ -467,6 +468,7 @@ module Make (Inputs : Inputs_intf) = struct
       |> don't_wait_for ;
       Signer.create ~parent_log:config.log ~change_feeder:tips_r
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
+        ~time_controller:config.time_controller
     in
     don't_wait_for
       (Linear_pipe.transfer_id (Signer.transitions miner)

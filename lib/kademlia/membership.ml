@@ -65,7 +65,7 @@ module Haskell_process = struct
         | Error _ ->
             Process.create ~prog:(test_prefix ^ kademlia_binary) ~args () )
     in
-    let kill_locked_process ~log ~conf_dir =
+    let kill_locked_process ~log =
       match%bind Sys.file_exists lock_path with
       | `Yes -> (
           let%bind p = Reader.file_contents lock_path in
@@ -86,7 +86,7 @@ module Haskell_process = struct
     in
     Logger.debug log "Args: %s\n"
       (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
-    let%bind () = kill_locked_process ~log ~conf_dir in
+    let%bind () = kill_locked_process ~log in
     match%bind
       Sys.is_directory conf_dir |> Deferred.map ~f:Or_error.return
     with
@@ -104,7 +104,7 @@ module Haskell_process = struct
         t
     | _ -> Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
-  let output {process} ~log =
+  let output {process; _} ~log =
     Pipe.map
       (Reader.pipe (Process.stdout process))
       ~f:(fun str ->
@@ -162,16 +162,15 @@ struct
         let _ = Peer.Table.add ~key:peer ~data:kkey t.peers in
         () ) ;
     if List.length lives > 0 then
-      Linear_pipe.write_or_drop ~capacity:500 t.changes_writer t.changes_reader
+      Linear_pipe.write t.changes_writer
         (Peer.Event.Connect (List.map lives ~f:fst))
-    else ()
+    else Deferred.unit
 
   let dead t deads =
     List.iter deads ~f:(fun peer -> Peer.Table.remove t.peers peer) ;
     if List.length deads > 0 then
-      Linear_pipe.write_or_drop ~capacity:500 t.changes_writer t.changes_reader
-        (Peer.Event.Disconnect deads)
-    else ()
+      Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
+    else Deferred.unit
 
   let connect ~initial_peers ~me ~parent_log ~conf_dir =
     let open Deferred.Or_error.Let_syntax in
@@ -185,18 +184,17 @@ struct
     in
     let t = {p; peers; changes_reader; changes_writer; first_peers} in
     don't_wait_for
-      (Pipe.iter_without_pushback (P.output p ~log) ~f:(fun lines ->
+      (Pipe.iter (P.output p ~log) ~f:(fun lines ->
            let lives, deads =
              List.partition_map lines ~f:(fun line ->
                  match String.split ~on:' ' line with
                  | [addr; kademliaKey; "on"] ->
                      `Fst (Host_and_port.of_string addr, kademliaKey)
-                 | [addr; kademliaKey; "off"] ->
-                     `Snd (Host_and_port.of_string addr)
+                 | [addr; _; "off"] -> `Snd (Host_and_port.of_string addr)
                  | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
              )
            in
-           live t lives ;
+           let open Deferred.Let_syntax in
            let () =
              if List.length lives <> 0 then
                (* Update the peers *)
@@ -205,7 +203,8 @@ struct
                  (List.map ~f:fst lives)
              else ()
            in
-           dead t deads )) ;
+           let%map () = live t lives and () = dead t deads in
+           () )) ;
     t
 
   let peers t = Peer.Table.keys t.peers
@@ -244,9 +243,9 @@ let%test_module "Tests" =
     struct
       type t = string list
 
-      let kill t = return ()
+      let kill _ = return ()
 
-      let create ~initial_peers ~me ~log ~conf_dir =
+      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
         let on p = Printf.sprintf "127.0.0.1:%d key on" p in
         let off p = Printf.sprintf "127.0.0.1:%d key off" p in
         let render cmds =
@@ -271,7 +270,7 @@ let%test_module "Tests" =
         in
         ()
 
-      let create ~initial_peers ~me ~log ~conf_dir =
+      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
         let open Deferred.Let_syntax in
         (* Try kademlia, then prepend test_prefix if it's missing *)
         match%bind Process.create ~prog:"./dummy.sh" ~args:[] () with

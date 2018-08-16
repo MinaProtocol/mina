@@ -26,7 +26,7 @@ struct
   module Scalar = Bignum_bigint
 
   module Signature = struct
-    type 'a t = 'a * 'a [@@deriving eq]
+    type 'a t = 'a * 'a [@@deriving eq, sexp]
 
     type var = Curve.Scalar.var t
 

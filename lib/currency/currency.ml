@@ -32,6 +32,8 @@ module type Basic = sig
 
   val of_int : int -> t
 
+  val to_int : t -> int
+
   val var_of_t : t -> var
 
   val var_to_bits : var -> Boolean.var Bitstring.Lsb_first.t
@@ -168,6 +170,8 @@ end = struct
   include Stable.V1
 
   let of_int = Unsigned.of_int
+
+  let to_int = Unsigned.to_int
 
   let of_string = Unsigned.of_string
 

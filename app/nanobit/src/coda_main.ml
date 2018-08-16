@@ -354,6 +354,11 @@ struct
     type t =
       {state: State.t; proof: State.Proof.t; ledger_builder: Ledger_builder.t}
     [@@deriving bin_io, sexp]
+
+    let of_transition_and_lb transition ledger_builder =
+      { state= External_transition.state transition
+      ; proof= External_transition.state_proof transition
+      ; ledger_builder }
   end
 
   let fee_public_key = Init.fee_public_key
@@ -515,6 +520,9 @@ struct
 
         type path = Path.t
       end)
+      (struct
+        let subtree_height = 3
+      end)
 
   module Net = Minibit_networking.Make (struct
     include Inputs0
@@ -602,14 +610,22 @@ struct
       let prove ~prev_state:(old_state, old_proof)
           (transition: Internal_transition.t) =
         let open Deferred.Or_error.Let_syntax in
+        let state_transition_data =
+          let open Block.State_transition_data in
+          { time= transition.timestamp
+          ; target_hash= transition.ledger_hash
+          ; ledger_builder_hash= transition.ledger_builder_hash }
+        in
         Prover.extend_blockchain Init.prover
           {proof= old_proof; state= State.to_blockchain_state old_state}
-          { header= {time= transition.timestamp; nonce= transition.nonce}
-          ; body=
-              { target_hash= transition.ledger_hash
-              ; ledger_builder_hash= transition.ledger_builder_hash
-              ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof
-              } }
+          { auxillary_data=
+              { nonce= transition.nonce
+              ; signature=
+                  Block.State_transition_data.Signature.sign
+                    Nanobit_base.Global_signer_private_key.t
+                    state_transition_data }
+          ; state_transition_data
+          ; proof= Option.map ~f:Ledger_proof.proof transition.ledger_proof }
         >>| fun {Blockchain_snark.Blockchain.proof; _} -> proof
     end
 
@@ -666,6 +682,8 @@ end
 
 module type Main_intf = sig
   module Inputs : sig
+    module Time : Protocols.Coda_pow.Time_intf
+
     module Ledger : sig
       type t [@@deriving sexp]
 
@@ -687,21 +705,12 @@ module type Main_intf = sig
       end
 
       module Gossip_net : sig
-        module Params : sig
-          type t =
-            {timeout: Time.Span.t; target_peer_count: int; address: Peer.t}
-        end
+        module Config : Gossip_net.Config_intf
       end
 
-      module Config : sig
-        type t =
-          { parent_log: Logger.t
-          ; conf_dir: string
-          ; gossip_net_params: Gossip_net.Params.t
-          ; initial_peers: Peer.t list
-          ; me: Peer.t
-          ; remap_addr_port: Peer.t -> Peer.t }
-      end
+      module Config :
+        Minibit_networking.Config_intf
+        with type gossip_config := Gossip_net.Config.t
     end
 
     module Sparse_ledger : sig
@@ -747,7 +756,8 @@ module type Main_intf = sig
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10] }
+      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; time_controller: Inputs.Time.Controller.t }
     [@@deriving make]
   end
 

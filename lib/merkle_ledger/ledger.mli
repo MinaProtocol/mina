@@ -28,7 +28,7 @@ module type S = sig
   end
 
   module Addr : sig
-    type t [@@deriving sexp, bin_io, hash, compare]
+    type t [@@deriving sexp, bin_io, hash, eq, compare]
 
     include Hashable.S with type t := t
 

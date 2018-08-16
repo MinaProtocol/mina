@@ -3,5 +3,5 @@
 (executables
  ((names (merkle_update))
   (modes (native))
-  (preprocess (pps (ppx_jane ppx_driver.runner)))
+  (preprocess (pps (ppx_jane)))
   (libraries (snarky core))))

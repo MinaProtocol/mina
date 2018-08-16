@@ -14,6 +14,9 @@ let ( = ) = equal
 
 type var = Tick.Field.var * Tick.Field.var
 
+let var_of_t (x, y) =
+  (Tick.Field.Checked.constant x, Tick.Field.Checked.constant y)
+
 let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
 (* TODO: We can move it onto the subgroup during account creation. No need to check with

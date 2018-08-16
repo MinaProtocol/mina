@@ -3,7 +3,7 @@
 (library
  ((name parallel_scan)
   (public_name parallel_scan)
-  (flags (:standard -short-paths -warn-error -9-6-27-33-32))
+  (flags (:standard -short-paths -warn-error -58))
   (inline_tests)
   (library_flags (-linkall))
   (libraries (linear_pipe cryptokit core async async_extra))
