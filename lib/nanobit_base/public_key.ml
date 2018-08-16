@@ -10,6 +10,8 @@ end
 
 include Stable.V1
 
+include Comparable.Make_binable(Stable.V1)
+
 let ( = ) = equal
 
 type var = Tick.Field.var * Tick.Field.var

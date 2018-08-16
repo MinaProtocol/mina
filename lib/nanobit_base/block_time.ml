@@ -9,7 +9,7 @@ open Snark_bits
 (* Milliseconds since epoch *)
 module Stable = struct
   module V1 = struct
-    type t = UInt64.t [@@deriving bin_io, sexp, compare, eq]
+    type t = UInt64.t [@@deriving bin_io, sexp, compare, eq, hash]
   end
 end
 

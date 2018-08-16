@@ -1,6 +1,7 @@
 open Core
 
-type t = Bignum_bigint.t * Bignum_bigint.t [@@deriving sexp, eq, compare, hash]
+type t = Bignum_bigint.t * Bignum_bigint.t
+[@@deriving bin_io, sexp, eq, compare, hash]
 
 module Stable : sig
   module V1 : sig
@@ -12,5 +13,3 @@ end
 open Snark_params.Tick
 
 type var = Boolean.var list * Boolean.var list
-
-val typ : (var, t) Typ.t

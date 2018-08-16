@@ -35,10 +35,11 @@ type var = (Payload.var, Public_key.var, Signature.var) t_
 let sign (kp: Signature_keypair.t) (payload: Payload.t) : t =
   { payload
   ; sender= kp.public_key
-  ; signature= Schnorr.sign kp.private_key payload }
+  ; signature=
+      Schnorr.sign (Schnorr.Private_key.of_bigint kp.private_key) payload }
 
 let typ : (var, t) Tick.Typ.t =
-  let spec = Data_spec.[Payload.typ; Public_key.typ; Signature.typ] in
+  let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
   let of_hlist
         : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
     H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
