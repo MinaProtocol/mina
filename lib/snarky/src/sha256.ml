@@ -35,7 +35,17 @@ module Make
       type var
       val typ : (var, t) Typ.t
 
+      val of_bits_exn : bool list -> t
+
+      val default_init : t
+
       module Checked : sig
+        val var_of_t : t -> var
+
+        val of_bits_exn : Boolean.var list -> var
+
+        val default_init : var
+
         val update : var -> Block.var -> (var, _) Checked.t
 
         val digest : var -> Digest.var
@@ -82,8 +92,24 @@ module Make
 
     let with_prefix = sprintf "%s_%s"
 
+    let init_words = [| 0x6a09e667; 0xbb67ae85; 0x3c6ef372; 0xa54ff53a; 0x510e527f; 0x9b05688c; 0x1f83d9ab; 0x5be0cd19 |]
+
+    let of_bits_exn bits = 
+      assert (Int.equal (List.length bits) length_in_bits);
+      bits
+
+    let default_init =
+      List.init length_in_bits ~f:(fun i ->
+        (init_words.(i / 32) lsr (31 - (i mod 32))) land 1 = 1)
+
     module Checked = struct
+      let var_of_t = List.map ~f:Boolean.var_of_value
+
       let digest (x : var) : Digest.var = x
+
+      let default_init = var_of_t default_init
+
+      let of_bits_exn = of_bits_exn
 
       module Digest_variable = struct
         open Libsnark
@@ -175,14 +201,16 @@ module Make
               Protoboard.Variable_array.emplace_back arr (conv (b :> Impl.Field.var)));
             arr
           in
+          let prev_state = conv_bits prev_state in
+          let block = conv_bits block in
           let output_var = Digest_variable.create pb Digest.length_in_bits in
+          let gadget =
+            Compression_gadget.create pb prev_state block output_var
+          in
           let output_unconstrained =
             let bits = Digest_variable.bits output_var in
             List.init Digest.length_in_bits ~f:(fun i ->
               conv_back (Protoboard.Variable_array.get bits i))
-          in
-          let gadget =
-            Compression_gadget.create pb (conv_bits prev_state) (conv_bits block) output_var
           in
           { gadget; output_unconstrained }
 
