@@ -8,6 +8,11 @@ let to_bool = function Left -> false | Right -> true
 
 let to_int = function Left -> 0 | Right -> 1
 
+let of_int = function
+  | 0 -> Left
+  | 1 -> Right
+  | value -> failwith (sprintf "Cannot integer %d into character" value)
+
 let flip = function Left -> Right | Right -> Left
 
 let gen = Quickcheck.Let_syntax.(Quickcheck.Generator.bool >>| of_bool)

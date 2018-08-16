@@ -51,6 +51,16 @@ struct
 
   let height path = Input.depth - Bitstring.bitstring_length path
 
+  let build (dirs: Direction.t list) =
+    let path = create_bitstring (List.length dirs) in
+    let rec loop i = function
+      | [] -> ()
+      | h :: t ->
+          if Direction.to_bool h then set path i ;
+          loop (i + 1) t
+    in
+    loop 0 dirs ; path
+
   let show (path: Bitstring.t) : string =
     let len = bitstring_length path in
     let bytes = Bytes.create len in
@@ -82,21 +92,12 @@ struct
         let sexp_of_t = Fn.compose sexp_of_string show
 
         let t_of_sexp =
-          Fn.compose
-            (fun (buf: string) ->
-              let len = String.length buf in
-              let bitstring = Bitstring.create_bitstring (String.length buf) in
-              for i = 0 to len - 1 do
-                match buf.[i] with
-                | '1' -> Bitstring.set bitstring i
-                | '0' -> ()
-                | char ->
-                    failwith
-                    @@ sprintf "cannot convert to address (invalid char: %c)"
-                         char
-              done ;
-              bitstring )
-            string_of_sexp
+          let of_string buf =
+            String.to_list buf
+            |> List.map ~f:(Fn.compose Direction.of_int Char.to_int)
+            |> build
+          in
+          Fn.compose of_string string_of_sexp
 
         let hash = Fn.compose [%hash : int * string] to_tuple
 
@@ -130,16 +131,6 @@ struct
     Fn.compose (Format.pp_print_string fmt) show
 
   let equals = equals
-
-  let build (dirs: Direction.t list) =
-    let path = create_bitstring (List.length dirs) in
-    let rec loop i = function
-      | [] -> ()
-      | h :: t ->
-          if Direction.to_bool h then set path i ;
-          loop (i + 1) t
-    in
-    loop 0 dirs ; path
 
   let copy (path: t) : t =
     let%bitstring path = {| path: -1: bitstring |} in
