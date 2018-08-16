@@ -79,7 +79,9 @@ let run_test with_snark : unit -> unit Deferred.t =
             !"Balance in account %{sexp: Currency.Balance.t} is not asserted \
               balance %{sexp: Currency.Balance.t}"
             balance amount ()
-    | None -> failwith (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
+    | None ->
+        failwith
+          (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
   in
   let client_port = 8123 in
   let run_snark_worker = `With_public_key Genesis_ledger.rich_pk in
