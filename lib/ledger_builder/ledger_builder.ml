@@ -99,26 +99,14 @@ end = struct
     ; public_key: Public_key.t }
   [@@deriving sexp, bin_io]
 
-  let merge_statement (s1: Ledger_proof_statement.t)
-      (s2: Ledger_proof_statement.t) =
-    let open Or_error.Let_syntax in
-    let%map fee_excess =
-      Fee.Signed.add s1.fee_excess s2.fee_excess |> option "Error adding fees"
-    in
-    { Ledger_proof_statement.source= s1.source
-    ; target= s2.target
-    ; fee_excess
-    ; proof_type= `Merge }
-
   let random_work_spec_chunk t (seen_statements: Ledger_proof_statement.Set.t) =
     let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
     let module A = Parallel_scan.Available_job in
     let module L = Ledger_proof_statement in
     let canonical_statement_of_job = function
       | A.Base {Super_transaction_with_witness.statement; _} -> statement
-      | A.Merge ((_, s1), _) ->
-          (* The same statement can never be reused in a different position *)
-          s1
+      | A.Merge ((_, s1), (_, s2)) ->
+          Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
     in
     let single_spec (job: job) =
       match job with
@@ -126,7 +114,7 @@ end = struct
           Snark_work_lib.Work.Single.Spec.Transition
             (d.statement, d.transaction, d.witness)
       | A.Merge ((p1, s1), (p2, s2)) ->
-          let merged = merge_statement s1 s2 |> Or_error.ok_exn in
+          let merged = Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn in
           Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
     in
     (* We currently have an invariant that work must be consecutive. In order to
@@ -152,16 +140,10 @@ end = struct
      * See meaning of rank/select from here:
      * https://en.wikipedia.org/wiki/Succinct_data_structure
      *)
-    let select0 str i =
-      List.sum
-        (module Int)
-        (List.take str (i + 1))
-        ~f:(fun x -> if not x then 1 else 0)
-    in
-    let rank0 str i =
+    let index_of_nth_occurence str n =
       Sequence.of_list str
       |> Sequence.filter_mapi ~f:(fun i b -> if not b then Some i else None)
-      |> Fn.flip Sequence.nth i
+      |> Fn.flip Sequence.nth n
     in
     let n = List.length all_jobs in
     let dirty_jobs =
@@ -181,8 +163,8 @@ end = struct
         ( Some [single_spec j]
         , L.Set.add seen_statements (canonical_statement_of_job j) )
     | _ ->
-        let i = Random.int (select0 dirty_jobs n) in
-        let j = rank0 dirty_jobs i |> Option.value_exn in
+        let i = Random.int (List.length jobs) in
+        let j = index_of_nth_occurence dirty_jobs i |> Option.value_exn in
         let chunk =
           [List.nth_exn all_jobs j; List.nth_exn all_jobs ((j + 1) % n)]
         in
@@ -789,6 +771,17 @@ let%test_module "test" =
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
           [@@deriving sexp, bin_io, compare]
+
+          let merge s1 s2 =
+            let open Or_error.Let_syntax in
+            let%map fee_excess =
+              Fee.Signed.add s1.fee_excess s2.fee_excess
+              |> option "Error adding fees"
+            in
+            { source= s1.source
+            ; target= s2.target
+            ; fee_excess
+            ; proof_type= `Merge }
         end
 
         include T

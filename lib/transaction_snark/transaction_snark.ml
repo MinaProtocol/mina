@@ -127,6 +127,17 @@ module Statement = struct
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
     [@@deriving sexp, bin_io, hash, compare, eq]
+
+    let option lab =
+      Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
+
+    let merge s1 s2 =
+      let open Or_error.Let_syntax in
+      let%map fee_excess =
+        Currency.Fee.Signed.add s1.fee_excess s2.fee_excess
+        |> option "Error adding fees"
+      in
+      {source= s1.source; target= s2.target; fee_excess; proof_type= `Merge}
   end
 
   include T

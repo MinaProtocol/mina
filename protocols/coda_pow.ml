@@ -218,6 +218,8 @@ module type Ledger_proof_statement_intf = sig
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
 
+  val merge : t -> t -> t Or_error.t
+
   include Comparable.S with type t := t
 end
 
