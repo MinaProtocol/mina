@@ -1,24 +1,6 @@
 open Core
 open Bitstring
 
-module Direction = struct
-  type t = Left | Right
-
-  let of_bool = function false -> Left | true -> Right
-
-  let to_bool = function Left -> false | Right -> true
-
-  let flip = function Left -> Right | Right -> Left
-
-  let gen = Quickcheck.Let_syntax.(Quickcheck.Generator.bool >>| of_bool)
-
-  let gen_list depth =
-    let open Quickcheck.Generator in
-    let open Let_syntax in
-    let%bind l = Int.gen_incl 0 (depth - 1) in
-    list_with_length l (Bool.gen >>| fun b -> if b then `Right else `Left)
-end
-
 module type S = sig
   type t [@@deriving sexp, bin_io, hash, eq, compare]
 
@@ -28,13 +10,13 @@ module type S = sig
 
   val parent : t -> t Or_error.t
 
-  val child : t -> [`Left | `Right] -> t Or_error.t
+  val child : t -> Direction.t -> t Or_error.t
 
-  val child_exn : t -> [`Left | `Right] -> t
+  val child_exn : t -> Direction.t -> t
 
   val parent_exn : t -> t
 
-  val dirs_from_root : t -> [`Left | `Right] list
+  val dirs_from_root : t -> Direction.t list
 
   val root : t
 end
@@ -44,14 +26,6 @@ module Make (Input : sig
 end) =
 struct
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
-
-  let of_variant = function
-    | `Left -> Direction.Left
-    | `Right -> Direction.Right
-
-  let to_variant = function
-    | Direction.Left -> `Left
-    | Direction.Right -> `Right
 
   let path_byte_count = byte_count_of_bits Input.depth
 
@@ -160,18 +134,16 @@ struct
 
   let parent_exn = Fn.compose Or_error.ok_exn parent
 
-  let child (path: t) (dir: [`Left | `Right]) : t Or_error.t =
-    let dir_bit = Direction.to_bool (of_variant dir) in
+  let child (path: t) dir : t Or_error.t =
+    let dir_bit = Direction.to_bool dir in
     let%bitstring path = {| path: -1: bitstring; dir_bit: 1|} in
     Or_error.return path
 
-  let child_exn (path: t) (dir: [`Left | `Right]) : t =
-    child path dir |> Or_error.ok_exn
+  let child_exn (path: t) dir : t = child path dir |> Or_error.ok_exn
 
-  let dirs_from_root t : [`Left | `Right] list =
+  let dirs_from_root t =
     List.init (length t) ~f:(fun pos ->
         Direction.of_bool (Bitstring.is_set t pos) )
-    |> List.map ~f:to_variant
 
   let root = Bitstring.create_bitstring 0
 
@@ -246,23 +218,19 @@ struct
 
   let of_direction dirs = List.fold dirs ~f:child_exn ~init:root
 
-  let bit_val = function `Left -> 0 | `Right -> 1
-
   let to_index a =
     List.foldi
       (List.rev @@ dirs_from_root a)
       ~init:0
-      ~f:(fun i acc dir -> acc lor (bit_val dir lsl i))
+      ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
 
   let%test "the merkle root should have no path" = dirs_from_root root = []
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
-    Quickcheck.test
-      ~sexp_of:[%sexp_of : [`Left | `Right] List.t * [`Left | `Right]]
-      Quickcheck.Generator.(
-        tuple2
-          (Direction.gen_list Input.depth)
-          (Bool.gen >>| fun b -> if b then `Right else `Left))
+    Quickcheck.test ~sexp_of:[%sexp_of : Direction.t List.t * Direction.t]
+      (Quickcheck.Generator.tuple2
+         (Direction.gen_list Input.depth)
+         Direction.gen)
       ~f:(fun (path, direction) ->
         let address = of_direction path in
         [%test_eq : t] (parent_exn (child_exn address direction)) address )

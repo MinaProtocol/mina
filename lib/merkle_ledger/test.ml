@@ -214,8 +214,8 @@ let%test_unit "set_inner_can_copy_correctly" =
   let rec all_inner_of a =
     if L3.Addr.depth a = L3.depth - 1 then []
     else
-      let lc = L3.Addr.child a `Left in
-      let rc = L3.Addr.child a `Right in
+      let lc = L3.Addr.child a Left in
+      let rc = L3.Addr.child a Right in
       match (lc, rc) with
       | Ok lc, Ok rc -> [lc; rc] @ all_inner_of lc @ all_inner_of rc
       | _ -> []
@@ -244,8 +244,8 @@ let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
   let rec mk_addr ix h a =
     if h = 0 then a
     else if ix land 1 = 1 then
-      mk_addr (ix lsr 1) (h - 1) (L16.Addr.child_exn a `Right)
-    else mk_addr (ix lsr 1) (h - 1) (L16.Addr.child_exn a `Left)
+      mk_addr (ix lsr 1) (h - 1) (L16.Addr.child_exn a Right)
+    else mk_addr (ix lsr 1) (h - 1) (L16.Addr.child_exn a Left)
   in
   let count = 8192 in
   let ledger, keys = L16.load_ledger count 1 in
@@ -262,7 +262,7 @@ let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
       let a =
         mk_addr idx height
           (repeated (L16.depth - max_height)
-             (fun a -> L16.Addr.child_exn a `Left)
+             (fun a -> L16.Addr.child_exn a Left)
              L16.Addr.root)
       in
       let old_hash = L16.get_inner_hash_at_addr_exn ledger a in

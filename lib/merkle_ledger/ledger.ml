@@ -1,5 +1,4 @@
 open Core
-open Dyn_array
 
 (* SOMEDAY: handle empty wallets *)
 
@@ -180,7 +179,7 @@ struct
     type nonrec t = t
 
     let fold t ~init ~f =
-      Hashtbl.fold t.accounts ~init ~f:(fun ~key:_ ~data:{account} acc ->
+      Hashtbl.fold t.accounts ~init ~f:(fun ~key:_ ~data:{account; _} acc ->
           f acc account )
 
     let iter = `Define_using_fold
@@ -220,7 +219,9 @@ struct
   let create_account_table () = Key.Table.create ()
 
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights = Array.create (depth + 1) Hash.empty_hash in
+    let empty_hash_at_heights =
+      Array.create ~len:(depth + 1) Hash.empty_hash
+    in
     let rec go i =
       if i <= depth then (
         let h = empty_hash_at_heights.(i - 1) in
@@ -328,7 +329,7 @@ struct
           let length = Int.pow 2 (tree.nodes_height - 1 - i) in
           let new_elems = length - Dyn_array.length nodes in
           Dyn_array.append
-            (Dyn_array.init new_elems (fun x -> Hash.empty_hash))
+            (Dyn_array.init new_elems (fun _ -> Hash.empty_hash))
             nodes ) )
 
   let rec recompute_layers curr_height get_prev_hash layers dirty_indices =
@@ -448,7 +449,7 @@ struct
     let len = DynArray.length tree.leafs in
     if new_size > len then
       DynArray.append tree.leafs
-        (DynArray.init (new_size - len) (fun x -> Key.empty)) ;
+        (DynArray.init (new_size - len) (fun _ -> Key.empty)) ;
     recompute_tree ~allow_sync:true t
 
   (* FIXME: Probably this well cause an error *)

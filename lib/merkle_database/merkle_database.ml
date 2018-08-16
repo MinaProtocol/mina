@@ -1,8 +1,6 @@
 open Core
 open Unsigned
 
-let gen_list = Address.Direction.gen_list
-
 module type Balance_intf = sig
   type t [@@deriving eq]
 
@@ -81,7 +79,7 @@ module type S = sig
   type address
 
   module MerklePath : sig
-    type t = Address.Direction.t * hash
+    type t = Direction.t * hash
 
     val implied_root : t list -> hash -> hash
   end
@@ -120,10 +118,9 @@ module Make
     include S
 
     val with_test_instance : (t -> 'a) -> 'a
-
-    module Address : sig
+    (* module Address : sig
       val of_direction : [`Left | `Right] List.t -> address
-    end
+    end *)
   end
   with type account := Account.t
    and type hash := Hash.t =
@@ -140,14 +137,14 @@ struct
   let exn_of_error err = Error_exception err
 
   module MerklePath = struct
-    type t = Address.Direction.t * Hash.t
+    type t = Direction.t * Hash.t
 
     let implied_root path leaf_hash =
       let rec loop sibling_hash = function
         | [] -> sibling_hash
-        | (Address.Direction.Left, hash) :: t ->
+        | (Direction.Left, hash) :: t ->
             loop (Hash.merge (hash, sibling_hash)) t
-        | (Address.Direction.Right, hash) :: t ->
+        | (Direction.Right, hash) :: t ->
             loop (Hash.merge (sibling_hash, hash)) t
       in
       loop leaf_hash path
@@ -207,7 +204,7 @@ struct
     let build_empty_account () : t =
       Account (Bitstring.create_bitstring max_depth)
 
-    let build_account (path: Address.Direction.t list) : t =
+    let build_account (path: Direction.t list) : t =
       assert (List.length path = max_depth) ;
       Account (Path.build path)
 
@@ -264,7 +261,7 @@ struct
           assert (Path.length path > 0) ;
           Hash (Path.parent_exn path)
 
-    let child (key: t) (dir: Address.Direction.t) : t =
+    let child (key: t) (dir: Direction.t) : t =
       match key with
       | Generic _ ->
           raise (Invalid_argument "child: generic keys have no child")
@@ -272,7 +269,7 @@ struct
           raise (Invalid_argument "child: account keys have no child")
       | Hash path ->
           assert (Path.length path < max_depth) ;
-          Hash (Path.child_exn path (Path.to_variant dir))
+          Hash (Path.child_exn path dir)
 
     let next : t -> t Option.t = function
       | Generic _ ->
@@ -295,7 +292,7 @@ struct
     let gen_account =
       let open Quickcheck.Let_syntax in
       let%map dirs =
-        Quickcheck.Generator.list_with_length Depth.depth Address.Direction.gen
+        Quickcheck.Generator.list_with_length Depth.depth Direction.gen
       in
       build_account dirs
   end
@@ -575,13 +572,13 @@ struct
                  get_inner_hash_at_addr_exn(address) = hash" =
     let gen_non_empty_directions =
       let open Quickcheck.Generator in
-      filter ~f:(Fn.compose not List.is_empty) (gen_list max_depth)
+      filter ~f:(Fn.compose not List.is_empty) (Direction.gen_list max_depth)
     in
     with_test_instance (fun mdb ->
         Quickcheck.test
           (Quickcheck.Generator.tuple2 gen_non_empty_directions Account.gen)
-          ~sexp_of:[%sexp_of : [`Left | `Right] List.t * Account.t sexp_opaque]
-          ~f:(fun (direction, account) ->
+          ~sexp_of:[%sexp_of : Direction.t List.t * Account.t sexp_opaque] ~f:
+          (fun (direction, account) ->
             let hash_account = Hash.hash_account account in
             let address = Address.of_direction direction in
             set_inner_hash_at_addr_exn mdb address hash_account ;
@@ -592,7 +589,7 @@ struct
                  set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
                  = accounts" =
     with_test_instance (fun mdb ->
-        let max_height = Int.min max_depth 7 in
+        let max_height = Int.min max_depth 5 in
         let num_accounts = 1 lsl max_height in
         let initial_accounts =
           Quickcheck.random_value
@@ -600,10 +597,10 @@ struct
         in
         List.iter initial_accounts ~f:(fun account ->
             ignore @@ set_account mdb account ) ;
-        Quickcheck.test (gen_list max_height)
-          ~sexp_of:[%sexp_of : [`Left | `Right] List.t] ~f:(fun directions ->
+        Quickcheck.test (Direction.gen_list max_height)
+          ~sexp_of:[%sexp_of : Direction.t List.t] ~f:(fun directions ->
             let offset =
-              List.init (max_depth - max_height) ~f:(fun _ -> `Left)
+              List.init (max_depth - max_height) ~f:(fun _ -> Direction.Left)
             in
             let padded_directions = List.concat [offset; directions] in
             let address = Address.of_direction padded_directions in

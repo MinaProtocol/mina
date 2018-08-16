@@ -3,26 +3,6 @@ open Async_kernel
 
 let rec repeated n f r = if n > 0 then repeated (n - 1) f (f r) else r
 
-module type Addr_intf = sig
-  type t [@@deriving sexp, bin_io, hash, eq, compare]
-
-  include Hashable.S with type t := t
-
-  val depth : t -> int
-
-  val parent : t -> t Or_error.t
-
-  val parent_exn : t -> t
-
-  val child : t -> [`Left | `Right] -> t Or_error.t
-
-  val child_exn : t -> [`Left | `Right] -> t
-
-  val dirs_from_root : t -> [`Left | `Right] list
-
-  val root : t
-end
-
 module type Hash_intf = sig
   type t [@@deriving sexp, hash, compare, bin_io, eq]
 
@@ -144,7 +124,7 @@ For a given addr, there are three possibilities:
 We want all_valid when every leaf of the tree is `Valid
 *)
 (* TODO: This is a waste of memory *)
-module Valid (Addr : Addr_intf) :
+module Valid (Addr : Address.S) :
   Validity_intf with type addr := Addr.t =
 struct
   type tree = Leaf of [`Valid | `Unknown] | Node of tree ref * tree ref
@@ -157,8 +137,8 @@ struct
     let rec go node dirs =
       match dirs with
       | d :: ds -> (
-          let accessor = match d with `Left -> fst | `Right -> snd in
-          assert (d = `Left) ;
+          let accessor = match d with Direction.Left -> fst | Right -> snd in
+          assert (d = Left) ;
           match !node with
           (* sanity assert: we shouldn't ever be recursing under valid parts of the tree *)
           | Leaf v ->
@@ -176,7 +156,7 @@ struct
     let rec mark_helper node dirs =
       match dirs with
       | d :: ds -> (
-          let accessor = match d with `Left -> fst | `Right -> snd in
+          let accessor = match d with Direction.Left -> fst | Right -> snd in
           match !node with
           (* sanity assert: we shouldn't ever be recursing under valid parts of the tree *)
           | Leaf v ->
@@ -215,7 +195,7 @@ do any other fixup necessary.
 *)
 
 module Make
-    (Addr : Addr_intf) (Key : sig
+    (Addr : Address.S) (Key : sig
         type t [@@deriving bin_io]
     end)
     (Valid : Validity_intf with type addr := Addr.t) (Account : sig
@@ -302,7 +282,7 @@ struct
     match children with
     | [(l1, h1); (l2, h2)] ->
         let (l1, h1), (l2, h2) =
-          if List.last_exn (Addr.dirs_from_root l1) = `Left then
+          if List.last_exn (Addr.dirs_from_root l1) = Left then
             ((l1, h1), (l2, h2))
           else ((l2, h2), (l1, h1))
         in
@@ -376,12 +356,12 @@ struct
     Addr.Table.clear t.waiting_parents ;
     Addr.Table.clear t.waiting_content ;
     let r =
-      repeated (MT.depth - height) (fun a -> Addr.child_exn a `Left) Addr.root
+      repeated (MT.depth - height) (fun a -> Addr.child_exn a Left) Addr.root
     in
     t.validity <- Valid.create r ;
     expect_children t r content_hash ;
-    let lr = Addr.child_exn r `Left in
-    let rr = Addr.child_exn r `Right in
+    let lr = Addr.child_exn r Left in
+    let rr = Addr.child_exn r Right in
     Linear_pipe.write_without_pushback t.queries (t.desired_root, What_hash lr) ;
     Linear_pipe.write_without_pushback t.queries (t.desired_root, What_hash rr)
 
@@ -412,9 +392,9 @@ struct
                     else (
                       expect_children t addr hash ;
                       Linear_pipe.write_without_pushback t.queries
-                        (t.desired_root, What_hash (Addr.child_exn addr `Left)) ;
+                        (t.desired_root, What_hash (Addr.child_exn addr Left)) ;
                       Linear_pipe.write_without_pushback t.queries
-                        (t.desired_root, What_hash (Addr.child_exn addr `Right)) )
+                        (t.desired_root, What_hash (Addr.child_exn addr Right)) )
                 )
             | Ok `More -> () (* wait for the other answer to come in *)
             | Ok `Hash_mismatch ->
@@ -476,7 +456,7 @@ struct
 end
 
 module Make_sync_responder
-    (Addr : Addr_intf) (Key : sig
+    (Addr : Address.S) (Key : sig
         type t [@@deriving bin_io]
     end) (Account : sig
       type t [@@deriving bin_io]
@@ -517,7 +497,7 @@ struct
         let height = Int.ceil_log2 len in
         let content_root_addr =
           repeated (MT.depth - height)
-            (fun a -> Addr.child_exn a `Left)
+            (fun a -> Addr.child_exn a Left)
             Addr.root
         in
         Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
