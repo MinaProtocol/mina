@@ -26,41 +26,60 @@ module type Config_intf = sig
   [@@deriving make]
 end
 
+module Action = struct
+  module T = struct
+    type ('q, 'r) t = ('q, 'r) dispatch * ('q -> 'r Deferred.t)
+  end
+
+  include T
+  module List = Hlist.Make2 (T)
+end
+
 module type S = sig
   type msg
 
-  type t
+  type 'a t
 
   module Config : Config_intf
 
-  val create : Config.t -> unit Rpc.Implementation.t list -> t Deferred.t
+  val create :
+       Config.t
+    -> unit Rpc.Implementation.t list
+    -> 'a Action.List.t
+    -> 'a t Deferred.t
 
-  val received : t -> msg Linear_pipe.Reader.t
+  val received : 'a t -> msg Linear_pipe.Reader.t
 
-  val broadcast : t -> msg Linear_pipe.Writer.t
+  val broadcast : 'a t -> msg Linear_pipe.Writer.t
 
-  val broadcast_all :
-    t -> msg -> (unit -> [`Done | `Continue] Deferred.t) Staged.t
+  val random_peers : 'a t -> int -> Peer.t list
 
-  val random_peers : t -> int -> Peer.t list
-
-  val peers : t -> Peer.t list
+  val peers : 'a t -> Peer.t list
 
   val query_peer :
-    t -> Peer.t -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t
+       'a t
+    -> Peer.t
+    -> ('q, 'r, 'a) Hlist.Elem2.t
+    -> 'q
+    -> 'r Or_error.t Deferred.t
 
   val query_random_peers :
-    t -> int -> ('q, 'r) dispatch -> 'q -> 'r Or_error.t Deferred.t List.t
+       'a t
+    -> int
+    -> ('q, 'r, 'a) Hlist.Elem2.t
+    -> 'q
+    -> 'r Or_error.t Deferred.t List.t
 end
 
 module Make (Message : Message_intf) : S with type msg := Message.msg = struct
-  type t =
+  type 'a t =
     { timeout: Time.Span.t
     ; log: Logger.t
     ; target_peer_count: int
     ; broadcast_writer: Message.msg Linear_pipe.Writer.t
     ; received_reader: Message.msg Linear_pipe.Reader.t
-    ; peers: Peer.Hash_set.t }
+    ; peers: Peer.Hash_set.t
+    ; actions: 'a Action.List.t }
 
   module Config = struct
     type t =
@@ -108,7 +127,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let selected_peers = random_sublist (Hash_set.to_list t.peers) n in
     broadcast_selected t selected_peers msg
 
-  let create (config: Config.t) implementations =
+  let create (config: Config.t) implementations actions =
     let log = Logger.child config.parent_log __MODULE__ in
     let%map membership =
       match%map
@@ -130,7 +149,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; target_peer_count= config.target_peer_count
       ; broadcast_writer
       ; received_reader
-      ; peers= Peer.Hash_set.create () }
+      ; peers= Peer.Hash_set.create ()
+      ; actions }
     in
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader ~f:
@@ -184,22 +204,16 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
 
   let peers t = Hash_set.to_list t.peers
 
-  let broadcast_all t msg =
-    let to_broadcast = ref (List.permute (Hash_set.to_list t.peers)) in
-    stage (fun () ->
-        let selected = List.take !to_broadcast t.target_peer_count in
-        to_broadcast := List.drop !to_broadcast t.target_peer_count ;
-        let%map () = broadcast_selected t selected msg in
-        if List.length !to_broadcast = 0 then `Done else `Continue )
-
   let random_peers t n = random_sublist (Hash_set.to_list t.peers) n
 
-  let query_peer t (peer: Peer.t) rpc query =
+  let query_peer t (peer: Peer.t) elem query =
+    let action = Action.List.get t.actions elem in
+    let rpc = fst action in
     Logger.trace t.log "querying peer"
       ~attrs:[("peer", [%sexp_of : Peer.t] peer)] ;
     try_call_rpc peer t.timeout rpc query
 
-  let query_random_peers t n rpc query =
+  let query_random_peers t n elem query =
     let peers = random_sublist (Hash_set.to_list t.peers) n in
-    List.map peers ~f:(fun peer -> query_peer t peer rpc query)
+    List.map peers ~f:(fun peer -> query_peer t peer elem query)
 end

@@ -8,6 +8,52 @@ module type Sync_ledger_intf = sig
   type answer [@@deriving bin_io]
 end
 
+module Proc_call (In : sig
+  val name : string
+
+  type query [@@deriving bin_io]
+
+  type response [@@deriving bin_io]
+end) =
+struct
+  module T = struct
+    let name = In.name
+
+    module T = struct
+      type query = In.query
+
+      type response = In.response
+    end
+
+    module Caller = T
+    module Callee = T
+  end
+
+  include T.T
+  include Versioned_rpc.Both_convert.Plain.Make (T)
+
+  module V1 = struct
+    module T = struct
+      include In
+
+      let version = 1
+
+      let query_of_caller_model = Fn.id
+
+      let callee_model_of_query = Fn.id
+
+      let response_of_callee_model = Fn.id
+
+      let caller_model_of_response = Fn.id
+    end
+
+    include T
+    include Register (T)
+  end
+
+  let action h = (dispatch_multi, h)
+end
+
 module Rpcs (Inputs : sig
   module Ledger_builder_aux_hash :
     Protocols.Coda_pow.Ledger_builder_aux_hash_intf
@@ -36,82 +82,22 @@ end) =
 struct
   open Inputs
 
-  module Get_ledger_builder_aux_at_hash = struct
-    module T = struct
-      let name = "get_ledger_builder_aux_at_hash"
+  module Get_ledger_builder_aux_at_hash = Proc_call (struct
+    let name = "get_ledger_builder_aux_at_hash"
 
-      module T = struct
-        type query = Ledger_builder_hash.t
+    type query = Ledger_builder_hash.t [@@deriving bin_io]
 
-        type response = (Ledger_builder_aux.t * Ledger_hash.t) option
-      end
+    type response = (Ledger_builder_aux.t * Ledger_hash.t) option
+    [@@deriving bin_io]
+  end)
 
-      module Caller = T
-      module Callee = T
-    end
+  module Answer_sync_ledger_query = Proc_call (struct
+    let name = "answer_sync_ledger_query"
 
-    include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
+    type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
 
-    module V1 = struct
-      module T = struct
-        type query = Ledger_builder_hash.t [@@deriving bin_io]
-
-        type response = (Ledger_builder_aux.t * Ledger_hash.t) option
-        [@@deriving bin_io]
-
-        let version = 1
-
-        let query_of_caller_model = Fn.id
-
-        let callee_model_of_query = Fn.id
-
-        let response_of_callee_model = Fn.id
-
-        let caller_model_of_response = Fn.id
-      end
-
-      include T
-      include Register (T)
-    end
-  end
-
-  module Answer_sync_ledger_query = struct
-    module T = struct
-      let name = "answer_sync_ledger_query"
-
-      module T = struct
-        type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
-
-        type response = Ledger_hash.t * Sync_ledger.answer [@@deriving bin_io]
-      end
-
-      module Caller = T
-      module Callee = T
-    end
-
-    include T.T
-    include Versioned_rpc.Both_convert.Plain.Make (T)
-
-    module V1 = struct
-      module T = struct
-        include T.T
-
-        let version = 1
-
-        let query_of_caller_model = Fn.id
-
-        let callee_model_of_query = Fn.id
-
-        let response_of_callee_model = Fn.id
-
-        let caller_model_of_response = Fn.id
-      end
-
-      include T
-      include Register (T)
-    end
-  end
+    type response = Ledger_hash.t * Sync_ledger.answer [@@deriving bin_io]
+  end)
 end
 
 module Message (Inputs : sig
@@ -155,6 +141,8 @@ struct
 
     include Register (T)
   end
+
+  let action h = (dispatch_multi, h)
 end
 
 module type Inputs_intf = sig
@@ -202,6 +190,7 @@ end
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Message = Message (Inputs)
+  module Action = Gossip_net.Action
   module Gossip_net = Gossip_net.Make (Message)
   module Peer = Peer
 
@@ -215,12 +204,22 @@ module Make (Inputs : Inputs_intf) = struct
   module Membership = Membership.Haskell
 
   type t =
-    { gossip_net: Gossip_net.t
+    { gossip_net:
+        (   Rpcs.Get_ledger_builder_aux_at_hash.query
+         -> Rpcs.Get_ledger_builder_aux_at_hash.response
+         -> Rpcs.Answer_sync_ledger_query.query
+         -> Rpcs.Answer_sync_ledger_query.response
+         -> unit)
+        Gossip_net.t
     ; log: Logger.t
     ; states: External_transition.t Linear_pipe.Reader.t
     ; transaction_pool_diffs: Transaction_pool_diff.t Linear_pipe.Reader.t
     ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t }
   [@@deriving fields]
+
+  let get_ledger_builder_aux_elem () = Hlist.Elem2._0 ()
+
+  let answer_sync_ledger_query_elem () = Hlist.Elem2._1 ()
 
   let create (config: Config.t)
       ~(get_ledger_builder_aux_at_hash:
@@ -236,15 +235,16 @@ module Make (Inputs : Inputs_intf) = struct
     let answer_sync_ledger_query_rpc () ~version:_ query =
       answer_sync_ledger_query query
     in
-    let implementations =
-      List.append
-        (Rpcs.Get_ledger_builder_aux_at_hash.implement_multi
-           get_ledger_builder_aux_at_hash_rpc)
-        (Rpcs.Answer_sync_ledger_query.implement_multi
-           answer_sync_ledger_query_rpc)
-    in
     let%map gossip_net =
-      Gossip_net.create config.gossip_net_params implementations
+      Gossip_net.create config.gossip_net_params
+        ( Rpcs.Get_ledger_builder_aux_at_hash.implement_multi
+            get_ledger_builder_aux_at_hash_rpc
+        @ Rpcs.Answer_sync_ledger_query.implement_multi
+            answer_sync_ledger_query_rpc )
+        Action.List.
+          [ Rpcs.Get_ledger_builder_aux_at_hash.action
+              get_ledger_builder_aux_at_hash
+          ; Rpcs.Answer_sync_ledger_query.action answer_sync_ledger_query ]
     in
     (* TODO: Think about buffering:
        I.e., what do we do when too many messages are coming in, or going out.
@@ -318,7 +318,7 @@ module Make (Inputs : Inputs_intf) = struct
       find_map' peers ~f:(fun peer ->
           match%map
             Gossip_net.query_peer t.gossip_net peer
-              Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
+              (get_ledger_builder_aux_elem ())
               ledger_builder_hash
           with
           | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
@@ -342,7 +342,8 @@ module Make (Inputs : Inputs_intf) = struct
             find_map peers ~f:(fun peer ->
                 match%map
                   Gossip_net.query_peer t.gossip_net peer
-                    Rpcs.Answer_sync_ledger_query.dispatch_multi query
+                    (answer_sync_ledger_query_elem ())
+                    query
                 with
                 | Ok answer -> Some answer
                 | Error err ->
