@@ -79,7 +79,7 @@ let run_test with_snark : unit -> unit Deferred.t =
             !"Balance in account %{sexp: Currency.Balance.t} is not asserted \
               balance %{sexp: Currency.Balance.t}"
             balance amount ()
-    | None -> ()
+    | None -> failwith (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
   in
   let client_port = 8123 in
   let run_snark_worker = `With_public_key Genesis_ledger.rich_pk in
@@ -141,21 +141,7 @@ let run_test with_snark : unit -> unit Deferred.t =
   let%bind () =
     test_sending_transaction () Genesis_ledger.rich_sk Genesis_ledger.poor_pk
   in
-  (*Send transactions from rick_pk to all others to include them in the ledger*)
-  (* TODO: This is failing now because a transaction is not being included in the diff*)
-  (*
-  let sks = List.init 10 ~f:(fun i -> Private_key.create ()) in
-  let receivers = poor_pk :: List.map ~f:pk sks in
-  let%bind () =
-    Deferred.List.fold receivers ~init:() ~f:(fun acc receiver ->
-        let%map () =
-          test_sending_transaction () Genesis_ledger.rich_sk receiver
-        in
-        () )
-  in *)
   let%bind () = after (Time_ns.Span.of_sec 10.) in
-  (* TODO: send transactions enought to emit proofs
-  *  Include multiple transactions in a block*)
   let%bind () = after (Time_ns.Span.of_sec 100.) in
   Deferred.unit
 
