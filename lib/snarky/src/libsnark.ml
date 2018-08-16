@@ -585,13 +585,12 @@ struct
 
       let get =
         let stub =
-          foreign
-            (with_prefix prefix "get")
+          foreign (with_prefix prefix "get")
             (typ @-> int @-> returning Variable.typ)
         in
         fun t i ->
           let v = stub t i in
-          Caml.Gc.finalise Variable.delete v;
+          Caml.Gc.finalise Variable.delete v ;
           v
     end
 
