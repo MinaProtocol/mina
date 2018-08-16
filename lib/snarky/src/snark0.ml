@@ -1118,6 +1118,11 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | bs ->
             equal (Cvar.constant (Field.of_int (List.length bs))) (Cvar.sum bs)
 
+      let of_field x =
+        let open Let_syntax in
+        let%map () = assert_ (Constraint.boolean x) in
+        x
+
       let var_of_value b = if b then true_ else false_
 
       module Unsafe = struct

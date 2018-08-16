@@ -11,6 +11,7 @@
 #include <libff/algebra/scalar_multiplication/wnaf.hpp>
 #include <gmp.h>
 #include <openssl/md5.h>
+#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
 
 typedef libff::bn128_pp ppT;
 typedef libff::Fr<ppT> FieldT;
