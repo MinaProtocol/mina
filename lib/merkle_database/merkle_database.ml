@@ -30,7 +30,7 @@ module type Hash_intf = sig
 
   val empty : t
 
-  val merge : t * t -> t
+  val merge : height:int -> t -> t -> t
 
   val hash_account : account -> t
 end
@@ -131,14 +131,14 @@ struct
     type t = Direction.t * Hash.t
 
     let implied_root path leaf_hash =
-      let rec loop sibling_hash = function
+      let rec loop sibling_hash ~height = function
         | [] -> sibling_hash
         | (Direction.Left, hash) :: t ->
-            loop (Hash.merge (hash, sibling_hash)) t
+            loop (Hash.merge ~height hash sibling_hash) ~height:(height + 1) t
         | (Direction.Right, hash) :: t ->
-            loop (Hash.merge (sibling_hash, hash)) t
+            loop (Hash.merge ~height sibling_hash hash) ~height:(height + 1) t
       in
-      loop leaf_hash path
+      loop leaf_hash ~height:1 path
   end
 
   (* Keys are a bitstring prefixed by a byte. In the case of accounts, the prefix
@@ -282,11 +282,11 @@ struct
 
   let empty_hashes =
     let empty_hashes = Array.create ~len:max_depth Hash.empty in
-    let rec loop last_hash i =
-      if i < max_depth then (
-        let hash = Hash.merge (last_hash, last_hash) in
-        empty_hashes.(i) <- hash ;
-        loop hash (i + 1) )
+    let rec loop last_hash height =
+      if height < max_depth then (
+        let hash = Hash.merge ~height last_hash last_hash in
+        empty_hashes.(height) <- hash ;
+        loop hash (height + 1) )
     in
     loop Hash.empty 1 ;
     Immutable_array.of_array empty_hashes
@@ -324,11 +324,14 @@ struct
   let rec set_hash mdb key new_hash =
     assert (Key.is_hash key) ;
     set_bin mdb key Hash.bin_size_t Hash.bin_write_t new_hash ;
-    let depth = Key.height key in
-    if depth < max_depth then
+    let height = Key.height key in
+    if height < max_depth then
       let sibling_hash = get_hash mdb (Key.sibling key) in
       let parent_hash =
-        Hash.merge (Key.order_siblings key new_hash sibling_hash)
+        let left_hash, right_hash =
+          Key.order_siblings key new_hash sibling_hash
+        in
+        Hash.merge ~height left_hash right_hash
       in
       set_hash mdb (Key.parent key) parent_hash
 
@@ -618,7 +621,7 @@ let%test_module "test functor on in memory databases" =
 
       let empty = 0
 
-      let merge : t * t -> t = Hashtbl.hash
+      let merge ~height left right = Hashtbl.hash (height, left, right)
 
       let hash_account : Account.t -> t = Hashtbl.hash
     end
