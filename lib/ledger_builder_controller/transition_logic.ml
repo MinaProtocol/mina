@@ -2,18 +2,32 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
-  module State : sig
-    type hash
-
-    type t [@@deriving eq, sexp]
-
-    val hash : t -> hash
+  module State_hash : sig
+    type t
   end
 
-  module Transition : sig
+  module Consensus_mechanism : sig
+    module Consensus_state : sig
+      type value
+    end
+
+    val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
+  end
+
+  module Protocol_state : sig
+    type value [@@deriving sexp]
+
+    val consensus_state : value -> Consensus_mechanism.Consensus_state.value
+
+    val equal : value -> value -> bool
+
+    val hash : value -> State_hash.t
+  end
+
+  module External_transition : sig
     type t [@@deriving eq, sexp, compare, bin_io]
 
-    val target_state : t -> State.t
+    val target_state : t -> Protocol_state.value
 
     val is_parent_of : child:t -> parent:t -> bool
   end
@@ -21,30 +35,26 @@ module type Inputs_intf = sig
   module Tip : sig
     type t [@@deriving sexp, bin_io]
 
-    val state : t -> State.t
+    val state : t -> Protocol_state.value
 
     val copy : t -> t
 
-    val transition_unchecked : t -> Transition.t -> t Deferred.t
+    val transition_unchecked : t -> External_transition.t -> t Deferred.t
 
-    val is_parent_of : child:Transition.t -> parent:t -> bool
+    val is_parent_of : child:External_transition.t -> parent:t -> bool
 
-    val is_materialization_of : t -> Transition.t -> bool
+    val is_materialization_of : t -> External_transition.t -> bool
   end
 
   module Transition_logic_state :
     Transition_logic_state.S
     with type tip := Tip.t
-     and type transition := Transition.t
+     and type external_transition := External_transition.t
 
   module Step : sig
     (* This checks the SNARKs in State/LB and does the transition *)
 
-    val step : Tip.t -> Transition.t -> Tip.t Deferred.Or_error.t
-  end
-
-  module Select : sig
-    val select : State.t -> State.t -> State.t
+    val step : Tip.t -> External_transition.t -> Tip.t Deferred.Or_error.t
   end
 
   module Catchup : sig
@@ -53,8 +63,8 @@ module type Inputs_intf = sig
     val sync :
          t
       -> Transition_logic_state.t
-      -> Transition.t
-      -> (Transition.t, Transition_logic_state.Change.t list) Job.t
+      -> External_transition.t
+      -> (External_transition.t, Transition_logic_state.Change.t list) Job.t
   end
 end
 
@@ -95,11 +105,11 @@ end
 module Make (Inputs : Inputs_intf) :
   S
   with type catchup := Inputs.Catchup.t
-   and type transition := Inputs.Transition.t
+   and type transition := Inputs.External_transition.t
    and type transition_logic_state := Inputs.Transition_logic_state.t
    and type handler_state_change := Inputs.Transition_logic_state.Change.t
    and type tip := Inputs.Tip.t
-   and type state := Inputs.State.t =
+   and type state := Inputs.Protocol_state.value =
 struct
   open Inputs
   open Transition_logic_state
@@ -111,21 +121,24 @@ struct
   type t0 = t
 
   module Path =
-    Path.Make (State)
+    Path.Make (struct
+        type t = Protocol_state.value [@@deriving sexp]
+      end)
       (struct
-        include Transition
+        include External_transition
 
         let target = target_state
       end)
 
   (* For debugging *)
-  let _num x = Obj.magic (Transition.target_state x |> State.hash)
+  let _num x =
+    Obj.magic (External_transition.target_state x |> Protocol_state.hash)
 
   let _str_path path =
     String.concat
       (List.concat
          [ [ Printf.sprintf "Path[source=%d:"
-               (path.Path.source |> State.hash |> Obj.magic) ]
+               (path.Path.source |> Protocol_state.hash |> Obj.magic) ]
          ; List.map path.Path.path ~f:(fun transition ->
                Printf.sprintf "%d," (_num transition) )
          ; ["]"] ])
@@ -140,13 +153,20 @@ struct
     (List.hd_exn path, List.last_exn path)
 
   let select_transition x y =
-    let f = Transition.target_state in
+    let f = External_transition.target_state in
     let sx = f x in
     let sy = f y in
-    if State.equal (Select.select sx sy) sx then x else y
+    match
+      Consensus_mechanism.select
+        (Protocol_state.consensus_state sx)
+        (Protocol_state.consensus_state sy)
+    with
+    | `Keep -> x
+    | `Take -> y
 
   module Path_traversal = struct
-    type t = (Transition.t, Transition_logic_state.Change.t list) Job.t
+    type t =
+      (External_transition.t, Transition_logic_state.Change.t list) Job.t
 
     let transition_unchecked h t =
       Interruptible.uninterruptible (Tip.transition_unchecked h t)
@@ -159,7 +179,7 @@ struct
       let new_head, _new_tip = locked_and_best new_tree in
       let old_head, _old_tip = locked_and_best old_tree in
       let open Interruptible.Let_syntax in
-      let ivar : Transition.t Ivar.t = Ivar.create () in
+      let ivar : External_transition.t Ivar.t = Ivar.create () in
       let step tip transition =
         Interruptible.lift (Step.step tip transition)
           (Deferred.map (Ivar.read ivar) ~f:ignore)
@@ -167,7 +187,8 @@ struct
       let work =
         (* Adjust the locked_ledger if necessary *)
         let%bind locked_tip =
-          if Transition.is_parent_of ~child:new_head ~parent:old_head then
+          if External_transition.is_parent_of ~child:new_head ~parent:old_head
+          then
             let locked_tip = Tip.copy locked_tip in
             transition_unchecked locked_tip new_head
           else return locked_tip
@@ -184,7 +205,7 @@ struct
         in
         let last_transition = List.last_exn path.Path.path in
         (* Now step over the path *)
-        assert (State.equal (Tip.state tip) path.Path.source) ;
+        assert (Protocol_state.equal (Tip.state tip) path.Path.source) ;
         let%map result =
           List.fold path.Path.path ~init:(Interruptible.return (Some tip)) ~f:
             (fun work curr ->
@@ -202,8 +223,8 @@ struct
         match result with
         | Some tip ->
             assert (
-              State.equal (Tip.state tip)
-                (Transition.target_state last_transition) ) ;
+              Protocol_state.equal (Tip.state tip)
+                (External_transition.target_state last_transition) ) ;
             [ Transition_logic_state.Change.Longest_branch_tip tip
             ; Transition_logic_state.Change.Ktree new_tree ]
         | None -> []
@@ -211,7 +232,7 @@ struct
       (work, ivar)
 
     let create (t: t0) new_tree old_tree new_best_path
-        (transition: Transition.t) : t =
+        (transition: External_transition.t) : t =
       (transition, run t new_tree old_tree new_best_path)
   end
 
@@ -229,7 +250,8 @@ struct
         let attempt_easy tip err_msg_name =
           let maybe_state =
             Transition_tree.find_map ktree ~f:(fun trans ->
-                if p_trans trans then Some (Transition.target_state trans)
+                if p_trans trans then
+                  Some (External_transition.target_state trans)
                 else None )
           in
           match maybe_state with
@@ -273,20 +295,21 @@ struct
                       assert (p_tip longest_branch_tip) ;
                       Ok
                         ( longest_branch_tip
-                        , Transition.target_state last_transition ) )
+                        , External_transition.target_state last_transition ) )
           | None -> return (Or_error.error_string "Not found locally")
 
-  let on_new_transition catchup ({state; log} as t) (transition: Transition.t)
-      :
+  let on_new_transition catchup ({state; log} as t)
+      (transition: External_transition.t) :
       ( Transition_logic_state.Change.t list
-      * (Transition.t, Transition_logic_state.Change.t list) Job.t option )
+      * (External_transition.t, Transition_logic_state.Change.t list) Job.t
+        option )
       Deferred.t =
     let longest_branch_tip = Transition_logic_state.longest_branch_tip t.state
     and ktree = Transition_logic_state.ktree t.state in
     match ktree with
-    | None ->
+    | None -> (
         let source_state = Tip.state longest_branch_tip in
-        let target_state = Transition.target_state transition in
+        let target_state = External_transition.target_state transition in
         if Tip.is_parent_of ~child:transition ~parent:longest_branch_tip then (
           (* Bootstrap from genesis *)
           let tree = Transition_tree.singleton transition in
@@ -301,19 +324,25 @@ struct
               Logger.info log "Recieved malicious transition %s"
                 (Error.to_string_hum e) ;
               ([], None) )
-        else if
-          State.equal (Select.select source_state target_state) target_state
-        then return ([], Some (Catchup.sync catchup state transition))
-        else return ([], None)
+        else
+          match
+            Consensus_mechanism.select
+              (Protocol_state.consensus_state source_state)
+              (Protocol_state.consensus_state target_state)
+          with
+          | `Keep -> return ([], Some (Catchup.sync catchup state transition))
+          | `Take -> return ([], None) )
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition ~parent:(fun x ->
-            Transition.is_parent_of ~child:transition ~parent:x )
+            External_transition.is_parent_of ~child:transition ~parent:x )
       with
       | `No_parent ->
           let best_tip = locked_and_best old_tree |> snd in
           if
-            Transition.equal (select_transition best_tip transition) transition
+            External_transition.equal
+              (select_transition best_tip transition)
+              transition
           then return ([], Some (Catchup.sync catchup state transition))
           else return ([], None)
       | `Repeat -> return ([], None)
@@ -321,8 +350,8 @@ struct
           let old_locked_head, old_best_tip = locked_and_best old_tree in
           let new_head, new_tip = locked_and_best new_tree in
           if
-            Transition.equal old_locked_head new_head
-            && Transition.equal old_best_tip new_tip
+            External_transition.equal old_locked_head new_head
+            && External_transition.equal old_best_tip new_tip
           then return ([Transition_logic_state.Change.Ktree new_tree], None)
           else
             let new_best_path =

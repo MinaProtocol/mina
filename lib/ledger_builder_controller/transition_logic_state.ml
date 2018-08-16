@@ -1,11 +1,11 @@
 open Core_kernel
 
 module type S = sig
-  type transition
+  type external_transition
 
   type tip
 
-  module Transition_tree : Ktree.S with type elem := transition
+  module Transition_tree : Ktree.S with type elem := external_transition
 
   type t [@@deriving bin_io]
 
@@ -35,7 +35,7 @@ end) (Tip : sig
 
   val is_materialization_of : t -> Transition.t -> bool
 end) :
-  S with type tip := Tip.t and type transition := Transition.t =
+  S with type tip := Tip.t and type external_transition := Transition.t =
 struct
   module Transition_tree =
     Ktree.Make (Transition)
