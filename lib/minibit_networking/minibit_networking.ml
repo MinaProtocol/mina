@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Kademlia
+open Nanobit_base
 
 module type Sync_ledger_intf = sig
   type query [@@deriving bin_io]
@@ -12,8 +13,6 @@ module Rpcs (Inputs : sig
   module Ledger_builder_aux_hash :
     Protocols.Coda_pow.Ledger_builder_aux_hash_intf
 
-  module State_hash : Protocols.Coda_pow.State_hash_intf
-
   module Ledger_builder_aux : Binable.S
 
   module Ledger_hash : Protocols.Coda_pow.Ledger_hash_intf
@@ -23,12 +22,14 @@ module Rpcs (Inputs : sig
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
-  module State : sig
-    type t [@@deriving bin_io, eq]
+  module Protocol_state : sig
+    type value [@@deriving bin_io]
 
-    val hash : t -> State_hash.t
+    val equal : value -> value -> bool
 
-    val ledger_builder_hash : t -> Ledger_builder_hash.t
+    val hash : value -> State_hash.t
+
+    val blockchain_state : value -> Blockchain_state.value
   end
 
   module Sync_ledger : Sync_ledger_intf
@@ -160,8 +161,6 @@ end
 module type Inputs_intf = sig
   module External_transition : Binable.S
 
-  module State_hash : Protocols.Coda_pow.State_hash_intf
-
   module Ledger_builder_aux_hash :
     Protocols.Coda_pow.Ledger_builder_aux_hash_intf
 
@@ -172,12 +171,14 @@ module type Inputs_intf = sig
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
-  module State : sig
-    type t [@@deriving bin_io, eq]
+  module Protocol_state : sig
+    type value [@@deriving bin_io]
 
-    val hash : t -> State_hash.t
+    val equal : value -> value -> bool
 
-    val ledger_builder_hash : t -> Ledger_builder_hash.t
+    val hash : value -> State_hash.t
+
+    val blockchain_state : value -> Blockchain_state.value
   end
 
   module Sync_ledger : Sync_ledger_intf
@@ -250,10 +251,10 @@ module Make (Inputs : Inputs_intf) = struct
             Ledger_hash.t * Sync_ledger.query
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.t) =
     let log = Logger.child config.parent_log "minibit networking" in
-    let get_ledger_builder_aux_at_hash_rpc () ~version hash =
+    let get_ledger_builder_aux_at_hash_rpc () ~version:_ hash =
       get_ledger_builder_aux_at_hash hash
     in
-    let answer_sync_ledger_query_rpc () ~version query =
+    let answer_sync_ledger_query_rpc () ~version:_ query =
       answer_sync_ledger_query query
     in
     let implementations =
