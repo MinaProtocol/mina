@@ -67,7 +67,7 @@ let fold ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
   +> Ledger_hash.fold ledger_hash
   +> Block_time.Bits.fold timestamp
 
-let var_to_bits_unchecked ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
+let to_bits ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
   Ledger_builder_hash.to_bits ledger_builder_hash
   @ Ledger_hash.to_bits ledger_hash
   @ Block_time.Bits.to_bits timestamp
@@ -77,11 +77,11 @@ let bit_length =
 
 let hash t =
   Pedersen.State.update_fold Hash_prefix.blockchain_state
-    (List.fold_left (var_to_bits_unchecked t))
+    (List.fold_left (to_bits t))
   |> Pedersen.State.digest
   |> State_hash.of_hash
 
-let set_timestamp timestamp t = { t with timestamp }
+let set_timestamp t timestamp = { t with timestamp }
 
 let genesis_time =
   Time.of_date_ofday ~zone:Time.Zone.utc

@@ -2,17 +2,13 @@ module type S = sig
   module Proof : sig type t [@@deriving bin_io, sexp] end
 
   module Consensus_state : sig
-    type value [@@deriving hash, compare]
+    type value [@@deriving hash, eq, compare]
 
     include Snark_params.Tick.Snarkable.S with type value := value
 
     val genesis : value
 
     val bit_length : int
-
-    val equal : value -> value -> bool
-
-    val compare : value -> value -> int
 
     val var_to_bits :
          var

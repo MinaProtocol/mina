@@ -125,7 +125,8 @@ struct
               hash(new) = new_hash
               the work_snark verifies against the old.ledger_hash and new_ledger_hash
               new.timestamp > old.timestamp
-              hash(new_hash||nonce) < target(old.next_difficulty)
+              transition consensus data is valid
+              new consensus state is a function of the old consensus state
       *)
       let update
           ((previous_state_hash, previous_state):

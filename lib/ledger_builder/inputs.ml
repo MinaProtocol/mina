@@ -85,4 +85,9 @@ module type S = sig
   module Config : sig
     val parallelism_log_2 : int
   end
+
+  val check :
+       Completed_work.t
+    -> Ledger_proof_statement.t list
+    -> Completed_work.Checked.t option Async_kernel.Deferred.t
 end

@@ -10,7 +10,7 @@ module Stable : sig
   end
 end
 
-include Comparable.S with type t := t
+include Comparable.S_binable with type t := t
 
 type var = Field.var * Field.var
 

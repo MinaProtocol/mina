@@ -108,15 +108,6 @@ module type Init_intf = sig
 
   module Blockchain : Blockchain.S with module Consensus_mechanism = Consensus_mechanism
 
-  (*
-  module Snark_worker : Snark_worker_lib.Intf.S
-   with type transition := Nanobit_base.Super_transaction.t
-    and type sparse_ledger := Nanobit_base.Sparse_ledger.t
-    and type public_key := Public_key.t
-    and type statement := Transaction_snark.Statement.t
-    and type proof := Ledger_proof.t
-   *)
-
   module Prover : Prover.S with module Consensus_mechanism = Consensus_mechanism and module Blockchain = Blockchain
 
   module Verifier : Verifier.S with type blockchain := Blockchain.t

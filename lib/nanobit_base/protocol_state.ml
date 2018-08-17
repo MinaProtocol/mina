@@ -6,9 +6,9 @@ module type Consensus_state_intf = sig
 
   include Snarkable.S with type value := value
 
-  val equal : value -> value -> bool
+  val equal_value : value -> value -> bool
 
-  val compare : value -> value -> int
+  val compare_value : value -> value -> int
 
   val genesis : value
 
@@ -36,9 +36,9 @@ module type S = sig
 
   include Hashable.S with type t := value
 
-  val equal : value -> value -> bool
+  val equal_value : value -> value -> bool
 
-  val compare : value -> value -> int
+  val compare_value : value -> value -> int
 
   val create_value :
        previous_state_hash:State_hash.Stable.V1.t
@@ -95,8 +95,8 @@ struct
   module Proof = Proof
   module Hash = State_hash
 
-  let equal =
-    equal State_hash.equal Blockchain_state.equal Consensus_state.equal
+  let equal_value =
+    equal State_hash.equal Blockchain_state.equal Consensus_state.equal_value
 
   let create ~previous_state_hash ~blockchain_state ~consensus_state =
     {previous_state_hash; blockchain_state; consensus_state}

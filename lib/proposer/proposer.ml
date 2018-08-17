@@ -34,7 +34,7 @@ struct
   open Inputs
 
   (* TODO fold signing result and hashing result together? *)
-  module Snark_transition_result : sig
+  module Consensus_result : sig
     type t
 
     val empty : Time.Controller.t -> t
@@ -129,19 +129,19 @@ struct
   end = struct
     (* TODO: No need to have our own Ivar since we got rid of Bundle_result *)
     type t =
-      { snark_transition_result: Snark_transition_result.t
+      { consensus_result: Consensus_result.t
       ; cancellation: unit Ivar.t
       ; result: Consensus_mechanism.External_transition.t Deferred.Or_error.t
       }
     [@@deriving fields]
 
     let empty controller =
-      { snark_transition_result= Snark_transition_result.empty controller
+      { consensus_result= Consensus_result.empty controller
       ; cancellation= Ivar.create ()
       ; result= Deferred.Or_error.error_string "empty" }
 
     let cancel t =
-      Snark_transition_result.cancel t.snark_transition_result ;
+      Consensus_result.cancel t.consensus_result ;
       Ivar.fill_if_empty t.cancellation ()
 
     let create ~state:(state, state_proof) ~time_controller ~ledger_builder
@@ -159,8 +159,8 @@ struct
             ( state |> Consensus_mechanism.Protocol_state.blockchain_state
             |> Blockchain_state.ledger_hash )
       in
-      let snark_transition_result =
-        Snark_transition_result.create state ~next_ledger_hash
+      let consensus_result =
+        Consensus_result.create state ~next_ledger_hash
           ~next_ledger_builder_hash ~time_controller
       in
       let cancellation = Ivar.create () in
@@ -168,7 +168,7 @@ struct
       let result =
         let result =
           match%bind
-            Snark_transition_result.result snark_transition_result
+            Consensus_result.result consensus_result
           with
           | `Ok (protocol_state, consensus_data) ->
             let snark_transition = 
@@ -203,7 +203,7 @@ struct
             >>| fun () -> Or_error.error_string "Signing cancelled" )
           ; result ]
       in
-      {snark_transition_result; result; cancellation}
+      {consensus_result; result; cancellation}
   end
 
   module Tip = struct

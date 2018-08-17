@@ -49,13 +49,13 @@ val bit_length : int
 
 val genesis : t
 
-val set_timestamp : 'c -> ('a, 'b, 'c) t_ -> ('a, 'b, 'c) t_
+val set_timestamp : ('a, 'b, 'c) t_ -> 'c -> ('a, 'b, 'c) t_
 
 val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
 
 val var_to_bits : var -> (Boolean.var list, _) Checked.t
 
-val var_to_bits_unchecked : t -> bool list
+val to_bits : t -> bool list
 
 val hash : t -> Hash.t
 

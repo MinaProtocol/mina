@@ -735,7 +735,7 @@ let%test_module "test" =
       Backtrace.elide := false ;
       let transitions =
         let f = transition in
-        [f 1 0 0; f 2 1 0; f 3 0 0; f 4 0 0; f 5 2 0; f 6 1 0; f 7 5 0]
+        [f 1 0 1; f 2 1 2; f 3 0 1; f 4 0 1; f 5 2 3; f 6 1 2; f 7 5 4]
       in
       let config = config transitions in
       Async.Thread_safe.block_on_async_exn (fun () ->

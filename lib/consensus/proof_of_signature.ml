@@ -64,9 +64,7 @@ struct
 
     type var = (Length.Unpacked.var, Public_key.Compressed.var) t_
 
-    let equal = equal_t_ Length.equal Public_key.Compressed.equal
-
-    let compare = compare_value
+    let equal_value = equal_t_ Length.equal Public_key.Compressed.equal
 
     let bit_length =
       Length.length_in_bits + Public_key.Compressed.length_in_bits
@@ -130,7 +128,9 @@ struct
     in
     {length; signer_public_key}
 
-  let update_unchecked _state _transition = failwith "TODO"
+  let update_unchecked state _transition =
+    let open Consensus_state in
+    {length= Length.succ state.length; signer_public_key= Public_key.compress Global_keypair.public_key}
 
   (*
     let consensus_state = () in
@@ -146,7 +146,10 @@ struct
     if l1 >= l2 then `Keep else `Take
 
   let genesis_protocol_state =
-    update_unchecked Protocol_state.negative_one Snark_transition.genesis
+    Protocol_state.create_value
+      ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
+      ~blockchain_state:(Snark_transition.genesis |> Snark_transition.protocol_state |> Protocol_state.blockchain_state)
+      ~consensus_state:(update_unchecked (Protocol_state.consensus_state Protocol_state.negative_one) Snark_transition.genesis)
 
   let create_consensus_data state =
     (* TODO: sign protocol_state instead of blockchain_state *)

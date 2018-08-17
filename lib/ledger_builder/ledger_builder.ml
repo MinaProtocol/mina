@@ -124,17 +124,8 @@ end)
     ; creator }
 end
 
-module type Inputs_intf = sig
-  include Inputs.S
-
-  val check :
-       Completed_work.t
-    -> Ledger_proof_statement.t list
-    -> Completed_work.Checked.t option Deferred.t
-end
-
 module Make
-    (Inputs : Inputs_intf)
+    (Inputs : Inputs.S)
 : sig
   include Coda_pow.Ledger_builder_intf
           with type diff := Inputs.Ledger_builder_diff.t
@@ -989,8 +980,6 @@ let%test_module "test" =
 
         module Checked = struct
           include T
-          (* type t = {fee: fee; proofs: proof list; prover: public_key}
-          [@@deriving sexp, bin_io, compare] *)
         end
 
         let forget : Checked.t -> t =

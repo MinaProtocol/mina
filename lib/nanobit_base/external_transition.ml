@@ -35,7 +35,7 @@ struct
   let compare t1 t2 = Protocol_state.compare t1.protocol_state t2.protocol_state
 
   let equal t1 t2 =
-    Protocol_state.equal t1.protocol_state t2.protocol_state
+    Protocol_state.equal_value t1.protocol_state t2.protocol_state
 
   let create ~protocol_state ~protocol_state_proof ~ledger_builder_diff =
     {protocol_state; protocol_state_proof; ledger_builder_diff}
