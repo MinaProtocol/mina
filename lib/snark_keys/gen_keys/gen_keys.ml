@@ -143,7 +143,7 @@ let main () =
           Transaction_snark.Keys.cached ()
         in
         let module Consensus_mechanism =
-        Consensus.Proof_of_signature.Make (Ledger_builder.Make_diff (struct
+        Consensus.Proof_of_signature.Make (Transaction_snark) (Ledger_builder.Make_diff (struct
           open Nanobit_base
 
           module Compressed_public_key = Public_key.Compressed

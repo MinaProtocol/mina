@@ -11,11 +11,16 @@ module Global_keypair = struct
   let public_key = Public_key.of_private_key private_key
 end
 
-module Make (Ledger_builder_diff : sig
+module Make
+(Ledger_proof : sig
+   type t [@@deriving bin_io, sexp]
+ end)
+(Ledger_builder_diff : sig
   type t [@@deriving sexp]
 end) :
   Mechanism.S =
 struct
+  module Ledger_proof = Ledger_proof
   module Ledger_builder_diff = Ledger_builder_diff
 
   module Consensus_data = struct
@@ -94,7 +99,7 @@ struct
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
   module Snark_transition =
-    Snark_transition.Make (Consensus_data) (Protocol_state)
+    Snark_transition.Make (Consensus_data) (Protocol_state) (Ledger_proof)
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition = External_transition.Make (Protocol_state)

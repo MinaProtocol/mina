@@ -4,8 +4,22 @@ open Nanobit_base
 open Blockchain_snark
 module Fee = Protocols.Coda_pow.Fee
 
+module type Ledger_proof_intf = sig
+  type t [@@deriving sexp, bin_io]
+
+  val proof : t -> Proof.t
+
+  val verify :
+       t
+    -> Transaction_snark.Statement.t
+    -> message:Currency.Fee.t * Public_key.Compressed.t
+    -> bool Deferred.t
+end
+
 module type Init_intf = sig
-  module Consensus_mechanism : Consensus.Mechanism.S
+  module Ledger_proof : Ledger_proof_intf
+
+  module Consensus_mechanism : Consensus.Mechanism.S with module Ledger_proof = Ledger_proof
 
   module Blockchain : Blockchain.S with module Consensus_mechanism = Consensus_mechanism
 
@@ -41,18 +55,8 @@ module type State_proof_intf = sig
 end
 
 module Make_inputs0
-    (Ledger_proof : sig
-        type t [@@deriving sexp, bin_io]
-
-        val proof : t -> Proof.t
-
-        val verify :
-             t
-          -> Transaction_snark.Statement.t
-          -> message:Currency.Fee.t * Public_key.Compressed.t
-          -> bool Deferred.t
-    end)
-    (Init : Init_intf) =
+    (Ledger_proof : Ledger_proof_intf)
+    (Init : Init_intf with module Ledger_proof = Ledger_proof) =
 struct
   open Protocols.Coda_pow
   module Consensus_mechanism = Init.Consensus_mechanism
@@ -335,7 +339,7 @@ module Make_inputs (Ledger_proof0 : sig
     -> message:Currency.Fee.t * Public_key.Compressed.t
     -> bool Deferred.t
 end)
-(Init : Init_intf)
+(Init : Init_intf with module Ledger_proof = Ledger_proof0)
 (Store : Storage.With_checksum_intf)
 () =
 struct
