@@ -118,7 +118,7 @@ struct
       ; completed_works: Completed_work.Checked.t list
       ; transactions: Transaction.With_valid_signature.t list
       ; creator: Compressed_public_key.t }
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp]
   end
 
   let forget

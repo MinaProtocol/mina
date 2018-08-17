@@ -131,21 +131,6 @@ struct
         let target = target_state
       end)
 
-  (* For debugging *)
-  let _num x =
-    Obj.magic (External_transition.target_state x |> Protocol_state.hash)
-
-  let _str_path path =
-    String.concat
-      (List.concat
-         [ [ Printf.sprintf "Path[source=%d:"
-               (path.Path.source |> Protocol_state.hash |> Obj.magic) ]
-         ; List.map path.Path.path ~f:(fun transition ->
-               Printf.sprintf "%d," (_num transition) )
-         ; ["]"] ])
-
-  (* End for debugging *)
-
   let create state parent_log : t =
     {state; log= Logger.child parent_log __MODULE__}
 

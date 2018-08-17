@@ -159,7 +159,7 @@ module type Transaction_intf = sig
   type public_key
 
   module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, compare, eq, bin_io]
+    type nonrec t = private t [@@deriving sexp, compare, eq]
   end
 
   val check : t -> With_valid_signature.t option

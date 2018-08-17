@@ -42,8 +42,6 @@ module type S = sig
   module Scalar : module type of Bignum_bigint
 
   module Signature : sig
-    type 'a _t = 'a * 'a [@@deriving sexp]
-
     type t = curve_scalar * curve_scalar [@@deriving sexp]
 
     type var = curve_scalar_var * curve_scalar_var
