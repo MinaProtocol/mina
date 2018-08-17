@@ -132,7 +132,8 @@ let () =
     ; ("full-test", Full_test.command)
     ; ("client", Client.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
-    ; (Coda_sample_test.name, Coda_sample_test.command) ]
+    ; (Coda_sample_test.name, Coda_sample_test.command)
+    ; (Coda_block_production_test.name, Coda_block_production_test.command) ]
   |> Command.run
 
 let () = never_returns (Scheduler.go ())
