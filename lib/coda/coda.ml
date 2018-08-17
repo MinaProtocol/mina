@@ -135,6 +135,27 @@ module type Snark_pool_intf = sig
     t -> completed_work_statement -> completed_work_checked option
 end
 
+module type Ktree_intf = sig
+  type elem
+
+  type t [@@deriving sexp]
+
+  val gen : elem Quickcheck.Generator.t -> t Quickcheck.Generator.t
+
+  val find_map : t -> f:(elem -> 'a option) -> 'a option
+
+  val path : t -> f:(elem -> bool) -> elem list option
+
+  val singleton : elem -> t
+
+  val longest_path : t -> elem list
+
+  val add :
+    t -> elem -> parent:(elem -> bool) -> [> `Added of t | `No_parent | `Repeat]
+
+  val root : t -> elem
+end
+
 module type Ledger_builder_controller_intf = sig
   type ledger_builder
 
@@ -184,6 +205,11 @@ module type Ledger_builder_controller_intf = sig
 
   val handle_sync_ledger_queries :
     ledger_hash * sync_query -> ledger_hash * sync_answer
+
+  (** For tests *)
+  module Transition_tree : Ktree_intf with type elem := external_transition
+
+  val transition_tree : t -> Transition_tree.t option
 end
 
 module type Signer_intf = sig
@@ -376,6 +402,9 @@ module Make (Inputs : Inputs_intf) = struct
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
+
+  let lbc_transition_tree t =
+    Ledger_builder_controller.transition_tree t.ledger_builder
 
   module Config = struct
     type t =
