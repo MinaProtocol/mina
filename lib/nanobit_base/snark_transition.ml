@@ -11,7 +11,7 @@ module type S = sig
 
   module Protocol_state : Protocol_state.S
 
-  module Ledger_proof : sig type t [@@deriving bin_io, sexp] end
+  module Proof : sig type t [@@deriving bin_io, sexp] end
 
   type ('protocol_state, 'consensus_data) t [@@deriving sexp]
 
@@ -26,14 +26,14 @@ module type S = sig
   val create_value :
        protocol_state:Protocol_state.value
     -> consensus_data:Consensus_data.value
-    -> ledger_proof:Ledger_proof.t option
+    -> ledger_proof:Proof.t option
     -> value
 
   val protocol_state : ('a, _) t -> 'a
 
   val consensus_data : (_, 'a) t -> 'a
 
-  val ledger_proof : _ t -> Ledger_proof.t option
+  val ledger_proof : _ t -> Proof.t option
 
   val genesis : value
 end
@@ -41,20 +41,20 @@ end
 module Make
     (Consensus_data : Consensus_data_intf)
     (Protocol_state : Protocol_state.S)
-    (Ledger_proof : sig type t [@@deriving bin_io, sexp] end) :
+    (Proof : sig type t [@@deriving bin_io, sexp] end) :
   S
   with module Protocol_state = Protocol_state
    and module Consensus_data = Consensus_data
-   and module Ledger_proof = Ledger_proof
+   and module Proof = Proof
 = struct
   module Consensus_data = Consensus_data
   module Protocol_state = Protocol_state
-  module Ledger_proof = Ledger_proof
+  module Proof = Proof
 
   type ('protocol_state, 'consensus_data) t =
     { protocol_state: 'protocol_state
     ; consensus_data: 'consensus_data
-    ; ledger_proof: Ledger_proof.t option }
+    ; ledger_proof: Proof.t option }
   [@@deriving bin_io, sexp, fields]
 
   type value = (Protocol_state.value, Consensus_data.value) t

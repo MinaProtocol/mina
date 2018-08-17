@@ -6,7 +6,7 @@ open Blockchain_snark
 open Cli_lib
 
 module type S = sig
-  module Consensus_mechanism : Consensus.Mechanism.S
+  module Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Proof.t
 
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism
@@ -25,7 +25,7 @@ module type S = sig
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
+    (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Nanobit_base.Proof.t)
     (Blockchain : Blockchain.S
                   with module Consensus_mechanism = Consensus_mechanism)
 = struct

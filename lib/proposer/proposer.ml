@@ -48,7 +48,7 @@ struct
 
     val result :
          t
-      -> [`Ok of Consensus_mechanism.Snark_transition.value | `Cancelled]
+      -> [`Ok of (Consensus_mechanism.Protocol_state.value * Consensus_mechanism.Consensus_data.value) | `Cancelled]
          Deferred.t
 
     val cancel : t -> unit
@@ -56,7 +56,7 @@ struct
     type t =
       { cancelled: bool ref
       ; result:
-          [`Ok of Consensus_mechanism.Snark_transition.value | `Cancelled]
+          [`Ok of (Consensus_mechanism.Protocol_state.value * Consensus_mechanism.Consensus_data.value)| `Cancelled]
           Deferred.t
       ; time_controller: Time.Controller.t }
 
@@ -70,8 +70,7 @@ struct
     let cancel t = t.cancelled := true
 
     let generate_next_state previous_state ~next_ledger_hash
-        ~next_ledger_builder_hash ~time_controller :
-        Consensus_mechanism.Snark_transition.value option =
+        ~next_ledger_builder_hash ~time_controller =
       let open Option.Let_syntax in
       let blockchain_state =
         Blockchain_state.create_value ~timestamp:(Time.now time_controller)
@@ -89,13 +88,9 @@ struct
       let%map consensus_data =
         Consensus_mechanism.create_consensus_data protocol_state
       in
-      Consensus_mechanism.Snark_transition.create_value ~protocol_state
-        ~consensus_data
-        ~ledger_proof:None
+      (protocol_state, consensus_data)
 
     let create previous_state ~time_controller ~next_ledger_hash ~next_ledger_builder_hash =
-    let create previous ~time_controller ~next_ledger_hash
-        ~next_ledger_builder_hash =
       let cancelled = ref false in
       let rec go () =
         if !cancelled then return `Cancelled
@@ -175,13 +170,20 @@ struct
           match%bind
             Snark_transition_result.result snark_transition_result
           with
-          | `Ok snark_transition ->
+          | `Ok (protocol_state, consensus_data) ->
+            let snark_transition = 
+              Consensus_mechanism.Snark_transition.create_value
+                ~protocol_state ~consensus_data
+                ~ledger_proof:
+                    (Option.map ledger_proof_opt ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+            in
+
+
               let open Deferred.Or_error.Let_syntax in
               let internal_transition =
                 Consensus_mechanism.Internal_transition.create
                   ~snark_transition
                   ~ledger_builder_diff:(Ledger_builder_diff.forget diff)
-                  ~ledger_proof:(Option.map ledger_proof_opt ~f:fst)
               in
               let%map protocol_state_proof =
                 Prover.prove ~prev_state:(state, state_proof)

@@ -851,6 +851,8 @@ let%test_module "test" =
           { source; target; fee_excess; proof_type }
       end
 
+      module Proof = String
+
       module Ledger_proof = struct
         (*A proof here is statement.target*)
         include String
@@ -864,6 +866,8 @@ let%test_module "test" =
 
         let statement_target : statement -> ledger_hash =
          fun statement -> statement.target
+
+        let underlying_proof = Fn.id
       end
 
       module Ledger = struct

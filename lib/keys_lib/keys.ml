@@ -58,7 +58,7 @@ let bc_pk = lazy (Snark_keys.blockchain_proving ())
 let bc_vk = lazy (Snark_keys.blockchain_verification ())
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
+    (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Tock.Proof.t)
 = struct
   module type S = S with module Consensus_mechanism = Consensus_mechanism
 

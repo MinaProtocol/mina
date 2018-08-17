@@ -7,7 +7,7 @@ module type S = sig
 
   module Snark_transition : Snark_transition.S
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   val create :
        snark_transition:Snark_transition.value
@@ -20,7 +20,7 @@ module type S = sig
 end
 
 module Make (Ledger_builder_diff : sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 end)
 (Snark_transition : Snark_transition.S) :
   S
@@ -33,7 +33,7 @@ struct
   type t =
     { snark_transition: Snark_transition.value
     ; ledger_builder_diff: Ledger_builder_diff.t }
-  [@@deriving sexp, fields]
+  [@@deriving sexp, fields, bin_io]
 
   let create ~snark_transition ~ledger_builder_diff =
     {snark_transition; ledger_builder_diff}

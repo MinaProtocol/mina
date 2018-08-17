@@ -80,7 +80,7 @@ module type Ledger_builder_aux_hash_intf = sig
 end
 
 module type Ledger_builder_hash_intf = sig
-  type t [@@deriving bin_io, sexp, eq]
+  type t [@@deriving bin_io, sexp, eq, compare]
 
   type ledger_hash
 
@@ -221,11 +221,15 @@ module type Ledger_proof_intf = sig
 
   type message
 
+  type proof
+
   type t [@@deriving sexp]
 
   val verify : t -> statement -> message:message -> bool Deferred.t
 
   val statement_target : statement -> ledger_hash
+
+  val underlying_proof : t -> proof
 end
 
 module type Completed_work_intf = sig
@@ -431,7 +435,7 @@ module type Consensus_mechanism_intf = sig
 
   type blockchain_state
 
-  type ledger_proof
+  type proof
 
   type ledger_builder_diff
 
@@ -480,7 +484,7 @@ module type Consensus_mechanism_intf = sig
     val create_value :
          protocol_state:Protocol_state.value
       -> consensus_data:Consensus_data.value
-      -> ledger_proof:ledger_proof option
+      -> ledger_proof:proof option
       -> value
 
     val protocol_state : value -> Protocol_state.value
@@ -494,14 +498,11 @@ module type Consensus_mechanism_intf = sig
     val create :
          snark_transition:Snark_transition.value
       -> ledger_builder_diff:ledger_builder_diff
-      -> ledger_proof:ledger_proof option
       -> t
 
     val snark_transition : t -> Snark_transition.value
 
     val ledger_builder_diff : t -> ledger_builder_diff
-
-    val ledger_proof : t -> ledger_proof option
   end
 
   module External_transition : sig
@@ -621,10 +622,13 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
 
+  module Proof : sig type t end
+
   module Ledger_proof :
     Ledger_proof_intf
     with type message := Fee.Unsigned.t * Public_key.Compressed.t
      and type ledger_hash := Ledger_hash.t
+     and type proof := Proof.t
 
   module Ledger :
     Ledger_intf
@@ -730,7 +734,7 @@ Merge Snark:
     with type protocol_state_hash := Protocol_state_hash.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type blockchain_state := Blockchain_state.value
-     and type ledger_proof := Ledger_proof.t
+     and type proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
 
   module Tip :

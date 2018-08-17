@@ -30,9 +30,8 @@ module type S = sig
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
-    (Protocol_state : Protocol_state.S
-                      with module Consensus_mechanism := Consensus_mechanism) :
+    (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Proof.t)
+     :
   S with type proof := Transaction_snark.t =
 struct
   module T = struct
@@ -49,7 +48,7 @@ struct
 
     let create () : t Deferred.t =
       let module Keys =
-        Keys_lib.Keys.Make (Consensus_mechanism) (Protocol_state) in
+        Keys_lib.Keys.Make (Consensus_mechanism) in
       let%map keys = Keys.create () in
       let module Keys = (val keys) in
       ( ( module Transaction_snark.Make (struct

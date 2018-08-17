@@ -1,5 +1,5 @@
 module type S = sig
-  module Ledger_proof : sig type t [@@deriving bin_io, sexp] end
+  module Proof : sig type t [@@deriving bin_io, sexp] end
 
   module Consensus_state : sig
     type value [@@deriving hash, compare]
@@ -32,7 +32,7 @@ module type S = sig
     Nanobit_base.Snark_transition.S
     with module Consensus_data = Consensus_data
      and module Protocol_state = Protocol_state
-     and module Ledger_proof = Ledger_proof
+     and module Proof = Proof
 
   module Internal_transition :
     Nanobit_base.Internal_transition.S

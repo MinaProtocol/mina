@@ -20,17 +20,14 @@ module type S = sig
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
-    (Protocol_state : Protocol_state.S
-                      with module Consensus_mechanism := Consensus_mechanism)
+    (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Proof.t)
     (Blockchain : Blockchain.S
-                  with module Consensus_mechanism = Consensus_mechanism
-                   and module Protocol_state = Protocol_state) :
+                  with module Consensus_mechanism = Consensus_mechanism) :
   S with type blockchain := Blockchain.t =
 struct
   module Worker_state = struct
     module type S = sig
-      val verify_wrap : Protocol_state.value -> Tock.Proof.t -> bool
+      val verify_wrap : Consensus_mechanism.Protocol_state.value -> Tock.Proof.t -> bool
 
       val verify_transaction_snark : Transaction_snark.t -> bool
     end
@@ -47,11 +44,10 @@ struct
            let keys = tx_vk
          end) in
          let module B =
-           Blockchain_transition.Make (Consensus_mechanism) (Protocol_state)
+           Blockchain_transition.Make (Consensus_mechanism)
              (T) in
          let module U =
            Blockchain_snark_utils.Verification (Consensus_mechanism)
-             (Protocol_state)
              (struct
                let key = bc_vk.wrap
 

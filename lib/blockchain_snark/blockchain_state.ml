@@ -40,7 +40,7 @@ module type S = sig
   end
 end
 
-module Make (Consensus_mechanism : Consensus.Mechanism.S) :
+module Make (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Tock.Proof.t) :
   S with module Consensus_mechanism := Consensus_mechanism =
 struct
   module Protocol_state = Consensus_mechanism.Protocol_state

@@ -49,7 +49,7 @@ module type S = sig
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
+    (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Tock.Proof.t)
 : sig
   module type S =
     S with module Consensus_mechanism = Consensus_mechanism

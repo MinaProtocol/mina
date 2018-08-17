@@ -7,8 +7,6 @@ open Snark_params
 
 module Verification
     (Consensus_mechanism : Consensus.Mechanism.S)
-    (Protocol_state : Protocol_state.S
-                      with module Consensus_mechanism := Consensus_mechanism)
                                                                             (Wrap : sig
         val key : Tock.Verification_key.t
 
@@ -27,7 +25,7 @@ struct
     let self = Wrap.key_to_bool_list Wrap.key in
     fun state ->
       Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
-        (List.fold self +> State_hash.fold (Protocol_state.hash state))
+        (List.fold self +> State_hash.fold (Consensus_mechanism.Protocol_state.hash state))
 
   let embed (x: Tick.Field.t) : Tock.Field.t =
     let n = Tick.Bigint.of_field x in

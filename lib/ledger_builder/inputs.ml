@@ -28,11 +28,14 @@ module type S = sig
     [@@deriving bin_io, sexp, eq]
   end
 
+  module Proof : sig type t end
+
   module Ledger_proof : sig
     include Coda_pow.Ledger_proof_intf
             with type statement := Ledger_proof_statement.t
              and type message := Fee.Unsigned.t * Compressed_public_key.t
              and type ledger_hash := Ledger_hash.t
+             and type proof := Proof.t
 
     include Binable.S with type t := t
 
