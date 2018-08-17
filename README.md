@@ -34,22 +34,22 @@ If developing on a VM, now is a good time to take a snapshot and save your state
 
 ## Build a dev docker image
 1. clone this repository 
-1. run `make docker` to pull down our dev container image (~7GB download, go strecth)
+1. run `make docker` to pull down our dev container image (~7GB download, go strecth your legs)
 
-## First build
+## First code build
 
-1. Change your shell path to include our scripts directory.
+1. Change your shell path to include our scripts directory.<br>
 (REMEMBER to change the HOME and SOURCE directory to match yours)
 
 ```bash
 export PATH=~/src/nanobit/scripts:$PATH
 ```
 
-2. Start a build `make dev` (go stretch)
+2. Start a build `make dev` (go stretch your arms)
 
-## Customizing your developer environment
+## Customizing your dev environment for autocomplete/merlin
 
-1. If you use vim, add this in your vimrc to use merlin. 
+1. If you use vim, add this snippet in your vimrc to use merlin. <br>
 (REMEMBER to change the HOME directory to match yours)
 
 ```bash
@@ -65,9 +65,21 @@ let g:syntastic_ocaml_checkers=['merlin']
 1. Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
 1. Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
 
+1. If you use vscode, you might like these extensions
+   * [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
+   * [Dune](https://marketplace.visualstudio.com/items?itemName=maelvalais.dune)
+
+# Docker Image Family Tree
+
+Container Stages:
+1. [ocaml/ocaml:debian-stable](https://hub.docker.com/r/ocaml/ocaml/) (community image, ~856MB) 
+1. ocaml407 (built by us, stored in gcr, ~1.7GB)
+1. ocaml-base (built by us, stored in gcr, ~7.1GB -- external dependancies and haskell)
+1. nanotest (built with `make docker`, used with `make dev`, ~7.8GBm)
+
 
 # ~~How to Testbridge~~
-FIXME: Deprecated
+FIXME: Everything Testbridge is Deprecated
 
 ### Docker image related setup
 
