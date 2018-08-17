@@ -78,7 +78,7 @@ FIXME: Deprecated
 
 1. Install `gcloud`, `kubectl`. If you use the docker dev environment, just run `make dev`.
 2. `gcloud auth login` (follow the instructions)
-3. `gcloud set config project o1labs-192920`
+3. `gcloud config set project o1labs-192920`
 
 ### Kubernetes related setup
 

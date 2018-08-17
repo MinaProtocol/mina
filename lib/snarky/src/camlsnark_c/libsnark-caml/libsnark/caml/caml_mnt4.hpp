@@ -13,6 +13,7 @@
 #include <libff/algebra/scalar_multiplication/wnaf.hpp>
 #include <gmp.h>
 #include <openssl/md5.h>
+#include <libsnark/gadgetlib1/gadgets/hashes/sha256/sha256_gadget.hpp>
 
 typedef libff::mnt4_pp ppT;
 typedef libff::mnt6_pp other_curve_ppT;
