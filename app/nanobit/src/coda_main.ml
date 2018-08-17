@@ -349,32 +349,6 @@ struct
   module External_transition = Consensus_mechanism.External_transition
   module Internal_transition = Consensus_mechanism.Internal_transition
 
-  (* TODO
-  module External_transition = struct
-    type t =
-      { protocol_state: Protocol_state.value
-      ; proof: Protocol_state_proof.t
-      ; ledger_builder_diff: Ledger_builder_diff.t }
-    [@@deriving fields, bin_io, sexp]
-
-    let protocol_state_proof {proof; _} = proof
-
-    let compare t1 t2 =
-      Protocol_state.compare t1.protocol_state t2.protocol_state
-
-    let equal t1 t2 = Protocol_state.equal t1.protocol_state t2.protocol_state
-  end
-
-  module Internal_transition = struct
-    type t =
-      { blockchain_state: Nanobit_base.Blockchain_state.value
-      ; consensus_data: Consensus_mechanism.Consensus_data.value
-      ; ledger_proof: Ledger_proof.t option
-      ; ledger_builder_diff: Ledger_builder_diff.t }
-    [@@deriving fields, sexp]
-  end
-
-*)
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (Transaction)
     include Network_pool.Make (Pool) (Pool.Diff)
@@ -460,16 +434,6 @@ struct
       { Stripped.ledger_builder_transition=
           Ledger_builder_transition.forget ledger_builder_transition
       ; state }
-
-    (*
-    let check
-          { Stripped.transactions; ledger_builder_transition; state } =
-      let open Option.Let_syntax in
-      let%map transactions = Option.all (List.map ~f:Transaction.check transactions) in
-      { transactions
-      ; ledger_builder_transition
-      ; state
-      } *)
 
     let forget_witness {ledger_builder_transition; state} = state
 
