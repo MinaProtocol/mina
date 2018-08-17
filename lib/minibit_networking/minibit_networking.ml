@@ -25,7 +25,7 @@ module Rpcs (Inputs : sig
   module Protocol_state : sig
     type value [@@deriving bin_io]
 
-    val equal : value -> value -> bool
+    val equal_value : value -> value -> bool
 
     val hash : value -> State_hash.t
 
@@ -174,7 +174,7 @@ module type Inputs_intf = sig
   module Protocol_state : sig
     type value [@@deriving bin_io]
 
-    val equal : value -> value -> bool
+    val equal_value : value -> value -> bool
 
     val hash : value -> State_hash.t
 

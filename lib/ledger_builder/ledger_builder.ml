@@ -58,8 +58,12 @@ struct
 
   include T
 
+  type unchecked = t
+
   module Checked = struct
     include T
+
+    let create = Fn.id
   end
 
   let forget = Fn.id
@@ -989,8 +993,12 @@ let%test_module "test" =
               Ledger_proof_statement.gen
         end
 
+        type unchecked = t
+
         module Checked = struct
           include T
+
+          let create = Fn.id
         end
 
         let forget : Checked.t -> t =

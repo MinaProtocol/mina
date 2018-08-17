@@ -1,7 +1,9 @@
 open Core_kernel
 
 module type Consensus_data_intf = sig
-  include Snark_params.Tick.Snarkable.S
+  type value [@@deriving bin_io, sexp]
+
+  include Snark_params.Tick.Snarkable.S with type value := value
 
   val genesis : value
 end
@@ -17,7 +19,8 @@ module type S = sig
 
   type ('protocol_state, 'consensus_data) t [@@deriving sexp]
 
-  type value = (Protocol_state.value, Consensus_data.value) t [@@deriving sexp]
+  type value = (Protocol_state.value, Consensus_data.value) t
+  [@@deriving bin_io, sexp]
 
   type var = (Protocol_state.var, Consensus_data.var) t
 

@@ -96,7 +96,7 @@ module type Inputs_intf = sig
 
     val consensus_state : value -> Consensus_mechanism.Consensus_state.value
 
-    val equal : value -> value -> bool
+    val equal_value : value -> value -> bool
 
     val hash : value -> State_hash.t
   end
@@ -399,7 +399,7 @@ end = struct
            t.handler <- Transition_logic.create new_state log ;
            ( if
                not
-                 (Protocol_state.equal
+                 (Protocol_state.equal_value
                     ( old_state |> Transition_logic_state.longest_branch_tip
                     |> Tip.state )
                     ( new_state |> Transition_logic_state.longest_branch_tip
@@ -531,7 +531,7 @@ let%test_module "test" =
           ; consensus_state: Consensus_mechanism_state.value }
         [@@deriving eq, sexp, fields, bin_io, compare]
 
-        type value = t [@@deriving sexp, bin_io]
+        type value = t [@@deriving sexp, bin_io, eq, compare]
 
         let create_value ~previous_state_hash ~blockchain_state
             ~consensus_state =

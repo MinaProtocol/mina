@@ -4,7 +4,7 @@ module type S = sig
   end
 
   module Consensus_state : sig
-    type value [@@deriving hash, eq, compare]
+    type value [@@deriving hash, eq, compare, bin_io, sexp]
 
     include Snark_params.Tick.Snarkable.S with type value := value
 
@@ -21,7 +21,9 @@ module type S = sig
     Nanobit_base.Protocol_state.S with module Consensus_state = Consensus_state
 
   module Consensus_data : sig
-    include Snark_params.Tick.Snarkable.S
+    type value [@@deriving bin_io, sexp]
+
+    include Snark_params.Tick.Snarkable.S with type value := value
 
     val genesis : value
   end

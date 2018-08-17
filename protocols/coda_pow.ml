@@ -268,10 +268,12 @@ module type Completed_work_intf = sig
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]
 
-  module Checked : sig
-    (* TODO: undo? *)
+  type unchecked = t
 
-    type nonrec t = t [@@deriving sexp, bin_io]
+  module Checked : sig
+    type t [@@deriving sexp, bin_io]
+
+    val create : unchecked -> t
   end
 
   val forget : Checked.t -> t
@@ -305,7 +307,7 @@ module type Ledger_builder_diff_intf = sig
       ; completed_works: completed_work_checked list
       ; transactions: transaction_with_valid_signature list
       ; creator: public_key }
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp]
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t

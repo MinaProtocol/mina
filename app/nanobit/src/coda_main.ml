@@ -320,7 +320,7 @@ struct
               Deferred.List.for_all ps ~f:(fun (proof, stmt) ->
                   Transaction_snark.verify ~message proof stmt )
             in
-            Option.some_if good t
+            Option.some_if good (Completed_work.Checked.create t)
     end
 
     include Ledger_builder.Make (Inputs)
@@ -339,7 +339,7 @@ struct
       type t =
         { old: Ledger_builder.t
         ; diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t }
-      [@@deriving sexp, bin_io]
+      [@@deriving sexp]
     end
 
     let forget {With_valid_signatures_and_proofs.old; diff} =
@@ -532,7 +532,8 @@ struct
       Option.map
         (Pool.request_proof (pool t) statement)
         ~f:(fun {proof; fee= {fee; prover}} ->
-          {Completed_work.fee; proofs= proof; prover} )
+          Completed_work.Checked.create
+            {Completed_work.fee; proofs= proof; prover} )
 
     let load ~disk_location ~incoming_diffs =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with

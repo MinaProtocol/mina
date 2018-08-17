@@ -2,7 +2,7 @@ open Core_kernel
 open Snark_params.Tick
 
 module type Consensus_state_intf = sig
-  type value [@@deriving hash, compare]
+  type value [@@deriving hash, compare, bin_io, sexp]
 
   include Snarkable.S with type value := value
 
@@ -22,17 +22,13 @@ module type S = sig
 
   type ('a, 'b, 'c) t [@@deriving bin_io, sexp]
 
-  include Snarkable.S
-          with type value =
-                      ( State_hash.Stable.V1.t
-                      , Blockchain_state.value
-                      , Consensus_state.value )
-                      t
-           and type var =
-                      ( State_hash.var
-                      , Blockchain_state.var
-                      , Consensus_state.var )
-                      t
+  type value =
+    (State_hash.Stable.V1.t, Blockchain_state.value, Consensus_state.value) t
+  [@@deriving bin_io, sexp]
+
+  type var = (State_hash.var, Blockchain_state.var, Consensus_state.var) t
+
+  include Snarkable.S with type value := value and type var := var
 
   include Hashable.S with type t := value
 

@@ -20,7 +20,7 @@ module type Inputs_intf = sig
 
     val consensus_state : value -> Consensus_mechanism.Consensus_state.value
 
-    val equal : value -> value -> bool
+    val equal_value : value -> value -> bool
 
     val hash : value -> State_hash.t
   end
@@ -206,7 +206,7 @@ struct
         in
         let last_transition = List.last_exn path.Path.path in
         (* Now step over the path *)
-        assert (Protocol_state.equal (Tip.state tip) path.Path.source) ;
+        assert (Protocol_state.equal_value (Tip.state tip) path.Path.source) ;
         let%map result =
           List.fold path.Path.path ~init:(Interruptible.return (Some tip)) ~f:
             (fun work curr ->
@@ -224,7 +224,7 @@ struct
         match result with
         | Some tip ->
             assert (
-              Protocol_state.equal (Tip.state tip)
+              Protocol_state.equal_value (Tip.state tip)
                 (External_transition.target_state last_transition) ) ;
             [ Transition_logic_state.Change.Longest_branch_tip tip
             ; Transition_logic_state.Change.Ktree new_tree ]
