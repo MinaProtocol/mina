@@ -10,7 +10,7 @@
 
 1. install gcloud
 2. run `gcloud auth login`
-3. run `gcloud set project <o1labs-project-id>`
+3. run `gcloud config set project <o1labs-project-id>`
 4. run `gcloud docker -a`
 5. run `make docker`
 6. talk to Brandon to setup `make dev`
@@ -49,7 +49,7 @@ let g:syntastic_ocaml_checkers=['merlin']
 
 1. Install `gcloud`, `kubectl`. If you use the docker dev environment, just run `make dev`.
 2. `gcloud auth login` (follow the instructions)
-3. `gcloud set config project o1labs-192920`
+3. `gcloud config set project o1labs-192920`
 
 ### Kubernetes related setup
 

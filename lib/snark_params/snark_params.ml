@@ -53,6 +53,13 @@ end
 module Tick = struct
   module Tick0 = Extend (Snarky.Snark.Make (Tick_curve))
 
+  module Sha256 =
+    Snarky.Sha256.Make (struct
+        let prefix = Tick_curve.prefix
+      end)
+      (Tick0)
+      (Tick_curve)
+
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
   module Field = struct
@@ -81,8 +88,8 @@ module Tick = struct
       match (xs0, ys0) with
       | true :: xs, true :: ys | false :: xs, false :: ys ->
           compare_bitstring xs ys
-      | false :: xs, true :: ys -> `LT
-      | true :: xs, false :: ys -> `GT
+      | false :: _, true :: _ -> `LT
+      | true :: _, false :: _ -> `GT
       | [], [] -> `EQ
       | _ :: _, [] | [], _ :: _ ->
           failwith "compare_bitstrings: Different lengths"

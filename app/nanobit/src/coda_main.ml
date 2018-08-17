@@ -616,6 +616,8 @@ end
 
 module type Main_intf = sig
   module Inputs : sig
+    module Time : Protocols.Coda_pow.Time_intf
+
     module Ledger : sig
       type t [@@deriving sexp]
 
@@ -637,21 +639,12 @@ module type Main_intf = sig
       end
 
       module Gossip_net : sig
-        module Params : sig
-          type t =
-            {timeout: Time.Span.t; target_peer_count: int; address: Peer.t}
-        end
+        module Config : Gossip_net.Config_intf
       end
 
-      module Config : sig
-        type t =
-          { parent_log: Logger.t
-          ; conf_dir: string
-          ; gossip_net_params: Gossip_net.Params.t
-          ; initial_peers: Peer.t list
-          ; me: Peer.t
-          ; remap_addr_port: Peer.t -> Peer.t }
-      end
+      module Config :
+        Minibit_networking.Config_intf
+        with type gossip_config := Gossip_net.Config.t
     end
 
     module Sparse_ledger : sig
@@ -697,7 +690,8 @@ module type Main_intf = sig
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10] }
+      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; time_controller: Inputs.Time.Controller.t }
     [@@deriving make]
   end
 

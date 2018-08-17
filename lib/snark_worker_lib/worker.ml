@@ -74,7 +74,7 @@ struct
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
           Logger.info log "No work; waiting a few seconds before retrying" ;
-          let%bind () = wait ~sec:5. () in
+          let%bind () = wait ~sec:Worker_state.worker_wait_time () in
           go ()
       | Ok (Some work) ->
           Logger.info log "Got some work" ;
@@ -83,9 +83,7 @@ struct
           | Ok result ->
             match Rpc.One_way.dispatch Rpcs.Submit_work.rpc conn result with
             | Error e -> log_and_retry "submitting work" e
-            | Ok () ->
-                let%bind () = wait ~sec:0.1 () in
-                go ()
+            | Ok () -> go ()
     in
     go ()
 

@@ -81,19 +81,21 @@ struct
                  |> Blockchain_state.ledger_hash ))
               "Body proof was none but tried to update ledger hash"
         | Some proof ->
-            check
-              (T.verify
-                 (Transaction_snark.create
-                    ~source:
-                      ( state |> Protocol_state.blockchain_state
-                      |> Blockchain_state.ledger_hash )
-                    ~target:
-                      ( transition |> Snark_transition.protocol_state
-                      |> Protocol_state.blockchain_state
-                      |> Blockchain_state.ledger_hash )
-                    ~proof_type:`Merge ~fee_excess:Currency.Amount.Signed.zero
-                    ~proof))
-              "Proof did not verify"
+            if Insecure.verify_blockchain then Ok ()
+            else
+              check
+                (T.verify
+                   (Transaction_snark.create
+                      ~source:
+                        ( state |> Protocol_state.blockchain_state
+                        |> Blockchain_state.ledger_hash )
+                      ~target:
+                        ( transition |> Snark_transition.protocol_state
+                        |> Protocol_state.blockchain_state
+                        |> Blockchain_state.ledger_hash )
+                      ~proof_type:`Merge ~fee_excess:Currency.Amount.Signed.zero
+                      ~proof))
+                "Proof did not verify"
       in
       Protocol_state.create_value
         ~previous_state_hash:(Protocol_state.hash state)

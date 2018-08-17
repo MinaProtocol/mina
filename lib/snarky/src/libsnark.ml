@@ -506,6 +506,8 @@ struct
       val create : unit -> t
 
       val delete : t -> unit
+
+      val get : t -> int -> Variable.t
     end
 
     val set_variable : t -> Variable.t -> Field.t -> unit
@@ -580,6 +582,16 @@ struct
         foreign
           (with_prefix prefix "emplace_back")
           (typ @-> Variable.typ @-> returning void)
+
+      let get =
+        let stub =
+          foreign (with_prefix prefix "get")
+            (typ @-> int @-> returning Variable.typ)
+        in
+        fun t i ->
+          let v = stub t i in
+          Caml.Gc.finalise Variable.delete v ;
+          v
     end
 
     let func_name = with_prefix (with_prefix M.prefix "protoboard")
@@ -1332,6 +1344,8 @@ module type S = sig
       val create : unit -> t
 
       val delete : t -> unit
+
+      val get : t -> int -> Variable.t
     end
 
     val set_variable : t -> Variable.t -> Field.t -> unit

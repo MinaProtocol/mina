@@ -1,0 +1,3 @@
+true: safe_string, bin_annot
+
+<*.{ml,mli,byte,native}>: package(fmt), package(alcotest), package(cstruct)

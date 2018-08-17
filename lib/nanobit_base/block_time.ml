@@ -13,7 +13,16 @@ module Stable = struct
   end
 end
 
+module Controller = struct
+  type t = unit
+
+  let create () = ()
+end
+
 include Stable.V1
+
+type t0 = t
+
 module B = Bits
 
 let bit_length = 64
@@ -50,16 +59,26 @@ module Span = struct
   let ( >= ) = UInt64.( >= )
 end
 
+let of_time t =
+  UInt64.of_int64
+    (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))
+
+let to_time t =
+  Time.of_span_since_epoch
+    (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
+
+let now () = of_time (Time.now ())
+
 module Timeout = struct
   type 'a t = {deferred: 'a Deferred.t; cancel: 'a -> unit}
 
-  let create span action =
+  let create () span ~f:action =
     let open Async_kernel.Deferred.Let_syntax in
     let cancel_ivar = Ivar.create () in
     let timeout = after (Span.to_time_ns_span span) >>| fun () -> None in
     let deferred =
       Deferred.any [Ivar.read cancel_ivar; timeout]
-      >>| function None -> action () | Some x -> x
+      >>| function None -> action (now ()) | Some x -> x
     in
     let cancel value = Ivar.fill_if_empty cancel_ivar (Some value) in
     {deferred; cancel}
@@ -68,7 +87,7 @@ module Timeout = struct
 
   let peek {deferred; _} = Deferred.peek deferred
 
-  let cancel {cancel; _} value = cancel value
+  let cancel () {cancel; _} value = cancel value
 end
 
 let field_var_to_unpacked (x: Tick.Field.Checked.t) =
@@ -85,13 +104,3 @@ let modulus t span = UInt64.rem t span
 let unpacked_to_number var =
   let bits = Span.Unpacked.var_to_bits var in
   Number.of_bits bits
-
-let of_time t =
-  UInt64.of_int64
-    (Int64.of_float (Time.Span.to_ms (Time.to_span_since_epoch t)))
-
-let to_time t =
-  Time.of_span_since_epoch
-    (Time.Span.of_ms (Int64.to_float (UInt64.to_int64 t)))
-
-let now () = of_time (Time.now ())

@@ -21,7 +21,7 @@ module Message = struct
       Pedersen.digest_fold Hash_prefix.signature
         (Transaction_payload.fold t +> List.fold nonce)
     in
-    List.take (Field.unpack d) Scalar.length |> Scalar.pack
+    Scalar.pack (Sha256_lib.Sha256.digest (Field.unpack d))
 
   let () = assert Insecure.signature_hash_function
 
@@ -46,8 +46,8 @@ module Message = struct
          in
          d
        in
-       let%map bs = Pedersen_hash.Digest.choose_preimage digest in
-       List.take bs Scalar.length)
+       let%bind bs = Pedersen_hash.Digest.choose_preimage digest in
+       Sha256_lib.Sha256.Checked.digest bs)
 end
 
 include Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Signature_curve)
