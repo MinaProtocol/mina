@@ -73,9 +73,7 @@ module type Basic = sig
       (Field.Checked.t -> Field.Checked.t -> Field.Checked.t -> t)
       with_constraint_args
 
-    val square :
-      (Field.Checked.t -> Field.Checked.t -> t)
-      with_constraint_args
+    val square : (Field.Checked.t -> Field.Checked.t -> t) with_constraint_args
   end
   
   and Data_spec : sig
@@ -409,10 +407,7 @@ module type Basic = sig
     -> (unit, _) Checked.t
 
   val assert_square :
-       ?label:string
-    -> Field.Checked.t
-    -> Field.Checked.t
-    -> (unit, _) Checked.t
+    ?label:string -> Field.Checked.t -> Field.Checked.t -> (unit, _) Checked.t
 
   val as_prover : (unit, 's) As_prover.t -> (unit, 's) Checked.t
 

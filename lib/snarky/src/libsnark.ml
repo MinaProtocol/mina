@@ -357,11 +357,10 @@ struct
     let typ = ptr void
 
     let prefix = with_prefix M.prefix "r1cs_constraint"
+
     let func_name = with_prefix prefix
 
-    let delete =
-      foreign (func_name "delete")
-        (typ @-> returning void)
+    let delete = foreign (func_name "delete") (typ @-> returning void)
 
     let create =
       let stub =
@@ -371,12 +370,10 @@ struct
       in
       fun a b c ->
         let t = stub a b c in
-        Caml.Gc.finalise delete t;
-        t
+        Caml.Gc.finalise delete t ; t
 
     let set_is_square =
-      foreign (func_name "set_is_square")
-        (typ @-> bool @-> returning void)
+      foreign (func_name "set_is_square") (typ @-> bool @-> returning void)
   end
 
   module R1CS_constraint_system : sig

@@ -593,8 +593,7 @@ struct
              cx = lambda^2 - (ax + bc)
           *)
           assert_
-            (Constraint.square ~label:"c1"
-               lambda
+            (Constraint.square ~label:"c1" lambda
                Field.Checked.Infix.(cx + ax + bx))
         in
         let%bind cy =

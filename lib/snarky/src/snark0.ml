@@ -188,27 +188,28 @@ module Make_basic (Backend : Backend_intf.S) = struct
         | Boolean v ->
             let lc = of_var v in
             let constr = R1CS_constraint.create lc lc lc in
-            R1CS_constraint.set_is_square constr true;
+            R1CS_constraint.set_is_square constr true ;
             constr
         | Equal (v1, v2) ->
-          (* 0 * 0 = (v1 - v2) *)
-          let constr =
-            R1CS_constraint.create
-              Linear_combination.zero
-              Linear_combination.zero
-              (of_var (Cvar.sub v1 v2))
-          in
-          R1CS_constraint.set_is_square constr true;
-          constr
+            (* 0 * 0 = (v1 - v2) *)
+            let constr =
+              R1CS_constraint.create Linear_combination.zero
+                Linear_combination.zero
+                (of_var (Cvar.sub v1 v2))
+            in
+            R1CS_constraint.set_is_square constr true ;
+            constr
         | Square (a, c) ->
-          let a = of_var a in
-          let constr = R1CS_constraint.create a a (of_var c) in
-          R1CS_constraint.set_is_square constr true;
-          constr
+            let a = of_var a in
+            let constr = R1CS_constraint.create a a (of_var c) in
+            R1CS_constraint.set_is_square constr true ;
+            constr
         | R1CS (a, b, c) ->
-          let constr = R1CS_constraint.create (of_var a) (of_var b) (of_var c) in
-          R1CS_constraint.set_is_square constr false;
-          constr
+            let constr =
+              R1CS_constraint.create (of_var a) (of_var b) (of_var c)
+            in
+            R1CS_constraint.set_is_square constr false ;
+            constr
 
     let create_basic ?label basic = {basic; annotation= label}
 
@@ -240,8 +241,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       | Equal (v1, v2) -> Field.equal (get_value v1) (get_value v2)
       | R1CS (v1, v2, v3) ->
           Field.(equal (mul (get_value v1) (get_value v2)) (get_value v3))
-      | Square (a, c) ->
-        Field.equal (Field.square (get_value a)) (get_value c)
+      | Square (a, c) -> Field.equal (Field.square (get_value a)) (get_value c)
 
     let eval t get_value =
       List.for_all t ~f:(fun {basic} -> eval_basic basic get_value)
@@ -1139,15 +1139,15 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let open Let_syntax in
         let%bind z =
           provide_witness Typ.field
-            As_prover.(Let_syntax.(
-              let%map x = read_var x and y = read_var y in
-              if Field.(equal one x) && Field.(equal one y)
-              then Field.one
-              else Field.zero))
+            (let open As_prover in
+            let open Let_syntax in
+            let%map x = read_var x and y = read_var y in
+            if Field.(equal one x) && Field.(equal one y) then Field.one
+            else Field.zero)
         in
         let%map () =
           let x_plus_y = Cvar.add x y in
-          assert_square x_plus_y Cvar.Infix.(Field.of_int 2 * z + x_plus_y)
+          assert_square x_plus_y Cvar.Infix.((Field.of_int 2 * z) + x_plus_y)
         in
         z
 
