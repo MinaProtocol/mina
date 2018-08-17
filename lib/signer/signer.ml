@@ -29,17 +29,19 @@ module Make (Inputs : Inputs_intf) :
    and type state := Inputs.State.t
    and type state_proof := Inputs.State.Proof.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
-   and type completed_work_checked := Inputs.Completed_work.Checked.t =
+   and type completed_work_checked := Inputs.Completed_work.Checked.t
+   and type time_controller := Inputs.Time.Controller.t =
 struct
   open Inputs
 
   module Hashing_result : sig
     type t
 
-    val empty : unit -> t
+    val empty : Time.Controller.t -> t
 
     val create :
          State.t
+      -> time_controller:Time.Controller.t
       -> next_ledger_hash:Ledger_hash.t
       -> next_ledger_builder_hash:Ledger_builder_hash.t
       -> t
@@ -50,18 +52,23 @@ struct
   end = struct
     type t =
       { cancelled: bool ref
-      ; result: [`Ok of State.t * Block_nonce.t | `Cancelled] Deferred.t }
+      ; result: [`Ok of State.t * Block_nonce.t | `Cancelled] Deferred.t
+      ; time_controller: Time.Controller.t }
 
-    let empty () = {cancelled= ref false; result= Deferred.return `Cancelled}
+    let empty time_controller =
+      { cancelled= ref false
+      ; result= Deferred.return `Cancelled
+      ; time_controller }
 
     let result t = t.result
 
     let cancel t = t.cancelled := true
 
     let find_block (previous: State.t) ~(next_ledger_hash: Ledger_hash.t)
-        ~next_ledger_builder_hash : (State.t * Block_nonce.t) option =
+        ~next_ledger_builder_hash ~time_controller :
+        (State.t * Block_nonce.t) option =
       let iterations = 10 in
-      let now = Time.now () in
+      let now = Time.now time_controller in
       let difficulty = previous.next_difficulty in
       let next_difficulty =
         Difficulty.next difficulty ~last:previous.timestamp ~this:now
@@ -87,31 +94,34 @@ struct
       in
       go nonce0 0
 
-    let create previous ~next_ledger_hash ~next_ledger_builder_hash =
+    let create previous ~time_controller ~next_ledger_hash
+        ~next_ledger_builder_hash =
       let cancelled = ref false in
       let rec go () =
         if !cancelled then return `Cancelled
         else
           match
             find_block previous ~next_ledger_hash ~next_ledger_builder_hash
+              ~time_controller
           with
           | None ->
               let%bind () = after (sec 0.01) in
               go ()
           | Some (state, nonce) -> return (`Ok (state, nonce))
       in
-      {cancelled; result= go ()}
+      {cancelled; result= go (); time_controller}
   end
 
   module Signing_result : sig
     type t
 
-    val empty : unit -> t
+    val empty : Time.Controller.t -> t
 
     val cancel : t -> unit
 
     val create :
          state:State.t * State.Proof.t
+      -> time_controller:Time.Controller.t
       -> ledger_builder:Ledger_builder.t
       -> transactions:Transaction.With_valid_signature.t Sequence.t
       -> get_completed_work:(   Completed_work.Statement.t
@@ -127,8 +137,8 @@ struct
       ; result: External_transition.t Deferred.Or_error.t }
     [@@deriving fields]
 
-    let empty () =
-      { hashing_result= Hashing_result.empty ()
+    let empty controller =
+      { hashing_result= Hashing_result.empty controller
       ; cancellation= Ivar.create ()
       ; result= Deferred.Or_error.error_string "empty" }
 
@@ -136,8 +146,8 @@ struct
       Hashing_result.cancel t.hashing_result ;
       Ivar.fill_if_empty t.cancellation ()
 
-    let create ~state:(state, state_proof) ~ledger_builder ~transactions
-        ~get_completed_work =
+    let create ~state:(state, state_proof) ~time_controller ~ledger_builder
+        ~transactions ~get_completed_work =
       let ( diff
           , `Hash_after_applying next_ledger_builder_hash
           , `Ledger_proof ledger_proof_opt ) =
@@ -151,6 +161,7 @@ struct
       in
       let hashing_result =
         Hashing_result.create state ~next_ledger_hash ~next_ledger_builder_hash
+          ~time_controller
       in
       let cancellation = Ivar.create () in
       (* Someday: If bundle finishes first you can stuff more transactions in the bundle *)
@@ -199,7 +210,7 @@ struct
 
   let transition_capacity = 64
 
-  let create ~parent_log ~get_completed_work ~change_feeder =
+  let create ~parent_log ~get_completed_work ~change_feeder ~time_controller =
     let logger = Logger.extend parent_log [("module", Atom __MODULE__)] in
     let r, w = Linear_pipe.create () in
     let write_result = function
@@ -211,17 +222,17 @@ struct
     let create_result {Tip.state; transactions; ledger_builder} =
       let result =
         Signing_result.create ~state ~ledger_builder ~transactions
-          ~get_completed_work
+          ~get_completed_work ~time_controller
       in
       upon (Signing_result.result result) write_result ;
       result
     in
     let schedule_transaction tip =
       let time_till_transaction =
-        Time.modulus (Time.now ()) Transaction_interval.t
+        Time.modulus (Time.now time_controller) Transaction_interval.t
       in
       Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
-      Time.Timeout.create time_till_transaction (fun () ->
+      Time.Timeout.create time_controller time_till_transaction ~f:(fun _ ->
           Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
           create_result tip )
     in
@@ -237,8 +248,8 @@ struct
             (fun scheduled_transaction (Tip_change tip) ->
               ( match Time.Timeout.peek scheduled_transaction with
               | None ->
-                  Time.Timeout.cancel scheduled_transaction
-                    (Signing_result.empty ())
+                  Time.Timeout.cancel time_controller scheduled_transaction
+                    (Signing_result.empty time_controller)
               | Some result -> Signing_result.cancel result ) ;
               return (schedule_transaction tip) )
           >>| ignore ) ;

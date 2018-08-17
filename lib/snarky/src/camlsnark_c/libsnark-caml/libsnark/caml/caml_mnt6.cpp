@@ -69,6 +69,11 @@ void camlsnark_mnt6_protoboard_variable_array_emplace_back(pb_variable_array<Fie
   arr->emplace_back(*v);
 }
 
+pb_variable<FieldT>* camlsnark_mnt6_protoboard_variable_array_get(
+    pb_variable_array<FieldT>* arr, int i) {
+  return new pb_variable<FieldT>((*arr)[i]);
+}
+
 linear_combination<FieldT> camlsnark_mnt6_linear_combination_renumber(
     linear_combination<FieldT> &lc,
     std::vector< linear_combination<FieldT> > &changes,
@@ -752,5 +757,50 @@ bool camlsnark_mnt6_gm_proof_verify(
   return r1cs_se_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
 }
 // End Groth-Maller specific code
+
+// begin SHA gadget code
+void camlsnark_mnt6_digest_variable_delete(
+    digest_variable<FieldT>* digest) {
+  delete digest;
+}
+
+digest_variable<FieldT>* camlsnark_mnt6_digest_variable_create(
+    protoboard<FieldT>* pb, int digest_size) {
+  return new digest_variable<FieldT>(*pb, digest_size, "digest_variable_create");
+}
+
+pb_variable_array<FieldT>* camlsnark_mnt6_digest_variable_bits(
+    digest_variable<FieldT>* digest) {
+  return new pb_variable_array<FieldT>(digest->bits);
+}
+
+void camlsnark_mnt6_sha256_compression_function_gadget_delete(
+    sha256_compression_function_gadget<FieldT>* g) {
+  delete g;
+}
+
+sha256_compression_function_gadget<FieldT>*
+camlsnark_mnt6_sha256_compression_function_gadget_create(
+    protoboard<FieldT>* pb,
+    pb_variable_array<FieldT>* prev_output,
+    pb_variable_array<FieldT>* new_block,
+    digest_variable<FieldT>* output) {
+  return new sha256_compression_function_gadget<FieldT>(
+      *pb,
+      pb_linear_combination_array<FieldT>(*prev_output),
+      *new_block,
+      *output,
+      "sha256_compression_function_gadget_create");
+}
+
+void camlsnark_mnt6_sha256_compression_function_gadget_generate_r1cs_constraints(
+  sha256_compression_function_gadget<FieldT>* g) {
+  g->generate_r1cs_constraints();
+}
+
+void camlsnark_mnt6_sha256_compression_function_gadget_generate_r1cs_witness(
+  sha256_compression_function_gadget<FieldT>* g) {
+  g->generate_r1cs_witness();
+}
 
 }

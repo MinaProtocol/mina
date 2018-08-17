@@ -1,0 +1,16 @@
+_build
+setup.data
+setup.log
+doc/*.html
+*.native
+*.byte
+*.so
+lib/decompress_conf.ml
+*.tar.gz
+_tests
+lib_test/files
+zpipe
+c/dpipe
+*.install
+*~
+.merlin

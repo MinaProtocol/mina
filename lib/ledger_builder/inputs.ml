@@ -23,14 +23,8 @@ module type S = sig
 
   module Ledger_hash : Coda_pow.Ledger_hash_intf
 
-  module Ledger_proof_statement : sig
-    type t =
-      { source: Ledger_hash.t
-      ; target: Ledger_hash.t
-      ; fee_excess: Fee.Signed.t
-      ; proof_type: [`Base | `Merge] }
-    [@@deriving bin_io, sexp, eq]
-  end
+  module Ledger_proof_statement :
+    Coda_pow.Ledger_proof_statement_intf with type ledger_hash := Ledger_hash.t
 
   module Ledger_proof : sig
     include Coda_pow.Ledger_proof_intf

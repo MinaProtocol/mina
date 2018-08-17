@@ -188,6 +188,8 @@ module type Basic = sig
 
     val all : var list -> (var, _) Checked.t
 
+    val of_field : Field.Checked.t -> (var, _) Checked.t
+
     val var_of_value : value -> var
 
     val typ : (var, value) Typ.t
