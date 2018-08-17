@@ -497,12 +497,12 @@ module type Consensus_mechanism_intf = sig
     type var
 
     val create_value :
-         protocol_state:Protocol_state.value
+         blockchain_state:blockchain_state
       -> consensus_data:Consensus_data.value
       -> ledger_proof:proof option
       -> value
 
-    val protocol_state : value -> Protocol_state.value
+    val blockchain_state : value -> blockchain_state
 
     val consensus_data : value -> Consensus_data.value
   end

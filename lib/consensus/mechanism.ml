@@ -1,3 +1,5 @@
+open Core_kernel
+
 module type S = sig
   module Proof : sig
     type t [@@deriving bin_io, sexp]
@@ -15,6 +17,8 @@ module type S = sig
     val var_to_bits :
          var
       -> (Snark_params.Tick.Boolean.var list, _) Snark_params.Tick.Checked.t
+
+    val fold : value -> Snark_params.Tick.Pedersen.fold
   end
 
   module Protocol_state :
@@ -31,7 +35,6 @@ module type S = sig
   module Snark_transition :
     Nanobit_base.Snark_transition.S
     with module Consensus_data = Consensus_data
-     and module Protocol_state = Protocol_state
      and module Proof = Proof
 
   module Internal_transition :
@@ -47,12 +50,14 @@ module type S = sig
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
 
   val update :
+       Consensus_state.value
+    -> Snark_transition.value
+    -> Consensus_state.value Or_error.t
+
+  val update_var :
        Consensus_state.var
     -> Snark_transition.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
-
-  val update_unchecked :
-    Consensus_state.value -> Snark_transition.value -> Consensus_state.value
 
   val step :
        Consensus_state.value

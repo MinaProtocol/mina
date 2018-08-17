@@ -174,7 +174,10 @@ struct
           | `Ok (protocol_state, consensus_data) ->
               let snark_transition =
                 Consensus_mechanism.Snark_transition.create_value
-                  ~protocol_state ~consensus_data
+                  ~blockchain_state:
+                    (Consensus_mechanism.Protocol_state.blockchain_state
+                       protocol_state)
+                  ~consensus_data
                   ~ledger_proof:
                     (Option.map ledger_proof_opt
                        ~f:(Fn.compose Ledger_proof.underlying_proof fst))
@@ -189,10 +192,7 @@ struct
                 Prover.prove ~prev_state:(state, state_proof)
                   internal_transition
               in
-              Consensus_mechanism.External_transition.create
-                ~protocol_state:
-                  (Consensus_mechanism.Snark_transition.protocol_state
-                     snark_transition)
+              Consensus_mechanism.External_transition.create ~protocol_state
                 ~protocol_state_proof
                 ~ledger_builder_diff:
                   (Consensus_mechanism.Internal_transition.ledger_builder_diff

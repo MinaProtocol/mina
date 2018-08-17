@@ -57,8 +57,6 @@ val var_to_bits : var -> (Boolean.var list, _) Checked.t
 
 val to_bits : t -> bool list
 
-val hash : t -> Hash.t
-
 module Message :
   Snarky.Signature.Message_intf
   with type ('a, 'b) checked := ('a, 'b) Tick.Checked.t

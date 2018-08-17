@@ -75,12 +75,6 @@ let to_bits ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
 let bit_length =
   Ledger_builder_hash.length_in_bits + Ledger_hash.length_in_bits + Block_time.bit_length
 
-let hash t =
-  Pedersen.State.update_fold Hash_prefix.blockchain_state
-    (List.fold_left (to_bits t))
-  |> Pedersen.State.digest
-  |> State_hash.of_hash
-
 let set_timestamp t timestamp = { t with timestamp }
 
 let genesis_time =

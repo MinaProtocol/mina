@@ -143,14 +143,14 @@ struct
                   ~previous_state_hash:
                     (Consensus_mechanism.Protocol_state.hash prev_state)
                   ~blockchain_state:
-                    ( transition
-                    |> Consensus_mechanism.Snark_transition.protocol_state
-                    |> Consensus_mechanism.Protocol_state.blockchain_state )
+                    (Consensus_mechanism.Snark_transition.blockchain_state
+                       transition)
                   ~consensus_state:
-                    (Consensus_mechanism.update_unchecked
-                       (Consensus_mechanism.Protocol_state.consensus_state
-                          prev_state)
-                       transition) }
+                    ( Or_error.ok_exn
+                    @@ Consensus_mechanism.update
+                         (Consensus_mechanism.Protocol_state.consensus_state
+                            prev_state)
+                         transition ) }
           else Or_error.ok_exn (W.extend_blockchain chain transition) )
 
     let verify_blockchain =

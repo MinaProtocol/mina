@@ -94,11 +94,14 @@ struct
         Public_key.Compressed.var_to_bits signer_public_key
       in
       Length.Unpacked.var_to_bits length @ public_key_bits
+
+    let fold {length; signer_public_key} =
+      let open Nanobit_base.Util in
+      Length.Bits.fold length +> Public_key.Compressed.fold signer_public_key
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
-  module Snark_transition =
-    Snark_transition.Make (Consensus_data) (Protocol_state) (Proof)
+  module Snark_transition = Snark_transition.Make (Consensus_data) (Proof)
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition =
@@ -110,10 +113,9 @@ struct
     in
     Blockchain_state.Signature.Checked.verifies signature
       (Public_key.var_of_t Global_keypair.public_key)
-      ( transition |> Snark_transition.protocol_state
-      |> Protocol_state.blockchain_state )
+      (transition |> Snark_transition.blockchain_state)
 
-  let update (state: Consensus_state.var) _block =
+  let update_var (state: Consensus_state.var) _block =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in
@@ -127,17 +129,11 @@ struct
     in
     {length; signer_public_key}
 
-  let update_unchecked state _transition =
+  let update state _transition =
     let open Consensus_state in
-    { length= Length.succ state.length
-    ; signer_public_key= Public_key.compress Global_keypair.public_key }
-
-  (*
-    let consensus_state = () in
-    { previous_state_hash= hash state
-    ; blockchain_state= Consensus_mechanism.Block.blockchain_state block
-    ; consensus_state }
-         *)
+    Or_error.return
+      { length= Length.succ state.length
+      ; signer_public_key= Public_key.compress Global_keypair.public_key }
 
   let step = Async_kernel.Deferred.Or_error.return
 
@@ -149,12 +145,12 @@ struct
     Protocol_state.create_value
       ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
       ~blockchain_state:
-        ( Snark_transition.genesis |> Snark_transition.protocol_state
-        |> Protocol_state.blockchain_state )
+        (Snark_transition.genesis |> Snark_transition.blockchain_state)
       ~consensus_state:
-        (update_unchecked
-           (Protocol_state.consensus_state Protocol_state.negative_one)
-           Snark_transition.genesis)
+        ( Or_error.ok_exn
+        @@ update
+             (Protocol_state.consensus_state Protocol_state.negative_one)
+             Snark_transition.genesis )
 
   let create_consensus_data state =
     (* TODO: sign protocol_state instead of blockchain_state *)

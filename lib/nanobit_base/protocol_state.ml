@@ -1,3 +1,4 @@
+open Util
 open Core_kernel
 open Snark_params.Tick
 
@@ -15,6 +16,8 @@ module type Consensus_state_intf = sig
   val bit_length : int
 
   val var_to_bits : var -> (Boolean.var list, _) Checked.t
+
+  val fold : value -> Pedersen.fold
 end
 
 module type S = sig
@@ -134,9 +137,14 @@ struct
     State_hash.length_in_bits + Blockchain_state.bit_length
     + Consensus_state.bit_length
 
-  let hash _s = failwith "TODO"
+  let fold {previous_state_hash; blockchain_state; consensus_state} =
+    State_hash.fold previous_state_hash
+    +> Blockchain_state.fold blockchain_state
+    +> Consensus_state.fold consensus_state
 
-  (* previous_state_hash ... Blockchain_state.hash s.blockchain_state ... Sybil_resistance_state.hash s.sybil_resistance_state *)
+  let hash s =
+    Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state (fold s)
+    |> State_hash.of_hash
 
   let negative_one =
     { previous_state_hash=

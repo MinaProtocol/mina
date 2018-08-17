@@ -9,41 +9,11 @@ open Tick
 open Nanobit_base
 open Let_syntax
 
-module type S = sig
-  module Consensus_mechanism : Consensus.Mechanism.S
-
-  module type Update_intf = sig
-    val update :
-         Consensus_mechanism.Protocol_state.value
-      -> Consensus_mechanism.Snark_transition.value
-      -> Consensus_mechanism.Protocol_state.value Or_error.t
-
-    module Checked : sig
-      val update :
-           State_hash.var * Consensus_mechanism.Protocol_state.var
-        -> Consensus_mechanism.Snark_transition.var
-        -> ( State_hash.var
-             * Consensus_mechanism.Protocol_state.var
-             * [`Success of Boolean.var]
-           , _ )
-           Checked.t
-    end
-  end
-
-  module Make_update (T : Transaction_snark.Verification.S) : Update_intf
-
-  module Checked : sig
-    val hash :
-      Consensus_mechanism.Protocol_state.var -> (State_hash.var, _) Checked.t
-
-    val is_base_hash : State_hash.var -> (Boolean.var, _) Checked.t
-  end
-end
-
 module Make
     (Consensus_mechanism : Consensus.Mechanism.S
                            with type Proof.t = Tock.Proof.t) :
-  S with module Consensus_mechanism := Consensus_mechanism =
+  Blockchain_state_intf.S
+  with module Consensus_mechanism := Consensus_mechanism =
 struct
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Snark_transition = Consensus_mechanism.Snark_transition
@@ -71,15 +41,14 @@ struct
   module Make_update (T : Transaction_snark.Verification.S) = struct
     let update state (transition: Snark_transition.value) =
       let open Or_error.Let_syntax in
-      let%map () =
+      let%bind () =
         match Snark_transition.ledger_proof transition with
         | None ->
             check
               (Ledger_hash.equal
                  ( state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
-                 ( transition |> Snark_transition.protocol_state
-                 |> Protocol_state.blockchain_state
+                 ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash ))
               "Body proof was none but tried to update ledger hash"
         | Some proof ->
@@ -92,22 +61,21 @@ struct
                         ( state |> Protocol_state.blockchain_state
                         |> Blockchain_state.ledger_hash )
                       ~target:
-                        ( transition |> Snark_transition.protocol_state
-                        |> Protocol_state.blockchain_state
+                        ( transition |> Snark_transition.blockchain_state
                         |> Blockchain_state.ledger_hash )
                       ~proof_type:`Merge
                       ~fee_excess:Currency.Amount.Signed.zero ~proof))
                 "Proof did not verify"
       in
+      let%map consensus_state =
+        Consensus_mechanism.update
+          (Protocol_state.consensus_state state)
+          transition
+      in
       Protocol_state.create_value
         ~previous_state_hash:(Protocol_state.hash state)
-        ~blockchain_state:
-          ( transition |> Snark_transition.protocol_state
-          |> Protocol_state.blockchain_state )
-        ~consensus_state:
-          (Consensus_mechanism.update_unchecked
-             (Protocol_state.consensus_state state)
-             transition)
+        ~blockchain_state:(Snark_transition.blockchain_state transition)
+        ~consensus_state
 
     module Checked = struct
       (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
@@ -143,8 +111,7 @@ struct
                T.verify_complete_merge
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
-                 ( transition |> Snark_transition.protocol_state
-                 |> Protocol_state.blockchain_state
+                 ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
                  (As_prover.return
                     (Option.value ~default:Tock.Proof.dummy
@@ -153,8 +120,7 @@ struct
                Ledger_hash.equal_var
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
-                 ( transition |> Snark_transition.protocol_state
-                 |> Protocol_state.blockchain_state
+                 ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
              and consensus_data_is_valid =
                Consensus_mechanism.verify transition
@@ -165,15 +131,13 @@ struct
              Boolean.(correct_snark && consensus_data_is_valid)
            in
            let%bind consensus_state =
-             Consensus_mechanism.update
+             Consensus_mechanism.update_var
                (Protocol_state.consensus_state previous_state)
                transition
            in
            let new_state =
              Protocol_state.create_var ~previous_state_hash
-               ~blockchain_state:
-                 ( transition |> Snark_transition.protocol_state
-                 |> Protocol_state.blockchain_state )
+               ~blockchain_state:(Snark_transition.blockchain_state transition)
                ~consensus_state
            in
            let%bind state_bits = Protocol_state.var_to_bits new_state in
@@ -183,7 +147,7 @@ struct
            in
            let%map state_hash =
              Pedersen_hash.Section.create
-               ~acc:(`Value Hash_prefix.blockchain_state.acc)
+               ~acc:(`Value Hash_prefix.protocol_state.acc)
                ~support:
                  (Interval_union.of_interval (0, Hash_prefix.length_in_bits))
              |> Pedersen_hash.Section.disjoint_union_exn state_partial
@@ -207,7 +171,7 @@ struct
     let hash (t: Protocol_state.var) =
       with_label __LOC__
         ( Protocol_state.var_to_bits t
-        >>= digest_bits ~init:Hash_prefix.blockchain_state
+        >>= digest_bits ~init:Hash_prefix.protocol_state
         >>| State_hash.var_of_hash_packed )
   end
 end
