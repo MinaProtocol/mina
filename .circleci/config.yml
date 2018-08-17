@@ -21,7 +21,11 @@ jobs:
 
       - run:
           name: Build OCaml
-          command: eval `opam config env` && dune build -j8
+          command: eval `opam config env` && dune build -j8 | tee build.log
+
+      - run:
+          name: Count OCaml Warns
+          command: ./scripts/buildwarns.py build.log
 
       - run:
           name: Run All Tests

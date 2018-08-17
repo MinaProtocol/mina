@@ -2,3 +2,6 @@ _build/
 *.install
 .merlin
 result
+build.log
+# emacs temp files
+*~
