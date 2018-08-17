@@ -339,8 +339,7 @@ module type Inputs_intf = sig
      and type ledger_builder := Ledger_builder.t
      and type transaction := Transaction.With_valid_signature.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type protocol_state_proof :=
-                Protocol_state_proof.t
+     and type protocol_state_proof := Protocol_state_proof.t
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
      and type external_transition := Consensus_mechanism.External_transition.t

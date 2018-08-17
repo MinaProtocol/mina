@@ -64,27 +64,40 @@ let daemon =
        in
        let me = Host_and_port.create ~host:ip ~port in
        let module Common = struct
-           module Make_consensus_mechanism (Ledger_builder_diff : sig type t [@@deriving sexp, bin_io] end) =
-             Consensus.Proof_of_signature.Make (Nanobit_base.Proof) (Ledger_builder_diff)
+         module Make_consensus_mechanism (Ledger_builder_diff : sig
+           type t [@@deriving sexp, bin_io]
+         end) =
+           Consensus.Proof_of_signature.Make (Nanobit_base.Proof)
+             (Ledger_builder_diff)
 
-           let logger = log
-           let conf_dir = conf_dir
-           let transaction_interval = Time.Span.of_sec 5.0
-           let fee_public_key = Genesis_ledger.rich_pk
-           let genesis_proof = Precomputed_values.base_proof
+         let logger = log
+
+         let conf_dir = conf_dir
+
+         let transaction_interval = Time.Span.of_sec 5.0
+
+         let fee_public_key = Genesis_ledger.rich_pk
+
+         let genesis_proof = Precomputed_values.base_proof
        end in
        let%bind (module M) =
          if Insecure.key_generation then
-           let%map (module Init) = make_init (module struct
-               include Common
-               module Ledger_proof = Ledger_proof.Debug
-           end) in
+           let%map (module Init) =
+             make_init
+               ( module struct
+                 include Common
+                 module Ledger_proof = Ledger_proof.Debug
+               end )
+           in
            (module Coda_without_snark (Init) () : Main_intf)
          else
-           let%map (module Init) = make_init (module struct
-               include Common
-               module Ledger_proof = Ledger_proof.Prod
-           end) in
+           let%map (module Init) =
+             make_init
+               ( module struct
+                 include Common
+                 module Ledger_proof = Ledger_proof.Prod
+               end )
+           in
            (module Coda_with_snark (Storage.Disk) (Init) () : Main_intf)
        in
        let module Run = Run (M) in

@@ -82,12 +82,12 @@ struct
     type value =
       (State_hash.Stable.V1.t, Blockchain_state.value, Consensus_state.value) t
     [@@deriving bin_io, sexp, hash, compare]
-    type t = value
-    [@@deriving bin_io, sexp, hash, compare]
+
+    type t = value [@@deriving bin_io, sexp, hash, compare]
   end
 
-  type value = Value.t
-  [@@deriving bin_io, sexp, hash, compare]
+  type value = Value.t [@@deriving bin_io, sexp, hash, compare]
+
   include Hashable.Make (Value)
 
   type var = (State_hash.var, Blockchain_state.var, Consensus_state.var) t

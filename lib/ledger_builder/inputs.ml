@@ -28,7 +28,9 @@ module type S = sig
     [@@deriving bin_io, sexp, eq]
   end
 
-  module Proof : sig type t end
+  module Proof : sig
+    type t
+  end
 
   module Ledger_proof : sig
     include Coda_pow.Ledger_proof_intf
@@ -42,7 +44,8 @@ module type S = sig
     include Sexpable.S with type t := t
   end
 
-  module Ledger_proof_verifier : Ledger_proof_verifier_intf
+  module Ledger_proof_verifier :
+    Ledger_proof_verifier_intf
     with type statement := Ledger_proof_statement.t
      and type message := Fee.Unsigned.t * Compressed_public_key.t
      and type ledger_proof := Ledger_proof.t

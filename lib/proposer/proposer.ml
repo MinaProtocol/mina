@@ -25,8 +25,7 @@ module Make (Inputs : Inputs_intf) :
    and type ledger_builder := Inputs.Ledger_builder.t
    and type transaction := Inputs.Transaction.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
-   and type protocol_state_proof :=
-              Inputs.Protocol_state_proof.t
+   and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t =
@@ -48,7 +47,9 @@ struct
 
     val result :
          t
-      -> [`Ok of (Consensus_mechanism.Protocol_state.value * Consensus_mechanism.Consensus_data.value) | `Cancelled]
+      -> [ `Ok of Consensus_mechanism.Protocol_state.value
+                  * Consensus_mechanism.Consensus_data.value
+         | `Cancelled ]
          Deferred.t
 
     val cancel : t -> unit
@@ -56,7 +57,9 @@ struct
     type t =
       { cancelled: bool ref
       ; result:
-          [`Ok of (Consensus_mechanism.Protocol_state.value * Consensus_mechanism.Consensus_data.value)| `Cancelled]
+          [ `Ok of Consensus_mechanism.Protocol_state.value
+                   * Consensus_mechanism.Consensus_data.value
+          | `Cancelled ]
           Deferred.t
       ; time_controller: Time.Controller.t }
 
@@ -90,7 +93,8 @@ struct
       in
       (protocol_state, consensus_data)
 
-    let create previous_state ~time_controller ~next_ledger_hash ~next_ledger_builder_hash =
+    let create previous_state ~time_controller ~next_ledger_hash
+        ~next_ledger_builder_hash =
       let cancelled = ref false in
       let rec go () =
         if !cancelled then return `Cancelled
@@ -115,8 +119,7 @@ struct
     val cancel : t -> unit
 
     val create :
-         state:Consensus_mechanism.Protocol_state.value
-               * Protocol_state_proof.t
+         state:Consensus_mechanism.Protocol_state.value * Protocol_state_proof.t
       -> time_controller:Time.Controller.t
       -> ledger_builder:Ledger_builder.t
       -> transactions:Transaction.With_valid_signature.t Sequence.t
@@ -167,18 +170,15 @@ struct
       (* Someday: If bundle finishes first you can stuff more transactions in the bundle *)
       let result =
         let result =
-          match%bind
-            Consensus_result.result consensus_result
-          with
+          match%bind Consensus_result.result consensus_result with
           | `Ok (protocol_state, consensus_data) ->
-            let snark_transition = 
-              Consensus_mechanism.Snark_transition.create_value
-                ~protocol_state ~consensus_data
-                ~ledger_proof:
-                    (Option.map ledger_proof_opt ~f:(Fn.compose Ledger_proof.underlying_proof fst))
-            in
-
-
+              let snark_transition =
+                Consensus_mechanism.Snark_transition.create_value
+                  ~protocol_state ~consensus_data
+                  ~ledger_proof:
+                    (Option.map ledger_proof_opt
+                       ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+              in
               let open Deferred.Or_error.Let_syntax in
               let internal_transition =
                 Consensus_mechanism.Internal_transition.create
@@ -194,7 +194,9 @@ struct
                   (Consensus_mechanism.Snark_transition.protocol_state
                      snark_transition)
                 ~protocol_state_proof
-                ~ledger_builder_diff:(Consensus_mechanism.Internal_transition.ledger_builder_diff internal_transition)
+                ~ledger_builder_diff:
+                  (Consensus_mechanism.Internal_transition.ledger_builder_diff
+                     internal_transition)
           | `Cancelled ->
               Deferred.return (Or_error.error_string "Signing cancelled")
         in

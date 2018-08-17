@@ -11,7 +11,8 @@ module type Inputs_intf = sig
       type value
     end
 
-    val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
+    val select :
+      Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
   end
 
   module Protocol_state : sig

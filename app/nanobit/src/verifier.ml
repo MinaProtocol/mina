@@ -27,7 +27,8 @@ module Make
 struct
   module Worker_state = struct
     module type S = sig
-      val verify_wrap : Consensus_mechanism.Protocol_state.value -> Tock.Proof.t -> bool
+      val verify_wrap :
+        Consensus_mechanism.Protocol_state.value -> Tock.Proof.t -> bool
 
       val verify_transaction_snark : Transaction_snark.t -> bool
     end
@@ -43,9 +44,7 @@ struct
          let module T = Transaction_snark.Verification.Make (struct
            let keys = tx_vk
          end) in
-         let module B =
-           Blockchain_transition.Make (Consensus_mechanism)
-             (T) in
+         let module B = Blockchain_transition.Make (Consensus_mechanism) (T) in
          let module U =
            Blockchain_snark_utils.Verification (Consensus_mechanism)
              (struct

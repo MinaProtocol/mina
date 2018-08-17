@@ -31,7 +31,8 @@ module type S = sig
 
     module Prover_state = Step_prover_state
 
-    val instance_hash : Consensus_mechanism.Protocol_state.value -> Tick.Field.t
+    val instance_hash :
+      Consensus_mechanism.Protocol_state.value -> Tick.Field.t
 
     val main : Tick.Field.var -> (unit, Prover_state.t) Tick.Checked.t
   end
@@ -58,8 +59,9 @@ let bc_pk = lazy (Snark_keys.blockchain_proving ())
 let bc_vk = lazy (Snark_keys.blockchain_verification ())
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Tock.Proof.t)
-= struct
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with type Proof.t = Tock.Proof.t) =
+struct
   module type S = S with module Consensus_mechanism = Consensus_mechanism
 
   let keys = Set_once.create ()
@@ -128,7 +130,8 @@ module Make
               in
               fun state ->
                 Tick.Pedersen.digest_fold s
-                  (State_hash.fold (Consensus_mechanism.Protocol_state.hash state))
+                  (State_hash.fold
+                     (Consensus_mechanism.Protocol_state.hash state))
 
             module Verification_key = struct
               let to_bool_list =

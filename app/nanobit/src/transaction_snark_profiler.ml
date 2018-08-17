@@ -42,8 +42,7 @@ let create_ledger_and_transactions num_transitions =
   | `Count n ->
       let num_transactions = n - 1 in
       let transactions =
-        List.rev
-          (List.init num_transactions (fun _ -> random_transaction ()))
+        List.rev (List.init num_transactions (fun _ -> random_transaction ()))
       in
       let fee_transfer =
         let open Currency.Fee in
@@ -142,9 +141,7 @@ let check_base_snarks sparse_ledger0
   "Base constraint system satisfied"
 
 let run profiler num_transactions =
-  let ledger, transitions =
-    create_ledger_and_transactions num_transactions
-  in
+  let ledger, transitions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
     Nanobit_base.Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map transitions ~f:(fun t ->
@@ -177,8 +174,7 @@ let command =
     (let%map_open n =
        flag "k"
          ~doc:
-           "log_2(number of transactions to snark) or none for the mocked \
-            ones"
+           "log_2(number of transactions to snark) or none for the mocked ones"
          (optional int)
      and check_only =
        flag "check-only"

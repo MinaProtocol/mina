@@ -6,7 +6,8 @@ open Blockchain_snark
 open Cli_lib
 
 module type S = sig
-  module Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Proof.t
+  module Consensus_mechanism :
+    Consensus.Mechanism.S with type Proof.t = Proof.t
 
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism
@@ -25,10 +26,11 @@ module type S = sig
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Nanobit_base.Proof.t)
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with type Proof.t = Nanobit_base.Proof.t)
     (Blockchain : Blockchain.S
-                  with module Consensus_mechanism = Consensus_mechanism)
-= struct
+                  with module Consensus_mechanism = Consensus_mechanism) =
+struct
   module Consensus_mechanism = Consensus_mechanism
   module Blockchain = Blockchain
 
@@ -55,8 +57,7 @@ module Make
 
     let create () : t Deferred.t =
       Deferred.return
-        (let module Keys =
-           Keys_lib.Keys.Make (Consensus_mechanism) in
+        (let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
         let%map (module Keys) = Keys.create () in
         let module Transaction_snark = Transaction_snark.Make (struct
           let keys = Keys.transaction_snark_keys
@@ -66,8 +67,8 @@ module Make
           open Keys
           module Consensus_mechanism = Keys.Consensus_mechanism
           module Transaction_snark = Transaction_snark
-          module Blockchain_state =
-            Blockchain_state.Make (Keys.Consensus_mechanism)
+          module Blockchain_state = Blockchain_state.Make (Keys.
+                                                           Consensus_mechanism)
           module State = Blockchain_state.Make_update (Transaction_snark)
 
           let update = State.update
@@ -125,10 +126,13 @@ module Make
           `Initialized )
 
     let extend_blockchain =
-      create [%bin_type_class : Blockchain.t * Consensus_mechanism.Snark_transition.value]
+      create
+        [%bin_type_class
+          : Blockchain.t * Consensus_mechanism.Snark_transition.value]
         Blockchain.bin_t
         (fun w
-        (({Blockchain.state= prev_state; proof= prev_proof} as chain), transition)
+        ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
+        , transition )
         ->
           let%map (module W) = Worker_state.get w in
           if Insecure.extend_blockchain then
@@ -136,9 +140,17 @@ module Make
             { Blockchain.proof
             ; state=
                 Consensus_mechanism.Protocol_state.create_value
-                  ~previous_state_hash:(Consensus_mechanism.Protocol_state.hash prev_state)
-                  ~blockchain_state:(transition |> Consensus_mechanism.Snark_transition.protocol_state |> Consensus_mechanism.Protocol_state.blockchain_state)
-                  ~consensus_state:(Consensus_mechanism.update_unchecked (Consensus_mechanism.Protocol_state.consensus_state prev_state) transition) }
+                  ~previous_state_hash:
+                    (Consensus_mechanism.Protocol_state.hash prev_state)
+                  ~blockchain_state:
+                    ( transition
+                    |> Consensus_mechanism.Snark_transition.protocol_state
+                    |> Consensus_mechanism.Protocol_state.blockchain_state )
+                  ~consensus_state:
+                    (Consensus_mechanism.update_unchecked
+                       (Consensus_mechanism.Protocol_state.consensus_state
+                          prev_state)
+                       transition) }
           else Or_error.ok_exn (W.extend_blockchain chain transition) )
 
     let verify_blockchain =

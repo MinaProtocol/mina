@@ -74,9 +74,11 @@ module type Inputs_intf = sig
 
     (* This checks the SNARKs in State/LB and does the transition *)
 
-    val step : Consensus_state.value -> Consensus_state.value Deferred.Or_error.t
+    val step :
+      Consensus_state.value -> Consensus_state.value Deferred.Or_error.t
 
-    val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
+    val select :
+      Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
   end
 
   module Protocol_state : sig
@@ -562,7 +564,8 @@ let%test_module "test" =
 
         let step = Deferred.Or_error.return
 
-        let select Consensus_state.({strength= s1}) Consensus_state.({strength= s2}) =
+        let select Consensus_state.({strength= s1})
+            Consensus_state.({strength= s2}) =
           if s1 >= s2 then `Keep else `Take
       end
 

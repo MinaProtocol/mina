@@ -1,9 +1,7 @@
-module Make
-(Proof : sig
+module Make (Proof : sig
   type t [@@deriving bin_io, sexp]
-end)
-(Ledger_builder_diff : sig
-   type t [@@deriving sexp, bin_io]
+end) (Ledger_builder_diff : sig
+  type t [@@deriving sexp, bin_io]
 end) :
   Mechanism.S
   with module Proof = Proof

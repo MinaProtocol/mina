@@ -21,7 +21,8 @@ end
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let base_hash = Keys.Step.instance_hash Keys.Consensus_mechanism.genesis_protocol_state
+  let base_hash =
+    Keys.Step.instance_hash Keys.Consensus_mechanism.genesis_protocol_state
 
   let base_hash_expr =
     [%expr
@@ -69,66 +70,67 @@ let main () =
     if use_dummy_values then return (module Dummy : S)
     else
       let module Consensus_mechanism =
-      Consensus.Proof_of_signature.Make (Nanobit_base.Proof) (Ledger_builder.Make_diff (struct
-        open Nanobit_base
+        Consensus.Proof_of_signature.Make (Nanobit_base.Proof)
+          (Ledger_builder.Make_diff (struct
+            open Nanobit_base
+            module Compressed_public_key = Public_key.Compressed
 
-        module Compressed_public_key = Public_key.Compressed
+            module Transaction = struct
+              include (
+                Transaction :
+                  module type of Transaction
+                  with module With_valid_signature := Transaction.
+                                                      With_valid_signature )
 
-        module Transaction = struct
-          include (
-            Transaction :
-              module type of Transaction
-              with module With_valid_signature := Transaction.
-                                                  With_valid_signature )
+              let receiver _ = failwith "stub"
 
-          let receiver _ = failwith "stub"
+              let sender _ = failwith "stub"
 
-          let sender _ = failwith "stub"
+              let fee _ = failwith "stub"
 
-          let fee _ = failwith "stub"
+              let compare _ _ = failwith "stub"
 
-          let compare _ _ = failwith "stub"
+              module With_valid_signature = struct
+                include Transaction.With_valid_signature
 
-          module With_valid_signature = struct
-            include Transaction.With_valid_signature
+                let compare _ _ = failwith "stub"
+              end
+            end
 
-            let compare _ _ = failwith "stub"
-          end
-        end
+            module Ledger_proof = Transaction_snark
 
-        module Ledger_proof = Transaction_snark
+            module Completed_work = struct
+              include Ledger_builder.Make_completed_work (Compressed_public_key)
+                        (Ledger_proof)
+                        (Transaction_snark.Statement)
 
-        module Completed_work = struct
-          include Ledger_builder.Make_completed_work (Compressed_public_key) (Ledger_proof) (Transaction_snark.Statement)
+              let check _ _ = failwith "stub"
+            end
 
-          let check _ _ = failwith "stub"
-        end
+            module Ledger_hash = struct
+              include Ledger_hash.Stable.V1
 
-        module Ledger_hash = struct
-          include Ledger_hash.Stable.V1
+              let to_bytes = Ledger_hash.to_bytes
+            end
 
-          let to_bytes = Ledger_hash.to_bytes
-        end
+            module Ledger_builder_aux_hash = struct
+              include Ledger_builder_hash.Aux_hash.Stable.V1
 
-        module Ledger_builder_aux_hash = struct
-          include Ledger_builder_hash.Aux_hash.Stable.V1
+              let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+            end
 
-          let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
-        end
+            module Ledger_builder_hash = struct
+              include Ledger_builder_hash.Stable.V1
 
-        module Ledger_builder_hash = struct
-          include Ledger_builder_hash.Stable.V1
+              let of_aux_and_ledger_hash =
+                Ledger_builder_hash.of_aux_and_ledger_hash
 
-          let of_aux_and_ledger_hash =
-            Ledger_builder_hash.of_aux_and_ledger_hash
+              let to_bytes = Ledger_builder_hash.to_bytes
 
-          let to_bytes = Ledger_builder_hash.to_bytes
-
-          let of_bytes = Ledger_builder_hash.of_bytes
-        end
-      end)) in
-      let module Keys =
-        Keys_lib.Keys.Make (Consensus_mechanism) in
+              let of_bytes = Ledger_builder_hash.of_bytes
+            end
+          end)) in
+      let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
       let%map (module K) = Keys.create () in
       (module Make_real (K) : S)
   in

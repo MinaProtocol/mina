@@ -111,7 +111,8 @@ module Keys = struct
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Tock.Proof.t)
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with type Proof.t = Tock.Proof.t)
     (T : Transaction_snark.Verification.S) =
 struct
   module Blockchain = Blockchain_state.Make (Consensus_mechanism)

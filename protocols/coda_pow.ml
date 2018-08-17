@@ -232,7 +232,9 @@ end
 
 module type Ledger_proof_verifier_intf = sig
   type ledger_proof
+
   type message
+
   type statement
 
   val verify : ledger_proof -> statement -> message:message -> bool Deferred.t
@@ -247,9 +249,13 @@ module type Completed_work_intf = sig
 
   module Statement : sig
     type t = statement list
+
     include Sexpable.S with type t := t
+
     include Binable.S with type t := t
+
     include Hashable.S_binable with type t := t
+
     val gen : t Quickcheck.Generator.t
   end
 
@@ -264,6 +270,7 @@ module type Completed_work_intf = sig
 
   module Checked : sig
     (* TODO: undo? *)
+
     type nonrec t = t [@@deriving sexp, bin_io]
   end
 
@@ -612,7 +619,8 @@ module type Inputs_intf = sig
 
   module Compressed_public_key : Compressed_public_key_intf
 
-  module Public_key : Public_key_intf
+  module Public_key :
+    Public_key_intf
     with module Private_key := Private_key
      and module Compressed = Compressed_public_key
 
@@ -629,7 +637,9 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
 
-  module Proof : sig type t end
+  module Proof : sig
+    type t
+  end
 
   module Ledger_proof :
     Ledger_proof_intf
@@ -740,6 +750,7 @@ Merge Snark:
      and type time := Time.t
 
   module Protocol_state_hash : Protocol_state_hash_intf
+
   module Protocol_state_proof : Protocol_state_proof_intf
 
   module Consensus_mechanism :
@@ -754,8 +765,7 @@ Merge Snark:
     Tip_intf
     with type ledger_builder := Ledger_builder.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type protocol_state_proof :=
-                Protocol_state_proof.t
+     and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := Consensus_mechanism.External_transition.t
 end
 

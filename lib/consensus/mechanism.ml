@@ -1,5 +1,7 @@
 module type S = sig
-  module Proof : sig type t [@@deriving bin_io, sexp] end
+  module Proof : sig
+    type t [@@deriving bin_io, sexp]
+  end
 
   module Consensus_state : sig
     type value [@@deriving hash, eq, compare]
@@ -60,5 +62,6 @@ module type S = sig
 
   val create_consensus_state : Protocol_state.value -> Consensus_state.value
 
-  val create_consensus_data : Protocol_state.value -> Consensus_data.value option
+  val create_consensus_data :
+    Protocol_state.value -> Consensus_data.value option
 end

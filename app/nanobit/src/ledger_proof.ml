@@ -13,7 +13,7 @@ end
 module Debug = struct
   type t = Transaction_snark.Statement.t [@@deriving sexp, bin_io]
 
-  let proof (_ : t) = Proof.dummy
+  let proof (_: t) = Proof.dummy
 
-  let statement (t : t) : Transaction_snark.Statement.t = t
+  let statement (t: t) : Transaction_snark.Statement.t = t
 end

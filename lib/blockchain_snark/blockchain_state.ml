@@ -40,7 +40,9 @@ module type S = sig
   end
 end
 
-module Make (Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Tock.Proof.t) :
+module Make
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with type Proof.t = Tock.Proof.t) :
   S with module Consensus_mechanism := Consensus_mechanism =
 struct
   module Protocol_state = Consensus_mechanism.Protocol_state
@@ -93,8 +95,8 @@ struct
                         ( transition |> Snark_transition.protocol_state
                         |> Protocol_state.blockchain_state
                         |> Blockchain_state.ledger_hash )
-                      ~proof_type:`Merge ~fee_excess:Currency.Amount.Signed.zero
-                      ~proof))
+                      ~proof_type:`Merge
+                      ~fee_excess:Currency.Amount.Signed.zero ~proof))
                 "Proof did not verify"
       in
       Protocol_state.create_value

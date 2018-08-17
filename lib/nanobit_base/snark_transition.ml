@@ -11,7 +11,9 @@ module type S = sig
 
   module Protocol_state : Protocol_state.S
 
-  module Proof : sig type t [@@deriving bin_io, sexp] end
+  module Proof : sig
+    type t [@@deriving bin_io, sexp]
+  end
 
   type ('protocol_state, 'consensus_data) t [@@deriving sexp]
 
@@ -40,13 +42,14 @@ end
 
 module Make
     (Consensus_data : Consensus_data_intf)
-    (Protocol_state : Protocol_state.S)
-    (Proof : sig type t [@@deriving bin_io, sexp] end) :
+    (Protocol_state : Protocol_state.S) (Proof : sig
+        type t [@@deriving bin_io, sexp]
+    end) :
   S
   with module Protocol_state = Protocol_state
    and module Consensus_data = Consensus_data
-   and module Proof = Proof
-= struct
+   and module Proof = Proof =
+struct
   module Consensus_data = Consensus_data
   module Protocol_state = Protocol_state
   module Proof = Proof
