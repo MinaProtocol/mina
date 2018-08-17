@@ -36,6 +36,8 @@ module Make (Inputs : Inputs.S) : sig
            and type ledger_builder_aux_hash := Inputs.Ledger_builder_aux_hash.t
            and type sparse_ledger := Inputs.Sparse_ledger.t
            and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
+           and type ledger_proof_statement_set :=
+                      Inputs.Ledger_proof_statement.Set.t
            and type super_transaction := Inputs.Super_transaction.t
 end = struct
   open Inputs
@@ -97,42 +99,78 @@ end = struct
     ; public_key: Public_key.t }
   [@@deriving sexp, bin_io]
 
-  let merge_statement (s1: Ledger_proof_statement.t)
-      (s2: Ledger_proof_statement.t) =
-    let open Or_error.Let_syntax in
-    let%map fee_excess =
-      Fee.Signed.add s1.fee_excess s2.fee_excess |> option "Error adding fees"
-    in
-    { Ledger_proof_statement.source= s1.source
-    ; target= s2.target
-    ; fee_excess
-    ; proof_type= `Merge }
-
-  let random_work_spec_chunk t =
+  let random_work_spec_chunk t (seen_statements: Ledger_proof_statement.Set.t) =
+    let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
     let module A = Parallel_scan.Available_job in
-    let jobs = Parallel_scan.next_jobs ~state:t.scan_state in
+    let module L = Ledger_proof_statement in
+    let canonical_statement_of_job = function
+      | A.Base {Super_transaction_with_witness.statement; _} -> statement
+      | A.Merge ((_, s1), (_, s2)) ->
+          Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
+    in
     let single_spec (job: job) =
       match job with
       | A.Base d ->
           Snark_work_lib.Work.Single.Spec.Transition
             (d.statement, d.transaction, d.witness)
       | A.Merge ((p1, s1), (p2, s2)) ->
-          let merged = merge_statement s1 s2 |> Or_error.ok_exn in
+          let merged = Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn in
           Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
     in
-    let n = List.length jobs in
+    (* We currently have an invariant that work must be consecutive. In order to
+     * appease that, we admit the redundant work in the following case:
+     *
+     * Starting state where we randomly choose index 1:
+     * |_|_|x|x|_|
+     *    ^
+     *
+     * We will produce the following bundle:
+     * |_|_|x|x|_|
+     *   (y,y)
+     *
+     * When we do bundles of size k instead we can revisit this and make it more
+     * efficient.
+     *
+     * We use the following algorithm to choose the index:
+     *
+     * i <-$- [0,select0 str length)
+     * j := (rank0 str i)
+     * emit jobs@j and jobs@j+1 (if it exists)
+     *
+     * See meaning of rank/select from here:
+     * https://en.wikipedia.org/wiki/Succinct_data_structure
+     *)
+    let index_of_nth_occurence str n =
+      Sequence.of_list str
+      |> Sequence.filter_mapi ~f:(fun i b -> if not b then Some i else None)
+      |> Fn.flip Sequence.nth n
+    in
+    let n = List.length all_jobs in
+    let dirty_jobs =
+      List.map all_jobs ~f:(fun j ->
+          L.Set.mem seen_statements (canonical_statement_of_job j) )
+    in
+    let seen_jobs, jobs =
+      List.partition_tf all_jobs ~f:(fun j ->
+          L.Set.mem seen_statements (canonical_statement_of_job j) )
+    in
+    let seen_statements =
+      List.map seen_jobs ~f:canonical_statement_of_job |> L.Set.of_list
+    in
     match jobs with
-    | [] -> None
-    | [j] -> Some [single_spec j]
+    | [] -> (None, seen_statements)
+    | [j] ->
+        ( Some [single_spec j]
+        , L.Set.add seen_statements (canonical_statement_of_job j) )
     | _ ->
-        (* TODO: Should we break these up in such a way that the following
-       * situation can't happen:
-       * A gets 0,1 ; B gets 1,2
-       * Essentially you "can't" buy B if you buy A
-       *)
-        let i = Random.int n in
-        let chunk = [List.nth_exn jobs i; List.nth_exn jobs ((i + 1) % n)] in
-        Some (List.map chunk ~f:single_spec)
+        let i = Random.int (List.length jobs) in
+        let j = index_of_nth_occurence dirty_jobs i |> Option.value_exn in
+        let chunk =
+          [List.nth_exn all_jobs j; List.nth_exn all_jobs ((j + 1) % n)]
+        in
+        ( Some (List.map chunk ~f:single_spec)
+        , L.Set.union seen_statements
+            (List.map chunk ~f:canonical_statement_of_job |> L.Set.of_list) )
 
   let aux {scan_state; _} = scan_state
 
@@ -726,26 +764,41 @@ let%test_module "test" =
       end
 
       module Ledger_proof_statement = struct
-        type t =
-          { source: Ledger_hash.t
-          ; target: Ledger_hash.t
-          ; fee_excess: Fee.Signed.t
-          ; proof_type: [`Base | `Merge] }
-        [@@deriving sexp, bin_io, compare, eq]
+        module T = struct
+          type t =
+            { source: Ledger_hash.t
+            ; target: Ledger_hash.t
+            ; fee_excess: Fee.Signed.t
+            ; proof_type: [`Base | `Merge] }
+          [@@deriving sexp, bin_io, compare]
+
+          let merge s1 s2 =
+            let open Or_error.Let_syntax in
+            let%map fee_excess =
+              Fee.Signed.add s1.fee_excess s2.fee_excess
+              |> option "Error adding fees"
+            in
+            { source= s1.source
+            ; target= s2.target
+            ; fee_excess
+            ; proof_type= `Merge }
+        end
+
+        include T
+        include Comparable.Make (T)
       end
 
       module Ledger_proof = struct
         (*A proof here is statement.target*)
         include String
 
-        type statement = Ledger_proof_statement.t
-
         type ledger_hash = Ledger_hash.t
 
-        let verify (_: t) (_: statement) ~message:_ : bool Deferred.t =
+        let verify (_: t) (_: Ledger_proof_statement.t) ~message:_ :
+            bool Deferred.t =
           return true
 
-        let statement_target : statement -> ledger_hash =
+        let statement_target : Ledger_proof_statement.t -> ledger_hash =
          fun statement -> statement.target
       end
 
@@ -968,7 +1021,7 @@ let%test_module "test" =
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
-      Quickcheck.test g ~trials:10000 ~f:(fun i ->
+      Quickcheck.test g ~trials:1000 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
               let old_ledger = !(Lb.ledger lb) in
@@ -985,4 +1038,31 @@ let%test_module "test" =
                     ~f:(fun (t, fee) -> t + fee)
               in
               assert (!(Lb.ledger lb) = expected_value) ) )
+
+    let%test_unit "Random workspec chunk doesn't send same things again" =
+      (*Always at worst case number of provers*)
+      Backtrace.elide := false ;
+      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let g = Int.gen_incl 1 p in
+      let initial_ledger = ref 0 in
+      let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
+      let module S = Test_input1.Ledger_proof_statement.Set in
+      Quickcheck.test g ~trials:100 ~f:(fun i ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let open Deferred.Let_syntax in
+              let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
+              let ts = List.take all_ts i in
+              let%map _, _ = create_and_apply lb (Sequence.of_list ts) in
+              (* A bit of a roundabout way to check, but essentially, if it
+               * does not give repeats then our loop will not iterate more than
+               * parallelism times. See random work description for
+               * explanation. *)
+              let rec go i seen =
+                [%test_result : Bool.t]
+                  ~message:"Exceeded time expected to exhaust random_work"
+                  ~expect:true (i <= p) ;
+                let maybe_stuff, seen = Lb.random_work_spec_chunk lb seen in
+                match maybe_stuff with None -> () | Some _ -> go (i + 1) seen
+              in
+              go 0 S.empty ) )
   end )
