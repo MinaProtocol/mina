@@ -1,7 +1,6 @@
 open Core
 open Async
 open Linear_pipe
-open Logger
 
 module type Worker_intf = sig
   type t
