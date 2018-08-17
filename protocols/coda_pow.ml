@@ -214,6 +214,21 @@ module type Super_transaction_intf = sig
   val fee_excess : t -> Fee.Unsigned.t Or_error.t
 end
 
+module type Ledger_proof_statement_intf = sig
+  type ledger_hash
+
+  type t =
+    { source: ledger_hash
+    ; target: ledger_hash
+    ; fee_excess: Fee.Signed.t
+    ; proof_type: [`Base | `Merge] }
+  [@@deriving sexp, bin_io, compare]
+
+  val merge : t -> t -> t Or_error.t
+
+  include Comparable.S with type t := t
+end
+
 module type Ledger_proof_intf = sig
   type ledger_hash
 
@@ -334,6 +349,8 @@ module type Ledger_builder_intf = sig
 
   type ledger_proof_statement
 
+  type ledger_proof_statement_set
+
   type sparse_ledger
 
   type completed_work
@@ -370,6 +387,7 @@ module type Ledger_builder_intf = sig
 
   val random_work_spec_chunk :
        t
+    -> ledger_proof_statement_set
     -> ( ledger_proof_statement
        , super_transaction
        , sparse_ledger
@@ -377,6 +395,7 @@ module type Ledger_builder_intf = sig
        Snark_work_lib.Work.Single.Spec.t
        list
        option
+       * ledger_proof_statement_set
 end
 
 module type Tip_intf = sig
@@ -613,10 +632,14 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
 
+  module Ledger_proof_statement :
+    Ledger_proof_statement_intf with type ledger_hash := Ledger_hash.t
+
   module Ledger_proof :
     Ledger_proof_intf
     with type message := Fee.Unsigned.t * Public_key.Compressed.t
      and type ledger_hash := Ledger_hash.t
+     and type statement := Ledger_proof_statement.t
 
   module Ledger :
     Ledger_intf
@@ -676,7 +699,7 @@ Merge Snark:
   module Completed_work :
     Completed_work_intf
     with type proof := Ledger_proof.t
-     and type statement := Ledger_proof.statement
+     and type statement := Ledger_proof_statement.t
      and type public_key := Public_key.Compressed.t
 
   module Ledger_builder_diff :
@@ -709,7 +732,8 @@ Merge Snark:
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
-     and type ledger_proof_statement := Ledger_proof.statement
+     and type ledger_proof_statement := Ledger_proof_statement.t
+     and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type super_transaction := Super_transaction.t
 
   module Ledger_builder_transition :

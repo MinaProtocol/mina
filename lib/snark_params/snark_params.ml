@@ -88,8 +88,8 @@ module Tick = struct
       match (xs0, ys0) with
       | true :: xs, true :: ys | false :: xs, false :: ys ->
           compare_bitstring xs ys
-      | false :: xs, true :: ys -> `LT
-      | true :: xs, false :: ys -> `GT
+      | false :: _, true :: _ -> `LT
+      | true :: _, false :: _ -> `GT
       | [], [] -> `EQ
       | _ :: _, [] | [], _ :: _ ->
           failwith "compare_bitstrings: Different lengths"

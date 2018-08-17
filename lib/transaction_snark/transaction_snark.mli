@@ -23,7 +23,11 @@ module Statement : sig
 
   val gen : t Quickcheck.Generator.t
 
+  val merge : t -> t -> t Or_error.t
+
   include Hashable.S_binable with type t := t
+
+  include Comparable.S with type t := t
 end
 
 type t [@@deriving bin_io, sexp]
