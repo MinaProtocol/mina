@@ -113,9 +113,8 @@ module Make
     (Hash : Hash_intf with type account := Account.t)
     (Depth : Depth_intf)
     (Kvdb : Key_value_database_intf)
-    (Sdb : Stack_database_intf) : S
-  with type account := Account.t
-   and type hash := Hash.t =
+    (Sdb : Stack_database_intf) :
+  S with type account := Account.t and type hash := Hash.t =
 struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   let max_depth = Depth.depth
@@ -170,9 +169,6 @@ struct
                                      (Bigstring.to_string bstr)]
       | Account of Addr.t
       | Hash of Addr.t
-    [@@deriving show]
-
-    type binary = Bigstring.t
 
     let is_generic = function Generic _ -> true | _ -> false
 
@@ -236,19 +232,6 @@ struct
             (Prefix.hash (Addr.depth path))
             (Addr.serialize path)
 
-    let copy_bigstring (bstr: Bigstring.t) : Bigstring.t =
-      let len = Bigstring.length bstr in
-      let bstr' = Bigstring.create len in
-      Bigstring.blit ~src:bstr ~src_pos:0 ~dst:bstr' ~dst_pos:0 ~len ;
-      bstr'
-
-    let copy : t -> t = function
-      | Generic data -> Generic (copy_bigstring data)
-      | Account path -> Account (Addr.copy path)
-      | Hash path -> Hash (Addr.copy path)
-
-    (* returns a slice of the original path, so the returned key needs to byte
-     * copied before mutating the path *)
     let parent : t -> t = function
       | Generic _ ->
           raise (Invalid_argument "parent: generic keys have no parent")
@@ -257,16 +240,6 @@ struct
       | Hash path ->
           assert (Addr.depth path > 0) ;
           Hash (Addr.parent_exn path)
-
-    let child (key: t) (dir: Direction.t) : t =
-      match key with
-      | Generic _ ->
-          raise (Invalid_argument "child: generic keys have no child")
-      | Account _ ->
-          raise (Invalid_argument "child: account keys have no child")
-      | Hash path ->
-          assert (Addr.depth path < max_depth) ;
-          Hash (Addr.child_exn path dir)
 
     let next : t -> t Option.t = function
       | Generic _ ->
@@ -294,7 +267,7 @@ struct
       build_account dirs
   end
 
-  type key = Key.t [@@deriving show]
+  type key = Key.t
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
@@ -642,8 +615,6 @@ let%test_module "test functor on in memory databases" =
 
     module Hash = struct
       type t = int [@@deriving bin_io, eq, sexp]
-
-      let create t = t
 
       let empty = 0
 

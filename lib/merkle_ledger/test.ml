@@ -37,7 +37,7 @@ let%test "empty_length" =
 let%test "length" =
   let n = 10 in
   let b = 100 in
-  let ledger, keys = L16.load_ledger n b in
+  let ledger, _ = L16.load_ledger n b in
   L16.length ledger = n
 
 let gkey = Option.map ~f:(fun {Test_ledger.Account.balance; _} -> balance)
@@ -54,7 +54,7 @@ let%test "idx_retrieval" =
 
 let%test "key_nonexist" =
   let b = 100 in
-  let ledger, keys = L16.load_ledger 10 b in
+  let ledger, _ = L16.load_ledger 10 b in
   None = L16.get ledger "aintioaerntnearst"
 
 let%test "idx_nonexist" =
@@ -81,16 +81,16 @@ let%test_unit "update_account" =
 
 let%test_unit "modify_account_by_idx" =
   let b = 100 in
-  let ledger, keys = L16.load_ledger 10 b in
+  let ledger, _ = L16.load_ledger 10 b in
   let idx = 0 in
   assert (
     match L16.get_at_index ledger idx with
-    | `Ok {balance} -> balance = 100
+    | `Ok {balance; _} -> balance = 100
     | _ -> false ) ;
   L16.set_at_index_exn ledger idx {balance= 50; key= Int.to_string idx} ;
   assert (
     match L16.get_at_index ledger idx with
-    | `Ok {balance} -> balance = 50
+    | `Ok {balance; _} -> balance = 50
     | _ -> false )
 
 let compose_hash n hash =
@@ -109,7 +109,7 @@ let%test "merkle_root" =
 
 let%test "merkle_root_nonempty" =
   let l = (1 lsl (3 - 1)) + 1 in
-  let ledger, keys = L3.load_ledger l 1 in
+  let ledger, _ = L3.load_ledger l 1 in
   let root = L3.merkle_root ledger in
   Test_ledger.Hash.empty_hash <> root
 
@@ -190,7 +190,7 @@ let%test_unit "merkle_path_at_index" =
   let b1 = 10 in
   let idx = 0 in
   List.iter (List.range 1 20) ~f:(fun n ->
-      let ledger, keys = L16.load_ledger n b1 in
+      let ledger, _ = L16.load_ledger n b1 in
       let path = L16.merkle_path_at_index_exn ledger idx in
       let account = L16.get_at_index_exn ledger idx in
       let root = L16.merkle_root ledger in
@@ -223,8 +223,8 @@ let%test_unit "set_inner_can_copy_correctly" =
   let n = 8 in
   let b1 = 1 in
   let b2 = 2 in
-  let ledger1, keys1 = L3.load_ledger n b1 in
-  let ledger2, keys2 = L3.load_ledger n b2 in
+  let ledger1, _ = L3.load_ledger n b1 in
+  let ledger2, _ = L3.load_ledger n b2 in
   L3.set_syncing ledger1 ;
   L3.set_syncing ledger2 ;
   let all_children = all_inner_of (L3.Addr.root ()) in
@@ -248,7 +248,7 @@ let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
     else mk_addr (ix lsr 1) (h - 1) (L16.Addr.child_exn a Left)
   in
   let count = 8192 in
-  let ledger, keys = L16.load_ledger count 1 in
+  let ledger, _ = L16.load_ledger count 1 in
   let mr_start = L16.merkle_root ledger in
   let max_height = Int.ceil_log2 count in
   L16.set_syncing ledger ;

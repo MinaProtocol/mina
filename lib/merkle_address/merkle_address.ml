@@ -220,7 +220,7 @@ struct
     type nonrec t = t * t
 
     let rec fold_exl (first, last) ~init ~f =
-      assert (depth first = depth last);
+      assert (depth first = depth last) ;
       let comparison = compare first last in
       if comparison > 0 then
         raise (Invalid_argument "first address needs to precede last address")
