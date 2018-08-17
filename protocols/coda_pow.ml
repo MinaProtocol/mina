@@ -1,6 +1,12 @@
 open Core_kernel
 open Async_kernel
 
+module type Time_controller_intf = sig
+  type t
+
+  val create : unit -> t
+end
+
 module type Time_intf = sig
   module Stable : sig
     module V1 : sig
@@ -8,7 +14,11 @@ module type Time_intf = sig
     end
   end
 
+  module Controller : Time_controller_intf
+
   type t [@@deriving sexp]
+
+  type t0 = t
 
   module Span : sig
     type t
@@ -29,20 +39,20 @@ module type Time_intf = sig
   module Timeout : sig
     type 'a t
 
-    val create : Span.t -> (unit -> 'a) -> 'a t
+    val create : Controller.t -> Span.t -> f:(t0 -> 'a) -> 'a t
 
     val to_deferred : 'a t -> 'a Deferred.t
 
     val peek : 'a t -> 'a option
 
-    val cancel : 'a t -> 'a -> unit
+    val cancel : Controller.t -> 'a t -> 'a -> unit
   end
 
   val diff : t -> t -> Span.t
 
   val modulus : t -> Span.t -> Span.t
 
-  val now : unit -> t
+  val now : Controller.t -> t
 end
 
 module type Ledger_hash_intf = sig
@@ -198,6 +208,21 @@ module type Super_transaction_intf = sig
   val fee_excess : t -> Fee.Unsigned.t Or_error.t
 end
 
+module type Ledger_proof_statement_intf = sig
+  type ledger_hash
+
+  type t =
+    { source: ledger_hash
+    ; target: ledger_hash
+    ; fee_excess: Fee.Signed.t
+    ; proof_type: [`Base | `Merge] }
+  [@@deriving sexp, bin_io, compare]
+
+  val merge : t -> t -> t Or_error.t
+
+  include Comparable.S with type t := t
+end
+
 module type Ledger_proof_intf = sig
   type ledger_hash
 
@@ -318,6 +343,8 @@ module type Ledger_builder_intf = sig
 
   type ledger_proof_statement
 
+  type ledger_proof_statement_set
+
   type sparse_ledger
 
   type completed_work
@@ -354,6 +381,7 @@ module type Ledger_builder_intf = sig
 
   val random_work_spec_chunk :
        t
+    -> ledger_proof_statement_set
     -> ( ledger_proof_statement
        , super_transaction
        , sparse_ledger
@@ -361,6 +389,7 @@ module type Ledger_builder_intf = sig
        Snark_work_lib.Work.Single.Spec.t
        list
        option
+       * ledger_proof_statement_set
 end
 
 module type Tip_intf = sig
@@ -597,10 +626,14 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
 
+  module Ledger_proof_statement :
+    Ledger_proof_statement_intf with type ledger_hash := Ledger_hash.t
+
   module Ledger_proof :
     Ledger_proof_intf
     with type message := Fee.Unsigned.t * Public_key.Compressed.t
      and type ledger_hash := Ledger_hash.t
+     and type statement := Ledger_proof_statement.t
 
   module Ledger :
     Ledger_intf
@@ -660,7 +693,7 @@ Merge Snark:
   module Completed_work :
     Completed_work_intf
     with type proof := Ledger_proof.t
-     and type statement := Ledger_proof.statement
+     and type statement := Ledger_proof_statement.t
      and type public_key := Public_key.Compressed.t
 
   module Ledger_builder_diff :
@@ -693,7 +726,8 @@ Merge Snark:
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
-     and type ledger_proof_statement := Ledger_proof.statement
+     and type ledger_proof_statement := Ledger_proof_statement.t
+     and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type super_transaction := Super_transaction.t
 
   module Ledger_builder_transition :

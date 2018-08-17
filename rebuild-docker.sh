@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Wrapper script for container builds
+
 set -e
 
 if [ ! $# -eq 1 ] && [ ! $# -eq 2 ] && [ ! $# -eq 3 ];
@@ -8,11 +10,14 @@ then
   exit 1
 fi
 
-img=$1:latest
-file=${2:-Dockerfile}
+imagename=$1:latest
+dockerfile=${2:-Dockerfile}
 
-docker build -f $file -t $img .
+echo "Building docker container named ${imagename} using ${dockerfile}."
+docker build --file $dockerfile --tag $imagename .
+
+# Retag with new image name
 if [[ ! -z $3 ]]; then
-  docker tag $img $1:$3
+  echo "Retagging as ${imagename}:$3"
+  docker tag $imagename $imagename:$3
 fi
-

@@ -33,17 +33,11 @@ struct
 end
 
 module Debug = struct
-  type t = unit [@@deriving sexp, bin_io]
+  type t = Transaction_snark.Statement.t [@@deriving sexp, bin_io]
 
-  let proof () = Proof.dummy
+  let proof _ = Proof.dummy
 
-  let statement =
-    let x =
-      lazy
-        (Quickcheck.Generator.generate ~size:0 Transaction_snark.Statement.gen
-           (Splittable_random.State.of_int 0))
-    in
-    fun () -> Lazy.force x
+  let statement = ident
 
   let verify _ _ ~message:_ = return true
 end
