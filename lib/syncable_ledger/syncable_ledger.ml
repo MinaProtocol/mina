@@ -124,7 +124,7 @@ For a given addr, there are three possibilities:
 We want all_valid when every leaf of the tree is `Valid
 *)
 (* TODO: This is a waste of memory *)
-module Valid (Addr : Address.S) :
+module Valid (Addr : Merkle_address.S) :
   Validity_intf with type addr := Addr.t =
 struct
   type tree = Leaf of [`Valid | `Unknown] | Node of tree ref * tree ref
@@ -149,7 +149,7 @@ struct
       | [] -> ()
       (*all done*)
     in
-    if not (Addr.equal a Addr.root) then go t (Addr.dirs_from_root a) ;
+    if not (Addr.equal a (Addr.root ())) then go t (Addr.dirs_from_root a) ;
     t
 
   let mark_known_good t a =
@@ -195,7 +195,7 @@ do any other fixup necessary.
 *)
 
 module Make
-    (Addr : Address.S) (Key : sig
+    (Addr : Merkle_address.S) (Key : sig
         type t [@@deriving bin_io]
     end)
     (Valid : Validity_intf with type addr := Addr.t) (Account : sig
@@ -356,7 +356,9 @@ struct
     Addr.Table.clear t.waiting_parents ;
     Addr.Table.clear t.waiting_content ;
     let r =
-      repeated (MT.depth - height) (fun a -> Addr.child_exn a Left) Addr.root
+      repeated (MT.depth - height)
+        (fun a -> Addr.child_exn a Left)
+        (Addr.root ())
     in
     t.validity <- Valid.create r ;
     expect_children t r content_hash ;
@@ -425,7 +427,7 @@ struct
       { desired_root= h
       ; tree= mt
       ; validity=
-          Valid.create Addr.root
+          Valid.create (Addr.root ())
           (* this gets tossed and remade when we hear Num_accounts *)
       ; answers= ar
       ; answer_writer= aw
@@ -456,7 +458,7 @@ struct
 end
 
 module Make_sync_responder
-    (Addr : Address.S) (Key : sig
+    (Addr : Merkle_address.S) (Key : sig
         type t [@@deriving bin_io]
     end) (Account : sig
       type t [@@deriving bin_io]
@@ -498,7 +500,7 @@ struct
         let content_root_addr =
           repeated (MT.depth - height)
             (fun a -> Addr.child_exn a Left)
-            Addr.root
+            (Addr.root ())
         in
         Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
 end
