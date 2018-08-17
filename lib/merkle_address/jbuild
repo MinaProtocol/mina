@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name address)
-  (public_name address)
+ ((name merkle_address)
+  (public_name merkle_address)
   (flags (:standard -short-paths -warn-error -58))
   (library_flags (-linkall))
   (inline_tests)

@@ -8,10 +8,12 @@ let to_bool = function Left -> false | Right -> true
 
 let to_int = function Left -> 0 | Right -> 1
 
-let of_int = function
-  | 0 -> Left
-  | 1 -> Right
-  | value -> failwith (sprintf "Cannot integer %d into character" value)
+let of_int = function 0 -> Some Left | 1 -> Some Right | _ -> None
+
+let of_int_exn value =
+  of_int value
+  |> Option.value_exn
+       ~message:(sprintf "Cannot convert integer %d into a direction" value)
 
 let flip = function Left -> Right | Right -> Left
 

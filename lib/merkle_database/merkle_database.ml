@@ -113,12 +113,7 @@ module Make
     (Hash : Hash_intf with type account := Account.t)
     (Depth : Depth_intf)
     (Kvdb : Key_value_database_intf)
-    (Sdb : Stack_database_intf) :
-  sig
-    include S
-
-    val with_test_instance : (t -> 'a) -> 'a
-  end
+    (Sdb : Stack_database_intf) : S
   with type account := Account.t
    and type hash := Hash.t =
 struct
@@ -156,7 +151,7 @@ struct
    * any bitstring.
    *)
   module Key = struct
-    module Addr = Address.Make (struct
+    module Addr = Merkle_address.Make (struct
       let depth = max_depth
     end)
 
@@ -195,24 +190,28 @@ struct
       | Generic _ -> raise (Invalid_argument "generic key has no directions")
       | Account path | Hash path -> path
 
-    let root_hash : t = Hash Addr.root
+    let root_hash : t = Hash (Addr.root ())
+
+    let last_direction path =
+      Direction.of_bool (Addr.get path (Addr.depth path - 1) = 0)
 
     let build_generic (data: Bigstring.t) : t = Generic data
 
     let build_empty_account () : t =
-      Account (Bitstring.create_bitstring max_depth)
+      Account
+        (Addr.of_directions @@ List.init max_depth ~f:(fun _ -> Direction.Left))
 
     let build_account (path: Direction.t list) : t =
       assert (List.length path = max_depth) ;
-      Account (Addr.build path)
+      Account (Addr.of_directions path)
 
     let parse (str: Bigstring.t) : (t, unit) Result.t =
       let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
       let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
       if prefix = Prefix.generic then Result.return (Generic data)
       else
-        let path = Bitstring.bitstring_of_string (Bigstring.to_string data) in
-        let slice_path = Bitstring.subbitstring path 0 in
+        let path = Addr.of_byte_string (Bigstring.to_string data) in
+        let slice_path = Addr.slice path 0 in
         if prefix = Prefix.account then
           Result.return (Account (slice_path max_depth))
         else if UInt8.to_int prefix <= max_depth then
@@ -283,7 +282,7 @@ struct
       | Hash path -> Hash (Addr.sibling path)
 
     let order_siblings (key: t) (base: 'a) (sibling: 'a) : 'a * 'a =
-      match Addr.last_direction (path key) with
+      match last_direction (path key) with
       | Left -> (base, sibling)
       | Right -> (sibling, base)
 
@@ -444,16 +443,16 @@ struct
       Result.map key_result ~f:(fun key -> update_account mdb key account)
 
   let get_all_accounts_rooted_at_exn mdb address =
-    let first_node, last_node = Key.Addr.width address in
+    let first_node, last_node = Key.Addr.Range.subtree_width address in
     let result =
-      Key.Addr.fold_sequence_incl first_node last_node ~init:[] ~f:
+      Key.Addr.Range.fold_incl (first_node, last_node) ~init:[] ~f:
         (fun bit_index acc ->
           let account =
             Option.value_exn
               ~message:
                 (sprintf
-                   !"address %s does not have an account"
-                   (Bitstring.string_of_bitstring bit_index))
+                   !"address %{sexp:Key.Addr.t} does not have an account"
+                   bit_index)
               (get_account mdb (Key.Account bit_index))
           in
           account :: acc )
@@ -461,14 +460,14 @@ struct
     List.rev result
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
-    let first_node, last_node = Key.Addr.width address in
-    Key.Addr.fold_sequence_incl first_node last_node ~init:accounts ~f:
+    let first_node, last_node = Key.Addr.Range.subtree_width address in
+    Key.Addr.Range.fold_incl (first_node, last_node) ~init:accounts ~f:
       (fun bit_index -> function
       | head :: tail ->
           update_account mdb (Key.Account bit_index) head ;
           tail
       | [] ->
-          assert (Key.Addr.equals last_node bit_index) ;
+          assert (Key.Addr.equal last_node bit_index) ;
           [] )
     |> ignore
 
@@ -479,7 +478,7 @@ struct
     assert (Key.is_hash key) ;
     let rec loop k =
       let sibling = Key.sibling k in
-      let sibling_dir = Key.Addr.last_direction (Key.path k) in
+      let sibling_dir = Key.last_direction (Key.path k) in
       (sibling_dir, get_hash mdb sibling)
       :: (if Key.height key < max_depth then loop (Key.parent k) else [])
     in
@@ -576,7 +575,7 @@ struct
           ~sexp_of:[%sexp_of : Direction.t List.t * Account.t sexp_opaque] ~f:
           (fun (direction, account) ->
             let hash_account = Hash.hash_account account in
-            let address = Key.Addr.build direction in
+            let address = Key.Addr.of_directions direction in
             set_inner_hash_at_addr_exn mdb address hash_account ;
             let result = get_inner_hash_at_addr_exn mdb address in
             assert (Hash.equal result hash_account) ) )
@@ -599,7 +598,7 @@ struct
               List.init (max_depth - max_height) ~f:(fun _ -> Direction.Left)
             in
             let padded_directions = List.concat [offset; directions] in
-            let address = Key.Addr.build padded_directions in
+            let address = Key.Addr.of_directions padded_directions in
             let num_accounts =
               1 lsl (max_depth - List.length padded_directions)
             in

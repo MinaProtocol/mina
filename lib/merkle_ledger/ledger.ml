@@ -29,7 +29,7 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
-  module Addr : Address.S
+  module Addr : Merkle_address.S
 
   val create : unit -> t
 
@@ -147,7 +147,7 @@ end) :
    and type key := Key.t =
 struct
   include Depth
-  module Addr = Address.Make (Depth)
+  module Addr = Merkle_address.Make (Depth)
 
   type entry = {merkle_index: int; account: Account.t}
   [@@deriving sexp, bin_io]
@@ -452,27 +452,33 @@ struct
         (DynArray.init (new_size - len) (fun _ -> Key.empty)) ;
     recompute_tree ~allow_sync:true t
 
-  (* FIXME: Probably this well cause an error *)
+  let to_index a =
+    List.foldi
+      (List.rev @@ Addr.dirs_from_root a)
+      ~init:0
+      ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
+
+  (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
     assert (Addr.depth a = Depth.depth - 1) ;
-    merkle_path_at_index_exn t (Addr.to_index a)
+    merkle_path_at_index_exn t (to_index a)
 
   let set_at_addr_exn t addr acct =
     assert (Addr.depth addr = Depth.depth - 1) ;
-    set_at_index_exn t (Addr.to_index addr) acct
+    set_at_index_exn t (to_index addr) acct
 
   let get_inner_hash_at_addr_exn t a =
     let path_length = Addr.depth a in
     assert (path_length < depth) ;
     let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
-    DynArray.get l (Addr.to_index a)
+    DynArray.get l (to_index a)
 
   let set_inner_hash_at_addr_exn t a hash =
     let path_length = Addr.depth a in
     assert (path_length < depth) ;
     (t.tree).dirty <- true ;
     let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
-    let index = Addr.to_index a in
+    let index = to_index a in
     DynArray.set l index hash
 
   let set_syncing t =
@@ -485,7 +491,7 @@ struct
 
   let set_all_accounts_rooted_at_exn t a accounts =
     let height = depth - Addr.depth a in
-    let first_index = Addr.to_index a lsl height in
+    let first_index = to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in
     assert (List.length accounts = count) ;
     List.iteri accounts ~f:(fun i a ->
@@ -497,7 +503,7 @@ struct
 
   let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
-    let first_index = Addr.to_index a lsl height in
+    let first_index = to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in
     let subarr = Dyn_array.sub t.tree.leafs first_index count in
     Dyn_array.to_list

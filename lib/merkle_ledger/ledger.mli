@@ -27,7 +27,7 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
-  module Addr : Address.S
+  module Addr : Merkle_address.S
 
   val create : unit -> t
 

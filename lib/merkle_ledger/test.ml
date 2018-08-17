@@ -227,7 +227,7 @@ let%test_unit "set_inner_can_copy_correctly" =
   let ledger2, keys2 = L3.load_ledger n b2 in
   L3.set_syncing ledger1 ;
   L3.set_syncing ledger2 ;
-  let all_children = all_inner_of L3.Addr.root in
+  let all_children = all_inner_of (L3.Addr.root ()) in
   List.iter all_children ~f:(fun x ->
       let src = L3.get_inner_hash_at_addr_exn ledger2 x in
       L3.set_inner_hash_at_addr_exn ledger1 x src ) ;
@@ -263,7 +263,7 @@ let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
         mk_addr idx height
           (repeated (L16.depth - max_height)
              (fun a -> L16.Addr.child_exn a Left)
-             L16.Addr.root)
+             (L16.Addr.root ()))
       in
       let old_hash = L16.get_inner_hash_at_addr_exn ledger a in
       L16.set_inner_hash_at_addr_exn ledger a hash_to_set ;
