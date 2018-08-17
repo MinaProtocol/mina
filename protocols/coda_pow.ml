@@ -225,11 +225,17 @@ module type Ledger_proof_intf = sig
 
   type t [@@deriving sexp]
 
-  val verify : t -> statement -> message:message -> bool Deferred.t
-
   val statement_target : statement -> ledger_hash
 
   val underlying_proof : t -> proof
+end
+
+module type Ledger_proof_verifier_intf = sig
+  type ledger_proof
+  type message
+  type statement
+
+  val verify : ledger_proof -> statement -> message:message -> bool Deferred.t
 end
 
 module type Completed_work_intf = sig
@@ -292,7 +298,7 @@ module type Ledger_builder_diff_intf = sig
       ; completed_works: completed_work_checked list
       ; transactions: transaction_with_valid_signature list
       ; creator: public_key }
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
@@ -511,6 +517,7 @@ module type Consensus_mechanism_intf = sig
     val create :
          protocol_state:Protocol_state.value
       -> protocol_state_proof:protocol_state_proof
+      -> ledger_builder_diff:ledger_builder_diff
       -> t
 
     val protocol_state : t -> Protocol_state.value
@@ -629,6 +636,12 @@ module type Inputs_intf = sig
     with type message := Fee.Unsigned.t * Public_key.Compressed.t
      and type ledger_hash := Ledger_hash.t
      and type proof := Proof.t
+
+  module Ledger_proof_verifier :
+    Ledger_proof_verifier_intf
+    with type message := Fee.Unsigned.t * Public_key.Compressed.t
+     and type ledger_proof := Ledger_proof.t
+     and type statement := Ledger_proof.statement
 
   module Ledger :
     Ledger_intf

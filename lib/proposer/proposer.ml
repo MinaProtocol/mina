@@ -194,6 +194,7 @@ struct
                   (Consensus_mechanism.Snark_transition.protocol_state
                      snark_transition)
                 ~protocol_state_proof
+                ~ledger_builder_diff:(Consensus_mechanism.Internal_transition.ledger_builder_diff internal_transition)
           | `Cancelled ->
               Deferred.return (Or_error.error_string "Signing cancelled")
         in

@@ -42,6 +42,11 @@ module type S = sig
     include Sexpable.S with type t := t
   end
 
+  module Ledger_proof_verifier : Ledger_proof_verifier_intf
+    with type statement := Ledger_proof_statement.t
+     and type message := Fee.Unsigned.t * Compressed_public_key.t
+     and type ledger_proof := Ledger_proof.t
+
   module Ledger :
     Coda_pow.Ledger_intf
     with type ledger_hash := Ledger_hash.t

@@ -63,31 +63,30 @@ let daemon =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
        let me = Host_and_port.create ~host:ip ~port in
-       let%bind prover = Prover.create ~conf_dir in
-       let%bind verifier = Verifier.create ~conf_dir in
-       let module Init = struct
-         type proof = Proof.Stable.V1.t [@@deriving bin_io]
+       let module Common = struct
+           module Make_consensus_mechanism (Ledger_builder_diff : sig type t [@@deriving sexp, bin_io] end) =
+             Consensus.Proof_of_signature.Make (Nanobit_base.Proof) (Ledger_builder_diff)
 
-         let logger = log
-
-         let verifier = verifier
-
-         let conf_dir = conf_dir
-
-         let prover = prover
-
-         let genesis_proof = Precomputed_values.base_proof
-
-         let transaction_interval = Time.Span.of_sec 5.0
-
-         let fee_public_key = Genesis_ledger.rich_pk
+           let logger = log
+           let conf_dir = conf_dir
+           let transaction_interval = Time.Span.of_sec 5.0
+           let fee_public_key = Genesis_ledger.rich_pk
+           let genesis_proof = Precomputed_values.base_proof
        end in
-       let module M = ( val if Insecure.key_generation then
-                              (module Coda_without_snark (Init) () : Main_intf
-                              )
-                            else
-                              (module Coda_with_snark (Storage.Disk) (Init) ()
-                              : Main_intf ) ) in
+       let%bind (module M) =
+         if Insecure.key_generation then
+           let%map (module Init) = make_init (module struct
+               include Common
+               module Ledger_proof = Ledger_proof.Debug
+           end) in
+           (module Coda_without_snark (Init) () : Main_intf)
+         else
+           let%map (module Init) = make_init (module struct
+               include Common
+               module Ledger_proof = Ledger_proof.Prod
+           end) in
+           (module Coda_with_snark (Storage.Disk) (Init) () : Main_intf)
+       in
        let module Run = Run (M) in
        let%bind () =
          let open M in

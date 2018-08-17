@@ -29,25 +29,18 @@ module Coda_worker = struct
     let%bind () = Sys.chdir program_dir in
     let%bind location = Unix.getcwd () in
     let conf_dir = log_dir in
-    let%bind verifier = Verifier.create ~conf_dir in
-    let%bind prover = Prover.create ~conf_dir in
-    let module Init = struct
-      type proof = Proof.Stable.V1.t [@@deriving bin_io, sexp]
+    let%bind (module Init) = make_init (module struct
+        module Ledger_proof = Ledger_proof.Debug
 
-      let logger = log
+        module Make_consensus_mechanism (Ledger_builder_diff : sig type t [@@deriving sexp, bin_io] end) =
+          Consensus.Proof_of_signature.Make (Nanobit_base.Proof) (Ledger_builder_diff)
 
-      let conf_dir = conf_dir
-
-      let verifier = verifier
-
-      let prover = prover
-
-      let genesis_proof = Precomputed_values.base_proof
-
-      let transaction_interval = Time.Span.of_ms 100.0
-
-      let fee_public_key = Genesis_ledger.rich_pk
-    end in
+        let logger = log
+        let conf_dir = conf_dir
+        let transaction_interval = Time.Span.of_ms 100.0
+        let fee_public_key = Genesis_ledger.rich_pk
+        let genesis_proof = Precomputed_values.base_proof
+    end) in
     let module Main : Main_intf = Coda_without_snark (Init) () in
     let module Run = Run (Main) in
     let net_config =

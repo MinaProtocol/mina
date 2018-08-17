@@ -86,8 +86,15 @@ module Make_diff (Inputs : sig
     with type public_key := Compressed_public_key.t
      and type statement := Transaction_snark.Statement.t
      and type proof := Ledger_proof.t
-end) =
-struct
+end)
+  : Coda_pow.Ledger_builder_diff_intf
+    with type transaction := Inputs.Transaction.t
+     and type transaction_with_valid_signature := Inputs.Transaction.With_valid_signature.t
+     and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
+     and type public_key := Inputs.Compressed_public_key.t
+     and type completed_work := Inputs.Completed_work.t
+     and type completed_work_checked := Inputs.Completed_work.Checked.t
+= struct
   open Inputs
 
   type t =
@@ -126,7 +133,9 @@ module type Inputs_intf = sig
     -> Completed_work.Checked.t option Deferred.t
 end
 
-module Make (Inputs : Inputs_intf) : sig
+module Make
+    (Inputs : Inputs_intf)
+: sig
   include Coda_pow.Ledger_builder_intf
           with type diff := Inputs.Ledger_builder_diff.t
            and type valid_diff :=
@@ -300,7 +309,7 @@ end = struct
   let verify ~message job proof =
     match statement_of_job job with
     | None -> return false
-    | Some statement -> Ledger_proof.verify proof statement ~message
+    | Some statement -> Inputs.Ledger_proof_verifier.verify proof statement ~message
 
   let total_proofs (works: Completed_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
@@ -861,13 +870,15 @@ let%test_module "test" =
 
         type ledger_hash = Ledger_hash.t
 
-        let verify (_: t) (_: statement) ~message:_ : bool Deferred.t =
-          return true
-
         let statement_target : statement -> ledger_hash =
          fun statement -> statement.target
 
         let underlying_proof = Fn.id
+      end
+
+      module Ledger_proof_verifier = struct
+        let verify (_: Ledger_proof.t) (_: Ledger_proof_statement.t) ~message:_ : bool Deferred.t =
+          return true
       end
 
       module Ledger = struct

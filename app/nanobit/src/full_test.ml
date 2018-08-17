@@ -13,30 +13,30 @@ let run_test with_snark : unit -> unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
-  let%bind prover = Prover.create ~conf_dir
-  and verifier = Verifier.create ~conf_dir in
-  let module Init = struct
-    type proof = Proof.Stable.V1.t [@@deriving bin_io, sexp]
+  let module Common = struct
+    module Make_consensus_mechanism (Ledger_builder_diff : sig type t [@@deriving sexp, bin_io] end) =
+      Consensus.Proof_of_signature.Make (Nanobit_base.Proof) (Ledger_builder_diff)
 
     let logger = log
-
     let conf_dir = conf_dir
-
-    let verifier = verifier
-
-    let prover = prover
-
-    let genesis_proof = Precomputed_values.base_proof
-
     let transaction_interval = Time.Span.of_ms 100.0
-
     let fee_public_key = Genesis_ledger.rich_pk
+    let genesis_proof = Precomputed_values.base_proof
   end in
-  let module Main = ( val if with_snark then
-                            (module Coda_with_snark (Storage.Memory) (Init) ()
-                            : Main_intf )
-                          else (module Coda_without_snark (Init) () : Main_intf)
-  ) in
+  let%bind (module Main) =
+    if with_snark then
+      let%map (module Init) = make_init (module struct
+          include Common
+          module Ledger_proof = Ledger_proof.Prod
+      end) in
+      (module Coda_with_snark (Storage.Memory) (Init) () : Main_intf)
+    else
+      let%map (module Init) = make_init (module struct
+          include Common
+          module Ledger_proof = Ledger_proof.Debug
+      end) in
+      (module Coda_without_snark (Init) () : Main_intf)
+  in
   let module Run = Run (Main) in
   let open Main in
   let net_config =

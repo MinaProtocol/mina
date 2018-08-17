@@ -4,45 +4,177 @@ open Nanobit_base
 open Blockchain_snark
 module Fee = Protocols.Coda_pow.Fee
 
+module Ledger_builder_aux_hash = struct
+  include Ledger_builder_hash.Aux_hash.Stable.V1
+
+  let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
+end
+
+module Ledger_builder_hash = struct
+  include Ledger_builder_hash.Stable.V1
+
+  let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
+
+  let to_bytes = Ledger_builder_hash.to_bytes
+
+  let of_bytes = Ledger_builder_hash.of_bytes
+end
+
+module Ledger_hash = struct
+  include Ledger_hash.Stable.V1
+
+  let to_bytes = Ledger_hash.to_bytes
+end
+
+
 module type Ledger_proof_intf = sig
   type t [@@deriving sexp, bin_io]
 
+  val statement : t -> Transaction_snark.Statement.t
+
   val proof : t -> Proof.t
+end
+
+module type Ledger_proof_verifier_intf = sig
+  type ledger_proof
 
   val verify :
-       t
+       ledger_proof
     -> Transaction_snark.Statement.t
     -> message:Currency.Fee.t * Public_key.Compressed.t
     -> bool Deferred.t
 end
 
+module Transaction = struct
+  include (
+    Transaction :
+      module type of Transaction
+      with module With_valid_signature := Transaction.With_valid_signature )
+
+  let fee (t: t) = t.payload.Transaction.Payload.fee
+
+  let receiver (t: t) = t.payload.receiver
+
+  let sender (t: t) = Public_key.compress t.sender
+
+  let seed = Secure_random.string ()
+
+  let compare t1 t2 = Transaction.Stable.V1.compare ~seed t1 t2
+
+  module With_valid_signature = struct
+    module T = struct
+      include Transaction.With_valid_signature
+
+      let compare t1 t2 =
+        Transaction.With_valid_signature.compare ~seed t1 t2
+    end
+
+    include T
+    include Comparable.Make (T)
+  end
+end
+
+module Ledger_proof_statement = Transaction_snark.Statement
+
+module type Config_intf = sig
+  val logger : Logger.t
+  val conf_dir : string
+  val transaction_interval : Time.Span.t
+  (* Public key to allocate fees to *)
+  val fee_public_key : Public_key.Compressed.t
+  val genesis_proof : Snark_params.Tock.Tock0.Proof.t
+end
+
 module type Init_intf = sig
   module Ledger_proof : Ledger_proof_intf
 
-  module Consensus_mechanism : Consensus.Mechanism.S with type Proof.t = Nanobit_base.Proof.t
+  module Completed_work : Protocols.Coda_pow.Completed_work_intf
+    with type public_key := Public_key.Compressed.t
+     and type statement := Transaction_snark.Statement.t
+     and type proof := Ledger_proof.t
+
+  module Ledger_builder_diff : Protocols.Coda_pow.Ledger_builder_diff_intf
+    with type completed_work_checked := Completed_work.Checked.t
+     and type completed_work := Completed_work.t
+     and type public_key := Public_key.Compressed.t
+     and type ledger_builder_hash := Ledger_builder_hash.t
+     and type transaction := Transaction.t
+     and type transaction_with_valid_signature := Transaction.With_valid_signature.t
+
+  module Consensus_mechanism : Consensus.Mechanism.S
+    with type Proof.t = Nanobit_base.Proof.t 
+     and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+     and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
 
   module Blockchain : Blockchain.S with module Consensus_mechanism = Consensus_mechanism
+
+  (*
+  module Snark_worker : Snark_worker_lib.Intf.S
+   with type transition := Nanobit_base.Super_transaction.t
+    and type sparse_ledger := Nanobit_base.Sparse_ledger.t
+    and type public_key := Public_key.t
+    and type statement := Transaction_snark.Statement.t
+    and type proof := Ledger_proof.t
+   *)
 
   module Prover : Prover.S with module Consensus_mechanism = Consensus_mechanism and module Blockchain = Blockchain
 
   module Verifier : Verifier.S with type blockchain := Blockchain.t
 
-  val logger : Logger.t
-
-  val conf_dir : string
+  include Config_intf
 
   val prover : Prover.t
 
   val verifier : Verifier.t
 
   val genesis_proof : Proof.t
-
-  val transaction_interval : Time.Span.t
-
-  (* Public key to allocate fees to *)
-
-  val fee_public_key : Public_key.Compressed.t
 end
+
+module type Init_inputs_intf = sig
+  include Config_intf
+
+  module Ledger_proof : Ledger_proof_intf
+
+  module Make_consensus_mechanism :
+    functor
+         (Ledger_builder_diff : sig type t [@@deriving sexp, bin_io] end)
+      -> Consensus.Mechanism.S
+         with type Proof.t = Nanobit_base.Proof.t
+          and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+          and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+end
+
+let make_init (type ledger_proof) (module Inputs : Init_inputs_intf with type Ledger_proof.t = ledger_proof) : (module Init_intf with type Ledger_proof.t = ledger_proof) Deferred.t =
+  let module Base = struct
+    include Inputs
+
+    module Completed_work = Ledger_builder.Make_completed_work (Public_key.Compressed) (Ledger_proof) (Ledger_proof_statement)
+
+    module Ledger_builder_diff = Ledger_builder.Make_diff (struct
+      module Ledger_proof = Ledger_proof
+      module Ledger_hash = Ledger_hash
+      module Ledger_builder_hash = Ledger_builder_hash
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+      module Compressed_public_key = Public_key.Compressed
+      module Transaction = Transaction
+      module Completed_work = Completed_work
+    end)
+
+    module Consensus_mechanism = Make_consensus_mechanism (Ledger_builder_diff)
+    module Blockchain = Blockchain.Make (Consensus_mechanism)
+    module Prover = Prover.Make (Consensus_mechanism) (Blockchain)
+    module Verifier = Verifier.Make (Consensus_mechanism) (Blockchain)
+  end in
+  let open Base in
+  let%bind prover = Prover.create ~conf_dir in
+  let%map verifier = Verifier.create ~conf_dir in
+  let module Init = struct
+    include Base
+
+    let prover = prover
+    let verifier = verifier
+  end in
+  (module Init : Init_intf with type Ledger_proof.t = ledger_proof)
 
 module type State_proof_intf = sig
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -54,84 +186,14 @@ module type State_proof_intf = sig
            and type t := t
 end
 
-module Make_inputs00
-    (Ledger_proof : Ledger_proof_intf) = struct
-  module Private_key = Private_key
-  module Public_key = Public_key
-  module State_hash = State_hash.Stable.V1
-
-  module Ledger_builder_aux_hash = struct
-    include Ledger_builder_hash.Aux_hash.Stable.V1
-
-    let of_bytes = Ledger_builder_hash.Aux_hash.of_bytes
-  end
-
-  module Ledger_builder_hash = struct
-    include Ledger_builder_hash.Stable.V1
-
-    let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
-
-    let to_bytes = Ledger_builder_hash.to_bytes
-
-    let of_bytes = Ledger_builder_hash.of_bytes
-  end
-
-  module Ledger_hash = struct
-    include Ledger_hash.Stable.V1
-
-    let to_bytes = Ledger_hash.to_bytes
-  end
-
-  module Transaction = struct
-    include (
-      Transaction :
-        module type of Transaction
-        with module With_valid_signature := Transaction.With_valid_signature )
-
-    let fee (t: t) = t.payload.Transaction.Payload.fee
-
-    let receiver (t: t) = t.payload.receiver
-
-    let sender (t: t) = Public_key.compress t.sender
-
-    let seed = Secure_random.string ()
-
-    let compare t1 t2 = Transaction.Stable.V1.compare ~seed t1 t2
-
-    module With_valid_signature = struct
-      module T = struct
-        include Transaction.With_valid_signature
-
-        let compare t1 t2 =
-          Transaction.With_valid_signature.compare ~seed t1 t2
-      end
-
-      include T
-      include Comparable.Make (T)
-    end
-  end
-
-  module Ledger_proof_statement = Transaction_snark.Statement
-
-  module Completed_work = Ledger_builder.Make_completed_work (Public_key.Compressed) (Ledger_proof) (Ledger_proof_statement)
-
-  module Ledger_builder_diff = Ledger_builder.Make_diff (struct
-    module Ledger_proof = Ledger_proof
-    module Ledger_hash = Ledger_hash
-    module Ledger_builder_hash = Ledger_builder_hash
-    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-    module Compressed_public_key = Public_key.Compressed
-    module Transaction = Transaction
-    module Completed_work = Completed_work
-  end)
-end
-
 module Make_inputs0
-    (Ledger_proof : Ledger_proof_intf)
-    (Init : Init_intf with module Ledger_proof = Ledger_proof) =
-struct
+    (Init : Init_intf)
+    (Ledger_proof_verifier : Ledger_proof_verifier_intf with type ledger_proof := Init.Ledger_proof.t)
+= struct
   open Protocols.Coda_pow
-  module Consensus_mechanism = Init.Consensus_mechanism
+  open Init
+
+  module Consensus_mechanism = Consensus_mechanism
   module Protocol_state = Consensus_mechanism.Protocol_state
 
   module Protocol_state_hash = State_hash.Stable.V1
@@ -178,8 +240,6 @@ struct
 
   module Fee_transfer = Nanobit_base.Fee_transfer
 
-  include Make_inputs00(Ledger_proof)
-
   module Super_transaction = struct
     module T = struct
       type t = Transaction_snark.Transition.t =
@@ -204,6 +264,7 @@ struct
   module Transaction_snark = struct
     module Statement = Transaction_snark.Statement
     include Ledger_proof
+    include Ledger_proof_verifier
   end
 
   module Proof = Nanobit_base.Proof.Stable.V1
@@ -211,7 +272,7 @@ struct
   module Ledger_proof = struct
     include Ledger_proof
 
-    type statement = Transaction_snark.Statement.t
+    type statement = Transaction_snark.Statement.t 
 
     let statement_target (t: Transaction_snark.Statement.t) = t.target
 
@@ -236,6 +297,7 @@ struct
       module Super_transaction = Super_transaction
       module Ledger = Ledger
       module Ledger_proof = Ledger_proof
+      module Ledger_proof_verifier = Ledger_proof_verifier
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_hash = Ledger_hash
       module Ledger_builder_diff = Ledger_builder_diff
@@ -340,28 +402,31 @@ struct
   let fee_public_key = Init.fee_public_key
 end
 
-module Make_inputs (Ledger_proof0 : sig
-  type t [@@deriving sexp, bin_io]
-
-  val statement : t -> Transaction_snark.Statement.t
-
-  val proof : t -> Proof.t
-
-  val verify :
-       t
-    -> Transaction_snark.Statement.t
-    -> message:Currency.Fee.t * Public_key.Compressed.t
-    -> bool Deferred.t
-end)
-(Init : Init_intf with module Ledger_proof = Ledger_proof0)
+module Make_inputs
+(Init : Init_intf)
+(Ledger_proof_verifier : Ledger_proof_verifier_intf with type ledger_proof := Init.Ledger_proof.t)
 (Store : Storage.With_checksum_intf)
 () =
 struct
+  open Init
+
   module Inputs0 =
     Make_inputs0
-      (Ledger_proof0)
       (Init)
+      (Ledger_proof_verifier)
   include Inputs0
+
+  module Blockchain_state = Nanobit_base.Blockchain_state
+  module Ledger_builder_diff = Ledger_builder_diff
+  module Completed_work = Completed_work
+  module Ledger_builder_hash = Ledger_builder_hash
+  module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+  module Ledger_proof_verifier = Ledger_proof_verifier
+  module Ledger_hash = Ledger_hash
+  module Transaction = Transaction
+  module Public_key = Public_key
+  module Compressed_public_key = Public_key.Compressed
+  module Private_key = Private_key
 
   module Proof_carrying_state = struct
     type t =
@@ -511,6 +576,9 @@ struct
     module Snark_pool = Snark_pool
     module Snark_pool_diff = Snark_pool.Diff
     module Sync_ledger = Sync_ledger
+    module Ledger_builder_hash = Ledger_builder_hash
+    module Ledger_hash = Ledger_hash
+    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
   end)
 
   module Ledger_builder_controller = struct
@@ -542,7 +610,7 @@ struct
             (Ledger_builder.apply t diff)
             ~f:
               (Option.map ~f:(fun proof ->
-                   ((Ledger_proof0.statement proof).target, proof) ))
+                   ((Ledger_proof.statement proof).target, proof) ))
       end
 
       module Consensus_mechanism = Consensus_mechanism
@@ -564,6 +632,24 @@ struct
 
   module Proposer = Proposer.Make (struct
     include Inputs0
+
+    module Ledger_builder_diff = Ledger_builder_diff
+
+    module Ledger_proof_verifier = Ledger_proof_verifier
+
+    module Completed_work = Completed_work
+
+    module Ledger_builder_hash = Ledger_builder_hash
+
+    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+
+    module Ledger_hash = Ledger_hash
+
+    module Transaction = Transaction
+
+    module Public_key = Public_key
+
+    module Private_key = Private_key
 
     module Blockchain_state = Nanobit_base.Blockchain_state
 
@@ -593,13 +679,30 @@ end
 
 module Coda_with_snark
     (Store : Storage.With_checksum_intf)
-    (Init : Init_intf)
+    (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t)
     () =
 struct
-  module Ledger_proof = Ledger_proof.Make_prod (Init)
+  module Ledger_proof_verifier = struct 
+    (* TODO: Use the message once SOK is implemented *)
+    let verify t stmt ~message:_ =
+      if
+        not
+          (Int.( = )
+             (Transaction_snark.Statement.compare
+                (Init.Ledger_proof.statement t)
+                stmt)
+             0)
+      then Deferred.return false
+      else
+        match%map Init.Verifier.verify_transaction_snark Init.verifier t with
+        | Ok b -> b
+        | Error e ->
+            Logger.warn Init.logger !"Bad transaction snark: %{sexp: Error.t}" e ;
+            false
+  end
 
   module Inputs = struct
-    include Make_inputs (Ledger_proof) (Init) (Store) ()
+    include Make_inputs (Init) (Ledger_proof_verifier) (Store) ()
 
     module Snark_worker = Snark_worker_lib.Prod.Worker
   end
@@ -611,12 +714,15 @@ struct
   let request_work = Inputs.request_work ~best_ledger_builder
 end
 
-module Coda_without_snark (Init : Init_intf) () = struct
+module Coda_without_snark (Init : Init_intf with module Ledger_proof = Ledger_proof.Debug) () = struct
   module Store = Storage.Memory
-  module Ledger_proof = Ledger_proof.Debug
+
+  module Ledger_proof_verifier = struct
+    let verify _ _ ~message:_ = return true 
+  end
 
   module Inputs = struct
-    include Make_inputs (Ledger_proof) (Init) (Store) ()
+    include Make_inputs (Init) (Ledger_proof_verifier) (Store) ()
 
     module Snark_worker = Snark_worker_lib.Debug.Worker
   end
