@@ -1472,7 +1472,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
       let mul x y = Checked.mul ~label:"Field.Checked.mul" x y
 
-      let square x = Checked.square ~label:"Field.Checked.mul" x
+      let square x = Checked.square ~label:"Field.Checked.square" x
 
       let div x y = Checked.div ~label:"Field.Checked.div" x y
 
