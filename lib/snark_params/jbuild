@@ -7,7 +7,7 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries
-    ( bitstring_lib core_kernel snarky snark_bits dummy_values crypto_params ))
+    ( bitstring_lib core_kernel snarky snark_bits dummy_values pedersen_types crypto_params ))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Snark parameters")))
 

@@ -1,4 +1,5 @@
 open Core_kernel
+open Pedersen_types
 
 module Make
     (Impl : Snark_intf.S) (Curve : sig
@@ -194,39 +195,6 @@ end = struct
   end
 end
 
-
-module Four = struct
-  type t =
-  | Zero
-  | One 
-  | Two
-  | Three
-end
-
-module Triple = struct
-  type 'a t = 'a * 'a * 'a
-
-  let get (b : bool t) =
-    let (s0, s1, s2) = b in
-      match s0, s1 with
-      | false, false -> Four.Zero
-      | true, false -> Four.One
-      | false, true -> Four.Two
-      | true, true -> Four.Three
-end
-
-module Quadruple = struct
-  type 'a t = 'a * 'a * 'a * 'a
-
-  let get quad (index : Four.t) = 
-    let (g0, g1, g2, g3) = quad in
-      match index with 
-      | Zero -> g0
-      | One -> g1
-      | Two -> g2
-      | Three -> g3
-end
-
 module Make_faster
     (Impl : Snark_intf.S) (Weierstrass_curve : sig
         type var = Impl.Field.Checked.t * Impl.Field.Checked.t
@@ -294,18 +262,12 @@ module Make_faster
     type t 
   end
 
-   (* val empty : t *)
-
     val create :
          acc: (*[`Var of Weierstrass_curve.var | `Value of Weierstrass_curve.t]*) Acc.t
       -> support:Interval_union.t
       -> t
 
-    (* why checked ?? *)
-    val of_triples : 
-    bool Triple.t list
-    -> Field.t * Field.t 
-    -> t
+    val of_triples : bool Triple.t list -> Field.t * Field.t -> t
 
     val to_initial_segment_digest :
       t -> (Digest.var * [`Length of int]) Or_error.t
@@ -316,9 +278,8 @@ module Make_faster
 
   val digest : Weierstrass_curve.var -> Digest.var
 end = struct
-  open Impl
-  open Params
-
+    open Impl
+    open Params
     open Let_syntax
 
     let lookup ((s0, s1, s2): Boolean.var Triple.t) (q: Weierstrass_curve.t Quadruple.t) =
@@ -332,7 +293,6 @@ end = struct
     let y_lhs = Field.Checked.constant Field.one - (Field.of_int 2) * (s2 :> Field.Checked.t) in
     let%map ys = Field.Checked.mul y_lhs y_rhs 
     in (xs, ys)
-
 
   let hash_length = Field.size_in_bits
 
@@ -358,7 +318,6 @@ end = struct
 
   open Let_syntax
 
-(* bs0 is now a list of triples *)
   let hash_unchecked ~init:(i0, init) (bs0 : bool Triple.t list) =
     let n = Array.length params in
     let rec go acc i = function
@@ -369,9 +328,7 @@ end = struct
               "Pedersen.hash_unchecked: Input length (%d) exceeded max (%d)"
               (List.length bs0) n ()
           else
-            (* b2 isnt used *)
-            let (b0, b1, b2) = b in
-            (* i dont think these are needed ever *)
+            let (b0, b1, b2) = b in 
             let index = Triple.get b in
             let (resx, resy) = Quadruple.get params.(i) index in
             let acc' = if b2 then
