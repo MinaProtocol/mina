@@ -320,7 +320,7 @@ struct
               Deferred.List.for_all ps ~f:(fun (proof, stmt) ->
                   Transaction_snark.verify ~message proof stmt )
             in
-            Option.some_if good (Completed_work.Checked.create t)
+            Option.some_if good (Completed_work.Checked.create_unsafe t)
     end
 
     include Ledger_builder.Make (Inputs)
@@ -496,7 +496,7 @@ struct
       Option.map
         (Pool.request_proof (pool t) statement)
         ~f:(fun {proof; fee= {fee; prover}} ->
-          Completed_work.Checked.create
+          Completed_work.Checked.create_unsafe
             {Completed_work.fee; proofs= proof; prover} )
 
     let load ~disk_location ~incoming_diffs =

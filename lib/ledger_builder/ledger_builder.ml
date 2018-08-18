@@ -63,7 +63,7 @@ struct
   module Checked = struct
     include T
 
-    let create = Fn.id
+    let create_unsafe = Fn.id
   end
 
   let forget = Fn.id
@@ -998,7 +998,7 @@ let%test_module "test" =
         module Checked = struct
           include T
 
-          let create = Fn.id
+          let create_unsafe = Fn.id
         end
 
         let forget : Checked.t -> t =

@@ -273,7 +273,7 @@ module type Completed_work_intf = sig
   module Checked : sig
     type t [@@deriving sexp, bin_io]
 
-    val create : unchecked -> t
+    val create_unsafe : unchecked -> t
   end
 
   val forget : Checked.t -> t
