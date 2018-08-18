@@ -49,8 +49,6 @@ module Make
         val scale_known : t -> Scalar.var -> (var, _) Checked.t
 
         val scale : var -> Scalar.var -> (var, _) Checked.t
-
-        val generator : var
       end
     end) (Message : sig
       open Impl
@@ -72,8 +70,6 @@ module Make
       type t
 
       type var
-
-      val typ : (var, t) Impl.Typ.t
 
       (* I believe this has to be a random oracle *)
 
@@ -429,8 +425,6 @@ let%test_module "vrf-test" =
 
         let scale = Curve.Checked.scale
 
-        let generator = Curve.Checked.generator
-
         let to_bits ((x, y): var) =
           let open Let_syntax in
           let%map x =
@@ -481,8 +475,6 @@ let%test_module "vrf-test" =
       type t = Impl.Field.t
 
       type var = Pedersen.Digest.var
-
-      let typ = Pedersen.Digest.typ
 
       let hash message pt = hash_bits (Group.to_bits message @ Group.to_bits pt)
 
