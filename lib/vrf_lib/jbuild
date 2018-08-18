@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name vrf_lib)
+  (public_name vrf_lib)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+   ( core snarky))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (synopsis "VRF instantiation")))
