@@ -394,6 +394,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
+    ; strongest_ledgers: (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Ledger_proof_statement.Set.t
     ; ledger_builder_transition_backup_capacity: int }
@@ -415,6 +416,13 @@ module Make (Inputs : Inputs_intf) = struct
 
   let lbc_transition_tree t =
     Ledger_builder_controller.transition_tree t.ledger_builder
+  let strongest_ledgers t =
+    let r,w = Linear_pipe.create () in
+    don't_wait_for begin
+      Linear_pipe.iter t.strongest_ledgers
+        ~f:(fun (_,b) -> Linear_pipe.write w b)
+    end;
+    r
 
   module Config = struct
     type t =
@@ -490,11 +498,15 @@ module Make (Inputs : Inputs_intf) = struct
       (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
            Net.broadcast_snark_pool_diff net x ;
            Deferred.unit )) ;
-    let strongest_ledgers_for_miner, strongest_ledgers_for_network =
-      Linear_pipe.fork2
+    let strongest_ledgers_for_miner, 
+        strongest_ledgers_for_network,
+        strongest_ledgers_for_api
+      =
+      Linear_pipe.fork3
         (Ledger_builder_controller.strongest_ledgers ledger_builder)
     in
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
+        Logger.fatal config.log "ledger";
         Net.broadcast_state net t ; Deferred.unit )
     |> don't_wait_for ;
     let proposer =
@@ -524,6 +536,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; transaction_pool
       ; snark_pool
       ; ledger_builder
+      ; strongest_ledgers= strongest_ledgers_for_api
       ; log= config.log
       ; seen_jobs= Ledger_proof_statement.Set.empty
       ; ledger_builder_transition_backup_capacity=
