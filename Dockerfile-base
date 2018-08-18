@@ -1,5 +1,7 @@
 FROM gcr.io/o1labs-192920/ocaml407:latest
 
+# Builds a base image with code dependancies added in
+
 # Install nix for our haskell deps
 RUN sudo mkdir -p /nix
 RUN sudo chown opam /nix
@@ -17,6 +19,7 @@ RUN sudo apt-get install --yes libgmp3-dev
 RUN sudo apt-get install --yes libboost-dev
 RUN sudo apt-get install --yes libboost-program-options-dev
 RUN sudo apt-get install --yes librocksdb4.5 librocksdb-dev
+RUN sudo apt-get install --yes python
 RUN sudo apt-get install --yes zlib1g-dev
 
 RUN opam update -y && opam upgrade -y
