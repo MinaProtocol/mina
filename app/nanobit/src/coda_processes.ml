@@ -41,6 +41,12 @@ module Coda_process = struct
 
   let peers_exn (conn, proc) =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
+    
+  let stream_exn (conn, proc) =
+    let%map r = 
+      Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.stream ~arg:()
+    in
+    Linear_pipe.wrap_reader r
 end
 
 module Coda_processes = struct
