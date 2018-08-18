@@ -1220,7 +1220,7 @@ module Mnt4_0 = Make_full (struct
 end)
 
 module Mnt6_0 = Make_full (struct
-  let prefix = "camlsnark_mnt4"
+  let prefix = "camlsnark_mnt6"
 end)
 
 module Mnt4 = struct

@@ -409,7 +409,7 @@ libff::G1<ppT>* camlsnark_mnt4_g1_add (libff::G1<ppT>* a, libff::G1<ppT>* b) {
   return new libff::G1<ppT>((*a) + (*b));
 }
 
-libff::G1<ppT>* camlsnark_mnt4_g1_scale (libff::Fr<ppT> *a, libff::G1<ppT>* x) {
+libff::G1<ppT>* camlsnark_mnt4_g1_scale (libff::bigint<libff::mnt4_r_limbs> *a, libff::G1<ppT>* x) {
   return new libff::G1<ppT>((*a) * (*x));
 }
 
