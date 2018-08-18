@@ -121,6 +121,9 @@ module Coda_worker = struct
         in
         let coda_sum x = return (x + 3) in
         let coda_peers () = return (Main.peers coda) in
+        don't_wait_for begin
+          Linear_pipe.drain (Main.strongest_ledgers coda)
+        end;
         let coda_stream () = 
           let r, w = Linear_pipe.create () in
           don't_wait_for begin
