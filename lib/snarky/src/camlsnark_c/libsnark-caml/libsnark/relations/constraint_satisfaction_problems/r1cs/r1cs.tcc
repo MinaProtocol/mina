@@ -168,6 +168,9 @@ template<typename FieldT>
 void r1cs_constraint_system<FieldT>::add_constraint(const r1cs_constraint<FieldT> &c)
 {
     constraints.emplace_back(c);
+    if (c.is_square) {
+      num_square_constraints += 1;
+    }
 }
 
 template<typename FieldT>
@@ -177,6 +180,9 @@ void r1cs_constraint_system<FieldT>::add_constraint(const r1cs_constraint<FieldT
     constraint_annotations[constraints.size()] = annotation;
 #endif
     constraints.emplace_back(c);
+    if (c.is_square) {
+      num_square_constraints += 1;
+    }
 }
 
 template<typename FieldT>

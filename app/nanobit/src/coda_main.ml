@@ -15,6 +15,8 @@ module type Init_intf = sig
 
   val genesis_proof : Proof.t
 
+  val lbc_tree_max_depth : [`Infinity | `Finite of int]
+
   val transaction_interval : Time.Span.t
 
   (* Public key to allocate fees to *)
@@ -268,6 +270,7 @@ struct
   end
 
   module Sparse_ledger = Nanobit_base.Sparse_ledger
+  module Ledger_proof_statement = Transaction_snark.Statement
 
   module Ledger_builder = struct
     include Ledger_builder.Make (struct
@@ -279,7 +282,7 @@ struct
       module Super_transaction = Super_transaction
       module Ledger = Ledger
       module Ledger_proof = Ledger_proof
-      module Ledger_proof_statement = Transaction_snark.Statement
+      module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_hash = Ledger_hash
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
@@ -354,6 +357,11 @@ struct
     type t =
       {state: State.t; proof: State.Proof.t; ledger_builder: Ledger_builder.t}
     [@@deriving bin_io, sexp]
+
+    let of_transition_and_lb transition ledger_builder =
+      { state= External_transition.state transition
+      ; proof= External_transition.state_proof transition
+      ; ledger_builder }
   end
 
   let fee_public_key = Init.fee_public_key
@@ -515,6 +523,9 @@ struct
 
         type path = Path.t
       end)
+      (struct
+        let subtree_height = 3
+      end)
 
   module Net = Minibit_networking.Make (struct
     include Inputs0
@@ -525,6 +536,10 @@ struct
 
   module Ledger_builder_controller = struct
     module Inputs = struct
+      module Security = struct
+        let max_depth = Init.lbc_tree_max_depth
+      end
+
       module Tip = Tip
       module Store = Store
       module Snark_pool = Snark_pool
@@ -595,6 +610,8 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
+  module Transition_tree = Ledger_builder_controller.Transition_tree
+
   module Signer = Signer.Make (struct
     include Inputs0
 
@@ -628,11 +645,16 @@ struct
     end
   end)
 
-  let request_work ~best_ledger_builder t =
-    let open Option.Let_syntax in
+  let request_work ~best_ledger_builder
+      ~(seen_jobs: 'a -> Ledger_proof_statement.Set.t)
+      ~(set_seen_jobs: 'a -> Ledger_proof_statement.Set.t -> unit) (t: 'a) =
     let lb = best_ledger_builder t in
-    let%map instances = Ledger_builder.random_work_spec_chunk lb in
-    {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
+    let maybe_instances, seen_jobs =
+      Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
+    in
+    set_seen_jobs t seen_jobs ;
+    Option.map maybe_instances ~f:(fun instances ->
+        {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero} )
 end
 
 module Coda_with_snark
@@ -652,7 +674,8 @@ struct
 
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
-  let request_work = Inputs.request_work ~best_ledger_builder
+  let request_work =
+    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
 end
 
 module Coda_without_snark (Init : Init_intf) () = struct
@@ -667,13 +690,16 @@ module Coda_without_snark (Init : Init_intf) () = struct
 
   include Coda.Make (Inputs)
 
-  let request_work = Inputs.request_work ~best_ledger_builder
+  let request_work =
+    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
 
   let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
 
 module type Main_intf = sig
   module Inputs : sig
+    module Time : Protocols.Coda_pow.Time_intf
+
     module Ledger : sig
       type t [@@deriving sexp]
 
@@ -695,21 +721,12 @@ module type Main_intf = sig
       end
 
       module Gossip_net : sig
-        module Params : sig
-          type t =
-            {timeout: Time.Span.t; target_peer_count: int; address: Peer.t}
-        end
+        module Config : Gossip_net.Config_intf
       end
 
-      module Config : sig
-        type t =
-          { parent_log: Logger.t
-          ; conf_dir: string
-          ; gossip_net_params: Gossip_net.Params.t
-          ; initial_peers: Peer.t list
-          ; me: Peer.t
-          ; remap_addr_port: Peer.t -> Peer.t }
-      end
+      module Config :
+        Minibit_networking.Config_intf
+        with type gossip_config := Gossip_net.Config.t
     end
 
     module Sparse_ledger : sig
@@ -746,6 +763,9 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
+
+    module Transition_tree :
+      Coda.Ktree_intf with type elem := External_transition.t
   end
 
   module Config : sig
@@ -755,7 +775,8 @@ module type Main_intf = sig
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10] }
+      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; time_controller: Inputs.Time.Controller.t }
     [@@deriving make]
   end
 
@@ -773,12 +794,18 @@ module type Main_intf = sig
 
   val create : Config.t -> t Deferred.t
 
+  val lbc_transition_tree : t -> Inputs.Transition_tree.t option
+
   val snark_worker_command_name : string
 end
 
 module Run (Program : Main_intf) = struct
   include Program
   open Inputs
+
+  module For_tests = struct
+    let get_transition_tree t = lbc_transition_tree t
+  end
 
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in

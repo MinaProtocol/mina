@@ -30,6 +30,8 @@ module type Inputs_intf = sig
     type t
 
     val create : unit -> t Deferred.t
+
+    val worker_wait_time : float
   end
 
   val perform_single :

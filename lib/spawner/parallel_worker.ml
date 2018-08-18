@@ -42,13 +42,13 @@ module Make (Worker : Worker_intf) (Id : Id_intf) :
   Parallel_worker_intf
   with type input = Worker.input
    and type state = Worker.state
-   and type config = (Id.t, string, string, string) Config.t =
+   and type config = (Id.t, string, string) Config.t =
 struct
   type input = Worker.input
 
   type state = Worker.state
 
-  type config = (Id.t, string, string, string) Config.t
+  type config = (Id.t, string, string) Config.t
 
   module Rpc_worker = struct
     module T = struct
@@ -96,7 +96,7 @@ struct
 
   type t = Rpc_worker.Connection.t
 
-  let create input {Config.id; host; executable_path; log_dir} =
+  let create input {Config.id; host; executable_path} =
     let worker_id = sprintf "worker-%s-%s" host (Id.to_string id)
     and worker_location =
       if host = Command_util.local_machine_host then
@@ -107,14 +107,15 @@ struct
              ~strict_host_key_checking:`No host)
     in
     match%bind
-      Rpc_worker.spawn input ~on_failure:Error.raise ~shutdown_on:Disconnect
-        ~connection_state_init_arg:()
-        ~redirect_stdout:(`File_append (log_dir ^/ worker_id ^ "-stdout"))
-        ~redirect_stderr:(`File_append (log_dir ^/ worker_id ^ "-stderr"))
-        ~connection_timeout:(Time.Span.of_min 1.) ~name:worker_id
+      Rpc_worker.spawn_in_foreground input ~on_failure:Error.raise
+        ~shutdown_on:Disconnect ~connection_state_init_arg:()
+        ~connection_timeout:(Time.Span.of_sec 15.) ~name:worker_id
         ~where:worker_location
     with
-    | Ok worker -> return worker
+    | Ok (worker, process) ->
+        File_system.dup_stdout process ;
+        File_system.dup_stderr process ;
+        return worker
     | Error e ->
         failwith
           (sprintf "Could not create %s\n%s\n" worker_id

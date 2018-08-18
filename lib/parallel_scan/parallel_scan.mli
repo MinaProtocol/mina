@@ -1,5 +1,4 @@
 open Core_kernel
-open Async_kernel
 
 module Ring_buffer : sig
   type 'a t [@@deriving sexp, bin_io]
@@ -55,5 +54,5 @@ val free_space : state:('a, 'd) State.t -> int
 
 val fill_in_completed_jobs :
      state:('a, 'd) State.t
-  -> jobs:'a State.Completed_job.t list
+  -> completed_jobs:'a State.Completed_job.t list
   -> 'a option Or_error.t

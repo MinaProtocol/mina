@@ -1,7 +1,7 @@
 (library
  ((name        precomputed_values)
   (public_name precomputed_values)
-  (flags (:standard -short-paths))
+  (flags (:standard -short-paths -warn-error -58))
   (libraries
     ( crypto_params
       dummy_values

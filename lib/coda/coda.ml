@@ -135,6 +135,27 @@ module type Snark_pool_intf = sig
     t -> completed_work_statement -> completed_work_checked option
 end
 
+module type Ktree_intf = sig
+  type elem
+
+  type t [@@deriving sexp]
+
+  val gen : elem Quickcheck.Generator.t -> t Quickcheck.Generator.t
+
+  val find_map : t -> f:(elem -> 'a option) -> 'a option
+
+  val path : t -> f:(elem -> bool) -> elem list option
+
+  val singleton : elem -> t
+
+  val longest_path : t -> elem list
+
+  val add :
+    t -> elem -> parent:(elem -> bool) -> [> `Added of t | `No_parent | `Repeat]
+
+  val root : t -> elem
+end
+
 module type Ledger_builder_controller_intf = sig
   type ledger_builder
 
@@ -172,10 +193,6 @@ module type Ledger_builder_controller_intf = sig
     [@@deriving make]
   end
 
-  module Aux : sig
-    type t = {root_and_proof: (ledger_hash * ledger_proof) option; state: state}
-  end
-
   val create : Config.t -> t Deferred.t
 
   val strongest_tip : t -> tip
@@ -188,6 +205,11 @@ module type Ledger_builder_controller_intf = sig
 
   val handle_sync_ledger_queries :
     ledger_hash * sync_query -> ledger_hash * sync_answer
+
+  (** For tests *)
+  module Transition_tree : Ktree_intf with type elem := external_transition
+
+  val transition_tree : t -> Transition_tree.t option
 end
 
 module type Signer_intf = sig
@@ -209,6 +231,8 @@ module type Signer_intf = sig
 
   type state_proof
 
+  type time_controller
+
   module Tip : sig
     type t =
       { state: state * state_proof
@@ -223,6 +247,7 @@ module type Signer_intf = sig
     -> get_completed_work:(   completed_work_statement
                            -> completed_work_checked option)
     -> change_feeder:change Linear_pipe.Reader.t
+    -> time_controller:time_controller
     -> t
 
   val transitions : t -> external_transition Linear_pipe.Reader.t
@@ -339,6 +364,7 @@ module type Inputs_intf = sig
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
      and type external_transition := External_transition.t
+     and type time_controller := Time.Controller.t
 
   module Genesis : sig
     val state : State.t
@@ -364,6 +390,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
     ; log: Logger.t
+    ; mutable seen_jobs: Ledger_proof_statement.Set.t
     ; ledger_builder_transition_backup_capacity: int }
 
   let best_ledger_builder t =
@@ -371,11 +398,18 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
+  let seen_jobs t = t.seen_jobs
+
+  let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
+
   let transaction_pool t = t.transaction_pool
 
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
+
+  let lbc_transition_tree t =
+    Ledger_builder_controller.transition_tree t.ledger_builder
 
   module Config = struct
     type t =
@@ -384,7 +418,8 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
-      ; ledger_builder_transition_backup_capacity: int [@default 10] }
+      ; ledger_builder_transition_backup_capacity: int [@default 10]
+      ; time_controller: Time.Controller.t }
     [@@deriving make]
   end
 
@@ -467,6 +502,7 @@ module Make (Inputs : Inputs_intf) = struct
       |> don't_wait_for ;
       Signer.create ~parent_log:config.log ~change_feeder:tips_r
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
+        ~time_controller:config.time_controller
     in
     don't_wait_for
       (Linear_pipe.transfer_id (Signer.transitions miner)
@@ -479,6 +515,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool
       ; ledger_builder
       ; log= config.log
+      ; seen_jobs= Ledger_proof_statement.Set.empty
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
 

@@ -193,20 +193,22 @@ module type Inputs_intf = sig
   module Transaction_pool_diff : Binable.S
 end
 
+module type Config_intf = sig
+  type gossip_config
+
+  type t = {parent_log: Logger.t; gossip_net_params: gossip_config}
+end
+
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
   module Message = Message (Inputs)
   module Gossip_net = Gossip_net.Make (Message)
   module Peer = Peer
 
-  module Config = struct
-    type t =
-      { parent_log: Logger.t
-      ; conf_dir: string
-      ; gossip_net_params: Gossip_net.Params.t
-      ; initial_peers: Peer.t list
-      ; me: Peer.t
-      ; remap_addr_port: Peer.t -> Peer.t }
+  module Config :
+    Config_intf with type gossip_config := Gossip_net.Config.t =
+  struct
+    type t = {parent_log: Logger.t; gossip_net_params: Gossip_net.Config.t}
   end
 
   module Rpcs = Rpcs (Inputs)
@@ -220,28 +222,6 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t }
   [@@deriving fields]
 
-  let init_gossip_net params conf_dir initial_peers me log remap_addr_port
-      implementations =
-    let%map membership =
-      match%map
-        Membership.connect ~initial_peers ~me ~conf_dir ~parent_log:log
-      with
-      | Ok membership -> membership
-      | Error e ->
-          failwith
-            (Printf.sprintf "Failed to connect to kademlia process: %s\n"
-               (Error.to_string_hum e))
-    in
-    let remap_ports peers =
-      List.map peers ~f:(fun peer -> remap_addr_port peer)
-    in
-    let peer_events =
-      Linear_pipe.map (Membership.changes membership) ~f:(function
-        | Connect peers -> Peer.Event.Connect (remap_ports peers)
-        | Disconnect peers -> Disconnect (remap_ports peers) )
-    in
-    Gossip_net.create peer_events params log implementations
-
   let create (config: Config.t)
       ~(get_ledger_builder_aux_at_hash:
             Ledger_builder_hash.t
@@ -250,10 +230,10 @@ module Make (Inputs : Inputs_intf) = struct
             Ledger_hash.t * Sync_ledger.query
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.t) =
     let log = Logger.child config.parent_log "minibit networking" in
-    let get_ledger_builder_aux_at_hash_rpc () ~version hash =
+    let get_ledger_builder_aux_at_hash_rpc () ~version:_ hash =
       get_ledger_builder_aux_at_hash hash
     in
-    let answer_sync_ledger_query_rpc () ~version query =
+    let answer_sync_ledger_query_rpc () ~version:_ query =
       answer_sync_ledger_query query
     in
     let implementations =
@@ -264,9 +244,7 @@ module Make (Inputs : Inputs_intf) = struct
            answer_sync_ledger_query_rpc)
     in
     let%map gossip_net =
-      init_gossip_net config.gossip_net_params config.conf_dir
-        config.initial_peers config.me log config.remap_addr_port
-        implementations
+      Gossip_net.create config.gossip_net_params implementations
     in
     (* TODO: Think about buffering:
        I.e., what do we do when too many messages are coming in, or going out.

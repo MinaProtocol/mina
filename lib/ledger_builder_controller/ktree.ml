@@ -4,7 +4,7 @@ open Core_kernel
 module Rose = struct
   type 'a t = Rose of 'a * 'a t list [@@deriving eq, sexp, bin_io, fold]
 
-  let single a = Rose (a, [])
+  let singleton a = Rose (a, [])
 
   let extract (Rose (x, _)) = x
 
@@ -34,20 +34,20 @@ end
 
 (** A Rose tree with max-depth k. Whenever we want to add a node that would increase the depth past k, we instead move the tree forward and root it at the node towards that path *)
 module Make (Elem : sig
-  type t [@@deriving eq, compare, bin_io, sexp]
-end) (Max_depth : sig
-  val k : int
-  (** The idea is k is "small" in the sense of probability of forking within k is < some nontrivial epsilon (like once a week?) *)
-end) =
+  type t [@@deriving compare, bin_io, sexp]
+end)
+(Security : Protocols.Coda_pow.Security_intf) =
 struct
   module Elem_set = Set.Make_binable (Elem)
 
   type t = {tree: Elem.t Rose.t; elems: Elem_set.t} [@@deriving sexp, bin_io]
 
-  let find_map {elems} ~f = Elem_set.find_map elems ~f
+  let root {tree; _} = Rose.extract tree
+
+  let find_map {elems; _} ~f = Elem_set.find_map elems ~f
 
   (** Path from the root to the first node where the predicate returns true *)
-  let path {tree} ~f =
+  let path {tree; _} ~f =
     let rec go tree path =
       match tree with
       | Rose.Rose (x, _) when f x -> Some (x :: path)
@@ -57,8 +57,8 @@ struct
     in
     go tree [] |> Option.map ~f:List.rev
 
-  let single (e: Elem.t) : t =
-    {tree= Rose.single e; elems= Elem_set.singleton e}
+  let singleton (e: Elem.t) : t =
+    {tree= Rose.singleton e; elems= Elem_set.singleton e}
 
   let gen elem_gen =
     let open Quickcheck.Generator.Let_syntax in
@@ -77,7 +77,7 @@ struct
     {tree; elems= !r}
 
   (* Note: This won't work in proof-of-work, but it's not a prefix of the proof-of-stakeversion, so I'm just going to use a longest heuristic for now *)
-  let longest_path {tree} =
+  let longest_path {tree; _} =
     let rec go tree depth path =
       match tree with
       | Rose.Rose (x, []) -> (x :: path, depth)
@@ -98,7 +98,7 @@ struct
     else
       let rec go node depth =
         let (Rose.Rose (x, xs)) = node in
-        if parent x then (Rose.Rose (x, Rose.single e :: xs), depth + 1)
+        if parent x then (Rose.Rose (x, Rose.singleton e :: xs), depth + 1)
         else
           let xs, ds =
             List.map xs ~f:(fun x -> go x (depth + 1)) |> List.unzip
@@ -110,7 +110,7 @@ struct
         let children_and_depths =
           List.map root_children ~f:(fun x -> go x 1)
         in
-        if parent root then (root, (Rose.single e, 1) :: children_and_depths)
+        if parent root then (root, (Rose.singleton e, 1) :: children_and_depths)
         else (
           assert (List.length root_children <> 0) ;
           (root, children_and_depths) )
@@ -127,7 +127,10 @@ struct
                 Int.compare d d' )
             |> Option.value_exn
           in
-          if longest_depth >= Max_depth.k then
+          let ( >= ) a b =
+            match b with `Infinity -> false | `Finite b -> a >= b
+          in
+          if longest_depth >= Security.max_depth then
             `Added
               { tree= longest_subtree
               ; elems= Elem_set.of_list (Rose.to_list longest_subtree) }
@@ -140,11 +143,14 @@ let%test_module "K-tree" =
       type t [@@deriving eq, compare, bin_io, sexp]
 
       val gen : t Quickcheck.Generator.t
-    end) (Max_depth : sig
-      val k : int
+    end) (Security : sig
+      val max_depth : int
     end) =
     struct
-      include Make (Elem) (Max_depth)
+      include Make (Elem)
+                (struct
+                  let max_depth = `Finite Security.max_depth
+                end)
 
       let%test_unit "Adding an element either changes the tree or it was \
                      already in the set" =
@@ -198,7 +204,7 @@ let%test_module "K-tree" =
       let%test_unit "Extending a tree with depth-k, extends full-tree properly" =
         let elem_pairs =
           Quickcheck.random_value ~seed:(`Deterministic "seed")
-            (Quickcheck.Generator.list_with_length Max_depth.k
+            (Quickcheck.Generator.list_with_length Security.max_depth
                (Quickcheck.Generator.tuple2 Elem.gen Elem.gen))
         in
         let (e1, e2), es = (List.hd_exn elem_pairs, List.tl_exn elem_pairs) in
@@ -206,16 +212,16 @@ let%test_module "K-tree" =
           let tree =
             List.fold es
               ~init:(Rose.Rose (e1, []))
-              ~f:(fun r (e, e') -> Rose.Rose (e, [Rose.single e'; r]))
+              ~f:(fun r (e, e') -> Rose.Rose (e, [Rose.singleton e'; r]))
           in
           {tree; elems= Elem_set.of_list (Rose.to_list tree)}
         in
-        assert (List.length (longest_path t) = Max_depth.k) ;
+        assert (List.length (longest_path t) = Security.max_depth) ;
         let (Rose.Rose (head, first_children)) = t.tree in
         match add t e2 ~parent:(Elem.equal e1) with
         | `No_parent | `Repeat -> failwith "Unexpected"
         | `Added t' ->
-            assert (List.length (longest_path t') = Max_depth.k) ;
+            assert (List.length (longest_path t') = Security.max_depth) ;
             assert (not (Rose.mem t'.tree head ~equal:Elem.equal)) ;
             assert (
               not
@@ -231,18 +237,18 @@ let%test_module "K-tree" =
     module Tree =
       Make_quickchecks (Int)
         (struct
-          let k = 10
+          let max_depth = 10
         end)
 
     module Big_tree =
       Make_quickchecks (Int)
         (struct
-          let k = 50
+          let max_depth = 50
         end)
 
     let sample_tree =
       { Tree.tree=
-          Rose.Rose (1, [Rose.Rose (2, [Rose.single 3]); Rose.single 4])
+          Rose.Rose (1, [Rose.Rose (2, [Rose.singleton 3]); Rose.singleton 4])
       ; elems= Tree.Elem_set.of_list [1; 2; 3; 4] }
 
     let%test_unit "longest_path finds longest path" =

@@ -4,6 +4,14 @@ open Snark_bits
 
 type t [@@deriving sexp, eq]
 
+type t0 = t
+
+module Controller : sig
+  type t = unit
+
+  val create : unit -> t
+end
+
 module Stable : sig
   module V1 : sig
     type nonrec t = t [@@deriving sexp, bin_io, compare, eq]
@@ -50,13 +58,13 @@ end
 module Timeout : sig
   type 'a t
 
-  val create : Span.t -> (unit -> 'a) -> 'a t
+  val create : Controller.t -> Span.t -> f:(t0 -> 'a) -> 'a t
 
   val to_deferred : 'a t -> 'a Async_kernel.Deferred.t
 
   val peek : 'a t -> 'a option
 
-  val cancel : 'a t -> 'a -> unit
+  val cancel : Controller.t -> 'a t -> 'a -> unit
 end
 
 val field_var_to_unpacked :
@@ -75,4 +83,4 @@ val of_time : Time.t -> t
 
 val to_time : t -> Time.t
 
-val now : unit -> t
+val now : Controller.t -> t

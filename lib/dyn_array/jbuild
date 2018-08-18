@@ -7,5 +7,5 @@
   (inline_tests)
   (libraries (core extlib))
   (preprocess (pps (ppx_jane)))
-  (flags (:standard -short-paths))
+  (flags (:standard -short-paths -warn-error -58))
   (synopsis "dyn_array has the same capabilities as Core's DynArray and it is also serializable")))

@@ -26,16 +26,15 @@ module Master = Master.Make (Worker (Int)) (Int)
 
 let master_command =
   let open Command.Let_syntax in
-  let%map {host; executable_path; log_dir} = Command_util.config_arguments in
+  let%map {host; executable_path} = Command_util.config_arguments in
   fun () ->
     let open Deferred.Let_syntax in
     let open Master in
     let t = create () in
-    let%bind () = File_system.create_dir log_dir in
     let id = 1 in
-    let config = {Config.id; host; executable_path; log_dir} and process = 1 in
-    let%bind () = add t id process ~config in
-    let%bind () = Option.value_exn (run t process) in
+    let config = {Config.id; host; executable_path} and input = 1 in
+    let%bind () = add t id input ~config in
+    let%bind () = Option.value_exn (run t input) in
     let reader = new_states t and expected_state = 2 in
     let%map _, actual_state = Linear_pipe.read_exn reader in
     assert (expected_state = actual_state)
