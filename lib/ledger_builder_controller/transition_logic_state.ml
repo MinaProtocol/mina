@@ -31,7 +31,7 @@ end
 module Make (Transition : sig
   type t [@@deriving compare, sexp, bin_io]
 end) (Tip : sig
-  type t [@@deriving bin_io]
+  type t [@@deriving bin_io, sexp]
 
   val is_materialization_of : t -> Transition.t -> bool
 end) :
@@ -48,6 +48,7 @@ struct
       | Locked_tip of Tip.t
       | Longest_branch_tip of Tip.t
       | Ktree of Transition_tree.t
+    [@@deriving sexp]
   end
 
   open Change

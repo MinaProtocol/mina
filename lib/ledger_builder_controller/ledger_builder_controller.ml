@@ -525,24 +525,21 @@ let%test_module "test" =
 
       module Protocol_state = struct
         type t =
-          { hash: State_hash.t
-          ; previous_state_hash: State_hash.t
+          { previous_state_hash: State_hash.t
           ; blockchain_state: Blockchain_state.value
           ; consensus_state: Consensus_mechanism_state.value }
         [@@deriving eq, sexp, fields, bin_io, compare]
 
         type value = t [@@deriving sexp, bin_io, eq, compare]
 
+        let hash t = t.blockchain_state.ledger_builder_hash
+
         let create_value ~previous_state_hash ~blockchain_state
             ~consensus_state =
-          let state =
-            {hash= 0; previous_state_hash; blockchain_state; consensus_state}
-          in
-          {state with hash= hash state}
+          {previous_state_hash; blockchain_state; consensus_state}
 
         let genesis =
-          { hash= 0
-          ; previous_state_hash= -1
+          { previous_state_hash= -1
           ; blockchain_state= {ledger_builder_hash= 0; ledger_hash= 0}
           ; consensus_state= {strength= 0} }
       end
@@ -651,7 +648,6 @@ let%test_module "test" =
 
     let transition x parent strength =
       { Inputs.Protocol_state.previous_state_hash= parent
-      ; hash= x
       ; blockchain_state= {ledger_builder_hash= x; ledger_hash= x}
       ; consensus_state= {strength} }
 
