@@ -42,7 +42,7 @@ update-deps: base-googlecloud
 	./scripts/rewrite-from-dockerfile.sh ocaml-base $(shell git rev-parse HEAD)
 
 test:
-	./test_all.sh
+	./scripts/test_all.sh
 
 reformat:
 	dune exec app/reformat/reformat.exe -- -path .
