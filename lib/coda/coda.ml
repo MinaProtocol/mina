@@ -506,7 +506,6 @@ module Make (Inputs : Inputs_intf) = struct
         (Ledger_builder_controller.strongest_ledgers ledger_builder)
     in
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
-        Logger.fatal config.log "ledger";
         Net.broadcast_state net t ; Deferred.unit )
     |> don't_wait_for ;
     let proposer =
