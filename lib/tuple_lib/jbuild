@@ -1,0 +1,12 @@
+(jbuild_version 1)
+
+(library
+ ((name tuple_lib)
+  (public_name tuple_lib)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries
+   ( core))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (synopsis "Tuple types")))
