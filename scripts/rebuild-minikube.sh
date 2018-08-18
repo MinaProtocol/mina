@@ -4,7 +4,7 @@ set -e
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
-$SCRIPTPATH/rebuild-docker.sh $1 $2
+$SCRIPTPATH/scripts/rebuild-docker.sh $1 $2
 
 img=$1:latest
 
