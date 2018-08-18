@@ -15,6 +15,8 @@ module type Init_intf = sig
 
   val genesis_proof : Proof.t
 
+  val lbc_tree_max_depth : [`Infinity | `Finite of int]
+
   val transaction_interval : Time.Span.t
 
   (* Public key to allocate fees to *)
@@ -534,6 +536,10 @@ struct
 
   module Ledger_builder_controller = struct
     module Inputs = struct
+      module Security = struct
+        let max_depth = Init.lbc_tree_max_depth
+      end
+
       module Tip = Tip
       module Store = Store
       module Snark_pool = Snark_pool
@@ -603,6 +609,8 @@ struct
 
     include Ledger_builder_controller.Make (Inputs)
   end
+
+  module Transition_tree = Ledger_builder_controller.Transition_tree
 
   module Signer = Signer.Make (struct
     include Inputs0
@@ -755,6 +763,9 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
+
+    module Transition_tree :
+      Coda.Ktree_intf with type elem := External_transition.t
   end
 
   module Config : sig
@@ -783,12 +794,18 @@ module type Main_intf = sig
 
   val create : Config.t -> t Deferred.t
 
+  val lbc_transition_tree : t -> Inputs.Transition_tree.t option
+
   val snark_worker_command_name : string
 end
 
 module Run (Program : Main_intf) = struct
   include Program
   open Inputs
+
+  module For_tests = struct
+    let get_transition_tree t = lbc_transition_tree t
+  end
 
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in

@@ -45,6 +45,8 @@ module Coda_worker = struct
 
       let prover = prover
 
+      let lbc_tree_max_depth = `Finite 50
+
       let genesis_proof = Precomputed_values.base_proof
 
       let transaction_interval = Time.Span.of_ms 100.0

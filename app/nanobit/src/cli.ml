@@ -74,6 +74,8 @@ let daemon =
 
          let conf_dir = conf_dir
 
+         let lbc_tree_max_depth = `Finite 50
+
          let prover = prover
 
          let genesis_proof = Precomputed_values.base_proof
