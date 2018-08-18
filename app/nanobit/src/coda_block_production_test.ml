@@ -19,9 +19,17 @@ let main () =
       let%bind peers = Coda_process.peers_exn worker in
       Print.printf "sum_worker: %d\n" res ;
       Print.printf !"peers: %{sexp: Host_and_port.t list}\n" peers;
-      let%bind stream = Coda_process.stream_exn worker in
-      let%bind () = Linear_pipe.iter stream ~f:(fun () -> Print.printf "got elem\n"; return ()) in
-      let%bind () = after (Time.Span.of_sec 5.) in
+      let%bind strongest_ledgers = Coda_process.strongest_ledgers_exn worker in
+      let count = ref 0 in
+      don't_wait_for begin
+        Linear_pipe.iter strongest_ledgers 
+          ~f:(fun () -> 
+              Print.printf "got ledger\n";
+              incr count;
+              Deferred.unit)
+      end;
+      let%bind () = after (Time.Span.of_sec 60.) in
+      Print.printf "ledgers: %d\n" !count;
       let%bind _ = Coda_process.disconnect worker in
       Deferred.unit
     )

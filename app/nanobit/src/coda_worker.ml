@@ -22,13 +22,13 @@ module Coda_worker = struct
     type 'worker functions = 
       { sum: ('worker, int, int) Rpc_parallel.Function.t
       ; peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
-      ; stream: ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
+      ; strongest_ledgers: ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
       }
 
     type coda_functions = 
       { coda_sum: int -> int Deferred.t 
       ; coda_peers: unit -> Peers.t Deferred.t
-      ; coda_stream: unit -> unit Pipe.Reader.t Deferred.t
+      ; coda_strongest_ledgers: unit -> unit Pipe.Reader.t Deferred.t
       }
 
     module Worker_state = struct
@@ -54,8 +54,8 @@ module Coda_worker = struct
       let peers_impl ~worker_state ~conn_state:() () =
         worker_state.coda_peers ()
 
-      let stream_impl ~worker_state ~conn_state:() () =
-        worker_state.coda_stream ()
+      let strongest_ledgers_impl ~worker_state ~conn_state:() () =
+        worker_state.coda_strongest_ledgers ()
 
       let sum =
         C.create_rpc ~f:sum_impl ~bin_input:Int.bin_t ~bin_output:Int.bin_t ()
@@ -63,10 +63,10 @@ module Coda_worker = struct
       let peers =
         C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t ()
 
-      let stream =
-        C.create_pipe ~f:stream_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t ()
+      let strongest_ledgers =
+        C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t ()
 
-      let functions = {sum; peers; stream}
+      let functions = {sum; peers; strongest_ledgers}
 
       let init_worker_state {host; conf_dir; program_dir; my_port; peers; gossip_port} = 
         let log = Logger.create () in
@@ -121,25 +121,22 @@ module Coda_worker = struct
         in
         let coda_sum x = return (x + 3) in
         let coda_peers () = return (Main.peers coda) in
-        don't_wait_for begin
+        (*don't_wait_for begin
           Linear_pipe.drain (Main.strongest_ledgers coda)
-        end;
-        let coda_stream () = 
+        end;*)
+        let coda_strongest_ledgers () = 
           let r, w = Linear_pipe.create () in
           don't_wait_for begin
-            let rec go () =
-              Linear_pipe.write_without_pushback w ();
-              let%bind () = after (Time.Span.of_sec 1.) in
-              go ()
-            in
-            go ()
+            Linear_pipe.iter 
+              (Main.strongest_ledgers coda)
+              ~f:(fun _ -> Linear_pipe.write w ())
           end;
           return r.pipe
         in
         return 
           { coda_sum
           ; coda_peers
-          ; coda_stream
+          ; coda_strongest_ledgers
           }
 
       let init_connection_state ~connection:_ ~worker_state:_ = return
