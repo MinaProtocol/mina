@@ -82,7 +82,7 @@ module State_transition_data = struct
             Pedersen.digest_fold Hash_prefix.signature
               (T.fold t +> List.fold nonce)
           in
-          List.take (Field.unpack d) Scalar.length |> Scalar.pack
+          List.take (Field.unpack d) Scalar.length_in_bits |> Scalar.pack
 
         let () = assert Insecure.signature_hash_function
 
@@ -101,7 +101,7 @@ module State_transition_data = struct
                Pedersen_hash.Digest.choose_preimage
                @@ Pedersen_hash.digest hash
              in
-             List.take bs Scalar.length)
+             List.take bs Scalar.length_in_bits)
       end)
 end
 
