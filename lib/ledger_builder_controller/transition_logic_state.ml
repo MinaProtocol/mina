@@ -5,7 +5,7 @@ module type S = sig
 
   type tip
 
-  module Transition_tree : Ktree.S with type elem := transition
+  module Transition_tree : Coda.Ktree_intf with type elem := transition
 
   type t [@@deriving bin_io]
 
@@ -28,7 +28,9 @@ module type S = sig
   val create : tip -> t
 end
 
-module Make (Transition : sig
+module Make (Security : sig
+  val max_depth : [`Infinity | `Finite of int]
+end) (Transition : sig
   type t [@@deriving compare, sexp, bin_io]
 end) (Tip : sig
   type t [@@deriving bin_io]
@@ -37,11 +39,7 @@ end) (Tip : sig
 end) :
   S with type tip := Tip.t and type transition := Transition.t =
 struct
-  module Transition_tree =
-    Ktree.Make (Transition)
-      (struct
-        let k = 50
-      end)
+  module Transition_tree = Ktree.Make (Transition) (Security)
 
   module Change = struct
     type t =

@@ -2,6 +2,8 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
+  module Security : Protocols.Coda_pow.Security_intf
+
   module Ledger_builder_hash : sig
     type t [@@deriving eq, bin_io]
   end
@@ -255,7 +257,7 @@ end = struct
     end
 
     module Transition_logic_state =
-      Transition_logic_state.Make (Transition) (Tip)
+      Transition_logic_state.Make (Security) (Transition) (Tip)
 
     module Step = struct
       let step (tip: Tip.t) transition =
@@ -288,12 +290,19 @@ end = struct
   module Transition_logic = Transition_logic.Make (Transition_logic_inputs)
   open Transition_logic_inputs
 
+  (** For tests *)
+  module Transition_tree = Transition_logic_state.Transition_tree
+
   type t =
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; mutable handler: Transition_logic.t
     ; strongest_ledgers:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
+
+  let transition_tree t =
+    let state = Transition_logic.state t.handler in
+    Transition_logic_state.ktree state
 
   let strongest_tip t =
     let state = Transition_logic.state t.handler in
@@ -420,6 +429,10 @@ end
 let%test_module "test" =
   ( module struct
     module Inputs = struct
+      module Security = struct
+        let max_depth = `Finite 50
+      end
+
       module Ledger_builder_hash = Int
       module Ledger_hash = Int
       (* A ledger_builder transition will just add to a "ledger" integer *)
