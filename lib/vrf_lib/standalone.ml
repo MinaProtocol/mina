@@ -331,6 +331,7 @@ let%test_module "vrf-test" =
           let random () = Bigint.random modulus
         end)
 
+    (*
     module Curve =
       Snarky.Curves.Edwards.Make (Impl) (Scalar)
         (struct
@@ -352,7 +353,19 @@ let%test_module "vrf-test" =
             , conv
                 "269570906944652130755537879906638127626718348459103982395416666003851617088183934285066554"
             )
-        end)
+        end) *)
+
+    module Curve = struct
+      open Impl
+
+      type var = Field.Checked.t * Field.Checked.t
+
+      include Snarky.Libsnark.Mnt6.Group
+
+      module Checked =
+        Snarky.Curves.Make_weierstrass_checked
+          (Impl)(Snarky.Libsnark.Mnt6.Group)(Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+    end
 
     module Group = struct
       open Impl
@@ -364,15 +377,13 @@ let%test_module "vrf-test" =
       include T
       include Binable.Of_sexpable (T)
 
-      let identity = Curve.identity
-
       let add = Curve.add
 
-      let inv (x, y) = (Field.negate x, y)
+      let inv (x, y) = (x, Field.negate y)
 
       let scale = Curve.scale
 
-      let generator = Curve.generator
+      let generator = Curve.one
 
       type var = Curve.var
 
@@ -441,7 +452,9 @@ let%test_module "vrf-test" =
           Group.scale Group.generator (Scalar.random ()) )
 
     module Pedersen =
-      Snarky.Pedersen.Make (Impl) (Curve)
+      Snarky.Pedersen.Make
+        (Impl)
+        (Curve)
         (struct
           let params = params
         end)

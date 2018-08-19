@@ -1,6 +1,9 @@
 module Tick_curve = Snarky.Backends.Mnt4.GM
 module Tock_curve = Snarky.Backends.Mnt6.GM
 
+module Inner_curve = Snarky.Libsnark.Mnt6.Group
+
+(*
 module Hash_curve = struct
   (*
   Curve params:
@@ -26,6 +29,6 @@ module Hash_curve = struct
     , f
         "269570906944652130755537879906638127626718348459103982395416666003851617088183934285066554"
     )
-end
+   end *)
 
 module Pedersen_params = Pedersen_params

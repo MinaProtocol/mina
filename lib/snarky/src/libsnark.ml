@@ -31,7 +31,9 @@ struct
 
     val one : t
 
-    val coords : t -> Fq.t * Fq.t
+    val to_coords : t -> Fq.t * Fq.t
+
+    val of_coords : Fq.t * Fq.t -> t
 
     val equal : t -> t -> bool
 
@@ -69,6 +71,13 @@ struct
         let x = stub () in
         schedule_delete x ; x
 
+    let of_coords =
+      let stub = foreign (func_name "of_coords") (Fq.typ @-> Fq.typ @-> returning typ) in
+      fun (x, y) ->
+        let t = stub x y in
+        schedule_delete t;
+        t
+
     let add =
       let stub = foreign (func_name "add") (typ @-> typ @-> returning typ) in
       fun x y ->
@@ -85,7 +94,7 @@ struct
 
     let equal = foreign (func_name "equal") (typ @-> typ @-> returning bool)
 
-    let coords =
+    let to_coords =
       let stub_to_affine =
         foreign (func_name "to_affine_coordinates") (typ @-> returning void)
       in

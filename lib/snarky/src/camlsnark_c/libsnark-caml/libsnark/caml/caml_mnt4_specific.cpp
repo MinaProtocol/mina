@@ -405,6 +405,10 @@ camlsnark_mnt4_gm_verification_key_sign_elts(
 
 // Start g1 ops code
 
+libff::G1<ppT>* camlsnark_mnt4_g1_of_coords (libff::Fq<ppT>* x, libff::Fq<ppT>* y) {
+  return new libff::G1<ppT>(*x, *y);
+}
+
 libff::G1<ppT>* camlsnark_mnt4_g1_add (libff::G1<ppT>* a, libff::G1<ppT>* b) {
   return new libff::G1<ppT>((*a) + (*b));
 }
