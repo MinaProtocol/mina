@@ -233,7 +233,7 @@ sap_instance_evaluation<FieldT> r1cs_to_sap_instance_map_with_evaluation(const r
                   u[next_square_constraint_index] * cs.constraints[i].c.terms[j].coeff;
           }
 
-          next_square_constraint_index += 2;
+          next_square_constraint_index += 1;
         } else {
           for (size_t j = 0; j < cs.constraints[i].a.terms.size(); ++j)
           {

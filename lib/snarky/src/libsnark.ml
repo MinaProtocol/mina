@@ -447,16 +447,31 @@ struct
 
     val create :
       Linear_combination.t -> Linear_combination.t -> Linear_combination.t -> t
+
+    val set_is_square : t -> bool -> unit
   end = struct
     type t = unit ptr
 
     let typ = ptr void
 
+    let prefix = with_prefix M.prefix "r1cs_constraint"
+
+    let func_name = with_prefix prefix
+
+    let delete = foreign (func_name "delete") (typ @-> returning void)
+
     let create =
-      foreign
-        (with_prefix M.prefix "r1cs_constraint_create")
-        ( Linear_combination.typ @-> Linear_combination.typ
-        @-> Linear_combination.typ @-> returning typ )
+      let stub =
+        foreign (func_name "create")
+          ( Linear_combination.typ @-> Linear_combination.typ
+          @-> Linear_combination.typ @-> returning typ )
+      in
+      fun a b c ->
+        let t = stub a b c in
+        Caml.Gc.finalise delete t ; t
+
+    let set_is_square =
+      foreign (func_name "set_is_square") (typ @-> bool @-> returning void)
   end
 
   module R1CS_constraint_system : sig

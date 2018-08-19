@@ -34,6 +34,8 @@ module type S = sig
 
     val create :
       Linear_combination.t -> Linear_combination.t -> Linear_combination.t -> t
+
+    val set_is_square : t -> bool -> unit
   end
 
   module Proving_key : sig
