@@ -4,6 +4,102 @@ open Foreign
 
 let with_prefix prefix s = sprintf "%s_%s" prefix s
 
+module Make_group (M : sig
+  val prefix : string
+end) (Bigint_r : sig
+  type t
+
+  val typ : t Ctypes.typ
+end) (Fq : sig
+  type t
+
+  val typ : t Ctypes.typ
+
+  val schedule_delete : t -> unit
+end) =
+struct
+  module Group : sig
+    type t
+
+    val typ : t Ctypes.typ
+
+    val add : t -> t -> t
+
+    val scale : Bigint_r.t -> t -> t
+
+    val zero : t
+
+    val one : t
+
+    val coords : t -> Fq.t * Fq.t
+
+    val equal : t -> t -> bool
+
+    val random : unit -> t
+
+    val delete : t -> unit
+
+    val print : t -> unit
+  end = struct
+    type t = unit ptr
+
+    let typ = ptr void
+
+    let prefix = with_prefix M.prefix "g1"
+
+    let func_name s = with_prefix prefix s
+
+    let zero =
+      let stub = foreign (func_name "zero") (void @-> returning typ) in
+      stub ()
+
+    let one =
+      let stub = foreign (func_name "one") (void @-> returning typ) in
+      stub ()
+
+    let delete = foreign (func_name "delete") (typ @-> returning void)
+
+    let schedule_delete t = Caml.Gc.finalise delete t
+
+    let print = foreign (func_name "print") (typ @-> returning void)
+
+    let random =
+      let stub = foreign (func_name "random") (void @-> returning typ) in
+      fun () ->
+        let x = stub () in
+        schedule_delete x ; x
+
+    let add =
+      let stub = foreign (func_name "add") (typ @-> typ @-> returning typ) in
+      fun x y ->
+        let z = stub x y in
+        schedule_delete z ; z
+
+    let scale =
+      let stub =
+        foreign (func_name "scale") (Bigint_r.typ @-> typ @-> returning typ)
+      in
+      fun x y ->
+        let z = stub x y in
+        schedule_delete z ; z
+
+    let equal = foreign (func_name "equal") (typ @-> typ @-> returning bool)
+
+    let coords =
+      let stub_to_affine =
+        foreign (func_name "to_affine_coordinates") (typ @-> returning void)
+      in
+      let stub_x = foreign (func_name "x") (typ @-> returning Fq.typ) in
+      let stub_y = foreign (func_name "y") (typ @-> returning Fq.typ) in
+      fun t ->
+        let () = stub_to_affine t in
+        let x = stub_x t in
+        Fq.schedule_delete x ;
+        let y = stub_y t in
+        Fq.schedule_delete y ; (x, y)
+  end
+end
+
 module Make_common (M : sig
   val prefix : string
 end) =
@@ -49,6 +145,8 @@ struct
     val random : unit -> t
 
     val delete : t -> unit
+
+    val schedule_delete : t -> unit
 
     val print : t -> unit
 
@@ -1091,6 +1189,8 @@ struct
     let prefix = M.prefix
   end)
 
+  module Prefix = M
+
   module type Common_intf = module type of Common
 
   module Default = struct
@@ -1115,13 +1215,23 @@ module Bn128 = Make_full (struct
   let prefix = "camlsnark_bn128"
 end)
 
-module Mnt4 = Make_full (struct
+module Mnt4_0 = Make_full (struct
   let prefix = "camlsnark_mnt4"
 end)
 
-module Mnt6 = Make_full (struct
+module Mnt6_0 = Make_full (struct
   let prefix = "camlsnark_mnt6"
 end)
+
+module Mnt4 = struct
+  include Mnt4_0
+  include Make_group (Prefix) (Mnt4_0.Bigint.R) (Mnt6_0.Field)
+end
+
+module Mnt6 = struct
+  include Mnt6_0
+  include Make_group (Prefix) (Mnt6_0.Bigint.R) (Mnt4_0.Field)
+end
 
 module type S = sig
   val prefix : string
