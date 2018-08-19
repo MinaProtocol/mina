@@ -495,21 +495,20 @@ end
 
 module Make_weierstrass_checked
     (Impl : Snark_intf.S)
+    (Scalar : sig
+       type t
+       val of_int : int -> t
+     end)
     (Curve : sig
        type t
        val to_coords : t -> Impl.Field.t * Impl.Field.t
        val of_coords : Impl.Field.t * Impl.Field.t -> t
+       val double : t -> t
+       val add : t -> t -> t
+       val negate : t -> t
+       val scale : t -> Scalar.t -> t
      end)
-    (Params : Params_intf with type field := Impl.Field.t)
-    (Scalar : sig
-        type var = Impl.Boolean.var list
-
-        type t
-
-        val length_in_bits : int
-
-        val typ : (var, t) Impl.Typ.t
-    end) =
+    (Params : Params_intf with type field := Impl.Field.t) =
 struct
   open Impl
 
@@ -535,12 +534,6 @@ struct
         ~back:Curve.of_coords
     in
     { unchecked with check = assert_on_curve }
-
-  module Scalar = struct
-    include Scalar
-
-    let assert_equal = Bitstring_checked.Assert.equal
-  end
 
   let constant (t: t) : var =
     let (x, y) = Curve.to_coords t in
@@ -676,6 +669,109 @@ struct
       in
       go 0 c init t)
 
+  let lookup_point (b0, b1) (t1, t2, t3, t4) =
+    let open Let_syntax in
+    let%map b0_and_b1 = Boolean.(&&) b0 b1 in
+    let lookup_one (a1, a2, a3, a4) =
+      let open Field.Infix in
+      let ( * ) = Field.Checked.Infix.( * )  in
+      let ( +^ ) = Field.Checked.Infix.( + )  in
+      Field.Checked.constant a1
+      +^ (a2 - a1) * (b0 :> Field.Checked.t)
+      +^ (a3 - a1) * (b1 :> Field.Checked.t)
+      +^ (a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Checked.t)
+    in
+    let (x1, y1) = Curve.to_coords t1
+    and (x2, y2) = Curve.to_coords t2
+    and (x3, y3) = Curve.to_coords t3
+    and (x4, y4) = Curve.to_coords t4
+    in
+    (lookup_one (x1, x2, x3, x4), lookup_one (y1, y2, y3, y4))
+
+  let lookup_single_bit (b : Boolean.var) (t1, t2) =
+    let lookup_one (a1, a2) =
+      let open Field.Checked.Infix in
+      Field.Checked.constant a1
+      + (Field.sub a2 a1) * (b :> Field.Checked.t)
+    in
+    let (x1, y1) = Curve.to_coords t1
+    and (x2, y2) = Curve.to_coords t2
+    in
+    (lookup_one (x1, x2), lookup_one (y1, y2))
+
+  let scale_known t (b : Boolean.var list) ~init =
+    let sigma = t in
+    let n = List.length b in
+    let sigma_count = (n + 1) / 2 in (* = ceil (n / 2.0) *)
+    (* We implement a complicated optimzation so that in total
+       this costs roughly 5 * (n / 2) constaints, rather than
+       the naive 4*n + 3*n
+    *)
+    (* Assume n is even *)
+    (* Define
+       to_term_unshifted i (b0, b1) =
+       match b0, b1 with
+       | false, false -> oo
+       | true, false -> 2^i * t
+       | false, true -> 2^{i+1} * t
+       | true, true -> 2^i * t + 2^{i + 1} t
+
+       to_term i (b0, b1) =
+       sigma + to_term_unshifted i (b0, b1) =
+       match b0, b1 with
+       | false, false -> sigma
+       | true, false -> sigma + 2^i * t
+       | false, true -> sigma + 2^{i+1} * t
+       | true, true -> sigma + 2^i * t + 2^{i + 1} t
+    *)
+    let to_term ~two_to_the_i ~two_to_the_i_plus_1 bits =
+      lookup_point bits
+        ( sigma
+        , Curve.add sigma two_to_the_i
+        , Curve.add sigma two_to_the_i_plus_1
+        , Curve.(add sigma (add two_to_the_i two_to_the_i_plus_1)) )
+    in
+    (*
+       Say b = b0, b1, .., b_{n-1}.
+       We compute
+
+       (to_term 0 (b0, b1)
+       + to_term 2 (b2, b3)
+       + to_term 4 (b4, b5)
+       + ...
+       + to_term (n-2) (b_{n-2}, b_{n-1}))
+       - (n/2) * sigma
+       =
+       (n/2)*sigma + (b0*2^0 + b1*21 + ... + b_{n-1}*2^{n-1}) t - (n/2) * sigma
+       =
+       (n/2)*sigma + b * t - (n/2)*sigma
+       = b * t
+    *)
+    let open Let_syntax in
+    let rec go acc two_to_the_i bits =
+      match bits with
+      | [] -> return acc
+      | [ b_i ] ->
+        let term =
+          lookup_single_bit b_i
+            (sigma, Curve.add sigma two_to_the_i)
+        in
+        add acc term
+      | b_i :: b_i_plus_1 :: rest ->
+        let two_to_the_i_plus_1 = Curve.double two_to_the_i in
+        let%bind term =
+          to_term ~two_to_the_i ~two_to_the_i_plus_1 (b_i, b_i_plus_1)
+        in
+        let%bind acc = add acc term in
+        go acc (Curve.double two_to_the_i_plus_1) rest
+    in
+    let%bind result_with_shift = go init t b in
+    let unshift =
+      Curve.scale (Curve.negate sigma) (Scalar.of_int sigma_count)
+    in
+    add result_with_shift (constant unshift)
+  ;;
+
   let sum =
     let open Let_syntax in
     let rec go acc = function
@@ -689,7 +785,7 @@ struct
       | [] -> failwith "Curves.sum: Expected non-empty list"
       | t :: ts -> go t ts
 
-  let multi_sum (pairs: (Scalar.var * var) list) ~init =
+  let multi_sum (pairs: (Boolean.var list * var) list) ~init =
     with_label __LOC__
       (let open Let_syntax in
       let rec go init = function
