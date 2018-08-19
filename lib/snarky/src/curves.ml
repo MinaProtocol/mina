@@ -518,11 +518,8 @@ struct
   type t = Curve.t
 
   let assert_on_curve (x, y) =
-    (* TODO: Replace when other PR is merged *)
-    let sqr a = Field.Checked.mul a a in
-    let assert_square a b = assert_r1cs a a b in
     let open Let_syntax in
-    let%bind x2 = sqr x in
+    let%bind x2 = Field.Checked.square x in
     let%bind x3 = Field.Checked.mul x2 x in
     assert_square y
       Field.Checked.Infix.(
@@ -555,10 +552,7 @@ struct
   let add (ax, ay) (bx, by) =
     with_label __LOC__
       (let open Let_syntax in
-      let%bind denom = Field.Checked.inv Field.Checked.Infix.(bx - ax) in
-      let%bind lambda =
-        Field.Checked.mul Field.Checked.Infix.(by - ay) denom
-      in
+      let%bind lambda = Field.Checked.(div (sub by ay) (sub bx ax)) in
       let%bind cx =
         provide_witness Typ.field
           (let open As_prover in
@@ -569,8 +563,12 @@ struct
           Field.(sub (square lambda) (add ax bx)))
       in
       let%bind () =
-        assert_r1cs ~label:"c1" lambda lambda
-          Field.Checked.Infix.(cx + ax + bx)
+        (* lambda^2 = cx + ax + bx
+            cx = lambda^2 - (ax + bc)
+        *)
+        assert_
+          (Constraint.square ~label:"c1" lambda
+              Field.Checked.Infix.(cx + ax + bx))
       in
       let%bind cy =
         provide_witness Typ.field
@@ -591,7 +589,7 @@ struct
   let double (ax, ay) =
     with_label __LOC__
       (let open Let_syntax in
-      let%bind x_squared = Field.Checked.mul ax ax in
+      let%bind x_squared = Field.Checked.square ax in
       let%bind lambda =
         provide_witness Typ.field
           As_prover.(
@@ -624,7 +622,7 @@ struct
         assert_r1cs (two * lambda) ay
           ( (Field.of_int 3 * x_squared)
           + Field.Checked.constant Params.a )
-      and () = assert_r1cs lambda lambda (bx + (two * ax))
+      and () = assert_square lambda (bx + (two * ax))
       and () = assert_r1cs lambda (ax - bx) (by + ay) in
       (bx, by))
 
