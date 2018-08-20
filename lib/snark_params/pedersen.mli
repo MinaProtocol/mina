@@ -48,12 +48,15 @@ module Make (Field : sig
 
   include Sexpable.S with type t := t
 end)
-(Bigint : Snarky.Bigint_intf.Extended with type field := Field.t)
-(Curve : sig
-   type t
-   val to_coords : t -> Field.t * Field.t
-   val zero : t
-   val add : t -> t -> t
-   val negate : t -> t
-     end) :
-S with type curve := Curve.t and type Digest.t = Field.t
+(Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
+    type t
+
+    val to_coords : t -> Field.t * Field.t
+
+    val zero : t
+
+    val add : t -> t -> t
+
+    val negate : t -> t
+end) :
+  S with type curve := Curve.t and type Digest.t = Field.t

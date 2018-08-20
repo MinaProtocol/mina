@@ -70,28 +70,32 @@ module Tick = struct
     include Crypto_params.Inner_curve
 
     module Scalar = struct
-      module T = (Tock.Field : module type of Tock.Field with type var := Tock.Field.var and module Checked := Tock.Field.Checked)
+      module T :
+        module type of Tock.Field
+        with type var := Tock.Field.var
+         and module Checked := Tock.Field.Checked =
+      Tock.Field
+
       include T
 
       let of_bits = Tock.Field.project
 
-      include Binable.Of_sexpable(T)
+      include Binable.Of_sexpable (T)
 
       let length_in_bits = size_in_bits
 
       type var = Boolean.var list
 
       let typ =
-        Typ.transport (Typ.list ~length:size_in_bits Boolean.typ)
-          ~there:unpack
-          ~back:project
+        Typ.transport
+          (Typ.list ~length:size_in_bits Boolean.typ)
+          ~there:unpack ~back:project
 
       let gen : t Quickcheck.Generator.t =
         Quickcheck.Generator.map
           (Bignum_bigint.gen_incl Bignum_bigint.one
              Bignum_bigint.(Tock.Field.size - one))
-          ~f:(fun x ->
-            Tock.Bigint.(to_field (of_bignum_bigint x)))
+          ~f:(fun x -> Tock.Bigint.(to_field (of_bignum_bigint x)))
 
       module Checked = struct
         module Assert = struct
@@ -101,15 +105,13 @@ module Tick = struct
     end
 
     module Checked = struct
-      include
-        Snarky.Curves.Make_weierstrass_checked
-          (Tick0)
-          (Scalar)
-          (struct
-            include Crypto_params.Inner_curve
-            let scale = scale_field
-          end)
-          (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+      include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
+                (struct
+                  include Crypto_params.Inner_curve
+
+                  let scale = scale_field
+                end)
+                (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
 
       let add_known v x = add v (constant x)
     end
@@ -156,8 +158,10 @@ module Tick = struct
   end
 
   module Pedersen = struct
-    include Pedersen.Make(Field)(Bigint)(Inner_curve)
-    module Checked = Snarky.Pedersen.Make(Tick0)(Inner_curve)(Crypto_params.Pedersen_params)
+    include Pedersen.Make (Field) (Bigint) (Inner_curve)
+    module Checked =
+      Snarky.Pedersen.Make (Tick0) (Inner_curve)
+        (Crypto_params.Pedersen_params)
   end
 
   module Util = Snark_util.Make (Tick0)

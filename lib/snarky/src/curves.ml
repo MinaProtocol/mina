@@ -3,6 +3,7 @@ open Core_kernel
 
 module type Params_intf = sig
   type field
+
   val a : field
 
   val b : field
@@ -494,20 +495,25 @@ module Edwards = struct
 end
 
 module Make_weierstrass_checked
-    (Impl : Snark_intf.S)
-    (Scalar : sig
-       type t
-       val of_int : int -> t
-     end)
-    (Curve : sig
-       type t
-       val to_coords : t -> Impl.Field.t * Impl.Field.t
-       val of_coords : Impl.Field.t * Impl.Field.t -> t
-       val double : t -> t
-       val add : t -> t -> t
-       val negate : t -> t
-       val scale : t -> Scalar.t -> t
-     end)
+    (Impl : Snark_intf.S) (Scalar : sig
+        type t
+
+        val of_int : int -> t
+    end) (Curve : sig
+      type t
+
+      val to_coords : t -> Impl.Field.t * Impl.Field.t
+
+      val of_coords : Impl.Field.t * Impl.Field.t -> t
+
+      val double : t -> t
+
+      val add : t -> t -> t
+
+      val negate : t -> t
+
+      val scale : t -> Scalar.t -> t
+    end)
     (Params : Params_intf with type field := Impl.Field.t) =
 struct
   open Impl
@@ -522,24 +528,21 @@ struct
     let%bind x3 = Field.Checked.mul x2 x in
     assert_square y
       Field.Checked.Infix.(
-        x3
-        + Params.a * x
-        + Field.Checked.constant Params.b)
+        x3 + (Params.a * x) + Field.Checked.constant Params.b)
 
   (* TODO: Check if point is on curve! *)
   let typ : (var, t) Typ.t =
     let unchecked =
-      Typ.transport Typ.(tuple2 field field)
-        ~there:Curve.to_coords
-        ~back:Curve.of_coords
+      Typ.transport
+        Typ.(tuple2 field field)
+        ~there:Curve.to_coords ~back:Curve.of_coords
     in
-    { unchecked with check = assert_on_curve }
+    {unchecked with check= assert_on_curve}
 
-  let negate ((x, y) : var) : var =
-    (x, Field.Checked.scale y Field.(negate one))
+  let negate ((x, y): var) : var = (x, Field.Checked.scale y Field.(negate one))
 
   let constant (t: t) : var =
-    let (x, y) = Curve.to_coords t in
+    let x, y = Curve.to_coords t in
     Field.Checked.(constant x, constant y)
 
   let assert_equal (x1, y1) (x2, y2) =
@@ -564,7 +567,7 @@ struct
         *)
         assert_
           (Constraint.square ~label:"c1" lambda
-              Field.Checked.Infix.(cx + ax + bx))
+             Field.Checked.Infix.(cx + ax + bx))
       in
       let%bind cy =
         provide_witness Typ.field
@@ -577,8 +580,7 @@ struct
           Field.(sub (mul lambda (sub ax cx)) ay))
       in
       let%map () =
-        let open Field.Checked.Infix in
-        assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay)
+        Field.Checked.Infix.(assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
       in
       (cx, cy))
 
@@ -592,8 +594,7 @@ struct
             map2 (read_var x_squared) (read_var ay) ~f:(fun x_squared ay ->
                 let open Field in
                 let open Infix in
-                ((of_int 3 * x_squared) + Params.a)
-                * inv (of_int 2 * ay) ))
+                ((of_int 3 * x_squared) + Params.a) * inv (of_int 2 * ay) ))
       in
       let%bind bx =
         provide_witness Typ.field
@@ -616,8 +617,7 @@ struct
       let open Field.Checked.Infix in
       let%map () =
         assert_r1cs (two * lambda) ay
-          ( (Field.of_int 3 * x_squared)
-          + Field.Checked.constant Params.a )
+          ((Field.of_int 3 * x_squared) + Field.Checked.constant Params.a)
       and () = assert_square lambda (bx + (two * ax))
       and () = assert_r1cs lambda (ax - bx) (by + ay) in
       (bx, by))
@@ -665,8 +665,8 @@ struct
             let%bind acc' =
               with_label (sprintf "acc_%d" i)
                 (let%bind add_pt = add acc pt in
-                  let don't_add_pt = acc in
-                  if_ b ~then_:add_pt ~else_:don't_add_pt)
+                 let don't_add_pt = acc in
+                 if_ b ~then_:add_pt ~else_:don't_add_pt)
             and pt' = double pt in
             go (i + 1) bs acc' pt'
       in
@@ -674,38 +674,35 @@ struct
 
   let lookup_point (b0, b1) (t1, t2, t3, t4) =
     let open Let_syntax in
-    let%map b0_and_b1 = Boolean.(&&) b0 b1 in
+    let%map b0_and_b1 = Boolean.( && ) b0 b1 in
     let lookup_one (a1, a2, a3, a4) =
       let open Field.Infix in
-      let ( * ) = Field.Checked.Infix.( * )  in
-      let ( +^ ) = Field.Checked.Infix.( + )  in
+      let ( * ) = Field.Checked.Infix.( * ) in
+      let ( +^ ) = Field.Checked.Infix.( + ) in
       Field.Checked.constant a1
-      +^ (a2 - a1) * (b0 :> Field.Checked.t)
-      +^ (a3 - a1) * (b1 :> Field.Checked.t)
-      +^ (a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Checked.t)
+      +^ ((a2 - a1) * (b0 :> Field.Checked.t))
+      +^ ((a3 - a1) * (b1 :> Field.Checked.t))
+      +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Checked.t))
     in
-    let (x1, y1) = Curve.to_coords t1
-    and (x2, y2) = Curve.to_coords t2
-    and (x3, y3) = Curve.to_coords t3
-    and (x4, y4) = Curve.to_coords t4
-    in
+    let x1, y1 = Curve.to_coords t1
+    and x2, y2 = Curve.to_coords t2
+    and x3, y3 = Curve.to_coords t3
+    and x4, y4 = Curve.to_coords t4 in
     (lookup_one (x1, x2, x3, x4), lookup_one (y1, y2, y3, y4))
 
-  let lookup_single_bit (b : Boolean.var) (t1, t2) =
+  let lookup_single_bit (b: Boolean.var) (t1, t2) =
     let lookup_one (a1, a2) =
       let open Field.Checked.Infix in
-      Field.Checked.constant a1
-      + (Field.sub a2 a1) * (b :> Field.Checked.t)
+      Field.Checked.constant a1 + (Field.sub a2 a1 * (b :> Field.Checked.t))
     in
-    let (x1, y1) = Curve.to_coords t1
-    and (x2, y2) = Curve.to_coords t2
-    in
+    let x1, y1 = Curve.to_coords t1 and x2, y2 = Curve.to_coords t2 in
     (lookup_one (x1, x2), lookup_one (y1, y2))
 
-  let scale_known t (b : Boolean.var list) ~init =
+  let scale_known t (b: Boolean.var list) ~init =
     let sigma = t in
     let n = List.length b in
-    let sigma_count = (n + 1) / 2 in (* = ceil (n / 2.0) *)
+    let sigma_count = (n + 1) / 2 in
+    (* = ceil (n / 2.0) *)
     (* We implement a complicated optimzation so that in total
        this costs roughly (1 + 3) * (n / 2) constaints, rather than
        the naive 4*n + 3*n. If scalars were represented with some
@@ -756,26 +753,24 @@ struct
     let rec go acc two_to_the_i bits =
       match bits with
       | [] -> return acc
-      | [ b_i ] ->
-        let term =
-          lookup_single_bit b_i
-            (sigma, Curve.add sigma two_to_the_i)
-        in
-        add acc term
+      | [b_i] ->
+          let term =
+            lookup_single_bit b_i (sigma, Curve.add sigma two_to_the_i)
+          in
+          add acc term
       | b_i :: b_i_plus_1 :: rest ->
-        let two_to_the_i_plus_1 = Curve.double two_to_the_i in
-        let%bind term =
-          to_term ~two_to_the_i ~two_to_the_i_plus_1 (b_i, b_i_plus_1)
-        in
-        let%bind acc = add acc term in
-        go acc (Curve.double two_to_the_i_plus_1) rest
+          let two_to_the_i_plus_1 = Curve.double two_to_the_i in
+          let%bind term =
+            to_term ~two_to_the_i ~two_to_the_i_plus_1 (b_i, b_i_plus_1)
+          in
+          let%bind acc = add acc term in
+          go acc (Curve.double two_to_the_i_plus_1) rest
     in
     let%bind result_with_shift = go init t b in
     let unshift =
       Curve.scale (Curve.negate sigma) (Scalar.of_int sigma_count)
     in
     add result_with_shift (constant unshift)
-  ;;
 
   let sum =
     let open Let_syntax in
