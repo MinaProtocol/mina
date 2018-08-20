@@ -854,8 +854,6 @@ module Run (Program : Main_intf) = struct
                in
                Linear_pipe.write_without_pushback solved_work_writer ()) ) ]
     in
-    let test_fn () () = return 987 in
-    let test_impls = [Rpc.Rpc.implement Test_rpcs.Test.rpc test_fn] in
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
     in
@@ -870,7 +868,7 @@ module Run (Program : Main_intf) = struct
              ~implementations:
                (Rpc.Implementations.create_exn
                   ~implementations:
-                    (client_impls @ snark_worker_impls @ test_impls)
+                    (client_impls @ snark_worker_impls)
                   ~on_unknown_rpc:`Raise)
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:
