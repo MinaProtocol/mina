@@ -6,8 +6,11 @@ let with_prefix prefix s = sprintf "%s_%s" prefix s
 
 module Make_group (M : sig
   val prefix : string
-end) (Field : sig type t val typ : t Ctypes.typ end)
-    (Bigint_r : sig
+end) (Field : sig
+  type t
+
+  val typ : t Ctypes.typ
+end) (Bigint_r : sig
   type t
 
   val typ : t Ctypes.typ
@@ -79,11 +82,12 @@ struct
         schedule_delete x ; x
 
     let of_coords =
-      let stub = foreign (func_name "of_coords") (Fq.typ @-> Fq.typ @-> returning typ) in
+      let stub =
+        foreign (func_name "of_coords") (Fq.typ @-> Fq.typ @-> returning typ)
+      in
       fun (x, y) ->
         let t = stub x y in
-        schedule_delete t;
-        t
+        schedule_delete t ; t
 
     let double =
       let stub = foreign (func_name "double") (typ @-> returning typ) in
