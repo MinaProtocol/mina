@@ -4,7 +4,7 @@ open Nanobit_base
 open Coda_main
 open Spawner
 
-module Coda_worker = struct
+module Coda_worker (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t) = struct
   type coda = {peers: unit -> Host_and_port.t list}
 
   type input =
@@ -24,31 +24,24 @@ module Coda_worker = struct
 
   type state = Host_and_port.t list [@@deriving bin_io]
 
-  let make {host; log_dir; program_dir; my_port; peers; gossip_port} =
+  let make {host; log_dir; program_dir; my_port; peers; gossip_port}  =
     let log = Logger.create () in
     let%bind () = Sys.chdir program_dir in
     let%bind location = Unix.getcwd () in
     let conf_dir = log_dir in
+    let module Config = struct
+      let logger = log
+
+      let conf_dir = conf_dir
+
+      let transaction_interval = Time.Span.of_ms 100.0
+
+      let fee_public_key = Genesis_ledger.rich_pk
+
+      let genesis_proof = Precomputed_values.base_proof
+    end in
     let%bind (module Init) =
-      make_init
-        ( module struct
-          module Ledger_proof = Ledger_proof.Debug
-          module Make_consensus_mechanism (Ledger_builder_diff : sig
-            type t [@@deriving sexp, bin_io]
-          end) =
-            Consensus.Proof_of_signature.Make (Nanobit_base.Proof)
-              (Ledger_builder_diff)
-
-          let logger = log
-
-          let conf_dir = conf_dir
-
-          let transaction_interval = Time.Span.of_ms 100.0
-
-          let fee_public_key = Genesis_ledger.rich_pk
-
-          let genesis_proof = Precomputed_values.base_proof
-        end )
+      make_init (module Config) (module Kernel)
     in
     let module Main : Main_intf = Coda_without_snark (Init) () in
     let module Run = Run (Main) in
@@ -88,11 +81,13 @@ module Coda_worker = struct
     Pipe.write writer @@ coda.peers ()
 end
 
-module Worker = Parallel_worker.Make (Coda_worker)
-module Master = Master.Make (Worker (Int)) (Int)
-
-let run =
+let run (module Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t) =
   let open Command.Let_syntax in
+
+  let module Coda_worker = Coda_worker (Kernel) in
+  let module Worker = Parallel_worker.Make (Coda_worker) in
+  let module Master = Master.Make (Worker (Int)) (Int) in
+
   (* HACK: to run the dependency, Kademlia *)
   let%map_open program_dir =
     flag "program-directory" ~doc:"base directory of nanobit project "
@@ -153,9 +148,9 @@ let run =
 
 let name = "coda-sample-test"
 
-let command =
+let command (module Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t) =
   Command.async
     ~summary:
       "A test that shows how a coda instance can identify another instance as \
        it's peer"
-    run
+    (run (module Kernel))

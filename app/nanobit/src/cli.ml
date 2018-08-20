@@ -5,7 +5,7 @@ open Blockchain_snark
 open Cli_lib
 open Coda_main
 
-let daemon =
+let daemon (module Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t) =
   let open Command.Let_syntax in
   Command.async ~summary:"Current daemon"
     (let%map_open conf_dir =
@@ -63,13 +63,7 @@ let daemon =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
        let me = Host_and_port.create ~host:ip ~port in
-       let module Common = struct
-         module Make_consensus_mechanism (Ledger_builder_diff : sig
-           type t [@@deriving sexp, bin_io]
-         end) =
-           Consensus.Proof_of_signature.Make (Nanobit_base.Proof)
-             (Ledger_builder_diff)
-
+       let module Config = struct
          let logger = log
 
          let conf_dir = conf_dir
@@ -80,26 +74,22 @@ let daemon =
 
          let genesis_proof = Precomputed_values.base_proof
        end in
+       let%bind (module Init) = make_init (module Config) (module Kernel) in
+       let (module M) = (module Coda_without_snark (Init) () : Main_intf) in
+       (*
        let%bind (module M) =
          if Insecure.key_generation then
            let%map (module Init) =
-             make_init
-               ( module struct
-                 include Common
-                 module Ledger_proof = Ledger_proof.Debug
-               end )
+             make_init (module Config) (module Kernel.Debug ())
            in
            (module Coda_without_snark (Init) () : Main_intf)
          else
            let%map (module Init) =
-             make_init
-               ( module struct
-                 include Common
-                 module Ledger_proof = Ledger_proof.Prod
-               end )
+             make_init (module Config) (module Kernel.Prod ())
            in
            (module Coda_with_snark (Storage.Disk) (Init) () : Main_intf)
        in
+        *)
        let module Run = Run (M) in
        let%bind () =
          let open M in
@@ -134,17 +124,19 @@ let daemon =
        Async.never ())
 
 let () =
+  let module Kernel = Kernel.Debug () in
+
   Random.self_init () ;
   Command.group ~summary:"Current"
-    [ ("daemon", daemon)
+    [ ("daemon", daemon (module Kernel))
     ; (Parallel.worker_command_name, Parallel.worker_command)
     ; ( Snark_worker_lib.Debug.command_name
       , Snark_worker_lib.Debug.Worker.command )
     ; (Snark_worker_lib.Prod.command_name, Snark_worker_lib.Prod.Worker.command)
-    ; ("full-test", Full_test.command)
+    ; ("full-test", Full_test.command (module Kernel))
     ; ("client", Client.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
-    ; (Coda_sample_test.name, Coda_sample_test.command) ]
+    ; (Coda_sample_test.name, Coda_sample_test.command (module Kernel)) ]
   |> Command.run
 
 let () = never_returns (Scheduler.go ())

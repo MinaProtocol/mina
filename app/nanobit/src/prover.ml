@@ -12,6 +12,11 @@ module type S = sig
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism
 
+  module Worker_state : sig
+    type t
+    val create : unit -> t Deferred.t
+  end
+
   type t
 
   val create : conf_dir:string -> t Deferred.t
@@ -203,7 +208,8 @@ struct
           ; verify_blockchain= f verify_blockchain
           ; verify_transaction_snark= f verify_transaction_snark }
 
-        let init_worker_state () = Worker_state.create ()
+        let init_worker_state () =
+          Worker_state.create ()
 
         let init_connection_state ~connection:_ ~worker_state:_ = return
       end
@@ -217,10 +223,13 @@ struct
   let create ~conf_dir =
     let%map connection, process =
       (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
-      Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
+      Worker.spawn_in_foreground_exn
+        ~connection_timeout:(Time.Span.of_min 1.)
         ~on_failure:Error.raise ~shutdown_on:Disconnect
         ~connection_state_init_arg:() ()
     in
+    File_system.dup_stdout process;
+    File_system.dup_stderr process;
     {connection; process}
 
   let initialized {connection; _} =

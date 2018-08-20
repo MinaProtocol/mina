@@ -10,6 +10,11 @@ module type S = sig
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism
 
+  module Worker_state : sig
+    type t
+    val create : unit -> t Deferred.t
+  end
+
   type t
 
   val create : conf_dir:string -> t Deferred.t

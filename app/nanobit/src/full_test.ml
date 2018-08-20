@@ -8,18 +8,16 @@ let pk sk = Public_key.of_private_key sk |> Public_key.compress
 let sk_bigint sk =
   Private_key.to_bigstring sk |> Private_key.of_bigstring |> Or_error.ok_exn
 
-let run_test with_snark : unit -> unit Deferred.t =
- fun () ->
+let run_test
+    (type ledger_proof)
+    (with_snark : bool)
+    (module Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t)
+  : unit Deferred.t
+=
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
-  let module Common = struct
-    module Make_consensus_mechanism (Ledger_builder_diff : sig
-      type t [@@deriving sexp, bin_io]
-    end) =
-      Consensus.Proof_of_signature.Make (Nanobit_base.Proof)
-        (Ledger_builder_diff)
-
+  let module Config = struct
     let logger = log
 
     let conf_dir = conf_dir
@@ -30,26 +28,27 @@ let run_test with_snark : unit -> unit Deferred.t =
 
     let genesis_proof = Precomputed_values.base_proof
   end in
+  let%bind (module Init) = make_init (module Config) (module Kernel) in
+  let (module Main) = 
+    (*if with_snark then
+      (module Coda_with_snark (Storage.Memory) (Init) () : Main_intf)
+    else *)
+      (module Coda_without_snark (Init) () : Main_intf)
+  in
+  (*
   let%bind (module Main) =
     if with_snark then
       let%map (module Init) =
-        make_init
-          ( module struct
-            include Common
-            module Ledger_proof = Ledger_proof.Prod
-          end )
+        make_init (module Config) (module Kernel.Prod ())
       in
       (module Coda_with_snark (Storage.Memory) (Init) () : Main_intf)
     else
       let%map (module Init) =
-        make_init
-          ( module struct
-            include Common
-            module Ledger_proof = Ledger_proof.Debug
-          end )
+        make_init (module Config) (module Kernel.Debug ())
       in
       (module Coda_without_snark (Init) () : Main_intf)
   in
+   *)
   let module Run = Run (Main) in
   let open Main in
   let net_config =
@@ -160,10 +159,10 @@ let run_test with_snark : unit -> unit Deferred.t =
   let%bind () = after (Time_ns.Span.of_sec 100.) in
   Deferred.unit
 
-let command =
+let command (module Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t) =
   let open Core in
   let open Async in
   Command.async ~summary:"Full minibit end-to-end test"
     (let open Command.Let_syntax in
     let%map_open with_snark = flag "with-snark" no_arg ~doc:"Produce snarks" in
-    run_test with_snark)
+    (fun () -> run_test with_snark (module Kernel)))
