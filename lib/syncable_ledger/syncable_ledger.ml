@@ -196,7 +196,7 @@ struct
 
   type index = int
 
-  (* TODO: This is a waste of memory. *)
+  (* TODO #434: This is a waste of memory. *)
   module Valid :
     Validity_intf with type hash := Hash.t and type addr := Addr.t =
   struct
@@ -212,8 +212,7 @@ struct
     let create h = ref (Leaf (Some (Stale, h)))
 
     let set t a (s, h) =
-      let rec set_helper node dirs depth =
-        (* FIXME #383 *)
+      let rec go node dirs depth =
         match dirs with
         | d :: ds -> (
             let accessor =
@@ -231,9 +230,9 @@ struct
                 (* otherwise we'd have to synthesize hashes *)
                 assert (ds = []) ;
                 node := Node ((Stale, l), ref (Leaf None), ref (Leaf None)) ;
-                set_helper node dirs depth
+                go node dirs depth
             | Node (_, l, r) ->
-                set_helper (accessor (l, r)) ds (depth + 1) ;
+                go (accessor (l, r)) ds (depth + 1) ;
                 match !node with
                 | Node
                     ( (Stale, h)
@@ -249,10 +248,10 @@ struct
                 | _ -> () )
         | [] -> node := Leaf (Some (s, h))
       in
-      set_helper t (Addr.dirs_from_root a) 0
+      go t (Addr.dirs_from_root a) 0
 
     let get t a =
-      let rec get_helper node dirs =
+      let rec go node dirs =
         match dirs with
         | d :: ds -> (
             let accessor =
@@ -260,10 +259,10 @@ struct
             in
             match !node with
             | Leaf _ -> None
-            | Node (_, l, r) -> get_helper (accessor (l, r)) ds )
+            | Node (_, l, r) -> go (accessor (l, r)) ds )
         | [] -> match !node with Leaf c -> c | Node (c, _, _) -> Some c
       in
-      get_helper t (Addr.dirs_from_root a)
+      go t (Addr.dirs_from_root a)
 
     let completely_fresh t =
       match !t with
@@ -314,7 +313,7 @@ struct
    fun t addr expected ->
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
-  (* TODO: verify content hash matches expected and blame the peer who gave it to us *)
+  (* TODO #435: verify content hash matches expected and blame the peer who gave it to us *)
   let add_content : t -> Addr.t -> Account.t list -> Hash.t Or_error.t =
    fun t addr content ->
     let expected = Addr.Table.find_exn t.waiting_content addr in
@@ -425,10 +424,10 @@ struct
           match a with
           | Has_hash (addr, h') -> (
             match add_child_hash_to t addr h' with
-            (* TODO: Stick this in a log, punish the sender *)
+            (* TODO #435: Stick this in a log, punish the sender *)
             | Error _e -> ()
             | Ok (`Good children_to_verify) ->
-                (* TODO: Make sure we don't write too much *)
+                (* TODO #312: Make sure we don't write too much *)
                 List.iter children_to_verify ~f:(fun (addr, hash) ->
                     handle_node t addr hash )
             | Ok `More -> () (* wait for the other answer to come in *)
