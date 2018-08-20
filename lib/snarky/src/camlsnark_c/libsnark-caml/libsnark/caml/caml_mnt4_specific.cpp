@@ -405,11 +405,27 @@ camlsnark_mnt4_gm_verification_key_sign_elts(
 
 // Start g1 ops code
 
+libff::G1<ppT>* camlsnark_mnt4_g1_of_coords (libff::Fq<ppT>* x, libff::Fq<ppT>* y) {
+  return new libff::G1<ppT>(*x, *y);
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_negate (libff::G1<ppT>* a) {
+  return new libff::G1<ppT>(- *a);
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_double (libff::G1<ppT>* a) {
+  return new libff::G1<ppT>(a->dbl());
+}
+
 libff::G1<ppT>* camlsnark_mnt4_g1_add (libff::G1<ppT>* a, libff::G1<ppT>* b) {
   return new libff::G1<ppT>((*a) + (*b));
 }
 
 libff::G1<ppT>* camlsnark_mnt4_g1_scale (libff::bigint<libff::mnt4_r_limbs> *a, libff::G1<ppT>* x) {
+  return new libff::G1<ppT>((*a) * (*x));
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_scale_field (FieldT *a, libff::G1<ppT>* x) {
   return new libff::G1<ppT>((*a) * (*x));
 }
 
