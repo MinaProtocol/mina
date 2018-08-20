@@ -3,10 +3,6 @@ open Async
 open Coda_worker
 open Coda_processes
 
-(* A bare bones use case of the [Rpc_parallel] library. This demonstrates how to
-   define a simple worker type that implements some functions. The master then spawns a
-   worker of this type and calls a function to run on this worker *)
-
 let main () =
   Coda_processes.init () ;
   let gossip_port = 8000 in
@@ -37,10 +33,6 @@ let main () =
 let name = "coda-block-production-test"
 
 let command =
-  (* Make sure to always use [Command.async] *)
   Command.async_spec ~summary:"Simple use of Async Rpc_parallel V2"
     Command.Spec.(empty)
     main
-
-(* This call to [Rpc_parallel.start_app] must be top level *)
-(*let () = Rpc_parallel.start_app command *)
