@@ -22,17 +22,21 @@ module type Scalar_intf = sig
 
   type var
 
-  type value
+  type t
 
-  val length : int
+  val typ : (var, t) typ
 
-  val typ : (var, value) typ
+  val length_in_bits : int
 
-  val assert_equal : var -> var -> (unit, _) checked
+  val test_bit : t -> int -> bool
 
-  val equal : var -> var -> (boolean_var, _) checked
+  module Checked : sig
+    val equal : var -> var -> (boolean_var, _) checked
 
-  val test_bit : value -> int -> bool
+    module Assert : sig
+      val equal : var -> var -> (unit, _) checked
+    end
+  end
 end
 
 module Make_intf (Impl : Snark_intf.S) = struct
@@ -130,6 +134,9 @@ module Edwards = struct
       type t = Field.t * Field.t
 
       (* x^2 + y^2 = 1 + dx^2 y^2 *)
+      (* x^2 - d x^2 y^2 = 1 - y^2 *)
+      (* x^2 (1 - d y^2) = 1 - y^2 *)
+      (* x^2 = (1 - y^2)/(1 - d y^2) *)
 
       let generator : t = Params.generator
 
@@ -195,7 +202,7 @@ module Edwards = struct
 
     val generator : value
 
-    val scale : value -> Scalar.value -> value
+    val scale : value -> Scalar.t -> value
 
     module Checked : sig
       val generator : var
@@ -260,7 +267,7 @@ module Edwards = struct
 
     let scale x s =
       let rec go i two_to_the_i_x acc =
-        if i >= Scalar.length then acc
+        if i >= Scalar.length_in_bits then acc
         else
           let acc' =
             if Scalar.test_bit s i then add acc two_to_the_i_x else acc
@@ -472,25 +479,17 @@ module Edwards = struct
   end
 
   module Make
-      (Impl : Snark_intf.S) (Scalar : sig
-          type var = Impl.Boolean.var list
-
-          type value
-
-          val test_bit : value -> int -> bool
-
-          val length : int
-
-          val typ : (var, value) Impl.Typ.t
-
-          val equal : var -> var -> (Impl.Boolean.var, _) Impl.Checked.t
-
-          val assert_equal : var -> var -> (unit, _) Impl.Checked.t
-      end)
+      (Impl : Snark_intf.S)
+      (Scalar : Scalar_intf
+                with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
+                 and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+                 and type boolean_var := Impl.Boolean.var
+                 and type var = Impl.Boolean.var list)
       (Params : Params_intf with type field := Impl.Field.t) :
     S
     with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-     and type Scalar.value = Scalar.value
+     and type Scalar.t = Scalar.t
+     and type Scalar.var = Scalar.var
      and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
      and type boolean_var := Impl.Boolean.var
      and type field := Impl.Field.t
@@ -578,10 +577,7 @@ struct
     let add (ax, ay) (bx, by) =
       with_label __LOC__
         (let open Let_syntax in
-        let%bind denom = Field.Checked.inv Field.Checked.Infix.(bx - ax) in
-        let%bind lambda =
-          Field.Checked.mul Field.Checked.Infix.(by - ay) denom
-        in
+        let%bind lambda = Field.Checked.(div (sub by ay) (sub bx ax)) in
         let%bind cx =
           provide_witness Typ.field
             (let open As_prover in
@@ -592,8 +588,12 @@ struct
             Field.(sub (square lambda) (add ax bx)))
         in
         let%bind () =
-          assert_r1cs ~label:"c1" lambda lambda
-            Field.Checked.Infix.(cx + ax + bx)
+          (* lambda^2 = cx + ax + bx
+             cx = lambda^2 - (ax + bc)
+          *)
+          assert_
+            (Constraint.square ~label:"c1" lambda
+               Field.Checked.Infix.(cx + ax + bx))
         in
         let%bind cy =
           provide_witness Typ.field
@@ -614,7 +614,7 @@ struct
     let double (ax, ay) =
       with_label __LOC__
         (let open Let_syntax in
-        let%bind x_squared = Field.Checked.mul ax ax in
+        let%bind x_squared = Field.Checked.square ax in
         let%bind lambda =
           provide_witness Typ.field
             As_prover.(
@@ -647,7 +647,7 @@ struct
           assert_r1cs (two * lambda) ay
             ( (Field.of_int 3 * x_squared)
             + Field.Checked.constant Coefficients.a )
-        and () = assert_r1cs lambda lambda (bx + (two * ax))
+        and () = assert_square lambda (bx + (two * ax))
         and () = assert_r1cs lambda (ax - bx) (by + ay) in
         (bx, by))
 

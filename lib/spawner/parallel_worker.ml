@@ -113,9 +113,8 @@ struct
         ~where:worker_location
     with
     | Ok (worker, process) ->
-        let print_worker_message = Core.sprintf !"(%s %s)%!" worker_id in
-        File_system.dup_stdout ~f:print_worker_message process ;
-        File_system.dup_stderr ~f:print_worker_message process ;
+        File_system.dup_stdout process ;
+        File_system.dup_stderr process ;
         return worker
     | Error e ->
         failwith

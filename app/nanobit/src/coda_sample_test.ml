@@ -26,6 +26,9 @@ module Coda_worker = struct
 
   let make {host; log_dir; program_dir; my_port; peers; gossip_port} =
     let log = Logger.create () in
+    let log =
+      Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string my_port)
+    in
     let%bind () = Sys.chdir program_dir in
     let%bind location = Unix.getcwd () in
     let conf_dir = log_dir in
@@ -41,6 +44,8 @@ module Coda_worker = struct
       let verifier = verifier
 
       let prover = prover
+
+      let lbc_tree_max_depth = `Finite 50
 
       let genesis_proof = Precomputed_values.base_proof
 
