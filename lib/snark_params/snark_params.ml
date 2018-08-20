@@ -51,7 +51,7 @@ module Tock = struct
 end
 
 module Tick = struct
-  module Tick0 = Extend (Snarky.Snark.Make (Tick_curve))
+  module Tick0 = Extend (Crypto_params.Tick0)
 
   module Sha256 =
     Snarky.Sha256.Make (struct
