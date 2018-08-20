@@ -173,7 +173,7 @@ let run_test with_snark : unit -> unit Deferred.t =
           acc )
   in
   (*After mining a few blocks and emitting a few ledger_proofs (by the parallel scan), check if the balances match *)
-  let%bind () = after (Time_ns.Span.of_min 3.) in
+  let%bind () = after (Time_ns.Span.of_min 1.) in
   Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
       assert_balance key data ) ;
   Deferred.unit
