@@ -416,9 +416,9 @@ struct
       Result.map key_result ~f:(fun key -> update_account mdb key account)
 
   let get_all_accounts_rooted_at_exn mdb address =
-    let first_node, last_node = Key.Addr.Range.subtree_width address in
+    let first_node, last_node = Key.Addr.Range.subtree_range address in
     let result =
-      Key.Addr.Range.fold_incl (first_node, last_node) ~init:[] ~f:
+      Key.Addr.Range.fold (first_node, last_node) ~init:[] ~f:
         (fun bit_index acc ->
           let account =
             Option.value_exn
@@ -433,8 +433,8 @@ struct
     List.rev result
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
-    let first_node, last_node = Key.Addr.Range.subtree_width address in
-    Key.Addr.Range.fold_incl (first_node, last_node) ~init:accounts ~f:
+    let first_node, last_node = Key.Addr.Range.subtree_range address in
+    Key.Addr.Range.fold (first_node, last_node) ~init:accounts ~f:
       (fun bit_index -> function
       | head :: tail ->
           update_account mdb (Key.Account bit_index) head ;
