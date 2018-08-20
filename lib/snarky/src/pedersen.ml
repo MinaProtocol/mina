@@ -1,6 +1,12 @@
 open Core_kernel
 open Tuple_lib
 
+let local_function ~negate quad (b0, b1, b2) =
+  let t = Quadruple.get quad (Four.of_bits_lsb (b0, b1)) in
+  if b2
+  then negate t
+  else t
+
 module Make
     (Impl : Snark_intf.S)
     (Weierstrass_curve : sig
@@ -31,11 +37,6 @@ module Make
       val params : Weierstrass_curve.t Quadruple.t array
     end) : sig
   open Impl
-
-  val local_function
-    : Weierstrass_curve.t Quadruple.t
-    -> bool Triple.t
-    -> Weierstrass_curve.t
 
   module Digest : sig
     module Unpacked : sig
@@ -98,12 +99,6 @@ end = struct
       and (x4, y4) = Weierstrass_curve.to_coords t4
       in
       ((x1, x2, x3, x4), (y1, y2, y3, y4))
-
-  let local_function quad (b0, b1, b2) =
-    let t = Quadruple.get quad (Four.of_bits_lsb (b0, b1)) in
-    if b2
-    then Weierstrass_curve.negate t
-    else t
 
   let lookup
         ((s0, s1, s2): Boolean.var Triple.t)

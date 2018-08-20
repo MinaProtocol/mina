@@ -556,7 +556,7 @@ let%test_module "vrf-test" =
         (bits_to_triples ~default:false bits)
         ~f:(fun i acc triple ->
           Curve.add acc
-            (Pedersen.local_function params.(i) triple))
+            (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i) triple))
       |> Curve.to_coords
       |> fst
 
