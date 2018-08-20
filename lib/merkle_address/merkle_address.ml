@@ -45,7 +45,12 @@ module type S = sig
   module Range : sig
     type nonrec t = t * t
 
-    val fold : ?stop:[`Inclusive | `Exclusive] -> t ->init:'a -> f:(Stable.V1.t -> 'a -> 'a) -> 'a
+    val fold :
+         ?stop:[`Inclusive | `Exclusive]
+      -> t
+      -> init:'a
+      -> f:(Stable.V1.t -> 'a -> 'a)
+      -> 'a
 
     val subtree_range : Stable.V1.t -> t
   end
@@ -183,7 +188,7 @@ struct
   let sibling (path: t) : t =
     let path = copy path in
     let last_bit_index = depth path - 1 in
-    let last_bit = (get path last_bit_index) lxor 1 in
+    let last_bit = get path last_bit_index lxor 1 in
     put path last_bit_index last_bit ;
     path
 
@@ -230,13 +235,13 @@ struct
 
     let fold_incl (first, last) ~init ~f =
       f last @@ fold_exl (first, last) ~init ~f
-    
-    let fold ?stop:(stop=`Inclusive) (first, last) ~init ~f = 
+
+    let fold ?(stop= `Inclusive) (first, last) ~init ~f =
       assert (depth first = depth last) ;
       match stop with
       | `Inclusive -> fold_incl (first, last) ~init ~f
       | `Exclusive -> fold_exl (first, last) ~init ~f
-    
+
     let subtree_range address =
       let first_node = concat [address; zeroes_bitstring @@ height address] in
       let last_node = concat [address; ones_bitstring @@ height address] in
