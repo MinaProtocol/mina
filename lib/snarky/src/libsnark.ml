@@ -6,7 +6,8 @@ let with_prefix prefix s = sprintf "%s_%s" prefix s
 
 module Make_group (M : sig
   val prefix : string
-end) (Bigint_r : sig
+end) (Field : sig type t val typ : t Ctypes.typ end)
+    (Bigint_r : sig
   type t
 
   val typ : t Ctypes.typ
@@ -25,13 +26,21 @@ struct
 
     val add : t -> t -> t
 
-    val scale : Bigint_r.t -> t -> t
+    val negate : t -> t
+
+    val double : t -> t
+
+    val scale : t -> Bigint_r.t -> t
+
+    val scale_field : t -> Field.t -> t
 
     val zero : t
 
     val one : t
 
-    val coords : t -> Fq.t * Fq.t
+    val to_coords : t -> Fq.t * Fq.t
+
+    val of_coords : Fq.t * Fq.t -> t
 
     val equal : t -> t -> bool
 
@@ -69,6 +78,25 @@ struct
         let x = stub () in
         schedule_delete x ; x
 
+    let of_coords =
+      let stub = foreign (func_name "of_coords") (Fq.typ @-> Fq.typ @-> returning typ) in
+      fun (x, y) ->
+        let t = stub x y in
+        schedule_delete t;
+        t
+
+    let double =
+      let stub = foreign (func_name "double") (typ @-> returning typ) in
+      fun x ->
+        let z = stub x in
+        schedule_delete z ; z
+
+    let negate =
+      let stub = foreign (func_name "negate") (typ @-> returning typ) in
+      fun x ->
+        let z = stub x in
+        schedule_delete z ; z
+
     let add =
       let stub = foreign (func_name "add") (typ @-> typ @-> returning typ) in
       fun x y ->
@@ -79,13 +107,21 @@ struct
       let stub =
         foreign (func_name "scale") (Bigint_r.typ @-> typ @-> returning typ)
       in
-      fun x y ->
+      fun y x ->
+        let z = stub x y in
+        schedule_delete z ; z
+
+    let scale_field =
+      let stub =
+        foreign (func_name "scale_field") (Field.typ @-> typ @-> returning typ)
+      in
+      fun y x ->
         let z = stub x y in
         schedule_delete z ; z
 
     let equal = foreign (func_name "equal") (typ @-> typ @-> returning bool)
 
-    let coords =
+    let to_coords =
       let stub_to_affine =
         foreign (func_name "to_affine_coordinates") (typ @-> returning void)
       in
@@ -1240,12 +1276,12 @@ end)
 
 module Mnt4 = struct
   include Mnt4_0
-  include Make_group (Prefix) (Mnt4_0.Bigint.R) (Mnt6_0.Field)
+  include Make_group (Prefix) (Mnt4_0.Field) (Mnt4_0.Bigint.R) (Mnt6_0.Field)
 end
 
 module Mnt6 = struct
   include Mnt6_0
-  include Make_group (Prefix) (Mnt6_0.Bigint.R) (Mnt4_0.Field)
+  include Make_group (Prefix) (Mnt6_0.Field) (Mnt6_0.Bigint.R) (Mnt4_0.Field)
 end
 
 module type S = sig
