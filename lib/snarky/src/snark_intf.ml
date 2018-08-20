@@ -249,6 +249,7 @@ module type Basic = sig
     include Field_intf.Extended with type t = field
 
     include Sexpable.S with type t := t
+    include Stringable.S with type t := t
 
     val size : Bignum_bigint.t
 
