@@ -15,8 +15,6 @@ MYGID=$(id -g)
 
 DOCKERNAME="nanotest-$MYUID"
 
-# FIXME: Used named images, don't rely on image name
-
 if [[ $1 == "restart" ]]; then
   if $(docker ps | grep -q $IMG); then
     echo "Stopping previous dev container"
@@ -38,6 +36,3 @@ if [[ $1 == "restart" ]]; then
 else
   NAME=$(docker ps -q --filter "name=$DOCKERNAME")
 fi
-
-echo "Starting Build"
-$SCRIPTPATH/scripts/run-in-docker dune build

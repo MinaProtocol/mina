@@ -16,5 +16,17 @@ WORKDIR /home/opam/app
 ENV TERM=xterm-256color
 ENV PATH "~/google-cloud-sdk/bin:$PATH"
 
-ENTRYPOINT bash
+# Utility to adjust uid to match host OS
+# https://github.com/boxboat/fixuid
+RUN USER=opam && \
+    GROUP=opam && \
+    sudo curl -SsL https://github.com/boxboat/fixuid/releases/download/v0.4/fixuid-0.4-linux-amd64.tar.gz | sudo tar -C /usr/local/bin -xzf - && \
+    sudo chown root:root /usr/local/bin/fixuid && \
+    sudo chmod 4755 /usr/local/bin/fixuid && \
+    sudo mkdir -p /etc/fixuid && \
+    sudo printf "user: $USER\ngroup: $GROUP\n" | sudo tee /etc/fixuid/config.yml > /dev/null
+
+USER opam:opam
+ENTRYPOINT ["fixuid"]
+
 
