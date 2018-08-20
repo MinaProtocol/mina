@@ -123,6 +123,12 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let t_of_sexp s =
       Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.t_of_sexp s))
 
+    let to_string x =
+      Bignum_bigint.to_string (Bigint.to_bignum_bigint (Bigint.of_field x))
+
+    let of_string s =
+      Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.of_string s))
+
     module Infix = struct
       let ( + ) = add
 
