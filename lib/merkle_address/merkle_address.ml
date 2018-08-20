@@ -188,7 +188,7 @@ struct
   let sibling (path: t) : t =
     let path = copy path in
     let last_bit_index = depth path - 1 in
-    let last_bit = get path last_bit_index lxor 1 in
+    let last_bit = if get path last_bit_index = 0 then 1 else 0 in
     put path last_bit_index last_bit ;
     path
 
