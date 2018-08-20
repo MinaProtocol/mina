@@ -5,7 +5,8 @@ open Blockchain_snark
 open Cli_lib
 open Coda_main
 
-let daemon (module Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t) =
+let daemon (module Kernel
+    : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t) =
   let open Command.Let_syntax in
   Command.async ~summary:"Current daemon"
     (let%map_open conf_dir =
@@ -68,6 +69,8 @@ let daemon (module Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_
 
          let conf_dir = conf_dir
 
+         let lbc_tree_max_depth = `Finite 50
+
          let transaction_interval = Time.Span.of_sec 5.0
 
          let fee_public_key = Genesis_ledger.rich_pk
@@ -125,7 +128,6 @@ let daemon (module Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof_
 
 let () =
   let module Kernel = Kernel.Debug () in
-
   Random.self_init () ;
   Command.group ~summary:"Current"
     [ ("daemon", daemon (module Kernel))

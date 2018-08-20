@@ -135,6 +135,27 @@ module type Snark_pool_intf = sig
     t -> completed_work_statement -> completed_work_checked option
 end
 
+module type Ktree_intf = sig
+  type elem
+
+  type t [@@deriving sexp]
+
+  val gen : elem Quickcheck.Generator.t -> t Quickcheck.Generator.t
+
+  val find_map : t -> f:(elem -> 'a option) -> 'a option
+
+  val path : t -> f:(elem -> bool) -> elem list option
+
+  val singleton : elem -> t
+
+  val longest_path : t -> elem list
+
+  val add :
+    t -> elem -> parent:(elem -> bool) -> [> `Added of t | `No_parent | `Repeat]
+
+  val root : t -> elem
+end
+
 module type Ledger_builder_controller_intf = sig
   type ledger_builder
 
@@ -186,6 +207,11 @@ module type Ledger_builder_controller_intf = sig
 
   val handle_sync_ledger_queries :
     ledger_hash * sync_query -> ledger_hash * sync_answer
+
+  (** For tests *)
+  module Transition_tree : Ktree_intf with type elem := external_transition
+
+  val transition_tree : t -> Transition_tree.t option
 end
 
 module type Proposer_intf = sig
@@ -369,6 +395,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
     ; log: Logger.t
+    ; mutable seen_jobs: Ledger_proof_statement.Set.t
     ; ledger_builder_transition_backup_capacity: int }
 
   let best_ledger_builder t =
@@ -376,11 +403,18 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
+  let seen_jobs t = t.seen_jobs
+
+  let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
+
   let transaction_pool t = t.transaction_pool
 
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
+
+  let lbc_transition_tree t =
+    Ledger_builder_controller.transition_tree t.ledger_builder
 
   module Config = struct
     type t =
@@ -491,6 +525,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool
       ; ledger_builder
       ; log= config.log
+      ; seen_jobs= Ledger_proof_statement.Set.empty
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
 

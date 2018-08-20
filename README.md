@@ -1,29 +1,56 @@
-# How to configure Mac Docker
+# Developer Setup
 
-1. Install docker for mac
-2. Click the whale dude in your tray and go to preferences
-3. Change the disk space to >=128GB
-4. Change the RAM to >=8GB
-5. Change the cores to more (so your builds are faster)
+## ~~Setup Docker CE for Mac~~
+(WARNING: Docker for Mac is not reccomended for builds as it is slower than local builds)
 
-# How to setup development docker
+1. ~~Install docker for mac~~
+1. ~~Click the whale dude in your tray and go to preferences~~
+1. ~~Change the disk space to >=128GB~~
+1. ~~Change the RAM to >=8GB~~
+1. ~~Change the cores to more (so your builds are faster)~~
 
-1. install gcloud
-2. run `gcloud auth login`
-3. run `gcloud config set project <o1labs-project-id>`
-4. run `gcloud docker -a`
-5. run `make docker`
-6. talk to Brandon to setup `make dev`
+## Setup Docker CE on Linux
+[Ubuntu Setup Instructions](https://docs.docker.com/install/linux/docker-ce/ubuntu/)
 
-# How to make dev
+## Setup Google Cloud gcloud/kubectl 
+We use gcloud to store developer container images
 
-1. Run this in your shell. REMEMBER to change the directory of the repo to your directory
+[Instructions to install gcloud sdk](https://cloud.google.com/sdk/install)
+(also install kubectl)
+
+## Take a Snapshot
+If developing on a VM, now is a good time to take a snapshot and save your state.
+
+## Login and test gcloud access
+
+1. Setup docker to use google cloud registry
+`gcloud auth configure-docker`
+
+1. Setup project id (o1 internal id)
+`gcloud config set project o1labs-192920`
+
+1. Test gcloud/docker access
+`docker run -it gcr.io/o1labs-192920/hellocoda`
+
+## Build a dev docker image
+1. clone this repository 
+1. run `make docker` to pull down our dev container image (~7GB download, go strecth your legs)
+
+## First code build
+
+1. Change your shell path to include our scripts directory.<br>
+(REMEMBER to change the HOME and SOURCE directory to match yours)
 
 ```bash
-export PATH=~/coins/nanobit/hackbin:$PATH
+export PATH=~/src/nanobit/scripts:$PATH
 ```
 
-2. Put this in your vimrc. REMEMBER to change the HOME directory to your directory
+2. Start a build `make dev` (go stretch your arms)
+
+## Customizing your dev environment for autocomplete/merlin
+
+1. If you use vim, add this snippet in your vimrc to use merlin. <br>
+(REMEMBER to change the HOME directory to match yours)
 
 ```bash
 let s:ocamlmerlin="/Users/bkase/.opam/4.06.0/share/merlin"
@@ -32,13 +59,27 @@ execute "set rtp+=".s:ocamlmerlin."/vimbufsync"
 let g:syntastic_ocaml_checkers=['merlin']
 ```
 
-3. In your home directory `opam init`
-4. In this shell, `eval \`opam config env\``
-5. Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
-6. Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
-7. Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
+2. In your home directory `opam init`
+1. In this shell, `eval \`opam config env\``
+1. Now `/usr/bin/opam install merlin ocp-indent core async ppx_jane ppx_deriving` (everything we depend on, that you want autocompletes for) for doc reasons
+1. Make sure you have `au FileType ocaml set omnifunc=merlin#Complete` in your vimrc
+1. Install an auto-completer (such as YouCompleteMe) and a syntastic (such syntastic or ALE)
 
-# How to Testbridge
+1. If you use vscode, you might like these extensions
+   * [OCaml and Reason IDE](https://marketplace.visualstudio.com/items?itemName=freebroccolo.reasonml)
+   * [Dune](https://marketplace.visualstudio.com/items?itemName=maelvalais.dune)
+
+# Docker Image Family Tree
+
+Container Stages:
+1. [ocaml/ocaml:debian-stable](https://hub.docker.com/r/ocaml/ocaml/) (community image, ~856MB) 
+1. ocaml407 (built by us, stored in gcr, ~1.7GB)
+1. ocaml-base (built by us, stored in gcr, ~7.1GB -- external dependancies and haskell)
+1. nanotest (built with `make docker`, used with `make dev`, ~7.8GBm)
+
+
+# ~~How to Testbridge~~
+FIXME: Everything Testbridge is Deprecated
 
 ### Docker image related setup
 
@@ -76,5 +117,3 @@ let g:syntastic_ocaml_checkers=['merlin']
     `jbuilder exec fetch_logs`, then `cat /tmp/testbridge_logs/<your-pod-name>`
    If you see a build failure, but no failure locally:
     a. Did you need to remake the Docker containers? Esp. base? If so, make sure you also cleanup/redeploy pods
-
-

@@ -99,7 +99,7 @@ module Schnorr
     (Impl : Snark_intf.S)
     (Curve : Curves.Edwards.S
              with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-              and type Scalar.value = Bignum_bigint.t
+              and type Scalar.t = Bignum_bigint.t
               and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
               and type boolean_var := Impl.Boolean.var
               and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
@@ -112,7 +112,7 @@ module Schnorr
   with type boolean_var := Impl.Boolean.var
    and type curve := Curve.value
    and type curve_var := Curve.var
-   and type curve_scalar := Curve.Scalar.value
+   and type curve_scalar := Curve.Scalar.t
    and type curve_scalar_var := Curve.Scalar.var
    and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
    and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
@@ -122,11 +122,11 @@ struct
   module Scalar = Bignum_bigint
 
   module Signature = struct
-    type 'a _t = 'a * 'a [@@deriving sexp]
+    type 'a t_ = 'a * 'a [@@deriving eq, sexp]
 
-    type t = Curve.Scalar.value _t [@@deriving sexp]
+    type var = Curve.Scalar.var t_
 
-    type var = Curve.Scalar.var _t
+    type t = Scalar.t t_ [@@deriving sexp]
 
     let typ : (var, t) Typ.t =
       let typ = Curve.Scalar.typ in
@@ -174,7 +174,7 @@ struct
         in
         go (i - 1) acc
     in
-    go (Curve.Scalar.length - 1) Curve.identity
+    go (Curve.Scalar.length_in_bits - 1) Curve.identity
 
   let verify ((s, h): Signature.t) (pk: Public_key.t) (m: Message.t) =
     let r = compress (shamir_sum (s, Curve.generator) (h, pk)) in
@@ -208,10 +208,11 @@ struct
 
     let verifies ((_, h) as signature) pk m =
       with_label __LOC__
-        (verification_hash signature pk m >>= Curve.Scalar.equal h)
+        (verification_hash signature pk m >>= Curve.Scalar.Checked.equal h)
 
     let assert_verifies ((_, h) as signature) pk m =
       with_label __LOC__
-        (verification_hash signature pk m >>= Curve.Scalar.assert_equal h)
+        ( verification_hash signature pk m
+        >>= Curve.Scalar.Checked.Assert.equal h )
   end
 end

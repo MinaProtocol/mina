@@ -72,6 +72,6 @@ module Signature :
    and type boolean_var := Tick.Boolean.var
    and type curve := Snark_params.Tick.Signature_curve.value
    and type curve_var := Snark_params.Tick.Signature_curve.var
-   and type curve_scalar := Snark_params.Tick.Signature_curve.Scalar.value
+   and type curve_scalar := Snark_params.Tick.Signature_curve.Scalar.t
    and type curve_scalar_var := Snark_params.Tick.Signature_curve.Scalar.var
    and module Message := Message

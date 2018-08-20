@@ -101,7 +101,7 @@ module Message = struct
       Pedersen.digest_fold Hash_prefix.signature
         (fold t +> List.fold nonce)
     in
-    List.take (Field.unpack d) Scalar.length |> Scalar.pack
+    List.take (Field.unpack d) Scalar.length_in_bits |> Scalar.pack
 
   let () = assert Insecure.signature_hash_function
 
@@ -120,7 +120,7 @@ module Message = struct
          Pedersen_hash.Digest.choose_preimage
          @@ Pedersen_hash.digest hash
        in
-       List.take bs Scalar.length)
+       List.take bs Scalar.length_in_bits)
 end
 
 module Signature = Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Signature_curve) (Message)

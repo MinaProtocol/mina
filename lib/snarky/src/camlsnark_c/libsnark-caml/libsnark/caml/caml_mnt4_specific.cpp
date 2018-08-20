@@ -401,4 +401,69 @@ camlsnark_mnt4_gm_verification_key_sign_elts(
     return res;
 }
 
+// End GM code
+
+// Start g1 ops code
+
+libff::G1<ppT>* camlsnark_mnt4_g1_of_coords (libff::Fq<ppT>* x, libff::Fq<ppT>* y) {
+  return new libff::G1<ppT>(*x, *y);
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_negate (libff::G1<ppT>* a) {
+  return new libff::G1<ppT>(- *a);
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_double (libff::G1<ppT>* a) {
+  return new libff::G1<ppT>(a->dbl());
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_add (libff::G1<ppT>* a, libff::G1<ppT>* b) {
+  return new libff::G1<ppT>((*a) + (*b));
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_scale (libff::bigint<libff::mnt4_r_limbs> *a, libff::G1<ppT>* x) {
+  return new libff::G1<ppT>((*a) * (*x));
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_scale_field (FieldT *a, libff::G1<ppT>* x) {
+  return new libff::G1<ppT>((*a) * (*x));
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_zero () {
+  return new libff::G1<ppT>(libff::G1<ppT>::zero());
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_one () {
+  return new libff::G1<ppT>(libff::G1<ppT>::one());
+}
+
+void camlsnark_mnt4_g1_print(libff::G1<ppT>* x) {
+  x->print();
+}
+
+bool camlsnark_mnt4_g1_equal(libff::G1<ppT>* a, libff::G1<ppT>* b) {
+  return *a == *b;
+}
+
+bool camlsnark_mnt4_g1_delete(libff::G1<ppT>* a) {
+  delete a;
+}
+
+libff::G1<ppT>* camlsnark_mnt4_g1_random() {
+  return new libff::G1<ppT>(libff::G1<ppT>::random_element());
+}
+
+void camlsnark_mnt4_g1_to_affine_coordinates(libff::G1<ppT>* a) {
+  a->to_affine_coordinates();
+}
+
+libff::Fq<ppT>* camlsnark_mnt4_g1_x(libff::G1<ppT>* a) {
+  assert(a->Z() == libff::Fq<ppT>::one());
+  return new libff::Fq<ppT>(a->X());
+}
+
+libff::Fq<ppT>* camlsnark_mnt4_g1_y(libff::G1<ppT>* a) {
+  assert(a->Z() == libff::Fq<ppT>::one());
+  return new libff::Fq<ppT>(a->Y());
+}
 }

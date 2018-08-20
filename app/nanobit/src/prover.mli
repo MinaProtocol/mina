@@ -12,6 +12,7 @@ module type S = sig
 
   module Worker_state : sig
     type t
+
     val create : unit -> t Deferred.t
   end
 

@@ -121,12 +121,9 @@ let genesis_block_expr ~loc =
         ; signature=
             Nanobit_base.Block.State_transition_data.Signature.Signature.
             t_of_sexp
-              Nanobit_base.Block.State_transition_data.Signature.Scalar.
-              t_of_sexp
               [%e
                 Ppx_util.expr_of_sexp ~loc
                   (Block.State_transition_data.Signature.Signature.sexp_of_t
-                     Block.State_transition_data.Signature.Scalar.sexp_of_t
                      genesis_block.auxillary_data.signature)] }
     ; state_transition_data=
         { Nanobit_base.Block.State_transition_data.time=
