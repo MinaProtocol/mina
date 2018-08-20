@@ -317,14 +317,14 @@ struct
   let extend_tree tree =
     let leafs = Dyn_array.length tree.leafs in
     if leafs <> 0 then (
-      let target_depth = Int.max 1 (Int.ceil_log2 leafs) in
-      let current_depth = tree.nodes_height in
-      let additional_depth = target_depth - current_depth in
-      tree.nodes_height <- tree.nodes_height + additional_depth ;
+      let target_height = Int.max 1 (Int.ceil_log2 leafs) in
+      let current_height = tree.nodes_height in
+      let additional_height = target_height - current_height in
+      tree.nodes_height <- tree.nodes_height + additional_height ;
       tree.nodes
       <- List.concat
            [ tree.nodes
-           ; List.init additional_depth ~f:(fun _ -> Dyn_array.create ()) ] ;
+           ; List.init additional_height ~f:(fun _ -> Dyn_array.create ()) ] ;
       List.iteri tree.nodes ~f:(fun i nodes ->
           let length = Int.pow 2 (tree.nodes_height - 1 - i) in
           let new_elems = length - Dyn_array.length nodes in
@@ -467,11 +467,30 @@ struct
     assert (Addr.depth addr = Depth.depth - 1) ;
     set_at_index_exn t (to_index addr) acct
 
+  let complete_with_empties hash start_height result_height =
+    let rec go cur_empty prev_hash height =
+      if height = result_height then prev_hash
+      else
+        let cur = Hash.merge ~height prev_hash cur_empty in
+        let next_empty = Hash.merge ~height cur_empty cur_empty in
+        go next_empty cur (height + 1)
+    in
+    go (empty_hash_at_height start_height) hash start_height
+
   let get_inner_hash_at_addr_exn t a =
-    let path_length = Addr.depth a in
-    assert (path_length < depth) ;
-    let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
-    DynArray.get l (to_index a)
+    let adepth = Addr.depth a in
+    assert (adepth < depth) ;
+    let height = Addr.height a in
+    let index = to_index a in
+    if height < t.tree.nodes_height && index < length t then
+      let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
+      DynArray.get l (to_index a)
+    else if index = 0 then
+      (* we're somewhere along the path to the content root *)
+      complete_with_empties
+        (DynArray.get (List.last_exn t.tree.nodes) 0)
+        t.tree.nodes_height height
+    else empty_hash_at_height height
 
   let set_inner_hash_at_addr_exn t a hash =
     let path_length = Addr.depth a in
