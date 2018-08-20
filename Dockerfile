@@ -24,7 +24,7 @@ RUN USER=opam && \
     sudo chown root:root /usr/local/bin/fixuid && \
     sudo chmod 4755 /usr/local/bin/fixuid && \
     sudo mkdir -p /etc/fixuid && \
-    sudo printf "user: $USER\ngroup: $GROUP\n" | sudo tee /etc/fixuid/config.yml > /dev/null
+    sudo printf "user: $USER\ngroup: $GROUP\npaths:\n   - /home\n   - /nix\n" | sudo tee /etc/fixuid/config.yml > /dev/null
 
 USER opam:opam
 ENTRYPOINT ["fixuid"]
