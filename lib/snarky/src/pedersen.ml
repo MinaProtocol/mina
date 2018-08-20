@@ -9,17 +9,19 @@ module Make
       type t
       [@@deriving eq]
 
-      val coords : t -> Impl.Field.t * Impl.Field.t
+      val to_coords : t -> Impl.Field.t * Impl.Field.t
 
       val typ : (var, t) Impl.Typ.t
 
+      val negate : t -> t
+
       val add : t -> t -> t
 
-      val var_of_value : t -> var
-
-      val identity : t
+      val zero : t
 
       module Checked : sig
+        val constant : t -> var
+
         val add : var -> var -> (var, _) Impl.Checked.t
 
         val add_known : var -> t -> (var, _) Impl.Checked.t
@@ -29,6 +31,11 @@ module Make
       val params : Weierstrass_curve.t Quadruple.t array
     end) : sig
   open Impl
+
+  val local_function
+    : Weierstrass_curve.t Quadruple.t
+    -> bool Triple.t
+    -> Weierstrass_curve.t
 
   module Digest : sig
     module Unpacked : sig
@@ -75,7 +82,7 @@ module Make
   end
 
   val hash :
-    init:int * Weierstrass_curve.var
+    init:int * Section.Acc.t
     -> Boolean.var Triple.t list
     -> (Weierstrass_curve.var, _) Checked.t
 
@@ -85,12 +92,18 @@ end = struct
 
   let coords : Weierstrass_curve.t Quadruple.t -> Field.t Quadruple.t * Field.t Quadruple.t =
     fun (t1, t2, t3, t4) ->
-      let (x1, y1) = Weierstrass_curve.coords t1
-      and (x2, y2) = Weierstrass_curve.coords t2
-      and (x3, y3) = Weierstrass_curve.coords t3
-      and (x4, y4) = Weierstrass_curve.coords t4
+      let (x1, y1) = Weierstrass_curve.to_coords t1
+      and (x2, y2) = Weierstrass_curve.to_coords t2
+      and (x3, y3) = Weierstrass_curve.to_coords t3
+      and (x4, y4) = Weierstrass_curve.to_coords t4
       in
       ((x1, x2, x3, x4), (y1, y2, y3, y4))
+
+  let local_function quad (b0, b1, b2) =
+    let t = Quadruple.get quad (Four.of_bits_lsb (b0, b1)) in
+    if b2
+    then Weierstrass_curve.negate t
+    else t
 
   let lookup
         ((s0, s1, s2): Boolean.var Triple.t)
@@ -156,7 +169,7 @@ end = struct
             `Var v
         | `Var v, `Value x
         | `Value x, `Var v ->
-          if Weierstrass_curve.(equal identity x)
+          if Weierstrass_curve.(equal zero x)
           then return (`Var v)
           else
             let%map v = Weierstrass_curve.Checked.add_known v x in
@@ -168,7 +181,7 @@ end = struct
         function
         | `Var v -> v
         | `Value x ->
-          Weierstrass_curve.var_of_value x
+          Weierstrass_curve.Checked.constant x
     end
 
     type t = {support: Interval_union.t; acc: Acc.t}
@@ -218,7 +231,7 @@ end = struct
           | `Value v ->
             let%bind init_term = get_term start x in
             let%bind init =
-              if Weierstrass_curve.(equal identity v)
+              if Weierstrass_curve.(equal zero v)
               then return init_term
               else Weierstrass_curve.Checked.add_known init_term v
             in
@@ -232,7 +245,7 @@ end = struct
   let hash ~init:(start, acc) triples =
     let open Checked.Let_syntax in
     let%map { acc; _ } = 
-      Section.extend { acc = `Var acc; support = Interval_union.empty }
+      Section.extend { acc; support = Interval_union.empty }
         triples ~start
     in
     match acc with

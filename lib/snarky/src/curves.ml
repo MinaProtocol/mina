@@ -535,6 +535,9 @@ struct
     in
     { unchecked with check = assert_on_curve }
 
+  let negate ((x, y) : var) : var =
+    (x, Field.Checked.scale y Field.(negate one))
+
   let constant (t: t) : var =
     let (x, y) = Curve.to_coords t in
     Field.Checked.(constant x, constant y)
@@ -704,8 +707,10 @@ struct
     let n = List.length b in
     let sigma_count = (n + 1) / 2 in (* = ceil (n / 2.0) *)
     (* We implement a complicated optimzation so that in total
-       this costs roughly 5 * (n / 2) constaints, rather than
-       the naive 4*n + 3*n
+       this costs roughly (1 + 3) * (n / 2) constaints, rather than
+       the naive 4*n + 3*n. If scalars were represented with some
+       kind of signed digit representation we could probably get it
+       down to 2 * (n / 3) + 3 * (n / 3).
     *)
     (* Assume n is even *)
     (* Define
