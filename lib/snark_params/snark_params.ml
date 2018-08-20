@@ -62,6 +62,61 @@ module Tick = struct
 
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
+  module Inner_curve = struct
+    open Tick0
+
+    type var = Field.Checked.t * Field.Checked.t
+
+    include Crypto_params.Inner_curve
+
+    module Scalar = struct
+      module T = (Tock.Field : module type of Tock.Field with type var := Tock.Field.var and module Checked := Tock.Field.Checked)
+      include T
+
+      let of_bits = Tock.Field.project
+
+      include Binable.Of_sexpable(T)
+
+      let length_in_bits = size_in_bits
+
+      type var = Boolean.var list
+
+      let typ =
+        Typ.transport (Typ.list ~length:size_in_bits Boolean.typ)
+          ~there:unpack
+          ~back:project
+
+      let gen : t Quickcheck.Generator.t =
+        Quickcheck.Generator.map
+          (Bignum_bigint.gen_incl Bignum_bigint.one
+             Bignum_bigint.(Tock.Field.size - one))
+          ~f:(fun x ->
+            Tock.Bigint.(to_field (of_bignum_bigint x)))
+
+      module Checked = struct
+        module Assert = struct
+          let equal = Bitstring_checked.Assert.equal
+        end
+      end
+    end
+
+    module Checked = struct
+      include
+        Snarky.Curves.Make_weierstrass_checked
+          (Tick0)
+          (Scalar)
+          (struct
+            include Crypto_params.Inner_curve
+            let scale = scale_field
+          end)
+          (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+
+      let add_known v x = add v (constant x)
+    end
+
+    let typ = Checked.typ
+  end
+
   module Field = struct
     module T = struct
       include Tick0.Field
@@ -101,111 +156,9 @@ module Tick = struct
   end
 
   module Pedersen = struct
-    module Curve = struct
-      (* someday: Compute this from the number inside of ocaml *)
-      let length_in_bits = 262
-
-      include Snarky.Curves.Edwards.Basic.Make (Field)
-                (Crypto_params.Hash_curve)
-
-      module Scalar = struct
-        (* Someday: Make more efficient *)
-        open Tick0
-
-        type var = Boolean.var list
-
-        type t = Bignum_bigint.t
-
-        let test_bit t i = Bignum_bigint.(shift_right t i land one = one)
-
-        let pack bs =
-          let pack_char bs =
-            Char.of_int_exn
-              (List.foldi bs ~init:0 ~f:(fun i acc b ->
-                   if b then acc lor (1 lsl i) else acc ))
-          in
-          String.of_char_list
-            (List.map ~f:pack_char (List.chunks_of ~length:8 bs))
-          |> Z.of_bits |> Bignum_bigint.of_zarith_bigint
-
-        let length_in_bits = length_in_bits
-
-        let typ : (var, t) Typ.t =
-          let open Typ in
-          transport
-            (list ~length:length_in_bits Boolean.typ)
-            ~there:(fun n ->
-              List.init length_in_bits
-                ~f:(Z.testbit (Bignum_bigint.to_zarith_bigint n)) )
-            ~back:pack
-
-        module Checked = struct
-          let equal = Bitstring_checked.equal
-
-          module Assert = struct
-            let equal = Bitstring_checked.Assert.equal
-          end
-        end
-      end
-    end
-
-    module P = Pedersen.Make (Field) (Tick_curve.Bigint.R) (Curve)
-
-    include (P : module type of P with module Digest := P.Digest)
-
-    module Digest = struct
-      include Hashable.Make (Field)
-      include P.Digest
-      include Snarkable (Tick0)
-    end
-
-    let params =
-      let f s = Tick_curve.Bigint.R.(to_field (of_decimal_string s)) in
-      Array.map Crypto_params.Pedersen_params.t ~f:(fun (x, y) -> (f x, f y))
-
-    let hash_bigstring x : Digest.t =
-      let s = State.create params in
-      State.update_bigstring s x |> State.digest
-
-    let%test_unit "hash_observationally_injective" =
-      let gen =
-        let open Quickcheck.Generator in
-        let open Let_syntax in
-        let%bind length = small_positive_int in
-        let bits = list_with_length length Bool.gen in
-        filter (both bits bits) ~f:(fun (x, y) -> x <> y)
-      in
-      let h bs = digest_fold (State.create params) (List.fold bs) in
-      Quickcheck.test gen ~f:(fun (x, y) ->
-          assert (not (Digest.( = ) (h x) (h y))) )
-
-    let zero_hash = hash_bigstring (Bigstring.create 0)
+    include Pedersen.Make(Field)(Bigint)(Inner_curve)
+    module Checked = Snarky.Pedersen.Make(Tick0)(Inner_curve)(Crypto_params.Pedersen_params)
   end
-
-  module Scalar = Pedersen.Curve.Scalar
-  module Hash_curve =
-    Snarky.Curves.Edwards.Extend (Tick0) (Scalar) (Pedersen.Curve)
-  module Signature_curve = Hash_curve
-
-  let%test "generator-order-match" =
-    Hash_curve.(equal (scale Params.generator Params.order) identity)
-
-  module Pedersen_hash =
-    Snarky.Pedersen.Make (Tick0)
-      (struct
-        include Hash_curve
-
-        let cond_add = Checked.cond_add
-      end)
-      (struct
-        let params = Pedersen.params
-      end)
-
-  let hash_bits ~(init: Pedersen.State.t) x =
-    Pedersen_hash.hash x
-      ~init:(init.bits_consumed, Hash_curve.var_of_value init.acc)
-
-  let digest_bits ~init x = Checked.(hash_bits ~init x >>| Pedersen_hash.digest)
 
   module Util = Snark_util.Make (Tick0)
 end
