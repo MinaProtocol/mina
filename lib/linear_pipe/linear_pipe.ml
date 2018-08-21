@@ -63,8 +63,7 @@ let iter_unordered ?consumer ~max_concurrency reader ~f =
      in
      Deferred.all_unit (List.init max_concurrency ~f:(fun _ -> run_reader ())))
 
-let drain r = 
-  iter r ~f:(fun _ -> Deferred.unit)
+let drain r = iter r ~f:(fun _ -> Deferred.unit)
 
 let length reader = Pipe.length reader.Reader.pipe
 

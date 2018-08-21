@@ -836,7 +836,8 @@ module type Main_intf = sig
 
   val peers : t -> Host_and_port.t list
 
-  val strongest_ledgers : t -> (Inputs.External_transition.t) Linear_pipe.Reader.t
+  val strongest_ledgers :
+    t -> Inputs.External_transition.t Linear_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
@@ -932,8 +933,7 @@ module Run (Program : Main_intf) = struct
            Rpc.Connection.server_with_close reader writer
              ~implementations:
                (Rpc.Implementations.create_exn
-                  ~implementations:
-                    (client_impls @ snark_worker_impls)
+                  ~implementations:(client_impls @ snark_worker_impls)
                   ~on_unknown_rpc:`Raise)
              ~connection_state:(fun _ -> ())
              ~on_handshake_error:

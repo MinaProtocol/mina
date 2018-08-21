@@ -115,9 +115,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~time_controller:(Inputs.Time.Controller.create ())
                 ())
          in
-         don't_wait_for begin
-           Linear_pipe.drain (Run.strongest_ledgers minibit)
-         end;
+         don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers minibit)) ;
          Run.setup_local_server ~minibit ~client_port ~log ;
          Run.run_snark_worker ~log ~client_port run_snark_worker
        in

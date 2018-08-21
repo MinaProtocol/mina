@@ -7,29 +7,27 @@ module Kernel = Kernel.Debug ()
 
 module Coda_worker = struct
   type input =
-      { host: string
-      ; conf_dir: string
-      ; program_dir: string
-      ; my_port: int
-      ; gossip_port: int
-      ; peers: Host_and_port.t list }
+    { host: string
+    ; conf_dir: string
+    ; program_dir: string
+    ; my_port: int
+    ; gossip_port: int
+    ; peers: Host_and_port.t list }
   [@@deriving bin_io]
 
   module T = struct
-
     module Peers = struct
       type t = Host_and_port.t List.t [@@deriving bin_io]
     end
 
-    type 'worker functions = 
+    type 'worker functions =
       { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
-      ; strongest_ledgers: ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
-      }
+      ; strongest_ledgers:
+          ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t }
 
-    type coda_functions = 
+    type coda_functions =
       { coda_peers: unit -> Peers.t Deferred.t
-      ; coda_strongest_ledgers: unit -> unit Pipe.Reader.t Deferred.t
-      }
+      ; coda_strongest_ledgers: unit -> unit Pipe.Reader.t Deferred.t }
 
     module Worker_state = struct
       type init_arg = input [@@deriving bin_io]
@@ -48,7 +46,6 @@ module Coda_worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-
       let peers_impl ~worker_state ~conn_state:() () =
         worker_state.coda_peers ()
 
@@ -56,14 +53,17 @@ module Coda_worker = struct
         worker_state.coda_strongest_ledgers ()
 
       let peers =
-        C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t ()
+        C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t
+          ~bin_output:Peers.bin_t ()
 
       let strongest_ledgers =
-        C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t ()
+        C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
+          ~bin_output:Unit.bin_t ()
 
       let functions = {peers; strongest_ledgers}
 
-      let init_worker_state {host; conf_dir; program_dir; my_port; peers; gossip_port} = 
+      let init_worker_state
+          {host; conf_dir; program_dir; my_port; peers; gossip_port} =
         let log = Logger.create () in
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string my_port)
@@ -73,7 +73,7 @@ module Coda_worker = struct
 
           module Make
               (Init : Init_intf
-               with type Ledger_proof.t = Ledger_proof_statement.t)
+                      with type Ledger_proof.t = Ledger_proof_statement.t)
               () =
             Coda_without_snark (Init) ()
         end in
@@ -114,19 +114,14 @@ module Coda_worker = struct
                ())
         in
         let coda_peers () = return (Main.peers coda) in
-        let coda_strongest_ledgers () = 
+        let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in
-          don't_wait_for begin
-            Linear_pipe.iter 
-              (Main.strongest_ledgers coda)
-              ~f:(fun _ -> Linear_pipe.write w ())
-          end;
+          don't_wait_for
+            (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun _ ->
+                 Linear_pipe.write w () )) ;
           return r.pipe
         in
-        return 
-          { coda_peers
-          ; coda_strongest_ledgers
-          }
+        return {coda_peers; coda_strongest_ledgers}
 
       let init_connection_state ~connection:_ ~worker_state:_ = return
     end
