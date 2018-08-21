@@ -5,20 +5,27 @@ open Util
 open Blockchain_snark
 open Snark_params
 
-module Verification (Wrap : sig
-  val key : Tock.Verification_key.t
+module Verification
+    (Consensus_mechanism : Consensus.Mechanism.S) (Wrap : sig
+        val key : Tock.Verification_key.t
 
-  val key_to_bool_list : Tock.Verification_key.t -> bool list
+        val key_to_bool_list : Tock.Verification_key.t -> bool list
 
-  val input :
-    unit -> ('a, 'b, Tock.Field.var -> 'a, Tock.Field.t -> 'b) Tock.Data_spec.t
-end) =
+        val input :
+             unit
+          -> ( 'a
+             , 'b
+             , Tock.Field.var -> 'a
+             , Tock.Field.t -> 'b )
+             Tock.Data_spec.t
+    end) =
 struct
   let instance_hash =
     let self = Wrap.key_to_bool_list Wrap.key in
     fun state ->
       Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
-        (List.fold self +> State_hash.fold (Blockchain_state.hash state))
+        ( List.fold self
+        +> State_hash.fold (Consensus_mechanism.Protocol_state.hash state) )
 
   let embed (x: Tick.Field.t) : Tock.Field.t =
     let n = Tick.Bigint.of_field x in

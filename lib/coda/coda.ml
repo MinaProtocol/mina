@@ -17,7 +17,7 @@ module type Ledger_builder_io_intf = sig
 
   type sync_ledger_answer
 
-  type state
+  type protocol_state
 
   val create : net -> t
 
@@ -38,7 +38,7 @@ module type Network_intf = sig
 
   type ledger_builder
 
-  type state
+  type protocol_state
 
   type ledger_hash
 
@@ -74,7 +74,7 @@ module type Network_intf = sig
      and type ledger_builder_aux := parallel_scan_state
      and type ledger_builder_hash := ledger_builder_hash
      and type ledger_hash := ledger_hash
-     and type state := state
+     and type protocol_state := protocol_state
      and type sync_ledger_query := sync_ledger_query
      and type sync_ledger_answer := sync_ledger_answer
 
@@ -171,7 +171,7 @@ module type Ledger_builder_controller_intf = sig
 
   type net
 
-  type state
+  type protocol_state
 
   type t
 
@@ -198,7 +198,9 @@ module type Ledger_builder_controller_intf = sig
   val strongest_tip : t -> tip
 
   val local_get_ledger :
-    t -> ledger_builder_hash -> (ledger_builder * state) Deferred.Or_error.t
+       t
+    -> ledger_builder_hash
+    -> (ledger_builder * protocol_state) Deferred.Or_error.t
 
   val strongest_ledgers :
     t -> (ledger_builder * external_transition) Linear_pipe.Reader.t
@@ -212,7 +214,7 @@ module type Ledger_builder_controller_intf = sig
   val transition_tree : t -> Transition_tree.t option
 end
 
-module type Signer_intf = sig
+module type Proposer_intf = sig
   type t
 
   type ledger_hash
@@ -227,15 +229,15 @@ module type Signer_intf = sig
 
   type completed_work_checked
 
-  type state
+  type protocol_state
 
-  type state_proof
+  type protocol_state_proof
 
   type time_controller
 
   module Tip : sig
     type t =
-      { state: state * state_proof
+      { protocol_state: protocol_state * protocol_state_proof
       ; ledger_builder: ledger_builder
       ; transactions: transaction Sequence.t }
   end
@@ -297,7 +299,10 @@ module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
   module Proof_carrying_state : sig
-    type t = (State.t, State.Proof.t) Coda_pow.Proof_carrying_data.t
+    type t =
+      ( Consensus_mechanism.Protocol_state.value
+      , Protocol_state_proof.t )
+      Coda_pow.Proof_carrying_data.t
     [@@deriving sexp, bin_io]
   end
 
@@ -328,10 +333,10 @@ module type Inputs_intf = sig
 
   module Net :
     Network_intf
-    with type state_with_witness := External_transition.t
+    with type state_with_witness := Consensus_mechanism.External_transition.t
      and type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type state := State.t
+     and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type snark_pool_diff := Snark_pool.pool_diff
      and type transaction_pool_diff := Transaction_pool.pool_diff
      and type parallel_scan_state := Ledger_builder.Aux.t
@@ -345,33 +350,33 @@ module type Inputs_intf = sig
      and type ledger := Ledger.t
      and type ledger_builder := Ledger_builder.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type internal_transition := Internal_transition.t
-     and type external_transition := External_transition.t
-     and type state := State.t
+     and type internal_transition := Consensus_mechanism.Internal_transition.t
+     and type external_transition := Consensus_mechanism.External_transition.t
+     and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type sync_query := Sync_ledger.query
      and type sync_answer := Sync_ledger.answer
      and type ledger_hash := Ledger_hash.t
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
 
-  module Signer :
-    Signer_intf
+  module Proposer :
+    Proposer_intf
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder := Ledger_builder.t
      and type transaction := Transaction.With_valid_signature.t
-     and type state := State.t
-     and type state_proof := State.Proof.t
+     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state_proof := Protocol_state_proof.t
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
-     and type external_transition := External_transition.t
+     and type external_transition := Consensus_mechanism.External_transition.t
      and type time_controller := Time.Controller.t
 
   module Genesis : sig
-    val state : State.t
+    val state : Consensus_mechanism.Protocol_state.value
 
     val ledger : Ledger.t
 
-    val proof : State.Proof.t
+    val proof : Protocol_state_proof.t
   end
 
   val fee_public_key : Public_key.Compressed.t
@@ -381,10 +386,10 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   type t =
-    { miner: Signer.t
+    { proposer: Proposer.t
     ; net: Net.t
     ; external_transitions:
-        External_transition.t Linear_pipe.Writer.t
+        Consensus_mechanism.External_transition.t Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
@@ -436,7 +441,7 @@ module Make (Inputs : Inputs_intf) = struct
              { ledger_builder=
                  Ledger_builder.create ~ledger:Genesis.ledger
                    ~self:fee_public_key
-             ; state= Genesis.state
+             ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
            ~disk_location:config.ledger_builder_persistant_location
            ~external_transitions:external_transitions_reader)
@@ -471,8 +476,8 @@ module Make (Inputs : Inputs_intf) = struct
     let tips_r, tips_w = Linear_pipe.create () in
     (let tip = Ledger_builder_controller.strongest_tip ledger_builder in
      Linear_pipe.write_without_pushback tips_w
-       (Signer.Tip_change
-          { state= (tip.state, tip.proof)
+       (Proposer.Tip_change
+          { protocol_state= (tip.protocol_state, tip.proof)
           ; transactions= Transaction_pool.transactions transaction_pool
           ; ledger_builder= tip.ledger_builder })) ;
     don't_wait_for
@@ -492,23 +497,28 @@ module Make (Inputs : Inputs_intf) = struct
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
         Net.broadcast_state net t ; Deferred.unit )
     |> don't_wait_for ;
-    let miner =
+    let proposer =
       Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
-        (fun (ledger_builder, {state; state_proof; _}) ->
-          Signer.Tip_change
-            { state= (state, state_proof)
+        (fun (ledger_builder, transition) ->
+          Proposer.Tip_change
+            { protocol_state=
+                ( Consensus_mechanism.External_transition.protocol_state
+                    transition
+                , Consensus_mechanism.External_transition.protocol_state_proof
+                    transition )
             ; ledger_builder
             ; transactions= Transaction_pool.transactions transaction_pool } )
       |> don't_wait_for ;
-      Signer.create ~parent_log:config.log ~change_feeder:tips_r
+      Proposer.create ~parent_log:config.log ~change_feeder:tips_r
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
         ~time_controller:config.time_controller
     in
     don't_wait_for
-      (Linear_pipe.transfer_id (Signer.transitions miner)
+      (Linear_pipe.transfer_id
+         (Proposer.transitions proposer)
          external_transitions_writer) ;
     return
-      { miner
+      { proposer
       ; net
       ; external_transitions= external_transitions_writer
       ; transaction_pool

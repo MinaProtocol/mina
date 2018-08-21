@@ -87,7 +87,7 @@ let rec pair_up = function
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions: Transaction_snark.Transition.t list) =
-  let module Sparse_ledger = Bundle.Sparse_ledger in
+  let module Sparse_ledger = Nanobit_base.Sparse_ledger in
   let (base_proof_time, _), base_proofs =
     List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:
       (fun (max_span, sparse_ledger) t ->
@@ -123,7 +123,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
 
 let check_base_snarks sparse_ledger0
     (transitions: Transaction_snark.Transition.t list) =
-  let module Sparse_ledger = Bundle.Sparse_ledger in
+  let module Sparse_ledger = Nanobit_base.Sparse_ledger in
   let _ =
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
@@ -143,7 +143,7 @@ let check_base_snarks sparse_ledger0
 let run profiler num_transactions =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
   let sparse_ledger =
-    Bundle.Sparse_ledger.of_ledger_subset_exn ledger
+    Nanobit_base.Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map transitions ~f:(fun t ->
            match t with
            | Fee_transfer t ->

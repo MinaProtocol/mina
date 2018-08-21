@@ -8,37 +8,34 @@ let pk sk = Public_key.of_private_key sk |> Public_key.compress
 let sk_bigint sk =
   Private_key.to_bigstring sk |> Private_key.of_bigstring |> Or_error.ok_exn
 
-let run_test with_snark : unit -> unit Deferred.t =
- fun () ->
+module type Coda_intf = sig
+  type ledger_proof
+
+  module Make (Init : Init_intf with type Ledger_proof.t = ledger_proof) () :
+    Main_intf
+end
+
+let run_test (type ledger_proof) (with_snark: bool) (module Kernel
+    : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
+    : Coda_intf with type ledger_proof = ledger_proof) : unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
-  let%bind prover = Prover.create ~conf_dir
-  and verifier = Verifier.create ~conf_dir in
-  let module Init = struct
-    type proof = Proof.Stable.V1.t [@@deriving bin_io, sexp]
-
+  let module Config = struct
     let logger = log
 
     let conf_dir = conf_dir
 
-    let verifier = verifier
-
     let lbc_tree_max_depth = `Finite 50
-
-    let prover = prover
-
-    let genesis_proof = Precomputed_values.base_proof
 
     let transaction_interval = Time.Span.of_ms 100.0
 
     let fee_public_key = Genesis_ledger.rich_pk
+
+    let genesis_proof = Precomputed_values.base_proof
   end in
-  let module Main = ( val if with_snark then
-                            (module Coda_with_snark (Storage.Memory) (Init) ()
-                            : Main_intf )
-                          else (module Coda_without_snark (Init) () : Main_intf)
-  ) in
+  let%bind (module Init) = make_init (module Config) (module Kernel) in
+  let module Main = Coda.Make (Init) () in
   let module Run = Run (Main) in
   let open Main in
   let net_config =
@@ -178,10 +175,12 @@ let run_test with_snark : unit -> unit Deferred.t =
       assert_balance key data ) ;
   Deferred.unit
 
-let command =
+let command (type ledger_proof) (module Kernel
+    : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
+    : Coda_intf with type ledger_proof = ledger_proof) =
   let open Core in
   let open Async in
   Command.async ~summary:"Full minibit end-to-end test"
     (let open Command.Let_syntax in
     let%map_open with_snark = flag "with-snark" no_arg ~doc:"Produce snarks" in
-    run_test with_snark)
+    fun () -> run_test with_snark (module Kernel) (module Coda))
