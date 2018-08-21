@@ -120,6 +120,8 @@ module Tick = struct
       then Some (Field.sqrt y2)
       else None
 
+    let scale = scale_field
+
     module Checked = struct
       include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
                 (struct
@@ -129,6 +131,18 @@ module Tick = struct
                 end)
                 (Coefficients)
 
+      let with_random_shift k =
+        let open Let_syntax in
+        let%bind init =
+          provide_witness typ
+            As_prover.(return (random ()))
+        in
+        let%bind shifted = k ~init in
+        add shifted (negate init)
+
+      let scale g s = with_random_shift (scale_bits g s)
+      let scale_known g s = with_random_shift (scale_known g s)
+
       let add_known v x = add v (constant x)
     end
 
@@ -136,20 +150,8 @@ module Tick = struct
   end
 
   module Field = struct
-    module T = struct
-      include Tick0.Field
-
-      let compare t1 t2 = Bigint.(compare (of_field t1) (of_field t2))
-
-      let hash_fold_t s x =
-        Bignum_bigint.hash_fold_t s Bigint.(to_bignum_bigint (of_field x))
-
-      let hash = Hash.of_fold hash_fold_t
-    end
-
-    include T
-    include Hashable.Make (T)
-    include Field_bin.Make (Tick0.Field) (Tick_curve.Bigint.R)
+    include Tick0.Field
+    include Hashable.Make (Tick0.Field)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
     let gen =

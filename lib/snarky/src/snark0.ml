@@ -117,6 +117,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       fun bs -> go Field.one Field.zero bs
 
+    let compare t1 t2 = Bigint.(compare (of_field t1) (of_field t2))
+
+    let hash_fold_t s x =
+      Bignum_bigint.hash_fold_t s Bigint.(to_bignum_bigint (of_field x))
+
+    let hash = Hash.of_fold hash_fold_t
+
     let sexp_of_t x =
       Bignum_bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
 
@@ -128,6 +135,12 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let of_string s =
       Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.of_string s))
+
+    include Binable.Of_binable(Bignum_bigint)(struct
+        type t = Field.t
+        let to_binable = Fn.compose Bigint.to_bignum_bigint Bigint.of_field
+        let of_binable = Fn.compose Bigint.to_field Bigint.of_bignum_bigint
+      end)
 
     module Infix = struct
       let ( + ) = add
