@@ -1,14 +1,18 @@
 open Core
 open Async_kernel
 
-let rec repeated n f r = if n > 0 then repeated (n - 1) f (f r) else r
+let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
 module type Hash_intf = sig
   type t [@@deriving sexp, hash, compare, bin_io, eq]
 
+  type account
+
   val empty_hash : t
 
   val merge : height:int -> t -> t -> t
+
+  val hash_account : account -> t
 end
 
 module type Merkle_tree_intf = sig
@@ -43,10 +47,6 @@ module type Merkle_tree_intf = sig
   val get_all_accounts_rooted_at_exn : t -> addr -> account list
 
   val merkle_root : t -> root_hash
-
-  val set_syncing : t -> unit
-
-  val clear_syncing : t -> unit
 end
 
 module type S = sig
@@ -104,85 +104,51 @@ module type Validity_intf = sig
 
   type addr
 
-  val create : addr -> t
+  type hash
 
-  val mark_known_good : t -> addr -> unit
+  type hash_status = Fresh | Stale
 
-  val fully_valid : t -> bool
+  type hash' = hash_status * hash
+
+  val create : hash -> t
+
+  val set : t -> addr -> hash' -> unit
+
+  val get : t -> addr -> hash' option
+
+  val completely_fresh : t -> bool
 end
 
 (*
-For a given addr, there are three possibilities:
 
-1. the current value in the ledger at addr is already fine. in this case, we
-  mark_known_good that addr.
-2. the current value in the ledger is bad. in tihs case, we do nothing and
-  recurse.
-3. we're down to a height=N subtree and fetch the child accounts, then
-  mark_known_good the addr of the root of the subtree
+Every node of the merkle tree is always in one of three states:
 
-We want all_valid when every leaf of the tree is `Valid
+- Fresh.
+  The current contents for this node in the MT match what we
+  expect.
+- Stale
+  The current contents for this node in the MT do _not_ match
+  what we expect.
+- Unknown.
+  We don't know what to expect yet.
+
+
+Although every node conceptually has one of these states, and can
+make a transition at any time, the syncer operates only along a
+"frontier" of the tree, which consists of the deepest Stale nodes.
+
+The goal of the ledger syncer is to make the root node be fresh,
+starting from it being stale.
+
+The syncer usually operates exclusively on these frontier nodes
+and their direct children. However, the goal hash can change
+while the syncer is running, and at that point every non-root node
+conceptually becomes Unknown, and we need to restart. However, we
+don't need to restart completely: in practice, only small portions
+of the merkle tree change between goals, and we can re-use the "Stale"
+nodes we already have if the expected hash doesn't change.
+
 *)
-(* TODO: This is a waste of memory *)
-module Valid (Addr : Merkle_address.S) :
-  Validity_intf with type addr := Addr.t =
-struct
-  type tree = Leaf of [`Valid | `Unknown] | Node of tree ref * tree ref
-  [@@deriving sexp]
-
-  type t = tree ref [@@deriving sexp]
-
-  let create a =
-    let t = ref (Leaf `Unknown) in
-    let rec go node dirs =
-      match dirs with
-      | d :: ds -> (
-          let accessor = match d with Direction.Left -> fst | Right -> snd in
-          assert (d = Left) ;
-          match !node with
-          (* sanity assert: we shouldn't ever be recursing under valid parts of the tree *)
-          | Leaf v ->
-              assert (v = `Unknown) ;
-              node := Node (ref !node, ref @@ Leaf `Valid) ;
-              go node dirs
-          | Node (l, r) -> go (accessor (l, r)) ds )
-      | [] -> ()
-      (*all done*)
-    in
-    if not (Addr.equal a (Addr.root ())) then go t (Addr.dirs_from_root a) ;
-    t
-
-  let mark_known_good t a =
-    let rec mark_helper node dirs =
-      match dirs with
-      | d :: ds -> (
-          let accessor = match d with Direction.Left -> fst | Right -> snd in
-          match !node with
-          (* sanity assert: we shouldn't ever be recursing under valid parts of the tree *)
-          | Leaf v ->
-              assert (v = `Unknown) ;
-              node := Node (ref !node, ref !node) ;
-              mark_helper node dirs
-          | Node (l, r) -> mark_helper (accessor (l, r)) ds )
-      | [] ->
-        match !node with
-        | Leaf `Unknown -> node := Leaf `Valid
-        | _ ->
-            failwith
-              "sanity: by the time we get here, we should be at a Leaf `Unknown"
-    in
-    mark_helper t (Addr.dirs_from_root a)
-
-  let fully_valid t =
-    let rec fully_valid t =
-      match !t with
-      | Leaf `Valid -> true
-      | Leaf `Unknown -> false
-      | Node (l, r) -> fully_valid l && fully_valid r
-    in
-    fully_valid t
-end
-
 (*
 Note: while syncing, the underlying ledger is in an
 indeterminate state. We're mutating hashes at internal
@@ -190,18 +156,15 @@ nodes without updating their children. In fact, we
 don't even set all the hashes for the internal nodes!
 (When we hit a height=N subtree, we don't do anything
 with the hashes in the bottomost N-1 internal nodes).
-We rely on clear_syncing to recompute the hashes and
-do any other fixup necessary.
 *)
 
 module Make
     (Addr : Merkle_address.S) (Key : sig
         type t [@@deriving bin_io]
+    end) (Account : sig
+      type t [@@deriving bin_io, sexp]
     end)
-    (Valid : Validity_intf with type addr := Addr.t) (Account : sig
-        type t [@@deriving bin_io, sexp]
-    end)
-    (Hash : Hash_intf) (Root_hash : sig
+    (Hash : Hash_intf with type account := Account.t) (Root_hash : sig
         type t [@@deriving eq]
 
         val to_hash : t -> Hash.t
@@ -226,6 +189,81 @@ struct
   type diff = unit
 
   type index = int
+
+  (* TODO #434: This is a waste of memory. *)
+  module Valid :
+    Validity_intf with type hash := Hash.t and type addr := Addr.t =
+  struct
+    type hash_status = Fresh | Stale [@@deriving sexp]
+
+    type hash' = hash_status * Hash.t [@@deriving sexp]
+
+    type tree = Leaf of hash' option | Node of hash' * tree ref * tree ref
+    [@@deriving sexp]
+
+    type t = tree ref [@@deriving sexp]
+
+    let create h = ref (Leaf (Some (Stale, h)))
+
+    let set t a (s, h) =
+      let rec go node dirs depth =
+        match dirs with
+        | d :: ds -> (
+            let accessor =
+              match d with Direction.Left -> fst | Direction.Right -> snd
+            in
+            match !node with
+            | Leaf (Some (Fresh, _)) ->
+                failwith
+                  "why are we descending into the children of a fresh leaf?"
+            | Leaf None ->
+                failwith
+                  "why are we descending into an `Unknown? take care of this \
+                   leaf first"
+            | Leaf (Some (Stale, l)) ->
+                (* otherwise we'd have to synthesize hashes *)
+                assert (ds = []) ;
+                node := Node ((Stale, l), ref (Leaf None), ref (Leaf None)) ;
+                go node dirs depth
+            | Node (_, l, r) ->
+                go (accessor (l, r)) ds (depth + 1) ;
+                match !node with
+                | Node
+                    ( (Stale, h)
+                    , {contents= Leaf (Some (Fresh, lh))}
+                    , {contents= Leaf (Some (Fresh, rh))} ) ->
+                    (* we _must_ check if the hashes match first, because we could be
+                       in validation mode and there might be some leftover junk. *)
+                    let mh =
+                      Hash.merge ~height:(max 0 (MT.depth - depth - 1)) lh rh
+                    in
+                    if Hash.equal mh h then node := Leaf (Some (Fresh, h))
+                    else ()
+                | _ -> () )
+        | [] -> node := Leaf (Some (s, h))
+      in
+      go t (Addr.dirs_from_root a) 0
+
+    let get t a =
+      let rec go node dirs =
+        match dirs with
+        | d :: ds -> (
+            let accessor =
+              match d with Direction.Left -> fst | Direction.Right -> snd
+            in
+            match !node with
+            | Leaf _ -> None
+            | Node (_, l, r) -> go (accessor (l, r)) ds )
+        | [] -> match !node with Leaf c -> c | Node (c, _, _) -> Some c
+      in
+      go t (Addr.dirs_from_root a)
+
+    let completely_fresh t =
+      match !t with
+      | Leaf (Some (Fresh, _)) -> true
+      | Node ((Fresh, _), _, _) -> true
+      | _ -> false
+  end
 
   type answer =
     | Has_hash of Addr.t * Hash.t
@@ -265,6 +303,19 @@ struct
     Addr.Table.add_exn t.waiting_parents ~key:parent_addr
       ~data:{expected; children= []}
 
+  let expect_content : t -> Addr.t -> Hash.t -> unit =
+   fun t addr expected ->
+    Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
+
+  (* TODO #435: verify content hash matches expected and blame the peer who gave it to us *)
+  let add_content : t -> Addr.t -> Account.t list -> Hash.t Or_error.t =
+   fun t addr content ->
+    let expected = Addr.Table.find_exn t.waiting_content addr in
+    (* TODO #444 should we batch all the updates and do them at the end? *)
+    MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+    Addr.Table.remove t.waiting_content addr ;
+    Ok expected
+
   let add_child_hash_to :
          t
       -> Addr.t
@@ -279,37 +330,36 @@ struct
       | Some {expected; children} ->
           Some {expected; children= (child_addr, h) :: children} ) ;
     let {expected; children} = Addr.Table.find_exn t.waiting_parents parent in
+    let validate addr hash =
+      let should_skip =
+        match Valid.get t.validity addr with
+        | Some (Fresh, vh) -> Hash.equal hash vh
+        | _ -> false
+      in
+      (* we check the validity tree first because the underlying MT hashes might not be current *)
+      if should_skip then []
+      else if Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash then (
+        Valid.set t.validity addr (Fresh, hash) ;
+        [] )
+      else (
+        Valid.set t.validity addr (Stale, hash) ;
+        [(addr, hash)] )
+    in
     match children with
     | [(l1, h1); (l2, h2)] ->
         let (l1, h1), (l2, h2) =
-          if List.last_exn (Addr.dirs_from_root l1) = Left then
+          if List.last_exn (Addr.dirs_from_root l1) = Direction.Left then
             ((l1, h1), (l2, h2))
           else ((l2, h2), (l1, h1))
         in
         let merged = Hash.merge ~height:(MT.depth - Addr.depth l1) h1 h2 in
         if Hash.equal merged expected then (
           Addr.Table.remove t.waiting_parents parent ;
-          let children_to_verify =
-            List.rev_append
-              ( if Hash.equal (MT.get_inner_hash_at_addr_exn t.tree l1) h1 then (
-                  Valid.mark_known_good t.validity l1 ;
-                  [] )
-              else (
-                MT.set_inner_hash_at_addr_exn t.tree l1 h1 ;
-                [(l1, h1)] ) )
-              ( if Hash.equal (MT.get_inner_hash_at_addr_exn t.tree l2) h2 then (
-                  Valid.mark_known_good t.validity l2 ;
-                  [] )
-              else (
-                MT.set_inner_hash_at_addr_exn t.tree l2 h2 ;
-                [(l2, h2)] ) )
-          in
-          `Good children_to_verify )
+          `Good (List.rev_append (validate l1 h1) (validate l2 h2)) )
         else `Hash_mismatch
     | _ -> `More
 
   let all_done t res =
-    MT.clear_syncing t.tree ;
     if not (Root_hash.equal (MT.merkle_root t.tree) t.desired_root) then
       failwith "We finished syncing, but made a mistake somewhere :("
     else (
@@ -317,55 +367,44 @@ struct
       Ivar.fill t.validity_listener `Ok ) ;
     res
 
-  let expect_content : t -> Addr.t -> Hash.t -> unit =
-   fun t addr expected ->
-    Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
-
-  (* TODO: verify the hash matches what we expect *)
-  let add_content : t -> Addr.t -> Account.t list -> unit =
-   fun t addr content ->
-    let _expected = Addr.Table.find_exn t.waiting_content addr in
-    MT.set_all_accounts_rooted_at_exn t.tree addr content ;
-    Addr.Table.remove t.waiting_content addr
-
   let empty_hash_at_height h =
     let rec go prev ctr =
       if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
     in
     go Hash.empty_hash 0
 
-  let implied_root hash height =
+  let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
-      if height = MT.depth then prev_hash
+      if height = result_height then prev_hash
       else
         let cur = Hash.merge ~height prev_hash cur_empty in
         let next_empty = Hash.merge ~height cur_empty cur_empty in
         go next_empty cur (height + 1)
     in
-    go (empty_hash_at_height height) hash height
+    go (empty_hash_at_height start_height) hash start_height
+
+  let handle_node t addr exp_hash =
+    if Addr.depth addr >= MT.depth - Subtree_height.subtree_height then (
+      expect_content t addr exp_hash ;
+      Linear_pipe.write_without_pushback t.queries
+        (t.desired_root, What_contents addr) )
+    else (
+      expect_children t addr exp_hash ;
+      Linear_pipe.write_without_pushback t.queries
+        (t.desired_root, What_hash (Addr.child_exn addr Direction.Left)) ;
+      Linear_pipe.write_without_pushback t.queries
+        (t.desired_root, What_hash (Addr.child_exn addr Direction.Right)) )
 
   let num_accounts t n content_hash =
+    let rh = Root_hash.to_hash t.desired_root in
     let height = Int.ceil_log2 n in
-    if
-      not
-        (Hash.equal
-           (implied_root content_hash height)
-           (Root_hash.to_hash t.desired_root))
+    if not (Hash.equal (complete_with_empties content_hash height MT.depth) rh)
     then failwith "reported content hash doesn't match desired root hash!" ;
     MT.extend_with_empty_to_fit t.tree n ;
     Addr.Table.clear t.waiting_parents ;
     Addr.Table.clear t.waiting_content ;
-    let r =
-      repeated (MT.depth - height)
-        (fun a -> Addr.child_exn a Left)
-        (Addr.root ())
-    in
-    t.validity <- Valid.create r ;
-    expect_children t r content_hash ;
-    let lr = Addr.child_exn r Left in
-    let rr = Addr.child_exn r Right in
-    Linear_pipe.write_without_pushback t.queries (t.desired_root, What_hash lr) ;
-    Linear_pipe.write_without_pushback t.queries (t.desired_root, What_hash rr)
+    Valid.set t.validity (Addr.root ()) (Stale, rh) ;
+    handle_node t (Addr.root ()) rh
 
   (* Assumption: only ever one answer is received for a given query
      When violated, waiting_parents can get junk added to it, which
@@ -379,25 +418,13 @@ struct
           match a with
           | Has_hash (addr, h') -> (
             match add_child_hash_to t addr h' with
-            (* TODO: Stick this in a log, punish the sender *)
-            | Error _e -> ()
+            (* TODO #435: Stick this in a log, punish the sender *)
+            | Error _e ->
+                ()
             | Ok (`Good children_to_verify) ->
-                (* TODO: Make sure we don't write too much *)
+                (* TODO #312: Make sure we don't write too much *)
                 List.iter children_to_verify ~f:(fun (addr, hash) ->
-                    if
-                      Addr.depth addr
-                      >= MT.depth - Subtree_height.subtree_height
-                    then (
-                      expect_content t addr hash ;
-                      Linear_pipe.write_without_pushback t.queries
-                        (t.desired_root, What_contents addr) )
-                    else (
-                      expect_children t addr hash ;
-                      Linear_pipe.write_without_pushback t.queries
-                        (t.desired_root, What_hash (Addr.child_exn addr Left)) ;
-                      Linear_pipe.write_without_pushback t.queries
-                        (t.desired_root, What_hash (Addr.child_exn addr Right)) )
-                )
+                    handle_node t addr hash )
             | Ok `More -> () (* wait for the other answer to come in *)
             | Ok `Hash_mismatch ->
                 (* just ask again for both children of the parent?
@@ -405,11 +432,11 @@ struct
              pin blame on a single node. *)
                 failwith "figure out how to handle peers lying" )
           | Contents_are (addr, leafs) ->
-              add_content t addr leafs ;
-              Valid.mark_known_good t.validity addr
+              let subtree_hash = add_content t addr leafs |> Or_error.ok_exn in
+              Valid.set t.validity addr (Fresh, subtree_hash)
           | Num_accounts (n, h) -> num_accounts t n h
         in
-        if Valid.fully_valid t.validity then all_done t res else res
+        if Valid.completely_fresh t.validity then all_done t res else res
     in
     Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a ; Deferred.unit)
 
@@ -420,14 +447,13 @@ struct
     Linear_pipe.write_without_pushback t.queries (h, Num_accounts)
 
   let create mt h =
-    MT.set_syncing mt ;
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
       { desired_root= h
       ; tree= mt
       ; validity=
-          Valid.create (Addr.root ())
+          Valid.create (Root_hash.to_hash h)
           (* this gets tossed and remade when we hear Num_accounts *)
       ; answers= ar
       ; answer_writer= aw
@@ -464,9 +490,7 @@ module Make_sync_responder
       type t [@@deriving bin_io]
     end)
     (Hash : Hash_intf) (Root_hash : sig
-        type t [@@deriving eq]
-
-        val to_hash : t -> Hash.t
+        type t
     end)
     (MT : Merkle_tree_intf
           with type hash := Hash.t
@@ -498,8 +522,8 @@ struct
         let len = MT.length mt in
         let height = Int.ceil_log2 len in
         let content_root_addr =
-          repeated (MT.depth - height)
-            (fun a -> Addr.child_exn a Left)
+          funpow (MT.depth - height)
+            (fun a -> Addr.child_exn a Direction.Left)
             (Addr.root ())
         in
         Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)

@@ -225,8 +225,8 @@ let%test_unit "set_inner_can_copy_correctly" =
   let b2 = 2 in
   let ledger1, _ = L3.load_ledger n b1 in
   let ledger2, _ = L3.load_ledger n b2 in
-  L3.set_syncing ledger1 ;
-  L3.set_syncing ledger2 ;
+  L3.recompute_tree ledger1 ;
+  L3.recompute_tree ledger2 ;
   let all_children = all_inner_of (L3.Addr.root ()) in
   List.iter all_children ~f:(fun x ->
       let src = L3.get_inner_hash_at_addr_exn ledger2 x in
@@ -234,8 +234,6 @@ let%test_unit "set_inner_can_copy_correctly" =
   List.iter (List.range 0 8) ~f:(fun x ->
       let src = L3.get_at_index_exn ledger2 x in
       L3.set_at_index_exn ledger1 x src ) ;
-  L3.clear_syncing ledger1 ;
-  L3.clear_syncing ledger2 ;
   assert (L3.merkle_root ledger1 = L3.merkle_root ledger2)
 
 let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
@@ -251,7 +249,6 @@ let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
   let ledger, _ = L16.load_ledger count 1 in
   let mr_start = L16.merkle_root ledger in
   let max_height = Int.ceil_log2 count in
-  L16.set_syncing ledger ;
   let hash_to_set =
     Test_ledger.Hash.(merge ~height:80 empty_hash empty_hash)
   in
@@ -275,5 +272,4 @@ let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
       in
       L16.set_inner_hash_at_addr_exn ledger a old_hash ;
       res ) ;
-  L16.clear_syncing ledger ;
   assert (mr_start = L16.merkle_root ledger)
