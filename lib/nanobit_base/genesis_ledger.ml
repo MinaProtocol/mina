@@ -2,12 +2,11 @@ open Core_kernel
 
 let rich_sk =
   "IgAAAAAAAAABIJLfK6/afuZTpDqzVSI/eMo7h/HuH/CcZozCtSEgsoLc" |> B64.decode
-  |> Bigstring.of_string |> Private_key.of_bigstring |> Or_error.ok_exn
+  |> Bigstring.of_string |> Private_key.of_bigstring
 
 let poor_sk =
   "KgAAAAAAAAABKEHfd5r8nKEMPSVcgvbWS6CdErbzB4eYaxpr9qJqtKy5JAAAAAAAAAA="
   |> B64.decode |> Bigstring.of_string |> Private_key.of_bigstring
-  |> Or_error.ok_exn
 
 let poor_pk = Public_key.of_private_key poor_sk |> Public_key.compress
 
