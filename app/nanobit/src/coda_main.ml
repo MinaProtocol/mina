@@ -168,25 +168,27 @@ module type Init_intf = sig
 
   include Kernel_intf
 
-  val prover : Prover.t Deferred.t
+  val prover : Prover.t
 
-  val verifier : Verifier.t Deferred.t
+  val verifier : Verifier.t
 
   val genesis_proof : Proof.t
 end
 
 let make_init (type ledger_proof) (module Config : Config_intf) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) :
-    (module Init_intf with type Ledger_proof.t = ledger_proof) =
+    (module Init_intf with type Ledger_proof.t = ledger_proof) Deferred.t =
   let open Config in
   let open Kernel in
+  let%bind prover = Prover.create ~conf_dir in
+  let%map verifier = Verifier.create ~conf_dir in
   let module Init = struct
     include Kernel
     include Config
 
-    let prover = Prover.create ~conf_dir
+    let prover = prover
 
-    let verifier = Verifier.create ~conf_dir
+    let verifier = verifier
   end in
   (module Init : Init_intf with type Ledger_proof.t = ledger_proof)
 
@@ -240,9 +242,9 @@ struct
     type input = Protocol_state.value
 
     let verify state_proof state =
-      let%bind verifier = Init.verifier in
       match%map
-        Init.Verifier.verify_blockchain verifier {proof= state_proof; state}
+        Init.Verifier.verify_blockchain Init.verifier
+          {proof= state_proof; state}
       with
       | Ok b -> b
       | Error e ->
@@ -531,10 +533,12 @@ struct
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Public_key.Compressed)
-      (Syncable_ledger.Valid (Ledger.Addr))
-      (Account)
-      (Merkle_hash)
+    Syncable_ledger.Make (Ledger.Addr) (Public_key.Compressed) (Account)
+      (struct
+        include Merkle_hash
+
+        let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
+      end)
       (struct
         include Ledger_hash
 
@@ -545,6 +549,8 @@ struct
         include Ledger
 
         type path = Path.t
+
+        let f = Account.hash
       end)
       (struct
         let subtree_height = 3
@@ -607,8 +613,7 @@ struct
       module Internal_transition = Internal_transition
 
       let verify_blockchain proof state =
-        let%bind verifier = Init.verifier in
-        Init.Verifier.verify_blockchain verifier {proof; state}
+        Init.Verifier.verify_blockchain Init.verifier {proof; state}
     end
 
     include Ledger_builder_controller.Make (Inputs)
@@ -634,9 +639,8 @@ struct
     module Prover = struct
       let prove ~prev_state:(old_state, old_proof)
           (transition: Init.Consensus_mechanism.Internal_transition.t) =
-        let%bind prover = Init.prover in
         let open Deferred.Or_error.Let_syntax in
-        Init.Prover.extend_blockchain prover
+        Init.Prover.extend_blockchain Init.prover
           (Init.Blockchain.create ~proof:old_proof ~state:old_state)
           (Init.Consensus_mechanism.Internal_transition.snark_transition
              transition)
@@ -677,8 +681,7 @@ struct
              0)
       then Deferred.return false
       else
-        let%bind verifier = Init.verifier in
-        match%map Init.Verifier.verify_transaction_snark verifier t with
+        match%map Init.Verifier.verify_transaction_snark Init.verifier t with
         | Ok b -> b
         | Error e ->
             Logger.warn Init.logger
