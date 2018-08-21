@@ -15,8 +15,6 @@ let main () =
   let log = Logger.child log name in
   Coda_process.spawn_local_exn ~peers ~port ~gossip_port ~program_dir ~f:
     (fun worker ->
-      let%bind res = Coda_process.sum_exn worker 40 in
-      let%bind peers = Coda_process.peers_exn worker in
       let%bind strongest_ledgers = Coda_process.strongest_ledgers_exn worker in
       let count = ref 0 in
       let blocks = ref [] in

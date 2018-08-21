@@ -38,9 +38,6 @@ module Coda_process = struct
     let%bind _ : Unix.Exit_or_signal.t = Process.wait proc in
     return ()
 
-  let sum_exn (conn, proc) n =
-    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.sum ~arg:n
-
   let peers_exn (conn, proc) =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
 
