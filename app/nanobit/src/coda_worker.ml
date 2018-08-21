@@ -22,14 +22,12 @@ module Coda_worker = struct
     end
 
     type 'worker functions = 
-      { sum: ('worker, int, int) Rpc_parallel.Function.t
-      ; peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
+      { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
       ; strongest_ledgers: ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
       }
 
     type coda_functions = 
-      { coda_sum: int -> int Deferred.t 
-      ; coda_peers: unit -> Peers.t Deferred.t
+      { coda_peers: unit -> Peers.t Deferred.t
       ; coda_strongest_ledgers: unit -> unit Pipe.Reader.t Deferred.t
       }
 
@@ -50,8 +48,6 @@ module Coda_worker = struct
              with type worker_state := Worker_state.t
               and type connection_state := Connection_state.t) =
     struct
-      let sum_impl ~worker_state ~conn_state:() arg =
-        worker_state.coda_sum arg
 
       let peers_impl ~worker_state ~conn_state:() () =
         worker_state.coda_peers ()
@@ -59,16 +55,13 @@ module Coda_worker = struct
       let strongest_ledgers_impl ~worker_state ~conn_state:() () =
         worker_state.coda_strongest_ledgers ()
 
-      let sum =
-        C.create_rpc ~f:sum_impl ~bin_input:Int.bin_t ~bin_output:Int.bin_t ()
-
       let peers =
         C.create_rpc ~f:peers_impl ~bin_input:Unit.bin_t ~bin_output:Peers.bin_t ()
 
       let strongest_ledgers =
         C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t ()
 
-      let functions = {sum; peers; strongest_ledgers}
+      let functions = {peers; strongest_ledgers}
 
       let init_worker_state {host; conf_dir; program_dir; my_port; peers; gossip_port} = 
         let log = Logger.create () in
@@ -124,7 +117,6 @@ module Coda_worker = struct
         (*don't_wait_for begin
           Linear_pipe.drain (Main.strongest_ledgers coda)
         end;*)
-        let coda_sum x = return (x + 3) in
         let coda_strongest_ledgers () = 
           let r, w = Linear_pipe.create () in
           don't_wait_for begin
@@ -135,8 +127,7 @@ module Coda_worker = struct
           return r.pipe
         in
         return 
-          { coda_sum
-          ; coda_peers
+          { coda_peers
           ; coda_strongest_ledgers
           }
 
