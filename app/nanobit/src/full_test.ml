@@ -34,7 +34,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let genesis_proof = Precomputed_values.base_proof
   end in
-  let (module Init) = make_init (module Config) (module Kernel) in
+  let%bind (module Init) = make_init (module Config) (module Kernel) in
   let module Main = Coda.Make (Init) () in
   let module Run = Run (Main) in
   let open Main in
