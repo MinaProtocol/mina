@@ -311,6 +311,7 @@ struct
   let add_content : t -> Addr.t -> Account.t list -> Hash.t Or_error.t =
    fun t addr content ->
     let expected = Addr.Table.find_exn t.waiting_content addr in
+    (* TODO #444 should we batch all the updates and do them at the end? *)
     MT.set_all_accounts_rooted_at_exn t.tree addr content ;
     Addr.Table.remove t.waiting_content addr ;
     Ok expected
