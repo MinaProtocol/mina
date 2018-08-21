@@ -114,7 +114,7 @@ module Tick = struct
 
         type var = Boolean.var list
 
-        type t = Bignum_bigint.t
+        type t = Bignum_bigint.t [@@deriving eq, bin_io, sexp]
 
         let test_bit t i = Bignum_bigint.(shift_right t i land one = one)
 

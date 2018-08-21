@@ -32,18 +32,18 @@ module type Inputs_intf = sig
     val copy : t -> t
   end
 
-  module State : sig
+  module Protocol_state_proof : sig
     type t
-
-    module Proof : sig
-      type t
-    end
   end
 
-  module Transition : sig
+  module Protocol_state : sig
+    type value
+  end
+
+  module External_transition : sig
     type t [@@deriving bin_io, eq, compare, sexp]
 
-    val target_state : t -> State.t
+    val target_state : t -> Protocol_state.value
 
     val ledger_hash : t -> Ledger_hash.t
 
@@ -53,14 +53,14 @@ module type Inputs_intf = sig
   module Tip :
     Protocols.Coda_pow.Tip_intf
     with type ledger_builder := Ledger_builder.t
-     and type state := State.t
-     and type state_proof := State.Proof.t
-     and type transition := Transition.t
+     and type protocol_state := Protocol_state.value
+     and type protocol_state_proof := Protocol_state_proof.t
+     and type external_transition := External_transition.t
 
   module Transition_logic_state :
     Transition_logic_state.S
     with type tip := Tip.t
-     and type transition := Transition.t
+     and type external_transition := External_transition.t
 
   module Sync_ledger : sig
     type t
@@ -90,7 +90,7 @@ module type Inputs_intf = sig
              and type ledger_builder_hash := Ledger_builder_hash.t
              and type ledger_builder_aux := Ledger_builder.Aux.t
              and type ledger_hash := Ledger_hash.t
-             and type state := State.t
+             and type protocol_state := Protocol_state.value
   end
 end
 
@@ -105,7 +105,7 @@ module Make (Inputs : Inputs_intf) = struct
   (* Perform the `Sync interruptible work *)
   let do_sync {net; log; sl_ref} (state: Transition_logic_state.t) transition =
     let locked_tip = Transition_logic_state.locked_tip state in
-    let h = Transition.ledger_hash transition in
+    let h = External_transition.ledger_hash transition in
     (* Lazily recreate the sync_ledger if necessary *)
     let sl : Sync_ledger.t =
       match !sl_ref with
@@ -122,20 +122,21 @@ module Make (Inputs : Inputs_intf) = struct
       | Some sl -> sl
     in
     let open Interruptible.Let_syntax in
-    let ivar : Transition.t Ivar.t = Ivar.create () in
+    let ivar : External_transition.t Ivar.t = Ivar.create () in
     let work =
       match%bind
         Interruptible.lift
           (Sync_ledger.wait_until_valid sl h)
           (Deferred.map (Ivar.read ivar) ~f:(fun transition ->
-               Sync_ledger.new_goal sl (Transition.ledger_hash transition) ))
+               Sync_ledger.new_goal sl
+                 (External_transition.ledger_hash transition) ))
       with
       | `Ok ledger -> (
           (* TODO: This should be parallelized with the syncing *)
           match%map
             Interruptible.uninterruptible
               (Net.get_ledger_builder_aux_at_hash net
-                 (Transition.ledger_builder_hash transition))
+                 (External_transition.ledger_builder_hash transition))
           with
           | Ok aux -> (
             match Ledger_builder.of_aux_and_ledger ledger aux with
