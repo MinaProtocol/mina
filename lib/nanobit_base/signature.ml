@@ -11,6 +11,3 @@ include Stable.V1
 open Snark_params.Tick
 
 type var = Boolean.var list * Boolean.var list
-
-let typ : (var, t) Typ.t =
-  Schnorr.Signature.typ

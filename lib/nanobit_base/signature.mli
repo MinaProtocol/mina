@@ -13,5 +13,3 @@ end
 open Snark_params.Tick
 
 type var = Boolean.var list * Boolean.var list
-
-val typ : (var, t) Typ.t

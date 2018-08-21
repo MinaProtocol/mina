@@ -7,7 +7,7 @@ open Fold_lib
 module type Basic = sig
   (* TODO: Use stable for bin_io *)
 
-  type t = private Pedersen.Digest.t [@@deriving sexp, eq]
+  type t = private Pedersen.Digest.t [@@deriving sexp, eq, compare]
 
   val gen : t Quickcheck.Generator.t
 

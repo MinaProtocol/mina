@@ -1,18 +1,30 @@
+all : clean docker container build
 
-all : docker dev
-.PHONY : all
+.PHONY : all dev
 
 kademlia:
 	bash -c 'cd app/kademlia-haskell && nix-build release2.nix'
 
 docker :
-	./rebuild-docker.sh nanotest Dockerfile
+	@./rebuild-docker.sh nanotest Dockerfile
 
-dev : docker
-	./develop.sh restart
-	@echo "*****"
-	@echo "** REMINDER: Add nanobit/scripts dir to the front of your PATH"
-	@echo "****"
+build :
+	@echo "Starting Build"
+	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
+		./scripts/run-in-docker dune build ; \
+	else \
+		dune build ; \
+	fi
+	@echo "Build complete"
+
+container :
+	@./container.sh restart
+
+clean :
+	@echo "Removing previous build artifacts"
+	@rm -rf _build
+
+dev : docker container build
 
 nanobit-docker :
 	./rebuild-docker.sh nanobit Dockerfile-nanobit
@@ -42,7 +54,11 @@ update-deps: base-googlecloud
 	./rewrite-from-dockerfile.sh ocaml-base $(shell git rev-parse HEAD)
 
 test:
-	./test_all.sh
+	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
+		./scripts/run-in-docker ./test_all.sh ; \
+	else	\
+		./test_all.sh ; \
+	fi
 
 reformat:
 	dune exec app/reformat/reformat.exe -- -path .
@@ -63,3 +79,4 @@ testbridge-googlecloud :
 
 ci-base-docker:
 	./rebuild-docker.sh o1labs/ci-base Dockerfile-ci-base
+	

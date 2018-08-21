@@ -21,9 +21,9 @@ module type S = sig
 
     type var
 
-    type t [@@deriving sexp]
+    type value [@@deriving sexp]
 
-    val typ : (var, t) Typ.t
+    val typ : (var, value) Typ.t
 
     module Checked : sig
       val hash : var -> (Hash.var, _) Checked.t
@@ -74,7 +74,7 @@ struct
       type t =
         { wrap_vk: Tock_curve.Verification_key.t
         ; prev_proof: Tock_curve.Proof.t
-        ; prev_state: State.t
+        ; prev_state: State.value
         ; update: Update.value }
       [@@deriving fields]
     end
@@ -134,7 +134,7 @@ struct
            choose_verification_key_data_and_proof_and_check_result
              prev_top_hash
              As_prover.(
-               map get_state ~f:(fun {Prover_state.prev_proof; wrap_vk} ->
+               map get_state ~f:(fun {Prover_state.prev_proof; wrap_vk; _} ->
                    { Verifier.All_in_one.verification_key= wrap_vk
                    ; proof= prev_proof } ))
          in
@@ -153,7 +153,7 @@ struct
            provide_witness' State.typ ~f:Prover_state.prev_state
          and update = provide_witness' Update.typ ~f:Prover_state.update in
          let%bind prev_state_hash = State.Checked.hash prev_state in
-         let%bind next_state_hash, next_state, `Success success =
+         let%bind next_state_hash, _next_state, `Success success =
            with_label __LOC__
              (State.Checked.update (prev_state_hash, prev_state) update)
          in

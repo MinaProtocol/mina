@@ -4,13 +4,15 @@ open Tick
 open Tuple_lib
 open Fold_lib
 
-type t = Field.t * Field.t [@@deriving sexp, eq, compare, hash]
+type t = Field.t * Field.t [@@deriving bin_io, sexp, eq, compare, hash]
 
 module Stable : sig
   module V1 : sig
     type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
   end
 end
+
+include Comparable.S_binable with type t := t
 
 type var = Field.var * Field.var
 

@@ -1,3 +1,5 @@
+(* TODO: rename length_in_bits -> bit_length *)
+
 open Core
 open Util
 open Snark_params.Tick
@@ -7,7 +9,7 @@ open Tuple_lib
 open Fold_lib
 
 module type Basic = sig
-  type t = private Pedersen.Digest.t [@@deriving sexp, eq]
+  type t = private Pedersen.Digest.t [@@deriving sexp, eq, compare]
 
   val gen : t Quickcheck.Generator.t
 

@@ -17,8 +17,10 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )"/.. && pwd )"
 ARGS=${@}
 ARGS=$(echo ${ARGS} | fix_dir_stdin)
 
-NAME=$(docker ps | grep nanotest | head | awk '{ print $1 }')
+MYUID=$(id -u)
+DOCKERNAME="nanotest-$MYUID"
 
+NAME=$(docker ps -q --filter "name=$DOCKERNAME")
 
 if [ -t 0 ] ;
 then

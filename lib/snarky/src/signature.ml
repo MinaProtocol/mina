@@ -1,15 +1,95 @@
 module Bignum_bigint = Bigint
 open Core_kernel
 
+module type Message_intf = sig
+  type boolean_var
+
+  type curve_scalar
+
+  type curve_scalar_var
+
+  type (_, _) checked
+
+  type t
+
+  type var
+
+  val hash : t -> nonce:bool list -> curve_scalar
+
+  val hash_checked :
+    var -> nonce:boolean_var list -> (curve_scalar_var, _) checked
+end
+
+module type S = sig
+  type boolean_var
+
+  type curve
+
+  type curve_var
+
+  type curve_scalar
+
+  type curve_scalar_var
+
+  type (_, _) checked
+
+  type (_, _) typ
+
+  module Message :
+    Message_intf
+    with type boolean_var := boolean_var
+     and type curve_scalar := curve_scalar
+     and type curve_scalar_var := curve_scalar_var
+     and type ('a, 'b) checked := ('a, 'b) checked
+
+  module Signature : sig
+    type t = curve_scalar * curve_scalar [@@deriving sexp]
+
+    type var = curve_scalar_var * curve_scalar_var
+
+    val typ : (var, t) typ
+  end
+
+  module Private_key : sig
+    type t = curve_scalar
+  end
+
+  module Public_key : sig
+    type t = curve
+
+    type var = curve_var
+  end
+
+  module Checked : sig
+    val compress : curve_var -> (boolean_var list, _) checked
+
+    val verification_hash :
+         Signature.var
+      -> Public_key.var
+      -> Message.var
+      -> (curve_scalar_var, _) checked
+
+    val verifies :
+         Signature.var
+      -> Public_key.var
+      -> Message.var
+      -> (boolean_var, _) checked
+
+    val assert_verifies :
+      Signature.var -> Public_key.var -> Message.var -> (unit, _) checked
+  end
+
+  val compress : curve -> bool list
+
+  val sign : Private_key.t -> Message.t -> Signature.t
+
+  val shamir_sum : curve_scalar * curve -> curve_scalar * curve -> curve
+
+  val verify : Signature.t -> Public_key.t -> Message.t -> bool
+end
+
 module Schnorr
     (Impl : Snark_intf.S)
-    (*Curve : Curves.Edwards.S
-             with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-              and type Scalar.t = Bignum_bigint.t
-              and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
-              and type boolean_var := Impl.Boolean.var
-              and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
-              and type field := Impl.Field.t*)
     (Curve : sig
        open Impl
 
@@ -51,18 +131,20 @@ module Schnorr
 
        val to_coords : t -> Field.t * Field.t
     end)
-    (Message : sig
-        type t
-
-        type var
-
-        val hash : t -> nonce:bool list -> Curve.Scalar.t
-
-        val hash_checked :
-             var
-          -> nonce:Impl.Boolean.var list
-          -> (Curve.Scalar.var, _) Impl.Checked.t
-    end) =
+    (Message : Message_intf
+               with type boolean_var := Impl.Boolean.var
+                and type curve_scalar_var := Curve.Scalar.var
+                and type curve_scalar := Curve.Scalar.t
+                and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
+  S
+  with type boolean_var := Impl.Boolean.var
+   and type curve := Curve.t
+   and type curve_var := Curve.var
+   and type curve_scalar := Curve.Scalar.t
+   and type curve_scalar_var := Curve.Scalar.var
+   and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
+   and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+   and module Message := Message =
 struct
   open Impl
 
@@ -87,9 +169,8 @@ struct
     Field.unpack x
 
   module Public_key : sig
-    type var = Curve.var
-
     type t = Curve.t
+    type var = Curve.var
 
     val typ : (var, t) Typ.t
   end = Curve
@@ -126,10 +207,6 @@ struct
     let r = compress (shamir_sum (s, Curve.one) (h, pk)) in
     let h' = Message.hash ~nonce:r m in
     Curve.Scalar.equal h' h
-
-  module Keypair = struct
-    type t = {public: Public_key.t; secret: Private_key.t}
-  end
 
   module Checked = struct
     let compress ((x, _): Curve.var) =

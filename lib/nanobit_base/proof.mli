@@ -1,6 +1,6 @@
 open Snark_params
 
-type t = Tock.Proof.t
+type t = Tock.Proof.t [@@deriving bin_io, sexp]
 
 val dummy : Tock.Proof.t
 

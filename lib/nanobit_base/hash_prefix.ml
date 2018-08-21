@@ -25,7 +25,7 @@ end
 let salt s =
   Snark_params.Tick.Pedersen.(State.salt params (T.create s :> string))
 
-let blockchain_state = salt "CodaBCState"
+let protocol_state = salt "CodaProtoState"
 
 let account = salt "CodaAccount"
 

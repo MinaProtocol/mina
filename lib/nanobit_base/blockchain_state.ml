@@ -13,55 +13,40 @@ module Hash = State_hash
 
 module Stable = struct
   module V1 = struct
-    (* Someday: It may well be worth using bitcoin's compact nbits for target values since
-      targets are quite chunky *)
-    type ('target, 'state_hash, 'ledger_builder_hash, 'ledger_hash, 'strength, 'length, 'time, 'signer_public_key) t_ =
-      { next_difficulty: 'target
-      ; previous_state_hash: 'state_hash
-      ; ledger_builder_hash: 'ledger_builder_hash
+    type ('ledger_builder_hash, 'ledger_hash, 'time) t_ =
+      { ledger_builder_hash: 'ledger_builder_hash
       ; ledger_hash: 'ledger_hash
-      ; strength: 'strength
-      ; length: 'length
-      ; timestamp: 'time
-      ; signer_public_key: 'signer_public_key
-      }
-    [@@deriving bin_io, sexp, fields, eq]
+      ; timestamp: 'time }
+    [@@deriving bin_io, sexp, fields, eq, compare, hash]
 
-    type t = (Target.Stable.V1.t, State_hash.Stable.V1.t, Ledger_builder_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Strength.Stable.V1.t, Length.Stable.V1.t, Block_time.Stable.V1.t, Public_key.Compressed.Stable.V1.t) t_
-    [@@deriving bin_io, sexp, eq]
+    type t = (Ledger_builder_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Block_time.Stable.V1.t) t_
+    [@@deriving bin_io, sexp, eq, compare, hash]
   end
 end
 
 include Stable.V1
 
 type var =
-  ( Target.Unpacked.var
-  , State_hash.var
-  , Ledger_builder_hash.var
+  ( Ledger_builder_hash.var
   , Ledger_hash.var
-  , Strength.Unpacked.var
-  , Length.Unpacked.var
-  , Block_time.Unpacked.var
-  , Public_key.Compressed.var
+  , Block_time.Unpacked.var 
   ) t_
 
-type value = t
+type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
-let to_hlist { next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; length; timestamp; signer_public_key } =
-  H_list.([ next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; length; timestamp; signer_public_key ])
-let of_hlist : (unit, 'ta -> 'sh -> 'lbh -> 'lh -> 'st -> 'lth -> 'ti -> 'spk -> unit) H_list.t -> ('ta, 'sh, 'lbh, 'lh, 'st, 'lth, 'ti, 'spk) t_ =
-  H_list.(fun [ next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; length; timestamp; signer_public_key ] -> { next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; length; timestamp; signer_public_key })
+let create_value ~ledger_builder_hash ~ledger_hash ~timestamp =
+  { ledger_builder_hash; ledger_hash; timestamp }
+
+let to_hlist { ledger_builder_hash; ledger_hash; timestamp } =
+  H_list.([ ledger_builder_hash; ledger_hash; timestamp ])
+let of_hlist : (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t_ =
+  H_list.(fun [ ledger_builder_hash; ledger_hash; timestamp ] -> { ledger_builder_hash; ledger_hash; timestamp })
 
 let data_spec =
   let open Data_spec in
-  [ Target.Unpacked.typ
-  ; State_hash.typ
-  ; Ledger_builder_hash.typ
+  [ Ledger_builder_hash.typ
   ; Ledger_hash.typ
-  ; Strength.Unpacked.typ
-  ; Length.Unpacked.typ
   ; Block_time.Unpacked.typ
-  ; Public_key.Compressed.typ
   ]
 
 let typ : (var, value) Typ.t =
@@ -69,43 +54,73 @@ let typ : (var, value) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let to_bits ({ next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; length; timestamp; signer_public_key } : var) =
+let var_to_bits ({ ledger_builder_hash; ledger_hash; timestamp } : var) =
   let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash
-  and previous_state_hash_bits = State_hash.var_to_bits previous_state_hash
   and ledger_builder_hash_bits = Ledger_builder_hash.var_to_bits ledger_builder_hash
-  and signer_public_key_bits = Public_key.Compressed.var_to_bits signer_public_key
   in
-  Target.Unpacked.var_to_bits next_difficulty
-  @ previous_state_hash_bits
-  @ ledger_builder_hash_bits
+  ledger_builder_hash_bits
   @ ledger_hash_bits
-  @ Strength.Unpacked.var_to_bits strength
-  @ Length.Unpacked.var_to_bits length
   @ Block_time.Unpacked.var_to_bits timestamp
-  @ signer_public_key_bits
 
-let fold ({ next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; length; timestamp; signer_public_key } : value) ~init ~f =
-  (Target.Bits.fold next_difficulty
-  +> State_hash.fold previous_state_hash
-  +> Ledger_builder_hash.fold ledger_builder_hash
+let fold ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
+  Ledger_builder_hash.fold ledger_builder_hash
   +> Ledger_hash.fold ledger_hash
-  +> Strength.Bits.fold strength
-  +> Length.Bits.fold length
   +> Block_time.Bits.fold timestamp
-  +> Public_key.Compressed.fold signer_public_key) ~init ~f
 
-let to_bits_unchecked ({ next_difficulty; previous_state_hash; ledger_builder_hash; ledger_hash; strength; length; timestamp; signer_public_key } : value) =
-  Target.Bits.to_bits next_difficulty
-  @ State_hash.to_bits previous_state_hash
-  @ Ledger_builder_hash.to_bits ledger_builder_hash
+let to_bits ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
+  Ledger_builder_hash.to_bits ledger_builder_hash
   @ Ledger_hash.to_bits ledger_hash
-  @ Strength.Bits.to_bits strength
-  @ Length.Bits.to_bits length
   @ Block_time.Bits.to_bits timestamp
-  @ Public_key.Compressed.to_bits signer_public_key
 
-let hash t =
-  Pedersen.State.update_fold Hash_prefix.blockchain_state
-    (List.fold_left (to_bits_unchecked t))
-  |> Pedersen.State.digest
-  |> State_hash.of_hash
+let bit_length =
+  Ledger_builder_hash.length_in_bits + Ledger_hash.length_in_bits + Block_time.bit_length
+
+let set_timestamp t timestamp = { t with timestamp }
+
+let genesis_time =
+  Time.of_date_ofday ~zone:Time.Zone.utc
+    (Date.create_exn ~y:2018 ~m:Month.Feb ~d:2)
+    Time.Ofday.start_of_day
+  |> Block_time.of_time
+
+let genesis =
+  { ledger_builder_hash= Ledger_builder_hash.dummy
+  ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
+  ; timestamp= genesis_time }
+
+module Message = struct
+  open Util
+  open Tick
+
+  type nonrec t = t
+
+  type nonrec var = var
+
+  let hash t ~nonce =
+    let d =
+      Pedersen.digest_fold Hash_prefix.signature
+        (fold t +> List.fold nonce)
+    in
+    List.take (Field.unpack d) Scalar.length_in_bits |> Scalar.pack
+
+  let () = assert Insecure.signature_hash_function
+
+  let hash_checked t ~nonce =
+    let open Let_syntax in
+    with_label __LOC__
+      (let%bind bits = var_to_bits t in
+       let%bind hash =
+         Pedersen_hash.hash
+           ~init:
+             ( Hash_prefix.length_in_bits
+             , Signature_curve.var_of_value Hash_prefix.signature.acc )
+           (bits @ nonce)
+       in
+       let%map bs =
+         Pedersen_hash.Digest.choose_preimage
+         @@ Pedersen_hash.digest hash
+       in
+       List.take bs Scalar.length_in_bits)
+end
+
+module Signature = Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Signature_curve) (Message)
