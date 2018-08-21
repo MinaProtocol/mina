@@ -80,13 +80,11 @@ module type S = sig
 
   val extend_with_empty_to_fit : t -> int -> unit
 
-  val set_syncing : t -> unit
-
-  val clear_syncing : t -> unit
-
   val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
 
   val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
+
+  val recompute_tree : t -> unit
 end
 
 module type F = functor (Key :sig
