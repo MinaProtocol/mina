@@ -48,10 +48,6 @@ struct
   let%test "full_sync_entirely_different" =
     let l1, _k1 = L.load_ledger Num_accts.num_accts 1 in
     let l2, _k2 = L.load_ledger Num_accts.num_accts 2 in
-    L.set_syncing l1 ;
-    L.set_syncing l2 ;
-    L.clear_syncing l1 ;
-    L.clear_syncing l2 ;
     let desired_root = L.merkle_root l2 in
     let lsync = SL.create l1 desired_root in
     let qr = SL.query_reader lsync in
@@ -75,10 +71,6 @@ struct
     let l1, _k1 = L.load_ledger Num_accts.num_accts 1 in
     let l2, _k2 = L.load_ledger Num_accts.num_accts 2 in
     let l3, _k3 = L.load_ledger Num_accts.num_accts 3 in
-    L.set_syncing l1 ;
-    L.set_syncing l2 ;
-    L.clear_syncing l1 ;
-    L.clear_syncing l2 ;
     let desired_root = ref @@ L.merkle_root l2 in
     let lsync = SL.create l1 !desired_root in
     let qr = SL.query_reader lsync in

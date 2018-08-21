@@ -47,10 +47,6 @@ module type Merkle_tree_intf = sig
   val get_all_accounts_rooted_at_exn : t -> addr -> account list
 
   val merkle_root : t -> root_hash
-
-  val set_syncing : t -> unit
-
-  val clear_syncing : t -> unit
 end
 
 module type S = sig
@@ -160,8 +156,6 @@ nodes without updating their children. In fact, we
 don't even set all the hashes for the internal nodes!
 (When we hit a height=N subtree, we don't do anything
 with the hashes in the bottomost N-1 internal nodes).
-We rely on clear_syncing to recompute the hashes and
-do any other fixup necessary.
 *)
 
 module Make
@@ -365,7 +359,6 @@ struct
     | _ -> `More
 
   let all_done t res =
-    MT.clear_syncing t.tree ;
     if not (Root_hash.equal (MT.merkle_root t.tree) t.desired_root) then
       failwith "We finished syncing, but made a mistake somewhere :("
     else (
@@ -453,7 +446,6 @@ struct
     Linear_pipe.write_without_pushback t.queries (h, Num_accounts)
 
   let create mt h =
-    MT.set_syncing mt ;
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =

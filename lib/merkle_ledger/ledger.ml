@@ -82,13 +82,11 @@ module type S = sig
 
   val extend_with_empty_to_fit : t -> int -> unit
 
-  val set_syncing : t -> unit
-
-  val clear_syncing : t -> unit
-
   val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
 
   val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
+
+  val recompute_tree : t -> unit
 end
 
 module type F = functor (Key :sig
@@ -353,10 +351,8 @@ struct
         in
         recompute_layers (curr_height + 1) get_curr_hash layers dirty_indices
 
-  let recompute_tree ?(allow_sync= false) t =
-    if t.tree.syncing && not allow_sync then
-      failwith "recompute tree while syncing -- logic error!" ;
-    if not (List.is_empty t.tree.dirty_indices) || t.tree.dirty then (
+  let recompute_tree t =
+    if not (List.is_empty t.tree.dirty_indices) then (
       extend_tree t.tree ;
       (t.tree).dirty <- false ;
       let layer_dirty_indices =
@@ -450,7 +446,7 @@ struct
     if new_size > len then
       DynArray.append tree.leafs
         (DynArray.init (new_size - len) (fun _ -> Key.empty)) ;
-    recompute_tree ~allow_sync:true t
+    recompute_tree t
 
   let to_index a =
     List.foldi
@@ -482,6 +478,7 @@ struct
     assert (adepth < depth) ;
     let height = Addr.height a in
     let index = to_index a in
+    recompute_tree t ;
     if height < t.tree.nodes_height && index < length t then
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
       DynArray.get l (to_index a)
@@ -499,14 +496,6 @@ struct
     let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
     let index = to_index a in
     DynArray.set l index hash
-
-  let set_syncing t =
-    recompute_tree t ;
-    (t.tree).syncing <- true
-
-  let clear_syncing t =
-    (t.tree).syncing <- false ;
-    recompute_tree t
 
   let set_all_accounts_rooted_at_exn t a accounts =
     let height = depth - Addr.depth a in
