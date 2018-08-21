@@ -1,4 +1,5 @@
 open Core
+open Fold_lib
 open Util
 open Coda_numbers
 open Snark_params.Tick
@@ -57,26 +58,31 @@ let typ : (var, t) Typ.t =
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let fold {receiver; amount; fee; nonce} =
+  let open Fold in
   Public_key.Compressed.fold receiver
-  +> Amount.fold amount +> Fee.fold fee
-  +> Account_nonce.Bits.fold nonce
+  +> Amount.fold amount
+  +> Fee.fold fee
+  +> Account_nonce.fold nonce
 
-let var_to_bits {receiver; amount; fee; nonce} =
+(* TODO: This could be a bit more efficient by packing across triples,
+   but I think the added confusion-possibility
+   is not worth it. *)
+let var_to_triples {receiver; amount; fee; nonce} =
   with_label __LOC__
-    (let%map receiver = Public_key.Compressed.var_to_bits receiver in
-     let amount = (Amount.var_to_bits amount :> Boolean.var list) in
-     let fee = (Fee.var_to_bits fee :> Boolean.var list) in
-     let nonce = Account_nonce.Unpacked.var_to_bits nonce in
+    (let%map receiver = Public_key.Compressed.var_to_triples receiver in
+     let amount = Amount.var_to_triples amount in
+     let fee = Fee.var_to_triples fee in
+     let nonce = Account_nonce.Unpacked.var_to_triples nonce in
      receiver @ amount @ fee @ nonce)
 
-let length_in_bits =
-  Public_key.Compressed.length_in_bits + Amount.length + Fee.length
-  + Account_nonce.length_in_bits
+let length_in_triples =
+  Public_key.Compressed.length_in_triples
+  + Amount.length_in_triples
+  + Fee.length_in_triples
+  + Account_nonce.length_in_triples
 
-let to_bits {receiver; amount; fee; nonce} =
-  Public_key.Compressed.to_bits receiver
-  @ Amount.to_bits amount @ Fee.to_bits fee
-  @ Account_nonce.Bits.to_bits nonce
+let to_triples t =
+  Fold.to_list (fold t)
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in
@@ -89,10 +95,12 @@ let gen =
 let%test_unit "to_bits" =
   let open Test_util in
   with_randomness 123456789 (fun () ->
-      let length = length_in_bits in
+      let triple_typ = Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ in
+      let length = length_in_triples in
       test_equal typ
-        (Typ.list ~length Boolean.typ)
-        var_to_bits to_bits
+        (Typ.list ~length triple_typ)
+        var_to_triples
+        to_triples
         { receiver= {x= Field.random (); is_odd= Random.bool ()}
         ; amount= Amount.of_int (Random.int Int.max_value)
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)

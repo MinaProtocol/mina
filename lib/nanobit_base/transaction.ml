@@ -75,6 +75,6 @@ module With_valid_signature = struct
 end
 
 let check_signature ({payload; sender; signature}: t) =
-  Schnorr.verify signature sender payload
+  Schnorr.verify signature (Inner_curve.of_coords sender) payload
 
 let check t = Option.some_if (check_signature t) t

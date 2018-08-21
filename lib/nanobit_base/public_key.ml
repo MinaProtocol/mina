@@ -1,5 +1,7 @@
 open Core_kernel
+open Util
 open Snark_params
+open Fold_lib
 
 module Stable = struct
   module V1 = struct
@@ -22,7 +24,8 @@ let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 (* TODO: We can move it onto the subgroup during account creation. No need to check with
   every transaction *)
 
-let of_private_key pk = Tick.Hash_curve.scale Tick.Hash_curve.generator pk
+let of_private_key pk =
+  Tick.Inner_curve.(to_coords (scale_field Tick.Inner_curve.one pk))
 
 module Compressed = struct
   open Tick
@@ -47,7 +50,7 @@ module Compressed = struct
     let%map x = Field.gen and is_odd = Bool.gen in
     {x; is_odd}
 
-  let length_in_bits = 1 + Field.size_in_bits
+  let length_in_triples = bit_length_to_triple_length (1 + Field.size_in_bits)
 
   type var = (Field.var, Boolean.var) t_
 
@@ -71,18 +74,21 @@ module Compressed = struct
     and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
     ()
 
-  let fold {is_odd; x} ~init ~f = Field.Bits.fold x ~init:(f init is_odd) ~f
+  let fold_bits {is_odd; x} =
+    { Fold.fold = fun ~init ~f ->
+        f ((Field.Bits.fold x).fold ~init ~f) is_odd
+    }
 
-  let to_bits {is_odd; x} = is_odd :: Field.Bits.to_bits x
+  let fold t = Fold.group3 ~default:false (fold_bits t)
 
   (* TODO: Right now everyone could switch to using the other unpacking...
    Either decide this is ok or assert bitstring lt field size *)
-  let var_to_bits ({x; is_odd}: var) =
+  let var_to_triples ({x; is_odd}: var) =
     let open Let_syntax in
     let%map x_bits =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
     in
-    is_odd :: x_bits
+    Bitstring_lib.Bitstring.pad_to_triple_list (x_bits @ [is_odd]) ~default:Boolean.false_
 end
 
 open Tick
@@ -91,7 +97,7 @@ open Let_syntax
 let parity y = Bigint.(test_bit (of_field y) 0)
 
 let decompress ({x; is_odd}: Compressed.t) =
-  Option.map (Signature_curve.find_y x) ~f:(fun y ->
+  Option.map (Tick.Inner_curve.find_y x) ~f:(fun y ->
       let y_parity = parity y in
       let y = if Bool.(is_odd = y_parity) then y else Field.negate y in
       (x, y) )
@@ -108,7 +114,7 @@ let decompress_var ({x; is_odd} as c: Compressed.var) =
       As_prover.(
         map (read Compressed.typ c) ~f:(fun c -> snd (decompress_exn c)))
   in
-  let%map () = Signature_curve.Checked.Assert.on_curve (x, y)
+  let%map () = Inner_curve.Checked.Assert.on_curve (x, y)
   and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
   (x, y)
 

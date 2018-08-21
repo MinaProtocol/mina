@@ -1,6 +1,8 @@
 open Core
 open Snark_params.Tick
 open Snark_bits
+open Tuple_lib
+open Fold_lib
 
 module type Basic = sig
   (* TODO: Use stable for bin_io *)
@@ -11,7 +13,7 @@ module type Basic = sig
 
   val to_bytes : t -> string
 
-  val length_in_bits : int
+  val length_in_triples : int
 
   val ( = ) : t -> t -> bool
 
@@ -25,11 +27,11 @@ module type Basic = sig
 
   type var
 
-  val var_of_hash_unpacked : Pedersen.Digest.Unpacked.var -> var
+  val var_of_hash_unpacked : Pedersen.Checked.Digest.Unpacked.var -> var
 
-  val var_to_hash_packed : var -> Pedersen.Digest.Packed.var
+  val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
 
-  val var_to_bits : var -> (Boolean.var list, _) Checked.t
+  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   val typ : (var, t) Typ.t
 
@@ -40,6 +42,8 @@ module type Basic = sig
   val var_of_t : t -> var
 
   include Bits_intf.S with type t := t
+
+  val fold : t -> bool Triple.t Fold.t
 end
 
 module type Full_size = sig
@@ -47,7 +51,7 @@ module type Full_size = sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-  val var_of_hash_packed : Pedersen.Digest.Packed.var -> var
+  val var_of_hash_packed : Pedersen.Checked.Digest.var -> var
 
   val of_hash : Pedersen.Digest.t -> t
 end
@@ -55,7 +59,7 @@ end
 module type Small = sig
   include Basic
 
-  val var_of_hash_packed : Pedersen.Digest.Packed.var -> (var, _) Checked.t
+  val var_of_hash_packed : Pedersen.Checked.Digest.var -> (var, _) Checked.t
 
   val of_hash : Pedersen.Digest.t -> t Or_error.t
 end

@@ -1,6 +1,8 @@
 open Core
 open Snark_params
 open Tick
+open Tuple_lib
+open Fold_lib
 
 type t = Field.t * Field.t [@@deriving sexp, eq, compare, hash]
 
@@ -33,7 +35,7 @@ module Compressed : sig
 
   val empty : t
 
-  val length_in_bits : int
+  val length_in_triples : int
 
   type var = (Field.var, Boolean.var) t_
 
@@ -45,11 +47,9 @@ module Compressed : sig
 
   include Hashable.S_binable with type t := t
 
-  val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
+  val fold : t -> bool Triple.t Fold.t
 
-  val to_bits : t -> bool list
-
-  val var_to_bits : var -> (Boolean.var list, _) Checked.t
+  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   val assert_equal : var -> var -> (unit, _) Checked.t
 end

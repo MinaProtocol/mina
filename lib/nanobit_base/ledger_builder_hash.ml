@@ -2,9 +2,8 @@ open Core
 open Snark_params.Tick
 
 module Hash = struct
-  include Data_hash.Make_small (struct
-    let length_in_bits = 256
-  end)
+  let length_in_bits = 256
+  include Data_hash.Make_small (struct let length_in_bits = length_in_bits end)
 
   let of_bytes s =
     Z.of_bits s |> Bignum_bigint.of_zarith_bigint |> Bigint.of_bignum_bigint
