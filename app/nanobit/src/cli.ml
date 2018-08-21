@@ -5,8 +5,18 @@ open Blockchain_snark
 open Cli_lib
 open Coda_main
 
-let daemon (module Kernel
-    : Kernel_intf with type Ledger_proof.t = Ledger_proof_statement.t) =
+module type Coda_intf = sig
+  type ledger_proof
+
+  module Make : functor (Init : Init_intf with type Ledger_proof.t = ledger_proof) ()
+    -> Main_intf
+end
+
+let daemon
+    (type ledger_proof)
+    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof)
+    (module Coda : Coda_intf with type ledger_proof = ledger_proof)
+=
   let open Command.Let_syntax in
   Command.async ~summary:"Current daemon"
     (let%map_open conf_dir =
@@ -78,21 +88,7 @@ let daemon (module Kernel
          let genesis_proof = Precomputed_values.base_proof
        end in
        let%bind (module Init) = make_init (module Config) (module Kernel) in
-       let (module M) = (module Coda_without_snark (Init) () : Main_intf) in
-       (*
-       let%bind (module M) =
-         if Insecure.key_generation then
-           let%map (module Init) =
-             make_init (module Config) (module Kernel.Debug ())
-           in
-           (module Coda_without_snark (Init) () : Main_intf)
-         else
-           let%map (module Init) =
-             make_init (module Config) (module Kernel.Prod ())
-           in
-           (module Coda_with_snark (Storage.Disk) (Init) () : Main_intf)
-       in
-        *)
+       let module M = Coda.Make (Init) () in
        let module Run = Run (M) in
        let%bind () =
          let open M in
@@ -127,18 +123,37 @@ let daemon (module Kernel
        Async.never ())
 
 let () =
-  let module Kernel = Kernel.Debug () in
+  let (daemon, full_test) =
+    if Insecure.with_snark then
+      let module Kernel = Kernel.Prod () in
+      let module Coda = struct
+        type ledger_proof = Transaction_snark.t
+        module Make (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t) () = Coda_with_snark (Storage.Disk) (Init) ()
+      end in
+      ( daemon (module Kernel) (module Coda)
+      , Full_test.command (module Kernel) (module Coda) )
+    else
+      let module Kernel = Kernel.Debug () in
+      let module Coda = struct
+        type ledger_proof = Ledger_proof_statement.t
+        module Make (Init : Init_intf with type Ledger_proof.t = Ledger_proof_statement.t) () = Coda_without_snark (Init) ()
+      end in
+      ( daemon (module Kernel) (module Coda)
+      , Full_test.command (module Kernel) (module Coda) )
+  in
+
   Random.self_init () ;
   Command.group ~summary:"Current"
-    [ ("daemon", daemon (module Kernel))
+    [ ("daemon", daemon)
     ; (Parallel.worker_command_name, Parallel.worker_command)
     ; ( Snark_worker_lib.Debug.command_name
       , Snark_worker_lib.Debug.Worker.command )
     ; (Snark_worker_lib.Prod.command_name, Snark_worker_lib.Prod.Worker.command)
-    ; ("full-test", Full_test.command (module Kernel))
+    ; ("full-test", full_test)
     ; ("client", Client.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
-    ; (Coda_sample_test.name, Coda_sample_test.command (module Kernel)) ]
+    (* ; (Coda_sample_test.name, Coda_sample_test.command (module Kernel)) *)
+    ] 
   |> Command.run
 
 let () = never_returns (Scheduler.go ())
