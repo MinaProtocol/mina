@@ -310,16 +310,14 @@ struct
               Logger.info log "Recieved malicious transition %s"
                 (Error.to_string_hum e) ;
               ([], None) )
-        else (
+        else
           match
             Consensus_mechanism.select
               (Protocol_state.consensus_state source_state)
               (Protocol_state.consensus_state target_state)
           with
-          | `Keep ->
-              return ([], Some (Catchup.sync catchup state transition))
-          | `Take ->
-              return ([], None) ))
+          | `Keep -> return ([], Some (Catchup.sync catchup state transition))
+          | `Take -> return ([], None) )
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition ~parent:(fun x ->

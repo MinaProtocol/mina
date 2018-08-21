@@ -246,8 +246,7 @@ struct
         Init.Verifier.verify_blockchain Init.verifier
           {proof= state_proof; state}
       with
-      | Ok b ->
-          b
+      | Ok b -> b
       | Error e ->
           Logger.error Init.logger
             !"Could not connect to verifier: %{sexp:Error.t}"

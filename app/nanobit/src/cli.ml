@@ -8,15 +8,13 @@ open Coda_main
 module type Coda_intf = sig
   type ledger_proof
 
-  module Make : functor (Init : Init_intf with type Ledger_proof.t = ledger_proof) ()
-    -> Main_intf
+  module Make (Init : Init_intf with type Ledger_proof.t = ledger_proof) () :
+    Main_intf
 end
 
-let daemon
-    (type ledger_proof)
-    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof)
-    (module Coda : Coda_intf with type ledger_proof = ledger_proof)
-=
+let daemon (type ledger_proof) (module Kernel
+    : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
+    : Coda_intf with type ledger_proof = ledger_proof) =
   let open Command.Let_syntax in
   Command.async ~summary:"Current daemon"
     (let%map_open conf_dir =
@@ -123,12 +121,16 @@ let daemon
        Async.never ())
 
 let () =
-  let (daemon, full_test) =
+  let daemon, full_test =
     if Insecure.with_snark then
       let module Kernel = Kernel.Prod () in
       let module Coda = struct
         type ledger_proof = Transaction_snark.t
-        module Make (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t) () = Coda_with_snark (Storage.Disk) (Init) ()
+
+        module Make
+            (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t)
+            () =
+          Coda_with_snark (Storage.Disk) (Init) ()
       end in
       ( daemon (module Kernel) (module Coda)
       , Full_test.command (module Kernel) (module Coda) )
@@ -136,12 +138,16 @@ let () =
       let module Kernel = Kernel.Debug () in
       let module Coda = struct
         type ledger_proof = Ledger_proof_statement.t
-        module Make (Init : Init_intf with type Ledger_proof.t = Ledger_proof_statement.t) () = Coda_without_snark (Init) ()
+
+        module Make
+            (Init : Init_intf
+                    with type Ledger_proof.t = Ledger_proof_statement.t)
+            () =
+          Coda_without_snark (Init) ()
       end in
       ( daemon (module Kernel) (module Coda)
       , Full_test.command (module Kernel) (module Coda) )
   in
-
   Random.self_init () ;
   Command.group ~summary:"Current"
     [ ("daemon", daemon)
@@ -153,7 +159,7 @@ let () =
     ; ("client", Client.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
     (* ; (Coda_sample_test.name, Coda_sample_test.command (module Kernel)) *)
-    ] 
+     ]
   |> Command.run
 
 let () = never_returns (Scheduler.go ())

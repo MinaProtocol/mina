@@ -192,11 +192,12 @@ struct
                 Prover.prove ~prev_state:(state, state_proof)
                   internal_transition
               in
-              let external_transition = Consensus_mechanism.External_transition.create ~protocol_state
-                ~protocol_state_proof
-                ~ledger_builder_diff:
-                  (Consensus_mechanism.Internal_transition.ledger_builder_diff
-                     internal_transition)
+              let external_transition =
+                Consensus_mechanism.External_transition.create ~protocol_state
+                  ~protocol_state_proof
+                  ~ledger_builder_diff:
+                    (Consensus_mechanism.Internal_transition.
+                     ledger_builder_diff internal_transition)
               in
               external_transition
           | `Cancelled ->
@@ -233,8 +234,7 @@ struct
     let logger = Logger.extend parent_log [("module", Atom __MODULE__)] in
     let r, w = Linear_pipe.create () in
     let write_result = function
-      | Ok t ->
-          Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
+      | Ok t -> Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
       | Error e ->
           Logger.error logger "%s\n"
             Error.(to_string_hum (tag e ~tag:"signer"))

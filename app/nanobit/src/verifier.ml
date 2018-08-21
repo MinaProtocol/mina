@@ -89,8 +89,8 @@ struct
       struct
         let verify_blockchain (w: Worker_state.t) (chain: Blockchain.t) =
           let%map (module M) = Worker_state.get w in
-          if Insecure.verify_blockchain then true else
-            M.verify_wrap chain.state chain.proof
+          if Insecure.verify_blockchain then true
+          else M.verify_wrap chain.state chain.proof
 
         let verify_transaction_snark (w: Worker_state.t)
             (s: Transaction_snark.t) =

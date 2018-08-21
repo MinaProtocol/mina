@@ -11,14 +11,13 @@ let sk_bigint sk =
 module type Coda_intf = sig
   type ledger_proof
 
-  module Make : functor (Init : Init_intf with type Ledger_proof.t = ledger_proof) ()
-    -> Main_intf
+  module Make (Init : Init_intf with type Ledger_proof.t = ledger_proof) () :
+    Main_intf
 end
 
-let run_test (type ledger_proof) (with_snark: bool)
-    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof)
-    (module Coda : Coda_intf with type ledger_proof = ledger_proof)
-  : unit Deferred.t =
+let run_test (type ledger_proof) (with_snark: bool) (module Kernel
+    : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
+    : Coda_intf with type ledger_proof = ledger_proof) : unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
@@ -145,11 +144,9 @@ let run_test (type ledger_proof) (with_snark: bool)
   in
   Deferred.unit
 
-let command
-    (type ledger_proof)
-    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof)
-    (module Coda : Coda_intf with type ledger_proof = ledger_proof)
-  =
+let command (type ledger_proof) (module Kernel
+    : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
+    : Coda_intf with type ledger_proof = ledger_proof) =
   let open Core in
   let open Async in
   Command.async ~summary:"Full minibit end-to-end test"
