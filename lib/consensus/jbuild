@@ -3,7 +3,7 @@
 (library
  ((name consensus)
   (public_name consensus)
-  (flags (:standard -short-paths))
+  (flags (:standard -short-paths -warn-error -32))
   (library_flags (-linkall))
   (libraries (core_kernel nanobit_base snark_params))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
