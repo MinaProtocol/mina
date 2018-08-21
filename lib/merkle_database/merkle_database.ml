@@ -138,7 +138,7 @@ struct
         | (Direction.Right, hash) :: t ->
             loop (Hash.merge ~height sibling_hash hash) ~height:(height + 1) t
       in
-      loop leaf_hash ~height:1 path
+      loop leaf_hash ~height:0 path
   end
 
   (* Keys are a bitstring prefixed by a byte. In the case of accounts, the prefix
@@ -284,7 +284,7 @@ struct
     let empty_hashes = Array.create ~len:max_depth Hash.empty in
     let rec loop last_hash height =
       if height < max_depth then (
-        let hash = Hash.merge ~height last_hash last_hash in
+        let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
     in
