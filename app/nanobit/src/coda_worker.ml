@@ -3,6 +3,8 @@ open Async
 open Nanobit_base
 open Coda_main
 
+module Kernel = Kernel.Debug ()
+
 module Coda_worker = struct
   type input =
       { host: string
@@ -73,31 +75,30 @@ module Coda_worker = struct
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string my_port)
         in
-        let%bind () = Sys.chdir program_dir in
-        let%bind location = Unix.getcwd () in
-        let conf_dir = conf_dir in
-        let%bind verifier = Verifier.create ~conf_dir in
-        let%bind prover = Prover.create ~conf_dir in
-        let module Init = struct
-          type proof = Proof.Stable.V1.t [@@deriving bin_io, sexp]
+        let module Coda = struct
+          type ledger_proof = Ledger_proof_statement.t
 
+          module Make
+              (Init : Init_intf
+               with type Ledger_proof.t = Ledger_proof_statement.t)
+              () =
+            Coda_without_snark (Init) ()
+        end in
+        let module Config = struct
           let logger = log
 
           let conf_dir = conf_dir
 
-          let verifier = verifier
-
-          let prover = prover
-
           let lbc_tree_max_depth = `Finite 50
-
-          let genesis_proof = Precomputed_values.base_proof
 
           let transaction_interval = Time.Span.of_ms 100.0
 
           let fee_public_key = Genesis_ledger.rich_pk
+
+          let genesis_proof = Precomputed_values.base_proof
         end in
-        let module Main : Main_intf = Coda_without_snark (Init) () in
+        let (module Init) = make_init (module Config) (module Kernel) in
+        let module Main = Coda.Make (Init) () in
         let module Run = Run (Main) in
         let net_config =
           { Main.Inputs.Net.Config.parent_log= log
@@ -119,11 +120,11 @@ module Coda_worker = struct
                ~time_controller:(Main.Inputs.Time.Controller.create ())
                ())
         in
-        let coda_sum x = return (x + 3) in
         let coda_peers () = return (Main.peers coda) in
         (*don't_wait_for begin
           Linear_pipe.drain (Main.strongest_ledgers coda)
         end;*)
+        let coda_sum x = return (x + 3) in
         let coda_strongest_ledgers () = 
           let r, w = Linear_pipe.create () in
           don't_wait_for begin

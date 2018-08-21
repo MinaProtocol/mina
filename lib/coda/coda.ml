@@ -394,7 +394,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
-    ; strongest_ledgers: (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
+    ; strongest_ledgers: (Ledger_builder.t * Consensus_mechanism.External_transition.t) Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Ledger_proof_statement.Set.t
     ; ledger_builder_transition_backup_capacity: int }

@@ -8,6 +8,7 @@ module Coda_process = struct
   let spawn_exn config =
     let%bind (conn, process) =
       Coda_worker.spawn_in_foreground_exn ~on_failure:Error.raise
+        ~cd:config.Coda_worker.program_dir
         ~shutdown_on:Disconnect ~connection_state_init_arg:()
         ~connection_timeout:(Time.Span.of_sec 15.)
          config
