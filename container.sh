@@ -32,7 +32,8 @@ if [[ $1 == "restart" ]]; then
       --detach \
       --tty \
       --interactive \
-      $IMG)
+      $IMG \
+      sleep infinity)
 else
   NAME=$(docker ps -q --filter "name=$DOCKERNAME")
 fi

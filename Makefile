@@ -1,7 +1,3 @@
-
-
-
-
 all : clean docker container build
 
 .PHONY : all dev
@@ -83,3 +79,4 @@ testbridge-googlecloud :
 
 ci-base-docker:
 	./rebuild-docker.sh o1labs/ci-base Dockerfile-ci-base
+	
