@@ -26,7 +26,7 @@ module type Merkle_tree_intf = sig
 
   type addr
 
-  type t [@@deriving sexp]
+  type t
 
   type path
 
