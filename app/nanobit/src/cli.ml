@@ -85,7 +85,7 @@ let daemon (type ledger_proof) (module Kernel
 
          let genesis_proof = Precomputed_values.base_proof
        end in
-       let%bind (module Init) = make_init (module Config) (module Kernel) in
+       let (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
        let module Run = Run (M) in
        let%bind () =
