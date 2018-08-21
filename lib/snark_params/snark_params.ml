@@ -114,7 +114,7 @@ module Tick = struct
 
         type var = Boolean.var list
 
-        type t = Bignum_bigint.t
+        type t = Bignum_bigint.t [@@deriving eq, bin_io, sexp]
 
         let test_bit t i = Bignum_bigint.(shift_right t i land one = one)
 
@@ -221,7 +221,7 @@ let embed (x: Tick.Field.t) : Tock.Field.t =
   in
   go Tock.Field.one Tock.Field.zero 0
 
-let ledger_depth = 3
+let ledger_depth = 10
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

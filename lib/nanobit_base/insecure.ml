@@ -25,3 +25,7 @@ let compute_base_hash = true
 let compute_base_proof = true
 
 let extend_blockchain = true
+
+(* set this to true to enable snark verification *)
+(* (the above flags, from key_generation down, must be false *)
+let with_snark = false

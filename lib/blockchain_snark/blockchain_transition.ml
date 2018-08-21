@@ -39,7 +39,7 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _e -> failwithf "Transaction_snark: load failed on %s" p ()
       in
       let%map step = load tick_controller step
       and wrap = load tock_controller wrap in
@@ -74,7 +74,7 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _e -> failwithf "Transaction_snark: load failed on %s" p ()
       in
       let%map step = load tick_controller step
       and wrap = load tock_controller wrap in
@@ -110,25 +110,33 @@ module Keys = struct
     )
 end
 
-module Make (T : Transaction_snark.Verification.S) = struct
+module Make
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with type Proof.t = Tock.Proof.t)
+    (T : Transaction_snark.Verification.S) =
+struct
+  module Blockchain = Blockchain_state.Make (Consensus_mechanism)
+
   module System = struct
-    module U = Blockchain_state.Make_update (T)
+    module U = Blockchain.Make_update (T)
+    module Update = Consensus_mechanism.Snark_transition
 
     module State = struct
+      include Consensus_mechanism.Protocol_state
+
       include (
-        Blockchain_state :
-          module type of Blockchain_state
-          with module Checked := Blockchain_state.Checked )
+        Blockchain :
+          module type of Blockchain with module Checked := Blockchain.Checked )
 
       include (U : module type of U with module Checked := U.Checked)
 
+      module Hash = Nanobit_base.State_hash
+
       module Checked = struct
-        include Blockchain_state.Checked
+        include Blockchain.Checked
         include U.Checked
       end
     end
-
-    module Update = Nanobit_base.Block
   end
 
   open Nanobit_base

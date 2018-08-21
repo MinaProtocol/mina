@@ -1,11 +1,12 @@
 open Core_kernel
 
 module type S = sig
-  type transition
+  type external_transition
 
   type tip
 
-  module Transition_tree : Coda.Ktree_intf with type elem := transition
+  module Transition_tree :
+    Coda.Ktree_intf with type elem := external_transition
 
   type t [@@deriving bin_io]
 
@@ -33,11 +34,11 @@ module Make (Security : sig
 end) (Transition : sig
   type t [@@deriving compare, sexp, bin_io]
 end) (Tip : sig
-  type t [@@deriving bin_io]
+  type t [@@deriving bin_io, sexp]
 
   val is_materialization_of : t -> Transition.t -> bool
 end) :
-  S with type tip := Tip.t and type transition := Transition.t =
+  S with type tip := Tip.t and type external_transition := Transition.t =
 struct
   module Transition_tree = Ktree.Make (Transition) (Security)
 
@@ -46,6 +47,7 @@ struct
       | Locked_tip of Tip.t
       | Longest_branch_tip of Tip.t
       | Ktree of Transition_tree.t
+    [@@deriving sexp]
   end
 
   open Change

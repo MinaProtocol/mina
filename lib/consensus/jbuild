@@ -1,0 +1,10 @@
+(jbuild_version 1)
+
+(library
+ ((name consensus)
+  (public_name consensus)
+  (flags (:standard -short-paths))
+  (library_flags (-linkall))
+  (libraries (core_kernel nanobit_base snark_params))
+  (preprocess (pps (ppx_jane ppx_deriving.eq)))
+  (synopsis "Consensus mechanisms")))
