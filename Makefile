@@ -17,6 +17,19 @@ build :
 	fi
 	@echo "Build complete"
 
+deb :
+	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
+		./scripts/run-in-docker ./rebuild-deb.sh ; \
+	else \
+		./rebuild-deb.sh ; \
+	fi	
+
+codaslim :
+	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
+	@cp _build/codaclient.deb .
+	@./rebuild-docker.sh codaslim Dockerfile-codaslim
+	@rm codaclient.deb
+
 container :
 	@./container.sh restart
 
