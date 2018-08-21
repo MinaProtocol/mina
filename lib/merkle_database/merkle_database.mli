@@ -62,6 +62,8 @@ module type Stack_database_intf = sig
   val push : t -> Bigstring.t -> unit
 
   val pop : t -> Bigstring.t option
+
+  val length : t -> int
 end
 
 module type S = sig
