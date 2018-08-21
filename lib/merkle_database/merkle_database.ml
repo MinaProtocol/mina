@@ -90,6 +90,8 @@ module type S = sig
 
   val destroy : t -> unit
 
+  val num_accounts : t -> int
+
   val get_key_of_account : t -> account -> (key, error) Result.t
 
   val get_account : t -> key -> account option
@@ -99,6 +101,8 @@ module type S = sig
   val merkle_root : t -> hash
 
   val merkle_path : t -> key -> MerklePath.t list
+
+  val merkle_path_at_addr : t -> address -> MerklePath.t list
 
   val set_inner_hash_at_addr_exn : t -> address -> hash -> unit
 
@@ -481,6 +485,9 @@ struct
     in
     loop key
 
+  let merkle_path_at_addr t addr =
+    merkle_path t (Key.Hash addr)
+
   let with_test_instance f =
     let uuid = Uuid.create () in
     let tmp_dir = "/tmp/merkle_database_test-" ^ Uuid.to_string uuid in
@@ -718,3 +725,102 @@ let%test_module "test functor on in memory databases" =
       let depth = 30
     end)
   end )
+
+  module type Merkle_tree_intf = sig
+  type root_hash
+
+  type hash
+
+  type account
+
+  type key
+
+  type addr
+
+  type t
+
+  type path
+
+  val depth : int
+
+  val length : t -> int
+
+  val merkle_path_at_addr_exn : t -> addr -> path
+
+  val get_inner_hash_at_addr_exn : t -> addr -> hash
+
+  val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
+
+  val extend_with_empty_to_fit : t -> int -> unit
+
+  val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
+
+  val get_all_accounts_rooted_at_exn : t -> addr -> account list
+
+  val merkle_root : t -> root_hash
+
+  val set_syncing : t -> unit
+
+  val clear_syncing : t -> unit
+end
+
+
+module Make_Adapter
+    (Balance : Balance_intf)
+    (Account : Account_intf with type balance := Balance.t)
+    (Hash : Hash_intf with type account := Account.t)
+    (Depth : Depth_intf) (Kvdb : sig
+        include Key_value_database_intf
+
+        val set_syncing : t -> unit
+
+        val clear_syncing : t -> unit
+    end) (Sdb : sig
+      include Stack_database_intf
+
+      val length : t -> int
+
+      val set_syncing : t -> unit
+
+      val clear_syncing : t -> unit
+    end) :
+  Merkle_tree_intf =
+struct
+  module MT = Make (Balance) (Account) (Hash) (Depth) (Kvdb) (Sdb)
+
+  type root_hash = Hash.t
+
+  type hash = Hash.t
+
+  type account = Account.t
+
+  type key = MT.key
+
+  type addr = MT.address
+
+  type path = MT.MerklePath.t list
+
+  type t = MT.t
+
+  let depth = Depth.depth
+
+  let length = MT.num_accounts
+
+  let clear_syncing _ = ()
+
+  let set_syncing _ = ()
+
+  let extend_with_empty_to_fit _ _ = ()
+
+  let merkle_path_at_addr_exn = MT.merkle_path_at_addr
+
+  let merkle_root = MT.merkle_root
+
+  let get_all_accounts_rooted_at_exn = MT.get_all_accounts_rooted_at_exn
+
+  let set_all_accounts_rooted_at_exn = MT.set_all_accounts_rooted_at_exn
+
+  let get_inner_hash_at_addr_exn = MT.get_inner_hash_at_addr_exn
+
+  let set_inner_hash_at_addr_exn = MT.set_inner_hash_at_addr_exn
+end
