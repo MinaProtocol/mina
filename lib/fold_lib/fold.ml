@@ -33,3 +33,15 @@ let group3 ~default (t: 'a t) : ('a * 'a * 'a) t =
         | [b1; b0] -> f pt (b0, b1, default)
         | [b0] -> f pt (b0, default, default)
         | [] | _ :: _ :: _ :: _ -> pt ) }
+
+let string_bits s =
+  let ith_bit_int n i = (n lsr i) land 1 = 1 in
+  { fold=
+      (fun ~init ~f ->
+        String.fold s ~init ~f:(fun acc c ->
+            let c = Char.to_int c in
+            let update i acc = f acc (ith_bit_int c i) in
+            update 0 acc |> update 1 |> update 2 |> update 3 |> update 4
+            |> update 5 |> update 6 |> update 7 ) ) }
+
+let string_triples s = group3 ~default:false (string_bits s)
