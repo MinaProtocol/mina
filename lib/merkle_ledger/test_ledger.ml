@@ -1,12 +1,11 @@
 open Core
-open Ledger
 
 module Account = struct
   type t = {balance: int; key: string} [@@deriving sexp, eq, bin_io]
 
-  let public_key {key} = key
+  let public_key {key; _} = key
 
-  let balance {balance} = balance
+  let balance {balance; _} = balance
 end
 
 module Hash = struct
