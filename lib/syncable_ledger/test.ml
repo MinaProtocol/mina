@@ -66,7 +66,9 @@ struct
       Async.Thread_safe.block_on_async_exn (fun () ->
           SL.wait_until_valid lsync desired_root )
     with
-    | `Ok mt -> total_queries := Some (List.length !seen_queries) ; Adjhash.equal desired_root (L.merkle_root mt)
+    | `Ok mt ->
+        total_queries := Some (List.length !seen_queries) ;
+        Adjhash.equal desired_root (L.merkle_root mt)
     | `Target_changed -> false
 
   let%test_unit "new_goal_soon" =
@@ -88,16 +90,21 @@ struct
     let ctr = ref 0 in
     don't_wait_for
       (Linear_pipe.iter qr ~f:(fun (hash, query) ->
-        if not (Adjhash.equal hash !desired_root) then Deferred.unit else
-        let res = if !ctr = (!total_queries |> Option.value_exn) / 2 then (
-             sr := SR.create l3 (fun q -> seen_queries := q :: !seen_queries) ;
-             desired_root := L.merkle_root l3 ;
-             SL.new_goal lsync !desired_root ;
-             Deferred.unit )
+           if not (Adjhash.equal hash !desired_root) then Deferred.unit
            else
-             let answ = SR.answer_query !sr query in
-             Linear_pipe.write aw (!desired_root, answ)
-          in ctr := !ctr + 1; res )) ;
+             let res =
+               if !ctr = (!total_queries |> Option.value_exn) / 2 then (
+                 sr :=
+                   SR.create l3 (fun q -> seen_queries := q :: !seen_queries) ;
+                 desired_root := L.merkle_root l3 ;
+                 SL.new_goal lsync !desired_root ;
+                 Deferred.unit )
+               else
+                 let answ = SR.answer_query !sr query in
+                 Linear_pipe.write aw (!desired_root, answ)
+             in
+             ctr := !ctr + 1 ;
+             res )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
           SL.wait_until_valid lsync !desired_root )

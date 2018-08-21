@@ -425,7 +425,8 @@ struct
           | Has_hash (addr, h') -> (
             match add_child_hash_to t addr h' with
             (* TODO #435: Stick this in a log, punish the sender *)
-            | Error _e -> ()
+            | Error _e ->
+                ()
             | Ok (`Good children_to_verify) ->
                 (* TODO #312: Make sure we don't write too much *)
                 List.iter children_to_verify ~f:(fun (addr, hash) ->
