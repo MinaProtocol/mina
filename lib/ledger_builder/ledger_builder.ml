@@ -468,15 +468,18 @@ end = struct
   let apply_diff t (diff: Ledger_builder_diff.t) =
     let open Result_with_rollback.Let_syntax in
     let%bind payments =
-      List.fold_until diff.transactions ~init:[]
-        ~f:(fun acc t ->
-          match Transaction.check t with
-          | Some t -> Continue (t :: acc)
-          | None ->
-              (* TODO: punish *)
-              Stop (Or_error.error_string "Bad signature") )
-        ~finish:Or_error.return
-      |> Result_with_rollback.of_or_error
+      let%map payments' =
+        List.fold_until diff.transactions ~init:[]
+          ~f:(fun acc t ->
+            match Transaction.check t with
+            | Some t -> Continue (t :: acc)
+            | None ->
+                (* TODO: punish *)
+                Stop (Or_error.error_string "Bad signature") )
+          ~finish:Or_error.return
+        |> Result_with_rollback.of_or_error
+      in
+      List.rev payments'
     in
     let completed_works = diff.completed_works in
     let%bind () =
