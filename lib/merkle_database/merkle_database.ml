@@ -63,6 +63,8 @@ module type Stack_database_intf = sig
   val push : t -> Bigstring.t -> unit
 
   val pop : t -> Bigstring.t option
+
+  val length : t -> int
 end
 
 module type S = sig
@@ -220,6 +222,12 @@ struct
       Bigstring.set dst 0 (Char.of_int_exn (UInt8.to_int prefix)) ;
       Bigstring.blit ~src ~src_pos:0 ~dst ~dst_pos:1 ~len:src_len ;
       dst
+
+    let get_path = function
+      | Account path -> path
+      | Hash path -> path
+      | Generic _ ->
+          raise (Invalid_argument "get_path: generic does not have a path")
 
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
@@ -387,6 +395,16 @@ struct
       Result.map key_result ~f:(fun key ->
           set mdb account (Key.serialize key) ;
           key )
+
+    let last_free_key_address mdb =
+      match
+        Key.build_generic (Bigstring.of_string "next_free_account_key")
+        |> get_raw mdb
+        |> Option.value_map ~f:Key.parse
+             ~default:(Result.return @@ Key.build_empty_account ())
+      with
+      | Error () -> failwith "Could not get retrieve last key"
+      | Ok parsed_key -> Key.get_path parsed_key
   end
 
   let get_key_of_account = Account_key.get
@@ -417,6 +435,9 @@ struct
         | Ok key -> Ok key
       in
       Result.map key_result ~f:(fun key -> update_account mdb key account)
+
+  let num_accounts t =
+    Key.Addr.to_int (Account_key.last_free_key_address t) - Sdb.length t.sdb
 
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Key.Addr.Range.subtree_range address in
@@ -523,6 +544,32 @@ struct
         let account = Account.set_balance account Balance.zero in
         assert (set_account mdb account = Ok ()) ;
         get_account mdb key = None )
+
+  let%test_unit "num_accounts" =
+    with_test_instance (fun mdb ->
+        let open Quickcheck.Generator in
+        let max_accounts = Int.min (1 lsl Depth.depth) (1 lsl 5) in
+        let gen_unique_nonzero_balance_accounts n =
+          let open Quickcheck.Let_syntax in
+          let%bind num_initial_accounts = Int.gen_incl 0 n in
+          let%map accounts =
+            list_with_length num_initial_accounts Account.gen
+          in
+          List.filter accounts ~f:(fun account ->
+              not (Balance.equal (Account.balance account) Balance.zero) )
+          |> List.dedup_and_sort ~compare:(fun account1 account2 ->
+                 String.compare
+                   (Account.public_key account1)
+                   (Account.public_key account2) )
+        in
+        let accounts =
+          Quickcheck.random_value
+            (gen_unique_nonzero_balance_accounts (max_accounts / 2))
+        in
+        let num_initial_accounts = List.length accounts in
+        List.iter accounts ~f:(fun account ->
+            assert (set_account mdb account = Ok ()) ) ;
+        assert (num_accounts mdb = num_initial_accounts) )
 
   let%test "deleted account keys are reassigned" =
     with_test_instance (fun mdb ->
@@ -656,6 +703,8 @@ let%test_module "test functor on in memory databases" =
         | h :: t ->
             ls := t ;
             Some h
+
+      let length ls = List.length !ls
     end
 
     module Mdb_d (D : Depth_intf) =
