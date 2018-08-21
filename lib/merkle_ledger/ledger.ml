@@ -1,5 +1,4 @@
 open Core
-open Dyn_array
 
 (* SOMEDAY: handle empty wallets *)
 
@@ -30,25 +29,7 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
-  module Addr : sig
-    type t [@@deriving sexp, bin_io, hash, eq, compare]
-
-    include Hashable.S with type t := t
-
-    val depth : t -> int
-
-    val parent : t -> t Or_error.t
-
-    val parent_exn : t -> t
-
-    val child : t -> [`Left | `Right] -> t Or_error.t
-
-    val child_exn : t -> [`Left | `Right] -> t
-
-    val dirs_from_root : t -> [`Left | `Right] list
-
-    val root : t
-  end
+  module Addr : Merkle_address.S
 
   val create : unit -> t
 
@@ -92,8 +73,6 @@ module type S = sig
   val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
 
   val merkle_path_at_index_exn : t -> index -> Path.t
-
-  val addr_of_index : t -> index -> Addr.t
 
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
@@ -168,71 +147,7 @@ end) :
    and type key := Key.t =
 struct
   include Depth
-
-  module Addr = struct
-    module T = struct
-      type t = {depth: int; index: int}
-      [@@deriving sexp, bin_io, hash, eq, compare]
-    end
-
-    include T
-    include Hashable.Make (T)
-
-    let depth {depth; _} = depth
-
-    let bit_val = function `Left -> 0 | `Right -> 1
-
-    let child {depth; index} d =
-      if depth + 1 < Depth.depth then
-        Ok {depth= depth + 1; index= index lor (bit_val d lsl depth)}
-      else Or_error.error_string "Addr.child: Depth was too large"
-
-    let child_exn a d = child a d |> Or_error.ok_exn
-
-    let dirs_from_root {depth; index} =
-      List.init depth ~f:(fun i ->
-          if (index lsr i) land 1 = 1 then `Right else `Left )
-
-    (* FIXME: this could be a lot faster. https://graphics.stanford.edu/~seander/bithacks.html#BitReverseObvious etc *)
-    let to_index a =
-      List.foldi
-        (List.rev @@ dirs_from_root a)
-        ~init:0
-        ~f:(fun i acc dir -> acc lor (bit_val dir lsl i))
-
-    let of_index index =
-      let depth = Depth.depth in
-      let bits = List.init depth ~f:(fun i -> (index lsr i) land 1) in
-      (* XXX: LSB first *)
-      {depth; index= List.fold bits ~init:0 ~f:(fun acc b -> (acc lsl 1) lor b)}
-
-    let clear_all_but_first k i = i land ((1 lsl k) - 1)
-
-    let parent {depth; index} =
-      if depth > 0 then
-        Ok {depth= depth - 1; index= clear_all_but_first (depth - 1) index}
-      else Or_error.error_string "Addr.parent: depth <= 0"
-
-    let parent_exn a = Or_error.ok_exn (parent a)
-
-    let root = {depth= 0; index= 0}
-
-    let%test_unit "dirs_from_root" =
-      let dir_list =
-        let open Quickcheck.Generator in
-        let open Let_syntax in
-        let%bind l = Int.gen_incl 0 (Depth.depth - 1) in
-        list_with_length l (Bool.gen >>| fun b -> if b then `Right else `Left)
-      in
-      Quickcheck.test dir_list ~f:(fun dirs ->
-          assert (
-            dirs_from_root (List.fold dirs ~f:child_exn ~init:root) = dirs ) )
-
-    let%test_unit "to_index (of_index i) = i" =
-      Quickcheck.test ~sexp_of:[%sexp_of : int]
-        (Int.gen_incl 0 (Depth.depth - 1))
-        ~f:(fun i -> [%test_eq : int] (to_index (of_index i)) i)
-  end
+  module Addr = Merkle_address.Make (Depth)
 
   type entry = {merkle_index: int; account: Account.t}
   [@@deriving sexp, bin_io]
@@ -264,7 +179,7 @@ struct
     type nonrec t = t
 
     let fold t ~init ~f =
-      Hashtbl.fold t.accounts ~init ~f:(fun ~key:_ ~data:{account} acc ->
+      Hashtbl.fold t.accounts ~init ~f:(fun ~key:_ ~data:{account; _} acc ->
           f acc account )
 
     let iter = `Define_using_fold
@@ -304,7 +219,9 @@ struct
   let create_account_table () = Key.Table.create ()
 
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights = Array.create (depth + 1) Hash.empty_hash in
+    let empty_hash_at_heights =
+      Array.create ~len:(depth + 1) Hash.empty_hash
+    in
     let rec go i =
       if i <= depth then (
         let h = empty_hash_at_heights.(i - 1) in
@@ -412,7 +329,7 @@ struct
           let length = Int.pow 2 (tree.nodes_height - 1 - i) in
           let new_elems = length - Dyn_array.length nodes in
           Dyn_array.append
-            (Dyn_array.init new_elems (fun x -> Hash.empty_hash))
+            (Dyn_array.init new_elems (fun _ -> Hash.empty_hash))
             nodes ) )
 
   let rec recompute_layers curr_height get_prev_hash layers dirty_indices =
@@ -527,34 +444,41 @@ struct
     | `Ok path -> path
     | `Index_not_found -> index_not_found "merkle_path_at_index_exn" index
 
-  let addr_of_index t index = {Addr.depth; index}
-
   let extend_with_empty_to_fit t new_size =
     let tree = t.tree in
     let len = DynArray.length tree.leafs in
     if new_size > len then
       DynArray.append tree.leafs
-        (DynArray.init (new_size - len) (fun x -> Key.empty)) ;
+        (DynArray.init (new_size - len) (fun _ -> Key.empty)) ;
     recompute_tree ~allow_sync:true t
 
+  let to_index a =
+    List.foldi
+      (List.rev @@ Addr.dirs_from_root a)
+      ~init:0
+      ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
+
+  (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
-    assert (a.Addr.depth = Depth.depth - 1) ;
-    merkle_path_at_index_exn t (Addr.to_index a)
+    assert (Addr.depth a = Depth.depth - 1) ;
+    merkle_path_at_index_exn t (to_index a)
 
   let set_at_addr_exn t addr acct =
-    assert (addr.Addr.depth = Depth.depth - 1) ;
-    set_at_index_exn t (Addr.to_index addr) acct
+    assert (Addr.depth addr = Depth.depth - 1) ;
+    set_at_index_exn t (to_index addr) acct
 
   let get_inner_hash_at_addr_exn t a =
-    assert (a.Addr.depth < depth) ;
-    let l = List.nth_exn t.tree.nodes (depth - a.depth - 1) in
-    DynArray.get l (Addr.to_index a)
+    let path_length = Addr.depth a in
+    assert (path_length < depth) ;
+    let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
+    DynArray.get l (to_index a)
 
   let set_inner_hash_at_addr_exn t a hash =
-    assert (a.Addr.depth < depth) ;
+    let path_length = Addr.depth a in
+    assert (path_length < depth) ;
     (t.tree).dirty <- true ;
-    let l = List.nth_exn t.tree.nodes (depth - a.depth - 1) in
-    let index = Addr.to_index a in
+    let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
+    let index = to_index a in
     DynArray.set l index hash
 
   let set_syncing t =
@@ -565,21 +489,21 @@ struct
     (t.tree).syncing <- false ;
     recompute_tree t
 
-  let set_all_accounts_rooted_at_exn t ({Addr.depth= adepth} as a) accounts =
-    let height = depth - adepth in
-    let first_index = Addr.to_index a lsl height in
+  let set_all_accounts_rooted_at_exn t a accounts =
+    let height = depth - Addr.depth a in
+    let first_index = to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in
     assert (List.length accounts = count) ;
     List.iteri accounts ~f:(fun i a ->
         let pk = Account.public_key a in
         let entry = {merkle_index= first_index + i; account= a} in
         (t.tree).dirty_indices <- (first_index + i) :: t.tree.dirty_indices ;
-        Key.Table.set t.accounts pk entry ;
+        Key.Table.set t.accounts ~key:pk ~data:entry ;
         Dyn_array.set t.tree.leafs (first_index + i) pk )
 
   let get_all_accounts_rooted_at_exn t a =
-    let height = depth - a.Addr.depth in
-    let first_index = Addr.to_index a lsl height in
+    let height = depth - Addr.depth a in
+    let first_index = to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in
     let subarr = Dyn_array.sub t.tree.leafs first_index count in
     Dyn_array.to_list

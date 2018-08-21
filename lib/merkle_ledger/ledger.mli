@@ -27,25 +27,7 @@ module type S = sig
     val implied_root : t -> hash -> hash
   end
 
-  module Addr : sig
-    type t [@@deriving sexp, bin_io, hash, eq, compare]
-
-    include Hashable.S with type t := t
-
-    val depth : t -> int
-
-    val parent : t -> t Or_error.t
-
-    val parent_exn : t -> t
-
-    val child : t -> [`Left | `Right] -> t Or_error.t
-
-    val child_exn : t -> [`Left | `Right] -> t
-
-    val dirs_from_root : t -> [`Left | `Right] list
-
-    val root : t
-  end
+  module Addr : Merkle_address.S
 
   val create : unit -> t
 
@@ -89,8 +71,6 @@ module type S = sig
   val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
 
   val merkle_path_at_index_exn : t -> index -> Path.t
-
-  val addr_of_index : t -> index -> Addr.t
 
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
