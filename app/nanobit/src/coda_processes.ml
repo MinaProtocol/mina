@@ -21,8 +21,7 @@ let spawn_local_processes_exn n ~program_dir ~f =
     let ports, gossip_ports, peers = net_configs n in
     let peers = [] :: List.drop peers 1 in
     List.map3_exn ports gossip_ports peers ~f:(fun port gossip_port peers ->
-        Coda_process.spawn_local_exn ~peers ~port ~gossip_port ~program_dir
-    )
+        Coda_process.spawn_local_exn ~peers ~port ~gossip_port ~program_dir )
   in
   let first = List.hd_exn fns in
   let rest = List.drop fns 1 in

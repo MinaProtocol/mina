@@ -16,12 +16,12 @@ let main () =
     (fun worker ->
       let%bind strongest_ledgers = Coda_process.strongest_ledgers_exn worker in
       let rec go i blocks =
-        if i = 10 then return blocks else (
+        if i = 10 then return blocks
+        else
           let%bind () = Linear_pipe.read_exn strongest_ledgers in
           Logger.debug log "got ledger\n" ;
-          go (i+1) (((), Time.now ()) :: blocks)
-        )
-      in 
+          go (i + 1) (((), Time.now ()) :: blocks)
+      in
       let%bind blocks = go 0 [] in
       let first_block = List.hd_exn blocks in
       let last_block = List.last_exn blocks in

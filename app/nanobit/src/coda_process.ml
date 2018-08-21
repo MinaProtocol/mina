@@ -8,8 +8,8 @@ let spawn_exn config =
   let%bind conn, process =
     Coda_worker.spawn_in_foreground_exn ~on_failure:Error.raise
       ~cd:config.Coda_worker.program_dir ~shutdown_on:Disconnect
-      ~connection_state_init_arg:()
-      ~connection_timeout:(Time.Span.of_sec 15.) config
+      ~connection_state_init_arg:() ~connection_timeout:(Time.Span.of_sec 15.)
+      config
   in
   File_system.dup_stdout process ;
   File_system.dup_stderr process ;
@@ -21,12 +21,7 @@ let spawn_local_exn ~peers ~port ~gossip_port ~program_dir ~f =
     "/tmp/" ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
   in
   let config =
-    { Coda_worker.host
-    ; my_port= port
-    ; peers
-    ; conf_dir
-    ; program_dir
-    ; gossip_port }
+    {Coda_worker.host; my_port= port; peers; conf_dir; program_dir; gossip_port}
   in
   File_system.with_temp_dirs [conf_dir] ~f:(fun () ->
       let%bind worker = spawn_exn config in

@@ -16,7 +16,10 @@ let main () =
       Deferred.all_unit
         (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
              let%bind peers = Coda_process.peers_exn worker in
-             Logger.debug log !"got peers %{sexp: Host_and_port.t list} %{sexp: Host_and_port.t list}\n" peers expected_peers ;
+             Logger.debug log
+               !"got peers %{sexp: Host_and_port.t list} %{sexp: \
+                 Host_and_port.t list}\n"
+               peers expected_peers ;
              assert (peers = expected_peers) ;
              Deferred.unit )) )
 
