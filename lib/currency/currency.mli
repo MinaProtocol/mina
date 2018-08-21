@@ -1,7 +1,8 @@
 open Core
 open Snark_params.Tick
 open Snark_bits
-open Bitstring_lib
+open Fold_lib
+open Tuple_lib
 
 module type Basic = sig
   type t [@@deriving sexp, compare, eq, hash]
@@ -16,7 +17,9 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
-  val length : int
+  val fold : t -> bool Triple.t Fold.t
+
+  val length_in_triples : int
 
   val zero : t
 
@@ -34,7 +37,7 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
-  val var_to_bits : var -> Boolean.var Bitstring.Lsb_first.t
+  val var_to_triples : var -> Boolean.var Triple.t list
 end
 
 module type Arithmetic_intf = sig
@@ -84,7 +87,7 @@ module type Signed_intf = sig
     end
   end
 
-  val length : int
+  val length_in_triples : int
 
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
 
@@ -98,9 +101,9 @@ module type Signed_intf = sig
 
   val zero : t
 
-  val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
+  val fold : t -> bool Triple.t Fold.t
 
-  val to_bits : t -> bool list
+  val to_triples : t -> bool Triple.t list
 
   val add : t -> t -> t option
 
@@ -111,7 +114,7 @@ module type Signed_intf = sig
   val of_unsigned : magnitude -> t
 
   module Checked : sig
-    val to_bits : var -> Boolean.var list
+    val to_triples : var -> Boolean.var Triple.t list
 
     val add : var -> var -> (var, _) Checked.t
 
