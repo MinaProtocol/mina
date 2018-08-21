@@ -58,6 +58,9 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
          ~time_controller:(Inputs.Time.Controller.create ())
          ())
   in
+  don't_wait_for begin
+    Linear_pipe.drain (Main.strongest_ledgers minibit)
+  end;
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
     let rec go () =
       match Run.get_balance minibit receiver_pk with
