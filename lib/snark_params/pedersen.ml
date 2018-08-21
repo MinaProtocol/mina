@@ -3,25 +3,15 @@ open Snark_bits
 open Fold_lib
 open Tuple_lib
 
-let fold_string_bits s =
-  let ith_bit_int n i = (n lsr i) land 1 = 1 in
-  { Fold.fold=
-      (fun ~init ~f ->
-        String.fold s ~init ~f:(fun acc c ->
-            let c = Char.to_int c in
-            let update i acc = f acc (ith_bit_int c i) in
-            update 0 acc |> update 1 |> update 2 |> update 3 |> update 4
-            |> update 5 |> update 6 |> update 7 ) ) }
-
-let fold_string_triples s = Fold.group3 ~default:false (fold_string_bits s)
-
 module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq]
+    type t [@@deriving bin_io, sexp, eq, hash, compare]
 
     val size_in_bits : int
+
+    val fold : t -> bool Triple.t Fold.t
 
     val ( = ) : t -> t -> bool
 
@@ -56,9 +46,8 @@ module type S = sig
 end
 
 module Make (Field : sig
-  include Snarky.Field_intf.S
-
-  include Sexpable.S with type t := t
+  type t [@@deriving sexp, bin_io, compare, hash, eq]
+  include Snarky.Field_intf.S with type t := t
 end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
     type t
@@ -74,7 +63,7 @@ end) :
   S with type curve := Curve.t and type Digest.t = Field.t =
 struct
   module Digest = struct
-    type t = Field.t [@@deriving sexp, eq]
+    type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
 
     let size_in_bits = Field.size_in_bits
 
@@ -83,6 +72,8 @@ struct
     include Field_bin.Make (Field) (Bigint)
     module Snarkable = Bits.Snarkable.Field
     module Bits = Bits.Make_field (Field) (Bigint)
+
+    let fold t = Fold.group3 ~default:false (Bits.fold t)
   end
 
   module Params = struct
@@ -111,7 +102,7 @@ struct
       let x, _y = Curve.to_coords t.acc in
       x
 
-    let salt params s = update_fold (create params) (fold_string_triples s)
+    let salt params s = update_fold (create params) (Fold.string_triples s)
   end
 
   let hash_fold s fold = State.update_fold s fold

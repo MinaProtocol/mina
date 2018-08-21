@@ -7,9 +7,11 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq]
+    type t [@@deriving bin_io, sexp, eq, hash, compare]
 
     val size_in_bits : int
+
+    val fold : t -> bool Triple.t Fold.t
 
     val ( = ) : t -> t -> bool
 
@@ -44,9 +46,8 @@ module type S = sig
 end
 
 module Make (Field : sig
-  include Snarky.Field_intf.S
-
-  include Sexpable.S with type t := t
+  type t [@@deriving sexp, bin_io, compare, hash, eq]
+  include Snarky.Field_intf.S with type t := t
 end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
     type t

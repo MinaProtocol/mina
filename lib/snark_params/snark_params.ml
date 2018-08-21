@@ -77,6 +77,7 @@ module Tick = struct
       Tock.Field
 
       include T
+      include Infix
 
       let of_bits = Tock.Field.project
 
@@ -97,12 +98,27 @@ module Tick = struct
              Bignum_bigint.(Tock.Field.size - one))
           ~f:(fun x -> Tock.Bigint.(to_field (of_bignum_bigint x)))
 
+      let test_bit x i =
+        Tock.Bigint.(test_bit (of_field x) i)
+
       module Checked = struct
+        let equal = Bitstring_checked.equal
+
         module Assert = struct
           let equal = Bitstring_checked.Assert.equal
         end
       end
     end
+
+    module Coefficients = Snarky.Libsnark.Curves.Mnt6.G1.Coefficients
+
+    let find_y x =
+      let y2 =
+        Field.Infix.(x * Field.square x + Coefficients.a * x + Coefficients.b)
+      in
+      if Field.is_square y2
+      then Some (Field.sqrt y2)
+      else None
 
     module Checked = struct
       include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
@@ -111,7 +127,7 @@ module Tick = struct
 
                   let scale = scale_field
                 end)
-                (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+                (Coefficients)
 
       let add_known v x = add v (constant x)
     end
@@ -158,10 +174,19 @@ module Tick = struct
   end
 
   module Pedersen = struct
+    include Crypto_params.Pedersen_params
     include Pedersen.Make (Field) (Bigint) (Inner_curve)
-    module Checked =
-      Snarky.Pedersen.Make (Tick0) (Inner_curve)
-        (Crypto_params.Pedersen_params)
+    module Checked = struct
+      include
+        Snarky.Pedersen.Make (Tick0) (Inner_curve)
+          (Crypto_params.Pedersen_params)
+
+      let hash_triples ts ~(init : State.t) =
+        hash ts ~init:(init.triples_consumed, `Value init.acc)
+
+      let digest_triples ts ~init =
+        Checked.map (hash_triples ts ~init) ~f:digest
+    end
   end
 
   module Util = Snark_util.Make (Tick0)
