@@ -6,7 +6,8 @@ open Coda_pow
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
 
-let check label b = if not b then Or_error.error_string label else Ok ()
+let check_or_error label b =
+  if not b then Or_error.error_string label else Ok ()
 
 let map2_or_error xs ys ~f =
   let rec go xs ys acc =
@@ -18,6 +19,119 @@ let map2_or_error xs ys ~f =
   in
   go xs ys []
 
+module Make_completed_work
+    (Compressed_public_key : Compressed_public_key_intf) (Ledger_proof : sig
+        type t [@@deriving sexp, bin_io]
+    end) (Ledger_proof_statement : sig
+      type t [@@deriving sexp, bin_io, hash, compare]
+
+      val gen : t Quickcheck.Generator.t
+    end) :
+  Coda_pow.Completed_work_intf
+  with type proof := Ledger_proof.t
+   and type statement := Ledger_proof_statement.t
+   and type public_key := Compressed_public_key.t =
+struct
+  let proofs_length = 2
+
+  module Statement = struct
+    module T = struct
+      type t = Ledger_proof_statement.t list
+      [@@deriving bin_io, sexp, hash, compare]
+    end
+
+    include T
+    include Hashable.Make_binable (T)
+
+    let gen =
+      Quickcheck.Generator.list_with_length proofs_length
+        Ledger_proof_statement.gen
+  end
+
+  module T = struct
+    type t =
+      { fee: Fee.Unsigned.t
+      ; proofs: Ledger_proof.t list
+      ; prover: Compressed_public_key.t }
+    [@@deriving sexp, bin_io]
+  end
+
+  include T
+
+  type unchecked = t
+
+  module Checked = struct
+    include T
+
+    let create_unsafe = Fn.id
+  end
+
+  let forget = Fn.id
+end
+
+module Make_diff (Inputs : sig
+  module Ledger_hash : Ledger_hash_intf
+
+  module Ledger_proof : sig
+    type t [@@deriving sexp, bin_io]
+  end
+
+  module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
+
+  module Ledger_builder_hash :
+    Ledger_builder_hash_intf
+    with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type ledger_hash := Ledger_hash.t
+
+  module Compressed_public_key : Compressed_public_key_intf
+
+  module Transaction :
+    Transaction_intf with type public_key := Compressed_public_key.t
+
+  module Completed_work :
+    Completed_work_intf
+    with type public_key := Compressed_public_key.t
+     and type statement := Transaction_snark.Statement.t
+     and type proof := Ledger_proof.t
+end) :
+  Coda_pow.Ledger_builder_diff_intf
+  with type transaction := Inputs.Transaction.t
+   and type transaction_with_valid_signature :=
+              Inputs.Transaction.With_valid_signature.t
+   and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
+   and type public_key := Inputs.Compressed_public_key.t
+   and type completed_work := Inputs.Completed_work.t
+   and type completed_work_checked := Inputs.Completed_work.Checked.t =
+struct
+  open Inputs
+
+  type t =
+    { prev_hash: Ledger_builder_hash.t
+    ; completed_works: Completed_work.t list
+    ; transactions: Transaction.t list
+    ; creator: Compressed_public_key.t }
+  [@@deriving sexp, bin_io]
+
+  module With_valid_signatures_and_proofs = struct
+    type t =
+      { prev_hash: Ledger_builder_hash.t
+      ; completed_works: Completed_work.Checked.t list
+      ; transactions: Transaction.With_valid_signature.t list
+      ; creator: Compressed_public_key.t }
+    [@@deriving sexp]
+  end
+
+  let forget
+      { With_valid_signatures_and_proofs.prev_hash
+      ; completed_works
+      ; transactions
+      ; creator } =
+    { prev_hash
+    ; completed_works= List.map ~f:Completed_work.forget completed_works
+    ; transactions= (transactions :> Transaction.t list)
+    ; creator }
+end
+
 module Make (Inputs : Inputs.S) : sig
   include Coda_pow.Ledger_builder_intf
           with type diff := Inputs.Ledger_builder_diff.t
@@ -26,7 +140,7 @@ module Make (Inputs : Inputs.S) : sig
                       With_valid_signatures_and_proofs.t
            and type ledger_hash := Inputs.Ledger_hash.t
            and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
-           and type public_key := Inputs.Public_key.t
+           and type public_key := Inputs.Compressed_public_key.t
            and type ledger := Inputs.Ledger.t
            and type transaction_with_valid_signature :=
                       Inputs.Transaction.With_valid_signature.t
@@ -96,7 +210,7 @@ end = struct
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
     ; ledger: Ledger.t
-    ; public_key: Public_key.t }
+    ; public_key: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
   let random_work_spec_chunk t (seen_statements: Ledger_proof_statement.Set.t) =
@@ -230,7 +344,8 @@ end = struct
   let verify ~message job proof =
     match statement_of_job job with
     | None -> return false
-    | Some statement -> Ledger_proof.verify proof statement ~message
+    | Some statement ->
+        Inputs.Ledger_proof_verifier.verify proof statement ~message
 
   let total_proofs (works: Completed_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
@@ -322,7 +437,7 @@ end = struct
           let message = (work.fee, work.prover) in
           Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:
             (fun (job, proof) -> verify ~message job proof ) )
-      |> Deferred.map ~f:(check "proofs did not verify"))
+      |> Deferred.map ~f:(check_or_error "proofs did not verify"))
 
   let create_fee_transfers completed_works delta public_key =
     let singles =
@@ -331,7 +446,7 @@ end = struct
             (prover, fee) )
     in
     Or_error.try_with (fun () ->
-        Public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
+        Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
             Option.value_exn (Fee.Unsigned.add f1 f2) )
         (* TODO: This creates a weird incentive to have a small public_key *)
         |> Map.to_alist ~key_order:`Increasing
@@ -369,7 +484,7 @@ end = struct
     let completed_works = diff.completed_works in
     let%bind () =
       let curr_hash = hash t in
-      check
+      check_or_error
         (sprintf
            !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got \
              %{sexp:Ledger_builder_hash.t}"
@@ -464,7 +579,7 @@ end = struct
 
   module Resources = struct
     module Queue_consumption = struct
-      type t = {fee_transfers: Public_key.Set.t; transactions: int}
+      type t = {fee_transfers: Compressed_public_key.Set.t; transactions: int}
       [@@deriving sexp]
 
       let count {fee_transfers; transactions} =
@@ -477,7 +592,8 @@ end = struct
         {t with fee_transfers= Set.add t.fee_transfers public_key}
 
       let init ~self =
-        {transactions= 0; fee_transfers= Public_key.Set.singleton self}
+        { transactions= 0
+        ; fee_transfers= Compressed_public_key.Set.singleton self }
     end
 
     type t =
@@ -676,7 +792,7 @@ let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
-      module Public_key = String
+      module Compressed_public_key = String
 
       module Transaction = struct
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
@@ -706,7 +822,8 @@ let%test_module "test" =
       end
 
       module Fee_transfer = struct
-        type public_key = Public_key.t [@@deriving sexp, bin_io, compare, eq]
+        type public_key = Compressed_public_key.t
+        [@@deriving sexp, bin_io, compare, eq]
 
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare, eq]
 
@@ -773,7 +890,7 @@ let%test_module "test" =
             ; target: Ledger_hash.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
-          [@@deriving sexp, bin_io, compare]
+          [@@deriving sexp, bin_io, compare, hash]
 
           let merge s1 s2 =
             let open Or_error.Let_syntax in
@@ -789,7 +906,20 @@ let%test_module "test" =
 
         include T
         include Comparable.Make (T)
+
+        let gen =
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind source = Ledger_hash.gen in
+          let%bind target = Ledger_hash.gen in
+          let%bind fee_excess = Fee.Signed.gen in
+          let%map proof_type =
+            Quickcheck.Generator.bool
+            >>| function true -> `Base | false -> `Merge
+          in
+          {source; target; fee_excess; proof_type}
       end
+
+      module Proof = String
 
       module Ledger_proof = struct
         (*A proof here is statement.target*)
@@ -797,12 +927,16 @@ let%test_module "test" =
 
         type ledger_hash = Ledger_hash.t
 
-        let verify (_: t) (_: Ledger_proof_statement.t) ~message:_ :
-            bool Deferred.t =
-          return true
-
         let statement_target : Ledger_proof_statement.t -> ledger_hash =
          fun statement -> statement.target
+
+        let underlying_proof = Fn.id
+      end
+
+      module Ledger_proof_verifier = struct
+        let verify (_: Ledger_proof.t) (_: Ledger_proof_statement.t) ~message:_
+            : bool Deferred.t =
+          return true
       end
 
       module Ledger = struct
@@ -856,7 +990,8 @@ let%test_module "test" =
       module Sparse_ledger = struct
         type t = int [@@deriving sexp, bin_io]
 
-        let of_ledger_subset_exn : Ledger.t -> Public_key.t list -> t =
+        let of_ledger_subset_exn :
+            Ledger.t -> Compressed_public_key.t list -> t =
          fun ledger _ -> !ledger
       end
 
@@ -881,32 +1016,45 @@ let%test_module "test" =
       end
 
       module Completed_work = struct
+        let proofs_length = 2
+
         type proof = Ledger_proof.t [@@deriving sexp, bin_io, compare]
 
         type statement = Ledger_proof_statement.t
-        [@@deriving sexp, bin_io, compare]
+        [@@deriving sexp, bin_io, compare, hash]
 
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
-        type public_key = Public_key.t [@@deriving sexp, bin_io, compare]
-
-        type t = {fee: fee; proofs: proof list; prover: public_key}
+        type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare]
 
-        module Statement = struct
-          type t = statement list [@@deriving sexp, bin_io, compare]
-        end
-
-        module Checked = struct
+        module T = struct
           type t = {fee: fee; proofs: proof list; prover: public_key}
           [@@deriving sexp, bin_io, compare]
         end
 
-        let check : t -> Statement.t -> Checked.t option Deferred.t =
-         fun {fee= f; proofs= p; prover= pr} _ ->
-          Deferred.return @@ Some {Checked.fee= f; proofs= p; prover= pr}
+        include T
 
-        let proofs_length = 2
+        module Statement = struct
+          module T = struct
+            type t = statement list [@@deriving sexp, bin_io, compare, hash]
+          end
+
+          include T
+          include Hashable.Make_binable (T)
+
+          let gen =
+            Quickcheck.Generator.list_with_length proofs_length
+              Ledger_proof_statement.gen
+        end
+
+        type unchecked = t
+
+        module Checked = struct
+          include T
+
+          let create_unsafe = Fn.id
+        end
 
         let forget : Checked.t -> t =
          fun {Checked.fee= f; proofs= p; prover= pr} ->
@@ -926,7 +1074,8 @@ let%test_module "test" =
           Transaction.With_valid_signature.t
         [@@deriving sexp, bin_io, compare]
 
-        type public_key = Public_key.t [@@deriving sexp, bin_io, compare]
+        type public_key = Compressed_public_key.t
+        [@@deriving sexp, bin_io, compare]
 
         type ledger_builder_hash = Ledger_builder_hash.t
         [@@deriving sexp, bin_io, compare]
@@ -961,6 +1110,14 @@ let%test_module "test" =
       module Config = struct
         let parallelism_log_2 = 8
       end
+
+      let check :
+             Completed_work.t
+          -> Completed_work.statement list
+          -> Completed_work.Checked.t option Deferred.t =
+       fun {fee= f; proofs= p; prover= pr} _ ->
+        Deferred.return
+        @@ Some {Completed_work.Checked.fee= f; proofs= p; prover= pr}
     end
 
     module Lb = Make (Test_input1)

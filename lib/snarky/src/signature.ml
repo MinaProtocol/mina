@@ -1,6 +1,100 @@
 module Bignum_bigint = Bigint
 open Core_kernel
 
+module type Message_intf = sig
+  type boolean_var
+
+  type curve_scalar_var
+
+  type (_, _) checked
+
+  type t
+
+  type var
+
+  val hash : t -> nonce:bool list -> Bignum_bigint.t
+
+  val hash_checked :
+    var -> nonce:boolean_var list -> (curve_scalar_var, _) checked
+end
+
+module type S = sig
+  type boolean_var
+
+  type curve
+
+  type curve_var
+
+  type curve_scalar
+
+  type curve_scalar_var
+
+  type (_, _) checked
+
+  type (_, _) typ
+
+  module Message :
+    Message_intf
+    with type boolean_var := boolean_var
+     and type curve_scalar_var := curve_scalar_var
+     and type ('a, 'b) checked := ('a, 'b) checked
+
+  module Scalar : module type of Bignum_bigint
+
+  module Signature : sig
+    type t = curve_scalar * curve_scalar [@@deriving sexp]
+
+    type var = curve_scalar_var * curve_scalar_var
+
+    val typ : (var, t) typ
+  end
+
+  module Private_key : sig
+    type t = Scalar.t [@@deriving bin_io]
+
+    val of_bigint : Bignum_bigint.t -> t
+  end
+
+  module Public_key : sig
+    type t = curve
+
+    type var = curve_var
+  end
+
+  module Keypair : sig
+    type t
+
+    val create : unit -> t
+  end
+
+  module Checked : sig
+    val compress : curve_var -> (boolean_var list, _) checked
+
+    val verification_hash :
+         Signature.var
+      -> Public_key.var
+      -> Message.var
+      -> (curve_scalar_var, _) checked
+
+    val verifies :
+         Signature.var
+      -> Public_key.var
+      -> Message.var
+      -> (boolean_var, _) checked
+
+    val assert_verifies :
+      Signature.var -> Public_key.var -> Message.var -> (unit, _) checked
+  end
+
+  val compress : curve -> bool list
+
+  val sign : Private_key.t -> Message.t -> Signature.t
+
+  val shamir_sum : Scalar.t * curve -> Scalar.t * curve -> curve
+
+  val verify : Signature.t -> Public_key.t -> Message.t -> bool
+end
+
 module Schnorr
     (Impl : Snark_intf.S)
     (Curve : Curves.Edwards.S
@@ -9,18 +103,20 @@ module Schnorr
               and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
               and type boolean_var := Impl.Boolean.var
               and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
-              and type field := Impl.Field.t) (Message : sig
-        type t
-
-        type var
-
-        val hash : t -> nonce:bool list -> Bignum_bigint.t
-
-        val hash_checked :
-             var
-          -> nonce:Impl.Boolean.var list
-          -> (Curve.Scalar.var, _) Impl.Checked.t
-    end) =
+              and type field := Impl.Field.t)
+    (Message : Message_intf
+               with type boolean_var := Impl.Boolean.var
+                and type curve_scalar_var := Curve.Scalar.var
+                and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
+  S
+  with type boolean_var := Impl.Boolean.var
+   and type curve := Curve.value
+   and type curve_var := Curve.var
+   and type curve_scalar := Curve.Scalar.t
+   and type curve_scalar_var := Curve.Scalar.var
+   and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
+   and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+   and module Message := Message =
 struct
   open Impl
   module Scalar = Bignum_bigint
@@ -39,16 +135,18 @@ struct
 
   module Private_key = struct
     type t = Scalar.t [@@deriving bin_io]
+
+    let of_bigint = Fn.id
   end
 
   let compress ((x, _): Curve.value) = Field.unpack x
 
   module Public_key : sig
+    type t = Curve.value
+
     type var = Curve.var
 
-    type value = Curve.value
-
-    val typ : (var, value) Typ.t
+    val typ : (var, t) Typ.t
   end = Curve
 
   let sign (k: Private_key.t) m =
@@ -78,13 +176,13 @@ struct
     in
     go (Curve.Scalar.length_in_bits - 1) Curve.identity
 
-  let verify ((s, h): Signature.t) (pk: Public_key.value) (m: Message.t) =
+  let verify ((s, h): Signature.t) (pk: Public_key.t) (m: Message.t) =
     let r = compress (shamir_sum (s, Curve.generator) (h, pk)) in
     let h' = Message.hash ~nonce:r m in
     Scalar.equal h' h
 
   module Keypair = struct
-    type t = {public: Public_key.value; secret: Private_key.t}
+    type t = {public: Public_key.t; secret: Private_key.t}
 
     let create () =
       (* TODO: More secure random *)

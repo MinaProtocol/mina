@@ -1,0 +1,66 @@
+open Core_kernel
+open Unsigned
+
+module type Inputs_intf = sig
+  module Time : sig
+    type t
+
+    module Span : sig
+      type t
+
+      val to_ms : t -> Int64.t
+    end
+
+    val to_ms : t -> Int64.t
+
+    val diff : t -> t -> Span.t
+
+    val less_than : t -> t -> bool
+  end
+
+  val genesis_block_timestamp : Time.t
+
+  val slot_interval : Time.t
+
+  val epoch_size : UInt32.t
+end
+
+module Make (Inputs : Inputs_intf) : Mechanism.S = struct
+  module Time = Inputs.Time
+
+  module Slot = struct
+    type t = UInt32.t
+
+    let interval = Inputs.slot_interval
+
+    let of_time t =
+      (if Time.less_than t Inputs.genesis_block_timestamp then
+         raise (Invalid_argument "Slot.of_time: time is less than genesis block timestamp"));
+      let diff = Time.diff t Inputs.genesis_block_timestamp in
+      UInt32.of_int64 Int64.(Time.Span.to_ms diff / Time.to_ms interval)
+  end
+
+  module Epoch = struct
+    type t = UInt32.t
+  end
+
+  module State = struct
+    type epoch_info =
+      { slot: Slot.t
+      ; epoch: Epoch.t
+      ; seed: Ledger.t?
+      ; ledger: Ledger.t?
+      ; post_lock_hash: Ledger_hash.t?
+      ; last_start_hash: Ledger_hash.t? }
+
+    type t =
+      { length: Length.t
+      ; checkpoints: ?
+      ; current_epoch: epoch_info
+      ; next_epoch: epoch_info
+      ; last_epoch_length: Length.t?
+      ; unique_participants: ?
+      ; unique_participation: ?
+      ; last_epoch_participation: ? }
+  end
+end

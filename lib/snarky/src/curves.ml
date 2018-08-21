@@ -22,7 +22,7 @@ module type Scalar_intf = sig
 
   type var
 
-  type t
+  type t [@@deriving eq, sexp]
 
   val typ : (var, t) typ
 
@@ -106,7 +106,7 @@ module Edwards = struct
     module type S = sig
       type field
 
-      type t = field * field
+      type t = field * field [@@deriving sexp]
 
       module Params : Params_intf with type field := field
 
@@ -131,7 +131,7 @@ module Edwards = struct
       open Field
       module Params = Params
 
-      type t = Field.t * Field.t
+      type t = Field.t * Field.t [@@deriving sexp]
 
       (* x^2 + y^2 = 1 + dx^2 y^2 *)
       (* x^2 - d x^2 y^2 = 1 - y^2 *)
@@ -188,7 +188,7 @@ module Edwards = struct
 
     type var
 
-    type value = t
+    type value = t [@@deriving eq, sexp]
 
     val var_of_value : value -> var
 
@@ -252,11 +252,11 @@ module Edwards = struct
     include Basic
     module Scalar = Scalar
 
-    type 'a tup = 'a * 'a
+    type 'a tup = 'a * 'a [@@deriving eq, sexp]
 
     type var = Field.Checked.t tup
 
-    type value = Field.t tup
+    type value = Field.t tup [@@deriving eq, sexp]
 
     let var_of_value (x, y) =
       (Field.Checked.constant x, Field.Checked.constant y)
