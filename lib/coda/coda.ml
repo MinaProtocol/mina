@@ -419,12 +419,7 @@ module Make (Inputs : Inputs_intf) = struct
   let lbc_transition_tree t =
     Ledger_builder_controller.transition_tree t.ledger_builder
 
-  let strongest_ledgers t =
-    let r, w = Linear_pipe.create () in
-    don't_wait_for
-      (Linear_pipe.iter t.strongest_ledgers ~f:(fun (_, b) ->
-           Linear_pipe.write w b )) ;
-    r
+  let strongest_ledgers t = Linear_pipe.map t.strongest_ledgers ~f:(fun (_, transition) -> transition)
 
   module Config = struct
     type t =

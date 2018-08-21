@@ -1,7 +1,6 @@
 open Core
 open Async
 open Coda_worker
-open Coda_processes
 
 let name = "coda-block-production-test"
 
@@ -16,19 +15,14 @@ let main () =
   Coda_process.spawn_local_exn ~peers ~port ~gossip_port ~program_dir ~f:
     (fun worker ->
       let%bind strongest_ledgers = Coda_process.strongest_ledgers_exn worker in
-      let count = ref 0 in
-      let blocks = ref [] in
-      let%bind () =
-        Deferred.create (fun got_10_blocks ->
-            don't_wait_for
-              (Linear_pipe.iter strongest_ledgers ~f:(fun () ->
-                   Logger.debug log "got ledger\n" ;
-                   incr count ;
-                   blocks := ((), Time.now ()) :: !blocks ;
-                   if !count > 10 then Ivar.fill_if_empty got_10_blocks () ;
-                   Deferred.unit )) )
-      in
-      let blocks = !blocks in
+      let rec go i blocks =
+        if i = 10 then return blocks else (
+          let%bind () = Linear_pipe.read_exn strongest_ledgers in
+          Logger.debug log "got ledger\n" ;
+          go (i+1) (((), Time.now ()) :: blocks)
+        )
+      in 
+      let%bind blocks = go 0 [] in
       let first_block = List.hd_exn blocks in
       let last_block = List.last_exn blocks in
       let first_block_time = snd first_block in
