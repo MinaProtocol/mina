@@ -8,3 +8,5 @@ module Make
     (Kvdb : Intf.Key_value_database)
     (Sdb : Intf.Stack_database) :
   S with type account := Account.t and type hash := Hash.t
+
+module Test_database = Test_database
