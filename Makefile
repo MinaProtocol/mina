@@ -13,6 +13,7 @@ build :
 	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
 		./scripts/run-in-docker dune build ; \
 	else \
+		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
 		dune build ; \
 	fi
 	@echo "Build complete"
@@ -70,6 +71,7 @@ test:
 	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
 		./scripts/run-in-docker ./test_all.sh ; \
 	else	\
+		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
 		./test_all.sh ; \
 	fi
 
