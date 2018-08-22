@@ -533,10 +533,12 @@ struct
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Public_key.Compressed)
-      (Syncable_ledger.Valid (Ledger.Addr))
-      (Account)
-      (Merkle_hash)
+    Syncable_ledger.Make (Ledger.Addr) (Public_key.Compressed) (Account)
+      (struct
+        include Merkle_hash
+
+        let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
+      end)
       (struct
         include Ledger_hash
 
@@ -547,6 +549,8 @@ struct
         include Ledger
 
         type path = Path.t
+
+        let f = Account.hash
       end)
       (struct
         let subtree_height = 3
@@ -834,6 +838,9 @@ module type Main_intf = sig
   val best_ledger : t -> Inputs.Ledger.t
 
   val peers : t -> Host_and_port.t list
+
+  val strongest_ledgers :
+    t -> Inputs.External_transition.t Linear_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 

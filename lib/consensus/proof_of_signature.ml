@@ -152,7 +152,7 @@ struct
              (Protocol_state.consensus_state Protocol_state.negative_one)
              Snark_transition.genesis )
 
-  let create_consensus_data state =
+  let create_consensus_data state ~time:_ =
     (* TODO: sign protocol_state instead of blockchain_state *)
     Some (Consensus_data.create_value (Protocol_state.blockchain_state state))
 
