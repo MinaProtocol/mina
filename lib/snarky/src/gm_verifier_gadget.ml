@@ -163,7 +163,7 @@ struct
           List.init (V.length elts) ~f:(fun i -> V.get elts i)
       ; sign= List.init (V.length signs) ~f:(fun i -> V.get signs i) }
 
-    let to_bits ({characterizing_up_to_sign; sign} : t) =
+    let to_bits ({characterizing_up_to_sign; sign}: t) =
       let bs1 =
         (* It's ok to use choose_preimage here *)
         List.concat_map characterizing_up_to_sign ~f:(fun x -> Field.unpack x)

@@ -72,7 +72,9 @@ struct
         let%map tx_vk = Lazy.force tx_vk
         and bc_pk = Lazy.force bc_pk
         and bc_vk = Lazy.force bc_vk in
-        let module T = Transaction_snark.Verification.Make(struct let keys = tx_vk end) in
+        let module T = Transaction_snark.Verification.Make (struct
+          let keys = tx_vk
+        end) in
         let module B =
           Blockchain_snark.Blockchain_transition.Make (Consensus_mechanism) (T) in
         let module Step = B.Step (struct

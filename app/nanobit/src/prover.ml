@@ -65,7 +65,8 @@ struct
       Deferred.return
         (let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
         let%map (module Keys) = Keys.create () in
-        let module Transaction_snark = Transaction_snark.Verification.Make (struct
+        let module Transaction_snark =
+        Transaction_snark.Verification.Make (struct
           let keys = Keys.transaction_snark_keys
         end) in
         let module M = struct
