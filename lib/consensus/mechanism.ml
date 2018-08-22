@@ -1,4 +1,6 @@
 open Core_kernel
+open Tuple_lib
+open Fold_lib
 
 module type S = sig
   module Proof : sig
@@ -12,13 +14,13 @@ module type S = sig
 
     val genesis : value
 
-    val bit_length : int
+    val length_in_triples : int
 
-    val var_to_bits :
+    val var_to_triples :
          var
-      -> (Snark_params.Tick.Boolean.var list, _) Snark_params.Tick.Checked.t
+      -> (Snark_params.Tick.Boolean.var Triple.t list, _) Snark_params.Tick.Checked.t
 
-    val fold : value -> Snark_params.Tick.Pedersen.fold
+    val fold : value -> bool Triple.t Fold.t
   end
 
   module Protocol_state :
