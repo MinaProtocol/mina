@@ -394,6 +394,9 @@ module Make (Inputs : Inputs_intf) = struct
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
+    ; strongest_ledgers:
+        (Ledger_builder.t * Consensus_mechanism.External_transition.t)
+        Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs:
         Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
@@ -420,6 +423,8 @@ module Make (Inputs : Inputs_intf) = struct
   let ledger_builder_ledger_proof t =
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
+
+  let strongest_ledgers t = Linear_pipe.map t.strongest_ledgers ~f:snd
 
   module Config = struct
     type t =
@@ -495,8 +500,10 @@ module Make (Inputs : Inputs_intf) = struct
       (Linear_pipe.iter (Snark_pool.broadcasts snark_pool) ~f:(fun x ->
            Net.broadcast_snark_pool_diff net x ;
            Deferred.unit )) ;
-    let strongest_ledgers_for_miner, strongest_ledgers_for_network =
-      Linear_pipe.fork2
+    let ( strongest_ledgers_for_miner
+        , strongest_ledgers_for_network
+        , strongest_ledgers_for_api ) =
+      Linear_pipe.fork3
         (Ledger_builder_controller.strongest_ledgers ledger_builder)
     in
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
@@ -529,6 +536,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; transaction_pool
       ; snark_pool
       ; ledger_builder
+      ; strongest_ledgers= strongest_ledgers_for_api
       ; log= config.log
       ; seen_jobs= (Ledger_proof_statement.Set.empty, None)
       ; ledger_builder_transition_backup_capacity=

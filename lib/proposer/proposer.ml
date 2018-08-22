@@ -90,6 +90,9 @@ struct
       in
       let%map consensus_data =
         Consensus_mechanism.create_consensus_data protocol_state
+          ~time:
+            ( Time.now time_controller |> Time.to_span_since_epoch
+            |> Time.Span.to_ms )
       in
       (protocol_state, consensus_data)
 
@@ -247,12 +250,12 @@ struct
       upon (Signing_result.result result) write_result ;
       result
     in
-    let schedule_transaction tip =
-      let time_till_transaction =
+    let schedule_transition tip =
+      let time_till_transition =
         Time.modulus (Time.now time_controller) Proposal_interval.t
       in
       Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
-      Time.Timeout.create time_controller time_till_transaction ~f:(fun _ ->
+      Time.Timeout.create time_controller time_till_transition ~f:(fun _ ->
           Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
           create_result tip )
     in
@@ -264,14 +267,14 @@ struct
             !"Signer got initial change with tip %{sexp: Tip.t}"
             initial_tip ;
           Linear_pipe.fold change_feeder
-            ~init:(schedule_transaction initial_tip) ~f:
-            (fun scheduled_transaction (Tip_change tip) ->
-              ( match Time.Timeout.peek scheduled_transaction with
+            ~init:(schedule_transition initial_tip) ~f:
+            (fun scheduled_transition (Tip_change tip) ->
+              ( match Time.Timeout.peek scheduled_transition with
               | None ->
-                  Time.Timeout.cancel time_controller scheduled_transaction
+                  Time.Timeout.cancel time_controller scheduled_transition
                     (Signing_result.empty time_controller)
               | Some result -> Signing_result.cancel result ) ;
-              return (schedule_transaction tip) )
+              return (schedule_transition tip) )
           >>| ignore ) ;
     {transitions= r}
 end

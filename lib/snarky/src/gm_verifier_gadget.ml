@@ -55,8 +55,6 @@ struct
 
     let typ = ptr void
 
-    type witness = Other_curve.Verification_key.t
-
     let prefix =
       with_prefix Prefix.prefix "r1cs_se_ppzksnark_verification_key_variable"
 
@@ -165,8 +163,7 @@ struct
           List.init (V.length elts) ~f:(fun i -> V.get elts i)
       ; sign= List.init (V.length signs) ~f:(fun i -> V.get signs i) }
 
-    let to_bits ({characterizing_up_to_sign; sign} as t: t) =
-      printf !"To bits: %{sexp:t}\n%!" t ;
+    let to_bits ({characterizing_up_to_sign; sign}: t) =
       let bs1 =
         (* It's ok to use choose_preimage here *)
         List.concat_map characterizing_up_to_sign ~f:(fun x -> Field.unpack x)
@@ -256,10 +253,6 @@ struct
     val create : Pb.t -> t
   end = struct
     type t = unit ptr
-
-    type input = unit
-
-    type witness = Other_curve.Proof.t
 
     let typ = ptr void
 

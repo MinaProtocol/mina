@@ -39,6 +39,8 @@ val iter_unordered :
   -> f:('a -> unit Deferred.t)
   -> unit Deferred.t
 
+val drain : 'a Reader.t -> unit Deferred.t
+
 val length : 'a Reader.t -> int
 
 val fold :

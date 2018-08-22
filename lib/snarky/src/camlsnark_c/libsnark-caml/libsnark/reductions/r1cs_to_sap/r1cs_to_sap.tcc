@@ -46,7 +46,9 @@ std::shared_ptr<libfqfft::evaluation_domain<FieldT> > r1cs_to_sap_get_domain(con
      * see comments in r1cs_to_sap_instance_map for details on where these
      * constraints come from.
      */
-    return libfqfft::get_evaluation_domain<FieldT>(2 * cs.num_constraints() - cs.num_square_constraints + 2 * cs.num_inputs() + 1);
+    return libfqfft::get_evaluation_domain<FieldT>(
+        2 * cs.num_constraints() - cs.num_square_constraints
+        + 2 * cs.num_inputs() + 1);
 }
 
 /**
@@ -348,7 +350,7 @@ sap_witness<FieldT> r1cs_to_sap_witness_map(const r1cs_constraint_system<FieldT>
     const std::shared_ptr<libfqfft::evaluation_domain<FieldT> > domain =
         r1cs_to_sap_get_domain(cs);
 
-    size_t sap_num_variables = cs.num_variables() + cs.num_constraints() + cs.num_inputs();
+    size_t sap_num_variables = cs.num_variables() + (cs.num_constraints() - cs.num_square_constraints) + cs.num_inputs();
 
     r1cs_variable_assignment<FieldT> full_variable_assignment = primary_input;
     full_variable_assignment.insert(full_variable_assignment.end(), auxiliary_input.begin(), auxiliary_input.end());

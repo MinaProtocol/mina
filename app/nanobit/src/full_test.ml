@@ -28,13 +28,13 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let lbc_tree_max_depth = `Finite 50
 
-    let transaction_interval = Time.Span.of_ms 100.0
+    let transition_interval = Time.Span.of_ms 100.0
 
     let fee_public_key = Genesis_ledger.rich_pk
 
     let genesis_proof = Precomputed_values.base_proof
   end in
-  let (module Init) = make_init (module Config) (module Kernel) in
+  let%bind (module Init) = make_init (module Config) (module Kernel) in
   let module Main = Coda.Make (Init) () in
   let module Run = Run (Main) in
   let open Main in
@@ -58,6 +58,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
          ~time_controller:(Inputs.Time.Controller.create ())
          ())
   in
+  don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers minibit)) ;
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
     let rec go () =
       match Run.get_balance minibit receiver_pk with

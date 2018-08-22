@@ -79,13 +79,13 @@ let daemon (type ledger_proof) (module Kernel
 
          let lbc_tree_max_depth = `Finite 50
 
-         let transaction_interval = Time.Span.of_sec 5.0
+         let transition_interval = Time.Span.of_sec 5.0
 
          let fee_public_key = Genesis_ledger.rich_pk
 
          let genesis_proof = Precomputed_values.base_proof
        end in
-       let (module Init) = make_init (module Config) (module Kernel) in
+       let%bind (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
        let module Run = Run (M) in
        let%bind () =
@@ -115,6 +115,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~time_controller:(Inputs.Time.Controller.create ())
                 ())
          in
+         don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers minibit)) ;
          Run.setup_local_server ~minibit ~client_port ~log ;
          Run.run_snark_worker ~log ~client_port run_snark_worker
        in
@@ -158,8 +159,7 @@ let () =
     ; ("full-test", full_test)
     ; ("client", Client.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
-    (* ; (Coda_sample_test.name, Coda_sample_test.command (module Kernel)) *)
-     ]
+    ; (Coda_peers_test.name, Coda_peers_test.command) ]
   |> Command.run
 
 let () = never_returns (Scheduler.go ())
