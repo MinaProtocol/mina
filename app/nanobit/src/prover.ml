@@ -42,7 +42,7 @@ struct
 
   module Worker_state = struct
     module type S = sig
-      module Transaction_snark : Transaction_snark.S
+      module Transaction_snark : Transaction_snark.Verification.S
 
       val extend_blockchain :
            Blockchain.t
@@ -65,7 +65,7 @@ struct
       Deferred.return
         (let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
         let%map (module Keys) = Keys.create () in
-        let module Transaction_snark = Transaction_snark.Make (struct
+        let module Transaction_snark = Transaction_snark.Verification.Make (struct
           let keys = Keys.transaction_snark_keys
         end) in
         let module M = struct
