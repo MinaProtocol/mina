@@ -4,7 +4,7 @@ set -eo pipefail
 
 eval `opam config env`
 
-dune runtest --verbose -j8 & p1=$!
+dune runtest -j8 & p1=$!
 
 integration () {
   dune exec cli -- full-test
