@@ -123,30 +123,35 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     end
   end
 
-  module Consensus_data = struct
-    type value = unit [@@deriving sexp, bin_io, eq, compare]
+  module Transition_data = struct
+    type 'amount t = {total_currency_diff: 'amount}
+    [@@deriving sexp, bin_io, eq, compare]
 
-    type var = unit
+    type value = Currency.Amount.t t
+    [@@deriving sexp, bin_io, eq, compare]
 
-    let genesis = ()
+    type var = Currency.Amount.var t
 
-    let to_hlist () = Nanobit_base.H_list.[]
+    let genesis = {total_currency_diff= Currency.Amount.zero}
 
-    let of_hlist : (unit, unit) Nanobit_base.H_list.t -> unit =
-     fun Nanobit_base.H_list.([]) -> ()
+    let to_hlist {total_currency_diff} = Nanobit_base.H_list.[total_currency_diff]
 
-    let data_spec = Snark_params.Tick.Data_spec.[]
+    let of_hlist : (unit, 'amount -> unit) Nanobit_base.H_list.t -> 'amount t =
+     fun Nanobit_base.H_list.[total_currency_diff] -> {total_currency_diff}
+
+    let data_spec = Snark_params.Tick.Data_spec.[Currency.Amount.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let fold () ~init ~f:_ = init
+    let fold {total_currency_diff} =
+      Currency.Amount.fold total_currency_diff
 
-    let var_to_bits () = []
+    let var_to_bits {total_currency_diff} = Currency.Amount.var_to_bits total_currency_diff
 
-    let bit_length = 0
+    let bit_length = Currency.Amount.length
   end
 
   module Epoch_info = struct
@@ -182,7 +187,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     let bit_length = Epoch.Slot.bit_length
   end
 
-  module Consensus_state = struct
+  module State_data = struct
     type ('length, 'epoch_info) t =
       {length: 'length; current_epoch: 'epoch_info; next_epoch: 'epoch_info}
     [@@deriving sexp, bin_io, eq, compare, hash]
@@ -315,7 +320,8 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
              (Protocol_state.consensus_state Protocol_state.negative_one)
              Snark_transition.genesis )
 
-  let create_consensus_data _state = Some ()
+  let create_transition_data _state =
+    Some ()
 
-  let create_consensus_state _state = Consensus_state.genesis
+  let create_state_data _state = Consensus_state.genesis
 end
