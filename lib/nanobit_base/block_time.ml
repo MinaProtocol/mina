@@ -48,6 +48,8 @@ module Span = struct
 
   let to_ms = UInt64.to_int64
 
+  let of_ms = UInt64.of_int64
+
   let ( < ) = UInt64.( < )
 
   let ( > ) = UInt64.( > )
@@ -93,7 +95,15 @@ end
 let field_var_to_unpacked (x: Tick.Field.Checked.t) =
   Tick.Field.Checked.unpack ~length:64 x
 
+let epoch = of_time Time.epoch
+
+let add x y = UInt64.add x y
+
 let diff x y = UInt64.sub x y
+
+let to_span_since_epoch t = diff t epoch
+
+let of_span_since_epoch s = UInt64.add s epoch
 
 let diff_checked x y =
   let pack = Tick.Field.Checked.project in

@@ -31,6 +31,10 @@ module type Time_intf = sig
 
     val of_time_span : Core_kernel.Time.Span.t -> t
 
+    val to_ms : t -> Int64.t
+
+    val of_ms : Int64.t -> t
+
     val ( < ) : t -> t -> bool
 
     val ( > ) : t -> t -> bool
@@ -53,6 +57,10 @@ module type Time_intf = sig
 
     val cancel : Controller.t -> 'a t -> 'a -> unit
   end
+
+  val to_span_since_epoch : t -> Span.t
+
+  val of_span_since_epoch : Span.t -> t
 
   val diff : t -> t -> Span.t
 
@@ -514,7 +522,7 @@ module type Consensus_mechanism_intf = sig
   val create_consensus_state : Protocol_state.value -> Consensus_state.value
 
   val create_consensus_data :
-    Protocol_state.value -> Consensus_data.value option
+    Protocol_state.value -> time:Int64.t -> Consensus_data.value option
 
   module Snark_transition : sig
     type value

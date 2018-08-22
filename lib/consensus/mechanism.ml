@@ -70,5 +70,5 @@ module type S = sig
   val create_consensus_state : Protocol_state.value -> Consensus_state.value
 
   val create_consensus_data :
-    Protocol_state.value -> Consensus_data.value option
+    Protocol_state.value -> time:Int64.t -> Consensus_data.value option
 end
