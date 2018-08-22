@@ -16,30 +16,32 @@ module type Inputs_intf = sig
       type t
 
       val to_ms : t -> Int64.t
+
+      val of_ms : Int64.t -> t
+
+      val ( + ) : t -> t -> t
+
+      val ( * ) : t -> t -> t
     end
-
-    val of_ms : Int64.t -> t
-
-    val to_ms : t -> Int64.t
-
-    val diff : t -> t -> Span.t
-
-    val less_than : t -> t -> bool
 
     val ( < ) : t -> t -> bool
 
     val ( >= ) : t -> t -> bool
 
-    val ( + ) : t -> t -> t
+    val diff : t -> t -> Span.t
 
-    val ( * ) : t -> t -> t
+    val to_span_since_epoch : t -> Span.t
+
+    val of_span_since_epoch : Span.t -> t
+
+    val add : t -> Span.t -> t
   end
 
   val genesis_block_timestamp : Time.t
 
-  val slot_interval : Time.t
+  val slot_interval : Time.Span.t
 
-  val epoch_size : UInt64.t
+  val epoch_size : UInt32.t
 end
 
 module Make (Inputs : Inputs_intf) : Mechanism.S

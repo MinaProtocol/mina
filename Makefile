@@ -13,9 +13,23 @@ build :
 	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
 		./scripts/run-in-docker dune build ; \
 	else \
+		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
 		dune build ; \
 	fi
 	@echo "Build complete"
+
+deb :
+	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
+		./scripts/run-in-docker ./rebuild-deb.sh ; \
+	else \
+		./rebuild-deb.sh ; \
+	fi	
+
+codaslim :
+	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
+	@cp _build/codaclient.deb .
+	@./rebuild-docker.sh codaslim Dockerfile-codaslim
+	@rm codaclient.deb
 
 container :
 	@./container.sh restart
@@ -57,6 +71,7 @@ test:
 	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
 		./scripts/run-in-docker ./test_all.sh ; \
 	else	\
+		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
 		./test_all.sh ; \
 	fi
 

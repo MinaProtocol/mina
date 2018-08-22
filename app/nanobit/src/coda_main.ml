@@ -839,6 +839,9 @@ module type Main_intf = sig
 
   val peers : t -> Host_and_port.t list
 
+  val strongest_ledgers :
+    t -> Inputs.External_transition.t Linear_pipe.Reader.t
+
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
   val snark_pool : t -> Inputs.Snark_pool.t
