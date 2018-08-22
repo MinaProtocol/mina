@@ -84,7 +84,7 @@ module Coda_worker = struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let transaction_interval = Time.Span.of_ms 100.0
+          let transition_interval = Time.Span.of_ms 100.0
 
           let fee_public_key = Genesis_ledger.rich_pk
 
