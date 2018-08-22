@@ -113,6 +113,20 @@ module type Validity_intf = sig
   val completely_fresh : t -> bool
 end
 
+module type Responder_intf = sig
+  type t
+
+  type merkle_tree
+
+  type query
+
+  type answer
+
+  val create : merkle_tree -> (query -> unit) -> t
+
+  val answer_query : t -> query -> answer
+end
+
 (*
 
 Every node of the merkle tree is always in one of three states:
@@ -470,20 +484,6 @@ struct
   let merkle_path_at_addr _ = failwith "no"
 
   let get_account_at_addr _ = failwith "no"
-end
-
-module type Responder_intf = sig
-  type t
-
-  type merkle_tree
-
-  type query
-
-  type answer
-
-  val create : merkle_tree -> (query -> unit) -> t
-
-  val answer_query : t -> query -> answer
 end
 
 module Make_sync_responder
