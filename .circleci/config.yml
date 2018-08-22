@@ -25,7 +25,7 @@ jobs:
 
       - run:
           name: Build deb Package
-          command: build deb
+          command: make deb
 
       - run:
           name: Run All Tests
