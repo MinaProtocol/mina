@@ -52,7 +52,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   module Time = Inputs.Time
 
   module Epoch = struct
-    type t = Segment_id.t
+    include Segment_id
 
     let size = Inputs.epoch_size
 
@@ -74,89 +74,65 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     let end_time (e: t) = Time.(start_time e + interval)
 
     module Slot = struct
-      type 'segment_id t = 'segment_id * 'segment_id
-      [@@deriving sexp, bin_io, eq, compare, hash]
-
-      type value = Segment_id.t t [@@deriving sexp, bin_io, eq, compare, hash]
-
-      type var = Segment_id.Unpacked.var t
-
-      let to_hlist (e, s) = Nanobit_base.H_list.[e; s]
-
-      let of_hlist :
-             (unit, 'segment_id -> 'segment_id -> unit) Nanobit_base.H_list.t
-          -> 'segment_id t =
-       fun Nanobit_base.H_list.([e; s]) -> (e, s)
-
-      let data_spec =
-        let open Snark_params.Tick.Data_spec in
-        [Segment_id.Unpacked.typ; Segment_id.Unpacked.typ]
-
-      let typ =
-        Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-          ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-          ~value_of_hlist:of_hlist
-
-      let fold (e, s) =
-        Nanobit_base.Util.(Segment_id.Bits.fold e +> Segment_id.Bits.fold s)
-
-      let var_to_bits (e, s) =
-        Segment_id.Unpacked.var_to_bits e @ Segment_id.Unpacked.var_to_bits s
-
-      let bit_length = Segment_id.length_in_bits * 2
+      include Segment_id
 
       let interval = Inputs.slot_interval
-
-      let of_time_exn t : value =
-        let epoch = of_time_exn t in
-        let time_since_epoch = Time.diff t (start_time epoch) in
-        let slot =
-          UInt64.of_int64
-            Int64.(Time.Span.to_ms time_since_epoch / Time.to_ms interval)
-        in
-        (epoch, slot)
-
-      let start_time ((epoch, slot): value) =
-        Time.(start_time epoch + (of_ms (UInt64.to_int64 slot) * interval))
-
-      let end_time (s: value) = Time.(start_time s + interval)
     end
+
+    let slot_start_time (epoch: t) (slot: Slot.t) =
+      Time.(start_time epoch + (of_ms (UInt64.to_int64 slot) * Slot.interval))
+
+    let slot_end_time (epoch: t) (slot: Slot.t) =
+      Time.(slot_start_time epoch slot + Slot.interval)
+
+    let epoch_and_slot_of_time_exn t : t * Slot.t =
+      let epoch = of_time_exn t in
+      let time_since_epoch = Time.diff t (start_time epoch) in
+      let slot =
+        UInt64.of_int64
+          Int64.(Time.Span.to_ms time_since_epoch / Time.to_ms Slot.interval)
+      in
+      (epoch, slot)
   end
 
   module Consensus_data = struct
-    type 'slot t = {slot: 'slot}
+    type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
     [@@deriving sexp, bin_io, eq, compare]
 
-    type value = Epoch.Slot.value t
+    type value = (Epoch.t, Epoch.Slot.t) t
     [@@deriving sexp, bin_io, eq, compare]
 
-    type var = Epoch.Slot.var t
+    type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
 
-    let genesis = { slot= (UInt64.zero, UInt64.zero) }
+    let genesis = {epoch= UInt64.zero; slot= UInt64.zero}
 
-    let to_hlist {slot} = Nanobit_base.H_list.[slot]
+    let to_hlist {epoch; slot} = Nanobit_base.H_list.[epoch; slot]
 
-    let of_hlist : (unit, 'slot -> unit) Nanobit_base.H_list.t -> 'slot t =
-      fun Nanobit_base.H_list.([slot]) -> {slot}
+    let of_hlist :
+           (unit, 'epoch -> 'slot -> unit) Nanobit_base.H_list.t
+        -> ('epoch, 'slot) t =
+     fun Nanobit_base.H_list.([epoch; slot]) -> {epoch; slot}
 
-    let data_spec = Snark_params.Tick.Data_spec.[Epoch.Slot.typ]
+    let data_spec =
+      Snark_params.Tick.Data_spec.[Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let fold {slot} = Epoch.Slot.fold slot
+    let fold {epoch; slot} =
+      Nanobit_base.Util.(Epoch.Bits.fold epoch +> Epoch.Slot.Bits.fold slot)
 
-    let var_to_bits {slot} = Epoch.Slot.var_to_bits slot
+    let var_to_bits {epoch; slot} =
+      Epoch.Unpacked.var_to_bits epoch @ Epoch.Slot.Unpacked.var_to_bits slot
 
-    let bit_length = Epoch.Slot.bit_length
+    let bit_length = Epoch.length_in_bits + Epoch.Slot.length_in_bits
   end
 
   module Consensus_state = struct
-    type ('length, 'slot) t =
-      { length: 'length
-      ; current_slot: 'slot }
+    type ('length, 'epoch, 'slot) t =
+      {length: 'length; current_epoch: 'epoch; current_slot: 'slot}
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     (*
@@ -167,47 +143,49 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
       ; last_epoch_participation: ? }
        *)
 
-    type value = (Length.t, Epoch.Slot.value) t
+    type value = (Length.t, Epoch.t, Epoch.Slot.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    type var = (Length.Unpacked.var, Epoch.Slot.var) t
+    type var =
+      (Length.Unpacked.var, Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
 
     let genesis =
       { length= Length.zero
-      ; current_slot= (UInt64.zero, UInt64.zero) }
+      ; current_epoch= UInt64.zero
+      ; current_slot= UInt64.zero }
 
-    let to_hlist {length; current_slot} =
-      Nanobit_base.H_list.[length; current_slot]
+    let to_hlist {length; current_epoch; current_slot} =
+      Nanobit_base.H_list.[length; current_epoch; current_slot]
 
     let of_hlist :
-           ( unit
-           , 'length -> 'epoch_info -> unit )
-           Nanobit_base.H_list.t
-        -> ('length, 'epoch_info) t =
-     fun Nanobit_base.H_list.([length; current_slot]) ->
-      {length; current_slot}
+           (unit, 'length -> 'epoch -> 'slot -> unit) Nanobit_base.H_list.t
+        -> ('length, 'epoch, 'slot) t =
+     fun Nanobit_base.H_list.([length; current_epoch; current_slot]) ->
+      {length; current_epoch; current_slot}
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
-      [Length.Unpacked.typ; Epoch.Slot.typ]
+      [Length.Unpacked.typ; Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let var_to_bits {length; current_slot} =
+    let var_to_bits {length; current_epoch; current_slot} =
       Snark_params.Tick.Let_syntax.return
         ( Length.Unpacked.var_to_bits length
-        @ Epoch.Slot.var_to_bits current_slot )
+        @ Epoch.Unpacked.var_to_bits current_epoch
+        @ Epoch.Slot.Unpacked.var_to_bits current_slot )
 
-    let fold {length; current_slot} =
+    let fold {length; current_epoch; current_slot} =
       let open Nanobit_base.Util in
       Length.Bits.fold length
-      +> Epoch.Slot.fold current_slot
+      +> Epoch.Bits.fold current_epoch
+      +> Epoch.Slot.Bits.fold current_slot
 
     let bit_length =
-      Length.length_in_bits + Epoch.Slot.bit_length
+      Length.length_in_bits + Epoch.length_in_bits + Epoch.Slot.length_in_bits
   end
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)
@@ -227,10 +205,13 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     Snark_params.Tick.Let_syntax.return state
 
   let update state transition =
+    let open Consensus_data in
     let open Consensus_state in
+    let consensus_data = Snark_transition.consensus_data transition in
     let state =
       { length= Length.succ state.length
-      ; current_slot= (Snark_transition.consensus_data transition).Consensus_data.slot }
+      ; current_epoch= consensus_data.epoch
+      ; current_slot= consensus_data.slot }
     in
     Or_error.return state
 
