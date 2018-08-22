@@ -1245,7 +1245,8 @@ let%test_module "test" =
               let rec go i seen =
                 [%test_result : Bool.t]
                   ~message:"Exceeded time expected to exhaust random_work"
-                  ~expect:true (i <= p) ;
+                  ~expect:true
+                  (i < 2 * p) ;
                 let maybe_stuff, seen = Lb.random_work_spec_chunk lb seen in
                 match maybe_stuff with None -> () | Some _ -> go (i + 1) seen
               in
