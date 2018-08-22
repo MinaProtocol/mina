@@ -1,6 +1,8 @@
 open Util
 open Core_kernel
 open Snark_params.Tick
+open Tuple_lib
+open Fold_lib
 
 module type Consensus_state_intf = sig
   type value [@@deriving hash, compare, bin_io, sexp]
@@ -13,11 +15,11 @@ module type Consensus_state_intf = sig
 
   val genesis : value
 
-  val bit_length : int
+  val length_in_triples : int
 
-  val var_to_bits : var -> (Boolean.var list, _) Checked.t
+  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-  val fold : value -> Pedersen.fold
+  val fold : value -> bool Triple.t Fold.t
 end
 
 module type S = sig
@@ -59,9 +61,9 @@ module type S = sig
 
   val negative_one : value
 
-  val bit_length : int
+  val length_in_triples : int
 
-  val var_to_bits : var -> (Boolean.var list, _) Checked.t
+  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   val hash : value -> State_hash.Stable.V1.t
 end
@@ -125,22 +127,23 @@ struct
     Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let var_to_bits {previous_state_hash; blockchain_state; consensus_state} =
+  let var_to_triples {previous_state_hash; blockchain_state; consensus_state} =
     let open Let_syntax in
-    let%map previous_state_hash_bits =
-      State_hash.var_to_bits previous_state_hash
-    and blockchain_state_bits = Blockchain_state.var_to_bits blockchain_state
-    and consensus_state_bits = Consensus_state.var_to_bits consensus_state in
-    previous_state_hash_bits @ blockchain_state_bits @ consensus_state_bits
+    let%map previous_state_hash =
+      State_hash.var_to_triples previous_state_hash
+    and blockchain_state = Blockchain_state.var_to_triples blockchain_state
+    and consensus_state = Consensus_state.var_to_triples consensus_state in
+    previous_state_hash @ blockchain_state @ consensus_state
 
-  let bit_length =
-    State_hash.length_in_bits + Blockchain_state.bit_length
-    + Consensus_state.bit_length
+  let length_in_triples =
+    State_hash.length_in_triples + Blockchain_state.length_in_triples
+    + Consensus_state.length_in_triples
 
   let fold {previous_state_hash; blockchain_state; consensus_state} =
+    Fold.(
     State_hash.fold previous_state_hash
     +> Blockchain_state.fold blockchain_state
-    +> Consensus_state.fold consensus_state
+    +> Consensus_state.fold consensus_state )
 
   let hash s =
     Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state (fold s)

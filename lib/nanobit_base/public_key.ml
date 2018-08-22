@@ -90,7 +90,8 @@ module Compressed = struct
     let%map x_bits =
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
     in
-    Bitstring_lib.Bitstring.pad_to_triple_list (x_bits @ [is_odd]) ~default:Boolean.false_
+    Bitstring_lib.Bitstring.pad_to_triple_list
+      (x_bits @ [is_odd]) ~default:Boolean.false_
 end
 
 open Tick

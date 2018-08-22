@@ -1,6 +1,5 @@
 open Core
 open Fold_lib
-open Util
 open Coda_numbers
 open Snark_params.Tick
 open Let_syntax
@@ -30,8 +29,6 @@ let dummy =
   ; amount= Amount.zero
   ; fee= Fee.zero
   ; nonce= Account_nonce.zero }
-
-type value = t
 
 type var =
   ( Public_key.Compressed.var
@@ -95,16 +92,14 @@ let gen =
 let%test_unit "to_bits" =
   let open Test_util in
   with_randomness 123456789 (fun () ->
-      let triple_typ = Typ.tuple3 Boolean.typ Boolean.typ Boolean.typ in
-      let length = length_in_triples in
-      test_equal typ
-        (Typ.list ~length triple_typ)
-        var_to_triples
-        to_triples
-        { receiver= {x= Field.random (); is_odd= Random.bool ()}
+      let input =
+        { receiver= {Public_key.Compressed.x= Field.random (); is_odd= Random.bool ()}
         ; amount= Amount.of_int (Random.int Int.max_value)
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
-        ; nonce= Account_nonce.random () } )
+        ; nonce= Account_nonce.random () }
+      in
+      Test_util.test_to_triples typ fold var_to_triples input
+  )
 
 let var_of_t ({receiver; amount; fee; nonce}: t) : var =
   { receiver= Public_key.Compressed.var_of_t receiver

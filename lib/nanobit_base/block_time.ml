@@ -1,3 +1,4 @@
+open Util
 open Core_kernel
 open Async_kernel
 open Snark_params
@@ -5,6 +6,7 @@ open Tick
 open Let_syntax
 open Unsigned_extended
 open Snark_bits
+open Fold_lib
 
 (* Milliseconds since epoch *)
 module Stable = struct
@@ -26,9 +28,12 @@ type t0 = t
 module B = Bits
 
 let bit_length = 64
+let length_in_triples = bit_length_to_triple_length bit_length
 
 module Bits = Bits.UInt64
 include B.Snarkable.UInt64 (Tick)
+
+let fold t = Fold.group3 ~default:false (Bits.fold t)
 
 module Span = struct
   module Stable = struct

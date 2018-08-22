@@ -1,6 +1,8 @@
 open Core_kernel
 open Snark_params
 open Snark_bits
+open Tuple_lib
+open Fold_lib
 
 type t [@@deriving sexp, eq]
 
@@ -18,9 +20,11 @@ module Stable : sig
   end
 end
 
-val bit_length : int
+val length_in_triples : int
 
 module Bits : Bits_intf.S with type t := t
+
+val fold : t -> bool Triple.t Fold.t
 
 include Tick.Snarkable.Bits.Faithful
         with type Unpacked.value = t
