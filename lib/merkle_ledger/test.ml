@@ -9,11 +9,27 @@ module type S =
 module type Ledger_intf = sig
   include S
 
+  type key = string
+
+  type hash = Md5.t
+
+  type account = Test_ledger.Account.t
+
+  type addr = Addr.t
+
   val load_ledger : int -> int -> t * string list
 end
 
 module Ledger (L : S) : Ledger_intf = struct
   include L
+
+  type key = string
+
+  type hash = Md5.t
+
+  type account = Test_ledger.Account.t
+
+  type addr = Addr.t
 
   let load_ledger n b =
     let ledger = create () in

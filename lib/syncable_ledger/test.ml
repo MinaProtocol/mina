@@ -2,45 +2,35 @@ open Core
 open Async_kernel
 module TL = Merkle_ledger.Test_ledger
 
+module type Ledger_intf = sig
+  include Syncable_ledger.Merkle_tree_intf
+
+  val load_ledger : int -> int -> t * string list
+end
+
+module type Root_hash_intf = sig
+  type t [@@deriving bin_io, compare, hash, sexp, compare]
+
+  val equal : t -> t -> bool
+end
+
 module Tests
-    (L : Merkle_ledger.Test.Ledger_intf) (Num_accts : sig
+    (Root_hash : Root_hash_intf)
+    (L : Ledger_intf with type root_hash := Root_hash.t)
+    (SL : Syncable_ledger.S
+          with type merkle_tree := L.t
+           and type hash := L.hash
+           and type root_hash := Root_hash.t
+           and type addr := L.addr
+           and type merkle_path := L.path
+           and type account := L.account)
+    (SR : Syncable_ledger.Responder_intf
+          with type merkle_tree := L.t
+           and type query := SL.query
+           and type answer := SL.answer) (Num_accts : sig
         val num_accts : int
     end) =
 struct
-  module Adjhash = struct
-    include TL.Hash
-
-    type t = hash [@@deriving bin_io, compare, hash, sexp, compare]
-
-    type account = TL.Account.t
-
-    let to_hash (x: t) = x
-
-    let equal h1 h2 = compare_hash h1 h2 = 0
-  end
-
-  module Ledger' = struct
-    include L
-
-    type key = unit
-
-    type path = Path.t
-  end
-
-  module SL =
-    Syncable_ledger.Make (L.Addr) (TL.Key) (TL.Account) (Adjhash) (Adjhash)
-      (Ledger')
-      (struct
-        let subtree_height = 3
-      end)
-
-  module SR =
-    Syncable_ledger.Make_sync_responder (L.Addr) (TL.Key) (TL.Account)
-      (Adjhash)
-      (Adjhash)
-      (Ledger')
-      (SL)
-
   (* not really kosher but the tests are run in-order, so this will get filled
    * in before we need it. *)
   let total_queries = ref None
@@ -64,7 +54,7 @@ struct
     with
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
-        Adjhash.equal desired_root (L.merkle_root mt)
+        Root_hash.equal desired_root (L.merkle_root mt)
     | `Target_changed -> false
 
   let%test_unit "new_goal_soon" =
@@ -82,7 +72,7 @@ struct
     let ctr = ref 0 in
     don't_wait_for
       (Linear_pipe.iter qr ~f:(fun (hash, query) ->
-           if not (Adjhash.equal hash !desired_root) then Deferred.unit
+           if not (Root_hash.equal hash !desired_root) then Deferred.unit
            else
              let res =
                if !ctr = (!total_queries |> Option.value_exn) / 2 then (
@@ -108,49 +98,87 @@ struct
             SL.wait_until_valid lsync !desired_root )
       with
       | `Ok mt ->
-          [%test_result : Adjhash.t] ~expect:(L.merkle_root l3)
+          [%test_result : Root_hash.t] ~expect:(L.merkle_root l3)
             (L.merkle_root mt)
       | `Target_changed -> failwith "the target changed again"
 end
 
+module Ledger_tests (L : sig
+  include Merkle_ledger.Test.Ledger_intf (* type path = Path.t *)
+end) (Num_accts : sig
+  val num_accts : int
+end) =
+struct
+  module Adjhash = struct
+    include TL.Hash
+
+    type t = hash [@@deriving bin_io, compare, hash, sexp, compare]
+
+    type account = TL.Account.t
+
+    let to_hash (x: t) = x
+
+    let equal h1 h2 = compare_hash h1 h2 = 0
+  end
+
+  module L' = struct
+    include L
+
+    type path = Path.t
+  end
+
+  module SL =
+    Syncable_ledger.Make (L.Addr) (TL.Account) (Adjhash) (Adjhash) (L')
+      (struct
+        let subtree_height = 3
+      end)
+
+  module SR =
+    Syncable_ledger.Make_sync_responder (L.Addr) (TL.Account) (Adjhash)
+      (Adjhash)
+      (L')
+      (SL)
+  module Test = Tests (Adjhash) (L') (SL) (SR) (Num_accts)
+end
+
 module TestL3_3 =
-  Tests (Merkle_ledger.Test.L3)
+  Ledger_tests (Merkle_ledger.Test.L3)
     (struct
       let num_accts = 3
     end)
 
 module TestL3_8 =
-  Tests (Merkle_ledger.Test.L3)
+  Ledger_tests (Merkle_ledger.Test.L3)
     (struct
       let num_accts = 8
     end)
 
 module TestL16_3 =
-  Tests (Merkle_ledger.Test.L16)
+  Ledger_tests (Merkle_ledger.Test.L16)
     (struct
       let num_accts = 3
     end)
 
 module TestL16_20 =
-  Tests (Merkle_ledger.Test.L16)
+  Ledger_tests (Merkle_ledger.Test.L16)
     (struct
       let num_accts = 20
     end)
 
 module TestL16_1024 =
-  Tests (Merkle_ledger.Test.L16)
+  Ledger_tests (Merkle_ledger.Test.L16)
     (struct
       let num_accts = 1024
     end)
 
 module TestL16_1025 =
-  Tests (Merkle_ledger.Test.L16)
+  Ledger_tests (Merkle_ledger.Test.L16)
     (struct
       let num_accts = 80
     end)
 
 module TestL16_65536 =
-  Tests (Merkle_ledger.Test.L16)
+  Ledger_tests (Merkle_ledger.Test.L16)
     (struct
       let num_accts = 65536
     end)

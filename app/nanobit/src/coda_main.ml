@@ -533,7 +533,7 @@ struct
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Public_key.Compressed) (Account)
+    Syncable_ledger.Make (Ledger.Addr) (Account)
       (struct
         include Merkle_hash
 
