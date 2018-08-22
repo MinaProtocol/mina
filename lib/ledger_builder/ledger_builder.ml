@@ -613,7 +613,12 @@ end = struct
     [@@deriving sexp]
 
     let space_available t =
-      Queue_consumption.count t.queue_consumption < t.max_throughput
+      let can_add =
+        if t.available_queue_space < t.max_throughput then
+          t.available_queue_space
+        else t.max_throughput
+      in
+      Queue_consumption.count t.queue_consumption < can_add
 
     let budget_non_neg t = Fee.Signed.sgn t.budget = Sgn.Pos
 
@@ -686,7 +691,7 @@ end = struct
 
   let txns_not_included (valid: Resources.t) (invalid: Resources.t) =
     let diff =
-      List.length valid.transactions - List.length invalid.transactions
+      List.length invalid.transactions - List.length valid.transactions
     in
     if diff > 0 then List.take invalid.transactions diff else []
 
@@ -717,13 +722,13 @@ end = struct
         else
           check_resources_and_add Sequence.empty ts get_completed_work ledger
             valid r_transaction
-    | Some (w, ws), Some (t, ts), true ->
-        let enough_work_added =
+    | Some (w, ws), Some (t, ts), true -> (
+        let enough_work_added_to_include_one_more =
           resources.work_done
           = (Resources.Queue_consumption.count resources.queue_consumption + 1)
             * 2
         in
-        if enough_work_added then
+        if enough_work_added_to_include_one_more then
           let r_transaction =
             log_error_and_return_value
               (add_transaction ledger t resources)
@@ -738,20 +743,19 @@ end = struct
               (Sequence.append (Sequence.singleton w) ws)
               ts get_completed_work ledger valid r_transaction
         else
-          let r_work =
-            log_error_and_return_value
-              (add_work w resources get_completed_work)
-              resources
-          in
-          check_resources_and_add ws
-            (Sequence.append (Sequence.singleton t) ts)
-            get_completed_work ledger valid r_work
+          match add_work w resources get_completed_work with
+          | Ok r_work ->
+              check_resources_and_add ws
+                (Sequence.append (Sequence.singleton t) ts)
+                get_completed_work ledger valid r_work
+          | Error e ->
+              Printf.printf "%s" (Error.to_string_hum e) ;
+              (valid, txns_not_included valid resources) )
     | _, _, _ -> (valid, txns_not_included valid resources)
 
   let undo_txns ledger txns =
-    List.map txns ~f:(fun _ (t, u) ->
-        Or_error.ok_exn (Ledger.undo ledger u) ;
-        t )
+    List.fold txns ~init:() ~f:(fun _ (_, u) ->
+        Or_error.ok_exn (Ledger.undo ledger u) )
 
   let process_works_add_txns ws_seq ts_seq ps_free_space max_throughput
       get_completed_work ledger self : Resources.t =
