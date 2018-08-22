@@ -29,7 +29,7 @@ module type Hash_intf = sig
 
   val empty : t
 
-  val merge : t * t -> t
+  val merge : height:int -> t -> t -> t
 
   val hash_account : account -> t
 end
