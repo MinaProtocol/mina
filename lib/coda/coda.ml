@@ -395,7 +395,8 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
     ; log: Logger.t
-    ; mutable seen_jobs: Ledger_proof_statement.Set.t
+    ; mutable seen_jobs:
+        Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
     ; ledger_builder_transition_backup_capacity: int }
 
   let best_ledger_builder t =
@@ -529,7 +530,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool
       ; ledger_builder
       ; log= config.log
-      ; seen_jobs= Ledger_proof_statement.Set.empty
+      ; seen_jobs= (Ledger_proof_statement.Set.empty, None)
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
 

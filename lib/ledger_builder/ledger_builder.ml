@@ -213,7 +213,9 @@ end = struct
     ; public_key: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
-  let random_work_spec_chunk t (seen_statements: Ledger_proof_statement.Set.t) =
+  let random_work_spec_chunk t
+      (seen_statements:
+        Ledger_proof_statement.Set.t * Ledger_proof_statement.t option) =
     let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
     let module A = Parallel_scan.Available_job in
     let module L = Ledger_proof_statement in
@@ -262,29 +264,42 @@ end = struct
     let n = List.length all_jobs in
     let dirty_jobs =
       List.map all_jobs ~f:(fun j ->
-          L.Set.mem seen_statements (canonical_statement_of_job j) )
+          L.Set.mem (fst seen_statements) (canonical_statement_of_job j) )
     in
     let seen_jobs, jobs =
       List.partition_tf all_jobs ~f:(fun j ->
-          L.Set.mem seen_statements (canonical_statement_of_job j) )
+          L.Set.mem (fst seen_statements) (canonical_statement_of_job j) )
     in
-    let seen_statements =
+    let seen_statements' =
       List.map seen_jobs ~f:canonical_statement_of_job |> L.Set.of_list
     in
     match jobs with
     | [] -> (None, seen_statements)
-    | [j] ->
-        ( Some [single_spec j]
-        , L.Set.add seen_statements (canonical_statement_of_job j) )
     | _ ->
         let i = Random.int (List.length jobs) in
         let j = index_of_nth_occurence dirty_jobs i |> Option.value_exn in
-        let chunk =
-          [List.nth_exn all_jobs j; List.nth_exn all_jobs ((j + 1) % n)]
-        in
-        ( Some (List.map chunk ~f:single_spec)
-        , L.Set.union seen_statements
-            (List.map chunk ~f:canonical_statement_of_job |> L.Set.of_list) )
+        (*TODO All of this will change, when we fix  #450. There'll be no more bundles! *)
+        if j + 1 < n then
+          let chunk =
+            [List.nth_exn all_jobs j; List.nth_exn all_jobs (j + 1)]
+          in
+          ( Some (List.map chunk ~f:single_spec)
+          , ( L.Set.add seen_statements'
+                (canonical_statement_of_job @@ List.hd_exn chunk)
+            , None ) )
+        else
+          let last_job = List.nth_exn all_jobs j in
+          let opt_eq =
+            Option.map (snd seen_statements) ~f:(fun stmt ->
+                Ledger_proof_statement.equal stmt
+                  (canonical_statement_of_job last_job) )
+          in
+          match opt_eq with
+          | Some true -> (None, seen_statements)
+          | _ ->
+              ( Some [single_spec last_job]
+              , (seen_statements', Some (canonical_statement_of_job last_job))
+              )
 
   let aux {scan_state; _} = scan_state
 
@@ -1234,5 +1249,5 @@ let%test_module "test" =
                 let maybe_stuff, seen = Lb.random_work_spec_chunk lb seen in
                 match maybe_stuff with None -> () | Some _ -> go (i + 1) seen
               in
-              go 0 S.empty ) )
+              go 0 (S.empty, None) ) )
   end )

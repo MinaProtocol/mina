@@ -649,8 +649,12 @@ struct
   end)
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs: 'a -> Ledger_proof_statement.Set.t)
-      ~(set_seen_jobs: 'a -> Ledger_proof_statement.Set.t -> unit) (t: 'a) =
+      ~(seen_jobs:
+         'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
+      ~(set_seen_jobs:
+            'a
+         -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
+         -> unit) (t: 'a) =
     let lb = best_ledger_builder t in
     let maybe_instances, seen_jobs =
       Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
