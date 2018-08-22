@@ -198,7 +198,6 @@ struct
                     (External_transition_result.empty ())
               | Some result -> External_transition_result.cancel result ) ;
               return (schedule_transaction tip) )
-
           >>| ignore ) ;
     {transitions= r}
 end
