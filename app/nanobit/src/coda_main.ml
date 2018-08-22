@@ -154,7 +154,7 @@ module type Config_intf = sig
 
   val lbc_tree_max_depth : [`Infinity | `Finite of int]
 
-  val transaction_interval : Time.Span.t
+  val transition_interval : Time.Span.t
 
   (* Public key to allocate fees to *)
 
@@ -648,7 +648,7 @@ struct
     end
 
     module Proposal_interval = struct
-      let t = Time.Span.of_time_span Init.transaction_interval
+      let t = Time.Span.of_time_span Init.transition_interval
     end
   end)
 

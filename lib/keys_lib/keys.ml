@@ -16,7 +16,7 @@ module type S = sig
     type t = {proof: Tick.Proof.t}
   end
 
-  val transaction_snark_keys : Transaction_snark.Keys.t
+  val transaction_snark_keys : Transaction_snark.Keys.Verification.t
 
   module Step : sig
     val keys : Tick.Keypair.t
@@ -50,8 +50,6 @@ module type S = sig
   end
 end
 
-let tx_pk = lazy (Snark_keys.transaction_proving ())
-
 let tx_vk = lazy (Snark_keys.transaction_verification ())
 
 let bc_pk = lazy (Snark_keys.blockchain_proving ())
@@ -71,15 +69,11 @@ struct
     | Some x -> x
     | None ->
         let open Async in
-        let%map tx_pk = Lazy.force tx_pk
-        and tx_vk = Lazy.force tx_vk
+        let%map tx_vk = Lazy.force tx_vk
         and bc_pk = Lazy.force bc_pk
         and bc_vk = Lazy.force bc_vk in
-        let tx_keys =
-          {Transaction_snark.Keys.proving= tx_pk; verification= tx_vk}
-        in
-        let module T = Transaction_snark.Make (struct
-          let keys = tx_keys
+        let module T = Transaction_snark.Verification.Make (struct
+          let keys = tx_vk
         end) in
         let module B =
           Blockchain_snark.Blockchain_transition.Make (Consensus_mechanism) (T) in
@@ -96,6 +90,8 @@ struct
         let module M = struct
           module Consensus_mechanism = Consensus_mechanism
 
+          let transaction_snark_keys = tx_vk
+
           module Step_prover_state = struct
             type t =
               { wrap_vk: Tock.Verification_key.t
@@ -107,8 +103,6 @@ struct
           module Wrap_prover_state = struct
             type t = {proof: Tick.Proof.t}
           end
-
-          let transaction_snark_keys = tx_keys
 
           module Step = struct
             include (
