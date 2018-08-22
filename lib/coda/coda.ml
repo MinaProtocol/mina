@@ -419,8 +419,7 @@ module Make (Inputs : Inputs_intf) = struct
   let lbc_transition_tree t =
     Ledger_builder_controller.transition_tree t.ledger_builder
 
-  let strongest_ledgers t =
-    Linear_pipe.map t.strongest_ledgers ~f:snd
+  let strongest_ledgers t = Linear_pipe.map t.strongest_ledgers ~f:snd
 
   module Config = struct
     type t =
