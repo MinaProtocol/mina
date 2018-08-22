@@ -1,4 +1,5 @@
 open Core_kernel
+open Signed
 open Unsigned
 open Coda_numbers
 
@@ -18,33 +19,39 @@ module type Inputs_intf = sig
       type t
 
       val to_ms : t -> Int64.t
+
+      val of_ms : Int64.t -> t
+
+      val ( + ) : t -> t -> t
+
+      val ( * ) : t -> t -> t
     end
-
-    val of_ms : Int64.t -> t
-
-    val to_ms : t -> Int64.t
-
-    val diff : t -> t -> Span.t
-
-    val less_than : t -> t -> bool
 
     val ( < ) : t -> t -> bool
 
     val ( >= ) : t -> t -> bool
 
-    val ( + ) : t -> t -> t
+    val diff : t -> t -> Span.t
 
-    val ( * ) : t -> t -> t
+    val to_span_since_epoch : t -> Span.t
+
+    val of_span_since_epoch : Span.t -> t
+
+    val add : t -> Span.t -> t
   end
 
   val genesis_block_timestamp : Time.t
 
-  val slot_interval : Time.t
+  val slot_interval : Time.Span.t
 
-  val epoch_size : UInt64.t
+  val epoch_size : UInt32.t
 end
 
-module Segment_id = Nat.Make64 ()
+module Segment_id = Nat.Make32 ()
+
+let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
+
+let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
 module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   module Proof = Inputs.Proof
@@ -56,7 +63,10 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
 
     let size = Inputs.epoch_size
 
-    let interval = Time.(Inputs.slot_interval * (of_ms @@ UInt64.to_int64 size))
+    let interval =
+      Time.Span.of_ms
+        Int64.Infix.(
+          Time.Span.to_ms Inputs.slot_interval * int64_of_uint32 size)
 
     let of_time_exn t : t =
       if Time.(t < Inputs.genesis_block_timestamp) then
@@ -64,14 +74,20 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
           (Invalid_argument
              "Epoch.of_time: time is less than genesis block timestamp") ;
       let time_since_genesis = Time.diff t Inputs.genesis_block_timestamp in
-      UInt64.of_int64
-        Int64.(Time.Span.to_ms time_since_genesis / Time.to_ms interval)
+      uint32_of_int64
+        Int64.Infix.(
+          Time.Span.to_ms time_since_genesis / Time.Span.to_ms interval)
 
-    let start_time (e: t) =
-      let open Time in
-      Inputs.genesis_block_timestamp + (of_ms (UInt64.to_int64 e) * interval)
+    let start_time (epoch: t) =
+      let ms =
+        let open Int64.Infix in
+        Time.Span.to_ms
+          (Time.to_span_since_epoch Inputs.genesis_block_timestamp)
+        + (int64_of_uint32 epoch * Time.Span.to_ms interval)
+      in
+      Time.of_span_since_epoch (Time.Span.of_ms ms)
 
-    let end_time (e: t) = Time.(start_time e + interval)
+    let end_time (epoch: t) = Time.add (start_time epoch) interval
 
     module Slot = struct
       include Segment_id
@@ -80,17 +96,21 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     end
 
     let slot_start_time (epoch: t) (slot: Slot.t) =
-      Time.(start_time epoch + (of_ms (UInt64.to_int64 slot) * Slot.interval))
+      Time.add (start_time epoch)
+        (Time.Span.of_ms
+           Int64.Infix.(int64_of_uint32 slot * Time.Span.to_ms Slot.interval))
 
     let slot_end_time (epoch: t) (slot: Slot.t) =
-      Time.(slot_start_time epoch slot + Slot.interval)
+      Time.add (slot_start_time epoch slot) Slot.interval
 
     let epoch_and_slot_of_time_exn t : t * Slot.t =
       let epoch = of_time_exn t in
       let time_since_epoch = Time.diff t (start_time epoch) in
       let slot =
-        UInt64.of_int64
-          Int64.(Time.Span.to_ms time_since_epoch / Time.to_ms Slot.interval)
+        uint32_of_int64
+        @@
+        Int64.Infix.(
+          Time.Span.to_ms time_since_epoch / Time.Span.to_ms Slot.interval)
       in
       (epoch, slot)
   end
@@ -104,7 +124,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
 
     type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
 
-    let genesis = {epoch= UInt64.zero; slot= UInt64.zero}
+    let genesis = {epoch= Epoch.zero; slot= Epoch.Slot.zero}
 
     let to_hlist {epoch; slot} = Nanobit_base.H_list.[epoch; slot]
 
@@ -135,14 +155,6 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
       {length: 'length; current_epoch: 'epoch; current_slot: 'slot}
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    (*
-      ; checkpoints: ?
-      ; last_epoch_length: Length.t?
-      ; unique_participants: ?
-      ; unique_participation: ?
-      ; last_epoch_participation: ? }
-       *)
-
     type value = (Length.t, Epoch.t, Epoch.Slot.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
@@ -151,8 +163,8 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
 
     let genesis =
       { length= Length.zero
-      ; current_epoch= UInt64.zero
-      ; current_slot= UInt64.zero }
+      ; current_epoch= Epoch.zero
+      ; current_slot= Epoch.Slot.zero }
 
     let to_hlist {length; current_epoch; current_slot} =
       Nanobit_base.H_list.[length; current_epoch; current_slot]
@@ -220,6 +232,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   let select _curr _cand = `Keep
 
   (*
+  let select curr cand =
     let cand_fork_before_checkpoint =
       not (List.exists curr.checkpoints ~f:(fun c ->
         List.exists cand.checkpoints ~f:(checkpoint_equal c)))
@@ -234,11 +247,11 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     if not cand_fork_before_checkpoint || not cand_is_valid then
       `Keep
     else if curr.current_epoch.post_lock_hash = cand.current_epoch.post_lock_hash then
-      () (* argmax_(chain in [cand, curr])(len(chain)) *)
+      argmax_(chain in [cand, curr])(len(chain))?
     else if curr.current_epoch.last_start_hash = cand.current_epoch.last_start_hash then
-      () (* argmax_(chain in [cand, curr])(len(chain.last_epoch_length)) *)
+      argmax_(chain in [cand, curr])(len(chain.last_epoch_length))?
     else
-      () (* argmax_(chain in [cand, curr])(len(chain.last_epoch_participation)) *)
+      argmax_(chain in [cand, curr])(len(chain.last_epoch_participation))?
     *)
 
   let genesis_protocol_state =
@@ -252,7 +265,13 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
              (Protocol_state.consensus_state Protocol_state.negative_one)
              Snark_transition.genesis )
 
-  let create_consensus_data _state = Some Consensus_data.genesis
+  let create_consensus_data _state ~time =
+    let open Consensus_data in
+    let epoch, slot =
+      Epoch.epoch_and_slot_of_time_exn
+        (Time.of_span_since_epoch @@ Time.Span.of_ms time)
+    in
+    Some {epoch; slot}
 
   let create_consensus_state _state = Consensus_state.genesis
 end
