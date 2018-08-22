@@ -54,8 +54,9 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   module Epoch = struct
     type t = Segment_id.t
 
-    let interval =
-      Time.(Inputs.slot_interval * (of_ms @@ UInt64.to_int64 Inputs.epoch_size))
+    let size = Inputs.epoch_size
+
+    let interval = Time.(Inputs.slot_interval * (of_ms @@ UInt64.to_int64 size))
 
     let of_time_exn t : t =
       if Time.(t < Inputs.genesis_block_timestamp) then
@@ -256,7 +257,26 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   let update_var (state: Consensus_state.var) _block =
     Snark_params.Tick.Let_syntax.return state
 
-  let update state _transition = Or_error.return state
+  let update state _transition =
+    let open Consensus_state in
+    let current_epoch, next_epoch =
+      if Epoch.Slot.slot_id state.current_epoch.slot >= Epoch.size then
+        ( state.next_epoch
+        , let open Epoch_info in
+          { slot=
+              ( Epoch.Slot.epoch_id state.next_epoch.slot + UInt64.one
+              , UInt64.zero ) } )
+      else
+        ( (let open Epoch_info in
+          { slot=
+              ( Epoch.Slot.epoch_id state.current_epoch.slot
+              , Epoch.Slot.slot_id state.current_epoch.slot + UInt64.one ) })
+        , state.next_epoch )
+    in
+    let state =
+      {length= Length.succ state.length; current_epoch; next_epoch}
+    in
+    Or_error.return state
 
   let step = Async_kernel.Deferred.Or_error.return
 
