@@ -391,6 +391,8 @@ module type Ledger_builder_intf = sig
 
   val create : ledger:ledger -> self:public_key -> t
 
+  val current_ledger_proof : t -> ledger_proof option
+
   val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
 
   (* This should memoize the snark verifications *)

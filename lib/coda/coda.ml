@@ -416,6 +416,10 @@ module Make (Inputs : Inputs_intf) = struct
   let lbc_transition_tree t =
     Ledger_builder_controller.transition_tree t.ledger_builder
 
+  let ledger_builder_ledger_proof t =
+    let lb = best_ledger_builder t in
+    Ledger_builder.current_ledger_proof lb
+
   module Config = struct
     type t =
       { log: Logger.t

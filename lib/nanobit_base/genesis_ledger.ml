@@ -9,12 +9,12 @@ let rich_sk = bigint "IgAAAAAAAAABIJLfK6/afuZTpDqzVSI/eMo7h/HuH/CcZozCtSEgsoLc"
 let poor_sk =
   bigint "KgAAAAAAAAABKEHfd5r8nKEMPSVcgvbWS6CdErbzB4eYaxpr9qJqtKy5JAAAAAAAAAA="
 
-let accounts = 8
+let accounts = 16
 
-let sincere_pairs = List.init accounts ~f:(fun _ -> Signature_keypair.create ())
+let honest_pairs = List.init accounts ~f:(fun _ -> Signature_keypair.create ())
 
-let sincere_pks =
-  List.map sincere_pairs ~f:(fun pair -> Public_key.compress pair.public_key)
+let honest_pks =
+  List.map honest_pairs ~f:(fun pair -> Public_key.compress pair.public_key)
 
 let init_balance = 1000
 
@@ -38,7 +38,7 @@ let ledger =
     ; balance= initial_poor_balance
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; nonce= Account.Nonce.zero } ;
-  List.fold sincere_pairs ~init:() ~f:(fun _ pair ->
+  List.fold honest_pairs ~init:() ~f:(fun _ pair ->
       Ledger.set ledger
         (Public_key.compress pair.public_key)
         { Account.public_key= Public_key.compress pair.public_key

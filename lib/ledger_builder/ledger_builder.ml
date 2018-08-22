@@ -309,6 +309,10 @@ end = struct
     ; ledger
     ; public_key= self }
 
+  let current_ledger_proof t =
+    let res_opt = Parallel_scan.last_emitted_value t.scan_state in
+    Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
+
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
     | Merge ((_, stmt1), (_, stmt2)) ->

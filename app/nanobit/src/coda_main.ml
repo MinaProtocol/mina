@@ -845,6 +845,8 @@ module type Main_intf = sig
   val lbc_transition_tree : t -> Inputs.Transition_tree.t option
 
   val snark_worker_command_name : string
+
+  val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 end
 
 module Run (Program : Main_intf) = struct
@@ -853,6 +855,8 @@ module Run (Program : Main_intf) = struct
 
   module For_tests = struct
     let get_transition_tree t = lbc_transition_tree t
+
+    let ledger_proof t = ledger_builder_ledger_proof t
   end
 
   let get_balance t (addr: Public_key.Compressed.t) =
