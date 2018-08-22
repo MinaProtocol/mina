@@ -90,6 +90,9 @@ struct
       in
       let%map consensus_data =
         Consensus_mechanism.create_consensus_data protocol_state
+          ~time:
+            ( Time.now time_controller |> Time.to_span_since_epoch
+            |> Time.Span.to_ms )
       in
       (protocol_state, consensus_data)
 
