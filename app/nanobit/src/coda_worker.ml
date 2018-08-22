@@ -90,7 +90,7 @@ module Coda_worker = struct
 
           let genesis_proof = Precomputed_values.base_proof
         end in
-        let (module Init) = make_init (module Config) (module Kernel) in
+        let%bind (module Init) = make_init (module Config) (module Kernel) in
         let module Main = Coda.Make (Init) () in
         let module Run = Run (Main) in
         let net_config =
