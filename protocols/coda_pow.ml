@@ -487,6 +487,14 @@ module type Consensus_mechanism_intf = sig
 
   type ledger_builder_diff
 
+  type transaction
+
+  module Consensus_transition_data : sig
+    type value [@@deriving sexp]
+
+    type var
+  end
+
   module Consensus_state : sig
     type value
 
@@ -513,17 +521,6 @@ module type Consensus_mechanism_intf = sig
     val hash : value -> protocol_state_hash
   end
 
-  module Consensus_data : sig
-    type value [@@deriving sexp]
-
-    type var
-  end
-
-  val create_consensus_state : Protocol_state.value -> Consensus_state.value
-
-  val create_consensus_data :
-    Protocol_state.value -> time:Int64.t -> Consensus_data.value option
-
   module Snark_transition : sig
     type value
 
@@ -531,13 +528,13 @@ module type Consensus_mechanism_intf = sig
 
     val create_value :
          blockchain_state:blockchain_state
-      -> consensus_data:Consensus_data.value
+      -> consensus_data:Consensus_transition_data.value
       -> ledger_proof:proof option
       -> value
 
     val blockchain_state : value -> blockchain_state
 
-    val consensus_data : value -> Consensus_data.value
+    val consensus_data : value -> Consensus_transition_data.value
   end
 
   module Internal_transition : sig
@@ -566,6 +563,13 @@ module type Consensus_mechanism_intf = sig
 
     val protocol_state_proof : t -> protocol_state_proof
   end
+
+  val generate_transition :
+       previous_protocol_state:Protocol_state.value
+    -> blockchain_state:blockchain_state
+    -> time:Int64.t
+    -> transactions:transaction list
+    -> Protocol_state.value * Consensus_transition_data.value
 end
 
 module type Time_close_validator_intf = sig
@@ -800,6 +804,7 @@ Merge Snark:
      and type blockchain_state := Blockchain_state.value
      and type proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
+     and type transaction := Transaction.t
 
   module Tip :
     Tip_intf
