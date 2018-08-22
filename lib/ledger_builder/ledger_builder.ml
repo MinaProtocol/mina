@@ -446,8 +446,10 @@ end = struct
   let create_fee_transfers completed_works delta public_key =
     let singles =
       (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
-      @ List.map completed_works ~f:(fun {Completed_work.fee; prover; _} ->
-            (prover, fee) )
+      @ List.filter_map completed_works ~f:
+          (fun {Completed_work.fee; prover; _} ->
+            if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
+            else Some (prover, fee) )
     in
     Or_error.try_with (fun () ->
         Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
