@@ -20,3 +20,14 @@ let gen =
 let of_bigstring = Binable.of_bigstring (module T)
 
 let to_bigstring = Binable.to_bigstring (module T)
+
+let to_base64 t =
+  to_bigstring t
+  |> Bigstring.to_string
+  |> B64.encode
+
+let of_base64 s =
+  B64.decode s
+  |> Bigstring.of_string
+  |> of_bigstring
+

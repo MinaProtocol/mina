@@ -1,12 +1,8 @@
 open Core_kernel
 
-let bigint s =
-  B64.decode s |> Bigstring.of_string |> Private_key.of_bigstring
+let rich_sk = Private_key.of_base64 "JgOTdFn9Dnvlc52Mh7AmUXSokCyFvGV4qrd98TRWKyBsnRGVsIFC"
 
-let rich_sk = bigint "IgAAAAAAAAABIJLfK6/afuZTpDqzVSI/eMo7h/HuH/CcZozCtSEgsoLc"
-
-let poor_sk =
-  bigint "KgAAAAAAAAABKEHfd5r8nKEMPSVcgvbWS6CdErbzB4eYaxpr9qJqtKy5JAAAAAAAAAA="
+let poor_sk = Private_key.of_base64 "JgOg9hn2KucsCNf+tu+TCjgXd1yjUYQpus5e3K5M/XSrAlBJkfh/"
 
 let accounts = 8
 
