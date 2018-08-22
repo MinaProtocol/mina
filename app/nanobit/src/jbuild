@@ -17,6 +17,7 @@
       coda_numbers
       protocols
       nanobit_base
+      test_util
       ledger_builder
       ledger_builder_controller
       sparse_ledger_lib

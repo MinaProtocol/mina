@@ -5,9 +5,6 @@ open Coda_main
 
 let pk sk = Public_key.of_private_key sk |> Public_key.compress
 
-let sk_bigint sk =
-  Private_key.to_bigstring sk |> Private_key.of_bigstring |> Or_error.ok_exn
-
 module type Coda_intf = sig
   type ledger_proof
 
