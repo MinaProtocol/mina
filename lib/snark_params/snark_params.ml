@@ -81,8 +81,6 @@ module Tick = struct
 
       let of_bits = Tock.Field.project
 
-      include Binable.Of_sexpable (T)
-
       let length_in_bits = size_in_bits
 
       type var = Boolean.var list
@@ -154,6 +152,8 @@ module Tick = struct
     include Hashable.Make (Tick0.Field)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
+    let size_in_triples = (size_in_bits + 2)/3
+
     let gen =
       Quickcheck.Generator.map
         Bignum_bigint.(gen_incl zero (Tick0.Field.size - one))
@@ -178,6 +178,9 @@ module Tick = struct
   module Pedersen = struct
     include Crypto_params.Pedersen_params
     include Pedersen.Make (Field) (Bigint) (Inner_curve)
+
+    let zero_hash = digest_fold (State.create params) (Fold_lib.Fold.of_list [(false, false, false)])
+
     module Checked = struct
       include
         Snarky.Pedersen.Make (Tick0) (Inner_curve)
