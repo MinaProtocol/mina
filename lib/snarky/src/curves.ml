@@ -660,6 +660,15 @@ struct
       in
       r
 
+  let if_value (cond : Boolean.var) ~then_ ~else_ =
+    let (x1, y1) = Curve.to_coords then_ in
+    let (x2, y2) = Curve.to_coords else_ in
+    let cond = (cond :> Field.Checked.t) in
+    let choose a1 a2 =
+      Field.Checked.(Infix.(a1 * cond + a2 * (constant Field.one - cond)))
+    in
+    (choose x1 x2, choose y1 y2)
+
   let scale_bits t (c: Boolean.var list) ~init =
     with_label __LOC__
       (let open Let_syntax in

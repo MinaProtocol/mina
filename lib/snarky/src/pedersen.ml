@@ -39,11 +39,13 @@ module Make
     module Unpacked : sig
       type var = private Boolean.var list
 
-      type t
+      type t = bool list
 
       val typ : (var, t) Typ.t
 
       val project : var -> Field.Checked.t
+
+      val constant : t -> var
     end
 
     type t = Field.t
@@ -75,6 +77,9 @@ module Make
 
     val to_initial_segment_digest :
       t -> (Digest.var * [`Length_in_triples of int]) Or_error.t
+
+    val to_initial_segment_digest_exn :
+      t -> (Digest.var * [`Length_in_triples of int])
   end
 
   val hash :
@@ -131,6 +136,8 @@ end = struct
       let typ : (var, t) Typ.t = Typ.list Boolean.typ ~length:length_in_bits
 
       let project = Field.Checked.project
+
+      let constant = List.map ~f:Boolean.var_of_value
     end
 
     type var = Field.Checked.t
@@ -195,6 +202,9 @@ end = struct
         else Ok ()
       in
       (digest (acc t), `Length_in_triples b)
+
+    let to_initial_segment_digest_exn t =
+      Or_error.ok_exn (to_initial_segment_digest t)
 
     let get_term i bits = lookup bits Params.params.(i)
 
