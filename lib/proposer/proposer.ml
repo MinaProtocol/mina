@@ -194,10 +194,10 @@ struct
             (fun scheduled_transition (Tip_change tip) ->
               ( match Time.Timeout.peek scheduled_transition with
               | None ->
-                  Time.Timeout.cancel time_controller scheduled_transaction
+                  Time.Timeout.cancel time_controller scheduled_transition
                     (External_transition_result.empty ())
               | Some result -> External_transition_result.cancel result ) ;
-              return (schedule_transaction tip) )
+              return (schedule_transition tip) )
           >>| ignore ) ;
     {transitions= r}
 end
