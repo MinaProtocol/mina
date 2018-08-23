@@ -64,6 +64,10 @@ module type Time_intf = sig
 
   val diff : t -> t -> Span.t
 
+  val sub : t -> Span.t -> t
+
+  val add : t -> Span.t -> t
+
   val modulus : t -> Span.t -> Span.t
 
   val now : Controller.t -> t

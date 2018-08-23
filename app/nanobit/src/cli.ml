@@ -146,7 +146,11 @@ let () =
       ( if Insecure.integration_tests then
           let module Coda_peers_test =
             Coda_peers_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
-          [ ("coda-peers-test", Coda_peers_test.command)
+          let module Coda_block_production_test =
+            Coda_block_production_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
+          [ (Coda_peers_test.name, Coda_peers_test.command)
+          ; ( Coda_block_production_test.name
+            , Coda_block_production_test.command )
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
     else
@@ -165,7 +169,12 @@ let () =
       ( if Insecure.integration_tests then
           let module Coda_peers_test =
             Coda_peers_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
-          [ ("coda-peers-test", Coda_peers_test.command)
+          let module Coda_block_production_test =
+            Coda_block_production_test.Make (Ledger_proof.Debug) (Kernel)
+              (Coda) in
+          [ (Coda_peers_test.name, Coda_peers_test.command)
+          ; ( Coda_block_production_test.name
+            , Coda_block_production_test.command )
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
   in

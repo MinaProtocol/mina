@@ -3,18 +3,14 @@ open Async
 open Coda_worker
 open Coda_main
 
-module type S = sig
-  val command : Command.t
-end
-
-let name = "coda-peers-test"
-
 module Make
     (Ledger_proof : Ledger_proof_intf)
     (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
     (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) :
-  S =
+  Integration_test_intf.S =
 struct
+  let name = "coda-peers-test"
+
   module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
   open Coda_processes
 
