@@ -20,7 +20,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let transition_interval = Time.Span.of_ms 100.0
 
-    let fee_public_key = Genesis_ledger.rich_pk
+    let fee_public_key = Genesis_ledger.high_balance_pk
 
     let genesis_proof = Precomputed_values.base_proof
   end in
@@ -73,17 +73,17 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
           (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
   in
   let client_port = 8123 in
-  let run_snark_worker = `With_public_key Genesis_ledger.rich_pk in
+  let run_snark_worker = `With_public_key Genesis_ledger.high_balance_pk in
   Run.setup_local_server ~client_port ~minibit ~log ;
   Run.run_snark_worker ~log ~client_port run_snark_worker ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
-  (* Check if rich-man has some balance *)
-  assert_balance rich_pk initial_rich_balance ;
-  assert_balance poor_pk initial_poor_balance ;
+  (* Check if high balance account has expected balance *)
+  assert_balance high_balance_pk initial_high_balance ;
+  assert_balance low_balance_pk initial_low_balance ;
   (*No proof emitted by the parallel scan at the begining*)
   assert (Option.is_none @@ Run.For_tests.ledger_proof minibit) ;
-  (* Note: This is much less than half of the rich balance so we can test
+  (* Note: This is much less than half of the high balance account so we can test
    *       transaction replays being prohibited
    *)
   let send_amount = Currency.Amount.of_int 10 in
@@ -156,10 +156,12 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
           (f_amount i) acc (Currency.Fee.of_int 0) )
   in
   let%bind () =
-    test_sending_transaction Genesis_ledger.rich_sk Genesis_ledger.poor_pk
+    test_sending_transaction Genesis_ledger.high_balance_sk
+      Genesis_ledger.low_balance_pk
   in
   let%bind () =
-    test_sending_transaction Genesis_ledger.rich_sk Genesis_ledger.poor_pk
+    test_sending_transaction Genesis_ledger.high_balance_sk
+      Genesis_ledger.low_balance_pk
   in
   let wait_for_proof_or_timeout () =
     let rec go () =
