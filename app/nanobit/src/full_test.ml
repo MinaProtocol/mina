@@ -157,10 +157,12 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
           (f_amount i) acc (Currency.Fee.of_int 0) )
   in
   let%bind () =
-    test_sending_transaction Genesis_ledger.high_balance_sk Genesis_ledger.low_balance_pk
+    test_sending_transaction Genesis_ledger.high_balance_sk
+      Genesis_ledger.low_balance_pk
   in
   let%bind () =
-    test_sending_transaction Genesis_ledger.high_balance_sk Genesis_ledger.low_balance_pk
+    test_sending_transaction Genesis_ledger.high_balance_sk
+      Genesis_ledger.low_balance_pk
   in
   let wait_for_proof_or_timeout () =
     let rec go () =

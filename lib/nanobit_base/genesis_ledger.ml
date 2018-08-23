@@ -4,13 +4,17 @@ let pk str = Binable.of_string (module Public_key.Compressed) (B64.decode str)
 
 let sk str = Binable.of_string (module Private_key) (B64.decode str)
 
-let high_balance_pk = pk "JgFkl9FmG1SLJ+Ph8kCGuG0bH0RHYdUe6VcmqlVBlNfDPm8y/9wZAA=="
+let high_balance_pk =
+  pk "JgFkl9FmG1SLJ+Ph8kCGuG0bH0RHYdUe6VcmqlVBlNfDPm8y/9wZAA=="
 
-let high_balance_sk = sk "ASjoODd+z5uFSXr3XlFpvy3O7j2+2RlnU354HErLSv9jrAUAAAAAAAAA"
+let high_balance_sk =
+  sk "ASjoODd+z5uFSXr3XlFpvy3O7j2+2RlnU354HErLSv9jrAUAAAAAAAAA"
 
-let low_balance_pk = pk "JgL1+XZwf8h3rHAONU7JEEpC88rYKCsht+s1SQMHHBmjL6OtRuMeAQ=="
+let low_balance_pk =
+  pk "JgL1+XZwf8h3rHAONU7JEEpC88rYKCsht+s1SQMHHBmjL6OtRuMeAQ=="
 
-let low_balance_sk = sk "AShPfTImkKIlph1SoMhbcK6Ykz+CJnpJNg/Pm2TU6j9D5SEAAAAAAAAA"
+let low_balance_sk =
+  sk "AShPfTImkKIlph1SoMhbcK6Ykz+CJnpJNg/Pm2TU6j9D5SEAAAAAAAAA"
 
 let extra_accounts =
   [ ( pk "JgKdMWuYhlGknk9gfyfOCRcjWilIjb3Pc+7qohJ7BFeq5Pbp+g3QAA=="
