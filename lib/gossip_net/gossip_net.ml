@@ -18,8 +18,7 @@ module type Config_intf = sig
   type t =
     { timeout: Time.Span.t
     ; target_peer_count: int
-    ; address: Peer.t
-    ; initial_peers: Peer.t list
+    ; initial_peers: Host_and_port.t list
     ; me: Peer.t
     ; conf_dir: string
     ; parent_log: Logger.t }
@@ -66,8 +65,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     type t =
       { timeout: Time.Span.t
       ; target_peer_count: int
-      ; address: Peer.t
-      ; initial_peers: Peer.t list
+      ; initial_peers: Host_and_port.t list
       ; me: Peer.t
       ; conf_dir: string
       ; parent_log: Logger.t }
@@ -94,6 +92,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       | Error exn -> Or_error.of_exn exn
 
   let broadcast_selected t peers msg =
+    let peers = List.map peers ~f:(fun peer -> Peer.external_rpc peer) in
     let send peer =
       Logger.fatal t.log !"send peer %{sexp: Host_and_port.t}" peer;
       try_call_rpc peer t.timeout
@@ -114,7 +113,6 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let%map membership =
       match%map
         Membership.connect ~initial_peers:config.initial_peers ~me:config.me
-          ~external_rpc_port:(Host_and_port.port config.address)
           ~conf_dir:config.conf_dir ~parent_log:log
       with
       | Ok membership -> membership
@@ -165,13 +163,13 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
             List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
             Deferred.unit )) ;
-    Logger.fatal t.log !"starting server on %{sexp: Host_and_port.t}" config.address;
+    Logger.fatal t.log !"starting server on %d" (snd config.me);
     ignore
       (Tcp.Server.create
          ~on_handler_error:
            (`Call
              (fun _ exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
-         (Tcp.Where_to_listen.of_port (Host_and_port.port config.address))
+         (Tcp.Where_to_listen.of_port (snd config.me))
          (fun _ reader writer ->
            Rpc.Connection.server_with_close reader writer ~implementations
              ~connection_state:(fun _ -> ())
@@ -201,6 +199,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let query_peer t (peer: Peer.t) rpc query =
     Logger.trace t.log "querying peer"
       ~attrs:[("peer", [%sexp_of : Peer.t] peer)] ;
+    let peer = Peer.external_rpc peer in
     try_call_rpc peer t.timeout rpc query
 
   let query_random_peers t n rpc query =

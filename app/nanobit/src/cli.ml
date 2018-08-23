@@ -79,7 +79,7 @@ let daemon (type ledger_proof) (module Kernel
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
-       let me = Host_and_port.create ~host:ip ~port in
+       let me = (Host_and_port.create ~host:ip ~port, membership_port) in
        let module Config = struct
          let logger = log
 
@@ -109,7 +109,6 @@ let daemon (type ledger_proof) (module Kernel
                ; parent_log= log
                ; target_peer_count= 8
                ; conf_dir
-               ; address= Host_and_port.create ~host:ip ~port:membership_port
                ; initial_peers
                ; me } }
          in

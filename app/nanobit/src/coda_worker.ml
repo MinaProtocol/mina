@@ -19,7 +19,7 @@ struct
 
   module T = struct
     module Peers = struct
-      type t = Host_and_port.t List.t [@@deriving bin_io]
+      type t = Kademlia.Peer.t List.t [@@deriving bin_io]
     end
 
     type 'worker functions =
@@ -92,9 +92,8 @@ struct
               { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
               ; target_peer_count= 8
               ; conf_dir
-              ; address= Host_and_port.create ~host ~port:gossip_port
               ; initial_peers= peers
-              ; me= Host_and_port.create ~host ~port:my_port
+              ; me= (Host_and_port.create ~host ~port:my_port, gossip_port)
               ; parent_log= log } }
         in
         let%bind coda =
