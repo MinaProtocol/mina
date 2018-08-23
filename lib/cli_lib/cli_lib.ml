@@ -66,4 +66,8 @@ let txn_nonce =
   let open Nanobit_base in
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
-let default_daemon_port = 8302
+let default_client_port = 8301
+
+let default_external_port = 8302
+
+let default_discovery_port = 8303
