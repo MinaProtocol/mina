@@ -44,7 +44,7 @@ module Haskell_process = struct
 
   let cli_format (addr, port) : string =
     (* assertion for discovery_port = external_port - 1 *)
-    assert((Host_and_port.port addr) - 1 = port);
+    assert (Host_and_port.port addr - 1 = port) ;
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
       (Host_and_port.port addr)
 
@@ -197,14 +197,11 @@ struct
              List.partition_map lines ~f:(fun line ->
                  match String.split ~on:' ' line with
                  | [addr; kademliaKey; "on"] ->
-                    let addr = Host_and_port.of_string addr in
-                     `Fst
-                       (( addr, Host_and_port.port addr - 1)
-                       , kademliaKey )
+                     let addr = Host_and_port.of_string addr in
+                     `Fst ((addr, Host_and_port.port addr - 1), kademliaKey)
                  | [addr; _; "off"] ->
-                    let addr = Host_and_port.of_string addr in
-                     `Snd
-                       ( addr, Host_and_port.port addr - 1)
+                     let addr = Host_and_port.of_string addr in
+                     `Snd (addr, Host_and_port.port addr - 1)
                  | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
              )
            in

@@ -13,8 +13,8 @@ struct
   let init () = Parallel.init_master ()
 
   let net_configs n =
-    let external_ports = List.init n ~f:(fun i -> 23000 + i*2) in
-    let discovery_ports = List.init n ~f:(fun i -> 23000 + 1 + i*2) in
+    let external_ports = List.init n ~f:(fun i -> 23000 + (i * 2)) in
+    let discovery_ports = List.init n ~f:(fun i -> 23000 + 1 + (i * 2)) in
     let all_peers =
       List.map discovery_ports ~f:(fun p -> Host_and_port.create "127.0.0.1" p)
     in
