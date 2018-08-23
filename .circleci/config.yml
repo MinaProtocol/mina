@@ -3,39 +3,47 @@ jobs:
   build:
     resource_class: xlarge
     docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
+      - image: debian:9-slim
+      #- image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
         # ENV variable is located in circleci
         auth:
           username: _json_key
           password: $JSON_GCLOUD_CREDENTIALS
     steps:
-      - checkout
-
+      #- checkout
       - run:
-          name: Lint
-          command: eval `opam config env` && make check-format
-
+        name: Test Tee Out
+        command: cat /proc/cpuinfo | tee /tmp/myoutput
       - run:
-          name: Build Haskell
-          command: source ~/.profile && cd app/kademlia-haskell && nix-build release2.nix
+        name: Test Tee Read
+        command: cat /tmp/myoutput
 
-      - run:
-          name: Build OCaml
-          command: eval `opam config env` && set -o pipefail && dune build -j8 | tee /tmp/build.log
 
-      - run:
-          name: Install python -- hack
-          command: sudo apt install -y python
+    #   - run:
+    #       name: Lint
+    #       command: eval `opam config env` && make check-format
 
-      - run: 
-          name: Count Warns
-          command: ./scripts/buildwarns.py /tmp/build.log
+    #   - run:
+    #       name: Build Haskell
+    #       command: source ~/.profile && cd app/kademlia-haskell && nix-build release2.nix
 
-      - run:
-          name: Build deb Package
-          command: make deb
+    #   - run:
+    #       name: Build OCaml
+    #       command: eval `opam config env` && set -o pipefail && dune build -j8 | tee /tmp/build.log
 
-      - run:
-          name: Run All Tests
-          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test
+    #   - run:
+    #       name: Install python -- hack
+    #       command: sudo apt install -y python
+
+    #   - run: 
+    #       name: Count Warns
+    #       command: ./scripts/buildwarns.py /tmp/build.log
+
+    #   - run:
+    #       name: Build deb Package
+    #       command: make deb
+
+    #   - run:
+    #       name: Run All Tests
+    #       command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test
 
