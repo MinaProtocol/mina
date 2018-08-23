@@ -4,13 +4,13 @@ let pk str = Binable.of_string (module Public_key.Compressed) (B64.decode str)
 
 let sk str = Binable.of_string (module Private_key) (B64.decode str)
 
-let rich_pk = pk "JgFkl9FmG1SLJ+Ph8kCGuG0bH0RHYdUe6VcmqlVBlNfDPm8y/9wZAA=="
+let high_balance_pk = pk "JgFkl9FmG1SLJ+Ph8kCGuG0bH0RHYdUe6VcmqlVBlNfDPm8y/9wZAA=="
 
-let rich_sk = sk "ASjoODd+z5uFSXr3XlFpvy3O7j2+2RlnU354HErLSv9jrAUAAAAAAAAA"
+let high_balance_sk = sk "ASjoODd+z5uFSXr3XlFpvy3O7j2+2RlnU354HErLSv9jrAUAAAAAAAAA"
 
-let poor_pk = pk "JgL1+XZwf8h3rHAONU7JEEpC88rYKCsht+s1SQMHHBmjL6OtRuMeAQ=="
+let low_balance_pk = pk "JgL1+XZwf8h3rHAONU7JEEpC88rYKCsht+s1SQMHHBmjL6OtRuMeAQ=="
 
-let poor_sk = sk "AShPfTImkKIlph1SoMhbcK6Ykz+CJnpJNg/Pm2TU6j9D5SEAAAAAAAAA"
+let low_balance_sk = sk "AShPfTImkKIlph1SoMhbcK6Ykz+CJnpJNg/Pm2TU6j9D5SEAAAAAAAAA"
 
 let extra_accounts =
   [ ( pk "JgKdMWuYhlGknk9gfyfOCRcjWilIjb3Pc+7qohJ7BFeq5Pbp+g3QAA=="
@@ -50,20 +50,20 @@ let pks = fst @@ List.unzip extra_accounts
 
 let init_balance = 1000
 
-let initial_rich_balance = Currency.Balance.of_int 10_000
+let initial_high_balance = Currency.Balance.of_int 10_000
 
-let initial_poor_balance = Currency.Balance.of_int 100
+let initial_low_balance = Currency.Balance.of_int 100
 
 let ledger =
   let ledger = Ledger.create () in
-  Ledger.set ledger rich_pk
-    { Account.public_key= rich_pk
-    ; balance= initial_rich_balance
+  Ledger.set ledger high_balance_pk
+    { Account.public_key= high_balance_pk
+    ; balance= initial_high_balance
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; nonce= Account.Nonce.zero } ;
-  Ledger.set ledger poor_pk
-    { Account.public_key= poor_pk
-    ; balance= initial_poor_balance
+  Ledger.set ledger low_balance_pk
+    { Account.public_key= low_balance_pk
+    ; balance= initial_low_balance
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; nonce= Account.Nonce.zero } ;
   List.fold pks ~init:() ~f:(fun _ pk ->
