@@ -81,6 +81,8 @@ val add : t -> Span.t -> t
 
 val diff : t -> t -> Span.t
 
+val sub : t -> Span.t -> t
+
 val to_span_since_epoch : t -> Span.t
 
 val of_span_since_epoch : Span.t -> t
