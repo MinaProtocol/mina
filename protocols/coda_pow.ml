@@ -229,7 +229,7 @@ module type Super_transaction_intf = sig
   type t = Transaction of valid_transaction | Fee_transfer of fee_transfer
   [@@deriving sexp, compare, eq, bin_io]
 
-  val fee_excess : t -> Fee.Unsigned.t Or_error.t
+  val fee_excess : t -> Fee.Signed.t Or_error.t
 end
 
 module type Ledger_proof_statement_intf = sig
