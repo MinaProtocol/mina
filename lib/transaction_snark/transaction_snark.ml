@@ -1259,7 +1259,7 @@ let%test_module "transaction_snark" =
       of_transaction source target transaction (handle_with_ledger ledger)
 
     let%test "base_and_merge" =
-      Test_util.with_randomness 123456789 (fun () ->
+      Snark_params.Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
           Array.iter wallets ~f:(fun {account; _} ->

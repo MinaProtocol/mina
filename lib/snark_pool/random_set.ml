@@ -86,7 +86,7 @@ let%test_module "random set test" =
     module Int_random_set = Make (Int)
 
     let%test "simulate random numbers from 0 to 10" =
-      Test_util.with_randomness 123456789 (fun () ->
+      Snark_params.Test_util.with_randomness 123456789 (fun () ->
           let s = Int_random_set.create () in
           let upper_bound = 10 in
           let sample_size = 100000 in

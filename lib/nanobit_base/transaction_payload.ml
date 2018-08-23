@@ -90,7 +90,7 @@ let gen =
   {receiver; amount; fee; nonce}
 
 let%test_unit "to_bits" =
-  let open Test_util in
+  let open Snark_params.Test_util in
   with_randomness 123456789 (fun () ->
       let input =
         { receiver= {Public_key.Compressed.x= Field.random (); is_odd= Random.bool ()}
@@ -98,7 +98,7 @@ let%test_unit "to_bits" =
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random () }
       in
-      Test_util.test_to_triples typ fold var_to_triples input
+      test_to_triples typ fold var_to_triples input
   )
 
 let var_of_t ({receiver; amount; fee; nonce}: t) : var =
