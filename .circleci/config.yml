@@ -10,39 +10,32 @@ jobs:
           password: $JSON_GCLOUD_CREDENTIALS
     steps:
       - checkout
+
       - run:
-          name: Test Tee Out
-          command: cat /proc/cpuinfo | tee /tmp/myoutput
+          name: Lint
+          command: eval `opam config env` && make check-format
+
       - run:
-          name: Test Tee Read
-          command: cat /tmp/myoutput
+          name: Build Haskell
+          command: source ~/.profile && make kademlia
 
+      - run:
+          name: Build OCaml
+          command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
 
-    #   - run:
-    #       name: Lint
-    #       command: eval `opam config env` && make check-format
+      - run:
+          name: Install python -- hack
+          command: sudo apt install -y python
 
-    #   - run:
-    #       name: Build Haskell
-    #       command: source ~/.profile && cd app/kademlia-haskell && nix-build release2.nix
+      - run: 
+          name: Count OCaml Warns
+          command: ./scripts/buildwarns.py /tmp/buildocaml.log
 
-    #   - run:
-    #       name: Build OCaml
-    #       command: eval `opam config env` && set -o pipefail && dune build -j8 | tee /tmp/build.log
+      - run:
+          name: Build deb Package
+          command: make deb
 
-    #   - run:
-    #       name: Install python -- hack
-    #       command: sudo apt install -y python
-
-    #   - run: 
-    #       name: Count Warns
-    #       command: ./scripts/buildwarns.py /tmp/build.log
-
-    #   - run:
-    #       name: Build deb Package
-    #       command: make deb
-
-    #   - run:
-    #       name: Run All Tests
-    #       command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test
+      - run:
+          name: Run All Tests
+          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test
 
