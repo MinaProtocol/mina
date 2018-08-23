@@ -79,7 +79,7 @@ let check_signature ({payload; sender; signature}: t) =
 
 let%test_unit "completeness" =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  Quickcheck.test (gen ~keys ~max_amount:10000 ~max_fee:1000) ~f:(fun t ->
+  Quickcheck.test ~trials:20 (gen ~keys ~max_amount:10000 ~max_fee:1000) ~f:(fun t ->
     assert (check_signature t))
 
 let check t = Option.some_if (check_signature t) t
