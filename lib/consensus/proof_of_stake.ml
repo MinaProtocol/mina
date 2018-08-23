@@ -2,6 +2,7 @@ open Core_kernel
 open Signed
 open Unsigned
 open Coda_numbers
+open Currency
 
 module type Inputs_intf = sig
   module Proof : sig
@@ -40,7 +41,11 @@ module type Inputs_intf = sig
     val add : t -> Span.t -> t
   end
 
-  val genesis_block_timestamp : Time.t
+  val genesis_state_timestamp : Time.t
+
+  val genesis_ledger_total_currency : Amount.t
+
+  val coinbase : Amount.t
 
   val slot_interval : Time.Span.t
 
@@ -69,11 +74,11 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
           Time.Span.to_ms Inputs.slot_interval * int64_of_uint32 size)
 
     let of_time_exn t : t =
-      if Time.(t < Inputs.genesis_block_timestamp) then
+      if Time.(t < Inputs.genesis_state_timestamp) then
         raise
           (Invalid_argument
              "Epoch.of_time: time is less than genesis block timestamp") ;
-      let time_since_genesis = Time.diff t Inputs.genesis_block_timestamp in
+      let time_since_genesis = Time.diff t Inputs.genesis_state_timestamp in
       uint32_of_int64
         Int64.Infix.(
           Time.Span.to_ms time_since_genesis / Time.Span.to_ms interval)
@@ -82,7 +87,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
       let ms =
         let open Int64.Infix in
         Time.Span.to_ms
-          (Time.to_span_since_epoch Inputs.genesis_block_timestamp)
+          (Time.to_span_since_epoch Inputs.genesis_state_timestamp)
         + (int64_of_uint32 epoch * Time.Span.to_ms interval)
       in
       Time.of_span_since_epoch (Time.Span.of_ms ms)
@@ -115,94 +120,127 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
       (epoch, slot)
   end
 
-  module Consensus_data = struct
-    type ('epoch, 'slot) t = {epoch: 'epoch; slot: 'slot}
+  module Consensus_transition_data = struct
+    type ('epoch, 'slot, 'amount) t =
+      {epoch: 'epoch; slot: 'slot; total_currency_diff: 'amount}
     [@@deriving sexp, bin_io, eq, compare]
 
-    type value = (Epoch.t, Epoch.Slot.t) t
+    type value = (Epoch.t, Epoch.Slot.t, Amount.t) t
     [@@deriving sexp, bin_io, eq, compare]
 
-    type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
+    type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var, Amount.var) t
 
-    let genesis = {epoch= Epoch.zero; slot= Epoch.Slot.zero}
+    let genesis =
+      { epoch= Epoch.zero
+      ; slot= Epoch.Slot.zero
+      ; total_currency_diff= Amount.zero }
 
-    let to_hlist {epoch; slot} = Nanobit_base.H_list.[epoch; slot]
+    let to_hlist {epoch; slot; total_currency_diff} =
+      Nanobit_base.H_list.[epoch; slot; total_currency_diff]
 
     let of_hlist :
-           (unit, 'epoch -> 'slot -> unit) Nanobit_base.H_list.t
-        -> ('epoch, 'slot) t =
-     fun Nanobit_base.H_list.([epoch; slot]) -> {epoch; slot}
+           (unit, 'epoch -> 'slot -> 'amount -> unit) Nanobit_base.H_list.t
+        -> ('epoch, 'slot, 'amount) t =
+     fun Nanobit_base.H_list.([epoch; slot; total_currency_diff]) ->
+      {epoch; slot; total_currency_diff}
 
     let data_spec =
-      Snark_params.Tick.Data_spec.[Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ]
+      let open Snark_params.Tick.Data_spec in
+      [Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ; Amount.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let fold {epoch; slot} =
-      Nanobit_base.Util.(Epoch.Bits.fold epoch +> Epoch.Slot.Bits.fold slot)
+    let fold {epoch; slot; total_currency_diff} =
+      let open Nanobit_base.Util in
+      Epoch.Bits.fold epoch +> Epoch.Slot.Bits.fold slot
+      +> Amount.fold total_currency_diff
 
-    let var_to_bits {epoch; slot} =
-      Epoch.Unpacked.var_to_bits epoch @ Epoch.Slot.Unpacked.var_to_bits slot
+    let var_to_bits {epoch; slot; total_currency_diff} =
+      Epoch.Unpacked.var_to_bits epoch
+      @ Epoch.Slot.Unpacked.var_to_bits slot
+      @ ( total_currency_diff |> Amount.var_to_bits
+        |> Bitstring_lib.Bitstring.Lsb_first.to_list )
 
-    let bit_length = Epoch.length_in_bits + Epoch.Slot.length_in_bits
+    let bit_length =
+      Epoch.length_in_bits + Epoch.Slot.length_in_bits + Amount.length
   end
 
   module Consensus_state = struct
-    type ('length, 'epoch, 'slot) t =
-      {length: 'length; current_epoch: 'epoch; current_slot: 'slot}
+    type ('length, 'epoch, 'slot, 'amount) t =
+      { length: 'length
+      ; current_epoch: 'epoch
+      ; current_slot: 'slot
+      ; total_currency: 'amount }
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    type value = (Length.t, Epoch.t, Epoch.Slot.t) t
+    type value = (Length.t, Epoch.t, Epoch.Slot.t, Amount.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var =
-      (Length.Unpacked.var, Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
+      ( Length.Unpacked.var
+      , Epoch.Unpacked.var
+      , Epoch.Slot.Unpacked.var
+      , Amount.var )
+      t
 
     let genesis =
       { length= Length.zero
       ; current_epoch= Epoch.zero
-      ; current_slot= Epoch.Slot.zero }
+      ; current_slot= Epoch.Slot.zero
+      ; total_currency= Inputs.genesis_ledger_total_currency }
 
-    let to_hlist {length; current_epoch; current_slot} =
-      Nanobit_base.H_list.[length; current_epoch; current_slot]
+    let to_hlist {length; current_epoch; current_slot; total_currency} =
+      Nanobit_base.H_list.[length; current_epoch; current_slot; total_currency]
 
     let of_hlist :
-           (unit, 'length -> 'epoch -> 'slot -> unit) Nanobit_base.H_list.t
-        -> ('length, 'epoch, 'slot) t =
-     fun Nanobit_base.H_list.([length; current_epoch; current_slot]) ->
-      {length; current_epoch; current_slot}
+           ( unit
+           , 'length -> 'epoch -> 'slot -> 'amount -> unit )
+           Nanobit_base.H_list.t
+        -> ('length, 'epoch, 'slot, 'amount) t =
+     fun Nanobit_base.H_list.([ length
+                              ; current_epoch
+                              ; current_slot
+                              ; total_currency ]) ->
+      {length; current_epoch; current_slot; total_currency}
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
-      [Length.Unpacked.typ; Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ]
+      [ Length.Unpacked.typ
+      ; Epoch.Unpacked.typ
+      ; Epoch.Slot.Unpacked.typ
+      ; Amount.typ ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let var_to_bits {length; current_epoch; current_slot} =
+    let var_to_bits {length; current_epoch; current_slot; total_currency} =
       Snark_params.Tick.Let_syntax.return
         ( Length.Unpacked.var_to_bits length
         @ Epoch.Unpacked.var_to_bits current_epoch
-        @ Epoch.Slot.Unpacked.var_to_bits current_slot )
+        @ Epoch.Slot.Unpacked.var_to_bits current_slot
+        @ ( total_currency |> Amount.var_to_bits
+          |> Bitstring_lib.Bitstring.Lsb_first.to_list ) )
 
-    let fold {length; current_epoch; current_slot} =
+    let fold {length; current_epoch; current_slot; total_currency} =
       let open Nanobit_base.Util in
       Length.Bits.fold length
       +> Epoch.Bits.fold current_epoch
       +> Epoch.Slot.Bits.fold current_slot
+      +> Amount.fold total_currency
 
     let bit_length =
       Length.length_in_bits + Epoch.length_in_bits + Epoch.Slot.length_in_bits
+      + Amount.length
   end
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)
   module Snark_transition =
-    Nanobit_base.Snark_transition.Make (Consensus_data) (Proof)
+    Nanobit_base.Snark_transition.Make (Consensus_transition_data) (Proof)
   module Internal_transition =
     Nanobit_base.Internal_transition.Make (Ledger_builder_diff)
       (Snark_transition)
@@ -210,22 +248,27 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     Nanobit_base.External_transition.Make (Ledger_builder_diff)
       (Protocol_state)
 
-  let verify (_transition: Snark_transition.var) =
-    Snark_params.Tick.(Let_syntax.return Boolean.true_)
+  let verify _transition = Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
-  let update_var (state: Consensus_state.var) _block =
-    Snark_params.Tick.Let_syntax.return state
+  let update_var state _transition = Snark_params.Tick.Let_syntax.return state
 
-  let update state transition =
-    let open Consensus_data in
+  let update (state: Consensus_state.value)
+      (transition: Snark_transition.value) =
+    let open Or_error.Let_syntax in
     let open Consensus_state in
-    let consensus_data = Snark_transition.consensus_data transition in
-    let state =
-      { length= Length.succ state.length
-      ; current_epoch= consensus_data.epoch
-      ; current_slot= consensus_data.slot }
+    let Consensus_transition_data.({epoch; slot; total_currency_diff}) =
+      Snark_transition.consensus_data transition
     in
-    Or_error.return state
+    let%map total_currency =
+      Amount.add state.total_currency total_currency_diff
+      |> Option.map ~f:Or_error.return
+      |> Option.value
+           ~default:(Or_error.error_string "failed to add total_currency")
+    in
+    { length= Length.succ state.length
+    ; current_epoch= epoch
+    ; current_slot= slot
+    ; total_currency }
 
   let step = Async_kernel.Deferred.Or_error.return
 
@@ -253,6 +296,34 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     else
       argmax_(chain in [cand, curr])(len(chain.last_epoch_participation))?
     *)
+  (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
+  let generate_transition ~previous_protocol_state ~blockchain_state ~time
+      ~transactions:_ =
+    let previous_consensus_state =
+      Protocol_state.consensus_state previous_protocol_state
+    in
+    let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
+    let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
+    let consensus_transition_data =
+      let open Consensus_transition_data in
+      {epoch; slot; total_currency_diff= Inputs.coinbase}
+    in
+    let consensus_state =
+      let open Consensus_state in
+      { length= Length.succ previous_consensus_state.length
+      ; current_epoch= epoch
+      ; current_slot= slot
+      ; total_currency=
+          Option.value_exn ~message:"failed to add total currency"
+            (Amount.add previous_consensus_state.total_currency Inputs.coinbase)
+      }
+    in
+    let protocol_state =
+      Protocol_state.create_value
+        ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
+        ~blockchain_state ~consensus_state
+    in
+    (protocol_state, consensus_transition_data)
 
   let genesis_protocol_state =
     Protocol_state.create_value
@@ -264,14 +335,4 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
         @@ update
              (Protocol_state.consensus_state Protocol_state.negative_one)
              Snark_transition.genesis )
-
-  let create_consensus_data _state ~time =
-    let open Consensus_data in
-    let epoch, slot =
-      Epoch.epoch_and_slot_of_time_exn
-        (Time.of_span_since_epoch @@ Time.Span.of_ms time)
-    in
-    Some {epoch; slot}
-
-  let create_consensus_state _state = Consensus_state.genesis
 end

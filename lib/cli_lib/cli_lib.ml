@@ -43,6 +43,9 @@ let public_key =
   Command.Arg_type.map public_key_compressed
     ~f:Nanobit_base.Public_key.decompress_exn
 
+let peer : Host_and_port.t Command.Arg_type.t =
+  Command.Arg_type.create (fun s -> Host_and_port.of_string s)
+
 let private_key =
   let module Sk = Key_arg_type (struct
     include Nanobit_base.Private_key

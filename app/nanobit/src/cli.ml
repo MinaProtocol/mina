@@ -20,13 +20,20 @@ let daemon (type ledger_proof) (module Kernel
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"Configuration directory" (optional file)
      and should_mine = flag "mine" ~doc:"Run the miner" (optional bool)
+     and peers =
+       flag "peer"
+         ~doc:
+           "Host_and_port for TCP daemon communications (can be given \
+            multiple times)"
+         (listed peer)
      and run_snark_worker =
        flag "run-snark-worker" ~doc:"Run the SNARK worker"
          (optional public_key_compressed)
      and port =
        flag "port"
          ~doc:
-           (Printf.sprintf "Server port for other to connect (default: %d)"
+           (Printf.sprintf
+              "Server port for other daemons to connect (default: %d)"
               default_daemon_port)
          (optional int16)
      and client_port =
@@ -34,9 +41,7 @@ let daemon (type ledger_proof) (module Kernel
          ~doc:"Port for client to connect daemon locally (default: 8301)"
          (optional int16)
      and membership_port =
-       flag "membership-port"
-         ~doc:
-           "Port for dameon to find out the membership topology (default: 8303)"
+       flag "membership-port" ~doc:"Port for P2P UDP overlay (default: 8303)"
          (optional int16)
      and ip =
        flag "ip" ~doc:"External IP address for others to connect"
@@ -54,18 +59,21 @@ let daemon (type ledger_proof) (module Kernel
        let membership_port = Option.value ~default:8303 membership_port in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
-         let peers_path = conf_dir ^/ "peers" in
-         match%bind
-           Reader.load_sexp peers_path [%of_sexp : Host_and_port.t list]
-         with
-         | Ok ls -> return ls
-         | Error e ->
-             let default_initial_peers = [] in
-             let%map () =
-               Writer.save_sexp peers_path
-                 ([%sexp_of : Host_and_port.t list] default_initial_peers)
-             in
-             []
+         match peers with
+         | _ :: _ -> return peers
+         | [] ->
+             let peers_path = conf_dir ^/ "peers" in
+             match%bind
+               Reader.load_sexp peers_path [%of_sexp : Host_and_port.t list]
+             with
+             | Ok ls -> return ls
+             | Error e ->
+                 let default_initial_peers = [] in
+                 let%map () =
+                   Writer.save_sexp peers_path
+                     ([%sexp_of : Host_and_port.t list] default_initial_peers)
+                 in
+                 []
        in
        let log = Logger.create () in
        let%bind ip =
