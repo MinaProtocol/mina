@@ -1,18 +1,20 @@
 open Snark_params
 
-module Step_prover_state : sig
-  type t =
-    { wrap_vk: Tock.Verification_key.t
-    ; prev_proof: Tock.Proof.t
-    ; prev_state: Blockchain_snark.Blockchain_state.t
-    ; update: Nanobit_base.Block.t }
-end
-
-module Wrap_prover_state : sig
-  type t = {proof: Tick.Proof.t}
-end
-
 module type S = sig
+  module Consensus_mechanism : Consensus.Mechanism.S
+
+  module Step_prover_state : sig
+    type t =
+      { wrap_vk: Tock.Verification_key.t
+      ; prev_proof: Tock.Proof.t
+      ; prev_state: Consensus_mechanism.Protocol_state.value
+      ; update: Consensus_mechanism.Snark_transition.value }
+  end
+
+  module Wrap_prover_state : sig
+    type t = {proof: Tick.Proof.t}
+  end
+
   val transaction_snark_keys : Transaction_snark.Keys.t
 
   module Step : sig
@@ -28,7 +30,8 @@ module type S = sig
 
     module Prover_state = Step_prover_state
 
-    val instance_hash : Blockchain_snark.Blockchain_state.t -> Tick.Field.t
+    val instance_hash :
+      Consensus_mechanism.Protocol_state.value -> Tick.Field.t
 
     val main : Tick.Field.var -> (unit, Prover_state.t) Tick.Checked.t
   end
@@ -46,4 +49,10 @@ module type S = sig
   end
 end
 
-val create : unit -> (module S) Async.Deferred.t
+module Make
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with type Proof.t = Tock.Proof.t) : sig
+  module type S = S with module Consensus_mechanism = Consensus_mechanism
+
+  val create : unit -> (module S) Async.Deferred.t
+end

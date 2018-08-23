@@ -69,10 +69,14 @@ module type Ledger_hash_intf = sig
   include Hashable.S_binable with type t := t
 end
 
-module type State_hash_intf = sig
+module type Protocol_state_hash_intf = sig
   type t [@@deriving bin_io, sexp, eq]
 
   include Hashable.S_binable with type t := t
+end
+
+module type Protocol_state_proof_intf = sig
+  type t
 end
 
 module type Ledger_builder_aux_hash_intf = sig
@@ -82,7 +86,7 @@ module type Ledger_builder_aux_hash_intf = sig
 end
 
 module type Ledger_builder_hash_intf = sig
-  type t [@@deriving bin_io, sexp, eq]
+  type t [@@deriving bin_io, sexp, eq, compare]
 
   type ledger_hash
 
@@ -177,16 +181,18 @@ module type Private_key_intf = sig
   type t
 end
 
+module type Compressed_public_key_intf = sig
+  type t [@@deriving sexp, bin_io, compare]
+
+  include Comparable.S with type t := t
+end
+
 module type Public_key_intf = sig
   module Private_key : Private_key_intf
 
-  type t
+  type t [@@deriving sexp]
 
-  module Compressed : sig
-    type t [@@deriving sexp, bin_io, compare]
-
-    include Comparable.S with type t := t
-  end
+  module Compressed : Compressed_public_key_intf
 
   val of_private_key : Private_key.t -> t
 end
@@ -236,11 +242,23 @@ module type Ledger_proof_intf = sig
 
   type message
 
-  type t
+  type proof
 
-  val verify : t -> statement -> message:message -> bool Deferred.t
+  type t [@@deriving sexp]
 
   val statement_target : statement -> ledger_hash
+
+  val underlying_proof : t -> proof
+end
+
+module type Ledger_proof_verifier_intf = sig
+  type ledger_proof
+
+  type message
+
+  type statement
+
+  val verify : ledger_proof -> statement -> message:message -> bool Deferred.t
 end
 
 module type Completed_work_intf = sig
@@ -252,6 +270,14 @@ module type Completed_work_intf = sig
 
   module Statement : sig
     type t = statement list
+
+    include Sexpable.S with type t := t
+
+    include Binable.S with type t := t
+
+    include Hashable.S_binable with type t := t
+
+    val gen : t Quickcheck.Generator.t
   end
 
   (* TODO: The SOK message actually should bind the SNARK to
@@ -263,11 +289,13 @@ module type Completed_work_intf = sig
   type t = {fee: Fee.Unsigned.t; proofs: proof list; prover: public_key}
   [@@deriving sexp, bin_io]
 
-  module Checked : sig
-    type t [@@deriving sexp]
-  end
+  type unchecked = t
 
-  val check : t -> Statement.t -> Checked.t option Deferred.t
+  module Checked : sig
+    type t [@@deriving sexp, bin_io]
+
+    val create_unsafe : unchecked -> t
+  end
 
   val forget : Checked.t -> t
 
@@ -399,140 +427,137 @@ module type Ledger_builder_intf = sig
 end
 
 module type Tip_intf = sig
-  type state
+  type protocol_state
 
-  type state_proof
+  type protocol_state_proof
 
   type ledger_builder
 
-  type transition
-
-  type t = {state: state; proof: state_proof; ledger_builder: ledger_builder}
-  [@@deriving sexp, bin_io]
-
-  val of_transition_and_lb : transition -> ledger_builder -> t
-end
-
-module type Nonce_intf = sig
-  type t
-
-  val succ : t -> t
-
-  val random : unit -> t
-end
-
-module type Strength_intf = sig
-  type t [@@deriving compare, bin_io]
-
-  type difficulty
-
-  val zero : t
-
-  val ( < ) : t -> t -> bool
-
-  val ( > ) : t -> t -> bool
-
-  val ( = ) : t -> t -> bool
-
-  val increase : t -> by:difficulty -> t
-end
-
-module type Length_intf = sig
-  type t [@@deriving compare, bin_io]
-
-  val zero : t
-
-  val succ : t -> t
-end
-
-module type Pow_intf = sig
-  type t
-end
-
-module type Difficulty_intf = sig
-  type t
-
-  type time
-
-  type pow
-
-  val next : t -> last:time -> this:time -> t
-
-  val meets : t -> pow -> bool
-end
-
-module type State_intf = sig
-  type state_hash
-
-  type ledger_hash
-
-  type ledger_builder_hash
-
-  type nonce
-
-  type pow
-
-  type difficulty
-
-  type strength
-
-  type length
-
-  type time
-
-  type public_key
+  type external_transition
 
   type t =
-    { next_difficulty: difficulty
-    ; previous_state_hash: state_hash
-    ; ledger_builder_hash: ledger_builder_hash
-    ; ledger_hash: ledger_hash
-    ; strength: strength
-    ; length: length
-    ; timestamp: time
-    ; signer_public_key: public_key }
-  [@@deriving sexp, bin_io, fields]
+    { protocol_state: protocol_state
+    ; proof: protocol_state_proof
+    ; ledger_builder: ledger_builder }
+  [@@deriving sexp, bin_io]
 
-  val hash : t -> state_hash
-
-  val create_pow : t -> nonce -> pow Or_error.t
+  val of_transition_and_lb : external_transition -> ledger_builder -> t
 end
 
-module type Internal_transition_intf = sig
+module type Blockchain_state_intf = sig
+  type ledger_builder_hash
+
   type ledger_hash
 
-  type ledger_builder_hash
+  type time
+
+  type value [@@deriving sexp, bin_io]
+
+  type var
+
+  val create_value :
+       ledger_builder_hash:ledger_builder_hash
+    -> ledger_hash:ledger_hash
+    -> timestamp:time
+    -> value
+
+  val ledger_builder_hash : value -> ledger_builder_hash
+
+  val ledger_hash : value -> ledger_hash
+
+  val timestamp : value -> time
+end
+
+module type Consensus_mechanism_intf = sig
+  type protocol_state_proof
+
+  type protocol_state_hash
+
+  type blockchain_state
 
   type proof
 
-  type nonce
-
-  type time
-
   type ledger_builder_diff
 
-  type t =
-    { ledger_hash: ledger_hash (* TODO: I believe this is unused. *)
-    ; ledger_builder_hash: ledger_builder_hash
-    ; ledger_proof: proof option
-    ; ledger_builder_diff: ledger_builder_diff
-    ; timestamp: time
-    ; nonce: nonce }
-  [@@deriving fields, sexp]
-end
+  module Consensus_state : sig
+    type value
 
-module type External_transition_intf = sig
-  type state_proof
+    type var
+  end
 
-  type state
+  module Protocol_state : sig
+    type value [@@deriving sexp, bin_io]
 
-  type ledger_builder_diff
+    type var
 
-  type t =
-    { state_proof: state_proof
-    ; state: state
-    ; ledger_builder_diff: ledger_builder_diff }
-  [@@deriving compare, fields, eq, bin_io, sexp]
+    val create_value :
+         previous_state_hash:protocol_state_hash
+      -> blockchain_state:blockchain_state
+      -> consensus_state:Consensus_state.value
+      -> value
+
+    val previous_state_hash : value -> protocol_state_hash
+
+    val blockchain_state : value -> blockchain_state
+
+    val consensus_state : value -> Consensus_state.value
+
+    val hash : value -> protocol_state_hash
+  end
+
+  module Consensus_data : sig
+    type value [@@deriving sexp]
+
+    type var
+  end
+
+  val create_consensus_state : Protocol_state.value -> Consensus_state.value
+
+  val create_consensus_data :
+    Protocol_state.value -> Consensus_data.value option
+
+  module Snark_transition : sig
+    type value
+
+    type var
+
+    val create_value :
+         blockchain_state:blockchain_state
+      -> consensus_data:Consensus_data.value
+      -> ledger_proof:proof option
+      -> value
+
+    val blockchain_state : value -> blockchain_state
+
+    val consensus_data : value -> Consensus_data.value
+  end
+
+  module Internal_transition : sig
+    type t [@@deriving sexp]
+
+    val create :
+         snark_transition:Snark_transition.value
+      -> ledger_builder_diff:ledger_builder_diff
+      -> t
+
+    val snark_transition : t -> Snark_transition.value
+
+    val ledger_builder_diff : t -> ledger_builder_diff
+  end
+
+  module External_transition : sig
+    type t [@@deriving sexp]
+
+    val create :
+         protocol_state:Protocol_state.value
+      -> protocol_state_proof:protocol_state_proof
+      -> ledger_builder_diff:ledger_builder_diff
+      -> t
+
+    val protocol_state : t -> Protocol_state.value
+
+    val protocol_state_proof : t -> protocol_state_proof
+  end
 end
 
 module type Time_close_validator_intf = sig
@@ -571,14 +596,17 @@ module type Machine_intf = sig
 end
 
 module type Block_state_transition_proof_intf = sig
-  type state
+  type protocol_state
 
-  type proof
+  type protocol_state_proof
 
-  type transition
+  type internal_transition
 
   module Witness : sig
-    type t = {old_state: state; old_proof: proof; transition: transition}
+    type t =
+      { old_state: protocol_state
+      ; old_proof: protocol_state_proof
+      ; transition: internal_transition }
   end
 
   (*
@@ -603,7 +631,8 @@ Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
   *)
   (* TODO: Why is this taking new_state? *)
 
-  val prove_zk_state_valid : Witness.t -> new_state:state -> proof Deferred.t
+  val prove_zk_state_valid :
+    Witness.t -> new_state:protocol_state -> protocol_state_proof Deferred.t
 end
 
 module Proof_carrying_data = struct
@@ -615,7 +644,12 @@ module type Inputs_intf = sig
 
   module Private_key : Private_key_intf
 
-  module Public_key : Public_key_intf with module Private_key := Private_key
+  module Compressed_public_key : Compressed_public_key_intf
+
+  module Public_key :
+    Public_key_intf
+    with module Private_key := Private_key
+     and module Compressed = Compressed_public_key
 
   module Transaction :
     Transaction_intf with type public_key := Public_key.Compressed.t
@@ -628,9 +662,11 @@ module type Inputs_intf = sig
     with type valid_transaction := Transaction.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
 
-  module Block_nonce : Nonce_intf
-
   module Ledger_hash : Ledger_hash_intf
+
+  module Proof : sig
+    type t
+  end
 
   module Ledger_proof_statement :
     Ledger_proof_statement_intf with type ledger_hash := Ledger_hash.t
@@ -640,23 +676,19 @@ module type Inputs_intf = sig
     with type message := Fee.Unsigned.t * Public_key.Compressed.t
      and type ledger_hash := Ledger_hash.t
      and type statement := Ledger_proof_statement.t
+     and type proof := Proof.t
+
+  module Ledger_proof_verifier :
+    Ledger_proof_verifier_intf
+    with type message := Fee.Unsigned.t * Public_key.Compressed.t
+     and type ledger_proof := Ledger_proof.t
+     and type statement := Ledger_proof_statement.t
 
   module Ledger :
     Ledger_intf
     with type valid_transaction := Transaction.With_valid_signature.t
      and type super_transaction := Super_transaction.t
      and type ledger_hash := Ledger_hash.t
-
-  module Pow : Pow_intf
-
-  module Difficulty :
-    Difficulty_intf with type time := Time.t and type pow := Pow.t
-
-  module Strength : Strength_intf with type difficulty := Difficulty.t
-
-  module Length : Length_intf
-
-  module State_hash : State_hash_intf
 
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
 
@@ -743,66 +775,56 @@ Merge Snark:
      and type diff_with_valid_signatures_and_proofs :=
                 Ledger_builder_diff.With_valid_signatures_and_proofs.t
 
-  module Internal_transition :
-    Internal_transition_intf
-    with type ledger_hash := Ledger_hash.t
-     and type ledger_builder_hash := Ledger_builder_hash.t
-     and type proof := Ledger_proof.t
-     and type nonce := Block_nonce.t
+  module Blockchain_state :
+    Blockchain_state_intf
+    with type ledger_builder_hash := Ledger_builder_hash.t
+     and type ledger_hash := Ledger_hash.t
      and type time := Time.t
+
+  module Protocol_state_hash : Protocol_state_hash_intf
+
+  module Protocol_state_proof : Protocol_state_proof_intf
+
+  module Consensus_mechanism :
+    Consensus_mechanism_intf
+    with type protocol_state_hash := Protocol_state_hash.t
+     and type protocol_state_proof := Protocol_state_proof.t
+     and type blockchain_state := Blockchain_state.value
+     and type proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
-
-  module State : sig
-    include State_intf
-            with type ledger_hash := Ledger_hash.t
-             and type state_hash := State_hash.t
-             and type difficulty := Difficulty.t
-             and type strength := Strength.t
-             and type time := Time.t
-             and type nonce := Block_nonce.t
-             and type ledger_builder_hash := Ledger_builder_hash.t
-             and type pow := Pow.t
-             and type length := Length.t
-             and type public_key := Public_key.t
-
-    module Proof : sig
-      include Proof_intf with type input = t
-
-      include Sexpable.S with type t := t
-    end
-  end
-
-  module External_transition :
-    External_transition_intf
-    with type state_proof := State.Proof.t
-     and type ledger_builder_diff := Ledger_builder_diff.t
-     and type state := State.t
 
   module Tip :
     Tip_intf
     with type ledger_builder := Ledger_builder.t
-     and type state := State.t
-     and type state_proof := State.Proof.t
-     and type transition := External_transition.t
+     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state_proof := Protocol_state_proof.t
+     and type external_transition := Consensus_mechanism.External_transition.t
 end
 
 module Make
     (Inputs : Inputs_intf)
     (Block_state_transition_proof : Block_state_transition_proof_intf
-                                    with type state := Inputs.State.t
-                                     and type proof := Inputs.State.Proof.t
-                                     and type transition :=
-                                                Inputs.Internal_transition.t) =
+                                    with type protocol_state :=
+                                                Inputs.Consensus_mechanism.
+                                                Protocol_state.value
+                                     and type protocol_state_proof :=
+                                                Inputs.Protocol_state_proof.t
+                                     and type internal_transition :=
+                                                Inputs.Consensus_mechanism.
+                                                Internal_transition.t) =
 struct
   open Inputs
 
   module Proof_carrying_state = struct
-    type t = (State.t, State.Proof.t) Proof_carrying_data.t
+    type t =
+      ( Consensus_mechanism.Protocol_state.value
+      , Protocol_state_proof.t )
+      Proof_carrying_data.t
   end
 
   module Event = struct
     type t =
-      | Found of Internal_transition.t
+      | Found of Consensus_mechanism.Internal_transition.t
       | New_state of Proof_carrying_state.t * Ledger_builder_transition.t
   end
 

@@ -2,6 +2,8 @@ open Core_kernel
 open Async_kernel
 open Snark_params
 open Snark_bits
+open Fold_lib
+
 module Digest = Tick.Pedersen.Digest
 
 module Keys = struct
@@ -39,7 +41,7 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _e -> failwithf "Transaction_snark: load failed on %s" p ()
       in
       let%map step = load tick_controller step
       and wrap = load tock_controller wrap in
@@ -74,7 +76,7 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _e -> failwithf "Transaction_snark: load failed on %s" p ()
       in
       let%map step = load tick_controller step
       and wrap = load tock_controller wrap in
@@ -110,34 +112,63 @@ module Keys = struct
     )
 end
 
-module Make (T : Transaction_snark.Verification.S) = struct
+module Make
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with type Proof.t = Tock.Proof.t)
+    (T : Transaction_snark.Verification.S) =
+struct
+  module Blockchain = Blockchain_state.Make (Consensus_mechanism)
+
   module System = struct
-    module U = Blockchain_state.Make_update (T)
+    module U = Blockchain.Make_update (T)
+    module Update = Consensus_mechanism.Snark_transition
 
     module State = struct
+      include Consensus_mechanism.Protocol_state
+
       include (
-        Blockchain_state :
-          module type of Blockchain_state
-          with module Checked := Blockchain_state.Checked )
+        Blockchain :
+          module type of Blockchain with module Checked := Blockchain.Checked )
 
       include (U : module type of U with module Checked := U.Checked)
 
+      module Hash = Nanobit_base.State_hash
+
       module Checked = struct
-        include Blockchain_state.Checked
+        include Blockchain.Checked
         include U.Checked
       end
     end
-
-    module Update = Nanobit_base.Block
   end
 
   open Nanobit_base
 
   include Transition_system.Make (struct
-              module Tick = Digest
-              module Tock = Bits.Snarkable.Field (Tock)
-            end)
-            (System)
+      module Tick = struct
+        module Packed = struct
+          type value = Tick.Pedersen.Digest.t
+          type var = Tick.Pedersen.Checked.Digest.var
+          let typ = Tick.Pedersen.Checked.Digest.typ
+        end
+        module Unpacked = struct
+          type value = Tick.Pedersen.Checked.Digest.Unpacked.t
+          type var = Tick.Pedersen.Checked.Digest.Unpacked.var
+          let typ : (var, value) Tick.Typ.t = Tick.Pedersen.Checked.Digest.Unpacked.typ
+          let var_to_bits (x : var) = (x :> Tick.Boolean.var list)
+          let var_to_triples xs =
+            Fold.(to_list (
+              group3 ~default:Tick.Boolean.false_ (of_list (var_to_bits xs))))
+          let var_of_value = Tick.Pedersen.Checked.Digest.Unpacked.constant
+        end
+        let project_value = Tick.Field.project
+        let project_var = Tick.Pedersen.Checked.Digest.Unpacked.project
+        let unpack_value = Tick.Field.unpack
+        let choose_preimage_var = Tick.Pedersen.Checked.Digest.choose_preimage
+      end
+
+      module Tock = Bits.Snarkable.Field (Tock)
+    end)
+    (System)
 
   module Keys = struct
     include Keys

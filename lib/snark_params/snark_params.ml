@@ -81,8 +81,6 @@ module Tick = struct
 
       let of_bits = Tock.Field.project
 
-      include Binable.Of_sexpable (T)
-
       let length_in_bits = size_in_bits
 
       type var = Boolean.var list
@@ -120,6 +118,8 @@ module Tick = struct
       then Some (Field.sqrt y2)
       else None
 
+    let scale = scale_field
+
     module Checked = struct
       include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
                 (struct
@@ -129,6 +129,18 @@ module Tick = struct
                 end)
                 (Coefficients)
 
+      let with_random_shift k =
+        let open Let_syntax in
+        let%bind init =
+          provide_witness typ
+            As_prover.(return (random ()))
+        in
+        let%bind shifted = k ~init in
+        add shifted (negate init)
+
+      let scale g s = with_random_shift (scale_bits g s)
+      let scale_known g s = with_random_shift (scale_known g s)
+
       let add_known v x = add v (constant x)
     end
 
@@ -136,21 +148,11 @@ module Tick = struct
   end
 
   module Field = struct
-    module T = struct
-      include Tick0.Field
-
-      let compare t1 t2 = Bigint.(compare (of_field t1) (of_field t2))
-
-      let hash_fold_t s x =
-        Bignum_bigint.hash_fold_t s Bigint.(to_bignum_bigint (of_field x))
-
-      let hash = Hash.of_fold hash_fold_t
-    end
-
-    include T
-    include Hashable.Make (T)
-    include Field_bin.Make (Tick0.Field) (Tick_curve.Bigint.R)
+    include Tick0.Field
+    include Hashable.Make (Tick0.Field)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
+
+    let size_in_triples = (size_in_bits + 2)/3
 
     let gen =
       Quickcheck.Generator.map
@@ -176,6 +178,9 @@ module Tick = struct
   module Pedersen = struct
     include Crypto_params.Pedersen_params
     include Pedersen.Make (Field) (Bigint) (Inner_curve)
+
+    let zero_hash = digest_fold (State.create params) (Fold_lib.Fold.of_list [(false, false, false)])
+
     module Checked = struct
       include
         Snarky.Pedersen.Make (Tick0) (Inner_curve)
@@ -203,7 +208,7 @@ let embed (x: Tick.Field.t) : Tock.Field.t =
   in
   go Tock.Field.one Tock.Field.zero 0
 
-let ledger_depth = 3
+let ledger_depth = 10
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

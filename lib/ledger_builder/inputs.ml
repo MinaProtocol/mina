@@ -4,17 +4,13 @@ open Protocols
 module type S = sig
   open Coda_pow
 
-  module Public_key : sig
-    type t [@@deriving sexp, bin_io, compare]
-
-    include Comparable.S with type t := t
-  end
+  module Compressed_public_key : Compressed_public_key_intf
 
   module Transaction :
-    Coda_pow.Transaction_intf with type public_key := Public_key.t
+    Coda_pow.Transaction_intf with type public_key := Compressed_public_key.t
 
   module Fee_transfer :
-    Coda_pow.Fee_transfer_intf with type public_key := Public_key.t
+    Coda_pow.Fee_transfer_intf with type public_key := Compressed_public_key.t
 
   module Super_transaction :
     Coda_pow.Super_transaction_intf
@@ -26,16 +22,27 @@ module type S = sig
   module Ledger_proof_statement :
     Coda_pow.Ledger_proof_statement_intf with type ledger_hash := Ledger_hash.t
 
+  module Proof : sig
+    type t
+  end
+
   module Ledger_proof : sig
     include Coda_pow.Ledger_proof_intf
             with type statement := Ledger_proof_statement.t
-             and type message := Fee.Unsigned.t * Public_key.t
+             and type message := Fee.Unsigned.t * Compressed_public_key.t
              and type ledger_hash := Ledger_hash.t
+             and type proof := Proof.t
 
     include Binable.S with type t := t
 
     include Sexpable.S with type t := t
   end
+
+  module Ledger_proof_verifier :
+    Ledger_proof_verifier_intf
+    with type statement := Ledger_proof_statement.t
+     and type message := Fee.Unsigned.t * Compressed_public_key.t
+     and type ledger_proof := Ledger_proof.t
 
   module Ledger :
     Coda_pow.Ledger_intf
@@ -46,7 +53,7 @@ module type S = sig
   module Sparse_ledger : sig
     type t [@@deriving sexp, bin_io]
 
-    val of_ledger_subset_exn : Ledger.t -> Public_key.t list -> t
+    val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
   end
 
   module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
@@ -60,7 +67,7 @@ module type S = sig
     Coda_pow.Completed_work_intf
     with type proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
-     and type public_key := Public_key.t
+     and type public_key := Compressed_public_key.t
 
   module Ledger_builder_diff :
     Coda_pow.Ledger_builder_diff_intf
@@ -69,10 +76,15 @@ module type S = sig
      and type transaction := Transaction.t
      and type transaction_with_valid_signature :=
                 Transaction.With_valid_signature.t
-     and type public_key := Public_key.t
+     and type public_key := Compressed_public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Config : sig
     val parallelism_log_2 : int
   end
+
+  val check :
+       Completed_work.t
+    -> Ledger_proof_statement.t list
+    -> Completed_work.Checked.t option Async_kernel.Deferred.t
 end

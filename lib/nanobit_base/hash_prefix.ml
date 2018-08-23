@@ -2,7 +2,7 @@ open Core_kernel
 
 let length_in_bytes = 20
 
-let length_in_bits = 8 * length_in_bytes
+let length_in_triples = Util.bit_length_to_triple_length (8 * length_in_bytes)
 
 module T : sig
   type t = private string
@@ -25,7 +25,7 @@ end
 let salt s =
   Snark_params.Tick.Pedersen.(State.salt params (T.create s :> string))
 
-let blockchain_state = salt "CodaBCState"
+let protocol_state = salt "CodaProtoState"
 
 let account = salt "CodaAccount"
 

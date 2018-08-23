@@ -35,10 +35,11 @@ type var = (Payload.var, Public_key.var, Signature.var) t_
 let sign (kp: Signature_keypair.t) (payload: Payload.t) : t =
   { payload
   ; sender= kp.public_key
-  ; signature= Schnorr.sign kp.private_key payload }
+  ; signature=
+      Schnorr.sign kp.private_key payload }
 
 let typ : (var, t) Tick.Typ.t =
-  let spec = Data_spec.[Payload.typ; Public_key.typ; Signature.typ] in
+  let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
   let of_hlist
         : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
     H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
@@ -50,7 +51,6 @@ let typ : (var, t) Tick.Typ.t =
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let gen ~keys ~max_amount ~max_fee =
-  let open Quickcheck.Generator in
   let open Quickcheck.Generator.Let_syntax in
   let%map sender_idx = Int.gen_incl 0 (Array.length keys - 1)
   and receiver_idx = Int.gen_incl 0 (Array.length keys - 1)
@@ -75,6 +75,11 @@ module With_valid_signature = struct
 end
 
 let check_signature ({payload; sender; signature}: t) =
-  Schnorr.verify signature sender payload
+  Schnorr.verify signature (Inner_curve.of_coords sender) payload
+
+let%test_unit "completeness" =
+  let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
+  Quickcheck.test ~trials:20 (gen ~keys ~max_amount:10000 ~max_fee:1000) ~f:(fun t ->
+    assert (check_signature t))
 
 let check t = Option.some_if (check_signature t) t
