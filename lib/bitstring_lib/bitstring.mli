@@ -1,4 +1,5 @@
 open Core_kernel
+open Tuple_lib
 
 module type S = sig
   type 'a t = private 'a list
@@ -19,3 +20,6 @@ and Lsb_first : sig
 
   val of_msb_first : 'a Lsb_first.t -> 'a t
 end
+
+val pad_to_triple_list
+  : default:'a -> 'a list -> 'a Triple.t list

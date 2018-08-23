@@ -1,16 +1,17 @@
 open Core_kernel
 open Snark_bits
+open Fold_lib
+open Tuple_lib
 
 module type S = sig
   type curve
 
-  type fold =
-    init:curve * int -> f:(curve * int -> bool -> curve * int) -> curve * int
-
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq]
+    type t [@@deriving bin_io, sexp, eq, hash, compare]
 
     val size_in_bits : int
+
+    val fold : t -> bool Triple.t Fold.t
 
     val ( = ) : t -> t -> bool
 
@@ -24,39 +25,39 @@ module type S = sig
   end
 
   module Params : sig
-    type t = curve array
-
-    val random : max_input_length:int -> t
+    type t = curve Quadruple.t array
   end
 
   module State : sig
-    type t = {bits_consumed: int; acc: curve; params: Params.t}
+    type t = {triples_consumed: int; acc: curve; params: Params.t}
 
-    val create : ?bits_consumed:int -> ?init:curve -> Params.t -> t
+    val create : ?triples_consumed:int -> ?init:curve -> Params.t -> t
 
-    val update_bigstring : t -> Bigstring.t -> t
-
-    val update_string : t -> string -> t
-
-    val update_fold : t -> fold -> t
-
-    val update_iter : t -> (f:(bool -> unit) -> unit) -> t
+    val update_fold : t -> bool Triple.t Fold.t -> t
 
     val digest : t -> Digest.t
 
     val salt : Params.t -> string -> t
   end
 
-  val hash_fold : State.t -> fold -> State.t
+  val hash_fold : State.t -> bool Triple.t Fold.t -> State.t
 
-  val digest_fold : State.t -> fold -> Digest.t
+  val digest_fold : State.t -> bool Triple.t Fold.t -> Digest.t
 end
 
 module Make (Field : sig
-  include Snarky.Field_intf.S
-
-  include Sexpable.S with type t := t
+  type t [@@deriving sexp, bin_io, compare, hash, eq]
+  include Snarky.Field_intf.S with type t := t
 end)
-(Bigint : Snarky.Bigint_intf.Extended with type field := Field.t)
-(Curve : Snarky.Curves.Edwards.Basic.S with type field := Field.t) :
+(Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
+    type t
+
+    val to_coords : t -> Field.t * Field.t
+
+    val zero : t
+
+    val add : t -> t -> t
+
+    val negate : t -> t
+end) :
   S with type curve := Curve.t and type Digest.t = Field.t

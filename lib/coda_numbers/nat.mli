@@ -1,5 +1,7 @@
 open Core_kernel
 open Snark_bits
+open Fold_lib
+open Tuple_lib
 
 module type S = sig
   type t [@@deriving sexp, compare, eq, hash]
@@ -10,7 +12,7 @@ module type S = sig
     end
   end
 
-  val length_in_bits : int
+  val length_in_triples : int
 
   val gen : t Quickcheck.Generator.t
 
@@ -34,6 +36,8 @@ module type S = sig
   include Snark_params.Tick.Snarkable.Bits.Small
           with type Unpacked.value = t
            and type Packed.value = t
+
+  val fold : t -> bool Triple.t Fold.t
 end
 
 module type F = functor (N :sig
