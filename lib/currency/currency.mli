@@ -4,7 +4,7 @@ open Snark_bits
 open Bitstring_lib
 
 module type Basic = sig
-  type t [@@deriving sexp, compare, eq, hash]
+  type t [@@deriving bin_io, sexp, compare, eq, hash]
 
   val gen : t Quickcheck.Generator.t
 

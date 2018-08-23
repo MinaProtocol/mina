@@ -37,7 +37,11 @@ module type Inputs_intf = sig
     val add : t -> Span.t -> t
   end
 
-  val genesis_block_timestamp : Time.t
+  val genesis_state_timestamp : Time.t
+
+  val genesis_ledger_total_currency : Currency.Amount.t
+
+  val coinbase : Currency.Amount.t
 
   val slot_interval : Time.Span.t
 

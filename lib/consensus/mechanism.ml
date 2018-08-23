@@ -5,6 +5,14 @@ module type S = sig
     type t [@@deriving bin_io, sexp]
   end
 
+  module Consensus_transition_data : sig
+    type value [@@deriving bin_io, sexp]
+
+    include Snark_params.Tick.Snarkable.S with type value := value
+
+    val genesis : value
+  end
+
   module Consensus_state : sig
     type value [@@deriving hash, eq, compare, bin_io, sexp]
 
@@ -24,17 +32,9 @@ module type S = sig
   module Protocol_state :
     Nanobit_base.Protocol_state.S with module Consensus_state = Consensus_state
 
-  module Consensus_data : sig
-    type value [@@deriving bin_io, sexp]
-
-    include Snark_params.Tick.Snarkable.S with type value := value
-
-    val genesis : value
-  end
-
   module Snark_transition :
     Nanobit_base.Snark_transition.S
-    with module Consensus_data = Consensus_data
+    with module Consensus_data = Consensus_transition_data
      and module Proof = Proof
 
   module Internal_transition :
@@ -65,10 +65,12 @@ module type S = sig
 
   val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
 
+  val generate_transition :
+       previous_protocol_state:Protocol_state.value
+    -> blockchain_state:Nanobit_base.Blockchain_state.value
+    -> time:Int64.t
+    -> transactions:Nanobit_base.Transaction.t list
+    -> Protocol_state.value * Consensus_transition_data.value
+
   val genesis_protocol_state : Protocol_state.value
-
-  val create_consensus_state : Protocol_state.value -> Consensus_state.value
-
-  val create_consensus_data :
-    Protocol_state.value -> time:Int64.t -> Consensus_data.value option
 end
