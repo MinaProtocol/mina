@@ -21,7 +21,15 @@ jobs:
 
       - run:
           name: Build OCaml
-          command: eval `opam config env` && dune build -j8
+          command: eval `opam config env` && dune build -j8 | tee build.log
+
+      - run:
+	  name: Install python (hack)
+	  command: apt install python
+
+      - run: 
+	  name: Count Warns
+	  command: ./scripts/buildwarns.py build.log
 
       - run:
           name: Build deb Package
