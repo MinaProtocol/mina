@@ -10,11 +10,12 @@ end
 let name = "coda-peers-test"
 
 module Make
-    (Kernel : Kernel_intf)
-    (Coda : Coda_intf.S with type ledger_proof = Kernel.Ledger_proof.t) :
+    (Ledger_proof : Ledger_proof_intf)
+    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
+    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) :
   S =
 struct
-  module Coda_processes = Coda_processes.Make (Kernel) (Coda)
+  module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
   open Coda_processes
 
   let main () =

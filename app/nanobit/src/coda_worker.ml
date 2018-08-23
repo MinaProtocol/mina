@@ -4,8 +4,9 @@ open Nanobit_base
 open Coda_main
 
 module Make
-    (Kernel : Kernel_intf)
-    (Coda : Coda_intf.S with type ledger_proof = Kernel.Ledger_proof.t) =
+    (Ledger_proof : Ledger_proof_intf)
+    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
+    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
 struct
   type input =
     { host: string

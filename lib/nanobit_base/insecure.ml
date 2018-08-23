@@ -15,6 +15,8 @@ let private_key_generation = true
 
 let randomness = true
 
+let integration_tests = true
+
 (* Enabling this will SPEED UP builds as keys are generated at compile-time *)
 let key_generation = true
 
