@@ -5,7 +5,7 @@ open Fold_lib
 
 module Global_keypair = struct
   let private_key =
-    Private_key.of_base64 "JgDwuhZ+kgxR1jBT+F9hpH96nxD/TIGZ7fVSpw9YAGDlhwltebhc"
+    Private_key.of_base64_exn "JgDwuhZ+kgxR1jBT+F9hpH96nxD/TIGZ7fVSpw9YAGDlhwltebhc"
 
   let public_key = Public_key.of_private_key private_key
 end

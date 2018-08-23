@@ -1,8 +1,8 @@
 open Core_kernel
 
-let rich_sk = Private_key.of_base64 "JgOTdFn9Dnvlc52Mh7AmUXSokCyFvGV4qrd98TRWKyBsnRGVsIFC"
+let rich_sk = Private_key.of_base64_exn "JgOTdFn9Dnvlc52Mh7AmUXSokCyFvGV4qrd98TRWKyBsnRGVsIFC"
 
-let poor_sk = Private_key.of_base64 "JgOg9hn2KucsCNf+tu+TCjgXd1yjUYQpus5e3K5M/XSrAlBJkfh/"
+let poor_sk = Private_key.of_base64_exn "JgOg9hn2KucsCNf+tu+TCjgXd1yjUYQpus5e3K5M/XSrAlBJkfh/"
 
 let accounts = 8
 

@@ -17,7 +17,7 @@ let gen =
     (gen_incl one (Snark_params.Tick.Inner_curve.Scalar.size - one))
     ~f:Snark_params.Tock.Bigint.(Fn.compose to_field of_bignum_bigint)
 
-let of_bigstring = Binable.of_bigstring (module T)
+let of_bigstring_exn = Binable.of_bigstring (module T)
 
 let to_bigstring = Binable.to_bigstring (module T)
 
@@ -26,8 +26,8 @@ let to_base64 t =
   |> Bigstring.to_string
   |> B64.encode
 
-let of_base64 s =
+let of_base64_exn s =
   B64.decode s
   |> Bigstring.of_string
-  |> of_bigstring
+  |> of_bigstring_exn
 
