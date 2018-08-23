@@ -21,7 +21,7 @@ jobs:
 
       - run:
           name: Build OCaml
-          command: eval `opam config env` && dune build -j8 | tee /tmp/build.log
+          command: eval `opam config env` && set -o pipefail && dune build -j8 | tee /tmp/build.log
 
       - run:
           name: Install python -- hack
