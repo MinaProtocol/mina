@@ -7,6 +7,7 @@ module type S = sig
   val connect :
        initial_peers:Peer.t list
     -> me:Peer.t
+    -> external_rpc_port:int
     -> parent_log:Logger.t
     -> conf_dir:string
     -> t Deferred.Or_error.t
@@ -46,11 +47,16 @@ module Haskell_process = struct
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
       (Host_and_port.port addr)
 
-  let create ~initial_peers ~me ~log ~conf_dir =
+  let cli_format_init (addr: Host_and_port.t) (external_port: int) : string =
+    Printf.sprintf "(\"%s\", %d, %d)" (Host_and_port.host addr)
+      (Host_and_port.port addr)
+      external_port
+
+  let create ~initial_peers ~me ~external_rpc_port ~log ~conf_dir =
     let lock_path = Filename.concat conf_dir lock_file in
     let run_kademlia () =
       let args =
-        ["test"; cli_format me] @ List.map initial_peers ~f:cli_format
+        ["test"; cli_format_init me external_rpc_port] @ List.map initial_peers ~f:cli_format
       in
       Logger.debug log "Args: %s\n"
         (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
@@ -82,7 +88,7 @@ module Haskell_process = struct
     in
     let open Deferred.Or_error.Let_syntax in
     let args =
-      ["test"; cli_format me] @ List.map initial_peers ~f:cli_format
+      ["test"; cli_format_init me external_rpc_port] @ List.map initial_peers ~f:cli_format
     in
     Logger.debug log "Args: %s\n"
       (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
@@ -140,6 +146,7 @@ module Make (P : sig
   val create :
        initial_peers:Peer.t list
     -> me:Peer.t
+    -> external_rpc_port:int
     -> log:Logger.t
     -> conf_dir:string
     -> t Deferred.Or_error.t
@@ -172,10 +179,10 @@ struct
       Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
     else Deferred.unit
 
-  let connect ~initial_peers ~me ~parent_log ~conf_dir =
+  let connect ~initial_peers ~me ~external_rpc_port ~parent_log ~conf_dir =
     let open Deferred.Or_error.Let_syntax in
     let log = Logger.child parent_log "membership" in
-    let%map p = P.create ~initial_peers ~me ~log ~conf_dir in
+    let%map p = P.create ~initial_peers ~me ~external_rpc_port ~log ~conf_dir in
     let peers = Peer.Table.create () in
     let changes_reader, changes_writer = Linear_pipe.create () in
     let first_peers_ivar = ref None in
@@ -224,6 +231,7 @@ let%test_module "Tests" =
           match%bind
             M.connect ~initial_peers:[]
               ~me:(Host_and_port.create ~host:"127.0.0.1" ~port:3000)
+              ~external_rpc_port:3001
               ~parent_log:(Logger.create ()) ~conf_dir:"/tmp/membership-test"
           with
           | Ok t ->
@@ -245,7 +253,7 @@ let%test_module "Tests" =
 
       let kill _ = return ()
 
-      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~me:_ ~external_rpc_port:_ ~log:_ ~conf_dir:_ =
         let on p = Printf.sprintf "127.0.0.1:%d key on" p in
         let off p = Printf.sprintf "127.0.0.1:%d key off" p in
         let render cmds =
@@ -270,7 +278,7 @@ let%test_module "Tests" =
         in
         ()
 
-      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~me:_ ~external_rpc_port:_ ~log:_ ~conf_dir:_ =
         let open Deferred.Let_syntax in
         (* Try kademlia, then prepend test_prefix if it's missing *)
         match%bind Process.create ~prog:"./dummy.sh" ~args:[] () with
@@ -348,8 +356,8 @@ let%test_unit "connect" =
       let%bind () = Async.Unix.mkdir ~p:() conf_dir_1 in
       let%bind () = Async.Unix.mkdir ~p:() conf_dir_2 in
       File_system.with_temp_dirs [conf_dir_1; conf_dir_2] ~f:(fun () ->
-          let%bind _n0 = node (addr 0) [] conf_dir_1
-          and _n1 = node (addr 1) [addr 0] conf_dir_2 in
+          let%bind _n0 = node (addr 0) [] conf_dir_1 ~external_rpc_port:1001
+          and _n1 = node (addr 1) [addr 0] conf_dir_2 ~external_rpc_port:1000 in
           let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
           let%bind n0_peers =
             Deferred.any
@@ -374,7 +382,7 @@ let%test_unit "lockfile does not exist after connection calling stop" =
       let open Async in
       let open Deferred.Let_syntax in
       File_system.with_temp_dirs [conf_dir] ~f:(fun () ->
-          let%bind n = node (addr 1) [] conf_dir >>| Or_error.ok_exn in
+          let%bind n = node (addr 1) [] conf_dir ~external_rpc_port:1000 >>| Or_error.ok_exn in
           let lock_path = Filename.concat conf_dir lock_file in
           let%bind yes_result = Sys.file_exists lock_path in
           assert (`Yes = yes_result) ;

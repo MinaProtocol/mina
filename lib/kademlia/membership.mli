@@ -6,6 +6,7 @@ module type S = sig
   val connect :
        initial_peers:Peer.t list
     -> me:Peer.t
+    -> external_rpc_port:int
     -> parent_log:Logger.t
     -> conf_dir:string
     -> t Deferred.Or_error.t

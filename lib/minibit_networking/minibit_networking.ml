@@ -253,7 +253,9 @@ module Make (Inputs : Inputs_intf) = struct
        block announcment).
     *)
     let states, snark_pool_diffs, transaction_pool_diffs =
-      Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(function
+      Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(fun x ->
+        Logger.fatal log "received message";
+        match x with
         | New_state s -> `Fst s
         | Snark_pool_diff d -> `Snd d
         | Transaction_pool_diff d -> `Trd d )
