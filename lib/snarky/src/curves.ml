@@ -530,7 +530,6 @@ struct
       Field.Checked.Infix.(
         x3 + (Params.a * x) + Field.Checked.constant Params.b)
 
-  (* TODO: Check if point is on curve! *)
   let typ : (var, t) Typ.t =
     let unchecked =
       Typ.transport
@@ -686,6 +685,10 @@ struct
       in
       go 0 c init t)
 
+(* This 'looks up' a field element from a lookup table of size 2^2 = 4 with
+   a 2 bit index.  See https://github.com/zcash/zcash/issues/2234#issuecomment-383736266 for
+   a discussion of this trick.
+*)
   let lookup_point (b0, b1) (t1, t2, t3, t4) =
     let open Let_syntax in
     let%map b0_and_b1 = Boolean.( && ) b0 b1 in
@@ -704,6 +707,7 @@ struct
     and x4, y4 = Curve.to_coords t4 in
     (lookup_one (x1, x2, x3, x4), lookup_one (y1, y2, y3, y4))
 
+  (* Similar to the above, but doing lookup in a size 1 table *)
   let lookup_single_bit (b: Boolean.var) (t1, t2) =
     let lookup_one (a1, a2) =
       let open Field.Checked.Infix in
@@ -791,7 +795,6 @@ struct
     let rec go acc = function
       | [] -> return acc
       | t :: ts ->
-          printf "sum loop\n%!" ;
           let%bind acc' = add t acc in
           go acc' ts
     in
