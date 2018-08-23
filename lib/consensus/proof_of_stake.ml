@@ -61,6 +61,12 @@ module Epoch_seed = struct
   include Nanobit_base.Data_hash.Make_full_size ()
 
   let zero = Snark_params.Tick.Pedersen.zero_hash
+
+  let update seed vrf_result =
+    let open Nanobit_base.Util in
+    let open Snark_params.Tick in
+    let fold_hash = fold seed +> List.fold vrf_result in
+    of_hash (Pedersen.digest_fold Nanobit_base.Hash_prefix.epoch_seed fold_hash)
 end
 
 let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
@@ -110,6 +116,15 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
       include Segment_id
 
       let interval = Inputs.slot_interval
+
+      let unforkable_count = UInt32.of_int (Inputs.probable_slots_per_transition_count * Inputs.unforkable_transition_count)
+
+      let in_seed_update_range (slot : t) =
+        let open UInt32 in
+        let open UInt32.Infix in
+        let (<=) x y = compare x y <= 0 in
+        let (<) x y = compare x y < 0 in
+        unforkable_count <= slot && slot < unforkable_count * of_int 2
     end
 
     let slot_start_time (epoch: t) (slot: Slot.t) =
@@ -232,7 +247,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
       ; epoch_seed= Epoch_seed.of_hash Epoch_seed.zero
       ; next_epoch_seed= Epoch_seed.of_hash Epoch_seed.zero }
 
-    let update previous_state transition_data =
+    let update (previous_state : value) (transition_data : Consensus_transition_data.value) : value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
@@ -244,17 +259,13 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
       in
       let epoch_seed, next_epoch_seed =
         if transition_data.epoch = previous_state.current_epoch then
-          let open Nanobit_base.Util in
-          let next_epoch_seed =
-            Snark_params.Tick.Pedersen.digest_fold
-              Nanobit_base.Hash_prefix.epoch_seed
-              ( Epoch_seed.fold previous_state.next_epoch_seed
-              +> List.fold transition_data.proposer_vrf_result )
-            |> Epoch_seed.of_hash
-          in
-          (previous_state.epoch_seed, next_epoch_seed)
+          (previous_state.epoch_seed, previous_state.next_epoch_seed)
         else
           (previous_state.next_epoch_seed, Epoch_seed.of_hash Epoch_seed.zero)
+      in
+      let next_epoch_seed =
+        if not (Epoch.Slot.in_seed_update_range transition_data.slot) then next_epoch_seed else
+          Epoch_seed.update next_epoch_seed transition_data.proposer_vrf_result
       in
       { length= Length.succ previous_state.length
       ; current_epoch= transition_data.epoch
