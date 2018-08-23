@@ -10,7 +10,7 @@ myprocs=`nproc --all`
 date
 dune runtest --verbose -j${myprocs}
 
-data
+date
 dune exec cli -- full-test
 
 date
@@ -19,5 +19,8 @@ dune exec cli -- coda-peers-test
 date
 dune exec cli -- coda-block-production-test
 
+# This test actually creates SNARKs (is slow)
 date
-dune exec cli -- transaction-snark-profiler -check-only
+dune exec cli -- transaction-snark-profiler -k 2
+
+date
