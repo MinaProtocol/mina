@@ -56,7 +56,9 @@ let daemon (type ledger_proof) (module Kernel
        let conf_dir =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
-       let external_port = Option.value ~default:default_daemon_port external_port in
+       let external_port =
+         Option.value ~default:default_daemon_port external_port
+       in
        let client_port = Option.value ~default:8301 client_port in
        let discovery_port = Option.value ~default:8303 discovery_port in
        let%bind () = Unix.mkdir ~p:() conf_dir in
@@ -81,7 +83,9 @@ let daemon (type ledger_proof) (module Kernel
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
-       let me = (Host_and_port.create ~host:ip ~port:discovery_port, external_port) in
+       let me =
+         (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
+       in
        let module Config = struct
          let logger = log
 

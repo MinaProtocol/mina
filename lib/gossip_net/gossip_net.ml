@@ -94,7 +94,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let broadcast_selected t peers msg =
     let peers = List.map peers ~f:(fun peer -> Peer.external_rpc peer) in
     let send peer =
-      Logger.fatal t.log !"send peer %{sexp: Host_and_port.t}" peer;
+      Logger.fatal t.log !"send peer %{sexp: Host_and_port.t}" peer ;
       try_call_rpc peer t.timeout
         (fun conn m -> return (Message.dispatch_multi conn m))
         msg
@@ -135,7 +135,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     don't_wait_for
       (Linear_pipe.iter_unordered ~max_concurrency:64 broadcast_reader ~f:
          (fun m ->
-           Logger.fatal log "broadcasting message";
+           Logger.fatal log "broadcasting message" ;
            Logger.trace log "broadcasting message" ;
            broadcast_random t t.target_peer_count m )) ;
     let broadcast_received_capacity = 64 in
@@ -163,7 +163,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
               (List.sexp_of_t Peer.sexp_of_t peers |> Sexp.to_string_hum) ;
             List.iter peers ~f:(fun peer -> Hash_set.remove t.peers peer) ;
             Deferred.unit )) ;
-    Logger.fatal t.log !"starting server on %d" (snd config.me);
+    Logger.fatal t.log !"starting server on %d" (snd config.me) ;
     ignore
       (Tcp.Server.create
          ~on_handler_error:

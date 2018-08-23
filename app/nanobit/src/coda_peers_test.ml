@@ -13,6 +13,7 @@ struct
 
   module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
   open Coda_processes
+
   let main () =
     let%bind program_dir = Unix.getcwd () in
     let n = 3 in
@@ -23,7 +24,8 @@ struct
         let _, _, expected_peers = Coda_processes.net_configs n in
         let%bind _ = after (Time.Span.of_sec 10.) in
         Deferred.all_unit
-          (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
+          (List.map2_exn workers expected_peers ~f:
+             (fun worker expected_peers ->
                let%bind peers = Coda_process.peers_exn worker in
                Logger.debug log
                  !"got peers %{sexp: Kademlia.Peer.t list} %{sexp: \

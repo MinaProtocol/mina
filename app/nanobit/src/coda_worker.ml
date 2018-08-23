@@ -93,7 +93,9 @@ struct
               ; target_peer_count= 8
               ; conf_dir
               ; initial_peers= peers
-              ; me= (Host_and_port.create ~host ~port:discovery_port, external_port)
+              ; me=
+                  ( Host_and_port.create ~host ~port:discovery_port
+                  , external_port )
               ; parent_log= log } }
         in
         let%bind coda =
