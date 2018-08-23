@@ -12,8 +12,7 @@ end)
   open Impl
 
   module Digest : sig
-    type t = bool list
-    [@@deriving sexp, bin_io, eq, compare]
+    type t = bool list [@@deriving sexp, bin_io, eq, compare]
 
     type var = Boolean.var list
 
@@ -72,8 +71,7 @@ end = struct
   struct
     include M
 
-    type t = bool list
-    [@@deriving sexp, bin_io, eq, compare]
+    type t = bool list [@@deriving sexp, bin_io, eq, compare]
 
     type var = Boolean.var list
 

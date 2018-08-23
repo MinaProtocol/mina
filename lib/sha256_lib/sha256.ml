@@ -12,8 +12,7 @@ let bits_to_string bs =
   chunks_of 8 bs |> List.map ~f:bits_to_char_big_endian |> String.of_char_list
 
 module Gadget =
-  Snarky.Sha256.Make
-    (struct
+  Snarky.Sha256.Make (struct
       let prefix = Tick_curve.prefix
     end)
     (Tick)

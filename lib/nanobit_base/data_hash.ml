@@ -7,7 +7,8 @@ open Snark_bits
 open Bitstring_lib
 
 module type Basic = sig
-  type t = private Pedersen.Digest.t [@@deriving bin_io, sexp, eq, compare, hash]
+  type t = private Pedersen.Digest.t
+  [@@deriving bin_io, sexp, eq, compare, hash]
 
   val gen : t Quickcheck.Generator.t
 
