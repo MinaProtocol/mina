@@ -252,6 +252,15 @@ end = struct
      * i <-$- [0,select0 str length)
      * j := (rank0 str i)
      * emit jobs@j and jobs@j+1 (if it exists)
+     *  
+     * if jobs@j+1 doesn't exist (if the last job is at j) 
+     * then we track it separately and return a chunk consisting of just one
+     * job. The last job is tracked separately and not included in the list of 
+     * seen jobs for the following two reasons:
+     * 1. It can be paired with a new job that could be appended to the list 
+     * later.
+     * 2. The chunk consisting of just the last job is not created more 
+     * than once.
      *
      * See meaning of rank/select from here:
      * https://en.wikipedia.org/wiki/Succinct_data_structure
@@ -278,28 +287,35 @@ end = struct
     | _ ->
         let i = Random.int (List.length jobs) in
         let j = index_of_nth_occurence dirty_jobs i |> Option.value_exn in
-        (*TODO All of this will change, when we fix  #450. There'll be no more bundles! *)
+        (*TODO All of this will change, when we fix  #450. 
+          There'll be no more bundles! *)
         if j + 1 < n then
           let chunk =
             [List.nth_exn all_jobs j; List.nth_exn all_jobs (j + 1)]
           in
+          let new_last_job =
+            Option.fold (snd seen_statements) ~init:None ~f:(fun _ stmt ->
+                if
+                  Ledger_proof_statement.equal stmt
+                    (canonical_statement_of_job (List.last_exn all_jobs))
+                then Some stmt
+                else None )
+          in
           ( Some (List.map chunk ~f:single_spec)
           , ( L.Set.add seen_statements'
                 (canonical_statement_of_job @@ List.hd_exn chunk)
-            , None ) )
+            , new_last_job ) )
         else
           let last_job = List.nth_exn all_jobs j in
-          let opt_eq =
-            Option.map (snd seen_statements) ~f:(fun stmt ->
+          let last_job_eq =
+            Option.fold (snd seen_statements) ~init:false ~f:(fun _ stmt ->
                 Ledger_proof_statement.equal stmt
                   (canonical_statement_of_job last_job) )
           in
-          match opt_eq with
-          | Some true -> (None, seen_statements)
-          | _ ->
-              ( Some [single_spec last_job]
-              , (seen_statements', Some (canonical_statement_of_job last_job))
-              )
+          if last_job_eq then (None, seen_statements)
+          else
+            ( Some [single_spec last_job]
+            , (seen_statements', Some (canonical_statement_of_job last_job)) )
 
   let aux {scan_state; _} = scan_state
 
@@ -1246,7 +1262,7 @@ let%test_module "test" =
                 [%test_result : Bool.t]
                   ~message:"Exceeded time expected to exhaust random_work"
                   ~expect:true
-                  (i < 2 * p) ;
+                  (i <= 2 * p) ;
                 let maybe_stuff, seen = Lb.random_work_spec_chunk lb seen in
                 match maybe_stuff with None -> () | Some _ -> go (i + 1) seen
               in

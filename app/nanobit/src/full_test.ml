@@ -3,10 +3,7 @@ open Async_kernel
 open Nanobit_base
 open Coda_main
 
-let pk sk = Public_key.of_private_key sk |> Public_key.compress
-
-let sk_bigint sk =
-  Private_key.to_bigstring sk |> Private_key.of_bigstring |> Or_error.ok_exn
+let pk_of_sk sk = Public_key.of_private_key sk |> Public_key.compress
 
 module type Coda_intf = sig
   type ledger_proof
@@ -100,7 +97,9 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   let send_amount = Currency.Amount.of_int 10 in
   (* Send money to someone *)
   let build_txn amount sender_sk receiver_pk fee =
-    let nonce = Run.get_nonce minibit (pk sender_sk) |> Option.value_exn in
+    let nonce =
+      Run.get_nonce minibit (pk_of_sk sender_sk) |> Option.value_exn
+    in
     let payload : Transaction.Payload.t =
       {receiver= receiver_pk; amount; fee; nonce}
     in
@@ -111,7 +110,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
       build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
     let prev_sender_balance =
-      Run.get_balance minibit (pk sender_sk) |> Option.value_exn
+      Run.get_balance minibit (pk_of_sk sender_sk) |> Option.value_exn
     in
     let prev_receiver_balance =
       Run.get_balance minibit receiver_pk
@@ -132,7 +131,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     assert_balance receiver_pk
       ( Currency.Balance.( + ) prev_receiver_balance send_amount
       |> Option.value_exn ) ;
-    assert_balance (pk sender_sk)
+    assert_balance (pk_of_sk sender_sk)
       ( Currency.Balance.( - ) prev_sender_balance send_amount
       |> Option.value_exn )
   in
@@ -154,14 +153,13 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     new_balance_sheet'
   in
   let send_txns balance_sheet f_amount =
-    Deferred.List.foldi honest_pairs ~init:balance_sheet ~f:
-      (fun i acc key_pair ->
-        let sender_pk = Public_key.compress key_pair.public_key in
+    Deferred.List.foldi pairs ~init:balance_sheet ~f:(fun i acc key_pair ->
+        let sender_pk = fst key_pair in
         let receiver =
           List.random_element_exn
-            (List.filter honest_pks ~f:(fun pk -> not (pk = sender_pk)))
+            (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
         in
-        send_txn_update_balance_sheet key_pair.private_key sender_pk receiver
+        send_txn_update_balance_sheet (snd key_pair) sender_pk receiver
           (f_amount i) acc (Currency.Fee.of_int 0) )
   in
   let%bind () =
@@ -188,8 +186,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   (*Include multiple transactions in a block*)
   let balance_sheet =
     Public_key.Compressed.Map.of_alist_exn
-      (List.map honest_pks ~f:(fun pk ->
-           (pk, Currency.Balance.of_int init_balance) ))
+      (List.map pks ~f:(fun pk -> (pk, Currency.Balance.of_int init_balance)))
   in
   let%bind updated_balance_sheet =
     send_txns balance_sheet (fun i -> Currency.Amount.of_int ((i + 1) * 10))
