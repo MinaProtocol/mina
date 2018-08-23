@@ -234,7 +234,7 @@ struct
   let transition_capacity = 64
 
   let create ~parent_log ~get_completed_work ~change_feeder ~time_controller =
-    let logger = Logger.extend parent_log [("module", Atom __MODULE__)] in
+    let logger = Logger.child parent_log "proposer" in
     let r, w = Linear_pipe.create () in
     let write_result = function
       | Ok t -> Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
@@ -251,8 +251,18 @@ struct
       result
     in
     let schedule_transition tip =
+      let time_now = Time.now time_controller in
+      let time_after_last_transition =
+        Time.modulus time_now Proposal_interval.t
+      in
+      let last_transition_time = 
+        Time.sub time_now time_after_last_transition
+      in
+      let time_of_next_transition =
+        Time.add last_transition_time Proposal_interval.t
+      in
       let time_till_transition =
-        Time.modulus (Time.now time_controller) Proposal_interval.t
+        Time.diff time_of_next_transition time_now
       in
       Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
       Time.Timeout.create time_controller time_till_transition ~f:(fun _ ->

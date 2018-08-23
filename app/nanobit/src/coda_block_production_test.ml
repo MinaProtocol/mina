@@ -12,6 +12,7 @@ let main () =
   let%bind program_dir = Unix.getcwd () in
   let log = Logger.create () in
   let log = Logger.child log name in
+  Logger.info log "hi";
   Coda_process.spawn_local_exn ~peers ~port ~gossip_port ~program_dir ~f:
     (fun worker ->
       let%bind strongest_ledgers = Coda_process.strongest_ledgers_exn worker in
@@ -32,7 +33,7 @@ let main () =
       let time_per_block =
         time_diff_secs /. Float.of_int (List.length blocks - 1)
       in
-      let expected_time_per_block = 0.10 in
+      let expected_time_per_block = 1.00 in
       let percent_diff =
         Float.max
           (expected_time_per_block /. time_per_block)
