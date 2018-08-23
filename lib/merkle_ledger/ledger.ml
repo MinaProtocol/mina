@@ -1,146 +1,21 @@
 open Core
 
 (* SOMEDAY: handle empty wallets *)
-
-module type S = sig
-  type hash
-
-  type account
-
-  type key
-
-  val depth : int
-
-  type index = int
-
-  type t [@@deriving sexp, bin_io]
-
-  include Container.S0 with type t := t and type elt := account
-
-  val copy : t -> t
-
-  module Path : sig
-    type elem = [`Left of hash | `Right of hash] [@@deriving sexp]
-
-    val elem_hash : elem -> hash
-
-    type t = elem list [@@deriving sexp]
-
-    val implied_root : t -> hash -> hash
-  end
-
-  module Addr : Merkle_address.S
-
-  val create : unit -> t
-
-  val length : t -> int
-
-  val get : t -> key -> account option
-
-  val set : t -> key -> account -> unit
-
-  val update : t -> key -> f:(account option -> account) -> unit
-
-  val merkle_root : t -> hash
-
-  val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
-
-  val hash_fold_t :
-    Ppx_hash_lib.Std.Hash.state -> t -> Ppx_hash_lib.Std.Hash.state
-
-  val compare : t -> t -> int
-
-  val merkle_path : t -> key -> Path.t option
-
-  val key_of_index : t -> index -> key option
-
-  val index_of_key : t -> key -> index option
-
-  val key_of_index_exn : t -> index -> key
-
-  val index_of_key_exn : t -> key -> index
-
-  val get_at_index : t -> index -> [`Ok of account | `Index_not_found]
-
-  val set_at_index : t -> index -> account -> [`Ok | `Index_not_found]
-
-  val merkle_path_at_index : t -> index -> [`Ok of Path.t | `Index_not_found]
-
-  val get_at_index_exn : t -> index -> account
-
-  val set_at_index_exn : t -> index -> account -> unit
-
-  val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
-
-  val merkle_path_at_index_exn : t -> index -> Path.t
-
-  val set_at_addr_exn : t -> Addr.t -> account -> unit
-
-  val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
-
-  val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
-
-  val extend_with_empty_to_fit : t -> int -> unit
-
-  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
-
-  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
-
-  val recompute_tree : t -> unit
-end
-
-module type F = functor (Key :sig
-                                
-                                type t [@@deriving sexp, bin_io]
-
-                                val empty : t
-
-                                include Hashable.S_binable with type t := t
-end) -> functor (Account :sig
-                            
-                            type t [@@deriving sexp, eq, bin_io]
-
-                            val public_key : t -> Key.t
-end) -> functor (Hash :sig
-                         
-                         type hash [@@deriving sexp, hash, compare, bin_io]
-
-                         val hash_account : Account.t -> hash
-
-                         val empty_hash : hash
-
-                         val merge : height:int -> hash -> hash -> hash
-end) -> functor (Depth :sig
-                          
-                          val depth : int
-end) -> S
-        with type hash := Hash.hash
-         and type account := Account.t
-         and type key := Key.t
-
-module Make (Key : sig
-  type t [@@deriving sexp, bin_io]
-
-  val empty : t
-
-  include Hashable.S_binable with type t := t
-end) (Account : sig
+module Make (Key : Intf.Key) (Account : sig
   type t [@@deriving sexp, eq, bin_io]
 
   val public_key : t -> Key.t
-end) (Hash : sig
-  type hash [@@deriving sexp, hash, compare, bin_io]
+end)
+(Hash : sig
+          type t [@@deriving sexp, hash, compare, bin_io]
 
-  val hash_account : Account.t -> hash
-
-  val empty_hash : hash
-
-  val merge : height:int -> hash -> hash -> hash
-end) (Depth : sig
-  val depth : int
+          include Intf.Hash with type t := t
+        end
+        with type account := Account.t) (Depth : sig
+    val depth : int
 end) :
-  S
-  with type hash := Hash.hash
+  Intf.Ledger_S
+  with type hash := Hash.t
    and type account := Account.t
    and type key := Key.t =
 struct
@@ -156,7 +31,7 @@ struct
 
   type leafs = Key.t Dyn_array.t [@@deriving sexp, bin_io]
 
-  type nodes = Hash.hash Dyn_array.t list [@@deriving sexp, bin_io]
+  type nodes = Hash.t Dyn_array.t list [@@deriving sexp, bin_io]
 
   type tree =
     { leafs: leafs
@@ -197,7 +72,7 @@ struct
     {accounts= Key.Table.copy t.accounts; tree= copy_tree t.tree}
 
   module Path = struct
-    type elem = [`Left of Hash.hash | `Right of Hash.hash] [@@deriving sexp]
+    type elem = [`Left of Hash.t | `Right of Hash.t] [@@deriving sexp]
 
     let elem_hash = function `Left h | `Right h -> h
 
@@ -217,9 +92,7 @@ struct
   let create_account_table () = Key.Table.create ()
 
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights =
-      Array.create ~len:(depth + 1) Hash.empty_hash
-    in
+    let empty_hash_at_heights = Array.create ~len:(depth + 1) Hash.empty in
     let rec go i =
       if i <= depth then (
         let h = empty_hash_at_heights.(i - 1) in
@@ -327,7 +200,7 @@ struct
           let length = Int.pow 2 (tree.nodes_height - 1 - i) in
           let new_elems = length - Dyn_array.length nodes in
           Dyn_array.append
-            (Dyn_array.init new_elems (fun _ -> Hash.empty_hash))
+            (Dyn_array.init new_elems (fun _ -> Hash.empty))
             nodes ) )
 
   let rec recompute_layers curr_height get_prev_hash layers dirty_indices =
@@ -364,7 +237,7 @@ struct
           Hash.hash_account
             (Hashtbl.find_exn t.accounts (Dyn_array.get t.tree.leafs i))
               .account
-        else Hash.empty_hash
+        else Hash.empty
       in
       recompute_layers 1 get_leaf_hash t.tree.nodes layer_dirty_indices ;
       (t.tree).dirty_indices <- [] )
@@ -374,7 +247,7 @@ struct
     let height = t.tree.nodes_height in
     let base_root =
       match List.last t.tree.nodes with
-      | None -> Hash.empty_hash
+      | None -> Hash.empty
       | Some a -> Dyn_array.get a 0
     in
     let rec go i hash =
@@ -386,11 +259,11 @@ struct
     in
     go (depth - height) base_root
 
-  let hash t = Hash.hash_hash (merkle_root t)
+  let hash t = Hash.hash (merkle_root t)
 
   let hash_fold_t state t = Ppx_hash_lib.Std.Hash.fold_int state (hash t)
 
-  let compare t t' = Hash.compare_hash (merkle_root t) (merkle_root t')
+  let compare t t' = Hash.compare (merkle_root t) (merkle_root t')
 
   let merkle_path t key =
     recompute_tree t ;
@@ -412,8 +285,7 @@ struct
         in
         let leaf_hash_idx = addr0 lxor 1 in
         let leaf_hash =
-          if leaf_hash_idx >= Dyn_array.length t.tree.leafs then
-            Hash.empty_hash
+          if leaf_hash_idx >= Dyn_array.length t.tree.leafs then Hash.empty
           else
             Hash.hash_account
               (Hashtbl.find_exn t.accounts
