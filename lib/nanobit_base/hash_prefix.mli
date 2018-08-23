@@ -1,8 +1,8 @@
 open Snark_params
 
-val length_in_bits : int
+val length_in_triples : int
 
-val blockchain_state : Tick.Pedersen.State.t
+val protocol_state : Tick.Pedersen.State.t
 
 val signature : Tick.Pedersen.State.t
 

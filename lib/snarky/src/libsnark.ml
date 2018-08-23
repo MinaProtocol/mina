@@ -154,7 +154,7 @@ struct
   let () = init ()
 
   module Field : sig
-    type t
+    type t [@@deriving sexp]
 
     val typ : t Ctypes.typ
 
@@ -193,7 +193,7 @@ struct
     module Vector : Vector.S with type elt = t
   end = struct
     module T = struct
-      type t = unit ptr
+      type t = unit ptr sexp_opaque [@@deriving sexp]
 
       let typ = ptr void
 

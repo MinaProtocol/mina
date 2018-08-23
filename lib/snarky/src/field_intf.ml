@@ -1,5 +1,5 @@
 module type S = sig
-  type t
+  type t [@@deriving sexp]
 
   val of_int : int -> t
 
@@ -36,8 +36,6 @@ module type Extended = sig
   open Core_kernel
 
   include S
-
-  include Sexpable.S with type t := t
 
   val negate : t -> t
 
