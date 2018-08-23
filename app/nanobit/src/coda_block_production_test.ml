@@ -16,13 +16,13 @@ struct
 
   let main () =
     Coda_processes.init () ;
-    let gossip_port = 8000 in
-    let port = 3000 in
+    let discovery_port = 3000 in
+    let external_port = 8000 in
     let peers = [] in
     let%bind program_dir = Unix.getcwd () in
     let log = Logger.create () in
     let log = Logger.child log name in
-    Coda_process.spawn_local_exn ~peers ~port ~gossip_port ~program_dir ~f:
+    Coda_process.spawn_local_exn ~peers ~external_port ~discovery_port ~program_dir ~f:
       (fun worker ->
         let%bind strongest_ledgers =
           Coda_process.strongest_ledgers_exn worker

@@ -12,8 +12,8 @@ struct
     { host: string
     ; conf_dir: string
     ; program_dir: string
-    ; my_port: int
-    ; gossip_port: int
+    ; external_port: int
+    ; discovery_port: int
     ; peers: Host_and_port.t list }
   [@@deriving bin_io]
 
@@ -65,10 +65,10 @@ struct
       let functions = {peers; strongest_ledgers}
 
       let init_worker_state
-          {host; conf_dir; program_dir; my_port; peers; gossip_port} =
+          {host; conf_dir; program_dir; external_port; peers; discovery_port} =
         let log = Logger.create () in
         let log =
-          Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string my_port)
+          Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
         in
         let module Config = struct
           let logger = log
@@ -93,7 +93,7 @@ struct
               ; target_peer_count= 8
               ; conf_dir
               ; initial_peers= peers
-              ; me= (Host_and_port.create ~host ~port:my_port, gossip_port)
+              ; me= (Host_and_port.create ~host ~port:discovery_port, external_port)
               ; parent_log= log } }
         in
         let%bind coda =

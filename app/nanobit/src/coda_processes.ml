@@ -13,24 +13,24 @@ struct
   let init () = Parallel.init_master ()
 
   let net_configs n =
-    let ports = List.init n ~f:(fun i -> 23000 + i) in
-    let gossip_ports = List.init n ~f:(fun i -> 24000 + i) in
+    let discovery_ports = List.init n ~f:(fun i -> 23000 + i) in
+    let external_ports = List.init n ~f:(fun i -> 24000 + i) in
     let all_peers =
-      List.map ports ~f:(fun p -> Host_and_port.create "127.0.0.1" p)
+      List.map discovery_ports ~f:(fun p -> Host_and_port.create "127.0.0.1" p)
     in
     let peers =
       List.init n ~f:(fun i ->
           List.take all_peers i @ List.drop all_peers (i + 1) )
     in
-    (ports, gossip_ports, peers)
+    (discovery_ports, external_ports, peers)
 
   let spawn_local_processes_exn n ~program_dir ~f =
     let fns =
-      let ports, gossip_ports, peers = net_configs n in
+      let discovery_ports, external_ports, peers = net_configs n in
       let peers = [] :: List.drop peers 1 in
-      List.map3_exn ports gossip_ports peers ~f:(fun port gossip_port peers ->
-          Coda_process.spawn_local_exn ~peers ~port ~gossip_port ~program_dir
-      )
+      List.map3_exn discovery_ports external_ports peers 
+        ~f:(fun discovery_port external_port peers ->
+            Coda_process.spawn_local_exn ~peers ~discovery_port ~external_port ~program_dir )
     in
     let first = List.hd_exn fns in
     let rest = List.drop fns 1 in
