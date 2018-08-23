@@ -1,9 +1,11 @@
 open Core_kernel
 
 module T = struct
-  type t = (Host_and_port.Stable.V1.t * int) [@@deriving bin_io, sexp, compare, hash]
+  type t = Host_and_port.Stable.V1.t * int
+  [@@deriving bin_io, sexp, compare, hash]
 
-  let external_rpc t = Host_and_port.create ~host:(Host_and_port.host (fst t)) ~port:(snd t)
+  let external_rpc t =
+    Host_and_port.create ~host:(Host_and_port.host (fst t)) ~port:(snd t)
 end
 
 include T

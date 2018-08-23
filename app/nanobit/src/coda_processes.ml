@@ -28,9 +28,10 @@ struct
     let fns =
       let discovery_ports, external_ports, peers = net_configs n in
       let peers = [] :: List.drop peers 1 in
-      List.map3_exn discovery_ports external_ports peers 
-        ~f:(fun discovery_port external_port peers ->
-            Coda_process.spawn_local_exn ~peers ~discovery_port ~external_port ~program_dir )
+      List.map3_exn discovery_ports external_ports peers ~f:
+        (fun discovery_port external_port peers ->
+          Coda_process.spawn_local_exn ~peers ~discovery_port ~external_port
+            ~program_dir )
     in
     let first = List.hd_exn fns in
     let rest = List.drop fns 1 in
