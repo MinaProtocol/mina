@@ -12,10 +12,6 @@ jobs:
       - checkout
 
       - run:
-          name: Install python -- hack
-          command: sudo apt install -y python
-
-      - run:
           name: Lint
           command: eval `opam config env` && make check-format
 
@@ -25,11 +21,15 @@ jobs:
 
       - run:
           name: Build OCaml
-          command: eval `opam config env` && dune build -j8 | tee build.log
+          command: eval `opam config env` && dune build -j8 | tee /tmp/build.log
+
+      - run:
+          name: Install python -- hack
+          command: sudo apt install -y python
 
       - run: 
           name: Count Warns
-          command: ./scripts/buildwarns.py build.log
+          command: ./scripts/buildwarns.py /tmp/build.log
 
       - run:
           name: Build deb Package
