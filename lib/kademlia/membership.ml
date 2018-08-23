@@ -43,8 +43,10 @@ module Haskell_process = struct
     Sys.remove lock_path
 
   let cli_format (addr, port) : string =
-    Printf.sprintf "(\"%s\", %d, %d)" (Host_and_port.host addr)
-      (Host_and_port.port addr) port
+    (* assertion for discovery_port = external_port - 1 *)
+    assert((Host_and_port.port addr) - 1 = port);
+    Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
+      (Host_and_port.port addr)
 
   let cli_format_initial_peer addr : string =
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
@@ -194,15 +196,15 @@ struct
            let lives, deads =
              List.partition_map lines ~f:(fun line ->
                  match String.split ~on:' ' line with
-                 | [addr; external_rpc_port; kademliaKey; "on"] ->
+                 | [addr; kademliaKey; "on"] ->
+                    let addr = Host_and_port.of_string addr in
                      `Fst
-                       ( ( Host_and_port.of_string addr
-                         , Int.of_string external_rpc_port )
+                       (( addr, Host_and_port.port addr - 1)
                        , kademliaKey )
-                 | [addr; external_rpc_port; _; "off"] ->
+                 | [addr; _; "off"] ->
+                    let addr = Host_and_port.of_string addr in
                      `Snd
-                       ( Host_and_port.of_string addr
-                       , Int.of_string external_rpc_port )
+                       ( addr, Host_and_port.port addr - 1)
                  | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
              )
            in

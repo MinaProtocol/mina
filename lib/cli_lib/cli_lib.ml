@@ -69,5 +69,3 @@ let txn_nonce =
 let default_client_port = 8301
 
 let default_external_port = 8302
-
-let default_discovery_port = 8303

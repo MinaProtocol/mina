@@ -43,14 +43,6 @@ let daemon (type ledger_proof) (module Kernel
               "Port for client to connect daemon locally (default: %d)"
               default_client_port)
          (optional int16)
-     and discovery_port =
-       flag "discovery-port"
-         ~doc:
-           (Printf.sprintf
-              "Port for dameon to find out the membership topology (default: \
-               %d)"
-              default_discovery_port)
-         (optional int16)
      and ip =
        flag "ip" ~doc:"External IP address for others to connect"
          (optional string)
@@ -68,9 +60,7 @@ let daemon (type ledger_proof) (module Kernel
        let client_port =
          Option.value ~default:default_client_port client_port
        in
-       let discovery_port =
-         Option.value ~default:default_discovery_port discovery_port
-       in
+       let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
          match peers with
