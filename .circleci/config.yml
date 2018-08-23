@@ -10,13 +10,13 @@ jobs:
           username: _json_key
           password: $JSON_GCLOUD_CREDENTIALS
     steps:
-      #- checkout
+      - checkout
       - run:
-        name: Test Tee Out
-        command: cat /proc/cpuinfo | tee /tmp/myoutput
+          name: Test Tee Out
+          command: cat /proc/cpuinfo | tee /tmp/myoutput
       - run:
-        name: Test Tee Read
-        command: cat /tmp/myoutput
+          name: Test Tee Read
+          command: cat /tmp/myoutput
 
 
     #   - run:
