@@ -178,15 +178,13 @@ struct
       let time_after_last_transition =
         Time.modulus time_now Proposal_interval.t
       in
-      let last_transition_time = 
+      let last_transition_time =
         Time.sub time_now time_after_last_transition
       in
       let time_of_next_transition =
         Time.add last_transition_time Proposal_interval.t
       in
-      let time_till_transition =
-        Time.diff time_of_next_transition time_now
-      in
+      let time_till_transition = Time.diff time_of_next_transition time_now in
       Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
       Time.Timeout.create time_controller time_till_transition ~f:(fun _ ->
           Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
