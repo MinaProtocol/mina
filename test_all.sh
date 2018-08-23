@@ -9,4 +9,6 @@ dune exec cli -- full-test
 
 dune exec cli -- coda-peers-test
 dune exec cli -- coda-block-production-test
-dune exec cli -- transaction-snark-profiler -check-only
+
+# This test actually creates SNARKs (is slow)
+dune exec cli -- transaction-snark-profiler -k 2
