@@ -20,6 +20,9 @@ date
 dune exec cli -- coda-block-production-test
 
 date
+dune exec cli -- coda-shared-prefix-test
+
+date
 dune exec cli -- transaction-snark-profiler -check-only
 
 date
