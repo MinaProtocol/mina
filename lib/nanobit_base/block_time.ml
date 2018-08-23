@@ -101,6 +101,8 @@ let add x y = UInt64.add x y
 
 let diff x y = UInt64.sub x y
 
+let sub x y = UInt64.sub x y
+
 let to_span_since_epoch t = diff t epoch
 
 let of_span_since_epoch s = UInt64.add s epoch
