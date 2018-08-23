@@ -403,6 +403,8 @@ module type Ledger_builder_intf = sig
 
   val create : ledger:ledger -> self:public_key -> t
 
+  val current_ledger_proof : t -> ledger_proof option
+
   val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
 
   (* This should memoize the snark verifications *)
@@ -427,7 +429,7 @@ module type Ledger_builder_intf = sig
 
   val random_work_spec_chunk :
        t
-    -> ledger_proof_statement_set
+    -> ledger_proof_statement_set * ledger_proof_statement option
     -> ( ledger_proof_statement
        , super_transaction
        , sparse_ledger
@@ -435,7 +437,7 @@ module type Ledger_builder_intf = sig
        Snark_work_lib.Work.Single.Spec.t
        list
        option
-       * ledger_proof_statement_set
+       * (ledger_proof_statement_set * ledger_proof_statement option)
 end
 
 module type Tip_intf = sig

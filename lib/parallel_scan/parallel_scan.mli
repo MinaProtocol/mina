@@ -56,3 +56,5 @@ val fill_in_completed_jobs :
      state:('a, 'd) State.t
   -> completed_jobs:'a State.Completed_job.t list
   -> 'a option Or_error.t
+
+val last_emitted_value : ('a, 'd) State.t -> 'a option

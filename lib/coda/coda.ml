@@ -398,7 +398,8 @@ module Make (Inputs : Inputs_intf) = struct
         (Ledger_builder.t * Consensus_mechanism.External_transition.t)
         Linear_pipe.Reader.t
     ; log: Logger.t
-    ; mutable seen_jobs: Ledger_proof_statement.Set.t
+    ; mutable seen_jobs:
+        Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
     ; ledger_builder_transition_backup_capacity: int }
 
   let best_ledger_builder t =
@@ -418,6 +419,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   let lbc_transition_tree t =
     Ledger_builder_controller.transition_tree t.ledger_builder
+
+  let ledger_builder_ledger_proof t =
+    let lb = best_ledger_builder t in
+    Ledger_builder.current_ledger_proof lb
 
   let strongest_ledgers t = Linear_pipe.map t.strongest_ledgers ~f:snd
 
@@ -533,7 +538,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder
       ; strongest_ledgers= strongest_ledgers_for_api
       ; log= config.log
-      ; seen_jobs= Ledger_proof_statement.Set.empty
+      ; seen_jobs= (Ledger_proof_statement.Set.empty, None)
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
 
