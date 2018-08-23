@@ -17,11 +17,19 @@ jobs:
 
       - run:
           name: Build Haskell
-          command: source ~/.profile && cd app/kademlia-haskell && nix-build release2.nix
+          command: source ~/.profile && make kademlia
 
       - run:
           name: Build OCaml
-          command: eval `opam config env` && dune build -j8
+          command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+
+      - run:
+          name: Install python -- hack
+          command: sudo apt install -y python
+
+      - run: 
+          name: Count OCaml Warns
+          command: ./scripts/buildwarns.py /tmp/buildocaml.log
 
       - run:
           name: Build deb Package
