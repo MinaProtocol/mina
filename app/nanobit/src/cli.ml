@@ -29,8 +29,8 @@ let daemon (type ledger_proof) (module Kernel
      and run_snark_worker =
        flag "run-snark-worker" ~doc:"Run the SNARK worker"
          (optional public_key_compressed)
-     and port =
-       flag "port"
+     and external_port =
+       flag "external-port"
          ~doc:
            (Printf.sprintf
               "Server port for other daemons to connect (default: %d)"
@@ -40,8 +40,10 @@ let daemon (type ledger_proof) (module Kernel
        flag "client-port"
          ~doc:"Port for client to connect daemon locally (default: 8301)"
          (optional int16)
-     and membership_port =
-       flag "membership-port" ~doc:"Port for P2P UDP overlay (default: 8303)"
+     and discovery_port =
+       flag "discovery-port"
+         ~doc:
+           "Port for dameon to find out the membership topology (default: 8303)"
          (optional int16)
      and ip =
        flag "ip" ~doc:"External IP address for others to connect"
@@ -54,9 +56,9 @@ let daemon (type ledger_proof) (module Kernel
        let conf_dir =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
-       let port = Option.value ~default:default_daemon_port port in
+       let external_port = Option.value ~default:default_daemon_port external_port in
        let client_port = Option.value ~default:8301 client_port in
-       let membership_port = Option.value ~default:8303 membership_port in
+       let discovery_port = Option.value ~default:8303 discovery_port in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
          match peers with
@@ -79,7 +81,7 @@ let daemon (type ledger_proof) (module Kernel
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
-       let me = (Host_and_port.create ~host:ip ~port, membership_port) in
+       let me = (Host_and_port.create ~host:ip ~port:discovery_port, external_port) in
        let module Config = struct
          let logger = log
 
