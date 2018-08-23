@@ -153,7 +153,8 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     new_balance_sheet'
   in
   let send_txns balance_sheet f_amount =
-    Deferred.List.foldi pairs ~init:balance_sheet ~f:(fun i acc key_pair ->
+    Deferred.List.foldi extra_accounts ~init:balance_sheet ~f:
+      (fun i acc key_pair ->
         let sender_pk = fst key_pair in
         let receiver =
           List.random_element_exn
