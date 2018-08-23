@@ -34,15 +34,17 @@ module Make
   open Impl
 
   module Digest : sig
+    type var = Field.Checked.t
+
     module Unpacked : sig
-      type var = Boolean.var list
+      type var = private Boolean.var list
 
       type t
 
       val typ : (var, t) Typ.t
-    end
 
-    type var = Field.Checked.t
+      val project : var -> Field.Checked.t
+    end
 
     type t = Field.t
 
@@ -57,6 +59,8 @@ module Make
     end
 
     type t
+
+    val empty : t
 
     val disjoint_union_exn : t -> t -> (t, _) Checked.t
 
@@ -125,6 +129,8 @@ end = struct
       type t = bool list
 
       let typ : (var, t) Typ.t = Typ.list Boolean.typ ~length:length_in_bits
+
+      let project = Field.Checked.project
     end
 
     type var = Field.Checked.t
@@ -165,6 +171,8 @@ end = struct
     type t = {support: Interval_union.t; acc: Acc.t}
 
     let create ~acc ~support = {acc; support}
+
+    let empty = { acc = `Value Weierstrass_curve.zero; support = Interval_union.empty }
 
     let acc t = Acc.to_var t.acc
 

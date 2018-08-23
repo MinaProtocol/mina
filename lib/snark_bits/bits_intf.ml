@@ -1,7 +1,10 @@
+open Fold_lib
+open Tuple_lib
+
 module type Basic = sig
   type t
 
-  val fold : t -> init:'a -> f:('a -> bool -> 'a) -> 'a
+  val fold : t -> bool Fold.t
 end
 
 module type S = sig
@@ -20,8 +23,6 @@ module Snarkable = struct
 
     type boolean_var
 
-    (*     module Bits : S *)
-
     module Packed : sig
       type var
 
@@ -38,6 +39,8 @@ module Snarkable = struct
       val typ : (var, value) typ
 
       val var_to_bits : var -> boolean_var list
+
+      val var_to_triples : var -> boolean_var Triple.t list
 
       val var_of_value : value -> var
     end

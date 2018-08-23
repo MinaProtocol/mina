@@ -547,6 +547,11 @@ struct
   let assert_equal (x1, y1) (x2, y2) =
     assert_all [Constraint.equal x1 x2; Constraint.equal y1 y2]
 
+  module Assert = struct
+    let on_curve = assert_on_curve
+    let equal = assert_equal
+  end
+
   let add (ax, ay) (bx, by) =
     with_label __LOC__
       (let open Let_syntax in

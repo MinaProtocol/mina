@@ -4,6 +4,8 @@ open Tick
 open Let_syntax
 open Snark_bits
 open Bitstring_lib
+open Fold_lib
+open Tuple_lib
 
 module type Basic = sig
   type t [@@deriving sexp, compare, eq, hash]
@@ -18,7 +20,9 @@ module type Basic = sig
 
   include Bits_intf.S with type t := t
 
-  val length : int
+  val fold : t -> bool Triple.t Fold.t
+
+  val length_in_triples : int
 
   val zero : t
 
@@ -36,7 +40,7 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
-  val var_to_bits : var -> Boolean.var Bitstring.Lsb_first.t
+  val var_to_triples : var -> Boolean.var Triple.t list
 end
 
 module type Arithmetic_intf = sig
@@ -70,7 +74,7 @@ module type Signed_intf = sig
     end
   end
 
-  val length : int
+  val length_in_triples : int
 
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
 
@@ -84,9 +88,9 @@ module type Signed_intf = sig
 
   val zero : t
 
-  val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
+  val fold : t -> bool Triple.t Fold.t
 
-  val to_bits : t -> bool list
+  val to_triples : t -> bool Triple.t list
 
   val add : t -> t -> t option
 
@@ -97,7 +101,7 @@ module type Signed_intf = sig
   val of_unsigned : magnitude -> t
 
   module Checked : sig
-    val to_bits : var -> Boolean.var list
+    val to_triples : var -> Boolean.var Triple.t list
 
     val add : var -> var -> (var, _) Checked.t
 
@@ -147,6 +151,7 @@ module Make
         val length : int
     end) : sig
   include S with type t = Unsigned.t
+             and type var = Boolean.var list
 
   val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var
 
@@ -154,7 +159,9 @@ module Make
 
   val pack_var : var -> Field.Checked.t
 end = struct
-  let length = M.length
+  let length_in_bits = M.length
+
+  let length_in_triples = (length_in_bits + 2)/3
 
   module Stable = struct
     module V1 = struct
@@ -200,7 +207,8 @@ end = struct
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
 
-  let var_to_bits t = Bitstring.Lsb_first.of_list (var_to_bits t)
+  let var_to_triples t =
+    Bitstring.pad_to_triple_list ~default:Boolean.false_ (var_to_bits t)
 
   let var_of_bits (bits: Boolean.var Bitstring.Lsb_first.t) : var =
     let bits = (bits :> Boolean.var list) in
@@ -222,9 +230,13 @@ end = struct
   let ( - ) = sub
 
   let var_of_t t =
-    List.init M.length (fun i -> Boolean.var_of_value (Vector.get t i))
+    List.init M.length ~f:(fun i -> Boolean.var_of_value (Vector.get t i))
 
   type magnitude = t [@@deriving sexp, bin_io, hash, compare, eq]
+
+  let fold_bits = fold
+
+  let fold t = Fold.group3 ~default:false (fold t)
 
   module Signed = struct
     module Stable = struct
@@ -249,7 +261,8 @@ end = struct
 
     type nonrec var = (var, Sgn.var) t_
 
-    let length = Int.( + ) length 1
+    let length_in_bits = Int.( + ) length_in_bits 1
+    let length_in_triples = Int.((length_in_bits + 2) / 3)
 
     let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
       Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
@@ -264,11 +277,16 @@ end = struct
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
-    let fold ({sgn; magnitude}: t) ~init ~f =
-      let init = f init (sgn_to_bool sgn) in
-      fold magnitude ~init ~f
+    let fold_bits ({sgn; magnitude}: t) =
+      { Fold.fold = fun ~init ~f ->
+          let init = (fold_bits magnitude).fold ~init ~f in
+          f init (sgn_to_bool sgn)
+      }
 
-    let to_bits ({sgn; magnitude}: t) = sgn_to_bool sgn :: to_bits magnitude
+    let fold t = Fold.group3 ~default:false (fold_bits t)
+
+    let to_triples t =
+      List.rev ((fold t).fold ~init:[] ~f:(fun acc x -> x :: acc))
 
     let add (x: t) (y: t) : t option =
       match (x.sgn, y.sgn) with
@@ -295,7 +313,10 @@ end = struct
 
     module Checked = struct
       let to_bits {magnitude; sgn} =
-        Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
+        var_to_bits magnitude @ [ Sgn.Checked.is_pos sgn ]
+
+      let to_triples t =
+        Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
 
       let to_field_var ({magnitude; sgn}: var) =
         Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Checked.t)
@@ -450,8 +471,6 @@ module Amount = struct
 
   type amount = T.Stable.V1.t [@@deriving bin_io, sexp]
 
-  type amount_var = T.var
-
   include (
     T :
       module type of T
@@ -468,9 +487,9 @@ module Amount = struct
   module Checked = struct
     include T.Checked
 
-    let of_fee (fee: Fee.var) = var_of_bits (Fee.var_to_bits fee)
+    let of_fee (fee: Fee.var) = (fee : var)
 
-    let to_fee (t: var) : Fee.var = Fee.var_of_bits (var_to_bits t)
+    let to_fee (t: var) = (t : Fee.var)
 
     let add_fee (t: var) (fee: Fee.var) =
       Field.Checked.add (pack_var t) (Fee.pack_var fee) |> unpack_var
