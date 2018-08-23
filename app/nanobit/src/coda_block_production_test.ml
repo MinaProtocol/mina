@@ -16,8 +16,8 @@ struct
 
   let main () =
     Coda_processes.init () ;
-    let discovery_port = 3000 in
-    let external_port = 8000 in
+    let discovery_port = 3001 in
+    let external_port = 3000 in
     let peers = [] in
     let%bind program_dir = Unix.getcwd () in
     let log = Logger.create () in
