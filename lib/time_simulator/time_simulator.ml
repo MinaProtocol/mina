@@ -5,6 +5,8 @@ type t = Int64.t [@@deriving compare]
 
 let add = Int64.( + )
 
+let sub = Int64.( - )
+
 let diff = Int64.( - )
 
 let modulus = Int64.( % )

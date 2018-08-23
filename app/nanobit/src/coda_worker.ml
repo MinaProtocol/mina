@@ -3,9 +3,11 @@ open Async
 open Nanobit_base
 open Coda_main
 
-module Kernel = Kernel.Debug ()
-
-module Coda_worker = struct
+module Make
+    (Ledger_proof : Ledger_proof_intf)
+    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
+    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
+struct
   type input =
     { host: string
     ; conf_dir: string
@@ -68,15 +70,6 @@ module Coda_worker = struct
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string my_port)
         in
-        let module Coda = struct
-          type ledger_proof = Ledger_proof_statement.t
-
-          module Make
-              (Init : Init_intf
-                      with type Ledger_proof.t = Ledger_proof_statement.t)
-              () =
-            Coda_without_snark (Init) ()
-        end in
         let module Config = struct
           let logger = log
 
@@ -84,7 +77,7 @@ module Coda_worker = struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let transition_interval = Time.Span.of_ms 100.0
+          let transition_interval = Time.Span.of_ms 1000.0
 
           let fee_public_key = Genesis_ledger.rich_pk
 
