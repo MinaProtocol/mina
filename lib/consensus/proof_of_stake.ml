@@ -58,7 +58,12 @@ let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
-module Make (Inputs : Inputs_intf) : Mechanism.S = struct
+module Make (Inputs : Inputs_intf)
+  : Mechanism.S
+    with type Proof.t = Inputs.Proof.t
+     and type Internal_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t
+     and type External_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t
+= struct
   module Proof = Inputs.Proof
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
@@ -121,51 +126,47 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   end
 
   module Consensus_transition_data = struct
-    type ('epoch, 'slot, 'amount) t =
-      {epoch: 'epoch; slot: 'slot; total_currency_diff: 'amount}
+    type ('epoch, 'slot) t =
+      {epoch: 'epoch; slot: 'slot}
     [@@deriving sexp, bin_io, eq, compare]
 
-    type value = (Epoch.t, Epoch.Slot.t, Amount.t) t
+    type value = (Epoch.t, Epoch.Slot.t) t
     [@@deriving sexp, bin_io, eq, compare]
 
-    type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var, Amount.var) t
+    type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var) t
 
     let genesis =
       { epoch= Epoch.zero
-      ; slot= Epoch.Slot.zero
-      ; total_currency_diff= Amount.zero }
+      ; slot= Epoch.Slot.zero }
 
-    let to_hlist {epoch; slot; total_currency_diff} =
-      Nanobit_base.H_list.[epoch; slot; total_currency_diff]
+    let to_hlist {epoch; slot} =
+      Nanobit_base.H_list.[epoch; slot]
 
     let of_hlist :
-           (unit, 'epoch -> 'slot -> 'amount -> unit) Nanobit_base.H_list.t
-        -> ('epoch, 'slot, 'amount) t =
-     fun Nanobit_base.H_list.([epoch; slot; total_currency_diff]) ->
-      {epoch; slot; total_currency_diff}
+           (unit, 'epoch -> 'slot -> unit) Nanobit_base.H_list.t
+        -> ('epoch, 'slot) t =
+     fun Nanobit_base.H_list.([epoch; slot]) ->
+      {epoch; slot}
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
-      [Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ; Amount.typ]
+      [Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let fold {epoch; slot; total_currency_diff} =
+    let fold {epoch; slot} =
       let open Nanobit_base.Util in
       Epoch.Bits.fold epoch +> Epoch.Slot.Bits.fold slot
-      +> Amount.fold total_currency_diff
 
-    let var_to_bits {epoch; slot; total_currency_diff} =
+    let var_to_bits {epoch; slot} =
       Epoch.Unpacked.var_to_bits epoch
       @ Epoch.Slot.Unpacked.var_to_bits slot
-      @ ( total_currency_diff |> Amount.var_to_bits
-        |> Bitstring_lib.Bitstring.Lsb_first.to_list )
 
     let bit_length =
-      Epoch.length_in_bits + Epoch.Slot.length_in_bits + Amount.length
+      Epoch.length_in_bits + Epoch.Slot.length_in_bits
   end
 
   module Consensus_state = struct
@@ -250,17 +251,26 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
 
   let verify _transition = Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
-  let update_var state _transition = Snark_params.Tick.Let_syntax.return state
+  let update_var (state : Consensus_state.var) (transition : Snark_transition.var) : (Consensus_state.var, _) Snark_params.Tick.Checked.t =
+    let open Snark_params.Tick.Let_syntax in
+    let open Consensus_state in
+    let consensus_transition_data = Snark_transition.consensus_data transition in
+    let%bind length = Length.increment_var state.length in
+    let%map total_currency = Amount.Checked.add state.total_currency (Amount.var_of_t Inputs.coinbase) in
+    { length
+    ; current_epoch= consensus_transition_data.epoch
+    ; current_slot= consensus_transition_data.slot
+    ; total_currency }
 
   let update (state: Consensus_state.value)
       (transition: Snark_transition.value) =
     let open Or_error.Let_syntax in
     let open Consensus_state in
-    let Consensus_transition_data.({epoch; slot; total_currency_diff}) =
+    let Consensus_transition_data.({epoch; slot}) =
       Snark_transition.consensus_data transition
     in
     let%map total_currency =
-      Amount.add state.total_currency total_currency_diff
+      Amount.add state.total_currency Inputs.coinbase
       |> Option.map ~f:Or_error.return
       |> Option.value
            ~default:(Or_error.error_string "failed to add total_currency")
@@ -272,7 +282,12 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
 
   let step = Async_kernel.Deferred.Or_error.return
 
-  let select _curr _cand = `Keep
+  let select curr cand =
+    let open Consensus_state in
+    if Length.compare curr.length cand.length < 0 then
+      `Take
+    else
+      `Keep
 
   (*
   let select curr cand =
@@ -306,7 +321,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
     let consensus_transition_data =
       let open Consensus_transition_data in
-      {epoch; slot; total_currency_diff= Inputs.coinbase}
+      {epoch; slot}
     in
     let consensus_state =
       let open Consensus_state in

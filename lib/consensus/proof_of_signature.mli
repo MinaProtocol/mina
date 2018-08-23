@@ -1,9 +1,15 @@
-module Make (Proof : sig
-  type t [@@deriving bin_io, sexp]
-end) (Ledger_builder_diff : sig
-  type t [@@deriving sexp, bin_io]
-end) :
+module type Inputs_intf = sig
+  module Proof : sig
+    type t [@@deriving bin_io, sexp]
+  end
+
+  module Ledger_builder_diff : sig
+    type t [@@deriving bin_io, sexp]
+  end
+end
+
+module Make (Inputs : Inputs_intf) :
   Mechanism.S
-  with module Proof = Proof
-   and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-   and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+  with type Proof.t = Inputs.Proof.t
+   and type Internal_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t
+   and type External_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t

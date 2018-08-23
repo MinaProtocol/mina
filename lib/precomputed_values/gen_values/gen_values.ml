@@ -70,8 +70,9 @@ let main () =
     if use_dummy_values then return (module Dummy : S)
     else
       let module Consensus_mechanism =
-        Consensus.Proof_of_signature.Make (Nanobit_base.Proof)
-          (Ledger_builder.Make_diff (struct
+        Consensus.Proof_of_signature.Make (struct
+          module Proof = Nanobit_base.Proof
+          module Ledger_builder_diff = Ledger_builder.Make_diff (struct
             open Nanobit_base
             module Compressed_public_key = Public_key.Compressed
 
@@ -129,7 +130,8 @@ let main () =
 
               let of_bytes = Ledger_builder_hash.of_bytes
             end
-          end)) in
+          end)
+        end) in
       let module Keys = Keys_lib.Keys.Make (Consensus_mechanism) in
       let%map (module K) = Keys.create () in
       (module Make_real (K) : S)

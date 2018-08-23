@@ -48,4 +48,8 @@ module type Inputs_intf = sig
   val epoch_size : UInt32.t
 end
 
-module Make (Inputs : Inputs_intf) : Mechanism.S
+module Make (Inputs : Inputs_intf) :
+  Mechanism.S
+  with type Proof.t = Inputs.Proof.t
+   and type Internal_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t
+   and type External_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t

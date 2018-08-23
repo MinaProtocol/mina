@@ -3,7 +3,13 @@ open Async
 open Nanobit_base
 open Coda_main
 
-module Kernel = Kernel.Debug ()
+module Kernel = Make_kernel (Ledger_proof.Debug)
+  (functor
+      (Ledger_builder_diff :sig type t [@@deriving sexp, bin_io] end) ->
+    Consensus.Proof_of_signature.Make (struct
+      module Proof = Nanobit_base.Proof 
+      module Ledger_builder_diff = Ledger_builder_diff
+    end))
 
 module Coda_worker = struct
   type input =
