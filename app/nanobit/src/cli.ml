@@ -130,7 +130,7 @@ let daemon (type ledger_proof) (module Kernel
        Async.never ())
 
 let () =
-  let daemon, full_test =
+  let commands =
     if Insecure.with_snark then
       let module Kernel = Kernel.Prod () in
       let module Coda = struct
@@ -141,8 +141,18 @@ let () =
             () =
           Coda_with_snark (Storage.Disk) (Init) ()
       end in
-      ( daemon (module Kernel) (module Coda)
-      , Full_test.command (module Kernel) (module Coda) )
+      ("daemon", daemon (module Kernel) (module Coda))
+      ::
+      ( if Insecure.integration_tests then
+          let module Coda_peers_test =
+            Coda_peers_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
+          let module Coda_block_production_test =
+            Coda_block_production_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
+          [ (Coda_peers_test.name, Coda_peers_test.command)
+          ; ( Coda_block_production_test.name
+            , Coda_block_production_test.command )
+          ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
+      else [] )
     else
       let module Kernel = Kernel.Debug () in
       let module Coda = struct
@@ -154,20 +164,34 @@ let () =
             () =
           Coda_without_snark (Init) ()
       end in
-      ( daemon (module Kernel) (module Coda)
-      , Full_test.command (module Kernel) (module Coda) )
+      ("daemon", daemon (module Kernel) (module Coda))
+      ::
+      ( if Insecure.integration_tests then
+          let module Coda_peers_test =
+            Coda_peers_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
+          let module Coda_block_production_test =
+            Coda_block_production_test.Make (Ledger_proof.Debug) (Kernel)
+              (Coda) in
+          [ (Coda_peers_test.name, Coda_peers_test.command)
+          ; ( Coda_block_production_test.name
+            , Coda_block_production_test.command )
+          ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
+      else [] )
+  in
+  let extra_commands =
+    if Insecure.integration_tests then
+      [("transaction-snark-profiler", Transaction_snark_profiler.command)]
+    else []
   in
   Random.self_init () ;
   Command.group ~summary:"Current"
-    [ ("daemon", daemon)
-    ; (Parallel.worker_command_name, Parallel.worker_command)
-    ; ( Snark_worker_lib.Debug.command_name
-      , Snark_worker_lib.Debug.Worker.command )
-    ; (Snark_worker_lib.Prod.command_name, Snark_worker_lib.Prod.Worker.command)
-    ; ("full-test", full_test)
-    ; ("client", Client.command)
-    ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
-    ; (Coda_peers_test.name, Coda_peers_test.command) ]
+    ( [ (Parallel.worker_command_name, Parallel.worker_command)
+      ; ( Snark_worker_lib.Debug.command_name
+        , Snark_worker_lib.Debug.Worker.command )
+      ; ( Snark_worker_lib.Prod.command_name
+        , Snark_worker_lib.Prod.Worker.command )
+      ; ("client", Client.command) ]
+    @ commands @ extra_commands )
   |> Command.run
 
 let () = never_returns (Scheduler.go ())

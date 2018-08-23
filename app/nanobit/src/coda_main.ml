@@ -653,8 +653,12 @@ struct
   end)
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs: 'a -> Ledger_proof_statement.Set.t)
-      ~(set_seen_jobs: 'a -> Ledger_proof_statement.Set.t -> unit) (t: 'a) =
+      ~(seen_jobs:
+         'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
+      ~(set_seen_jobs:
+            'a
+         -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
+         -> unit) (t: 'a) =
     let lb = best_ledger_builder t in
     let maybe_instances, seen_jobs =
       Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
@@ -851,6 +855,8 @@ module type Main_intf = sig
   val lbc_transition_tree : t -> Inputs.Transition_tree.t option
 
   val snark_worker_command_name : string
+
+  val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 end
 
 module Run (Program : Main_intf) = struct
@@ -859,6 +865,8 @@ module Run (Program : Main_intf) = struct
 
   module For_tests = struct
     let get_transition_tree t = lbc_transition_tree t
+
+    let ledger_proof t = ledger_builder_ledger_proof t
   end
 
   let get_balance t (addr: Public_key.Compressed.t) =
