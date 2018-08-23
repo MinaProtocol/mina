@@ -3,9 +3,10 @@ open Async
 open Nanobit_base
 open Coda_main
 
-module Kernel = Kernel.Debug ()
-
-module Coda_worker = struct
+module Make
+    (Kernel : Kernel_intf)
+    (Coda : Coda_intf.S with type ledger_proof = Kernel.Ledger_proof.t) =
+struct
   type input =
     { host: string
     ; conf_dir: string
@@ -68,15 +69,6 @@ module Coda_worker = struct
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string my_port)
         in
-        let module Coda = struct
-          type ledger_proof = Ledger_proof_statement.t
-
-          module Make
-              (Init : Init_intf
-                      with type Ledger_proof.t = Ledger_proof_statement.t)
-              () =
-            Coda_without_snark (Init) ()
-        end in
         let module Config = struct
           let logger = log
 

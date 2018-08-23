@@ -130,7 +130,7 @@ let daemon (type ledger_proof) (module Kernel
        Async.never ())
 
 let () =
-  let daemon, full_test =
+  let daemon, full_test, coda_peers_test =
     if Insecure.with_snark then
       let module Kernel = Kernel.Prod () in
       let module Coda = struct
@@ -141,8 +141,10 @@ let () =
             () =
           Coda_with_snark (Storage.Disk) (Init) ()
       end in
+      let module Coda_peers_test = Coda_peers_test.Make (Kernel) (Coda) in
       ( daemon (module Kernel) (module Coda)
-      , Full_test.command (module Kernel) (module Coda) )
+      , Full_test.command (module Kernel) (module Coda)
+      , Coda_peers_test.command )
     else
       let module Kernel = Kernel.Debug () in
       let module Coda = struct
@@ -154,8 +156,10 @@ let () =
             () =
           Coda_without_snark (Init) ()
       end in
+      let module Coda_peers_test = Coda_peers_test.Make (Kernel) (Coda) in
       ( daemon (module Kernel) (module Coda)
-      , Full_test.command (module Kernel) (module Coda) )
+      , Full_test.command (module Kernel) (module Coda)
+      , Coda_peers_test.command )
   in
   Random.self_init () ;
   Command.group ~summary:"Current"
@@ -167,7 +171,7 @@ let () =
     ; ("full-test", full_test)
     ; ("client", Client.command)
     ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
-    ; (Coda_peers_test.name, Coda_peers_test.command) ]
+    ; (Coda_peers_test.name, coda_peers_test) ]
   |> Command.run
 
 let () = never_returns (Scheduler.go ())
