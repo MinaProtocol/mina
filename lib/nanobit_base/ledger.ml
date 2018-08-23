@@ -4,11 +4,11 @@ open Currency
 
 include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
           (struct
-            type hash = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
+            type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
 
             let merge = Merkle_hash.merge
 
-            let empty_hash = Merkle_hash.empty_hash
+            let empty = Merkle_hash.empty_hash
 
             let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
           end)

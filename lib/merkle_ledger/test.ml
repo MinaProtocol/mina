@@ -1,9 +1,9 @@
 open Core
 
 module type S =
-  Ledger.S
+  Intf.Ledger_S
   with type key := string
-   and type hash := Md5.t
+   and type hash := int
    and type account := Test_ledger.Account.t
 
 module type Ledger_intf = sig
@@ -105,13 +105,13 @@ let compose_hash n hash =
 let%test "merkle_root" =
   let ledger = L16.create () in
   let root = L16.merkle_root ledger in
-  compose_hash 16 Test_ledger.Hash.empty_hash = root
+  compose_hash 16 Test_ledger.Hash.empty = root
 
 let%test "merkle_root_nonempty" =
   let l = (1 lsl (3 - 1)) + 1 in
   let ledger, _ = L3.load_ledger l 1 in
   let root = L3.merkle_root ledger in
-  Test_ledger.Hash.empty_hash <> root
+  Test_ledger.Hash.empty <> root
 
 let%test_unit "merkle_root_edit" =
   let b1 = 10 in
@@ -120,7 +120,7 @@ let%test_unit "merkle_root_edit" =
   let ledger, keys = L16.load_ledger n b1 in
   let key = List.nth_exn keys 0 in
   let root0 = L16.merkle_root ledger in
-  assert (Test_ledger.Hash.empty_hash <> root0) ;
+  assert (Test_ledger.Hash.empty <> root0) ;
   L16.set ledger key {balance= b2; key} ;
   let root1 = L16.merkle_root ledger in
   assert (root1 <> root0) ;
@@ -250,7 +250,7 @@ let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
   let mr_start = L16.merkle_root ledger in
   let max_height = Int.ceil_log2 count in
   let hash_to_set =
-    Test_ledger.Hash.(merge ~height:80 empty_hash empty_hash)
+    Test_ledger.Hash.(merge ~height:80 empty empty)
   in
   let open Quickcheck.Generator in
   Quickcheck.test
@@ -265,8 +265,8 @@ let%test_unit "set_inner_hash_at_addr_exn t a h ; get_inner_hash_at_addr_exn \
       let old_hash = L16.get_inner_hash_at_addr_exn ledger a in
       L16.set_inner_hash_at_addr_exn ledger a hash_to_set ;
       let res =
-        [%test_result : Test_ledger.Hash.hash]
-          ~equal:Test_ledger.Hash.equal_hash
+        [%test_result : Test_ledger.Hash.t]
+          ~equal:Test_ledger.Hash.equal
           (L16.get_inner_hash_at_addr_exn ledger a)
           ~expect:hash_to_set
       in

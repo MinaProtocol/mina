@@ -9,7 +9,7 @@ module Account = struct
 end
 
 module Hash = struct
-  type hash = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
+  type t = Md5.t [@@deriving sexp, hash, compare, bin_io, eq]
 
   (* to prevent pre-image attack,
    * important impossible to create an account such that (merge a b = hash_account account) *)
@@ -17,7 +17,7 @@ module Hash = struct
   let hash_account account =
     Md5.digest_string ("0" ^ Sexp.to_string ([%sexp_of : Account.t] account))
 
-  let empty_hash = Md5.digest_string ""
+  let empty = Md5.digest_string ""
 
   let merge ~height a b =
     let res =
@@ -26,6 +26,16 @@ module Hash = struct
     in
     res
 end
+
+(* module Hash = struct
+  type t = int [@@deriving sexp, hash, compare, bin_io, eq]
+
+  let empty = 0
+
+  let merge ~height left right = Hashtbl.hash (height, left, right)
+
+  let hash_account : Account.t -> t = Hashtbl.hash
+end *)
 
 module Key = struct
   module T = struct
