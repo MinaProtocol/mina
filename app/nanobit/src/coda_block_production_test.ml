@@ -30,7 +30,7 @@ struct
         let rec go i blocks =
           if i = 10 then return blocks
           else
-            let%bind () = Linear_pipe.read_exn strongest_ledgers in
+            let%bind _ = Linear_pipe.read_exn strongest_ledgers in
             go (i + 1) (((), Time.now ()) :: blocks)
         in
         let%bind blocks = go 0 [] in

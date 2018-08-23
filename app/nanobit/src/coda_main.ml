@@ -752,9 +752,13 @@ module type Main_intf = sig
       val get : t -> Public_key.Compressed.t -> Account.t option
     end
 
-    module External_transition : sig
-      type t
+    module Ledger_builder_diff : sig
+      type t [@@deriving sexp, bin_io]
     end
+
+    module Consensus_mechanism : Consensus.Mechanism.S
+    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+     and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
 
     module Net : sig
       type t
@@ -811,7 +815,7 @@ module type Main_intf = sig
     end
 
     module Transition_tree :
-      Coda.Ktree_intf with type elem := External_transition.t
+      Coda.Ktree_intf with type elem := Consensus_mechanism.External_transition.t
   end
 
   module Consensus_mechanism :
@@ -846,7 +850,7 @@ module type Main_intf = sig
   val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
-    t -> Inputs.External_transition.t Linear_pipe.Reader.t
+    t -> Inputs.Consensus_mechanism.External_transition.t Linear_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
