@@ -5,16 +5,9 @@ open Coda_main
 
 let pk_of_sk sk = Public_key.of_private_key sk |> Public_key.compress
 
-module type Coda_intf = sig
-  type ledger_proof
-
-  module Make (Init : Init_intf with type Ledger_proof.t = ledger_proof) () :
-    Main_intf
-end
-
 let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
-    : Coda_intf with type ledger_proof = ledger_proof) : unit Deferred.t =
+    : Coda_intf.S with type ledger_proof = ledger_proof) : unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
@@ -201,7 +194,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
 let command (type ledger_proof) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
-    : Coda_intf with type ledger_proof = ledger_proof) =
+    : Coda_intf.S with type ledger_proof = ledger_proof) =
   let open Core in
   let open Async in
   Command.async ~summary:"Full minibit end-to-end test"
