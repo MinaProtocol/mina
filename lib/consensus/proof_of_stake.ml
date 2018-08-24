@@ -157,6 +157,20 @@ struct
           compare_var slot unforkable_count_times_2 >>| fun c -> c.less
         in
         Boolean.(slot_gte_unforkable_count && slot_lt_unforkable_count_times_2)
+
+      let gen =
+        let open Quickcheck.Let_syntax in
+        Core.Int.gen_incl 0 (UInt32.to_int unforkable_count * 3)
+        >>| UInt32.of_int
+
+      let%test_unit "in_seed_update_range_var" =
+        Quickcheck.test gen ~f:(fun slot ->
+          Nanobit_base.Test_util.test_equal
+            Unpacked.typ
+            Snark_params.Tick.Boolean.typ
+            in_seed_update_range_var
+            in_seed_update_range
+            slot)
     end
 
     let slot_start_time (epoch: t) (slot: Slot.t) =
