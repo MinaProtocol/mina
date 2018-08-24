@@ -99,7 +99,7 @@ let daemon (type ledger_proof) (module Kernel
 
          let transition_interval = Time.Span.of_sec 5.0
 
-         let fee_public_key = Genesis_ledger.rich_pk
+         let fee_public_key = Genesis_ledger.high_balance_pk
 
          let genesis_proof = Precomputed_values.base_proof
        end in

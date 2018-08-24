@@ -79,7 +79,7 @@ struct
 
           let transition_interval = Time.Span.of_ms 1000.0
 
-          let fee_public_key = Genesis_ledger.rich_pk
+          let fee_public_key = Genesis_ledger.high_balance_pk
 
           let genesis_proof = Precomputed_values.base_proof
         end in
