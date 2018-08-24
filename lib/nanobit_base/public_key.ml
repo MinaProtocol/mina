@@ -45,6 +45,14 @@ module Compressed = struct
   include Comparable.Make_binable (Stable.V1)
   include Hashable.Make_binable (Stable.V1)
 
+  let to_base64 t =
+    Binable.to_string (module Stable.V1) t
+    |> Base64.encode_string
+
+  let of_base64_exn s =
+    Base64.decode_string s
+    |> Binable.of_string (module Stable.V1)
+
   let empty = {x= Field.zero; is_odd= false}
 
   let gen =
