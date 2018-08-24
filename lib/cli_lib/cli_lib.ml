@@ -67,5 +67,3 @@ let txn_nonce =
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
 let default_client_port = 8301
-
-let default_external_port = 8302

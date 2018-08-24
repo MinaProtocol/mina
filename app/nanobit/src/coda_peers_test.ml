@@ -14,12 +14,6 @@ struct
   module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
   open Coda_processes
 
-  let equal_unordered xs ys =
-    if List.length xs <> List.length ys then false
-    else
-      List.for_all xs ~f:(fun x ->
-          Option.is_some (List.find ys ~f:(fun y -> y = x)) )
-
   let main () =
     let%bind program_dir = Unix.getcwd () in
     let n = 3 in
@@ -37,7 +31,11 @@ struct
                  !"got peers %{sexp: Kademlia.Peer.t list} %{sexp: \
                    Host_and_port.t list}\n"
                  peers expected_peers ;
-               assert (equal_unordered (List.map peers ~f:fst) expected_peers) ;
+               let module S = Host_and_port.Set in
+               assert (
+                 S.equal
+                   (S.of_list (peers |> List.map ~f:fst))
+                   (S.of_list expected_peers) ) ;
                Deferred.unit )) )
 
   let command =

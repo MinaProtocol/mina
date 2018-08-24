@@ -12,6 +12,8 @@ module type Coda_intf = sig
     Main_intf
 end
 
+let default_external_port = 8302
+
 let daemon (type ledger_proof) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
     : Coda_intf with type ledger_proof = ledger_proof) =
