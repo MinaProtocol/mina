@@ -303,6 +303,9 @@ struct
         (var, _) Snark_params.Tick.Checked.t =
       let open Snark_params.Tick.Let_syntax in
       let%bind length = Length.increment_var previous_state.length
+      (* TODO: keep track of total_currency in transaction snark. The current_slot
+       * implementation would allow an adversary to make then total_currency incorrect by
+       * not adding the coinbase to their account. *)
       and total_currency =
         Amount.Checked.add previous_state.total_currency
           (Amount.var_of_t Inputs.coinbase)
