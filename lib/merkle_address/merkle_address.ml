@@ -58,6 +58,8 @@ module type S = sig
   val depth : t -> int
 
   val height : t -> int
+
+  val to_int : t -> int
 end
 
 module Make (Input : sig
@@ -179,6 +181,12 @@ struct
       Or_error.return path
 
   let child_exn (path: t) dir : t = child path dir |> Or_error.ok_exn
+
+  let to_int (path: t) : int =
+    Sequence.range 0 (depth path)
+    |> Sequence.fold ~init:0 ~f:(fun acc i ->
+           let index = depth path - 1 - i in
+           acc + ((if get path index <> 0 then 1 else 0) lsl i) )
 
   let dirs_from_root t =
     List.init (depth t) ~f:(fun pos -> Direction.of_bool (is_set t pos))
