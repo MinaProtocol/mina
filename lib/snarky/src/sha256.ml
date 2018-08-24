@@ -12,13 +12,15 @@ end)
   open Impl
 
   module Digest : sig
-    type t = bool list
+    type t = bool list [@@deriving sexp, bin_io, eq, compare]
 
     type var = Boolean.var list
 
     val length_in_bits : int
 
     val typ : (var, t) Typ.t
+
+    val fold : t -> init:'a -> f:('a -> bool -> 'a) -> 'a
   end
 
   module Block : sig
@@ -69,9 +71,11 @@ end = struct
   struct
     include M
 
-    type t = bool list
+    type t = bool list [@@deriving sexp, bin_io, eq, compare]
 
     type var = Boolean.var list
+
+    let fold = List.fold
 
     let typ = Typ.list ~length:length_in_bits Boolean.typ
   end

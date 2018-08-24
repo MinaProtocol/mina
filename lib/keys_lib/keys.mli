@@ -15,7 +15,7 @@ module type S = sig
     type t = {proof: Tick.Proof.t}
   end
 
-  val transaction_snark_keys : Transaction_snark.Keys.t
+  val transaction_snark_keys : Transaction_snark.Keys.Verification.t
 
   module Step : sig
     val keys : Tick.Keypair.t

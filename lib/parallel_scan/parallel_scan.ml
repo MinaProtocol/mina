@@ -311,6 +311,8 @@ let fill_in_completed_jobs :
   (state.jobs).position <- 0 ;
   if not (fst last_acc = fst state.acc) then snd state.acc else None
 
+let last_emitted_value (state: ('a, 'd) State1.t) = snd state.acc
+
 let gen :
        gen_data:'d Quickcheck.Generator.t
     -> f_job_done:(('a, 'd) Available_job.t -> 'a State.Completed_job.t)

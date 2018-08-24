@@ -31,6 +31,10 @@ module type Time_intf = sig
 
     val of_time_span : Core_kernel.Time.Span.t -> t
 
+    val to_ms : t -> Int64.t
+
+    val of_ms : Int64.t -> t
+
     val ( < ) : t -> t -> bool
 
     val ( > ) : t -> t -> bool
@@ -54,7 +58,15 @@ module type Time_intf = sig
     val cancel : Controller.t -> 'a t -> 'a -> unit
   end
 
+  val to_span_since_epoch : t -> Span.t
+
+  val of_span_since_epoch : Span.t -> t
+
   val diff : t -> t -> Span.t
+
+  val sub : t -> Span.t -> t
+
+  val add : t -> Span.t -> t
 
   val modulus : t -> Span.t -> Span.t
 
@@ -391,6 +403,8 @@ module type Ledger_builder_intf = sig
 
   val create : ledger:ledger -> self:public_key -> t
 
+  val current_ledger_proof : t -> ledger_proof option
+
   val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
 
   (* This should memoize the snark verifications *)
@@ -415,7 +429,7 @@ module type Ledger_builder_intf = sig
 
   val random_work_spec_chunk :
        t
-    -> ledger_proof_statement_set
+    -> ledger_proof_statement_set * ledger_proof_statement option
     -> ( ledger_proof_statement
        , super_transaction
        , sparse_ledger
@@ -423,7 +437,7 @@ module type Ledger_builder_intf = sig
        Snark_work_lib.Work.Single.Spec.t
        list
        option
-       * ledger_proof_statement_set
+       * (ledger_proof_statement_set * ledger_proof_statement option)
 end
 
 module type Tip_intf = sig
@@ -479,6 +493,14 @@ module type Consensus_mechanism_intf = sig
 
   type ledger_builder_diff
 
+  type transaction
+
+  module Consensus_transition_data : sig
+    type value [@@deriving sexp]
+
+    type var
+  end
+
   module Consensus_state : sig
     type value
 
@@ -505,17 +527,6 @@ module type Consensus_mechanism_intf = sig
     val hash : value -> protocol_state_hash
   end
 
-  module Consensus_data : sig
-    type value [@@deriving sexp]
-
-    type var
-  end
-
-  val create_consensus_state : Protocol_state.value -> Consensus_state.value
-
-  val create_consensus_data :
-    Protocol_state.value -> Consensus_data.value option
-
   module Snark_transition : sig
     type value
 
@@ -523,13 +534,13 @@ module type Consensus_mechanism_intf = sig
 
     val create_value :
          blockchain_state:blockchain_state
-      -> consensus_data:Consensus_data.value
+      -> consensus_data:Consensus_transition_data.value
       -> ledger_proof:proof option
       -> value
 
     val blockchain_state : value -> blockchain_state
 
-    val consensus_data : value -> Consensus_data.value
+    val consensus_data : value -> Consensus_transition_data.value
   end
 
   module Internal_transition : sig
@@ -558,6 +569,13 @@ module type Consensus_mechanism_intf = sig
 
     val protocol_state_proof : t -> protocol_state_proof
   end
+
+  val generate_transition :
+       previous_protocol_state:Protocol_state.value
+    -> blockchain_state:blockchain_state
+    -> time:Int64.t
+    -> transactions:transaction list
+    -> Protocol_state.value * Consensus_transition_data.value
 end
 
 module type Time_close_validator_intf = sig
@@ -792,6 +810,7 @@ Merge Snark:
      and type blockchain_state := Blockchain_state.value
      and type proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
+     and type transaction := Transaction.t
 
   module Tip :
     Tip_intf

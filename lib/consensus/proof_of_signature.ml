@@ -23,10 +23,10 @@ struct
   module Proof = Proof
   module Ledger_builder_diff = Ledger_builder_diff
 
-  module Consensus_data = struct
+  module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
 
-    type value = Signature.Stable.V1.t t_ [@@deriving bin_io, sexp]
+    type value = Signature.t t_ [@@deriving bin_io, sexp]
 
     type var = Signature.var t_
 
@@ -101,14 +101,15 @@ struct
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
-  module Snark_transition = Snark_transition.Make (Consensus_data) (Proof)
+  module Snark_transition =
+    Snark_transition.Make (Consensus_transition_data) (Proof)
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let verify (transition: Snark_transition.var) =
-    let Consensus_data.({signature}) =
+    let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
     Blockchain_state.Signature.Checked.verifies signature
@@ -141,6 +142,27 @@ struct
       Consensus_state.({length= l2; _}) =
     if l1 >= l2 then `Keep else `Take
 
+  let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
+      ~transactions:_ =
+    let previous_consensus_state =
+      Protocol_state.consensus_state previous_protocol_state
+    in
+    (* TODO: sign protocol_state instead of blockchain_state *)
+    let consensus_transition_data =
+      Consensus_transition_data.create_value blockchain_state
+    in
+    let consensus_state =
+      let open Consensus_state in
+      { length= Length.succ previous_consensus_state.length
+      ; signer_public_key= Public_key.compress Global_keypair.public_key }
+    in
+    let protocol_state =
+      Protocol_state.create_value
+        ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
+        ~blockchain_state ~consensus_state
+    in
+    (protocol_state, consensus_transition_data)
+
   let genesis_protocol_state =
     Protocol_state.create_value
       ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
@@ -151,16 +173,4 @@ struct
         @@ update
              (Protocol_state.consensus_state Protocol_state.negative_one)
              Snark_transition.genesis )
-
-  let create_consensus_data state =
-    (* TODO: sign protocol_state instead of blockchain_state *)
-    Some (Consensus_data.create_value (Protocol_state.blockchain_state state))
-
-  let create_consensus_state state =
-    let open Consensus_state in
-    let {length= old_length; signer_public_key= _} =
-      Protocol_state.consensus_state state
-    in
-    { length= Length.succ old_length
-    ; signer_public_key= Public_key.compress Global_keypair.public_key }
 end
