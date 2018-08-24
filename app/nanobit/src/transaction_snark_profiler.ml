@@ -157,7 +157,7 @@ let run profiler num_transactions =
   exit 0
 
 let main num_transactions () =
-  Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
+  Test_util.with_randomness 123456789 (fun () ->
       let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct
         let keys = keys
@@ -165,7 +165,7 @@ let main num_transactions () =
       run (profile (module T)) num_transactions )
 
 let dry num_transactions () =
-  Nanobit_base.Test_util.with_randomness 123456789 (fun () ->
+  Test_util.with_randomness 123456789 (fun () ->
       run check_base_snarks num_transactions )
 
 let command =

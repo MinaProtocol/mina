@@ -2,6 +2,8 @@ open Core_kernel
 open Coda_numbers
 open Snark_params
 open Tick
+open Tuple_lib
+open Fold_lib
 
 type ('ledger_builder_hash, 'ledger_hash, 'time) t_ =
   { ledger_builder_hash: 'ledger_builder_hash
@@ -45,23 +47,22 @@ val create_value :
   -> timestamp:Block_time.Stable.V1.t
   -> value
 
-val bit_length : int
+val length_in_triples : int
 
 val genesis : t
 
 val set_timestamp : ('a, 'b, 'c) t_ -> 'c -> ('a, 'b, 'c) t_
 
-val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
+val fold : t -> bool Triple.t Fold.t
 
-val var_to_bits : var -> (Boolean.var list, _) Checked.t
-
-val to_bits : t -> bool list
+val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
 module Message :
   Snarky.Signature.Message_intf
   with type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
    and type boolean_var := Tick.Boolean.var
-   and type curve_scalar_var := Snark_params.Tick.Signature_curve.Scalar.var
+   and type curve_scalar := Inner_curve.Scalar.t
+   and type curve_scalar_var := Inner_curve.Scalar.var
    and type t = t
    and type var = var
 
@@ -70,8 +71,8 @@ module Signature :
   with type ('a, 'b) typ := ('a, 'b) Tick.Typ.t
    and type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
    and type boolean_var := Tick.Boolean.var
-   and type curve := Snark_params.Tick.Signature_curve.value
-   and type curve_var := Snark_params.Tick.Signature_curve.var
-   and type curve_scalar := Snark_params.Tick.Signature_curve.Scalar.t
-   and type curve_scalar_var := Snark_params.Tick.Signature_curve.Scalar.var
+   and type curve := Snark_params.Tick.Inner_curve.t
+   and type curve_var := Snark_params.Tick.Inner_curve.var
+   and type curve_scalar := Snark_params.Tick.Inner_curve.Scalar.t
+   and type curve_scalar_var := Snark_params.Tick.Inner_curve.Scalar.var
    and module Message := Message

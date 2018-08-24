@@ -2,17 +2,8 @@ open Core
 
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = Bignum_bigint.t * Bignum_bigint.t
-      [@@deriving sexp, eq, compare, hash]
-    end
-
-    type t = Bignum_bigint.Stable.V1.t * Bignum_bigint.Stable.V1.t
-    [@@deriving bin_io]
-
-    let equal = T.equal
-
-    include (T : module type of T with type t := t)
+    type t = Snark_params.Tock.Field.t * Snark_params.Tock.Field.t
+    [@@deriving sexp, eq, compare, hash, bin_io]
   end
 end
 

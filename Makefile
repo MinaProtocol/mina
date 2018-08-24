@@ -18,6 +18,7 @@ build :
 		./scripts/run-in-docker dune build ; \
 	else \
 		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
+                ulimit -s 65536 ; \
 		dune build ; \
 	fi
 	@echo "Build complete"

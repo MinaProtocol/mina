@@ -117,11 +117,57 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       fun bs -> go Field.one Field.zero bs
 
+    let compare t1 t2 = Bigint.(compare (of_field t1) (of_field t2))
+
+    let hash_fold_t s x =
+      Bignum_bigint.hash_fold_t s Bigint.(to_bignum_bigint (of_field x))
+
+    let hash = Hash.of_fold hash_fold_t
+
     let sexp_of_t x =
       Bignum_bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
 
     let t_of_sexp s =
       Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.t_of_sexp s))
+
+    let to_string x =
+      Bignum_bigint.to_string (Bigint.to_bignum_bigint (Bigint.of_field x))
+
+    let of_string s =
+      Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.of_string s))
+
+    include Binable.Of_binable (Bigstring)
+              (struct
+                type t = Field.t
+
+                let ( /^ ) x y = Float.(to_int (round_up (x // y)))
+
+                let size_in_bytes = size_in_bits /^ 8
+
+                (* Someday: There should be a more efficient way of doing
+          this since bigints are backed by a char[] *)
+                let to_binable x =
+                  let n = Bigint.of_field x in
+                  let b i j =
+                    if Bigint.test_bit n ((8 * i) + j) then 1 lsl j else 0
+                  in
+                  Bigstring.init size_in_bytes ~f:(fun i ->
+                      Char.of_int_exn
+                        (let i = size_in_bytes - 1 - i in
+                         b i 0 lor b i 1 lor b i 2 lor b i 3 lor b i 4
+                         lor b i 5 lor b i 6 lor b i 7) )
+
+                let of_binable =
+                  Fn.compose Bigint.to_field Bigint.of_bignum_bigint
+
+                (* Someday:
+          This/the reader can definitely be made more efficient as well.
+          bin_read should probably be in C. *)
+                let of_binable s =
+                  Bigstring.to_string ~len:size_in_bytes ~pos:0 s
+                  |> Bigint.of_numeral ~base:256
+                  |> Bigint.to_field
+              end)
 
     module Infix = struct
       let ( + ) = add

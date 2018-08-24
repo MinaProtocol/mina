@@ -1,6 +1,6 @@
 open Snark_params
 
-val length_in_bits : int
+val length_in_triples : int
 
 val protocol_state : Tick.Pedersen.State.t
 
