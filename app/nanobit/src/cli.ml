@@ -145,8 +145,8 @@ let daemon (type ledger_proof) (module Kernel
 let () =
   let commands =
     let consensus_mechanism_of_string = function
-      | "proof_of_signature" -> `Proof_of_signature
-      | "proof_of_stake" -> `Proof_of_stake
+      | "PROOF_OF_SIGNATURE" -> `Proof_of_signature
+      | "PROOF_OF_STAKE" -> `Proof_of_stake
       | _ -> failwith "invalid consensus mechanism"
     in
     let consensus_mechanism =
