@@ -1,11 +1,11 @@
 open Core_kernel
 open Snark_bits
+open Pedersen_types
 
 module type S = sig
   type curve
 
-  type fold =
-    init:curve * int -> f:(curve * int -> bool -> curve * int) -> curve * int
+  type ('s, 'b) fold = init:'s -> f:('s -> 'b -> 's) -> 's
 
   module Digest : sig
     type t [@@deriving bin_io, sexp, eq]
@@ -23,33 +23,67 @@ module type S = sig
        and type Unpacked.value = Impl.Field.t
   end
 
-  module Params : sig
+  module Bits_params : sig
     type t = curve array
 
     val random : max_input_length:int -> t
   end
 
-  module State : sig
-    type t = {bits_consumed: int; acc: curve; params: Params.t}
+  module Bits_state : sig
+    type t = {bits_consumed: int; acc: curve; params: Bits_params.t}
 
-    val create : ?bits_consumed:int -> ?init:curve -> Params.t -> t
+    val create : ?bits_consumed:int -> ?init:curve -> Bits_params.t -> t
 
     val update_bigstring : t -> Bigstring.t -> t
 
     val update_string : t -> string -> t
 
-    val update_fold : t -> fold -> t
+    val update_bit_fold : t -> ((curve * int), bool) fold -> t
 
     val update_iter : t -> (f:(bool -> unit) -> unit) -> t
 
     val digest : t -> Digest.t
 
-    val salt : Params.t -> string -> t
+    val salt : Bits_params.t -> string -> t
   end
 
-  val hash_fold : State.t -> fold -> State.t
+  val hash_bit_fold : Bits_state.t -> ((curve * int), bool) fold -> Bits_state.t
 
-  val digest_fold : State.t -> fold -> Digest.t
+  val digest_bit_fold : Bits_state.t -> ((curve * int), bool) fold -> Digest.t
+
+
+  module Params : sig
+    type t = curve Quadruple.t array
+
+    val of_curve : curve -> curve Quadruple.t
+(*
+    val random : max_input_length:int -> t
+*)
+  end
+
+  module State : sig
+    type t = {triples_consumed: int; acc: curve; params: Params.t}
+
+    val create : ?triples_consumed:int -> ?init:curve -> Params.t -> t
+
+    val update_bigstring : t -> Bigstring.t -> t
+
+    val update_string : t -> string -> t
+
+    val update_fold : t -> ((curve * int), bool Triple.t) fold -> t
+(*
+    val update_iter : t -> (f:(bool -> unit) -> unit) -> t
+*)
+    val digest : t -> Digest.t
+(*  
+    val salt : Triple_params.t -> string -> t
+*)
+  end
+
+  val hash_fold : State.t -> ((curve * int), bool Triple.t) fold -> State.t
+
+  val digest_fold : State.t -> ((curve * int), bool Triple.t) fold -> Digest.t
+
 end
 
 module Make (Field : sig

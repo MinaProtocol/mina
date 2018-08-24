@@ -159,9 +159,11 @@ module Tick = struct
       include Snarkable (Tick0)
     end
 
-    let params =
+    let curve_params =
       let f s = Tick_curve.Bigint.R.(to_field (of_decimal_string s)) in
       Array.map Crypto_params.Pedersen_params.t ~f:(fun (x, y) -> (f x, f y))
+
+    let params = Array.map Crypto_params.Pedersen_params.of_curve curve_params
 
     let hash_bigstring x : Digest.t =
       let s = State.create params in
@@ -198,12 +200,12 @@ module Tick = struct
         let cond_add = Checked.cond_add
       end)
       (struct
-        let params = Pedersen.params
+        let params = Pedersen.Params.t
       end)
 
   let hash_bits ~(init: Pedersen.State.t) x =
     Pedersen_hash.hash x
-      ~init:(init.bits_consumed, Hash_curve.var_of_value init.acc)
+      ~init:(init.triples_consumed, Hash_curve.var_of_value init.acc)
 
   let digest_bits ~init x = Checked.(hash_bits ~init x >>| Pedersen_hash.digest)
 

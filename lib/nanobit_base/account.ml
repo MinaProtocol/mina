@@ -99,9 +99,29 @@ let fold_bits ({public_key; balance; nonce; receipt_chain_hash}: t) =
 
 let hash_prefix = Hash_prefix.account
 
-let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
+let hash t = Pedersen.hash_bit_fold hash_prefix (fold_bits t)
 
 let digest t = Pedersen.State.digest (hash t)
+
+let pubkey t = t.public_key
+
+let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
+  let%map public_key = Public_key.Compressed.var_to_bits public_key
+  and receipt_chain_hash = Receipt.Chain_hash.var_to_bits receipt_chain_hash in
+  let balance = (Balance.var_to_bits balance :> Boolean.var list) in
+  let nonce = Nonce.Unpacked.var_to_bits nonce in
+  public_key @ balance @ nonce @ receipt_chain_hash
+
+let fold_triples ({public_key; balance; nonce; receipt_chain_hash}: t) =
+  Public_key.Compressed.fold public_key
+  +> Balance.fold balance +> Nonce.Bits.fold nonce
+  +> Receipt.Chain_hash.fold receipt_chain_hash
+
+let hash_prefix = Hash_prefix.account
+
+let hash t = Pedersen.hash_fold hash_prefix (fold_triples t)
+
+let digest t = Pedersen.Triple_state.digest (hash t)
 
 let pubkey t = t.public_key
 
