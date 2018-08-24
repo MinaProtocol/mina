@@ -166,9 +166,8 @@ struct
 
       let%test_unit "in_seed_update_range_var" =
         Quickcheck.test gen ~f:(fun slot ->
-            Test_util.test_equal Unpacked.typ
-              Snark_params.Tick.Boolean.typ in_seed_update_range_var
-              in_seed_update_range slot )
+            Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
+              in_seed_update_range_var in_seed_update_range slot )
     end
 
     let slot_start_time (epoch: t) (slot: Slot.t) =
