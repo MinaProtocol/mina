@@ -166,7 +166,7 @@ struct
 
       let%test_unit "in_seed_update_range_var" =
         Quickcheck.test gen ~f:(fun slot ->
-            Nanobit_base.Test_util.test_equal Unpacked.typ
+            Test_util.test_equal Unpacked.typ
               Snark_params.Tick.Boolean.typ in_seed_update_range_var
               in_seed_update_range slot )
     end
