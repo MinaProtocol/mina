@@ -79,7 +79,7 @@ module Make
       t -> (Digest.var * [`Length_in_triples of int]) Or_error.t
 
     val to_initial_segment_digest_exn :
-      t -> (Digest.var * [`Length_in_triples of int])
+      t -> Digest.var * [`Length_in_triples of int]
   end
 
   val hash :
@@ -179,7 +179,8 @@ end = struct
 
     let create ~acc ~support = {acc; support}
 
-    let empty = { acc = `Value Weierstrass_curve.zero; support = Interval_union.empty }
+    let empty =
+      {acc= `Value Weierstrass_curve.zero; support= Interval_union.empty}
 
     let acc t = Acc.to_var t.acc
 

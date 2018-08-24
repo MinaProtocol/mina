@@ -5,7 +5,8 @@ open Fold_lib
 
 module Global_keypair = struct
   let private_key =
-    Private_key.of_base64_exn "JgDwuhZ+kgxR1jBT+F9hpH96nxD/TIGZ7fVSpw9YAGDlhwltebhc"
+    Private_key.of_base64_exn
+      "JgDwuhZ+kgxR1jBT+F9hpH96nxD/TIGZ7fVSpw9YAGDlhwltebhc"
 
   let public_key = Public_key.of_private_key private_key
 end
@@ -95,9 +96,7 @@ struct
       Length.Unpacked.var_to_triples length @ public_key_triples
 
     let fold {length; signer_public_key} =
-      Fold.(
-        Length.fold length
-        +> Public_key.Compressed.fold signer_public_key)
+      Fold.(Length.fold length +> Public_key.Compressed.fold signer_public_key)
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)

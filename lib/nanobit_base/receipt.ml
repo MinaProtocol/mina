@@ -12,8 +12,7 @@ module Chain_hash = struct
 
   let cons payload t =
     Pedersen.digest_fold Hash_prefix.receipt_chain
-      Fold.(
-        Transaction.Payload.fold payload +> fold t)
+      Fold.(Transaction.Payload.fold payload +> fold t)
     |> of_hash
 
   module Checked = struct
@@ -29,13 +28,15 @@ module Chain_hash = struct
       let init =
         Pedersen.Checked.Section.create
           ~acc:(`Value Hash_prefix.receipt_chain.acc)
-          ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_triples))
+          ~support:
+            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
       in
       let%bind with_t =
         let%bind bs = var_to_triples t in
         Pedersen.Checked.Section.extend init bs
           ~start:
-            (Hash_prefix.length_in_triples + Transaction.Payload.length_in_triples)
+            ( Hash_prefix.length_in_triples
+            + Transaction.Payload.length_in_triples )
       in
       let%map s = Pedersen.Checked.Section.disjoint_union_exn payload with_t in
       let digest, _ =

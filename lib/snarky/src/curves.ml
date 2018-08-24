@@ -549,6 +549,7 @@ struct
 
   module Assert = struct
     let on_curve = assert_on_curve
+
     let equal = assert_equal
   end
 
@@ -659,12 +660,13 @@ struct
       in
       r
 
-  let if_value (cond : Boolean.var) ~then_ ~else_ =
-    let (x1, y1) = Curve.to_coords then_ in
-    let (x2, y2) = Curve.to_coords else_ in
+  let if_value (cond: Boolean.var) ~then_ ~else_ =
+    let x1, y1 = Curve.to_coords then_ in
+    let x2, y2 = Curve.to_coords else_ in
     let cond = (cond :> Field.Checked.t) in
     let choose a1 a2 =
-      Field.Checked.(Infix.(a1 * cond + a2 * (constant Field.one - cond)))
+      let open Field.Checked in
+      Infix.((a1 * cond) + (a2 * (constant Field.one - cond)))
     in
     (choose x1 x2, choose y1 y2)
 
@@ -685,7 +687,7 @@ struct
       in
       go 0 c init t)
 
-(* This 'looks up' a field element from a lookup table of size 2^2 = 4 with
+  (* This 'looks up' a field element from a lookup table of size 2^2 = 4 with
    a 2 bit index.  See https://github.com/zcash/zcash/issues/2234#issuecomment-383736266 for
    a discussion of this trick.
 *)

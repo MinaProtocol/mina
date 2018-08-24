@@ -8,7 +8,6 @@ let high_balance_pk, high_balance_sk =
   ( pk "JgN/txgzOFPrOy8khSJSdPyFHdT+t05dgljjcaRvjXSC6ZFfcfkXAA"
   , sk "JgGg7PfX+SuEc8siVxn+OVeXBXcN3p0Wed0plH+tRn4+RduAlfUY" )
 
-
 let low_balance_pk, low_balance_sk =
   ( pk "JgMuF0Dkx1tw6eAX2om4kJ+4Ch4PsBmtaaeX9o0y26fsnUBLrUlPAA"
   , sk "JgERfGHovlhcwIfMQltKFskwxODQCiI8pOhbJNLCItz38ljGMnPK" )
@@ -45,8 +44,7 @@ let extra_accounts =
   ; ( pk "JgNCzMj7zA30XxNkja+EGYaplp6b+/Y2C7segUpHDaHhewRCKS6vAQ"
     , sk "JgEtzt0FSquiXmxHyvwoDFxfDjpMPDlV72QekDlHGT4KjbMOS0E+" )
   ; ( pk "JgIIB+xP5EBjykhIteN2xbCgGK7BxKnaOqDiMGJROrr0nMj+kZstAQ"
-    , sk "JgOeo/ijaEqR3ZoNgDKj3gU+ZnrbR+yo/+cNW68SjOQ6Z7UBzKHa" )
-  ]
+    , sk "JgOeo/ijaEqR3ZoNgDKj3gU+ZnrbR+yo/+cNW68SjOQ6Z7UBzKHa" ) ]
 
 let pks = fst @@ List.unzip extra_accounts
 

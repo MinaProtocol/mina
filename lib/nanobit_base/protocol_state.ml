@@ -129,8 +129,7 @@ struct
 
   let var_to_triples {previous_state_hash; blockchain_state; consensus_state} =
     let open Let_syntax in
-    let%map previous_state_hash =
-      State_hash.var_to_triples previous_state_hash
+    let%map previous_state_hash = State_hash.var_to_triples previous_state_hash
     and blockchain_state = Blockchain_state.var_to_triples blockchain_state
     and consensus_state = Consensus_state.var_to_triples consensus_state in
     previous_state_hash @ blockchain_state @ consensus_state
@@ -140,10 +139,10 @@ struct
     + Consensus_state.length_in_triples
 
   let fold {previous_state_hash; blockchain_state; consensus_state} =
-    Fold.(
+    let open Fold in
     State_hash.fold previous_state_hash
     +> Blockchain_state.fold blockchain_state
-    +> Consensus_state.fold consensus_state )
+    +> Consensus_state.fold consensus_state
 
   let hash s =
     Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state (fold s)

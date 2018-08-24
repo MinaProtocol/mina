@@ -21,5 +21,4 @@ and Lsb_first : sig
   val of_msb_first : 'a Lsb_first.t -> 'a t
 end
 
-val pad_to_triple_list
-  : default:'a -> 'a list -> 'a Triple.t list
+val pad_to_triple_list : default:'a -> 'a list -> 'a Triple.t list

@@ -57,9 +57,7 @@ let typ : (var, t) Typ.t =
 let fold {receiver; amount; fee; nonce} =
   let open Fold in
   Public_key.Compressed.fold receiver
-  +> Amount.fold amount
-  +> Fee.fold fee
-  +> Account_nonce.fold nonce
+  +> Amount.fold amount +> Fee.fold fee +> Account_nonce.fold nonce
 
 (* TODO: This could be a bit more efficient by packing across triples,
    but I think the added confusion-possibility
@@ -73,13 +71,10 @@ let var_to_triples {receiver; amount; fee; nonce} =
      receiver @ amount @ fee @ nonce)
 
 let length_in_triples =
-  Public_key.Compressed.length_in_triples
-  + Amount.length_in_triples
-  + Fee.length_in_triples
-  + Account_nonce.length_in_triples
+  Public_key.Compressed.length_in_triples + Amount.length_in_triples
+  + Fee.length_in_triples + Account_nonce.length_in_triples
 
-let to_triples t =
-  Fold.to_list (fold t)
+let to_triples t = Fold.to_list (fold t)
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in
@@ -93,13 +88,13 @@ let%test_unit "to_bits" =
   let open Test_util in
   with_randomness 123456789 (fun () ->
       let input =
-        { receiver= {Public_key.Compressed.x= Field.random (); is_odd= Random.bool ()}
+        { receiver=
+            {Public_key.Compressed.x= Field.random (); is_odd= Random.bool ()}
         ; amount= Amount.of_int (Random.int Int.max_value)
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random () }
       in
-      Test_util.test_to_triples typ fold var_to_triples input
-  )
+      Test_util.test_to_triples typ fold var_to_triples input )
 
 let var_of_t ({receiver; amount; fee; nonce}: t) : var =
   { receiver= Public_key.Compressed.var_of_t receiver

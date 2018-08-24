@@ -3,7 +3,6 @@ open Async_kernel
 open Snark_params
 open Snark_bits
 open Fold_lib
-
 module Digest = Tick.Pedersen.Digest
 
 module Keys = struct
@@ -144,31 +143,48 @@ struct
   open Nanobit_base
 
   include Transition_system.Make (struct
-      module Tick = struct
-        module Packed = struct
-          type value = Tick.Pedersen.Digest.t
-          type var = Tick.Pedersen.Checked.Digest.var
-          let typ = Tick.Pedersen.Checked.Digest.typ
-        end
-        module Unpacked = struct
-          type value = Tick.Pedersen.Checked.Digest.Unpacked.t
-          type var = Tick.Pedersen.Checked.Digest.Unpacked.var
-          let typ : (var, value) Tick.Typ.t = Tick.Pedersen.Checked.Digest.Unpacked.typ
-          let var_to_bits (x : var) = (x :> Tick.Boolean.var list)
-          let var_to_triples xs =
-            Fold.(to_list (
-              group3 ~default:Tick.Boolean.false_ (of_list (var_to_bits xs))))
-          let var_of_value = Tick.Pedersen.Checked.Digest.Unpacked.constant
-        end
-        let project_value = Tick.Field.project
-        let project_var = Tick.Pedersen.Checked.Digest.Unpacked.project
-        let unpack_value = Tick.Field.unpack
-        let choose_preimage_var = Tick.Pedersen.Checked.Digest.choose_preimage
-      end
+              module Tick = struct
+                module Packed = struct
+                  type value = Tick.Pedersen.Digest.t
 
-      module Tock = Bits.Snarkable.Field (Tock)
-    end)
-    (System)
+                  type var = Tick.Pedersen.Checked.Digest.var
+
+                  let typ = Tick.Pedersen.Checked.Digest.typ
+                end
+
+                module Unpacked = struct
+                  type value = Tick.Pedersen.Checked.Digest.Unpacked.t
+
+                  type var = Tick.Pedersen.Checked.Digest.Unpacked.var
+
+                  let typ : (var, value) Tick.Typ.t =
+                    Tick.Pedersen.Checked.Digest.Unpacked.typ
+
+                  let var_to_bits (x: var) = (x :> Tick.Boolean.var list)
+
+                  let var_to_triples xs =
+                    let open Fold in
+                    to_list
+                      (group3 ~default:Tick.Boolean.false_
+                         (of_list (var_to_bits xs)))
+
+                  let var_of_value =
+                    Tick.Pedersen.Checked.Digest.Unpacked.constant
+                end
+
+                let project_value = Tick.Field.project
+
+                let project_var = Tick.Pedersen.Checked.Digest.Unpacked.project
+
+                let unpack_value = Tick.Field.unpack
+
+                let choose_preimage_var =
+                  Tick.Pedersen.Checked.Digest.choose_preimage
+              end
+
+              module Tock = Bits.Snarkable.Field (Tock)
+            end)
+            (System)
 
   module Keys = struct
     include Keys

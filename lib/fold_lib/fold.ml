@@ -12,7 +12,7 @@ let of_list (xs: 'a list) : 'a t =
 
 let%test_unit "fold-to-list" =
   Quickcheck.test (Quickcheck.Generator.list Int.gen) ~f:(fun xs ->
-    assert (xs = to_list (of_list xs)))
+      assert (xs = to_list (of_list xs)) )
 
 let sexp_of_t f t = List.sexp_of_t f (to_list t)
 
@@ -30,8 +30,7 @@ let group3 ~default (t: 'a t) : ('a * 'a * 'a) t =
               | [b2; b1; b0] ->
                   let pt' = f pt (b0, b1, b2) in
                   (pt', [b])
-              | _ ->
-                (pt, b :: bs) )
+              | _ -> (pt, b :: bs) )
         in
         match bs with
         | [b2; b1; b0] -> f pt (b0, b1, b2)
@@ -42,18 +41,19 @@ let group3 ~default (t: 'a t) : ('a * 'a * 'a) t =
 
 let%test_unit "group3" =
   Quickcheck.test (Quickcheck.Generator.list Int.gen) ~f:(fun xs ->
-    let default = 0 in
-    let n = List.length xs in
-    let tuples = to_list (group3 ~default (of_list xs)) in
-    let k = List.length tuples in
-    let r = n mod 3 in
-    begin
-      let padded = xs @ (if r = 0 then [] else List.init (3 - r) ~f:(fun _ -> default)) in
-      let concated = List.concat_map ~f:(fun (b1,b2,b3) -> [b1;b2;b3]) tuples in
-      [%test_eq: int list] padded concated
-    end;
-    assert ((n + 2)/3 = k);
-  )
+      let default = 0 in
+      let n = List.length xs in
+      let tuples = to_list (group3 ~default (of_list xs)) in
+      let k = List.length tuples in
+      let r = n mod 3 in
+      (let padded =
+         xs @ if r = 0 then [] else List.init (3 - r) ~f:(fun _ -> default)
+       in
+       let concated =
+         List.concat_map ~f:(fun (b1, b2, b3) -> [b1; b2; b3]) tuples
+       in
+       [%test_eq : int list] padded concated) ;
+      assert ((n + 2) / 3 = k) )
 
 let string_bits s =
   let ith_bit_int n i = (n lsr i) land 1 = 1 in
