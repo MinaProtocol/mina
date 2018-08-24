@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core bitstring integers extlib immutable_array dyn_array merkle_address direction))
-  (preprocess (pps (ppx_jane ppx_deriving.eq)))
-  (synopsis "Merkle Ledger implementation")))
+  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.show)))
+  (synopsis "Implementation of different account databases")))
 
