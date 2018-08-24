@@ -1,98 +1,148 @@
 open Core_kernel
+open Tuple_lib
+
+let local_function ~negate quad (b0, b1, b2) =
+  let t = Quadruple.get quad (Four.of_bits_lsb (b0, b1)) in
+  if b2 then negate t else t
 
 module Make
-    (Impl : Snark_intf.S) (Curve : sig
+    (Impl : Snark_intf.S) (Weierstrass_curve : sig
         type var = Impl.Field.Checked.t * Impl.Field.Checked.t
 
-        type value
+        type t [@@deriving eq]
 
-        val typ : (var, value) Impl.Typ.t
+        val to_coords : t -> Impl.Field.t * Impl.Field.t
 
-        val add : value -> value -> value
+        val typ : (var, t) Impl.Typ.t
 
-        val var_of_value : value -> var
+        val negate : t -> t
 
-        val identity : value
+        val add : t -> t -> t
+
+        val zero : t
 
         module Checked : sig
+          val constant : t -> var
+
           val add : var -> var -> (var, _) Impl.Checked.t
 
-          val add_known : var -> value -> (var, _) Impl.Checked.t
-
-          val cond_add :
-            value -> to_:var -> if_:Impl.Boolean.var -> (var, _) Impl.Checked.t
+          val add_known : var -> t -> (var, _) Impl.Checked.t
         end
     end) (Params : sig
-      val params : Curve.value array
+      val params : Weierstrass_curve.t Quadruple.t array
     end) : sig
   open Impl
 
   module Digest : sig
-    module Unpacked : sig
-      type var = Boolean.var list
-
-      type value
-
-      val typ : (var, value) Typ.t
-    end
-
     type var = Field.Checked.t
 
-    type value = Field.t
+    module Unpacked : sig
+      type var = private Boolean.var list
 
-    val typ : (var, value) Typ.t
+      type t = bool list
+
+      val typ : (var, t) Typ.t
+
+      val project : var -> Field.Checked.t
+
+      val constant : t -> var
+    end
+
+    type t = Field.t
+
+    val typ : (var, t) Typ.t
 
     val choose_preimage : var -> (Unpacked.var, _) Checked.t
   end
 
   module Section : sig
+    module Acc : sig
+      type t = [`Var of Weierstrass_curve.var | `Value of Weierstrass_curve.t]
+    end
+
     type t
-
-    val disjoint_union_exn : t -> t -> (t, _) Checked.t
-
-    val extend : t -> Boolean.var list -> start:int -> (t, _) Checked.t
-
-    val acc : t -> Curve.var
-
-    val support : t -> Interval_union.t
 
     val empty : t
 
-    val create :
-         acc:[`Var of Curve.var | `Value of Curve.value]
-      -> support:Interval_union.t
-      -> t
+    val disjoint_union_exn : t -> t -> (t, _) Checked.t
 
-    val of_bits : bool list -> t
+    val extend :
+      t -> Boolean.var Triple.t list -> start:int -> (t, _) Checked.t
+
+    val acc : t -> Weierstrass_curve.var
+
+    val support : t -> Interval_union.t
+
+    val create : acc:Acc.t -> support:Interval_union.t -> t
 
     val to_initial_segment_digest :
-      t -> (Digest.var * [`Length of int]) Or_error.t
+      t -> (Digest.var * [`Length_in_triples of int]) Or_error.t
 
-    val to_initial_segment_digest_exn : t -> Digest.var * [`Length of int]
+    val to_initial_segment_digest_exn :
+      t -> Digest.var * [`Length_in_triples of int]
   end
 
   val hash :
-    init:int * Curve.var -> Boolean.var list -> (Curve.var, _) Checked.t
+       init:int * Section.Acc.t
+    -> Boolean.var Triple.t list
+    -> (Weierstrass_curve.var, _) Checked.t
 
-  val digest : Curve.var -> Digest.var
+  val digest : Weierstrass_curve.var -> Digest.var
 end = struct
   open Impl
-  open Params
 
-  let hash_length = Field.size_in_bits
+  let coords :
+         Weierstrass_curve.t Quadruple.t
+      -> Field.t Quadruple.t * Field.t Quadruple.t =
+   fun (t1, t2, t3, t4) ->
+    let x1, y1 = Weierstrass_curve.to_coords t1
+    and x2, y2 = Weierstrass_curve.to_coords t2
+    and x3, y3 = Weierstrass_curve.to_coords t3
+    and x4, y4 = Weierstrass_curve.to_coords t4 in
+    ((x1, x2, x3, x4), (y1, y2, y3, y4))
+
+  let lookup ((s0, s1, s2): Boolean.var Triple.t)
+      (q: Weierstrass_curve.t Quadruple.t) =
+    let open Let_syntax in
+    let%bind s_and = Boolean.(s0 && s1) in
+    let open Field.Checked.Infix in
+    let lookup_one (a1, a2, a3, a4) =
+      Field.Checked.constant a1
+      + (Field.Infix.(a2 - a1) * (s0 :> Field.Checked.t))
+      + (Field.Infix.(a3 - a1) * (s1 :> Field.Checked.t))
+      + (Field.Infix.(a4 + a1 - a2 - a3) * (s_and :> Field.Checked.t))
+    in
+    let x_q, y_q = coords q in
+    let x = lookup_one x_q in
+    let%map y =
+      let sign =
+        (* sign = 1 if s2 = 0
+          sign = -1 if s2 = 1 *)
+        Field.Checked.constant Field.one
+        - (Field.of_int 2 * (s2 :> Field.Checked.t))
+      in
+      Field.Checked.mul sign (lookup_one y_q)
+    in
+    (x, y)
 
   module Digest = struct
+    let length_in_bits = Field.size_in_bits
+
     module Unpacked = struct
       type var = Boolean.var list
 
-      type value = bool list
+      type t = bool list
 
-      let typ : (var, value) Typ.t = Typ.list Boolean.typ ~length:hash_length
+      let typ : (var, t) Typ.t = Typ.list Boolean.typ ~length:length_in_bits
+
+      let project = Field.Checked.project
+
+      let constant = List.map ~f:Boolean.var_of_value
     end
 
     type var = Field.Checked.t
 
-    type value = Field.t
+    type t = Field.t
 
     let typ = Typ.field
 
@@ -101,84 +151,43 @@ end = struct
         (Field.Checked.choose_preimage_var ~length:Field.size_in_bits x)
   end
 
-  open Let_syntax
-
-  let hash_unchecked ~init:(i0, init) bs0 =
-    let n = Array.length params in
-    let rec go acc i = function
-      | [] -> acc
-      | b :: bs ->
-          if i = n then
-            failwithf
-              "Pedersen.hash_unchecked: Input length (%d) exceeded max (%d)"
-              (List.length bs0) n ()
-          else
-            let acc' = if b then Curve.add params.(i) acc else acc in
-            go acc' (i + 1) bs
-    in
-    go init i0 bs0
-
-  let hash ~init:(i0, init) bs0 =
-    let n = Array.length params in
-    let rec go acc i = function
-      | [] -> return acc
-      | b :: bs ->
-          if i = n then
-            failwithf "Pedersen.hash: Input length (%d) exceeded max (%d)"
-              (List.length bs0) n ()
-          else
-            let%bind acc' =
-              Curve.Checked.cond_add params.(i) ~to_:acc ~if_:b
-            in
-            go acc' (i + 1) bs
-    in
-    with_label "Pedersen.hash" (go init i0 bs0)
-
   let digest (x, _) = x
 
   module Section = struct
     module Acc = struct
-      type t = [`Var of Curve.var | `Value of Curve.value]
+      type t = [`Var of Weierstrass_curve.var | `Value of Weierstrass_curve.t]
 
-      let add t1 t2 =
+      let add (t1: t) (t2: t) =
+        let open Let_syntax in
         match (t1, t2) with
         | `Var v1, `Var v2 ->
-            let%map v = Curve.Checked.add v1 v2 in
+            let%map v = Weierstrass_curve.Checked.add v1 v2 in
             `Var v
         | `Var v, `Value x | `Value x, `Var v ->
-            let%map v = Curve.Checked.add_known v x in
-            `Var v
-        | `Value x1, `Value x2 -> return (`Value (Curve.add x2 x2))
+            if Weierstrass_curve.(equal zero x) then return (`Var v)
+            else
+              let%map v = Weierstrass_curve.Checked.add_known v x in
+              `Var v
+        | `Value x1, `Value x2 -> return (`Value (Weierstrass_curve.add x1 x2))
 
-      let to_var = function `Var v -> v | `Value x -> Curve.var_of_value x
+      let to_var = function
+        | `Var v -> v
+        | `Value x -> Weierstrass_curve.Checked.constant x
     end
 
     type t = {support: Interval_union.t; acc: Acc.t}
 
     let create ~acc ~support = {acc; support}
 
-    let of_bits bs =
-      let n = List.length bs in
-      let interval = (0, n) in
-      { support= Interval_union.of_interval interval
-      ; acc= `Value (hash_unchecked ~init:(0, Curve.identity) bs) }
-
-    let empty = {support= Interval_union.empty; acc= `Value Curve.identity}
+    let empty =
+      {acc= `Value Weierstrass_curve.zero; support= Interval_union.empty}
 
     let acc t = Acc.to_var t.acc
 
     let support t = t.support
 
-    let extend t bits ~start =
-      let n = List.length bits in
-      let interval = (start, start + n) in
-      let support =
-        Interval_union.(disjoint_union_exn (of_interval interval) t.support)
-      in
-      let%map acc = hash ~init:(start, Acc.to_var t.acc) bits in
-      {support; acc= `Var acc}
-
     let disjoint_union_exn t1 t2 =
+      let open Let_syntax in
       let support = Interval_union.disjoint_union_exn t1.support t2.support in
       let%map acc = Acc.add t1.acc t2.acc in
       {support; acc}
@@ -193,9 +202,44 @@ end = struct
             a b
         else Ok ()
       in
-      (digest (acc t), `Length b)
+      (digest (acc t), `Length_in_triples b)
 
     let to_initial_segment_digest_exn t =
       Or_error.ok_exn (to_initial_segment_digest t)
+
+    let get_term i bits = lookup bits Params.params.(i)
+
+    let extend t triples ~start =
+      let open Let_syntax in
+      let hash offset init xs =
+        Checked.List.foldi xs ~init ~f:(fun i acc x ->
+            get_term (offset + i) x >>= Weierstrass_curve.Checked.add acc )
+      in
+      match triples with
+      | [] -> return t
+      | x :: xs ->
+          let support =
+            Interval_union.disjoint_union_exn t.support
+              (Interval_union.of_interval (start, start + List.length triples))
+          in
+          let%map acc =
+            match t.acc with
+            | `Value v ->
+                let%bind init_term = get_term start x in
+                let%bind init =
+                  if Weierstrass_curve.(equal zero v) then return init_term
+                  else Weierstrass_curve.Checked.add_known init_term v
+                in
+                hash (start + 1) init xs
+            | `Var v -> hash start v (x :: xs)
+          in
+          {support; acc= `Var acc}
   end
+
+  let hash ~init:(start, acc) triples =
+    let open Checked.Let_syntax in
+    let%map {acc; _} =
+      Section.extend {acc; support= Interval_union.empty} triples ~start
+    in
+    match acc with `Var acc -> acc | `Value _ -> assert false
 end

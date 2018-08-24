@@ -6,6 +6,7 @@ open Tick
 open Let_syntax
 open Currency
 open Snark_bits
+open Fold_lib
 
 module Index = struct
   type t = int [@@deriving bin_io]
@@ -62,7 +63,9 @@ type value =
 [@@deriving sexp]
 
 let empty_hash =
-  Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
+  Pedersen.digest_fold
+    (Pedersen.State.create Pedersen.params)
+    (Fold_lib.Fold.string_triples "nothing up my sleeve")
 
 let typ : (var, value) Typ.t =
   let spec =
@@ -85,16 +88,19 @@ let typ : (var, value) Typ.t =
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_to_bits {public_key; balance; nonce; receipt_chain_hash} =
-  let%map public_key = Public_key.Compressed.var_to_bits public_key
-  and receipt_chain_hash = Receipt.Chain_hash.var_to_bits receipt_chain_hash in
-  let balance = (Balance.var_to_bits balance :> Boolean.var list) in
-  let nonce = Nonce.Unpacked.var_to_bits nonce in
+let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
+  let%map public_key = Public_key.Compressed.var_to_triples public_key
+  and receipt_chain_hash =
+    Receipt.Chain_hash.var_to_triples receipt_chain_hash
+  in
+  let balance = Balance.var_to_triples balance in
+  let nonce = Nonce.Unpacked.var_to_triples nonce in
   public_key @ balance @ nonce @ receipt_chain_hash
 
 let fold_bits ({public_key; balance; nonce; receipt_chain_hash}: t) =
+  let open Fold in
   Public_key.Compressed.fold public_key
-  +> Balance.fold balance +> Nonce.Bits.fold nonce
+  +> Balance.fold balance +> Nonce.fold nonce
   +> Receipt.Chain_hash.fold receipt_chain_hash
 
 let hash_prefix = Hash_prefix.account
@@ -106,7 +112,9 @@ let digest t = Pedersen.State.digest (hash t)
 let pubkey t = t.public_key
 
 module Checked = struct
-  let hash t = var_to_bits t >>= hash_bits ~init:hash_prefix
+  let hash t =
+    var_to_triples t >>= Pedersen.Checked.hash_triples ~init:hash_prefix
 
-  let digest t = var_to_bits t >>= digest_bits ~init:hash_prefix
+  let digest t =
+    var_to_triples t >>= Pedersen.Checked.digest_triples ~init:hash_prefix
 end

@@ -1,54 +1,50 @@
 open Core_kernel
 
-let pk str = Binable.of_string (module Public_key.Compressed) (B64.decode str)
+let pk = Public_key.Compressed.of_base64_exn
 
-let sk str = Binable.of_string (module Private_key) (B64.decode str)
+let sk = Private_key.of_base64_exn
 
-let high_balance_pk =
-  pk "JgFkl9FmG1SLJ+Ph8kCGuG0bH0RHYdUe6VcmqlVBlNfDPm8y/9wZAA=="
+let high_balance_pk, high_balance_sk =
+  ( pk "JgN/txgzOFPrOy8khSJSdPyFHdT+t05dgljjcaRvjXSC6ZFfcfkXAA"
+  , sk "JgGg7PfX+SuEc8siVxn+OVeXBXcN3p0Wed0plH+tRn4+RduAlfUY" )
 
-let high_balance_sk =
-  sk "ASjoODd+z5uFSXr3XlFpvy3O7j2+2RlnU354HErLSv9jrAUAAAAAAAAA"
-
-let low_balance_pk =
-  pk "JgL1+XZwf8h3rHAONU7JEEpC88rYKCsht+s1SQMHHBmjL6OtRuMeAQ=="
-
-let low_balance_sk =
-  sk "AShPfTImkKIlph1SoMhbcK6Ykz+CJnpJNg/Pm2TU6j9D5SEAAAAAAAAA"
+let low_balance_pk, low_balance_sk =
+  ( pk "JgMuF0Dkx1tw6eAX2om4kJ+4Ch4PsBmtaaeX9o0y26fsnUBLrUlPAA"
+  , sk "JgERfGHovlhcwIfMQltKFskwxODQCiI8pOhbJNLCItz38ljGMnPK" )
 
 let extra_accounts =
-  [ ( pk "JgKdMWuYhlGknk9gfyfOCRcjWilIjb3Pc+7qohJ7BFeq5Pbp+g3QAA=="
-    , sk "ASglIO54FD/TlwgRWvEGojlTmD+AsU+4MWRMmmIoKfNV8AsAAAAAAAAA" )
-  ; ( pk "JgHQomPdDrSdw6AvQaDllbsaFsR5DXPrdauqz8smBw3TTPnoAuLcAA=="
-    , sk "AShh1xwPJMrSbAcvsixZ2Ee2Te0XL4gyfINg4Ut0HTJtCxcAAAAAAAAA" )
-  ; ( pk "JgG/Gcihxh/cp4UZpIyG66zotLGAbI+o/oK4nYzZZsSvV5R/N3svAQ=="
-    , sk "ASiXPIakKEQm5c5E83oojXAEwIC5/Nu68lLTQihPx7OGZQgAAAAAAAAA" )
-  ; ( pk "JgLeKZNVh25d//bfolkrpjDolpT+IA5oy6lFe8oA9GM5wwzatSY9AQ=="
-    , sk "ASiPofEqMrYgyCmaqc6cnVZmtFliklC/OS8YLyQK7Dso3hMAAAAAAAAA" )
-  ; ( pk "JgBBHAze2lg5N+vjvoufFX2n0U+Lawmr7cAI9D5y7Ez03qnyaVOUAA=="
-    , sk "ASgLwrQ6u0KQwiaZHuq1t8UQyk7XSAK3x2sP68ta6/cdsBAAAAAAAAAA" )
-  ; ( pk "JgBVIVLbAj9dFOUADVeWkicjXRt6iku3hWoK6Wrfu508KYfEVNkbAA=="
-    , sk "AShzB9wxg86y6IJ6OYx1mzKoevElQBYgLJ/Ya+m52VNHCRMAAAAAAAAA" )
-  ; ( pk "JgDtPH4Wmc71DaemHehT15FDOlwEVcqfZAQ0A4zfNvZxRrH+VHQ1AQ=="
-    , sk "ASiLmAbMjU1UXLX1b7EAhVhoDCScRE3xZnMqvlIcGGCtZgoAAAAAAAAA" )
-  ; ( pk "JgI+kOJEwsbjMX9FmqergrOS4s8qHwyubiJm/I/YVA7edrGrD8GkAA=="
-    , sk "ASjxlKV5G6ESXaPgyXrYpFCEw5eld4B5isX0oI8LONTv0Q8AAAAAAAAA" )
-  ; ( pk "JgDCWl0H7Bhjt1+ziZ0qhyK7DZNtln3KMB7rPXew0eZQzjFYmuvSAA=="
-    , sk "AShytejYP4X494fkAHxHuq1sd6Otlsj76LBh0szD/A9VwRMAAAAAAAAA" )
-  ; ( pk "JgNwXG/btGGLqDHiUf3K9bm1SxtHIdJInYTFLskdx+ZvO+Drn2+GAQ=="
-    , sk "ASicKBiHnC2ziFlf6EiqgxF/YDufYZ8nTeGbB7I4lJTtbRcAAAAAAAAA" )
-  ; ( pk "JgB2i2hSNBskUUpcFkhNnSIM2ROyGzwCnfE5OOsF4xKMylCBLEUYAQ=="
-    , sk "ASjkR5IXfnR7IhaRanDRoF6ZSWNITRzD5cwsCGV1CgvnyBkAAAAAAAAA" )
-  ; ( pk "JgH4QeZaI9hOPYoDREzZWq5erf6YWBZ+h2iTMbv835XwMOB+K56wAA=="
-    , sk "ASj18UkA1Y7UqcRJVHLXUv/cbps7oWR0Li1N7YrdLw+BggcAAAAAAAAA" )
-  ; ( pk "JgGMfB9wT38uwdWVwGtU90MLy9lmBzor2LgRUTwiDykZ/I4E1XhcAQ=="
-    , sk "ASjAtg6VI/57qT6QtFXVQJWf12EYLM6ouzlykYZ4GK/FpSMAAAAAAAAA" )
-  ; ( pk "JgFbsgkjQ67nmREtyNXlyQ/7C9t2F0z57KPzLtF72f5eg4liptR3AQ=="
-    , sk "AShCqoW4MbDHjLIJDKISXLZjtYbLT0gLCxSBtFFN7P+VrhEAAAAAAAAA" )
-  ; ( pk "JgDkCvx8Hnw6F926LjhJp64TLtAI9tc7hEIiXPFdo2mnZXQ0nKSQAQ=="
-    , sk "AShYXjfIGV1wXlFrys33jvlIDT1TTUiO7I/Sw704osnKKwgAAAAAAAAA" )
-  ; ( pk "JgFx2z13vE4jVAoepeagZ355y0j1zeaupL2LqbXH37XublciAFpDAA=="
-    , sk "ASh3qcrRS1aJYcnbrLmLrZl5HpW/K2uIWBoDJF1Mz+fbEhEAAAAAAAAA" ) ]
+  [ ( pk "JgLY2GjlFLGHNbrbu/32nGlO39ixo1/NzMH6/L1GuP+BHJulXVDEAA"
+    , sk "JgMnYAqUS1X1qOwW6AwuOh8mIiWmo0bLTbDqW7ouhBHCq0VqaGs3" )
+  ; ( pk "JgHfMr6v59H2q19OecwH9UaFrGqXdnziPqsX7ULF4DhdL2/gVYeNAA"
+    , sk "JgHINxmgDL8GFdXyikq+eROjlsmyVINqFChuWzUeXMoRCD5pcdq6" )
+  ; ( pk "JgIOKmls1aOl3+PznWZUNEsJ3zgGRGt+nS4A1oi4l03hy/DvlzZBAQ"
+    , sk "JgF283vHMDkdLytZlRD1RY+3CFAr2AtpKHpnbOIcbfFQrTZaRkC9" )
+  ; ( pk "JgO8ti/8l0mg1Uwk4F56JqpkozVmkIrnwcJj5lYTJldUu+N4Jdz+AQ"
+    , sk "JgIzb5ddd7RlfcokVW9hw/IQbEReGnj+NmpD1pw8w8RNwTP1FzRF" )
+  ; ( pk "JgIgzSmc6IxkeAaD8lGhZ1bkeXLIM7NUSbpP5FcUnKeqc5mL1pSyAA"
+    , sk "JgNvjVrgqpPqgCeReVn5R1EMUadiZVEkE0fDEDEXH8J+niGq9i1v" )
+  ; ( pk "JgJaS0kJRzpqJBg0a+cRF3hvDCE9fxK9sq7Lj7lNWO5SDjJaFQKWAQ"
+    , sk "JgOp9/95QdH3hS2U/j3Ddx5mskHQ93UBf/YzoQHUoq1iGplMZezg" )
+  ; ( pk "JgKoLBcjSkt+DssCqYz5/+ayWHyC5dJZL4VCg7WVaMHhHFBva5vSAA"
+    , sk "JgMsQrwAH+RyLOR1esRb4XGgj3lLDChTGB9YUqPkJVq9TWMTzupK" )
+  ; ( pk "JgMwgDyBIdFgALh8vXRIPMFmlIQTt3ZPgwnIZAOEQZmq45LmtU3AAQ"
+    , sk "JgBM8rWambKPszX61qbf3Eb+QAGpLkqheflPqiiXKsKEVCu0faYc" )
+  ; ( pk "JgBw5GRX/8MZXO6Ff3PizxSfzziAYjvs9QQOnP3sJqQhNQoJUS/+AA"
+    , sk "JgAiZueO1mYN/8zUIIF1aohOwL2ZKEy5ASAuFvk0umuu8Noc2BIL" )
+  ; ( pk "JgCaJziWG8VV7DdDQRlvcTN2sqJfsCXLlNn5ZnsTGu0Gz6ZAJGxIAA"
+    , sk "JgOmXbtaAJJJFSATZkfONlXxkY4SCOWfK981CN1RMukrk7h8JvaP" )
+  ; ( pk "JgG1CnPr+XNMpqz/QaeTtusDDn/JfpFK16tyMl0/AvlaPqaOxacYAA"
+    , sk "JgDDyEej3siVxk0ql8Xuetmy53p28UnSa3ICDCPeDjxR/mPoSztp" )
+  ; ( pk "JgHD27kPFutx01zY2+MetiPIRKw7iYIIvKWJahJ/GWTFBNbkIfZfAA"
+    , sk "JgI3S4++04bM/tul3MWlt8RqGIKGFcwkMb6sVJ7wQnNA0LdKErP2" )
+  ; ( pk "JgJkntFhEpBWcsGnKIdyzhTdyXiFvrru9+U+iSFQCpJoMaF9YCReAA"
+    , sk "JgJ6mS/GkgD1GGQbx1+G7/y2NzWUYk3FWR7QoFKNiPujl1uG/vkv" )
+  ; ( pk "JgE5hzTB/bgp8Dj4szxkd7l41epgG6/LDf9oTr+JHIkHAbVt07kNAA"
+    , sk "JgNP4DpNRoc6kaipoXtLWiyGfZ1l6R9BztBL1shJcc/CEzcf9Pag" )
+  ; ( pk "JgNCzMj7zA30XxNkja+EGYaplp6b+/Y2C7segUpHDaHhewRCKS6vAQ"
+    , sk "JgEtzt0FSquiXmxHyvwoDFxfDjpMPDlV72QekDlHGT4KjbMOS0E+" )
+  ; ( pk "JgIIB+xP5EBjykhIteN2xbCgGK7BxKnaOqDiMGJROrr0nMj+kZstAQ"
+    , sk "JgOeo/ijaEqR3ZoNgDKj3gU+ZnrbR+yo/+cNW68SjOQ6Z7UBzKHa" ) ]
 
 let pks = fst @@ List.unzip extra_accounts
 

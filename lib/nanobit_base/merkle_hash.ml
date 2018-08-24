@@ -1,6 +1,7 @@
 open Core
 open Util
 open Snark_params
+open Fold_lib
 
 type t = Tick.Pedersen.Digest.t [@@deriving sexp, hash, compare, bin_io, eq]
 
@@ -9,9 +10,11 @@ let merge ~height h1 h2 =
   State.digest
     (hash_fold
        Hash_prefix.merkle_tree.(height)
-       (Digest.Bits.fold h1 +> Digest.Bits.fold h2))
+       Fold.(Digest.fold h1 +> Digest.fold h2))
 
 let empty_hash =
-  Tick.Pedersen.hash_bigstring (Bigstring.of_string "nothing up my sleeve")
+  Tick.Pedersen.digest_fold
+    (Tick.Pedersen.State.create Tick.Pedersen.params)
+    (Fold.string_triples "nothing up my sleeve")
 
 let of_digest = Fn.id
