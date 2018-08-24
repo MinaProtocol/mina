@@ -85,6 +85,23 @@ module Make_intf (Impl : Snark_intf.S) = struct
   end
 end
 
+module type Shifted_intf = sig
+  type (_, _) checked
+  type boolean_var
+  type curve_var
+
+  type t
+
+  val zero : t
+
+  val add : t -> curve_var -> (t, _) checked
+
+  (* This is only safe if the result is guaranteed to not be zero. *)
+  val unshift_nonzero : t -> (curve_var, _) checked
+
+  val if_ : boolean_var -> then_:t -> else_:t -> (t, _) checked
+end
+
 module Edwards = struct
   module type Params_intf = sig
     type field
@@ -623,18 +640,10 @@ struct
       r
 
   module Shifted = struct
-    module type S = sig
-      type t
-
-      val zero : t
-
-      val add : t -> var -> (t, _) Checked.t
-
-      (* This is only safe if the result is guaranteed to not be zero. *)
-      val unshift_nonzero : t -> (var, _) Checked.t
-
-      val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
-    end
+    module type S = Shifted_intf
+      with type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type curve_var := var
+       and type boolean_var := Boolean.var
 
     module Make (M : sig val shift : var end) : S = struct
       open M
@@ -650,7 +659,7 @@ struct
       let add shifted x = add_unsafe shifted x
     end
 
-    let create () : ((module S), _) Checked.t =
+    let create (type shifted) () : ((module S), _) Checked.t =
       let open Let_syntax in
       let%map shift =
         provide_witness typ
