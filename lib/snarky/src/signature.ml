@@ -4,6 +4,8 @@ open Core_kernel
 module type Message_intf = sig
   type boolean_var
 
+  type curve_scalar
+
   type curve_scalar_var
 
   type (_, _) checked
@@ -12,7 +14,7 @@ module type Message_intf = sig
 
   type var
 
-  val hash : t -> nonce:bool list -> Bignum_bigint.t
+  val hash : t -> nonce:bool list -> curve_scalar
 
   val hash_checked :
     var -> nonce:boolean_var list -> (curve_scalar_var, _) checked
@@ -36,10 +38,9 @@ module type S = sig
   module Message :
     Message_intf
     with type boolean_var := boolean_var
+     and type curve_scalar := curve_scalar
      and type curve_scalar_var := curve_scalar_var
      and type ('a, 'b) checked := ('a, 'b) checked
-
-  module Scalar : module type of Bignum_bigint
 
   module Signature : sig
     type t = curve_scalar * curve_scalar [@@deriving sexp]
@@ -50,21 +51,13 @@ module type S = sig
   end
 
   module Private_key : sig
-    type t = Scalar.t [@@deriving bin_io]
-
-    val of_bigint : Bignum_bigint.t -> t
+    type t = curve_scalar
   end
 
   module Public_key : sig
     type t = curve
 
     type var = curve_var
-  end
-
-  module Keypair : sig
-    type t
-
-    val create : unit -> t
   end
 
   module Checked : sig
@@ -90,27 +83,75 @@ module type S = sig
 
   val sign : Private_key.t -> Message.t -> Signature.t
 
-  val shamir_sum : Scalar.t * curve -> Scalar.t * curve -> curve
+  val shamir_sum : curve_scalar * curve -> curve_scalar * curve -> curve
 
   val verify : Signature.t -> Public_key.t -> Message.t -> bool
 end
 
 module Schnorr
-    (Impl : Snark_intf.S)
-    (Curve : Curves.Edwards.S
-             with type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-              and type Scalar.t = Bignum_bigint.t
-              and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
-              and type boolean_var := Impl.Boolean.var
-              and type var = Impl.Field.Checked.t * Impl.Field.Checked.t
-              and type field := Impl.Field.t)
+    (Impl : Snark_intf.S) (Curve : sig
+        open Impl
+
+        module Scalar : sig
+          type t [@@deriving sexp, eq]
+
+          type var
+
+          val typ : (var, t) Typ.t
+
+          val random : unit -> t
+
+          val ( * ) : t -> t -> t
+
+          val ( + ) : t -> t -> t
+
+          val ( - ) : t -> t -> t
+
+          val test_bit : t -> int -> bool
+
+          val length_in_bits : int
+
+          module Checked : sig
+            val equal : var -> var -> (Boolean.var, _) Checked.t
+
+            module Assert : sig
+              val equal : var -> var -> (unit, _) Checked.t
+            end
+          end
+        end
+
+        type t
+
+        type var = Field.Checked.t * Field.Checked.t
+
+        module Checked : sig
+          val add : var -> var -> (var, _) Checked.t
+
+          val scale : var -> Scalar.var -> (var, _) Checked.t
+
+          val scale_known : t -> Scalar.var -> (var, _) Checked.t
+        end
+
+        val one : t
+
+        val zero : t
+
+        val add : t -> t -> t
+
+        val typ : (var, t) Typ.t
+
+        val scale : t -> Scalar.t -> t
+
+        val to_coords : t -> Field.t * Field.t
+    end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
                 and type curve_scalar_var := Curve.Scalar.var
+                and type curve_scalar := Curve.Scalar.t
                 and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t) :
   S
   with type boolean_var := Impl.Boolean.var
-   and type curve := Curve.value
+   and type curve := Curve.t
    and type curve_var := Curve.var
    and type curve_scalar := Curve.Scalar.t
    and type curve_scalar_var := Curve.Scalar.var
@@ -119,14 +160,13 @@ module Schnorr
    and module Message := Message =
 struct
   open Impl
-  module Scalar = Bignum_bigint
 
   module Signature = struct
     type 'a t_ = 'a * 'a [@@deriving eq, sexp]
 
     type var = Curve.Scalar.var t_
 
-    type t = Scalar.t t_ [@@deriving sexp]
+    type t = Curve.Scalar.t t_ [@@deriving sexp]
 
     let typ : (var, t) Typ.t =
       let typ = Curve.Scalar.typ in
@@ -134,15 +174,15 @@ struct
   end
 
   module Private_key = struct
-    type t = Scalar.t [@@deriving bin_io]
-
-    let of_bigint = Fn.id
+    type t = Curve.Scalar.t
   end
 
-  let compress ((x, _): Curve.value) = Field.unpack x
+  let compress (t: Curve.t) =
+    let x, _ = Curve.to_coords t in
+    Field.unpack x
 
   module Public_key : sig
-    type t = Curve.value
+    type t = Curve.t
 
     type var = Curve.var
 
@@ -150,16 +190,16 @@ struct
   end = Curve
 
   let sign (k: Private_key.t) m =
-    let e_r = Scalar.random Curve.Params.order in
-    let r = compress (Curve.scale Curve.generator e_r) in
+    let e_r = Curve.Scalar.random () in
+    let r = compress (Curve.scale Curve.one e_r) in
     let h = Message.hash ~nonce:r m in
-    let s = Scalar.((e_r - (k * h)) % Curve.Params.order) in
+    let s = Curve.Scalar.(e_r - (k * h)) in
     (s, h)
 
   (* TODO: Have expect test for this *)
   (* TODO: Have optimized double function *)
-  let shamir_sum ((sp, p): Scalar.t * Curve.value)
-      ((sq, q): Scalar.t * Curve.value) =
+  let shamir_sum ((sp, p): Curve.Scalar.t * Curve.t)
+      ((sq, q): Curve.Scalar.t * Curve.t) =
     let pq = Curve.add p q in
     let rec go i acc =
       if i < 0 then acc
@@ -174,21 +214,12 @@ struct
         in
         go (i - 1) acc
     in
-    go (Curve.Scalar.length_in_bits - 1) Curve.identity
+    go (Curve.Scalar.length_in_bits - 1) Curve.zero
 
   let verify ((s, h): Signature.t) (pk: Public_key.t) (m: Message.t) =
-    let r = compress (shamir_sum (s, Curve.generator) (h, pk)) in
+    let r = compress (shamir_sum (s, Curve.one) (h, pk)) in
     let h' = Message.hash ~nonce:r m in
-    Scalar.equal h' h
-
-  module Keypair = struct
-    type t = {public: Public_key.t; secret: Private_key.t}
-
-    let create () =
-      (* TODO: More secure random *)
-      let x = Bignum_bigint.random Curve.Params.order in
-      {public= Curve.scale Curve.generator x; secret= x}
-  end
+    Curve.Scalar.equal h' h
 
   module Checked = struct
     let compress ((x, _): Curve.var) =
@@ -200,7 +231,7 @@ struct
         (m: Message.var) =
       with_label __LOC__
         (let%bind r =
-           let%bind s_g = Curve.Checked.scale_known Curve.generator s
+           let%bind s_g = Curve.Checked.scale_known Curve.one s
            and h_pk = Curve.Checked.scale public_key h in
            Checked.bind ~f:compress (Curve.Checked.add s_g h_pk)
          in

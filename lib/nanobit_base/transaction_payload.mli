@@ -1,4 +1,6 @@
 open Core
+open Fold_lib
+open Tuple_lib
 open Coda_numbers
 open Snark_params.Tick
 
@@ -46,14 +48,14 @@ type var =
   , Account_nonce.Unpacked.var )
   t_
 
-val length_in_bits : int
+val length_in_triples : int
 
 val typ : (var, t) Typ.t
 
-val to_bits : t -> bool list
+val to_triples : t -> bool Triple.t list
 
-val fold : t -> init:'acc -> f:('acc -> bool -> 'acc) -> 'acc
+val fold : t -> bool Triple.t Fold.t
 
-val var_to_bits : var -> (Boolean.var list, _) Checked.t
+val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
 val var_of_t : t -> var

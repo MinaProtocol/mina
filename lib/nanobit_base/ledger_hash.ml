@@ -6,16 +6,23 @@ open Let_syntax
 open Currency
 
 module Merkle_tree = Snarky.Merkle_tree.Checked(Tick)(struct
-    open Pedersen.Digest
-    include Packed
+    type value = Pedersen.Checked.Digest.t
+    type var = Pedersen.Checked.Digest.var
+    let typ = Pedersen.Checked.Digest.typ
 
     let hash ~height h1 h2 =
-      (* TODO: Think about if choose_preimage_var is ok *)
-      let%bind h1 = choose_preimage_var h1
-      and h2 = choose_preimage_var h2
+      let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
+        Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
+          (bs :> Boolean.var list)
       in
-      Tick.digest_bits ~init:Hash_prefix.merkle_tree.(height)
-        (Unpacked.var_to_bits h1 @ Unpacked.var_to_bits h2)
+      let open Let_syntax in
+      (* TODO: Think about if choose_preimage_var is ok *)
+      let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
+      and h2 = Pedersen.Checked.Digest.choose_preimage h2
+      in
+      Pedersen.Checked.digest_triples
+        ~init:Hash_prefix.merkle_tree.(height)
+        (to_triples h1 @ to_triples h2)
 
     let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 

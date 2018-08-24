@@ -140,18 +140,18 @@ struct
                ~blockchain_state:(Snark_transition.blockchain_state transition)
                ~consensus_state
            in
-           let%bind state_bits = Protocol_state.var_to_bits new_state in
+           let%bind state_triples = Protocol_state.var_to_triples new_state in
            let%bind state_partial =
-             Pedersen_hash.Section.extend Pedersen_hash.Section.empty
-               ~start:Hash_prefix.length_in_bits state_bits
+             Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
+               ~start:Hash_prefix.length_in_triples state_triples
            in
            let%map state_hash =
-             Pedersen_hash.Section.create
+             Pedersen.Checked.Section.create
                ~acc:(`Value Hash_prefix.protocol_state.acc)
                ~support:
-                 (Interval_union.of_interval (0, Hash_prefix.length_in_bits))
-             |> Pedersen_hash.Section.disjoint_union_exn state_partial
-             >>| Pedersen_hash.Section.acc >>| Pedersen_hash.digest
+                 (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
+             |> Pedersen.Checked.Section.disjoint_union_exn state_partial
+             >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
            in
            ( State_hash.var_of_hash_packed state_hash
            , new_state
@@ -170,8 +170,8 @@ struct
 
     let hash (t: Protocol_state.var) =
       with_label __LOC__
-        ( Protocol_state.var_to_bits t
-        >>= digest_bits ~init:Hash_prefix.protocol_state
+        ( Protocol_state.var_to_triples t
+        >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.protocol_state
         >>| State_hash.var_of_hash_packed )
   end
 end

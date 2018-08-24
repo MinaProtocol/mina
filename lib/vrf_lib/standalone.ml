@@ -29,7 +29,7 @@ module Make
 
       val add : t -> t -> t
 
-      val inv : t -> t
+      val negate : t -> t
 
       val scale : t -> Scalar.t -> t
 
@@ -44,7 +44,7 @@ module Make
 
         val add : var -> var -> (var, _) Checked.t
 
-        val inv : var -> var
+        val negate : var -> var
 
         val scale_known : t -> Scalar.var -> (var, _) Checked.t
 
@@ -213,8 +213,8 @@ end = struct
       let dleq =
         Scalar.equal c
           (Hash.hash_for_proof message public_key
-             ((s * g) + (c * Group.inv public_key))
-             ((s * message_hash) + (c * Group.inv scaled_message_hash)))
+             ((s * g) + (c * Group.negate public_key))
+             ((s * message_hash) + (c * Group.negate scaled_message_hash)))
       in
       if dleq then Some (Output_hash.hash message scaled_message_hash)
       else None
@@ -229,13 +229,15 @@ end = struct
             (* TODO: Can save one EC add here by passing sg as the initial accumulator
                to scale *)
             let%bind sg = Group.Checked.scale_known Group.generator s
-            and neg_c_pk = Group.Checked.(scale (inv public_key) c) in
+            and neg_c_pk = Group.Checked.(scale (negate public_key) c) in
             Group.Checked.add sg neg_c_pk
           and b =
             let%bind sx =
               let%bind message_hash = Message.Checked.hash_to_group message in
               Group.Checked.scale message_hash s
-            and neg_cy = Group.Checked.(scale (inv scaled_message_hash) c) in
+            and neg_cy =
+              Group.Checked.(scale (negate scaled_message_hash) c)
+            in
             Group.Checked.add sx neg_cy
           in
           Hash.Checked.hash_for_proof message public_key a b
@@ -320,7 +322,42 @@ let%test_module "vrf-test" =
   ( module struct
     (* Nothing in here is secure, it's just for the test *)
     module Impl = Snarky.Snark.Make (Snarky.Backends.Mnt4.GM)
+    module Other_impl = Snarky.Snark.Make (Snarky.Backends.Mnt6.GM)
+    module B = Bigint
 
+    module Scalar = struct
+      include Snarky.Libsnark.Mnt6.Field
+
+      let of_bits = Other_impl.Field.project
+
+      include (Other_impl.Field : Sexpable.S with type t := t)
+
+      include Binable.Of_sexpable (Other_impl.Field)
+
+      let length_in_bits = size_in_bits
+
+      open Impl
+
+      type var = Boolean.var list
+
+      let typ =
+        Typ.transport
+          (Typ.list ~length:size_in_bits Boolean.typ)
+          ~there:Other_impl.Field.unpack ~back:Other_impl.Field.project
+
+      let gen : t Quickcheck.Generator.t =
+        Quickcheck.Generator.map
+          (B.gen_incl B.one B.(Other_impl.Field.size - one))
+          ~f:(fun x -> Other_impl.Bigint.(to_field (of_bignum_bigint x)))
+
+      module Checked = struct
+        module Assert = struct
+          let equal = Bitstring_checked.Assert.equal
+        end
+      end
+    end
+
+    (*
     module Scalar =
       Bigint_scalar (Impl)
         (struct
@@ -352,33 +389,70 @@ let%test_module "vrf-test" =
             , conv
                 "269570906944652130755537879906638127626718348459103982395416666003851617088183934285066554"
             )
-        end)
+        end) *)
+
+    module Curve = struct
+      open Impl
+
+      type var = Field.Checked.t * Field.Checked.t
+
+      include Snarky.Libsnark.Mnt6.Group
+
+      module Checked = struct
+        include Snarky.Curves.Make_weierstrass_checked (Impl) (Scalar)
+                  (struct
+                    include Snarky.Libsnark.Mnt6.Group
+
+                    let scale = scale_field
+                  end)
+                  (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+
+        let add_known v x = add v (constant x)
+      end
+
+      let typ = Checked.typ
+    end
 
     module Group = struct
       open Impl
 
       module T = struct
-        type t = Field.t * Field.t [@@deriving sexp, eq]
+        type t = Curve.t
+
+        include Sexpable.Of_sexpable (struct
+                    type t = Field.t * Field.t [@@deriving sexp]
+                  end)
+                  (struct
+                    type t = Curve.t
+
+                    let to_sexpable = Curve.to_coords
+
+                    let of_sexpable = Curve.of_coords
+                  end)
       end
 
       include T
       include Binable.Of_sexpable (T)
 
-      let identity = Curve.identity
+      let equal = Curve.equal
+
+      let zero = Curve.zero
 
       let add = Curve.add
 
-      let inv (x, y) = (Field.negate x, y)
+      let negate = Curve.negate
 
-      let scale = Curve.scale
+      let scale = Curve.scale_field
 
-      let generator = Curve.generator
+      let generator = Curve.one
 
       type var = Curve.var
 
       let typ = Curve.typ
 
-      let to_bits ((x, y): t) = List.hd_exn (Field.unpack y) :: Field.unpack x
+      let to_bits (t: t) =
+        let x, y = Curve.to_coords t in
+        List.hd_exn (Field.unpack y) :: Field.unpack x
 
       let gen =
         let open Quickcheck.Generator.Let_syntax in
@@ -387,12 +461,12 @@ let%test_module "vrf-test" =
 
       let%test_unit "inv works" =
         Quickcheck.test gen ~f:(fun x ->
-            let res = add x (inv x) in
-            if not (equal res identity) then
+            let res = add x (negate x) in
+            if not (equal res zero) then
               failwithf
                 !"inv failured, x = %{sexp:t}, x + inv x = %{sexp:t}, \
                   expected %{sexp:t}"
-                x res identity () )
+                x res zero () )
 
       let%test_unit "scaling associates" =
         let open Quickcheck in
@@ -403,27 +477,22 @@ let%test_module "vrf-test" =
                 (scale generator (Scalar.mul a b))
                 (scale (scale generator a) b) ) )
 
-      let%test_unit "modulus-identity" =
-        Quickcheck.test ~trials:50 gen ~f:(fun x ->
-            assert (equal (scale x Scalar.modulus) Curve.identity) )
-
-      let%test_unit "modulus-not-identity" =
-        let non_identity_pt =
-          Quickcheck.Generator.filter gen ~f:(fun x -> not (equal x identity))
-        in
-        Quickcheck.test ~trials:50
-          (Quickcheck.Generator.tuple2 non_identity_pt
-             Scalar.(gen_incl one (modulus - one)))
-          ~f:(fun (x, s) -> assert (not (equal (scale x s) Curve.identity)))
-
       module Checked = struct
         let add = Curve.Checked.add
 
-        let inv (x, y) = (x, Field.Checked.scale y Field.(negate one))
+        let negate = Curve.Checked.negate
 
-        let scale_known = Curve.Checked.scale_known
+        let with_random_shift k =
+          let open Let_syntax in
+          let%bind init =
+            provide_witness Curve.Checked.typ
+              (As_prover.return (Curve.random ()))
+          in
+          k ~init >>= Curve.Checked.add (Curve.Checked.negate init)
 
-        let scale = Curve.Checked.scale
+        let scale_known t b = with_random_shift (Curve.Checked.scale_known t b)
+
+        let scale t b = with_random_shift (Curve.Checked.scale_bits t b)
 
         let to_bits ((x, y): var) =
           let open Let_syntax in
@@ -438,7 +507,9 @@ let%test_module "vrf-test" =
 
     let params =
       Array.init (5 * Impl.Field.size_in_bits) ~f:(fun _ ->
-          Group.scale Group.generator (Scalar.random ()) )
+          let t = Curve.random () in
+          let tt = Curve.double t in
+          (t, tt, Curve.add t tt, Curve.double tt) )
 
     module Pedersen =
       Snarky.Pedersen.Make (Impl) (Curve)
@@ -449,7 +520,18 @@ let%test_module "vrf-test" =
     module Message = struct
       open Impl
 
-      type t = Field.t * Field.t [@@deriving sexp]
+      type t = Curve.t
+
+      include Sexpable.Of_sexpable (struct
+                  type t = Field.t * Field.t [@@deriving sexp]
+                end)
+                (struct
+                  type t = Curve.t
+
+                  let to_sexpable = Curve.to_coords
+
+                  let of_sexpable = Curve.of_coords
+                end)
 
       type var = Curve.var
 
@@ -462,14 +544,26 @@ let%test_module "vrf-test" =
       end
     end
 
+    let rec bits_to_triples ~default = function
+      | b0 :: b1 :: b2 :: bs -> (b0, b1, b2) :: bits_to_triples ~default bs
+      | [] -> []
+      | [b] -> [(b, default, default)]
+      | [b1; b2] -> [(b1, b2, default)]
+
     let hash_bits bits =
-      List.foldi ~init:Curve.identity bits ~f:(fun i acc b ->
-          if b then Curve.add params.(i) acc else acc )
-      |> fst
+      List.foldi ~init:Curve.zero (bits_to_triples ~default:false bits) ~f:
+        (fun i acc triple ->
+          Curve.add acc
+            (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
+               triple) )
+      |> Curve.to_coords |> fst
 
     let hash_bits_checked bits =
       let open Impl.Let_syntax in
-      Pedersen.hash ~init:(0, Curve.Checked.identity) bits >>| Pedersen.digest
+      Pedersen.hash
+        ~init:(0, `Value Curve.zero)
+        (bits_to_triples bits ~default:Impl.Boolean.false_)
+      >>| Pedersen.digest
 
     module Output_hash = struct
       type t = Impl.Field.t
@@ -502,7 +596,8 @@ let%test_module "vrf-test" =
             >>| List.concat
           in
           hash_bits_checked bs >>= Pedersen.Digest.choose_preimage
-          >>| fun xs -> List.take xs Scalar.length_in_bits
+          >>| fun xs ->
+          List.take (xs :> Boolean.var list) Scalar.length_in_bits
       end
     end
 
