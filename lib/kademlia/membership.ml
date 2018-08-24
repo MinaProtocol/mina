@@ -234,7 +234,7 @@ let%test_module "Tests" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           match%bind
             M.connect ~initial_peers:[]
-              ~me:(Host_and_port.create ~host:"127.0.0.1" ~port:3000, 3000)
+              ~me:(Host_and_port.create ~host:"127.0.0.1" ~port:3001, 3000)
               ~parent_log:(Logger.create ()) ~conf_dir:"/tmp/membership-test"
           with
           | Ok t ->
@@ -341,7 +341,7 @@ let%test_module "Tests" =
 module Haskell = Make (Haskell_process)
 
 let addr i =
-  (Host_and_port.of_string (Printf.sprintf "127.0.0.1:%d" (3005 + i)), 2005 + i)
+  (Host_and_port.of_string (Printf.sprintf "127.0.0.1:%d" (3006 + i)), 3005 + i)
 
 let node me peers conf_dir =
   Haskell.connect ~initial_peers:peers ~me ~parent_log:(Logger.create ())
