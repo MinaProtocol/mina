@@ -109,11 +109,11 @@ end = struct
       Bigstring.blit ~src ~src_pos:0 ~dst ~dst_pos:1 ~len:src_len ;
       dst
 
-    let get_path = function
+    let to_path_exn = function
       | Account path -> path
       | Hash path -> path
       | Generic _ ->
-          raise (Invalid_argument "get_path: generic does not have a path")
+          raise (Invalid_argument "to_path_exn: generic does not have a path")
 
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
@@ -292,7 +292,7 @@ end = struct
              ~default:(Result.return @@ Key.build_empty_account ())
       with
       | Error () -> failwith "Could not get retrieve last key"
-      | Ok parsed_key -> Key.get_path parsed_key
+      | Ok parsed_key -> Key.to_path_exn parsed_key
   end
 
   let get_key_of_account = Account_key.get
