@@ -226,7 +226,8 @@ struct
 
     let fold {epoch; slot; proposer_vrf_result} =
       let open Fold in
-      Epoch.Bits.fold epoch +> Epoch.Slot.Bits.fold slot
+      Epoch.fold epoch 
+      +> Epoch.Slot.fold slot
       +> Sha256.Digest.fold proposer_vrf_result
 
     let var_to_triples {epoch; slot; proposer_vrf_result} =
@@ -236,7 +237,7 @@ struct
 
     let length_in_triples =
       Epoch.length_in_triples + Epoch.Slot.length_in_triples
-      + Sha256.Digest.length_in_tiples
+      + Sha256.Digest.length_in_triples
   end
 
   module Consensus_state = struct
