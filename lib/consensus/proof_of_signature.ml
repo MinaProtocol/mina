@@ -24,8 +24,10 @@ end
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
   with module Proof = Inputs.Proof
-   and type Internal_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t
-   and type External_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t =
+   and type Internal_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t
+   and type External_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t =
 struct
   open Inputs
   module Proof = Proof

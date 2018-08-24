@@ -1199,6 +1199,28 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let check v = assert_ (Constraint.boolean ~label:"boolean-alloc" v) in
         {read; store; alloc; check}
 
+      let if_ (b: var) ~then_ ~else_ =
+        let open Checked1 in
+        with_label "if_"
+          (let open Let_syntax in
+          (* r = e + b (t - e)
+          r - e = b (t - e)
+        *)
+          let%bind r =
+            provide_witness Typ.field
+              (let open As_prover in
+              let open Let_syntax in
+              let%bind b = read typ b in
+              read Typ.field (if b then then_ else else_))
+          in
+          let%map () =
+            assert_r1cs
+              (b :> Cvar.t)
+              Cvar.Infix.(then_ - else_)
+              Cvar.Infix.(r - else_)
+          in
+          r)
+
       let typ_unchecked : (var, value) Typ.t =
         {typ with check= (fun _ -> return ())}
 
@@ -1488,27 +1510,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       type comparison_result =
         {less: Checked.Boolean.var; less_or_equal: Checked.Boolean.var}
 
-      let if_ (b: Checked.Boolean.var) ~then_ ~else_ =
-        let open Checked in
-        with_label "if_"
-          (let open Let_syntax in
-          (* r = e + b (t - e)
-          r - e = b (t - e)
-        *)
-          let%bind r =
-            provide_witness Typ.field
-              (let open As_prover in
-              let open Let_syntax in
-              let%bind b = read Boolean.typ b in
-              read Typ.field (if b then then_ else else_))
-          in
-          let%map () =
-            assert_r1cs
-              (b :> Cvar.t)
-              Cvar.Infix.(then_ - else_)
-              Cvar.Infix.(r - else_)
-          in
-          r)
+      let if_ = Checked.Boolean.if_
 
       let compare ~bit_length a b =
         let open Checked in

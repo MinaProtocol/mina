@@ -1,4 +1,4 @@
-open Unsigned
+open Currency
 
 module type Inputs_intf = sig
   module Proof : sig
@@ -39,17 +39,21 @@ module type Inputs_intf = sig
 
   val genesis_state_timestamp : Time.t
 
-  val genesis_ledger_total_currency : Currency.Amount.t
+  val genesis_ledger_total_currency : Amount.t
 
-  val coinbase : Currency.Amount.t
+  val coinbase : Amount.t
 
   val slot_interval : Time.Span.t
 
-  val epoch_size : UInt32.t
+  val unforkable_transition_count : int
+
+  val probable_slots_per_transition_count : int
 end
 
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
   with type Proof.t = Inputs.Proof.t
-   and type Internal_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t
-   and type External_transition.Ledger_builder_diff.t = Inputs.Ledger_builder_diff.t
+   and type Internal_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t
+   and type External_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t

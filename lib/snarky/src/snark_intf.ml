@@ -178,6 +178,8 @@ module type Basic = sig
 
     val false_ : var
 
+    val if_ : var -> then_:var -> else_:var -> (var, _) Checked.t
+
     val not : var -> var
 
     val ( && ) : var -> var -> (var, _) Checked.t
