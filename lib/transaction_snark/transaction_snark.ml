@@ -280,9 +280,8 @@ module Base = struct
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let apply_tagged_transaction (type shifted)
-        (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-        root
-      ((tag, {sender; signature; payload}): Tagged_transaction.var) =
+      (shifted: (module Inner_curve.Checked.Shifted.S with type t = shifted))
+      root ((tag, {sender; signature; payload}): Tagged_transaction.var) =
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
@@ -293,7 +292,8 @@ module Base = struct
         let%bind () =
           with_label __LOC__
             (let%bind verifies =
-               Schnorr.Checked.verifies shifted signature sender payload_section
+               Schnorr.Checked.verifies shifted signature sender
+                 payload_section
              in
              (* Should only assert_verifies if the tag is Normal *)
              Boolean.Assert.any [is_fee_transfer; verifies])

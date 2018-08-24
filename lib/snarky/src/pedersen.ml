@@ -153,7 +153,7 @@ end = struct
 
   let digest (x, _) = x
 
-(* The use of add_unsafe is acceptable in this context because getting this to
+  (* The use of add_unsafe is acceptable in this context because getting this to
    hit a problematic case is tantamount to finding a collision in the pedersen hash. *)
 
   module Section = struct
@@ -216,8 +216,8 @@ end = struct
       let open Let_syntax in
       let hash offset init xs =
         Checked.List.foldi xs ~init ~f:(fun i acc x ->
-          get_term (offset + i) x
-          >>= Weierstrass_curve.Checked.add_unsafe acc )
+            get_term (offset + i) x
+            >>= Weierstrass_curve.Checked.add_unsafe acc )
       in
       match triples with
       | [] -> return t

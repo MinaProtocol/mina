@@ -44,25 +44,31 @@ module Make
 
         module Shifted : sig
           open Impl
-          module type S = 
+
+          module type S =
             Snarky.Curves.Shifted_intf
-                with type ('a, 'b) checked := ('a, 'b) Checked.t
-                and type boolean_var := Boolean.var
-                and type curve_var := var
+            with type ('a, 'b) checked := ('a, 'b) Checked.t
+             and type boolean_var := Boolean.var
+             and type curve_var := var
         end
 
         val negate : var -> var
 
-        val scale_known
-          : (module Shifted.S with type t = 'shifted)
-          -> t -> Scalar.var -> init:'shifted -> ('shifted , _) Checked.t
+        val scale_known :
+             (module Shifted.S with type t = 'shifted)
+          -> t
+          -> Scalar.var
+          -> init:'shifted
+          -> ('shifted, _) Checked.t
 
-        val scale
-          : (module Shifted.S with type t = 'shifted)
-          -> var -> Scalar.var -> init:'shifted -> ('shifted, _) Checked.t
+        val scale :
+             (module Shifted.S with type t = 'shifted)
+          -> var
+          -> Scalar.var
+          -> init:'shifted
+          -> ('shifted, _) Checked.t
       end
-    end)
-    (Message : sig
+    end) (Message : sig
       open Impl
 
       type t [@@deriving sexp]
@@ -137,8 +143,8 @@ module Make
     val verified_output : t -> Context.t -> Output_hash.t option
 
     module Checked : sig
-      val verified_output
-        : (module Group.Checked.Shifted.S with type t = 'shifted)
+      val verified_output :
+           (module Group.Checked.Shifted.S with type t = 'shifted)
         -> var
         -> Context.var
         -> (Output_hash.var, _) Impl.Checked.t
@@ -236,14 +242,18 @@ end = struct
 
     module Checked = struct
       let verified_output (type shifted)
-          ((module Shifted) as shifted : (module Group.Checked.Shifted.S with type t = shifted))
+          ((module Shifted) as shifted:
+            (module Group.Checked.Shifted.S with type t = shifted))
           ({scaled_message_hash; discrete_log_equality= {c; s}}: var)
           ({message; public_key}: Context.var) =
         let open Impl.Let_syntax in
         let%bind () =
           let%bind a =
             (* s * g - c * public_key *)
-            let%bind sg = Group.Checked.scale_known shifted Group.generator s ~init:Shifted.zero in
+            let%bind sg =
+              Group.Checked.scale_known shifted Group.generator s
+                ~init:Shifted.zero
+            in
             Group.Checked.(scale shifted (negate public_key) c ~init:sg)
             >>= Shifted.unshift_nonzero
           and b =
@@ -252,7 +262,8 @@ end = struct
               let%bind message_hash = Message.Checked.hash_to_group message in
               Group.Checked.scale shifted message_hash s ~init:Shifted.zero
             in
-            Group.Checked.(scale shifted (negate scaled_message_hash) c ~init:sx)
+            Group.Checked.(
+              scale shifted (negate scaled_message_hash) c ~init:sx)
             >>= Shifted.unshift_nonzero
           in
           Hash.Checked.hash_for_proof message public_key a b

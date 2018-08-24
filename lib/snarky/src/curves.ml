@@ -87,7 +87,9 @@ end
 
 module type Shifted_intf = sig
   type (_, _) checked
+
   type boolean_var
+
   type curve_var
 
   type t
@@ -97,6 +99,7 @@ module type Shifted_intf = sig
   val add : t -> curve_var -> (t, _) checked
 
   (* This is only safe if the result is guaranteed to not be zero. *)
+
   val unshift_nonzero : t -> (curve_var, _) checked
 
   val if_ : boolean_var -> then_:t -> else_:t -> (t, _) checked
@@ -640,12 +643,17 @@ struct
       r
 
   module Shifted = struct
-    module type S = Shifted_intf
+    module type S =
+      Shifted_intf
       with type ('a, 'b) checked := ('a, 'b) Checked.t
        and type curve_var := var
        and type boolean_var := Boolean.var
 
-    module Make (M : sig val shift : var end) : S = struct
+    module Make (M : sig
+      val shift : var
+    end) :
+      S =
+    struct
       open M
 
       type t = var
@@ -662,10 +670,11 @@ struct
     let create (type shifted) () : ((module S), _) Checked.t =
       let open Let_syntax in
       let%map shift =
-        provide_witness typ
-          As_prover.(map (return ()) ~f:Curve.random)
+        provide_witness typ As_prover.(map (return ()) ~f:Curve.random)
       in
-      let module M = Make (struct let shift = shift end) in
+      let module M = Make (struct
+        let shift = shift
+      end) in
       (module M : S)
   end
 
@@ -717,12 +726,9 @@ struct
     in
     (choose x1 x2, choose y1 y2)
 
-  let scale_bits
-        (type shifted)
-        (module Shifted : Shifted.S with type t = shifted)
-        t (c: Boolean.var list) ~(init : shifted)
-        : (shifted, _) Checked.t
-    =
+  let scale_bits (type shifted) (module Shifted
+      : Shifted.S with type t = shifted) t (c: Boolean.var list)
+      ~(init: shifted) : (shifted, _) Checked.t =
     with_label __LOC__
       (let open Let_syntax in
       let rec go i bs0 acc pt =
@@ -770,11 +776,9 @@ struct
     let x1, y1 = Curve.to_coords t1 and x2, y2 = Curve.to_coords t2 in
     (lookup_one (x1, x2), lookup_one (y1, y2))
 
-  let scale_known
-        (type shifted)
-        (module Shifted : Shifted.S with type t = shifted)
-        (t : Curve.t)
-        (b: Boolean.var list) ~init =
+  let scale_known (type shifted) (module Shifted
+      : Shifted.S with type t = shifted) (t: Curve.t) (b: Boolean.var list)
+      ~init =
     let sigma = t in
     let n = List.length b in
     let sigma_count = (n + 1) / 2 in
@@ -848,7 +852,8 @@ struct
     in
     Shifted.add result_with_shift (constant unshift)
 
-  let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs ~init =
+  let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs
+      ~init =
     let open Let_syntax in
     let rec go acc = function
       | [] -> return acc
