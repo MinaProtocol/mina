@@ -22,11 +22,9 @@ module type Merkle_tree_intf = sig
 
   type account
 
-  type key
-
   type addr
 
-  type t [@@deriving sexp]
+  type t
 
   type path
 
@@ -39,8 +37,6 @@ module type Merkle_tree_intf = sig
   val get_inner_hash_at_addr_exn : t -> addr -> hash
 
   val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
-
-  val extend_with_empty_to_fit : t -> int -> unit
 
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
@@ -65,8 +61,6 @@ module type S = sig
   type diff
 
   type account
-
-  type key
 
   type index = int
 
@@ -119,6 +113,20 @@ module type Validity_intf = sig
   val completely_fresh : t -> bool
 end
 
+module type Responder_intf = sig
+  type t
+
+  type merkle_tree
+
+  type query
+
+  type answer
+
+  val create : merkle_tree -> (query -> unit) -> t
+
+  val answer_query : t -> query -> answer
+end
+
 (*
 
 Every node of the merkle tree is always in one of three states:
@@ -159,10 +167,8 @@ with the hashes in the bottomost N-1 internal nodes).
 *)
 
 module Make
-    (Addr : Merkle_address.S) (Key : sig
-        type t [@@deriving bin_io]
-    end) (Account : sig
-      type t [@@deriving bin_io, sexp]
+    (Addr : Merkle_address.S) (Account : sig
+        type t [@@deriving bin_io, sexp]
     end)
     (Hash : Hash_intf with type account := Account.t) (Root_hash : sig
         type t [@@deriving eq]
@@ -173,7 +179,6 @@ module Make
           with type hash := Hash.t
            and type root_hash := Root_hash.t
            and type addr := Addr.t
-           and type key := Key.t
            and type account := Account.t) (Subtree_height : sig
         val subtree_height : int
     end) :
@@ -183,8 +188,7 @@ module Make
    and type root_hash := Root_hash.t
    and type addr := Addr.t
    and type merkle_path := MT.path
-   and type account := Account.t
-   and type key := Key.t =
+   and type account := Account.t =
 struct
   type diff = unit
 
@@ -400,7 +404,6 @@ struct
     let height = Int.ceil_log2 n in
     if not (Hash.equal (complete_with_empties content_hash height MT.depth) rh)
     then failwith "reported content hash doesn't match desired root hash!" ;
-    MT.extend_with_empty_to_fit t.tree n ;
     Addr.Table.clear t.waiting_parents ;
     Addr.Table.clear t.waiting_content ;
     Valid.set t.validity (Addr.root ()) (Stale, rh) ;
@@ -484,10 +487,8 @@ struct
 end
 
 module Make_sync_responder
-    (Addr : Merkle_address.S) (Key : sig
+    (Addr : Merkle_address.S) (Account : sig
         type t [@@deriving bin_io]
-    end) (Account : sig
-      type t [@@deriving bin_io]
     end)
     (Hash : Hash_intf) (Root_hash : sig
         type t
@@ -496,7 +497,6 @@ module Make_sync_responder
           with type hash := Hash.t
            and type root_hash := Root_hash.t
            and type addr := Addr.t
-           and type key := Key.t
            and type account := Account.t)
     (Sync : S
             with type merkle_tree := MT.t
@@ -504,8 +504,11 @@ module Make_sync_responder
              and type root_hash := Root_hash.t
              and type addr := Addr.t
              and type merkle_path := MT.path
-             and type account := Account.t
-             and type key := Key.t) =
+             and type account := Account.t) :
+  Responder_intf
+  with type merkle_tree := MT.t
+   and type query := Sync.query
+   and type answer := Sync.answer =
 struct
   type t = {mt: MT.t; f: Sync.query -> unit}
 
