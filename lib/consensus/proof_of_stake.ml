@@ -64,7 +64,7 @@ module Epoch_seed = struct
   let zero = Snark_params.Tick.Pedersen.zero_hash
 
   let fold_vrf_result seed vrf_result =
-    Nanobit_base.Util.(fold seed +> Sha256.Digest.fold vrf_result)
+    Fold.(fold seed +> Sha256.Digest.fold vrf_result)
 
   let update seed vrf_result =
     let open Snark_params.Tick in
