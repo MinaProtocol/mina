@@ -46,6 +46,8 @@ module type Inputs_intf = sig
 
   val genesis_ledger_total_currency : Amount.t
 
+  val genesis_ledger : Nanobit_base.Ledger.t
+
   val coinbase : Amount.t
 
   val slot_interval : Time.Span.t
@@ -78,6 +80,14 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   module Proof = Inputs.Proof
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
+  module Ledger = Nanobit_base.Ledger
+  module Ledger_hash = Nanobit_base.Ledger_hash
+  module Ledger_pool = Rc_pool.Make (Nanobit_base.Ledger_hash)
+
+  module Local_state = struct
+    (* TODO: Flesh out with real state *)
+    type t = unit
+  end
 
   module Epoch = struct
     include Segment_id

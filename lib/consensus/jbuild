@@ -5,6 +5,6 @@
   (public_name consensus)
   (flags (:standard -short-paths -warn-error -32))
   (library_flags (-linkall))
-  (libraries (core_kernel nanobit_base snark_params))
+  (libraries (core_kernel nanobit_base snark_params rc_pool))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Consensus mechanisms")))

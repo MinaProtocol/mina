@@ -45,14 +45,34 @@ module type S = sig
     Nanobit_base.External_transition.S
     with module Protocol_state = Protocol_state
 
+  module Local_state : sig
+    type t
+  end
+
+  module Ledger_hash : sig
+    type t
+  end
+
+  module Ledger_pool : Rc_pool.S with type key := Ledger_hash.t
+
+  module Ledger : sig
+    type t
+
+    val copy : t -> t
+  end
+
   val verify :
        Snark_transition.var
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
 
   val update :
-       Consensus_state.value
-    -> Snark_transition.value
-    -> Consensus_state.value Or_error.t
+       consensus:Consensus_state.value
+    -> transition:Snark_transition.value
+    -> state:Local_state.t
+    -> pool:Ledger.t Ledger_pool.t
+    -> last_ledger:Ledger.t
+    -> next_ledger:Ledger.t
+    -> (Consensus_state.value * Local_state.t) Or_error.t
 
   val update_var :
        Consensus_state.var

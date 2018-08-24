@@ -41,6 +41,8 @@ module type Basic = sig
   val var_of_t : t -> var
 
   include Bits_intf.S with type t := t
+
+  include Hashable.S with type t := t
 end
 
 module type Full_size = sig

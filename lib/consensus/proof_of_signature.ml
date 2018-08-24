@@ -24,6 +24,14 @@ struct
   module Proof = Proof
   module Ledger_builder_diff = Ledger_builder_diff
 
+  module Local_state = struct
+    type t = unit
+  end
+
+  module Ledger = Ledger
+  module Ledger_hash = Ledger_hash
+  module Ledger_pool = Rc_pool.Make (Ledger_hash)
+
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
 
@@ -98,6 +106,10 @@ struct
     let fold {length; signer_public_key} =
       let open Nanobit_base.Util in
       Length.Bits.fold length +> Public_key.Compressed.fold signer_public_key
+
+    let update state =
+      { length= Length.succ state.length
+      ; signer_public_key= Public_key.compress Global_keypair.public_key }
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
@@ -130,11 +142,9 @@ struct
     in
     {length; signer_public_key}
 
-  let update state _transition =
-    let open Consensus_state in
-    Or_error.return
-      { length= Length.succ state.length
-      ; signer_public_key= Public_key.compress Global_keypair.public_key }
+  let update ~consensus:state ~transition:_ ~state:s ~pool:_ ~last_ledger:_
+      ~next_ledger:_ =
+    Or_error.return (Consensus_state.update state, s)
 
   let step = Async_kernel.Deferred.Or_error.return
 
@@ -169,8 +179,6 @@ struct
       ~blockchain_state:
         (Snark_transition.genesis |> Snark_transition.blockchain_state)
       ~consensus_state:
-        ( Or_error.ok_exn
-        @@ update
-             (Protocol_state.consensus_state Protocol_state.negative_one)
-             Snark_transition.genesis )
+        (Consensus_state.update
+           (Protocol_state.consensus_state Protocol_state.negative_one))
 end
