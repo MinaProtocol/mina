@@ -1,5 +1,6 @@
 open Core
 open Snark_params
+open Fold_lib
 
 module type S = sig
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -118,9 +119,10 @@ struct
                 let wrap_vk = Tock.Keypair.vk Wrap.keys in
                 Tick.Pedersen.State.update_fold
                   Hash_prefix.transition_system_snark
-                  (List.fold
-                     Step.Verifier.Verification_key_data.(
-                       to_bits (of_verification_key wrap_vk)))
+                  Fold.(
+                    Step.Verifier.Verification_key_data.(
+                      to_bits (of_verification_key wrap_vk))
+                    |> of_list |> group3 ~default:false)
               in
               fun state ->
                 Tick.Pedersen.digest_fold s

@@ -2,7 +2,7 @@ open Core_kernel
 
 let length_in_bytes = 20
 
-let length_in_bits = 8 * length_in_bytes
+let length_in_triples = Util.bit_length_to_triple_length (8 * length_in_bytes)
 
 module T : sig
   type t = private string

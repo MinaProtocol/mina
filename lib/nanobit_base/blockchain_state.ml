@@ -4,6 +4,7 @@ open Util
 open Snark_params
 open Tick
 open Let_syntax
+open Fold_lib
 
 module Digest = Pedersen.Digest
 
@@ -54,26 +55,23 @@ let typ : (var, value) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_to_bits ({ ledger_builder_hash; ledger_hash; timestamp } : var) =
-  let%map ledger_hash_bits = Ledger_hash.var_to_bits ledger_hash
-  and ledger_builder_hash_bits = Ledger_builder_hash.var_to_bits ledger_builder_hash
+let var_to_triples ({ ledger_builder_hash; ledger_hash; timestamp } : var) =
+  let%map ledger_hash_triples = Ledger_hash.var_to_triples ledger_hash
+  and ledger_builder_hash_triples = Ledger_builder_hash.var_to_triples ledger_builder_hash
   in
-  ledger_builder_hash_bits
-  @ ledger_hash_bits
-  @ Block_time.Unpacked.var_to_bits timestamp
+  ledger_builder_hash_triples
+  @ ledger_hash_triples
+  @ Block_time.Unpacked.var_to_triples timestamp
 
 let fold ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
-  Ledger_builder_hash.fold ledger_builder_hash
+  Fold.(Ledger_builder_hash.fold ledger_builder_hash
   +> Ledger_hash.fold ledger_hash
-  +> Block_time.Bits.fold timestamp
+  +> Block_time.fold timestamp)
 
-let to_bits ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
-  Ledger_builder_hash.to_bits ledger_builder_hash
-  @ Ledger_hash.to_bits ledger_hash
-  @ Block_time.Bits.to_bits timestamp
-
-let bit_length =
-  Ledger_builder_hash.length_in_bits + Ledger_hash.length_in_bits + Block_time.bit_length
+let length_in_triples =
+  Ledger_builder_hash.length_in_triples
+  + Ledger_hash.length_in_triples
+  + Block_time.length_in_triples
 
 let set_timestamp t timestamp = { t with timestamp }
 
@@ -99,28 +97,25 @@ module Message = struct
   let hash t ~nonce =
     let d =
       Pedersen.digest_fold Hash_prefix.signature
-        (fold t +> List.fold nonce)
+        Fold.(fold t +> Fold.(group3 ~default:false (of_list nonce)))
     in
-    List.take (Field.unpack d) Scalar.length_in_bits |> Scalar.pack
+    List.take (Field.unpack d) Inner_curve.Scalar.length_in_bits
+    |> Inner_curve.Scalar.of_bits
 
   let () = assert Insecure.signature_hash_function
 
   let hash_checked t ~nonce =
     let open Let_syntax in
     with_label __LOC__
-      (let%bind bits = var_to_bits t in
+      (let%bind trips = var_to_triples t in
        let%bind hash =
-         Pedersen_hash.hash
-           ~init:
-             ( Hash_prefix.length_in_bits
-             , Signature_curve.var_of_value Hash_prefix.signature.acc )
-           (bits @ nonce)
+         Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
+           (trips @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list nonce))))
        in
        let%map bs =
-         Pedersen_hash.Digest.choose_preimage
-         @@ Pedersen_hash.digest hash
+         Pedersen.Checked.Digest.choose_preimage hash
        in
-       List.take bs Scalar.length_in_bits)
+       List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits)
 end
 
-module Signature = Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Signature_curve) (Message)
+module Signature = Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Inner_curve) (Message)

@@ -8,6 +8,8 @@
   (inline_tests)
   (libraries
     ( core
+      fold_lib
+      tuple_lib
       snark_bits
       sgn
       snark_params
