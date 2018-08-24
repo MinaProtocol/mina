@@ -107,15 +107,14 @@ struct
            ~acc:(`Value Hash_prefix.transition_system_snark.acc)
            ~support:
              (Interval_union.of_interval (0, Hash_prefix.length_in_triples)))
-        ~start:Hash_prefix.length_in_triples
-        bs
+        ~start:Hash_prefix.length_in_triples bs
 
     let compute_top_hash wrap_vk_section state_hash_trips =
       Tick.Pedersen.Checked.Section.extend wrap_vk_section
         ~start:(Hash_prefix.length_in_triples + wrap_vk_triple_length)
         state_hash_trips
-      >>| Tick.Pedersen.Checked.Section.to_initial_segment_digest >>| Or_error.ok_exn
-      >>| fst
+      >>| Tick.Pedersen.Checked.Section.to_initial_segment_digest
+      >>| Or_error.ok_exn >>| fst
 
     let prev_state_valid wrap_vk_section wrap_vk_data prev_state_hash =
       let open Let_syntax in

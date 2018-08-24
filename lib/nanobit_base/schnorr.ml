@@ -14,19 +14,16 @@ module Message = struct
   let var_of_payload payload =
     let open Let_syntax in
     let%bind bs = Transaction_payload.var_to_triples payload in
-    Pedersen.Checked.Section.extend
-      Pedersen.Checked.Section.empty
-      bs
+    Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
       ~start:Hash_prefix.length_in_triples
 
   let hash t ~nonce =
     let d =
       Pedersen.digest_fold Hash_prefix.signature
-        Fold.(Transaction_payload.fold t
-              +> group3 ~default:false (of_list nonce))
+        Fold.(
+          Transaction_payload.fold t +> group3 ~default:false (of_list nonce))
     in
-    Scalar.of_bits
-      (Sha256_lib.Sha256.digest (Field.unpack d))
+    Scalar.of_bits (Sha256_lib.Sha256.digest (Field.unpack d))
 
   let () = assert Insecure.signature_hash_function
 
@@ -34,7 +31,8 @@ module Message = struct
     let open Let_syntax in
     with_label __LOC__
       (let init =
-         Pedersen.Checked.Section.create ~acc:(`Value Hash_prefix.signature.acc)
+         Pedersen.Checked.Section.create
+           ~acc:(`Value Hash_prefix.signature.acc)
            ~support:
              (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
        in
@@ -42,9 +40,11 @@ module Message = struct
        let%bind digest =
          let%map final =
            Pedersen.Checked.Section.extend with_t
-             (Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ nonce)
+             (Bitstring_lib.Bitstring.pad_to_triple_list
+                ~default:Boolean.false_ nonce)
              ~start:
-               (Hash_prefix.length_in_triples + Transaction_payload.length_in_triples)
+               ( Hash_prefix.length_in_triples
+               + Transaction_payload.length_in_triples )
          in
          let d, _ =
            Pedersen.Checked.Section.to_initial_segment_digest final
@@ -56,7 +56,5 @@ module Message = struct
        Sha256_lib.Sha256.Checked.digest (bs :> Boolean.var list))
 end
 
-include Snarky.Signature.Schnorr
-    (Tick)
-    (Snark_params.Tick.Inner_curve)
-    (Message)
+include Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
+          (Message)

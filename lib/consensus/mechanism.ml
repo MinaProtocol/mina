@@ -26,7 +26,9 @@ module type S = sig
 
     val var_to_triples :
          var
-      -> (Snark_params.Tick.Boolean.var Triple.t list, _) Snark_params.Tick.Checked.t
+      -> ( Snark_params.Tick.Boolean.var Triple.t list
+         , _ )
+         Snark_params.Tick.Checked.t
 
     val fold : value -> bool Triple.t Fold.t
   end

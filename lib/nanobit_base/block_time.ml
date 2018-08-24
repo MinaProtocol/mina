@@ -28,6 +28,7 @@ type t0 = t
 module B = Bits
 
 let bit_length = 64
+
 let length_in_triples = bit_length_to_triple_length bit_length
 
 module Bits = Bits.UInt64

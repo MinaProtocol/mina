@@ -596,7 +596,8 @@ let%test_module "vrf-test" =
             >>| List.concat
           in
           hash_bits_checked bs >>= Pedersen.Digest.choose_preimage
-          >>| fun xs -> List.take (xs :> Boolean.var list) Scalar.length_in_bits
+          >>| fun xs ->
+          List.take (xs :> Boolean.var list) Scalar.length_in_bits
       end
     end
 

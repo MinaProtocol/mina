@@ -56,6 +56,7 @@ module Compressed : sig
   val assert_equal : var -> var -> (unit, _) Checked.t
 
   val of_base64_exn : string -> t
+
   val to_base64 : t -> string
 end
 

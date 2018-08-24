@@ -89,47 +89,60 @@ module type S = sig
 end
 
 module Schnorr
-    (Impl : Snark_intf.S)
-    (Curve : sig
-       open Impl
+    (Impl : Snark_intf.S) (Curve : sig
+        open Impl
 
-       module Scalar : sig
-         type t [@@deriving sexp, eq]
-         type var
-         val typ : (var, t) Typ.t
-         val random : unit -> t
-         val ( * ) : t -> t -> t
-         val (+) : t -> t -> t
-         val (-) : t -> t -> t
+        module Scalar : sig
+          type t [@@deriving sexp, eq]
 
-         val test_bit : t -> int -> bool
+          type var
 
-         val length_in_bits : int
-         module Checked : sig
-          val equal : var -> var -> (Boolean.var, _) Checked.t
-          module Assert : sig val equal : var -> var -> (unit, _) Checked.t end
-         end
-       end
+          val typ : (var, t) Typ.t
 
-       type t
-       type var = Field.Checked.t * Field.Checked.t
+          val random : unit -> t
 
-       module Checked : sig
-         val add : var -> var -> (var, _) Checked.t
-         val scale : var -> Scalar.var -> (var, _) Checked.t
-         val scale_known : t -> Scalar.var -> (var, _) Checked.t
-       end
+          val ( * ) : t -> t -> t
 
-       val one : t
-       val zero : t
+          val ( + ) : t -> t -> t
 
-       val add : t -> t -> t
+          val ( - ) : t -> t -> t
 
-       val typ : (var, t) Typ.t
+          val test_bit : t -> int -> bool
 
-       val scale : t -> Scalar.t -> t
+          val length_in_bits : int
 
-       val to_coords : t -> Field.t * Field.t
+          module Checked : sig
+            val equal : var -> var -> (Boolean.var, _) Checked.t
+
+            module Assert : sig
+              val equal : var -> var -> (unit, _) Checked.t
+            end
+          end
+        end
+
+        type t
+
+        type var = Field.Checked.t * Field.Checked.t
+
+        module Checked : sig
+          val add : var -> var -> (var, _) Checked.t
+
+          val scale : var -> Scalar.var -> (var, _) Checked.t
+
+          val scale_known : t -> Scalar.var -> (var, _) Checked.t
+        end
+
+        val one : t
+
+        val zero : t
+
+        val add : t -> t -> t
+
+        val typ : (var, t) Typ.t
+
+        val scale : t -> Scalar.t -> t
+
+        val to_coords : t -> Field.t * Field.t
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
@@ -164,12 +177,13 @@ struct
     type t = Curve.Scalar.t
   end
 
-  let compress (t : Curve.t) =
-    let (x, _) = Curve.to_coords t in
+  let compress (t: Curve.t) =
+    let x, _ = Curve.to_coords t in
     Field.unpack x
 
   module Public_key : sig
     type t = Curve.t
+
     type var = Curve.var
 
     val typ : (var, t) Typ.t
@@ -184,9 +198,8 @@ struct
 
   (* TODO: Have expect test for this *)
   (* TODO: Have optimized double function *)
-  let shamir_sum
-        ((sp, p): Curve.Scalar.t * Curve.t)
-        ((sq, q): Curve.Scalar.t * Curve.t) =
+  let shamir_sum ((sp, p): Curve.Scalar.t * Curve.t)
+      ((sq, q): Curve.Scalar.t * Curve.t) =
     let pq = Curve.add p q in
     let rec go i acc =
       if i < 0 then acc

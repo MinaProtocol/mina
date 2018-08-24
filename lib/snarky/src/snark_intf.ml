@@ -246,10 +246,10 @@ module type Basic = sig
   end
   
   and Field : sig
-    type t = field
-    [@@deriving bin_io, sexp, hash, compare, eq]
+    type t = field [@@deriving bin_io, sexp, hash, compare, eq]
 
     include Field_intf.Extended with type t := t
+
     include Stringable.S with type t := t
 
     val size : Bignum_bigint.t

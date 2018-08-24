@@ -124,9 +124,8 @@ struct
 
   let var_of_hash_unpacked unpacked =
     { digest= Pedersen.Checked.Digest.Unpacked.project unpacked
-    ; bits=
-        Some
-          (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list)) }
+    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list))
+    }
 
   let var_to_hash_packed {digest; _} = digest
 
@@ -147,8 +146,7 @@ struct
           bits )
 
   let var_to_triples t =
-    var_to_bits t
-    >>| Bitstring.pad_to_triple_list ~default:Boolean.false_
+    var_to_bits t >>| Bitstring.pad_to_triple_list ~default:Boolean.false_
 
   include Pedersen.Digest.Bits
 

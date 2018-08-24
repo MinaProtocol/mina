@@ -83,7 +83,7 @@ end = struct
 
     let typ = Typ.list ~length:length_in_bits Boolean.typ
 
-    let length_in_triples = (M.length_in_bits + 2) /3
+    let length_in_triples = (M.length_in_bits + 2) / 3
   end
 
   module Digest = Bits (struct

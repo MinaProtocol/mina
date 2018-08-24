@@ -54,12 +54,12 @@ module Vector = struct
     type t = V.t
 
     let fold t =
-      { Fold.fold = fun ~init ~f ->
-          let rec go acc i =
-            if i = V.length then acc else go (f acc (V.get t i)) (i + 1)
-          in
-          go init 0
-      }
+      { Fold.fold=
+          (fun ~init ~f ->
+            let rec go acc i =
+              if i = V.length then acc else go (f acc (V.get t i)) (i + 1)
+            in
+            go init 0 ) }
 
     let iter t ~f = for i = 0 to V.length - 1 do f (V.get t i) done
 
@@ -100,12 +100,14 @@ struct
   type t = Field.t
 
   let fold t =
-    { Fold.fold = fun ~init ~f ->
-      let n = Bigint.of_field t in
-      let rec go acc i =
-        if i = bit_length then acc else go (f acc (Bigint.test_bit n i)) (i + 1)
-      in
-      go init 0 }
+    { Fold.fold=
+        (fun ~init ~f ->
+          let n = Bigint.of_field t in
+          let rec go acc i =
+            if i = bit_length then acc
+            else go (f acc (Bigint.test_bit n i)) (i + 1)
+          in
+          go init 0 ) }
 
   let iter t ~f =
     let n = Bigint.of_field t in
@@ -228,7 +230,7 @@ module Snarkable = struct
 
       let var_to_bits = Fn.id
 
-      let var_to_triples (bs : var) =
+      let var_to_triples (bs: var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
 
       let var_of_value v =
@@ -300,7 +302,7 @@ module Snarkable = struct
 
       let var_to_bits = Fn.id
 
-      let var_to_triples (bs : var) =
+      let var_to_triples (bs: var) =
         Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bs
 
       let var_of_value v =

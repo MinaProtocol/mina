@@ -96,8 +96,7 @@ module Tick = struct
              Bignum_bigint.(Tock.Field.size - one))
           ~f:(fun x -> Tock.Bigint.(to_field (of_bignum_bigint x)))
 
-      let test_bit x i =
-        Tock.Bigint.(test_bit (of_field x) i)
+      let test_bit x i = Tock.Bigint.(test_bit (of_field x) i)
 
       module Checked = struct
         let equal = Bitstring_checked.equal
@@ -112,11 +111,10 @@ module Tick = struct
 
     let find_y x =
       let y2 =
-        Field.Infix.(x * Field.square x + Coefficients.a * x + Coefficients.b)
+        let open Field.Infix in
+        (x * Field.square x) + (Coefficients.a * x) + Coefficients.b
       in
-      if Field.is_square y2
-      then Some (Field.sqrt y2)
-      else None
+      if Field.is_square y2 then Some (Field.sqrt y2) else None
 
     let scale = scale_field
 
@@ -131,14 +129,12 @@ module Tick = struct
 
       let with_random_shift k =
         let open Let_syntax in
-        let%bind init =
-          provide_witness typ
-            As_prover.(return (random ()))
-        in
+        let%bind init = provide_witness typ As_prover.(return (random ())) in
         let%bind shifted = k ~init in
         add shifted (negate init)
 
       let scale g s = with_random_shift (scale_bits g s)
+
       let scale_known g s = with_random_shift (scale_known g s)
 
       let add_known v x = add v (constant x)
@@ -152,7 +148,7 @@ module Tick = struct
     include Hashable.Make (Tick0.Field)
     module Bits = Bits.Make_field (Tick0.Field) (Tick0.Bigint)
 
-    let size_in_triples = (size_in_bits + 2)/3
+    let size_in_triples = (size_in_bits + 2) / 3
 
     let gen =
       Quickcheck.Generator.map
@@ -179,14 +175,15 @@ module Tick = struct
     include Crypto_params.Pedersen_params
     include Pedersen.Make (Field) (Bigint) (Inner_curve)
 
-    let zero_hash = digest_fold (State.create params) (Fold_lib.Fold.of_list [(false, false, false)])
+    let zero_hash =
+      digest_fold (State.create params)
+        (Fold_lib.Fold.of_list [(false, false, false)])
 
     module Checked = struct
-      include
-        Snarky.Pedersen.Make (Tick0) (Inner_curve)
-          (Crypto_params.Pedersen_params)
+      include Snarky.Pedersen.Make (Tick0) (Inner_curve)
+                (Crypto_params.Pedersen_params)
 
-      let hash_triples ts ~(init : State.t) =
+      let hash_triples ts ~(init: State.t) =
         hash ts ~init:(init.triples_consumed, `Value init.acc)
 
       let digest_triples ts ~init =

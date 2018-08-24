@@ -47,6 +47,7 @@ end
 
 module Make (Field : sig
   type t [@@deriving sexp, bin_io, compare, hash, eq]
+
   include Snarky.Field_intf.S with type t := t
 end)
 (Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig

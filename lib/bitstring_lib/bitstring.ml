@@ -29,9 +29,8 @@ end
 let pad_to_triple_list ~default xs =
   let rec go acc = function
     | [] -> List.rev acc
-    | [ x1 ] -> List.rev ((x1, default, default) :: acc)
-    | [ x1; x2 ] -> List.rev ((x1, x2, default) :: acc)
-    | x1 :: x2 :: x3 :: xs ->
-      go ((x1, x2, x3) :: acc) xs
+    | [x1] -> List.rev ((x1, default, default) :: acc)
+    | [x1; x2] -> List.rev ((x1, x2, default) :: acc)
+    | x1 :: x2 :: x3 :: xs -> go ((x1, x2, x3) :: acc) xs
   in
   go [] xs

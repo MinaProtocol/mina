@@ -150,8 +150,7 @@ module Make
     (Unsigned : Unsigned_extended.S) (M : sig
         val length : int
     end) : sig
-  include S with type t = Unsigned.t
-             and type var = Boolean.var list
+  include S with type t = Unsigned.t and type var = Boolean.var list
 
   val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var
 
@@ -161,7 +160,7 @@ module Make
 end = struct
   let length_in_bits = M.length
 
-  let length_in_triples = (length_in_bits + 2)/3
+  let length_in_triples = (length_in_bits + 2) / 3
 
   module Stable = struct
     module V1 = struct
@@ -262,6 +261,7 @@ end = struct
     type nonrec var = (var, Sgn.var) t_
 
     let length_in_bits = Int.( + ) length_in_bits 1
+
     let length_in_triples = Int.((length_in_bits + 2) / 3)
 
     let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
@@ -278,10 +278,10 @@ end = struct
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
     let fold_bits ({sgn; magnitude}: t) =
-      { Fold.fold = fun ~init ~f ->
-          let init = (fold_bits magnitude).fold ~init ~f in
-          f init (sgn_to_bool sgn)
-      }
+      { Fold.fold=
+          (fun ~init ~f ->
+            let init = (fold_bits magnitude).fold ~init ~f in
+            f init (sgn_to_bool sgn) ) }
 
     let fold t = Fold.group3 ~default:false (fold_bits t)
 
@@ -313,7 +313,7 @@ end = struct
 
     module Checked = struct
       let to_bits {magnitude; sgn} =
-        var_to_bits magnitude @ [ Sgn.Checked.is_pos sgn ]
+        var_to_bits magnitude @ [Sgn.Checked.is_pos sgn]
 
       let to_triples t =
         Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
@@ -487,9 +487,9 @@ module Amount = struct
   module Checked = struct
     include T.Checked
 
-    let of_fee (fee: Fee.var) = (fee : var)
+    let of_fee (fee: Fee.var) : var = fee
 
-    let to_fee (t: var) = (t : Fee.var)
+    let to_fee (t: var) : Fee.var = t
 
     let add_fee (t: var) (fee: Fee.var) =
       Field.Checked.add (pack_var t) (Fee.pack_var fee) |> unpack_var
