@@ -7,7 +7,8 @@ open Fold_lib
 module type Basic = sig
   (* TODO: Use stable for bin_io *)
 
-  type t = private Pedersen.Digest.t [@@deriving sexp, eq, compare]
+  type t = private Pedersen.Digest.t
+  [@@deriving bin_io, sexp, eq, compare, hash]
 
   val gen : t Quickcheck.Generator.t
 
@@ -19,7 +20,7 @@ module type Basic = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
 
       include Hashable_binable with type t := t
     end

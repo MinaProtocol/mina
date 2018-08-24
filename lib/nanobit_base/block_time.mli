@@ -48,6 +48,8 @@ module Span : sig
 
   val to_ms : t -> Int64.t
 
+  val of_ms : Int64.t -> t
+
   val ( < ) : t -> t -> bool
 
   val ( > ) : t -> t -> bool
@@ -79,7 +81,15 @@ val diff_checked :
 
 val unpacked_to_number : Span.Unpacked.var -> Tick.Number.t
 
+val add : t -> Span.t -> t
+
 val diff : t -> t -> Span.t
+
+val sub : t -> Span.t -> t
+
+val to_span_since_epoch : t -> Span.t
+
+val of_span_since_epoch : Span.t -> t
 
 val modulus : t -> Span.t -> Span.t
 

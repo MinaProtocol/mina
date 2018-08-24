@@ -69,6 +69,8 @@ std::ostream& operator<<(std::ostream &out, const r1cs_constraint<FieldT> &c)
     out << c.a;
     out << c.b;
     out << c.c;
+    unsigned char x = c.is_square ? '1' : '0';
+    out << x;
 
     return out;
 }
@@ -79,6 +81,9 @@ std::istream& operator>>(std::istream &in, r1cs_constraint<FieldT> &c)
     in >> c.a;
     in >> c.b;
     in >> c.c;
+    unsigned char x;
+    in >> x;
+    c.is_square = x == '1';
 
     return in;
 }
@@ -275,6 +280,7 @@ std::ostream& operator<<(std::ostream &out, const r1cs_constraint_system<FieldT>
 template<typename FieldT>
 std::istream& operator>>(std::istream &in, r1cs_constraint_system<FieldT> &cs)
 {
+    cs.num_square_constraints = 0;
     in >> cs.primary_input_size;
     in >> cs.auxiliary_input_size;
 
@@ -293,6 +299,9 @@ std::istream& operator>>(std::istream &in, r1cs_constraint_system<FieldT> &cs)
         r1cs_constraint<FieldT> c;
         in >> c;
         cs.constraints.emplace_back(c);
+        if (c.is_square) {
+          cs.num_square_constraints += 1;
+        }
     }
 #ifdef DEBUG
     size_t num_constraint_annotations;
