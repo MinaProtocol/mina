@@ -24,9 +24,9 @@ module Make
         module Checked : sig
           val constant : t -> var
 
-          val add : var -> var -> (var, _) Impl.Checked.t
+          val add_unsafe : var -> var -> (var, _) Impl.Checked.t
 
-          val add_known : var -> t -> (var, _) Impl.Checked.t
+          val add_known_unsafe : var -> t -> (var, _) Impl.Checked.t
         end
     end) (Params : sig
       val params : Weierstrass_curve.t Quadruple.t array
@@ -153,6 +153,9 @@ end = struct
 
   let digest (x, _) = x
 
+(* The use of add_unsafe is acceptable in this context because getting this to
+   hit a problematic case is tantamount to finding a collision in the pedersen hash. *)
+
   module Section = struct
     module Acc = struct
       type t = [`Var of Weierstrass_curve.var | `Value of Weierstrass_curve.t]
@@ -161,12 +164,12 @@ end = struct
         let open Let_syntax in
         match (t1, t2) with
         | `Var v1, `Var v2 ->
-            let%map v = Weierstrass_curve.Checked.add v1 v2 in
+            let%map v = Weierstrass_curve.Checked.add_unsafe v1 v2 in
             `Var v
         | `Var v, `Value x | `Value x, `Var v ->
             if Weierstrass_curve.(equal zero x) then return (`Var v)
             else
-              let%map v = Weierstrass_curve.Checked.add_known v x in
+              let%map v = Weierstrass_curve.Checked.add_known_unsafe v x in
               `Var v
         | `Value x1, `Value x2 -> return (`Value (Weierstrass_curve.add x1 x2))
 
@@ -213,7 +216,8 @@ end = struct
       let open Let_syntax in
       let hash offset init xs =
         Checked.List.foldi xs ~init ~f:(fun i acc x ->
-            get_term (offset + i) x >>= Weierstrass_curve.Checked.add acc )
+          get_term (offset + i) x
+          >>= Weierstrass_curve.Checked.add_unsafe acc )
       in
       match triples with
       | [] -> return t
@@ -228,7 +232,7 @@ end = struct
                 let%bind init_term = get_term start x in
                 let%bind init =
                   if Weierstrass_curve.(equal zero v) then return init_term
-                  else Weierstrass_curve.Checked.add_known init_term v
+                  else Weierstrass_curve.Checked.add_known_unsafe init_term v
                 in
                 hash (start + 1) init xs
             | `Var v -> hash start v (x :: xs)

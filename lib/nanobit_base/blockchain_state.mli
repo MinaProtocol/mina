@@ -76,3 +76,4 @@ module Signature :
    and type curve_scalar := Snark_params.Tick.Inner_curve.Scalar.t
    and type curve_scalar_var := Snark_params.Tick.Inner_curve.Scalar.var
    and module Message := Message
+   and module Shifted := Snark_params.Tick.Inner_curve.Checked.Shifted
