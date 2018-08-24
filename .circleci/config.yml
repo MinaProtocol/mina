@@ -1,7 +1,7 @@
 version: 2
 jobs:
   build:
-    resource_class: medium
+    resource_class: large
     docker:
       - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
         # ENV variable is located in circleci
