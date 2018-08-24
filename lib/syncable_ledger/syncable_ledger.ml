@@ -132,6 +132,7 @@ Every node of the merkle tree is always in one of three states:
 - Unknown.
   We don't know what to expect yet.
 
+
 Although every node conceptually has one of these states, and can
 make a transition at any time, the syncer operates only along a
 "frontier" of the tree, which consists of the deepest Stale nodes.
