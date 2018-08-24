@@ -2,8 +2,12 @@ all : clean docker container build
 
 .PHONY : all dev
 
-kademlia:
-	bash -c 'cd app/kademlia-haskell && nix-build release2.nix'
+kademlia :
+	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
+		./scripts/run-in-docker bash -c 'cd app/kademlia-haskell && nix-build release2.nix' ; \
+	else \
+		bash -c 'cd app/kademlia-haskell && nix-build release2.nix' ; \
+	fi
 
 docker :
 	@./rebuild-docker.sh nanotest Dockerfile

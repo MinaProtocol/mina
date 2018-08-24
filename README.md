@@ -24,7 +24,7 @@ If developing on a VM, now is a good time to take a snapshot and save your state
 ## Login and test gcloud access
 
 * Authorize gcloud with your o1 account\
-`gclould auth login`
+`gcloud auth login`
 
 * Setup docker to use google cloud registry\
 `gcloud auth configure-docker`

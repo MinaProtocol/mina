@@ -1191,3 +1191,84 @@ module Keys = struct
     in
     (location, t, checksum)
 end
+
+let%test_module "transaction_snark" =
+  ( module struct
+    type wallet = {private_key: Private_key.t; account: Account.t}
+
+    let random_wallets () =
+      let random_wallet () : wallet =
+        let private_key = Private_key.create () in
+        { private_key
+        ; account=
+            { public_key=
+                Public_key.compress (Public_key.of_private_key private_key)
+            ; balance= Balance.of_int (10 + Random.int 100)
+            ; receipt_chain_hash= Receipt.Chain_hash.empty
+            ; nonce= Account.Nonce.zero } }
+      in
+      let n = Int.pow 2 ledger_depth in
+      Array.init n ~f:(fun _ -> random_wallet ())
+
+    let transaction wallets i j amt fee nonce =
+      let sender = wallets.(i) in
+      let receiver = wallets.(j) in
+      let payload : Transaction.Payload.t =
+        { receiver= receiver.account.public_key
+        ; fee
+        ; amount= Amount.of_int amt
+        ; nonce }
+      in
+      let signature = Schnorr.sign sender.private_key payload in
+      Transaction.check
+        { Transaction.payload
+        ; sender= Public_key.of_private_key sender.private_key
+        ; signature }
+      |> Option.value_exn
+
+    let keys = Keys.create ()
+
+    include Make (struct
+      let keys = keys
+    end)
+
+    let of_transaction' ledger transaction =
+      let source = Ledger.merkle_root ledger in
+      let target =
+        Ledger.merkle_root_after_transaction_exn ledger transaction
+      in
+      of_transaction source target transaction (handle_with_ledger ledger)
+
+    let%test "base_and_merge" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let wallets = random_wallets () in
+          let ledger = Ledger.create () in
+          Array.iter wallets ~f:(fun {account} ->
+              Ledger.set ledger account.public_key account ) ;
+          let t1 =
+            transaction wallets 0 1 8
+              (Fee.of_int (Random.int 20))
+              Account.Nonce.zero
+          in
+          let t2 =
+            transaction wallets 1 2 3
+              (Fee.of_int (Random.int 20))
+              Account.Nonce.zero
+          in
+          let state1 = Ledger.merkle_root ledger in
+          let proof12 = of_transaction' ledger t1 in
+          let proof23 = of_transaction' ledger t2 in
+          let total_fees =
+            let open Amount in
+            let magnitude =
+              of_fee (t1 :> Transaction.t).payload.fee
+              + of_fee (t2 :> Transaction.t).payload.fee
+              |> Option.value_exn
+            in
+            Signed.create ~magnitude ~sgn:Sgn.Pos
+          in
+          let state3 = Ledger.merkle_root ledger in
+          let proof13 = merge proof12 proof23 |> Or_error.ok_exn in
+          Tock.verify proof13.proof keys.verification.wrap (wrap_input ())
+            (embed (merge_top_hash state1 state3 total_fees wrap_vk_bits)) )
+  end )

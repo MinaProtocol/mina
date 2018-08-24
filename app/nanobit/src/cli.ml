@@ -20,33 +20,36 @@ let daemon (type ledger_proof) (module Kernel
   let open Command.Let_syntax in
   Command.async ~summary:"Current daemon"
     (let%map_open conf_dir =
-       flag "config-directory" ~doc:"Configuration directory" (optional file)
-     and should_mine = flag "mine" ~doc:"Run the miner" (optional bool)
+       flag "config-directory" ~doc:"DIR Configuration directory"
+         (optional file)
+     and should_mine =
+       flag "mine" ~doc:"true|false Run the miner (default:false)"
+         (optional bool)
      and peers =
        flag "peer"
          ~doc:
-           "Host_and_port for TCP daemon communications (can be given \
-            multiple times)"
+           "HOST:PORT TCP daemon communications (can be given multiple times)"
          (listed peer)
      and run_snark_worker =
-       flag "run-snark-worker" ~doc:"Run the SNARK worker"
+       flag "run-snark-worker" ~doc:"KEY Run the SNARK worker with a key"
          (optional public_key_compressed)
      and external_port =
        flag "external-port"
          ~doc:
            (Printf.sprintf
-              "Server port for other daemons to connect (default: %d)"
+              "PORT Base server port for daemon TCP (discovery UDP on port+1) \
+               (default: %d)"
               default_external_port)
          (optional int16)
      and client_port =
        flag "client-port"
          ~doc:
            (Printf.sprintf
-              "Port for client to connect daemon locally (default: %d)"
+              "PORT Client to daemon local communication (default: %d)"
               default_client_port)
          (optional int16)
      and ip =
-       flag "ip" ~doc:"External IP address for others to connect"
+       flag "ip" ~doc:"IP External IP address for others to connect"
          (optional string)
      in
      fun () ->

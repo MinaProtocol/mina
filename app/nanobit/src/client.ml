@@ -19,13 +19,13 @@ let get_balance =
     (let open Command.Let_syntax in
     let%map_open address =
       flag "address"
-        ~doc:"Public-key address of which you want to see the balance"
+        ~doc:"KEY Public-key address of which you want to see the balance"
         (required public_key)
     and port =
       flag "daemon-port"
         ~doc:
           (Printf.sprintf
-             "Port of the deamon's client-rpc handlers (default: %d)"
+             "PORT Client to daemon local communication (default: %d)"
              default_client_port)
         (optional int16)
     in
@@ -52,23 +52,25 @@ let send_txn =
   Command.async ~summary:"Send transaction to an address"
     (let open Command.Let_syntax in
     let%map_open address =
-      flag "receiver" ~doc:"Public-key address to which you want to send money"
+      flag "receiver"
+        ~doc:"KEY Public-key address to which you want to send money"
         (required public_key)
     and from_account =
       flag "from"
-        ~doc:"Private-key address from which you would like to send money"
+        ~doc:"KEY Private-key address from which you would like to send money"
         (required private_key)
     and fee =
-      flag "fee" ~doc:"Transaction fee you're willing to pay (default: 1)"
+      flag "fee"
+        ~doc:"VALUE  Transaction fee you're willing to pay (default: 1)"
         (optional txn_fee)
     and amount =
-      flag "amount" ~doc:"Transaction amount you want to send"
+      flag "amount" ~doc:"VALUE Transaction amount you want to send"
         (required txn_amount)
     and port =
       flag "daemon-port"
         ~doc:
           (Printf.sprintf
-             "Port of the deamon's client-rpc handlers (default: %d)"
+             "PORT Client to daemon local communication (default: %d)"
              default_client_port)
         (optional int16)
     in
