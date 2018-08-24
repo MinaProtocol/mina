@@ -4,6 +4,7 @@ open Unsigned
 open Coda_numbers
 open Currency
 open Sha256_lib
+open Fold_lib
 
 module type Inputs_intf = sig
   module Proof : sig
@@ -63,9 +64,8 @@ module Epoch_seed = struct
   let zero = Snark_params.Tick.Pedersen.zero_hash
 
   let update seed vrf_result =
-    let open Nanobit_base.Util in
     let open Snark_params.Tick in
-    let fold_hash = fold seed +> List.fold vrf_result in
+    let fold_hash = Fold.(fold seed +> Sha256.Digest.fold vrf_result) in
     of_hash
       (Pedersen.digest_fold Nanobit_base.Hash_prefix.epoch_seed fold_hash)
 end
@@ -203,21 +203,21 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
         ~value_of_hlist:of_hlist
 
     let fold {epoch; slot; total_currency_diff; proposer_vrf_result} =
-      let open Nanobit_base.Util in
-      Epoch.Bits.fold epoch +> Epoch.Slot.Bits.fold slot
+      Fold.(
+        Epoch.fold epoch
+      +> Epoch.Slot.fold slot
       +> Amount.fold total_currency_diff
-      +> Sha256.Digest.fold proposer_vrf_result
+      +> Sha256.Digest.fold proposer_vrf_result)
 
-    let var_to_bits {epoch; slot; total_currency_diff; proposer_vrf_result} =
-      Epoch.Unpacked.var_to_bits epoch
-      @ Epoch.Slot.Unpacked.var_to_bits slot
-      @ ( total_currency_diff |> Amount.var_to_bits
-        |> Bitstring_lib.Bitstring.Lsb_first.to_list )
+    let var_to_triples {epoch; slot; total_currency_diff; proposer_vrf_result} =
+      Epoch.Unpacked.var_to_triples epoch
+      @ Epoch.Slot.Unpacked.var_to_triples slot
+      @ ( total_currency_diff |> Amount.var_to_triples)
       @ proposer_vrf_result
 
-    let bit_length =
-      Epoch.length_in_bits + Epoch.Slot.length_in_bits + Amount.length
-      + Sha256.Digest.length_in_bits
+    let length_in_triples =
+      Epoch.length_in_triples + Epoch.Slot.length_in_triples + Amount.length_in_triples
+      + Sha256.Digest.length_in_triples
   end
 
   module Consensus_state = struct
@@ -334,7 +334,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let var_to_bits
+    let var_to_triples
         { length
         ; current_epoch
         ; current_slot
@@ -342,14 +342,13 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
         ; epoch_seed
         ; next_epoch_seed } =
       let open Snark_params.Tick.Let_syntax in
-      let%map epoch_seed_bits = Epoch_seed.var_to_bits epoch_seed
-      and next_epoch_seed_bits = Epoch_seed.var_to_bits next_epoch_seed in
-      Length.Unpacked.var_to_bits length
-      @ Epoch.Unpacked.var_to_bits current_epoch
-      @ Epoch.Slot.Unpacked.var_to_bits current_slot
-      @ ( total_currency |> Amount.var_to_bits
-        |> Bitstring_lib.Bitstring.Lsb_first.to_list )
-      @ epoch_seed_bits @ next_epoch_seed_bits
+      let%map epoch_seed_triples = Epoch_seed.var_to_triples epoch_seed
+      and next_epoch_seed_triples = Epoch_seed.var_to_triples next_epoch_seed in
+      Length.Unpacked.var_to_triples length
+      @ Epoch.Unpacked.var_to_triples current_epoch
+      @ Epoch.Slot.Unpacked.var_to_triples current_slot
+      @ ( total_currency |> Amount.var_to_triples)
+      @ epoch_seed_triples @ next_epoch_seed_triples
 
     let fold
         { length
@@ -358,16 +357,16 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
         ; total_currency
         ; epoch_seed
         ; next_epoch_seed } =
-      let open Nanobit_base.Util in
-      Length.Bits.fold length
-      +> Epoch.Bits.fold current_epoch
-      +> Epoch.Slot.Bits.fold current_slot
-      +> Amount.fold total_currency +> Epoch_seed.fold epoch_seed
-      +> Epoch_seed.fold next_epoch_seed
+      Fold.(Length.fold length
+      +> Epoch.fold current_epoch
+      +> Epoch.Slot.fold current_slot
+      +> Amount.fold total_currency
+      +> Epoch_seed.fold epoch_seed
+      +> Epoch_seed.fold next_epoch_seed)
 
-    let bit_length =
-      Length.length_in_bits + Epoch.length_in_bits + Epoch.Slot.length_in_bits
-      + Amount.length + Epoch_seed.length_in_bits + Epoch_seed.length_in_bits
+    let length_in_triples =
+      Length.length_in_triples + Epoch.length_in_triples + Epoch.Slot.length_in_triples
+      + Amount.length_in_triples + Epoch_seed.length_in_triples + Epoch_seed.length_in_triples
   end
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)

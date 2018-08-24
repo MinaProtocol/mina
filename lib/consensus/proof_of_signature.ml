@@ -26,7 +26,7 @@ struct
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
 
-    type value = Signature.t t_ [@@deriving bin_io, sexp]
+    type value = Signature.Stable.V1.t t_ [@@deriving bin_io, sexp]
 
     type var = Signature.var t_
 
