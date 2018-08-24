@@ -226,8 +226,7 @@ struct
 
     let fold {epoch; slot; proposer_vrf_result} =
       let open Fold in
-      Epoch.fold epoch 
-      +> Epoch.Slot.fold slot
+      Epoch.fold epoch +> Epoch.Slot.fold slot
       +> Sha256.Digest.fold proposer_vrf_result
 
     let var_to_triples {epoch; slot; proposer_vrf_result} =
