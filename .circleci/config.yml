@@ -27,6 +27,8 @@ jobs:
     - run:
         name: Build deb Package
         command: make deb
+    - store_artifacts:
+        path: /tmp/artifacts
     - run:
         name: Test make test-runtest
         command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
