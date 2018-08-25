@@ -22,6 +22,8 @@ module type Consensus_mechanism_intf = sig
      and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
 end
 
+let default_external_port = 8302
+
 let daemon (type ledger_proof) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
     : Coda_intf with type ledger_proof = ledger_proof) =
@@ -41,20 +43,20 @@ let daemon (type ledger_proof) (module Kernel
      and run_snark_worker =
        flag "run-snark-worker" ~doc:"KEY Run the SNARK worker with a key"
          (optional public_key_compressed)
-     and port =
-       flag "port"
+     and external_port =
+       flag "external-port"
          ~doc:
            (Printf.sprintf
-              "PORT Server port for other daemons to connect (default: %d)"
-              default_daemon_port)
+              "PORT Base server port for daemon TCP (discovery UDP on port+1) \
+               (default: %d)"
+              default_external_port)
          (optional int16)
      and client_port =
        flag "client-port"
-         ~doc:"PORT Client to daemon local communication (default: 8301)"
-         (optional int16)
-     and membership_port =
-       flag "membership-port"
-         ~doc:"PORT P2P UDP overlay communication(default: 8303)"
+         ~doc:
+           (Printf.sprintf
+              "PORT Client to daemon local communication (default: %d)"
+              default_client_port)
          (optional int16)
      and ip =
        flag "ip" ~doc:"IP External IP address for others to connect"
@@ -67,9 +69,13 @@ let daemon (type ledger_proof) (module Kernel
        let conf_dir =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
-       let port = Option.value ~default:default_daemon_port port in
-       let client_port = Option.value ~default:8301 client_port in
-       let membership_port = Option.value ~default:8303 membership_port in
+       let external_port =
+         Option.value ~default:default_external_port external_port
+       in
+       let client_port =
+         Option.value ~default:default_client_port client_port
+       in
+       let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
          match peers with
@@ -92,7 +98,9 @@ let daemon (type ledger_proof) (module Kernel
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
-       let me = Host_and_port.create ~host:ip ~port in
+       let me =
+         (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
+       in
        let module Config = struct
          let logger = log
 
@@ -122,7 +130,6 @@ let daemon (type ledger_proof) (module Kernel
                ; parent_log= log
                ; target_peer_count= 8
                ; conf_dir
-               ; address= Host_and_port.create ~host:ip ~port:membership_port
                ; initial_peers
                ; me } }
          in
