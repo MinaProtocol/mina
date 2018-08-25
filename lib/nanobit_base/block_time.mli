@@ -50,6 +50,10 @@ module Span : sig
 
   val of_ms : Int64.t -> t
 
+  val ( + ) : t -> t -> t
+
+  val ( * ) : t -> t -> t
+
   val ( < ) : t -> t -> bool
 
   val ( > ) : t -> t -> bool
@@ -72,6 +76,16 @@ module Timeout : sig
 
   val cancel : Controller.t -> 'a t -> 'a -> unit
 end
+
+val ( < ) : t -> t -> bool
+
+val ( > ) : t -> t -> bool
+
+val ( = ) : t -> t -> bool
+
+val ( <= ) : t -> t -> bool
+
+val ( >= ) : t -> t -> bool
 
 val field_var_to_unpacked :
   Tick.Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t

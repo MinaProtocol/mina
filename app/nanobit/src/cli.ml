@@ -12,6 +12,16 @@ module type Coda_intf = sig
     Main_intf
 end
 
+module type Consensus_mechanism_intf = sig
+  module Make (Ledger_builder_diff : sig
+    type t [@@deriving bin_io, sexp]
+  end) :
+    Consensus.Mechanism.S
+    with type Proof.t = Nanobit_base.Proof.t
+     and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+     and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+end
+
 let default_external_port = 8302
 
 let daemon (type ledger_proof) (module Kernel
@@ -141,8 +151,57 @@ let daemon (type ledger_proof) (module Kernel
 
 let () =
   let commands =
+    let consensus_mechanism_of_string = function
+      | "PROOF_OF_SIGNATURE" -> `Proof_of_signature
+      | "PROOF_OF_STAKE" -> `Proof_of_stake
+      | _ -> failwith "invalid consensus mechanism"
+    in
+    let consensus_mechanism =
+      Unix.getenv "CODA_CONSENSUS_MECHANISM"
+      |> Option.map
+           ~f:(Fn.compose consensus_mechanism_of_string String.uppercase)
+      |> Option.value ~default:`Proof_of_signature
+    in
+    let (module Consensus_mechanism : Consensus_mechanism_intf) =
+      match consensus_mechanism with
+      | `Proof_of_signature ->
+          ( module struct
+            module Make (Ledger_builder_diff : sig
+              type t [@@deriving sexp, bin_io]
+            end) =
+            Consensus.Proof_of_signature.Make (struct
+              module Proof = Nanobit_base.Proof
+              module Ledger_builder_diff = Ledger_builder_diff
+            end)
+          end )
+      | `Proof_of_stake ->
+          ( module struct
+            module Make (Ledger_builder_diff : sig
+              type t [@@deriving sexp, bin_io]
+            end) =
+            Consensus.Proof_of_stake.Make (struct
+              module Proof = Nanobit_base.Proof
+              module Ledger_builder_diff = Ledger_builder_diff
+              module Time = Nanobit_base.Block_time
+
+              (* TODO: choose reasonable values *)
+              let genesis_state_timestamp = Time.now ()
+
+              let genesis_ledger_total_currency = Currency.Amount.zero
+
+              let coinbase = Currency.Amount.of_int 20
+
+              let slot_interval = Time.Span.of_ms (Int64.of_int 500)
+
+              let unforkable_transition_count = 12
+
+              let probable_slots_per_transition_count = 8
+            end)
+          end )
+    in
     if Insecure.with_snark then
-      let module Kernel = Kernel.Prod () in
+      let module Kernel =
+        Make_kernel (Ledger_proof.Prod) (Consensus_mechanism.Make) in
       let module Coda = struct
         type ledger_proof = Transaction_snark.t
 
@@ -164,7 +223,8 @@ let () =
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
     else
-      let module Kernel = Kernel.Debug () in
+      let module Kernel =
+        Make_kernel (Ledger_proof.Debug) (Consensus_mechanism.Make) in
       let module Coda = struct
         type ledger_proof = Ledger_proof_statement.t
 
