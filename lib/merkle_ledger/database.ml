@@ -83,7 +83,7 @@ end = struct
     let root_hash : t = Hash (Addr.root ())
 
     let last_direction path =
-      Direction.of_bool (Addr.get path (Addr.depth path - 1) = 0)
+      Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
 
     let build_generic (data: Bigstring.t) : t = Generic data
 
@@ -160,6 +160,9 @@ end = struct
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
+  (* let sexp_of_t {kvdb; _} = 
+    let rec go i =  *)
+
   let gen_account_key =
     let open Quickcheck.Let_syntax in
     let build_account (path: Direction.t list) =
@@ -179,15 +182,20 @@ end = struct
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:max_depth Hash.empty in
+    let empty_hashes = Array.create ~len:(max_depth + 1) Hash.empty in
     let rec loop last_hash height =
-      if height < max_depth then (
+      if height <= max_depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
     in
     loop Hash.empty 1 ;
     Immutable_array.of_array empty_hashes
+
+  let empty_hash_array = 
+    let array = Array.create ~len:(max_depth + 1) Hash.empty in
+    Array.iteri array ~f:(fun i _ -> array.(i) <- Immutable_array.get empty_hashes i);
+    array
 
   let get_raw {kvdb; _} key = Kvdb.get kvdb ~key:(Key.serialize key)
 
@@ -223,12 +231,19 @@ end = struct
     assert (Key.is_hash key) ;
     set_bin mdb key Hash.bin_size_t Hash.bin_write_t new_hash ;
     let height = Key.height key in
+    
     if height < max_depth then
       let sibling_hash = get_hash mdb (Key.sibling key) in
       let parent_hash =
         let left_hash, right_hash =
           Key.order_siblings key new_hash sibling_hash
         in
+        assert (height <= Depth.depth);
+        (* (match key with
+        | Hash path -> Core.printf !"Path: %{sexp:Addr.t}\n" path
+        | _ -> failwith "Not implemented"); *)
+
+        (* Core.printf !"Height %d : %{sexp:Hash.t} %{sexp:Hash.t}\n" height left_hash right_hash; *)
         Hash.merge ~height left_hash right_hash
       in
       set_hash mdb (Key.parent key) parent_hash

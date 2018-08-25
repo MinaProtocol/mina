@@ -225,6 +225,13 @@ struct
         in
         recompute_layers (curr_height + 1) get_curr_hash layers dirty_indices
 
+  let get_leaf_hash t i =
+    if i < Dyn_array.length t.tree.leafs then
+      Hash.hash_account
+        (Hashtbl.find_exn t.accounts (Dyn_array.get t.tree.leafs i))
+          .account
+    else Hash.empty
+  
   let recompute_tree t =
     if not (List.is_empty t.tree.dirty_indices) then (
       extend_tree t.tree ;
@@ -233,14 +240,7 @@ struct
         Int.Set.to_list
           (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
       in
-      let get_leaf_hash i =
-        if i < Dyn_array.length t.tree.leafs then
-          Hash.hash_account
-            (Hashtbl.find_exn t.accounts (Dyn_array.get t.tree.leafs i))
-              .account
-        else Hash.empty
-      in
-      recompute_layers 1 get_leaf_hash t.tree.nodes layer_dirty_indices ;
+      recompute_layers 1 (get_leaf_hash t) t.tree.nodes layer_dirty_indices ;
       (t.tree).dirty_indices <- [] )
 
   let merkle_root t =
@@ -336,6 +336,10 @@ struct
     assert (Addr.depth addr = Depth.depth - 1) ;
     set_at_index_exn t (to_index addr) acct
 
+  let get_at_addr_exn t addr =
+    assert (Addr.depth addr = Depth.depth - 1) ;
+    get_at_index_exn t (to_index addr)
+
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
       if height = result_height then prev_hash
@@ -355,12 +359,14 @@ struct
     if height < t.tree.nodes_height && index < length t then
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
       DynArray.get l (to_index a)
-    else if index = 0 then
+    else if index = 0 && not (t.tree.nodes_height = 0) then
       (* we're somewhere along the path to the content root *)
       complete_with_empties
         (DynArray.get (List.last_exn t.tree.nodes) 0)
         t.tree.nodes_height height
     else empty_hash_at_height height
+
+  let empty_hash_array = memoized_empty_hash_at_height
 
   let set_inner_hash_at_addr_exn t a hash =
     let path_length = Addr.depth a in

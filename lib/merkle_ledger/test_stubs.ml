@@ -8,6 +8,7 @@ module Balance = struct
   let equal x y = UInt64.compare x y = 0
 end
 
+(* (("" 109643) (b 127475378971) ("" 54193148208643064)) *)
 module Account = struct
   (* type balance = Balance.t sexp_opaque [@@deriving bin_io, eq, show, sexp] *)
   type t =
@@ -29,6 +30,8 @@ module Account = struct
   let empty = {public_key= ""; balance= Balance.zero}
 
   let set_balance {public_key; _} balance = {public_key; balance}
+
+  let create public_key balance = {public_key; balance=(UInt64.of_int balance)}
 
   let gen =
     let open Quickcheck.Let_syntax in
