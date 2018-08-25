@@ -10,9 +10,8 @@ open Nanobit_base
 open Let_syntax
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S
-                           with type Proof.t = Tock.Proof.t) :
-  Blockchain_state_intf.S
+    (Consensus_mechanism : Consensus.Mechanism.S)
+  : Blockchain_state_intf.S
   with module Consensus_mechanism := Consensus_mechanism =
 struct
   module Protocol_state = Consensus_mechanism.Protocol_state

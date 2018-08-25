@@ -7,10 +7,6 @@ open Sha256_lib
 open Fold_lib
 
 module type Inputs_intf = sig
-  module Proof : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
   end
@@ -92,13 +88,11 @@ let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
-  with type Proof.t = Inputs.Proof.t
-   and type Internal_transition.Ledger_builder_diff.t =
+  with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t =
 struct
-  module Proof = Inputs.Proof
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
@@ -443,7 +437,7 @@ struct
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)
   module Snark_transition =
-    Nanobit_base.Snark_transition.Make (Consensus_transition_data) (Proof)
+    Nanobit_base.Snark_transition.Make (Consensus_transition_data)
   module Internal_transition =
     Nanobit_base.Internal_transition.Make (Ledger_builder_diff)
       (Snark_transition)

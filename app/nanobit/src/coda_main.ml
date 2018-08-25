@@ -95,8 +95,7 @@ module type Kernel_intf = sig
 
   module Consensus_mechanism :
     Consensus.Mechanism.S
-    with type Proof.t = Nanobit_base.Proof.t
-     and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
      and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
 
   module Blockchain :
@@ -119,8 +118,7 @@ module Make_kernel
                                                                     sexp
                                                                     , bin_io]
       end) -> Consensus.Mechanism.S
-              with type Proof.t = Nanobit_base.Proof.t
-               and type Internal_transition.Ledger_builder_diff.t =
+              with type Internal_transition.Ledger_builder_diff.t =
                           Ledger_builder_diff.t
                and type External_transition.Ledger_builder_diff.t =
                           Ledger_builder_diff.t) :
@@ -812,11 +810,9 @@ module type Main_intf = sig
       Coda.Ktree_intf with type elem := External_transition.t
   end
 
-  module Consensus_mechanism :
-    Consensus.Mechanism.S with type Proof.t = Nanobit_base.Proof.t
+  module Consensus_mechanism : Consensus.Mechanism.S
 
-  module Blockchain :
-    Blockchain.S with module Consensus_mechanism = Consensus_mechanism
+  module Blockchain : Blockchain.S with module Consensus_mechanism = Consensus_mechanism
 
   module Prover :
     Prover.S
