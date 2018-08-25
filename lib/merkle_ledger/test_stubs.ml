@@ -6,11 +6,10 @@ module Balance = struct
   include Binable.Of_stringable (UInt64)
 
   let equal x y = UInt64.compare x y = 0
+
 end
 
-(* (("" 109643) (b 127475378971) ("" 54193148208643064)) *)
 module Account = struct
-  (* type balance = Balance.t sexp_opaque [@@deriving bin_io, eq, show, sexp] *)
   type t =
     { public_key: string
     ; balance: Balance.t
@@ -22,10 +21,10 @@ module Account = struct
   let sexp_of_t {public_key; balance} =
     [%sexp_of : string * string] (public_key, Balance.to_string balance)
 
-  let t_of_sexp sexp : t =
+  let t_of_sexp sexp =
     let public_key, string_balance = [%of_sexp : string * string] sexp in
     let balance = Balance.of_string string_balance in
-    ({public_key; balance} : t)
+    ({public_key; balance})
 
   let empty = {public_key= ""; balance= Balance.zero}
 
