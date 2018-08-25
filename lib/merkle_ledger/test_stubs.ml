@@ -6,7 +6,6 @@ module Balance = struct
   include Binable.Of_stringable (UInt64)
 
   let equal x y = UInt64.compare x y = 0
-
 end
 
 module Account = struct
@@ -24,13 +23,13 @@ module Account = struct
   let t_of_sexp sexp =
     let public_key, string_balance = [%of_sexp : string * string] sexp in
     let balance = Balance.of_string string_balance in
-    ({public_key; balance})
+    {public_key; balance}
 
   let empty = {public_key= ""; balance= Balance.zero}
 
   let set_balance {public_key; _} balance = {public_key; balance}
 
-  let create public_key balance = {public_key; balance=(UInt64.of_int balance)}
+  let create public_key balance = {public_key; balance= UInt64.of_int balance}
 
   let gen =
     let open Quickcheck.Let_syntax in

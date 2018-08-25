@@ -145,7 +145,7 @@ module type Ledger_S = sig
   val merkle_path_at_index_exn : t -> index -> Path.t
 
   val get_at_addr_exn : t -> Addr.t -> account
-  
+
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
   val get_inner_hash_at_addr_exn : t -> Addr.t -> hash

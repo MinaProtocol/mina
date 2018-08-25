@@ -1,4 +1,4 @@
-(* open Core
+open Core
 
 let%test_module "test functor on in memory databases" =
   ( module struct
@@ -183,4 +183,4 @@ let%test_module "test functor on in memory databases" =
     module Mdb_d30 = Mdb_d (struct
       let depth = 30
     end)
-  end ) *)
+  end )
