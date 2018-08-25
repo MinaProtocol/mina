@@ -28,17 +28,30 @@ jobs:
         name: Build deb Package
         command: make deb
     - run:
-        name: Test runtest
+        name: Test make test-runtest
         command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
     - run:
-        name: Test full
-        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full
+        name: Test make test-full-sig
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-sig
     - run:
-        name: Test codapeers
-        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers
+        name: Test make test-codapeers-sig
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-sig
     - run:
-        name: Test coda-block-production
-        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production
+        name: Test make test-coda-block-production-sig
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-sig
     - run:
-        name: Test test-transaction-snark-profiler
-        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler
+        name: Test make test-transaction-snark-profiler-sig
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-sig
+
+    - run:
+        name: Test make test-full-stake
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-stake
+    - run:
+        name: Test make test-codapeers-stake
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-stake
+    - run:
+        name: Test make test-coda-block-production-stake
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-stake
+    - run:
+        name: Test make test-transaction-snark-profiler-stake
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-stake

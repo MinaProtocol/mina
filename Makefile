@@ -96,24 +96,43 @@ test :
 		make test-all ; \
 	fi
 
-test-all : test-runtest test-full test-codapeers test-coda-block-production test-transaction-snark-profiler
+test-all : | test-runtest \
+			test-full-sig \
+			test-codapeers-sig \
+			test-coda-block-production-sig \
+			test-transaction-snark-profiler-sig \
+			test-full-stake \
+			test-codapeers-stake \
+			test-coda-block-production-stake \
+			test-transaction-snark-profiler-stake
 
 myprocs:=$(shell nproc --all)
 test-runtest :
 	dune runtest --verbose -j$(myprocs)
 
-test-full :
-	dune exec cli -- full-test
+test-full-sig :
+	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- full-test
 
-test-codapeers :
-	dune exec cli -- coda-peers-test
+test-full-stake :
+	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- full-test
 
-test-coda-block-production :
-	dune exec cli -- coda-block-production-test
+test-codapeers-sig :
+	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- coda-peers-test
 
-test-transaction-snark-profiler :
-	dune exec cli -- transaction-snark-profiler -check-only
+test-codapeers-stake :
+	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- coda-peers-test
 
+test-coda-block-production-sig :
+	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- coda-block-production-test
+
+test-coda-block-production-stake :
+	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- coda-block-production-test
+
+test-transaction-snark-profiler-sig :
+	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- transaction-snark-profiler -check-only
+
+test-transaction-snark-profiler-stake :
+	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- transaction-snark-profiler -check-only
 
 ## Lint
 
