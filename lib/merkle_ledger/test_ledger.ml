@@ -1,4 +1,4 @@
-open Core
+(* open Core
 open Unsigned
 
 module type S =
@@ -283,4 +283,4 @@ let%test_module "test functor on in memory databases" =
           L16.set_inner_hash_at_addr_exn ledger a old_hash ;
           res ) ;
       assert (mr_start = L16.merkle_root ledger)
-  end )
+  end ) *)
