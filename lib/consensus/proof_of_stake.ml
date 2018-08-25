@@ -72,7 +72,16 @@ module Epoch_seed = struct
       (Pedersen.digest_fold Nanobit_base.Hash_prefix.epoch_seed
          (fold_vrf_result seed vrf_result))
 
-  let update_var _seed _vrf_result = failwith "waiting for izzy's pr"
+  let update_var (seed : var) (vrf_result : Sha256.Digest.var) : (var, _) Snark_params.Tick.Checked.t =
+    let open Snark_params.Tick in
+    let open Snark_params.Tick.Let_syntax in
+    let%bind seed_triples = var_to_triples seed in
+    let%map hash =
+      Pedersen.Checked.digest_triples
+        ~init:Nanobit_base.Hash_prefix.epoch_seed
+        (seed_triples @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list vrf_result))))
+    in
+    var_of_hash_packed hash
 end
 
 let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
