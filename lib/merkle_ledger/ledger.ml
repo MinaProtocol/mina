@@ -350,21 +350,25 @@ struct
     in
     go (empty_hash_at_height start_height) hash start_height
 
+  (* Change the logic of this so that it performs like db *)
   let get_inner_hash_at_addr_exn t a =
     let adepth = Addr.depth a in
     assert (adepth < depth) ;
     let height = Addr.height a in
     let index = to_index a in
     recompute_tree t ;
+    Core.printf !"Address: %{sexp:Addr.t} Height: %d  --- " a height;
     if height < t.tree.nodes_height && index < length t then
+      let () = Core.printf !"1 \n" in
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
-      DynArray.get l (to_index a)
+      let index = to_index a in
+      if index < DynArray.length l then DynArray.get l index else (printf !"height: %d %{sexp:Hash.t}" height (empty_hash_at_height height); empty_hash_at_height height)
     else if index = 0 && not (t.tree.nodes_height = 0) then
-      (* we're somewhere along the path to the content root *)
+      let () = Core.printf !"2 \n" in
       complete_with_empties
         (DynArray.get (List.last_exn t.tree.nodes) 0)
         t.tree.nodes_height height
-    else empty_hash_at_height height
+    else let () = Core.printf !"3 \n" in empty_hash_at_height height
 
   let empty_hash_array = memoized_empty_hash_at_height
 

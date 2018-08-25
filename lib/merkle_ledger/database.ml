@@ -316,6 +316,7 @@ end = struct
 
   let update_account mdb key account =
     set_bin mdb key Account.bin_size_t Account.bin_write_t account ;
+    (* printf !"Updating Account---- addr:%{sexp:Addr.t} %{sexp:Hash.t}" (Key.path key) ((Hash.hash_account account)); *)
     set_hash mdb (Key.Hash (Key.path key)) (Hash.hash_account account)
 
   let delete_account mdb account =
@@ -324,6 +325,7 @@ end = struct
     | Error err -> Error err
     | Ok key ->
         Kvdb.delete mdb.kvdb ~key:(Key.serialize key) ;
+        
         set_hash mdb (Key.Hash (Key.path key)) Hash.empty ;
         Account_key.delete mdb account ;
         Sdb.push mdb.sdb (Key.serialize key) ;
