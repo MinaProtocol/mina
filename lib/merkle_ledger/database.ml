@@ -192,9 +192,10 @@ end = struct
     loop Hash.empty 1 ;
     Immutable_array.of_array empty_hashes
 
-  let empty_hash_array = 
+  let empty_hash_array =
     let array = Array.create ~len:(max_depth + 1) Hash.empty in
-    Array.iteri array ~f:(fun i _ -> array.(i) <- Immutable_array.get empty_hashes i);
+    Array.iteri array ~f:(fun i _ ->
+        array.(i) <- Immutable_array.get empty_hashes i ) ;
     array
 
   let get_raw {kvdb; _} key = Kvdb.get kvdb ~key:(Key.serialize key)
@@ -231,18 +232,16 @@ end = struct
     assert (Key.is_hash key) ;
     set_bin mdb key Hash.bin_size_t Hash.bin_write_t new_hash ;
     let height = Key.height key in
-    
     if height < max_depth then
       let sibling_hash = get_hash mdb (Key.sibling key) in
       let parent_hash =
         let left_hash, right_hash =
           Key.order_siblings key new_hash sibling_hash
         in
-        assert (height <= Depth.depth);
+        assert (height <= Depth.depth) ;
         (* (match key with
         | Hash path -> Core.printf !"Path: %{sexp:Addr.t}\n" path
         | _ -> failwith "Not implemented"); *)
-
         (* Core.printf !"Height %d : %{sexp:Hash.t} %{sexp:Hash.t}\n" height left_hash right_hash; *)
         Hash.merge ~height left_hash right_hash
       in
@@ -316,7 +315,6 @@ end = struct
 
   let update_account mdb key account =
     set_bin mdb key Account.bin_size_t Account.bin_write_t account ;
-    (* printf !"Updating Account---- addr:%{sexp:Addr.t} %{sexp:Hash.t}" (Key.path key) ((Hash.hash_account account)); *)
     set_hash mdb (Key.Hash (Key.path key)) (Hash.hash_account account)
 
   let delete_account mdb account =
@@ -325,7 +323,6 @@ end = struct
     | Error err -> Error err
     | Ok key ->
         Kvdb.delete mdb.kvdb ~key:(Key.serialize key) ;
-        
         set_hash mdb (Key.Hash (Key.path key)) Hash.empty ;
         Account_key.delete mdb account ;
         Sdb.push mdb.sdb (Key.serialize key) ;

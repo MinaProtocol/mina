@@ -201,7 +201,7 @@ struct
           let length = Int.pow 2 (tree.nodes_height - 1 - i) in
           let new_elems = length - Dyn_array.length nodes in
           Dyn_array.append
-            (Dyn_array.init new_elems (fun _ -> Hash.empty))
+            (Dyn_array.init new_elems (fun _ -> empty_hash_at_height (i + 1)))
             nodes ) )
 
   let rec recompute_layers curr_height get_prev_hash layers dirty_indices =
@@ -228,10 +228,9 @@ struct
   let get_leaf_hash t i =
     if i < Dyn_array.length t.tree.leafs then
       Hash.hash_account
-        (Hashtbl.find_exn t.accounts (Dyn_array.get t.tree.leafs i))
-          .account
+        (Hashtbl.find_exn t.accounts (Dyn_array.get t.tree.leafs i)).account
     else Hash.empty
-  
+
   let recompute_tree t =
     if not (List.is_empty t.tree.dirty_indices) then (
       extend_tree t.tree ;
@@ -357,18 +356,21 @@ struct
     let height = Addr.height a in
     let index = to_index a in
     recompute_tree t ;
-    Core.printf !"Address: %{sexp:Addr.t} Height: %d  --- " a height;
     if height < t.tree.nodes_height && index < length t then
-      let () = Core.printf !"1 \n" in
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
       let index = to_index a in
-      if index < DynArray.length l then DynArray.get l index else (printf !"height: %d %{sexp:Hash.t}" height (empty_hash_at_height height); empty_hash_at_height height)
+      if index < DynArray.length l then DynArray.get l index
+      else (
+        printf
+          !"height: %d %{sexp:Hash.t}"
+          height
+          (empty_hash_at_height height) ;
+        empty_hash_at_height height )
     else if index = 0 && not (t.tree.nodes_height = 0) then
-      let () = Core.printf !"2 \n" in
       complete_with_empties
         (DynArray.get (List.last_exn t.tree.nodes) 0)
         t.tree.nodes_height height
-    else let () = Core.printf !"3 \n" in empty_hash_at_height height
+    else empty_hash_at_height height
 
   let empty_hash_array = memoized_empty_hash_at_height
 
