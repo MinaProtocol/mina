@@ -56,7 +56,7 @@ module type Network_intf = sig
 
   val states : t -> state_with_witness Linear_pipe.Reader.t
 
-  val peers : t -> Host_and_port.t list
+  val peers : t -> Kademlia.Peer.t list
 
   val snark_pool_diffs : t -> snark_pool_diff Linear_pipe.Reader.t
 

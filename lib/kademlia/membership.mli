@@ -1,10 +1,11 @@
 open Async_kernel
+open Core_kernel
 
 module type S = sig
   type t
 
   val connect :
-       initial_peers:Peer.t list
+       initial_peers:Host_and_port.t list
     -> me:Peer.t
     -> parent_log:Logger.t
     -> conf_dir:string

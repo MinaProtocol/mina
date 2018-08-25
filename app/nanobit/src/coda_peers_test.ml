@@ -28,10 +28,14 @@ struct
              (fun worker expected_peers ->
                let%bind peers = Coda_process.peers_exn worker in
                Logger.debug log
-                 !"got peers %{sexp: Host_and_port.t list} %{sexp: \
+                 !"got peers %{sexp: Kademlia.Peer.t list} %{sexp: \
                    Host_and_port.t list}\n"
                  peers expected_peers ;
-               assert (peers = expected_peers) ;
+               let module S = Host_and_port.Set in
+               assert (
+                 S.equal
+                   (S.of_list (peers |> List.map ~f:fst))
+                   (S.of_list expected_peers) ) ;
                Deferred.unit )) )
 
   let command =
