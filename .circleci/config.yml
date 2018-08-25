@@ -36,6 +36,21 @@ jobs:
           command: make deb
 
       - run:
-          name: Run All Tests
-          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test
+          name: Test runtest
+          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
 
+       - run:
+          name: Test full
+          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full
+         
+       - run:
+          name: Test codapeers
+          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers
+
+       - run:
+          name: Test coda-block-production
+          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production
+
+       - run:
+          name: Test test-transaction-snark-profiler
+          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler
