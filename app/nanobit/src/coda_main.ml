@@ -812,7 +812,8 @@ module type Main_intf = sig
 
   module Consensus_mechanism : Consensus.Mechanism.S
 
-  module Blockchain : Blockchain.S with module Consensus_mechanism = Consensus_mechanism
+  module Blockchain :
+    Blockchain.S with module Consensus_mechanism = Consensus_mechanism
 
   module Prover :
     Prover.S

@@ -436,8 +436,7 @@ struct
   end
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)
-  module Snark_transition =
-    Nanobit_base.Snark_transition.Make (Consensus_transition_data)
+  module Snark_transition = Nanobit_base.Snark_transition.Make (Consensus_transition_data)
   module Internal_transition =
     Nanobit_base.Internal_transition.Make (Ledger_builder_diff)
       (Snark_transition)

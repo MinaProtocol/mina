@@ -103,8 +103,7 @@ struct
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
-  module Snark_transition =
-    Snark_transition.Make (Consensus_transition_data)
+  module Snark_transition = Snark_transition.Make (Consensus_transition_data)
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition =

@@ -49,8 +49,7 @@ module type S = sig
   end
 end
 
-module Make
-    (Consensus_mechanism : Consensus.Mechanism.S) : sig
+module Make (Consensus_mechanism : Consensus.Mechanism.S) : sig
   module type S = S with module Consensus_mechanism = Consensus_mechanism
 
   val create : unit -> (module S) Async.Deferred.t

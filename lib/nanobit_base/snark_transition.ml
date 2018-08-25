@@ -37,8 +37,7 @@ module type S = sig
   val genesis : value
 end
 
-module Make
-    (Consensus_data : Consensus_data_intf) :
+module Make (Consensus_data : Consensus_data_intf) :
   S with module Consensus_data = Consensus_data =
 struct
   module Consensus_data = Consensus_data
