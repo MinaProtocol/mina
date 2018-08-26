@@ -1,20 +1,14 @@
 open Core
 open Unsigned
 
+module Intf = Merkle_ledger.Intf
+module Ledger = Merkle_ledger.Ledger
+
 module type S =
   Merkle_ledger.Ledger_intf.S
   with type key := string
    and type hash := Md5.t
    and type account := Test_stubs.Account.t
-
-module type Ledger_intf = sig
-  include S
-
-  val load_ledger : int -> int -> t * string list
-end
-
-module Intf = Merkle_ledger.Intf
-module Ledger = Merkle_ledger.Ledger
 
 let%test_module "test functor on in memory databases" =
   ( module struct
@@ -22,7 +16,7 @@ let%test_module "test functor on in memory databases" =
     module Hash = Test_stubs.Hash
     module Account = Test_stubs.Account
 
-    module Make (Depth : Intf.Depth) : Ledger_intf = struct
+    module Make (Depth : Intf.Depth) = struct
       include Ledger.Make (Key) (Account) (Hash) (Depth)
 
       let load_ledger n b =

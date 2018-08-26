@@ -3,18 +3,6 @@ open Async_kernel
 
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
-module type Hash_intf = sig
-  type t [@@deriving sexp, hash, compare, bin_io, eq]
-
-  type account
-
-  val empty_hash : t
-
-  val merge : height:int -> t -> t -> t
-
-  val hash_account : account -> t
-end
-
 module type Merkle_tree_intf = sig
   type root_hash
 
@@ -181,7 +169,11 @@ module Make
     (Addr : Merkle_address.S) (Account : sig
         type t [@@deriving bin_io, sexp]
     end)
-    (Hash : Hash_intf with type account := Account.t) (Root_hash : sig
+    (Hash : sig
+      type t [@@deriving bin_io, sexp, eq]
+      include Merkle_ledger.Intf.Hash with type account := Account.t and type t := t
+
+    end) (Root_hash : sig
         type t [@@deriving eq]
 
         val to_hash : t -> Hash.t
@@ -428,7 +420,7 @@ struct
     let rec go prev ctr =
       if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
     in
-    go Hash.empty_hash 0
+    go Hash.empty 0
 
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
