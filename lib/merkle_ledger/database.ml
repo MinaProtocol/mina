@@ -348,11 +348,7 @@ end = struct
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
           let account =
-            Option.value_exn
-              ~message:
-                (sprintf
-                   !"address %{sexp:Addr.t} does not have an account"
-                   bit_index)
+            Option.value ~default:Account.empty
               (get_account mdb (Key.Account bit_index))
           in
           account :: acc )

@@ -6,15 +6,7 @@ module Make (Depth : sig
   val num_accts : int
 end) =
 struct
-  open Merkle_database.Test_database
-
-  module Account = struct
-    include Account
-
-    let sexp_of_t = sexp_of_opaque
-
-    let t_of_sexp = opaque_of_sexp
-  end
+  open Merkle_ledger.Test_stubs
 
   module Hash = struct
     type t = Hash.t [@@deriving sexp, hash, compare, bin_io, eq]
@@ -34,7 +26,7 @@ struct
 
   module L = struct
     module MT =
-      Merkle_database.Make (Balance) (Account) (Hash) (Depth) (In_memory_kvdb)
+      Merkle_ledger.Database.Make (Balance) (Account) (Hash) (Depth) (In_memory_kvdb)
         (In_memory_sdb)
     module Addr = MT.Addr
 
@@ -76,14 +68,11 @@ struct
 
     let load_ledger num_accounts (balance: int) =
       let ledger = MT.create ~key_value_db_dir:"" ~stack_db_file:"" in
-      let keys = List.init num_accounts ~f:(fun i -> Int.to_string i) in
-      List.iter keys ~f:(fun _ ->
-          let account =
-            Account.set_balance
-              (Quickcheck.random_value Account.gen)
-              (Unsigned.UInt64.of_int balance)
-          in
-          assert (MT.set_account ledger account = Ok ()) ) ;
+      let keys = List.init num_accounts ~f:((+) 1) |> List.map ~f:Int.to_string in
+      List.iter keys ~f:(fun key ->
+        let account = Account.create key balance in
+        assert (MT.set_account ledger account = Ok ()) 
+        ) |> ignore;
       (ledger, keys)
   end
 

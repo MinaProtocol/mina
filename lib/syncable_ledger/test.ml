@@ -1,6 +1,5 @@
 open Core
 open Async_kernel
-module TL = Merkle_ledger.Test_ledger
 
 module type Ledger_intf = sig
   include Syncable_ledger.Merkle_tree_intf
@@ -150,4 +149,40 @@ module TestL16_65536 = Make (Test_ledger.Make (struct
   let depth = 16
 
   let num_accts = 65536
+end))
+
+module TestDB3_3 = Make (Test_db.Make (struct
+  let depth = 3
+
+  let num_accts = 3
+end))
+
+module TestDB3_8 = Make (Test_db.Make (struct
+  let depth = 3
+
+  let num_accts = 7
+end))
+
+module TestDB16_20 = Make (Test_db.Make (struct
+  let depth = 16
+
+  let num_accts = 20
+end))
+
+module TestDB16_1024 = Make (Test_db.Make (struct
+  let depth = 16
+
+  let num_accts = 1024
+end))
+
+module TestDB16_1025 = Make (Test_db.Make (struct
+  let depth = 16
+
+  let num_accts = 80
+end))
+
+module TestDB16_65536 = Make (Test_db.Make (struct
+  let depth = 16
+
+  let num_accts = 65535
 end))

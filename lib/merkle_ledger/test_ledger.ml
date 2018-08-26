@@ -7,19 +7,13 @@ module type S =
    and type hash := Md5.t
    and type account := Test_stubs.Account.t
 
-module type Ledger_intf = sig
-  include S
-
-  val load_ledger : int -> int -> t * string list
-end
-
 let%test_module "test functor on in memory databases" =
   ( module struct
     module Key = Test_stubs.Key
     module Hash = Test_stubs.Hash
     module Account = Test_stubs.Account
 
-    module Make (Depth : Intf.Depth) : Ledger_intf = struct
+    module Make (Depth : Intf.Depth) = struct
       include Ledger.Make (Key) (Account) (Hash) (Depth)
 
       let load_ledger n b =
