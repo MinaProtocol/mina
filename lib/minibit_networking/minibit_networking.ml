@@ -84,7 +84,8 @@ struct
       module T = struct
         type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
 
-        type response = Ledger_hash.t * Sync_ledger.answer [@@deriving bin_io]
+        type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
+        [@@deriving bin_io]
       end
 
       module Caller = T
@@ -229,7 +230,7 @@ module Make (Inputs : Inputs_intf) = struct
          -> (Ledger_builder_aux.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query:
             Ledger_hash.t * Sync_ledger.query
-         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.t) =
+         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t) =
     let log = Logger.child config.parent_log "minibit networking" in
     let get_ledger_builder_aux_at_hash_rpc () ~version:_ hash =
       get_ledger_builder_aux_at_hash hash
@@ -265,8 +266,7 @@ module Make (Inputs : Inputs_intf) = struct
   let broadcast t x =
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
-  let broadcast_state t x = 
-    broadcast t (New_state x)
+  let broadcast_state t x = broadcast t (New_state x)
 
   let broadcast_transaction_pool_diff t x =
     broadcast t (Transaction_pool_diff x)
@@ -341,7 +341,10 @@ module Make (Inputs : Inputs_intf) = struct
                   Gossip_net.query_peer t.gossip_net peer
                     Rpcs.Answer_sync_ledger_query.dispatch_multi query
                 with
-                | Ok answer -> Some answer
+                | Ok (Ok answer) -> Some answer
+                | Ok (Error e) ->
+                    Logger.info t.log "%s" (Error.to_string_mach e) ;
+                    None
                 | Error err ->
                     Logger.warn t.log "%s" (Error.to_string_mach err) ;
                     None )

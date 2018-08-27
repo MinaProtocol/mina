@@ -133,6 +133,14 @@ module type Inputs_intf = sig
 
     type query [@@deriving bin_io]
 
+    module Responder : sig
+      type t
+
+      val create : Ledger.t -> (query -> unit) -> t
+
+      val answer_query : t -> query -> answer
+    end
+
     val create : Ledger.t -> Ledger_hash.t -> t
 
     val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
@@ -408,45 +416,50 @@ end = struct
              Transition_logic_state.apply_all old_state changes
            in
            t.handler <- Transition_logic.create new_state log ;
-           ( if
-               not
-                 (Protocol_state.equal_value
-                    ( old_state |> Transition_logic_state.longest_branch_tip
-                    |> Tip.state )
-                    ( new_state |> Transition_logic_state.longest_branch_tip
-                    |> Tip.state ))
-             then
-               let lb =
-                 (new_state |> Transition_logic_state.longest_branch_tip)
-                   .ledger_builder
+           if
+             not
+               (Protocol_state.equal_value
+                  ( old_state |> Transition_logic_state.longest_branch_tip
+                  |> Tip.state )
+                  ( new_state |> Transition_logic_state.longest_branch_tip
+                  |> Tip.state ))
+           then (
+             let lb =
+               (new_state |> Transition_logic_state.longest_branch_tip)
+                 .ledger_builder
+             in
+             let bits_to_str b =
+               let str =
+                 String.concat
+                   (List.map b ~f:(fun x -> if x then "1" else "0"))
                in
-               let bits_to_str b = 
-                 let str = String.concat (List.map b ~f:(fun x -> if x then "1" else "0")) in 
-                 let hash = Md5.digest_string str in
-                 Md5.to_hex hash
-               in
-               let s = Inputs.External_transition.protocol_state transition in
-               let h = Inputs.Protocol_state.hash s in
-               let h = Inputs.State_hash.to_bits h in
-               let s = bits_to_str h in
-               Logger.fatal log "sending %s" s;
-               Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-                 strongest_ledgers_reader (lb, transition) ) ;
+               let hash = Md5.digest_string str in
+               Md5.to_hex hash
+             in
+             let s = Inputs.External_transition.protocol_state transition in
+             let h = Inputs.Protocol_state.hash s in
+             let h = Inputs.State_hash.to_bits h in
+             let s = bits_to_str h in
+             Logger.fatal log "sending %s" s ;
+             Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
+               strongest_ledgers_reader (lb, transition) ) ;
            Store.store storage_controller config.disk_location new_state )) ;
     (* Handle new transitions *)
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.external_transitions ~f:(fun transition ->
-            let bits_to_str b = 
-              let str = String.concat (List.map b ~f:(fun x -> if x then "1" else "0")) in 
-              let hash = Md5.digest_string str in
-              Md5.to_hex hash
+          let bits_to_str b =
+            let str =
+              String.concat (List.map b ~f:(fun x -> if x then "1" else "0"))
             in
-            let s = Inputs.External_transition.protocol_state transition in
-            let h = Inputs.Protocol_state.hash s in
-            let h = Inputs.State_hash.to_bits h in
-            let s = bits_to_str h in
-            Logger.fatal log "processing %s" s;
+            let hash = Md5.digest_string str in
+            Md5.to_hex hash
+          in
+          let s = Inputs.External_transition.protocol_state transition in
+          let h = Inputs.Protocol_state.hash s in
+          let h = Inputs.State_hash.to_bits h in
+          let s = bits_to_str h in
+          Logger.fatal log "processing %s" s ;
           let%bind changes, job =
             Transition_logic.on_new_transition catchup t.handler transition
           in
@@ -461,8 +474,10 @@ end = struct
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
             let this_input, _ = job in
-            let bits_to_str b = 
-              let str = String.concat (List.map b ~f:(fun x -> if x then "1" else "0")) in 
+            let bits_to_str b =
+              let str =
+                String.concat (List.map b ~f:(fun x -> if x then "1" else "0"))
+              in
               let hash = Md5.digest_string str in
               Md5.to_hex hash
             in
@@ -471,72 +486,89 @@ end = struct
             let h = Inputs.Protocol_state.hash s in
             let h = Inputs.State_hash.to_bits h in
             let s = bits_to_str h in
-            Logger.fatal log "A %s" s;
+            Logger.fatal log "A %s" s ;
             let replace =
               match last with
               | None -> true
-              | Some last -> 
-                let last_t, _ = last in
-                let job_t, _ = job in
-                match
-                  Consensus_mechanism.select
-                    (Protocol_state.consensus_state (Inputs.External_transition.protocol_state last_t))
-                    (Protocol_state.consensus_state (Inputs.External_transition.protocol_state job_t))
-                with
-                | `Keep -> 
-                  false
-                | `Take -> 
-                  true
+              | Some last ->
+                  let last_t, _ = last in
+                  let job_t, _ = job in
+                  match
+                    Consensus_mechanism.select
+                      (Protocol_state.consensus_state
+                         (Inputs.External_transition.protocol_state last_t))
+                      (Protocol_state.consensus_state
+                         (Inputs.External_transition.protocol_state job_t))
+                  with
+                  | `Keep -> false
+                  | `Take -> true
             in
-            Logger.fatal log "replace %b" replace;
+            Logger.fatal log "replace %b" replace ;
             match replace with
             | false -> return last
             | true ->
-              Option.iter last ~f:(fun (input, ivar) ->
-                  Ivar.fill_if_empty ivar input ) ;
-              let w, this_ivar = Job.run job in
-              let () =
-                Deferred.upon w.Interruptible.d (function
-                  | Ok [] -> ()
-                  | Ok changes ->
-                      (* TODO fix this *)
-                      Linear_pipe.write_without_pushback mutate_state_writer (changes, this_input)
-                  | Error () -> () )
-              in
-              Logger.fatal log "B";
-              return (Some (this_input, this_ivar)) 
-          )
+                Option.iter last ~f:(fun (input, ivar) ->
+                    Ivar.fill_if_empty ivar input ) ;
+                let w, this_ivar = Job.run job in
+                let () =
+                  Deferred.upon w.Interruptible.d (function
+                    | Ok [] -> ()
+                    | Ok changes ->
+                        (* TODO fix this *)
+                        Linear_pipe.write_without_pushback mutate_state_writer
+                          (changes, this_input)
+                    | Error () -> () )
+                in
+                Logger.fatal log "B" ;
+                return (Some (this_input, this_ivar)) )
       >>| ignore ) ;
     t
 
-  (* TODO: implement this when sync-ledger merges *)
-  let handle_sync_ledger_queries (hash, query) = 
-    failwith "nyi"
-    (*match query with
-    | What_hash a -> 
-
-    | What_contents a ->
-
-    | Num_accounts ->*)
-
   let strongest_ledgers {strongest_ledgers; _} = strongest_ledgers
+
+  let local_get_ledger' t hash ~p_tip ~p_trans ~f_result =
+    let open Deferred.Or_error.Let_syntax in
+    let%map tip, state =
+      Transition_logic.local_get_tip t.handler ~p_tip:(p_tip hash)
+        ~p_trans:(p_trans hash)
+    in
+    (f_result tip, state)
 
   (** Returns a reference to a ledger_builder with hash [hash], materialize a
    fresh ledger at a specific hash if necessary; also gives back target_state *)
   let local_get_ledger t hash =
+    local_get_ledger' t hash
+      ~p_tip:(fun hash tip ->
+        Ledger_builder_hash.equal
+          (Ledger_builder.hash tip.Tip.ledger_builder)
+          hash )
+      ~p_trans:(fun hash trans ->
+        Ledger_builder_hash.equal
+          (External_transition.ledger_builder_hash trans)
+          hash )
+      ~f_result:(fun tip -> tip.Tip.ledger_builder)
+
+  let handle_sync_ledger_queries :
+         t
+      -> Ledger_hash.t * Sync_ledger.query
+      -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t =
+   fun t (hash, query) ->
+    (* TODO: We should cache, but in the future it will be free *)
     let open Deferred.Or_error.Let_syntax in
-    let%map tip, state =
-      Transition_logic.local_get_tip t.handler
-        ~p_tip:(fun tip ->
-          Ledger_builder_hash.equal
-            (Ledger_builder.hash tip.Tip.ledger_builder)
+    let%map ledger =
+      local_get_ledger' t hash
+        ~p_tip:(fun hash tip ->
+          Ledger_hash.equal
+            ( tip.Tip.ledger_builder |> Ledger_builder.ledger
+            |> Ledger.merkle_root )
             hash )
-        ~p_trans:(fun trans ->
-          Ledger_builder_hash.equal
-            (External_transition.ledger_builder_hash trans)
-            hash )
+        ~p_trans:(fun hash trans ->
+          Ledger_hash.equal (External_transition.ledger_hash trans) hash )
+        ~f_result:(fun tip -> tip.Tip.ledger_builder |> Ledger_builder.ledger)
+      >>| fst
     in
-    (tip.Tip.ledger_builder, state)
+    let responder = Sync_ledger.Responder.create ledger ignore in
+    (hash, Sync_ledger.Responder.answer_query responder query)
 end
 
 let%test_module "test" =
@@ -586,8 +618,9 @@ let%test_module "test" =
       module State_hash = struct
         include Int
 
-        let to_bits t = [ t <> 0 ]
+        let to_bits t = [t <> 0]
       end
+
       module Protocol_state_proof = Unit
 
       module Blockchain_state = struct
@@ -686,6 +719,14 @@ let%test_module "test" =
         type answer = Ledger.t [@@deriving bin_io]
 
         type query = unit [@@deriving bin_io]
+
+        module Responder = struct
+          type t = unit
+
+          let create = failwith "unused"
+
+          let answer_query = failwith "unused"
+        end
 
         type t =
           { mutable ledger: Ledger.t

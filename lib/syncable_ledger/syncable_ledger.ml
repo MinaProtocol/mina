@@ -79,6 +79,14 @@ module type S = sig
   type query = What_hash of addr | What_contents of addr | Num_accounts
   [@@deriving bin_io, sexp]
 
+  module Responder : sig
+    type t
+
+    val create : merkle_tree -> (query -> unit) -> t
+
+    val answer_query : t -> query -> answer
+  end
+
   val create : merkle_tree -> root_hash -> t
 
   val answer_writer : t -> (root_hash * answer) Linear_pipe.Writer.t
@@ -275,6 +283,29 @@ struct
 
   type query = What_hash of Addr.t | What_contents of Addr.t | Num_accounts
   [@@deriving bin_io, sexp]
+
+  module Responder = struct
+    type t = {mt: MT.t; f: query -> unit}
+
+    let create : MT.t -> (query -> unit) -> t = fun mt f -> {mt; f}
+
+    let answer_query : t -> query -> answer =
+     fun {mt; f} q ->
+      f q ;
+      match q with
+      | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
+      | What_contents a ->
+          Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
+      | Num_accounts ->
+          let len = MT.length mt in
+          let height = Int.ceil_log2 len in
+          let content_root_addr =
+            funpow (MT.depth - height)
+              (fun a -> Addr.child_exn a Direction.Left)
+              (Addr.root ())
+          in
+          Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
+  end
 
   type waiting = {expected: Hash.t; children: (Addr.t * Hash.t) list}
 
@@ -481,50 +512,4 @@ struct
   let merkle_path_at_addr _ = failwith "no"
 
   let get_account_at_addr _ = failwith "no"
-end
-
-module Make_sync_responder
-    (Addr : Merkle_address.S) (Key : sig
-        type t [@@deriving bin_io]
-    end) (Account : sig
-      type t [@@deriving bin_io]
-    end)
-    (Hash : Hash_intf) (Root_hash : sig
-        type t
-    end)
-    (MT : Merkle_tree_intf
-          with type hash := Hash.t
-           and type root_hash := Root_hash.t
-           and type addr := Addr.t
-           and type key := Key.t
-           and type account := Account.t)
-    (Sync : S
-            with type merkle_tree := MT.t
-             and type hash := Hash.t
-             and type root_hash := Root_hash.t
-             and type addr := Addr.t
-             and type merkle_path := MT.path
-             and type account := Account.t
-             and type key := Key.t) =
-struct
-  type t = {mt: MT.t; f: Sync.query -> unit}
-
-  let create : MT.t -> (Sync.query -> unit) -> t = fun mt f -> {mt; f}
-
-  let answer_query : t -> Sync.query -> Sync.answer =
-   fun {mt; f} q ->
-    f q ;
-    match q with
-    | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
-    | What_contents a ->
-        Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
-    | Num_accounts ->
-        let len = MT.length mt in
-        let height = Int.ceil_log2 len in
-        let content_root_addr =
-          funpow (MT.depth - height)
-            (fun a -> Addr.child_exn a Direction.Left)
-            (Addr.root ())
-        in
-        Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
 end

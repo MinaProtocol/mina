@@ -35,11 +35,7 @@ struct
       end)
 
   module SR =
-    Syncable_ledger.Make_sync_responder (L.Addr) (TL.Key) (TL.Account)
-      (Adjhash)
-      (Adjhash)
-      (Ledger')
-      (SL)
+    SL.Responder
 
   (* not really kosher but the tests are run in-order, so this will get filled
    * in before we need it. *)
