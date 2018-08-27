@@ -460,20 +460,52 @@ end = struct
     in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
-            Logger.fatal log "A";
-            Option.iter last ~f:(fun (input, ivar) ->
-                Ivar.fill_if_empty ivar input ) ;
             let this_input, _ = job in
-            let w, this_ivar = Job.run job in
-            let%bind () =
-              Deferred.bind w.Interruptible.d ~f:(function
-                | Ok [] -> return ()
-                | Ok changes ->
-                    Linear_pipe.write mutate_state_writer (changes, this_input)
-                | Error () -> return () )
+            let bits_to_str b = 
+              let str = String.concat (List.map b ~f:(fun x -> if x then "1" else "0")) in 
+              let hash = Md5.digest_string str in
+              Md5.to_hex hash
             in
-            Logger.fatal log "B";
-            return (Some (this_input, this_ivar)) )
+            let transition, _ = job in
+            let s = Inputs.External_transition.protocol_state transition in
+            let h = Inputs.Protocol_state.hash s in
+            let h = Inputs.State_hash.to_bits h in
+            let s = bits_to_str h in
+            Logger.fatal log "A %s" s;
+            let replace =
+              match last with
+              | None -> true
+              | Some last -> 
+                let last_t, _ = last in
+                let job_t, _ = job in
+                match
+                  Consensus_mechanism.select
+                    (Protocol_state.consensus_state (Inputs.External_transition.protocol_state last_t))
+                    (Protocol_state.consensus_state (Inputs.External_transition.protocol_state job_t))
+                with
+                | `Keep -> 
+                  false
+                | `Take -> 
+                  true
+            in
+            Logger.fatal log "replace %b" replace;
+            match replace with
+            | false -> return last
+            | true ->
+              Option.iter last ~f:(fun (input, ivar) ->
+                  Ivar.fill_if_empty ivar input ) ;
+              let w, this_ivar = Job.run job in
+              let () =
+                Deferred.upon w.Interruptible.d (function
+                  | Ok [] -> ()
+                  | Ok changes ->
+                      (* TODO fix this *)
+                      Linear_pipe.write_without_pushback mutate_state_writer (changes, this_input)
+                  | Error () -> () )
+              in
+              Logger.fatal log "B";
+              return (Some (this_input, this_ivar)) 
+          )
       >>| ignore ) ;
     t
 

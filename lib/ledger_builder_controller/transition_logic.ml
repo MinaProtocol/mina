@@ -321,8 +321,8 @@ struct
               (Protocol_state.consensus_state source_state)
               (Protocol_state.consensus_state target_state)
           with
-          | `Keep -> return ([], Some (Catchup.sync catchup state transition))
-          | `Take -> return ([], None) )
+          | `Keep -> return ([], None)
+          | `Take -> return ([], Some (Catchup.sync catchup state transition)) )
     | Some old_tree ->
       Logger.fatal log "4";
       match
