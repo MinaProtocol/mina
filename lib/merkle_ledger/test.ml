@@ -33,9 +33,7 @@ let%test_module "Database integration test" =
 
       let get_inner_hash_at_addr_exn db dirs =
         let addr = Addr.of_directions dirs in
-        if List.length dirs = Depth.depth then
-          let index = to_index addr in
-          get_leaf_hash db index
+        if List.length dirs = Depth.depth then get_leaf_hash_at_addr db addr
         else get_inner_hash_at_addr_exn db addr
     end)
 

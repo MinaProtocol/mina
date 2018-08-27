@@ -14,12 +14,14 @@ module Make
             end
             with type account := Account.t) (Depth : sig
         val depth : int
-    end) :
-  Intf.Ledger_S
-  with type hash := Hash.t
-   and type account := Account.t
-   and type key := Key.t =
-struct
+    end) : sig
+  include Intf.Ledger_S
+          with type hash := Hash.t
+           and type account := Account.t
+           and type key := Key.t
+
+  val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+end = struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
 
@@ -326,6 +328,8 @@ struct
       ~init:0
       ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
 
+  let get_leaf_hash_at_addr t addr = get_leaf_hash t (to_index addr)
+
   (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
     assert (Addr.depth a = Depth.depth - 1) ;
@@ -334,10 +338,6 @@ struct
   let set_at_addr_exn t addr acct =
     assert (Addr.depth addr = Depth.depth - 1) ;
     set_at_index_exn t (to_index addr) acct
-
-  let get_at_addr_exn t addr =
-    assert (Addr.depth addr = Depth.depth - 1) ;
-    get_at_index_exn t (to_index addr)
 
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
@@ -349,7 +349,6 @@ struct
     in
     go (empty_hash_at_height start_height) hash start_height
 
-  (* Change the logic of this so that it performs like db *)
   let get_inner_hash_at_addr_exn t a =
     let adepth = Addr.depth a in
     assert (adepth < depth) ;
@@ -360,19 +359,12 @@ struct
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
       let index = to_index a in
       if index < DynArray.length l then DynArray.get l index
-      else (
-        printf
-          !"height: %d %{sexp:Hash.t}"
-          height
-          (empty_hash_at_height height) ;
-        empty_hash_at_height height )
+      else empty_hash_at_height height
     else if index = 0 && not (t.tree.nodes_height = 0) then
       complete_with_empties
         (DynArray.get (List.last_exn t.tree.nodes) 0)
         t.tree.nodes_height height
     else empty_hash_at_height height
-
-  let empty_hash_array = memoized_empty_hash_at_height
 
   let set_inner_hash_at_addr_exn t a hash =
     let path_length = Addr.depth a in

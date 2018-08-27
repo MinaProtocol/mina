@@ -144,8 +144,6 @@ module type Ledger_S = sig
 
   val merkle_path_at_index_exn : t -> index -> Path.t
 
-  val get_at_addr_exn : t -> Addr.t -> account
-
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
   val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
@@ -159,12 +157,6 @@ module type Ledger_S = sig
   val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
 
   val recompute_tree : t -> unit
-
-  val empty_hash_array : hash array
-
-  val get_leaf_hash : t -> index -> hash
-
-  val to_index : Addr.t -> index
 end
 
 module type Database_S = sig
@@ -211,6 +203,4 @@ module type Database_S = sig
   val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
 
   val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
-
-  val empty_hash_array : hash array
 end

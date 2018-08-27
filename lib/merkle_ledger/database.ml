@@ -160,9 +160,6 @@ end = struct
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
-  (* let sexp_of_t {kvdb; _} = 
-    let rec go i =  *)
-
   let gen_account_key =
     let open Quickcheck.Let_syntax in
     let build_account (path: Direction.t list) =
@@ -191,12 +188,6 @@ end = struct
     in
     loop Hash.empty 1 ;
     Immutable_array.of_array empty_hashes
-
-  let empty_hash_array =
-    let array = Array.create ~len:(max_depth + 1) Hash.empty in
-    Array.iteri array ~f:(fun i _ ->
-        array.(i) <- Immutable_array.get empty_hashes i ) ;
-    array
 
   let get_raw {kvdb; _} key = Kvdb.get kvdb ~key:(Key.serialize key)
 
@@ -239,10 +230,6 @@ end = struct
           Key.order_siblings key new_hash sibling_hash
         in
         assert (height <= Depth.depth) ;
-        (* (match key with
-        | Hash path -> Core.printf !"Path: %{sexp:Addr.t}\n" path
-        | _ -> failwith "Not implemented"); *)
-        (* Core.printf !"Height %d : %{sexp:Hash.t} %{sexp:Hash.t}\n" height left_hash right_hash; *)
         Hash.merge ~height left_hash right_hash
       in
       set_hash mdb (Key.parent key) parent_hash

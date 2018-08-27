@@ -222,7 +222,7 @@ struct
 
   let serialize path =
     let path = add_padding path in
-    let path_len = bitstring_length path in
+    let path_len = depth path in
     let required_bits = 8 * path_byte_count in
     assert (path_len <= required_bits) ;
     let required_padding = required_bits - path_len in

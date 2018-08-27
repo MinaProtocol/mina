@@ -11,8 +11,11 @@ module Make
             end
             with type account := Account.t) (Depth : sig
         val depth : int
-    end) :
-  Intf.Ledger_S
-  with type hash := Hash.t
-   and type account := Account.t
-   and type key := Key.t
+    end) : sig
+  include Intf.Ledger_S
+          with type hash := Hash.t
+           and type account := Account.t
+           and type key := Key.t
+
+  val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+end
