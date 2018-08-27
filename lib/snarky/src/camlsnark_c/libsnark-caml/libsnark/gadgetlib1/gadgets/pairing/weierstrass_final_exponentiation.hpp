@@ -18,6 +18,7 @@
 #include <memory>
 
 #include <libsnark/gadgetlib1/gadgets/fields/exponentiation_gadget.hpp>
+#include <libsnark/gadgetlib1/gadgets/pairing/mnt128_pairing_params.hpp>
 #include <libsnark/gadgetlib1/gadgets/pairing/mnt_pairing_params.hpp>
 
 namespace libsnark {
@@ -52,8 +53,8 @@ public:
     std::shared_ptr<Fqk_mul_gadget<ppT> > compute_el_inv_q_3_minus_1;
     std::shared_ptr<Fqk_mul_gadget<ppT> > compute_inv_beta;
 
-    std::shared_ptr<exponentiation_gadget<FqkT<ppT>, Fp6_variable, Fp6_mul_gadget, Fp6_cyclotomic_sqr_gadget, libff::mnt6_q_limbs> > compute_w1;
-    std::shared_ptr<exponentiation_gadget<FqkT<ppT>, Fp6_variable, Fp6_mul_gadget, Fp6_cyclotomic_sqr_gadget, libff::mnt6_q_limbs> > compute_w0;
+  std::shared_ptr<exponentiation_gadget<FqkT<ppT>, Fp6_variable, Fp6_mul_gadget, Fp6_cyclotomic_sqr_gadget, pairing_selector<ppT>::q_limbs> > compute_w1;
+  std::shared_ptr<exponentiation_gadget<FqkT<ppT>, Fp6_variable, Fp6_mul_gadget, Fp6_cyclotomic_sqr_gadget, pairing_selector<ppT>::q_limbs> > compute_w0;
     std::shared_ptr<Fqk_mul_gadget<ppT> > compute_result;
 
     pb_variable<FieldT> result_is_one;
@@ -89,9 +90,8 @@ public:
     std::shared_ptr<Fqk_mul_gadget<ppT> > compute_el_inv;
     std::shared_ptr<Fqk_mul_gadget<ppT> > compute_el_q_2_minus_1;
     std::shared_ptr<Fqk_mul_gadget<ppT> > compute_el_inv_q_2_minus_1;
-
-    std::shared_ptr<exponentiation_gadget<FqkT<ppT>, Fp4_variable, Fp4_mul_gadget, Fp4_cyclotomic_sqr_gadget, libff::mnt4_q_limbs> > compute_w1;
-    std::shared_ptr<exponentiation_gadget<FqkT<ppT>, Fp4_variable, Fp4_mul_gadget, Fp4_cyclotomic_sqr_gadget, libff::mnt4_q_limbs> > compute_w0;
+  std::shared_ptr<exponentiation_gadget<FqkT<ppT>, Fp4_variable, Fp4_mul_gadget, Fp4_cyclotomic_sqr_gadget, pairing_selector<ppT>::q_limbs> > compute_w1;
+  std::shared_ptr<exponentiation_gadget<FqkT<ppT>, Fp4_variable, Fp4_mul_gadget, Fp4_cyclotomic_sqr_gadget, pairing_selector<ppT>::q_limbs> > compute_w0;
     std::shared_ptr<Fqk_mul_gadget<ppT> > compute_result;
 
     pb_variable<FieldT> result_is_one;
