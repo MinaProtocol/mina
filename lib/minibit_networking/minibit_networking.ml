@@ -265,7 +265,8 @@ module Make (Inputs : Inputs_intf) = struct
   let broadcast t x =
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
-  let broadcast_state t x = broadcast t (New_state x)
+  let broadcast_state t x = 
+    broadcast t (New_state x)
 
   let broadcast_transaction_pool_diff t x =
     broadcast t (Transaction_pool_diff x)
@@ -273,12 +274,6 @@ module Make (Inputs : Inputs_intf) = struct
   let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
 
   let peers t = Gossip_net.peers t.gossip_net
-
-  (* TODO: Have better pushback behavior *)
-  let broadcast_state t s =
-    Linear_pipe.write_without_pushback
-      (Gossip_net.broadcast t.gossip_net)
-      (New_state s)
 
   module Ledger_builder_io = struct
     type nonrec t = t

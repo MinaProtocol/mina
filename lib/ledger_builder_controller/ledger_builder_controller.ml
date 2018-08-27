@@ -4,6 +4,8 @@ open Async_kernel
 module type Inputs_intf = sig
   module State_hash : sig
     type t [@@deriving eq]
+
+    val to_bits : t -> bool list
   end
 
   module Security : Protocols.Coda_pow.Security_intf
@@ -418,6 +420,16 @@ end = struct
                  (new_state |> Transition_logic_state.longest_branch_tip)
                    .ledger_builder
                in
+               let bits_to_str b = 
+                 let str = String.concat (List.map b ~f:(fun x -> if x then "1" else "0")) in 
+                 let hash = Md5.digest_string str in
+                 Md5.to_hex hash
+               in
+               let s = Inputs.External_transition.protocol_state transition in
+               let h = Inputs.Protocol_state.hash s in
+               let h = Inputs.State_hash.to_bits h in
+               let s = bits_to_str h in
+               Logger.fatal log "sending %s" s;
                Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
                  strongest_ledgers_reader (lb, transition) ) ;
            Store.store storage_controller config.disk_location new_state )) ;
@@ -425,6 +437,16 @@ end = struct
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.external_transitions ~f:(fun transition ->
+            let bits_to_str b = 
+              let str = String.concat (List.map b ~f:(fun x -> if x then "1" else "0")) in 
+              let hash = Md5.digest_string str in
+              Md5.to_hex hash
+            in
+            let s = Inputs.External_transition.protocol_state transition in
+            let h = Inputs.Protocol_state.hash s in
+            let h = Inputs.State_hash.to_bits h in
+            let s = bits_to_str h in
+            Logger.fatal log "processing %s" s;
           let%bind changes, job =
             Transition_logic.on_new_transition catchup t.handler transition
           in
@@ -438,6 +460,7 @@ end = struct
     in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
+            Logger.fatal log "A";
             Option.iter last ~f:(fun (input, ivar) ->
                 Ivar.fill_if_empty ivar input ) ;
             let this_input, _ = job in
@@ -449,6 +472,7 @@ end = struct
                     Linear_pipe.write mutate_state_writer (changes, this_input)
                 | Error () -> return () )
             in
+            Logger.fatal log "B";
             return (Some (this_input, this_ivar)) )
       >>| ignore ) ;
     t
@@ -520,7 +544,11 @@ let%test_module "test" =
           return (Ok (Some (x, ())))
       end
 
-      module State_hash = Int
+      module State_hash = struct
+        include Int
+
+        let to_bits t = [ t <> 0 ]
+      end
       module Protocol_state_proof = Unit
 
       module Blockchain_state = struct
