@@ -56,6 +56,10 @@ module Span = struct
 
   let of_ms = UInt64.of_int64
 
+  let ( + ) = UInt64.Infix.( + )
+
+  let ( * ) = UInt64.Infix.( * )
+
   let ( < ) = UInt64.( < )
 
   let ( > ) = UInt64.( > )
@@ -66,6 +70,16 @@ module Span = struct
 
   let ( >= ) = UInt64.( >= )
 end
+
+let ( < ) = UInt64.( < )
+
+let ( > ) = UInt64.( > )
+
+let ( = ) = UInt64.( = )
+
+let ( <= ) = UInt64.( <= )
+
+let ( >= ) = UInt64.( >= )
 
 let of_time t =
   UInt64.of_int64

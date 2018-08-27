@@ -12,6 +12,18 @@ module type Coda_intf = sig
     Main_intf
 end
 
+module type Consensus_mechanism_intf = sig
+  module Make (Ledger_builder_diff : sig
+    type t [@@deriving bin_io, sexp]
+  end) :
+    Consensus.Mechanism.S
+    with type Proof.t = Nanobit_base.Proof.t
+     and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+     and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+end
+
+let default_external_port = 8302
+
 let daemon (type ledger_proof) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
     : Coda_intf with type ledger_proof = ledger_proof) =
@@ -31,20 +43,20 @@ let daemon (type ledger_proof) (module Kernel
      and run_snark_worker =
        flag "run-snark-worker" ~doc:"KEY Run the SNARK worker with a key"
          (optional public_key_compressed)
-     and port =
-       flag "port"
+     and external_port =
+       flag "external-port"
          ~doc:
            (Printf.sprintf
-              "PORT Server port for other daemons to connect (default: %d)"
-              default_daemon_port)
+              "PORT Base server port for daemon TCP (discovery UDP on port+1) \
+               (default: %d)"
+              default_external_port)
          (optional int16)
      and client_port =
        flag "client-port"
-         ~doc:"PORT Client to daemon local communication (default: 8301)"
-         (optional int16)
-     and membership_port =
-       flag "membership-port"
-         ~doc:"PORT P2P UDP overlay communication(default: 8303)"
+         ~doc:
+           (Printf.sprintf
+              "PORT Client to daemon local communication (default: %d)"
+              default_client_port)
          (optional int16)
      and ip =
        flag "ip" ~doc:"IP External IP address for others to connect"
@@ -57,9 +69,13 @@ let daemon (type ledger_proof) (module Kernel
        let conf_dir =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
-       let port = Option.value ~default:default_daemon_port port in
-       let client_port = Option.value ~default:8301 client_port in
-       let membership_port = Option.value ~default:8303 membership_port in
+       let external_port =
+         Option.value ~default:default_external_port external_port
+       in
+       let client_port =
+         Option.value ~default:default_client_port client_port
+       in
+       let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
          match peers with
@@ -82,7 +98,9 @@ let daemon (type ledger_proof) (module Kernel
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
-       let me = Host_and_port.create ~host:ip ~port in
+       let me =
+         (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
+       in
        let module Config = struct
          let logger = log
 
@@ -112,7 +130,6 @@ let daemon (type ledger_proof) (module Kernel
                ; parent_log= log
                ; target_peer_count= 8
                ; conf_dir
-               ; address= Host_and_port.create ~host:ip ~port:membership_port
                ; initial_peers
                ; me } }
          in
@@ -134,8 +151,57 @@ let daemon (type ledger_proof) (module Kernel
 
 let () =
   let commands =
+    let consensus_mechanism_of_string = function
+      | "PROOF_OF_SIGNATURE" -> `Proof_of_signature
+      | "PROOF_OF_STAKE" -> `Proof_of_stake
+      | _ -> failwith "invalid consensus mechanism"
+    in
+    let consensus_mechanism =
+      Unix.getenv "CODA_CONSENSUS_MECHANISM"
+      |> Option.map
+           ~f:(Fn.compose consensus_mechanism_of_string String.uppercase)
+      |> Option.value ~default:`Proof_of_signature
+    in
+    let (module Consensus_mechanism : Consensus_mechanism_intf) =
+      match consensus_mechanism with
+      | `Proof_of_signature ->
+          ( module struct
+            module Make (Ledger_builder_diff : sig
+              type t [@@deriving sexp, bin_io]
+            end) =
+            Consensus.Proof_of_signature.Make (struct
+              module Proof = Nanobit_base.Proof
+              module Ledger_builder_diff = Ledger_builder_diff
+            end)
+          end )
+      | `Proof_of_stake ->
+          ( module struct
+            module Make (Ledger_builder_diff : sig
+              type t [@@deriving sexp, bin_io]
+            end) =
+            Consensus.Proof_of_stake.Make (struct
+              module Proof = Nanobit_base.Proof
+              module Ledger_builder_diff = Ledger_builder_diff
+              module Time = Nanobit_base.Block_time
+
+              (* TODO: choose reasonable values *)
+              let genesis_state_timestamp = Time.now ()
+
+              let genesis_ledger_total_currency = Currency.Amount.zero
+
+              let coinbase = Currency.Amount.of_int 20
+
+              let slot_interval = Time.Span.of_ms (Int64.of_int 500)
+
+              let unforkable_transition_count = 12
+
+              let probable_slots_per_transition_count = 8
+            end)
+          end )
+    in
     if Insecure.with_snark then
-      let module Kernel = Kernel.Prod () in
+      let module Kernel =
+        Make_kernel (Ledger_proof.Prod) (Consensus_mechanism.Make) in
       let module Coda = struct
         type ledger_proof = Transaction_snark.t
 
@@ -157,7 +223,8 @@ let () =
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
     else
-      let module Kernel = Kernel.Debug () in
+      let module Kernel =
+        Make_kernel (Ledger_proof.Debug) (Consensus_mechanism.Make) in
       let module Coda = struct
         type ledger_proof = Ledger_proof_statement.t
 

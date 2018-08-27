@@ -533,7 +533,7 @@ struct
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Public_key.Compressed) (Account)
+    Syncable_ledger.Make (Ledger.Addr) (Account)
       (struct
         include Merkle_hash
 
@@ -760,8 +760,10 @@ module type Main_intf = sig
       type t
 
       module Peer : sig
-        type t = Host_and_port.Stable.V1.t
+        type t = Host_and_port.Stable.V1.t * int
         [@@deriving bin_io, sexp, compare, hash]
+
+        val external_rpc : t -> Host_and_port.Stable.V1.t
       end
 
       module Gossip_net : sig
@@ -841,7 +843,7 @@ module type Main_intf = sig
 
   val best_ledger : t -> Inputs.Ledger.t
 
-  val peers : t -> Host_and_port.t list
+  val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
     t -> Inputs.External_transition.t Linear_pipe.Reader.t
