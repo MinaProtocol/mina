@@ -55,8 +55,9 @@ struct
             if Insecure.verify_blockchain then Ok ()
             else
               check
-                (T.verify
+                (T.verify_against_digest
                    (Transaction_snark.create
+                      ~sok_digest:(Snark_transition.sok_digest transition)
                       ~source:
                         ( state |> Protocol_state.blockchain_state
                         |> Blockchain_state.ledger_hash )
@@ -109,6 +110,7 @@ struct
           (let%bind good_body =
              let%bind correct_transaction_snark =
                T.verify_complete_merge
+                 (Snark_transition.sok_digest transition)
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state

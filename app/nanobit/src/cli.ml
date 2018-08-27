@@ -160,9 +160,10 @@ let () =
 
         module Make
             (Init : Init_intf
-                    with type Ledger_proof.t = Ledger_proof_statement.t)
+                    with type Ledger_proof.t = Ledger_proof_statement.t * Sok_message.Digest.t)
             () =
-          Coda_without_snark (Init) ()
+          Coda_without_snark
+            (Init) ()
       end in
       ("daemon", daemon (module Kernel) (module Coda))
       ::

@@ -43,7 +43,9 @@ module Digest = struct
     let to_triples t = Fold.(to_list (group3 ~default:Boolean.false_ (of_list t)))
   end
 
-  let length_in_bits = 256
+  let length_in_bytes = 32
+
+  let length_in_bits = 8 * length_in_bytes
 
   let length_in_triples = (length_in_bits + 2)/3
 
@@ -53,6 +55,8 @@ module Digest = struct
         List.init 256 ~f:(fun i ->
           (Char.to_int s.[i/8] lsr (7 - (i % 8))) land 1 = 1))
       ~back:Sha256_lib.Sha256.bits_to_string
+
+  let default = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
 
 let digest t =

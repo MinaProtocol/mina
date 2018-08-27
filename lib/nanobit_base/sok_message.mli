@@ -8,6 +8,7 @@ type t =
   { fee : Currency.Fee.t
   ; prover : Public_key.Compressed.t
   }
+[@@deriving bin_io]
 
 val create : fee:Currency.Fee.t -> prover:Public_key.Compressed.t -> t
 
@@ -32,6 +33,8 @@ module Digest : sig
   val typ : (Checked.t, t) Typ.t
 
   val length_in_triples : int
+
+  val default : t
 end
 
 val digest : t -> Digest.t

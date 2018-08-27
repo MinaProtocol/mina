@@ -469,7 +469,7 @@ end = struct
       in
       Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:
         (fun (jobs, work) ->
-          let message = (work.fee, work.prover) in
+          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
           Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:
             (fun (job, proof) -> verify ~message job proof ) )
       |> Deferred.map ~f:(check_or_error "proofs did not verify"))
@@ -834,6 +834,11 @@ let%test_module "test" =
     module Test_input1 = struct
       open Coda_pow
       module Compressed_public_key = String
+      module Sok_message = struct
+        module Digest = Unit
+        include Unit
+        let create ~fee:_ ~prover:_ = ()
+      end
 
       module Transaction = struct
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
@@ -972,6 +977,8 @@ let%test_module "test" =
          fun statement -> statement.target
 
         let underlying_proof = Fn.id
+
+        let sok_digest _ = ()
       end
 
       module Ledger_proof_verifier = struct
