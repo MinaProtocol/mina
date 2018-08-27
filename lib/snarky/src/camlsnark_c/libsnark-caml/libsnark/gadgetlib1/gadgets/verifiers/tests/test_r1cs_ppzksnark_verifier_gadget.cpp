@@ -374,57 +374,63 @@ void test_full_precomputed_pairing(const std::string &annotation)
     printf("number of constraints for full precomputed pairing (Fr is %s)  = %zu\n", annotation.c_str(), pb.num_constraints());
 }
 
+typedef libff::mnt4128_pp mnt4_pp;
+typedef libff::mnt6128_pp mnt6_pp;
+
 int main(void)
 {
     libff::start_profiling();
-    libff::mnt4_pp::init_public_params();
-    libff::mnt6_pp::init_public_params();
+    mnt4_pp::init_public_params();
+    mnt6_pp::init_public_params();
 
-    test_mul<libff::mnt4_Fq2, Fp2_variable, Fp2_mul_gadget>("mnt4_Fp2");
-    test_sqr<libff::mnt4_Fq2, Fp2_variable, Fp2_sqr_gadget>("mnt4_Fp2");
+    test_mul<libff::Fqe<mnt4_pp>, Fp2_variable, Fp2_mul_gadget>("mnt4_Fp2");
+    test_sqr<libff::Fqe<mnt4_pp>, Fp2_variable, Fp2_sqr_gadget>("mnt4_Fp2");
 
-    test_mul<libff::mnt4_Fq4, Fp4_variable, Fp4_mul_gadget>("mnt4_Fp4");
-    test_sqr<libff::mnt4_Fq4, Fp4_variable, Fp4_sqr_gadget>("mnt4_Fp4");
-    test_cyclotomic_sqr<libff::mnt4_pp, Fp4_variable, Fp4_cyclotomic_sqr_gadget>("mnt4_Fp4");
-    test_exponentiation_gadget<libff::mnt4_Fq4, Fp4_variable, Fp4_mul_gadget, Fp4_sqr_gadget, libff::mnt4_q_limbs>(libff::mnt4_final_exponent_last_chunk_abs_of_w0, "mnt4_Fq4");
-    test_Frobenius<libff::mnt4_Fq4, Fp4_variable>("mnt4_Fq4");
+    test_mul<libff::Fqk<mnt4_pp>, Fp4_variable, Fp4_mul_gadget>("mnt4_Fp4");
+    test_sqr<libff::Fqk<mnt4_pp>, Fp4_variable, Fp4_sqr_gadget>("mnt4_Fp4");
+    test_cyclotomic_sqr<mnt4_pp, Fp4_variable, Fp4_cyclotomic_sqr_gadget>("mnt4_Fp4");
+    test_exponentiation_gadget<libff::Fqk<mnt4_pp>, Fp4_variable, Fp4_mul_gadget, Fp4_sqr_gadget, pairing_selector<mnt6_pp>::q_limbs>(
+        pairing_selector<mnt6_pp>::final_exponent_last_chunk_abs_of_w0, "mnt4_Fq4");
+    test_Frobenius<libff::Fqk<mnt4_pp>, Fp4_variable>("mnt4_Fq4");
 
-    test_mul<libff::mnt6_Fq3, Fp3_variable, Fp3_mul_gadget>("mnt6_Fp3");
-    test_sqr<libff::mnt6_Fq3, Fp3_variable, Fp3_sqr_gadget>("mnt6_Fp3");
+    test_mul<libff::Fqe<mnt6_pp>, Fp3_variable, Fp3_mul_gadget>("mnt6_Fp3");
+    test_sqr<libff::Fqe<mnt6_pp>, Fp3_variable, Fp3_sqr_gadget>("mnt6_Fp3");
 
-    test_mul<libff::mnt6_Fq6, Fp6_variable, Fp6_mul_gadget>("mnt6_Fp6");
-    test_sqr<libff::mnt6_Fq6, Fp6_variable, Fp6_sqr_gadget>("mnt6_Fp6");
-    test_cyclotomic_sqr<libff::mnt6_pp, Fp6_variable, Fp6_cyclotomic_sqr_gadget>("mnt6_Fp6");
-    test_exponentiation_gadget<libff::mnt6_Fq6, Fp6_variable, Fp6_mul_gadget, Fp6_sqr_gadget, libff::mnt6_q_limbs>(libff::mnt6_final_exponent_last_chunk_abs_of_w0, "mnt6_Fq6");
-    test_Frobenius<libff::mnt6_Fq6, Fp6_variable>("mnt6_Fq6");
+    test_mul<libff::Fqk<mnt6_pp>, Fp6_variable, Fp6_mul_gadget>("mnt6_Fp6");
+    test_sqr<libff::Fqk<mnt6_pp>, Fp6_variable, Fp6_sqr_gadget>("mnt6_Fp6");
+    test_cyclotomic_sqr<mnt6_pp, Fp6_variable, Fp6_cyclotomic_sqr_gadget>("mnt6_Fp6");
+    test_exponentiation_gadget<libff::Fqk<mnt6_pp>, Fp6_variable, Fp6_mul_gadget, Fp6_sqr_gadget, pairing_selector<mnt4_pp>::q_limbs>(
+        pairing_selector<mnt4_pp>::final_exponent_last_chunk_abs_of_w0, "mnt6_Fq6");
+    test_Frobenius<libff::Fqk<mnt6_pp>, Fp6_variable>("mnt6_Fq6");
 
-    test_G2_checker_gadget<libff::mnt4_pp>("mnt4");
-    test_G2_checker_gadget<libff::mnt6_pp>("mnt6");
+    test_G2_checker_gadget<mnt4_pp>("mnt4");
+    test_G2_checker_gadget<mnt6_pp>("mnt6");
 
-    test_G1_variable_precomp<libff::mnt4_pp>("mnt4");
-    test_G1_variable_precomp<libff::mnt6_pp>("mnt6");
+    test_G1_variable_precomp<mnt4_pp>("mnt4");
+    test_G1_variable_precomp<mnt6_pp>("mnt6");
 
-    test_G2_variable_precomp<libff::mnt4_pp>("mnt4");
-    test_G2_variable_precomp<libff::mnt6_pp>("mnt6");
+    test_G2_variable_precomp<mnt4_pp>("mnt4");
+    test_G2_variable_precomp<mnt6_pp>("mnt6");
 
-    test_mnt_miller_loop<libff::mnt4_pp>("mnt4");
-    test_mnt_miller_loop<libff::mnt6_pp>("mnt6");
+    test_mnt_miller_loop<mnt4_pp>("mnt4");
+    test_mnt_miller_loop<mnt6_pp>("mnt6");
 
-    test_mnt_e_over_e_miller_loop<libff::mnt4_pp>("mnt4");
-    test_mnt_e_over_e_miller_loop<libff::mnt6_pp>("mnt6");
+    test_mnt_e_over_e_miller_loop<mnt4_pp>("mnt4");
+    test_mnt_e_over_e_miller_loop<mnt6_pp>("mnt6");
 
-    test_mnt_e_times_e_over_e_miller_loop<libff::mnt4_pp>("mnt4");
-    test_mnt_e_times_e_over_e_miller_loop<libff::mnt6_pp>("mnt6");
+    test_mnt_e_times_e_over_e_miller_loop<mnt4_pp>("mnt4");
+    test_mnt_e_times_e_over_e_miller_loop<mnt6_pp>("mnt6");
 
-    test_full_pairing<libff::mnt4_pp>("mnt4");
-    test_full_pairing<libff::mnt6_pp>("mnt6");
+    test_full_pairing<mnt4_pp>("mnt4");
+    test_full_pairing<mnt6_pp>("mnt6");
 
-    test_full_precomputed_pairing<libff::mnt4_pp>("mnt4");
-    test_full_precomputed_pairing<libff::mnt6_pp>("mnt6");
+    test_full_precomputed_pairing<mnt4_pp>("mnt4");
+    test_full_precomputed_pairing<mnt6_pp>("mnt6");
 
-    test_verifier<libff::mnt4_pp, libff::mnt6_pp>("mnt4", "mnt6");
-    test_verifier<libff::mnt6_pp, libff::mnt4_pp>("mnt6", "mnt4");
+    test_verifier<mnt4_pp, mnt6_pp>("mnt4", "mnt6");
+    test_verifier<mnt6_pp, mnt4_pp>("mnt6", "mnt4");
 
-    test_hardcoded_verifier<libff::mnt4_pp, libff::mnt6_pp>("mnt4", "mnt6");
-    test_hardcoded_verifier<libff::mnt6_pp, libff::mnt4_pp>("mnt6", "mnt4");
+    test_hardcoded_verifier<mnt4_pp, mnt6_pp>("mnt4", "mnt6");
+    test_hardcoded_verifier<mnt6_pp, mnt4_pp>("mnt6", "mnt4");
+
 }

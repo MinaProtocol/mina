@@ -120,7 +120,13 @@ struct
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
-    Blockchain_state.Signature.Checked.verifies signature
+    let open Snark_params.Tick.Let_syntax in
+    let%bind (module Shifted) =
+      Snark_params.Tick.Inner_curve.Checked.Shifted.create ()
+    in
+    Blockchain_state.Signature.Checked.verifies
+      (module Shifted)
+      signature
       (Public_key.var_of_t Global_keypair.public_key)
       (transition |> Snark_transition.blockchain_state)
 
