@@ -11,10 +11,6 @@ end
 module type S = sig
   module Consensus_data : Consensus_data_intf
 
-  module Proof : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   type ('blockchain_state, 'consensus_data) t [@@deriving sexp]
 
   type value = (Blockchain_state.value, Consensus_data.value) t
@@ -41,14 +37,10 @@ module type S = sig
   val genesis : value
 end
 
-module Make
-    (Consensus_data : Consensus_data_intf) (Proof : sig
-        type t [@@deriving bin_io, sexp]
-    end) :
-  S with module Consensus_data = Consensus_data and module Proof = Proof =
+module Make (Consensus_data : Consensus_data_intf) :
+  S with module Consensus_data = Consensus_data =
 struct
   module Consensus_data = Consensus_data
-  module Proof = Proof
 
   type ('blockchain_state, 'consensus_data) t =
     { blockchain_state: 'blockchain_state
