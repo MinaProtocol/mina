@@ -1,4 +1,4 @@
-_build/
+_build*
 *.install
 .merlin
 result

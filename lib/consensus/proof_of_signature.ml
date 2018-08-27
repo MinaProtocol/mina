@@ -1,26 +1,35 @@
 open Core_kernel
 open Coda_numbers
 open Nanobit_base
+open Fold_lib
 
 module Global_keypair = struct
   let private_key =
-    "KgAAAAAAAAABKOg4N37Pm4VJevdeUWm/Lc7uPb7ZGWdTfngcSstK/2OsBQAAAAAAAAA="
-    |> B64.decode |> Bigstring.of_string |> Private_key.of_bigstring
-    |> Or_error.ok_exn
+    Private_key.of_base64_exn
+      "JgDwuhZ+kgxR1jBT+F9hpH96nxD/TIGZ7fVSpw9YAGDlhwltebhc"
 
   let public_key = Public_key.of_private_key private_key
 end
 
-module Make (Proof : sig
-  type t [@@deriving bin_io, sexp]
-end) (Ledger_builder_diff : sig
-  type t [@@deriving sexp, bin_io]
-end) :
+module type Inputs_intf = sig
+  module Proof : sig
+    type t [@@deriving bin_io, sexp]
+  end
+
+  module Ledger_builder_diff : sig
+    type t [@@deriving bin_io, sexp]
+  end
+end
+
+module Make (Inputs : Inputs_intf) :
   Mechanism.S
-  with module Proof = Proof
-   and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-   and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t =
+  with module Proof = Inputs.Proof
+   and type Internal_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t
+   and type External_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t =
 struct
+  open Inputs
   module Proof = Proof
   module Ledger_builder_diff = Ledger_builder_diff
 
@@ -35,7 +44,7 @@ struct
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
 
-    type value = Signature.t t_ [@@deriving bin_io, sexp]
+    type value = Signature.Stable.V1.t t_ [@@deriving bin_io, sexp]
 
     type var = Signature.var t_
 
@@ -72,8 +81,8 @@ struct
 
     let equal_value = equal_t_ Length.equal Public_key.Compressed.equal
 
-    let bit_length =
-      Length.length_in_bits + Public_key.Compressed.length_in_bits
+    let length_in_triples =
+      Length.length_in_triples + Public_key.Compressed.length_in_triples
 
     let genesis =
       { length= Length.zero
@@ -96,16 +105,15 @@ struct
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let var_to_bits {length; signer_public_key} =
+    let var_to_triples {length; signer_public_key} =
       let open Snark_params.Tick.Let_syntax in
-      let%map public_key_bits =
-        Public_key.Compressed.var_to_bits signer_public_key
+      let%map public_key_triples =
+        Public_key.Compressed.var_to_triples signer_public_key
       in
-      Length.Unpacked.var_to_bits length @ public_key_bits
+      Length.Unpacked.var_to_triples length @ public_key_triples
 
     let fold {length; signer_public_key} =
-      let open Nanobit_base.Util in
-      Length.Bits.fold length +> Public_key.Compressed.fold signer_public_key
+      Fold.(Length.fold length +> Public_key.Compressed.fold signer_public_key)
 
     let update state =
       { length= Length.succ state.length
@@ -124,7 +132,13 @@ struct
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
-    Blockchain_state.Signature.Checked.verifies signature
+    let open Snark_params.Tick.Let_syntax in
+    let%bind (module Shifted) =
+      Snark_params.Tick.Inner_curve.Checked.Shifted.create ()
+    in
+    Blockchain_state.Signature.Checked.verifies
+      (module Shifted)
+      signature
       (Public_key.var_of_t Global_keypair.public_key)
       (transition |> Snark_transition.blockchain_state)
 

@@ -6,21 +6,15 @@ eval `opam config env`
 
 # FIXME: Linux specific
 myprocs=`nproc --all`
-
 date
 dune runtest --verbose -j${myprocs}
 
-date
-dune exec cli -- full-test
-
-date
-dune exec cli -- coda-peers-test
-
-date
-dune exec cli -- coda-block-production-test
-
-# This test actually creates SNARKs (is slow)
-date
-dune exec cli -- transaction-snark-profiler -k 2
+for consensus_mechanism in proof_of_signature proof_of_stake; do
+  export CODA_CONSENSUS_MECHANISM="$consensus_mechanism"
+  for test_args in full-test coda-peers-test coda-block-production-test 'transaction-snark-profiler -check-only'; do
+    date
+    dune exec cli -- $test_args
+  done
+done
 
 date

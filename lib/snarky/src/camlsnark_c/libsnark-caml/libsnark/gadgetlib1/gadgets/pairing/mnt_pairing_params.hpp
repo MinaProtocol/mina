@@ -72,8 +72,15 @@ public:
     typedef mnt4_final_exp_gadget<libff::mnt4_pp> final_exp_gadget_type;
     typedef mnt4_final_exp_value_gadget<libff::mnt4_pp> final_exp_value_gadget_type;
 
+    static const constexpr mp_size_t &q_limbs = libff::mnt6_q_limbs;
+
     static const constexpr libff::bigint<libff::mnt6_Fr::num_limbs> &pairing_loop_count = libff::mnt6_ate_loop_count;
     static const constexpr bool &is_loop_count_neg = libff::mnt6_ate_is_loop_count_neg;
+    static const constexpr FqeT &twist = libff::mnt6_twist;
+
+    static const constexpr libff::bigint<libff::mnt6_Fr::num_limbs> &final_exponent_last_chunk_abs_of_w0 = libff::mnt6_final_exponent_last_chunk_abs_of_w0;
+    static const constexpr bool &final_exponent_last_chunk_is_w0_neg = libff::mnt6_final_exponent_last_chunk_is_w0_neg;
+    static const constexpr libff::bigint<libff::mnt6_Fr::num_limbs> &final_exponent_last_chunk_w1 = libff::mnt6_final_exponent_last_chunk_w1;
 };
 
 /**
@@ -104,8 +111,15 @@ public:
     typedef mnt6_final_exp_gadget<libff::mnt6_pp> final_exp_gadget_type;
     typedef mnt6_final_exp_value_gadget<libff::mnt6_pp> final_exp_value_gadget_type;
 
+    static const constexpr mp_size_t &q_limbs = libff::mnt4_q_limbs;
+
     static const constexpr libff::bigint<libff::mnt4_Fr::num_limbs> &pairing_loop_count = libff::mnt4_ate_loop_count;
     static const constexpr bool &is_loop_count_neg = libff::mnt4_ate_is_loop_count_neg;
+    static const constexpr FqeT &twist = libff::mnt4_twist;
+
+    static const constexpr libff::bigint<libff::mnt4_Fr::num_limbs> &final_exponent_last_chunk_abs_of_w0 = libff::mnt4_final_exponent_last_chunk_abs_of_w0;
+    static const constexpr bool &final_exponent_last_chunk_is_w0_neg = libff::mnt4_final_exponent_last_chunk_is_w0_neg;
+    static const constexpr libff::bigint<libff::mnt4_Fr::num_limbs> &final_exponent_last_chunk_w1 = libff::mnt4_final_exponent_last_chunk_w1;
 };
 
 } // libsnark

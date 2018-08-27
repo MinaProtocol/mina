@@ -1,4 +1,6 @@
 open Core
+open Tuple_lib
+open Fold_lib
 
 module Make (Prefix : sig
   val prefix : string
@@ -20,7 +22,9 @@ end)
 
     val typ : (var, t) Typ.t
 
-    val fold : t -> init:'a -> f:('a -> bool -> 'a) -> 'a
+    val fold : t -> bool Triple.t Fold.t
+
+    val length_in_triples : int
   end
 
   module Block : sig
@@ -75,9 +79,11 @@ end = struct
 
     type var = Boolean.var list
 
-    let fold = List.fold
+    let fold xs = Fold.(group3 ~default:false (of_list xs))
 
     let typ = Typ.list ~length:length_in_bits Boolean.typ
+
+    let length_in_triples = (M.length_in_bits + 2) / 3
   end
 
   module Digest = Bits (struct
