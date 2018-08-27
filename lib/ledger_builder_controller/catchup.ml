@@ -125,13 +125,15 @@ module Make (Inputs : Inputs_intf) = struct
     Logger.fatal log "S2";
     let open Interruptible.Let_syntax in
     let ivar : External_transition.t Ivar.t = Ivar.create () in
+    Sync_ledger.new_goal sl
+      (External_transition.ledger_hash transition);
     let work =
       match%bind
         Interruptible.lift
           (Sync_ledger.wait_until_valid sl h)
-          (Deferred.map (Ivar.read ivar) ~f:(fun transition ->
-               Sync_ledger.new_goal sl
-                 (External_transition.ledger_hash transition) ))
+          (Deferred.map (Ivar.read ivar) ~f:(fun _ ->
+               Logger.fatal log "set new goal";
+                ))
       with
       | `Ok ledger -> (
           Logger.fatal log "S3";
@@ -164,7 +166,9 @@ module Make (Inputs : Inputs_intf) = struct
               Logger.info log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;
               [] )
-      | `Target_changed -> return []
+      | `Target_changed -> 
+        Logger.fatal log "S32";
+        return []
     in
     (work, ivar)
 
