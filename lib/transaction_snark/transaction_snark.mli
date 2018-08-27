@@ -36,7 +36,7 @@ val create :
      source:Ledger_hash.t
   -> target:Ledger_hash.t
   -> proof_type:Proof_type.t
-  -> fee_excess:Currency.Amount.Signed.t
+  -> fee_excess:Currency.Fee.Signed.t
   -> proof:Tock.Proof.t
   -> t
 

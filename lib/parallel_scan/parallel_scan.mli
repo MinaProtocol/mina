@@ -58,3 +58,5 @@ val fill_in_completed_jobs :
   -> 'a option Or_error.t
 
 val last_emitted_value : ('a, 'd) State.t -> 'a option
+
+val as_and_ds : ('a, 'd) State.t -> 'a list * 'd list

@@ -94,17 +94,19 @@ struct
       Ledger_builder.create_diff ledger_builder
         ~transactions_by_fee:transactions ~get_completed_work
     in
-    let next_ledger_hash =
+    let next_ledger_hash, fee_excess =
       Option.value_map ledger_proof_opt
-        ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
+        ~f:(fun (_, stmt) ->
+          (Ledger_proof.(statement_target stmt), stmt.fee_excess) )
         ~default:
           ( previous_protocol_state |> Protocol_state.blockchain_state
-          |> Blockchain_state.ledger_hash )
+            |> Blockchain_state.ledger_hash
+          , Currency.Fee.Signed.zero )
     in
     let blockchain_state =
       Blockchain_state.create_value ~timestamp:(Time.now time_controller)
         ~ledger_hash:next_ledger_hash
-        ~ledger_builder_hash:next_ledger_builder_hash
+        ~ledger_builder_hash:next_ledger_builder_hash ~fee_excess
     in
     let time =
       Time.now time_controller |> Time.to_span_since_epoch |> Time.Span.to_ms

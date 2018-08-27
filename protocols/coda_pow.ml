@@ -465,6 +465,8 @@ module type Blockchain_state_intf = sig
 
   type time
 
+  type fee_excess
+
   type value [@@deriving sexp, bin_io]
 
   type var
@@ -473,6 +475,7 @@ module type Blockchain_state_intf = sig
        ledger_builder_hash:ledger_builder_hash
     -> ledger_hash:ledger_hash
     -> timestamp:time
+    -> fee_excess:fee_excess
     -> value
 
   val ledger_builder_hash : value -> ledger_builder_hash
@@ -798,6 +801,7 @@ Merge Snark:
     with type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_hash := Ledger_hash.t
      and type time := Time.t
+     and type fee_excess := Currency.Fee.Signed.t
 
   module Protocol_state_hash : Protocol_state_hash_intf
 

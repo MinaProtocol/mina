@@ -52,17 +52,20 @@ struct
         | Some proof ->
             if Insecure.verify_blockchain then Ok ()
             else
-              check
-                (T.verify
-                   (Transaction_snark.create
-                      ~source:
-                        ( state |> Protocol_state.blockchain_state
-                        |> Blockchain_state.ledger_hash )
-                      ~target:
-                        ( transition |> Snark_transition.blockchain_state
-                        |> Blockchain_state.ledger_hash )
-                      ~proof_type:`Merge
-                      ~fee_excess:Currency.Amount.Signed.zero ~proof))
+            check
+                T.verify
+                  (Transaction_snark.create
+                     ~source:
+                       ( state |> Protocol_state.blockchain_state
+                       |> Blockchain_state.ledger_hash )
+                     ~target:
+                       ( transition |> Snark_transition.blockchain_state
+                       |> Blockchain_state.ledger_hash )
+                     ~proof_type:`Merge
+                     ~fee_excess:
+                       ( state |> Protocol_state.blockchain_state
+                       |> Blockchain_state.fee_excess )
+                     ~proof)
                 "Proof did not verify"
       in
       let%map consensus_state =
