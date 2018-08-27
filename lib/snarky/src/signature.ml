@@ -35,6 +35,14 @@ module type S = sig
 
   type (_, _) typ
 
+  module Shifted : sig
+    module type S =
+      Curves.Shifted_intf
+      with type curve_var := curve_var
+       and type boolean_var := boolean_var
+       and type ('a, 'b) checked := ('a, 'b) checked
+  end
+
   module Message :
     Message_intf
     with type boolean_var := boolean_var
@@ -64,19 +72,25 @@ module type S = sig
     val compress : curve_var -> (boolean_var list, _) checked
 
     val verification_hash :
-         Signature.var
+         (module Shifted.S with type t = 't)
+      -> Signature.var
       -> Public_key.var
       -> Message.var
       -> (curve_scalar_var, _) checked
 
     val verifies :
-         Signature.var
+         (module Shifted.S with type t = 't)
+      -> Signature.var
       -> Public_key.var
       -> Message.var
       -> (boolean_var, _) checked
 
     val assert_verifies :
-      Signature.var -> Public_key.var -> Message.var -> (unit, _) checked
+         (module Shifted.S with type t = 't)
+      -> Signature.var
+      -> Public_key.var
+      -> Message.var
+      -> (unit, _) checked
   end
 
   val compress : curve -> bool list
@@ -120,16 +134,32 @@ module Schnorr
           end
         end
 
-        type t
+        type t [@@deriving eq]
 
         type var = Field.Checked.t * Field.Checked.t
 
         module Checked : sig
-          val add : var -> var -> (var, _) Checked.t
+          module Shifted : sig
+            module type S =
+              Curves.Shifted_intf
+              with type curve_var := var
+               and type boolean_var := Boolean.var
+               and type ('a, 'b) checked := ('a, 'b) Checked.t
+          end
 
-          val scale : var -> Scalar.var -> (var, _) Checked.t
+          val scale_known :
+               (module Shifted.S with type t = 'shifted)
+            -> t
+            -> Scalar.var
+            -> init:'shifted
+            -> ('shifted, _) Checked.t
 
-          val scale_known : t -> Scalar.var -> (var, _) Checked.t
+          val scale :
+               (module Shifted.S with type t = 'shifted)
+            -> var
+            -> Scalar.var
+            -> init:'shifted
+            -> ('shifted, _) Checked.t
         end
 
         val one : t
@@ -137,6 +167,8 @@ module Schnorr
         val zero : t
 
         val add : t -> t -> t
+
+        val double : t -> t
 
         val typ : (var, t) Typ.t
 
@@ -157,6 +189,7 @@ module Schnorr
    and type curve_scalar_var := Curve.Scalar.var
    and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
    and type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+   and module Shifted := Curve.Checked.Shifted
    and module Message := Message =
 struct
   open Impl
@@ -197,14 +230,13 @@ struct
     (s, h)
 
   (* TODO: Have expect test for this *)
-  (* TODO: Have optimized double function *)
   let shamir_sum ((sp, p): Curve.Scalar.t * Curve.t)
       ((sq, q): Curve.Scalar.t * Curve.t) =
     let pq = Curve.add p q in
     let rec go i acc =
       if i < 0 then acc
       else
-        let acc = Curve.add acc acc in
+        let acc = Curve.double acc in
         let acc =
           match (Curve.Scalar.test_bit sp i, Curve.Scalar.test_bit sq i) with
           | true, false -> Curve.add p acc
@@ -217,9 +249,12 @@ struct
     go (Curve.Scalar.length_in_bits - 1) Curve.zero
 
   let verify ((s, h): Signature.t) (pk: Public_key.t) (m: Message.t) =
-    let r = compress (shamir_sum (s, Curve.one) (h, pk)) in
-    let h' = Message.hash ~nonce:r m in
-    Curve.Scalar.equal h' h
+    let pre_r = shamir_sum (s, Curve.one) (h, pk) in
+    if Curve.equal Curve.zero pre_r then false
+    else
+      let r = compress pre_r in
+      let h' = Message.hash ~nonce:r m in
+      Curve.Scalar.equal h' h
 
   module Checked = struct
     let compress ((x, _): Curve.var) =
@@ -227,23 +262,32 @@ struct
 
     open Impl.Let_syntax
 
-    let verification_hash ((s, h): Signature.var) (public_key: Public_key.var)
-        (m: Message.var) =
+    let verification_hash (type s)
+        ((module Shifted) as shifted:
+          (module Curve.Checked.Shifted.S with type t = s))
+        ((s, h): Signature.var) (public_key: Public_key.var) (m: Message.var) =
       with_label __LOC__
-        (let%bind r =
-           let%bind s_g = Curve.Checked.scale_known Curve.one s
-           and h_pk = Curve.Checked.scale public_key h in
-           Checked.bind ~f:compress (Curve.Checked.add s_g h_pk)
+        (let%bind pre_r =
+           (* s * g + h * public_key *)
+           let%bind s_g =
+             Curve.Checked.scale_known shifted Curve.one s ~init:Shifted.zero
+           in
+           let%bind s_g_h_pk =
+             Curve.Checked.scale shifted public_key h ~init:s_g
+           in
+           Shifted.unshift_nonzero s_g_h_pk
          in
+         let%bind r = compress pre_r in
          Message.hash_checked m ~nonce:r)
 
-    let verifies ((_, h) as signature) pk m =
+    let verifies shifted ((_, h) as signature) pk m =
       with_label __LOC__
-        (verification_hash signature pk m >>= Curve.Scalar.Checked.equal h)
+        ( verification_hash shifted signature pk m
+        >>= Curve.Scalar.Checked.equal h )
 
-    let assert_verifies ((_, h) as signature) pk m =
+    let assert_verifies shifted ((_, h) as signature) pk m =
       with_label __LOC__
-        ( verification_hash signature pk m
+        ( verification_hash shifted signature pk m
         >>= Curve.Scalar.Checked.Assert.equal h )
   end
 end
