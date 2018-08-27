@@ -17,8 +17,7 @@ module type Consensus_mechanism_intf = sig
     type t [@@deriving bin_io, sexp]
   end) :
     Consensus.Mechanism.S
-    with type Proof.t = Nanobit_base.Proof.t
-     and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
      and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
 end
 

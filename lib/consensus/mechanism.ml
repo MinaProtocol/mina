@@ -3,10 +3,6 @@ open Tuple_lib
 open Fold_lib
 
 module type S = sig
-  module Proof : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Consensus_transition_data : sig
     type value [@@deriving bin_io, sexp]
 
@@ -39,7 +35,6 @@ module type S = sig
   module Snark_transition :
     Nanobit_base.Snark_transition.S
     with module Consensus_data = Consensus_transition_data
-     and module Proof = Proof
 
   module Internal_transition :
     Nanobit_base.Internal_transition.S
