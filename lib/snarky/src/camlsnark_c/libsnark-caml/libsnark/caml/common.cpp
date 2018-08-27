@@ -5,6 +5,12 @@
 #include <libff/algebra/curves/mnt/mnt6/mnt6_g1.hpp>
 #include <libff/algebra/curves/mnt/mnt4/mnt4_pp.hpp>
 #include <libff/algebra/curves/mnt/mnt6/mnt6_pp.hpp>
+#include <libff/algebra/curves/mnt_128/mnt4128/mnt4128_init.hpp>
+#include <libff/algebra/curves/mnt_128/mnt6128/mnt6128_init.hpp>
+#include <libff/algebra/curves/mnt_128/mnt4128/mnt4128_g1.hpp>
+#include <libff/algebra/curves/mnt_128/mnt6128/mnt6128_g1.hpp>
+#include <libff/algebra/curves/mnt_128/mnt4128/mnt4128_pp.hpp>
+#include <libff/algebra/curves/mnt_128/mnt6128/mnt6128_pp.hpp>
 
 extern "C" {
 
@@ -13,6 +19,13 @@ const libff::bigint<libff::mnt6_q_limbs>* camlsnark_mnt6_final_exponent_last_chu
 
 const libff::bigint<libff::mnt6_q_limbs>* camlsnark_mnt6_final_exponent_last_chunk_w1 =
   &libff::mnt6_final_exponent_last_chunk_w1;
+
+  const libff::bigint<libff::mnt6128_q_limbs>* camlsnark_mnt6128_final_exponent_last_chunk_abs_of_w0 =
+    &libff::mnt6128_final_exponent_last_chunk_abs_of_w0;
+
+  const libff::bigint<libff::mnt6128_q_limbs>* camlsnark_mnt6128_final_exponent_last_chunk_w1 =
+    &libff::mnt6128_final_exponent_last_chunk_w1;
+
 
 // long vector
 std::vector<long>* camlsnark_long_vector_create() {
@@ -92,6 +105,21 @@ libff::Fr<libff::mnt4_pp>* camlsnark_mnt6_G1_generator_x() {
 libff::Fr<libff::mnt4_pp>* camlsnark_mnt6_G1_generator_y() {
   return new libff::Fr<libff::mnt4_pp>(libff::mnt6_G1::G1_one.Y());
 }
+  libff::Fr<libff::mnt4128_pp>* camlsnark_mnt6128_G1_coeff_a() {
+    return &libff::mnt6128_G1::coeff_a;
+  }
+
+  libff::Fr<libff::mnt4128_pp>* camlsnark_mnt6128_G1_coeff_b() {
+    return &libff::mnt6128_G1::coeff_b;
+  }
+
+  libff::Fr<libff::mnt4128_pp>* camlsnark_mnt6128_G1_generator_x() {
+    return new libff::Fr<libff::mnt4128_pp>(libff::mnt6128_G1::G1_one.X());
+  }
+
+  libff::Fr<libff::mnt4128_pp>* camlsnark_mnt6128_G1_generator_y() {
+    return new libff::Fr<libff::mnt4128_pp>(libff::mnt6128_G1::G1_one.Y());
+  }
 
 
 
@@ -110,6 +138,22 @@ libff::Fr<libff::mnt6_pp>* camlsnark_mnt4_G1_generator_x() {
 libff::Fr<libff::mnt6_pp>* camlsnark_mnt4_G1_generator_y() {
   return new libff::Fr<libff::mnt6_pp>(libff::mnt4_G1::G1_one.Y());
 }
+
+  libff::Fr<libff::mnt6128_pp>* camlsnark_mnt4128_G1_coeff_a() {
+    return &libff::mnt4128_G1::coeff_a;
+  }
+
+  libff::Fr<libff::mnt6128_pp>* camlsnark_mnt4128_G1_coeff_b() {
+    return &libff::mnt4128_G1::coeff_b;
+  }
+
+  libff::Fr<libff::mnt6128_pp>* camlsnark_mnt4128_G1_generator_x() {
+    return new libff::Fr<libff::mnt6128_pp>(libff::mnt4128_G1::G1_one.X());
+  }
+
+  libff::Fr<libff::mnt6128_pp>* camlsnark_mnt4128_G1_generator_y() {
+    return new libff::Fr<libff::mnt6128_pp>(libff::mnt4128_G1::G1_one.Y());
+  }
 
 const char* camlsnark_string_to_char_pointer(std::string* s) {
   return s->c_str();
