@@ -3,39 +3,57 @@ jobs:
   build:
     resource_class: large
     docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
-        # ENV variable is located in circleci
-        auth:
-          username: _json_key
-          password: $JSON_GCLOUD_CREDENTIALS
+    - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
+      auth:
+        username: _json_key
+        password: $JSON_GCLOUD_CREDENTIALS
     steps:
-      - checkout
+    - checkout
+    - run:
+        name: Lint
+        command: eval `opam config env` && make check-format
+    - run:
+        name: Build Haskell
+        command: source ~/.profile && make kademlia
+    - run:
+        name: Build OCaml
+        command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+    - run:
+        name: Install python -- hack
+        command: sudo apt install -y python
+    - run:
+        name: Count OCaml Warns
+        command: ./scripts/buildwarns.py /tmp/buildocaml.log
+    - run:
+        name: Build deb Package
+        command: make deb
+    - store_artifacts:
+        path: /tmp/artifacts
+    - run:
+        name: Test make test-runtest
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
+    - run:
+        name: Test make test-full-sig
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-sig
+    - run:
+        name: Test make test-codapeers-sig
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-sig
+    - run:
+        name: Test make test-coda-block-production-sig
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-sig
+    - run:
+        name: Test make test-transaction-snark-profiler-sig
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-sig
 
-      - run:
-          name: Lint
-          command: eval `opam config env` && make check-format
-
-      - run:
-          name: Build Haskell
-          command: source ~/.profile && make kademlia
-
-      - run:
-          name: Build OCaml
-          command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
-
-      - run:
-          name: Install python -- hack
-          command: sudo apt install -y python
-
-      - run: 
-          name: Count OCaml Warns
-          command: ./scripts/buildwarns.py /tmp/buildocaml.log
-
-      - run:
-          name: Build deb Package
-          command: make deb
-
-      - run:
-          name: Run All Tests
-          command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test
-
+    - run:
+        name: Test make test-full-stake
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-stake
+    - run:
+        name: Test make test-codapeers-stake
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-stake
+    - run:
+        name: Test make test-coda-block-production-stake
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-stake
+    - run:
+        name: Test make test-transaction-snark-profiler-stake
+        command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-stake
