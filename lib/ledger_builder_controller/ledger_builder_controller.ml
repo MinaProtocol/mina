@@ -510,7 +510,14 @@ end = struct
     t
 
   (* TODO: implement this when sync-ledger merges *)
-  let handle_sync_ledger_queries _query = failwith "TODO"
+  let handle_sync_ledger_queries (hash, query) = 
+    failwith "nyi"
+    (*match query with
+    | What_hash a -> 
+
+    | What_contents a ->
+
+    | Num_accounts ->*)
 
   let strongest_ledgers {strongest_ledgers; _} = strongest_ledgers
 
