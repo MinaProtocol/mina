@@ -13,9 +13,9 @@ module Make
         val depth : int
     end) : sig
   include Ledger_intf.S
-  with type hash := Hash.t
-   and type account := Account.t
-   and type key := Key.t
+          with type hash := Hash.t
+           and type account := Account.t
+           and type key := Key.t
 
   val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
 end

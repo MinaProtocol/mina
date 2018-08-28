@@ -49,8 +49,8 @@ let%test_module "Database integration test" =
         let open Quickcheck.Generator in
         list_with_length num_accounts (Int.gen_incl 1 Int.max_value)
       in
-      Quickcheck.test ~trials:100 ~sexp_of:[%sexp_of : int list] gen_non_zero_balances ~f:
-        (fun balances ->
+      Quickcheck.test ~trials:100 ~sexp_of:[%sexp_of : int list]
+        gen_non_zero_balances ~f:(fun balances ->
           let accounts =
             List.mapi balances ~f:(fun account_id balance ->
                 Account.create (Int.to_string account_id) balance )
