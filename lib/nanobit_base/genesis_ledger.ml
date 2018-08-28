@@ -26,21 +26,22 @@ let initial_rich_balance = Currency.Balance.of_int 10_000
 
 let initial_poor_balance = Currency.Balance.of_int 100
 
+let set ledger account = Ledger.set' ledger account |> Or_error.ok_exn
+
 let ledger =
   let ledger = Ledger.create () in
-  Ledger.set ledger rich_pk
+  set ledger
     { Account.public_key= rich_pk
     ; balance= initial_rich_balance
     ; receipt_chain_hash= Receipt.Chain_hash.empty
-    ; nonce= Account.Nonce.zero } ;
-  Ledger.set ledger poor_pk
+    ; nonce= Account.Nonce.zero };
+  set ledger
     { Account.public_key= poor_pk
     ; balance= initial_poor_balance
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; nonce= Account.Nonce.zero } ;
   List.fold sincere_pairs ~init:() ~f:(fun _ pair ->
-      Ledger.set ledger
-        (Public_key.compress pair.public_key)
+      set ledger
         { Account.public_key= Public_key.compress pair.public_key
         ; balance= Currency.Balance.of_int 1000
         ; receipt_chain_hash= Receipt.Chain_hash.empty

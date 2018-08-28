@@ -2,7 +2,26 @@ open Core
 open Snark_params
 open Currency
 
-include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
+module My_Key = struct
+
+  include Public_key.Compressed
+
+  let to_string key =
+    let bin_size = Public_key.Compressed.bin_size_t key in
+    let buf = Bigstring.create bin_size in
+    ignore (Public_key.Compressed.bin_write_t buf ~pos:0 key) ;
+    Bigstring.to_string buf
+end
+
+module Account = struct
+  include Account
+
+  let set_balance t new_balance = {t with balance= new_balance}
+
+  let public_key (t: t) = public_key t
+end
+
+include Merkle_ledger.Database.Make (My_Key) (Account)
           (struct
             type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
 
@@ -15,6 +34,38 @@ include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
           (struct
             let depth = ledger_depth
           end)
+          (Merkle_ledger.Test_stubs.In_memory_kvdb)
+          (Merkle_ledger.Test_stubs.In_memory_sdb)
+
+let merkle_path_at_index_exn t index =
+  merkle_path_at_addr t (Addr.of_index_exn index)
+
+let get_at_index_exn t index = 
+  get_account_from_key t (of_index index) |> Option.value_exn
+
+let set_at_index_exn t index account = 
+  update_account t (of_index index) account
+
+let index_of_key_exn t public_key =
+  public_key_to_index t public_key |> 
+  Option.value_exn |>
+  to_index
+
+let merkle_path_at_addr_exn = merkle_path_at_addr
+
+let depth = ledger_depth
+
+let length = num_accounts
+
+let copy t = t
+
+let t_of_sexp = opaque_of_sexp
+
+let sexp_of_t = sexp_of_opaque
+
+let create () = create ~key_value_db_dir:"" ~stack_db_file:""
+
+let set t pk account = update_account t (public_key_to_index t pk |> Option.value_exn) account
 
 let merkle_root t =
   Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
@@ -24,7 +75,11 @@ let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
 let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
 
 let get' ledger tag key =
-  error_opt (sprintf "%s not found" tag) (get ledger key)
+  error_opt (sprintf "%s not found" tag) (get_account ledger key)
+
+let set' ledger account : unit Or_error.t =
+  set_account ledger account |>
+  Result.map_error ~f:(fun error -> Error.create "" error [%sexp_of: error])
 
 let add_amount balance amount =
   error_opt "overflow" (Balance.add_amount balance amount)
@@ -57,8 +112,9 @@ end
    in the case that the sender is equal to the receiver, but it complicates the SNARK, so
    we don't for now. *)
 let apply_transaction_unchecked ledger
-    ({payload; sender} as transaction: Transaction.t) =
+    ({payload; sender; _} as transaction: Transaction.t) =
   let sender = Public_key.compress sender in
+  
   let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
   let open Or_error.Let_syntax in
   let%bind sender_account = get' ledger "sender" sender in
@@ -78,14 +134,14 @@ let apply_transaction_unchecked ledger
     ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
   in
   if Public_key.Compressed.equal sender receiver then (
-    set ledger sender sender_account_without_balance_modified ;
+    let%bind () = set' ledger sender_account_without_balance_modified in
     return undo )
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
-    let%map receiver_balance' = add_amount receiver_account.balance amount in
-    set ledger sender
-      {sender_account_without_balance_modified with balance= sender_balance'} ;
-    set ledger receiver {receiver_account with balance= receiver_balance'} ;
+    let%bind receiver_balance' = add_amount receiver_account.balance amount in
+    let%bind () = set' ledger
+      {sender_account_without_balance_modified with balance= sender_balance'} in
+    let%map () = set' ledger {receiver_account with balance= receiver_balance'} in
     undo
 
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
@@ -95,12 +151,12 @@ let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
   let open Or_error.Let_syntax in
   match transfer with
   | One (pk, fee) ->
-      let%map a = get' t "One-pk" pk in
-      set t pk {a with balance= modify_balance a.balance fee}
+      let%bind a = get' t "One-pk" pk in
+      set' t {a with balance= modify_balance a.balance fee}
   | Two ((pk1, fee1), (pk2, fee2)) ->
-      let%map a1 = get' t "Two-pk1" pk1 and a2 = get' t "Two-pk2" pk2 in
-      set t pk1 {a1 with balance= modify_balance a1.balance fee1} ;
-      set t pk2 {a2 with balance= modify_balance a2.balance fee2}
+      let%bind a1 = get' t "Two-pk1" pk1 and a2 = get' t "Two-pk2" pk2 in
+      let%bind () = set' t {a1 with balance= modify_balance a1.balance fee1} in
+      set' t {a2 with balance= modify_balance a2.balance fee2}
 
 let apply_fee_transfer t transfer =
   process_fee_transfer t transfer ~modify_balance:(fun b f ->
@@ -111,7 +167,7 @@ let undo_fee_transfer t transfer =
       Option.value_exn (Balance.sub_amount b (Amount.of_fee f)) )
 
 let undo_transaction ledger
-    {Undo.transaction= {payload; sender}; previous_receipt_chain_hash} =
+    {Undo.transaction= {payload; sender; _}; previous_receipt_chain_hash} =
   let sender = Public_key.compress sender in
   let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
   let open Or_error.Let_syntax in
@@ -127,18 +183,17 @@ let undo_transaction ledger
     {sender_account with nonce; receipt_chain_hash= previous_receipt_chain_hash}
   in
   if Public_key.Compressed.equal sender receiver then (
-    set ledger sender sender_account_without_balance_modified ;
-    return () )
+    set' ledger sender_account_without_balance_modified
+    )
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
-    let%map receiver_balance' = sub_amount receiver_account.balance amount in
-    set ledger sender
-      {sender_account_without_balance_modified with balance= sender_balance'} ;
-    set ledger receiver {receiver_account with balance= receiver_balance'}
+    let%bind receiver_balance' = sub_amount receiver_account.balance amount in
+    let%bind () = set' ledger 
+      {sender_account_without_balance_modified with balance= sender_balance'} in
+    set' ledger {receiver_account with balance= receiver_balance'}
 
 let undo : t -> Undo.t -> unit Or_error.t =
  fun ledger undo ->
-  let open Or_error.Let_syntax in
   match undo with
   | Fee_transfer t -> undo_fee_transfer ledger t
   | Transaction u -> undo_transaction ledger u

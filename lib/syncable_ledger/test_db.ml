@@ -26,7 +26,8 @@ struct
 
   module L = struct
     module MT =
-      Merkle_ledger.Database.Make (Balance) (Account) (Hash) (Depth) (In_memory_kvdb)
+      Merkle_ledger.Database.Make (Balance) (Account) (Hash) (Depth)
+        (In_memory_kvdb)
         (In_memory_sdb)
     module Addr = MT.Addr
 
@@ -68,11 +69,13 @@ struct
 
     let load_ledger num_accounts (balance: int) =
       let ledger = MT.create ~key_value_db_dir:"" ~stack_db_file:"" in
-      let keys = List.init num_accounts ~f:((+) 1) |> List.map ~f:Int.to_string in
+      let keys =
+        List.init num_accounts ~f:(( + ) 1) |> List.map ~f:Int.to_string
+      in
       List.iter keys ~f:(fun key ->
-        let account = Account.create key balance in
-        assert (MT.set_account ledger account = Ok ()) 
-        ) |> ignore;
+          let account = Account.create key balance in
+          assert (MT.set_account ledger account = Ok ()) )
+      |> ignore ;
       (ledger, keys)
   end
 

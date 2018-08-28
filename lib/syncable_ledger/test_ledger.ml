@@ -9,7 +9,7 @@ end) =
 struct
   open Merkle_ledger.Test_stubs
 
-  module Root_hash = struct  
+  module Root_hash = struct
     include Hash
 
     let to_hash = Fn.id
@@ -17,11 +17,9 @@ struct
     type account = Account.t
   end
 
-  module L = struct 
-    include Merkle_ledger.Ledger.Make (Key) 
-      (Account) 
-      (Hash) 
-      (Inputs)
+  module L = struct
+    include Merkle_ledger.Ledger.Make (Key) (Account) (Hash) (Inputs)
+
     type path = Path.t
 
     type addr = Addr.t
@@ -30,7 +28,7 @@ struct
 
     type hash = Root_hash.t
 
-(* TODO: Make this into a functors *)
+    (* TODO: Make this into a functors *)
     let load_ledger n b =
       let ledger = create () in
       let keys = List.init n ~f:(fun i -> Int.to_string i) in

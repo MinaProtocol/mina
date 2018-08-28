@@ -30,6 +30,8 @@ module type S = sig
 
   val child_exn : t -> Direction.t -> t
 
+  val of_index_exn : int -> t
+
   val parent_exn : t -> t
 
   val dirs_from_root : t -> Direction.t list
@@ -255,6 +257,23 @@ struct
       (first_node, last_node)
   end
 
+  let to_index a =
+    List.foldi
+      (List.rev @@ dirs_from_root a)
+      ~init:0
+      ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
+  
+  let of_index_exn index =
+    if index >= (1 lsl Input.depth) then failwith "Index is too large" else
+    let buf = create_bitstring Input.depth in
+    
+    (Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive (Input.depth - 1) 0) |>
+    Sequence.fold ~init:index ~f:(fun i pos -> 
+      Bitstring.put buf pos (i % 2);
+      i / 2
+    ) |> ignore;
+    buf
+
   let%test "the merkle root should have no path" =
     dirs_from_root (root ()) = []
 
@@ -266,6 +285,13 @@ struct
       ~f:(fun (path, direction) ->
         let address = of_directions path in
         [%test_eq : t] (parent_exn (child_exn address direction)) address )
+
+  let%test_unit "to_index(compute_leaf_path_exn(i)) = i" =
+    Quickcheck.test ~sexp_of:[%sexp_of: int]
+    (Int.gen_incl 0 (1 lsl Input.depth - 1))
+    ~f:(fun index -> 
+      [%test_result : int] ~expect:index (to_index @@ of_index_exn index)
+      )
 end
 
 let%test_module "Address" =

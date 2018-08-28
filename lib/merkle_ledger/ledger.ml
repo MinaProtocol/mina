@@ -3,9 +3,8 @@ open Core
 (* SOMEDAY: handle empty wallets *)
 module Make
     (Key : Intf.Key) (Account : sig
-        type t [@@deriving sexp, eq, bin_io]
-
-        val public_key : t -> Key.t
+        type t [@@deriving sexp, bin_io]
+        include Intf.Account with type key := Key.t and type t := t
     end)
     (Hash : sig
               type t [@@deriving sexp, hash, compare, bin_io]
@@ -72,23 +71,10 @@ struct
     in
     {accounts= Key.Table.copy t.accounts; tree= copy_tree t.tree}
 
-  module Path = struct
-    type elem = [`Left of Hash.t | `Right of Hash.t] [@@deriving sexp]
+  module Path =
+    Merkle_path.Make(Hash)
 
-    let elem_hash = function `Left h | `Right h -> h
-
-    type t = elem list [@@deriving sexp]
-
-    let implied_root (t: t) hash =
-      List.fold t ~init:(hash, 0) ~f:(fun (acc, height) elem ->
-          let acc =
-            match elem with
-            | `Left h -> Hash.merge ~height acc h
-            | `Right h -> Hash.merge ~height h acc
-          in
-          (acc, height + 1) )
-      |> fst
-  end
+  type path = Path.t
 
   let create_account_table () = Key.Table.create ()
 

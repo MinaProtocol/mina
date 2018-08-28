@@ -48,7 +48,7 @@ module Hash = struct
 
   let hash_account account = Md5.digest_string ("0" ^ Account.show account)
 
-  let empty = (hash_account Account.empty)
+  let empty = hash_account Account.empty
 
   let merge ~height a b =
     let res =
@@ -70,6 +70,8 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let set tbl ~key ~data = Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
 
   let delete tbl ~key = Hashtbl.remove tbl (Bigstring.to_string key)
+
+  let copy tbl = Hashtbl.copy tbl
 end
 
 module In_memory_sdb : Intf.Stack_database = struct
@@ -89,6 +91,8 @@ module In_memory_sdb : Intf.Stack_database = struct
         Some h
 
   let length ls = List.length !ls
+
+  let copy stack = ref (!stack)
 end
 
 module Key = struct

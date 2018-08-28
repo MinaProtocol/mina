@@ -343,7 +343,7 @@ struct
 
   module Ledger_builder_transition = struct
     type t = {old: Ledger_builder.t; diff: Ledger_builder_diff.t}
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp]
 
     module With_valid_signatures_and_proofs = struct
       type t =
@@ -382,7 +382,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving bin_io, sexp]
+    [@@deriving sexp]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -437,7 +437,7 @@ struct
       type t =
         { ledger_builder_transition: Ledger_builder_transition.t
         ; state: Proof_carrying_state.t }
-      [@@deriving bin_io]
+      
     end
 
     let strip {ledger_builder_transition; state} =
@@ -549,8 +549,6 @@ struct
       end)
       (struct
         include Ledger
-
-        type path = Path.t
 
         let f = Account.hash
       end)

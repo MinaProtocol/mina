@@ -8,7 +8,7 @@ include Sparse_ledger_lib.Sparse_ledger.Make (struct
           (struct
             include Account.Stable.V1
 
-            let key {Account.public_key} = public_key
+            let key {Account.public_key; _} = public_key
 
             let hash = Fn.compose Merkle_hash.of_digest Account.digest
           end)
@@ -17,14 +17,14 @@ let of_ledger_subset_exn ledger keys =
   List.fold keys
     ~f:(fun acc key ->
       add_path acc
-        (Option.value_exn (Ledger.merkle_path ledger key))
-        (Option.value_exn (Ledger.get ledger key)) )
+        (Ledger.merkle_path ledger key)
+        (Option.value_exn (Ledger.get_account ledger key)) )
     ~init:
-      (of_hash ~depth:Ledger.depth
+      (of_hash ~depth:Ledger.max_depth
          (Merkle_hash.of_digest (Ledger.merkle_root ledger :> Pedersen.Digest.t)))
 
-let apply_transaction_exn t ({sender; payload}: Transaction.t) =
-  let {Transaction_payload.amount; fee; receiver} = payload in
+let apply_transaction_exn t ({sender; payload; _}: Transaction.t) =
+  let {Transaction_payload.amount; fee; receiver; _} = payload in
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in

@@ -555,7 +555,7 @@ module Merge = struct
   let main (top_hash: Pedersen.Digest.Packed.var) =
     let%bind tock_vk_data =
       provide_witness' Verifier.Verification_key_data.typ ~f:
-        (fun {Prover_state.tock_vk} ->
+        (fun {Prover_state.tock_vk; _} ->
           Verifier.Verification_key_data.of_verification_key tock_vk )
     and s1 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash1
     and s2 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash2
@@ -844,7 +844,7 @@ struct
         ~length:Tick_curve.Field.size_in_bits
     in
     let%bind is_base =
-      provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type} ->
+      provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
           Proof_type.is_base proof_type )
     in
     let verification_key =
@@ -1099,7 +1099,7 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _ -> failwithf "Transaction_snark: load failed on %s" p ()
       in
       let%map base = load tick_controller base
       and merge = load tick_controller merge
@@ -1243,7 +1243,7 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
-          Array.iter wallets ~f:(fun {account} ->
+          Array.iter wallets ~f:(fun {account; _} ->
               Ledger.set ledger account.public_key account ) ;
           let t1 =
             transaction wallets 0 1 8

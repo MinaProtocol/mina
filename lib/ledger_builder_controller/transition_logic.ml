@@ -34,7 +34,7 @@ module type Inputs_intf = sig
   end
 
   module Tip : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
 
     val state : t -> Protocol_state.value
 

@@ -2,8 +2,11 @@ open Core
 open Unsigned
 
 module Make
-    (Balance : Intf.Balance)
-    (Account : Intf.Account with type balance := Balance.t)
+    (Public_key : sig
+      type t
+      val to_string : t -> string
+    end)
+    (Account : Intf.Account with type key := Public_key.t)
     (Hash : Intf.Hash with type account := Account.t)
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
@@ -11,29 +14,35 @@ module Make
   include Intf.Database_S
           with type account := Account.t
            and type hash := Hash.t
+           and type key := Public_key.t
 
-  val gen_account_key : key Core.Quickcheck.Generator.t
+  module Key : sig
+    type t
+  end
+  val of_index: int -> Key.t
+
+  val to_index: Key.t -> int
+
+  val gen_account_key : Key.t Core.Quickcheck.Generator.t
+
+  val get_account_from_key : t -> Key.t -> Account.t option
+
+  val get_key_of_account : t -> Account.t -> (Key.t, error) Result.t
+
+  val update_account: t -> Key.t -> Account.t -> unit
+
+  val public_key_to_index : t -> Public_key.t -> Key.t option
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   let max_depth = Depth.depth
 
   let () = assert (max_depth < 0xfe)
 
-  type error = Account_key_not_found | Out_of_leaves | Malformed_database
+  type error = Account_key_not_found | Out_of_leaves | Malformed_database [@@deriving sexp]
 
-  module MerklePath = struct
-    type t = Direction.t * Hash.t
+  module Path = Merkle_path.Make(Hash)
 
-    let implied_root path leaf_hash =
-      let rec loop sibling_hash ~height = function
-        | [] -> sibling_hash
-        | (Direction.Left, hash) :: t ->
-            loop (Hash.merge ~height hash sibling_hash) ~height:(height + 1) t
-        | (Direction.Right, hash) :: t ->
-            loop (Hash.merge ~height sibling_hash hash) ~height:(height + 1) t
-      in
-      loop leaf_hash ~height:0 path
-  end
+  type path = Path.t
 
   module Addr = Merkle_address.Make (struct
     let depth = max_depth
@@ -156,12 +165,14 @@ end = struct
       | Right -> (sibling, base)
   end
 
-  type key = Key.t
+  let of_index index = Key.Account (Addr.of_index_exn index)
+
+  let to_index  = function
+    | Key.Generic _ -> raise (Invalid_argument "generic keys do not have an index")
+    | Account path -> Addr.to_int path
+    | Hash path -> Addr.to_int path
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
-
-  (* let sexp_of_t {kvdb; _} = 
-    let rec go i =  *)
 
   let gen_account_key =
     let open Quickcheck.Let_syntax in
@@ -206,8 +217,8 @@ end = struct
   let get_generic mdb key =
     assert (Key.is_generic key) ;
     get_raw mdb key
-
-  let get_account mdb key =
+  
+  let get_account_from_key mdb key =
     assert (Key.is_account key) ;
     get_bin mdb key Account.bin_read_t
 
@@ -237,10 +248,6 @@ end = struct
           Key.order_siblings key new_hash sibling_hash
         in
         assert (height <= Depth.depth) ;
-        (* (match key with
-        | Hash path -> Core.printf !"Path: %{sexp:Addr.t}\n" path
-        | _ -> failwith "Not implemented"); *)
-        (* Core.printf !"Height %d : %{sexp:Hash.t} %{sexp:Hash.t}\n" height left_hash right_hash; *)
         Hash.merge ~height left_hash right_hash
       in
       set_hash mdb (Key.parent key) parent_hash
@@ -256,7 +263,7 @@ end = struct
   module Account_key = struct
     let build_key account =
       Key.build_generic
-        (Bigstring.of_string ("$" ^ Account.public_key account))
+        (Bigstring.of_string ("$" ^ Public_key.to_string (Account.public_key account) ))
 
     let get mdb account =
       match get_generic mdb (build_key account) with
@@ -330,8 +337,12 @@ end = struct
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
           let account =
-            Option.value ~default:Account.empty
-              (get_account mdb (Key.Account bit_index))
+            Option.value_exn
+              ~message:
+                (sprintf
+                   !"address %{sexp:Addr.t} does not have an account"
+                   bit_index)
+              (get_account_from_key mdb (Key.Account bit_index))
           in
           account :: acc )
     in
@@ -357,10 +368,37 @@ end = struct
     let rec loop k =
       let sibling = Key.sibling k in
       let sibling_dir = Key.last_direction (Key.path k) in
-      (sibling_dir, get_hash mdb sibling)
+      let hash = get_hash mdb sibling in
+      (Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash))
       :: (if Key.height key < max_depth then loop (Key.parent k) else [])
     in
     loop key
 
   let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
+
+  let copy {kvdb; sdb} = {kvdb=Kvdb.copy kvdb; sdb=Sdb.copy sdb} 
+
+  module Public_key_operations = struct
+      open Option.Let_syntax
+
+      let public_key_to_index mdb public_key =
+        (* TODO: duplicated code *)
+        let open Option.Let_syntax in
+        let%bind account_key_bin = get_generic mdb (Key.build_generic 
+        (Bigstring.of_string ("$" ^ Public_key.to_string public_key))) in
+        match Key.parse account_key_bin with
+        | Ok account_key -> Some account_key 
+        | Error () -> None
+
+      let get_account mdb public_key = 
+        public_key_to_index mdb public_key >>=
+        get_account_from_key mdb
+
+      let merkle_path mdb public_key =
+        public_key_to_index mdb public_key
+        |> Option.value_exn
+        |> merkle_path mdb
+  end
+
+  include Public_key_operations
 end

@@ -17,15 +17,9 @@ end
 module type Account = sig
   type t [@@deriving bin_io, eq]
 
-  type balance
+  type key
 
-  val empty : t
-
-  val balance : t -> balance
-
-  val set_balance : t -> balance -> t
-
-  val public_key : t -> string
+  val public_key : t -> key
 end
 
 module type Hash = sig
@@ -47,6 +41,8 @@ end
 module type Key_value_database = sig
   type t
 
+  val copy : t -> t
+
   val create : directory:string -> t
 
   val destroy : t -> unit
@@ -60,6 +56,8 @@ end
 
 module type Stack_database = sig
   type t
+
+  val copy : t -> t
 
   val create : filename:string -> t
 
@@ -85,19 +83,13 @@ module type Ledger_S = sig
 
   type t [@@deriving sexp, bin_io]
 
+  module Path : Merkle_path.S with type hash := hash
+
+  type path = Path.t
+
   include Container.S0 with type t := t and type elt := account
 
   val copy : t -> t
-
-  module Path : sig
-    type elem = [`Left of hash | `Right of hash] [@@deriving sexp]
-
-    val elem_hash : elem -> hash
-
-    type t = elem list [@@deriving sexp]
-
-    val implied_root : t -> hash -> hash
-  end
 
   module Addr : Merkle_address.S
 
@@ -120,7 +112,7 @@ module type Ledger_S = sig
 
   val compare : t -> t -> int
 
-  val merkle_path : t -> key -> Path.t option
+  val merkle_path : t -> key -> path option
 
   val key_of_index : t -> index -> key option
 
@@ -134,15 +126,15 @@ module type Ledger_S = sig
 
   val set_at_index : t -> index -> account -> [`Ok | `Index_not_found]
 
-  val merkle_path_at_index : t -> index -> [`Ok of Path.t | `Index_not_found]
+  val merkle_path_at_index : t -> index -> [`Ok of path | `Index_not_found]
 
   val get_at_index_exn : t -> index -> account
 
   val set_at_index_exn : t -> index -> account -> unit
 
-  val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
+  val merkle_path_at_addr_exn : t -> Addr.t -> path
 
-  val merkle_path_at_index_exn : t -> index -> Path.t
+  val merkle_path_at_index_exn : t -> index -> path
 
   val get_at_addr_exn : t -> Addr.t -> account
 
@@ -176,15 +168,17 @@ module type Database_S = sig
 
   type t
 
-  type error = Account_key_not_found | Out_of_leaves | Malformed_database
+  type error = Account_key_not_found | Out_of_leaves | Malformed_database [@@deriving sexp]
 
   module Addr : Merkle_address.S
 
-  module MerklePath : sig
-    type t = Direction.t * hash
+  module Path : Merkle_path.S with type hash := hash
+  
+  type path = Path.t
 
-    val implied_root : t list -> hash -> hash
-  end
+  val copy : t -> t
+
+  val max_depth : int
 
   val create : key_value_db_dir:string -> stack_db_file:string -> t
 
@@ -192,17 +186,15 @@ module type Database_S = sig
 
   val num_accounts : t -> int
 
-  val get_key_of_account : t -> account -> (key, error) Result.t
-
   val get_account : t -> key -> account option
 
   val set_account : t -> account -> (unit, error) Result.t
 
   val merkle_root : t -> hash
 
-  val merkle_path : t -> key -> MerklePath.t list
+  val merkle_path : t -> key -> path
 
-  val merkle_path_at_addr : t -> Addr.t -> MerklePath.t list
+  val merkle_path_at_addr : t -> Addr.t -> path
 
   val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
 
