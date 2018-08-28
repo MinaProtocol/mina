@@ -226,8 +226,6 @@ end = struct
     ignore (bin_write buf ~pos:0 v) ;
     set_raw mdb key buf
 
-  let delete_raw {kvdb; _} key = Kvdb.delete kvdb ~key:(Key.serialize key)
-
   let rec set_hash mdb key new_hash =
     assert (Key.is_hash key) ;
     set_bin mdb key Hash.bin_size_t Hash.bin_write_t new_hash ;
@@ -269,24 +267,22 @@ end = struct
 
     let set mdb account key = set_raw mdb (build_key account) key
 
-    let delete mdb account = delete_raw mdb (build_key account)
-
     let increment_last_account_key mdb =
-      let key =
-        Key.build_generic (Bigstring.of_string "last_account_key")
-      in
-        match get_generic mdb key with
-        | None -> let account_key = Key.build_empty_account () in
-                  set_raw mdb key (Key.serialize account_key);
-                  Result.return account_key
-        | Some prev_key -> (match Key.parse prev_key with
-          | Error () -> Error Malformed_database
-          | Ok prev_account_key -> Key.next prev_account_key |> 
-                Result.of_option ~error:Out_of_leaves |> 
-                Result.map ~f:(fun next_account_key ->
-                 set_raw mdb key (Key.serialize next_account_key) ;
-                 next_account_key )
-        )
+      let key = Key.build_generic (Bigstring.of_string "last_account_key") in
+      match get_generic mdb key with
+      | None ->
+          let account_key = Key.build_empty_account () in
+          set_raw mdb key (Key.serialize account_key) ;
+          Result.return account_key
+      | Some prev_key ->
+        match Key.parse prev_key with
+        | Error () -> Error Malformed_database
+        | Ok prev_account_key ->
+            Key.next prev_account_key
+            |> Result.of_option ~error:Out_of_leaves
+            |> Result.map ~f:(fun next_account_key ->
+                   set_raw mdb key (Key.serialize next_account_key) ;
+                   next_account_key )
 
     let allocate mdb account =
       let key_result =
@@ -302,12 +298,11 @@ end = struct
     let last_key_address mdb =
       match
         Key.build_generic (Bigstring.of_string "last_account_key")
-        |> get_raw mdb
-        |> Result.of_option ~error:(())
+        |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Key.parse
       with
       | Error () -> None
-      | Ok parsed_key -> Some(Key.get_path parsed_key)
+      | Ok parsed_key -> Some (Key.get_path parsed_key)
   end
 
   let get_key_of_account = Account_key.get
@@ -316,28 +311,14 @@ end = struct
     set_bin mdb key Account.bin_size_t Account.bin_write_t account ;
     set_hash mdb (Key.Hash (Key.path key)) (Hash.hash_account account)
 
-  let delete_account mdb account =
-    match Account_key.get mdb account with
-    | Error Account_key_not_found -> Ok ()
-    | Error err -> Error err
-    | Ok key ->
-        Kvdb.delete mdb.kvdb ~key:(Key.serialize key) ;
-        set_hash mdb (Key.Hash (Key.path key)) Hash.empty ;
-        Account_key.delete mdb account ;
-        Sdb.push mdb.sdb (Key.serialize key) ;
-        Ok ()
-
   let set_account mdb account =
-    if Balance.equal (Account.balance account) Balance.zero then
-      delete_account mdb account
-    else
-      let key_result =
-        match Account_key.get mdb account with
-        | Error Account_key_not_found -> Account_key.allocate mdb account
-        | Error err -> Error err
-        | Ok key -> Ok key
-      in
-      Result.map key_result ~f:(fun key -> update_account mdb key account)
+    let key_result =
+      match Account_key.get mdb account with
+      | Error Account_key_not_found -> Account_key.allocate mdb account
+      | Error err -> Error err
+      | Ok key -> Ok key
+    in
+    Result.map key_result ~f:(fun key -> update_account mdb key account)
 
   let num_accounts t =
     match Account_key.last_key_address t with
