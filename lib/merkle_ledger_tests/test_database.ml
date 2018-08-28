@@ -176,6 +176,26 @@ let%test_module "test functor on in memory databases" =
                 MT.set_all_accounts_rooted_at_exn mdb address accounts ;
                 let result = MT.get_all_accounts_rooted_at_exn mdb address in
                 assert (List.equal ~equal:Account.equal accounts result) ) )
+
+      let%test_unit "Add 2^d accounts (for testing, d is small)" =
+        if Depth.depth <= 8 then
+          with_test_instance (fun mdb ->
+              let gen_balance = Int.gen_incl 1 Int.max_value in
+              let accounts =
+                List.init (1 lsl Depth.depth) ~f:(fun public_key ->
+                    Account.create (Int.to_string public_key)
+                      (Quickcheck.random_value gen_balance) )
+              in
+              assert (
+                Sequence.for_all (Sequence.of_list accounts) ~f:(fun account ->
+                    MT.set_account mdb account = Ok () ) ) ;
+              let retrieved_accounts =
+                MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
+              in
+              assert (List.length accounts = List.length retrieved_accounts) ;
+              assert (
+                List.equal ~equal:Account.equal accounts retrieved_accounts )
+          )
     end
 
     module Mdb_d4 = Mdb_d (struct

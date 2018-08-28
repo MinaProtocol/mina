@@ -262,28 +262,27 @@ end = struct
 
     let delete mdb account = delete_raw mdb (build_key account)
 
-    let next_free_key mdb =
+    let increment_last_account_key mdb =
       let key =
-        Key.build_generic (Bigstring.of_string "next_free_account_key")
+        Key.build_generic (Bigstring.of_string "last_account_key")
       in
-      let account_key_result =
         match get_generic mdb key with
-        | None -> Result.return (Key.build_empty_account ())
-        | Some key -> Key.parse key
-      in
-      match account_key_result with
-      | Error () -> Error Malformed_database
-      | Ok account_key ->
-          Key.next account_key
-          |> Result.of_option ~error:Out_of_leaves
-          |> Result.map ~f:(fun next_account_key ->
+        | None -> let account_key = Key.build_empty_account () in
+                  set_raw mdb key (Key.serialize account_key);
+                  Result.return account_key
+        | Some prev_key -> (match Key.parse prev_key with
+          | Error () -> Error Malformed_database
+          | Ok prev_account_key -> Key.next prev_account_key |> 
+                Result.of_option ~error:Out_of_leaves |> 
+                Result.map ~f:(fun next_account_key ->
                  set_raw mdb key (Key.serialize next_account_key) ;
-                 account_key )
+                 next_account_key )
+        )
 
     let allocate mdb account =
       let key_result =
         match Sdb.pop mdb.sdb with
-        | None -> next_free_key mdb
+        | None -> increment_last_account_key mdb
         | Some key ->
             Key.parse key |> Result.map_error ~f:(fun () -> Malformed_database)
       in
@@ -291,15 +290,15 @@ end = struct
           set mdb account (Key.serialize key) ;
           key )
 
-    let last_free_key_address mdb =
+    let last_key_address mdb =
       match
-        Key.build_generic (Bigstring.of_string "next_free_account_key")
+        Key.build_generic (Bigstring.of_string "last_account_key")
         |> get_raw mdb
-        |> Option.value_map ~f:Key.parse
-             ~default:(Result.return @@ Key.build_empty_account ())
+        |> Result.of_option ~error:(())
+        |> Result.bind ~f:Key.parse
       with
-      | Error () -> failwith "Could not get retrieve last key"
-      | Ok parsed_key -> Key.to_path_exn parsed_key
+      | Error () -> None
+      | Ok parsed_key -> Some(Key.to_path_exn parsed_key)
   end
 
   let get_key_of_account = Account_key.get
@@ -332,7 +331,9 @@ end = struct
       Result.map key_result ~f:(fun key -> update_account mdb key account)
 
   let num_accounts t =
-    Addr.to_int (Account_key.last_free_key_address t) - Sdb.length t.sdb
+    match Account_key.last_key_address t with
+    | None -> 0
+    | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
 
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in
