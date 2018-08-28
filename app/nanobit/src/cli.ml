@@ -65,9 +65,7 @@ let daemon (type ledger_proof) (module Kernel
        let client_port =
          Option.value ~default:default_client_port client_port
        in
-       let should_propose =
-         Option.value ~default:true should_propose
-       in
+       let should_propose = Option.value ~default:true should_propose in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
@@ -166,8 +164,7 @@ let () =
           [ (Coda_peers_test.name, Coda_peers_test.command)
           ; ( Coda_block_production_test.name
             , Coda_block_production_test.command )
-          ; ( Coda_shared_prefix_test.name
-            , Coda_shared_prefix_test.command )
+          ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
     else
@@ -190,13 +187,11 @@ let () =
             Coda_block_production_test.Make (Ledger_proof.Debug) (Kernel)
               (Coda) in
           let module Coda_shared_prefix_test =
-            Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel)
-              (Coda) in
+            Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           [ (Coda_peers_test.name, Coda_peers_test.command)
           ; ( Coda_block_production_test.name
             , Coda_block_production_test.command )
-          ; ( Coda_shared_prefix_test.name
-            , Coda_shared_prefix_test.command )
+          ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
   in

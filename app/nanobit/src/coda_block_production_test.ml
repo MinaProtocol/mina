@@ -22,8 +22,8 @@ struct
     let%bind program_dir = Unix.getcwd () in
     let log = Logger.create () in
     let log = Logger.child log name in
-    Coda_process.spawn_local_exn ~peers ~external_port ~discovery_port ~should_propose:true
-      ~program_dir ~f:(fun worker ->
+    Coda_process.spawn_local_exn ~peers ~external_port ~discovery_port
+      ~should_propose:true ~program_dir ~f:(fun worker ->
         let%bind strongest_ledgers =
           Coda_process.strongest_ledgers_exn worker
         in

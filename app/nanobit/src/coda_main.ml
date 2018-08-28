@@ -756,9 +756,12 @@ module type Main_intf = sig
       type t [@@deriving sexp, bin_io]
     end
 
-    module Consensus_mechanism : Consensus.Mechanism.S
-    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
-     and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+    module Consensus_mechanism :
+      Consensus.Mechanism.S
+      with type Internal_transition.Ledger_builder_diff.t =
+                  Ledger_builder_diff.t
+       and type External_transition.Ledger_builder_diff.t =
+                  Ledger_builder_diff.t
 
     module Net : sig
       type t
@@ -815,7 +818,8 @@ module type Main_intf = sig
     end
 
     module Transition_tree :
-      Coda.Ktree_intf with type elem := Consensus_mechanism.External_transition.t
+      Coda.Ktree_intf
+      with type elem := Consensus_mechanism.External_transition.t
   end
 
   module Consensus_mechanism :

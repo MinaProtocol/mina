@@ -34,8 +34,7 @@ struct
         let subtree_height = 3
       end)
 
-  module SR =
-    SL.Responder
+  module SR = SL.Responder
 
   (* not really kosher but the tests are run in-order, so this will get filled
    * in before we need it. *)

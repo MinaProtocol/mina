@@ -528,16 +528,12 @@ module Make (Inputs : Inputs_intf) = struct
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
         ~time_controller:config.time_controller
     in
-    if config.should_propose
-    then begin
+    if config.should_propose then
       don't_wait_for
         (Linear_pipe.transfer_id
            (Proposer.transitions proposer)
            external_transitions_writer)
-    end
-    else don't_wait_for begin
-      Linear_pipe.drain (Proposer.transitions proposer)
-    end;
+    else don't_wait_for (Linear_pipe.drain (Proposer.transitions proposer)) ;
     return
       { proposer
       ; net
