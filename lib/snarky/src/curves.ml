@@ -85,6 +85,26 @@ module Make_intf (Impl : Snark_intf.S) = struct
   end
 end
 
+module type Shifted_intf = sig
+  type (_, _) checked
+
+  type boolean_var
+
+  type curve_var
+
+  type t
+
+  val zero : t
+
+  val add : t -> curve_var -> (t, _) checked
+
+  (* This is only safe if the result is guaranteed to not be zero. *)
+
+  val unshift_nonzero : t -> (curve_var, _) checked
+
+  val if_ : boolean_var -> then_:t -> else_:t -> (t, _) checked
+end
+
 module Edwards = struct
   module type Params_intf = sig
     type field
@@ -301,8 +321,6 @@ module Edwards = struct
           let%map () = Field.Checked.Assert.equal x1 x2
           and () = Field.Checked.Assert.equal y1 y2 in
           ()
-
-        let not_identity (x, y) = failwith ""
       end
 
       let add_known (x1, y1) (x2, y2) =
@@ -502,6 +520,8 @@ module Make_weierstrass_checked
     end) (Curve : sig
       type t
 
+      val random : unit -> t
+
       val to_coords : t -> Impl.Field.t * Impl.Field.t
 
       val of_coords : Impl.Field.t * Impl.Field.t -> t
@@ -553,7 +573,7 @@ struct
     let equal = assert_equal
   end
 
-  let add (ax, ay) (bx, by) =
+  let add_unsafe (ax, ay) (bx, by) =
     with_label __LOC__
       (let open Let_syntax in
       let%bind lambda = Field.Checked.(div (sub by ay) (sub bx ax)) in
@@ -588,6 +608,75 @@ struct
         Field.Checked.Infix.(assert_r1cs ~label:"c2" lambda (ax - cx) (cy + ay))
       in
       (cx, cy))
+
+  (* TODO-someday: Make it so this doesn't have to compute both branches *)
+  let if_ =
+    let to_list (x, y) = [x; y] in
+    let rev_map3i_exn xs ys zs ~f =
+      let rec go i acc xs ys zs =
+        match (xs, ys, zs) with
+        | x :: xs, y :: ys, z :: zs -> go (i + 1) (f i x y z :: acc) xs ys zs
+        | [], [], [] -> acc
+        | _ -> failwith "rev_map3i_exn"
+      in
+      go 0 [] xs ys zs
+    in
+    fun b ~then_ ~else_ ->
+      let open Let_syntax in
+      let%bind r =
+        provide_witness typ
+          (let open As_prover in
+          let open Let_syntax in
+          let%bind b = read Boolean.typ b in
+          read typ (if b then then_ else else_))
+      in
+      (*     r - e = b (t - e) *)
+      let%map () =
+        rev_map3i_exn (to_list r) (to_list then_) (to_list else_) ~f:
+          (fun i r t e ->
+            let open Field.Checked.Infix in
+            Constraint.r1cs ~label:(sprintf "main_%d" i)
+              (b :> Field.Checked.t)
+              (t - e) (r - e) )
+        |> assert_all
+      in
+      r
+
+  module Shifted = struct
+    module type S =
+      Shifted_intf
+      with type ('a, 'b) checked := ('a, 'b) Checked.t
+       and type curve_var := var
+       and type boolean_var := Boolean.var
+
+    module Make (M : sig
+      val shift : var
+    end) :
+      S =
+    struct
+      open M
+
+      type t = var
+
+      let zero = shift
+
+      let if_ = if_
+
+      let unshift_nonzero shifted = add_unsafe (negate shift) shifted
+
+      let add shifted x = add_unsafe shifted x
+    end
+
+    let create (type shifted) () : ((module S), _) Checked.t =
+      let open Let_syntax in
+      let%map shift =
+        provide_witness typ As_prover.(map (return ()) ~f:Curve.random)
+      in
+      let module M = Make (struct
+        let shift = shift
+      end) in
+      (module M : S)
+  end
 
   let double (ax, ay) =
     with_label __LOC__
@@ -627,39 +716,6 @@ struct
       and () = assert_r1cs lambda (ax - bx) (by + ay) in
       (bx, by))
 
-  (* TODO-someday: Make it so this doesn't have to compute both branches *)
-  let if_ =
-    let to_list (x, y) = [x; y] in
-    let rev_map3i_exn xs ys zs ~f =
-      let rec go i acc xs ys zs =
-        match (xs, ys, zs) with
-        | x :: xs, y :: ys, z :: zs -> go (i + 1) (f i x y z :: acc) xs ys zs
-        | [], [], [] -> acc
-        | _ -> failwith "rev_map3i_exn"
-      in
-      go 0 [] xs ys zs
-    in
-    fun b ~then_ ~else_ ->
-      let open Let_syntax in
-      let%bind r =
-        provide_witness typ
-          (let open As_prover in
-          let open Let_syntax in
-          let%bind b = read Boolean.typ b in
-          read typ (if b then then_ else else_))
-      in
-      (*     r - e = b (t - e) *)
-      let%map () =
-        rev_map3i_exn (to_list r) (to_list then_) (to_list else_) ~f:
-          (fun i r t e ->
-            let open Field.Checked.Infix in
-            Constraint.r1cs ~label:(sprintf "main_%d" i)
-              (b :> Field.Checked.t)
-              (t - e) (r - e) )
-        |> assert_all
-      in
-      r
-
   let if_value (cond: Boolean.var) ~then_ ~else_ =
     let x1, y1 = Curve.to_coords then_ in
     let x2, y2 = Curve.to_coords else_ in
@@ -670,7 +726,9 @@ struct
     in
     (choose x1 x2, choose y1 y2)
 
-  let scale_bits t (c: Boolean.var list) ~init =
+  let scale_bits (type shifted) (module Shifted
+      : Shifted.S with type t = shifted) t (c: Boolean.var list)
+      ~(init: shifted) : (shifted, _) Checked.t =
     with_label __LOC__
       (let open Let_syntax in
       let rec go i bs0 acc pt =
@@ -679,9 +737,9 @@ struct
         | b :: bs ->
             let%bind acc' =
               with_label (sprintf "acc_%d" i)
-                (let%bind add_pt = add acc pt in
+                (let%bind add_pt = Shifted.add acc pt in
                  let don't_add_pt = acc in
-                 if_ b ~then_:add_pt ~else_:don't_add_pt)
+                 Shifted.if_ b ~then_:add_pt ~else_:don't_add_pt)
             and pt' = double pt in
             go (i + 1) bs acc' pt'
       in
@@ -718,7 +776,9 @@ struct
     let x1, y1 = Curve.to_coords t1 and x2, y2 = Curve.to_coords t2 in
     (lookup_one (x1, x2), lookup_one (y1, y2))
 
-  let scale_known t (b: Boolean.var list) ~init =
+  let scale_known (type shifted) (module Shifted
+      : Shifted.S with type t = shifted) (t: Curve.t) (b: Boolean.var list)
+      ~init =
     let sigma = t in
     let n = List.length b in
     let sigma_count = (n + 1) / 2 in
@@ -777,41 +837,29 @@ struct
           let term =
             lookup_single_bit b_i (sigma, Curve.add sigma two_to_the_i)
           in
-          add acc term
+          Shifted.add acc term
       | b_i :: b_i_plus_1 :: rest ->
           let two_to_the_i_plus_1 = Curve.double two_to_the_i in
           let%bind term =
             to_term ~two_to_the_i ~two_to_the_i_plus_1 (b_i, b_i_plus_1)
           in
-          let%bind acc = add acc term in
+          let%bind acc = Shifted.add acc term in
           go acc (Curve.double two_to_the_i_plus_1) rest
     in
     let%bind result_with_shift = go init t b in
     let unshift =
       Curve.scale (Curve.negate sigma) (Scalar.of_int sigma_count)
     in
-    add result_with_shift (constant unshift)
+    Shifted.add result_with_shift (constant unshift)
 
-  let sum =
+  let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs
+      ~init =
     let open Let_syntax in
     let rec go acc = function
       | [] -> return acc
       | t :: ts ->
-          let%bind acc' = add t acc in
+          let%bind acc' = Shifted.add acc t in
           go acc' ts
     in
-    function
-      | [] -> failwith "Curves.sum: Expected non-empty list"
-      | t :: ts -> go t ts
-
-  let multi_sum (pairs: (Boolean.var list * var) list) ~init =
-    with_label __LOC__
-      (let open Let_syntax in
-      let rec go init = function
-        | (c, t) :: ps ->
-            let%bind acc = scale_bits t c ~init in
-            go acc ps
-        | [] -> return init
-      in
-      go init pairs)
+    go init xs
 end

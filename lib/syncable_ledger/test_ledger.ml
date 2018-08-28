@@ -1,26 +1,26 @@
+open Core
+open Unsigned
+
 module Make (Inputs : sig
   val depth : int
 
   val num_accts : int
 end) =
 struct
-  open Merkle_ledger.Test_ledger
+  open Merkle_ledger.Test_stubs
 
   module Root_hash = struct
     include Hash
 
-    type t = hash [@@deriving bin_io, compare, hash, sexp, compare]
+    let to_hash = Fn.id
+
+    let empty_hash = empty
 
     type account = Account.t
-
-    let to_hash (x: t) = x
-
-    let equal h1 h2 = compare_hash h1 h2 = 0
   end
 
   module L = struct
-    module Ledger = Merkle_ledger.Ledger.Make (Key) (Account) (Hash) (Inputs)
-    include Merkle_ledger.Test.Ledger (Ledger)
+    include Merkle_ledger.Ledger.Make (Key) (Account) (Hash) (Inputs)
 
     type path = Path.t
 
@@ -29,6 +29,13 @@ struct
     type account = Account.t
 
     type hash = Root_hash.t
+
+    let load_ledger n b =
+      let ledger = create () in
+      let keys = List.init n ~f:(fun i -> Int.to_string i) in
+      List.iter keys ~f:(fun k ->
+          set ledger k {Account.balance= UInt64.of_int b; public_key= k} ) ;
+      (ledger, keys)
   end
 
   module SL =

@@ -12,10 +12,6 @@ module Global_keypair = struct
 end
 
 module type Inputs_intf = sig
-  module Proof : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
   end
@@ -23,14 +19,12 @@ end
 
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
-  with module Proof = Inputs.Proof
-   and type Internal_transition.Ledger_builder_diff.t =
+  with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t =
 struct
   open Inputs
-  module Proof = Proof
   module Ledger_builder_diff = Ledger_builder_diff
 
   module Consensus_transition_data = struct
@@ -109,8 +103,7 @@ struct
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
-  module Snark_transition =
-    Snark_transition.Make (Consensus_transition_data) (Proof)
+  module Snark_transition = Snark_transition.Make (Consensus_transition_data)
   module Internal_transition =
     Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition =
@@ -120,7 +113,13 @@ struct
     let Consensus_transition_data.({signature}) =
       Snark_transition.consensus_data transition
     in
-    Blockchain_state.Signature.Checked.verifies signature
+    let open Snark_params.Tick.Let_syntax in
+    let%bind (module Shifted) =
+      Snark_params.Tick.Inner_curve.Checked.Shifted.create ()
+    in
+    Blockchain_state.Signature.Checked.verifies
+      (module Shifted)
+      signature
       (Public_key.var_of_t Global_keypair.public_key)
       (transition |> Snark_transition.blockchain_state)
 
