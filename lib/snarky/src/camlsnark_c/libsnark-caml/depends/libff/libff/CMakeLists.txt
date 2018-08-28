@@ -45,6 +45,17 @@ add_library(
   algebra/curves/mnt/mnt6/mnt6_init.cpp
   algebra/curves/mnt/mnt6/mnt6_pairing.cpp
   algebra/curves/mnt/mnt6/mnt6_pp.cpp
+  algebra/curves/mnt_128/mnt4128/mnt4128_g1.cpp
+  algebra/curves/mnt_128/mnt4128/mnt4128_g2.cpp
+  algebra/curves/mnt_128/mnt4128/mnt4128_init.cpp
+  algebra/curves/mnt_128/mnt4128/mnt4128_pairing.cpp
+  algebra/curves/mnt_128/mnt4128/mnt4128_pp.cpp
+  algebra/curves/mnt_128/mnt46128_common.cpp
+  algebra/curves/mnt_128/mnt6128/mnt6128_g1.cpp
+  algebra/curves/mnt_128/mnt6128/mnt6128_g2.cpp
+  algebra/curves/mnt_128/mnt6128/mnt6128_init.cpp
+  algebra/curves/mnt_128/mnt6128/mnt6128_pairing.cpp
+  algebra/curves/mnt_128/mnt6128/mnt6128_pp.cpp
   common/double.cpp
   common/profiling.cpp
   common/utils.cpp

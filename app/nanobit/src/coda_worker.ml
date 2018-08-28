@@ -3,21 +3,23 @@ open Async
 open Nanobit_base
 open Coda_main
 
-module Kernel = Kernel.Debug ()
-
-module Coda_worker = struct
+module Make
+    (Ledger_proof : Ledger_proof_intf)
+    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
+    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
+struct
   type input =
     { host: string
     ; conf_dir: string
     ; program_dir: string
-    ; my_port: int
-    ; gossip_port: int
+    ; external_port: int
+    ; discovery_port: int
     ; peers: Host_and_port.t list }
   [@@deriving bin_io]
 
   module T = struct
     module Peers = struct
-      type t = Host_and_port.t List.t [@@deriving bin_io]
+      type t = Kademlia.Peer.t List.t [@@deriving bin_io]
     end
 
     type 'worker functions =
@@ -63,20 +65,11 @@ module Coda_worker = struct
       let functions = {peers; strongest_ledgers}
 
       let init_worker_state
-          {host; conf_dir; program_dir; my_port; peers; gossip_port} =
+          {host; conf_dir; program_dir; external_port; peers; discovery_port} =
         let log = Logger.create () in
         let log =
-          Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string my_port)
+          Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
         in
-        let module Coda = struct
-          type ledger_proof = Ledger_proof_statement.t
-
-          module Make
-              (Init : Init_intf
-                      with type Ledger_proof.t = Ledger_proof_statement.t)
-              () =
-            Coda_without_snark (Init) ()
-        end in
         let module Config = struct
           let logger = log
 
@@ -84,9 +77,9 @@ module Coda_worker = struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let transition_interval = Time.Span.of_ms 100.0
+          let transition_interval = Time.Span.of_ms 1000.0
 
-          let fee_public_key = Genesis_ledger.rich_pk
+          let fee_public_key = Genesis_ledger.high_balance_pk
 
           let genesis_proof = Precomputed_values.base_proof
         end in
@@ -99,9 +92,10 @@ module Coda_worker = struct
               { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
               ; target_peer_count= 8
               ; conf_dir
-              ; address= Host_and_port.create ~host ~port:gossip_port
               ; initial_peers= peers
-              ; me= Host_and_port.create ~host ~port:my_port
+              ; me=
+                  ( Host_and_port.create ~host ~port:discovery_port
+                  , external_port )
               ; parent_log= log } }
         in
         let%bind coda =

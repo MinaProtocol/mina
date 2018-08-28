@@ -1,10 +1,8 @@
 open Core_kernel
+open Tuple_lib
+open Fold_lib
 
 module type S = sig
-  module Proof : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Consensus_transition_data : sig
     type value [@@deriving bin_io, sexp]
 
@@ -20,13 +18,15 @@ module type S = sig
 
     val genesis : value
 
-    val bit_length : int
+    val length_in_triples : int
 
-    val var_to_bits :
+    val var_to_triples :
          var
-      -> (Snark_params.Tick.Boolean.var list, _) Snark_params.Tick.Checked.t
+      -> ( Snark_params.Tick.Boolean.var Triple.t list
+         , _ )
+         Snark_params.Tick.Checked.t
 
-    val fold : value -> Snark_params.Tick.Pedersen.fold
+    val fold : value -> bool Triple.t Fold.t
   end
 
   module Protocol_state :
@@ -35,7 +35,6 @@ module type S = sig
   module Snark_transition :
     Nanobit_base.Snark_transition.S
     with module Consensus_data = Consensus_transition_data
-     and module Proof = Proof
 
   module Internal_transition :
     Nanobit_base.Internal_transition.S

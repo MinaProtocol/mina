@@ -49,7 +49,7 @@ let%test_module "Database integration test" =
         let open Quickcheck.Generator in
         list_with_length num_accounts (Int.gen_incl 1 Int.max_value)
       in
-      Quickcheck.test ~sexp_of:[%sexp_of : int list] gen_non_zero_balances ~f:
+      Quickcheck.test ~trials:100 ~sexp_of:[%sexp_of : int list] gen_non_zero_balances ~f:
         (fun balances ->
           let accounts =
             List.mapi balances ~f:(fun account_id balance ->
@@ -82,19 +82,21 @@ let%test_module "Database integration test" =
               let binary_hash =
                 Binary_tree.get_inner_hash_at_addr_exn binary_tree dirs
               in
-              [%test_result : Hash.t] ~expect:binary_hash db_hash
+              [%test_result : Hash.t] ~expect:binary_hash ledger_hash
                 ~message:
                   (sprintf
-                     !"Expected:\n\
+                     !"Ledger:\n\
+                       Expected:\n\
                        %{sexp:Binary_tree_visualizor.tree}\n\n\n \
                        Actual:\n\
                        %{sexp:Ledger_visualizor.tree}"
                      (Binary_tree_visualizor.to_tree binary_tree)
                      (Ledger_visualizor.to_tree ledger)) ;
-              [%test_result : Hash.t] ~expect:binary_hash ledger_hash
+              [%test_result : Hash.t] ~expect:binary_hash db_hash
                 ~message:
                   (sprintf
-                     !"Expected:\n\
+                     !"Database:\n\
+                       Expected:\n\
                        %{sexp:Binary_tree_visualizor.tree}\n\n\n \
                        Actual:\n\
                        %{sexp:DB_visualizor.tree}"

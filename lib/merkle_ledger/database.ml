@@ -8,7 +8,7 @@ module Make
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
     (Sdb : Intf.Stack_database) : sig
-  include Intf.Database_S
+  include Database_intf.S
           with type account := Account.t
            and type hash := Hash.t
 
@@ -111,11 +111,11 @@ end = struct
       Bigstring.blit ~src ~src_pos:0 ~dst ~dst_pos:1 ~len:src_len ;
       dst
 
-    let get_path = function
+    let to_path_exn = function
       | Account path -> path
       | Hash path -> path
       | Generic _ ->
-          raise (Invalid_argument "get_path: generic does not have a path")
+          raise (Invalid_argument "to_path_exn: generic does not have a path")
 
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
@@ -179,9 +179,9 @@ end = struct
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:(max_depth + 1) Hash.empty in
+    let empty_hashes = Array.create ~len:max_depth Hash.empty in
     let rec loop last_hash height =
-      if height <= max_depth then (
+      if height < max_depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
@@ -295,7 +295,7 @@ end = struct
              ~default:(Result.return @@ Key.build_empty_account ())
       with
       | Error () -> failwith "Could not get retrieve last key"
-      | Ok parsed_key -> Key.get_path parsed_key
+      | Ok parsed_key -> Key.to_path_exn parsed_key
   end
 
   let get_key_of_account = Account_key.get

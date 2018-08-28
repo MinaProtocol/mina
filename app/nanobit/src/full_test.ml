@@ -3,21 +3,11 @@ open Async_kernel
 open Nanobit_base
 open Coda_main
 
-let pk sk = Public_key.of_private_key sk |> Public_key.compress
-
-let sk_bigint sk =
-  Private_key.to_bigstring sk |> Private_key.of_bigstring |> Or_error.ok_exn
-
-module type Coda_intf = sig
-  type ledger_proof
-
-  module Make (Init : Init_intf with type Ledger_proof.t = ledger_proof) () :
-    Main_intf
-end
+let pk_of_sk sk = Public_key.of_private_key sk |> Public_key.compress
 
 let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
-    : Coda_intf with type ledger_proof = ledger_proof) : unit Deferred.t =
+    : Coda_intf.S with type ledger_proof = ledger_proof) : unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
@@ -30,7 +20,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let transition_interval = Time.Span.of_ms 100.0
 
-    let fee_public_key = Genesis_ledger.rich_pk
+    let fee_public_key = Genesis_ledger.high_balance_pk
 
     let genesis_proof = Precomputed_values.base_proof
   end in
@@ -46,8 +36,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; target_peer_count= 8
         ; initial_peers= []
         ; conf_dir
-        ; address= Host_and_port.of_string "127.0.0.1:8001"
-        ; me= Host_and_port.of_string "127.0.0.1:8000" } }
+        ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000) } }
   in
   let%bind minibit =
     Main.create
@@ -84,30 +73,36 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
           (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
   in
   let client_port = 8123 in
-  let run_snark_worker = `With_public_key Genesis_ledger.rich_pk in
+  let run_snark_worker = `With_public_key Genesis_ledger.high_balance_pk in
   Run.setup_local_server ~client_port ~minibit ~log ;
   Run.run_snark_worker ~log ~client_port run_snark_worker ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
-  (* Check if rich-man has some balance *)
-  assert_balance rich_pk initial_rich_balance ;
-  assert_balance poor_pk initial_poor_balance ;
-  (* Note: This is much less than half of the rich balance so we can test
+  (* Check if high balance account has expected balance *)
+  assert_balance high_balance_pk initial_high_balance ;
+  assert_balance low_balance_pk initial_low_balance ;
+  (*No proof emitted by the parallel scan at the begining*)
+  assert (Option.is_none @@ Run.For_tests.ledger_proof minibit) ;
+  (* Note: This is much less than half of the high balance account so we can test
    *       transaction replays being prohibited
    *)
   let send_amount = Currency.Amount.of_int 10 in
   (* Send money to someone *)
-  let build_txn amount sender_sk receiver_pk =
-    let nonce = Run.get_nonce minibit (pk sender_sk) |> Option.value_exn in
+  let build_txn amount sender_sk receiver_pk fee =
+    let nonce =
+      Run.get_nonce minibit (pk_of_sk sender_sk) |> Option.value_exn
+    in
     let payload : Transaction.Payload.t =
-      {receiver= receiver_pk; amount; fee= Currency.Fee.of_int 0; nonce}
+      {receiver= receiver_pk; amount; fee; nonce}
     in
     Transaction.sign (Signature_keypair.of_private_key sender_sk) payload
   in
   let test_sending_transaction sender_sk receiver_pk =
-    let transaction = build_txn send_amount sender_sk receiver_pk in
+    let transaction =
+      build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
+    in
     let prev_sender_balance =
-      Run.get_balance minibit (pk sender_sk) |> Option.value_exn
+      Run.get_balance minibit (pk_of_sk sender_sk) |> Option.value_exn
     in
     let prev_receiver_balance =
       Run.get_balance minibit receiver_pk
@@ -116,7 +111,9 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     let%bind () = Run.send_txn log minibit (transaction :> Transaction.t) in
     (* Send a similar the transaction twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
-    let transaction' = build_txn send_amount sender_sk receiver_pk in
+    let transaction' =
+      build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
+    in
     let%bind () = Run.send_txn log minibit (transaction' :> Transaction.t) in
     (* Let the system settle, mine some blocks *)
     let%map () =
@@ -126,17 +123,18 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     assert_balance receiver_pk
       ( Currency.Balance.( + ) prev_receiver_balance send_amount
       |> Option.value_exn ) ;
-    assert_balance (pk sender_sk)
+    assert_balance (pk_of_sk sender_sk)
       ( Currency.Balance.( - ) prev_sender_balance send_amount
       |> Option.value_exn )
   in
   let send_txn_update_balance_sheet sender_sk sender_pk receiver_pk amount
-      balance_sheet =
-    let transaction = build_txn amount sender_sk receiver_pk in
+      balance_sheet fee =
+    let transaction = build_txn amount sender_sk receiver_pk fee in
     let new_balance_sheet =
       Map.update balance_sheet sender_pk (fun v ->
           Option.value_exn
-            (Currency.Balance.sub_amount (Option.value_exn v) amount) )
+            (Currency.Balance.sub_amount (Option.value_exn v)
+               (Option.value_exn (Currency.Amount.add_fee amount fee))) )
     in
     let new_balance_sheet' =
       Map.update new_balance_sheet receiver_pk (fun v ->
@@ -146,39 +144,58 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     let%map () = Run.send_txn log minibit (transaction :> Transaction.t) in
     new_balance_sheet'
   in
-  let%bind () =
-    test_sending_transaction Genesis_ledger.rich_sk Genesis_ledger.poor_pk
+  let send_txns balance_sheet f_amount =
+    Deferred.List.foldi extra_accounts ~init:balance_sheet ~f:
+      (fun i acc key_pair ->
+        let sender_pk = fst key_pair in
+        let receiver =
+          List.random_element_exn
+            (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
+        in
+        send_txn_update_balance_sheet (snd key_pair) sender_pk receiver
+          (f_amount i) acc (Currency.Fee.of_int 0) )
   in
   let%bind () =
-    test_sending_transaction Genesis_ledger.rich_sk Genesis_ledger.poor_pk
+    test_sending_transaction Genesis_ledger.high_balance_sk
+      Genesis_ledger.low_balance_pk
+  in
+  let%bind () =
+    test_sending_transaction Genesis_ledger.high_balance_sk
+      Genesis_ledger.low_balance_pk
+  in
+  let wait_for_proof_or_timeout () =
+    let rec go () =
+      if Option.is_some @@ Run.For_tests.ledger_proof minibit then (
+        Core.printf "Ledger_proof emitted\n %!" ;
+        return true )
+      else
+        let%bind () = after (Time_ns.Span.of_sec 10.) in
+        go ()
+    in
+    let timeout =
+      let%map () = after (Time_ns.Span.of_min 3.) in
+      false
+    in
+    Deferred.any [timeout; go ()]
   in
   (*Include multiple transactions in a block*)
   let balance_sheet =
     Public_key.Compressed.Map.of_alist_exn
-      (List.map sincere_pks ~f:(fun pk ->
-           (pk, Currency.Balance.of_int init_balance) ))
+      (List.map pks ~f:(fun pk -> (pk, Currency.Balance.of_int init_balance)))
   in
   let%bind updated_balance_sheet =
-    Deferred.List.foldi sincere_pairs ~init:balance_sheet ~f:
-      (fun i acc key_pair ->
-        let sender_pk = Public_key.compress key_pair.public_key in
-        let receiver =
-          List.random_element_exn
-            (List.filter sincere_pks ~f:(fun pk -> not (pk = sender_pk)))
-        in
-        send_txn_update_balance_sheet key_pair.private_key sender_pk receiver
-          (Currency.Amount.of_int ((i + 1) * 10))
-          acc )
+    send_txns balance_sheet (fun i -> Currency.Amount.of_int ((i + 1) * 10))
   in
-  (*After mining a few blocks and emitting a few ledger_proofs (by the parallel scan), check if the balances match *)
-  let%bind () = after (Time_ns.Span.of_min 1.) in
+  (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
+  let%bind emitted = wait_for_proof_or_timeout () in
+  assert emitted ;
   Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
       assert_balance key data ) ;
   Deferred.unit
 
 let command (type ledger_proof) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
-    : Coda_intf with type ledger_proof = ledger_proof) =
+    : Coda_intf.S with type ledger_proof = ledger_proof) =
   let open Core in
   let open Async in
   Command.async ~summary:"Full minibit end-to-end test"

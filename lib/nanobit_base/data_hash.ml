@@ -5,21 +5,24 @@ open Util
 open Snark_params.Tick
 open Snark_bits
 open Bitstring_lib
+open Tuple_lib
+open Fold_lib
 
 module type Basic = sig
-  type t = private Pedersen.Digest.t [@@deriving sexp, eq, compare]
+  type t = private Pedersen.Digest.t
+  [@@deriving bin_io, sexp, eq, compare, hash]
 
   val gen : t Quickcheck.Generator.t
 
   val to_bytes : t -> string
 
-  val length_in_bits : int
+  val length_in_triples : int
 
   val ( = ) : t -> t -> bool
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq]
+      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
 
       include Hashable_binable with type t := t
     end
@@ -27,11 +30,11 @@ module type Basic = sig
 
   type var
 
-  val var_of_hash_unpacked : Pedersen.Digest.Unpacked.var -> var
+  val var_of_hash_unpacked : Pedersen.Checked.Digest.Unpacked.var -> var
 
-  val var_to_hash_packed : var -> Pedersen.Digest.Packed.var
+  val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
 
-  val var_to_bits : var -> (Boolean.var list, _) Checked.t
+  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   val typ : (var, t) Typ.t
 
@@ -42,6 +45,8 @@ module type Basic = sig
   val var_of_t : t -> var
 
   include Bits_intf.S with type t := t
+
+  val fold : t -> bool Triple.t Fold.t
 end
 
 module type Full_size = sig
@@ -49,7 +54,7 @@ module type Full_size = sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-  val var_of_hash_packed : Pedersen.Digest.Packed.var -> var
+  val var_of_hash_packed : Pedersen.Checked.Digest.var -> var
 
   val of_hash : Pedersen.Digest.t -> t
 end
@@ -57,7 +62,7 @@ end
 module type Small = sig
   include Basic
 
-  val var_of_hash_packed : Pedersen.Digest.Packed.var -> (var, _) Checked.t
+  val var_of_hash_packed : Pedersen.Checked.Digest.var -> (var, _) Checked.t
 
   val of_hash : Pedersen.Digest.t -> t Or_error.t
 end
@@ -88,6 +93,8 @@ struct
 
   let () = assert (length_in_bits <= Field.size_in_bits)
 
+  let length_in_triples = bit_length_to_triple_length length_in_bits
+
   let gen : t Quickcheck.Generator.t =
     let m =
       if length_in_bits = Field.size_in_bits then
@@ -101,7 +108,7 @@ struct
   let ( = ) = equal
 
   type var =
-    { digest: Pedersen.Digest.Packed.var
+    { digest: Pedersen.Checked.Digest.var
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
 
   let var_of_t t =
@@ -116,19 +123,17 @@ struct
   open Let_syntax
 
   let var_of_hash_unpacked unpacked =
-    { digest= Pedersen.Digest.project_var unpacked
-    ; bits=
-        Some
-          (Bitstring.Lsb_first.of_list
-             (Pedersen.Digest.Unpacked.var_to_bits unpacked)) }
+    { digest= Pedersen.Checked.Digest.Unpacked.project unpacked
+    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list))
+    }
 
   let var_to_hash_packed {digest; _} = digest
 
   (* TODO: Audit this usage of choose_preimage *)
   let unpack =
     if Int.( = ) length_in_bits Field.size_in_bits then fun x ->
-      Pedersen.Digest.choose_preimage_var x
-      >>| Pedersen.Digest.Unpacked.var_to_bits
+      Pedersen.Checked.Digest.choose_preimage x
+      >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
   let var_to_bits t =
@@ -140,7 +145,12 @@ struct
           t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
           bits )
 
+  let var_to_triples t =
+    var_to_bits t >>| Bitstring.pad_to_triple_list ~default:Boolean.false_
+
   include Pedersen.Digest.Bits
+
+  let fold = Pedersen.Digest.fold
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 

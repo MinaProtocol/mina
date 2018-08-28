@@ -2,52 +2,20 @@ all : clean docker container build
 
 .PHONY : all dev
 
-kademlia:
-	bash -c 'cd app/kademlia-haskell && nix-build release2.nix'
-
-docker :
-	@./rebuild-docker.sh nanotest Dockerfile
-
-build :
-	@echo "Starting Build"
-	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
-		./scripts/run-in-docker dune build ; \
-	else \
-		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
-		dune build ; \
-	fi
-	@echo "Build complete"
-
-deb :
-	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
-		./scripts/run-in-docker ./rebuild-deb.sh ; \
-	else \
-		./rebuild-deb.sh ; \
-	fi	
-
-codaslim :
-	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
-	@cp _build/codaclient.deb .
-	@./rebuild-docker.sh codaslim Dockerfile-codaslim
-	@rm codaclient.deb
-
-container :
-	@./container.sh restart
-
 clean :
 	@echo "Removing previous build artifacts"
 	@rm -rf _build
 
-dev : docker container build
+## Containers and container management
+
+docker :
+	@./rebuild-docker.sh nanotest Dockerfile
+
+ci-base-docker:
+	./rebuild-docker.sh o1labs/ci-base Dockerfile-ci-base
 
 nanobit-docker :
 	./rebuild-docker.sh nanobit Dockerfile-nanobit
-
-nanobit-minikube :
-	./rebuild-minikube.sh nanobit Dockerfile-nanobit
-
-nanobit-googlecloud :
-	./rebuild-googlecloud.sh nanobit Dockerfile-nanobit
 
 base-docker :
 	./rebuild-docker.sh ocaml-base Dockerfile-base
@@ -55,8 +23,14 @@ base-docker :
 base-minikube :
 	./rebuild-minikube.sh ocaml-base Dockerfile-base
 
+nanobit-minikube :
+	./rebuild-minikube.sh nanobit Dockerfile-nanobit
+
 base-googlecloud :
 	./rebuild-googlecloud.sh ocaml-base Dockerfile-base $(shell git rev-parse HEAD)
+
+nanobit-googlecloud :
+	./rebuild-googlecloud.sh nanobit Dockerfile-nanobit
 
 ocaml407-googlecloud:
 	./rebuild-googlecloud.sh ocaml407 Dockerfile-ocaml407
@@ -67,31 +41,103 @@ pull-ocaml407-googlecloud:
 update-deps: base-googlecloud
 	./rewrite-from-dockerfile.sh ocaml-base $(shell git rev-parse HEAD)
 
-test:
+container :
+	@./container.sh restart
+
+
+## Code
+
+kademlia :
 	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
-		./scripts/run-in-docker ./test_all.sh ; \
+		./scripts/run-in-docker bash -c 'cd app/kademlia-haskell && nix-build release2.nix' ; \
+	else \
+		bash -c 'cd app/kademlia-haskell && nix-build release2.nix' ; \
+	fi
+
+build :
+	@echo "Starting Build"
+	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
+		./scripts/run-in-docker dune build ; \
+	else \
+		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
+                ulimit -s 65536 ; \
+		dune build ; \
+	fi
+	@echo "Build complete"
+
+dev : docker container build
+
+
+## Artifacts 
+
+deb :
+	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
+		./scripts/run-in-docker ./rebuild-deb.sh ; \
+	else \
+		./rebuild-deb.sh ; \
+	fi
+	@mkdir /tmp/artifacts
+	@cp _build/codaclient.deb /tmp/artifacts/.
+
+codaslim :
+	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
+	@cp _build/codaclient.deb .
+	@./rebuild-docker.sh codaslim Dockerfile-codaslim
+	@rm codaclient.deb
+
+
+## Tests
+
+test :
+	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
+		./scripts/run-in-docker make test-all ; \
 	else	\
 		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
-		./test_all.sh ; \
+		make test-all ; \
 	fi
+
+test-all : | test-runtest \
+			test-full-sig \
+			test-codapeers-sig \
+			test-coda-block-production-sig \
+			test-transaction-snark-profiler-sig \
+			test-full-stake \
+			test-codapeers-stake \
+			test-coda-block-production-stake \
+			test-transaction-snark-profiler-stake
+
+myprocs:=$(shell nproc --all)
+test-runtest :
+	dune runtest --verbose -j$(myprocs)
+
+test-full-sig :
+	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- full-test
+
+test-full-stake :
+	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- full-test
+
+test-codapeers-sig :
+	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- coda-peers-test
+
+test-codapeers-stake :
+	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- coda-peers-test
+
+test-coda-block-production-sig :
+	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- coda-block-production-test
+
+test-coda-block-production-stake :
+	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- coda-block-production-test
+
+test-transaction-snark-profiler-sig :
+	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- transaction-snark-profiler -check-only
+
+test-transaction-snark-profiler-stake :
+	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- transaction-snark-profiler -check-only
+
+## Lint
 
 reformat:
 	dune exec app/reformat/reformat.exe -- -path .
 
 check-format:
 	dune exec app/reformat/reformat.exe -- -path . -check
-
-## FIXME Things below are Deprecated things to clean up
-
-testbridge-docker :
-	./rebuild-docker.sh testbridge-nanobit Dockerfile-testbridge
-
-testbridge-minikube :
-	./rebuild-minikube.sh testbridge-nanobit Dockerfile-testbridge
-
-testbridge-googlecloud :
-	./rebuild-googlecloud.sh testbridge-nanobit Dockerfile-testbridge
-
-ci-base-docker:
-	./rebuild-docker.sh o1labs/ci-base Dockerfile-ci-base
-	

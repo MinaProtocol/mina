@@ -1,6 +1,6 @@
 open Snark_params
 
-val length_in_bits : int
+val length_in_triples : int
 
 val protocol_state : Tick.Pedersen.State.t
 
@@ -19,3 +19,5 @@ val base_snark : Tick.Pedersen.State.t
 val transition_system_snark : Tick.Pedersen.State.t
 
 val receipt_chain : Tick.Pedersen.State.t
+
+val epoch_seed : Tick.Pedersen.State.t
