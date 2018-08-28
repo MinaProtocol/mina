@@ -7,6 +7,10 @@ module type S = sig
     type t [@@deriving bin_io, sexp]
   end
 
+  module Local_state : sig
+    type t
+  end
+
   module Consensus_transition_data : sig
     type value [@@deriving bin_io, sexp]
 
@@ -49,52 +53,55 @@ module type S = sig
     Nanobit_base.External_transition.S
     with module Protocol_state = Protocol_state
 
-  module Local_state : sig
-    type t
-  end
+  val genesis_protocol_state : Protocol_state.value
 
-  module Ledger_hash : sig
-    type t
-  end
+  (**
+   * Generate a new protocol state and consensus specific transition data
+   * for a new transition. Called from the proposer in order to generate
+   * a new transition to propose to the network. Returns `None` if a new
+   * transition cannot be generated.
+   *)
+  val generate_transition :
+       previous_protocol_state:Protocol_state.value
+    -> blockchain_state:Nanobit_base.Blockchain_state.value
+    -> local_state:Local_state.t
+    -> time:Int64.t
+    -> transactions:Nanobit_base.Transaction.t list
+    -> (Protocol_state.value * Consensus_transition_data.value) option
 
-  module Ledger_pool : Rc_pool.S with type key := Ledger_hash.t
-
-  module Ledger : sig
-    type t
-
-    val copy : t -> t
-  end
-
-  val verify :
+  (**
+   * Create a checked boolean constraint for the validity of a transition.
+   *)
+  val is_transition_valid_checked :
        Snark_transition.var
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
 
-  val update :
-       consensus:Consensus_state.value
-    -> transition:Snark_transition.value
-    -> state:Local_state.t
-    -> pool:Ledger.t Ledger_pool.t
-    -> last_ledger:Ledger.t
-    -> next_ledger:Ledger.t
-    -> (Consensus_state.value * Local_state.t) Or_error.t
-
-  val update_var :
+  (**
+   * Create a constrained, checked var for the next consensus state of
+   * a given consensus state and snark transition.
+   *)
+  val next_state_checked :
        Consensus_state.var
     -> Snark_transition.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
 
-  val step :
-       Consensus_state.value
-    -> Consensus_state.value Async_kernel.Deferred.Or_error.t
+  (**
+   * Update the local state of a ledger builder controller tip given a
+   * previous local state (if there is one), a previous consensus state,
+   * a new consensus state, and the new ledger. The current local state may
+   * not exist.
+   *)
+  val update_local_state :
+       Local_state.t option
+    -> previous_consensus_state:Consensus_state.value
+    -> next_consensus_state:Consensus_state.value
+    -> ledger:Nanobit_base.Ledger.t
+    -> Local_state.t
 
+  (**
+   * Select between two ledger builder controller tips given the consensus
+   * states for the two tips. Returns `\`Keep` if the first tip should be
+   * kept, or `\`Take` if the second tip should be taken instead.
+   *)
   val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
-
-  val generate_transition :
-       previous_protocol_state:Protocol_state.value
-    -> blockchain_state:Nanobit_base.Blockchain_state.value
-    -> time:Int64.t
-    -> transactions:Nanobit_base.Transaction.t list
-    -> Protocol_state.value * Consensus_transition_data.value
-
-  val genesis_protocol_state : Protocol_state.value
 end

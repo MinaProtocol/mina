@@ -100,7 +100,8 @@ let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
 let fold_bits ({public_key; balance; nonce; receipt_chain_hash}: t) =
   let open Fold in
   Public_key.Compressed.fold public_key
-  +> Balance.fold balance +> Nonce.fold nonce
+  +> Balance.fold balance
+  +> Nonce.fold nonce
   +> Receipt.Chain_hash.fold receipt_chain_hash
 
 let hash_prefix = Hash_prefix.account

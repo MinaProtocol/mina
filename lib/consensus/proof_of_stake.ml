@@ -103,13 +103,38 @@ struct
   module Proof = Inputs.Proof
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
-  module Ledger = Nanobit_base.Ledger
-  module Ledger_hash = Nanobit_base.Ledger_hash
-  module Ledger_pool = Rc_pool.Make (Nanobit_base.Ledger_hash)
+
+  let genesis_ledger_hash = Ledger.merkle_root genesis_ledger
+
+  module Ledger_pool = Rc_pool.Make
+      (Nanobit_base.Ledger_hash)
+      (struct 
+        include Nanobit_base.Ledger
+
+        let to_key = merkle_root
+      end)
 
   module Local_state = struct
-    (* TODO: Flesh out with real state *)
-    type t = unit
+    type t =
+      { ledger_pool: Ledger_pool.t
+      ; epoch_ledger_hash: Ledger_hash.t option
+      ; next_epoch_ledger_hash: Ledger_hash.t option }
+
+    let initialize () =
+      { ledger_pool= Ledger_pool.create ()
+      ; epoch_ledger_hash= None
+      ; next_epoch_ledger_hash= None }
+
+    let update local_state ~previous_epoch ~next_epoch ~ledger =
+      match local_state with
+        | None                      -> initialize ()
+        | Some local_state ->
+            if previous_epoch = next_epoch then
+              local_state
+            else (
+              ignore (Option.map local_state.epoch_ledger_hash ~f:(Ledger_pool.free local_state.ledger_pool));
+              { epoch_ledger_hash= local_state.next_epoch_ledger_hash
+              ; next_epoch_ledger_hash= Ledger_pool.save local_state.ledger_pool ledger })
   end
 
   module Epoch = struct
@@ -291,8 +316,10 @@ struct
       ; epoch_seed= Epoch_seed.of_hash Epoch_seed.zero
       ; next_epoch_seed= Epoch_seed.of_hash Epoch_seed.zero }
 
-    let update (previous_state: value)
-        (transition_data: Consensus_transition_data.value) : value Or_error.t =
+    let update
+        ~(previous_consensus_state: value)
+        ~(consensus_transition_data: Consensus_transition_data.value)
+      : value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
@@ -462,8 +489,13 @@ struct
       (Protocol_state)
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
-  let generate_transition ~previous_protocol_state ~blockchain_state ~time
-      ~transactions:_ =
+  let generate_transition
+      ~previous_protocol_state
+      ~blockchain_state
+      ~local_state
+      ~time
+      ~transactions:_
+  =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -488,15 +520,21 @@ struct
 
   let verify _transition = Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
-  let update previous_state transition =
-    Consensus_state.update previous_state
-      (Snark_transition.consensus_data transition)
-
-  let update_var previous_state transition =
+  let next_state_checked previous_state transition =
     Consensus_state.update_var previous_state
       (Snark_transition.consensus_data transition)
 
-  let step = Async_kernel.Deferred.Or_error.return
+  let update_local_state
+      local_state
+      ~previous_consensus_state
+      ~next_consensus_state
+      ~ledger =
+    let open Consensus_state in
+    Local_state.update
+      local_state
+      ~previous_epoch:(previous_consensus_state.current_epoch)
+      ~next_epoch:(next_consensus_state.current_epoch)
+      ~ledger
 
   let select curr cand =
     let open Consensus_state in
@@ -526,13 +564,16 @@ struct
     *)
 
   let genesis_protocol_state =
+    let consensus_state =
+      Or_error.ok_exn (
+        Consensus_state.update
+          ~previous_consensus_state:Protocol_state.(consensus_state negative_one)
+          ~consensus_transition_data:Snark_transition.genesis
+          ~epoch_ledger_hash:genesis_ledger_hash
+          ~next_epoch_ledger_hash:genesis_ledger_hash)
+    in
     Protocol_state.create_value
-      ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
-      ~blockchain_state:
-        (Snark_transition.genesis |> Snark_transition.blockchain_state)
-      ~consensus_state:
-        ( Or_error.ok_exn
-        @@ update
-             (Protocol_state.consensus_state Protocol_state.negative_one)
-             Snark_transition.genesis )
+      ~previous_state_hash:(Protocol_state.(hash negative_one))
+      ~blockchain_state:(Snark_transition.(blockchain_state genesis))
+      ~consensus_state
 end

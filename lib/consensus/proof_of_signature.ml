@@ -37,10 +37,6 @@ struct
     type t = unit
   end
 
-  module Ledger = Ledger
-  module Ledger_hash = Ledger_hash
-  module Ledger_pool = Rc_pool.Make (Ledger_hash)
-
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
 
@@ -156,9 +152,8 @@ struct
     in
     {length; signer_public_key}
 
-  let update ~consensus:state ~transition:_ ~state:s ~pool:_ ~last_ledger:_
-      ~next_ledger:_ =
-    Or_error.return (Consensus_state.update state, s)
+  let update ~previous_consensus_state ~transition:_ ~local_state ~ledger_pool:_ ~ledger:_ =
+    Or_error.return (Some (Consensus_state.update previous_consensus_state, local_state))
 
   let step = Async_kernel.Deferred.Or_error.return
 

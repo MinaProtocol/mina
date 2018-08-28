@@ -42,11 +42,11 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
-  val fold : t -> bool Triple.t Fold.t
-
   include Bits_intf.S with type t := t
 
   include Hashable.S with type t := t
+
+  val fold : t -> bool Triple.t Fold.t
 end
 
 module type Full_size = sig

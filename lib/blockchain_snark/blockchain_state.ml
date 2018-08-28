@@ -67,10 +67,13 @@ struct
                       ~fee_excess:Currency.Amount.Signed.zero ~proof))
                 "Proof did not verify"
       in
-      let%map consensus_state =
+      let%map (consensus_state, local_state) =
         Consensus_mechanism.update
-          (Protocol_state.consensus_state state)
-          transition
+          ~consensus_state:(Protocol_state.consensus_state state)
+          ~transition
+          ~local_state:()
+          ~ledger_pool:()
+          ~ledger:()
       in
       Protocol_state.create_value
         ~previous_state_hash:(Protocol_state.hash state)

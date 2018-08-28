@@ -1,30 +1,51 @@
 open Core_kernel
 
+module type Data_intf = sig
+  type key
+
+  type t
+
+  val to_key : t -> key
+
+  val copy : t -> t
+end
+
 module type S = sig
   type key
 
-  type 'a t
+  type data
 
-  val incr : 'a t -> key:key -> data:'a -> unit
+  type t
 
-  val decr : 'a t -> key -> unit
+  val save : t -> data -> key
 
-  val find : 'a t -> key -> 'a option
+  val free : t -> key -> unit
+
+  val find : t -> key -> data option
 end
 
-module Make (Key : Hashable.S) : S with type key := Key.t = struct
-  type 'a t = ('a * int) Key.Table.t
+exception Free_unsaved_value
 
-  let incr t ~key ~data =
-    Key.Table.change t key ~f:(function
-      | None -> Some (data, 1)
-      | Some (_, x) -> Some (data, Int.succ x) )
+module Make
+    (Key : Hashable.S)
+    (Data : Data_intf with type key := Key.t)
+  : S with type key := Key.t and type data := Data.t
+= struct
+  type t = (Data.t * int) Key.Table.t
 
-  let decr t key =
+  let save t data =
+    let key = Data.to_key data in
     Key.Table.change t key ~f:(function
-      | None -> None
+      | None        -> Some (Data.copy data, 1)
+      | Some (d, n) -> Some (d, n));
+    key
+
+  let free t key =
+    Key.Table.change t key ~f:(function
+      | None        -> raise Free_unsaved_value
       | Some (_, 1) -> None
-      | Some (data, x) -> Some (data, Int.pred x) )
+      | Some (d, n) -> Some (d, n - 1))
 
-  let find t key = Key.Table.find t key |> Option.map ~f:fst
+  let find t key =
+    Key.Table.find t key |> Option.map ~f:fst
 end
