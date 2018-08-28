@@ -36,10 +36,10 @@ module type Input_intf = sig
 end
 
 module Make (Input : Input_intf) = struct
-  (* not really kosher but the tests are run in-order, so this will get filled
-   * in before we need it. *)
   open Input
 
+  (* not really kosher but the tests are run in-order, so this will get filled
+   * in before we need it. *)
   let total_queries = ref None
 
   let%test "full_sync_entirely_different" =
