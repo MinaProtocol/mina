@@ -186,6 +186,18 @@ module Tick = struct
   end
 
   module Util = Snark_util.Make (Tick0)
+
+  module Vrf =
+    Vrf_lib.Integrated.Make (Tick0)
+      (struct
+        type var = Boolean.var list
+      end)
+      (struct
+        include Inner_curve.Checked
+
+        let scale_generator shifted s ~init =
+          scale_known shifted Inner_curve.one s ~init
+      end)
 end
 
 let embed (x: Tick.Field.t) : Tock.Field.t =
