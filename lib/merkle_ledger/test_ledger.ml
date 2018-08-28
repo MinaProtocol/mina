@@ -2,7 +2,7 @@ open Core
 open Unsigned
 
 module type S =
-  Intf.Ledger_S
+  Ledger_intf.S
   with type key := string
    and type hash := Md5.t
    and type account := Test_stubs.Account.t

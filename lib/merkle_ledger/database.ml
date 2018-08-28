@@ -8,7 +8,7 @@ module Make
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
     (Sdb : Intf.Stack_database) : sig
-  include Intf.Database_S
+  include Database_intf.S
           with type account := Account.t
            and type hash := Hash.t
 

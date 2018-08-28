@@ -15,7 +15,7 @@ module Make
             with type account := Account.t) (Depth : sig
         val depth : int
     end) :
-  Intf.Ledger_S
+  Ledger_intf.S
   with type hash := Hash.t
    and type account := Account.t
    and type key := Key.t =
