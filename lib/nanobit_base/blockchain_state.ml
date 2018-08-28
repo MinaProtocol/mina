@@ -65,7 +65,7 @@ let var_to_triples ({ ledger_builder_hash; ledger_hash; timestamp; fee_excess } 
   ledger_builder_hash_triples
   @ ledger_hash_triples
   @ Block_time.Unpacked.var_to_triples timestamp
-  @ Currency.Fee.Signed.to_triples fee_excess
+  @ Currency.Fee.Signed.Checked.to_triples fee_excess
 
 let fold ({ ledger_builder_hash; ledger_hash; timestamp; fee_excess } : value) =
   Fold.(Ledger_builder_hash.fold ledger_builder_hash

@@ -294,7 +294,7 @@ struct
 
     type statement = Transaction_snark.Statement.t
 
-    let statement_target (t: Transaction_snark.Statement.t) = t.target
+    let statement_target (t: statement) = t.target
 
     let underlying_proof = Ledger_proof.proof
   end

@@ -55,6 +55,8 @@ module type Inputs_intf = sig
          t
       -> Ledger_builder_diff.t
       -> (Ledger_hash.t * proof) option Deferred.Or_error.t
+
+    val fee_excess_in_aux : t -> Currency.Fee.Signed.t Or_error.t
   end
 
   module Protocol_state_proof : sig
@@ -67,6 +69,8 @@ module type Inputs_intf = sig
     val ledger_hash : value -> Ledger_hash.t
 
     val ledger_builder_hash : value -> Ledger_builder_hash.t
+
+    val fee_excess : value -> Currency.Fee.Signed.t
   end
 
   module Consensus_mechanism : sig
@@ -240,10 +244,28 @@ end = struct
               old_state |> Protocol_state.blockchain_state
               |> Blockchain_state.ledger_hash
         in
+        let%bind fee_excess_zero =
+          let state_fee_excess =
+            new_state |> Protocol_state.blockchain_state
+            |> Blockchain_state.fee_excess
+          in
+          let%bind aux_fee_excess =
+            Deferred.return
+            @@ Ledger_builder.fee_excess_in_aux tip.ledger_builder
+          in
+          let%map total_fe =
+            Deferred.return
+            @@ Option.value_map
+                 ~default:(Or_error.error_string "Overflow: fee excess")
+                 (Currency.Fee.Signed.add state_fee_excess aux_fee_excess) ~f:
+                 (fun fe -> Ok fe )
+          in
+          Currency.Fee.Signed.equal total_fe Currency.Fee.Signed.zero
+        in
         let ledger_builder_hash = Ledger_builder.hash tip.ledger_builder in
         let%bind () =
           if
-            verified
+            verified && fee_excess_zero
             && Ledger_builder_hash.equal ledger_builder_hash
                  ( new_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_builder_hash )
@@ -518,6 +540,8 @@ let%test_module "test" =
         let apply (t: t) (x: Ledger_builder_diff.t) =
           t := x ;
           return (Ok (Some (x, ())))
+
+        let fee_excess_in_aux _ = Ok Currency.Fee.Signed.zero
       end
 
       module State_hash = Int
@@ -526,7 +550,8 @@ let%test_module "test" =
       module Blockchain_state = struct
         type t =
           { ledger_builder_hash: Ledger_builder_hash.t
-          ; ledger_hash: Ledger_hash.t }
+          ; ledger_hash: Ledger_hash.t
+          ; fee_excess: Currency.Fee.Signed.t }
         [@@deriving eq, sexp, fields, bin_io, compare]
 
         type value = t [@@deriving eq, sexp, bin_io, compare]
@@ -553,7 +578,10 @@ let%test_module "test" =
 
         let genesis =
           { previous_state_hash= -1
-          ; blockchain_state= {ledger_builder_hash= 0; ledger_hash= 0}
+          ; blockchain_state=
+              { ledger_builder_hash= 0
+              ; ledger_hash= 0
+              ; fee_excess= Currency.Fee.Signed.zero }
           ; consensus_state= {strength= 0} }
       end
 
@@ -661,7 +689,10 @@ let%test_module "test" =
 
     let transition x parent strength =
       { Inputs.Protocol_state.previous_state_hash= parent
-      ; blockchain_state= {ledger_builder_hash= x; ledger_hash= x}
+      ; blockchain_state=
+          { ledger_builder_hash= x
+          ; ledger_hash= x
+          ; fee_excess= Currency.Fee.Signed.zero }
       ; consensus_state= {strength} }
 
     let slowly_pipe_of_list xs =

@@ -425,6 +425,8 @@ module type Ledger_builder_intf = sig
 
   val aux : t -> Aux.t
 
+  val fee_excess_in_aux : t -> Fee.Signed.t Or_error.t
+
   val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
 
   val random_work_spec_chunk :
@@ -482,6 +484,8 @@ module type Blockchain_state_intf = sig
 
   val ledger_hash : value -> ledger_hash
 
+  val fee_excess : value -> fee_excess
+
   val timestamp : value -> time
 end
 
@@ -538,7 +542,7 @@ module type Consensus_mechanism_intf = sig
     val create_value :
          blockchain_state:blockchain_state
       -> consensus_data:Consensus_transition_data.value
-      -> ledger_proof:proof option
+      -> ledger_proof_fee_excess:(proof * Fee.Signed.t) option
       -> value
 
     val blockchain_state : value -> blockchain_state

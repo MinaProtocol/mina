@@ -99,6 +99,7 @@ module Verification : sig
          Ledger_hash.var
       -> Ledger_hash.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
+      -> Currency.Fee.Signed.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
   end
 

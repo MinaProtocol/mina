@@ -179,14 +179,12 @@ let create = Fields.create
 
 let base_top_hash s1 s2 excess =
   Tick.Pedersen.digest_fold Hash_prefix.base_snark
-    Fold.(
-      Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Fee.Signed.fold excess)
+    Fold.(Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Fee.Signed.fold excess)
 
 let merge_top_hash s1 s2 fee_excess wrap_vk_bits =
   Tick.Pedersen.digest_fold Hash_prefix.merge_snark
     Fold.(
-      Ledger_hash.fold s1 +> Ledger_hash.fold s2
-      +> Fee.Signed.fold fee_excess
+      Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Fee.Signed.fold fee_excess
       +> Fold.(group3 ~default:false (of_list wrap_vk_bits)))
 
 let embed (x: Tick.Field.t) : Tock.Field.t =
@@ -670,6 +668,7 @@ module Verification = struct
          Ledger_hash.var
       -> Ledger_hash.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
+      -> Currency.Fee.Signed.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
   end
 
@@ -693,10 +692,10 @@ module Verification = struct
       in
       Tock.verify proof keys.wrap (wrap_input ()) (embed input)
 
-    (* The curve pt corresponding to H(merge_prefix, _, _, Amount.Signed.zero, wrap_vk)
+    (* The curve pt corresponding to H(merge_prefix, _, _, fee, wrap_vk)
     (with starting point shifted over by 2 * digest_size so that
-    this can then be used to compute H(merge_prefix, s1, s2, Amount.Signed.zero, wrap_vk) *)
-    let merge_prefix_and_zero_and_vk_curve_pt =
+    this can then be used to compute H(merge_prefix, s1, s2, fee, wrap_vk) *)
+    let merge_prefix_and_zero_and_vk_curve_pt fee_excess =
       let open Tick in
       let s =
         { Hash_prefix.merge_snark with
@@ -707,7 +706,7 @@ module Verification = struct
       let s =
         Pedersen.State.update_fold s
           Fold.(
-            Amount.Signed.(fold zero)
+            Fee.Signed.(fold fee_excess)
             +> group3 ~default:false (of_list wrap_vk_bits))
       in
       let hash_interval = (0, Hash_prefix.length_in_triples) in
@@ -725,20 +724,22 @@ module Verification = struct
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
-      (against the wrap verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
+      (against the wrap verification key) H(s1, s2, fee, wrap_vk).
       This in turn should only happen if there exists a tick proof proving
-      (against the merge verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
+      (against the merge verification key) H(s1, s2, fee, wrap_vk).
 
       We precompute the parts of the pedersen involving wrap_vk and
       Amount.Signed.zero outside the SNARK since this saves us many constraints.
     *)
-    let verify_complete_merge s1 s2 get_proof =
+    let verify_complete_merge s1 s2 get_proof fee_excess =
       let open Tick in
       let open Let_syntax in
       let%bind s1 = Ledger_hash.var_to_triples s1
       and s2 = Ledger_hash.var_to_triples s2 in
+      (*let fee = Currency.Fee.Signed.Checked.to_triples fee_excess in*)
       let%bind top_hash_section =
-        Pedersen.Checked.Section.extend merge_prefix_and_zero_and_vk_curve_pt
+        Pedersen.Checked.Section.extend
+          (merge_prefix_and_zero_and_vk_curve_pt fee_excess)
           ~start:Hash_prefix.length_in_triples (s1 @ s2)
       in
       let digest =
@@ -1123,7 +1124,7 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _ -> failwithf "Transaction_snark: load failed on %s" p ()
       in
       let%map base = load tick_controller base
       and merge = load tick_controller merge
@@ -1267,7 +1268,7 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
-          Array.iter wallets ~f:(fun {account} ->
+          Array.iter wallets ~f:(fun {account; _} ->
               Ledger.set ledger account.public_key account ) ;
           let t1 =
             transaction wallets 0 1 8

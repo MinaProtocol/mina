@@ -94,6 +94,10 @@ struct
       Ledger_builder.create_diff ledger_builder
         ~transactions_by_fee:transactions ~get_completed_work
     in
+    let prev_fee_excess =
+      previous_protocol_state |> Protocol_state.blockchain_state
+      |> Blockchain_state.fee_excess
+    in
     let next_ledger_hash, fee_excess =
       Option.value_map ledger_proof_opt
         ~f:(fun (_, stmt) ->
@@ -103,10 +107,16 @@ struct
             |> Blockchain_state.ledger_hash
           , Currency.Fee.Signed.zero )
     in
+    let new_fee_excess =
+      match Currency.Fee.Signed.add prev_fee_excess fee_excess with
+      | None -> failwith "Fee excess overflowed"
+      | Some fe -> fe
+    in
     let blockchain_state =
       Blockchain_state.create_value ~timestamp:(Time.now time_controller)
         ~ledger_hash:next_ledger_hash
-        ~ledger_builder_hash:next_ledger_builder_hash ~fee_excess
+        ~ledger_builder_hash:next_ledger_builder_hash
+        ~fee_excess:new_fee_excess
     in
     let time =
       Time.now time_controller |> Time.to_span_since_epoch |> Time.Span.to_ms
@@ -124,9 +134,10 @@ struct
       Snark_transition.create_value
         ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
         ~consensus_data:consensus_transition_data
-        ~ledger_proof:
-          (Option.map ledger_proof_opt
-             ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+        ~ledger_proof_fee_excess:
+          (Option.map ledger_proof_opt ~f:(fun (proof, stmt) ->
+               let p = Ledger_proof.underlying_proof proof in
+               (p, stmt.fee_excess) ))
     in
     let internal_transition =
       Internal_transition.create ~snark_transition
