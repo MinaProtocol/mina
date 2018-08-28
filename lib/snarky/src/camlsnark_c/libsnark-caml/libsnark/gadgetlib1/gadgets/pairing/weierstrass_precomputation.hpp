@@ -16,6 +16,8 @@
 
 #include <memory>
 
+#include <libff/algebra/curves/mnt_128/mnt4128/mnt4128_init.hpp>
+#include <libff/algebra/curves/mnt_128/mnt6128/mnt6128_init.hpp>
 #include <libff/algebra/curves/mnt/mnt4/mnt4_init.hpp>
 #include <libff/algebra/curves/mnt/mnt6/mnt6_init.hpp>
 
@@ -68,8 +70,8 @@ public:
             precomp(precomp)
     {
         pb_linear_combination<FieldT> c0, c1;
-        c0.assign(pb, P.Y * ((libff::mnt4_twist).squared().c0));
-        c1.assign(pb, P.Y * ((libff::mnt4_twist).squared().c1));
+        c0.assign(pb, P.Y * ((pairing_selector<ppT>::twist).squared().c0));
+        c1.assign(pb, P.Y * (((pairing_selector<ppT>::twist)).squared().c1));
 
         precomp.P.reset(new G1_variable<ppT>(P));
         precomp.PY_twist_squared.reset(new Fqe_variable<ppT>(pb, c0, c1, FMT(annotation_prefix, " PY_twist_squared")));
@@ -85,9 +87,9 @@ public:
             precomp(precomp)
     {
         pb_linear_combination<FieldT> c0, c1, c2;
-        c0.assign(pb, P.Y * ((libff::mnt6_twist).squared().c0));
-        c1.assign(pb, P.Y * ((libff::mnt6_twist).squared().c1));
-        c2.assign(pb, P.Y * ((libff::mnt6_twist).squared().c2));
+        c0.assign(pb, P.Y * ((pairing_selector<ppT>::twist).squared().c0));
+        c1.assign(pb, P.Y * ((pairing_selector<ppT>::twist).squared().c1));
+        c2.assign(pb, P.Y * ((pairing_selector<ppT>::twist).squared().c2));
 
         precomp.P.reset(new G1_variable<ppT>(P));
         precomp.PY_twist_squared.reset(new Fqe_variable<ppT>(pb, c0, c1, c2, FMT(annotation_prefix, " PY_twist_squared")));

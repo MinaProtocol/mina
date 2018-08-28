@@ -11,7 +11,7 @@
   (public_name snarky.c)
   (preprocess no_preprocessing)
   (flags (:standard -short-paths -safe-string))
-  (c_library_flags (:standard -Wl,-E -Wl,-whole-archive -lcamlsnark_c_stubs -Wl,-no-whole-archive -lssl -lcrypto -lprocps -lgmp -lstdc++ 
+  (c_library_flags (:standard -Wl,-E -Wl,-whole-archive -lcamlsnark_c_stubs -Wl,-no-whole-archive -fopenmp -lssl -lcrypto -lprocps -lgmp -lstdc++ 
   ))
   (self_build_stubs_archive (camlsnark_c))))
 
@@ -23,7 +23,7 @@ pwd
 pushd libsnark-caml
   mkdir -p build
   pushd build
-    cmake -DUSE_PT_COMPRESSION=OFF ..
+    cmake -DMULTICORE=ON -DUSE_PT_COMPRESSION=OFF ..
     make -j12
 
     mkdir _stubs_build

@@ -49,11 +49,11 @@ mnt4_final_exp_value_gadget<ppT>::mnt4_final_exp_value_gadget(protoboard<FieldT>
     compute_el_inv_q_3_minus_1.reset(new Fqk_mul_gadget<ppT>(pb, *el_inv_q_3, el, *el_inv_q_3_minus_1, FMT(annotation_prefix, " compute_el_inv__q_3_minus_1")));
     compute_inv_beta.reset(new Fqk_mul_gadget<ppT>(pb, *inv_alpha, *el_inv_q_3_minus_1, *inv_beta, FMT(annotation_prefix, " compute_inv_beta")));
 
-    compute_w1.reset(new exponentiation_gadget<FqkT<ppT>, Fp6_variable, Fp6_mul_gadget, Fp6_cyclotomic_sqr_gadget, libff::mnt6_q_limbs>(
-        pb, *beta_q, libff::mnt6_final_exponent_last_chunk_w1, *w1, FMT(annotation_prefix, " compute_w1")));
+    compute_w1.reset(new exponentiation_gadget<FqkT<ppT>, Fp6_variable, Fp6_mul_gadget, Fp6_cyclotomic_sqr_gadget, pairing_selector<ppT>::q_limbs>(
+      pb, *beta_q, pairing_selector<ppT>::final_exponent_last_chunk_w1, *w1, FMT(annotation_prefix, " compute_w1")));
 
-    compute_w0.reset(new exponentiation_gadget<FqkT<ppT>, Fp6_variable, Fp6_mul_gadget, Fp6_cyclotomic_sqr_gadget, libff::mnt6_q_limbs>(
-        pb, (libff::mnt6_final_exponent_last_chunk_is_w0_neg ? *inv_beta : *beta), libff::mnt6_final_exponent_last_chunk_abs_of_w0, *w0, FMT(annotation_prefix, " compute_w0")));
+    compute_w0.reset(new exponentiation_gadget<FqkT<ppT>, Fp6_variable, Fp6_mul_gadget, Fp6_cyclotomic_sqr_gadget, pairing_selector<ppT>::q_limbs>(
+      pb, (pairing_selector<ppT>::final_exponent_last_chunk_is_w0_neg ? *inv_beta : *beta), pairing_selector<ppT>::final_exponent_last_chunk_abs_of_w0, *w0, FMT(annotation_prefix, " compute_w0")));
 
     compute_result.reset(new Fqk_mul_gadget<ppT>(pb, *w1, *w0, result, FMT(annotation_prefix, " compute_result")));
 }
@@ -121,10 +121,10 @@ mnt6_final_exp_value_gadget<ppT>::mnt6_final_exp_value_gadget(protoboard<FieldT>
     compute_el_q_2_minus_1.reset(new Fqk_mul_gadget<ppT>(pb, *el_q_2, *el_inv, *el_q_2_minus_1, FMT(annotation_prefix, " compute_el_q_2_minus_1")));
     compute_el_inv_q_2_minus_1.reset(new Fqk_mul_gadget<ppT>(pb, *el_inv_q_2, el, *el_inv_q_2_minus_1, FMT(annotation_prefix, " compute_el_inv_q_2_minus_1")));
 
-    compute_w1.reset(new exponentiation_gadget<FqkT<ppT>, Fp4_variable, Fp4_mul_gadget, Fp4_cyclotomic_sqr_gadget, libff::mnt4_q_limbs>(
-        pb, *el_q_3_minus_q, libff::mnt4_final_exponent_last_chunk_w1, *w1, FMT(annotation_prefix, " compute_w1")));
-    compute_w0.reset(new exponentiation_gadget<FqkT<ppT>, Fp4_variable, Fp4_mul_gadget, Fp4_cyclotomic_sqr_gadget, libff::mnt4_q_limbs>(
-        pb, (libff::mnt4_final_exponent_last_chunk_is_w0_neg ? *el_inv_q_2_minus_1 : *el_q_2_minus_1), libff::mnt4_final_exponent_last_chunk_abs_of_w0, *w0, FMT(annotation_prefix, " compute_w0")));
+    compute_w1.reset(new exponentiation_gadget<FqkT<ppT>, Fp4_variable, Fp4_mul_gadget, Fp4_cyclotomic_sqr_gadget, pairing_selector<ppT>::q_limbs>(
+      pb, *el_q_3_minus_q, pairing_selector<ppT>::final_exponent_last_chunk_w1, *w1, FMT(annotation_prefix, " compute_w1")));
+    compute_w0.reset(new exponentiation_gadget<FqkT<ppT>, Fp4_variable, Fp4_mul_gadget, Fp4_cyclotomic_sqr_gadget, pairing_selector<ppT>::q_limbs>(
+      pb, (pairing_selector<ppT>::final_exponent_last_chunk_is_w0_neg ? *el_inv_q_2_minus_1 : *el_q_2_minus_1), pairing_selector<ppT>::final_exponent_last_chunk_abs_of_w0, *w0, FMT(annotation_prefix, " compute_w0")));
     compute_result.reset(new Fqk_mul_gadget<ppT>(pb, *w1, *w0, result, FMT(annotation_prefix, " compute_result")));
 }
 
