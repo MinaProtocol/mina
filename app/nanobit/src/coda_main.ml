@@ -832,6 +832,7 @@ module type Main_intf = sig
   module Config : sig
     type t =
       { log: Logger.t
+      ; should_propose: bool
       ; net_config: Inputs.Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string

@@ -22,8 +22,8 @@ let daemon (type ledger_proof) (module Kernel
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
-     and should_mine =
-       flag "mine" ~doc:"true|false Run the miner (default:false)"
+     and should_propose =
+       flag "propose" ~doc:"true|false Run the proposer (default:true)"
          (optional bool)
      and peers =
        flag "peer"
@@ -64,6 +64,9 @@ let daemon (type ledger_proof) (module Kernel
        in
        let client_port =
          Option.value ~default:default_client_port client_port
+       in
+       let should_propose =
+         Option.value ~default:true should_propose
        in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
@@ -125,7 +128,7 @@ let daemon (type ledger_proof) (module Kernel
          in
          let%map minibit =
            Run.create
-             (Run.Config.make ~log ~net_config
+             (Run.Config.make ~log ~net_config ~should_propose
                 ~ledger_builder_persistant_location:
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")

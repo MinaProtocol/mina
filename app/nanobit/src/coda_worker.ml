@@ -10,6 +10,7 @@ module Make
 struct
   type input =
     { host: string
+    ; should_propose: bool
     ; conf_dir: string
     ; program_dir: string
     ; external_port: int
@@ -69,7 +70,7 @@ struct
       let functions = {peers; strongest_ledgers}
 
       let init_worker_state
-          {host; conf_dir; program_dir; external_port; peers; discovery_port} =
+          {host; should_propose; conf_dir; program_dir; external_port; peers; discovery_port} =
         let log = Logger.create () in
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
@@ -104,7 +105,7 @@ struct
         in
         let%bind coda =
           Main.create
-            (Main.Config.make ~log ~net_config
+            (Main.Config.make ~log ~net_config ~should_propose
                ~ledger_builder_persistant_location:"ledger_builder"
                ~transaction_pool_disk_location:"transaction_pool"
                ~snark_pool_disk_location:"snark_pool"

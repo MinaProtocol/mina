@@ -431,6 +431,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Config = struct
     type t =
       { log: Logger.t
+      ; should_propose: bool
       ; net_config: Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
@@ -527,10 +528,16 @@ module Make (Inputs : Inputs_intf) = struct
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
         ~time_controller:config.time_controller
     in
-    don't_wait_for
-      (Linear_pipe.transfer_id
-         (Proposer.transitions proposer)
-         external_transitions_writer) ;
+    if config.should_propose
+    then begin
+      don't_wait_for
+        (Linear_pipe.transfer_id
+           (Proposer.transitions proposer)
+           external_transitions_writer)
+    end
+    else don't_wait_for begin
+      Linear_pipe.drain (Proposer.transitions proposer)
+    end;
     return
       { proposer
       ; net
