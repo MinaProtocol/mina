@@ -6,15 +6,7 @@ module Make (Depth : sig
   val num_accts : int
 end) =
 struct
-  open Merkle_database.Test_database
-
-  module Account = struct
-    include Account
-
-    let sexp_of_t = sexp_of_opaque
-
-    let t_of_sexp = opaque_of_sexp
-  end
+  open Merkle_ledger.Test_stubs
 
   module Hash = struct
     type t = Hash.t [@@deriving sexp, hash, compare, bin_io, eq]
@@ -34,7 +26,8 @@ struct
 
   module L = struct
     module MT =
-      Merkle_database.Make (Balance) (Account) (Hash) (Depth) (In_memory_kvdb)
+      Merkle_ledger.Database.Make (Balance) (Account) (Hash) (Depth)
+        (In_memory_kvdb)
         (In_memory_sdb)
     module Addr = MT.Addr
 
