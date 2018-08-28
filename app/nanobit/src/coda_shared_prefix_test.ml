@@ -21,7 +21,7 @@ struct
     let log = Logger.child log name in
     Logger.info log "hi";
     Coda_processes.init () ;
-    Coda_processes.spawn_local_processes_exn n ~program_dir ~f:(fun workers ->
+    Coda_processes.spawn_local_processes_exn n ~program_dir ~first_delay:0.0 ~f:(fun workers ->
         let chains = Array.init (List.length workers) ~f:(fun _ -> []) in
         let check_chains () =
           let lengths = Array.to_list (Array.map chains ~f:(fun c -> List.length c)) in
@@ -35,7 +35,7 @@ struct
           in
           let shared_idx =
             match newest_shared with
-            | None -> 0
+            | None -> List.length first
             | Some shared -> 
               Option.value_exn (
                 Option.map 

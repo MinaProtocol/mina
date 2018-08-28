@@ -24,7 +24,7 @@ struct
     in
     (discovery_ports, external_ports, peers)
 
-  let spawn_local_processes_exn n ~program_dir ~f =
+  let spawn_local_processes_exn ?(first_delay=3.0) n ~program_dir ~f =
     let fns =
       let discovery_ports, external_ports, peers = net_configs n in
       let peers = [] :: List.drop peers 1 in
@@ -41,6 +41,6 @@ struct
         ~f:(fun last fn ws -> fn (fun w -> last (w :: ws)))
     in
     first (fun w ->
-        let%bind () = after (Time.Span.of_sec 3.) in
+        let%bind () = after (Time.Span.of_sec first_delay) in
         scoped [w] )
 end
