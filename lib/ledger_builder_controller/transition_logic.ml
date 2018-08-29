@@ -157,7 +157,7 @@ struct
     let transition_unchecked h t =
       Interruptible.uninterruptible (Tip.transition_unchecked h t)
 
-    let run (t: t0) new_tree old_tree new_best_path logger _transition =
+    let run (t: t0) new_tree old_tree new_best_path _logger _transition =
       let locked_tip = Transition_logic_state.locked_tip t.state
       and longest_branch_tip =
         Transition_logic_state.longest_branch_tip t.state
