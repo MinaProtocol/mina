@@ -12,7 +12,9 @@ module Make
           with type account := Account.t
            and type hash := Hash.t
 
-  val gen_account_key : key Core.Quickcheck.Generator.t
+  module For_tests : sig
+    val gen_account_key : key Core.Quickcheck.Generator.t
+  end
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   let max_depth = Depth.depth
@@ -83,7 +85,7 @@ end = struct
     let root_hash : t = Hash (Addr.root ())
 
     let last_direction path =
-      Direction.of_bool (Addr.get path (Addr.depth path - 1) = 0)
+      Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
 
     let build_generic (data: Bigstring.t) : t = Generic data
 
@@ -160,16 +162,18 @@ end = struct
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
-  let gen_account_key =
-    let open Quickcheck.Let_syntax in
-    let build_account (path: Direction.t list) =
-      assert (List.length path = Depth.depth) ;
-      Key.Account (Addr.of_directions path)
-    in
-    let%map dirs =
-      Quickcheck.Generator.list_with_length Depth.depth Direction.gen
-    in
-    build_account dirs
+  module For_tests = struct
+    let gen_account_key =
+      let open Quickcheck.Let_syntax in
+      let build_account (path: Direction.t list) =
+        assert (List.length path = Depth.depth) ;
+        Key.Account (Addr.of_directions path)
+      in
+      let%map dirs =
+        Quickcheck.Generator.list_with_length Depth.depth Direction.gen
+      in
+      build_account dirs
+  end
 
   let create ~key_value_db_dir ~stack_db_file =
     let kvdb = Kvdb.create ~directory:key_value_db_dir in
@@ -179,9 +183,9 @@ end = struct
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:max_depth Hash.empty in
+    let empty_hashes = Array.create ~len:(max_depth + 1) Hash.empty in
     let rec loop last_hash height =
-      if height < max_depth then (
+      if height <= max_depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
@@ -229,6 +233,7 @@ end = struct
         let left_hash, right_hash =
           Key.order_siblings key new_hash sibling_hash
         in
+        assert (height <= Depth.depth) ;
         Hash.merge ~height left_hash right_hash
       in
       set_hash mdb (Key.parent key) parent_hash
