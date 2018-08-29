@@ -1,35 +1,79 @@
-all : clean docker container build
+########################################
+## Docker Wrapper 
+## Hint: export USEDOCKER=TRUE
 
-.PHONY : all dev
+MYUID = $(shell id -u)
+DOCKERNAME = nanotest-$(MYUID)
 
-clean :
-	@echo "Removing previous build artifacts"
+ifeq ($(USEDOCKER),TRUE)
+ $(info INFO Using Docker Named $(DOCKERNAME))
+ WRAP = docker exec -it $(DOCKERNAME)
+else
+ $(info INFO Not using Docker)
+ WRAP =
+endif
+
+
+########################################
+## Code
+
+all: clean docker container build
+
+clean:
+	$(info Removing previous build artifacts)
 	@rm -rf _build
 
+kademlia:
+	@# FIXME: Bash wrap here is awkward but required to get nix-env
+	$(WRAP) bash -c "source ~/.profile && cd app/kademlia-haskell && nix-build release2.nix"
+
+# Alias
+dht: kademlia
+
+build:
+	$(info Starting Build)
+	ulimit -s 65536
+	$(WRAP) dune build 
+	$(info Build complete)
+
+dev: docker container build
+
+
+########################################
+## Lint
+
+reformat:
+	$(WRAP) dune exec app/reformat/reformat.exe -- -path .
+
+check-format:
+	$(WRAP) dune exec app/reformat/reformat.exe -- -path . -check
+
+
+########################################
 ## Containers and container management
 
-docker :
-	@./rebuild-docker.sh nanotest Dockerfile
+docker:
+	./rebuild-docker.sh nanotest Dockerfile
 
 ci-base-docker:
 	./rebuild-docker.sh o1labs/ci-base Dockerfile-ci-base
 
-nanobit-docker :
+nanobit-docker:
 	./rebuild-docker.sh nanobit Dockerfile-nanobit
 
-base-docker :
+base-docker:
 	./rebuild-docker.sh ocaml-base Dockerfile-base
 
-base-minikube :
+base-minikube:
 	./rebuild-minikube.sh ocaml-base Dockerfile-base
 
-nanobit-minikube :
+nanobit-minikube:
 	./rebuild-minikube.sh nanobit Dockerfile-nanobit
 
-base-googlecloud :
+base-googlecloud:
 	./rebuild-googlecloud.sh ocaml-base Dockerfile-base $(shell git rev-parse HEAD)
 
-nanobit-googlecloud :
+nanobit-googlecloud:
 	./rebuild-googlecloud.sh nanobit Dockerfile-nanobit
 
 ocaml407-googlecloud:
@@ -41,62 +85,31 @@ pull-ocaml407-googlecloud:
 update-deps: base-googlecloud
 	./rewrite-from-dockerfile.sh ocaml-base $(shell git rev-parse HEAD)
 
-container :
+container:
 	@./container.sh restart
 
-
-## Code
-
-kademlia :
-	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
-		./scripts/run-in-docker bash -c 'cd app/kademlia-haskell && nix-build release2.nix' ; \
-	else \
-		bash -c 'cd app/kademlia-haskell && nix-build release2.nix' ; \
-	fi
-
-build :
-	@echo "Starting Build"
-	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
-		./scripts/run-in-docker dune build ; \
-	else \
-		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
-                ulimit -s 65536 ; \
-		dune build ; \
-	fi
-	@echo "Build complete"
-
-dev : docker container build
-
-
+########################################
 ## Artifacts 
 
-deb :
-	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
-		./scripts/run-in-docker ./rebuild-deb.sh ; \
-	else \
-		./rebuild-deb.sh ; \
-	fi
+deb:
+	$(WRAP) ./rebuild-deb.sh
 	@mkdir /tmp/artifacts
 	@cp _build/codaclient.deb /tmp/artifacts/.
 
-codaslim :
+codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
 	@cp _build/codaclient.deb .
 	@./rebuild-docker.sh codaslim Dockerfile-codaslim
 	@rm codaclient.deb
 
 
+########################################
 ## Tests
 
-test :
-	@if [ "$(USEDOCKER)" = "TRUE" ]; then \
-		./scripts/run-in-docker make test-all ; \
-	else	\
-		echo "WARN: Running OUTSIDE docker - try: USEDOCKER=TRUE make ..." ; \
-		make test-all ; \
-	fi
+test:
+	$(WRAP) make test-all
 
-test-all : | test-runtest \
+test-all: | test-runtest \
 			test-full-sig \
 			test-codapeers-sig \
 			test-coda-block-production-sig \
@@ -106,38 +119,37 @@ test-all : | test-runtest \
 			test-coda-block-production-stake \
 			test-transaction-snark-profiler-stake
 
-myprocs:=$(shell nproc --all)
-test-runtest :
-	dune runtest --verbose -j$(myprocs)
+MYPROCS := $(shell nproc --all)
+test-runtest:
+	$(WRAP) dune runtest --verbose -j$(MYPROCS)
 
-test-full-sig :
-	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- full-test
+SIGNATURE=CODA_CONSENSUS_MECHANISM=proof_of_signature
+STAKE=CODA_CONSENSUS_MECHANISM=proof_of_stake
 
-test-full-stake :
-	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- full-test
+test-full-sig:
+	$(WRAP) $(SIGNATURE) dune exec cli -- full-test
+test-full-stake:
+	$(WRAP) $(STAKE) dune exec cli -- full-test
 
-test-codapeers-sig :
-	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- coda-peers-test
+test-codapeers-sig:
+	$(WRAP) $(SIGNATURE) dune exec cli -- coda-peers-test
+test-codapeers-stake:
+	$(WRAP) $(STAKE) dune exec cli -- coda-peers-test
 
-test-codapeers-stake :
-	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- coda-peers-test
+test-coda-block-production-sig:
+	$(WRAP) $(SIGNATURE) dune exec cli -- coda-block-production-test
+test-coda-block-production-stake:
+	$(WRAP) $(STAKE) dune exec cli -- coda-block-production-test
 
-test-coda-block-production-sig :
-	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- coda-block-production-test
+test-transaction-snark-profiler-sig:
+	$(WRAP) $(SIGNATURE) dune exec cli -- transaction-snark-profiler -check-only
+test-transaction-snark-profiler-stake:
+	$(WRAP) $(STAKE) dune exec cli -- transaction-snark-profiler -check-only
 
-test-coda-block-production-stake :
-	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- coda-block-production-test
 
-test-transaction-snark-profiler-sig :
-	CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- transaction-snark-profiler -check-only
-
-test-transaction-snark-profiler-stake :
-	CODA_CONSENSUS_MECHANISM=proof_of_stake dune exec cli -- transaction-snark-profiler -check-only
-
-## Lint
-
-reformat:
-	dune exec app/reformat/reformat.exe -- -path .
-
-check-format:
-	dune exec app/reformat/reformat.exe -- -path . -check
+########################################
+# To avoid unintended conflicts with file names, always add to .PHONY
+# unless there is a reason not to.
+# https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
+# HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia nanobit-docker nanobit-googlecloud nanobit-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps
