@@ -38,10 +38,101 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
   end
 end
 
-module Tock = struct
-  module Tock0 = Extend (Snarky.Snark.Make (Tock_curve))
+module Tock0 = Extend (Snarky.Snark.Make (Tock_curve))
 
+module Tick0 = Extend (Crypto_params.Tick0)
+
+module Make_inner_curve_scalar
+    (Impl : Snark_intf.S)
+    (Other_impl : Snark_intf.S) = struct
+  module T = Other_impl.Field
+  include ( T :
+    module type of T
+    with type var := T.var
+      and module Checked := T.Checked)
+
+  include Infix
+
+  let of_bits = Other_impl.Field.project
+
+  let length_in_bits = size_in_bits
+
+  open Impl
+
+  type var = Boolean.var list
+
+  let typ =
+    Typ.transport
+      (Typ.list ~length:size_in_bits Boolean.typ)
+      ~there:unpack ~back:project
+
+  let gen : t Quickcheck.Generator.t =
+    Quickcheck.Generator.map
+      (Bignum_bigint.gen_incl Bignum_bigint.one
+          Bignum_bigint.(Other_impl.Field.size - one))
+      ~f:(fun x -> Other_impl.Bigint.(to_field (of_bignum_bigint x)))
+
+  let test_bit x i = Other_impl.Bigint.(test_bit (of_field x) i)
+
+  module Checked = struct
+    let equal = Bitstring_checked.equal
+
+    let to_bits xs = Bitstring_lib.Bitstring.Lsb_first.of_list xs
+
+    module Assert = struct
+      let equal = Bitstring_checked.Assert.equal
+    end
+  end
+end
+
+module Make_inner_curve_aux
+    (Impl : Snark_intf.S)
+    (Other_impl : Snark_intf.S)
+    (Coefficients : sig
+       val a : Impl.Field.t
+       val b : Impl.Field.t
+    end)
+= struct
+  open Impl
+
+  type var = Field.Checked.t * Field.Checked.t
+
+  module Scalar = Make_inner_curve_scalar(Impl)(Other_impl)
+
+  module Coefficients = Coefficients
+
+  let find_y x =
+    let y2 =
+      let open Field.Infix in
+      (x * Field.square x) + (Coefficients.a * x) + Coefficients.b
+    in
+    if Field.is_square y2 then Some (Field.sqrt y2) else None
+end
+
+module Tock = struct
   include (Tock0 : module type of Tock0 with module Proof := Tock0.Proof)
+
+  module Inner_curve = struct
+    include Snarky.Backends.Mnt4.Group
+    include Make_inner_curve_aux(Tock0)(Tick0)(Snarky.Libsnark.Curves.Mnt4.G1.Coefficients)
+    let ctypes_typ = typ
+
+    let scale = scale_field
+
+    module Checked = struct
+      include Snarky.Curves.Make_weierstrass_checked (Tock0) (Scalar)
+                (struct
+                  include Snarky.Backends.Mnt4.Group
+
+                  let scale = scale_field
+                end)
+                (Coefficients)
+
+      let add_known_unsafe t x = add_unsafe t (constant x)
+    end
+
+    let typ = Checked.typ
+  end
 
   module Proof = struct
     include Tock0.Proof
@@ -51,8 +142,6 @@ module Tock = struct
 end
 
 module Tick = struct
-  module Tick0 = Extend (Crypto_params.Tick0)
-
   module Sha256 =
     Snarky.Sha256.Make (struct
         let prefix = Tick_curve.prefix
@@ -63,58 +152,9 @@ module Tick = struct
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
   module Inner_curve = struct
-    open Tick0
-
-    type var = Field.Checked.t * Field.Checked.t
-
     include Crypto_params.Inner_curve
-
-    module Scalar = struct
-      module T :
-        module type of Tock.Field
-        with type var := Tock.Field.var
-         and module Checked := Tock.Field.Checked =
-      Tock.Field
-
-      include T
-      include Infix
-
-      let of_bits = Tock.Field.project
-
-      let length_in_bits = size_in_bits
-
-      type var = Boolean.var list
-
-      let typ =
-        Typ.transport
-          (Typ.list ~length:size_in_bits Boolean.typ)
-          ~there:unpack ~back:project
-
-      let gen : t Quickcheck.Generator.t =
-        Quickcheck.Generator.map
-          (Bignum_bigint.gen_incl Bignum_bigint.one
-             Bignum_bigint.(Tock.Field.size - one))
-          ~f:(fun x -> Tock.Bigint.(to_field (of_bignum_bigint x)))
-
-      let test_bit x i = Tock.Bigint.(test_bit (of_field x) i)
-
-      module Checked = struct
-        let equal = Bitstring_checked.equal
-
-        module Assert = struct
-          let equal = Bitstring_checked.Assert.equal
-        end
-      end
-    end
-
-    module Coefficients = Snarky.Libsnark.Curves.Mnt6.G1.Coefficients
-
-    let find_y x =
-      let y2 =
-        let open Field.Infix in
-        (x * Field.square x) + (Coefficients.a * x) + Coefficients.b
-      in
-      if Field.is_square y2 then Some (Field.sqrt y2) else None
+    include Make_inner_curve_aux(Tick0)(Tock0)(Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+    let ctypes_typ = typ
 
     let scale = scale_field
 
@@ -126,10 +166,6 @@ module Tick = struct
                   let scale = scale_field
                 end)
                 (Coefficients)
-
-      let scale = scale_bits
-
-      let scale_known = scale_known
 
       let add_known_unsafe t x = add_unsafe t (constant x)
     end
