@@ -4,10 +4,7 @@ open Tick
 open Fold_lib
 open Tuple_lib
 
-type t =
-  { fee : Currency.Fee.t
-  ; prover : Public_key.Compressed.t
-  }
+type t = {fee: Currency.Fee.t; prover: Public_key.Compressed.t}
 [@@deriving bin_io]
 
 val create : fee:Currency.Fee.t -> prover:Public_key.Compressed.t -> t
@@ -17,8 +14,7 @@ module Digest : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t
-      [@@deriving sexp, bin_io, hash, compare, eq]
+      type nonrec t = t [@@deriving sexp, bin_io, hash, compare, eq]
     end
   end
 

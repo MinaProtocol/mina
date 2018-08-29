@@ -37,13 +37,10 @@ module Inputs = struct
     function
       | Work.Single.Spec.Transition (input, t, l) ->
           Or_error.return
-            (M.of_transition
-               ~sok_digest
-               ~source:input.Statement.source
+            (M.of_transition ~sok_digest ~source:input.Statement.source
                ~target:input.target t
                (unstage (Nanobit_base.Sparse_ledger.handler l)))
-      | Merge (_, proof1, proof2) ->
-        M.merge ~sok_digest proof1 proof2
+      | Merge (_, proof1, proof2) -> M.merge ~sok_digest proof1 proof2
 end
 
 module Worker = Worker.Make (Inputs)

@@ -834,9 +834,11 @@ let%test_module "test" =
     module Test_input1 = struct
       open Coda_pow
       module Compressed_public_key = String
+
       module Sok_message = struct
         module Digest = Unit
         include Unit
+
         let create ~fee:_ ~prover:_ = ()
       end
 
@@ -965,11 +967,11 @@ let%test_module "test" =
           {source; target; fee_excess; proof_type}
       end
 
-      module Proof = String
+      module Proof = Ledger_proof_statement
 
       module Ledger_proof = struct
-        (*A proof here is statement.target*)
-        include String
+        (*A proof here is a statement *)
+        include Ledger_proof_statement
 
         type ledger_hash = Ledger_hash.t
 
@@ -979,6 +981,8 @@ let%test_module "test" =
         let underlying_proof = Fn.id
 
         let sok_digest _ = ()
+
+        let statement = Fn.id
       end
 
       module Ledger_proof_verifier = struct
@@ -1174,13 +1178,12 @@ let%test_module "test" =
 
     let stmt_to_work (stmts: Test_input1.Completed_work.Statement.t) :
         Test_input1.Completed_work.Checked.t option =
-      let proofs = List.map stmts ~f:(fun stmt -> stmt.target) in
       let prover =
         List.fold stmts ~init:"P" ~f:(fun p stmt -> p ^ stmt.target)
       in
       Some
         { Test_input1.Completed_work.Checked.fee= Fee.Unsigned.of_int 1
-        ; proofs
+        ; proofs= stmts
         ; prover }
 
     let create_and_apply lb txns =

@@ -26,8 +26,8 @@ module type S = sig
     type t
   end
 
-  module Sok_message : Sok_message_intf
-    with type public_key_compressed := Compressed_public_key.t
+  module Sok_message :
+    Sok_message_intf with type public_key_compressed := Compressed_public_key.t
 
   module Ledger_proof : sig
     include Coda_pow.Ledger_proof_intf

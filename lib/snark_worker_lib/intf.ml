@@ -85,5 +85,8 @@ module type S = sig
 
   val command : Command.t
 
-  val arguments : public_key:Nanobit_base.Public_key.Compressed.t -> daemon_port:int -> string list
+  val arguments :
+       public_key:Nanobit_base.Public_key.Compressed.t
+    -> daemon_port:int
+    -> string list
 end

@@ -7,10 +7,11 @@ let int16 =
       else failwithf "Port not between 0 and %d" max_port () )
 
 module Key_arg_type (Key : sig
-    type t
+  type t
 
-    val of_base64_exn : string -> t
-    val to_base64 : t -> string
+  val of_base64_exn : string -> t
+
+  val to_base64 : t -> string
 
   val name : string
 
@@ -33,7 +34,8 @@ let public_key_compressed =
 
     let name = "public key"
 
-    let random () = Public_key.compress (Signature_keypair.create ()).public_key
+    let random () =
+      Public_key.compress (Signature_keypair.create ()).public_key
   end) in
   Pk.arg_type
 

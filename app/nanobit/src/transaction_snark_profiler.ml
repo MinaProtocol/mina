@@ -112,7 +112,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
           List.fold_map (pair_up proofs) ~init:Time.Span.zero ~f:
             (fun max_time (x, y) ->
               let pair_time, proof =
-                time (fun () -> T.merge ~sok_digest:Sok_message.Digest.default x y |> Or_error.ok_exn)
+                time (fun () ->
+                    T.merge ~sok_digest:Sok_message.Digest.default x y
+                    |> Or_error.ok_exn )
               in
               (Time.Span.max max_time pair_time, proof) )
         in
@@ -134,8 +136,7 @@ let check_base_snarks sparse_ledger0
           Sparse_ledger.apply_super_transaction_exn sparse_ledger t
         in
         let () =
-          Transaction_snark.check_transition
-            ~sok_message
+          Transaction_snark.check_transition ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             t

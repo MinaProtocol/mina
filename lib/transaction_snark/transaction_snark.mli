@@ -101,7 +101,7 @@ module Verification : sig
     val verify_against_digest : t -> bool
 
     val verify_complete_merge :
-      Sok_message.Digest.Checked.t
+         Sok_message.Digest.Checked.t
       -> Ledger_hash.var
       -> Ledger_hash.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
@@ -115,7 +115,7 @@ module Verification : sig
 end
 
 val check_transition :
-  sok_message:Sok_message.t
+     sok_message:Sok_message.t
   -> source:Ledger_hash.t
   -> target:Ledger_hash.t
   -> Transition.t
@@ -123,7 +123,7 @@ val check_transition :
   -> unit
 
 val check_transaction :
-  sok_message:Sok_message.t
+     sok_message:Sok_message.t
   -> source:Ledger_hash.t
   -> target:Ledger_hash.t
   -> Transaction.With_valid_signature.t
@@ -134,7 +134,7 @@ module type S = sig
   include Verification.S
 
   val of_transition :
-    sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Ledger_hash.t
     -> target:Ledger_hash.t
     -> Transition.t
@@ -142,7 +142,7 @@ module type S = sig
     -> t
 
   val of_transaction :
-    sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Ledger_hash.t
     -> target:Ledger_hash.t
     -> Transaction.With_valid_signature.t
@@ -150,16 +150,14 @@ module type S = sig
     -> t
 
   val of_fee_transfer :
-    sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Ledger_hash.t
     -> target:Ledger_hash.t
     -> Fee_transfer.t
     -> Tick.Handler.t
     -> t
 
-  val merge
-    : sok_digest:Sok_message.Digest.t
-    -> t -> t -> t Or_error.t
+  val merge : sok_digest:Sok_message.Digest.t -> t -> t -> t Or_error.t
 end
 
 val handle_with_ledger : Ledger.t -> Tick.Handler.t

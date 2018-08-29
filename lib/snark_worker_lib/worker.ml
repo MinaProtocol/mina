@@ -40,7 +40,11 @@ struct
       ({instances; fee} as spec: Work.Spec.t) =
     List.fold_until instances ~init:[]
       ~f:(fun acc w ->
-        match perform_single s ~message:(Nanobit_base.Sok_message.create ~fee ~prover:public_key) w with
+        match
+          perform_single s
+            ~message:(Nanobit_base.Sok_message.create ~fee ~prover:public_key)
+            w
+        with
         | Ok res -> Continue (res :: acc)
         | Error e -> Stop (Error e) )
       ~finish:(fun res ->

@@ -17,17 +17,19 @@ module type S = sig
 
   type ('blockchain_state, 'consensus_data, 'sok_digest) t [@@deriving sexp]
 
-  type value = (Blockchain_state.value, Consensus_data.value, Sok_message.Digest.t) t
+  type value =
+    (Blockchain_state.value, Consensus_data.value, Sok_message.Digest.t) t
   [@@deriving bin_io, sexp]
 
-  type var = (Blockchain_state.var, Consensus_data.var, Sok_message.Digest.Checked.t) t
+  type var =
+    (Blockchain_state.var, Consensus_data.var, Sok_message.Digest.Checked.t) t
 
   include Snark_params.Tick.Snarkable.S
           with type value := value
            and type var := var
 
   val create_value :
-    ?sok_digest:Sok_message.Digest.t
+       ?sok_digest:Sok_message.Digest.t
     -> ?ledger_proof:Proof.t
     -> blockchain_state:Blockchain_state.value
     -> consensus_data:Consensus_data.value
@@ -57,30 +59,35 @@ struct
   type ('blockchain_state, 'consensus_data, 'sok_digest) t =
     { blockchain_state: 'blockchain_state
     ; consensus_data: 'consensus_data
-    ; sok_digest : 'sok_digest
+    ; sok_digest: 'sok_digest
     ; ledger_proof: Proof.t option }
   [@@deriving bin_io, sexp, fields]
 
-  type value = (Blockchain_state.value, Consensus_data.value, Sok_message.Digest.Stable.V1.t) t
+  type value =
+    ( Blockchain_state.value
+    , Consensus_data.value
+    , Sok_message.Digest.Stable.V1.t )
+    t
   [@@deriving bin_io, sexp]
 
-  type var = (Blockchain_state.var, Consensus_data.var, Sok_message.Digest.Checked.t) t
+  type var =
+    (Blockchain_state.var, Consensus_data.var, Sok_message.Digest.Checked.t) t
 
-  let create_value
-        ?(sok_digest=Sok_message.Digest.default)
-        ?ledger_proof
-        ~blockchain_state ~consensus_data () =
+  let create_value ?(sok_digest= Sok_message.Digest.default) ?ledger_proof
+      ~blockchain_state ~consensus_data () =
     {blockchain_state; consensus_data; ledger_proof; sok_digest}
 
   let to_hlist {blockchain_state; consensus_data; sok_digest; ledger_proof= _} =
     H_list.[blockchain_state; consensus_data; sok_digest]
 
-  let of_hlist : (unit, 'ps -> 'cd -> 'dig -> unit) H_list.t -> ('ps, 'cd, 'dig) t =
-    fun H_list.([blockchain_state; consensus_data; sok_digest]) ->
-      {blockchain_state; consensus_data; sok_digest; ledger_proof= None}
+  let of_hlist :
+      (unit, 'ps -> 'cd -> 'dig -> unit) H_list.t -> ('ps, 'cd, 'dig) t =
+   fun H_list.([blockchain_state; consensus_data; sok_digest]) ->
+    {blockchain_state; consensus_data; sok_digest; ledger_proof= None}
 
   let data_spec =
-    Snark_params.Tick.Data_spec.[Blockchain_state.typ; Consensus_data.typ; Sok_message.Digest.typ]
+    let open Snark_params.Tick.Data_spec in
+    [Blockchain_state.typ; Consensus_data.typ; Sok_message.Digest.typ]
 
   let typ =
     Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -89,6 +96,8 @@ struct
   let genesis =
     { blockchain_state= Blockchain_state.genesis
     ; consensus_data= Consensus_data.genesis
-    ; sok_digest = Sok_message.digest { fee = Currency.Fee.zero; prover = Genesis_ledger.high_balance_pk }
+    ; sok_digest=
+        Sok_message.digest
+          {fee= Currency.Fee.zero; prover= Genesis_ledger.high_balance_pk}
     ; ledger_proof= None }
 end

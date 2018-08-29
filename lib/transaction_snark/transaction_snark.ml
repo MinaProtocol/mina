@@ -161,11 +161,11 @@ type t =
   ; target: Ledger_hash.Stable.V1.t
   ; proof_type: Proof_type.t
   ; fee_excess: Amount.Signed.Stable.V1.t
-  ; sok_digest : Sok_message.Digest.Stable.V1.t
+  ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
 [@@deriving fields, sexp, bin_io]
 
-let statement {source; target; proof_type; fee_excess; sok_digest=_; proof= _} =
+let statement {source; target; proof_type; fee_excess; sok_digest= _; proof= _} =
   { Statement.source
   ; target
   ; proof_type
@@ -178,28 +178,20 @@ let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
 
 let create = Fields.create
 
-let construct_input
-      ~proof_type
-      ~sok_digest
-      ~state1
-      ~state2
-      ~fee_excess
-  =
+let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~fee_excess =
   let fold =
-    Fold.(Sok_message.Digest.fold sok_digest
-    +> Ledger_hash.fold state1
-    +> Ledger_hash.fold state2
-    +> Amount.Signed.fold fee_excess)
+    let open Fold in
+    Sok_message.Digest.fold sok_digest
+    +> Ledger_hash.fold state1 +> Ledger_hash.fold state2
+    +> Amount.Signed.fold fee_excess
   in
   match proof_type with
-  | `Base ->
-    Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
+  | `Base -> Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
   | `Merge wrap_vk_bits ->
-    Tick.Pedersen.digest_fold Hash_prefix.merge_snark
-      Fold.(fold +> group3 ~default:false (of_list wrap_vk_bits))
+      Tick.Pedersen.digest_fold Hash_prefix.merge_snark
+        Fold.(fold +> group3 ~default:false (of_list wrap_vk_bits))
 
-let base_top_hash =
-  construct_input ~proof_type:`Base
+let base_top_hash = construct_input ~proof_type:`Base
 
 let merge_top_hash wrap_vk_bits =
   construct_input ~proof_type:(`Merge wrap_vk_bits)
@@ -376,8 +368,7 @@ module Base = struct
       { transaction: Tagged_transaction.t
       ; state1: Ledger_hash.t
       ; state2: Ledger_hash.t
-      ; sok_digest : Sok_message.Digest.t
-      }
+      ; sok_digest: Sok_message.Digest.t }
     [@@deriving fields]
   end
 
@@ -413,32 +404,36 @@ module Base = struct
            in
            let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
            Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark
-             (Sok_message.Digest.Checked.to_triples sok_digest @ b1 @ b2 @ fee_excess)
+             ( Sok_message.Digest.Checked.to_triples sok_digest
+             @ b1 @ b2 @ fee_excess )
            >>= Field.Checked.Assert.equal top_hash)
       in
       ())
 
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
-  let tagged_transaction_proof ~proving_key
-        sok_digest
-        state1 state2
+  let tagged_transaction_proof ~proving_key sok_digest state1 state2
       (transaction: Tagged_transaction.t) handler =
-    let prover_state : Prover_state.t = {state1; state2; transaction; sok_digest} in
+    let prover_state : Prover_state.t =
+      {state1; state2; transaction; sok_digest}
+    in
     let main top_hash = handle (main top_hash) handler in
     let top_hash =
-      base_top_hash ~sok_digest ~state1 ~state2 ~fee_excess:(Tagged_transaction.excess transaction)
+      base_top_hash ~sok_digest ~state1 ~state2
+        ~fee_excess:(Tagged_transaction.excess transaction)
     in
     (top_hash, prove proving_key (tick_input ()) prover_state main top_hash)
 
-  let fee_transfer_proof ~proving_key sok_message state1 state2 transfer handler =
+  let fee_transfer_proof ~proving_key sok_message state1 state2 transfer
+      handler =
     tagged_transaction_proof ~proving_key sok_message state1 state2
       (Fee_transfer.to_tagged_transaction transfer)
       handler
 
-  let transaction_proof ~proving_key sok_message state1 state2 transaction handler =
-    tagged_transaction_proof ~proving_key sok_message state1 state2 (Normal, transaction)
-      handler
+  let transaction_proof ~proving_key sok_message state1 state2 transaction
+      handler =
+    tagged_transaction_proof ~proving_key sok_message state1 state2
+      (Normal, transaction) handler
 
   let cached =
     let load =
@@ -460,10 +455,9 @@ end
 
 module Transition_data = struct
   type t =
-    { proof : Proof_type.t * Tock_curve.Proof.t
-    ; fee_excess : Amount.Signed.t
-    ; sok_digest : Sok_message.Digest.t
-    }
+    { proof: Proof_type.t * Tock_curve.Proof.t
+    ; fee_excess: Amount.Signed.t
+    ; sok_digest: Sok_message.Digest.t }
   [@@deriving fields]
 end
 
@@ -474,13 +468,12 @@ module Merge = struct
   module Prover_state = struct
     type t =
       { tock_vk: Tock_curve.Verification_key.t
-      ; sok_digest : Sok_message.Digest.t
+      ; sok_digest: Sok_message.Digest.t
       ; ledger_hash1: bool list
       ; ledger_hash2: bool list
-      ; transition12 : Transition_data.t
+      ; transition12: Transition_data.t
       ; ledger_hash3: bool list
-      ; transition23 : Transition_data.t
-      }
+      ; transition23: Transition_data.t }
     [@@deriving fields]
   end
 
@@ -490,7 +483,7 @@ module Merge = struct
 
   let wrap_input_typ = Typ.list ~length:Tock.Field.size_in_bits Boolean.typ
 
-(* TODO: When we switch to the weierstrass curve use the shifted
+  (* TODO: When we switch to the weierstrass curve use the shifted
    add-many function *)
   let disjoint_union_sections = function
     | [] -> failwith "empty list"
@@ -521,18 +514,11 @@ module Merge = struct
   let input_triples_length_excluding_vk =
     (2 * state_hash_size_in_triples) + Amount.Signed.length_in_triples
 
-  let construct_input_checked
-        ~prefix
-        ~(sok_digest : Sok_message.Digest.Checked.t)
-        ~state1
-        ~state2
-        ~fee_excess
-        ?tock_vk
-        ()
-    =
+  let construct_input_checked ~prefix
+      ~(sok_digest: Sok_message.Digest.Checked.t) ~state1 ~state2 ~fee_excess
+      ?tock_vk () =
     let prefix_section =
-      Pedersen.Checked.Section.create
-        ~acc:prefix
+      Pedersen.Checked.Section.create ~acc:prefix
         ~support:
           (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
     in
@@ -544,34 +530,23 @@ module Merge = struct
     let%bind prefix_and_sok_digest_and_fee =
       let open Pedersen.Checked.Section in
       extend prefix_and_sok_digest
-        ~start:(
-          Hash_prefix.length_in_triples +
-          Sok_message.Digest.length_in_triples +
-          state_hash_size_in_triples +
-          state_hash_size_in_triples)
+        ~start:
+          ( Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
+          + state_hash_size_in_triples + state_hash_size_in_triples )
         (Amount.Signed.Checked.to_triples fee_excess)
     in
     disjoint_union_sections
-      ([ prefix_and_sok_digest_and_fee
-      ; state1
-      ; state2
-      ]
-      @ Option.to_list tock_vk)
+      ([prefix_and_sok_digest_and_fee; state1; state2] @ Option.to_list tock_vk)
 
   (* spec for [verify_transition tock_vk proof_field s1 s2]:
      returns a bool which is true iff
      there is a snark proving making tock_vk
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
-  let verify_transition
-        tock_vk_data tock_vk_section get_transition_data s1 s2
+  let verify_transition tock_vk_data tock_vk_section get_transition_data s1 s2
       fee_excess =
     let open Let_syntax in
     let%bind is_base =
-      let get_type s =
-        get_transition_data s
-        |> Transition_data.proof
-        |> fst
-      in
+      let get_type s = get_transition_data s |> Transition_data.proof |> fst in
       with_label __LOC__
         (provide_witness' Boolean.typ ~f:(fun s ->
              Proof_type.is_base (get_type s) ))
@@ -585,15 +560,10 @@ module Merge = struct
         `Var
           (Inner_curve.Checked.if_value is_base
              ~then_:Hash_prefix.base_snark.acc
-            ~else_:Hash_prefix.merge_snark.acc)
+             ~else_:Hash_prefix.merge_snark.acc)
       in
-      construct_input_checked
-        ~prefix
-        ~sok_digest
-        ~state1:s1
-        ~state2:s2
-        ~fee_excess
-        ()
+      construct_input_checked ~prefix ~sok_digest ~state1:s1 ~state2:s2
+        ~fee_excess ()
     in
     let%bind with_vk_top_hash =
       with_label __LOC__
@@ -612,11 +582,7 @@ module Merge = struct
         >>= Pedersen.Checked.Digest.choose_preimage
         >>| fun x -> (x :> Boolean.var list) )
     in
-    let get_proof s =
-      get_transition_data s
-      |> Transition_data.proof
-      |> snd
-    in
+    let get_proof s = get_transition_data s |> Transition_data.proof |> snd in
     check_snark ~get_proof tock_vk_data input
 
   (* spec for [main top_hash]:
@@ -636,12 +602,10 @@ module Merge = struct
     and s3 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash3
     and fee_excess12 =
       provide_witness' Amount.Signed.typ
-        ~f:(Fn.compose Transition_data.fee_excess
-              Prover_state.transition12)
+        ~f:(Fn.compose Transition_data.fee_excess Prover_state.transition12)
     and fee_excess23 =
       provide_witness' Amount.Signed.typ
-        ~f:(Fn.compose Transition_data.fee_excess
-              Prover_state.transition23)
+        ~f:(Fn.compose Transition_data.fee_excess Prover_state.transition23)
     in
     let bits_to_triples bits =
       Fold.(to_list (group3 ~default:Boolean.false_ (of_list bits)))
@@ -671,19 +635,12 @@ module Merge = struct
       in
       let%bind input =
         let%bind sok_digest =
-          provide_witness' Sok_message.Digest.typ
-            ~f:Prover_state.sok_digest
+          provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
         in
-        construct_input_checked
-          ~prefix:(`Value Hash_prefix.merge_snark.acc)
-          ~sok_digest
-          ~state1:s1_section
-          ~state2:s3_section
-          ~fee_excess:total_fees
-          ~tock_vk:tock_vk_section
-          ()
-        >>| Pedersen.Checked.Section.to_initial_segment_digest_exn
-        >>| fst
+        construct_input_checked ~prefix:(`Value Hash_prefix.merge_snark.acc)
+          ~sok_digest ~state1:s1_section ~state2:s3_section
+          ~fee_excess:total_fees ~tock_vk:tock_vk_section ()
+        >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
       in
       Field.Checked.Assert.equal top_hash input
     and verify_12 =
@@ -734,7 +691,7 @@ module Verification = struct
     val verify_against_digest : t -> bool
 
     val verify_complete_merge :
-      Sok_message.Digest.Checked.t
+         Sok_message.Digest.Checked.t
       -> Ledger_hash.var
       -> Ledger_hash.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
@@ -755,18 +712,20 @@ module Verification = struct
 
     (* someday: Reorganize this module so that the inputs are separated from the proof. *)
     let verify_against_digest
-          {source; target; proof; proof_type; fee_excess; sok_digest} =
+        {source; target; proof; proof_type; fee_excess; sok_digest} =
       let input =
         match proof_type with
-        | `Base -> base_top_hash ~sok_digest ~state1:source ~state2:target ~fee_excess
-        | `Merge -> merge_top_hash ~sok_digest wrap_vk_bits ~state1:source ~state2:target ~fee_excess
+        | `Base ->
+            base_top_hash ~sok_digest ~state1:source ~state2:target ~fee_excess
+        | `Merge ->
+            merge_top_hash ~sok_digest wrap_vk_bits ~state1:source
+              ~state2:target ~fee_excess
       in
       Tock.verify proof keys.wrap (wrap_input ()) (embed input)
 
     let verify t ~message =
       Sok_message.Digest.equal t.sok_digest (Sok_message.digest message)
-        &&
-        verify_against_digest t
+      && verify_against_digest t
 
     (* The curve pt corresponding to H(merge_prefix, _, _, Amount.Signed.zero, wrap_vk)
     (with starting point shifted over by 2 * digest_size so that
@@ -836,8 +795,8 @@ module Verification = struct
             !"%d = Hash_prefix.length_in_triples aka %d\n            \
               + Sok_message.Digest.length_in_triples aka %d\n\
               + (2 * Ledger_hash.length_in_triples) aka %d \n            \
-              + Amount.Signed.length aka %d + List.length wrap_vk_triples aka %d \
-              ) aka %d"
+              + Amount.Signed.length aka %d + List.length wrap_vk_triples aka \
+              %d ) aka %d"
             n Hash_prefix.length_in_triples
             Sok_message.Digest.length_in_triples
             (2 * Ledger_hash.length_in_triples)
@@ -993,7 +952,7 @@ module type S = sig
   include Verification.S
 
   val of_transition :
-    sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Ledger_hash.t
     -> target:Ledger_hash.t
     -> Transition.t
@@ -1001,7 +960,7 @@ module type S = sig
     -> t
 
   val of_transaction :
-    sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Ledger_hash.t
     -> target:Ledger_hash.t
     -> Transaction.With_valid_signature.t
@@ -1009,16 +968,14 @@ module type S = sig
     -> t
 
   val of_fee_transfer :
-    sok_digest:Sok_message.Digest.t
+       sok_digest:Sok_message.Digest.t
     -> source:Ledger_hash.t
     -> target:Ledger_hash.t
     -> Fee_transfer.t
     -> Tick.Handler.t
     -> t
 
-  val merge
-    : sok_digest:Sok_message.Digest.t
-    -> t -> t -> t Or_error.t
+  val merge : sok_digest:Sok_message.Digest.t -> t -> t -> t Or_error.t
 end
 
 let check_tagged_transaction sok_message source target transaction handler =
@@ -1027,7 +984,9 @@ let check_tagged_transaction sok_message source target transaction handler =
     {state1= source; state2= target; transaction; sok_digest}
   in
   let fee_excess = Tagged_transaction.excess transaction in
-  let top_hash = base_top_hash ~sok_digest ~state1:source ~state2:target ~fee_excess in
+  let top_hash =
+    base_top_hash ~sok_digest ~state1:source ~state2:target ~fee_excess
+  in
   let open Tick in
   let main =
     handle
@@ -1043,10 +1002,10 @@ let check_transition ~sok_message ~source ~target (t: Transition.t) handler =
     (Transition.to_tagged_transaction t)
     handler
 
-let check_transaction ~sok_message  ~source ~target t handler =
-  check_transition ~sok_message  ~source ~target (Transaction t) handler
+let check_transaction ~sok_message ~source ~target t handler =
+  check_transition ~sok_message ~source ~target (Transaction t) handler
 
-let check_fee_transfer ~sok_message  ~source ~target t handler =
+let check_fee_transfer ~sok_message ~source ~target t handler =
   check_transition ~sok_message ~source ~target (Fee_transfer t) handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
@@ -1072,22 +1031,16 @@ struct
     Tock.prove keys.proving.wrap (wrap_input ()) prover_state Wrap.main
       (embed input)
 
-  let merge_proof
-        sok_digest
-        ledger_hash1 ledger_hash2 ledger_hash3
-        transition12 transition23
-    =
+  let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
+      transition12 transition23 =
     let fee_excess =
-      Amount.Signed.add
-        transition12.Transition_data.fee_excess
+      Amount.Signed.add transition12.Transition_data.fee_excess
         transition23.Transition_data.fee_excess
       |> Option.value_exn
     in
     let top_hash =
-      merge_top_hash wrap_vk_bits
-        ~sok_digest
-        ~state1:ledger_hash1 ~state2:ledger_hash3
-        ~fee_excess
+      merge_top_hash wrap_vk_bits ~sok_digest ~state1:ledger_hash1
+        ~state2:ledger_hash3 ~fee_excess
     in
     let prover_state =
       let to_bits = Ledger_hash.to_bits in
@@ -1105,9 +1058,8 @@ struct
 
   let of_tagged_transaction sok_digest source target transaction handler =
     let top_hash, proof =
-      Base.tagged_transaction_proof sok_digest
-        ~proving_key:keys.proving.base source
-        target transaction handler
+      Base.tagged_transaction_proof sok_digest ~proving_key:keys.proving.base
+        source target transaction handler
     in
     { source
     ; sok_digest
@@ -1141,16 +1093,13 @@ struct
       Proof_type_with_fees.to_proof_type_and_amount t2.proof_type_with_fees
        in *)
     let input, proof =
-      merge_proof sok_digest
-        t1.source t1.target t2.target
-        { Transition_data.proof = (t1.proof_type, t1.proof)
-        ; fee_excess = t1.fee_excess
-        ; sok_digest = t1.sok_digest
-        }
-        { Transition_data.proof = (t2.proof_type, t2.proof)
-        ; fee_excess = t2.fee_excess
-        ; sok_digest = t2.sok_digest
-        }
+      merge_proof sok_digest t1.source t1.target t2.target
+        { Transition_data.proof= (t1.proof_type, t1.proof)
+        ; fee_excess= t1.fee_excess
+        ; sok_digest= t1.sok_digest }
+        { Transition_data.proof= (t2.proof_type, t2.proof)
+        ; fee_excess= t2.fee_excess
+        ; sok_digest= t2.sok_digest }
     in
     let open Or_error.Let_syntax in
     let%map fee_excess =
@@ -1369,13 +1318,14 @@ let%test_module "transaction_snark" =
       let target =
         Ledger.merkle_root_after_transaction_exn ledger transaction
       in
-      of_transaction ~sok_digest ~source ~target transaction (handle_with_ledger ledger)
+      of_transaction ~sok_digest ~source ~target transaction
+        (handle_with_ledger ledger)
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
-          Array.iter wallets ~f:(fun {account; private_key=_} ->
+          Array.iter wallets ~f:(fun {account; private_key= _} ->
               Ledger.set ledger account.public_key account ) ;
           let t1 =
             transaction wallets 0 1 8
@@ -1408,10 +1358,6 @@ let%test_module "transaction_snark" =
           let proof13 = merge ~sok_digest proof12 proof23 |> Or_error.ok_exn in
           Tock.verify proof13.proof keys.verification.wrap (wrap_input ())
             (embed
-               (merge_top_hash
-                 ~sok_digest
-                  ~state1:state1
-                  ~state2:state3
-                  ~fee_excess:total_fees
-                  wrap_vk_bits)) )
+               (merge_top_hash ~sok_digest ~state1 ~state2:state3
+                  ~fee_excess:total_fees wrap_vk_bits)) )
   end )

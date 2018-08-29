@@ -16,7 +16,10 @@ module type S = sig
   val verify_blockchain : t -> blockchain -> bool Or_error.t Deferred.t
 
   val verify_transaction_snark :
-    t -> Transaction_snark.t -> message:Sok_message.t -> bool Or_error.t Deferred.t
+       t
+    -> Transaction_snark.t
+    -> message:Sok_message.t
+    -> bool Or_error.t Deferred.t
 end
 
 module Make
@@ -30,7 +33,8 @@ struct
       val verify_wrap :
         Consensus_mechanism.Protocol_state.value -> Tock.Proof.t -> bool
 
-      val verify_transaction_snark : Transaction_snark.t -> message:Sok_message.t -> bool
+      val verify_transaction_snark :
+        Transaction_snark.t -> message:Sok_message.t -> bool
     end
 
     type init_arg = unit [@@deriving bin_io]
@@ -72,7 +76,8 @@ struct
 
       type 'w functions =
         { verify_blockchain: ('w, Blockchain.t, bool) F.t
-        ; verify_transaction_snark: ('w, Transaction_snark.t * Sok_message.t, bool) F.t }
+        ; verify_transaction_snark:
+            ('w, Transaction_snark.t * Sok_message.t, bool) F.t }
 
       module Worker_state = Worker_state
 
@@ -92,8 +97,7 @@ struct
           if Insecure.verify_blockchain then true
           else M.verify_wrap chain.state chain.proof
 
-        let verify_transaction_snark (w: Worker_state.t)
-            (p, message) =
+        let verify_transaction_snark (w: Worker_state.t) (p, message) =
           let%map (module M) = Worker_state.get w in
           M.verify_transaction_snark p ~message
 
@@ -106,9 +110,10 @@ struct
           { verify_blockchain=
               f (Blockchain.bin_t, Bool.bin_t, verify_blockchain)
           ; verify_transaction_snark=
-              f ( [%bin_type_class: Transaction_snark.t * Sok_message.t], Bool.bin_t
-                , verify_transaction_snark)
-          }
+              f
+                ( [%bin_type_class : Transaction_snark.t * Sok_message.t]
+                , Bool.bin_t
+                , verify_transaction_snark ) }
 
         let init_worker_state () = Worker_state.create ()
 
