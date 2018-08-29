@@ -130,7 +130,7 @@ module Make (Inputs : Inputs_intf) = struct
       match%bind
         Interruptible.lift
           (Sync_ledger.wait_until_valid sl h)
-          (Deferred.map (Ivar.read ivar) ~f:(fun _ -> ()))
+          (Deferred.map (Ivar.read ivar) ~f:ignore)
       with
       | `Ok ledger -> (
           (* TODO: This should be parallelized with the syncing *)

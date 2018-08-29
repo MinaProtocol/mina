@@ -446,41 +446,41 @@ end = struct
           in
           job )
     in
+    let replace last job =
+      let current_transition, _ = job in
+      match last with
+      | None -> `Cancel_and_do_next
+      | Some last ->
+          let last_transition, _ = last in
+          match
+            Consensus_mechanism.select
+              (Protocol_state.consensus_state
+                 (Inputs.External_transition.protocol_state last_transition))
+              (Protocol_state.consensus_state
+                 (Inputs.External_transition.protocol_state current_transition))
+          with
+          | `Keep -> `Do_nothing
+          | `Take -> `Cancel_and_do_next
+    in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
             let current_transition, _ = job in
-            let replace =
-              match last with
-              | None -> true
-              | Some last ->
-                  let last_transition, _ = last in
-                  match
-                    Consensus_mechanism.select
-                      (Protocol_state.consensus_state
-                         (Inputs.External_transition.protocol_state
-                            last_transition))
-                      (Protocol_state.consensus_state
-                         (Inputs.External_transition.protocol_state
-                            current_transition))
-                  with
-                  | `Keep -> false
-                  | `Take -> true
-            in
-            if replace then (
-              Option.iter last ~f:(fun (input, ivar) ->
-                  Ivar.fill_if_empty ivar input ) ;
-              let w, this_ivar = Job.run job in
-              let () =
-                Deferred.upon w.Interruptible.d (function
-                  | Ok [] -> ()
-                  | Ok changes ->
-                      (* TODO fix this *)
-                      Linear_pipe.write_without_pushback mutate_state_writer
-                        (changes, current_transition)
-                  | Error () -> () )
-              in
-              return (Some (current_transition, this_ivar)) )
-            else return last )
+            match replace last job with
+            | `Do_nothing -> return last
+            | `Cancel_and_do_next ->
+                Option.iter last ~f:(fun (input, ivar) ->
+                    Ivar.fill_if_empty ivar input ) ;
+                let w, this_ivar = Job.run job in
+                let () =
+                  Deferred.upon w.Interruptible.d (function
+                    | Ok [] -> ()
+                    | Ok changes ->
+                        (* TODO fix this *)
+                        Linear_pipe.write_without_pushback mutate_state_writer
+                          (changes, current_transition)
+                    | Error () -> () )
+                in
+                return (Some (current_transition, this_ivar)) )
       >>| ignore ) ;
     t
 
@@ -683,9 +683,9 @@ let%test_module "test" =
         module Responder = struct
           type t = unit
 
-          let create = failwith "unused"
+          let create _ = failwith "unused"
 
-          let answer_query = failwith "unused"
+          let answer_query _ = failwith "unused"
         end
 
         type t =

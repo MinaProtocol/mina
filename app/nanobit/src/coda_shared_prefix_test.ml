@@ -84,7 +84,7 @@ struct
         return () )
 
   let command =
-    Command.async_spec ~summary:"Simple use of Async Rpc_parallel V2"
+    Command.async_spec ~summary:"Test that workers share prefixes"
       Command.Spec.(empty)
       main
 end
