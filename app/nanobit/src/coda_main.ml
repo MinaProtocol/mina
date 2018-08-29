@@ -26,16 +26,12 @@ module Ledger_hash = struct
   let to_bytes = Ledger_hash.to_bytes
 end
 
-module type Ledger_proof_intf = sig
-  type t
-  [@@deriving sexp, bin_io]
-
-  val statement : t -> Transaction_snark.Statement.t
-
-  val proof : t -> Proof.t
-
-  val sok_digest : t -> Sok_message.Digest.t
-end
+module type Ledger_proof_intf =
+  Protocols.Coda_pow.Ledger_proof_intf
+  with type sok_digest := Sok_message.Digest.t
+   and type ledger_hash := Ledger_hash.t
+   and type proof := Proof.t
+   and type statement = Transaction_snark.Statement.t
 
 module type Ledger_proof_verifier_intf = sig
   type ledger_proof
@@ -289,17 +285,7 @@ struct
   end
 
   module Proof = Nanobit_base.Proof.Stable.V1
-
-  module Ledger_proof = struct
-    include Ledger_proof
-
-    type statement = Transaction_snark.Statement.t
-
-    let statement_target (t: Transaction_snark.Statement.t) = t.target
-
-    let underlying_proof = Ledger_proof.proof
-  end
-
+  module Ledger_proof = Ledger_proof
   module Sparse_ledger = Nanobit_base.Sparse_ledger
 
   module Completed_work_proof = struct
@@ -690,7 +676,9 @@ struct
              0)
       then Deferred.return false
       else
-        match%map Init.Verifier.verify_transaction_snark Init.verifier t ~message with
+        match%map
+          Init.Verifier.verify_transaction_snark Init.verifier t ~message
+        with
         | Ok b -> b
         | Error e ->
             Logger.warn Init.logger

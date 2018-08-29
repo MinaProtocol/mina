@@ -268,9 +268,11 @@ module type Ledger_proof_intf = sig
 
   type sok_digest
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   val statement_target : statement -> ledger_hash
+
+  val statement : t -> statement
 
   val sok_digest : t -> sok_digest
 
@@ -549,7 +551,7 @@ module type Consensus_mechanism_intf = sig
     type var
 
     val create_value :
-      ?sok_digest:sok_digest
+         ?sok_digest:sok_digest
       -> ?ledger_proof:proof
       -> blockchain_state:blockchain_state
       -> consensus_data:Consensus_transition_data.value
@@ -705,8 +707,7 @@ module type Inputs_intf = sig
   end
 
   module Sok_message :
-    Sok_message_intf
-    with type public_key_compressed := Public_key.Compressed.t
+    Sok_message_intf with type public_key_compressed := Public_key.Compressed.t
 
   module Ledger_proof_statement :
     Ledger_proof_statement_intf with type ledger_hash := Ledger_hash.t

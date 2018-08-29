@@ -156,14 +156,12 @@ let () =
     else
       let module Kernel = Kernel.Debug () in
       let module Coda = struct
-        type ledger_proof = Ledger_proof_statement.t
+        type ledger_proof = Ledger_proof.Debug.t
 
         module Make
-            (Init : Init_intf
-                    with type Ledger_proof.t = Ledger_proof_statement.t * Sok_message.Digest.t)
+            (Init : Init_intf with type Ledger_proof.t = Ledger_proof.Debug.t)
             () =
-          Coda_without_snark
-            (Init) ()
+          Coda_without_snark (Init) ()
       end in
       ("daemon", daemon (module Kernel) (module Coda))
       ::
