@@ -114,6 +114,15 @@ module Tock = struct
 
   module Inner_curve = struct
     include Snarky.Backends.Mnt4.Group
+    include Sexpable.Of_sexpable(struct
+        type t = Field.t * Field.t [@@deriving sexp]
+      end)(struct
+        type nonrec t = t
+        let to_sexpable = to_coords
+        let of_sexpable = of_coords
+        end)
+
+
     include Make_inner_curve_aux(Tock0)(Tick0)(Snarky.Libsnark.Curves.Mnt4.G1.Coefficients)
     let ctypes_typ = typ
 
@@ -151,28 +160,6 @@ module Tick = struct
 
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
-  module Inner_curve = struct
-    include Crypto_params.Inner_curve
-    include Make_inner_curve_aux(Tick0)(Tock0)(Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
-    let ctypes_typ = typ
-
-    let scale = scale_field
-
-    module Checked = struct
-      include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
-                (struct
-                  include Crypto_params.Inner_curve
-
-                  let scale = scale_field
-                end)
-                (Coefficients)
-
-      let add_known_unsafe t x = add_unsafe t (constant x)
-    end
-
-    let typ = Checked.typ
-  end
-
   module Field = struct
     include Tick0.Field
     include Hashable.Make (Tick0.Field)
@@ -199,6 +186,35 @@ module Tick = struct
       let main_size_proxy = List.rev (unpack (negate one)) in
       let other_size_proxy = List.rev Tock.Field.(unpack (negate one)) in
       assert (compare_bitstring main_size_proxy other_size_proxy = `LT)
+  end
+
+  module Inner_curve = struct
+    include Crypto_params.Inner_curve
+    include Sexpable.Of_sexpable(struct
+        type t = Field.t * Field.t [@@deriving sexp]
+      end)(struct
+        type nonrec t = t
+        let to_sexpable = to_coords
+        let of_sexpable = of_coords
+        end)
+    include Make_inner_curve_aux(Tick0)(Tock0)(Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+    let ctypes_typ = typ
+
+    let scale = scale_field
+
+    module Checked = struct
+      include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
+                (struct
+                  include Crypto_params.Inner_curve
+
+                  let scale = scale_field
+                end)
+                (Coefficients)
+
+      let add_known_unsafe t x = add_unsafe t (constant x)
+    end
+
+    let typ = Checked.typ
   end
 
   module Pedersen = struct
