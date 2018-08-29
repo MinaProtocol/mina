@@ -14,7 +14,24 @@ module Make
         val input_size : int
 
         val fqe_size_in_field_elements : int
-    end) =
+      end)
+    (Inner_curve : sig
+       open Impl
+       type t [@@deriving sexp]
+       type var = Field.var * Field.var
+       val typ : (var, t) Typ.t
+
+       module Checked :
+         Curves.Weierstrass_checked_intf
+         with type t := t
+          and module Impl := Impl
+          and type var := var
+
+       val ctypes_typ : t Ctypes.typ
+       module Vector : Vector.S with type elt := t
+     end)
+
+=
 struct
   open Impl
   open Ctypes
@@ -30,7 +47,7 @@ struct
     type t = unit ptr
   end
 
-  module Verification_key : sig
+  module Verification_key_var : sig
     type t
 
     val typ : t Ctypes.typ
@@ -46,6 +63,8 @@ struct
       Other_curve.Verification_key.t -> Field.Vector.t
 
     val sign_elts : Other_curve.Verification_key.t -> Field.Vector.t
+
+    val query : Other_curve.Verification_key.t -> Inner_curve.Vector.t
 
     val generate_witness : t -> Other_curve.Verification_key.t -> unit
   end = struct
@@ -87,6 +106,18 @@ struct
         Caml.Gc.finalise Field.Vector.delete v ;
         v
 
+    let query =
+      let stub =
+        foreign
+          (with_prefix Prefix.prefix "gm_verification_key_query")
+          (Other_curve.Verification_key.typ
+           @-> returning Inner_curve.Vector.typ)
+      in
+      fun t ->
+        let v = stub t in
+        Caml.Gc.finalise Inner_curve.Vector.delete v ;
+        v
+
     let sign_elts =
       let stub =
         foreign
@@ -124,6 +155,9 @@ struct
     type 'field t_ = {characterizing_up_to_sign: 'field list; sign: 'field list}
     [@@deriving sexp]
 
+    let base_g1_count = 2
+
+(*
     let characterizing_length, sign_length =
       let g1_count = 2 + (1 + Info.input_size) in
       let g2_count = 3 in
@@ -133,13 +167,31 @@ struct
         + (gt_count * Info.fqe_size_in_field_elements)
       , g1_count + g2_count + gt_count )
 
+*)
+    let lengths ~g1_count =
+      let g2_count = 3 in
+      let gt_count = 1 in
+      ( (g1_count * 1)
+        + (g2_count * Info.fqe_size_in_field_elements)
+        + (gt_count * Info.fqe_size_in_field_elements)
+      , g1_count + g2_count + gt_count )
+
+    let full_lengths =
+      lengths ~g1_count:(Info.input_size + 1 + base_g1_count)
+
     type t = Field.t t_ [@@deriving sexp]
 
     type var = Field.Checked.t t_
 
-    let bit_length = (characterizing_length * Field.size_in_bits) + sign_length
+    let bit_length (characterizing_length, sign_length) =
+      (characterizing_length * Field.size_in_bits) + sign_length
 
-    let typ =
+    let full_bit_length = bit_length full_lengths
+
+    let typ ~g1_count =
+      let characterizing_length, sign_length =
+        lengths ~g1_count
+      in
       let open H_list in
       Typ.of_hlistable
         [ Typ.list ~length:characterizing_length Field.typ
@@ -153,9 +205,10 @@ struct
         ~value_of_hlist:(fun [characterizing_up_to_sign; sign] ->
           {characterizing_up_to_sign; sign} )
 
-    let of_verification_key vk : t =
-      let elts = Verification_key.characterizing_elts_up_to_sign vk in
-      let signs = Verification_key.sign_elts vk in
+    let full_data_of_verification_key vk : t =
+      let characterizing_length, sign_length = full_lengths in
+      let elts = Verification_key_var.characterizing_elts_up_to_sign vk in
+      let signs = Verification_key_var.sign_elts vk in
       let module V = Field.Vector in
       assert (V.length elts = characterizing_length) ;
       assert (V.length signs = sign_length) ;
@@ -181,16 +234,36 @@ struct
         ; characterizing_up_to_sign=
             List.map characterizing_up_to_sign ~f:Field.Checked.constant }
 
+      let if_value (choice: Boolean.var) ~then_:t1 ~else_:t2 =
+        let if_value x y =
+          let choice = (choice :> Field.Checked.t) in
+          let open Field.Checked in
+          Infix.((x * choice) + (y * (constant Field.one - choice)))
+        in
+        let if_list xs ys = List.map2_exn ~f:if_value xs ys in
+        { characterizing_up_to_sign=
+            if_list t1.characterizing_up_to_sign t2.characterizing_up_to_sign
+        ; sign= if_list t1.sign t2.sign }
+
       module Assert = struct
         let equal t1 t2 =
           let check xs ys =
             Checked.List.iter (List.zip_exn xs ys) ~f:(fun (x, y) ->
-                Field.Checked.Assert.equal x y )
+              with_label __LOC__
+                (Field.Checked.Assert.equal x y ))
           in
           let open Checked.Let_syntax in
+          let%bind () =
+            as_prover As_prover.(Let_syntax.(
+              let typ = (typ ~g1_count:(base_g1_count+2)) in
+              let%map t1 = read typ t1 and t2 = read typ t2 in
+              Core.printf !"t1 = %{sexp:t}\nt2 = %{sexp:t}\n%!" t1 t2
+            ))
+            in
           let%map () =
-            check t1.characterizing_up_to_sign t2.characterizing_up_to_sign
-          and () = check t1.sign t2.sign in
+            with_label __LOC__
+              (check t1.characterizing_up_to_sign t2.characterizing_up_to_sign)
+          and () = with_label __LOC__ (check t1.sign t2.sign) in
           ()
       end
 
@@ -209,6 +282,99 @@ struct
               >>| Bitstring_lib.Bitstring.Lsb_first.to_list >>| List.hd_exn )
         in
         bs1 @ bs2
+    end
+  end
+
+  module Verification_key = struct
+    type ('g1, 'field) t_ =
+      { query_base : 'g1
+      ; query : 'g1 list
+      ; other_data : 'field Verification_key_data.t_
+      }
+    [@@deriving sexp]
+
+    type t = (Inner_curve.t, Field.t) t_ [@@deriving sexp]
+    type var = (Inner_curve.var, Field.var) t_
+
+    let of_hlist (H_list.[query_base; query; other_data] : (unit, 'a1 -> 'a2 -> 'a3 -> unit) H_list.t) =
+      { query_base; query; other_data }
+
+    let to_hlist { query_base; query; other_data } =
+      H_list.[query_base; query; other_data]
+
+    let typ : (var, t) Typ.t =
+      Typ.of_hlistable
+        [ Inner_curve.typ; Typ.list ~length:Info.input_size Inner_curve.typ
+        ; Verification_key_data.typ ~g1_count:Verification_key_data.base_g1_count
+        ]
+        ~var_to_hlist:to_hlist
+        ~value_to_hlist:to_hlist
+        ~var_of_hlist:of_hlist
+        ~value_of_hlist:of_hlist
+
+    let of_verification_key vk : t =
+      let query_g1_size = 1 + Info.input_size in
+      let characterizing_length, sign_length = Verification_key_data.lengths ~g1_count:Verification_key_data.base_g1_count in
+      let characterizing_up_to_sign =
+        let chars = Verification_key_var.characterizing_elts_up_to_sign vk in
+        assert (Field.Vector.length chars = query_g1_size + characterizing_length);
+        List.init characterizing_length ~f:(fun i ->
+          Field.Vector.get chars (query_g1_size + i))
+      in
+      let sign =
+        let signs = Verification_key_var.sign_elts vk in
+        assert (Field.Vector.length signs = query_g1_size + sign_length);
+        List.init sign_length ~f:(fun i ->
+          Field.Vector.get signs (query_g1_size + i))
+      in
+      let query = Verification_key_var.query vk in
+      assert (Inner_curve.Vector.length query = Info.input_size + 1);
+      { query_base = Inner_curve.Vector.get query 0
+      ; query = List.init (Inner_curve.Vector.length query - 1) ~f:(fun i ->
+          Inner_curve.Vector.get query (i + 1))
+      ; other_data =
+          { characterizing_up_to_sign; sign }
+      }
+
+    let to_full_data ~get_x ~get_y { query_base; query; other_data } =
+      let g1s = query_base :: query in
+      { Verification_key_data.characterizing_up_to_sign =
+          List.map g1s ~f:get_x @ other_data.characterizing_up_to_sign
+      ; sign =
+          List.map g1s ~f:get_y @ other_data.sign
+      }
+
+    module Checked = struct
+      let to_full_data (t : var) = to_full_data ~get_x:fst ~get_y:snd t
+
+      let accumulate_input (type s) ((module Shifted) : s Inner_curve.Checked.Shifted.m)
+            { query_base; query; other_data=_ }
+            (inputs : Boolean.var Bitstring_lib.Bitstring.Lsb_first.t list)
+        =
+        let open Let_syntax in
+        let%bind init = Shifted.(add zero query_base) in
+        Checked.List.fold (List.zip_exn query inputs) ~f:(fun acc (g, x) ->
+          Inner_curve.Checked.scale (module Shifted) g x ~init:acc)
+          ~init
+        >>= Shifted.unshift_nonzero
+      ;;
+
+      let constant ({ query_base; query; other_data } : t) =
+        { query_base = Inner_curve.Checked.constant query_base
+        ; query = List.map ~f:Inner_curve.Checked.constant query
+        ; other_data = Verification_key_data.Checked.constant other_data
+        }
+
+      let if_value cond ~then_ ~else_ =
+        { query_base = Inner_curve.Checked.if_value cond
+            ~then_:then_.query_base ~else_:else_.query_base
+        ; query =
+            List.map2_exn then_.query else_.query
+              ~f:(fun then_ else_ -> Inner_curve.Checked.if_value cond ~then_ ~else_)
+        ; other_data =
+            Verification_key_data.Checked.if_value cond
+              ~then_:then_.other_data ~else_:else_.other_data
+        }
     end
   end
 
@@ -286,14 +452,13 @@ struct
 
     type input =
       { pvk: Preprocessed_verification_key.t
-      ; input: Boolean.var list
-      ; elt_size: int
+      ; accumulated_input: Field.var * Field.var
       ; proof: Proof.t }
 
     type witness = unit
 
     let prefix =
-      with_prefix Prefix.prefix "r1cs_se_ppzksnark_online_verifier_gadget"
+      with_prefix Prefix.prefix "r1cs_se_ppzksnark_accumulated_online_verifier_gadget"
 
     let func_name = with_prefix prefix
 
@@ -301,18 +466,16 @@ struct
 
     let create_stub =
       foreign (func_name "create")
-        ( Pb.typ @-> Preprocessed_verification_key.typ @-> Pb.Variable_array.typ
-        @-> int @-> Proof.typ @-> Pb.Variable.typ @-> returning gadget_typ )
+        ( Pb.typ @-> Preprocessed_verification_key.typ
+          @-> Pb.Variable.typ @-> Pb.Variable.typ
+          @-> Proof.typ @-> Pb.Variable.typ @-> returning gadget_typ )
 
     let create pb (conv: Field.Checked.t -> Pb.Variable.t)
         (conv_back: Pb.Variable.t -> Field.Checked.t)
-        {pvk; input; elt_size; proof} =
-      let input_pb = Pb.Variable_array.create () in
-      List.iter
-        ~f:(fun v -> Pb.Variable_array.emplace_back input_pb (conv v))
-        (input :> Field.Checked.t list) ;
+        {pvk; accumulated_input=(acc_x, acc_y); proof} =
+      let acc_x = conv acc_x and acc_y = conv acc_y in
       let result_pb = Pb.allocate_variable pb in
-      let gadget = create_stub pb pvk input_pb elt_size proof result_pb in
+      let gadget = create_stub pb pvk acc_x acc_y proof result_pb in
       Caml.Gc.finalise delete gadget ;
       let result = conv_back result_pb in
       {gadget; result}
@@ -341,19 +504,19 @@ struct
       let gadget_typ = ptr void
 
       let prefix =
-        with_prefix Prefix.prefix "r1cs_se_ppzksnark_verifier_gadget"
+        with_prefix Prefix.prefix "r1cs_se_ppzksnark_accumulated_verifier_gadget"
 
       let func_name = with_prefix prefix
 
       type t =
         { gadget: gadget
-        ; vk: Verification_key.t
+        ; vk: Verification_key_var.t
         ; proof: Proof.t
         ; result: Boolean.var
         ; vk_characterizing_vars_up_to_sign: Field.Checked.t list
         ; vk_sign_vars: Field.Checked.t list }
 
-      type input = Boolean.var list
+      type input = Inner_curve.var
 
       type witness =
         { verification_key: Other_curve.Verification_key.t
@@ -362,16 +525,14 @@ struct
       let delete_gadget =
         foreign (func_name "delete") (gadget_typ @-> returning void)
 
-      let elt_size = Other_curve.Field.size_in_bits
-
       let create_gadget =
         let stub =
           foreign (func_name "create")
-            ( Pb.typ @-> Verification_key.typ @-> Pb.Variable_array.typ @-> int
+            ( Pb.typ @-> Verification_key_var.typ @-> Pb.Variable.typ @-> Pb.Variable.typ
             @-> Proof.typ @-> Pb.Variable.typ @-> returning gadget_typ )
         in
-        fun pb vk input_pb proof result_pb ->
-          let gadget = stub pb vk input_pb elt_size proof result_pb in
+        fun pb vk (acc_x, acc_y) proof result_pb ->
+          let gadget = stub pb vk acc_x acc_y proof result_pb in
           Caml.Gc.finalise delete_gadget gadget ;
           gadget
 
@@ -410,25 +571,19 @@ struct
         let module V = Libsnark.Linear_combination.Vector in
         List.init (V.length lcs) ~f:(fun i -> conv_lc conv_back (V.get lcs i))
 
-      let create pb conv conv_back (input: input) =
-        let input_pb =
-          let res = Pb.Variable_array.create () in
-          List.iter input ~f:(fun b ->
-              Pb.Variable_array.emplace_back res (conv (b :> Field.Checked.t))
-          ) ;
-          res
-        in
-        let vk = Verification_key.create pb in
+      let create pb conv conv_back ((acc_x, acc_y): input) =
+        let acc_x = conv acc_x and acc_y = conv acc_y in
+        let vk = Verification_key_var.create pb in
         let proof = Proof.create pb in
         let result_pb = Pb.allocate_variable pb in
-        let gadget = create_gadget pb vk input_pb proof result_pb in
+        let gadget = create_gadget pb vk (acc_x, acc_y) proof result_pb in
         let result = conv_back result_pb in
         let vk_characterizing_vars_up_to_sign =
           conv_lc_vector conv_back
-            (Verification_key.characterizing_vars_up_to_sign vk)
+            (Verification_key_var.characterizing_vars_up_to_sign vk)
         in
         let vk_sign_vars =
-          conv_lc_vector conv_back (Verification_key.sign_vars vk)
+          conv_lc_vector conv_back (Verification_key_var.sign_vars vk)
         in
         { gadget
         ; vk
@@ -443,7 +598,7 @@ struct
 
       let generate_witness {gadget; proof; vk; _} _input (w: witness) =
         suspend (fun () ->
-            Verification_key.generate_witness vk w.verification_key ;
+            Verification_key_var.generate_witness vk w.verification_key ;
             Proof.generate_witness proof w.proof ;
             gadget_generate_witness gadget )
     end
@@ -451,18 +606,37 @@ struct
     include T
     include Gadget.Make (Impl) (Libsnark) (T)
 
-    let choose_verification_key_data_and_proof_and_check_result input
+    let choose_verification_key_data_and_proof_and_check_result
+          input
         get_witness =
       let open Let_syntax in
       let%map t = create input get_witness in
-      assert (
-        List.length t.vk_characterizing_vars_up_to_sign
-        = Verification_key_data.characterizing_length ) ;
-      assert (List.length t.vk_sign_vars = Verification_key_data.sign_length) ;
+      begin
+        let characterizing_length, sign_length = Verification_key_data.full_lengths in
+        assert (
+          List.length t.vk_characterizing_vars_up_to_sign
+          = characterizing_length ) ;
+        assert (List.length t.vk_sign_vars = sign_length) ;
+      end;
       ( { Verification_key_data.characterizing_up_to_sign=
             t.vk_characterizing_vars_up_to_sign
         ; sign= t.vk_sign_vars }
       , t.result )
+
+    let check_proof ~get_vk ~get_proof vk input =
+      let open Let_syntax in
+      let%bind (module Shifted) = Inner_curve.Checked.Shifted.create () in
+      let%bind acc =
+        Verification_key.Checked.accumulate_input (module Shifted)
+          vk
+          input
+      in
+      let get_witness =
+        As_prover.map2 get_vk get_proof ~f:(fun verification_key proof ->
+          { verification_key; proof })
+      in
+      choose_verification_key_data_and_proof_and_check_result acc get_witness
+    ;;
   end
 end
 
