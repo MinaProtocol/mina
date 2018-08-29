@@ -13,15 +13,24 @@ end
 module type S = sig
   type t
 
-  type tree [@@deriving sexp, eq]
+  type hash [@@deriving sexp, eq]
+
+  type tree =
+    | Leaf of (Direction.t list * hash)
+    | Node of (Direction.t list * hash * tree * tree)
+  [@@deriving sexp, eq]
 
   val to_tree : t -> tree
 end
 
-module Make (L : Ledger_intf) : S with type t := L.t = struct
+module Make (L : Ledger_intf) = struct
+  type t = L.t
+
+  type hash = L.hash [@@deriving sexp, eq]
+
   type tree =
-    | Leaf of (Direction.t list * L.hash)
-    | Node of (Direction.t list * L.hash * tree * tree)
+    | Leaf of (Direction.t list * hash)
+    | Node of (Direction.t list * hash * tree * tree)
   [@@deriving sexp, eq]
 
   let to_tree t =

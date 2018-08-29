@@ -3,7 +3,7 @@ open Core
 module Make (Account : sig
   type t
 end)
-(Hash : Intf.Hash with type account := Account.t) (Depth : sig
+(Hash : Merkle_ledger.Intf.Hash with type account := Account.t) (Depth : sig
     val depth : int
 end) =
 struct

@@ -20,7 +20,9 @@ module Make
            and type account := Account.t
            and type key := Key.t
 
-  val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+  module For_tests : sig
+    val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+  end
 end = struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
@@ -328,7 +330,9 @@ end = struct
       ~init:0
       ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
 
-  let get_leaf_hash_at_addr t addr = get_leaf_hash t (to_index addr)
+  module For_tests = struct
+    let get_leaf_hash_at_addr t addr = get_leaf_hash t (to_index addr)
+  end
 
   (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
@@ -357,9 +361,7 @@ end = struct
     recompute_tree t ;
     if height < t.tree.nodes_height && index < length t then
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
-      let index = to_index a in
-      if index < DynArray.length l then DynArray.get l index
-      else empty_hash_at_height height
+      DynArray.get l index
     else if index = 0 && not (t.tree.nodes_height = 0) then
       complete_with_empties
         (DynArray.get (List.last_exn t.tree.nodes) 0)

@@ -17,5 +17,7 @@ module Make
            and type account := Account.t
            and type key := Key.t
 
-  val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+  module For_tests : sig
+    val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+  end
 end

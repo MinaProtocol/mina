@@ -2,7 +2,7 @@ open Core
 open Unsigned
 
 module type S =
-  Ledger_intf.S
+  Merkle_ledger.Ledger_intf.S
   with type key := string
    and type hash := Md5.t
    and type account := Test_stubs.Account.t
@@ -12,6 +12,9 @@ module type Ledger_intf = sig
 
   val load_ledger : int -> int -> t * string list
 end
+
+module Intf = Merkle_ledger.Intf
+module Ledger = Merkle_ledger.Ledger
 
 let%test_module "test functor on in memory databases" =
   ( module struct

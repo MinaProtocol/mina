@@ -1,6 +1,5 @@
 open Core
 open Async_kernel
-module TL = Merkle_ledger.Test_ledger
 
 module type Ledger_intf = sig
   include Syncable_ledger.Merkle_tree_intf

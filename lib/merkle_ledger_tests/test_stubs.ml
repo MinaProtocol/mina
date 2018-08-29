@@ -58,6 +58,8 @@ module Hash = struct
     res
 end
 
+module Intf = Merkle_ledger.Intf
+
 module In_memory_kvdb : Intf.Key_value_database = struct
   type t = (string, Bigstring.t) Hashtbl.t
 

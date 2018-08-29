@@ -1,5 +1,7 @@
 open Core
 open Test_stubs
+module Database = Merkle_ledger.Database
+module Ledger = Merkle_ledger.Ledger
 
 let%test_module "Database integration test" =
   ( module struct
@@ -33,7 +35,8 @@ let%test_module "Database integration test" =
 
       let get_inner_hash_at_addr_exn db dirs =
         let addr = Addr.of_directions dirs in
-        if List.length dirs = Depth.depth then get_leaf_hash_at_addr db addr
+        if List.length dirs = Depth.depth then
+          For_tests.get_leaf_hash_at_addr db addr
         else get_inner_hash_at_addr_exn db addr
     end)
 
@@ -43,14 +46,28 @@ let%test_module "Database integration test" =
       type hash = Hash.t [@@deriving sexp, eq]
     end)
 
+    let check_hash (type t1 t2) (module L1
+        : Visualizable_ledger.S with type t = t1 and type hash = Hash.t)
+        (module L2
+        : Visualizable_ledger.S with type t = t2 and type hash = Hash.t)
+        (l1, h1) (l2, h2) =
+      if not (Hash.equal h1 h2) then
+        failwithf
+          !"\n                   \
+            Expected:\n\
+            %{sexp:L1.tree}\n\n\n \
+            Actual:\n\
+            %{sexp:L2.tree}"
+          (L1.to_tree l1) (L2.to_tree l2) ()
+
     let%test_unit "databases have equivalent hash values" =
       let num_accounts = (1 lsl Depth.depth) - 1 in
       let gen_non_zero_balances =
         let open Quickcheck.Generator in
         list_with_length num_accounts (Int.gen_incl 1 Int.max_value)
       in
-      Quickcheck.test ~trials:100 ~sexp_of:[%sexp_of : int list]
-        gen_non_zero_balances ~f:(fun balances ->
+      Quickcheck.test ~sexp_of:[%sexp_of : int list] gen_non_zero_balances ~f:
+        (fun balances ->
           let accounts =
             List.mapi balances ~f:(fun account_id balance ->
                 Account.create (Int.to_string account_id) balance )
@@ -82,24 +99,12 @@ let%test_module "Database integration test" =
               let binary_hash =
                 Binary_tree.get_inner_hash_at_addr_exn binary_tree dirs
               in
-              [%test_result : Hash.t] ~expect:binary_hash ledger_hash
-                ~message:
-                  (sprintf
-                     !"Ledger:\n\
-                       Expected:\n\
-                       %{sexp:Binary_tree_visualizor.tree}\n\n\n \
-                       Actual:\n\
-                       %{sexp:Ledger_visualizor.tree}"
-                     (Binary_tree_visualizor.to_tree binary_tree)
-                     (Ledger_visualizor.to_tree ledger)) ;
-              [%test_result : Hash.t] ~expect:binary_hash db_hash
-                ~message:
-                  (sprintf
-                     !"Database:\n\
-                       Expected:\n\
-                       %{sexp:Binary_tree_visualizor.tree}\n\n\n \
-                       Actual:\n\
-                       %{sexp:DB_visualizor.tree}"
-                     (Binary_tree_visualizor.to_tree binary_tree)
-                     (DB_visualizor.to_tree db)) ) )
+              check_hash
+                (module Ledger_visualizor)
+                (module Binary_tree_visualizor)
+                (ledger, ledger_hash) (binary_tree, binary_hash) ;
+              check_hash
+                (module DB_visualizor)
+                (module Binary_tree_visualizor)
+                (db, db_hash) (binary_tree, binary_hash) ) )
   end )
