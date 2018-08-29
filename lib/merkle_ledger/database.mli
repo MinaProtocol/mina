@@ -9,5 +9,7 @@ module Make
           with type account := Account.t
            and type hash := Hash.t
 
-  val gen_account_key : key Core.Quickcheck.Generator.t
+  module For_tests : sig
+    val gen_account_key : key Core.Quickcheck.Generator.t
+  end
 end

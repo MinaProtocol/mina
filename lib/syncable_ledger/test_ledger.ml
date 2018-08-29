@@ -7,7 +7,7 @@ module Make (Inputs : sig
   val num_accts : int
 end) =
 struct
-  open Merkle_ledger.Test_stubs
+  open Merkle_ledger_tests.Test_stubs
 
   module Root_hash = struct
     include Hash
