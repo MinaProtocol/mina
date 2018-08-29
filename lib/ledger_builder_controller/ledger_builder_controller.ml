@@ -416,20 +416,20 @@ end = struct
              Transition_logic_state.apply_all old_state changes
            in
            t.handler <- Transition_logic.create new_state log ;
-           if
-             not
-               (Protocol_state.equal_value
-                  ( old_state |> Transition_logic_state.longest_branch_tip
-                  |> Tip.state )
-                  ( new_state |> Transition_logic_state.longest_branch_tip
-                  |> Tip.state ))
-           then (
-             let lb =
-               (new_state |> Transition_logic_state.longest_branch_tip)
-                 .ledger_builder
-             in
-             Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-               strongest_ledgers_reader (lb, transition) ) ;
+           ( if
+               not
+                 (Protocol_state.equal_value
+                    ( old_state |> Transition_logic_state.longest_branch_tip
+                    |> Tip.state )
+                    ( new_state |> Transition_logic_state.longest_branch_tip
+                    |> Tip.state ))
+             then
+               let lb =
+                 (new_state |> Transition_logic_state.longest_branch_tip)
+                   .ledger_builder
+               in
+               Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
+                 strongest_ledgers_reader (lb, transition) ) ;
            Store.store storage_controller config.disk_location new_state )) ;
     (* Handle new transitions *)
     let possibly_jobs =

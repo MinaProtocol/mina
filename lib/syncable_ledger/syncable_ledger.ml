@@ -293,22 +293,22 @@ struct
 
     let create : MT.t -> (query -> unit) -> t = fun mt f -> {mt; f}
 
-  let answer_query : t -> query -> answer =
-   fun {mt; f} q ->
-    f q ;
-    match q with
-    | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
-    | What_contents a ->
-        Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
-    | Num_accounts ->
-        let len = MT.length mt in
-        let height = Int.ceil_log2 len in
-        let content_root_addr =
-          funpow (MT.depth - height)
-            (fun a -> Addr.child_exn a Direction.Left)
-            (Addr.root ())
-        in
-        Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
+    let answer_query : t -> query -> answer =
+     fun {mt; f} q ->
+      f q ;
+      match q with
+      | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
+      | What_contents a ->
+          Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
+      | Num_accounts ->
+          let len = MT.length mt in
+          let height = Int.ceil_log2 len in
+          let content_root_addr =
+            funpow (MT.depth - height)
+              (fun a -> Addr.child_exn a Direction.Left)
+              (Addr.root ())
+          in
+          Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
   end
 
   type waiting = {expected: Hash.t; children: (Addr.t * Hash.t) list}

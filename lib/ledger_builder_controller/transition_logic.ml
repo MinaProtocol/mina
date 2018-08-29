@@ -320,34 +320,33 @@ struct
           | `Take -> return ([], Some (Catchup.sync catchup state transition))
         )
     | Some old_tree ->
-        match
-          Transition_tree.add old_tree transition ~parent:(fun x ->
-              External_transition.is_parent_of ~child:transition ~parent:x )
-        with
-        | `No_parent ->
-            let best_tip = locked_and_best old_tree |> snd in
-            if
-              External_transition.equal
-                (select_transition best_tip transition)
-                transition
-            then return ([], Some (Catchup.sync catchup state transition))
-            else return ([], None)
-        | `Repeat -> return ([], None)
-        | `Added new_tree ->
-            let old_locked_head, old_best_tip = locked_and_best old_tree in
-            let new_head, new_tip = locked_and_best new_tree in
-            if
-              External_transition.equal old_locked_head new_head
-              && External_transition.equal old_best_tip new_tip
-            then (
-              return ([Transition_logic_state.Change.Ktree new_tree], None) )
-            else (
-              let new_best_path =
-                Transition_tree.longest_path new_tree |> Path.of_tree_path
-              in
-              return
-                ( []
-                , Some
-                    (Path_traversal.create t new_tree old_tree new_best_path
-                       log transition) ) )
+      match
+        Transition_tree.add old_tree transition ~parent:(fun x ->
+            External_transition.is_parent_of ~child:transition ~parent:x )
+      with
+      | `No_parent ->
+          let best_tip = locked_and_best old_tree |> snd in
+          if
+            External_transition.equal
+              (select_transition best_tip transition)
+              transition
+          then return ([], Some (Catchup.sync catchup state transition))
+          else return ([], None)
+      | `Repeat -> return ([], None)
+      | `Added new_tree ->
+          let old_locked_head, old_best_tip = locked_and_best old_tree in
+          let new_head, new_tip = locked_and_best new_tree in
+          if
+            External_transition.equal old_locked_head new_head
+            && External_transition.equal old_best_tip new_tip
+          then return ([Transition_logic_state.Change.Ktree new_tree], None)
+          else
+            let new_best_path =
+              Transition_tree.longest_path new_tree |> Path.of_tree_path
+            in
+            return
+              ( []
+              , Some
+                  (Path_traversal.create t new_tree old_tree new_best_path log
+                     transition) )
 end

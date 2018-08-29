@@ -48,12 +48,12 @@ struct
           Logger.info log
             !"lengths: %{sexp: int list} shared_prefix: %{sexp: string \
               option} shared_prefix_dist: %d"
-            lengths newest_shared shared_prefix_dist;
-          assert(shared_prefix_dist <= 1);
-          if (Array.fold ~init:0 (Array.map chains List.length ) ~f:Int.max) > 20
+            lengths newest_shared shared_prefix_dist ;
+          assert (shared_prefix_dist <= 1) ;
+          if Array.fold ~init:0 (Array.map chains List.length) ~f:Int.max > 20
           then exit 0
           else Deferred.unit
-      in
+        in
         let%bind () =
           Deferred.List.all_unit
             (List.mapi workers ~f:(fun i worker ->
