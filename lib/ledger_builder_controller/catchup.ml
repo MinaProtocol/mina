@@ -104,7 +104,6 @@ module Make (Inputs : Inputs_intf) = struct
 
   (* Perform the `Sync interruptible work *)
   let do_sync {net; log; sl_ref} (state: Transition_logic_state.t) transition =
-    Logger.fatal log "S1" ;
     let locked_tip = Transition_logic_state.locked_tip state in
     let h = External_transition.ledger_hash transition in
     (* Lazily recreate the sync_ledger if necessary *)
@@ -122,7 +121,6 @@ module Make (Inputs : Inputs_intf) = struct
           sl
       | Some sl -> sl
     in
-    Logger.fatal log "S2" ;
     let open Interruptible.Let_syntax in
     let ivar : External_transition.t Ivar.t = Ivar.create () in
     Sync_ledger.new_goal sl (External_transition.ledger_hash transition) ;
@@ -130,11 +128,9 @@ module Make (Inputs : Inputs_intf) = struct
       match%bind
         Interruptible.lift
           (Sync_ledger.wait_until_valid sl h)
-          (Deferred.map (Ivar.read ivar) ~f:(fun _ ->
-               Logger.fatal log "set new goal" ))
+          (Deferred.map (Ivar.read ivar) ~f:(fun _ -> ()))
       with
       | `Ok ledger -> (
-          Logger.fatal log "S3" ;
           (* TODO: This should be parallelized with the syncing *)
           match%map
             Interruptible.uninterruptible
@@ -142,12 +138,10 @@ module Make (Inputs : Inputs_intf) = struct
                  (External_transition.ledger_builder_hash transition))
           with
           | Ok aux -> (
-              Logger.fatal log "S4" ;
               match Ledger_builder.of_aux_and_ledger ledger aux with
               (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
               | Ok lb ->
-                  Logger.fatal log "S5" ;
                   let new_tree =
                     Transition_logic_state.Transition_tree.singleton transition
                   in
@@ -158,17 +152,15 @@ module Make (Inputs : Inputs_intf) = struct
                   ; Locked_tip new_tip
                   ; Longest_branch_tip new_tip ]
               | Error e ->
-                  Logger.fatal log "S6" ;
                   Logger.info log "Malicious aux data received from net %s"
                     (Error.to_string_hum e) ;
                   (* TODO: Retry? see #361 *)
                   [] )
           | Error e ->
-              Logger.fatal log "S31" ;
               Logger.info log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;
               [] )
-      | `Target_changed -> Logger.fatal log "S32" ; return []
+      | `Target_changed -> return []
     in
     (work, ivar)
 
