@@ -52,6 +52,82 @@ module type Inputs_intf = sig
   val probable_slots_per_transition_count : int
 end
 
+(* TODO: make a "snarkable" library (or move to snarky) *)
+module Option = struct
+  include Option
+  open Snark_params.Tick
+
+  type 'a var = Boolean.var * 'a
+
+  let typ (sub_type : ('var, 't) Typ.t) (sub_default : 't) : ('var var, 't option) Typ.t =
+    let open Typ in
+    let alloc =
+      let open Alloc.Let_syntax in
+      let%map opt = alloc Boolean.typ
+      and sub = alloc sub_type in
+      (opt, sub)
+    in
+    let store opt =
+      let open Store.Let_syntax in
+      match opt with
+      | Some x ->
+          let%map opt = store Boolean.typ true
+          and sub = store sub_type x in
+          (opt, sub)
+      | None -> 
+          let%map opt = store Boolean.typ false
+          and sub = store sub_type sub_default in
+          (opt, sub)
+    in
+    let read (opt, sub) =
+      let open Read.Let_syntax in
+      let%bind opt = read Boolean.typ opt in
+      if opt then
+        let%map sub = read sub_type sub in
+        Some sub
+      else
+        return None
+    in
+    let check (opt, sub) =
+      let open Let_syntax in
+      let%map () = check Boolean.typ opt
+      and () = check sub_type sub in
+      ()
+    in
+    { alloc; store; read; check }
+
+  let fold
+      (sub_fold : 't -> bool Tuple_lib.Triple.t Fold.t)
+      (opt : 't t)
+    : bool Tuple_lib.Triple.t Fold.t
+  =
+    match opt with
+    (* TODO: ask izzy if this case should still generate the same number of triples *)
+    | None     -> { fold= fun ~init ~f -> f init (false, false, false) }
+    | Some sub -> { fold= fun ~init ~f ->
+        let (leftover, init) =
+          (sub_fold sub).fold ~init:(true, init) ~f:(fun (x', init) (x, y, z) ->
+            (z, f init (x', x, y)))
+        in
+        f init (leftover, false, false) }
+
+  let var_to_triples
+      (sub_var_to_triples : 'var -> (Boolean.var Tuple_lib.Triple.t list, _) Checked.t)
+      ((opt, sub) : 'var var)
+    : (Boolean.var Tuple_lib.Triple.t list, _) Checked.t
+  =
+    let open Let_syntax in
+    let%map sub_triples = sub_var_to_triples sub in
+    let leftover, shifted_triples =
+      List.fold_left sub_triples ~init:(opt, []) ~f:(fun (x', t) (x, y, z) ->
+        (z, (x', x, y) :: t))
+    in
+    let last_triple = (leftover, Boolean.false_, Boolean.false_) in
+    List.rev (last_triple :: shifted_triples)
+
+  let length_in_triples sub_length_in_triples = 1 + sub_length_in_triples
+end
+
 module Segment_id = Nat.Make32 ()
 
 module Epoch_seed = struct
@@ -245,16 +321,22 @@ struct
   end
 
   module Consensus_state = struct
-    type ('length, 'epoch, 'slot, 'amount, 'epoch_seed) t =
+    type ('length, 'epoch, 'slot, 'amount, 'epoch_seed, 'protocol_state_hash, 'protocol_state_hash_option) t =
       { length: 'length
       ; current_epoch: 'epoch
       ; current_slot: 'slot
       ; total_currency: 'amount
       ; epoch_seed: 'epoch_seed
-      ; next_epoch_seed: 'epoch_seed }
+      ; next_epoch_seed: 'epoch_seed
+      ; epoch_start_checkpoint: 'protocol_state_hash
+      ; epoch_lock_checkpoint: 'protocol_state_hash_option
+      ; next_epoch_start_checkpoint: 'protocol_state_hash
+      ; next_epoch_lock_checkpoint: 'protocol_state_hash_option
+      ; epoch_length: 'length
+      ; next_epoch_length: 'length }
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    type value = (Length.t, Epoch.t, Epoch.Slot.t, Amount.t, Epoch_seed.t) t
+    type value = (Length.t, Epoch.t, Epoch.Slot.t, Amount.t, Epoch_seed.t, Nanobit_base.State_hash.t, Nanobit_base.State_hash.t Option.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var =
@@ -262,7 +344,9 @@ struct
       , Epoch.Unpacked.var
       , Epoch.Slot.Unpacked.var
       , Amount.var
-      , Epoch_seed.var )
+      , Epoch_seed.var
+      , Nanobit_base.State_hash.var
+      , Nanobit_base.State_hash.var Option.var )
       t
 
     let genesis : value =
@@ -273,77 +357,13 @@ struct
           Inputs.genesis_ledger_total_currency
           (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
       ; epoch_seed= Epoch_seed.of_hash Epoch_seed.zero
-      ; next_epoch_seed= Epoch_seed.of_hash Epoch_seed.zero }
-
-    let update (previous_state: value)
-        (transition_data: Consensus_transition_data.value) : value Or_error.t =
-      let open Or_error.Let_syntax in
-      let open Consensus_transition_data in
-      let%map total_currency =
-        Amount.add previous_state.total_currency Inputs.coinbase
-        |> Option.map ~f:Or_error.return
-        |> Option.value
-             ~default:(Or_error.error_string "failed to add total_currency")
-      in
-      let epoch_seed, next_epoch_seed =
-        if transition_data.epoch > previous_state.current_epoch then
-          (previous_state.next_epoch_seed, Epoch_seed.of_hash Epoch_seed.zero)
-        else (previous_state.epoch_seed, previous_state.next_epoch_seed)
-      in
-      let next_epoch_seed =
-        if Epoch.Slot.in_seed_update_range transition_data.slot then
-          Epoch_seed.update next_epoch_seed transition_data.proposer_vrf_result
-        else next_epoch_seed
-      in
-      { length= Length.succ previous_state.length
-      ; current_epoch= transition_data.epoch
-      ; current_slot= transition_data.slot
-      ; total_currency
-      ; epoch_seed
-      ; next_epoch_seed }
-
-    let update_var (previous_state: var)
-        (transition_data: Consensus_transition_data.var) :
-        (var, _) Snark_params.Tick.Checked.t =
-      let open Snark_params.Tick.Let_syntax in
-      let%bind length = Length.increment_var previous_state.length
-      (* TODO: keep track of total_currency in transaction snark. The current_slot
-       * implementation would allow an adversary to make then total_currency incorrect by
-       * not adding the coinbase to their account. *)
-      and total_currency =
-        Amount.Checked.add previous_state.total_currency
-          (Amount.var_of_t Inputs.coinbase)
-      and epoch_seed, next_epoch_seed =
-        let%bind epoch_changed =
-          Epoch.compare_var previous_state.current_epoch transition_data.epoch
-          >>| fun c -> c.less
-        in
-        let%map epoch_seed =
-          Epoch_seed.if_ epoch_changed ~then_:previous_state.next_epoch_seed
-            ~else_:previous_state.epoch_seed
-        and next_epoch_seed =
-          Epoch_seed.if_ epoch_changed
-            ~then_:(Epoch_seed.var_of_t @@ Epoch_seed.of_hash Epoch_seed.zero)
-            ~else_:previous_state.next_epoch_seed
-        in
-        (epoch_seed, next_epoch_seed)
-      in
-      let%map next_epoch_seed =
-        let%bind updated_next_epoch_seed =
-          Epoch_seed.update_var next_epoch_seed
-            transition_data.proposer_vrf_result
-        and in_seed_update_range =
-          Epoch.Slot.in_seed_update_range_var transition_data.slot
-        in
-        Epoch_seed.if_ in_seed_update_range ~then_:updated_next_epoch_seed
-          ~else_:next_epoch_seed
-      in
-      { length
-      ; current_epoch= transition_data.epoch
-      ; current_slot= transition_data.slot
-      ; total_currency
-      ; epoch_seed
-      ; next_epoch_seed }
+      ; next_epoch_seed= Epoch_seed.of_hash Epoch_seed.zero
+      ; epoch_start_checkpoint= Nanobit_base.State_hash.of_hash Nanobit_base.State_hash.zero
+      ; epoch_lock_checkpoint= None
+      ; next_epoch_start_checkpoint= Nanobit_base.State_hash.of_hash Nanobit_base.State_hash.zero
+      ; next_epoch_lock_checkpoint= None
+      ; epoch_length= Length.zero
+      ; next_epoch_length= Length.zero }
 
     let to_hlist
         { length
@@ -351,14 +371,26 @@ struct
         ; current_slot
         ; total_currency
         ; epoch_seed
-        ; next_epoch_seed } =
+        ; next_epoch_seed
+        ; epoch_start_checkpoint
+        ; epoch_lock_checkpoint
+        ; next_epoch_start_checkpoint
+        ; next_epoch_lock_checkpoint
+        ; epoch_length
+        ; next_epoch_length } =
       let open Nanobit_base.H_list in
       [ length
       ; current_epoch
       ; current_slot
       ; total_currency
       ; epoch_seed
-      ; next_epoch_seed ]
+      ; next_epoch_seed 
+      ; epoch_start_checkpoint
+      ; epoch_lock_checkpoint
+      ; next_epoch_start_checkpoint
+      ; next_epoch_lock_checkpoint
+      ; epoch_length
+      ; next_epoch_length ]
 
     let of_hlist :
            ( unit
@@ -368,21 +400,39 @@ struct
              -> 'amount
              -> 'epoch_seed
              -> 'epoch_seed
+             -> 'protocol_state_hash
+             -> 'protocol_state_hash_option
+             -> 'protocol_state_hash
+             -> 'protocol_state_hash_option
+             -> 'length
+             -> 'length
              -> unit )
            Nanobit_base.H_list.t
-        -> ('length, 'epoch, 'slot, 'amount, 'epoch_seed) t =
+        -> ('length, 'epoch, 'slot, 'amount, 'epoch_seed, 'protocol_state_hash, 'protocol_state_hash_option) t =
      fun Nanobit_base.H_list.([ length
                               ; current_epoch
                               ; current_slot
                               ; total_currency
                               ; epoch_seed
-                              ; next_epoch_seed ]) ->
+                              ; next_epoch_seed
+                              ; epoch_start_checkpoint
+                              ; epoch_lock_checkpoint
+                              ; next_epoch_start_checkpoint
+                              ; next_epoch_lock_checkpoint
+                              ; epoch_length
+                              ; next_epoch_length ]) ->
       { length
       ; current_epoch
       ; current_slot
       ; total_currency
       ; epoch_seed
-      ; next_epoch_seed }
+      ; next_epoch_seed
+      ; epoch_start_checkpoint
+      ; epoch_lock_checkpoint
+      ; next_epoch_start_checkpoint
+      ; next_epoch_lock_checkpoint
+      ; epoch_length
+      ; next_epoch_length }
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
@@ -391,7 +441,13 @@ struct
       ; Epoch.Slot.Unpacked.typ
       ; Amount.typ
       ; Epoch_seed.typ
-      ; Epoch_seed.typ ]
+      ; Epoch_seed.typ
+      ; Nanobit_base.State_hash.typ
+      ; Option.typ Nanobit_base.State_hash.typ Nanobit_base.State_hash.(of_hash zero)
+      ; Nanobit_base.State_hash.typ
+      ; Option.typ Nanobit_base.State_hash.typ Nanobit_base.State_hash.(of_hash zero)
+      ; Length.Unpacked.typ
+      ; Length.Unpacked.typ ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -404,17 +460,33 @@ struct
         ; current_slot
         ; total_currency
         ; epoch_seed
-        ; next_epoch_seed } =
+        ; next_epoch_seed
+        ; epoch_start_checkpoint
+        ; epoch_lock_checkpoint
+        ; next_epoch_start_checkpoint
+        ; next_epoch_lock_checkpoint
+        ; epoch_length
+        ; next_epoch_length } =
       let open Snark_params.Tick.Let_syntax in
       let%map epoch_seed_triples = Epoch_seed.var_to_triples epoch_seed
-      and next_epoch_seed_triples =
-        Epoch_seed.var_to_triples next_epoch_seed
+      and next_epoch_seed_triples = Epoch_seed.var_to_triples next_epoch_seed
+      and epoch_start_checkpoint_triples = Nanobit_base.State_hash.var_to_triples epoch_start_checkpoint
+      and epoch_lock_checkpoint_triples = Option.var_to_triples Nanobit_base.State_hash.var_to_triples epoch_lock_checkpoint
+      and next_epoch_start_checkpoint_triples = Nanobit_base.State_hash.var_to_triples next_epoch_start_checkpoint
+      and next_epoch_lock_checkpoint_triples = Option.var_to_triples Nanobit_base.State_hash.var_to_triples next_epoch_lock_checkpoint
       in
       Length.Unpacked.var_to_triples length
       @ Epoch.Unpacked.var_to_triples current_epoch
       @ Epoch.Slot.Unpacked.var_to_triples current_slot
       @ (total_currency |> Amount.var_to_triples)
-      @ epoch_seed_triples @ next_epoch_seed_triples
+      @ epoch_seed_triples
+      @ next_epoch_seed_triples
+      @ epoch_start_checkpoint_triples
+      @ epoch_lock_checkpoint_triples
+      @ next_epoch_start_checkpoint_triples
+      @ next_epoch_lock_checkpoint_triples
+      @ Length.Unpacked.var_to_triples epoch_length
+      @ Length.Unpacked.var_to_triples next_epoch_length
 
     let fold
         { length
@@ -422,17 +494,40 @@ struct
         ; current_slot
         ; total_currency
         ; epoch_seed
-        ; next_epoch_seed } =
+        ; next_epoch_seed
+        ; epoch_start_checkpoint
+        ; epoch_lock_checkpoint
+        ; next_epoch_start_checkpoint
+        ; next_epoch_lock_checkpoint
+        ; epoch_length
+        ; next_epoch_length } =
       let open Fold in
-      Length.fold length +> Epoch.fold current_epoch
+      Length.fold length
+      +> Epoch.fold current_epoch
       +> Epoch.Slot.fold current_slot
-      +> Amount.fold total_currency +> Epoch_seed.fold epoch_seed
+      +> Amount.fold total_currency
+      +> Epoch_seed.fold epoch_seed
       +> Epoch_seed.fold next_epoch_seed
+      +> Nanobit_base.State_hash.fold epoch_start_checkpoint
+      +> Option.fold Nanobit_base.State_hash.fold epoch_lock_checkpoint
+      +> Nanobit_base.State_hash.fold next_epoch_start_checkpoint
+      +> Option.fold Nanobit_base.State_hash.fold next_epoch_lock_checkpoint
+      +> Length.fold epoch_length
+      +> Length.fold next_epoch_length
 
     let length_in_triples =
-      Length.length_in_triples + Epoch.length_in_triples
-      + Epoch.Slot.length_in_triples + Amount.length_in_triples
-      + Epoch_seed.length_in_triples + Epoch_seed.length_in_triples
+      Length.length_in_triples
+      + Epoch.length_in_triples
+      + Epoch.Slot.length_in_triples
+      + Amount.length_in_triples
+      + Epoch_seed.length_in_triples
+      + Epoch_seed.length_in_triples
+      + Nanobit_base.State_hash.length_in_triples
+      + Option.length_in_triples Nanobit_base.State_hash.length_in_triples
+      + Nanobit_base.State_hash.length_in_triples
+      + Option.length_in_triples Nanobit_base.State_hash.length_in_triples
+      + Length.length_in_triples
+      + Length.length_in_triples
   end
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)
@@ -444,40 +539,138 @@ struct
     Nanobit_base.External_transition.Make (Ledger_builder_diff)
       (Protocol_state)
 
-  (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
-  let generate_transition ~previous_protocol_state ~blockchain_state ~time
-      ~transactions:_ =
-    let previous_consensus_state =
-      Protocol_state.consensus_state previous_protocol_state
+  let next_state
+      (prev_protocol_state: Protocol_state.value)
+      (transition_data: Consensus_transition_data.value)
+      (next_blockchain_state: Nanobit_base.Blockchain_state.value)
+    : Protocol_state.value Or_error.t
+  =
+    let open Or_error.Let_syntax in
+    let open Consensus_state in
+    let open Consensus_transition_data in
+    let prev_state = Protocol_state.consensus_state prev_protocol_state in
+    let%map total_currency =
+      Amount.add prev_state.total_currency Inputs.coinbase
+      |> Option.map ~f:Or_error.return
+      |> Option.value
+           ~default:(Or_error.error_string "failed to add total_currency")
     in
+    let
+      ( epoch_seed
+      , next_epoch_seed
+      , epoch_start_checkpoint
+      , epoch_lock_checkpoint
+      , next_epoch_start_checkpoint
+      , next_epoch_lock_checkpoint
+      , epoch_length
+      , next_epoch_length )
+    =
+      if transition_data.epoch > prev_state.current_epoch then
+        ( prev_state.next_epoch_seed
+        , Epoch_seed.of_hash Epoch_seed.zero 
+        , prev_state.next_epoch_start_checkpoint
+        , prev_state.next_epoch_lock_checkpoint
+        , Protocol_state.hash prev_protocol_state
+        , None
+        , prev_state.next_epoch_length
+        , Length.zero )
+      else
+        ( prev_state.epoch_seed
+        , prev_state.next_epoch_seed
+        , prev_state.epoch_start_checkpoint
+        , prev_state.epoch_lock_checkpoint
+        , prev_state.next_epoch_start_checkpoint
+        , prev_state.next_epoch_lock_checkpoint
+        , prev_state.epoch_length
+        , prev_state.next_epoch_length)
+    in
+    let next_epoch_seed, next_epoch_lock_checkpoint =
+      if Epoch.Slot.in_seed_update_range transition_data.slot then
+        ( Epoch_seed.update next_epoch_seed transition_data.proposer_vrf_result
+        , Some (Protocol_state.hash prev_protocol_state) )
+      else
+        (next_epoch_seed, next_epoch_lock_checkpoint)
+    in
+    let next_state =
+      { length= Length.succ prev_state.length
+      ; current_epoch= transition_data.epoch
+      ; current_slot= transition_data.slot
+      ; total_currency
+      ; epoch_seed
+      ; next_epoch_seed
+      ; epoch_start_checkpoint
+      ; epoch_lock_checkpoint
+      ; next_epoch_start_checkpoint
+      ; next_epoch_lock_checkpoint
+      ; epoch_length
+      ; next_epoch_length= Length.succ next_epoch_length }
+    in
+    Protocol_state.create_value
+      ~previous_state_hash:(Protocol_state.hash prev_protocol_state)
+      ~blockchain_state:next_blockchain_state
+      ~consensus_state:next_state
+
+  (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
+  let generate_transition ~previous_state ~blockchain_state ~time ~transactions:_ =
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
     (* TODO: mock VRF *)
     let proposer_vrf_result = List.init 256 ~f:(fun _ -> false) in
-    let consensus_transition_data =
-      Consensus_transition_data.{epoch; slot; proposer_vrf_result}
-    in
-    let consensus_state =
-      Or_error.ok_exn
-      @@ Consensus_state.update previous_consensus_state
-           consensus_transition_data
-    in
-    let protocol_state =
-      Protocol_state.create_value
-        ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
-        ~blockchain_state ~consensus_state
-    in
-    (protocol_state, consensus_transition_data)
+    let consensus_transition_data = Consensus_transition_data.{epoch; slot; proposer_vrf_result} in
+    let next_state = Or_error.ok_exn (next_state previous_state consensus_transition_data blockchain_state) in
+    (next_state, consensus_transition_data)
 
   let verify _transition = Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
   let update previous_state transition =
-    Consensus_state.update previous_state
-      (Snark_transition.consensus_data transition)
+    next_state
+      previous_state
+      (Snark_transition.consensus_data transition) 
+      (Snark_transition.blockchain_state transition)
 
   let update_var previous_state transition =
-    Consensus_state.update_var previous_state
-      (Snark_transition.consensus_data transition)
+    let open Snark_params.Tick.Let_syntax in
+    let open Consensus_state in
+    let transition_data = Snark_transition.consensus_data transition in
+    let%bind length = Length.increment_var previous_state.length
+    (* TODO: keep track of total_currency in transaction snark. The current_slot
+     * implementation would allow an adversary to make then total_currency incorrect by
+     * not adding the coinbase to their account. *)
+    and total_currency =
+      Amount.Checked.add previous_state.total_currency
+        (Amount.var_of_t Inputs.coinbase)
+    and epoch_seed, next_epoch_seed =
+      let%bind epoch_changed =
+        Epoch.compare_var previous_state.current_epoch transition_data.epoch
+        >>| fun c -> c.less
+      in
+      let%map epoch_seed =
+        Epoch_seed.if_ epoch_changed ~then_:previous_state.next_epoch_seed
+          ~else_:previous_state.epoch_seed
+      and next_epoch_seed =
+        Epoch_seed.if_ epoch_changed
+          ~then_:(Epoch_seed.var_of_t @@ Epoch_seed.of_hash Epoch_seed.zero)
+          ~else_:previous_state.next_epoch_seed
+      in
+      (epoch_seed, next_epoch_seed)
+    in
+    let%map next_epoch_seed =
+      let%bind updated_next_epoch_seed =
+        Epoch_seed.update_var next_epoch_seed
+          transition_data.proposer_vrf_result
+      and in_seed_update_range =
+        Epoch.Slot.in_seed_update_range_var transition_data.slot
+      in
+      Epoch_seed.if_ in_seed_update_range ~then_:updated_next_epoch_seed
+        ~else_:next_epoch_seed
+    in
+    { length
+    ; current_epoch= transition_data.epoch
+    ; current_slot= transition_data.slot
+    ; total_currency
+    ; epoch_seed
+    ; next_epoch_seed }
+
 
   let step = Async_kernel.Deferred.Or_error.return
 
