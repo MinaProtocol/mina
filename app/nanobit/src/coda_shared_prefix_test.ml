@@ -19,10 +19,9 @@ struct
     let n = 2 in
     let log = Logger.create () in
     let log = Logger.child log name in
-    Logger.info log "hi" ;
     Coda_processes.init () ;
-    Coda_processes.spawn_local_processes_exn n ~program_dir ~first_delay:0.0
-      ~should_propose:(fun i -> i = 0)
+    Coda_processes.spawn_local_processes_exn n ~program_dir
+      ~should_propose:(fun i -> i = 1)
       ~f:(fun workers ->
         let chains = Array.init (List.length workers) ~f:(fun _ -> []) in
         let check_chains () =
@@ -45,12 +44,16 @@ struct
                      (List.findi first ~f:(fun _ x -> x = shared))
                      ~f:(fun x -> fst x))
           in
-          let shared_prefix_dist = List.length first - shared_idx in
+          let shared_prefix_dist = shared_idx in
           Logger.info log
             !"lengths: %{sexp: int list} shared_prefix: %{sexp: string \
               option} shared_prefix_dist: %d"
-            lengths newest_shared shared_prefix_dist
-        in
+            lengths newest_shared shared_prefix_dist;
+          assert(shared_prefix_dist <= 1);
+          if (Array.fold ~init:0 (Array.map chains List.length ) ~f:Int.max) > 20
+          then exit 0
+          else Deferred.unit
+      in
         let%bind () =
           Deferred.List.all_unit
             (List.mapi workers ~f:(fun i worker ->
@@ -72,7 +75,7 @@ struct
                         let chain = chains.(i) in
                         let chain = curr_str :: chain in
                         chains.(i) <- chain ;
-                        check_chains () ;
+                        let%bind () = check_chains () in
                         Logger.debug log "%d got tip %s %s" i prev_str curr_str ;
                         return () )) ;
                  Deferred.unit ))
