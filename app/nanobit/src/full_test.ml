@@ -36,7 +36,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; target_peer_count= 8
         ; initial_peers= []
         ; conf_dir
-        ; me= (Host_and_port.of_string "127.0.0.1:8000", 8001) } }
+        ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000) } }
   in
   let should_propose = true in
   let%bind minibit =

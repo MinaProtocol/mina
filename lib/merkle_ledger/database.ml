@@ -1,131 +1,25 @@
 open Core
 open Unsigned
 
-module type Balance_intf = sig
-  type t [@@deriving eq]
-
-  val zero : t
-end
-
-module type Account_intf = sig
-  type t [@@deriving bin_io, eq]
-
-  type balance
-
-  val empty : t
-
-  val balance : t -> balance
-
-  val set_balance : t -> balance -> t
-
-  val public_key : t -> string
-
-  val gen : t Quickcheck.Generator.t
-end
-
-module type Hash_intf = sig
-  type t [@@deriving bin_io, eq]
-
-  type account
-
-  val empty : t
-
-  val merge : height:int -> t -> t -> t
-
-  val hash_account : account -> t
-end
-
-module type Depth_intf = sig
-  val depth : int
-end
-
-module type Key_value_database_intf = sig
-  type t
-
-  val create : directory:string -> t
-
-  val destroy : t -> unit
-
-  val get : t -> key:Bigstring.t -> Bigstring.t option
-
-  val set : t -> key:Bigstring.t -> data:Bigstring.t -> unit
-
-  val delete : t -> key:Bigstring.t -> unit
-end
-
-module type Stack_database_intf = sig
-  type t
-
-  val create : filename:string -> t
-
-  val destroy : t -> unit
-
-  val push : t -> Bigstring.t -> unit
-
-  val pop : t -> Bigstring.t option
-end
-
-module type S = sig
-  type account
-
-  type hash
-
-  type key
-
-  type t
-
-  type error = Account_key_not_found | Out_of_leaves | Malformed_database
-
-  type address
-
-  module MerklePath : sig
-    type t = Direction.t * hash
-
-    val implied_root : t list -> hash -> hash
-  end
-
-  val create : key_value_db_dir:string -> stack_db_file:string -> t
-
-  val destroy : t -> unit
-
-  val get_key_of_account : t -> account -> (key, error) Result.t
-
-  val get_account : t -> key -> account option
-
-  val set_account : t -> account -> (unit, error) Result.t
-
-  val merkle_root : t -> hash
-
-  val merkle_path : t -> key -> MerklePath.t list
-
-  val set_inner_hash_at_addr_exn : t -> address -> hash -> unit
-
-  val get_inner_hash_at_addr_exn : t -> address -> hash
-
-  val get_all_accounts_rooted_at_exn : t -> address -> account list
-
-  val set_all_accounts_rooted_at_exn : t -> address -> account list -> unit
-end
-
 module Make
-    (Balance : Balance_intf)
-    (Account : Account_intf with type balance := Balance.t)
-    (Hash : Hash_intf with type account := Account.t)
-    (Depth : Depth_intf)
-    (Kvdb : Key_value_database_intf)
-    (Sdb : Stack_database_intf) :
-  S with type account := Account.t and type hash := Hash.t =
-struct
+    (Balance : Intf.Balance)
+    (Account : Intf.Account with type balance := Balance.t)
+    (Hash : Intf.Hash with type account := Account.t)
+    (Depth : Intf.Depth)
+    (Kvdb : Intf.Key_value_database)
+    (Sdb : Intf.Stack_database) : sig
+  include Database_intf.S
+          with type account := Account.t
+           and type hash := Hash.t
+
+  val gen_account_key : key Core.Quickcheck.Generator.t
+end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   let max_depth = Depth.depth
 
   let () = assert (max_depth < 0xfe)
 
   type error = Account_key_not_found | Out_of_leaves | Malformed_database
-
-  exception Error_exception of error
-
-  let exn_of_error err = Error_exception err
 
   module MerklePath = struct
     type t = Direction.t * Hash.t
@@ -141,6 +35,10 @@ struct
       loop leaf_hash ~height:0 path
   end
 
+  module Addr = Merkle_address.Make (struct
+    let depth = max_depth
+  end)
+
   (* Keys are a bitstring prefixed by a byte. In the case of accounts, the prefix
    * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
    * 1 and N (where N is the height of the root of the merkle tree, with 1 representing
@@ -150,10 +48,6 @@ struct
    * any bitstring.
    *)
   module Key = struct
-    module Addr = Merkle_address.Make (struct
-      let depth = max_depth
-    end)
-
     module Prefix = struct
       let generic = UInt8.of_int 0xff
 
@@ -197,10 +91,6 @@ struct
       Account
         (Addr.of_directions @@ List.init max_depth ~f:(fun _ -> Direction.Left))
 
-    let build_account (path: Direction.t list) : t =
-      assert (List.length path = max_depth) ;
-      Account (Addr.of_directions path)
-
     let parse (str: Bigstring.t) : (t, unit) Result.t =
       let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
       let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
@@ -220,6 +110,12 @@ struct
       Bigstring.set dst 0 (Char.of_int_exn (UInt8.to_int prefix)) ;
       Bigstring.blit ~src ~src_pos:0 ~dst ~dst_pos:1 ~len:src_len ;
       dst
+
+    let to_path_exn = function
+      | Account path -> path
+      | Hash path -> path
+      | Generic _ ->
+          raise (Invalid_argument "to_path_exn: generic does not have a path")
 
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
@@ -258,20 +154,22 @@ struct
       match last_direction (path key) with
       | Left -> (base, sibling)
       | Right -> (sibling, base)
-
-    let gen_account =
-      let open Quickcheck.Let_syntax in
-      let%map dirs =
-        Quickcheck.Generator.list_with_length max_depth Direction.gen
-      in
-      build_account dirs
   end
 
   type key = Key.t
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
-  type address = Key.Addr.t
+  let gen_account_key =
+    let open Quickcheck.Let_syntax in
+    let build_account (path: Direction.t list) =
+      assert (List.length path = Depth.depth) ;
+      Key.Account (Addr.of_directions path)
+    in
+    let%map dirs =
+      Quickcheck.Generator.list_with_length Depth.depth Direction.gen
+    in
+    build_account dirs
 
   let create ~key_value_db_dir ~stack_db_file =
     let kvdb = Kvdb.create ~directory:key_value_db_dir in
@@ -336,11 +234,11 @@ struct
       set_hash mdb (Key.parent key) parent_hash
 
   let get_inner_hash_at_addr_exn mdb address =
-    assert (Key.Addr.depth address <= max_depth) ;
+    assert (Addr.depth address <= max_depth) ;
     get_hash mdb (Key.Hash address)
 
   let set_inner_hash_at_addr_exn mdb address hash =
-    assert (Key.Addr.depth address <= max_depth) ;
+    assert (Addr.depth address <= max_depth) ;
     set_bin mdb (Key.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
   module Account_key = struct
@@ -387,6 +285,16 @@ struct
       Result.map key_result ~f:(fun key ->
           set mdb account (Key.serialize key) ;
           key )
+
+    let last_free_key_address mdb =
+      match
+        Key.build_generic (Bigstring.of_string "next_free_account_key")
+        |> get_raw mdb
+        |> Option.value_map ~f:Key.parse
+             ~default:(Result.return @@ Key.build_empty_account ())
+      with
+      | Error () -> failwith "Could not get retrieve last key"
+      | Ok parsed_key -> Key.to_path_exn parsed_key
   end
 
   let get_key_of_account = Account_key.get
@@ -418,16 +326,18 @@ struct
       in
       Result.map key_result ~f:(fun key -> update_account mdb key account)
 
+  let num_accounts t =
+    Addr.to_int (Account_key.last_free_key_address t) - Sdb.length t.sdb
+
   let get_all_accounts_rooted_at_exn mdb address =
-    let first_node, last_node = Key.Addr.Range.subtree_range address in
+    let first_node, last_node = Addr.Range.subtree_range address in
     let result =
-      Key.Addr.Range.fold (first_node, last_node) ~init:[] ~f:
-        (fun bit_index acc ->
+      Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
           let account =
             Option.value_exn
               ~message:
                 (sprintf
-                   !"address %{sexp:Key.Addr.t} does not have an account"
+                   !"address %{sexp:Addr.t} does not have an account"
                    bit_index)
               (get_account mdb (Key.Account bit_index))
           in
@@ -436,14 +346,14 @@ struct
     List.rev result
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
-    let first_node, last_node = Key.Addr.Range.subtree_range address in
-    Key.Addr.Range.fold (first_node, last_node) ~init:accounts ~f:
-      (fun bit_index -> function
+    let first_node, last_node = Addr.Range.subtree_range address in
+    Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
+        function
       | head :: tail ->
           update_account mdb (Key.Account bit_index) head ;
           tail
       | [] ->
-          assert (Key.Addr.equal last_node bit_index) ;
+          assert (Addr.equal last_node bit_index) ;
           [] )
     |> ignore
 
@@ -460,212 +370,5 @@ struct
     in
     loop key
 
-  let with_test_instance f =
-    let uuid = Uuid.create () in
-    let tmp_dir = "/tmp/merkle_database_test-" ^ Uuid.to_string uuid in
-    let key_value_db_dir = Filename.concat tmp_dir "kvdb" in
-    let stack_db_file = Filename.concat tmp_dir "sdb" in
-    assert (Unix.system ("rm -rf " ^ tmp_dir) = Result.Ok ()) ;
-    Unix.mkdir tmp_dir ;
-    let mdb = create ~key_value_db_dir ~stack_db_file in
-    let cleanup () =
-      destroy mdb ;
-      assert (Unix.system ("rm -rf " ^ tmp_dir) = Result.Ok ())
-    in
-    try
-      let result = f mdb in
-      cleanup () ; result
-    with exn -> cleanup () ; raise exn
-
-  let%test_unit "getting a non existing account returns None" =
-    with_test_instance (fun mdb ->
-        Quickcheck.test Key.gen_account ~f:(fun key ->
-            assert (get_account mdb key = None) ) )
-
-  let%test "add and retrieve an account" =
-    with_test_instance (fun mdb ->
-        let account = Quickcheck.random_value Account.gen in
-        assert (set_account mdb account = Ok ()) ;
-        let key =
-          Account_key.get mdb account
-          |> Result.map_error ~f:exn_of_error
-          |> Result.ok_exn
-        in
-        Account.equal (Option.value_exn (get_account mdb key)) account )
-
-  let%test "accounts are atomic" =
-    with_test_instance (fun mdb ->
-        let account = Quickcheck.random_value Account.gen in
-        assert (set_account mdb account = Ok ()) ;
-        let key =
-          Account_key.get mdb account
-          |> Result.map_error ~f:exn_of_error
-          |> Result.ok_exn
-        in
-        assert (set_account mdb account = Ok ()) ;
-        let key' =
-          Account_key.get mdb account
-          |> Result.map_error ~f:exn_of_error
-          |> Result.ok_exn
-        in
-        key = key' && get_account mdb key = get_account mdb key' )
-
-  let%test "accounts can be deleted" =
-    with_test_instance (fun mdb ->
-        let account = Quickcheck.random_value Account.gen in
-        assert (set_account mdb account = Ok ()) ;
-        let key =
-          Account_key.get mdb account
-          |> Result.map_error ~f:exn_of_error
-          |> Result.ok_exn
-        in
-        assert (Option.is_some (get_account mdb key)) ;
-        let account = Account.set_balance account Balance.zero in
-        assert (set_account mdb account = Ok ()) ;
-        get_account mdb key = None )
-
-  let%test "deleted account keys are reassigned" =
-    with_test_instance (fun mdb ->
-        let account = Quickcheck.random_value Account.gen in
-        let account' = Quickcheck.random_value Account.gen in
-        assert (set_account mdb account = Ok ()) ;
-        let key =
-          Account_key.get mdb account
-          |> Result.map_error ~f:exn_of_error
-          |> Result.ok_exn
-        in
-        let account = Account.set_balance account Balance.zero in
-        assert (set_account mdb account = Ok ()) ;
-        assert (set_account mdb account' = Ok ()) ;
-        get_account mdb key = Some account' )
-
-  let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
-                 get_inner_hash_at_addr_exn(address) = hash" =
-    let gen_non_empty_directions =
-      let open Quickcheck.Generator in
-      filter ~f:(Fn.compose not List.is_empty) (Direction.gen_list max_depth)
-    in
-    with_test_instance (fun mdb ->
-        Quickcheck.test
-          (Quickcheck.Generator.tuple2 gen_non_empty_directions Account.gen)
-          ~sexp_of:[%sexp_of : Direction.t List.t * Account.t sexp_opaque] ~f:
-          (fun (direction, account) ->
-            let hash_account = Hash.hash_account account in
-            let address = Key.Addr.of_directions direction in
-            set_inner_hash_at_addr_exn mdb address hash_account ;
-            let result = get_inner_hash_at_addr_exn mdb address in
-            assert (Hash.equal result hash_account) ) )
-
-  let%test_unit "If the entire database is full,\n \
-                 set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
-                 = accounts" =
-    with_test_instance (fun mdb ->
-        let max_height = Int.min max_depth 5 in
-        let num_accounts = 1 lsl max_height in
-        let initial_accounts =
-          Quickcheck.random_value
-            (Quickcheck.Generator.list_with_length num_accounts Account.gen)
-        in
-        List.iter initial_accounts ~f:(fun account ->
-            ignore @@ set_account mdb account ) ;
-        Quickcheck.test (Direction.gen_list max_height)
-          ~sexp_of:[%sexp_of : Direction.t List.t] ~f:(fun directions ->
-            let offset =
-              List.init (max_depth - max_height) ~f:(fun _ -> Direction.Left)
-            in
-            let padded_directions = List.concat [offset; directions] in
-            let address = Key.Addr.of_directions padded_directions in
-            let num_accounts =
-              1 lsl (max_depth - List.length padded_directions)
-            in
-            let accounts =
-              Quickcheck.random_value
-                (Quickcheck.Generator.list_with_length num_accounts Account.gen)
-            in
-            set_all_accounts_rooted_at_exn mdb address accounts ;
-            let result = get_all_accounts_rooted_at_exn mdb address in
-            assert (List.equal ~equal:Account.equal accounts result) ) )
+  let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
 end
-
-let%test_module "test functor on in memory databases" =
-  ( module struct
-    module UInt64 = struct
-      include UInt64
-      include Binable.Of_stringable (UInt64)
-
-      let equal x y = UInt64.compare x y = 0
-    end
-
-    module Account : Account_intf with type balance := UInt64.t = struct
-      type t = {public_key: string; balance: UInt64.t} [@@deriving bin_io, eq]
-
-      let empty = {public_key= ""; balance= UInt64.zero}
-
-      let balance {balance; _} = balance
-
-      let set_balance {public_key; _} balance = {public_key; balance}
-
-      let public_key {public_key; _} = public_key
-
-      let gen =
-        let open Quickcheck.Let_syntax in
-        let%bind public_key = String.gen in
-        let%map int_balance = Int.gen in
-        let nat_balance = abs int_balance in
-        let balance = UInt64.of_int nat_balance in
-        {public_key; balance}
-    end
-
-    module Hash = struct
-      type t = int [@@deriving bin_io, eq, sexp]
-
-      let empty = 0
-
-      let merge ~height left right = Hashtbl.hash (height, left, right)
-
-      let hash_account : Account.t -> t = Hashtbl.hash
-    end
-
-    module In_memory_kvdb : Key_value_database_intf = struct
-      type t = (string, Bigstring.t) Hashtbl.t
-
-      let create ~directory:_ = Hashtbl.create (module String)
-
-      let destroy _ = ()
-
-      let get tbl ~key = Hashtbl.find tbl (Bigstring.to_string key)
-
-      let set tbl ~key ~data =
-        Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
-
-      let delete tbl ~key = Hashtbl.remove tbl (Bigstring.to_string key)
-    end
-
-    module In_memory_sdb : Stack_database_intf = struct
-      type t = Bigstring.t list ref
-
-      let create ~filename:_ = ref []
-
-      let destroy _ = ()
-
-      let push ls v = ls := v :: !ls
-
-      let pop ls =
-        match !ls with
-        | [] -> None
-        | h :: t ->
-            ls := t ;
-            Some h
-    end
-
-    module Mdb_d (D : Depth_intf) =
-      Make (UInt64) (Account) (Hash) (D) (In_memory_kvdb) (In_memory_sdb)
-
-    module Mdb_d4 = Mdb_d (struct
-      let depth = 4
-    end)
-
-    module Mdb_d30 = Mdb_d (struct
-      let depth = 30
-    end)
-  end )

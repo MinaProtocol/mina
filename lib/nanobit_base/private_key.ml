@@ -1,25 +1,27 @@
 open Core_kernel
 open Async_kernel
 
-type t = Bignum_bigint.Stable.V1.t [@@deriving bin_io, sexp]
+module T = struct
+  type t = Snark_params.Tick.Inner_curve.Scalar.t [@@deriving bin_io, sexp]
+end
+
+include T
 
 let create () =
   if Insecure.private_key_generation then
-    Bignum_bigint.random Snark_params.Tick.Signature_curve.Params.order
+    Snark_params.Tick.Inner_curve.Scalar.random ()
   else failwith "Insecure.private_key_generation"
 
 let gen =
   let open Bignum_bigint in
-  gen_incl zero (Snark_params.Tick.Signature_curve.Params.order - one)
+  Quickcheck.Generator.map
+    (gen_incl one (Snark_params.Tick.Inner_curve.Scalar.size - one))
+    ~f:Snark_params.Tock.Bigint.(Fn.compose to_field of_bignum_bigint)
 
-let of_bigstring bs =
-  let open Or_error.Let_syntax in
-  let%map elem, _ = Bigstring.read_bin_prot bs bin_reader_t in
-  elem
+let of_bigstring_exn = Binable.of_bigstring (module T)
 
-let to_bigstring elem =
-  let bs =
-    Bigstring.create (bin_size_t elem + Bin_prot.Utils.size_header_length)
-  in
-  let _ = Bigstring.write_bin_prot bs bin_writer_t elem in
-  bs
+let to_bigstring = Binable.to_bigstring (module T)
+
+let to_base64 t = to_bigstring t |> Bigstring.to_string |> B64.encode
+
+let of_base64_exn s = B64.decode s |> Bigstring.of_string |> of_bigstring_exn

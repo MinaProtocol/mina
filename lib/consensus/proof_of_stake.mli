@@ -1,10 +1,6 @@
 open Currency
 
 module type Inputs_intf = sig
-  module Proof : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
   end
@@ -50,4 +46,9 @@ module type Inputs_intf = sig
   val probable_slots_per_transition_count : int
 end
 
-module Make (Inputs : Inputs_intf) : Mechanism.S
+module Make (Inputs : Inputs_intf) :
+  Mechanism.S
+  with type Internal_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t
+   and type External_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t

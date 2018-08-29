@@ -2,47 +2,45 @@ open Core
 open Async_kernel
 module TL = Merkle_ledger.Test_ledger
 
-module Tests
-    (L : Merkle_ledger.Test.Ledger_intf) (Num_accts : sig
-        val num_accts : int
-    end) =
-struct
-  module Adjhash = struct
-    include TL.Hash
+module type Ledger_intf = sig
+  include Syncable_ledger.Merkle_tree_intf
 
-    type t = hash [@@deriving bin_io, compare, hash, sexp, compare]
+  val load_ledger : int -> int -> t * string list
+end
 
-    type account = TL.Account.t
+module type Input_intf = sig
+  module Root_hash : sig
+    type t [@@deriving bin_io, compare, hash, sexp, compare]
 
-    let to_hash (x: t) = x
-
-    let equal h1 h2 = compare_hash h1 h2 = 0
+    val equal : t -> t -> bool
   end
 
-  module Ledger' = struct
-    include L
+  module L : Ledger_intf with type root_hash := Root_hash.t
 
-    type key = unit
-
-    type path = Path.t
-  end
-
-  module SL =
-    Syncable_ledger.Make (L.Addr) (TL.Key) (TL.Account) (Adjhash) (Adjhash)
-      (Ledger')
-      (struct
-        let subtree_height = 3
-      end)
+  module SL :
+    Syncable_ledger.S
+    with type merkle_tree := L.t
+     and type hash := L.hash
+     and type root_hash := Root_hash.t
+     and type addr := L.addr
+     and type merkle_path := L.path
+     and type account := L.account
 
   module SR = SL.Responder
+
+  val num_accts : int
+end
+
+module Make (Input : Input_intf) = struct
+  open Input
 
   (* not really kosher but the tests are run in-order, so this will get filled
    * in before we need it. *)
   let total_queries = ref None
 
   let%test "full_sync_entirely_different" =
-    let l1, _k1 = L.load_ledger Num_accts.num_accts 1 in
-    let l2, _k2 = L.load_ledger Num_accts.num_accts 2 in
+    let l1, _k1 = L.load_ledger num_accts 1 in
+    let l2, _k2 = L.load_ledger num_accts 2 in
     let desired_root = L.merkle_root l2 in
     let lsync = SL.create l1 desired_root in
     let qr = SL.query_reader lsync in
@@ -59,13 +57,13 @@ struct
     with
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
-        Adjhash.equal desired_root (L.merkle_root mt)
+        Root_hash.equal desired_root (L.merkle_root mt)
     | `Target_changed -> false
 
   let%test_unit "new_goal_soon" =
-    let l1, _k1 = L.load_ledger Num_accts.num_accts 1 in
-    let l2, _k2 = L.load_ledger Num_accts.num_accts 2 in
-    let l3, _k3 = L.load_ledger Num_accts.num_accts 3 in
+    let l1, _k1 = L.load_ledger num_accts 1 in
+    let l2, _k2 = L.load_ledger num_accts 2 in
+    let l3, _k3 = L.load_ledger num_accts 3 in
     let desired_root = ref @@ L.merkle_root l2 in
     let lsync = SL.create l1 !desired_root in
     let qr = SL.query_reader lsync in
@@ -77,7 +75,7 @@ struct
     let ctr = ref 0 in
     don't_wait_for
       (Linear_pipe.iter qr ~f:(fun (hash, query) ->
-           if not (Adjhash.equal hash !desired_root) then Deferred.unit
+           if not (Root_hash.equal hash !desired_root) then Deferred.unit
            else
              let res =
                if !ctr = (!total_queries |> Option.value_exn) / 2 then (
@@ -103,49 +101,49 @@ struct
             SL.wait_until_valid lsync !desired_root )
       with
       | `Ok mt ->
-          [%test_result : Adjhash.t] ~expect:(L.merkle_root l3)
+          [%test_result : Root_hash.t] ~expect:(L.merkle_root l3)
             (L.merkle_root mt)
       | `Target_changed -> failwith "the target changed again"
 end
 
-module TestL3_3 =
-  Tests (Merkle_ledger.Test.L3)
-    (struct
-      let num_accts = 3
-    end)
+module TestL3_3 = Make (Test_ledger.Make (struct
+  let depth = 3
 
-module TestL3_8 =
-  Tests (Merkle_ledger.Test.L3)
-    (struct
-      let num_accts = 8
-    end)
+  let num_accts = 3
+end))
 
-module TestL16_3 =
-  Tests (Merkle_ledger.Test.L16)
-    (struct
-      let num_accts = 3
-    end)
+module TestL3_8 = Make (Test_ledger.Make (struct
+  let depth = 3
 
-module TestL16_20 =
-  Tests (Merkle_ledger.Test.L16)
-    (struct
-      let num_accts = 20
-    end)
+  let num_accts = 8
+end))
 
-module TestL16_1024 =
-  Tests (Merkle_ledger.Test.L16)
-    (struct
-      let num_accts = 1024
-    end)
+module TestL16_3 = Make (Test_ledger.Make (struct
+  let depth = 16
 
-module TestL16_1025 =
-  Tests (Merkle_ledger.Test.L16)
-    (struct
-      let num_accts = 80
-    end)
+  let num_accts = 3
+end))
 
-module TestL16_65536 =
-  Tests (Merkle_ledger.Test.L16)
-    (struct
-      let num_accts = 65536
-    end)
+module TestL16_20 = Make (Test_ledger.Make (struct
+  let depth = 16
+
+  let num_accts = 20
+end))
+
+module TestL16_1024 = Make (Test_ledger.Make (struct
+  let depth = 16
+
+  let num_accts = 1024
+end))
+
+module TestL16_1025 = Make (Test_ledger.Make (struct
+  let depth = 16
+
+  let num_accts = 80
+end))
+
+module TestL16_65536 = Make (Test_ledger.Make (struct
+  let depth = 16
+
+  let num_accts = 65536
+end))

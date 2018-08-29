@@ -1,6 +1,8 @@
 open Core_kernel
 open Snark_params
 open Snark_bits
+open Tuple_lib
+open Fold_lib
 
 type t [@@deriving sexp, eq]
 
@@ -18,9 +20,11 @@ module Stable : sig
   end
 end
 
-val bit_length : int
+val length_in_triples : int
 
 module Bits : Bits_intf.S with type t := t
+
+val fold : t -> bool Triple.t Fold.t
 
 include Tick.Snarkable.Bits.Faithful
         with type Unpacked.value = t
@@ -46,6 +50,10 @@ module Span : sig
 
   val of_ms : Int64.t -> t
 
+  val ( + ) : t -> t -> t
+
+  val ( * ) : t -> t -> t
+
   val ( < ) : t -> t -> bool
 
   val ( > ) : t -> t -> bool
@@ -68,6 +76,16 @@ module Timeout : sig
 
   val cancel : Controller.t -> 'a t -> 'a -> unit
 end
+
+val ( < ) : t -> t -> bool
+
+val ( > ) : t -> t -> bool
+
+val ( = ) : t -> t -> bool
+
+val ( <= ) : t -> t -> bool
+
+val ( >= ) : t -> t -> bool
 
 val field_var_to_unpacked :
   Tick.Field.Checked.t -> (Unpacked.var, _) Tick.Checked.t

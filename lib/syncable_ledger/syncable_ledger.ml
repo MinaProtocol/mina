@@ -22,11 +22,9 @@ module type Merkle_tree_intf = sig
 
   type account
 
-  type key
-
   type addr
 
-  type t [@@deriving sexp]
+  type t
 
   type path
 
@@ -39,8 +37,6 @@ module type Merkle_tree_intf = sig
   val get_inner_hash_at_addr_exn : t -> addr -> hash
 
   val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
-
-  val extend_with_empty_to_fit : t -> int -> unit
 
   val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
 
@@ -65,8 +61,6 @@ module type S = sig
   type diff
 
   type account
-
-  type key
 
   type index = int
 
@@ -127,6 +121,20 @@ module type Validity_intf = sig
   val completely_fresh : t -> bool
 end
 
+module type Responder_intf = sig
+  type t
+
+  type merkle_tree
+
+  type query
+
+  type answer
+
+  val create : merkle_tree -> (query -> unit) -> t
+
+  val answer_query : t -> query -> answer
+end
+
 (*
 
 Every node of the merkle tree is always in one of three states:
@@ -167,10 +175,8 @@ with the hashes in the bottomost N-1 internal nodes).
 *)
 
 module Make
-    (Addr : Merkle_address.S) (Key : sig
-        type t [@@deriving bin_io]
-    end) (Account : sig
-      type t [@@deriving bin_io, sexp]
+    (Addr : Merkle_address.S) (Account : sig
+        type t [@@deriving bin_io, sexp]
     end)
     (Hash : Hash_intf with type account := Account.t) (Root_hash : sig
         type t [@@deriving eq]
@@ -181,7 +187,6 @@ module Make
           with type hash := Hash.t
            and type root_hash := Root_hash.t
            and type addr := Addr.t
-           and type key := Key.t
            and type account := Account.t) (Subtree_height : sig
         val subtree_height : int
     end) :
@@ -191,8 +196,7 @@ module Make
    and type root_hash := Root_hash.t
    and type addr := Addr.t
    and type merkle_path := MT.path
-   and type account := Account.t
-   and type key := Key.t =
+   and type account := Account.t =
 struct
   type diff = unit
 
@@ -289,22 +293,22 @@ struct
 
     let create : MT.t -> (query -> unit) -> t = fun mt f -> {mt; f}
 
-    let answer_query : t -> query -> answer =
-     fun {mt; f} q ->
-      f q ;
-      match q with
-      | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
-      | What_contents a ->
-          Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
-      | Num_accounts ->
-          let len = MT.length mt in
-          let height = Int.ceil_log2 len in
-          let content_root_addr =
-            funpow (MT.depth - height)
-              (fun a -> Addr.child_exn a Direction.Left)
-              (Addr.root ())
-          in
-          Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
+  let answer_query : t -> query -> answer =
+   fun {mt; f} q ->
+    f q ;
+    match q with
+    | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
+    | What_contents a ->
+        Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
+    | Num_accounts ->
+        let len = MT.length mt in
+        let height = Int.ceil_log2 len in
+        let content_root_addr =
+          funpow (MT.depth - height)
+            (fun a -> Addr.child_exn a Direction.Left)
+            (Addr.root ())
+        in
+        Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
   end
 
   type waiting = {expected: Hash.t; children: (Addr.t * Hash.t) list}
@@ -431,7 +435,6 @@ struct
     let height = Int.ceil_log2 n in
     if not (Hash.equal (complete_with_empties content_hash height MT.depth) rh)
     then failwith "reported content hash doesn't match desired root hash!" ;
-    MT.extend_with_empty_to_fit t.tree n ;
     Addr.Table.clear t.waiting_parents ;
     Addr.Table.clear t.waiting_content ;
     Valid.set t.validity (Addr.root ()) (Stale, rh) ;

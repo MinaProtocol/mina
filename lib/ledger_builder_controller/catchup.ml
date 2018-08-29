@@ -123,6 +123,8 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let open Interruptible.Let_syntax in
     let ivar : External_transition.t Ivar.t = Ivar.create () in
+    (* TODO: This is a horrible hack; this works by accident because we only
+     * call this one at a time for now. Will be fixed by #521 *)
     Sync_ledger.new_goal sl (External_transition.ledger_hash transition) ;
     let work =
       match%bind

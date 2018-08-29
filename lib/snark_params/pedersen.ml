@@ -1,16 +1,17 @@
 open Core_kernel
 open Snark_bits
+open Fold_lib
+open Tuple_lib
 
 module type S = sig
   type curve
 
-  type fold =
-    init:curve * int -> f:(curve * int -> bool -> curve * int) -> curve * int
-
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq]
+    type t [@@deriving bin_io, sexp, eq, hash, compare]
 
     val size_in_bits : int
+
+    val fold : t -> bool Triple.t Fold.t
 
     val ( = ) : t -> t -> bool
 
@@ -24,44 +25,46 @@ module type S = sig
   end
 
   module Params : sig
-    type t = curve array
-
-    val random : max_input_length:int -> t
+    type t = curve Quadruple.t array
   end
 
   module State : sig
-    type t = {bits_consumed: int; acc: curve; params: Params.t}
+    type t = {triples_consumed: int; acc: curve; params: Params.t}
 
-    val create : ?bits_consumed:int -> ?init:curve -> Params.t -> t
+    val create : ?triples_consumed:int -> ?init:curve -> Params.t -> t
 
-    val update_bigstring : t -> Bigstring.t -> t
-
-    val update_string : t -> string -> t
-
-    val update_fold : t -> fold -> t
-
-    val update_iter : t -> (f:(bool -> unit) -> unit) -> t
+    val update_fold : t -> bool Triple.t Fold.t -> t
 
     val digest : t -> Digest.t
 
     val salt : Params.t -> string -> t
   end
 
-  val hash_fold : State.t -> fold -> State.t
+  val hash_fold : State.t -> bool Triple.t Fold.t -> State.t
 
-  val digest_fold : State.t -> fold -> Digest.t
+  val digest_fold : State.t -> bool Triple.t Fold.t -> Digest.t
 end
 
 module Make (Field : sig
-  include Snarky.Field_intf.S
+  type t [@@deriving sexp, bin_io, compare, hash, eq]
 
-  include Sexpable.S with type t := t
+  include Snarky.Field_intf.S with type t := t
 end)
-(Bigint : Snarky.Bigint_intf.Extended with type field := Field.t)
-(Curve : Snarky.Curves.Edwards.Basic.S with type field := Field.t) =
+(Bigint : Snarky.Bigint_intf.Extended with type field := Field.t) (Curve : sig
+    type t
+
+    val to_coords : t -> Field.t * Field.t
+
+    val zero : t
+
+    val add : t -> t -> t
+
+    val negate : t -> t
+end) :
+  S with type curve := Curve.t and type Digest.t = Field.t =
 struct
   module Digest = struct
-    type t = Field.t [@@deriving sexp, eq]
+    type t = Field.t [@@deriving sexp, bin_io, compare, hash, eq]
 
     let size_in_bits = Field.size_in_bits
 
@@ -70,97 +73,37 @@ struct
     include Field_bin.Make (Field) (Bigint)
     module Snarkable = Bits.Snarkable.Field
     module Bits = Bits.Make_field (Field) (Bigint)
+
+    let fold t = Fold.group3 ~default:false (Bits.fold t)
   end
 
-  type fold =
-       init:Curve.t * int
-    -> f:(Curve.t * int -> bool -> Curve.t * int)
-    -> Curve.t * int
-
   module Params = struct
-    type t = Curve.t array
-
-    let random_elt () =
-      let x = Field.random () in
-      let n = Bigint.of_field x in
-      let rec go two_to_the_i i acc =
-        if i = Field.size_in_bits then acc
-        else
-          let acc =
-            if Bigint.test_bit n i then Curve.add acc two_to_the_i else acc
-          in
-          go (Curve.double two_to_the_i) (i + 1) acc
-      in
-      go Curve.generator 0 Curve.identity
-
-    let random ~max_input_length =
-      Array.init max_input_length ~f:(fun _ -> random_elt ())
-
-    let max_input_length t = Array.length t
+    type t = Curve.t Quadruple.t array
   end
 
   module State = struct
-    type t = {bits_consumed: int; acc: Curve.t; params: Params.t}
+    type t = {triples_consumed: int; acc: Curve.t; params: Params.t}
 
-    let create ?(bits_consumed= 0) ?(init= Curve.identity) params =
-      {acc= init; bits_consumed; params}
+    let create ?(triples_consumed= 0) ?(init= Curve.zero) params =
+      {acc= init; triples_consumed; params}
 
-    let ith_bit_int n i = (n lsr i) land 1 = 1
-
-    let update_fold (t: t)
-        (fold: init:'acc -> f:('acc -> bool -> 'acc) -> 'acc) =
+    let update_fold (t: t) (fold: bool Triple.t Fold.t) =
       let params = t.params in
-      let acc, bits_consumed =
-        fold ~init:(t.acc, t.bits_consumed) ~f:(fun (acc, i) b ->
-            if b then (Curve.add acc params.(i), i + 1) else (acc, i + 1) )
-      in
-      {t with acc; bits_consumed}
-
-    let update_iter (t: t) (iter: f:(bool -> unit) -> unit) =
-      let i = ref t.bits_consumed in
-      let acc = ref t.acc in
-      let params = t.params in
-      iter ~f:(fun b ->
-          if b then acc := Curve.add !acc params.(!i) ;
-          incr i ) ;
-      {t with acc= !acc; bits_consumed= !i}
-
-    let update_char_fold ({acc; bits_consumed; params}: t) fold_chars =
-      let acc, bits_consumed =
-        fold_chars ~init:(acc, bits_consumed) ~f:(fun (acc, offset) c ->
-            let c = Char.to_int c in
-            let cond_add j acc =
-              if ith_bit_int c j then Curve.add acc params.(offset + j)
-              else acc
+      let acc, triples_consumed =
+        fold.fold ~init:(t.acc, t.triples_consumed) ~f:(fun (acc, i) triple ->
+            let term =
+              Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
+                triple
             in
-            ( acc |> cond_add 0 |> cond_add 1 |> cond_add 2 |> cond_add 3
-              |> cond_add 4 |> cond_add 5 |> cond_add 6 |> cond_add 7
-            , offset + 8 ) )
+            (Curve.add acc term, i + 1) )
       in
-      {acc; bits_consumed; params}
-
-    let fold_bigstring s ~init ~f =
-      let length = Bigstring.length s in
-      let rec go acc i =
-        if i = length then acc else go (f acc (Bigstring.get s i)) (i + 1)
-      in
-      go init 0
-
-    let update_bigstring (t: t) (s: Bigstring.t) =
-      let bit_length = 8 * Bigstring.length s in
-      assert (bit_length <= Params.max_input_length t.params - t.bits_consumed) ;
-      update_char_fold t (fold_bigstring s)
-
-    let update_string (t: t) (s: string) =
-      let bit_length = 8 * String.length s in
-      assert (bit_length <= Params.max_input_length t.params - t.bits_consumed) ;
-      update_char_fold t (String.fold s)
+      {t with acc; triples_consumed}
 
     let digest t =
-      let x, _y = t.acc in
+      let x, _y = Curve.to_coords t.acc in
       x
 
-    let salt params s = update_string (create params) s
+    let salt params s = update_fold (create params) (Fold.string_triples s)
   end
 
   let hash_fold s fold = State.update_fold s fold
