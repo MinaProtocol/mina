@@ -20,7 +20,8 @@ struct
     let log = Logger.create () in
     let log = Logger.child log name in
     Coda_processes.init () ;
-    Coda_processes.spawn_local_processes_exn n ~program_dir ~f:(fun workers ->
+    Coda_processes.spawn_local_processes_exn n ~program_dir
+      ~should_propose:(Fn.const false) ~f:(fun workers ->
         let _, _, expected_peers = Coda_processes.net_configs n in
         let%bind _ = after (Time.Span.of_sec 10.) in
         Deferred.all_unit
