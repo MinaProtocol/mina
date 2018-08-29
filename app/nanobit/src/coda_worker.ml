@@ -10,6 +10,7 @@ module Make
 struct
   type input =
     { host: string
+    ; should_propose: bool
     ; conf_dir: string
     ; program_dir: string
     ; external_port: int
@@ -22,14 +23,20 @@ struct
       type t = Kademlia.Peer.t List.t [@@deriving bin_io]
     end
 
+    module State_hashes = struct
+      type t = bool list * bool list [@@deriving bin_io]
+    end
+
     type 'worker functions =
       { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
       ; strongest_ledgers:
-          ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t }
+          ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
+      }
 
     type coda_functions =
       { coda_peers: unit -> Peers.t Deferred.t
-      ; coda_strongest_ledgers: unit -> unit Pipe.Reader.t Deferred.t }
+      ; coda_strongest_ledgers: unit -> State_hashes.t Pipe.Reader.t Deferred.t
+      }
 
     module Worker_state = struct
       type init_arg = input [@@deriving bin_io]
@@ -60,12 +67,18 @@ struct
 
       let strongest_ledgers =
         C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
-          ~bin_output:Unit.bin_t ()
+          ~bin_output:State_hashes.bin_t ()
 
       let functions = {peers; strongest_ledgers}
 
       let init_worker_state
-          {host; conf_dir; program_dir; external_port; peers; discovery_port} =
+          { host
+          ; should_propose
+          ; conf_dir
+          ; program_dir
+          ; external_port
+          ; peers
+          ; discovery_port } =
         let log = Logger.create () in
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
@@ -100,7 +113,7 @@ struct
         in
         let%bind coda =
           Main.create
-            (Main.Config.make ~log ~net_config
+            (Main.Config.make ~log ~net_config ~should_propose
                ~ledger_builder_persistant_location:"ledger_builder"
                ~transaction_pool_disk_location:"transaction_pool"
                ~snark_pool_disk_location:"snark_pool"
@@ -111,8 +124,21 @@ struct
         let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in
           don't_wait_for
-            (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun _ ->
-                 Linear_pipe.write w () )) ;
+            (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun t ->
+                 let p =
+                   Main.Inputs.Consensus_mechanism.External_transition.
+                   protocol_state t
+                 in
+                 let prev_state_hash =
+                   Main.Inputs.Consensus_mechanism.Protocol_state.
+                   previous_state_hash p
+                 in
+                 let state_hash =
+                   Main.Inputs.Consensus_mechanism.Protocol_state.hash p
+                 in
+                 let prev_state_hash = State_hash.to_bits prev_state_hash in
+                 let state_hash = State_hash.to_bits state_hash in
+                 Linear_pipe.write w (prev_state_hash, state_hash) )) ;
           return r.pipe
         in
         return {coda_peers; coda_strongest_ledgers}

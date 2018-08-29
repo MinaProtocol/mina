@@ -88,9 +88,7 @@ struct
         let subtree_height = 3
       end)
 
-  module SR =
-    Syncable_ledger.Make_sync_responder (L.Addr) (Account) (Hash) (Hash) (L)
-      (SL)
+  module SR = SL.Responder
 
   let num_accts = Depth.num_accts
 end

@@ -25,11 +25,7 @@ module type Input_intf = sig
      and type merkle_path := L.path
      and type account := L.account
 
-  module SR :
-    Syncable_ledger.Responder_intf
-    with type merkle_tree := L.t
-     and type query := SL.query
-     and type answer := SL.answer
+  module SR = SL.Responder
 
   val num_accts : int
 end
