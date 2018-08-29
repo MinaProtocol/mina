@@ -35,6 +35,7 @@ let main dry_run check path =
             && not (String.is_suffix ~suffix:"_build" path)
             && not (String.is_suffix ~suffix:".un~" path)
             && not (String.is_suffix ~suffix:"external" path)
+            && not (String.is_suffix ~suffix:"ocamlformat" path)
         | `File ->
             not
               (List.exists whitelist ~f:(fun s ->
