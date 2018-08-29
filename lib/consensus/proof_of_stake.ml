@@ -86,6 +86,18 @@ let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
+module Vrf =
+  Vrf_lib.Integrated.Make (Snark_params.Tick)
+    (struct
+      type var = Snark_params.Tick.Boolean.var list
+    end)
+    (struct
+      include Snark_params.Tick.Inner_curve.Checked
+
+      let scale_generator shifted s ~init =
+        scale_known shifted Snark_params.Tick.Inner_curve.one s ~init
+    end)
+
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
   with type Internal_transition.Ledger_builder_diff.t =
