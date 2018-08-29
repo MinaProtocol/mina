@@ -448,39 +448,39 @@ end = struct
     in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
-            let this_input, _ = job in
+            let current_transition, _ = job in
             let replace =
               match last with
               | None -> true
               | Some last ->
-                  let last_t, _ = last in
-                  let job_t, _ = job in
+                  let last_transition, _ = last in
                   match
                     Consensus_mechanism.select
                       (Protocol_state.consensus_state
-                         (Inputs.External_transition.protocol_state last_t))
+                         (Inputs.External_transition.protocol_state
+                            last_transition))
                       (Protocol_state.consensus_state
-                         (Inputs.External_transition.protocol_state job_t))
+                         (Inputs.External_transition.protocol_state
+                            current_transition))
                   with
                   | `Keep -> false
                   | `Take -> true
             in
-            match replace with
-            | false -> return last
-            | true ->
-                Option.iter last ~f:(fun (input, ivar) ->
-                    Ivar.fill_if_empty ivar input ) ;
-                let w, this_ivar = Job.run job in
-                let () =
-                  Deferred.upon w.Interruptible.d (function
-                    | Ok [] -> ()
-                    | Ok changes ->
-                        (* TODO fix this *)
-                        Linear_pipe.write_without_pushback mutate_state_writer
-                          (changes, this_input)
-                    | Error () -> () )
-                in
-                return (Some (this_input, this_ivar)) )
+            if replace then (
+              Option.iter last ~f:(fun (input, ivar) ->
+                  Ivar.fill_if_empty ivar input ) ;
+              let w, this_ivar = Job.run job in
+              let () =
+                Deferred.upon w.Interruptible.d (function
+                  | Ok [] -> ()
+                  | Ok changes ->
+                      (* TODO fix this *)
+                      Linear_pipe.write_without_pushback mutate_state_writer
+                        (changes, current_transition)
+                  | Error () -> () )
+              in
+              return (Some (current_transition, this_ivar)) )
+            else return last )
       >>| ignore ) ;
     t
 
