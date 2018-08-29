@@ -4,7 +4,7 @@ open Fold_lib
 
 module type S = sig
   module Local_state : sig
-    type t
+    type t [@@deriving sexp]
   end
 
   module Consensus_transition_data : sig

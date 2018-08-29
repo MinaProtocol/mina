@@ -26,6 +26,7 @@ module type S = sig
   val extend_blockchain :
        t
     -> Blockchain.t
+    -> Consensus_mechanism.Protocol_state.value
     -> Consensus_mechanism.Snark_transition.value
     -> Blockchain.t Deferred.Or_error.t
 end
@@ -44,15 +45,11 @@ struct
 
       val extend_blockchain :
            Blockchain.t
+        -> Consensus_mechanism.Protocol_state.value
         -> Consensus_mechanism.Snark_transition.value
-        -> Blockchain.t Or_error.t
+        -> Blockchain.t
 
       val verify : Consensus_mechanism.Protocol_state.value -> Proof.t -> bool
-
-      val update :
-           Consensus_mechanism.Protocol_state.value
-        -> Consensus_mechanism.Snark_transition.value
-        -> Consensus_mechanism.Protocol_state.value Or_error.t
     end
 
     type init_arg = unit [@@deriving bin_io]
@@ -76,18 +73,13 @@ struct
                                                            Consensus_mechanism)
           module State = Blockchain_state.Make_update (Transaction_snark)
 
-          let update = State.update
-
           let wrap hash proof =
             let module Wrap = Keys.Wrap in
             Tock.prove
               (Tock.Keypair.pk Wrap.keys)
               (Wrap.input ()) {Wrap.Prover_state.proof} Wrap.main (embed hash)
 
-          let extend_blockchain (chain: Blockchain.t)
-              (block: Keys.Consensus_mechanism.Snark_transition.value) =
-            let open Or_error.Let_syntax in
-            let%map next_state = update chain.state block in
+          let extend_blockchain (chain: Blockchain.t) (next_state: Keys.Consensus_mechanism.Protocol_state.value) (block: Keys.Consensus_mechanism.Snark_transition.value) =
             let next_state_top_hash = Keys.Step.instance_hash next_state in
             let prover_state =
               { Keys.Step.Prover_state.prev_proof= chain.proof
@@ -133,30 +125,19 @@ struct
     let extend_blockchain =
       create
         [%bin_type_class
-          : Blockchain.t * Consensus_mechanism.Snark_transition.value]
+          : Blockchain.t * Consensus_mechanism.Protocol_state.value * Consensus_mechanism.Snark_transition.value]
         Blockchain.bin_t
         (fun w
         ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
+        , next_state
         , transition )
         ->
           let%map (module W) = Worker_state.get w in
           if Insecure.extend_blockchain then
             let proof = Precomputed_values.base_proof in
             { Blockchain.proof
-            ; state=
-                Consensus_mechanism.Protocol_state.create_value
-                  ~previous_state_hash:
-                    (Consensus_mechanism.Protocol_state.hash prev_state)
-                  ~blockchain_state:
-                    (Consensus_mechanism.Snark_transition.blockchain_state
-                       transition)
-                  ~consensus_state:
-                    ( Or_error.ok_exn
-                    @@ Consensus_mechanism.update
-                         (Consensus_mechanism.Protocol_state.consensus_state
-                            prev_state)
-                         transition ) }
-          else Or_error.ok_exn (W.extend_blockchain chain transition) )
+            ; state= next_state }
+          else W.extend_blockchain chain next_state transition )
 
     let verify_blockchain =
       create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
@@ -177,7 +158,7 @@ struct
         { initialized: ('w, unit, [`Initialized]) F.t
         ; extend_blockchain:
             ( 'w
-            , Blockchain.t * Consensus_mechanism.Snark_transition.value
+            , Blockchain.t * Consensus_mechanism.Protocol_state.value * Consensus_mechanism.Snark_transition.value
             , Blockchain.t )
             F.t
         ; verify_blockchain: ('w, Blockchain.t, bool) F.t
@@ -233,9 +214,9 @@ struct
   let initialized {connection; _} =
     Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
 
-  let extend_blockchain {connection; _} chain block =
+  let extend_blockchain {connection; _} chain next_state block =
     Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
-      ~arg:(chain, block)
+      ~arg:(chain, next_state, block)
 
   let verify_blockchain {connection; _} chain =
     Worker.Connection.run connection ~f:Worker.functions.verify_blockchain

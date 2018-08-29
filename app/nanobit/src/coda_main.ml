@@ -378,13 +378,15 @@ struct
   module Tip = struct
     type t =
       { protocol_state: Protocol_state.value
+      ; local_state: Consensus_mechanism.Local_state.t option
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving bin_io, sexp]
+    [@@deriving sexp]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
           Consensus_mechanism.External_transition.protocol_state transition
+      ; local_state= None
       ; proof=
           Consensus_mechanism.External_transition.protocol_state_proof
             transition
@@ -635,11 +637,15 @@ struct
     module Compressed_public_key = Public_key.Compressed
 
     module Prover = struct
-      let prove ~prev_state:(old_state, old_proof)
+      let prove
+          ~prev_state
+          ~prev_state_proof
+          ~next_state
           (transition: Init.Consensus_mechanism.Internal_transition.t) =
         let open Deferred.Or_error.Let_syntax in
         Init.Prover.extend_blockchain Init.prover
-          (Init.Blockchain.create ~proof:old_proof ~state:old_state)
+          (Init.Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+          next_state
           (Init.Consensus_mechanism.Internal_transition.snark_transition
              transition)
         >>| fun {Init.Blockchain.proof; _} -> proof

@@ -173,6 +173,8 @@ module type Ledger_builder_controller_intf = sig
 
   type protocol_state
 
+  type local_state
+
   type t
 
   type sync_query
@@ -203,7 +205,7 @@ module type Ledger_builder_controller_intf = sig
     -> (ledger_builder * protocol_state) Deferred.Or_error.t
 
   val strongest_ledgers :
-    t -> (ledger_builder * external_transition) Linear_pipe.Reader.t
+    t -> (ledger_builder * external_transition * local_state) Linear_pipe.Reader.t
 
   val handle_sync_ledger_queries :
     ledger_hash * sync_query -> ledger_hash * sync_answer
@@ -233,11 +235,14 @@ module type Proposer_intf = sig
 
   type protocol_state_proof
 
+  type local_state
+
   type time_controller
 
   module Tip : sig
     type t =
       { protocol_state: protocol_state * protocol_state_proof
+      ; local_state: local_state option
       ; ledger_builder: ledger_builder
       ; transactions: transaction Sequence.t }
   end
@@ -353,6 +358,7 @@ module type Inputs_intf = sig
      and type internal_transition := Consensus_mechanism.Internal_transition.t
      and type external_transition := Consensus_mechanism.External_transition.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type local_state := Consensus_mechanism.Local_state.t
      and type sync_query := Sync_ledger.query
      and type sync_answer := Sync_ledger.answer
      and type ledger_hash := Ledger_hash.t
@@ -365,6 +371,7 @@ module type Inputs_intf = sig
      and type ledger_builder := Ledger_builder.t
      and type transaction := Transaction.With_valid_signature.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type local_state := Consensus_mechanism.Local_state.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
@@ -395,7 +402,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; snark_pool: Snark_pool.t
     ; ledger_builder: Ledger_builder_controller.t
     ; strongest_ledgers:
-        (Ledger_builder.t * Consensus_mechanism.External_transition.t)
+        (Ledger_builder.t * Consensus_mechanism.External_transition.t * Consensus_mechanism.Local_state.t)
         Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs:
@@ -424,7 +431,7 @@ module Make (Inputs : Inputs_intf) = struct
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
 
-  let strongest_ledgers t = Linear_pipe.map t.strongest_ledgers ~f:snd
+  let strongest_ledgers t = Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x, _) -> x)
 
   module Config = struct
     type t =
@@ -452,6 +459,7 @@ module Make (Inputs : Inputs_intf) = struct
                  Ledger_builder.create ~ledger:Genesis.ledger
                    ~self:fee_public_key
              ; protocol_state= Genesis.state
+             ; local_state= None
              ; proof= Genesis.proof }
            ~disk_location:config.ledger_builder_persistant_location
            ~external_transitions:external_transitions_reader)
@@ -488,6 +496,7 @@ module Make (Inputs : Inputs_intf) = struct
      Linear_pipe.write_without_pushback tips_w
        (Proposer.Tip_change
           { protocol_state= (tip.protocol_state, tip.proof)
+          ; local_state= None
           ; transactions= Transaction_pool.transactions transaction_pool
           ; ledger_builder= tip.ledger_builder })) ;
     don't_wait_for
@@ -506,18 +515,19 @@ module Make (Inputs : Inputs_intf) = struct
       Linear_pipe.fork3
         (Ledger_builder_controller.strongest_ledgers ledger_builder)
     in
-    Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
+    Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t, _) ->
         Net.broadcast_state net t ; Deferred.unit )
     |> don't_wait_for ;
     let proposer =
       Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
-        (fun (ledger_builder, transition) ->
+        (fun (ledger_builder, transition, local_state) ->
           Proposer.Tip_change
             { protocol_state=
                 ( Consensus_mechanism.External_transition.protocol_state
                     transition
                 , Consensus_mechanism.External_transition.protocol_state_proof
                     transition )
+            ; local_state= None
             ; ledger_builder
             ; transactions= Transaction_pool.transactions transaction_pool } )
       |> don't_wait_for ;

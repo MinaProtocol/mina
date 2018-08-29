@@ -28,7 +28,7 @@ struct
   module Ledger_builder_diff = Ledger_builder_diff
 
   module Local_state = struct
-    type t = unit
+    type t = unit [@@deriving sexp]
   end
 
   module Consensus_transition_data = struct
@@ -117,44 +117,7 @@ struct
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
-  let verify (transition: Snark_transition.var) =
-    let Consensus_transition_data.({signature}) =
-      Snark_transition.consensus_data transition
-    in
-    let open Snark_params.Tick.Let_syntax in
-    let%bind (module Shifted) =
-      Snark_params.Tick.Inner_curve.Checked.Shifted.create ()
-    in
-    Blockchain_state.Signature.Checked.verifies
-      (module Shifted)
-      signature
-      (Public_key.var_of_t Global_keypair.public_key)
-      (transition |> Snark_transition.blockchain_state)
-
-  let update_var (state: Consensus_state.var) _block =
-    let open Consensus_state in
-    let open Snark_params.Tick.Let_syntax in
-    let%bind length = Length.increment_var state.length in
-    let signer_public_key =
-      Public_key.Compressed.var_of_t
-      @@ Public_key.compress Global_keypair.public_key
-    in
-    let%map () =
-      Public_key.Compressed.assert_equal state.signer_public_key
-        signer_public_key
-    in
-    {length; signer_public_key}
-
-  let update ~previous_consensus_state ~transition:_ ~local_state ~ledger_pool:_ ~ledger:_ =
-    Or_error.return (Some (Consensus_state.update previous_consensus_state, local_state))
-
-  let step = Async_kernel.Deferred.Or_error.return
-
-  let select Consensus_state.({length= l1; _})
-      Consensus_state.({length= l2; _}) =
-    if l1 >= l2 then `Keep else `Take
-
-  let generate_transition ~previous_protocol_state ~blockchain_state ~time:_
+  let generate_transition ~previous_protocol_state ~blockchain_state ~local_state:_ ~time:_
       ~transactions:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
@@ -171,10 +134,44 @@ struct
     let protocol_state =
       Protocol_state.create_value
         ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
+
         ~blockchain_state ~consensus_state
     in
-    (protocol_state, consensus_transition_data)
+    Some (protocol_state, consensus_transition_data)
 
+  let is_transition_valid_checked (transition: Snark_transition.var) =
+    let Consensus_transition_data.({signature}) =
+      Snark_transition.consensus_data transition
+    in
+    let open Snark_params.Tick.Let_syntax in
+    let%bind (module Shifted) =
+      Snark_params.Tick.Inner_curve.Checked.Shifted.create ()
+    in
+    Blockchain_state.Signature.Checked.verifies
+      (module Shifted)
+      signature
+      (Public_key.var_of_t Global_keypair.public_key)
+      (transition |> Snark_transition.blockchain_state)
+
+  let next_state_checked (state: Consensus_state.var) _block =
+    let open Consensus_state in
+    let open Snark_params.Tick.Let_syntax in
+    let%bind length = Length.increment_var state.length in
+    let signer_public_key =
+      Public_key.Compressed.var_of_t
+      @@ Public_key.compress Global_keypair.public_key
+    in
+    let%map () =
+      Public_key.Compressed.assert_equal state.signer_public_key
+        signer_public_key
+    in
+    {length; signer_public_key}
+
+  let update_local_state _ ~previous_consensus_state:_ ~next_consensus_state:_ ~ledger:_ = ()
+
+  let select Consensus_state.({length= l1; _})
+      Consensus_state.({length= l2; _}) =
+    if l1 >= l2 then `Keep else `Take
   let genesis_protocol_state =
     Protocol_state.create_value
       ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)

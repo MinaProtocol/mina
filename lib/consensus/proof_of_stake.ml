@@ -98,7 +98,7 @@ struct
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
-  let genesis_ledger_hash = Ledger.merkle_root genesis_ledger
+  let genesis_ledger_hash = Nanobit_base.Ledger.merkle_root Inputs.genesis_ledger
 
   module Ledger_pool = Rc_pool.Make
       (Nanobit_base.Ledger_hash)
@@ -110,9 +110,10 @@ struct
 
   module Local_state = struct
     type t =
-      { ledger_pool: Ledger_pool.t
-      ; epoch_ledger_hash: Ledger_hash.t option
-      ; next_epoch_ledger_hash: Ledger_hash.t option }
+      { ledger_pool: Ledger_pool.t sexp_opaque
+      ; epoch_ledger_hash: Nanobit_base.Ledger_hash.t option
+      ; next_epoch_ledger_hash: Nanobit_base.Ledger_hash.t option }
+    [@@deriving sexp]
 
     let initialize () =
       { ledger_pool= Ledger_pool.create ()
@@ -127,8 +128,9 @@ struct
               local_state
             else (
               ignore (Option.map local_state.epoch_ledger_hash ~f:(Ledger_pool.free local_state.ledger_pool));
-              { epoch_ledger_hash= local_state.next_epoch_ledger_hash
-              ; next_epoch_ledger_hash= Ledger_pool.save local_state.ledger_pool ledger })
+              { local_state with
+                epoch_ledger_hash= local_state.next_epoch_ledger_hash
+              ; next_epoch_ledger_hash= Some (Ledger_pool.save local_state.ledger_pool ledger) })
   end
 
   module Epoch = struct
@@ -317,24 +319,24 @@ struct
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
-        Amount.add previous_state.total_currency Inputs.coinbase
+        Amount.add previous_consensus_state.total_currency Inputs.coinbase
         |> Option.map ~f:Or_error.return
         |> Option.value
              ~default:(Or_error.error_string "failed to add total_currency")
       in
       let epoch_seed, next_epoch_seed =
-        if transition_data.epoch > previous_state.current_epoch then
-          (previous_state.next_epoch_seed, Epoch_seed.of_hash Epoch_seed.zero)
-        else (previous_state.epoch_seed, previous_state.next_epoch_seed)
+        if consensus_transition_data.epoch > previous_consensus_state.current_epoch then
+          (previous_consensus_state.next_epoch_seed, Epoch_seed.of_hash Epoch_seed.zero)
+        else (previous_consensus_state.epoch_seed, previous_consensus_state.next_epoch_seed)
       in
       let next_epoch_seed =
-        if Epoch.Slot.in_seed_update_range transition_data.slot then
-          Epoch_seed.update next_epoch_seed transition_data.proposer_vrf_result
+        if Epoch.Slot.in_seed_update_range consensus_transition_data.slot then
+          Epoch_seed.update next_epoch_seed consensus_transition_data.proposer_vrf_result
         else next_epoch_seed
       in
-      { length= Length.succ previous_state.length
-      ; current_epoch= transition_data.epoch
-      ; current_slot= transition_data.slot
+      { length= Length.succ previous_consensus_state.length
+      ; current_epoch= consensus_transition_data.epoch
+      ; current_slot= consensus_transition_data.slot
       ; total_currency
       ; epoch_seed
       ; next_epoch_seed }
@@ -485,7 +487,7 @@ struct
   let generate_transition
       ~previous_protocol_state
       ~blockchain_state
-      ~local_state
+      ~local_state:_
       ~time
       ~transactions:_
   =
@@ -500,18 +502,19 @@ struct
       Consensus_transition_data.{epoch; slot; proposer_vrf_result}
     in
     let consensus_state =
-      Or_error.ok_exn
-      @@ Consensus_state.update previous_consensus_state
-           consensus_transition_data
+      Or_error.ok_exn (
+        Consensus_state.update
+          ~previous_consensus_state
+          ~consensus_transition_data)
     in
     let protocol_state =
       Protocol_state.create_value
         ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
         ~blockchain_state ~consensus_state
     in
-    (protocol_state, consensus_transition_data)
+    Some (protocol_state, consensus_transition_data)
 
-  let verify _transition = Snark_params.Tick.(Let_syntax.return Boolean.true_)
+  let is_transition_valid_checked _transition = Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
   let next_state_checked previous_state transition =
     Consensus_state.update_var previous_state
@@ -529,9 +532,9 @@ struct
       ~next_epoch:(next_consensus_state.current_epoch)
       ~ledger
 
-  let select curr cand =
+  let select current candidate =
     let open Consensus_state in
-    if Length.compare curr.length cand.length < 0 then `Take else `Keep
+    if Length.compare current.length candidate.length < 0 then `Take else `Keep
 
   (*
   let select curr cand =
@@ -561,9 +564,7 @@ struct
       Or_error.ok_exn (
         Consensus_state.update
           ~previous_consensus_state:Protocol_state.(consensus_state negative_one)
-          ~consensus_transition_data:Snark_transition.genesis
-          ~epoch_ledger_hash:genesis_ledger_hash
-          ~next_epoch_ledger_hash:genesis_ledger_hash)
+          ~consensus_transition_data:Snark_transition.(consensus_data genesis))
     in
     Protocol_state.create_value
       ~previous_state_hash:(Protocol_state.(hash negative_one))

@@ -445,15 +445,18 @@ module type Tip_intf = sig
 
   type protocol_state_proof
 
+  type local_state
+
   type ledger_builder
 
   type external_transition
 
   type t =
     { protocol_state: protocol_state
+    ; local_state: local_state option
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp]
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 end
@@ -494,6 +497,10 @@ module type Consensus_mechanism_intf = sig
   type ledger_builder_diff
 
   type transaction
+
+  module Local_state : sig
+    type t [@@deriving sexp]
+  end
 
   module Consensus_transition_data : sig
     type value [@@deriving sexp]
@@ -573,9 +580,10 @@ module type Consensus_mechanism_intf = sig
   val generate_transition :
        previous_protocol_state:Protocol_state.value
     -> blockchain_state:blockchain_state
+    -> local_state:Local_state.t
     -> time:Int64.t
     -> transactions:transaction list
-    -> Protocol_state.value * Consensus_transition_data.value
+    -> (Protocol_state.value * Consensus_transition_data.value) option
 end
 
 module type Time_close_validator_intf = sig
@@ -816,6 +824,7 @@ Merge Snark:
     Tip_intf
     with type ledger_builder := Ledger_builder.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type local_state := Consensus_mechanism.Local_state.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := Consensus_mechanism.External_transition.t
 end

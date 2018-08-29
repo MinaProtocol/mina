@@ -7,7 +7,8 @@ module type Inputs_intf = sig
   module Prover : sig
     val prove :
          prev_state:Consensus_mechanism.Protocol_state.value
-                    * Protocol_state_proof.t
+      -> prev_state_proof:Protocol_state_proof.t
+      -> next_state:Consensus_mechanism.Protocol_state.value 
       -> Consensus_mechanism.Internal_transition.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
@@ -26,6 +27,7 @@ module Make (Inputs : Inputs_intf) :
    and type transaction := Inputs.Transaction.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
+   and type local_state := Inputs.Consensus_mechanism.Local_state.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t =
@@ -35,8 +37,6 @@ struct
 
   module External_transition_result : sig
     type t
-
-    val empty : unit -> t
 
     val cancel : t -> unit
 
@@ -55,10 +55,6 @@ struct
       ; result: External_transition.t Deferred.Or_error.t }
     [@@deriving fields]
 
-    let empty () =
-      { cancellation= Ivar.create ()
-      ; result= Deferred.Or_error.error_string "empty" }
-
     let cancel t = Ivar.fill_if_empty t.cancellation ()
 
     let create ~previous_protocol_state ~previous_protocol_state_proof
@@ -70,8 +66,9 @@ struct
           let open Deferred.Or_error.Let_syntax in
           let%map protocol_state_proof =
             Prover.prove
-              ~prev_state:
-                (previous_protocol_state, previous_protocol_state_proof)
+              ~prev_state:previous_protocol_state
+              ~prev_state_proof:previous_protocol_state_proof
+              ~next_state:protocol_state
               internal_transition
           in
           External_transition.create ~protocol_state ~protocol_state_proof
@@ -86,8 +83,9 @@ struct
       {result; cancellation}
   end
 
-  let generate_next_state ~previous_protocol_state ~time_controller
+  let generate_next_state ~previous_protocol_state ~local_state ~time_controller
       ~ledger_builder ~transactions ~get_completed_work =
+    let open Option.Let_syntax in
     let ( diff
         , `Hash_after_applying next_ledger_builder_hash
         , `Ledger_proof ledger_proof_opt ) =
@@ -109,9 +107,12 @@ struct
     let time =
       Time.now time_controller |> Time.to_span_since_epoch |> Time.Span.to_ms
     in
-    let protocol_state, consensus_transition_data =
-      Consensus_mechanism.generate_transition ~previous_protocol_state
-        ~blockchain_state ~time
+    let%map protocol_state, consensus_transition_data =
+      Consensus_mechanism.generate_transition
+        ~previous_protocol_state
+        ~blockchain_state
+        ~local_state
+        ~time
         ~transactions:
           ( diff
               .Ledger_builder_diff.With_valid_signatures_and_proofs.
@@ -136,6 +137,7 @@ struct
     type t =
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
+      ; local_state: Consensus_mechanism.Local_state.t option
       ; ledger_builder: Ledger_builder.t sexp_opaque
       ; transactions: Transaction.With_valid_signature.t Sequence.t }
     [@@deriving sexp_of]
@@ -160,10 +162,13 @@ struct
     let create_result
         { Tip.protocol_state=
             previous_protocol_state, previous_protocol_state_proof
+        ; local_state
         ; transactions
         ; ledger_builder } =
-      let protocol_state, internal_transition =
-        generate_next_state ~previous_protocol_state ~time_controller
+      let open Option.Let_syntax in
+      let%bind local_state = local_state in
+      let%map protocol_state, internal_transition =
+        generate_next_state ~previous_protocol_state ~local_state ~time_controller
           ~ledger_builder ~transactions ~get_completed_work
       in
       let result =
@@ -201,10 +206,11 @@ struct
             ~init:(schedule_transition initial_tip) ~f:
             (fun scheduled_transition (Tip_change tip) ->
               ( match Time.Timeout.peek scheduled_transition with
-              | None ->
-                  Time.Timeout.cancel time_controller scheduled_transition
-                    (External_transition_result.empty ())
-              | Some result -> External_transition_result.cancel result ) ;
+              | None
+              | Some None ->
+                  Time.Timeout.cancel time_controller scheduled_transition None
+              | Some (Some result) ->
+                  External_transition_result.cancel result ) ;
               return (schedule_transition tip) )
           >>| ignore ) ;
     {transitions= r}

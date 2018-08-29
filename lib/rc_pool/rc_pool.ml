@@ -17,6 +17,8 @@ module type S = sig
 
   type t
 
+  val create : ?growth_allowed:bool -> ?size:int -> unit -> t
+
   val save : t -> data -> key
 
   val free : t -> key -> unit
@@ -32,6 +34,8 @@ module Make
   : S with type key := Key.t and type data := Data.t
 = struct
   type t = (Data.t * int) Key.Table.t
+
+  let create = Key.Table.create
 
   let save t data =
     let key = Data.to_key data in
