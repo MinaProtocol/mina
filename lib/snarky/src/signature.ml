@@ -127,7 +127,7 @@ module Schnorr
 
           module Checked : sig
             val equal : var -> var -> (Boolean.var, _) Checked.t
-
+            val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
             module Assert : sig
               val equal : var -> var -> (unit, _) Checked.t
             end
@@ -138,29 +138,11 @@ module Schnorr
 
         type var = Field.Checked.t * Field.Checked.t
 
-        module Checked : sig
-          module Shifted : sig
-            module type S =
-              Curves.Shifted_intf
-              with type curve_var := var
-               and type boolean_var := Boolean.var
-               and type ('a, 'b) checked := ('a, 'b) Checked.t
-          end
-
-          val scale_known :
-               (module Shifted.S with type t = 'shifted)
-            -> t
-            -> Scalar.var
-            -> init:'shifted
-            -> ('shifted, _) Checked.t
-
-          val scale :
-               (module Shifted.S with type t = 'shifted)
-            -> var
-            -> Scalar.var
-            -> init:'shifted
-            -> ('shifted, _) Checked.t
-        end
+        module Checked
+          : Curves.Weierstrass_checked_intf
+            with module Impl := Impl
+             and type t := t
+             and type var := var
 
         val one : t
 
@@ -270,10 +252,10 @@ struct
         (let%bind pre_r =
            (* s * g + h * public_key *)
            let%bind s_g =
-             Curve.Checked.scale_known shifted Curve.one s ~init:Shifted.zero
+             Curve.Checked.scale_known shifted Curve.one (Curve.Scalar.Checked.to_bits s) ~init:Shifted.zero
            in
            let%bind s_g_h_pk =
-             Curve.Checked.scale shifted public_key h ~init:s_g
+             Curve.Checked.scale shifted public_key (Curve.Scalar.Checked.to_bits h) ~init:s_g
            in
            Shifted.unshift_nonzero s_g_h_pk
          in
