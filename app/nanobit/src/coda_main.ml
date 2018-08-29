@@ -158,7 +158,7 @@ module type Config_intf = sig
 
   val fee_public_key : Public_key.Compressed.t
 
-  val genesis_proof : Snark_params.Tock.Tock0.Proof.t
+  val genesis_proof : Snark_params.Tock.Proof.t
 end
 
 module type Init_intf = sig
