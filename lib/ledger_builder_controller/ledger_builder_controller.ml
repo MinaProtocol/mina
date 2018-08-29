@@ -459,14 +459,14 @@ end = struct
               (Protocol_state.consensus_state
                  (Inputs.External_transition.protocol_state current_transition))
           with
-          | `Keep -> `Do_nothing
+          | `Keep -> `Skip
           | `Take -> `Cancel_and_do_next
     in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
             let current_transition, _ = job in
             match replace last job with
-            | `Do_nothing -> return last
+            | `Skip -> return last
             | `Cancel_and_do_next ->
                 Option.iter last ~f:(fun (input, ivar) ->
                     Ivar.fill_if_empty ivar input ) ;
