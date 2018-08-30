@@ -117,7 +117,7 @@ module type Validity_intf = sig
 
   val create : unit -> t
 
-  val set : t -> addr -> hash' -> unit
+  val set : t -> addr -> hash' -> bool
 
   val get : t -> addr -> hash' option
 
@@ -233,7 +233,7 @@ struct
                   "why are we descending into the children of a fresh leaf?"
             | Leaf None ->
                 failwith
-                  "why are we descending into an `Unknown? take care of this \
+                  "why are we descending into the unknown? take care of this \
                    leaf first"
             | Leaf (Some (Stale, l)) ->
                 (* otherwise we'd have to synthesize hashes *)
@@ -241,7 +241,7 @@ struct
                 node := Node ((Stale, l), ref (Leaf None), ref (Leaf None)) ;
                 go node dirs depth
             | Node (_, l, r) ->
-                go (accessor (l, r)) ds (depth + 1) ;
+                let res = go (accessor (l, r)) ds (depth + 1) in
                 match !node with
                 | Node
                     ( (Stale, h)
@@ -252,10 +252,19 @@ struct
                     let mh =
                       Hash.merge ~height:(max 0 (MT.depth - depth - 1)) lh rh
                     in
-                    if Hash.equal mh h then node := Leaf (Some (Fresh, h))
-                    else ()
-                | _ -> () )
-        | [] -> node := Leaf (Some (s, h))
+                    if Hash.equal mh h then (
+                      node := Leaf (Some (Fresh, h)) ;
+                      res )
+                    else res
+                | _ -> res )
+        | [] ->
+            let changed =
+              match !node with
+              | Leaf (Some (s', _)) | Node ((s', _), _, _) -> s = s'
+              | _ -> false
+            in
+            node := Leaf (Some (s, h)) ;
+            changed
       in
       go t (Addr.dirs_from_root a) 0
 
@@ -356,6 +365,12 @@ struct
     Addr.Table.remove t.waiting_content addr ;
     Ok expected
 
+  let validity_changed_at t a =
+    (* TODO : This is probably obnoxiously slow. *)
+    let filter a' = not @@ Addr.is_parent_of a ~maybe_child:a' in
+    Addr.Table.filter_keys_inplace t.waiting_content ~f:filter ;
+    Addr.Table.filter_keys_inplace t.waiting_parents ~f:filter
+
   let add_child_hash_to :
          t
       -> Addr.t
@@ -379,10 +394,12 @@ struct
       (* we check the validity tree first because the underlying MT hashes might not be current *)
       if should_skip then []
       else if Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash then (
-        Valid.set t.validity addr (Fresh, hash) ;
+        if Valid.set t.validity addr (Fresh, hash) then
+          validity_changed_at t addr ;
         [] )
       else (
-        Valid.set t.validity addr (Stale, hash) ;
+        if Valid.set t.validity addr (Stale, hash) then
+          validity_changed_at t addr ;
         [(addr, hash)] )
     in
     match children with
@@ -442,7 +459,7 @@ struct
     then failwith "reported content hash doesn't match desired root hash!" ;
     Addr.Table.clear t.waiting_parents ;
     Addr.Table.clear t.waiting_content ;
-    Valid.set t.validity (Addr.root ()) (Stale, rh) ;
+    Valid.set t.validity (Addr.root ()) (Stale, rh) |> ignore ;
     handle_node t (Addr.root ()) rh
 
   (* Assumption: only ever one answer is received for a given query
@@ -472,7 +489,7 @@ struct
                 failwith "figure out how to handle peers lying" )
           | Contents_are (addr, leafs) ->
               let subtree_hash = add_content t addr leafs |> Or_error.ok_exn in
-              Valid.set t.validity addr (Fresh, subtree_hash)
+              Valid.set t.validity addr (Fresh, subtree_hash) |> ignore
           | Num_accounts (n, h) -> num_accounts t n h
         in
         if Valid.completely_fresh t.validity then all_done t res else res
@@ -483,7 +500,7 @@ struct
     Ivar.fill_if_empty t.validity_listener `Target_changed ;
     t.validity_listener <- Ivar.create () ;
     t.desired_root <- Some h ;
-    Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h) ;
+    Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h) |> ignore ;
     Linear_pipe.write_without_pushback t.queries (h, Num_accounts)
 
   let wait_until_valid t h =
