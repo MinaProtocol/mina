@@ -138,7 +138,7 @@ module type Inputs_intf = sig
       val answer_query : t -> query -> answer
     end
 
-    val create : Ledger.t -> Ledger_hash.t -> t
+    val create : Ledger.t -> t
 
     val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
 
@@ -146,9 +146,7 @@ module type Inputs_intf = sig
 
     val destroy : t -> unit
 
-    val new_goal : t -> Ledger_hash.t -> unit
-
-    val wait_until_valid :
+    val fetch :
       t -> Ledger_hash.t -> [`Ok of Ledger.t | `Target_changed] Deferred.t
   end
 
@@ -665,7 +663,7 @@ let%test_module "test" =
               (Ledger_hash.t * query) Linear_pipe.Reader.t
               * (Ledger_hash.t * query) Linear_pipe.Writer.t }
 
-        let create ledger _goal =
+        let create ledger =
           let t =
             { ledger
             ; answer_pipe= Linear_pipe.create ()
@@ -683,9 +681,7 @@ let%test_module "test" =
 
         let destroy _t = ()
 
-        let new_goal _t _h = ()
-
-        let wait_until_valid t _h = return (`Ok t.ledger)
+        let fetch t _h = return (`Ok t.ledger)
       end
 
       module Store = Storage.Memory
