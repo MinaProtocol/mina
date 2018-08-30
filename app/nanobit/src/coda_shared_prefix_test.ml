@@ -14,14 +14,14 @@ struct
 
   let name = "coda-shared-prefix-test"
 
-  let main () =
+  let main who_proposes () =
     let%bind program_dir = Unix.getcwd () in
     let n = 2 in
     let log = Logger.create () in
     let log = Logger.child log name in
     Coda_processes.init () ;
     Coda_processes.spawn_local_processes_exn n ~program_dir
-      ~should_propose:(fun i -> i = 0)
+      ~should_propose:(fun i -> i = who_proposes)
       ~f:(fun workers ->
         let chains = Array.init (List.length workers) ~f:(fun _ -> []) in
         let check_chains () =
@@ -84,7 +84,9 @@ struct
         return () )
 
   let command =
-    Command.async_spec ~summary:"Test that workers share prefixes"
-      Command.Spec.(empty)
-      main
+    let open Command.Let_syntax in
+    Command.async ~summary:"Test that workers share prefixes"
+      (let%map_open who_proposes =
+        flag "who-proposes" ~doc:"ID node number which will be proposing" (required int) in
+        main who_proposes)
 end
