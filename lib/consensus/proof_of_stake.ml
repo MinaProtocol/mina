@@ -53,6 +53,7 @@ module type Inputs_intf = sig
 end
 
 (* TODO: make a "snarkable" library (or move to snarky) *)
+(*
 module Option = struct
   include Option
   open Snark_params.Tick
@@ -127,6 +128,7 @@ module Option = struct
 
   let length_in_triples sub_length_in_triples = 1 + sub_length_in_triples
 end
+*)
 
 module Segment_id = Nat.Make32 ()
 
@@ -321,7 +323,7 @@ struct
   end
 
   module Consensus_state = struct
-    type ('length, 'epoch, 'slot, 'amount, 'epoch_seed, 'protocol_state_hash, 'protocol_state_hash_option) t =
+    type ('length, 'epoch, 'slot, 'amount, 'epoch_seed, 'protocol_state_hash) t =
       { length: 'length
       ; current_epoch: 'epoch
       ; current_slot: 'slot
@@ -329,14 +331,14 @@ struct
       ; epoch_seed: 'epoch_seed
       ; next_epoch_seed: 'epoch_seed
       ; epoch_start_checkpoint: 'protocol_state_hash
-      ; epoch_lock_checkpoint: 'protocol_state_hash_option
+      ; epoch_lock_checkpoint: 'protocol_state_hash
       ; next_epoch_start_checkpoint: 'protocol_state_hash
-      ; next_epoch_lock_checkpoint: 'protocol_state_hash_option
+      ; next_epoch_lock_checkpoint: 'protocol_state_hash
       ; epoch_length: 'length
       ; next_epoch_length: 'length }
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    type value = (Length.t, Epoch.t, Epoch.Slot.t, Amount.t, Epoch_seed.t, Nanobit_base.State_hash.t, Nanobit_base.State_hash.t Option.t) t
+    type value = (Length.t, Epoch.t, Epoch.Slot.t, Amount.t, Epoch_seed.t, Nanobit_base.State_hash.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var =
@@ -345,8 +347,7 @@ struct
       , Epoch.Slot.Unpacked.var
       , Amount.var
       , Epoch_seed.var
-      , Nanobit_base.State_hash.var
-      , Nanobit_base.State_hash.var Option.var )
+      , Nanobit_base.State_hash.var )
       t
 
     let genesis : value =
@@ -359,9 +360,9 @@ struct
       ; epoch_seed= Epoch_seed.of_hash Epoch_seed.zero
       ; next_epoch_seed= Epoch_seed.of_hash Epoch_seed.zero
       ; epoch_start_checkpoint= Nanobit_base.State_hash.of_hash Nanobit_base.State_hash.zero
-      ; epoch_lock_checkpoint= None
+      ; epoch_lock_checkpoint= Nanobit_base.State_hash.of_hash Nanobit_base.State_hash.zero
       ; next_epoch_start_checkpoint= Nanobit_base.State_hash.of_hash Nanobit_base.State_hash.zero
-      ; next_epoch_lock_checkpoint= None
+      ; next_epoch_lock_checkpoint= Nanobit_base.State_hash.of_hash Nanobit_base.State_hash.zero
       ; epoch_length= Length.zero
       ; next_epoch_length= Length.zero }
 
@@ -401,14 +402,14 @@ struct
              -> 'epoch_seed
              -> 'epoch_seed
              -> 'protocol_state_hash
-             -> 'protocol_state_hash_option
              -> 'protocol_state_hash
-             -> 'protocol_state_hash_option
+             -> 'protocol_state_hash
+             -> 'protocol_state_hash
              -> 'length
              -> 'length
              -> unit )
            Nanobit_base.H_list.t
-        -> ('length, 'epoch, 'slot, 'amount, 'epoch_seed, 'protocol_state_hash, 'protocol_state_hash_option) t =
+        -> ('length, 'epoch, 'slot, 'amount, 'epoch_seed, 'protocol_state_hash) t =
      fun Nanobit_base.H_list.([ length
                               ; current_epoch
                               ; current_slot
@@ -443,9 +444,9 @@ struct
       ; Epoch_seed.typ
       ; Epoch_seed.typ
       ; Nanobit_base.State_hash.typ
-      ; Option.typ Nanobit_base.State_hash.typ Nanobit_base.State_hash.(of_hash zero)
       ; Nanobit_base.State_hash.typ
-      ; Option.typ Nanobit_base.State_hash.typ Nanobit_base.State_hash.(of_hash zero)
+      ; Nanobit_base.State_hash.typ
+      ; Nanobit_base.State_hash.typ
       ; Length.Unpacked.typ
       ; Length.Unpacked.typ ]
 
@@ -471,9 +472,9 @@ struct
       let%map epoch_seed_triples = Epoch_seed.var_to_triples epoch_seed
       and next_epoch_seed_triples = Epoch_seed.var_to_triples next_epoch_seed
       and epoch_start_checkpoint_triples = Nanobit_base.State_hash.var_to_triples epoch_start_checkpoint
-      and epoch_lock_checkpoint_triples = Option.var_to_triples Nanobit_base.State_hash.var_to_triples epoch_lock_checkpoint
+      and epoch_lock_checkpoint_triples = Nanobit_base.State_hash.var_to_triples epoch_lock_checkpoint
       and next_epoch_start_checkpoint_triples = Nanobit_base.State_hash.var_to_triples next_epoch_start_checkpoint
-      and next_epoch_lock_checkpoint_triples = Option.var_to_triples Nanobit_base.State_hash.var_to_triples next_epoch_lock_checkpoint
+      and next_epoch_lock_checkpoint_triples = Nanobit_base.State_hash.var_to_triples next_epoch_lock_checkpoint
       in
       Length.Unpacked.var_to_triples length
       @ Epoch.Unpacked.var_to_triples current_epoch
@@ -509,9 +510,9 @@ struct
       +> Epoch_seed.fold epoch_seed
       +> Epoch_seed.fold next_epoch_seed
       +> Nanobit_base.State_hash.fold epoch_start_checkpoint
-      +> Option.fold Nanobit_base.State_hash.fold epoch_lock_checkpoint
+      +> Nanobit_base.State_hash.fold epoch_lock_checkpoint
       +> Nanobit_base.State_hash.fold next_epoch_start_checkpoint
-      +> Option.fold Nanobit_base.State_hash.fold next_epoch_lock_checkpoint
+      +> Nanobit_base.State_hash.fold next_epoch_lock_checkpoint
       +> Length.fold epoch_length
       +> Length.fold next_epoch_length
 
@@ -523,9 +524,9 @@ struct
       + Epoch_seed.length_in_triples
       + Epoch_seed.length_in_triples
       + Nanobit_base.State_hash.length_in_triples
-      + Option.length_in_triples Nanobit_base.State_hash.length_in_triples
       + Nanobit_base.State_hash.length_in_triples
-      + Option.length_in_triples Nanobit_base.State_hash.length_in_triples
+      + Nanobit_base.State_hash.length_in_triples
+      + Nanobit_base.State_hash.length_in_triples
       + Length.length_in_triples
       + Length.length_in_triples
   end
@@ -571,7 +572,7 @@ struct
         , prev_state.next_epoch_start_checkpoint
         , prev_state.next_epoch_lock_checkpoint
         , Protocol_state.hash prev_protocol_state
-        , None
+        , Nanobit_base.State_hash.(of_hash zero) 
         , prev_state.next_epoch_length
         , Length.zero )
       else
@@ -587,7 +588,7 @@ struct
     let next_epoch_seed, next_epoch_lock_checkpoint =
       if Epoch.Slot.in_seed_update_range transition_data.slot then
         ( Epoch_seed.update next_epoch_seed transition_data.proposer_vrf_result
-        , Some (Protocol_state.hash prev_protocol_state) )
+        , Protocol_state.hash prev_protocol_state )
       else
         (next_epoch_seed, next_epoch_lock_checkpoint)
     in
@@ -628,9 +629,10 @@ struct
       (Snark_transition.consensus_data transition) 
       (Snark_transition.blockchain_state transition)
 
-  let update_var previous_state transition =
+  let update_var previous_state previous_state_hash transition =
     let open Snark_params.Tick.Let_syntax in
     let open Consensus_state in
+    let open Consensus_transition_data in
     let transition_data = Snark_transition.consensus_data transition in
     let%bind length = Length.increment_var previous_state.length
     (* TODO: keep track of total_currency in transaction snark. The current_slot
@@ -639,7 +641,16 @@ struct
     and total_currency =
       Amount.Checked.add previous_state.total_currency
         (Amount.var_of_t Inputs.coinbase)
-    and epoch_seed, next_epoch_seed =
+    and
+      ( epoch_seed
+      , next_epoch_seed
+      , epoch_start_checkpoint
+      , epoch_lock_checkpoint
+      , next_epoch_start_checkpoint
+      , next_epoch_lock_checkpoint
+      , epoch_length
+      , next_epoch_length )
+    =
       let%bind epoch_changed =
         Epoch.compare_var previous_state.current_epoch transition_data.epoch
         >>| fun c -> c.less
@@ -649,27 +660,72 @@ struct
           ~else_:previous_state.epoch_seed
       and next_epoch_seed =
         Epoch_seed.if_ epoch_changed
-          ~then_:(Epoch_seed.var_of_t @@ Epoch_seed.of_hash Epoch_seed.zero)
+          ~then_:(Epoch_seed.var_of_t (Epoch_seed.of_hash Epoch_seed.zero))
           ~else_:previous_state.next_epoch_seed
+      and epoch_start_checkpoint =
+        Nanobit_base.State_hash.if_ epoch_changed
+          ~then_:previous_state.next_epoch_start_checkpoint
+          ~else_:previous_state.epoch_start_checkpoint
+      and epoch_lock_checkpoint =
+        Nanobit_base.State_hash.if_ epoch_changed
+          ~then_:previous_state.next_epoch_lock_checkpoint
+          ~else_:previous_state.epoch_lock_checkpoint
+      and next_epoch_start_checkpoint =
+        Nanobit_base.State_hash.if_ epoch_changed
+          ~then_:previous_state_hash
+          ~else_:previous_state.next_epoch_start_checkpoint
+      and next_epoch_lock_checkpoint =
+        Nanobit_base.State_hash.if_ epoch_changed
+          ~then_:Nanobit_base.State_hash.(var_of_t @@ of_hash Snark_params.Tick.Pedersen.zero_hash)
+          ~else_:previous_state.next_epoch_lock_checkpoint
+      and epoch_length =
+        Length.if_ epoch_changed
+          ~then_:previous_state.next_epoch_length
+          ~else_:previous_state.epoch_length
+      and next_epoch_length =
+        Length.if_ epoch_changed
+          ~then_:(Length.Unpacked.var_of_value Length.zero)
+          ~else_:previous_state.next_epoch_length
       in
-      (epoch_seed, next_epoch_seed)
+      ( epoch_seed
+      , next_epoch_seed
+      , epoch_start_checkpoint
+      , epoch_lock_checkpoint
+      , next_epoch_start_checkpoint
+      , next_epoch_lock_checkpoint
+      , epoch_length
+      , next_epoch_length )
     in
-    let%map next_epoch_seed =
+    let%map next_epoch_seed, next_epoch_lock_checkpoint =
       let%bind updated_next_epoch_seed =
         Epoch_seed.update_var next_epoch_seed
           transition_data.proposer_vrf_result
       and in_seed_update_range =
         Epoch.Slot.in_seed_update_range_var transition_data.slot
       in
-      Epoch_seed.if_ in_seed_update_range ~then_:updated_next_epoch_seed
-        ~else_:next_epoch_seed
+      let%map next_epoch_seed =
+        Epoch_seed.if_ in_seed_update_range
+          ~then_:updated_next_epoch_seed
+          ~else_:next_epoch_seed
+      and next_epoch_lock_checkpoint =
+        Nanobit_base.State_hash.if_ in_seed_update_range
+          ~then_:previous_state_hash
+          ~else_:next_epoch_lock_checkpoint
+      in
+      (next_epoch_seed, next_epoch_lock_checkpoint)
     in
     { length
     ; current_epoch= transition_data.epoch
     ; current_slot= transition_data.slot
     ; total_currency
     ; epoch_seed
-    ; next_epoch_seed }
+    ; next_epoch_seed
+    ; epoch_start_checkpoint
+    ; epoch_lock_checkpoint
+    ; next_epoch_start_checkpoint
+    ; next_epoch_lock_checkpoint
+    ; epoch_length
+    ; next_epoch_length }
 
 
   let step = Async_kernel.Deferred.Or_error.return
@@ -702,13 +758,6 @@ struct
     *)
 
   let genesis_protocol_state =
-    Protocol_state.create_value
-      ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)
-      ~blockchain_state:
-        (Snark_transition.genesis |> Snark_transition.blockchain_state)
-      ~consensus_state:
-        ( Or_error.ok_exn
-        @@ update
-             (Protocol_state.consensus_state Protocol_state.negative_one)
-             Snark_transition.genesis )
+    Or_error.ok_exn (
+      update Protocol_state.negative_one Snark_transition.genesis)
 end

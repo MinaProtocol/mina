@@ -110,8 +110,10 @@ struct
       Time.now time_controller |> Time.to_span_since_epoch |> Time.Span.to_ms
     in
     let protocol_state, consensus_transition_data =
-      Consensus_mechanism.generate_transition ~previous_protocol_state
-        ~blockchain_state ~time
+      Consensus_mechanism.generate_transition
+        ~previous_state:previous_protocol_state
+        ~blockchain_state
+        ~time
         ~transactions:
           ( diff
               .Ledger_builder_diff.With_valid_signatures_and_proofs.

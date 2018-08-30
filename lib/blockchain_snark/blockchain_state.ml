@@ -65,15 +65,7 @@ struct
                       ~fee_excess:Currency.Amount.Signed.zero ~proof))
                 "Proof did not verify"
       in
-      let%map consensus_state =
-        Consensus_mechanism.update
-          (Protocol_state.consensus_state state)
-          transition
-      in
-      Protocol_state.create_value
-        ~previous_state_hash:(Protocol_state.hash state)
-        ~blockchain_state:(Snark_transition.blockchain_state transition)
-        ~consensus_state
+      Consensus_mechanism.update state transition
 
     module Checked = struct
       (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
@@ -131,6 +123,7 @@ struct
            let%bind consensus_state =
              Consensus_mechanism.update_var
                (Protocol_state.consensus_state previous_state)
+               previous_state_hash
                transition
            in
            let new_state =

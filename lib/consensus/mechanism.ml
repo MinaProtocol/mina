@@ -49,12 +49,13 @@ module type S = sig
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
 
   val update :
-       Consensus_state.value
+       Protocol_state.value
     -> Snark_transition.value
-    -> Consensus_state.value Or_error.t
+    -> Protocol_state.value Or_error.t
 
   val update_var :
        Consensus_state.var
+    -> Nanobit_base.State_hash.var
     -> Snark_transition.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
 
@@ -65,7 +66,7 @@ module type S = sig
   val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
 
   val generate_transition :
-       previous_protocol_state:Protocol_state.value
+       previous_state:Protocol_state.value
     -> blockchain_state:Nanobit_base.Blockchain_state.value
     -> time:Int64.t
     -> transactions:Nanobit_base.Transaction.t list
