@@ -5,6 +5,8 @@ open Fold_lib
 module type S = sig
   module Local_state : sig
     type t [@@deriving sexp]
+
+    val create : unit -> t
   end
 
   module Consensus_transition_data : sig
@@ -62,6 +64,7 @@ module type S = sig
     -> local_state:Local_state.t
     -> time:Int64.t
     -> transactions:Nanobit_base.Transaction.t list
+    -> ledger:Nanobit_base.Ledger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
 
   (**
@@ -79,19 +82,6 @@ module type S = sig
        Consensus_state.var
     -> Snark_transition.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
-
-  (**
-   * Update the local state of a ledger builder controller tip given a
-   * previous local state (if there is one), a previous consensus state,
-   * a new consensus state, and the new ledger. The current local state may
-   * not exist.
-   *)
-  val update_local_state :
-       Local_state.t option
-    -> previous_consensus_state:Consensus_state.value
-    -> next_consensus_state:Consensus_state.value
-    -> ledger:Nanobit_base.Ledger.t
-    -> Local_state.t
 
   (**
    * Select between two ledger builder controller tips given the consensus

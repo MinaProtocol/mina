@@ -29,6 +29,8 @@ struct
 
   module Local_state = struct
     type t = unit [@@deriving sexp]
+
+    let create () = ()
   end
 
   module Consensus_transition_data = struct
@@ -117,8 +119,7 @@ struct
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
-  let generate_transition ~previous_protocol_state ~blockchain_state ~local_state:_ ~time:_
-      ~transactions:_ =
+  let generate_transition ~previous_protocol_state ~blockchain_state ~local_state:_ ~time:_ ~transactions:_ ~ledger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in

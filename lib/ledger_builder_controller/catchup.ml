@@ -36,12 +36,6 @@ module type Inputs_intf = sig
     type t
   end
 
-  module Consensus_mechanism : sig
-    module Local_state : sig
-      type t
-    end
-  end
-
   module Protocol_state : sig
     type value
   end
@@ -61,7 +55,6 @@ module type Inputs_intf = sig
     with type ledger_builder := Ledger_builder.t
      and type protocol_state := Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
-     and type local_state := Consensus_mechanism.Local_state.t
      and type external_transition := External_transition.t
 
   module Transition_logic_state :

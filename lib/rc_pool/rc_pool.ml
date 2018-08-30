@@ -19,7 +19,7 @@ module type S = sig
 
   val create : ?growth_allowed:bool -> ?size:int -> unit -> t
 
-  val save : t -> data -> key
+  val save : t -> data -> unit
 
   val free : t -> key -> unit
 
@@ -41,8 +41,7 @@ module Make
     let key = Data.to_key data in
     Key.Table.change t key ~f:(function
       | None        -> Some (Data.copy data, 1)
-      | Some (d, n) -> Some (d, n));
-    key
+      | Some (d, n) -> Some (d, n))
 
   let free t key =
     Key.Table.change t key ~f:(function

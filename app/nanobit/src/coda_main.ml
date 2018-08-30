@@ -378,7 +378,6 @@ struct
   module Tip = struct
     type t =
       { protocol_state: Protocol_state.value
-      ; local_state: Consensus_mechanism.Local_state.t option
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
     [@@deriving sexp]
@@ -386,7 +385,6 @@ struct
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
           Consensus_mechanism.External_transition.protocol_state transition
-      ; local_state= None
       ; proof=
           Consensus_mechanism.External_transition.protocol_state_proof
             transition

@@ -445,15 +445,12 @@ module type Tip_intf = sig
 
   type protocol_state_proof
 
-  type local_state
-
   type ledger_builder
 
   type external_transition
 
   type t =
     { protocol_state: protocol_state
-    ; local_state: local_state option
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
   [@@deriving sexp]
@@ -498,8 +495,12 @@ module type Consensus_mechanism_intf = sig
 
   type transaction
 
+  type ledger
+
   module Local_state : sig
     type t [@@deriving sexp]
+
+    val create : unit -> t
   end
 
   module Consensus_transition_data : sig
@@ -583,6 +584,7 @@ module type Consensus_mechanism_intf = sig
     -> local_state:Local_state.t
     -> time:Int64.t
     -> transactions:transaction list
+    -> ledger:ledger
     -> (Protocol_state.value * Consensus_transition_data.value) option
 end
 
@@ -819,12 +821,12 @@ Merge Snark:
      and type proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
      and type transaction := Transaction.t
+     and type ledger := Ledger.t
 
   module Tip :
     Tip_intf
     with type ledger_builder := Ledger_builder.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type local_state := Consensus_mechanism.Local_state.t
      and type protocol_state_proof := Protocol_state_proof.t
      and type external_transition := Consensus_mechanism.External_transition.t
 end

@@ -70,22 +70,11 @@ module type Inputs_intf = sig
   end
 
   module Consensus_mechanism : sig
-    module Local_state : sig
-      type t
-    end
-
     module Consensus_state : sig
       type value
     end
 
     (* This checks the SNARKs in State/LB and does the transition *)
-
-    val update_local_state :
-         Local_state.t option
-      -> previous_consensus_state:Consensus_state.value
-      -> next_consensus_state:Consensus_state.value
-      -> ledger:Ledger.t
-      -> Local_state.t
 
     val select :
       Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
@@ -126,7 +115,6 @@ module type Inputs_intf = sig
     with type ledger_builder := Ledger_builder.t
      and type protocol_state := Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
-     and type local_state := Consensus_mechanism.Local_state.t
      and type external_transition := External_transition.t
 
   module Valid_transaction : sig
@@ -179,7 +167,6 @@ module Make (Inputs : Inputs_intf) : sig
            and type ledger_proof := Inputs.Ledger_builder.proof
            and type net := Inputs.Net.net
            and type protocol_state := Inputs.Protocol_state.value
-           and type local_state := Inputs.Consensus_mechanism.Local_state.t
            and type ledger_hash := Inputs.Ledger_hash.t
            and type sync_query := Inputs.Sync_ledger.query
            and type sync_answer := Inputs.Sync_ledger.answer
@@ -266,16 +253,8 @@ end = struct
           then Deferred.return (Ok ())
           else Deferred.Or_error.error_string "TODO: Punish"
         in
-        let local_state =
-          Consensus_mechanism.update_local_state
-            tip.local_state
-            ~previous_consensus_state:(Protocol_state.consensus_state old_state)
-            ~next_consensus_state:(Protocol_state.consensus_state new_state)
-            ~ledger:(Ledger_builder.ledger tip.ledger_builder)
-        in
         { tip with
           protocol_state= new_state
-        ; local_state= Some local_state
         ; proof= External_transition.protocol_state_proof transition }
     end
 
@@ -357,7 +336,7 @@ end = struct
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; mutable handler: Transition_logic.t
-    ; strongest_ledgers: (Ledger_builder.t * External_transition.t * Consensus_mechanism.Local_state.t) Linear_pipe.Reader.t }
+    ; strongest_ledgers: (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
 
   let transition_tree t =
     let state = Transition_logic.state t.handler in
@@ -405,9 +384,8 @@ end = struct
                     |> Tip.state ))
              then
                let tip = Transition_logic_state.longest_branch_tip new_state in
-               let local_state = Option.value_exn ~message:"cannot write tip with empty local state" tip.local_state in
                Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-                 strongest_ledgers_reader (tip.ledger_builder, transition, local_state) ) ;
+                 strongest_ledgers_reader (tip.ledger_builder, transition) ) ;
            Deferred.return () ) ) ;
     (* Handle new transitions *)
     let possibly_jobs =
@@ -558,10 +536,7 @@ let%test_module "test" =
       end
 
       module Consensus_mechanism = struct
-        module Local_state = struct type t = unit [@@deriving bin_io, sexp] end
         module Consensus_state = Consensus_mechanism_state
-
-        let update_local_state _ ~previous_consensus_state:_ ~next_consensus_state:_ ~ledger:_ = ()
 
         let select Consensus_state.({strength= s1})
             Consensus_state.({strength= s2}) =
@@ -571,14 +546,12 @@ let%test_module "test" =
       module Tip = struct
         type t =
           { protocol_state: Protocol_state.value
-          ; local_state: Consensus_mechanism.Local_state.t option
           ; proof: Protocol_state_proof.t
           ; ledger_builder: Ledger_builder.t }
         [@@deriving bin_io, sexp, fields]
 
         let of_transition_and_lb transition ledger_builder =
           { protocol_state= External_transition.protocol_state transition
-          ; local_state= None
           ; proof= External_transition.protocol_state_proof transition
           ; ledger_builder }
       end
@@ -674,7 +647,6 @@ let%test_module "test" =
              ~f:Inputs.External_transition.of_state)
         ~genesis_tip:
           { protocol_state= Inputs.Protocol_state.genesis
-          ; local_state= None
           ; proof= ()
           ; ledger_builder= Inputs.Ledger_builder.create 0 }
         ~disk_location:"/tmp/test_lbc_disk"
@@ -700,7 +672,7 @@ let%test_module "test" =
             let%bind lbc = lbc_deferred in
             let%map results =
               take_map (Lbc.strongest_ledgers lbc) (List.length expected) ~f:
-                (fun (lb, _, _) -> !lb )
+                (fun (lb, _) -> !lb )
             in
             assert (List.equal results expected ~equal:Int.equal) )
       in

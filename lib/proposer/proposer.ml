@@ -27,7 +27,6 @@ module Make (Inputs : Inputs_intf) :
    and type transaction := Inputs.Transaction.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
-   and type local_state := Inputs.Consensus_mechanism.Local_state.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t =
@@ -118,6 +117,7 @@ struct
               .Ledger_builder_diff.With_valid_signatures_and_proofs.
                transactions
             :> Transaction.t list )
+        ~ledger:(Ledger_builder.ledger ledger_builder)
     in
     let snark_transition =
       Snark_transition.create_value
@@ -137,7 +137,6 @@ struct
     type t =
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
-      ; local_state: Consensus_mechanism.Local_state.t option
       ; ledger_builder: Ledger_builder.t sexp_opaque
       ; transactions: Transaction.With_valid_signature.t Sequence.t }
     [@@deriving sexp_of]
@@ -159,14 +158,13 @@ struct
           Logger.error logger "%s\n"
             Error.(to_string_hum (tag e ~tag:"signer"))
     in
+    let local_state = Consensus_mechanism.Local_state.create () in
     let create_result
         { Tip.protocol_state=
             previous_protocol_state, previous_protocol_state_proof
-        ; local_state
         ; transactions
         ; ledger_builder } =
       let open Option.Let_syntax in
-      let%bind local_state = local_state in
       let%map protocol_state, internal_transition =
         generate_next_state ~previous_protocol_state ~local_state ~time_controller
           ~ledger_builder ~transactions ~get_completed_work
