@@ -354,9 +354,8 @@ module Make (Inputs : Inputs_intf) = struct
           with
           | Some answer ->
               (* TODO *)
-              if Pipe.is_closed response_writer then Deferred.unit
-              else Linear_pipe.write response_writer answer
-          | None -> Deferred.return () )
+              Linear_pipe.write_if_open response_writer answer
+          | None -> Deferred.unit )
       |> don't_wait_for
   end
 end

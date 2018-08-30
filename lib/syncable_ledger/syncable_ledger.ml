@@ -81,7 +81,7 @@ module type S = sig
     val answer_query : t -> query -> answer
   end
 
-  val create : merkle_tree -> root_hash -> t
+  val create : merkle_tree -> t
 
   val answer_writer : t -> (root_hash * answer) Linear_pipe.Writer.t
 
@@ -92,6 +92,9 @@ module type S = sig
   val new_goal : t -> root_hash -> unit
 
   val wait_until_valid :
+    t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
+
+  val fetch :
     t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
 
   val apply_or_queue_diff : t -> diff -> unit
@@ -112,7 +115,7 @@ module type Validity_intf = sig
 
   type hash' = hash_status * hash
 
-  val create : hash -> t
+  val create : unit -> t
 
   val set : t -> addr -> hash' -> unit
 
@@ -215,7 +218,7 @@ struct
 
     type t = tree ref [@@deriving sexp]
 
-    let create h = ref (Leaf (Some (Stale, h)))
+    let create () = ref (Leaf None)
 
     let set t a (s, h) =
       let rec go node dirs depth =
@@ -314,7 +317,7 @@ struct
   type waiting = {expected: Hash.t; children: (Addr.t * Hash.t) list}
 
   type t =
-    { mutable desired_root: Root_hash.t
+    { mutable desired_root: Root_hash.t option
     ; tree: MT.t
     ; mutable validity: Valid.t
     ; answers: (Root_hash.t * answer) Linear_pipe.Reader.t
@@ -324,6 +327,8 @@ struct
     ; waiting_parents: waiting Addr.Table.t
     ; waiting_content: Hash.t Addr.Table.t
     ; mutable validity_listener: [`Ok | `Target_changed] Ivar.t }
+
+  let desired_root_exn {desired_root; _} = desired_root |> Option.value_exn
 
   let destroy t =
     Linear_pipe.close_read t.answers ;
@@ -395,7 +400,7 @@ struct
     | _ -> `More
 
   let all_done t res =
-    if not (Root_hash.equal (MT.merkle_root t.tree) t.desired_root) then
+    if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
     else (
       destroy t ;
@@ -422,16 +427,16 @@ struct
     if Addr.depth addr >= MT.depth - Subtree_height.subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback t.queries
-        (t.desired_root, What_contents addr) )
+        (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
       Linear_pipe.write_without_pushback t.queries
-        (t.desired_root, What_hash (Addr.child_exn addr Direction.Left)) ;
+        (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Left)) ;
       Linear_pipe.write_without_pushback t.queries
-        (t.desired_root, What_hash (Addr.child_exn addr Direction.Right)) )
+        (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
 
   let num_accounts t n content_hash =
-    let rh = Root_hash.to_hash t.desired_root in
+    let rh = Root_hash.to_hash (desired_root_exn t) in
     let height = Int.ceil_log2 n in
     if not (Hash.equal (complete_with_empties content_hash height MT.depth) rh)
     then failwith "reported content hash doesn't match desired root hash!" ;
@@ -446,7 +451,7 @@ struct
      node to never be verified *)
   let main_loop t =
     let handle_answer (root_hash, a) =
-      if not (Root_hash.equal root_hash t.desired_root) then ()
+      if not (Root_hash.equal root_hash (desired_root_exn t)) then ()
       else
         let res =
           match a with
@@ -477,18 +482,26 @@ struct
   let new_goal t h =
     Ivar.fill_if_empty t.validity_listener `Target_changed ;
     t.validity_listener <- Ivar.create () ;
-    t.desired_root <- h ;
+    t.desired_root <- Some h ;
+    Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h) ;
     Linear_pipe.write_without_pushback t.queries (h, Num_accounts)
 
-  let create mt h =
+  let wait_until_valid t h =
+    if not (Root_hash.equal h (desired_root_exn t)) then return `Target_changed
+    else
+      Deferred.map (Ivar.read t.validity_listener) ~f:(function
+        | `Target_changed -> `Target_changed
+        | `Ok -> `Ok t.tree )
+
+  let fetch t rh = new_goal t rh ; wait_until_valid t rh
+
+  let create mt =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
-      { desired_root= h
+      { desired_root= None
       ; tree= mt
-      ; validity=
-          Valid.create (Root_hash.to_hash h)
-          (* this gets tossed and remade when we hear Num_accounts *)
+      ; validity= Valid.create ()
       ; answers= ar
       ; answer_writer= aw
       ; queries= qw
@@ -497,16 +510,8 @@ struct
       ; waiting_content= Addr.Table.create ()
       ; validity_listener= Ivar.create () }
     in
-    new_goal t h ;
     don't_wait_for (main_loop t) ;
     t
-
-  let wait_until_valid t h =
-    if not (Root_hash.equal h t.desired_root) then return `Target_changed
-    else
-      Deferred.map (Ivar.read t.validity_listener) ~f:(function
-        | `Target_changed -> `Target_changed
-        | `Ok -> `Ok t.tree )
 
   let apply_or_queue_diff _ _ =
     (* Need some interface for the diffs, not sure the layering is right here. *)
