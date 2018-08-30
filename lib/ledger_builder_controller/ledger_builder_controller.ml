@@ -434,18 +434,23 @@ end = struct
     in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
-            Option.iter last ~f:(fun (input, ivar) ->
-                Ivar.fill_if_empty ivar input ) ;
-            let this_input, _ = job in
-            let w, this_ivar = Job.run job in
-            let%bind () =
-              Deferred.bind w.Interruptible.d ~f:(function
-                | Ok [] -> return ()
-                | Ok changes ->
-                    Linear_pipe.write mutate_state_writer (changes, this_input)
-                | Error () -> return () )
-            in
-            return (Some (this_input, this_ivar)) )
+            let current_transition, _ = job in
+            match replace last job with
+            | `Skip -> return last
+            | `Cancel_and_do_next ->
+                Option.iter last ~f:(fun (input, ivar) ->
+                    Ivar.fill_if_empty ivar input ) ;
+                let w, this_ivar = Job.run job in
+                let () =
+                  Deferred.upon w.Interruptible.d (function
+                    | Ok [] -> ()
+                    | Ok changes ->
+                        (* TODO fix this *)
+                        Linear_pipe.write_without_pushback mutate_state_writer
+                          (changes, current_transition)
+                    | Error () -> () )
+                in
+                return (Some (current_transition, this_ivar)) )
       >>| ignore ) ;
     t
 
