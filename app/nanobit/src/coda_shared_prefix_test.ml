@@ -21,7 +21,7 @@ struct
     let log = Logger.child log name in
     Coda_processes.init () ;
     Coda_processes.spawn_local_processes_exn n ~program_dir
-      ~should_propose:(fun i -> i = 1)
+      ~should_propose:(fun i -> i = 0)
       ~f:(fun workers ->
         let chains = Array.init (List.length workers) ~f:(fun _ -> []) in
         let check_chains () =
@@ -49,8 +49,8 @@ struct
             !"lengths: %{sexp: int list} shared_prefix: %{sexp: string \
               option} shared_prefix_dist: %d"
             lengths newest_shared shared_prefix_dist ;
-          assert (shared_prefix_dist <= 1) ;
-          if Array.fold ~init:0 (Array.map chains List.length) ~f:Int.max > 20
+          assert (shared_prefix_dist <= 5) ;
+          if Array.fold ~init:0 (Array.map chains List.length) ~f:Int.max > 30
           then exit 0
           else Deferred.unit
         in
