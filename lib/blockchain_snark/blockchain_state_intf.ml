@@ -7,13 +7,6 @@ module type S = sig
   module Consensus_mechanism : Consensus.Mechanism.S
 
   module type Update_intf = sig
-    (*
-    val update :
-         Consensus_mechanism.Protocol_state.value
-      -> Consensus_mechanism.Snark_transition.value
-      -> Consensus_mechanism.Protocol_state.value Or_error.t
-       *)
-
     module Checked : sig
       val update :
            State_hash.var * Consensus_mechanism.Protocol_state.var
