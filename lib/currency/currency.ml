@@ -121,6 +121,8 @@ module type Checked_arithmetic_intf = sig
 
   type signed_var
 
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
   val add : var -> var -> (var, _) Checked.t
 
   val sub : var -> var -> (var, _) Checked.t
@@ -368,6 +370,10 @@ end = struct
   end
 
   module Checked = struct
+    let if_ cond ~then_ ~else_ =
+      Field.Checked.if_ cond ~then_:(pack_var then_) ~else_:(pack_var else_)
+      >>= unpack_var
+
     (* Unpacking protects against underflow *)
     let sub (x: Unpacked.var) (y: Unpacked.var) =
       unpack_var (Field.Checked.sub (pack_var x) (pack_var y))

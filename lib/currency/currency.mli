@@ -57,6 +57,8 @@ module type Checked_arithmetic_intf = sig
 
   type signed_var
 
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
   val add : var -> var -> (var, _) Checked.t
 
   val sub : var -> var -> (var, _) Checked.t
