@@ -1,6 +1,5 @@
 open Core
 open Async_kernel
-module TL = Merkle_ledger.Test_ledger
 
 module type Ledger_intf = sig
   include Syncable_ledger.Merkle_tree_intf
@@ -26,11 +25,7 @@ module type Input_intf = sig
      and type merkle_path := L.path
      and type account := L.account
 
-  module SR :
-    Syncable_ledger.Responder_intf
-    with type merkle_tree := L.t
-     and type query := SL.query
-     and type answer := SL.answer
+  module SR = SL.Responder
 
   val num_accts : int
 end

@@ -24,14 +24,18 @@ struct
     in
     (discovery_ports, external_ports, peers)
 
-  let spawn_local_processes_exn n ~program_dir ~f =
+  let spawn_local_processes_exn ?(should_propose= Fn.const true)
+      ?(first_delay= 3.0) n ~program_dir ~f =
     let fns =
       let discovery_ports, external_ports, peers = net_configs n in
       let peers = [] :: List.drop peers 1 in
-      List.map3_exn discovery_ports external_ports peers ~f:
-        (fun discovery_port external_port peers ->
+      let args =
+        List.map3_exn discovery_ports external_ports peers ~f:(fun x y z ->
+            (x, y, z) )
+      in
+      List.mapi args ~f:(fun i (discovery_port, external_port, peers) ->
           Coda_process.spawn_local_exn ~peers ~discovery_port ~external_port
-            ~program_dir )
+            ~program_dir ~should_propose:(should_propose i) )
     in
     let first = List.hd_exn fns in
     let rest = List.drop fns 1 in
@@ -41,6 +45,6 @@ struct
         ~f:(fun last fn ws -> fn (fun w -> last (w :: ws)))
     in
     first (fun w ->
-        let%bind () = after (Time.Span.of_sec 3.) in
+        let%bind () = after (Time.Span.of_sec first_delay) in
         scoped [w] )
 end
