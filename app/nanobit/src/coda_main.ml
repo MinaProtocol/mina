@@ -270,10 +270,7 @@ struct
             Ok
               (Currency.Fee.Signed.of_unsigned
                  (Transaction.fee (t :> Transaction.t)))
-        | Fee_transfer t ->
-            let open Or_error.Let_syntax in
-            let%map fee = Fee_transfer.fee_excess t in
-            Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
+        | Fee_transfer t -> Fee_transfer.fee_excess t
         | Coinbase _ -> failwith "Coinbases not yet implemented"
     end
 

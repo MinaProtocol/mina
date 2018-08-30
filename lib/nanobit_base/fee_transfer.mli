@@ -11,6 +11,6 @@ val to_list : t -> single list
 
 val of_single_list : single list -> t list
 
-val fee_excess : t -> Currency.Fee.t Or_error.t
+val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 
 val receivers : t -> Public_key.Compressed.t list
