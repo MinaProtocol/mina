@@ -229,19 +229,24 @@ end = struct
           let%bind a =
             (* s * g - c * public_key *)
             let%bind sg =
-              Group.Checked.scale_known shifted Group.generator (Scalar.Checked.to_bits s)
-                ~init:Shifted.zero
+              Group.Checked.scale_known shifted Group.generator
+                (Scalar.Checked.to_bits s) ~init:Shifted.zero
             in
-            Group.Checked.(scale shifted (negate public_key) (Scalar.Checked.to_bits c) ~init:sg)
+            Group.Checked.(
+              scale shifted (negate public_key) (Scalar.Checked.to_bits c)
+                ~init:sg)
             >>= Shifted.unshift_nonzero
           and b =
             (* s * H(m) - c * scaled_message_hash *)
             let%bind sx =
               let%bind message_hash = Message.Checked.hash_to_group message in
-              Group.Checked.scale shifted message_hash (Scalar.Checked.to_bits s) ~init:Shifted.zero
+              Group.Checked.scale shifted message_hash
+                (Scalar.Checked.to_bits s) ~init:Shifted.zero
             in
             Group.Checked.(
-              scale shifted (negate scaled_message_hash) (Scalar.Checked.to_bits c) ~init:sx)
+              scale shifted
+                (negate scaled_message_hash)
+                (Scalar.Checked.to_bits c) ~init:sx)
             >>= Shifted.unshift_nonzero
           in
           Hash.Checked.hash_for_proof message public_key a b

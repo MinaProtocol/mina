@@ -552,9 +552,10 @@ module Merge = struct
               )
             ~else_:states_and_excess_and_vk_hash
         >>= Pedersen.Checked.Digest.choose_preimage
-        >>| fun x -> Bitstring_lib.Bitstring.Lsb_first.of_list (x :> Boolean.var list) )
+        >>| fun x ->
+        Bitstring_lib.Bitstring.Lsb_first.of_list (x :> Boolean.var list) )
     in
-    check_snark ~get_proof tock_vk tock_vk_data [ input ]
+    check_snark ~get_proof tock_vk tock_vk_data [input]
 
   (* spec for [main top_hash]:
      constraints pass iff
@@ -589,7 +590,9 @@ module Merge = struct
         ~start:(Hash_prefix.length_in_triples + state_hash_size_in_triples)
         (bits_to_triples s3)
     in
-    let tock_vk_data = Verifier.Verification_key.Checked.to_full_data tock_vk in
+    let tock_vk_data =
+      Verifier.Verification_key.Checked.to_full_data tock_vk
+    in
     let%bind tock_vk_section =
       let%bind bs =
         Verifier.Verification_key_data.Checked.to_bits tock_vk_data
@@ -630,15 +633,15 @@ module Merge = struct
           ~start:(Hash_prefix.length_in_triples + state_hash_size_in_triples)
           (bits_to_triples s2)
       in
-      verify_transition tock_vk tock_vk_data tock_vk_section Prover_state.proof12
-        s1_section s2_section fee_excess12
+      verify_transition tock_vk tock_vk_data tock_vk_section
+        Prover_state.proof12 s1_section s2_section fee_excess12
     and verify_23 =
       let%bind s2_section =
         let open Pedersen.Checked.Section in
         extend empty ~start:Hash_prefix.length_in_triples (bits_to_triples s2)
       in
-      verify_transition tock_vk tock_vk_data tock_vk_section Prover_state.proof23
-        s2_section s3_section fee_excess23
+      verify_transition tock_vk tock_vk_data tock_vk_section
+        Prover_state.proof23 s2_section s3_section fee_excess23
     in
     Boolean.Assert.all [verify_12; verify_23]
 
@@ -681,11 +684,11 @@ module Verification = struct
   struct
     open K
 
-    let wrap_vk =
-      Merge.Verifier.Verification_key.of_verification_key keys.wrap
+    let wrap_vk = Merge.Verifier.Verification_key.of_verification_key keys.wrap
 
     let wrap_vk_data =
-      Merge.Verifier.Verification_key_data.full_data_of_verification_key keys.wrap
+      Merge.Verifier.Verification_key_data.full_data_of_verification_key
+        keys.wrap
 
     let wrap_vk_bits =
       Merge.Verifier.Verification_key_data.to_bits wrap_vk_data
@@ -784,11 +787,11 @@ module Verification = struct
       in
       let%map result =
         let%bind vk_data, result =
-          Merge.Verifier.All_in_one.
-            check_proof ~get_vk:(As_prover.return keys.wrap)
+          Merge.Verifier.All_in_one.check_proof
+            ~get_vk:(As_prover.return keys.wrap)
             ~get_proof
             (Merge.Verifier.Verification_key.Checked.constant wrap_vk)
-            [ Bitstring_lib.Bitstring.Lsb_first.of_list top_hash ]
+            [Bitstring_lib.Bitstring.Lsb_first.of_list top_hash]
         in
         let%map () =
           let open Merge.Verifier.Verification_key_data.Checked in
@@ -815,14 +818,12 @@ struct
       end)
       (Tock.Inner_curve)
 
-  let merge_vk =
-    Verifier.Verification_key.of_verification_key Vk.merge
+  let merge_vk = Verifier.Verification_key.of_verification_key Vk.merge
 
   let merge_vk_data =
     Verifier.Verification_key_data.full_data_of_verification_key Vk.merge
 
-  let base_vk =
-    Verifier.Verification_key.of_verification_key Vk.base
+  let base_vk = Verifier.Verification_key.of_verification_key Vk.base
 
   let base_vk_data =
     Verifier.Verification_key_data.full_data_of_verification_key Vk.base
@@ -841,39 +842,40 @@ struct
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
   let main input =
     let open Let_syntax in
-    with_label __LOC__ begin
-      let%bind input =
-        Field.Checked.choose_preimage_var input
-          ~length:Tick_curve.Field.size_in_bits
-      in
-      let%bind is_base =
-        provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
-            Proof_type.is_base proof_type )
-      in
-      let verification_key =
-        Verifier.Verification_key.Checked.if_value is_base
-          ~then_:base_vk ~else_:merge_vk
-      in
-      let%bind vk_data, result =
-        (* someday: Probably an opportunity for optimization here since
+    with_label __LOC__
+      (let%bind input =
+         Field.Checked.choose_preimage_var input
+           ~length:Tick_curve.Field.size_in_bits
+       in
+       let%bind is_base =
+         provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
+             Proof_type.is_base proof_type )
+       in
+       let verification_key =
+         Verifier.Verification_key.Checked.if_value is_base ~then_:base_vk
+           ~else_:merge_vk
+       in
+       let%bind vk_data, result =
+         (* someday: Probably an opportunity for optimization here since
             we are passing in one of two known verification keys. *)
-        with_label __LOC__ begin
-          Verifier.All_in_one.check_proof verification_key
-            ~get_vk:As_prover.(map get_state ~f:(fun { Prover_state.proof_type; _ } ->
-                    match proof_type with `Base -> Vk.base | `Merge -> Vk.merge))
-            ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
-            [ Bitstring_lib.Bitstring.Lsb_first.of_list input ]
-        end
-      in
-      let%bind () =
-        with_label __LOC__ begin
-          Verifier.Verification_key_data.Checked.Assert.equal
-            (Verifier.Verification_key.Checked.to_full_data verification_key)
-            vk_data
-        end
-      in
-      Boolean.Assert.is_true result
-    end
+         with_label __LOC__
+           (Verifier.All_in_one.check_proof verification_key
+              ~get_vk:
+                As_prover.(
+                  map get_state ~f:(fun {Prover_state.proof_type; _} ->
+                      match proof_type with
+                      | `Base -> Vk.base
+                      | `Merge -> Vk.merge ))
+              ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
+              [Bitstring_lib.Bitstring.Lsb_first.of_list input])
+       in
+       let%bind () =
+         with_label __LOC__
+           (Verifier.Verification_key_data.Checked.Assert.equal
+              (Verifier.Verification_key.Checked.to_full_data verification_key)
+              vk_data)
+       in
+       Boolean.Assert.is_true result)
 
   let create_keys () = generate_keypair ~exposing:(wrap_input ()) main
 

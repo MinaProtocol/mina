@@ -63,7 +63,9 @@ struct
 
     module Vector = Vector.Make (struct
       type elt = t
+
       let typ = typ
+
       let prefix = with_prefix prefix "vector"
     end)
 

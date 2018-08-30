@@ -514,9 +514,11 @@ end
 
 module type Weierstrass_checked_intf = sig
   module Impl : Snark_intf.S
+
   open Impl
 
   type t
+
   type var
 
   val typ : (var, t) Typ.t
@@ -534,6 +536,7 @@ module type Weierstrass_checked_intf = sig
   end
 
   val negate : var -> var
+
   val constant : t -> var
 
   val add_unsafe : var -> var -> (var, _) Checked.t
@@ -544,28 +547,25 @@ module type Weierstrass_checked_intf = sig
 
   val if_value : Boolean.var -> then_:t -> else_:t -> var
 
-  val scale
-    : 's Shifted.m
+  val scale :
+       's Shifted.m
     -> var
     -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
     -> init:'s
     -> ('s, _) Checked.t
 
-  val scale_known
-    : 's Shifted.m
+  val scale_known :
+       's Shifted.m
     -> t
     -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
     -> init:'s
     -> ('s, _) Checked.t
 
-  val sum
-    : 's Shifted.m
-    -> var list
-    -> init:'s
-    -> ('s, _) Checked.t
+  val sum : 's Shifted.m -> var list -> init:'s -> ('s, _) Checked.t
 
   module Assert : sig
     val on_curve : var -> (unit, _) Checked.t
+
     val equal : var -> var -> (unit, _) Checked.t
   end
 end
@@ -592,12 +592,11 @@ module Make_weierstrass_checked
 
       val scale : t -> Scalar.t -> t
     end)
-    (Params : Params_intf with type field := Impl.Field.t)
-  : Weierstrass_checked_intf
-    with module Impl := Impl
-     and type t := Curve.t
-     and type var := Impl.Field.var * Impl.Field.var
-=
+    (Params : Params_intf with type field := Impl.Field.t) :
+  Weierstrass_checked_intf
+  with module Impl := Impl
+   and type t := Curve.t
+   and type var := Impl.Field.var * Impl.Field.var =
 struct
   open Impl
 
@@ -791,9 +790,9 @@ struct
     in
     (choose x1 x2, choose y1 y2)
 
-  let scale (type shifted) (module Shifted
-      : Shifted.S with type t = shifted) t (c: Boolean.var Bitstring_lib.Bitstring.Lsb_first.t)
-      ~(init: shifted) : (shifted, _) Checked.t =
+  let scale (type shifted) (module Shifted : Shifted.S with type t = shifted) t
+      (c: Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~(init: shifted) :
+      (shifted, _) Checked.t =
     let c = Bitstring_lib.Bitstring.Lsb_first.to_list c in
     with_label __LOC__
       (let open Let_syntax in
@@ -843,8 +842,8 @@ struct
     (lookup_one (x1, x2), lookup_one (y1, y2))
 
   let scale_known (type shifted) (module Shifted
-      : Shifted.S with type t = shifted) (t: Curve.t) (b: Boolean.var Bitstring_lib.Bitstring.Lsb_first.t)
-      ~init =
+      : Shifted.S with type t = shifted) (t: Curve.t)
+      (b: Boolean.var Bitstring_lib.Bitstring.Lsb_first.t) ~init =
     let b = Bitstring_lib.Bitstring.Lsb_first.to_list b in
     let sigma = t in
     let n = List.length b in

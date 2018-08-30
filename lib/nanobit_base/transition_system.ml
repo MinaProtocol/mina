@@ -89,7 +89,7 @@ struct
     let wrap_vk_typ = Typ.list ~length:wrap_vk_length Boolean.typ
 
     module Verifier =
-      Snarky.Gm_verifier_gadget.Mnt4(Tick)
+      Snarky.Gm_verifier_gadget.Mnt4 (Tick)
         (struct
           let input_size = Tock.Data_spec.size (wrap_input ())
         end)
@@ -134,7 +134,7 @@ struct
            Verifier.All_in_one.check_proof wrap_vk
              ~get_vk:As_prover.(map get_state ~f:Prover_state.wrap_vk)
              ~get_proof:As_prover.(map get_state ~f:Prover_state.prev_proof)
-             [ Bitstring_lib.Bitstring.Lsb_first.of_list prev_top_hash ]
+             [Bitstring_lib.Bitstring.Lsb_first.of_list prev_top_hash]
          in
          let%map () =
            Verifier.Verification_key_data.Checked.Assert.equal wrap_vk_data
@@ -160,7 +160,9 @@ struct
              (fun {Prover_state.wrap_vk; _} ->
                Verifier.Verification_key.of_verification_key wrap_vk )
          in
-         let wrap_vk_data = Verifier.Verification_key.Checked.to_full_data wrap_vk in
+         let wrap_vk_data =
+           Verifier.Verification_key.Checked.to_full_data wrap_vk
+         in
          let%bind wrap_vk_section = hash_vk_data wrap_vk_data in
          let%bind () =
            with_label __LOC__
@@ -171,7 +173,8 @@ struct
               >>= Field.Checked.Assert.equal top_hash)
          in
          let%bind prev_state_valid =
-           prev_state_valid wrap_vk_section wrap_vk wrap_vk_data prev_state_hash
+           prev_state_valid wrap_vk_section wrap_vk wrap_vk_data
+             prev_state_hash
          in
          let%bind inductive_case_passed =
            with_label __LOC__ Boolean.(prev_state_valid && success)
@@ -196,16 +199,14 @@ struct
     open Tock
 
     module Verifier =
-      Snarky.Gm_verifier_gadget.Mnt6
-        (Tock)
+      Snarky.Gm_verifier_gadget.Mnt6 (Tock)
         (struct
           let input_size = step_input_size
         end)
         (Tock.Inner_curve)
 
     module Prover_state = struct
-      type t = {proof: Tick_curve.Proof.t}
-      [@@deriving fields]
+      type t = {proof: Tick_curve.Proof.t} [@@deriving fields]
     end
 
     let step_vk_data =
@@ -229,7 +230,7 @@ struct
                Checked.constant (of_verification_key Step_vk.verification_key))
              ~get_vk:(As_prover.return Step_vk.verification_key)
              ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
-             [ Bitstring_lib.Bitstring.Lsb_first.of_list input ]
+             [Bitstring_lib.Bitstring.Lsb_first.of_list input]
          in
          let%bind () =
            let open Verifier.Verification_key_data.Checked in
