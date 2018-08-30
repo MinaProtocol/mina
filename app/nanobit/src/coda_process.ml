@@ -23,18 +23,20 @@ struct
     File_system.dup_stderr process ;
     return (conn, process)
 
-  let spawn_local_exn ~peers ~port ~gossip_port ~program_dir ~f =
+  let spawn_local_exn ~peers ~discovery_port ~external_port ~program_dir
+      ~should_propose ~f =
     let host = "127.0.0.1" in
     let conf_dir =
       "/tmp/" ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
     in
     let config =
       { Coda_worker.host
-      ; my_port= port
+      ; should_propose
+      ; external_port
       ; peers
       ; conf_dir
       ; program_dir
-      ; gossip_port }
+      ; discovery_port }
     in
     File_system.with_temp_dirs [conf_dir] ~f:(fun () ->
         let%bind worker = spawn_exn config in

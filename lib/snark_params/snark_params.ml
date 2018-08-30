@@ -127,17 +127,11 @@ module Tick = struct
                 end)
                 (Coefficients)
 
-      let with_random_shift k =
-        let open Let_syntax in
-        let%bind init = provide_witness typ As_prover.(return (random ())) in
-        let%bind shifted = k ~init in
-        add shifted (negate init)
+      let scale = scale_bits
 
-      let scale g s = with_random_shift (scale_bits g s)
+      let scale_known = scale_known
 
-      let scale_known g s = with_random_shift (scale_known g s)
-
-      let add_known v x = add v (constant x)
+      let add_known_unsafe t x = add_unsafe t (constant x)
     end
 
     let typ = Checked.typ

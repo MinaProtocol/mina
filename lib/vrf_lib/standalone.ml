@@ -42,13 +42,31 @@ module Make
       module Checked : sig
         open Impl
 
-        val add : var -> var -> (var, _) Checked.t
+        module Shifted : sig
+          open Impl
+
+          module type S =
+            Snarky.Curves.Shifted_intf
+            with type ('a, 'b) checked := ('a, 'b) Checked.t
+             and type boolean_var := Boolean.var
+             and type curve_var := var
+        end
 
         val negate : var -> var
 
-        val scale_known : t -> Scalar.var -> (var, _) Checked.t
+        val scale_known :
+             (module Shifted.S with type t = 'shifted)
+          -> t
+          -> Scalar.var
+          -> init:'shifted
+          -> ('shifted, _) Checked.t
 
-        val scale : var -> Scalar.var -> (var, _) Checked.t
+        val scale :
+             (module Shifted.S with type t = 'shifted)
+          -> var
+          -> Scalar.var
+          -> init:'shifted
+          -> ('shifted, _) Checked.t
       end
     end) (Message : sig
       open Impl
@@ -126,7 +144,10 @@ module Make
 
     module Checked : sig
       val verified_output :
-        var -> Context.var -> (Output_hash.var, _) Impl.Checked.t
+           (module Group.Checked.Shifted.S with type t = 'shifted)
+        -> var
+        -> Context.var
+        -> (Output_hash.var, _) Impl.Checked.t
     end
   end
 end = struct
@@ -220,25 +241,30 @@ end = struct
       else None
 
     module Checked = struct
-      let verified_output
+      let verified_output (type shifted)
+          ((module Shifted) as shifted:
+            (module Group.Checked.Shifted.S with type t = shifted))
           ({scaled_message_hash; discrete_log_equality= {c; s}}: var)
           ({message; public_key}: Context.var) =
         let open Impl.Let_syntax in
         let%bind () =
           let%bind a =
-            (* TODO: Can save one EC add here by passing sg as the initial accumulator
-               to scale *)
-            let%bind sg = Group.Checked.scale_known Group.generator s
-            and neg_c_pk = Group.Checked.(scale (negate public_key) c) in
-            Group.Checked.add sg neg_c_pk
+            (* s * g - c * public_key *)
+            let%bind sg =
+              Group.Checked.scale_known shifted Group.generator s
+                ~init:Shifted.zero
+            in
+            Group.Checked.(scale shifted (negate public_key) c ~init:sg)
+            >>= Shifted.unshift_nonzero
           and b =
+            (* s * H(m) - c * scaled_message_hash *)
             let%bind sx =
               let%bind message_hash = Message.Checked.hash_to_group message in
-              Group.Checked.scale message_hash s
-            and neg_cy =
-              Group.Checked.(scale (negate scaled_message_hash) c)
+              Group.Checked.scale shifted message_hash s ~init:Shifted.zero
             in
-            Group.Checked.add sx neg_cy
+            Group.Checked.(
+              scale shifted (negate scaled_message_hash) c ~init:sx)
+            >>= Shifted.unshift_nonzero
           in
           Hash.Checked.hash_for_proof message public_key a b
           >>= Scalar.Checked.Assert.equal c
@@ -407,7 +433,7 @@ let%test_module "vrf-test" =
                   end)
                   (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
 
-        let add_known v x = add v (constant x)
+        let add_known_unsafe t x = add_unsafe t (constant x)
       end
 
       let typ = Checked.typ
@@ -478,21 +504,13 @@ let%test_module "vrf-test" =
                 (scale (scale generator a) b) ) )
 
       module Checked = struct
-        let add = Curve.Checked.add
+        module Shifted = Curve.Checked.Shifted
 
         let negate = Curve.Checked.negate
 
-        let with_random_shift k =
-          let open Let_syntax in
-          let%bind init =
-            provide_witness Curve.Checked.typ
-              (As_prover.return (Curve.random ()))
-          in
-          k ~init >>= Curve.Checked.add (Curve.Checked.negate init)
+        let scale_known = Curve.Checked.scale_known
 
-        let scale_known t b = with_random_shift (Curve.Checked.scale_known t b)
-
-        let scale t b = with_random_shift (Curve.Checked.scale_bits t b)
+        let scale = Curve.Checked.scale_bits
 
         let to_bits ((x, y): var) =
           let open Let_syntax in

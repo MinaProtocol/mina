@@ -286,8 +286,9 @@ module Base = struct
           - fee excess = -(amount + fee)
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
-  let apply_tagged_transaction root
-      ((tag, {sender; signature; payload}): Tagged_transaction.var) =
+  let apply_tagged_transaction (type shifted)
+      (shifted: (module Inner_curve.Checked.Shifted.S with type t = shifted))
+      root ((tag, {sender; signature; payload}): Tagged_transaction.var) =
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
@@ -298,7 +299,8 @@ module Base = struct
         let%bind () =
           with_label __LOC__
             (let%bind verifies =
-               Schnorr.Checked.verifies signature sender payload_section
+               Schnorr.Checked.verifies shifted signature sender
+                 payload_section
              in
              (* Should only assert_verifies if the tag is Normal *)
              Boolean.Assert.any [is_fee_transfer; verifies])
@@ -385,6 +387,7 @@ module Base = struct
   let main top_hash =
     with_label __LOC__
       (let open Let_syntax in
+      let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
       let%bind root_before =
         provide_witness' Ledger_hash.typ ~f:Prover_state.state1
       in
@@ -393,7 +396,7 @@ module Base = struct
           (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
       in
       let%bind root_after, fee_excess =
-        apply_tagged_transaction root_before t
+        apply_tagged_transaction (module Shifted) root_before t
       in
       let%map () =
         with_label __LOC__
@@ -1284,7 +1287,7 @@ let%test_module "transaction_snark" =
         ; account=
             { public_key=
                 Public_key.compress (Public_key.of_private_key private_key)
-            ; balance= Balance.of_int (10 + Random.int 100)
+            ; balance= Balance.of_int (50 + Random.int 100)
             ; receipt_chain_hash= Receipt.Chain_hash.empty
             ; nonce= Account.Nonce.zero } }
       in

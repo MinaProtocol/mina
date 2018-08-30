@@ -36,12 +36,12 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; target_peer_count= 8
         ; initial_peers= []
         ; conf_dir
-        ; address= Host_and_port.of_string "127.0.0.1:8001"
-        ; me= Host_and_port.of_string "127.0.0.1:8000" } }
+        ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000) } }
   in
+  let should_propose = true in
   let%bind minibit =
     Main.create
-      (Main.Config.make ~log ~net_config
+      (Main.Config.make ~log ~net_config ~should_propose
          ~ledger_builder_persistant_location:"ledger_builder"
          ~transaction_pool_disk_location:"transaction_pool"
          ~snark_pool_disk_location:"snark_pool"

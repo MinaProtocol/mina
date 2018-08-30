@@ -86,5 +86,11 @@ module Snarkable = struct
     val assert_equal_var : Unpacked.var -> Unpacked.var -> (unit, _) checked
 
     val equal_var : Unpacked.var -> Unpacked.var -> (boolean_var, _) checked
+
+    val if_ :
+         boolean_var
+      -> then_:Unpacked.var
+      -> else_:Unpacked.var
+      -> (Unpacked.var, _) checked
   end
 end

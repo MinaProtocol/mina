@@ -18,8 +18,7 @@ module type S = sig
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S
-                           with type Proof.t = Nanobit_base.Proof.t)
+    (Consensus_mechanism : Consensus.Mechanism.S)
     (Blockchain : Blockchain_snark.Blockchain.S
                   with module Consensus_mechanism = Consensus_mechanism) :
   S with type blockchain := Blockchain.t

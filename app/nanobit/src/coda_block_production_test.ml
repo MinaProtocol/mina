@@ -16,21 +16,21 @@ struct
 
   let main () =
     Coda_processes.init () ;
-    let gossip_port = 8000 in
-    let port = 3000 in
+    let discovery_port = 3001 in
+    let external_port = 3000 in
     let peers = [] in
     let%bind program_dir = Unix.getcwd () in
     let log = Logger.create () in
     let log = Logger.child log name in
-    Coda_process.spawn_local_exn ~peers ~port ~gossip_port ~program_dir ~f:
-      (fun worker ->
+    Coda_process.spawn_local_exn ~peers ~external_port ~discovery_port
+      ~should_propose:true ~program_dir ~f:(fun worker ->
         let%bind strongest_ledgers =
           Coda_process.strongest_ledgers_exn worker
         in
         let rec go i blocks =
           if i = 10 then return blocks
           else
-            let%bind () = Linear_pipe.read_exn strongest_ledgers in
+            let%bind _ = Linear_pipe.read_exn strongest_ledgers in
             go (i + 1) (((), Time.now ()) :: blocks)
         in
         let%bind blocks = go 0 [] in

@@ -7,10 +7,6 @@ open Sha256_lib
 open Fold_lib
 
 module type Inputs_intf = sig
-  module Proof : sig
-    type t [@@deriving bin_io, sexp]
-  end
-
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
   end
@@ -63,19 +59,52 @@ module Epoch_seed = struct
 
   let zero = Snark_params.Tick.Pedersen.zero_hash
 
+  let fold_vrf_result seed vrf_result =
+    Fold.(fold seed +> Sha256.Digest.fold vrf_result)
+
   let update seed vrf_result =
     let open Snark_params.Tick in
-    let fold_hash = Fold.(fold seed +> Sha256.Digest.fold vrf_result) in
     of_hash
-      (Pedersen.digest_fold Nanobit_base.Hash_prefix.epoch_seed fold_hash)
+      (Pedersen.digest_fold Nanobit_base.Hash_prefix.epoch_seed
+         (fold_vrf_result seed vrf_result))
+
+  let update_var (seed: var) (vrf_result: Sha256.Digest.var) :
+      (var, _) Snark_params.Tick.Checked.t =
+    let open Snark_params.Tick in
+    let open Snark_params.Tick.Let_syntax in
+    let%bind seed_triples = var_to_triples seed in
+    let%map hash =
+      Pedersen.Checked.digest_triples ~init:Nanobit_base.Hash_prefix.epoch_seed
+        ( seed_triples
+        @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list vrf_result)))
+        )
+    in
+    var_of_hash_packed hash
 end
 
 let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
-module Make (Inputs : Inputs_intf) : Mechanism.S = struct
-  module Proof = Inputs.Proof
+module Vrf =
+  Vrf_lib.Integrated.Make (Snark_params.Tick)
+    (struct
+      type var = Snark_params.Tick.Boolean.var list
+    end)
+    (struct
+      include Snark_params.Tick.Inner_curve.Checked
+
+      let scale_generator shifted s ~init =
+        scale_known shifted Snark_params.Tick.Inner_curve.one s ~init
+    end)
+
+module Make (Inputs : Inputs_intf) :
+  Mechanism.S
+  with type Internal_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t
+   and type External_transition.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t =
+struct
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
@@ -129,6 +158,33 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
         let ( <= ) x y = compare x y <= 0 in
         let ( < ) x y = compare x y < 0 in
         unforkable_count <= slot && slot < unforkable_count * of_int 2
+
+      let in_seed_update_range_var (slot: Unpacked.var) =
+        let open Snark_params.Tick in
+        let open Snark_params.Tick.Let_syntax in
+        let open Field.Checked in
+        let unforkable_count =
+          Unpacked.var_of_value @@ of_int @@ UInt32.to_int unforkable_count
+        and unforkable_count_times_2 =
+          Unpacked.var_of_value @@ of_int
+          @@ (UInt32.to_int unforkable_count * 2)
+        in
+        let%bind slot_gte_unforkable_count =
+          compare_var unforkable_count slot >>| fun c -> c.less_or_equal
+        and slot_lt_unforkable_count_times_2 =
+          compare_var slot unforkable_count_times_2 >>| fun c -> c.less
+        in
+        Boolean.(slot_gte_unforkable_count && slot_lt_unforkable_count_times_2)
+
+      let gen =
+        let open Quickcheck.Let_syntax in
+        Core.Int.gen_incl 0 (UInt32.to_int unforkable_count * 3)
+        >>| UInt32.of_int
+
+      let%test_unit "in_seed_update_range_var" =
+        Quickcheck.test gen ~f:(fun slot ->
+            Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
+              in_seed_update_range_var in_seed_update_range slot )
     end
 
     let slot_start_time (epoch: t) (slot: Slot.t) =
@@ -152,71 +208,52 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   end
 
   module Consensus_transition_data = struct
-    type ('epoch, 'slot, 'amount, 'vrf_result) t =
-      { epoch: 'epoch
-      ; slot: 'slot
-      ; total_currency_diff: 'amount
-      ; proposer_vrf_result: 'vrf_result }
+    type ('epoch, 'slot, 'vrf_result) t =
+      {epoch: 'epoch; slot: 'slot; proposer_vrf_result: 'vrf_result}
     [@@deriving sexp, bin_io, eq, compare]
 
-    type value = (Epoch.t, Epoch.Slot.t, Amount.t, Sha256.Digest.t) t
+    type value = (Epoch.t, Epoch.Slot.t, Sha256.Digest.t) t
     [@@deriving sexp, bin_io, eq, compare]
 
     type var =
-      ( Epoch.Unpacked.var
-      , Epoch.Slot.Unpacked.var
-      , Amount.var
-      , Sha256.Digest.var )
-      t
+      (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var, Sha256.Digest.var) t
 
     let genesis =
       { epoch= Epoch.zero
       ; slot= Epoch.Slot.zero
-      ; total_currency_diff= Amount.zero
       ; proposer_vrf_result= List.init 256 ~f:(fun _ -> false) }
 
-    let to_hlist {epoch; slot; total_currency_diff; proposer_vrf_result} =
-      let open Nanobit_base.H_list in
-      [epoch; slot; total_currency_diff; proposer_vrf_result]
+    let to_hlist {epoch; slot; proposer_vrf_result} =
+      Nanobit_base.H_list.[epoch; slot; proposer_vrf_result]
 
     let of_hlist :
-           ( unit
-           , 'epoch -> 'slot -> 'amount -> 'vrf_result -> unit )
-           Nanobit_base.H_list.t
-        -> ('epoch, 'slot, 'amount, 'vrf_result) t =
-     fun Nanobit_base.H_list.([ epoch
-                              ; slot
-                              ; total_currency_diff
-                              ; proposer_vrf_result ]) ->
-      {epoch; slot; total_currency_diff; proposer_vrf_result}
+           (unit, 'epoch -> 'slot -> 'vrf_result -> unit) Nanobit_base.H_list.t
+        -> ('epoch, 'slot, 'vrf_result) t =
+     fun Nanobit_base.H_list.([epoch; slot; proposer_vrf_result]) ->
+      {epoch; slot; proposer_vrf_result}
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
-      [ Epoch.Unpacked.typ
-      ; Epoch.Slot.Unpacked.typ
-      ; Amount.typ
-      ; Sha256.Digest.typ ]
+      [Epoch.Unpacked.typ; Epoch.Slot.Unpacked.typ; Sha256.Digest.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let fold {epoch; slot; total_currency_diff; proposer_vrf_result} =
+    let fold {epoch; slot; proposer_vrf_result} =
       let open Fold in
       Epoch.fold epoch +> Epoch.Slot.fold slot
-      +> Amount.fold total_currency_diff
       +> Sha256.Digest.fold proposer_vrf_result
 
-    let var_to_triples {epoch; slot; total_currency_diff; proposer_vrf_result} =
+    let var_to_triples {epoch; slot; proposer_vrf_result} =
       Epoch.Unpacked.var_to_triples epoch
       @ Epoch.Slot.Unpacked.var_to_triples slot
-      @ (total_currency_diff |> Amount.var_to_triples)
       @ proposer_vrf_result
 
     let length_in_triples =
       Epoch.length_in_triples + Epoch.Slot.length_in_triples
-      + Amount.length_in_triples + Sha256.Digest.length_in_triples
+      + Sha256.Digest.length_in_triples
   end
 
   module Consensus_state = struct
@@ -255,25 +292,65 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
-        Amount.add previous_state.total_currency
-          transition_data.total_currency_diff
+        Amount.add previous_state.total_currency Inputs.coinbase
         |> Option.map ~f:Or_error.return
         |> Option.value
              ~default:(Or_error.error_string "failed to add total_currency")
       in
       let epoch_seed, next_epoch_seed =
-        if transition_data.epoch = previous_state.current_epoch then
-          (previous_state.epoch_seed, previous_state.next_epoch_seed)
-        else
+        if transition_data.epoch > previous_state.current_epoch then
           (previous_state.next_epoch_seed, Epoch_seed.of_hash Epoch_seed.zero)
+        else (previous_state.epoch_seed, previous_state.next_epoch_seed)
       in
       let next_epoch_seed =
-        if not (Epoch.Slot.in_seed_update_range transition_data.slot) then
-          next_epoch_seed
-        else
+        if Epoch.Slot.in_seed_update_range transition_data.slot then
           Epoch_seed.update next_epoch_seed transition_data.proposer_vrf_result
+        else next_epoch_seed
       in
       { length= Length.succ previous_state.length
+      ; current_epoch= transition_data.epoch
+      ; current_slot= transition_data.slot
+      ; total_currency
+      ; epoch_seed
+      ; next_epoch_seed }
+
+    let update_var (previous_state: var)
+        (transition_data: Consensus_transition_data.var) :
+        (var, _) Snark_params.Tick.Checked.t =
+      let open Snark_params.Tick.Let_syntax in
+      let%bind length = Length.increment_var previous_state.length
+      (* TODO: keep track of total_currency in transaction snark. The current_slot
+       * implementation would allow an adversary to make then total_currency incorrect by
+       * not adding the coinbase to their account. *)
+      and total_currency =
+        Amount.Checked.add previous_state.total_currency
+          (Amount.var_of_t Inputs.coinbase)
+      and epoch_seed, next_epoch_seed =
+        let%bind epoch_changed =
+          Epoch.compare_var previous_state.current_epoch transition_data.epoch
+          >>| fun c -> c.less
+        in
+        let%map epoch_seed =
+          Epoch_seed.if_ epoch_changed ~then_:previous_state.next_epoch_seed
+            ~else_:previous_state.epoch_seed
+        and next_epoch_seed =
+          Epoch_seed.if_ epoch_changed
+            ~then_:(Epoch_seed.var_of_t @@ Epoch_seed.of_hash Epoch_seed.zero)
+            ~else_:previous_state.next_epoch_seed
+        in
+        (epoch_seed, next_epoch_seed)
+      in
+      let%map next_epoch_seed =
+        let%bind updated_next_epoch_seed =
+          Epoch_seed.update_var next_epoch_seed
+            transition_data.proposer_vrf_result
+        and in_seed_update_range =
+          Epoch.Slot.in_seed_update_range_var transition_data.slot
+        in
+        Epoch_seed.if_ in_seed_update_range ~then_:updated_next_epoch_seed
+          ~else_:next_epoch_seed
+      in
+      { length
       ; current_epoch= transition_data.epoch
       ; current_slot= transition_data.slot
       ; total_currency
@@ -371,8 +448,7 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
   end
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)
-  module Snark_transition =
-    Nanobit_base.Snark_transition.Make (Consensus_transition_data) (Proof)
+  module Snark_transition = Nanobit_base.Snark_transition.Make (Consensus_transition_data)
   module Internal_transition =
     Nanobit_base.Internal_transition.Make (Ledger_builder_diff)
       (Snark_transition)
@@ -380,18 +456,46 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     Nanobit_base.External_transition.Make (Ledger_builder_diff)
       (Protocol_state)
 
+  (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
+  let generate_transition ~previous_protocol_state ~blockchain_state ~time
+      ~transactions:_ =
+    let previous_consensus_state =
+      Protocol_state.consensus_state previous_protocol_state
+    in
+    let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
+    let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
+    (* TODO: mock VRF *)
+    let proposer_vrf_result = List.init 256 ~f:(fun _ -> false) in
+    let consensus_transition_data =
+      Consensus_transition_data.{epoch; slot; proposer_vrf_result}
+    in
+    let consensus_state =
+      Or_error.ok_exn
+      @@ Consensus_state.update previous_consensus_state
+           consensus_transition_data
+    in
+    let protocol_state =
+      Protocol_state.create_value
+        ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
+        ~blockchain_state ~consensus_state
+    in
+    (protocol_state, consensus_transition_data)
+
   let verify _transition = Snark_params.Tick.(Let_syntax.return Boolean.true_)
 
-  let update_var state _transition = Snark_params.Tick.Let_syntax.return state
-
-  let update (previous_state: Consensus_state.value)
-      (transition: Snark_transition.value) =
+  let update previous_state transition =
     Consensus_state.update previous_state
+      (Snark_transition.consensus_data transition)
+
+  let update_var previous_state transition =
+    Consensus_state.update_var previous_state
       (Snark_transition.consensus_data transition)
 
   let step = Async_kernel.Deferred.Or_error.return
 
-  let select _curr _cand = `Keep
+  let select curr cand =
+    let open Consensus_state in
+    if Length.compare curr.length cand.length < 0 then `Take else `Keep
 
   (*
   let select curr cand =
@@ -415,31 +519,6 @@ module Make (Inputs : Inputs_intf) : Mechanism.S = struct
     else
       argmax_(chain in [cand, curr])(len(chain.last_epoch_participation))?
     *)
-  (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
-  let generate_transition ~previous_protocol_state ~blockchain_state ~time
-      ~transactions:_ =
-    let previous_consensus_state =
-      Protocol_state.consensus_state previous_protocol_state
-    in
-    let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
-    let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
-    (* TODO: mock VRF *)
-    let proposer_vrf_result = List.init 256 ~f:(fun _ -> false) in
-    let consensus_transition_data =
-      let open Consensus_transition_data in
-      {epoch; slot; total_currency_diff= Inputs.coinbase; proposer_vrf_result}
-    in
-    let consensus_state =
-      Or_error.ok_exn
-      @@ Consensus_state.update previous_consensus_state
-           consensus_transition_data
-    in
-    let protocol_state =
-      Protocol_state.create_value
-        ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
-        ~blockchain_state ~consensus_state
-    in
-    (protocol_state, consensus_transition_data)
 
   let genesis_protocol_state =
     Protocol_state.create_value

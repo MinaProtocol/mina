@@ -264,6 +264,16 @@ module Snarkable = struct
     let assert_equal_var (n: Unpacked.var) (n': Unpacked.var) =
       with_label __LOC__
         (Field.Checked.Assert.equal (pack_var n) (pack_var n'))
+
+    let if_ (cond: Boolean.var) ~(then_: Unpacked.var) ~(else_: Unpacked.var) :
+        (Unpacked.var, _) Checked.t =
+      match
+        List.map2 then_ else_ ~f:(fun then_ else_ ->
+            Boolean.if_ cond ~then_ ~else_ )
+      with
+      | Ok result -> Checked.List.all result
+      | Unequal_lengths ->
+          failwith "Bits.if_: unpacked bit lengths were unequal"
   end
 
   module UInt64 (Impl : Snarky.Snark_intf.S) =

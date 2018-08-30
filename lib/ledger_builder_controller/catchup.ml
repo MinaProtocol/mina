@@ -123,13 +123,14 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let open Interruptible.Let_syntax in
     let ivar : External_transition.t Ivar.t = Ivar.create () in
+    (* TODO: This is a horrible hack; this works by accident because we only
+     * call this one at a time for now. Will be fixed by #521 *)
+    Sync_ledger.new_goal sl (External_transition.ledger_hash transition) ;
     let work =
       match%bind
         Interruptible.lift
           (Sync_ledger.wait_until_valid sl h)
-          (Deferred.map (Ivar.read ivar) ~f:(fun transition ->
-               Sync_ledger.new_goal sl
-                 (External_transition.ledger_hash transition) ))
+          (Deferred.map (Ivar.read ivar) ~f:ignore)
       with
       | `Ok ledger -> (
           (* TODO: This should be parallelized with the syncing *)
@@ -147,7 +148,6 @@ module Make (Inputs : Inputs_intf) = struct
                   Transition_logic_state.Transition_tree.singleton transition
                 in
                 sl_ref := None ;
-                Option.iter !sl_ref ~f:Sync_ledger.destroy ;
                 let new_tip = Tip.of_transition_and_lb transition lb in
                 let open Transition_logic_state.Change in
                 [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]

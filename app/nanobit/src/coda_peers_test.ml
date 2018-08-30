@@ -20,7 +20,8 @@ struct
     let log = Logger.create () in
     let log = Logger.child log name in
     Coda_processes.init () ;
-    Coda_processes.spawn_local_processes_exn n ~program_dir ~f:(fun workers ->
+    Coda_processes.spawn_local_processes_exn n ~program_dir
+      ~should_propose:(Fn.const false) ~f:(fun workers ->
         let _, _, expected_peers = Coda_processes.net_configs n in
         let%bind _ = after (Time.Span.of_sec 10.) in
         Deferred.all_unit
@@ -28,10 +29,14 @@ struct
              (fun worker expected_peers ->
                let%bind peers = Coda_process.peers_exn worker in
                Logger.debug log
-                 !"got peers %{sexp: Host_and_port.t list} %{sexp: \
+                 !"got peers %{sexp: Kademlia.Peer.t list} %{sexp: \
                    Host_and_port.t list}\n"
                  peers expected_peers ;
-               assert (peers = expected_peers) ;
+               let module S = Host_and_port.Set in
+               assert (
+                 S.equal
+                   (S.of_list (peers |> List.map ~f:fst))
+                   (S.of_list expected_peers) ) ;
                Deferred.unit )) )
 
   let command =

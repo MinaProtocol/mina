@@ -94,8 +94,7 @@ module type Kernel_intf = sig
 
   module Consensus_mechanism :
     Consensus.Mechanism.S
-    with type Proof.t = Nanobit_base.Proof.t
-     and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
      and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
 
   module Blockchain :
@@ -118,8 +117,7 @@ module Make_kernel
                                                                     sexp
                                                                     , bin_io]
       end) -> Consensus.Mechanism.S
-              with type Proof.t = Nanobit_base.Proof.t
-               and type Internal_transition.Ledger_builder_diff.t =
+              with type Internal_transition.Ledger_builder_diff.t =
                           Ledger_builder_diff.t
                and type External_transition.Ledger_builder_diff.t =
                           Ledger_builder_diff.t) :
@@ -525,7 +523,7 @@ struct
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Public_key.Compressed) (Account)
+    Syncable_ledger.Make (Ledger.Addr) (Account)
       (struct
         include Merkle_hash
 
@@ -745,16 +743,25 @@ module type Main_intf = sig
       val get : t -> Public_key.Compressed.t -> Account.t option
     end
 
-    module External_transition : sig
-      type t
+    module Ledger_builder_diff : sig
+      type t [@@deriving sexp, bin_io]
     end
+
+    module Consensus_mechanism :
+      Consensus.Mechanism.S
+      with type Internal_transition.Ledger_builder_diff.t =
+                  Ledger_builder_diff.t
+       and type External_transition.Ledger_builder_diff.t =
+                  Ledger_builder_diff.t
 
     module Net : sig
       type t
 
       module Peer : sig
-        type t = Host_and_port.Stable.V1.t
+        type t = Host_and_port.Stable.V1.t * int
         [@@deriving bin_io, sexp, compare, hash]
+
+        val external_rpc : t -> Host_and_port.Stable.V1.t
       end
 
       module Gossip_net : sig
@@ -801,11 +808,11 @@ module type Main_intf = sig
     end
 
     module Transition_tree :
-      Coda.Ktree_intf with type elem := External_transition.t
+      Coda.Ktree_intf
+      with type elem := Consensus_mechanism.External_transition.t
   end
 
-  module Consensus_mechanism :
-    Consensus.Mechanism.S with type Proof.t = Nanobit_base.Proof.t
+  module Consensus_mechanism : Consensus.Mechanism.S
 
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism
@@ -818,6 +825,7 @@ module type Main_intf = sig
   module Config : sig
     type t =
       { log: Logger.t
+      ; should_propose: bool
       ; net_config: Inputs.Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
@@ -833,10 +841,10 @@ module type Main_intf = sig
 
   val best_ledger : t -> Inputs.Ledger.t
 
-  val peers : t -> Host_and_port.t list
+  val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
-    t -> Inputs.External_transition.t Linear_pipe.Reader.t
+    t -> Inputs.Consensus_mechanism.External_transition.t Linear_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
