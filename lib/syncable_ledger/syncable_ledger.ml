@@ -366,7 +366,7 @@ struct
     Ok expected
 
   let validity_changed_at t a =
-    (* TODO : This is probably obnoxiously slow. *)
+    (* TODO #537: This is probably obnoxiously slow. *)
     let filter a' = not @@ Addr.is_parent_of a ~maybe_child:a' in
     Addr.Table.filter_keys_inplace t.waiting_content ~f:filter ;
     Addr.Table.filter_keys_inplace t.waiting_parents ~f:filter
