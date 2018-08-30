@@ -8,7 +8,7 @@ module type S = sig
   module Transition_tree :
     Coda.Ktree_intf with type elem := external_transition
 
-  type t [@@deriving bin_io]
+  type t
 
   val locked_tip : t -> tip
 
@@ -34,7 +34,7 @@ module Make (Security : sig
 end) (Transition : sig
   type t [@@deriving compare, sexp, bin_io]
 end) (Tip : sig
-  type t [@@deriving bin_io, sexp]
+  type t [@@deriving sexp]
 
   val is_materialization_of : t -> Transition.t -> bool
 end) :
@@ -73,7 +73,7 @@ struct
        list as well at the prefix of size (#blocks possible out of order)
      *)
     }
-  [@@deriving fields, bin_io]
+  [@@deriving fields]
 
   let apply t = function
     | Locked_tip h -> {t with locked_tip= h}

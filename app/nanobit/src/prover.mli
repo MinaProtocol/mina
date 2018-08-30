@@ -24,6 +24,7 @@ module type S = sig
   val extend_blockchain :
        t
     -> Blockchain.t
+    -> Consensus_mechanism.Protocol_state.value
     -> Consensus_mechanism.Snark_transition.value
     -> Blockchain.t Deferred.Or_error.t
 end
