@@ -109,7 +109,7 @@ struct
     in
     let new_fee_excess =
       match Currency.Fee.Signed.add prev_fee_excess fee_excess with
-      | None -> failwith "Fee excess overflowed"
+      | None -> failwith "Fee excess overflow"
       | Some fe -> fe
     in
     let blockchain_state =

@@ -113,7 +113,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     (* Send a similar the transaction twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
     let transaction' =
-      build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 3)
+      build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
     let%bind () = Run.send_txn log minibit (transaction' :> Transaction.t) in
     (* Let the system settle, mine some blocks *)
@@ -154,7 +154,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
             (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
         in
         send_txn_update_balance_sheet (snd key_pair) sender_pk receiver
-          (f_amount i) acc (Currency.Fee.of_int 3) )
+          (f_amount i) acc (Currency.Fee.of_int 0) )
   in
   let%bind () =
     test_sending_transaction Genesis_ledger.high_balance_sk

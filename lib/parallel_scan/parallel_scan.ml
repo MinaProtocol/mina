@@ -314,7 +314,7 @@ let fill_in_completed_jobs :
 let last_emitted_value (state: ('a, 'd) State1.t) = snd state.acc
 
 let as_and_ds (state: ('a, 'd) State1.t) : 'a list * 'd list =
-  let jobs = Fn.compose fst (Fn.compose List.unzip State1.jobs_list) state in
+  let jobs = fst (List.unzip @@ State1.jobs_list state) in
   List.fold jobs ~init:([], []) ~f:(fun (merge_nodes, base_nodes) job ->
       match job with
       | Base (Some d) -> (merge_nodes, d :: base_nodes)

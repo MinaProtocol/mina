@@ -191,16 +191,12 @@ end = struct
       Parallel_scan.State.t
     [@@deriving sexp, bin_io]
 
-    (*type t = {scan_state: scan_state; mutable fee_excess: Fee.Signed.t}
-    [@@deriving sexp, bin_io]*)
-
-    let hash_to_string scan_state(*{scan_state; fee_excess}*) =
+    let hash_to_string scan_state =
       let h =
         Parallel_scan.State.hash scan_state
           (Binable.to_string (module Snark_with_statement))
           (Binable.to_string (module Super_transaction_with_witness))
       in
-      (*h#add_string (Int.to_string (Fee.Signed.hash fee_excess)) ;*)
       h#result
 
     let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
@@ -214,8 +210,7 @@ end = struct
         (* Invariant: this is the ledger after having applied all the transactions in
     the above state. *)
     ; ledger: Ledger.t
-    ; public_key: Compressed_public_key.t
-    (*; mutable fee_excess: Fee.Signed.t*) }
+    ; public_key: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
   let random_work_spec_chunk t
@@ -322,16 +317,16 @@ end = struct
             ( Some [single_spec last_job]
             , (seen_statements', Some (canonical_statement_of_job last_job)) )
 
-  let aux t : Aux.t = t.scan_state(*{scan_state= t.scan_state; fee_excess= t.fee_excess}*)
+  let aux t : Aux.t = t.scan_state
 
   let make ~public_key ~ledger ~(aux: Aux.t) =
-    {public_key; ledger; scan_state= aux(*; fee_excess= aux.fee_excess*)}
+    {public_key; ledger; scan_state= aux}
 
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
     ; ledger= Ledger.copy ledger
     ; public_key
-    (*; fee_excess *)}
+    (*; fee_excess *) }
 
   let hash t : Ledger_builder_hash.t =
     let aux : Aux.t = t.scan_state in
@@ -346,8 +341,7 @@ end = struct
     let open Config in
     { scan_state= Parallel_scan.start ~parallelism_log_2
     ; ledger
-    ; public_key= self
-    (*; fee_excess= Currency.Fee.Signed.zero *)}
+    ; public_key= self }
 
   let current_ledger_proof t =
     let res_opt = Parallel_scan.last_emitted_value t.scan_state in
@@ -362,7 +356,7 @@ end = struct
           fee1 fee2
     | Some s -> Ok s
 
-  let fee_excess_in_scan_state t =
+  let fee_excess_in_aux t =
     let merges, bases = Parallel_scan.as_and_ds t.scan_state in
     let open Or_error.Let_syntax in
     let stmts =
@@ -371,8 +365,6 @@ end = struct
     List.fold stmts ~init:(Ok Currency.Fee.Signed.zero) ~f:(fun sum stmt ->
         let%bind sum' = sum in
         add_fee_excesses stmt.fee_excess sum' )
-
-  let fee_excess_in_aux = fee_excess_in_scan_state
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
@@ -530,30 +522,6 @@ end = struct
     in
     option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
 
-  (*let update_and_check_total_fee_excess t
-      (cur_res_opt: Ledger_proof.t with_statement option) =
-    let open Or_error.Let_syntax in
-    let zero = Fee.Signed.zero in
-    let check fee =
-      if Fee.Signed.equal fee zero then return ()
-      else Or_error.errorf !"Non-zero fee excess: %{sexp: Fee.Signed.t}%!" fee
-    in
-    let check_fee_excess emitted =
-      let%bind emitted_fee_excess = add_fee_excesses t.fee_excess emitted in
-      let%bind tree_fee_excess = fee_excess_in_scan_state t in
-      let%bind sum_fe = add_fee_excesses emitted_fee_excess tree_fee_excess in
-      let%map () = check sum_fe in
-      emitted_fee_excess
-    in
-    let%map new_fee_excess =
-      match cur_res_opt with
-      | Some (_, stmt) ->
-          if Fee.Signed.equal stmt.fee_excess zero then check_fee_excess zero
-          else check_fee_excess stmt.fee_excess
-      | None -> check_fee_excess zero
-    in
-    t.fee_excess <- new_fee_excess*)
-
   (* TODO: This must be updated when we add coinbases *)
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_diff t (diff: Ledger_builder_diff.t) =
@@ -610,10 +578,6 @@ end = struct
     let%map () =
       (* TODO: Add rollback *)
       enqueue_data_with_rollback t.scan_state new_data
-    (*in
-    let%map () =
-      update_and_check_total_fee_excess t res_opt
-      |> Result_with_rollback.of_or_error*)
     in
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
@@ -646,7 +610,6 @@ end = struct
     in
     Or_error.ok_exn
       (Parallel_scan.enqueue_data ~state:t.scan_state ~data:new_data) ;
-    (*Or_error.ok_exn (update_and_check_total_fee_excess t res_opt) ;*)
     res_opt
 
   let free_space t : int = Parallel_scan.free_space ~state:t.scan_state
@@ -1210,7 +1173,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let parallelism_log_2 = 3
+        let parallelism_log_2 = 8
       end
 
       let check :

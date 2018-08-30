@@ -105,11 +105,7 @@ struct
              let%bind correct_transaction_snark =
                let proof, fee_excess =
                  Option.value
-                   ~default:
-                     ( Tock.Proof.dummy
-                     , Currency.Fee.Signed.zero
-                       (*TODO? is this zero or fee_excess from the previous state*)
-                     )
+                   ~default:(Tock.Proof.dummy, Currency.Fee.Signed.zero)
                    (Snark_transition.ledger_proof_fee_excess transition)
                in
                T.verify_complete_merge

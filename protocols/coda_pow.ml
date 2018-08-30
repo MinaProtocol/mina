@@ -467,7 +467,7 @@ module type Blockchain_state_intf = sig
 
   type time
 
-  type fee_excess
+  type fee_excess = Fee.Signed.t
 
   type value [@@deriving sexp, bin_io]
 

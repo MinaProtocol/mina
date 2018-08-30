@@ -164,14 +164,7 @@ type t =
 [@@deriving fields, sexp, bin_io]
 
 let statement {source; target; proof_type; fee_excess; proof= _} =
-  { Statement.source
-  ; target
-  ; proof_type
-  ; fee_excess
-  (*Currency.Fee.Signed.create
-        ~magnitude:Currency.Amount.(to_fee (Signed.magnitude fee_excess))
-        ~sgn:(Currency.Fee.Signed.sgn fee_excess)*)
-  }
+  {Statement.source; target; proof_type; fee_excess}
 
 let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
 
@@ -692,9 +685,9 @@ module Verification = struct
       in
       Tock.verify proof keys.wrap (wrap_input ()) (embed input)
 
-    (* The curve pt corresponding to H(merge_prefix, _, _, fee, wrap_vk)
+    (* The curve pt corresponding to H(merge_prefix, _, _, fee_excess, wrap_vk)
     (with starting point shifted over by 2 * digest_size so that
-    this can then be used to compute H(merge_prefix, s1, s2, fee, wrap_vk) *)
+    this can then be used to compute H(merge_prefix, s1, s2, fee_excess, wrap_vk) *)
     let merge_prefix_and_zero_and_vk_curve_pt fee_excess =
       let open Tick in
       let s =
@@ -724,9 +717,9 @@ module Verification = struct
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
-      (against the wrap verification key) H(s1, s2, fee, wrap_vk).
+      (against the wrap verification key) H(s1, s2, fee_excess, wrap_vk).
       This in turn should only happen if there exists a tick proof proving
-      (against the merge verification key) H(s1, s2, fee, wrap_vk).
+      (against the merge verification key) H(s1, s2, fee_excess, wrap_vk).
 
       We precompute the parts of the pedersen involving wrap_vk and
       Amount.Signed.zero outside the SNARK since this saves us many constraints.
@@ -736,7 +729,6 @@ module Verification = struct
       let open Let_syntax in
       let%bind s1 = Ledger_hash.var_to_triples s1
       and s2 = Ledger_hash.var_to_triples s2 in
-      (*let fee = Currency.Fee.Signed.Checked.to_triples fee_excess in*)
       let%bind top_hash_section =
         Pedersen.Checked.Section.extend
           (merge_prefix_and_zero_and_vk_curve_pt fee_excess)
