@@ -4,6 +4,8 @@ open Async_kernel
 module type Inputs_intf = sig
   module State_hash : sig
     type t [@@deriving eq]
+
+    val to_bits : t -> bool list
   end
 
   module Security : Protocols.Coda_pow.Security_intf
@@ -127,6 +129,14 @@ module type Inputs_intf = sig
     type answer [@@deriving bin_io]
 
     type query [@@deriving bin_io]
+
+    module Responder : sig
+      type t
+
+      val create : Ledger.t -> (query -> unit) -> t
+
+      val answer_query : t -> query -> answer
+    end
 
     val create : Ledger.t -> Ledger_hash.t -> t
 
@@ -402,6 +412,22 @@ end = struct
           in
           job )
     in
+    let replace last job =
+      let current_transition, _ = job in
+      match last with
+      | None -> `Cancel_and_do_next
+      | Some last ->
+          let last_transition, _ = last in
+          match
+            Consensus_mechanism.select
+              (Protocol_state.consensus_state
+                 (Inputs.External_transition.protocol_state last_transition))
+              (Protocol_state.consensus_state
+                 (Inputs.External_transition.protocol_state current_transition))
+          with
+          | `Keep -> `Skip
+          | `Take -> `Cancel_and_do_next
+    in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
           Option.iter last ~f:(fun (input, ivar) ->
@@ -419,27 +445,51 @@ end = struct
       >>| ignore ) ;
     t
 
-  (* TODO: implement this when sync-ledger merges *)
-  let handle_sync_ledger_queries _query = failwith "TODO"
-
   let strongest_ledgers {strongest_ledgers; _} = strongest_ledgers
+
+  let local_get_ledger' t hash ~p_tip ~p_trans ~f_result =
+    let open Deferred.Or_error.Let_syntax in
+    let%map tip, state =
+      Transition_logic.local_get_tip t.handler ~p_tip:(p_tip hash)
+        ~p_trans:(p_trans hash)
+    in
+    (f_result tip, state)
 
   (** Returns a reference to a ledger_builder with hash [hash], materialize a
    fresh ledger at a specific hash if necessary; also gives back target_state *)
   let local_get_ledger t hash =
+    local_get_ledger' t hash
+      ~p_tip:(fun hash tip ->
+        Ledger_builder_hash.equal
+          (Ledger_builder.hash tip.Tip.ledger_builder)
+          hash )
+      ~p_trans:(fun hash trans ->
+        Ledger_builder_hash.equal
+          (External_transition.ledger_builder_hash trans)
+          hash )
+      ~f_result:(fun tip -> tip.Tip.ledger_builder)
+
+  let handle_sync_ledger_queries :
+         t
+      -> Ledger_hash.t * Sync_ledger.query
+      -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t =
+   fun t (hash, query) ->
+    (* TODO: We should cache, but in the future it will be free *)
     let open Deferred.Or_error.Let_syntax in
-    let%map tip, state =
-      Transition_logic.local_get_tip t.handler
-        ~p_tip:(fun tip ->
-          Ledger_builder_hash.equal
-            (Ledger_builder.hash tip.Tip.ledger_builder)
+    let%map ledger =
+      local_get_ledger' t hash
+        ~p_tip:(fun hash tip ->
+          Ledger_hash.equal
+            ( tip.Tip.ledger_builder |> Ledger_builder.ledger
+            |> Ledger.merkle_root )
             hash )
-        ~p_trans:(fun trans ->
-          Ledger_builder_hash.equal
-            (External_transition.ledger_builder_hash trans)
-            hash )
+        ~p_trans:(fun hash trans ->
+          Ledger_hash.equal (External_transition.ledger_hash trans) hash )
+        ~f_result:(fun tip -> tip.Tip.ledger_builder |> Ledger_builder.ledger)
+      >>| fst
     in
-    (tip.Tip.ledger_builder, state)
+    let responder = Sync_ledger.Responder.create ledger ignore in
+    (hash, Sync_ledger.Responder.answer_query responder query)
 end
 
 let%test_module "test" =
@@ -486,7 +536,12 @@ let%test_module "test" =
           return (Ok (Some (x, ())))
       end
 
-      module State_hash = Int
+      module State_hash = struct
+        include Int
+
+        let to_bits t = [t <> 0]
+      end
+
       module Protocol_state_proof = Unit
 
       module Blockchain_state = struct
@@ -583,6 +638,14 @@ let%test_module "test" =
         type answer = Ledger.t [@@deriving bin_io]
 
         type query = unit [@@deriving bin_io]
+
+        module Responder = struct
+          type t = unit
+
+          let create _ = failwith "unused"
+
+          let answer_query _ = failwith "unused"
+        end
 
         type t =
           { mutable ledger: Ledger.t

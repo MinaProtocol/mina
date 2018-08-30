@@ -90,7 +90,7 @@ module type Network_intf = sig
                                           Deferred.t)
     -> answer_sync_ledger_query:(   ledger_hash * sync_ledger_query
                                  -> (ledger_hash * sync_ledger_answer)
-                                    Deferred.t)
+                                    Deferred.Or_error.t)
     -> t Deferred.t
 end
 
@@ -206,7 +206,9 @@ module type Ledger_builder_controller_intf = sig
     t -> (ledger_builder * external_transition) Linear_pipe.Reader.t
 
   val handle_sync_ledger_queries :
-    ledger_hash * sync_query -> ledger_hash * sync_answer
+       t
+    -> ledger_hash * sync_query
+    -> (ledger_hash * sync_answer) Deferred.Or_error.t
 
   (** For tests *)
   module Transition_tree : Ktree_intf with type elem := external_transition
@@ -429,6 +431,7 @@ module Make (Inputs : Inputs_intf) = struct
   module Config = struct
     type t =
       { log: Logger.t
+      ; should_propose: bool
       ; net_config: Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
@@ -468,8 +471,8 @@ module Make (Inputs : Inputs_intf) = struct
                 , Ledger.merkle_root (Ledger_builder.ledger lb) )
           | _ -> None )
         ~answer_sync_ledger_query:(fun query ->
-          return (Ledger_builder_controller.handle_sync_ledger_queries query)
-          )
+          let%bind lbc = lbc_deferred in
+          Ledger_builder_controller.handle_sync_ledger_queries lbc query )
     in
     let%bind transaction_pool =
       Transaction_pool.load
@@ -525,10 +528,12 @@ module Make (Inputs : Inputs_intf) = struct
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
         ~time_controller:config.time_controller
     in
-    don't_wait_for
-      (Linear_pipe.transfer_id
-         (Proposer.transitions proposer)
-         external_transitions_writer) ;
+    if config.should_propose then
+      don't_wait_for
+        (Linear_pipe.transfer_id
+           (Proposer.transitions proposer)
+           external_transitions_writer)
+    else don't_wait_for (Linear_pipe.drain (Proposer.transitions proposer)) ;
     return
       { proposer
       ; net

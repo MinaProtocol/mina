@@ -14,12 +14,16 @@ module Make
             end
             with type account := Account.t) (Depth : sig
         val depth : int
-    end) :
-  Ledger_intf.S
-  with type hash := Hash.t
-   and type account := Account.t
-   and type key := Key.t =
-struct
+    end) : sig
+  include Ledger_intf.S
+          with type hash := Hash.t
+           and type account := Account.t
+           and type key := Key.t
+
+  module For_tests : sig
+    val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
+  end
+end = struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
 
@@ -201,7 +205,7 @@ struct
           let length = Int.pow 2 (tree.nodes_height - 1 - i) in
           let new_elems = length - Dyn_array.length nodes in
           Dyn_array.append
-            (Dyn_array.init new_elems (fun _ -> Hash.empty))
+            (Dyn_array.init new_elems (fun _ -> empty_hash_at_height (i + 1)))
             nodes ) )
 
   let rec recompute_layers curr_height get_prev_hash layers dirty_indices =
@@ -225,6 +229,12 @@ struct
         in
         recompute_layers (curr_height + 1) get_curr_hash layers dirty_indices
 
+  let get_leaf_hash t i =
+    if i < Dyn_array.length t.tree.leafs then
+      Hash.hash_account
+        (Hashtbl.find_exn t.accounts (Dyn_array.get t.tree.leafs i)).account
+    else Hash.empty
+
   let recompute_tree t =
     if not (List.is_empty t.tree.dirty_indices) then (
       extend_tree t.tree ;
@@ -233,14 +243,7 @@ struct
         Int.Set.to_list
           (Int.Set.of_list (List.map t.tree.dirty_indices ~f:(fun x -> x / 2)))
       in
-      let get_leaf_hash i =
-        if i < Dyn_array.length t.tree.leafs then
-          Hash.hash_account
-            (Hashtbl.find_exn t.accounts (Dyn_array.get t.tree.leafs i))
-              .account
-        else Hash.empty
-      in
-      recompute_layers 1 get_leaf_hash t.tree.nodes layer_dirty_indices ;
+      recompute_layers 1 (get_leaf_hash t) t.tree.nodes layer_dirty_indices ;
       (t.tree).dirty_indices <- [] )
 
   let merkle_root t =
@@ -327,6 +330,10 @@ struct
       ~init:0
       ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
 
+  module For_tests = struct
+    let get_leaf_hash_at_addr t addr = get_leaf_hash t (to_index addr)
+  end
+
   (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
     assert (Addr.depth a = Depth.depth - 1) ;
@@ -354,9 +361,8 @@ struct
     recompute_tree t ;
     if height < t.tree.nodes_height && index < length t then
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
-      DynArray.get l (to_index a)
-    else if index = 0 then
-      (* we're somewhere along the path to the content root *)
+      DynArray.get l index
+    else if index = 0 && not (t.tree.nodes_height = 0) then
       complete_with_empties
         (DynArray.get (List.last_exn t.tree.nodes) 0)
         t.tree.nodes_height height

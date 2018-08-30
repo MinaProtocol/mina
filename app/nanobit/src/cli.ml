@@ -31,8 +31,8 @@ let daemon (type ledger_proof) (module Kernel
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
-     and should_mine =
-       flag "mine" ~doc:"true|false Run the miner (default:false)"
+     and should_propose =
+       flag "propose" ~doc:"true|false Run the proposer (default:true)"
          (optional bool)
      and peers =
        flag "peer"
@@ -74,6 +74,7 @@ let daemon (type ledger_proof) (module Kernel
        let client_port =
          Option.value ~default:default_client_port client_port
        in
+       let should_propose = Option.value ~default:true should_propose in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
@@ -134,7 +135,7 @@ let daemon (type ledger_proof) (module Kernel
          in
          let%map minibit =
            Run.create
-             (Run.Config.make ~log ~net_config
+             (Run.Config.make ~log ~net_config ~should_propose
                 ~ledger_builder_persistant_location:
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
@@ -218,9 +219,12 @@ let () =
             Coda_peers_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_block_production_test =
             Coda_block_production_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
+          let module Coda_shared_prefix_test =
+            Coda_shared_prefix_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           [ (Coda_peers_test.name, Coda_peers_test.command)
           ; ( Coda_block_production_test.name
             , Coda_block_production_test.command )
+          ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
     else
@@ -243,9 +247,12 @@ let () =
           let module Coda_block_production_test =
             Coda_block_production_test.Make (Ledger_proof.Debug) (Kernel)
               (Coda) in
+          let module Coda_shared_prefix_test =
+            Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           [ (Coda_peers_test.name, Coda_peers_test.command)
           ; ( Coda_block_production_test.name
             , Coda_block_production_test.command )
+          ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
   in
