@@ -18,6 +18,8 @@ val wrap_reader : 'a Pipe.Reader.t -> 'a Reader.t
 
 val write : 'a Writer.t -> 'a -> unit Deferred.t
 
+val write_if_open : 'a Writer.t -> 'a -> unit Deferred.t
+
 val write_without_pushback : 'a Writer.t -> 'a -> unit
 
 val force_write_maybe_drop_head :
