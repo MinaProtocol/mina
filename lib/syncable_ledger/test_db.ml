@@ -6,7 +6,7 @@ module Make (Depth : sig
   val num_accts : int
 end) =
 struct
-  open Merkle_ledger.Test_stubs
+  open Merkle_ledger_tests.Test_stubs
 
   module Hash = struct
     type t = Hash.t [@@deriving sexp, hash, compare, bin_io, eq]
@@ -88,9 +88,7 @@ struct
         let subtree_height = 3
       end)
 
-  module SR =
-    Syncable_ledger.Make_sync_responder (L.Addr) (Account) (Hash) (Hash) (L)
-      (SL)
+  module SR = SL.Responder
 
   let num_accts = Depth.num_accts
 end

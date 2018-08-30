@@ -29,7 +29,7 @@ module type Account = sig
 end
 
 module type Hash = sig
-  type t [@@deriving bin_io]
+  type t [@@deriving bin_io, sexp]
 
   type account
 
