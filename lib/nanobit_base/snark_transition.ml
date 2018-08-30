@@ -25,14 +25,14 @@ module type S = sig
   val create_value :
        blockchain_state:Blockchain_state.value
     -> consensus_data:Consensus_data.value
-    -> ledger_proof:Proof.t option
+    -> ledger_proof_fee_excess:(Proof.t * Currency.Fee.Signed.t) option
     -> value
 
   val blockchain_state : ('a, _) t -> 'a
 
   val consensus_data : (_, 'a) t -> 'a
 
-  val ledger_proof : _ t -> Proof.t option
+  val ledger_proof_fee_excess : _ t -> (Proof.t * Currency.Fee.Signed.t) option
 
   val genesis : value
 end
@@ -45,7 +45,7 @@ struct
   type ('blockchain_state, 'consensus_data) t =
     { blockchain_state: 'blockchain_state
     ; consensus_data: 'consensus_data
-    ; ledger_proof: Proof.t option }
+    ; ledger_proof_fee_excess: (Proof.t * Currency.Fee.Signed.t) option }
   [@@deriving bin_io, sexp, fields]
 
   type value = (Blockchain_state.value, Consensus_data.value) t
@@ -53,15 +53,15 @@ struct
 
   type var = (Blockchain_state.var, Consensus_data.var) t
 
-  let create_value ~blockchain_state ~consensus_data ~ledger_proof =
-    {blockchain_state; consensus_data; ledger_proof}
+  let create_value ~blockchain_state ~consensus_data ~ledger_proof_fee_excess =
+    {blockchain_state; consensus_data; ledger_proof_fee_excess}
 
-  let to_hlist {blockchain_state; consensus_data; ledger_proof= _} =
+  let to_hlist {blockchain_state; consensus_data; ledger_proof_fee_excess= _} =
     H_list.[blockchain_state; consensus_data]
 
   let of_hlist : (unit, 'ps -> 'cd -> unit) H_list.t -> ('ps, 'cd) t =
    fun H_list.([blockchain_state; consensus_data]) ->
-    {blockchain_state; consensus_data; ledger_proof= None}
+    {blockchain_state; consensus_data; ledger_proof_fee_excess= None}
 
   let data_spec =
     Snark_params.Tick.Data_spec.[Blockchain_state.typ; Consensus_data.typ]
@@ -73,5 +73,5 @@ struct
   let genesis =
     { blockchain_state= Blockchain_state.genesis
     ; consensus_data= Consensus_data.genesis
-    ; ledger_proof= None }
+    ; ledger_proof_fee_excess= None }
 end

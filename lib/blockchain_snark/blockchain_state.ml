@@ -2,8 +2,6 @@
 
 open Core_kernel
 open Nanobit_base
-open Coda_numbers
-open Util
 open Snark_params
 open Tick
 open Nanobit_base
@@ -40,7 +38,7 @@ struct
     let update state (transition: Snark_transition.value) =
       let open Or_error.Let_syntax in
       let%bind () =
-        match Snark_transition.ledger_proof transition with
+        match Snark_transition.ledger_proof_fee_excess transition with
         | None ->
             check
               (Ledger_hash.equal
@@ -49,7 +47,7 @@ struct
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash ))
               "Body proof was none but tried to update ledger hash"
-        | Some proof ->
+        | Some (proof, fee_excess) ->
             if Insecure.verify_blockchain then Ok ()
             else
               check
@@ -61,8 +59,7 @@ struct
                       ~target:
                         ( transition |> Snark_transition.blockchain_state
                         |> Blockchain_state.ledger_hash )
-                      ~proof_type:`Merge
-                      ~fee_excess:Currency.Amount.Signed.zero ~proof))
+                      ~proof_type:`Merge ~fee_excess ~proof))
                 "Proof did not verify"
       in
       let%map consensus_state =
@@ -106,14 +103,17 @@ struct
         with_label __LOC__
           (let%bind good_body =
              let%bind correct_transaction_snark =
+               let proof, fee_excess =
+                 Option.value
+                   ~default:(Tock.Proof.dummy, Currency.Fee.Signed.zero)
+                   (Snark_transition.ledger_proof_fee_excess transition)
+               in
                T.verify_complete_merge
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
-                 (As_prover.return
-                    (Option.value ~default:Tock.Proof.dummy
-                       (Snark_transition.ledger_proof transition)))
+                 (As_prover.return proof) fee_excess
              and ledger_hash_didn't_change =
                Ledger_hash.equal_var
                  ( previous_state |> Protocol_state.blockchain_state

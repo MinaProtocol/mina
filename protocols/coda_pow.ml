@@ -229,7 +229,7 @@ module type Super_transaction_intf = sig
   type t = Transaction of valid_transaction | Fee_transfer of fee_transfer
   [@@deriving sexp, compare, eq, bin_io]
 
-  val fee_excess : t -> Fee.Unsigned.t Or_error.t
+  val fee_excess : t -> Fee.Signed.t Or_error.t
 end
 
 module type Ledger_proof_statement_intf = sig
@@ -425,6 +425,8 @@ module type Ledger_builder_intf = sig
 
   val aux : t -> Aux.t
 
+  val fee_excess_in_aux : t -> Fee.Signed.t Or_error.t
+
   val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
 
   val random_work_spec_chunk :
@@ -465,6 +467,8 @@ module type Blockchain_state_intf = sig
 
   type time
 
+  type fee_excess = Fee.Signed.t
+
   type value [@@deriving sexp, bin_io]
 
   type var
@@ -473,11 +477,14 @@ module type Blockchain_state_intf = sig
        ledger_builder_hash:ledger_builder_hash
     -> ledger_hash:ledger_hash
     -> timestamp:time
+    -> fee_excess:fee_excess
     -> value
 
   val ledger_builder_hash : value -> ledger_builder_hash
 
   val ledger_hash : value -> ledger_hash
+
+  val fee_excess : value -> fee_excess
 
   val timestamp : value -> time
 end
@@ -535,7 +542,7 @@ module type Consensus_mechanism_intf = sig
     val create_value :
          blockchain_state:blockchain_state
       -> consensus_data:Consensus_transition_data.value
-      -> ledger_proof:proof option
+      -> ledger_proof_fee_excess:(proof * Fee.Signed.t) option
       -> value
 
     val blockchain_state : value -> blockchain_state
@@ -798,6 +805,7 @@ Merge Snark:
     with type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_hash := Ledger_hash.t
      and type time := Time.t
+     and type fee_excess := Currency.Fee.Signed.t
 
   module Protocol_state_hash : Protocol_state_hash_intf
 

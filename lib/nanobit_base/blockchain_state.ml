@@ -14,13 +14,14 @@ module Hash = State_hash
 
 module Stable = struct
   module V1 = struct
-    type ('ledger_builder_hash, 'ledger_hash, 'time) t_ =
+    type ('ledger_builder_hash, 'ledger_hash, 'time, 'fee) t_ =
       { ledger_builder_hash: 'ledger_builder_hash
       ; ledger_hash: 'ledger_hash
-      ; timestamp: 'time }
+      ; timestamp: 'time 
+      ; fee_excess: 'fee}
     [@@deriving bin_io, sexp, fields, eq, compare, hash]
 
-    type t = (Ledger_builder_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Block_time.Stable.V1.t) t_
+    type t = (Ledger_builder_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Block_time.Stable.V1.t, Currency.Fee.Signed.t) t_
     [@@deriving bin_io, sexp, eq, compare, hash]
   end
 end
@@ -30,24 +31,26 @@ include Stable.V1
 type var =
   ( Ledger_builder_hash.var
   , Ledger_hash.var
-  , Block_time.Unpacked.var 
+  , Block_time.Unpacked.var
+  , Currency.Fee.Signed.var
   ) t_
 
 type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
-let create_value ~ledger_builder_hash ~ledger_hash ~timestamp =
-  { ledger_builder_hash; ledger_hash; timestamp }
+let create_value ~ledger_builder_hash ~ledger_hash ~timestamp ~fee_excess =
+  { ledger_builder_hash; ledger_hash; timestamp; fee_excess }
 
-let to_hlist { ledger_builder_hash; ledger_hash; timestamp } =
-  H_list.([ ledger_builder_hash; ledger_hash; timestamp ])
-let of_hlist : (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t_ =
-  H_list.(fun [ ledger_builder_hash; ledger_hash; timestamp ] -> { ledger_builder_hash; ledger_hash; timestamp })
+let to_hlist { ledger_builder_hash; ledger_hash; timestamp; fee_excess } =
+  H_list.([ ledger_builder_hash; ledger_hash; timestamp; fee_excess ])
+let of_hlist : (unit, 'lbh -> 'lh -> 'ti -> 'fe -> unit) H_list.t -> ('lbh, 'lh, 'ti, 'fe) t_ =
+  H_list.(fun [ ledger_builder_hash; ledger_hash; timestamp; fee_excess ] -> { ledger_builder_hash; ledger_hash; timestamp; fee_excess })
 
 let data_spec =
   let open Data_spec in
   [ Ledger_builder_hash.typ
   ; Ledger_hash.typ
   ; Block_time.Unpacked.typ
+  ; Currency.Fee.Signed.typ
   ]
 
 let typ : (var, value) Typ.t =
@@ -55,18 +58,20 @@ let typ : (var, value) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_to_triples ({ ledger_builder_hash; ledger_hash; timestamp } : var) =
+let var_to_triples ({ ledger_builder_hash; ledger_hash; timestamp; fee_excess } : var) =
   let%map ledger_hash_triples = Ledger_hash.var_to_triples ledger_hash
   and ledger_builder_hash_triples = Ledger_builder_hash.var_to_triples ledger_builder_hash
   in
   ledger_builder_hash_triples
   @ ledger_hash_triples
   @ Block_time.Unpacked.var_to_triples timestamp
+  @ Currency.Fee.Signed.Checked.to_triples fee_excess
 
-let fold ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
+let fold ({ ledger_builder_hash; ledger_hash; timestamp; fee_excess } : value) =
   Fold.(Ledger_builder_hash.fold ledger_builder_hash
   +> Ledger_hash.fold ledger_hash
-  +> Block_time.fold timestamp)
+  +> Block_time.fold timestamp
+  +> Currency.Fee.Signed.fold fee_excess)
 
 let length_in_triples =
   Ledger_builder_hash.length_in_triples
@@ -84,7 +89,8 @@ let genesis_time =
 let genesis =
   { ledger_builder_hash= Ledger_builder_hash.dummy
   ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
-  ; timestamp= genesis_time }
+  ; timestamp= genesis_time 
+  ; fee_excess = Currency.Fee.Signed.zero }
 
 module Message = struct
   open Util

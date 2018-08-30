@@ -317,19 +317,22 @@ end = struct
             ( Some [single_spec last_job]
             , (seen_statements', Some (canonical_statement_of_job last_job)) )
 
-  let aux {scan_state; _} = scan_state
+  let aux t : Aux.t = t.scan_state
 
-  let make ~public_key ~ledger ~aux = {public_key; ledger; scan_state= aux}
+  let make ~public_key ~ledger ~(aux: Aux.t) =
+    {public_key; ledger; scan_state= aux}
 
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
     ; ledger= Ledger.copy ledger
-    ; public_key }
+    ; public_key
+    (*; fee_excess *) }
 
-  let hash {scan_state; ledger; public_key= _} : Ledger_builder_hash.t =
+  let hash t : Ledger_builder_hash.t =
+    let aux : Aux.t = t.scan_state in
     let h = Cryptokit.Hash.sha3 256 in
-    h#add_string (Ledger_hash.to_bytes (Ledger.merkle_root ledger)) ;
-    h#add_string (Aux.hash_to_string scan_state) ;
+    h#add_string (Ledger_hash.to_bytes (Ledger.merkle_root t.ledger)) ;
+    h#add_string (Aux.hash_to_string aux) ;
     Ledger_builder_hash.of_bytes h#result
 
   let ledger {ledger; _} = ledger
@@ -343,6 +346,25 @@ end = struct
   let current_ledger_proof t =
     let res_opt = Parallel_scan.last_emitted_value t.scan_state in
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
+
+  let add_fee_excesses fee1 fee2 =
+    match Currency.Fee.Signed.add fee1 fee2 with
+    | None ->
+        Or_error.errorf
+          !"Error while adding fee_excesses %{sexp: Currency.Fee.Signed.t} \
+            and %{sexp: Currency.Fee.Signed.t}"
+          fee1 fee2
+    | Some s -> Ok s
+
+  let fee_excess_in_aux t =
+    let merges, bases = Parallel_scan.as_and_ds t.scan_state in
+    let open Or_error.Let_syntax in
+    let stmts =
+      List.map merges ~f:snd @ List.map bases ~f:(fun t -> t.statement)
+    in
+    List.fold stmts ~init:(Ok Currency.Fee.Signed.zero) ~f:(fun sum stmt ->
+        let%bind sum' = sum in
+        add_fee_excesses stmt.fee_excess sum' )
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
@@ -418,7 +440,7 @@ end = struct
     ( undo
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger
-      ; fee_excess= Fee.Signed.of_unsigned fee_excess
+      ; fee_excess
       ; proof_type= `Base } )
 
   let apply_super_transaction_and_get_witness ledger s =
@@ -904,18 +926,20 @@ let%test_module "test" =
         type fee_transfer = Fee_transfer.t
         [@@deriving sexp, bin_io, compare, eq]
 
-        type unsigned_fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
-
         type t =
           | Transaction of valid_transaction
           | Fee_transfer of fee_transfer
         [@@deriving sexp, bin_io, compare, eq]
 
-        let fee_excess : t -> unsigned_fee Or_error.t =
+        let fee_excess : t -> Fee.Signed.t Or_error.t =
          fun t ->
+          let open Or_error.Let_syntax in
           match t with
-          | Transaction t' -> Ok (Transaction.fee t')
-          | Fee_transfer f -> Fee_transfer.fee_excess f
+          | Transaction t' ->
+              Ok (Currency.Fee.Signed.of_unsigned (Transaction.fee t'))
+          | Fee_transfer f ->
+              let%map fee = Fee_transfer.fee_excess f in
+              Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
       end
 
       module Ledger_hash = struct

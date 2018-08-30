@@ -27,7 +27,7 @@ module Input = struct
   type t =
     { source: Ledger_hash.Stable.V1.t
     ; target: Ledger_hash.Stable.V1.t
-    ; fee_excess: Currency.Amount.Signed.t }
+    ; fee_excess: Currency.Fee.Signed.t }
   [@@deriving bin_io]
 end
 
@@ -77,14 +77,13 @@ module Tagged_transaction = struct
 
   let excess ((tag, t): t) =
     match tag with
-    | Normal ->
-        Amount.Signed.create ~sgn:Sgn.Pos
-          ~magnitude:(Amount.of_fee t.payload.fee)
+    | Normal -> Fee.Signed.create ~sgn:Sgn.Pos ~magnitude:t.payload.fee
     | Fee_transfer ->
         let magnitude =
-          Amount.add_fee t.payload.amount t.payload.fee |> Option.value_exn
+          Amount.add_fee t.payload.amount t.payload.fee
+          |> Option.value_exn |> Amount.to_fee
         in
-        Amount.Signed.create ~sgn:Sgn.Neg ~magnitude
+        Fee.Signed.create ~sgn:Sgn.Neg ~magnitude
 end
 
 module Fee_transfer = struct
@@ -160,18 +159,12 @@ type t =
   { source: Ledger_hash.Stable.V1.t
   ; target: Ledger_hash.Stable.V1.t
   ; proof_type: Proof_type.t
-  ; fee_excess: Amount.Signed.Stable.V1.t
+  ; fee_excess: Fee.Signed.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
 [@@deriving fields, sexp, bin_io]
 
 let statement {source; target; proof_type; fee_excess; proof= _} =
-  { Statement.source
-  ; target
-  ; proof_type
-  ; fee_excess=
-      Currency.Fee.Signed.create
-        ~magnitude:Currency.Amount.(to_fee (Signed.magnitude fee_excess))
-        ~sgn:(Currency.Amount.Signed.sgn fee_excess) }
+  {Statement.source; target; proof_type; fee_excess}
 
 let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
 
@@ -179,14 +172,12 @@ let create = Fields.create
 
 let base_top_hash s1 s2 excess =
   Tick.Pedersen.digest_fold Hash_prefix.base_snark
-    Fold.(
-      Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Amount.Signed.fold excess)
+    Fold.(Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Fee.Signed.fold excess)
 
 let merge_top_hash s1 s2 fee_excess wrap_vk_bits =
   Tick.Pedersen.digest_fold Hash_prefix.merge_snark
     Fold.(
-      Ledger_hash.fold s1 +> Ledger_hash.fold s2
-      +> Amount.Signed.fold fee_excess
+      Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Fee.Signed.fold fee_excess
       +> Fold.(group3 ~default:false (of_list wrap_vk_bits)))
 
 let embed (x: Tick.Field.t) : Tock.Field.t =
@@ -449,10 +440,10 @@ module Merge = struct
       ; ledger_hash1: bool list
       ; ledger_hash2: bool list
       ; proof12: Proof_type.t * Tock_curve.Proof.t
-      ; fee_excess12: Amount.Signed.t
+      ; fee_excess12: Fee.Signed.t
       ; ledger_hash3: bool list
       ; proof23: Proof_type.t * Tock_curve.Proof.t
-      ; fee_excess23: Amount.Signed.t }
+      ; fee_excess23: Fee.Signed.t }
     [@@deriving fields]
   end
 
@@ -534,7 +525,7 @@ module Merge = struct
       in
       let%bind sec = disjoint_union_sections [prefix; s1; s2] in
       Pedersen.Checked.Section.extend sec
-        (Amount.Signed.Checked.to_triples fee_excess)
+        (Fee.Signed.Checked.to_triples fee_excess)
         ~start:
           (Hash_prefix.length_in_triples + (2 * state_hash_size_in_triples))
     in
@@ -573,9 +564,9 @@ module Merge = struct
     and s2 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash2
     and s3 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash3
     and fee_excess12 =
-      provide_witness' Amount.Signed.typ ~f:Prover_state.fee_excess12
+      provide_witness' Fee.Signed.typ ~f:Prover_state.fee_excess12
     and fee_excess23 =
-      provide_witness' Amount.Signed.typ ~f:Prover_state.fee_excess23
+      provide_witness' Fee.Signed.typ ~f:Prover_state.fee_excess23
     in
     let bits_to_triples bits =
       Fold.(to_list (group3 ~default:Boolean.false_ (of_list bits)))
@@ -600,16 +591,14 @@ module Merge = struct
         (bits_to_triples bs)
     in
     let%bind () =
-      let%bind total_fees =
-        Amount.Signed.Checked.add fee_excess12 fee_excess23
-      in
+      let%bind total_fees = Fee.Signed.Checked.add fee_excess12 fee_excess23 in
       let%bind sec =
         let%bind fee_section =
           let open Pedersen.Checked.Section in
           extend empty
             ~start:
               (Hash_prefix.length_in_triples + (2 * state_hash_size_in_triples))
-            (Amount.Signed.Checked.to_triples total_fees)
+            (Fee.Signed.Checked.to_triples total_fees)
         in
         disjoint_union_sections
           [ Pedersen.Checked.Section.create
@@ -672,6 +661,7 @@ module Verification = struct
          Ledger_hash.var
       -> Ledger_hash.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
+      -> Currency.Fee.Signed.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
   end
 
@@ -695,10 +685,10 @@ module Verification = struct
       in
       Tock.verify proof keys.wrap (wrap_input ()) (embed input)
 
-    (* The curve pt corresponding to H(merge_prefix, _, _, Amount.Signed.zero, wrap_vk)
+    (* The curve pt corresponding to H(merge_prefix, _, _, fee_excess, wrap_vk)
     (with starting point shifted over by 2 * digest_size so that
-    this can then be used to compute H(merge_prefix, s1, s2, Amount.Signed.zero, wrap_vk) *)
-    let merge_prefix_and_zero_and_vk_curve_pt =
+    this can then be used to compute H(merge_prefix, s1, s2, fee_excess, wrap_vk) *)
+    let merge_prefix_and_zero_and_vk_curve_pt fee_excess =
       let open Tick in
       let s =
         { Hash_prefix.merge_snark with
@@ -709,7 +699,7 @@ module Verification = struct
       let s =
         Pedersen.State.update_fold s
           Fold.(
-            Amount.Signed.(fold zero)
+            Fee.Signed.(fold fee_excess)
             +> group3 ~default:false (of_list wrap_vk_bits))
       in
       let hash_interval = (0, Hash_prefix.length_in_triples) in
@@ -727,20 +717,21 @@ module Verification = struct
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
-      (against the wrap verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
+      (against the wrap verification key) H(s1, s2, fee_excess, wrap_vk).
       This in turn should only happen if there exists a tick proof proving
-      (against the merge verification key) H(s1, s2, Amount.Signed.zero, wrap_vk).
+      (against the merge verification key) H(s1, s2, fee_excess, wrap_vk).
 
       We precompute the parts of the pedersen involving wrap_vk and
       Amount.Signed.zero outside the SNARK since this saves us many constraints.
     *)
-    let verify_complete_merge s1 s2 get_proof =
+    let verify_complete_merge s1 s2 get_proof fee_excess =
       let open Tick in
       let open Let_syntax in
       let%bind s1 = Ledger_hash.var_to_triples s1
       and s2 = Ledger_hash.var_to_triples s2 in
       let%bind top_hash_section =
-        Pedersen.Checked.Section.extend merge_prefix_and_zero_and_vk_curve_pt
+        Pedersen.Checked.Section.extend
+          (merge_prefix_and_zero_and_vk_curve_pt fee_excess)
           ~start:Hash_prefix.length_in_triples (s1 @ s2)
       in
       let digest =
@@ -985,7 +976,7 @@ struct
   let merge_proof ledger_hash1 ledger_hash2 ledger_hash3 proof12 proof23
       fee_excess12 fee_excess23 =
     let fee_excess =
-      Amount.Signed.add fee_excess12 fee_excess23 |> Option.value_exn
+      Fee.Signed.add fee_excess12 fee_excess23 |> Option.value_exn
     in
     let top_hash =
       merge_top_hash ledger_hash1 ledger_hash3 fee_excess wrap_vk_bits
@@ -1046,7 +1037,7 @@ struct
     in
     let open Or_error.Let_syntax in
     let%map fee_excess =
-      Amount.Signed.add t1.fee_excess t2.fee_excess
+      Fee.Signed.add t1.fee_excess t2.fee_excess
       |> Option.value_map ~f:Or_error.return
            ~default:
              (Or_error.errorf "Transaction_snark.merge: Amount overflow")
@@ -1125,7 +1116,7 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _ -> failwithf "Transaction_snark: load failed on %s" p ()
       in
       let%map base = load tick_controller base
       and merge = load tick_controller merge
@@ -1269,7 +1260,7 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
-          Array.iter wallets ~f:(fun {account} ->
+          Array.iter wallets ~f:(fun {account; _} ->
               Ledger.set ledger account.public_key account ) ;
           let t1 =
             transaction wallets 0 1 8
@@ -1285,10 +1276,10 @@ let%test_module "transaction_snark" =
           let proof12 = of_transaction' ledger t1 in
           let proof23 = of_transaction' ledger t2 in
           let total_fees =
-            let open Amount in
+            let open Fee in
             let magnitude =
-              of_fee (t1 :> Transaction.t).payload.fee
-              + of_fee (t2 :> Transaction.t).payload.fee
+              (t1 :> Transaction.t).payload.fee
+              + (t2 :> Transaction.t).payload.fee
               |> Option.value_exn
             in
             Signed.create ~magnitude ~sgn:Sgn.Pos

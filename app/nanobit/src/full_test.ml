@@ -100,7 +100,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   in
   let test_sending_transaction sender_sk receiver_pk =
     let transaction =
-      build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
+      build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 3)
     in
     let prev_sender_balance =
       Run.get_balance minibit (pk_of_sk sender_sk) |> Option.value_exn

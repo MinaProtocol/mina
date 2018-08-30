@@ -262,8 +262,15 @@ struct
       [@@deriving compare, eq]
 
       let fee_excess = function
-        | Transaction t -> Ok (Transaction.fee (t :> Transaction.t))
+        | Transaction t ->
+            Ok
+              (Currency.Fee.Signed.of_unsigned
+                 (Transaction.fee (t :> Transaction.t)))
         | Fee_transfer t -> Fee_transfer.fee_excess t
+
+      (*let open Or_error.Let_syntax in
+            let%map fee = Fee_transfer.fee_excess t in
+            Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)*)
     end
 
     include T
@@ -288,7 +295,7 @@ struct
 
     type statement = Transaction_snark.Statement.t
 
-    let statement_target (t: Transaction_snark.Statement.t) = t.target
+    let statement_target (t: statement) = t.target
 
     let underlying_proof = Ledger_proof.proof
   end
