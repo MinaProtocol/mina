@@ -228,8 +228,7 @@ struct
 
   module Epoch_ledger = struct
     type ('ledger_hash, 'amount) t =
-      { hash: 'ledger_hash
-      ; total_currency: 'amount }
+      {hash: 'ledger_hash; total_currency: 'amount}
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type value = (Nanobit_base.Ledger_hash.t, Amount.t) t
@@ -237,20 +236,21 @@ struct
 
     type var = (Nanobit_base.Ledger_hash.var, Amount.var) t
 
-    let to_hlist {hash; total_currency} = Nanobit_base.H_list.[hash; total_currency]
+    let to_hlist {hash; total_currency} =
+      Nanobit_base.H_list.[hash; total_currency]
 
-    let of_hlist : (unit, 'ledger_hash -> 'total_currency -> unit) Nanobit_base.H_list.t -> ('ledger_hash, 'total_currency) t =
-      fun Nanobit_base.H_list.[hash; total_currency] ->
-        {hash; total_currency}
+    let of_hlist :
+           (unit, 'ledger_hash -> 'total_currency -> unit) Nanobit_base.H_list.t
+        -> ('ledger_hash, 'total_currency) t =
+     fun Nanobit_base.H_list.([hash; total_currency]) -> {hash; total_currency}
 
-    let data_spec = Snark_params.Tick.Data_spec.
-      [ Nanobit_base.Ledger_hash.typ
-      ; Amount.typ ]
+    let data_spec =
+      Snark_params.Tick.Data_spec.[Nanobit_base.Ledger_hash.typ; Amount.typ]
 
     let typ =
-      Snark_params.Tick.Typ.of_hlistable data_spec
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+      Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
 
     let var_to_triples {hash; total_currency} =
       let open Snark_params.Tick.Let_syntax in
@@ -258,16 +258,18 @@ struct
       hash_triples @ Amount.var_to_triples total_currency
 
     let fold {hash; total_currency} =
-      let open Fold in
-      Nanobit_base.Ledger_hash.fold hash +> Amount.fold total_currency
+      Fold.(Nanobit_base.Ledger_hash.fold hash +> Amount.fold total_currency)
 
     let length_in_triples =
       Nanobit_base.Ledger_hash.length_in_triples + Amount.length_in_triples
 
     let if_ cond ~then_ ~else_ =
       let open Snark_params.Tick.Let_syntax in
-      let%map hash = Nanobit_base.Ledger_hash.if_ cond ~then_:then_.hash ~else_:else_.hash
-      and total_currency = Amount.Checked.if_ cond ~then_:then_.total_currency ~else_:else_.total_currency
+      let%map hash =
+        Nanobit_base.Ledger_hash.if_ cond ~then_:then_.hash ~else_:else_.hash
+      and total_currency =
+        Amount.Checked.if_ cond ~then_:then_.total_currency
+          ~else_:else_.total_currency
       in
       {hash; total_currency}
 
@@ -278,8 +280,7 @@ struct
 
   module Epoch_data = struct
     type ('epoch_ledger, 'epoch_seed) t =
-      { ledger: 'epoch_ledger
-      ; seed: 'epoch_seed }
+      {ledger: 'epoch_ledger; seed: 'epoch_seed}
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type value = (Epoch_ledger.value, Epoch_seed.t) t
@@ -289,71 +290,66 @@ struct
 
     let to_hlist {ledger; seed} = Nanobit_base.H_list.[ledger; seed]
 
-    let of_hlist : (unit, 'ledger -> 'seed -> unit) Nanobit_base.H_list.t -> ('ledger, 'seed) t =
-      fun Nanobit_base.H_list.[ledger; seed] ->
-        {ledger; seed}
+    let of_hlist :
+           (unit, 'ledger -> 'seed -> unit) Nanobit_base.H_list.t
+        -> ('ledger, 'seed) t =
+     fun Nanobit_base.H_list.([ledger; seed]) -> {ledger; seed}
 
-    let data_spec = Snark_params.Tick.Data_spec.
-      [ Epoch_ledger.typ
-      ; Epoch_seed.typ ]
+    let data_spec =
+      Snark_params.Tick.Data_spec.[Epoch_ledger.typ; Epoch_seed.typ]
 
     let typ =
-      Snark_params.Tick.Typ.of_hlistable data_spec
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+      Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
 
     let var_to_triples {ledger; seed} =
       let open Snark_params.Tick.Let_syntax in
       let%map ledger_triples = Epoch_ledger.var_to_triples ledger
-      and seed_triples = Epoch_seed.var_to_triples seed
-      in
+      and seed_triples = Epoch_seed.var_to_triples seed in
       ledger_triples @ seed_triples
 
     let fold {ledger; seed} =
-      let open Fold in
-      Epoch_ledger.fold ledger +> Epoch_seed.fold seed
+      Fold.(Epoch_ledger.fold ledger +> Epoch_seed.fold seed)
 
     let length_in_triples =
       Epoch_ledger.length_in_triples + Epoch_seed.length_in_triples
 
     let if_ cond ~then_ ~else_ =
       let open Snark_params.Tick.Let_syntax in
-      let%map ledger = Epoch_ledger.if_ cond ~then_:then_.ledger ~else_:else_.ledger
+      let%map ledger =
+        Epoch_ledger.if_ cond ~then_:then_.ledger ~else_:else_.ledger
       and seed = Epoch_seed.if_ cond ~then_:then_.seed ~else_:else_.seed in
       {ledger; seed}
 
     let genesis =
-      { ledger= Epoch_ledger.genesis
-      ; seed= Epoch_seed.(of_hash zero) }
+      {ledger= Epoch_ledger.genesis; seed= Epoch_seed.(of_hash zero)}
 
-    let update_pair (last_data, curr_data) ~prev_epoch ~next_epoch ~next_slot ~proposer_vrf_result ~ledger_hash ~total_currency =
+    let update_pair (last_data, curr_data) ~prev_epoch ~next_epoch ~next_slot
+        ~proposer_vrf_result ~ledger_hash ~total_currency =
       let open Epoch_ledger in
-      let (last_data, curr_data) =
+      let last_data, curr_data =
         if next_epoch > prev_epoch then
           ( curr_data
           , { seed= Epoch_seed.(of_hash zero)
-            ; ledger=
-                { hash= ledger_hash
-                ; total_currency } } )
-        else
-          (last_data, curr_data)
+            ; ledger= {hash= ledger_hash; total_currency} } )
+        else (last_data, curr_data)
       in
       let curr_seed =
         if Epoch.Slot.in_seed_update_range next_slot then
           Epoch_seed.update curr_data.seed proposer_vrf_result
-        else
-          curr_data.seed
+        else curr_data.seed
       in
-      (last_data, { curr_data with seed= curr_seed })
+      (last_data, {curr_data with seed= curr_seed})
 
-    let update_pair_checked (last_data, curr_data) ~prev_epoch ~next_epoch ~next_slot ~proposer_vrf_result ~ledger_hash ~total_currency =
+    let update_pair_checked (last_data, curr_data) ~prev_epoch ~next_epoch
+        ~next_slot ~proposer_vrf_result ~ledger_hash ~total_currency =
       let open Snark_params.Tick.Let_syntax in
-      let%bind (last_data, curr_data) =
-        let%bind epoch_changed = Epoch.compare_var prev_epoch next_epoch >>| fun c -> c.less in
-        let%map last_data =
-          if_ epoch_changed
-            ~then_:curr_data
-            ~else_:last_data
+      let%bind last_data, curr_data =
+        let%bind epoch_changed =
+          Epoch.compare_var prev_epoch next_epoch >>| fun c -> c.less
+        in
+        let%map last_data = if_ epoch_changed ~then_:curr_data ~else_:last_data
         and curr_data =
           if_ epoch_changed
             ~then_:
@@ -364,14 +360,15 @@ struct
         (last_data, curr_data)
       in
       let%map curr_seed =
-        let%bind updated_curr_seed = Epoch_seed.update_var curr_data.seed proposer_vrf_result
-        and in_seed_update_range = Epoch.Slot.in_seed_update_range_var next_slot
+        let%bind updated_curr_seed =
+          Epoch_seed.update_var curr_data.seed proposer_vrf_result
+        and in_seed_update_range =
+          Epoch.Slot.in_seed_update_range_var next_slot
         in
-        Epoch_seed.if_ in_seed_update_range
-          ~then_:updated_curr_seed
+        Epoch_seed.if_ in_seed_update_range ~then_:updated_curr_seed
           ~else_:curr_data.seed
       in
-      (last_data, { curr_data with seed= curr_seed })
+      (last_data, {curr_data with seed= curr_seed})
   end
 
   module Consensus_transition_data = struct
@@ -434,12 +431,7 @@ struct
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type value =
-      ( Length.t
-      , Epoch.t
-      , Epoch.Slot.t
-      , Amount.t
-      , Epoch_data.value )
-      t
+      (Length.t, Epoch.t, Epoch.Slot.t, Amount.t, Epoch_data.value) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var =
@@ -449,6 +441,7 @@ struct
       , Amount.var
       , Epoch_data.var )
       t
+
     let to_hlist
         { length
         ; current_epoch
@@ -510,15 +503,16 @@ struct
         ; last_epoch_data
         ; curr_epoch_data } =
       let open Snark_params.Tick.Let_syntax in
-      let%map last_epoch_data_triples = Epoch_data.var_to_triples last_epoch_data
-      and curr_epoch_data_triples = Epoch_data.var_to_triples curr_epoch_data
+      let%map last_epoch_data_triples =
+        Epoch_data.var_to_triples last_epoch_data
+      and curr_epoch_data_triples =
+        Epoch_data.var_to_triples curr_epoch_data
       in
       Length.Unpacked.var_to_triples length
       @ Epoch.Unpacked.var_to_triples current_epoch
       @ Epoch.Slot.Unpacked.var_to_triples current_slot
       @ Amount.var_to_triples total_currency
-      @ last_epoch_data_triples
-      @ curr_epoch_data_triples
+      @ last_epoch_data_triples @ curr_epoch_data_triples
 
     let fold
         { length
@@ -535,12 +529,9 @@ struct
       +> Epoch_data.fold curr_epoch_data
 
     let length_in_triples =
-      Length.length_in_triples
-      + Epoch.length_in_triples
-      + Epoch.Slot.length_in_triples
-      + Amount.length_in_triples
-      + Epoch_data.length_in_triples
-      + Epoch_data.length_in_triples
+      Length.length_in_triples + Epoch.length_in_triples
+      + Epoch.Slot.length_in_triples + Amount.length_in_triples
+      + Epoch_data.length_in_triples + Epoch_data.length_in_triples
 
     let genesis : value =
       { length= Length.zero
@@ -563,7 +554,7 @@ struct
         |> Option.value
              ~default:(Or_error.error_string "failed to add total_currency")
       in
-      let (last_epoch_data, curr_epoch_data) =
+      let last_epoch_data, curr_epoch_data =
         Epoch_data.update_pair
           ( previous_consensus_state.last_epoch_data
           , previous_consensus_state.curr_epoch_data )
@@ -571,8 +562,7 @@ struct
           ~next_epoch:consensus_transition_data.epoch
           ~next_slot:consensus_transition_data.slot
           ~proposer_vrf_result:consensus_transition_data.proposer_vrf_result
-          ~ledger_hash
-          ~total_currency
+          ~ledger_hash ~total_currency
       in
       { length= Length.succ previous_consensus_state.length
       ; current_epoch= consensus_transition_data.epoch
@@ -594,7 +584,8 @@ struct
         previous_consensus_state.last_epoch_data.ledger.hash
         <> next_consensus_state.last_epoch_data.ledger.hash
       then (
-        Ledger_pool.free local_state previous_consensus_state.last_epoch_data.ledger.hash ;
+        Ledger_pool.free local_state
+          previous_consensus_state.last_epoch_data.ledger.hash ;
         Ledger_pool.save local_state ledger ) ;
       next_consensus_state
 
@@ -613,13 +604,10 @@ struct
       in
       let%map last_epoch_data, curr_epoch_data =
         Epoch_data.update_pair_checked
-          ( previous_state.last_epoch_data
-          , previous_state.curr_epoch_data )
+          (previous_state.last_epoch_data, previous_state.curr_epoch_data)
           ~prev_epoch:previous_state.current_epoch
-          ~next_epoch:transition_data.epoch
-          ~next_slot:transition_data.slot
-          ~proposer_vrf_result:transition_data.proposer_vrf_result
-          ~ledger_hash
+          ~next_epoch:transition_data.epoch ~next_slot:transition_data.slot
+          ~proposer_vrf_result:transition_data.proposer_vrf_result ~ledger_hash
           ~total_currency
       in
       { length
