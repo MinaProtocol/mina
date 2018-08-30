@@ -87,6 +87,8 @@ struct
     let open Command.Let_syntax in
     Command.async ~summary:"Test that workers share prefixes"
       (let%map_open who_proposes =
-        flag "who-proposes" ~doc:"ID node number which will be proposing" (required int) in
-        main who_proposes)
+         flag "who-proposes" ~doc:"ID node number which will be proposing"
+           (required int)
+       in
+       main who_proposes)
 end
