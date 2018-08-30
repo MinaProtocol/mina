@@ -37,6 +37,8 @@ module type Inputs_intf = sig
 
   val genesis_ledger_total_currency : Amount.t
 
+  val genesis_ledger : Nanobit_base.Ledger.t
+
   val coinbase : Amount.t
 
   val slot_interval : Time.Span.t

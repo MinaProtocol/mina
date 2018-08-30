@@ -426,7 +426,8 @@ module Make (Inputs : Inputs_intf) = struct
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
 
-  let strongest_ledgers t = Linear_pipe.map t.strongest_ledgers ~f:snd
+  let strongest_ledgers t =
+    Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x) -> x)
 
   module Config = struct
     type t =
@@ -509,7 +510,7 @@ module Make (Inputs : Inputs_intf) = struct
       Linear_pipe.fork3
         (Ledger_builder_controller.strongest_ledgers ledger_builder)
     in
-    Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (lb, t) ->
+    Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t) ->
         Net.broadcast_state net t ; Deferred.unit )
     |> don't_wait_for ;
     let proposer =
