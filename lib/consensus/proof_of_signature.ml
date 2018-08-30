@@ -119,7 +119,8 @@ struct
   module External_transition =
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
-  let generate_transition ~previous_protocol_state ~blockchain_state ~local_state:_ ~time:_ ~transactions:_ ~ledger:_ =
+  let generate_transition ~previous_protocol_state ~blockchain_state
+      ~local_state:_ ~time:_ ~transactions:_ ~ledger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -135,7 +136,6 @@ struct
     let protocol_state =
       Protocol_state.create_value
         ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
-
         ~blockchain_state ~consensus_state
     in
     Some (protocol_state, consensus_transition_data)
@@ -168,11 +168,14 @@ struct
     in
     {length; signer_public_key}
 
-  let update_local_state _ ~previous_consensus_state:_ ~next_consensus_state:_ ~ledger:_ = ()
+  let update_local_state _ ~previous_consensus_state:_ ~next_consensus_state:_
+      ~ledger:_ =
+    ()
 
   let select Consensus_state.({length= l1; _})
       Consensus_state.({length= l2; _}) =
     if l1 >= l2 then `Keep else `Take
+
   let genesis_protocol_state =
     Protocol_state.create_value
       ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)

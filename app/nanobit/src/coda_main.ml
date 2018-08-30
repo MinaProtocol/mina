@@ -635,10 +635,7 @@ struct
     module Compressed_public_key = Public_key.Compressed
 
     module Prover = struct
-      let prove
-          ~prev_state
-          ~prev_state_proof
-          ~next_state
+      let prove ~prev_state ~prev_state_proof ~next_state
           (transition: Init.Consensus_mechanism.Internal_transition.t) =
         let open Deferred.Or_error.Let_syntax in
         Init.Prover.extend_blockchain Init.prover

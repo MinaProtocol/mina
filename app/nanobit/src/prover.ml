@@ -79,7 +79,9 @@ struct
               (Tock.Keypair.pk Wrap.keys)
               (Wrap.input ()) {Wrap.Prover_state.proof} Wrap.main (embed hash)
 
-          let extend_blockchain (chain: Blockchain.t) (next_state: Keys.Consensus_mechanism.Protocol_state.value) (block: Keys.Consensus_mechanism.Snark_transition.value) =
+          let extend_blockchain (chain: Blockchain.t)
+              (next_state: Keys.Consensus_mechanism.Protocol_state.value)
+              (block: Keys.Consensus_mechanism.Snark_transition.value) =
             let next_state_top_hash = Keys.Step.instance_hash next_state in
             let prover_state =
               { Keys.Step.Prover_state.prev_proof= chain.proof
@@ -125,8 +127,9 @@ struct
     let extend_blockchain =
       create
         [%bin_type_class
-          : Blockchain.t * Consensus_mechanism.Protocol_state.value * Consensus_mechanism.Snark_transition.value]
-        Blockchain.bin_t
+          : Blockchain.t
+            * Consensus_mechanism.Protocol_state.value
+            * Consensus_mechanism.Snark_transition.value] Blockchain.bin_t
         (fun w
         ( ({Blockchain.state= prev_state; proof= prev_proof} as chain)
         , next_state
@@ -135,8 +138,7 @@ struct
           let%map (module W) = Worker_state.get w in
           if Insecure.extend_blockchain then
             let proof = Precomputed_values.base_proof in
-            { Blockchain.proof
-            ; state= next_state }
+            {Blockchain.proof; state= next_state}
           else W.extend_blockchain chain next_state transition )
 
     let verify_blockchain =
@@ -158,7 +160,9 @@ struct
         { initialized: ('w, unit, [`Initialized]) F.t
         ; extend_blockchain:
             ( 'w
-            , Blockchain.t * Consensus_mechanism.Protocol_state.value * Consensus_mechanism.Snark_transition.value
+            , Blockchain.t
+              * Consensus_mechanism.Protocol_state.value
+              * Consensus_mechanism.Snark_transition.value
             , Blockchain.t )
             F.t
         ; verify_blockchain: ('w, Blockchain.t, bool) F.t

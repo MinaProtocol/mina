@@ -52,12 +52,6 @@ module type S = sig
 
   val genesis_protocol_state : Protocol_state.value
 
-  (**
-   * Generate a new protocol state and consensus specific transition data
-   * for a new transition. Called from the proposer in order to generate
-   * a new transition to propose to the network. Returns `None` if a new
-   * transition cannot be generated.
-   *)
   val generate_transition :
        previous_protocol_state:Protocol_state.value
     -> blockchain_state:Nanobit_base.Blockchain_state.value
@@ -66,27 +60,33 @@ module type S = sig
     -> transactions:Nanobit_base.Transaction.t list
     -> ledger:Nanobit_base.Ledger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
-
   (**
-   * Create a checked boolean constraint for the validity of a transition.
+   * Generate a new protocol state and consensus specific transition data
+   * for a new transition. Called from the proposer in order to generate
+   * a new transition to propose to the network. Returns `None` if a new
+   * transition cannot be generated.
    *)
+
   val is_transition_valid_checked :
        Snark_transition.var
     -> (Snark_params.Tick.Boolean.var, _) Snark_params.Tick.Checked.t
-
   (**
-   * Create a constrained, checked var for the next consensus state of
-   * a given consensus state and snark transition.
+   * Create a checked boolean constraint for the validity of a transition.
    *)
+
   val next_state_checked :
        Consensus_state.var
     -> Snark_transition.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
+  (**
+   * Create a constrained, checked var for the next consensus state of
+   * a given consensus state and snark transition.
+   *)
 
+  val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
   (**
    * Select between two ledger builder controller tips given the consensus
    * states for the two tips. Returns `\`Keep` if the first tip should be
    * kept, or `\`Take` if the second tip should be taken instead.
    *)
-  val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
 end

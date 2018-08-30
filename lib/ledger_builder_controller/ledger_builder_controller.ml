@@ -346,7 +346,8 @@ end = struct
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; mutable handler: Transition_logic.t
-    ; strongest_ledgers: (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
+    ; strongest_ledgers:
+        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
 
   let transition_tree t =
     let state = Transition_logic.state t.handler in
@@ -383,7 +384,9 @@ end = struct
            (* TODO: We can make change-resolving more intelligent if different
          * concurrent processes took different times to finish. Since we
          * serialize to one job at a time this shouldn't happen anyway though *)
-           let new_state = Transition_logic_state.apply_all old_state changes in
+           let new_state =
+             Transition_logic_state.apply_all old_state changes
+           in
            t.handler <- Transition_logic.create new_state log ;
            ( if
                not
@@ -395,8 +398,9 @@ end = struct
              then
                let tip = Transition_logic_state.longest_branch_tip new_state in
                Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-                 strongest_ledgers_reader (tip.ledger_builder, transition) ) ;
-           Deferred.return () ) ) ;
+                 strongest_ledgers_reader
+                 (tip.ledger_builder, transition) ) ;
+           Deferred.return () )) ;
     (* Handle new transitions *)
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
@@ -430,18 +434,18 @@ end = struct
     in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
-          Option.iter last ~f:(fun (input, ivar) ->
-            Ivar.fill_if_empty ivar input ) ;
-          let this_input, _ = job in
-          let w, this_ivar = Job.run job in
-          let%bind () =
-            Deferred.bind w.Interruptible.d ~f:(function
-              | Ok [] -> return ()
-              | Ok changes ->
-                  Linear_pipe.write mutate_state_writer (changes, this_input)
-              | Error () -> return () )
-          in
-          return (Some (this_input, this_ivar)) )
+            Option.iter last ~f:(fun (input, ivar) ->
+                Ivar.fill_if_empty ivar input ) ;
+            let this_input, _ = job in
+            let w, this_ivar = Job.run job in
+            let%bind () =
+              Deferred.bind w.Interruptible.d ~f:(function
+                | Ok [] -> return ()
+                | Ok changes ->
+                    Linear_pipe.write mutate_state_writer (changes, this_input)
+                | Error () -> return () )
+            in
+            return (Some (this_input, this_ivar)) )
       >>| ignore ) ;
     t
 

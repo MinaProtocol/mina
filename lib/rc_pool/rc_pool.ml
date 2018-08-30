@@ -28,11 +28,9 @@ end
 
 exception Free_unsaved_value
 
-module Make
-    (Key : Hashable.S)
-    (Data : Data_intf with type key := Key.t)
-  : S with type key := Key.t and type data := Data.t
-= struct
+module Make (Key : Hashable.S) (Data : Data_intf with type key := Key.t) :
+  S with type key := Key.t and type data := Data.t =
+struct
   type t = (Data.t * int) Key.Table.t
 
   let create = Key.Table.create
@@ -40,15 +38,14 @@ module Make
   let save t data =
     let key = Data.to_key data in
     Key.Table.change t key ~f:(function
-      | None        -> Some (Data.copy data, 1)
-      | Some (d, n) -> Some (d, n))
+      | None -> Some (Data.copy data, 1)
+      | Some (d, n) -> Some (d, n) )
 
   let free t key =
     Key.Table.change t key ~f:(function
-      | None        -> raise Free_unsaved_value
+      | None -> raise Free_unsaved_value
       | Some (_, 1) -> None
-      | Some (d, n) -> Some (d, n - 1))
+      | Some (d, n) -> Some (d, n - 1) )
 
-  let find t key =
-    Key.Table.find t key |> Option.map ~f:fst
+  let find t key = Key.Table.find t key |> Option.map ~f:fst
 end

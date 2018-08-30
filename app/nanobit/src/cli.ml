@@ -187,7 +187,8 @@ let () =
               (* TODO: choose reasonable values *)
               let genesis_state_timestamp = Time.now ()
 
-              let genesis_ledger_total_currency = Nanobit_base.Genesis_ledger.total_currency
+              let genesis_ledger_total_currency =
+                Nanobit_base.Genesis_ledger.total_currency
 
               let genesis_ledger = Nanobit_base.Genesis_ledger.ledger
 

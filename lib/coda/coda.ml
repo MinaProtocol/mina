@@ -426,7 +426,8 @@ module Make (Inputs : Inputs_intf) = struct
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
 
-  let strongest_ledgers t = Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x) -> x)
+  let strongest_ledgers t =
+    Linear_pipe.map t.strongest_ledgers ~f:(fun (_, x) -> x)
 
   module Config = struct
     type t =
