@@ -1,6 +1,7 @@
 version: 2
 jobs:
-    build-a:
+
+    build:
         resource_class: large
         docker:
         - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
@@ -14,17 +15,7 @@ jobs:
                 command: eval `opam config env` && make check-format
             - run:
                 name: Build Haskell
-                command: source ~/.profile && make kademlia
-
-    build-b:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
+                command: source ~/.profile && make kademlia            
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
@@ -39,22 +30,29 @@ jobs:
                 command: make deb
             - store_artifacts:
                 path: /tmp/artifacts
+
+    test-code:
+        resource_class: large
+        docker:
+        - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
+          auth:
+            username: _json_key
+            password: $JSON_GCLOUD_CREDENTIALS
+        steps:
+            - checkout
             - run:
                 name: Test make test-runtest
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
-            - run:
-                name: Test make test-full-sig
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-sig
-            - run:
-                name: Test make test-codapeers-sig
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-sig
-            - run:
-                name: Test make test-coda-block-production-sig
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-sig
-            - run:
-                name: Test make test-transaction-snark-profiler-sig
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-sig
 
+    test-stake:
+        resource_class: large
+        docker:
+        - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
+          auth:
+            username: _json_key
+            password: $JSON_GCLOUD_CREDENTIALS
+        steps:
+            - checkout
             - run:
                 name: Test make test-full-stake
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-stake
@@ -68,9 +66,34 @@ jobs:
                 name: Test make test-transaction-snark-profiler-stake
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-stake
 
+    test-sig:
+        resource_class: large
+        docker:
+        - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
+          auth:
+            username: _json_key
+            password: $JSON_GCLOUD_CREDENTIALS
+        steps:
+            - checkout
+            - run:
+                name: Test make test-full-sig
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-sig
+            - run:
+                name: Test make test-codapeers-sig
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-sig
+            - run:
+                name: Test make test-coda-block-production-sig
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-sig
+            - run:
+                name: Test make test-transaction-snark-profiler-sig
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-sig
+
+
 workflows:
     version: 2
     build_wrap:
         jobs:
-            - build-a
-            - build-b
+            - build
+            - test-sig
+            - test-stake
+            - test-code
