@@ -50,6 +50,12 @@ struct
   let peers_exn (conn, proc) =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
 
+  let get_balance_exn (conn, proc) pk =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance ~arg:pk
+
+  let send_transaction_exn (conn, proc) sk pk amount fee =
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_transaction ~arg:(sk, pk, amount, fee)
+
   let strongest_ledgers_exn (conn, proc) =
     let%map r =
       Coda_worker.Connection.run_exn conn

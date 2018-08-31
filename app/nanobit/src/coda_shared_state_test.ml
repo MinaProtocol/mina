@@ -1,0 +1,91 @@
+open Core
+open Async
+open Coda_worker
+open Coda_main
+open Nanobit_base
+
+module Make
+    (Ledger_proof : Ledger_proof_intf)
+    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
+    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) :
+  Integration_test_intf.S =
+struct
+  module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
+  open Coda_processes
+
+  let name = "coda-shared-state-test"
+
+  let main () =
+    let%bind program_dir = Unix.getcwd () in
+    let n = 1 in
+    let log = Logger.create () in
+    let log = Logger.child log name in
+    Coda_processes.init () ;
+    Coda_processes.spawn_local_processes_exn n ~program_dir
+      ~should_propose:(fun i -> i = 0)
+      ~f:(fun workers ->
+          let blocks = ref 0 in
+          let balance = ref None in
+          let%bind () =
+            Deferred.List.all_unit
+              (List.mapi workers ~f:(fun i worker ->
+                   let%bind strongest_ledgers =
+                     Coda_process.strongest_ledgers_exn worker
+                   in
+                   let _ = log in
+                   let sender_initial_balance = Genesis_ledger.initial_high_balance in
+                   let sender_pk = Genesis_ledger.high_balance_pk in
+                   let receiver_pk = Genesis_ledger.low_balance_pk in
+                   let sender_sk = Genesis_ledger.high_balance_sk in
+                   let send_amount = Currency.Amount.of_int 10 in
+                   let fee = (Currency.Fee.of_int 0) in
+                   don't_wait_for begin
+                     let rec go () = 
+                       let%bind b = Coda_process.get_balance_exn worker sender_pk in
+                       Logger.debug log !"%d got balance %{sexp: Currency.Balance.t option}" i b ;
+                       balance := b;
+                       let%bind () = after (Time.Span.of_sec 0.5) in
+                       go ()
+                     in go ()
+                   end;
+                   let%bind () = 
+                     Coda_process.send_transaction_exn worker sender_sk receiver_pk send_amount fee;
+                   in
+                   don't_wait_for
+                     (Linear_pipe.iter strongest_ledgers ~f:(fun (prev, curr) ->
+                          let bits_to_str b =
+                            let str =
+                              String.concat
+                                (List.map b ~f:(fun x -> if x then "1" else "0"))
+                            in
+                            let hash = Md5.digest_string str in
+                            Md5.to_hex hash
+                          in
+                          let prev_str = bits_to_str prev in
+                          let curr_str = bits_to_str curr in
+                          Logger.debug log "%d got tip %s %s" i prev_str curr_str ;
+                          blocks := !blocks + 1;
+                          Option.iter !balance ~f:(fun b -> 
+                              let b = Currency.Balance.to_int b in
+                              let transactions = 
+                                (Currency.Balance.to_int sender_initial_balance - b) / 
+                                (Currency.Amount.to_int send_amount) 
+                              in
+                              let diff = !blocks - transactions in
+                              Logger.debug log "%d transactions/blocks diff %d %d %d" i !blocks transactions diff 
+                              (*assert (diff < 3)*)
+                          );
+                          let%bind () = 
+                            Coda_process.send_transaction_exn worker sender_sk receiver_pk send_amount fee;
+                          in
+                          return () )) ;
+                   Deferred.unit ))
+          in
+          let%bind () = after (Time.Span.of_sec 1000000.) in
+          return () )
+
+  let command =
+    Command.async_spec ~summary:"Test that workers share states"
+      Command.Spec.(empty)
+      main
+end
