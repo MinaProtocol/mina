@@ -54,6 +54,19 @@ let initial_high_balance = Currency.Balance.of_int 10_000
 
 let initial_low_balance = Currency.Balance.of_int 100
 
+let total_currency =
+  let open Currency.Amount in
+  let of_balance = Fn.compose of_int Currency.Balance.to_int in
+  let add_exn x y =
+    Option.value_exn
+      ~message:"overflow while calculating genesis ledger total currency"
+      (add x y)
+  in
+  List.fold_left pks ~init:zero ~f:(fun amount _ ->
+      add_exn amount (of_int init_balance) )
+  |> add_exn (of_balance initial_high_balance)
+  |> add_exn (of_balance initial_low_balance)
+
 let ledger =
   let ledger = Ledger.create () in
   Ledger.set ledger high_balance_pk

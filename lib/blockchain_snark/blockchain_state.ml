@@ -21,11 +21,6 @@ struct
     else Ok ()
 
   module type Update_intf = sig
-    val update :
-         Protocol_state.value
-      -> Snark_transition.value
-      -> Protocol_state.value Or_error.t
-
     module Checked : sig
       val update :
            State_hash.var * Protocol_state.var
@@ -37,36 +32,6 @@ struct
   end
 
   module Make_update (T : Transaction_snark.Verification.S) = struct
-    let update state (transition: Snark_transition.value) =
-      let open Or_error.Let_syntax in
-      let%bind () =
-        match Snark_transition.ledger_proof transition with
-        | None ->
-            check
-              (Ledger_hash.equal
-                 ( state |> Protocol_state.blockchain_state
-                 |> Blockchain_state.ledger_hash )
-                 ( transition |> Snark_transition.blockchain_state
-                 |> Blockchain_state.ledger_hash ))
-              "Body proof was none but tried to update ledger hash"
-        | Some proof ->
-            if Insecure.verify_blockchain then Ok ()
-            else
-              check
-                (T.verify
-                   (Transaction_snark.create
-                      ~source:
-                        ( state |> Protocol_state.blockchain_state
-                        |> Blockchain_state.ledger_hash )
-                      ~target:
-                        ( transition |> Snark_transition.blockchain_state
-                        |> Blockchain_state.ledger_hash )
-                      ~proof_type:`Merge
-                      ~fee_excess:Currency.Amount.Signed.zero ~proof))
-                "Proof did not verify"
-      in
-      Consensus_mechanism.update state transition
-
     module Checked = struct
       (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
             Input:
@@ -113,7 +78,7 @@ struct
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
              and consensus_data_is_valid =
-               Consensus_mechanism.verify transition
+               Consensus_mechanism.is_transition_valid_checked transition
              in
              let%bind correct_snark =
                Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
@@ -121,10 +86,9 @@ struct
              Boolean.(correct_snark && consensus_data_is_valid)
            in
            let%bind consensus_state =
-             Consensus_mechanism.update_var
+             Consensus_mechanism.next_state_checked
                (Protocol_state.consensus_state previous_state)
-               previous_state_hash
-               transition
+               previous_state_hash transition
            in
            let new_state =
              Protocol_state.create_var ~previous_state_hash
