@@ -173,13 +173,9 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         let%bind () = after (Time_ns.Span.of_sec 10.) in
         go ()
     in
-    let wait_time = 
-      if Insecure.with_snark then 20.
-      else 3.
-    in
     let timeout =
-        let%map () = after (Time_ns.Span.of_min wait_time) in
-        false
+      let%map () = after (Time_ns.Span.of_min 3.) in
+      false
     in
     Deferred.any [timeout; go ()]
   in
