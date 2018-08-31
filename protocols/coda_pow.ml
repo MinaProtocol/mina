@@ -542,7 +542,8 @@ module type Consensus_mechanism_intf = sig
     val create_value :
          blockchain_state:blockchain_state
       -> consensus_data:Consensus_transition_data.value
-      -> ledger_proof_fee_excess:(proof * Fee.Signed.t) option
+      -> ledger_proof : proof option
+      -> fee_excess: Fee.Signed.t
       -> value
 
     val blockchain_state : value -> blockchain_state

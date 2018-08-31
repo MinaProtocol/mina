@@ -38,7 +38,7 @@ struct
     let update state (transition: Snark_transition.value) =
       let open Or_error.Let_syntax in
       let%bind () =
-        match Snark_transition.ledger_proof_fee_excess transition with
+        match Snark_transition.ledger_proof transition with
         | None ->
             check
               (Ledger_hash.equal
@@ -47,9 +47,10 @@ struct
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash ))
               "Body proof was none but tried to update ledger hash"
-        | Some (proof, fee_excess) ->
+        | Some proof ->
             if Insecure.verify_blockchain then Ok ()
             else
+              let fee_excess = Snark_transition.fee_excess transition in
               check
                 (T.verify
                    (Transaction_snark.create
@@ -103,17 +104,19 @@ struct
         with_label __LOC__
           (let%bind good_body =
              let%bind correct_transaction_snark =
-               let proof, fee_excess =
+               let proof =
                  Option.value
-                   ~default:(Tock.Proof.dummy, Currency.Fee.Signed.zero)
-                   (Snark_transition.ledger_proof_fee_excess transition)
+                   ~default:Tock.Proof.dummy
+                   (Snark_transition.ledger_proof transition)
                in
-               T.verify_complete_merge
+               let fee_excess = Snark_transition.fee_excess transition
+               in
+               T.verify_merge
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
-                 (As_prover.return proof) fee_excess
+                 (As_prover.return proof)  fee_excess
              and ledger_hash_didn't_change =
                Ledger_hash.equal_var
                  ( previous_state |> Protocol_state.blockchain_state
@@ -123,6 +126,12 @@ struct
              and consensus_data_is_valid =
                Consensus_mechanism.verify transition
              in
+             (*let prev_acc_fee_excess = ( previous_state |> Protocol_state.blockchain_state
+               |> Blockchain_state.fee_excess)
+             in
+             let new_acc_fee_excess = ( transition |> Snark_transition.blockchain_state
+               |> Blockchain_state.fee_excess ) 
+             in*)
              let%bind correct_snark =
                Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
              in

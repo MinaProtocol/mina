@@ -98,12 +98,12 @@ struct
       previous_protocol_state |> Protocol_state.blockchain_state
       |> Blockchain_state.fee_excess
     in
-    let next_ledger_hash, fee_excess =
+    let proof_opt, next_ledger_hash, fee_excess =
       Option.value_map ledger_proof_opt
-        ~f:(fun (_, stmt) ->
-          (Ledger_proof.(statement_target stmt), stmt.fee_excess) )
+        ~f:(fun (proof, stmt) ->
+          (Some (Ledger_proof.underlying_proof proof), Ledger_proof.(statement_target stmt), stmt.fee_excess) )
         ~default:
-          ( previous_protocol_state |> Protocol_state.blockchain_state
+          ( None, previous_protocol_state |> Protocol_state.blockchain_state
             |> Blockchain_state.ledger_hash
           , Currency.Fee.Signed.zero )
     in
@@ -134,10 +134,8 @@ struct
       Snark_transition.create_value
         ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
         ~consensus_data:consensus_transition_data
-        ~ledger_proof_fee_excess:
-          (Option.map ledger_proof_opt ~f:(fun (proof, stmt) ->
-               let p = Ledger_proof.underlying_proof proof in
-               (p, stmt.fee_excess) ))
+        ~ledger_proof: proof_opt
+        ~fee_excess
     in
     let internal_transition =
       Internal_transition.create ~snark_transition

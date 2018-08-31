@@ -657,11 +657,11 @@ module Verification = struct
   module type S = sig
     val verify : t -> bool
 
-    val verify_complete_merge :
+    val verify_merge :
          Ledger_hash.var
       -> Ledger_hash.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
-      -> Currency.Fee.Signed.t
+      -> Currency.Fee.Signed.var
       -> (Tick.Boolean.var, 's) Tick.Checked.t
   end
 
@@ -685,35 +685,31 @@ module Verification = struct
       in
       Tock.verify proof keys.wrap (wrap_input ()) (embed input)
 
-    (* The curve pt corresponding to H(merge_prefix, _, _, fee_excess, wrap_vk)
-    (with starting point shifted over by 2 * digest_size so that
+    (* The curve pt corresponding to H(merge_prefix, _, _, _, wrap_vk)
+    (with starting point shifted over by 3 * digest_size so that
     this can then be used to compute H(merge_prefix, s1, s2, fee_excess, wrap_vk) *)
-    let merge_prefix_and_zero_and_vk_curve_pt fee_excess =
+   let merge_prefix_and_vk_curve_pt =
       let open Tick in
       let s =
         { Hash_prefix.merge_snark with
           triples_consumed=
             Hash_prefix.merge_snark.triples_consumed
-            + (2 * state_hash_size_in_triples) }
+            + (2 * state_hash_size_in_triples) + Fee.Signed.length_in_triples }
       in
       let s =
         Pedersen.State.update_fold s
-          Fold.(
-            Fee.Signed.(fold fee_excess)
-            +> group3 ~default:false (of_list wrap_vk_bits))
+          Fold.(group3 ~default:false (of_list wrap_vk_bits))
       in
       let hash_interval = (0, Hash_prefix.length_in_triples) in
-      let amount_begin =
-        Hash_prefix.length_in_triples + (2 * state_hash_size_in_triples)
+      let prefix_end =
+                Hash_prefix.length_in_triples + (2 * state_hash_size_in_triples) + Fee.Signed.length_in_triples
       in
-      let amount_end = amount_begin + Amount.Signed.length_in_triples in
-      let amount_interval = (amount_begin, amount_end) in
       let vk_length_in_triples = (2 + List.length wrap_vk_bits) / 3 in
-      let vk_interval = (amount_end, amount_end + vk_length_in_triples) in
+      let vk_interval = (prefix_end, prefix_end + vk_length_in_triples) in
       Tick.Pedersen.Checked.Section.create ~acc:(`Value s.acc)
         ~support:
           (Interval_union.of_intervals_exn
-             [hash_interval; amount_interval; vk_interval])
+             [hash_interval; vk_interval])
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
@@ -724,15 +720,16 @@ module Verification = struct
       We precompute the parts of the pedersen involving wrap_vk and
       Amount.Signed.zero outside the SNARK since this saves us many constraints.
     *)
-    let verify_complete_merge s1 s2 get_proof fee_excess =
+    let verify_merge s1 s2 get_proof fee_excess =
       let open Tick in
       let open Let_syntax in
       let%bind s1 = Ledger_hash.var_to_triples s1
       and s2 = Ledger_hash.var_to_triples s2 in
+      let fee_excess = Currency.Fee.Signed.Checked.to_triples fee_excess in
       let%bind top_hash_section =
         Pedersen.Checked.Section.extend
-          (merge_prefix_and_zero_and_vk_curve_pt fee_excess)
-          ~start:Hash_prefix.length_in_triples (s1 @ s2)
+          merge_prefix_and_vk_curve_pt
+          ~start:Hash_prefix.length_in_triples (s1 @ s2 @ fee_excess)
       in
       let digest =
         let open Interval_union in
@@ -744,7 +741,7 @@ module Verification = struct
           n
           = Hash_prefix.length_in_triples
             + (2 * Ledger_hash.length_in_triples)
-            + Amount.Signed.length_in_triples
+            + Fee.Signed.length_in_triples
             + Nanobit_base.Util.bit_length_to_triple_length
                 (List.length wrap_vk_bits)
         then digest
@@ -756,12 +753,12 @@ module Verification = struct
               ) aka %d"
             n Hash_prefix.length_in_triples
             (2 * Ledger_hash.length_in_triples)
-            Amount.Signed.length_in_triples
+            Fee.Signed.length_in_triples
             (Nanobit_base.Util.bit_length_to_triple_length
                (List.length wrap_vk_bits))
             ( Hash_prefix.length_in_triples
             + (2 * Ledger_hash.length_in_triples)
-            + Amount.Signed.length_in_triples
+            + Fee.Signed.length_in_triples
             + Nanobit_base.Util.bit_length_to_triple_length
                 (List.length wrap_vk_bits) )
             ()
