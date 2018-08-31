@@ -22,7 +22,7 @@ jobs:
             - save_cache:
                 key: builddir-{{ .Branch }}-{{ .Revision }}
                 paths:
-            -       "_build"
+                   - _build
             - run:
                 name: Install python -- hack
                 command: sudo apt install -y python
