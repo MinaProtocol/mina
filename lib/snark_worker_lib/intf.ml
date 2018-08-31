@@ -87,7 +87,9 @@ module type S = sig
     module Submit_work : sig
       type msg = Work.Result.t
 
-      val rpc : msg Rpc.One_way.t
+      type response = unit
+
+      val rpc : (msg, response) Rpc.Rpc.t
     end
   end
 

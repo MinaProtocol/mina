@@ -935,12 +935,11 @@ module Run (Program : Main_intf) = struct
                 | Some _ -> () ) ;
                 r
             | `Eof -> assert false )
-      ; Rpc.One_way.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
-            don't_wait_for
-              (let%map () =
+      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
+              let%map () =
                  Snark_pool.add_completed_work (snark_pool minibit) work
                in
-               Linear_pipe.write_without_pushback solved_work_writer ()) ) ]
+              Linear_pipe.write_without_pushback solved_work_writer ())  ]
     in
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)

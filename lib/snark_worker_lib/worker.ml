@@ -47,20 +47,31 @@ struct
       ~finish:(fun res ->
         Ok {Snark_work_lib.Work.Result.proofs= List.rev res; spec} )
 
-  let shutdown_on_disconnect log connection =
+  (*let shutdown_on_disconnect log connection =
     upon (Rpc.Connection.close_finished connection) (fun () ->
         Logger.info log "Connection to daemon closed, shutting down." ;
-        Shutdown.shutdown 0 )
+        Shutdown.shutdown 0 )*)
+
+  let dispatch rpc query port =
+  Tcp.with_connection
+    (Tcp.Where_to_connect.of_host_and_port
+       (Host_and_port.create ~host:"127.0.0.1" ~port))
+    ~timeout:(Time.Span.of_sec 1.)
+    (fun _ r w ->
+      let open Deferred.Let_syntax in
+      match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
+      | Error exn -> return (Or_error.of_exn exn)
+      | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
   let main daemon_port public_key =
-    let%bind conn =
+    (*let%bind conn =
       Rpc.Connection.client
         (Tcp.Where_to_connect.of_host_and_port
            (Host_and_port.create ~host:"127.0.0.1" ~port:daemon_port))
       >>| Result.ok_exn
-    in
+    in*)
     let log = Logger.create () in
-    shutdown_on_disconnect log conn ;
+    (*shutdown_on_disconnect log conn ;*)
     let%bind state = Worker_state.create () in
     let wait ?(sec= 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
@@ -70,18 +81,20 @@ struct
         go ()
       in
       Logger.info log "Asking for work again..." ;
-      match%bind Rpc.Rpc.dispatch Rpcs.Get_work.rpc conn () with
+      match%bind dispatch Rpcs.Get_work.rpc () daemon_port with
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
           Logger.info log "No work; waiting a few seconds before retrying" ;
           let%bind () = wait ~sec:Worker_state.worker_wait_time () in
           go ()
       | Ok (Some work) ->
-          Logger.info log "Got some work" ;
+          Core.printf !"Got some work: %{sexp: (Statement.t, Super_transaction.t, Sparse_ledger.t, Proof.t)
+          Snark_work_lib.Work.Single.Spec.t Snark_work_lib.Work.Spec.t}" work;
+          Logger.info log "Got some work\n";
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result ->
-            match Rpc.One_way.dispatch Rpcs.Submit_work.rpc conn result with
+            match%bind dispatch Rpcs.Submit_work.rpc result daemon_port with
             | Error e -> log_and_retry "submitting work" e
             | Ok () -> go ()
     in

@@ -34,7 +34,9 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       Work.Result.t
     [@@deriving bin_io]
 
-    let rpc : msg Rpc.One_way.t =
-      Rpc.One_way.create ~name:"Submit_work" ~version:0 ~bin_msg
+    type response = unit [@@deriving bin_io, sexp]
+
+    let rpc : (msg, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Submit_work" ~version:0 ~bin_query:bin_msg ~bin_response
   end
 end
