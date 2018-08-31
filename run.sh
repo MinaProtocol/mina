@@ -11,7 +11,7 @@ Test=coda-shared-state-test
 #Filter='^"module-coda-peers-test" = "true"'
 #Filter='(level=fatal && ^"module-host: 127.0.0.1:23002" = "true" && ^"module" = "ledger_builder_controller") || ^"module-coda-shared-prefix-test" = "true"'
 #Filter='(level=fatal && ^"module-host: 127.0.0.1:23002" = "true") || ^"module-coda-shared-prefix-test" = "true"'
-Filter='^"module-coda-shared-state-test" = "true"'
+Filter='^"module-coda-shared-state-test" = "true" || level=fatal'
 #Filter='^"module-coda-shared-prefix-test" = "true"'
 #Filter='^"module-coda-block-production-test" = "true"'
 #Filter='^"module-coda-shared-prefix-test" = "true" || level=fatal'

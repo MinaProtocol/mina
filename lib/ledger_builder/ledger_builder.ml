@@ -729,7 +729,7 @@ end = struct
   let log_error_and_return_value err_val def_val =
     match err_val with
     | Error e ->
-        Printf.printf "%s" (Error.to_string_hum e) ;
+        Printf.printf "%s\n%!" (Error.to_string_hum e) ;
         def_val
     | Ok value -> value
 
@@ -780,7 +780,7 @@ end = struct
                 (Sequence.append (Sequence.singleton t) ts)
                 get_completed_work ledger valid r_work
           | Error e ->
-              Printf.printf "%s" (Error.to_string_hum e) ;
+              Printf.printf "%s\n%!" (Error.to_string_hum e) ;
               (valid, txns_not_included valid resources) )
     | _, _, _ -> (valid, txns_not_included valid resources)
 

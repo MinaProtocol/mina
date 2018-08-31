@@ -24,7 +24,7 @@ struct
     return (conn, process)
 
   let spawn_local_exn ~peers ~discovery_port ~external_port ~program_dir
-      ~should_propose ~f =
+      ~should_propose ~f ~snark_worker_config =
     let host = "127.0.0.1" in
     let conf_dir =
       "/tmp/" ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -33,6 +33,7 @@ struct
       { Coda_worker.host
       ; should_propose
       ; external_port
+      ; snark_worker_config
       ; peers
       ; conf_dir
       ; program_dir
@@ -51,10 +52,12 @@ struct
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
 
   let get_balance_exn (conn, proc) pk =
-    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance ~arg:pk
+    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance
+      ~arg:pk
 
   let send_transaction_exn (conn, proc) sk pk amount fee =
-    Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.send_transaction ~arg:(sk, pk, amount, fee)
+    Coda_worker.Connection.run_exn conn
+      ~f:Coda_worker.functions.send_transaction ~arg:(sk, pk, amount, fee)
 
   let strongest_ledgers_exn (conn, proc) =
     let%map r =

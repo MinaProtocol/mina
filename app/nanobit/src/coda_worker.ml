@@ -8,9 +8,15 @@ module Make
     (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
     (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
 struct
+  module Snark_worker_config = struct
+    type t = {port: int; public_key: Public_key.Compressed.t}
+    [@@deriving bin_io]
+  end
+
   type input =
     { host: string
     ; should_propose: bool
+    ; snark_worker_config: Snark_worker_config.t option
     ; conf_dir: string
     ; program_dir: string
     ; external_port: int
@@ -32,21 +38,31 @@ struct
     end
 
     module Send_transaction_input = struct
-      type t = (Private_key.t * Public_key.Compressed.t * Currency.Amount.t * Currency.Fee.t) [@@deriving bin_io]
-
+      type t =
+        Private_key.t
+        * Public_key.Compressed.t
+        * Currency.Amount.t
+        * Currency.Fee.t
+      [@@deriving bin_io]
     end
 
     type 'worker functions =
       { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
-      ; get_balance: ('worker, Public_key.Compressed.t, Currency.Balance.t option) Rpc_parallel.Function.t
-      ; send_transaction: ('worker, Send_transaction_input.t, unit) Rpc_parallel.Function.t
+      ; get_balance:
+          ( 'worker
+          , Public_key.Compressed.t
+          , Currency.Balance.t option )
+          Rpc_parallel.Function.t
+      ; send_transaction:
+          ('worker, Send_transaction_input.t, unit) Rpc_parallel.Function.t
       ; strongest_ledgers:
           ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
       }
 
     type coda_functions =
       { coda_peers: unit -> Peers.t Deferred.t
-      ; coda_get_balance: Public_key.Compressed.t -> Maybe_currency.t Deferred.t
+      ; coda_get_balance:
+          Public_key.Compressed.t -> Maybe_currency.t Deferred.t
       ; coda_send_transaction: Send_transaction_input.t -> unit Deferred.t
       ; coda_strongest_ledgers: unit -> State_hashes.t Pipe.Reader.t Deferred.t
       }
@@ -89,8 +105,8 @@ struct
           ~bin_output:Maybe_currency.bin_t ()
 
       let send_transaction =
-        C.create_rpc ~f:send_transaction_impl ~bin_input:Send_transaction_input.bin_t
-          ~bin_output:Unit.bin_t ()
+        C.create_rpc ~f:send_transaction_impl
+          ~bin_input:Send_transaction_input.bin_t ~bin_output:Unit.bin_t ()
 
       let strongest_ledgers =
         C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
@@ -101,6 +117,7 @@ struct
       let init_worker_state
           { host
           ; should_propose
+          ; snark_worker_config
           ; conf_dir
           ; program_dir
           ; external_port
@@ -147,10 +164,17 @@ struct
                ~time_controller:(Main.Inputs.Time.Controller.create ())
                ())
         in
+        Option.iter snark_worker_config ~f:(fun config ->
+            let run_snark_worker = `With_public_key config.public_key in
+            Run.setup_local_server ~client_port:config.port ~minibit:coda ~log ;
+            Run.run_snark_worker ~log ~client_port:config.port run_snark_worker
+        ) ;
         let coda_peers () = return (Main.peers coda) in
         let coda_get_balance pk = return (Run.get_balance coda pk) in
         let coda_send_transaction (sk, pk, amount, fee) =
-          let pk_of_sk sk = Public_key.of_private_key sk |> Public_key.compress in
+          let pk_of_sk sk =
+            Public_key.of_private_key sk |> Public_key.compress
+          in
           let build_txn amount sender_sk receiver_pk fee =
             let nonce =
               Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
@@ -158,7 +182,9 @@ struct
             let payload : Transaction.Payload.t =
               {receiver= receiver_pk; amount; fee; nonce}
             in
-            Transaction.sign (Signature_keypair.of_private_key sender_sk) payload
+            Transaction.sign
+              (Signature_keypair.of_private_key sender_sk)
+              payload
           in
           let transaction = build_txn amount sk pk fee in
           Run.send_txn log coda (transaction :> Transaction.t)
@@ -183,7 +209,11 @@ struct
                  Linear_pipe.write w (prev_state_hash, state_hash) )) ;
           return r.pipe
         in
-        return {coda_peers; coda_strongest_ledgers; coda_get_balance; coda_send_transaction}
+        return
+          { coda_peers
+          ; coda_strongest_ledgers
+          ; coda_get_balance
+          ; coda_send_transaction }
 
       let init_connection_state ~connection:_ ~worker_state:_ = return
     end
