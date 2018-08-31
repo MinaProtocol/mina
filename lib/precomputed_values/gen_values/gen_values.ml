@@ -74,6 +74,7 @@ let main () =
         module Proof = Nanobit_base.Proof
 
         module Ledger_builder_diff = Ledger_builder.Make_diff (struct
+          open Signature_lib
           open Nanobit_base
           module Compressed_public_key = Public_key.Compressed
 

@@ -118,8 +118,6 @@ module Schnorr
 
           val ( * ) : t -> t -> t
 
-          val ( + ) : t -> t -> t
-
           val ( - ) : t -> t -> t
 
           val test_bit : t -> int -> bool
@@ -171,8 +169,6 @@ module Schnorr
 
         val double : t -> t
 
-        val typ : (var, t) Typ.t
-
         val scale : t -> Scalar.t -> t
 
         val to_coords : t -> Field.t * Field.t
@@ -196,7 +192,7 @@ struct
   open Impl
 
   module Signature = struct
-    type 'a t_ = 'a * 'a [@@deriving eq, sexp]
+    type 'a t_ = 'a * 'a [@@deriving sexp]
 
     type var = Curve.Scalar.var t_
 
@@ -219,8 +215,6 @@ struct
     type t = Curve.t
 
     type var = Curve.var
-
-    val typ : (var, t) Typ.t
   end = Curve
 
   let sign (k: Private_key.t) m =
