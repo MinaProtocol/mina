@@ -5,5 +5,4 @@ let of_private_key private_key =
   {public_key; private_key}
 
 let create () =
-  assert Insecure.private_key_generation ;
   of_private_key (Private_key.create ())

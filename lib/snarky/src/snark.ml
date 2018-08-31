@@ -5,4 +5,3 @@ module Curve_params = Libsnark.Curves
 module Merkle_tree = Merkle_tree
 module Knapsack = Knapsack
 module Curves = Curves
-module Signature = Signature

@@ -1,5 +1,6 @@
 module Bignum_bigint = Bigint
 open Core_kernel
+open Snarky
 
 module type Message_intf = sig
   type boolean_var
