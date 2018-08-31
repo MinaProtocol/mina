@@ -9,7 +9,7 @@ end) =
 struct
   open Merkle_ledger_tests.Test_stubs
 
-  module Root_hash = struct  
+  module Root_hash = struct
     include Hash
 
     let to_hash = Fn.id

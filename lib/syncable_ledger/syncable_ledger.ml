@@ -168,15 +168,16 @@ with the hashes in the bottomost N-1 internal nodes).
 module Make
     (Addr : Merkle_address.S) (Account : sig
         type t [@@deriving bin_io, sexp]
-    end)
-    (Hash : sig
+    end) (Hash : sig
       type t [@@deriving bin_io, sexp, eq]
-      include Merkle_ledger.Intf.Hash with type account := Account.t and type t := t
 
+      include Merkle_ledger.Intf.Hash
+              with type account := Account.t
+               and type t := t
     end) (Root_hash : sig
-        type t [@@deriving eq]
+      type t [@@deriving eq]
 
-        val to_hash : t -> Hash.t
+      val to_hash : t -> Hash.t
     end)
     (MT : Merkle_tree_intf
           with type hash := Hash.t

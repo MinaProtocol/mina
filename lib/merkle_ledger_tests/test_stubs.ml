@@ -48,7 +48,7 @@ module Hash = struct
 
   let hash_account account = Md5.digest_string ("0" ^ Account.show account)
 
-  let empty = (hash_account Account.empty)
+  let empty = hash_account Account.empty
 
   let merge ~height a b =
     let res =
