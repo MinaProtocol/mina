@@ -78,6 +78,7 @@ struct
           let%bind () = wait ~sec:Worker_state.worker_wait_time () in
           go ()
       | Ok (Some work) ->
+        Logger.info log "Got some work\n";
         match perform state public_key work with
         | Error e -> log_and_retry "performing work" e
         | Ok result ->
