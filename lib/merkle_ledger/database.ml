@@ -89,10 +89,6 @@ end = struct
 
     let build_generic (data: Bigstring.t) : t = Generic data
 
-    let build_empty_account () : t =
-      Account
-        (Addr.of_directions @@ List.init max_depth ~f:(fun _ -> Direction.Left))
-
     let parse (str: Bigstring.t) : (t, unit) Result.t =
       let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
       let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
@@ -262,22 +258,29 @@ end = struct
 
     let delete mdb account = delete_raw mdb (build_key account)
 
+    let last_key () =
+      Key.build_generic (Bigstring.of_string "last_account_key")
+
     let increment_last_account_key mdb =
-      let key =
-        Key.build_generic (Bigstring.of_string "last_account_key")
-      in
-        match get_generic mdb key with
-        | None -> let account_key = Key.build_empty_account () in
-                  set_raw mdb key (Key.serialize account_key);
-                  Result.return account_key
-        | Some prev_key -> (match Key.parse prev_key with
-          | Error () -> Error Malformed_database
-          | Ok prev_account_key -> Key.next prev_account_key |> 
-                Result.of_option ~error:Out_of_leaves |> 
-                Result.map ~f:(fun next_account_key ->
-                 set_raw mdb key (Key.serialize next_account_key) ;
-                 next_account_key )
-        )
+      let key = last_key () in
+      match get_generic mdb key with
+      | None ->
+          let first_key =
+            Key.Account
+              ( Addr.of_directions
+              @@ List.init max_depth ~f:(fun _ -> Direction.Left) )
+          in
+          set_raw mdb key (Key.serialize first_key) ;
+          Result.return first_key
+      | Some prev_key ->
+        match Key.parse prev_key with
+        | Error () -> Error Malformed_database
+        | Ok prev_account_key ->
+            Key.next prev_account_key
+            |> Result.of_option ~error:Out_of_leaves
+            |> Result.map ~f:(fun next_account_key ->
+                   set_raw mdb key (Key.serialize next_account_key) ;
+                   next_account_key )
 
     let allocate mdb account =
       let key_result =
@@ -292,13 +295,11 @@ end = struct
 
     let last_key_address mdb =
       match
-        Key.build_generic (Bigstring.of_string "last_account_key")
-        |> get_raw mdb
-        |> Result.of_option ~error:(())
+        last_key () |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Key.parse
       with
       | Error () -> None
-      | Ok parsed_key -> Some(Key.to_path_exn parsed_key)
+      | Ok parsed_key -> Some (Key.to_path_exn parsed_key)
   end
 
   let get_key_of_account = Account_key.get

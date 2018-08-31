@@ -186,9 +186,8 @@ let%test_module "test functor on in memory databases" =
                     Account.create (Int.to_string public_key)
                       (Quickcheck.random_value gen_balance) )
               in
-              assert (
-                Sequence.for_all (Sequence.of_list accounts) ~f:(fun account ->
-                    MT.set_account mdb account = Ok () ) ) ;
+              List.iter accounts ~f:(fun account ->
+                  assert (MT.set_account mdb account = Ok ()) ) ;
               let retrieved_accounts =
                 MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
