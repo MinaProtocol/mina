@@ -39,9 +39,11 @@ struct
                 List.nth_exn keys i )
           in
           let snark_worker_config =
-            Option.map public_key ~f:(fun public_key ->
-                { Coda_process.Coda_worker.Snark_worker_config.public_key
-                ; port= 20000 + i } )
+            Option.bind public_key ~f:(fun public_key ->
+                Option.bind public_key ~f:(fun public_key ->
+                    Some
+                      { Coda_process.Coda_worker.Snark_worker_config.public_key
+                      ; port= 20000 + i } ) )
           in
           Coda_process.spawn_local_exn ~peers ~discovery_port ~external_port
             ~snark_worker_config ~program_dir

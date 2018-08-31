@@ -21,7 +21,9 @@ struct
     assert (n = 1) ;
     let log = Logger.create () in
     let log = Logger.child log name in
-    let snark_worker_public_keys = Some [Genesis_ledger.high_balance_pk] in
+    let snark_worker_public_keys =
+      Some [Some Genesis_ledger.high_balance_pk]
+    in
     Coda_processes.init () ;
     Coda_processes.spawn_local_processes_exn n ~program_dir
       ~snark_worker_public_keys
