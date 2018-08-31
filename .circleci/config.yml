@@ -19,6 +19,10 @@ jobs:
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - save_cache:
+                key: builddir-{{ .Branch }}-{{ .Revision }}
+                paths:
+            -       "_build"
             - run:
                 name: Install python -- hack
                 command: sudo apt install -y python
@@ -40,9 +44,9 @@ jobs:
             password: $JSON_GCLOUD_CREDENTIALS
         steps:
             - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia            
+            - restore_cache:
+                keys:
+                  - builddir-{{ .Branch }}-{{ .Revision }}
             - run:
                 name: Test make test-runtest
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
@@ -56,9 +60,9 @@ jobs:
             password: $JSON_GCLOUD_CREDENTIALS
         steps:
             - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
+            - restore_cache:
+                keys:
+                  - builddir-{{ .Branch }}-{{ .Revision }}
             - run:
                 name: Test make test-full-stake
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-stake
@@ -81,9 +85,9 @@ jobs:
             password: $JSON_GCLOUD_CREDENTIALS
         steps:
             - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia            
+            - restore_cache:
+                keys:
+                  - builddir-{{ .Branch }}-{{ .Revision }}
             - run:
                 name: Test make test-full-sig
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-sig
@@ -102,6 +106,12 @@ workflows:
     build_wrap:
         jobs:
             - build
-            - test-sig
-            - test-stake
-            - test-code
+            - test-sig:
+                requires:
+                - build
+            - test-stake:
+                requires:
+                - build
+            - test-code:
+                requires:
+                - build
