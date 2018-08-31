@@ -4,7 +4,7 @@ jobs:
         resource_class: large
         docker:
         - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
-        auth:
+          auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
         steps:
@@ -20,7 +20,7 @@ jobs:
         resource_class: large
         docker:
         - image: gcr.io/o1labs-192920/ocaml-base:20472b5c2589370954463f27a7f84501a17206f0
-        auth:
+          auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
         steps:
