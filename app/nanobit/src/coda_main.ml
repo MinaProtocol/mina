@@ -536,6 +536,8 @@ struct
         include Merkle_hash
 
         let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
+
+        let empty = Merkle_hash.empty_hash
       end)
       (struct
         include Ledger_hash
