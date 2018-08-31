@@ -25,7 +25,8 @@ struct
       ~should_propose:(fun i -> i = 0)
       ~f:(fun workers ->
           let blocks = ref 0 in
-          let balance = ref None in
+          let update_block = ref 0 in
+          let last_balance = ref (Currency.Balance.of_int 0) in
           let%bind () =
             Deferred.List.all_unit
               (List.mapi workers ~f:(fun i worker ->
@@ -33,7 +34,7 @@ struct
                      Coda_process.strongest_ledgers_exn worker
                    in
                    let _ = log in
-                   let sender_initial_balance = Genesis_ledger.initial_high_balance in
+                   (*let sender_initial_balance = Genesis_ledger.initial_high_balance in*)
                    let sender_pk = Genesis_ledger.high_balance_pk in
                    let receiver_pk = Genesis_ledger.low_balance_pk in
                    let sender_sk = Genesis_ledger.high_balance_sk in
@@ -43,7 +44,13 @@ struct
                      let rec go () = 
                        let%bind b = Coda_process.get_balance_exn worker sender_pk in
                        Logger.debug log !"%d got balance %{sexp: Currency.Balance.t option}" i b ;
-                       balance := b;
+                       Option.iter b ~f:(fun b -> 
+                         if b <> !last_balance
+                         then (
+                           update_block := !blocks;
+                           last_balance := b
+                         )
+                         );
                        let%bind () = after (Time.Span.of_sec 0.5) in
                        go ()
                      in go ()
@@ -65,16 +72,9 @@ struct
                           let curr_str = bits_to_str curr in
                           Logger.debug log "%d got tip %s %s" i prev_str curr_str ;
                           blocks := !blocks + 1;
-                          Option.iter !balance ~f:(fun b -> 
-                              let b = Currency.Balance.to_int b in
-                              let transactions = 
-                                (Currency.Balance.to_int sender_initial_balance - b) / 
-                                (Currency.Amount.to_int send_amount) 
-                              in
-                              let diff = !blocks - transactions in
-                              Logger.debug log "%d transactions/blocks diff %d %d %d" i !blocks transactions diff 
-                              (*assert (diff < 3)*)
-                          );
+                          let diff = !blocks - !update_block in
+                          Logger.debug log "%d blocks/update_block diff %d %d %d" i !blocks !update_block diff;
+                          assert (diff < 5);
                           let%bind () = 
                             Coda_process.send_transaction_exn worker sender_sk receiver_pk send_amount fee;
                           in
