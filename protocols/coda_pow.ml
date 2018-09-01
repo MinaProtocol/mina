@@ -411,6 +411,7 @@ module type Ledger_builder_intf = sig
 
   val create_diff :
        t
+    -> logger:Logger.t
     -> transactions_by_fee:transaction_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
