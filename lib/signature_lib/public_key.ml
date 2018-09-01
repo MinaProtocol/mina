@@ -1,5 +1,4 @@
 open Core_kernel
-open Util
 open Snark_params
 open Fold_lib
 
@@ -11,8 +10,7 @@ module Stable = struct
 end
 
 include Stable.V1
-
-include Comparable.Make_binable(Stable.V1)
+include Comparable.Make_binable (Stable.V1)
 
 let ( = ) = equal
 
@@ -28,6 +26,14 @@ let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
 
 let of_private_key pk =
   Tick.Inner_curve.(to_coords (scale_field Tick.Inner_curve.one pk))
+
+let gen : t Quickcheck.Generator.t =
+  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
+      let open Option.Let_syntax in
+      let%map y = Tick.Inner_curve.find_y x in
+      (x, y) )
+
+let parity y = Tick.Bigint.(test_bit (of_field y) 0)
 
 module Compressed = struct
   open Tick
@@ -45,13 +51,11 @@ module Compressed = struct
   include Comparable.Make_binable (Stable.V1)
   include Hashable.Make_binable (Stable.V1)
 
-  let to_base64 t =
-    Binable.to_string (module Stable.V1) t
-    |> Base64.encode_string
+  let compress (x, y) : t = {x; is_odd= parity y}
 
-  let of_base64_exn s =
-    Base64.decode_string s
-    |> Binable.of_string (module Stable.V1)
+  let to_base64 t = Binable.to_string (module Stable.V1) t |> B64.encode
+
+  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.V1)
 
   let empty = {x= Field.zero; is_odd= false}
 
@@ -60,14 +64,16 @@ module Compressed = struct
     let%map x = Field.gen and is_odd = Bool.gen in
     {x; is_odd}
 
+  let bit_length_to_triple_length n = (n + 2) / 3
+
   let length_in_triples = bit_length_to_triple_length (1 + Field.size_in_bits)
 
   type var = (Field.var, Boolean.var) t_
 
-  let to_hlist {x; is_odd} = H_list.[x; is_odd]
+  let to_hlist {x; is_odd} = Snarky.H_list.[x; is_odd]
 
-  let of_hlist : (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) t_ =
-    H_list.(fun [x; is_odd] -> {x; is_odd})
+  let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) t_ =
+    Snarky.H_list.(fun [x; is_odd] -> {x; is_odd})
 
   let typ : (var, t) Typ.t =
     Typ.of_hlistable
@@ -85,9 +91,7 @@ module Compressed = struct
     ()
 
   let fold_bits {is_odd; x} =
-    { Fold.fold = fun ~init ~f ->
-        f ((Field.Bits.fold x).fold ~init ~f) is_odd
-    }
+    {Fold.fold= (fun ~init ~f -> f ((Field.Bits.fold x).fold ~init ~f) is_odd)}
 
   let fold t = Fold.group3 ~default:false (fold_bits t)
 
@@ -99,13 +103,12 @@ module Compressed = struct
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
     in
     Bitstring_lib.Bitstring.pad_to_triple_list
-      (x_bits @ [is_odd]) ~default:Boolean.false_
+      (x_bits @ [is_odd])
+      ~default:Boolean.false_
 end
 
 open Tick
 open Let_syntax
-
-let parity y = Bigint.(test_bit (of_field y) 0)
 
 let decompress ({x; is_odd}: Compressed.t) =
   Option.map (Tick.Inner_curve.find_y x) ~f:(fun y ->
@@ -129,17 +132,12 @@ let decompress_var ({x; is_odd} as c: Compressed.var) =
   and () = parity_var y >>= Boolean.Assert.(( = ) is_odd) in
   (x, y)
 
-let compress ((x, y): t) : Compressed.t = {x; is_odd= parity y}
+let compress : t -> Compressed.t = Compressed.compress
 
 let compress_var ((x, y): var) : (Compressed.var, _) Checked.t =
   with_label __LOC__
     (let%map is_odd = parity_var y in
      {Compressed.x; is_odd})
-
-let assert_equal ((x1, y1): var) ((x2, y2): var) : (unit, _) Checked.t =
-  let%map () = Field.Checked.Assert.equal x1 x2
-  and () = Field.Checked.Assert.equal y1 y2 in
-  ()
 
 let of_bigstring bs =
   let open Or_error.Let_syntax in
@@ -154,9 +152,5 @@ let to_bigstring elem =
   bs
 
 let%test_unit "point-compression: decompress . compress = id" =
-  Test_util.with_randomness 123456789 (fun () ->
-      let test () =
-        let pk = of_private_key (Private_key.create ()) in
-        assert (decompress_exn (compress pk) = pk)
-      in
-      for i = 0 to 100 do test () done )
+  Quickcheck.test gen ~f:(fun pk ->
+      assert (equal (decompress_exn (compress pk)) pk) )

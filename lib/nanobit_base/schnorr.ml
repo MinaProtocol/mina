@@ -56,5 +56,5 @@ module Message = struct
        Sha256_lib.Sha256.Checked.digest (bs :> Boolean.var list))
 end
 
-include Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
+include Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
           (Message)

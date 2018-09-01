@@ -2,6 +2,7 @@ open Core_kernel
 open Coda_numbers
 open Nanobit_base
 open Fold_lib
+open Signature_lib
 
 module Global_keypair = struct
   let private_key =

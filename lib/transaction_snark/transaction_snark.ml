@@ -1,4 +1,5 @@
 open Core
+open Signature_lib
 open Nanobit_base
 open Util
 open Snark_params

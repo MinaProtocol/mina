@@ -1,6 +1,7 @@
 open Core
 open Async
 open Nanobit_base
+open Signature_lib
 open Blockchain_snark
 module Fee = Protocols.Coda_pow.Fee
 
