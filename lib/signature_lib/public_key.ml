@@ -10,8 +10,7 @@ module Stable = struct
 end
 
 include Stable.V1
-
-include Comparable.Make_binable(Stable.V1)
+include Comparable.Make_binable (Stable.V1)
 
 let ( = ) = equal
 
@@ -30,9 +29,9 @@ let of_private_key pk =
 
 let gen : t Quickcheck.Generator.t =
   Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
-    let open Option.Let_syntax in
-    let%map y = Tick.Inner_curve.find_y x in
-    (x, y))
+      let open Option.Let_syntax in
+      let%map y = Tick.Inner_curve.find_y x in
+      (x, y) )
 
 let parity y = Tick.Bigint.(test_bit (of_field y) 0)
 
@@ -52,16 +51,11 @@ module Compressed = struct
   include Comparable.Make_binable (Stable.V1)
   include Hashable.Make_binable (Stable.V1)
 
-  let compress (x, y) : t =
-    {x; is_odd= parity y}
+  let compress (x, y) : t = {x; is_odd= parity y}
 
-  let to_base64 t =
-    Binable.to_string (module Stable.V1) t
-    |> B64.encode
+  let to_base64 t = Binable.to_string (module Stable.V1) t |> B64.encode
 
-  let of_base64_exn s =
-    B64.decode s
-    |> Binable.of_string (module Stable.V1)
+  let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.V1)
 
   let empty = {x= Field.zero; is_odd= false}
 
@@ -97,9 +91,7 @@ module Compressed = struct
     ()
 
   let fold_bits {is_odd; x} =
-    { Fold.fold = fun ~init ~f ->
-        f ((Field.Bits.fold x).fold ~init ~f) is_odd
-    }
+    {Fold.fold= (fun ~init ~f -> f ((Field.Bits.fold x).fold ~init ~f) is_odd)}
 
   let fold t = Fold.group3 ~default:false (fold_bits t)
 
@@ -111,7 +103,8 @@ module Compressed = struct
       Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
     in
     Bitstring_lib.Bitstring.pad_to_triple_list
-      (x_bits @ [is_odd]) ~default:Boolean.false_
+      (x_bits @ [is_odd])
+      ~default:Boolean.false_
 end
 
 open Tick
@@ -160,4 +153,4 @@ let to_bigstring elem =
 
 let%test_unit "point-compression: decompress . compress = id" =
   Quickcheck.test gen ~f:(fun pk ->
-    assert (equal (decompress_exn (compress pk)) pk))
+      assert (equal (decompress_exn (compress pk)) pk) )

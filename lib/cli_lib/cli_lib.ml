@@ -34,14 +34,12 @@ let public_key_compressed =
 
     let name = "public key"
 
-    let random () =
-      Public_key.compress (Keypair.create ()).public_key
+    let random () = Public_key.compress (Keypair.create ()).public_key
   end) in
   Pk.arg_type
 
 let public_key =
-  Command.Arg_type.map public_key_compressed
-    ~f:Public_key.decompress_exn
+  Command.Arg_type.map public_key_compressed ~f:Public_key.decompress_exn
 
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
