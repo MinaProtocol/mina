@@ -69,7 +69,7 @@ module type Inputs_intf = sig
 
     type query [@@deriving bin_io]
 
-    val create : Ledger.t -> Ledger_hash.t -> t
+    val create : Ledger.t -> t
 
     val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
 
@@ -77,9 +77,7 @@ module type Inputs_intf = sig
 
     val destroy : t -> unit
 
-    val new_goal : t -> Ledger_hash.t -> unit
-
-    val wait_until_valid :
+    val fetch :
       t -> Ledger_hash.t -> [`Ok of Ledger.t | `Target_changed] Deferred.t
   end
 
@@ -113,7 +111,7 @@ module Make (Inputs : Inputs_intf) = struct
           let ledger =
             Ledger_builder.ledger locked_tip.ledger_builder |> Ledger.copy
           in
-          let sl = Sync_ledger.create ledger h in
+          let sl = Sync_ledger.create ledger in
           Net.glue_sync_ledger net
             (Sync_ledger.query_reader sl)
             (Sync_ledger.answer_writer sl) ;
@@ -125,11 +123,8 @@ module Make (Inputs : Inputs_intf) = struct
     let ivar : External_transition.t Ivar.t = Ivar.create () in
     let work =
       match%bind
-        Interruptible.lift
-          (Sync_ledger.wait_until_valid sl h)
-          (Deferred.map (Ivar.read ivar) ~f:(fun transition ->
-               Sync_ledger.new_goal sl
-                 (External_transition.ledger_hash transition) ))
+        Interruptible.lift (Sync_ledger.fetch sl h)
+          (Deferred.map (Ivar.read ivar) ~f:ignore)
       with
       | `Ok ledger -> (
           (* TODO: This should be parallelized with the syncing *)
@@ -147,7 +142,6 @@ module Make (Inputs : Inputs_intf) = struct
                   Transition_logic_state.Transition_tree.singleton transition
                 in
                 sl_ref := None ;
-                Option.iter !sl_ref ~f:Sync_ledger.destroy ;
                 let new_tip = Tip.of_transition_and_lb transition lb in
                 let open Transition_logic_state.Change in
                 [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]

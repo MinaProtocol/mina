@@ -95,8 +95,7 @@ module type Kernel_intf = sig
 
   module Consensus_mechanism :
     Consensus.Mechanism.S
-    with type Proof.t = Nanobit_base.Proof.t
-     and type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+    with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
      and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
 
   module Blockchain :
@@ -119,8 +118,7 @@ module Make_kernel
                                                                     sexp
                                                                     , bin_io]
       end) -> Consensus.Mechanism.S
-              with type Proof.t = Nanobit_base.Proof.t
-               and type Internal_transition.Ledger_builder_diff.t =
+              with type Internal_transition.Ledger_builder_diff.t =
                           Ledger_builder_diff.t
                and type External_transition.Ledger_builder_diff.t =
                           Ledger_builder_diff.t) :
@@ -637,11 +635,12 @@ struct
     module Compressed_public_key = Public_key.Compressed
 
     module Prover = struct
-      let prove ~prev_state:(old_state, old_proof)
+      let prove ~prev_state ~prev_state_proof ~next_state
           (transition: Init.Consensus_mechanism.Internal_transition.t) =
         let open Deferred.Or_error.Let_syntax in
         Init.Prover.extend_blockchain Init.prover
-          (Init.Blockchain.create ~proof:old_proof ~state:old_state)
+          (Init.Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+          next_state
           (Init.Consensus_mechanism.Internal_transition.snark_transition
              transition)
         >>| fun {Init.Blockchain.proof; _} -> proof
@@ -653,8 +652,12 @@ struct
   end)
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs: 'a -> Ledger_proof_statement.Set.t)
-      ~(set_seen_jobs: 'a -> Ledger_proof_statement.Set.t -> unit) (t: 'a) =
+      ~(seen_jobs:
+         'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
+      ~(set_seen_jobs:
+            'a
+         -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
+         -> unit) (t: 'a) =
     let lb = best_ledger_builder t in
     let maybe_instances, seen_jobs =
       Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
@@ -748,16 +751,25 @@ module type Main_intf = sig
       val get : t -> Public_key.Compressed.t -> Account.t option
     end
 
-    module External_transition : sig
-      type t
+    module Ledger_builder_diff : sig
+      type t [@@deriving sexp, bin_io]
     end
+
+    module Consensus_mechanism :
+      Consensus.Mechanism.S
+      with type Internal_transition.Ledger_builder_diff.t =
+                  Ledger_builder_diff.t
+       and type External_transition.Ledger_builder_diff.t =
+                  Ledger_builder_diff.t
 
     module Net : sig
       type t
 
       module Peer : sig
-        type t = Host_and_port.Stable.V1.t
+        type t = Host_and_port.Stable.V1.t * int
         [@@deriving bin_io, sexp, compare, hash]
+
+        val external_rpc : t -> Host_and_port.Stable.V1.t
       end
 
       module Gossip_net : sig
@@ -805,11 +817,11 @@ module type Main_intf = sig
     end
 
     module Transition_tree :
-      Coda.Ktree_intf with type elem := External_transition.t
+      Coda.Ktree_intf
+      with type elem := Consensus_mechanism.External_transition.t
   end
 
-  module Consensus_mechanism :
-    Consensus.Mechanism.S with type Proof.t = Nanobit_base.Proof.t
+  module Consensus_mechanism : Consensus.Mechanism.S
 
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism
@@ -822,6 +834,7 @@ module type Main_intf = sig
   module Config : sig
     type t =
       { log: Logger.t
+      ; should_propose: bool
       ; net_config: Inputs.Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
@@ -837,10 +850,10 @@ module type Main_intf = sig
 
   val best_ledger : t -> Inputs.Ledger.t
 
-  val peers : t -> Host_and_port.t list
+  val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
-    t -> Inputs.External_transition.t Linear_pipe.Reader.t
+    t -> Inputs.Consensus_mechanism.External_transition.t Linear_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 
@@ -851,6 +864,8 @@ module type Main_intf = sig
   val lbc_transition_tree : t -> Inputs.Transition_tree.t option
 
   val snark_worker_command_name : string
+
+  val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 end
 
 module Run (Program : Main_intf) = struct
@@ -859,6 +874,8 @@ module Run (Program : Main_intf) = struct
 
   module For_tests = struct
     let get_transition_tree t = lbc_transition_tree t
+
+    let ledger_proof t = ledger_builder_ledger_proof t
   end
 
   let get_balance t (addr: Public_key.Compressed.t) =

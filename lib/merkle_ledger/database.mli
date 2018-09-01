@@ -8,7 +8,7 @@ module Make
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
     (Sdb : Intf.Stack_database) : sig
-  include Intf.Database_S
+  include Database_intf.S
           with type account := Account.t
            and type hash := Hash.t
            and type key := Public_key.t
@@ -16,11 +16,10 @@ module Make
   module Key : sig
     type t
   end
+
   val of_index: int -> Key.t
 
   val to_index: Key.t -> int
-  
-  val gen_account_key : Key.t Core.Quickcheck.Generator.t
 
   val get_account_from_key : t -> Key.t -> Account.t option
 
@@ -29,4 +28,8 @@ module Make
   val update_account: t -> Key.t -> Account.t -> unit
 
   val public_key_to_index : t -> Public_key.t -> Key.t option
+
+  module For_tests : sig
+    val gen_account_key : Key.t Core.Quickcheck.Generator.t
+  end
 end

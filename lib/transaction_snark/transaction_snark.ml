@@ -4,8 +4,11 @@ open Util
 open Snark_params
 open Snarky
 open Currency
+open Fold_lib
 
 let bundle_length = 1
+
+let state_hash_size_in_triples = Tick.Field.size_in_triples
 
 let tick_input () =
   let open Tick in
@@ -176,13 +179,15 @@ let create = Fields.create
 
 let base_top_hash s1 s2 excess =
   Tick.Pedersen.digest_fold Hash_prefix.base_snark
-    (Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Amount.Signed.fold excess)
+    Fold.(
+      Ledger_hash.fold s1 +> Ledger_hash.fold s2 +> Amount.Signed.fold excess)
 
 let merge_top_hash s1 s2 fee_excess wrap_vk_bits =
   Tick.Pedersen.digest_fold Hash_prefix.merge_snark
-    ( Ledger_hash.fold s1 +> Ledger_hash.fold s2
-    +> Amount.Signed.fold fee_excess
-    +> List.fold wrap_vk_bits )
+    Fold.(
+      Ledger_hash.fold s1 +> Ledger_hash.fold s2
+      +> Amount.Signed.fold fee_excess
+      +> Fold.(group3 ~default:false (of_list wrap_vk_bits)))
 
 let embed (x: Tick.Field.t) : Tock.Field.t =
   Tock.Field.project (Tick.Field.unpack x)
@@ -274,8 +279,9 @@ module Base = struct
           - fee excess = -(amount + fee)
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
-  let apply_tagged_transaction root
-      ((tag, {sender; signature; payload}): Tagged_transaction.var) =
+  let apply_tagged_transaction (type shifted)
+      (shifted: (module Inner_curve.Checked.Shifted.S with type t = shifted))
+      root ((tag, {sender; signature; payload}): Tagged_transaction.var) =
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
@@ -284,11 +290,13 @@ module Base = struct
         let is_normal = Tag.Checked.is_normal tag in
         let%bind payload_section = Schnorr.Message.var_of_payload payload in
         let%bind () =
-          let%bind verifies =
-            Schnorr.Checked.verifies signature sender payload_section
-          in
-          (* Should only assert_verifies if the tag is Normal *)
-          Boolean.Assert.any [is_fee_transfer; verifies]
+          with_label __LOC__
+            (let%bind verifies =
+               Schnorr.Checked.verifies shifted signature sender
+                 payload_section
+             in
+             (* Should only assert_verifies if the tag is Normal *)
+             Boolean.Assert.any [is_fee_transfer; verifies])
         in
         let%bind excess, sender_delta =
           let%bind amount_plus_fee = Amount.Checked.add_fee amount fee in
@@ -371,6 +379,7 @@ module Base = struct
   let main top_hash =
     with_label __LOC__
       (let open Let_syntax in
+      let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
       let%bind root_before =
         provide_witness' Ledger_hash.typ ~f:Prover_state.state1
       in
@@ -379,14 +388,15 @@ module Base = struct
           (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
       in
       let%bind root_after, fee_excess =
-        apply_tagged_transaction root_before t
+        apply_tagged_transaction (module Shifted) root_before t
       in
       let%map () =
         with_label __LOC__
-          (let%bind b1 = Ledger_hash.var_to_bits root_before
-           and b2 = Ledger_hash.var_to_bits root_after in
-           let fee_excess_bits = Amount.Signed.Checked.to_bits fee_excess in
-           digest_bits ~init:Hash_prefix.base_snark (b1 @ b2 @ fee_excess_bits)
+          (let%bind b1 = Ledger_hash.var_to_triples root_before
+           and b2 = Ledger_hash.var_to_triples root_after in
+           let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
+           Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark
+             (b1 @ b2 @ fee_excess)
            >>= Field.Checked.Assert.equal top_hash)
       in
       ())
@@ -459,10 +469,8 @@ module Merge = struct
   let disjoint_union_sections = function
     | [] -> failwith "empty list"
     | s :: ss ->
-        Checked.List.fold ~f:Pedersen_hash.Section.disjoint_union_exn ~init:s
-          ss
-
-  let state_hash_size_in_bits = Field.size_in_bits
+        Checked.List.fold ~f:Pedersen.Checked.Section.disjoint_union_exn
+          ~init:s ss
 
   module Verifier =
     Snarky.Gm_verifier_gadget.Mnt4 (Tick)
@@ -484,8 +492,8 @@ module Merge = struct
     in
     result
 
-  let input_bits_length_excluding_vk =
-    (2 * Tock.Field.size_in_bits) + Amount.Signed.length
+  let input_triples_length_excluding_vk =
+    (2 * state_hash_size_in_triples) + Amount.Signed.length_in_triples
 
   (* spec for [verify_transition tock_vk proof_field s1 s2]:
      returns a bool which is true iff
@@ -516,32 +524,36 @@ module Merge = struct
     let%bind states_and_excess_hash =
       let prefix =
         let acc =
-          Hash_curve.Checked.if_value is_base ~then_:Hash_prefix.base_snark.acc
+          Inner_curve.Checked.if_value is_base
+            ~then_:Hash_prefix.base_snark.acc
             ~else_:Hash_prefix.merge_snark.acc
         in
-        Pedersen_hash.Section.create ~acc:(`Var acc)
-          ~support:(Interval_union.of_interval (0, Hash_prefix.length_in_bits))
+        Pedersen.Checked.Section.create ~acc:(`Var acc)
+          ~support:
+            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
       in
       let%bind sec = disjoint_union_sections [prefix; s1; s2] in
-      Pedersen_hash.Section.extend sec
-        (Amount.Signed.Checked.to_bits fee_excess)
-        ~start:(Hash_prefix.length_in_bits + (2 * state_hash_size_in_bits))
+      Pedersen.Checked.Section.extend sec
+        (Amount.Signed.Checked.to_triples fee_excess)
+        ~start:
+          (Hash_prefix.length_in_triples + (2 * state_hash_size_in_triples))
     in
     let%bind states_and_excess_and_vk_hash =
       with_label __LOC__
-        (Pedersen_hash.Section.disjoint_union_exn tock_vk_section
+        (Pedersen.Checked.Section.disjoint_union_exn tock_vk_section
            states_and_excess_hash)
-      >>| Pedersen_hash.Section.to_initial_segment_digest_exn >>| fst
+      >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
     in
     let%bind input =
       with_label __LOC__
         ( Field.Checked.if_ is_base
             ~then_:
               ( states_and_excess_hash
-              |> Pedersen_hash.Section.to_initial_segment_digest_exn |> fst )
+              |> Pedersen.Checked.Section.to_initial_segment_digest_exn |> fst
+              )
             ~else_:states_and_excess_and_vk_hash
-        >>= Pedersen.Digest.choose_preimage_var
-        >>| Pedersen.Digest.Unpacked.var_to_bits )
+        >>= Pedersen.Checked.Digest.choose_preimage
+        >>| fun x -> (x :> Boolean.var list) )
     in
     check_snark ~get_proof tock_vk_data input
 
@@ -552,7 +564,7 @@ module Merge = struct
      verify_transition tock_vk _ s1 s2 is true
      verify_transition tock_vk _ s2 s3 is true
   *)
-  let main (top_hash: Pedersen.Digest.Packed.var) =
+  let main (top_hash: Pedersen.Checked.Digest.var) =
     let%bind tock_vk_data =
       provide_witness' Verifier.Verification_key_data.typ ~f:
         (fun {Prover_state.tock_vk; _} ->
@@ -565,22 +577,27 @@ module Merge = struct
     and fee_excess23 =
       provide_witness' Amount.Signed.typ ~f:Prover_state.fee_excess23
     in
+    let bits_to_triples bits =
+      Fold.(to_list (group3 ~default:Boolean.false_ (of_list bits)))
+    in
     let%bind s1_section =
-      Pedersen_hash.Section.(extend empty ~start:Hash_prefix.length_in_bits s1)
+      let open Pedersen.Checked.Section in
+      extend empty ~start:Hash_prefix.length_in_triples (bits_to_triples s1)
     in
     let%bind s3_section =
-      let open Pedersen_hash.Section in
+      let open Pedersen.Checked.Section in
       extend empty
-        ~start:(Hash_prefix.length_in_bits + state_hash_size_in_bits)
-        s3
+        ~start:(Hash_prefix.length_in_triples + state_hash_size_in_triples)
+        (bits_to_triples s3)
     in
     let%bind tock_vk_section =
       let%bind bs =
         Verifier.Verification_key_data.Checked.to_bits tock_vk_data
       in
-      Pedersen_hash.Section.extend Pedersen_hash.Section.empty
-        ~start:(Hash_prefix.length_in_bits + input_bits_length_excluding_vk)
-        bs
+      Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
+        ~start:
+          (Hash_prefix.length_in_triples + input_triples_length_excluding_vk)
+        (bits_to_triples bs)
     in
     let%bind () =
       let%bind total_fees =
@@ -588,36 +605,37 @@ module Merge = struct
       in
       let%bind sec =
         let%bind fee_section =
-          let open Pedersen_hash.Section in
+          let open Pedersen.Checked.Section in
           extend empty
-            ~start:(Hash_prefix.length_in_bits + (2 * state_hash_size_in_bits))
-            (Amount.Signed.Checked.to_bits total_fees)
+            ~start:
+              (Hash_prefix.length_in_triples + (2 * state_hash_size_in_triples))
+            (Amount.Signed.Checked.to_triples total_fees)
         in
         disjoint_union_sections
-          [ Pedersen_hash.Section.create
+          [ Pedersen.Checked.Section.create
               ~acc:(`Value Hash_prefix.merge_snark.acc)
               ~support:
-                (Interval_union.of_interval (0, Hash_prefix.length_in_bits))
+                (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
           ; s1_section
           ; s3_section
           ; fee_section
           ; tock_vk_section ]
       in
       Field.Checked.Assert.equal top_hash
-        (fst (Pedersen_hash.Section.to_initial_segment_digest_exn sec))
+        (fst (Pedersen.Checked.Section.to_initial_segment_digest_exn sec))
     and verify_12 =
       let%bind s2_section =
-        let open Pedersen_hash.Section in
+        let open Pedersen.Checked.Section in
         extend empty
-          ~start:(Hash_prefix.length_in_bits + state_hash_size_in_bits)
-          s2
+          ~start:(Hash_prefix.length_in_triples + state_hash_size_in_triples)
+          (bits_to_triples s2)
       in
       verify_transition tock_vk_data tock_vk_section Prover_state.proof12
         s1_section s2_section fee_excess12
     and verify_23 =
       let%bind s2_section =
-        let open Pedersen_hash.Section in
-        extend empty ~start:Hash_prefix.length_in_bits s2
+        let open Pedersen.Checked.Section in
+        extend empty ~start:Hash_prefix.length_in_triples (bits_to_triples s2)
       in
       verify_transition tock_vk_data tock_vk_section Prover_state.proof23
         s2_section s3_section fee_excess23
@@ -684,23 +702,25 @@ module Verification = struct
       let open Tick in
       let s =
         { Hash_prefix.merge_snark with
-          bits_consumed=
-            Hash_prefix.merge_snark.bits_consumed
-            + (Pedersen.Digest.size_in_bits * 2) }
+          triples_consumed=
+            Hash_prefix.merge_snark.triples_consumed
+            + (2 * state_hash_size_in_triples) }
       in
       let s =
-        Pedersen.State.update_fold s (fun ~init ~f ->
-            let init = Amount.Signed.(fold zero ~init ~f) in
-            List.fold wrap_vk_bits ~init ~f )
+        Pedersen.State.update_fold s
+          Fold.(
+            Amount.Signed.(fold zero)
+            +> group3 ~default:false (of_list wrap_vk_bits))
       in
-      let hash_interval = (0, Hash_prefix.length_in_bits) in
+      let hash_interval = (0, Hash_prefix.length_in_triples) in
       let amount_begin =
-        Hash_prefix.length_in_bits + (2 * Ledger_hash.length_in_bits)
+        Hash_prefix.length_in_triples + (2 * state_hash_size_in_triples)
       in
-      let amount_end = amount_begin + Amount.Signed.length in
+      let amount_end = amount_begin + Amount.Signed.length_in_triples in
       let amount_interval = (amount_begin, amount_end) in
-      let vk_interval = (amount_end, amount_end + List.length wrap_vk_bits) in
-      Tick.Pedersen_hash.Section.create ~acc:(`Value s.acc)
+      let vk_length_in_triples = (2 + List.length wrap_vk_bits) / 3 in
+      let vk_interval = (amount_end, amount_end + vk_length_in_triples) in
+      Tick.Pedersen.Checked.Section.create ~acc:(`Value s.acc)
         ~support:
           (Interval_union.of_intervals_exn
              [hash_interval; amount_interval; vk_interval])
@@ -717,23 +737,25 @@ module Verification = struct
     let verify_complete_merge s1 s2 get_proof =
       let open Tick in
       let open Let_syntax in
-      let%bind s1 = Ledger_hash.var_to_bits s1
-      and s2 = Ledger_hash.var_to_bits s2 in
+      let%bind s1 = Ledger_hash.var_to_triples s1
+      and s2 = Ledger_hash.var_to_triples s2 in
       let%bind top_hash_section =
-        Pedersen_hash.Section.extend merge_prefix_and_zero_and_vk_curve_pt
-          ~start:Hash_prefix.length_in_bits (s1 @ s2)
+        Pedersen.Checked.Section.extend merge_prefix_and_zero_and_vk_curve_pt
+          ~start:Hash_prefix.length_in_triples (s1 @ s2)
       in
       let digest =
         let open Interval_union in
-        let digest, `Length n =
-          Or_error.ok_exn
-            (Pedersen_hash.Section.to_initial_segment_digest top_hash_section)
+        let digest, `Length_in_triples n =
+          Pedersen.Checked.Section.to_initial_segment_digest_exn
+            top_hash_section
         in
         if
           n
-          = Hash_prefix.length_in_bits
-            + (2 * Ledger_hash.length_in_bits)
-            + Amount.Signed.length + List.length wrap_vk_bits
+          = Hash_prefix.length_in_triples
+            + (2 * Ledger_hash.length_in_triples)
+            + Amount.Signed.length_in_triples
+            + Nanobit_base.Util.bit_length_to_triple_length
+                (List.length wrap_vk_bits)
         then digest
         else
           failwithf
@@ -741,17 +763,21 @@ module Verification = struct
               + (2 * Ledger_hash.length_in_bits) aka %d \n            \
               + Amount.Signed.length aka %d + List.length wrap_vk_bits aka %d \
               ) aka %d"
-            n Hash_prefix.length_in_bits
-            (2 * Ledger_hash.length_in_bits)
-            Amount.Signed.length (List.length wrap_vk_bits)
-            ( Hash_prefix.length_in_bits
-            + (2 * Ledger_hash.length_in_bits)
-            + Amount.Signed.length + List.length wrap_vk_bits )
+            n Hash_prefix.length_in_triples
+            (2 * Ledger_hash.length_in_triples)
+            Amount.Signed.length_in_triples
+            (Nanobit_base.Util.bit_length_to_triple_length
+               (List.length wrap_vk_bits))
+            ( Hash_prefix.length_in_triples
+            + (2 * Ledger_hash.length_in_triples)
+            + Amount.Signed.length_in_triples
+            + Nanobit_base.Util.bit_length_to_triple_length
+                (List.length wrap_vk_bits) )
             ()
       in
       let%bind top_hash =
-        Pedersen.Digest.choose_preimage_var digest
-        >>| Pedersen.Digest.Unpacked.var_to_bits
+        Pedersen.Checked.Digest.choose_preimage digest
+        >>| fun x -> (x :> Boolean.var list)
       in
       let%map result =
         let%bind vk_data, result =
@@ -1203,7 +1229,7 @@ let%test_module "transaction_snark" =
         ; account=
             { public_key=
                 Public_key.compress (Public_key.of_private_key private_key)
-            ; balance= Balance.of_int (10 + Random.int 100)
+            ; balance= Balance.of_int (50 + Random.int 100)
             ; receipt_chain_hash= Receipt.Chain_hash.empty
             ; nonce= Account.Nonce.zero } }
       in

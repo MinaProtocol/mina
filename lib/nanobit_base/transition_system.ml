@@ -1,5 +1,7 @@
 open Core_kernel
+open Util
 open Snark_params
+open Tuple_lib
 
 module type S = sig
   open Tick
@@ -14,7 +16,7 @@ module type S = sig
 
       val typ : (var, t) Typ.t
 
-      val var_to_bits : var -> (Boolean.var list, _) Checked.t
+      val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
     end
 
     type var
@@ -92,33 +94,37 @@ struct
           let input_size = Tock.Data_spec.size (wrap_input ())
         end)
 
-    let wrap_vk_bit_length = Verifier.Verification_key_data.bit_length
+    let wrap_vk_triple_length =
+      bit_length_to_triple_length Verifier.Verification_key_data.bit_length
 
     let hash_vk_data data =
-      let%bind bs = Verifier.Verification_key_data.Checked.to_bits data in
-      Pedersen_hash.Section.extend
-        (Pedersen_hash.Section.create
+      let%bind bs =
+        Verifier.Verification_key_data.Checked.to_bits data
+        >>| Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
+      in
+      Pedersen.Checked.Section.extend
+        (Pedersen.Checked.Section.create
            ~acc:(`Value Hash_prefix.transition_system_snark.acc)
            ~support:
-             (Interval_union.of_interval (0, Hash_prefix.length_in_bits)))
-        ~start:Hash_prefix.length_in_bits bs
+             (Interval_union.of_interval (0, Hash_prefix.length_in_triples)))
+        ~start:Hash_prefix.length_in_triples bs
 
-    let compute_top_hash wrap_vk_section state_hash_bits =
-      Pedersen_hash.Section.extend wrap_vk_section
-        ~start:(Hash_prefix.length_in_bits + wrap_vk_bit_length)
-        state_hash_bits
-      >>| Pedersen_hash.Section.to_initial_segment_digest >>| Or_error.ok_exn
-      >>| fst
+    let compute_top_hash wrap_vk_section state_hash_trips =
+      Tick.Pedersen.Checked.Section.extend wrap_vk_section
+        ~start:(Hash_prefix.length_in_triples + wrap_vk_triple_length)
+        state_hash_trips
+      >>| Tick.Pedersen.Checked.Section.to_initial_segment_digest
+      >>| Or_error.ok_exn >>| fst
 
     let prev_state_valid wrap_vk_section wrap_vk_data prev_state_hash =
       let open Let_syntax in
       with_label __LOC__
         (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
-        (let%bind prev_state_hash_bits =
-           State.Hash.var_to_bits prev_state_hash
+        (let%bind prev_state_hash_trips =
+           State.Hash.var_to_triples prev_state_hash
          in
          let%bind prev_top_hash =
-           compute_top_hash wrap_vk_section prev_state_hash_bits
+           compute_top_hash wrap_vk_section prev_state_hash_trips
            >>= Digest.Tick.choose_preimage_var
            >>| Digest.Tick.Unpacked.var_to_bits
          in
@@ -158,7 +164,7 @@ struct
          let%bind wrap_vk_section = hash_vk_data wrap_vk_data in
          let%bind () =
            with_label __LOC__
-             (let%bind sh = State.Hash.var_to_bits next_state_hash in
+             (let%bind sh = State.Hash.var_to_triples next_state_hash in
               (* We could be reusing the intermediate state of the hash on sh here instead of
                hashing anew *)
               compute_top_hash wrap_vk_section sh

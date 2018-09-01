@@ -9,9 +9,7 @@ open Tick
 open Nanobit_base
 open Let_syntax
 
-module Make
-    (Consensus_mechanism : Consensus.Mechanism.S
-                           with type Proof.t = Tock.Proof.t) :
+module Make (Consensus_mechanism : Consensus.Mechanism.S) :
   Blockchain_state_intf.S
   with module Consensus_mechanism := Consensus_mechanism =
 struct
@@ -23,11 +21,6 @@ struct
     else Ok ()
 
   module type Update_intf = sig
-    val update :
-         Protocol_state.value
-      -> Snark_transition.value
-      -> Protocol_state.value Or_error.t
-
     module Checked : sig
       val update :
            State_hash.var * Protocol_state.var
@@ -39,44 +32,6 @@ struct
   end
 
   module Make_update (T : Transaction_snark.Verification.S) = struct
-    let update state (transition: Snark_transition.value) =
-      let open Or_error.Let_syntax in
-      let%bind () =
-        match Snark_transition.ledger_proof transition with
-        | None ->
-            check
-              (Ledger_hash.equal
-                 ( state |> Protocol_state.blockchain_state
-                 |> Blockchain_state.ledger_hash )
-                 ( transition |> Snark_transition.blockchain_state
-                 |> Blockchain_state.ledger_hash ))
-              "Body proof was none but tried to update ledger hash"
-        | Some proof ->
-            if Insecure.verify_blockchain then Ok ()
-            else
-              check
-                (T.verify
-                   (Transaction_snark.create
-                      ~source:
-                        ( state |> Protocol_state.blockchain_state
-                        |> Blockchain_state.ledger_hash )
-                      ~target:
-                        ( transition |> Snark_transition.blockchain_state
-                        |> Blockchain_state.ledger_hash )
-                      ~proof_type:`Merge
-                      ~fee_excess:Currency.Amount.Signed.zero ~proof))
-                "Proof did not verify"
-      in
-      let%map consensus_state =
-        Consensus_mechanism.update
-          (Protocol_state.consensus_state state)
-          transition
-      in
-      Protocol_state.create_value
-        ~previous_state_hash:(Protocol_state.hash state)
-        ~blockchain_state:(Snark_transition.blockchain_state transition)
-        ~consensus_state
-
     module Checked = struct
       (* Blockchain_snark ~old ~nonce ~ledger_snark ~ledger_hash ~timestamp ~new_hash
             Input:
@@ -123,7 +78,7 @@ struct
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
              and consensus_data_is_valid =
-               Consensus_mechanism.verify transition
+               Consensus_mechanism.is_transition_valid_checked transition
              in
              let%bind correct_snark =
                Boolean.(correct_transaction_snark || ledger_hash_didn't_change)
@@ -131,7 +86,7 @@ struct
              Boolean.(correct_snark && consensus_data_is_valid)
            in
            let%bind consensus_state =
-             Consensus_mechanism.update_var
+             Consensus_mechanism.next_state_checked
                (Protocol_state.consensus_state previous_state)
                transition
            in
@@ -140,18 +95,18 @@ struct
                ~blockchain_state:(Snark_transition.blockchain_state transition)
                ~consensus_state
            in
-           let%bind state_bits = Protocol_state.var_to_bits new_state in
+           let%bind state_triples = Protocol_state.var_to_triples new_state in
            let%bind state_partial =
-             Pedersen_hash.Section.extend Pedersen_hash.Section.empty
-               ~start:Hash_prefix.length_in_bits state_bits
+             Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
+               ~start:Hash_prefix.length_in_triples state_triples
            in
            let%map state_hash =
-             Pedersen_hash.Section.create
+             Pedersen.Checked.Section.create
                ~acc:(`Value Hash_prefix.protocol_state.acc)
                ~support:
-                 (Interval_union.of_interval (0, Hash_prefix.length_in_bits))
-             |> Pedersen_hash.Section.disjoint_union_exn state_partial
-             >>| Pedersen_hash.Section.acc >>| Pedersen_hash.digest
+                 (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
+             |> Pedersen.Checked.Section.disjoint_union_exn state_partial
+             >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
            in
            ( State_hash.var_of_hash_packed state_hash
            , new_state
@@ -170,8 +125,8 @@ struct
 
     let hash (t: Protocol_state.var) =
       with_label __LOC__
-        ( Protocol_state.var_to_bits t
-        >>= digest_bits ~init:Hash_prefix.protocol_state
+        ( Protocol_state.var_to_triples t
+        >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.protocol_state
         >>| State_hash.var_of_hash_packed )
   end
 end

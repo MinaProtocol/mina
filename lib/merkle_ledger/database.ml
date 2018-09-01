@@ -11,7 +11,7 @@ module Make
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
     (Sdb : Intf.Stack_database) : sig
-  include Intf.Database_S
+  include Database_intf.S
           with type account := Account.t
            and type hash := Hash.t
            and type key := Public_key.t
@@ -19,11 +19,10 @@ module Make
   module Key : sig
     type t
   end
+
   val of_index: int -> Key.t
 
   val to_index: Key.t -> int
-
-  val gen_account_key : Key.t Core.Quickcheck.Generator.t
 
   val get_account_from_key : t -> Key.t -> Account.t option
 
@@ -32,6 +31,10 @@ module Make
   val update_account: t -> Key.t -> Account.t -> unit
 
   val public_key_to_index : t -> Public_key.t -> Key.t option
+
+  module For_tests : sig
+    val gen_account_key : Key.t Core.Quickcheck.Generator.t
+  end
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   let max_depth = Depth.depth
@@ -165,6 +168,8 @@ end = struct
       | Right -> (sibling, base)
   end
 
+  type t = {kvdb: Kvdb.t; sdb: Sdb.t}
+
   let of_index index = Key.Account (Addr.of_index_exn index)
 
   let to_index  = function
@@ -172,18 +177,18 @@ end = struct
     | Account path -> Addr.to_int path
     | Hash path -> Addr.to_int path
 
-  type t = {kvdb: Kvdb.t; sdb: Sdb.t}
-
-  let gen_account_key =
-    let open Quickcheck.Let_syntax in
-    let build_account (path: Direction.t list) =
-      assert (List.length path = Depth.depth) ;
-      Key.Account (Addr.of_directions path)
-    in
-    let%map dirs =
-      Quickcheck.Generator.list_with_length Depth.depth Direction.gen
-    in
-    build_account dirs
+  module For_tests = struct
+    let gen_account_key =
+      let open Quickcheck.Let_syntax in
+      let build_account (path: Direction.t list) =
+        assert (List.length path = Depth.depth) ;
+        Key.Account (Addr.of_directions path)
+      in
+      let%map dirs =
+        Quickcheck.Generator.list_with_length Depth.depth Direction.gen
+      in
+      build_account dirs
+  end
 
   let create ~key_value_db_dir ~stack_db_file =
     let kvdb = Kvdb.create ~directory:key_value_db_dir in
@@ -202,12 +207,6 @@ end = struct
     in
     loop Hash.empty 1 ;
     Immutable_array.of_array empty_hashes
-
-  let empty_hash_array =
-    let array = Array.create ~len:(max_depth + 1) Hash.empty in
-    Array.iteri array ~f:(fun i _ ->
-        array.(i) <- Immutable_array.get empty_hashes i ) ;
-    array
 
   let get_raw {kvdb; _} key = Kvdb.get kvdb ~key:(Key.serialize key)
 

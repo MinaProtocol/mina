@@ -7,7 +7,8 @@ module type Inputs_intf = sig
   module Prover : sig
     val prove :
          prev_state:Consensus_mechanism.Protocol_state.value
-                    * Protocol_state_proof.t
+      -> prev_state_proof:Protocol_state_proof.t
+      -> next_state:Consensus_mechanism.Protocol_state.value
       -> Consensus_mechanism.Internal_transition.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
@@ -36,8 +37,6 @@ struct
   module External_transition_result : sig
     type t
 
-    val empty : unit -> t
-
     val cancel : t -> unit
 
     val create :
@@ -55,10 +54,6 @@ struct
       ; result: External_transition.t Deferred.Or_error.t }
     [@@deriving fields]
 
-    let empty () =
-      { cancellation= Ivar.create ()
-      ; result= Deferred.Or_error.error_string "empty" }
-
     let cancel t = Ivar.fill_if_empty t.cancellation ()
 
     let create ~previous_protocol_state ~previous_protocol_state_proof
@@ -69,10 +64,9 @@ struct
         let result =
           let open Deferred.Or_error.Let_syntax in
           let%map protocol_state_proof =
-            Prover.prove
-              ~prev_state:
-                (previous_protocol_state, previous_protocol_state_proof)
-              internal_transition
+            Prover.prove ~prev_state:previous_protocol_state
+              ~prev_state_proof:previous_protocol_state_proof
+              ~next_state:protocol_state internal_transition
           in
           External_transition.create ~protocol_state ~protocol_state_proof
             ~ledger_builder_diff:
@@ -86,8 +80,9 @@ struct
       {result; cancellation}
   end
 
-  let generate_next_state ~previous_protocol_state ~time_controller
-      ~ledger_builder ~transactions ~get_completed_work =
+  let generate_next_state ~previous_protocol_state ~local_state
+      ~time_controller ~ledger_builder ~transactions ~get_completed_work =
+    let open Option.Let_syntax in
     let ( diff
         , `Hash_after_applying next_ledger_builder_hash
         , `Ledger_proof ledger_proof_opt ) =
@@ -109,14 +104,15 @@ struct
     let time =
       Time.now time_controller |> Time.to_span_since_epoch |> Time.Span.to_ms
     in
-    let protocol_state, consensus_transition_data =
+    let%map protocol_state, consensus_transition_data =
       Consensus_mechanism.generate_transition ~previous_protocol_state
-        ~blockchain_state ~time
+        ~blockchain_state ~local_state ~time
         ~transactions:
           ( diff
               .Ledger_builder_diff.With_valid_signatures_and_proofs.
                transactions
             :> Transaction.t list )
+        ~ledger:(Ledger_builder.ledger ledger_builder)
     in
     let snark_transition =
       Snark_transition.create_value
@@ -149,7 +145,7 @@ struct
   let transition_capacity = 64
 
   let create ~parent_log ~get_completed_work ~change_feeder ~time_controller =
-    let logger = Logger.extend parent_log [("module", Atom __MODULE__)] in
+    let logger = Logger.child parent_log "proposer" in
     let r, w = Linear_pipe.create () in
     let write_result = function
       | Ok t -> Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
@@ -157,14 +153,16 @@ struct
           Logger.error logger "%s\n"
             Error.(to_string_hum (tag e ~tag:"signer"))
     in
+    let local_state = Consensus_mechanism.Local_state.create () in
     let create_result
         { Tip.protocol_state=
             previous_protocol_state, previous_protocol_state_proof
         ; transactions
         ; ledger_builder } =
-      let protocol_state, internal_transition =
-        generate_next_state ~previous_protocol_state ~time_controller
-          ~ledger_builder ~transactions ~get_completed_work
+      let open Option.Let_syntax in
+      let%map protocol_state, internal_transition =
+        generate_next_state ~previous_protocol_state ~local_state
+          ~time_controller ~ledger_builder ~transactions ~get_completed_work
       in
       let result =
         External_transition_result.create ~previous_protocol_state
@@ -174,9 +172,17 @@ struct
       result
     in
     let schedule_transition tip =
-      let time_till_transition =
-        Time.modulus (Time.now time_controller) Proposal_interval.t
+      let time_now = Time.now time_controller in
+      let time_after_last_transition =
+        Time.modulus time_now Proposal_interval.t
       in
+      let last_transition_time =
+        Time.sub time_now time_after_last_transition
+      in
+      let time_of_next_transition =
+        Time.add last_transition_time Proposal_interval.t
+      in
+      let time_till_transition = Time.diff time_of_next_transition time_now in
       Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
       Time.Timeout.create time_controller time_till_transition ~f:(fun _ ->
           Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
@@ -193,10 +199,10 @@ struct
             ~init:(schedule_transition initial_tip) ~f:
             (fun scheduled_transition (Tip_change tip) ->
               ( match Time.Timeout.peek scheduled_transition with
-              | None ->
-                  Time.Timeout.cancel time_controller scheduled_transition
-                    (External_transition_result.empty ())
-              | Some result -> External_transition_result.cancel result ) ;
+              | None | Some None ->
+                  Time.Timeout.cancel time_controller scheduled_transition None
+              | Some (Some result) -> External_transition_result.cancel result
+              ) ;
               return (schedule_transition tip) )
           >>| ignore ) ;
     {transitions= r}

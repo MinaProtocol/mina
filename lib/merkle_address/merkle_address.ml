@@ -40,6 +40,8 @@ module type S = sig
 
   val next : t -> t Option.t
 
+  val is_parent_of : t -> maybe_child:t -> bool
+
   val serialize : t -> Bigstring.t
 
   val pp : Format.formatter -> t -> unit
@@ -230,6 +232,12 @@ struct
     let required_padding = required_bits - path_len in
     Bigstring.of_string @@ string_of_bitstring
     @@ concat [path; zeroes_bitstring required_padding]
+
+  let is_parent_of parent ~maybe_child =
+    (* yikes! https://github.com/xguerin/bitstring/issues/16 *)
+    String.is_prefix
+      (Bitstring.string_of_bitstring maybe_child)
+      ~prefix:(Bitstring.string_of_bitstring parent)
 
   module Range = struct
     type nonrec t = t * t

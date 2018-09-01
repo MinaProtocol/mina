@@ -34,8 +34,8 @@ include Merkle_ledger.Database.Make (My_Key) (Account)
           (struct
             let depth = ledger_depth
           end)
-          (Merkle_ledger.Test_stubs.In_memory_kvdb)
-          (Merkle_ledger.Test_stubs.In_memory_sdb)
+          (Merkle_ledger_tests.Test_stubs.In_memory_kvdb)
+          (Merkle_ledger_tests.Test_stubs.In_memory_sdb)
 
 let merkle_path_at_index_exn t index =
   merkle_path_at_addr t (Addr.of_index_exn index)
@@ -55,7 +55,11 @@ let merkle_path_at_addr_exn = merkle_path_at_addr
 
 let depth = ledger_depth
 
+let max_depth = ledger_depth
+
 let length = num_accounts
+
+let get = get_account
 
 let copy t = t
 
@@ -65,6 +69,7 @@ let sexp_of_t = sexp_of_opaque
 
 let create () = create ~key_value_db_dir:"" ~stack_db_file:""
 
+(* TODO: test this *)
 let set t pk account = update_account t (public_key_to_index t pk |> Option.value_exn) account
 
 let merkle_root t =

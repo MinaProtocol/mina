@@ -1,4 +1,6 @@
 open Core
+module Intf = Merkle_ledger.Intf
+module Database = Merkle_ledger.Database
 
 let%test_module "test functor on in memory databases" =
   ( module struct
@@ -37,7 +39,7 @@ let%test_module "test functor on in memory databases" =
 
       let%test_unit "getting a non existing account returns None" =
         with_test_instance (fun mdb ->
-            Quickcheck.test MT.gen_account_key ~f:(fun key ->
+            Quickcheck.test MT.For_tests.gen_account_key ~f:(fun key ->
                 assert (MT.get_account_from_key mdb key = None) ) )
 
       let%test "add and retrieve an account" =

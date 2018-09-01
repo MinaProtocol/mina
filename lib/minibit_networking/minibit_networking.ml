@@ -84,7 +84,8 @@ struct
       module T = struct
         type query = Ledger_hash.t * Sync_ledger.query [@@deriving bin_io]
 
-        type response = Ledger_hash.t * Sync_ledger.answer [@@deriving bin_io]
+        type response = (Ledger_hash.t * Sync_ledger.answer) Or_error.t
+        [@@deriving bin_io]
       end
 
       module Caller = T
@@ -229,7 +230,7 @@ module Make (Inputs : Inputs_intf) = struct
          -> (Ledger_builder_aux.t * Ledger_hash.t) option Deferred.t)
       ~(answer_sync_ledger_query:
             Ledger_hash.t * Sync_ledger.query
-         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.t) =
+         -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t) =
     let log = Logger.child config.parent_log "minibit networking" in
     let get_ledger_builder_aux_at_hash_rpc () ~version:_ hash =
       get_ledger_builder_aux_at_hash hash
@@ -253,10 +254,11 @@ module Make (Inputs : Inputs_intf) = struct
        block announcment).
     *)
     let states, snark_pool_diffs, transaction_pool_diffs =
-      Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(function
-        | New_state s -> `Fst s
-        | Snark_pool_diff d -> `Snd d
-        | Transaction_pool_diff d -> `Trd d )
+      Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(fun x ->
+          match x with
+          | New_state s -> `Fst s
+          | Snark_pool_diff d -> `Snd d
+          | Transaction_pool_diff d -> `Trd d )
     in
     {gossip_net; log; states; snark_pool_diffs; transaction_pool_diffs}
 
@@ -272,12 +274,6 @@ module Make (Inputs : Inputs_intf) = struct
   let broadcast_snark_pool_diff t x = broadcast t (Snark_pool_diff x)
 
   let peers t = Gossip_net.peers t.gossip_net
-
-  (* TODO: Have better pushback behavior *)
-  let broadcast_state t s =
-    Linear_pipe.write_without_pushback
-      (Gossip_net.broadcast t.gossip_net)
-      (New_state s)
 
   module Ledger_builder_io = struct
     type nonrec t = t
@@ -315,14 +311,17 @@ module Make (Inputs : Inputs_intf) = struct
       Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
     let get_ledger_builder_aux_at_hash t ledger_builder_hash =
+      Print.printf "A\n" ;
       let peers = Gossip_net.random_peers t.gossip_net 8 in
       find_map' peers ~f:(fun peer ->
+          Print.printf "B\n" ;
           match%map
             Gossip_net.query_peer t.gossip_net peer
               Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
               ledger_builder_hash
           with
           | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
+              Print.printf "C\n" ;
               if
                 Ledger_builder_hash.equal
                   (Ledger_builder_hash.of_aux_and_ledger_hash
@@ -345,13 +344,18 @@ module Make (Inputs : Inputs_intf) = struct
                   Gossip_net.query_peer t.gossip_net peer
                     Rpcs.Answer_sync_ledger_query.dispatch_multi query
                 with
-                | Ok answer -> Some answer
+                | Ok (Ok answer) -> Some answer
+                | Ok (Error e) ->
+                    Logger.info t.log "%s" (Error.to_string_mach e) ;
+                    None
                 | Error err ->
                     Logger.warn t.log "%s" (Error.to_string_mach err) ;
                     None )
           with
-          | Some answer -> Linear_pipe.write response_writer answer
-          | None -> Deferred.return () )
+          | Some answer ->
+              (* TODO *)
+              Linear_pipe.write_if_open response_writer answer
+          | None -> Deferred.unit )
       |> don't_wait_for
   end
 end

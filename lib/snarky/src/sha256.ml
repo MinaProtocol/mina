@@ -1,4 +1,6 @@
 open Core
+open Tuple_lib
+open Fold_lib
 
 module Make (Prefix : sig
   val prefix : string
@@ -12,13 +14,17 @@ end)
   open Impl
 
   module Digest : sig
-    type t = bool list
+    type t = bool list [@@deriving sexp, bin_io, eq, compare]
 
     type var = Boolean.var list
 
     val length_in_bits : int
 
     val typ : (var, t) Typ.t
+
+    val fold : t -> bool Triple.t Fold.t
+
+    val length_in_triples : int
   end
 
   module Block : sig
@@ -69,11 +75,15 @@ end = struct
   struct
     include M
 
-    type t = bool list
+    type t = bool list [@@deriving sexp, bin_io, eq, compare]
 
     type var = Boolean.var list
 
+    let fold xs = Fold.(group3 ~default:false (of_list xs))
+
     let typ = Typ.list ~length:length_in_bits Boolean.typ
+
+    let length_in_triples = (M.length_in_bits + 2) / 3
   end
 
   module Digest = Bits (struct

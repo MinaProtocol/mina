@@ -16,7 +16,7 @@
 
 #include <type_traits>
 
-#include <libsnark/gadgetlib1/gadgets/pairing/mnt_pairing_params.hpp>
+#include <libsnark/gadgetlib1/gadgets/pairing/mnt128_pairing_params.hpp>
 
 namespace libsnark {
 

@@ -23,6 +23,8 @@ let create_reader ~close_on_exception f =
 
 let write = Pipe.write
 
+let write_if_open = Pipe.write_if_open
+
 let write_without_pushback = Pipe.write_without_pushback
 
 exception Overflow

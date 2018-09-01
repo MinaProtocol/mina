@@ -1,11 +1,8 @@
 open Core
 open Unsigned
 
-module type S =
-  Intf.Ledger_S
-  with type key := string
-   and type hash := Md5.t
-   and type account := Test_stubs.Account.t
+module Intf = Merkle_ledger.Intf
+module Ledger = Merkle_ledger.Ledger
 
 let%test_module "test functor on in memory databases" =
   ( module struct
@@ -138,7 +135,7 @@ let%test_module "test functor on in memory databases" =
       let root3 = L16.merkle_root ledger in
       assert (root3 = root1)
 
-    module Path = Merkle_path.Make(Hash)
+    module Path = Merkle_ledger.Merkle_path.Make(Hash)
 
     let check_path account (path: Path.t) root =
       let path_root, _ =

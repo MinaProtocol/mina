@@ -64,6 +64,10 @@ module type Time_intf = sig
 
   val diff : t -> t -> Span.t
 
+  val sub : t -> Span.t -> t
+
+  val add : t -> Span.t -> t
+
   val modulus : t -> Span.t -> Span.t
 
   val now : Controller.t -> t
@@ -399,6 +403,8 @@ module type Ledger_builder_intf = sig
 
   val create : ledger:ledger -> self:public_key -> t
 
+  val current_ledger_proof : t -> ledger_proof option
+
   val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
 
   (* This should memoize the snark verifications *)
@@ -423,7 +429,7 @@ module type Ledger_builder_intf = sig
 
   val random_work_spec_chunk :
        t
-    -> ledger_proof_statement_set
+    -> ledger_proof_statement_set * ledger_proof_statement option
     -> ( ledger_proof_statement
        , super_transaction
        , sparse_ledger
@@ -431,7 +437,7 @@ module type Ledger_builder_intf = sig
        Snark_work_lib.Work.Single.Spec.t
        list
        option
-       * ledger_proof_statement_set
+       * (ledger_proof_statement_set * ledger_proof_statement option)
 end
 
 module type Tip_intf = sig
@@ -488,6 +494,14 @@ module type Consensus_mechanism_intf = sig
   type ledger_builder_diff
 
   type transaction
+
+  type ledger
+
+  module Local_state : sig
+    type t [@@deriving sexp]
+
+    val create : unit -> t
+  end
 
   module Consensus_transition_data : sig
     type value [@@deriving sexp]
@@ -567,9 +581,11 @@ module type Consensus_mechanism_intf = sig
   val generate_transition :
        previous_protocol_state:Protocol_state.value
     -> blockchain_state:blockchain_state
+    -> local_state:Local_state.t
     -> time:Int64.t
     -> transactions:transaction list
-    -> Protocol_state.value * Consensus_transition_data.value
+    -> ledger:ledger
+    -> (Protocol_state.value * Consensus_transition_data.value) option
 end
 
 module type Time_close_validator_intf = sig
@@ -805,6 +821,7 @@ Merge Snark:
      and type proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
      and type transaction := Transaction.t
+     and type ledger := Ledger.t
 
   module Tip :
     Tip_intf

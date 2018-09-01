@@ -10,12 +10,27 @@ module type Ledger_intf = sig
   val get_inner_hash_at_addr_exn : t -> Direction.t list -> hash
 end
 
+module type S = sig
+  type t
+
+  type hash [@@deriving sexp, eq]
+
+  type tree =
+    | Leaf of (Direction.t list * hash)
+    | Node of (Direction.t list * hash * tree * tree)
+  [@@deriving sexp, eq]
+
+  val to_tree : t -> tree
+end
+
 module Make (L : Ledger_intf) = struct
   type t = L.t
 
+  type hash = L.hash [@@deriving sexp, eq]
+
   type tree =
-    | Leaf of (Direction.t list * L.hash)
-    | Node of (Direction.t list * L.hash * tree * tree)
+    | Leaf of (Direction.t list * hash)
+    | Node of (Direction.t list * hash * tree * tree)
   [@@deriving sexp, eq]
 
   let to_tree t =

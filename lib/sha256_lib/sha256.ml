@@ -47,6 +47,8 @@ let digest bits =
   Digestif.SHA256.(feed_string (init ()) (bits_to_string (pad false bits))).h
   |> words_to_bits
 
+module Digest = Gadget.Digest
+
 module Checked = struct
   open Tick
   open Let_syntax

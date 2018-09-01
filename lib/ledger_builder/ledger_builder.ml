@@ -213,7 +213,9 @@ end = struct
     ; public_key: Compressed_public_key.t }
   [@@deriving sexp]
 
-  let random_work_spec_chunk t (seen_statements: Ledger_proof_statement.Set.t) =
+  let random_work_spec_chunk t
+      (seen_statements:
+        Ledger_proof_statement.Set.t * Ledger_proof_statement.t option) =
     let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
     let module A = Parallel_scan.Available_job in
     let module L = Ledger_proof_statement in
@@ -250,6 +252,15 @@ end = struct
      * i <-$- [0,select0 str length)
      * j := (rank0 str i)
      * emit jobs@j and jobs@j+1 (if it exists)
+     *  
+     * if jobs@j+1 doesn't exist (if the last job is at j) 
+     * then we track it separately and return a chunk consisting of just one
+     * job. The last job is tracked separately and not included in the list of 
+     * seen jobs for the following two reasons:
+     * 1. It can be paired with a new job that could be appended to the list 
+     * later.
+     * 2. The chunk consisting of just the last job is not created more 
+     * than once.
      *
      * See meaning of rank/select from here:
      * https://en.wikipedia.org/wiki/Succinct_data_structure
@@ -262,29 +273,49 @@ end = struct
     let n = List.length all_jobs in
     let dirty_jobs =
       List.map all_jobs ~f:(fun j ->
-          L.Set.mem seen_statements (canonical_statement_of_job j) )
+          L.Set.mem (fst seen_statements) (canonical_statement_of_job j) )
     in
     let seen_jobs, jobs =
       List.partition_tf all_jobs ~f:(fun j ->
-          L.Set.mem seen_statements (canonical_statement_of_job j) )
+          L.Set.mem (fst seen_statements) (canonical_statement_of_job j) )
     in
-    let seen_statements =
+    let seen_statements' =
       List.map seen_jobs ~f:canonical_statement_of_job |> L.Set.of_list
     in
     match jobs with
     | [] -> (None, seen_statements)
-    | [j] ->
-        ( Some [single_spec j]
-        , L.Set.add seen_statements (canonical_statement_of_job j) )
     | _ ->
         let i = Random.int (List.length jobs) in
         let j = index_of_nth_occurence dirty_jobs i |> Option.value_exn in
-        let chunk =
-          [List.nth_exn all_jobs j; List.nth_exn all_jobs ((j + 1) % n)]
-        in
-        ( Some (List.map chunk ~f:single_spec)
-        , L.Set.union seen_statements
-            (List.map chunk ~f:canonical_statement_of_job |> L.Set.of_list) )
+        (*TODO All of this will change, when we fix  #450. 
+          There'll be no more bundles! *)
+        if j + 1 < n then
+          let chunk =
+            [List.nth_exn all_jobs j; List.nth_exn all_jobs (j + 1)]
+          in
+          let new_last_job =
+            Option.fold (snd seen_statements) ~init:None ~f:(fun _ stmt ->
+                if
+                  Ledger_proof_statement.equal stmt
+                    (canonical_statement_of_job (List.last_exn all_jobs))
+                then Some stmt
+                else None )
+          in
+          ( Some (List.map chunk ~f:single_spec)
+          , ( L.Set.add seen_statements'
+                (canonical_statement_of_job @@ List.hd_exn chunk)
+            , new_last_job ) )
+        else
+          let last_job = List.nth_exn all_jobs j in
+          let last_job_eq =
+            Option.fold (snd seen_statements) ~init:false ~f:(fun _ stmt ->
+                Ledger_proof_statement.equal stmt
+                  (canonical_statement_of_job last_job) )
+          in
+          if last_job_eq then (None, seen_statements)
+          else
+            ( Some [single_spec last_job]
+            , (seen_statements', Some (canonical_statement_of_job last_job)) )
 
   let aux {scan_state; _} = scan_state
 
@@ -308,6 +339,10 @@ end = struct
     { scan_state= Parallel_scan.start ~parallelism_log_2
     ; ledger
     ; public_key= self }
+
+  let current_ledger_proof t =
+    let res_opt = Parallel_scan.last_emitted_value t.scan_state in
+    Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
@@ -442,8 +477,10 @@ end = struct
   let create_fee_transfers completed_works delta public_key =
     let singles =
       (if Fee.Unsigned.(equal zero delta) then [] else [(public_key, delta)])
-      @ List.map completed_works ~f:(fun {Completed_work.fee; prover; _} ->
-            (prover, fee) )
+      @ List.filter_map completed_works ~f:
+          (fun {Completed_work.fee; prover; _} ->
+            if Fee.Unsigned.equal fee Fee.Unsigned.zero then None
+            else Some (prover, fee) )
     in
     Or_error.try_with (fun () ->
         Compressed_public_key.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
@@ -607,7 +644,12 @@ end = struct
     [@@deriving sexp]
 
     let space_available t =
-      Queue_consumption.count t.queue_consumption < t.max_throughput
+      let can_add =
+        if t.available_queue_space < t.max_throughput then
+          t.available_queue_space
+        else t.max_throughput
+      in
+      Queue_consumption.count t.queue_consumption < can_add
 
     let budget_non_neg t = Fee.Signed.sgn t.budget = Sgn.Pos
 
@@ -680,7 +722,7 @@ end = struct
 
   let txns_not_included (valid: Resources.t) (invalid: Resources.t) =
     let diff =
-      List.length valid.transactions - List.length invalid.transactions
+      List.length invalid.transactions - List.length valid.transactions
     in
     if diff > 0 then List.take invalid.transactions diff else []
 
@@ -711,13 +753,13 @@ end = struct
         else
           check_resources_and_add Sequence.empty ts get_completed_work ledger
             valid r_transaction
-    | Some (w, ws), Some (t, ts), true ->
-        let enough_work_added =
+    | Some (w, ws), Some (t, ts), true -> (
+        let enough_work_added_to_include_one_more =
           resources.work_done
           = (Resources.Queue_consumption.count resources.queue_consumption + 1)
             * 2
         in
-        if enough_work_added then
+        if enough_work_added_to_include_one_more then
           let r_transaction =
             log_error_and_return_value
               (add_transaction ledger t resources)
@@ -732,20 +774,19 @@ end = struct
               (Sequence.append (Sequence.singleton w) ws)
               ts get_completed_work ledger valid r_transaction
         else
-          let r_work =
-            log_error_and_return_value
-              (add_work w resources get_completed_work)
-              resources
-          in
-          check_resources_and_add ws
-            (Sequence.append (Sequence.singleton t) ts)
-            get_completed_work ledger valid r_work
+          match add_work w resources get_completed_work with
+          | Ok r_work ->
+              check_resources_and_add ws
+                (Sequence.append (Sequence.singleton t) ts)
+                get_completed_work ledger valid r_work
+          | Error e ->
+              Printf.printf "%s" (Error.to_string_hum e) ;
+              (valid, txns_not_included valid resources) )
     | _, _, _ -> (valid, txns_not_included valid resources)
 
   let undo_txns ledger txns =
-    List.map txns ~f:(fun _ (t, u) ->
-        Or_error.ok_exn (Ledger.undo ledger u) ;
-        t )
+    List.fold txns ~init:() ~f:(fun _ (_, u) ->
+        Or_error.ok_exn (Ledger.undo ledger u) )
 
   let process_works_add_txns ws_seq ts_seq ps_free_space max_throughput
       get_completed_work ledger self : Resources.t =
@@ -1220,9 +1261,10 @@ let%test_module "test" =
               let rec go i seen =
                 [%test_result : Bool.t]
                   ~message:"Exceeded time expected to exhaust random_work"
-                  ~expect:true (i <= p) ;
+                  ~expect:true
+                  (i <= 2 * p) ;
                 let maybe_stuff, seen = Lb.random_work_spec_chunk lb seen in
                 match maybe_stuff with None -> () | Some _ -> go (i + 1) seen
               in
-              go 0 S.empty ) )
+              go 0 (S.empty, None) ) )
   end )

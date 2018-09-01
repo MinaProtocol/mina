@@ -3,31 +3,40 @@ open Async
 open Nanobit_base
 open Coda_main
 
-module Kernel = Kernel.Debug ()
-
-module Coda_worker = struct
+module Make
+    (Ledger_proof : Ledger_proof_intf)
+    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
+    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
+struct
   type input =
     { host: string
+    ; should_propose: bool
     ; conf_dir: string
     ; program_dir: string
-    ; my_port: int
-    ; gossip_port: int
+    ; external_port: int
+    ; discovery_port: int
     ; peers: Host_and_port.t list }
   [@@deriving bin_io]
 
   module T = struct
     module Peers = struct
-      type t = Host_and_port.t List.t [@@deriving bin_io]
+      type t = Kademlia.Peer.t List.t [@@deriving bin_io]
+    end
+
+    module State_hashes = struct
+      type t = bool list * bool list [@@deriving bin_io]
     end
 
     type 'worker functions =
       { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
       ; strongest_ledgers:
-          ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t }
+          ('worker, unit, State_hashes.t Pipe.Reader.t) Rpc_parallel.Function.t
+      }
 
     type coda_functions =
       { coda_peers: unit -> Peers.t Deferred.t
-      ; coda_strongest_ledgers: unit -> unit Pipe.Reader.t Deferred.t }
+      ; coda_strongest_ledgers: unit -> State_hashes.t Pipe.Reader.t Deferred.t
+      }
 
     module Worker_state = struct
       type init_arg = input [@@deriving bin_io]
@@ -58,25 +67,22 @@ module Coda_worker = struct
 
       let strongest_ledgers =
         C.create_pipe ~f:strongest_ledgers_impl ~bin_input:Unit.bin_t
-          ~bin_output:Unit.bin_t ()
+          ~bin_output:State_hashes.bin_t ()
 
       let functions = {peers; strongest_ledgers}
 
       let init_worker_state
-          {host; conf_dir; program_dir; my_port; peers; gossip_port} =
+          { host
+          ; should_propose
+          ; conf_dir
+          ; program_dir
+          ; external_port
+          ; peers
+          ; discovery_port } =
         let log = Logger.create () in
         let log =
-          Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string my_port)
+          Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
         in
-        let module Coda = struct
-          type ledger_proof = Ledger_proof_statement.t
-
-          module Make
-              (Init : Init_intf
-                      with type Ledger_proof.t = Ledger_proof_statement.t)
-              () =
-            Coda_without_snark (Init) ()
-        end in
         let module Config = struct
           let logger = log
 
@@ -84,9 +90,9 @@ module Coda_worker = struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let transition_interval = Time.Span.of_ms 100.0
+          let transition_interval = Time.Span.of_ms 1000.0
 
-          let fee_public_key = Genesis_ledger.rich_pk
+          let fee_public_key = Genesis_ledger.high_balance_pk
 
           let genesis_proof = Precomputed_values.base_proof
         end in
@@ -99,14 +105,15 @@ module Coda_worker = struct
               { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
               ; target_peer_count= 8
               ; conf_dir
-              ; address= Host_and_port.create ~host ~port:gossip_port
               ; initial_peers= peers
-              ; me= Host_and_port.create ~host ~port:my_port
+              ; me=
+                  ( Host_and_port.create ~host ~port:discovery_port
+                  , external_port )
               ; parent_log= log } }
         in
         let%bind coda =
           Main.create
-            (Main.Config.make ~log ~net_config
+            (Main.Config.make ~log ~net_config ~should_propose
                ~ledger_builder_persistant_location:"ledger_builder"
                ~transaction_pool_disk_location:"transaction_pool"
                ~snark_pool_disk_location:"snark_pool"
@@ -117,8 +124,21 @@ module Coda_worker = struct
         let coda_strongest_ledgers () =
           let r, w = Linear_pipe.create () in
           don't_wait_for
-            (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun _ ->
-                 Linear_pipe.write w () )) ;
+            (Linear_pipe.iter (Main.strongest_ledgers coda) ~f:(fun t ->
+                 let p =
+                   Main.Inputs.Consensus_mechanism.External_transition.
+                   protocol_state t
+                 in
+                 let prev_state_hash =
+                   Main.Inputs.Consensus_mechanism.Protocol_state.
+                   previous_state_hash p
+                 in
+                 let state_hash =
+                   Main.Inputs.Consensus_mechanism.Protocol_state.hash p
+                 in
+                 let prev_state_hash = State_hash.to_bits prev_state_hash in
+                 let state_hash = State_hash.to_bits state_hash in
+                 Linear_pipe.write w (prev_state_hash, state_hash) )) ;
           return r.pipe
         in
         return {coda_peers; coda_strongest_ledgers}

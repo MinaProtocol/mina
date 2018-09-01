@@ -6,7 +6,7 @@ module Make (Depth : sig
   val num_accts : int
 end) =
 struct
-  open Merkle_ledger.Test_stubs
+  open Merkle_ledger_tests.Test_stubs
 
   module Hash = struct
     type t = Hash.t [@@deriving sexp, hash, compare, bin_io, eq]
@@ -26,7 +26,7 @@ struct
 
   module L = struct
     module MT =
-      Merkle_ledger.Database.Make (Balance) (Account) (Hash) (Depth)
+      Merkle_ledger.Database.Make (String) (Account) (Hash) (Depth)
         (In_memory_kvdb)
         (In_memory_sdb)
     module Addr = MT.Addr
@@ -37,11 +37,11 @@ struct
 
     type account = Account.t
 
-    type key = MT.key
+    type key = String.t
 
     type addr = Addr.t
 
-    type path = MT.MerklePath.t list
+    type path = MT.path
 
     type t = MT.t
 
@@ -87,9 +87,7 @@ struct
         let subtree_height = 3
       end)
 
-  module SR =
-    Syncable_ledger.Make_sync_responder (L.Addr) (Account) (Hash) (Hash) (L)
-      (SL)
+  module SR = SL.Responder
 
   let num_accts = Depth.num_accts
 end
