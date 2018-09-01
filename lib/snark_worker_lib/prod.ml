@@ -1,5 +1,6 @@
 open Core
 open Async
+open Signature_lib
 
 module Inputs = struct
   module Worker_state = struct
@@ -22,7 +23,7 @@ module Inputs = struct
   module Statement = Transaction_snark.Statement
 
   module Public_key = struct
-    include Nanobit_base.Public_key.Compressed
+    include Public_key.Compressed
 
     let arg_type = Cli_lib.public_key_compressed
   end

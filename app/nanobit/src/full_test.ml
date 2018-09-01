@@ -2,6 +2,7 @@ open Core_kernel
 open Async_kernel
 open Nanobit_base
 open Coda_main
+open Signature_lib
 
 let pk_of_sk sk = Public_key.of_private_key sk |> Public_key.compress
 
@@ -96,7 +97,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     let payload : Transaction.Payload.t =
       {receiver= receiver_pk; amount; fee; nonce}
     in
-    Transaction.sign (Signature_keypair.of_private_key sender_sk) payload
+    Transaction.sign (Keypair.of_private_key sender_sk) payload
   in
   let test_sending_transaction sender_sk receiver_pk =
     let transaction =

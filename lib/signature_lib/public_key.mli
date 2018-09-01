@@ -4,7 +4,7 @@ open Tick
 open Tuple_lib
 open Fold_lib
 
-type t = Field.t * Field.t [@@deriving bin_io, sexp, eq, compare, hash]
+type t = Field.t * Field.t [@@deriving bin_io, sexp, hash]
 
 module Stable : sig
   module V1 : sig
@@ -25,7 +25,7 @@ val of_private_key : Private_key.t -> t
 module Compressed : sig
   type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
 
-  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, eq, compare, hash]
+  type t = (Field.t, bool) t_ [@@deriving bin_io, sexp, hash]
 
   module Stable : sig
     module V1 : sig
