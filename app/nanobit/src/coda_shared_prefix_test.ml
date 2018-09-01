@@ -22,6 +22,7 @@ struct
     Coda_processes.init () ;
     Coda_processes.spawn_local_processes_exn n ~program_dir
       ~should_propose:(fun i -> i = who_proposes)
+      ~snark_worker_public_keys:None
       ~f:(fun workers ->
         let chains = Array.init (List.length workers) ~f:(fun _ -> []) in
         let check_chains () =
