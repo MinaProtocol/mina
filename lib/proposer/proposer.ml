@@ -81,12 +81,13 @@ struct
   end
 
   let generate_next_state ~previous_protocol_state ~local_state
-      ~time_controller ~ledger_builder ~transactions ~get_completed_work =
+      ~time_controller ~ledger_builder ~transactions ~get_completed_work
+      ~logger =
     let open Option.Let_syntax in
     let ( diff
         , `Hash_after_applying next_ledger_builder_hash
         , `Ledger_proof ledger_proof_opt ) =
-      Ledger_builder.create_diff ledger_builder
+      Ledger_builder.create_diff ledger_builder ~logger
         ~transactions_by_fee:transactions ~get_completed_work
     in
     let next_ledger_hash =
@@ -163,6 +164,7 @@ struct
       let%map protocol_state, internal_transition =
         generate_next_state ~previous_protocol_state ~local_state
           ~time_controller ~ledger_builder ~transactions ~get_completed_work
+          ~logger
       in
       let result =
         External_transition_result.create ~previous_protocol_state
