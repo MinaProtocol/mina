@@ -6,7 +6,7 @@ module Make (Depth : sig
   val num_accts : int
 end) =
 struct
-  open Merkle_ledger.Test_stubs
+  open Merkle_ledger_tests.Test_stubs
 
   module Hash = struct
     type t = Hash.t [@@deriving sexp, hash, compare, bin_io, eq]
@@ -69,14 +69,13 @@ struct
 
     let load_ledger num_accounts (balance: int) =
       let ledger = MT.create ~key_value_db_dir:"" ~stack_db_file:"" in
-      let keys = List.init num_accounts ~f:(fun i -> Int.to_string i) in
-      List.iter keys ~f:(fun _ ->
-          let account =
-            Account.set_balance
-              (Quickcheck.random_value Account.gen)
-              (Unsigned.UInt64.of_int balance)
-          in
-          assert (MT.set_account ledger account = Ok ()) ) ;
+      let keys =
+        List.init num_accounts ~f:(( + ) 1) |> List.map ~f:Int.to_string
+      in
+      List.iter keys ~f:(fun key ->
+          let account = Account.create key balance in
+          assert (MT.set_account ledger account = Ok ()) )
+      |> ignore ;
       (ledger, keys)
   end
 
@@ -88,9 +87,7 @@ struct
         let subtree_height = 3
       end)
 
-  module SR =
-    Syncable_ledger.Make_sync_responder (L.Addr) (Account) (Hash) (Hash) (L)
-      (SL)
+  module SR = SL.Responder
 
   let num_accts = Depth.num_accts
 end

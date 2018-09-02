@@ -9,7 +9,6 @@ module Balance = struct
 end
 
 module Account = struct
-  (* type balance = Balance.t sexp_opaque [@@deriving bin_io, eq, show, sexp] *)
   type t =
     { public_key: string
     ; balance: Balance.t
@@ -21,14 +20,16 @@ module Account = struct
   let sexp_of_t {public_key; balance} =
     [%sexp_of : string * string] (public_key, Balance.to_string balance)
 
-  let t_of_sexp sexp : t =
+  let t_of_sexp sexp =
     let public_key, string_balance = [%of_sexp : string * string] sexp in
     let balance = Balance.of_string string_balance in
-    ({public_key; balance} : t)
+    {public_key; balance}
 
   let empty = {public_key= ""; balance= Balance.zero}
 
   let set_balance {public_key; _} balance = {public_key; balance}
+
+  let create public_key balance = {public_key; balance= UInt64.of_int balance}
 
   let gen =
     let open Quickcheck.Let_syntax in
@@ -47,7 +48,7 @@ module Hash = struct
 
   let hash_account account = Md5.digest_string ("0" ^ Account.show account)
 
-  let empty = Md5.digest_string ""
+  let empty = hash_account Account.empty
 
   let merge ~height a b =
     let res =
@@ -56,6 +57,8 @@ module Hash = struct
     in
     res
 end
+
+module Intf = Merkle_ledger.Intf
 
 module In_memory_kvdb : Intf.Key_value_database = struct
   type t = (string, Bigstring.t) Hashtbl.t

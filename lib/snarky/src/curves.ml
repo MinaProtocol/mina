@@ -103,6 +103,10 @@ module type Shifted_intf = sig
   val unshift_nonzero : t -> (curve_var, _) checked
 
   val if_ : boolean_var -> then_:t -> else_:t -> (t, _) checked
+
+  module Assert : sig
+    val equal : t -> t -> (unit, _) checked
+  end
 end
 
 module Edwards = struct
@@ -729,6 +733,10 @@ struct
       let unshift_nonzero shifted = add_unsafe (negate shift) shifted
 
       let add shifted x = add_unsafe shifted x
+
+      module Assert = struct
+        let equal = assert_equal
+      end
     end
 
     let create (type shifted) () : ((module S), _) Checked.t =

@@ -34,7 +34,7 @@ module type Inputs_intf = sig
   end
 
   module Tip : sig
-    type t [@@deriving sexp, bin_io]
+    type t [@@deriving sexp]
 
     val state : t -> Protocol_state.value
 
@@ -157,7 +157,7 @@ struct
     let transition_unchecked h t =
       Interruptible.uninterruptible (Tip.transition_unchecked h t)
 
-    let run (t: t0) new_tree old_tree new_best_path _transition =
+    let run (t: t0) new_tree old_tree new_best_path _logger _transition =
       let locked_tip = Transition_logic_state.locked_tip t.state
       and longest_branch_tip =
         Transition_logic_state.longest_branch_tip t.state
@@ -217,9 +217,9 @@ struct
       in
       (work, ivar)
 
-    let create (t: t0) new_tree old_tree new_best_path
+    let create (t: t0) new_tree old_tree new_best_path (logger: Logger.t)
         (transition: External_transition.t) : t =
-      (transition, run t new_tree old_tree new_best_path)
+      (transition, run t new_tree old_tree new_best_path logger)
   end
 
   let local_get_tip t ~p_tip ~p_trans =
@@ -262,7 +262,7 @@ struct
              * matched the locked_tip *)
               let last_transition = List.last_exn path.Path.path in
               let job =
-                Path_traversal.create t ktree ktree path last_transition
+                Path_traversal.create t ktree ktree path t.log last_transition
               in
               let w, _ = Job.run job in
               match%map w.d with
@@ -316,8 +316,9 @@ struct
               (Protocol_state.consensus_state source_state)
               (Protocol_state.consensus_state target_state)
           with
-          | `Keep -> return ([], Some (Catchup.sync catchup state transition))
-          | `Take -> return ([], None) )
+          | `Keep -> return ([], None)
+          | `Take -> return ([], Some (Catchup.sync catchup state transition))
+        )
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition ~parent:(fun x ->
@@ -346,6 +347,6 @@ struct
             return
               ( []
               , Some
-                  (Path_traversal.create t new_tree old_tree new_best_path
+                  (Path_traversal.create t new_tree old_tree new_best_path log
                      transition) )
 end

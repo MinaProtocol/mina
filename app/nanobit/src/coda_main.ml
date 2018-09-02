@@ -1,6 +1,7 @@
 open Core
 open Async
 open Nanobit_base
+open Signature_lib
 open Blockchain_snark
 module Fee = Protocols.Coda_pow.Fee
 
@@ -380,7 +381,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving bin_io, sexp]
+    [@@deriving sexp]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -536,6 +537,8 @@ struct
         include Merkle_hash
 
         let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
+
+        let empty = Merkle_hash.empty_hash
       end)
       (struct
         include Ledger_hash
@@ -635,11 +638,12 @@ struct
     module Compressed_public_key = Public_key.Compressed
 
     module Prover = struct
-      let prove ~prev_state:(old_state, old_proof)
+      let prove ~prev_state ~prev_state_proof ~next_state
           (transition: Init.Consensus_mechanism.Internal_transition.t) =
         let open Deferred.Or_error.Let_syntax in
         Init.Prover.extend_blockchain Init.prover
-          (Init.Blockchain.create ~proof:old_proof ~state:old_state)
+          (Init.Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+          next_state
           (Init.Consensus_mechanism.Internal_transition.snark_transition
              transition)
         >>| fun {Init.Blockchain.proof; _} -> proof
@@ -750,9 +754,16 @@ module type Main_intf = sig
       val get : t -> Public_key.Compressed.t -> Account.t option
     end
 
-    module External_transition : sig
-      type t
+    module Ledger_builder_diff : sig
+      type t [@@deriving sexp, bin_io]
     end
+
+    module Consensus_mechanism :
+      Consensus.Mechanism.S
+      with type Internal_transition.Ledger_builder_diff.t =
+                  Ledger_builder_diff.t
+       and type External_transition.Ledger_builder_diff.t =
+                  Ledger_builder_diff.t
 
     module Net : sig
       type t
@@ -809,7 +820,8 @@ module type Main_intf = sig
     end
 
     module Transition_tree :
-      Coda.Ktree_intf with type elem := External_transition.t
+      Coda.Ktree_intf
+      with type elem := Consensus_mechanism.External_transition.t
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -825,6 +837,7 @@ module type Main_intf = sig
   module Config : sig
     type t =
       { log: Logger.t
+      ; should_propose: bool
       ; net_config: Inputs.Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
@@ -843,7 +856,7 @@ module type Main_intf = sig
   val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
-    t -> Inputs.External_transition.t Linear_pipe.Reader.t
+    t -> Inputs.Consensus_mechanism.External_transition.t Linear_pipe.Reader.t
 
   val transaction_pool : t -> Inputs.Transaction_pool.t
 

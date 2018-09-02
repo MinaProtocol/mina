@@ -118,4 +118,4 @@ module Message = struct
        List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits)
 end
 
-module Signature = Snarky.Signature.Schnorr (Tick) (Snark_params.Tick.Inner_curve) (Message)
+module Signature = Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve) (Message)

@@ -1,4 +1,5 @@
 open Core
+open Import
 open Snark_params.Tick
 
 type t [@@deriving bin_io, sexp]
