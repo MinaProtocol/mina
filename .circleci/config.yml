@@ -59,22 +59,8 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
-<<<<<<< HEAD
                 name: Test make test-stakes
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
-=======
-                name: Test make test-full-stake
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-stake
-            - run:
-                name: Test make test-codapeers-stake
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-stake
-            - run:
-                name: Test make test-coda-block-production-stake
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-stake
-            - run:
-                name: Test make test-transaction-snark-profiler-stake
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-stake
->>>>>>> b4214ff9e51ca1ad17b6230e5fa72c952e4f22ba
 
     test-sig:
         resource_class: large
