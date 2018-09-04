@@ -545,8 +545,8 @@ module Merge = struct
      returns a bool which is true iff
      there is a snark proving making tock_vk
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
-let verify_transition tock_vk tock_vk_data tock_vk_section get_transition_data s1 s2
-      fee_excess =
+  let verify_transition tock_vk tock_vk_data tock_vk_section
+      get_transition_data s1 s2 fee_excess =
     let open Let_syntax in
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
@@ -657,15 +657,15 @@ let verify_transition tock_vk tock_vk_data tock_vk_section get_transition_data s
           ~start:(Hash_prefix.length_in_triples + state_hash_size_in_triples)
           (bits_to_triples s2)
       in
-      verify_transition tock_vk tock_vk_data tock_vk_section Prover_state.transition12
-        s1_section s2_section fee_excess12
+      verify_transition tock_vk tock_vk_data tock_vk_section
+        Prover_state.transition12 s1_section s2_section fee_excess12
     and verify_23 =
       let%bind s2_section =
         let open Pedersen.Checked.Section in
         extend empty ~start:Hash_prefix.length_in_triples (bits_to_triples s2)
       in
-      verify_transition tock_vk tock_vk_data tock_vk_section Prover_state.transition23
-        s2_section s3_section fee_excess23
+      verify_transition tock_vk tock_vk_data tock_vk_section
+        Prover_state.transition23 s2_section s3_section fee_excess23
     in
     Boolean.Assert.all [verify_12; verify_23]
 
