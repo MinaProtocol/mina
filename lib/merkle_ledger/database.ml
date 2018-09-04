@@ -22,6 +22,8 @@ module Make
 
   val update_account: t -> Key.t -> Account.t -> unit
 
+  val of_public_key_string_to_index: t -> string -> Key.t option
+
   module For_tests : sig
     val gen_account_key : Key.t Core.Quickcheck.Generator.t
   end
@@ -160,6 +162,7 @@ end = struct
       match last_direction (path key) with
       | Left -> (base, sibling)
       | Right -> (sibling, base)
+
   end
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
@@ -369,4 +372,13 @@ end = struct
   let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
 
   let copy {kvdb; sdb} = {kvdb=Kvdb.copy kvdb; sdb=Sdb.copy sdb} 
+
+  let of_public_key_string_to_index mdb public_key =
+      (* TODO: duplicated code *)
+      let open Option.Let_syntax in
+      let%bind account_key_bin = get_generic mdb (Key.build_generic 
+      (Bigstring.of_string ("$" ^  public_key))) in
+      match Key.parse account_key_bin with
+      | Ok account_key -> Some account_key 
+      | Error () -> None
 end

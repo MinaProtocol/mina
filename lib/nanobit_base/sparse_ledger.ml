@@ -17,7 +17,7 @@ let of_ledger_subset_exn ledger keys =
   List.fold keys
     ~f:(fun acc key ->
       add_path acc
-        (Ledger.merkle_path ledger key)
+        (Option.value_exn (Ledger.merkle_path ledger key))
         (Option.value_exn (Ledger.get_account ledger key)) )
     ~init:
       (of_hash ~depth:Ledger.max_depth

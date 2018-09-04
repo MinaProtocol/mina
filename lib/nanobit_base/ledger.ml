@@ -2,26 +2,21 @@ open Core
 open Snark_params
 open Currency
 
-module My_Key = struct
 
-  include Public_key.Compressed
-
-  let to_string key =
-    let bin_size = Public_key.Compressed.bin_size_t key in
-    let buf = Bigstring.create bin_size in
-    ignore (Public_key.Compressed.bin_write_t buf ~pos:0 key) ;
-    Bigstring.to_string buf
-end
+let of_public_key_to_string key =
+  Public_key.Compressed.to_base64 key
 
 module Account = struct
   include Account
 
   let set_balance t new_balance = {t with balance= new_balance}
 
-  let public_key (t: t) = public_key t
+  let public_key (t: t) = 
+  public_key t |> of_public_key_to_string
 end
 
-include Merkle_ledger.Database.Make (My_Key) (Account)
+module Base = struct
+  include Merkle_ledger.Database.Make (Account)
           (struct
             type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
 
@@ -37,40 +32,52 @@ include Merkle_ledger.Database.Make (My_Key) (Account)
           (Merkle_ledger_tests.Test_stubs.In_memory_kvdb)
           (Merkle_ledger_tests.Test_stubs.In_memory_sdb)
 
-let merkle_path_at_index_exn t index =
-  merkle_path_at_addr t (Addr.of_index_exn index)
 
-let get_at_index_exn t index = 
-  get_account_from_key t (of_index index) |> Option.value_exn
+    type key = Public_key.Compressed.t
 
-let set_at_index_exn t index account = 
-  update_account t (of_index index) account
+    let to_index ledger key = 
+      of_public_key_to_string key |> of_public_key_string_to_index ledger
 
-let index_of_key_exn t public_key =
-  public_key_to_index t public_key |> 
-  Option.value_exn |>
-  to_index
+    let index_of_key ledger key =
+      to_index ledger key |> Option.map ~f:Key.to_index
 
-let merkle_path_at_addr_exn = merkle_path_at_addr
+    (* TODO: Figure out who calls this *)
+    let index_of_key_exn ledger key = 
+      index_of_key ledger key |> Option.value_exn
+    
+    let merkle_path ledger key = to_index ledger key |> 
+      (Option.map ~f:(merkle_path ledger))
 
-let depth = ledger_depth
+    let merkle_path_at_index_exn t index =
+    merkle_path_at_addr t (Addr.of_index_exn index)
 
-let max_depth = ledger_depth
+    let get_at_index_exn t index = 
+      get_account t (Key.of_index index) |> Option.value_exn
 
-let length = num_accounts
+    let set_at_index_exn t index account = 
+      update_account t (Key.of_index index) account
 
-let get = get_account
+    let merkle_path_at_addr_exn = merkle_path_at_addr
 
-let copy t = t
+    let depth = ledger_depth
 
-let t_of_sexp = opaque_of_sexp
+    let max_depth = ledger_depth
 
-let sexp_of_t = sexp_of_opaque
+    let length = num_accounts
 
-let create () = create ~key_value_db_dir:"" ~stack_db_file:""
+    let get_account ledger key = (to_index ledger key) 
+      |> Option.bind ~f:(get_account ledger)
 
-(* TODO: test this *)
-let set t pk account = update_account t (public_key_to_index t pk |> Option.value_exn) account
+    let copy t = t
+
+    let t_of_sexp = opaque_of_sexp
+
+    let sexp_of_t = sexp_of_opaque
+
+    let create () = create ~key_value_db_dir:"" ~stack_db_file:""
+  end
+
+include Base
 
 let merkle_root t =
   Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
@@ -80,11 +87,16 @@ let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
 let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
 
 let get' ledger tag key =
+  (* TODO: this needs to be set by public key, not account index *)
   error_opt (sprintf "%s not found" tag) (get_account ledger key)
 
 let set' ledger account : unit Or_error.t =
   set_account ledger account |>
-  Result.map_error ~f:(fun error -> Error.create "" error [%sexp_of: error])
+  Result.map_error ~f:(fun error -> 
+    Error.create "Cannot set account" error [%sexp_of: error])
+
+let set t account = 
+  set' t account |> Or_error.ok |> Option.value_exn
 
 let add_amount balance amount =
   error_opt "overflow" (Balance.add_amount balance amount)

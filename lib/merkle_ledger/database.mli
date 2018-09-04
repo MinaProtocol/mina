@@ -19,9 +19,9 @@ module Make
            and type hash := Hash.t
            and type key := Key.t
   
-  
-
   val update_account: t -> Key.t -> Account.t -> unit
+
+  val of_public_key_string_to_index: t -> string -> Key.t option
 
   module For_tests : sig
     val gen_account_key : Key.t Core.Quickcheck.Generator.t
