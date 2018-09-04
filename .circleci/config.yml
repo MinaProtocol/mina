@@ -59,17 +59,8 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
-                name: Test make test-full-stake
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-stake
-            - run:
-                name: Test make test-codapeers-stake
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-stake
-            - run:
-                name: Test make test-coda-block-production-stake
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-stake
-            - run:
-                name: Test make test-transaction-snark-profiler-stake
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-stake
+                name: Test make test-stakes
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
 
     test-sig:
         resource_class: large
@@ -84,17 +75,9 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
-                name: Test make test-full-sig
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-full-sig
-            - run:
-                name: Test make test-codapeers-sig
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-codapeers-sig
-            - run:
-                name: Test make test-coda-block-production-sig
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-coda-block-production-sig
-            - run:
-                name: Test make test-transaction-snark-profiler-sig
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-transaction-snark-profiler-sig
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
+
 
 workflows:
     version: 2
