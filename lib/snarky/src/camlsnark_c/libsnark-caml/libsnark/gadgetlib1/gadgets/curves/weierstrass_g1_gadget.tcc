@@ -51,6 +51,20 @@ G1_variable<ppT>::G1_variable(protoboard<FieldT> &pb,
 }
 
 template<typename ppT>
+G1_variable<ppT>::G1_variable(protoboard<FieldT> &pb,
+                              const pb_variable<FieldT> &X_var,
+                              const pb_variable<FieldT> &Y_var,
+                              const std::string &annotation_prefix) :
+    gadget<FieldT>(pb, annotation_prefix)
+{
+    X = pb_linear_combination<FieldT>(X_var);
+    Y = pb_linear_combination<FieldT>(Y_var);
+
+    all_vars.emplace_back(X);
+    all_vars.emplace_back(Y);
+}
+
+template<typename ppT>
 void G1_variable<ppT>::generate_r1cs_witness(const libff::G1<other_curve<ppT> > &el)
 {
     libff::G1<other_curve<ppT> > el_normalized = el;

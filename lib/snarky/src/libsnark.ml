@@ -52,12 +52,22 @@ struct
     val delete : t -> unit
 
     val print : t -> unit
+
+    module Vector : Vector.S with type elt := t
   end = struct
     type t = unit ptr
 
     let typ = ptr void
 
     let prefix = with_prefix M.prefix "g1"
+
+    module Vector = Vector.Make (struct
+      type elt = t
+
+      let typ = typ
+
+      let prefix = with_prefix prefix "vector"
+    end)
 
     let func_name s = with_prefix prefix s
 

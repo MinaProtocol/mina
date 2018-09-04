@@ -1,6 +1,7 @@
 open Core
 open Async
 open Nanobit_base
+open Signature_lib
 open Coda_main
 
 module Make
@@ -182,9 +183,7 @@ struct
             let payload : Transaction.Payload.t =
               {receiver= receiver_pk; amount; fee; nonce}
             in
-            Transaction.sign
-              (Signature_keypair.of_private_key sender_sk)
-              payload
+            Transaction.sign (Keypair.of_private_key sender_sk) payload
           in
           let transaction = build_txn amount sk pk fee in
           Run.send_txn log coda (transaction :> Transaction.t)
