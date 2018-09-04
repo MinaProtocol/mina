@@ -84,7 +84,11 @@ module type S = sig
    * a given consensus state and snark transition.
    *)
 
-  val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
+  val select :
+       Consensus_state.value
+    -> Consensus_state.value
+    -> time_received:Int64.t
+    -> [`Keep | `Take]
   (**
    * Select between two ledger builder controller tips given the consensus
    * states for the two tips. Returns `\`Keep` if the first tip should be

@@ -139,7 +139,7 @@ struct
 
   type change = Tip_change of Tip.t
 
-  type t = {transitions: External_transition.t Linear_pipe.Reader.t}
+  type t = {transitions: (External_transition.t * Int64.t) Linear_pipe.Reader.t}
   [@@deriving fields]
 
   let transition_capacity = 64
@@ -148,7 +148,12 @@ struct
     let logger = Logger.child parent_log "proposer" in
     let r, w = Linear_pipe.create () in
     let write_result = function
-      | Ok t -> Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
+      | Ok t ->
+          let time =
+            Time.now time_controller |> Time.to_span_since_epoch
+            |> Time.Span.to_ms
+          in
+          Linear_pipe.write_or_exn ~capacity:transition_capacity w r (t, time)
       | Error e ->
           Logger.error logger "%s\n"
             Error.(to_string_hum (tag e ~tag:"signer"))

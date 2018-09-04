@@ -499,72 +499,72 @@ struct
   end
 
   module Consensus_state = struct
-    type ('length, 'epoch, 'slot, 'amount, 'epoch_data) t =
+    type ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
       { length: 'length
-      ; current_epoch: 'epoch
-      ; current_slot: 'slot
       ; total_currency: 'amount
+      ; curr_epoch: 'epoch
+      ; curr_slot: 'slot
       ; last_epoch_data: 'epoch_data
       ; curr_epoch_data: 'epoch_data }
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type value =
-      (Length.t, Epoch.t, Epoch.Slot.t, Amount.t, Epoch_data.value) t
+      (Length.t, Amount.t, Epoch.t, Epoch.Slot.t, Epoch_data.value) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var =
       ( Length.Unpacked.var
+      , Amount.var
       , Epoch.Unpacked.var
       , Epoch.Slot.Unpacked.var
-      , Amount.var
       , Epoch_data.var )
       t
 
     let to_hlist
         { length
-        ; current_epoch
-        ; current_slot
         ; total_currency
+        ; curr_epoch
+        ; curr_slot
         ; last_epoch_data
         ; curr_epoch_data } =
       let open Nanobit_base.H_list in
       [ length
-      ; current_epoch
-      ; current_slot
       ; total_currency
+      ; curr_epoch
+      ; curr_slot
       ; last_epoch_data
       ; curr_epoch_data ]
 
     let of_hlist :
            ( unit
            ,    'length
+             -> 'amount
              -> 'epoch
              -> 'slot
-             -> 'amount
              -> 'epoch_data
              -> 'epoch_data
              -> unit )
            Nanobit_base.H_list.t
-        -> ('length, 'epoch, 'slot, 'amount, 'epoch_data) t =
+        -> ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
      fun Nanobit_base.H_list.([ length
-                              ; current_epoch
-                              ; current_slot
                               ; total_currency
+                              ; curr_epoch
+                              ; curr_slot
                               ; last_epoch_data
                               ; curr_epoch_data ]) ->
       { length
-      ; current_epoch
-      ; current_slot
       ; total_currency
+      ; curr_epoch
+      ; curr_slot
       ; last_epoch_data
       ; curr_epoch_data }
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
       [ Length.Unpacked.typ
+      ; Amount.typ
       ; Epoch.Unpacked.typ
       ; Epoch.Slot.Unpacked.typ
-      ; Amount.typ
       ; Epoch_data.typ
       ; Epoch_data.typ ]
 
@@ -575,9 +575,9 @@ struct
 
     let var_to_triples
         { length
-        ; current_epoch
-        ; current_slot
         ; total_currency
+        ; curr_epoch
+        ; curr_slot
         ; last_epoch_data
         ; curr_epoch_data } =
       let open Snark_params.Tick.Let_syntax in
@@ -587,21 +587,20 @@ struct
         Epoch_data.var_to_triples curr_epoch_data
       in
       Length.Unpacked.var_to_triples length
-      @ Epoch.Unpacked.var_to_triples current_epoch
-      @ Epoch.Slot.Unpacked.var_to_triples current_slot
+      @ Epoch.Unpacked.var_to_triples curr_epoch
+      @ Epoch.Slot.Unpacked.var_to_triples curr_slot
       @ Amount.var_to_triples total_currency
       @ last_epoch_data_triples @ curr_epoch_data_triples
 
     let fold
         { length
-        ; current_epoch
-        ; current_slot
+        ; curr_epoch
+        ; curr_slot
         ; total_currency
         ; last_epoch_data
         ; curr_epoch_data } =
       let open Fold in
-      Length.fold length +> Epoch.fold current_epoch
-      +> Epoch.Slot.fold current_slot
+      Length.fold length +> Epoch.fold curr_epoch +> Epoch.Slot.fold curr_slot
       +> Amount.fold total_currency
       +> Epoch_data.fold last_epoch_data
       +> Epoch_data.fold curr_epoch_data
@@ -613,11 +612,16 @@ struct
 
     let genesis : value =
       { length= Length.zero
-      ; current_epoch= Epoch.zero
-      ; current_slot= Epoch.Slot.zero
       ; total_currency= Inputs.genesis_ledger_total_currency
-      ; last_epoch_data= Epoch_data.genesis
-      ; curr_epoch_data= Epoch_data.genesis }
+      ; curr_epoch= Epoch.zero
+      ; curr_slot= Epoch.Slot.zero
+      ; curr_epoch_data= Epoch_data.genesis
+      ; last_epoch_data= Epoch_data.genesis }
+
+    let time_in_epoch_slot {curr_epoch; curr_slot; _} time =
+      let open Time in
+      Epoch.slot_start_time curr_epoch curr_slot < time
+      && Epoch.slot_end_time curr_epoch curr_slot >= time
 
     let update_stateless ~(previous_consensus_state: value)
         ~(consensus_transition_data: Consensus_transition_data.value)
@@ -635,7 +639,7 @@ struct
         Epoch_data.update_pair
           ( previous_consensus_state.last_epoch_data
           , previous_consensus_state.curr_epoch_data )
-          ~prev_epoch:previous_consensus_state.current_epoch
+          ~prev_epoch:previous_consensus_state.curr_epoch
           ~next_epoch:consensus_transition_data.epoch
           ~next_slot:consensus_transition_data.slot
           ~prev_protocol_state_hash:previous_protocol_state_hash
@@ -643,9 +647,9 @@ struct
           ~ledger_hash ~total_currency
       in
       { length= Length.succ previous_consensus_state.length
-      ; current_epoch= consensus_transition_data.epoch
-      ; current_slot= consensus_transition_data.slot
       ; total_currency
+      ; curr_epoch= consensus_transition_data.epoch
+      ; curr_slot= consensus_transition_data.slot
       ; last_epoch_data
       ; curr_epoch_data }
 
@@ -686,15 +690,15 @@ struct
       let%map last_epoch_data, curr_epoch_data =
         Epoch_data.update_pair_checked
           (previous_state.last_epoch_data, previous_state.curr_epoch_data)
-          ~prev_epoch:previous_state.current_epoch
+          ~prev_epoch:previous_state.curr_epoch
           ~next_epoch:transition_data.epoch ~next_slot:transition_data.slot
           ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result:transition_data.proposer_vrf_result ~ledger_hash
           ~total_currency
       in
       { length
-      ; current_epoch= transition_data.epoch
-      ; current_slot= transition_data.slot
+      ; curr_epoch= transition_data.epoch
+      ; curr_slot= transition_data.slot
       ; total_currency
       ; last_epoch_data
       ; curr_epoch_data }
@@ -747,32 +751,31 @@ struct
       ( transition |> Snark_transition.blockchain_state
       |> Nanobit_base.Blockchain_state.ledger_hash )
 
-  let select current candidate =
+  let select this that ~time_received =
     let open Consensus_state in
-    if Length.compare current.length candidate.length < 0 then `Take else `Keep
+    let open Epoch_data in
+    (* TODO: add fork_before_checkpoint check *)
+    if
+      not
+        (time_in_epoch_slot that
+           Time.(of_span_since_epoch (Span.of_ms time_received)))
+    then `Keep (* compare last or curr? *)
+    else if
+      this.last_epoch_data.lock_checkpoint
+      = that.last_epoch_data.lock_checkpoint
+    then if Length.compare this.length that.length < 0 then `Take else `Keep
+    else if
+      this.last_epoch_data.start_checkpoint
+      = that.last_epoch_data.start_checkpoint
+    then
+      if
+        Length.compare this.last_epoch_data.length that.last_epoch_data.length
+        < 0
+      then `Take
+      else `Keep
+    else `Keep
 
-  (*
-  let select curr cand =
-    let cand_fork_before_checkpoint =
-      not (List.exists curr.checkpoints ~f:(fun c ->
-        List.exists cand.checkpoints ~f:(checkpoint_equal c)))
-    in
-    let cand_is_valid =
-      (* shouldn't the proof have already been checked before this point? *)
-      verify cand.proof?
-      && Time.less_than (Epoch.Slot.start_time (cand.epoch, cand.slot)) time_of_reciept
-      && Time.greater_than_equal (Epoch.Slot.end_time (cand.epoch, cand.slot)) time_of_reciept
-      && check cand.state?
-    in
-    if not cand_fork_before_checkpoint || not cand_is_valid then
-      `Keep
-    else if curr.current_epoch.post_lock_hash = cand.current_epoch.post_lock_hash then
-      argmax_(chain in [cand, curr])(len(chain))?
-    else if curr.current_epoch.last_start_hash = cand.current_epoch.last_start_hash then
-      argmax_(chain in [cand, curr])(len(chain.last_epoch_length))?
-    else
-      argmax_(chain in [cand, curr])(len(chain.last_epoch_participation))?
-    *)
+  (* TODO *)
 
   let genesis_protocol_state =
     let consensus_state =
