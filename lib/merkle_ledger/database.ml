@@ -2,35 +2,25 @@ open Core
 open Unsigned
 
 module Make
-    (Public_key : sig
-      type t
-      val to_string : t -> string
-    end)
-    (Account : Intf.Account with type key := Public_key.t)
+    (Account : Intf.Account with type key := String.t)
     (Hash : Intf.Hash with type account := Account.t)
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
     (Sdb : Intf.Stack_database) : sig
+  module Key : sig
+    type t
+    
+    val of_index: int -> t
+
+    val to_index: t -> int
+  end
+
   include Database_intf.S
           with type account := Account.t
            and type hash := Hash.t
-           and type key := Public_key.t
-
-  module Key : sig
-    type t
-  end
-
-  val of_index: int -> Key.t
-
-  val to_index: Key.t -> int
-
-  val get_account_from_key : t -> Key.t -> Account.t option
-
-  val get_key_of_account : t -> Account.t -> (Key.t, error) Result.t
+           and type key := Key.t
 
   val update_account: t -> Key.t -> Account.t -> unit
-
-  val public_key_to_index : t -> Public_key.t -> Key.t option
 
   module For_tests : sig
     val gen_account_key : Key.t Core.Quickcheck.Generator.t
@@ -129,6 +119,10 @@ end = struct
       | Generic _ ->
           raise (Invalid_argument "get_path: generic does not have a path")
 
+    let of_index index = Account (Addr.of_index_exn index)
+
+    let to_index  = Fn.compose Addr.to_int get_path
+
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
       | Account path ->
@@ -170,13 +164,6 @@ end = struct
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
-  let of_index index = Key.Account (Addr.of_index_exn index)
-
-  let to_index  = function
-    | Key.Generic _ -> raise (Invalid_argument "generic keys do not have an index")
-    | Account path -> Addr.to_int path
-    | Hash path -> Addr.to_int path
-
   module For_tests = struct
     let gen_account_key =
       let open Quickcheck.Let_syntax in
@@ -217,7 +204,7 @@ end = struct
     assert (Key.is_generic key) ;
     get_raw mdb key
   
-  let get_account_from_key mdb key =
+  let get_account mdb key =
     assert (Key.is_account key) ;
     get_bin mdb key Account.bin_read_t
 
@@ -262,7 +249,7 @@ end = struct
   module Account_key = struct
     let build_key account =
       Key.build_generic
-        (Bigstring.of_string ("$" ^ Public_key.to_string (Account.public_key account) ))
+        (Bigstring.of_string ("$" ^ Account.public_key account ))
 
     let get mdb account =
       match get_generic mdb (build_key account) with
@@ -333,19 +320,24 @@ end = struct
 
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in
+
+    (* TODO: determine how compare works *)
+    (* let last_key = 
+      Account_key.last_key_address mdb |>
+      Option.value_exn in
+    
+    let min_node = min last_key last_node in
+
+    (Core.printf !"Last Key Address \n: %{sexp: Addr.t}" last_key); *)
+    
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account =
-            Option.value_exn
-              ~message:
-                (sprintf
-                   !"address %{sexp:Addr.t} does not have an account"
-                   bit_index)
-              (get_account_from_key mdb (Key.Account bit_index))
+          let account = get_account mdb (Key.Account bit_index)
           in
           account :: acc )
     in
-    List.rev result
+    List.rev_filter_map result ~f:Fn.id
+    
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
@@ -355,7 +347,8 @@ end = struct
           update_account mdb (Key.Account bit_index) head ;
           tail
       | [] ->
-          assert (Addr.equal last_node bit_index) ;
+          (* TODO: should this happen *)
+          (* assert (Addr.equal last_node bit_index) ; *)
           [] )
     |> ignore
 
@@ -376,28 +369,4 @@ end = struct
   let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
 
   let copy {kvdb; sdb} = {kvdb=Kvdb.copy kvdb; sdb=Sdb.copy sdb} 
-
-  module Public_key_operations = struct
-      open Option.Let_syntax
-
-      let public_key_to_index mdb public_key =
-        (* TODO: duplicated code *)
-        let open Option.Let_syntax in
-        let%bind account_key_bin = get_generic mdb (Key.build_generic 
-        (Bigstring.of_string ("$" ^ Public_key.to_string public_key))) in
-        match Key.parse account_key_bin with
-        | Ok account_key -> Some account_key 
-        | Error () -> None
-
-      let get_account mdb public_key = 
-        public_key_to_index mdb public_key >>=
-        get_account_from_key mdb
-
-      let merkle_path mdb public_key =
-        public_key_to_index mdb public_key
-        |> Option.value_exn
-        |> merkle_path mdb
-  end
-
-  include Public_key_operations
 end

@@ -147,7 +147,7 @@ module TestL16_65536 = Make (Test_ledger.Make (struct
   let num_accts = 65536
 end))
 
-(* module TestDB3_3 = Make (Test_db.Make (struct
+module TestDB3_3 = Make (Test_db.Make (struct
   let depth = 3
 
   let num_accts = 3
@@ -181,4 +181,4 @@ module TestDB16_65536 = Make (Test_db.Make (struct
   let depth = 16
 
   let num_accts = 65536
-end)) *)
+end))

@@ -8,12 +8,6 @@ module type Key = sig
   include Hashable.S_binable with type t := t
 end
 
-module type Balance = sig
-  type t [@@deriving eq]
-
-  val zero : t
-end
-
 module type Account = sig
   type t [@@deriving bin_io, eq]
 

@@ -9,7 +9,7 @@ let%test_module "test functor on in memory databases" =
 
       module Make (Depth : Intf.Depth) = struct
         module MT =
-          Database.Make (String) (Account) (Hash) (Depth) (In_memory_kvdb)
+          Database.Make (Account) (Hash) (Depth) (In_memory_kvdb)
             (In_memory_sdb)
         include MT
       end
@@ -40,7 +40,7 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "getting a non existing account returns None" =
         with_test_instance (fun mdb ->
             Quickcheck.test MT.For_tests.gen_account_key ~f:(fun key ->
-                assert (MT.get_account_from_key mdb key = None) ) )
+                assert (MT.get_account mdb key = None) ) )
 
       let%test "add and retrieve an account" =
         with_test_instance (fun mdb ->
@@ -51,7 +51,7 @@ let%test_module "test functor on in memory databases" =
               |> Result.map_error ~f:exn_of_error
               |> Result.ok_exn
             in
-            Account.equal (Option.value_exn (MT.get_account_from_key mdb key)) account
+            Account.equal (Option.value_exn (MT.get_account mdb key)) account
         )
 
       let%test "accounts are atomic" =
@@ -69,7 +69,7 @@ let%test_module "test functor on in memory databases" =
               |> Result.map_error ~f:exn_of_error
               |> Result.ok_exn
             in
-            key = key' && MT.get_account_from_key mdb key = MT.get_account_from_key mdb key' )
+            key = key' && MT.get_account mdb key = MT.get_account mdb key' )
 
       let%test_unit "num_accounts" =
         with_test_instance (fun mdb ->
@@ -110,7 +110,7 @@ let%test_module "test functor on in memory databases" =
             let account = Account.set_balance account Balance.zero in
             assert (MT.set_account mdb account = Ok ()) ;
             assert (MT.set_account mdb account' = Ok ()) ;
-            MT.get_account_from_key mdb key = Some account' )
+            MT.get_account mdb key = Some account' )
 
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =

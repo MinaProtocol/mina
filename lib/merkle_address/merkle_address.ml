@@ -74,7 +74,7 @@ struct
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
 
   let path_byte_count = byte_count_of_bits Input.depth
-
+    
   let depth = bitstring_length
 
   let height path = Input.depth - depth path
