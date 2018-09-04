@@ -25,7 +25,7 @@ struct
     (discovery_ports, external_ports, peers)
 
   let spawn_local_processes_exn ?(should_propose= Fn.const true)
-      ?(first_delay= 3.0) n ~program_dir ~f =
+      ?(first_delay= 3.0) n ~program_dir ~snark_worker_public_keys ~f =
     let fns =
       let discovery_ports, external_ports, peers = net_configs n in
       let peers = [] :: List.drop peers 1 in
@@ -34,8 +34,20 @@ struct
             (x, y, z) )
       in
       List.mapi args ~f:(fun i (discovery_port, external_port, peers) ->
+          let public_key =
+            Option.map snark_worker_public_keys ~f:(fun keys ->
+                List.nth_exn keys i )
+          in
+          let snark_worker_config =
+            Option.bind public_key ~f:(fun public_key ->
+                Option.bind public_key ~f:(fun public_key ->
+                    Some
+                      { Coda_process.Coda_worker.Snark_worker_config.public_key
+                      ; port= 20000 + i } ) )
+          in
           Coda_process.spawn_local_exn ~peers ~discovery_port ~external_port
-            ~program_dir ~should_propose:(should_propose i) )
+            ~snark_worker_config ~program_dir
+            ~should_propose:(should_propose i) )
     in
     let first = List.hd_exn fns in
     let rest = List.drop fns 1 in

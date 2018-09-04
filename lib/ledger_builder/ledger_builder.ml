@@ -469,7 +469,7 @@ end = struct
       in
       Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:
         (fun (jobs, work) ->
-          let message = (work.fee, work.prover) in
+          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
           Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:
             (fun (job, proof) -> verify ~message job proof ) )
       |> Deferred.map ~f:(check_or_error "proofs did not verify"))
@@ -726,15 +726,15 @@ end = struct
     in
     if diff > 0 then List.take invalid.transactions diff else []
 
-  let log_error_and_return_value err_val def_val =
+  let log_error_and_return_value logger err_val def_val =
     match err_val with
     | Error e ->
-        Printf.printf "%s" (Error.to_string_hum e) ;
+        Logger.error logger "%s" (Error.to_string_hum e) ;
         def_val
     | Ok value -> value
 
-  let rec check_resources_and_add ws_seq ts_seq get_completed_work ledger
-      (valid: Resources.t) (resources: Resources.t) =
+  let rec check_resources_and_add logger ws_seq ts_seq get_completed_work
+      ledger (valid: Resources.t) (resources: Resources.t) =
     match
       ( Sequence.next ws_seq
       , Sequence.next ts_seq
@@ -743,16 +743,16 @@ end = struct
     | None, None, _ -> (valid, txns_not_included valid resources)
     | None, Some (t, ts), true ->
         let r_transaction =
-          log_error_and_return_value
+          log_error_and_return_value logger
             (add_transaction ledger t resources)
             resources
         in
         if Resources.budget_non_neg r_transaction then
-          check_resources_and_add Sequence.empty ts get_completed_work ledger
-            r_transaction r_transaction
+          check_resources_and_add logger Sequence.empty ts get_completed_work
+            ledger r_transaction r_transaction
         else
-          check_resources_and_add Sequence.empty ts get_completed_work ledger
-            valid r_transaction
+          check_resources_and_add logger Sequence.empty ts get_completed_work
+            ledger valid r_transaction
     | Some (w, ws), Some (t, ts), true -> (
         let enough_work_added_to_include_one_more =
           resources.work_done
@@ -761,26 +761,26 @@ end = struct
         in
         if enough_work_added_to_include_one_more then
           let r_transaction =
-            log_error_and_return_value
+            log_error_and_return_value logger
               (add_transaction ledger t resources)
               resources
           in
           if Resources.budget_non_neg r_transaction then
-            check_resources_and_add
+            check_resources_and_add logger
               (Sequence.append (Sequence.singleton w) ws)
               ts get_completed_work ledger r_transaction r_transaction
           else
-            check_resources_and_add
+            check_resources_and_add logger
               (Sequence.append (Sequence.singleton w) ws)
               ts get_completed_work ledger valid r_transaction
         else
           match add_work w resources get_completed_work with
           | Ok r_work ->
-              check_resources_and_add ws
+              check_resources_and_add logger ws
                 (Sequence.append (Sequence.singleton t) ts)
                 get_completed_work ledger valid r_work
           | Error e ->
-              Printf.printf "%s" (Error.to_string_hum e) ;
+              Logger.error logger "%s" (Error.to_string_hum e) ;
               (valid, txns_not_included valid resources) )
     | _, _, _ -> (valid, txns_not_included valid resources)
 
@@ -788,19 +788,19 @@ end = struct
     List.fold txns ~init:() ~f:(fun _ (_, u) ->
         Or_error.ok_exn (Ledger.undo ledger u) )
 
-  let process_works_add_txns ws_seq ts_seq ps_free_space max_throughput
+  let process_works_add_txns logger ws_seq ts_seq ps_free_space max_throughput
       get_completed_work ledger self : Resources.t =
     let resources =
       Resources.init ~available_queue_space:ps_free_space ~max_throughput ~self
     in
     let valid, txns_to_undo =
-      check_resources_and_add ws_seq ts_seq get_completed_work ledger resources
-        resources
+      check_resources_and_add logger ws_seq ts_seq get_completed_work ledger
+        resources resources
     in
     let _ = undo_txns ledger txns_to_undo in
     valid
 
-  let create_diff t
+  let create_diff t ~logger
       ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
       ~(get_completed_work:
          Completed_work.Statement.t -> Completed_work.Checked.t option) =
@@ -810,8 +810,9 @@ end = struct
     let ledger = ledger t' in
     let max_throughput = Int.pow 2 (Inputs.Config.parallelism_log_2 - 1) in
     let resources =
-      process_works_add_txns (work_to_do t'.scan_state) transactions_by_fee
-        (free_space t') max_throughput get_completed_work ledger t'.public_key
+      process_works_add_txns logger (work_to_do t'.scan_state)
+        transactions_by_fee (free_space t') max_throughput get_completed_work
+        ledger t'.public_key
     in
     (* We have to reverse here because we only know they work in THIS order *)
     let transactions =
@@ -834,6 +835,13 @@ let%test_module "test" =
     module Test_input1 = struct
       open Coda_pow
       module Compressed_public_key = String
+
+      module Sok_message = struct
+        module Digest = Unit
+        include Unit
+
+        let create ~fee:_ ~prover:_ = ()
+      end
 
       module Transaction = struct
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
@@ -960,11 +968,11 @@ let%test_module "test" =
           {source; target; fee_excess; proof_type}
       end
 
-      module Proof = String
+      module Proof = Ledger_proof_statement
 
       module Ledger_proof = struct
-        (*A proof here is statement.target*)
-        include String
+        (*A proof here is a statement *)
+        include Ledger_proof_statement
 
         type ledger_hash = Ledger_hash.t
 
@@ -972,6 +980,10 @@ let%test_module "test" =
          fun statement -> statement.target
 
         let underlying_proof = Fn.id
+
+        let sok_digest _ = ()
+
+        let statement = Fn.id
       end
 
       module Ledger_proof_verifier = struct
@@ -1167,18 +1179,17 @@ let%test_module "test" =
 
     let stmt_to_work (stmts: Test_input1.Completed_work.Statement.t) :
         Test_input1.Completed_work.Checked.t option =
-      let proofs = List.map stmts ~f:(fun stmt -> stmt.target) in
       let prover =
         List.fold stmts ~init:"P" ~f:(fun p stmt -> p ^ stmt.target)
       in
       Some
         { Test_input1.Completed_work.Checked.fee= Fee.Unsigned.of_int 1
-        ; proofs
+        ; proofs= stmts
         ; prover }
 
-    let create_and_apply lb txns =
+    let create_and_apply lb logger txns =
       let diff, _, _ =
-        Lb.create_diff lb ~transactions_by_fee:txns
+        Lb.create_diff lb ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
       in
       let%map ledger_proof =
@@ -1190,6 +1201,7 @@ let%test_module "test" =
 
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
+      let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
@@ -1202,7 +1214,7 @@ let%test_module "test" =
                 txns (p / 2) (fun x -> (x + 1) * 100) (fun _ -> 4)
               in
               let%map _, diff =
-                create_and_apply lb (Sequence.of_list all_ts)
+                create_and_apply lb logger (Sequence.of_list all_ts)
               in
               let x = List.length diff.transactions in
               assert (x > 0) ;
@@ -1218,6 +1230,7 @@ let%test_module "test" =
     let%test_unit "Be able to include random number of transactions" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
+      let logger = Logger.create () in
       let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
@@ -1228,7 +1241,9 @@ let%test_module "test" =
               let old_ledger = !(Lb.ledger lb) in
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
-              let%map _, diff = create_and_apply lb (Sequence.of_list ts) in
+              let%map _, diff =
+                create_and_apply lb logger (Sequence.of_list ts)
+              in
               let x = List.length diff.transactions in
               assert (x > 0) ;
               let expected_value =
@@ -1242,6 +1257,7 @@ let%test_module "test" =
 
     let%test_unit "Random workspec chunk doesn't send same things again" =
       (*Always at worst case number of provers*)
+      let logger = Logger.create () in
       Backtrace.elide := false ;
       let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
       let g = Int.gen_incl 1 p in
@@ -1253,7 +1269,9 @@ let%test_module "test" =
               let open Deferred.Let_syntax in
               let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
               let ts = List.take all_ts i in
-              let%map _, _ = create_and_apply lb (Sequence.of_list ts) in
+              let%map _, _ =
+                create_and_apply lb logger (Sequence.of_list ts)
+              in
               (* A bit of a roundabout way to check, but essentially, if it
                * does not give repeats then our loop will not iterate more than
                * parallelism times. See random work description for

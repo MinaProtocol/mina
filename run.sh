@@ -2,14 +2,16 @@
 
 
 #Test=coda-block-production-test
-Test=coda-shared-prefix-test
+#Test=coda-shared-prefix-test
+Test=coda-shared-state-test
 #Test=full-test
 #Test=coda-peers-test
 
 #Filter='^"module-membership" = "true"'
 #Filter='^"module-coda-peers-test" = "true"'
 #Filter='(level=fatal && ^"module-host: 127.0.0.1:23002" = "true" && ^"module" = "ledger_builder_controller") || ^"module-coda-shared-prefix-test" = "true"'
-Filter='(level=fatal && ^"module-host: 127.0.0.1:23002" = "true") || ^"module-coda-shared-prefix-test" = "true"'
+#Filter='(level=fatal && ^"module-host: 127.0.0.1:23002" = "true") || ^"module-coda-shared-prefix-test" = "true"'
+Filter='^"module-coda-shared-state-test" = "true" || level=fatal'
 #Filter='^"module-coda-shared-prefix-test" = "true"'
 #Filter='^"module-coda-block-production-test" = "true"'
 #Filter='^"module-coda-shared-prefix-test" = "true" || level=fatal'

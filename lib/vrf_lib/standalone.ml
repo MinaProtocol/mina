@@ -20,6 +20,8 @@ module Make
         module Checked : sig
           open Impl
 
+          val to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+
           module Assert : sig
             val equal : var -> var -> (unit, _) Checked.t
           end
@@ -39,35 +41,11 @@ module Make
 
       val typ : (var, t) Impl.Typ.t
 
-      module Checked : sig
-        open Impl
-
-        module Shifted : sig
-          open Impl
-
-          module type S =
-            Snarky.Curves.Shifted_intf
-            with type ('a, 'b) checked := ('a, 'b) Checked.t
-             and type boolean_var := Boolean.var
-             and type curve_var := var
-        end
-
-        val negate : var -> var
-
-        val scale_known :
-             (module Shifted.S with type t = 'shifted)
-          -> t
-          -> Scalar.var
-          -> init:'shifted
-          -> ('shifted, _) Checked.t
-
-        val scale :
-             (module Shifted.S with type t = 'shifted)
-          -> var
-          -> Scalar.var
-          -> init:'shifted
-          -> ('shifted, _) Checked.t
-      end
+      module Checked :
+        Snarky.Curves.Weierstrass_checked_intf
+        with module Impl := Impl
+         and type t := t
+         and type var := var
     end) (Message : sig
       open Impl
 
@@ -251,19 +229,24 @@ end = struct
           let%bind a =
             (* s * g - c * public_key *)
             let%bind sg =
-              Group.Checked.scale_known shifted Group.generator s
-                ~init:Shifted.zero
+              Group.Checked.scale_known shifted Group.generator
+                (Scalar.Checked.to_bits s) ~init:Shifted.zero
             in
-            Group.Checked.(scale shifted (negate public_key) c ~init:sg)
+            Group.Checked.(
+              scale shifted (negate public_key) (Scalar.Checked.to_bits c)
+                ~init:sg)
             >>= Shifted.unshift_nonzero
           and b =
             (* s * H(m) - c * scaled_message_hash *)
             let%bind sx =
               let%bind message_hash = Message.Checked.hash_to_group message in
-              Group.Checked.scale shifted message_hash s ~init:Shifted.zero
+              Group.Checked.scale shifted message_hash
+                (Scalar.Checked.to_bits s) ~init:Shifted.zero
             in
             Group.Checked.(
-              scale shifted (negate scaled_message_hash) c ~init:sx)
+              scale shifted
+                (negate scaled_message_hash)
+                (Scalar.Checked.to_bits c) ~init:sx)
             >>= Shifted.unshift_nonzero
           in
           Hash.Checked.hash_for_proof message public_key a b
@@ -377,6 +360,8 @@ let%test_module "vrf-test" =
           ~f:(fun x -> Other_impl.Bigint.(to_field (of_bignum_bigint x)))
 
       module Checked = struct
+        let to_bits xs = Bitstring_lib.Bitstring.Lsb_first.of_list xs
+
         module Assert = struct
           let equal = Bitstring_checked.Assert.equal
         end
@@ -504,13 +489,7 @@ let%test_module "vrf-test" =
                 (scale (scale generator a) b) ) )
 
       module Checked = struct
-        module Shifted = Curve.Checked.Shifted
-
-        let negate = Curve.Checked.negate
-
-        let scale_known = Curve.Checked.scale_known
-
-        let scale = Curve.Checked.scale_bits
+        include Curve.Checked
 
         let to_bits ((x, y): var) =
           let open Let_syntax in

@@ -40,6 +40,10 @@ public:
     G1_variable(protoboard<FieldT> &pb,
                 const libff::G1<other_curve<ppT> > &P,
                 const std::string &annotation_prefix);
+    G1_variable(protoboard<FieldT> &pb,
+                const pb_variable<FieldT> &X_var,
+                const pb_variable<FieldT> &Y_var,
+                const std::string &annotation_prefix);
 
     void generate_r1cs_witness(const libff::G1<other_curve<ppT> > &elt);
 

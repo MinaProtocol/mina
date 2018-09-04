@@ -91,10 +91,12 @@ let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 module Vrf =
   Vrf_lib.Integrated.Make (Snark_params.Tick)
     (struct
-      type var = Snark_params.Tick.Boolean.var list
+      type var =
+        Snark_params.Tick.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
     end)
     (struct
-      include Snark_params.Tick.Inner_curve.Checked
+      include Snark_params.Tick.Inner_curve
+      include Checked
 
       let scale_generator shifted s ~init =
         scale_known shifted Snark_params.Tick.Inner_curve.one s ~init

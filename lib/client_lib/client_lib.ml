@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Nanobit_base
+open Signature_lib
 
 module Send_transaction = struct
   type query = Transaction.Stable.V1.t [@@deriving bin_io]
