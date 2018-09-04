@@ -26,7 +26,7 @@ module Digest = struct
   let fold s =
     { Fold.fold=
         (fun ~init ~f ->
-          let n = String.length s in
+          let n = 8 * String.length s in
           let rec go acc i =
             if i = n then acc
             else
@@ -34,6 +34,32 @@ module Digest = struct
               go (f acc b) (i + 1)
           in
           go init 0 ) }
+
+  let length_in_bytes = 32
+
+  let length_in_bits = 8 * length_in_bytes
+
+  let length_in_triples = (length_in_bits + 2) / 3
+
+  let to_bits s =
+    List.init length_in_bits ~f:(fun i ->
+        (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 )
+
+  let gen = String.gen_with_length length_in_bytes Char.gen
+
+  let%test_unit "to_bits compatible with fold" =
+    Quickcheck.test gen ~f:(fun t ->
+      assert (Fold.to_list (fold t) = to_bits t))
+
+  let of_bits = Sha256_lib.Sha256.bits_to_string
+
+  let%test_unit "of_bits . to_bits = id" =
+    Quickcheck.test gen ~f:(fun t ->
+      assert (equal (of_bits (to_bits t)) t))
+
+  let%test_unit "to_bits . of_bits = id" =
+    Quickcheck.test (List.gen_with_length length_in_bits Bool.gen) ~f:(fun t ->
+      assert (to_bits (of_bits t) = t))
 
   let fold t = Fold.group3 ~default:false (fold t)
 
@@ -44,19 +70,11 @@ module Digest = struct
       Fold.(to_list (group3 ~default:Boolean.false_ (of_list t)))
   end
 
-  let length_in_bytes = 32
-
-  let length_in_bits = 8 * length_in_bytes
-
-  let length_in_triples = (length_in_bits + 2) / 3
-
   let typ =
     Typ.transport
       (Typ.list ~length:length_in_bits Boolean.typ)
-      ~there:(fun (s: t) ->
-        List.init length_in_bits ~f:(fun i ->
-            (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 ) )
-      ~back:Sha256_lib.Sha256.bits_to_string
+      ~there:to_bits
+      ~back:of_bits
 
   let default = String.init length_in_bytes ~f:(fun _ -> '\000')
 end

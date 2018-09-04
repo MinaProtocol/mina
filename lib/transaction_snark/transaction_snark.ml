@@ -407,9 +407,13 @@ module Base = struct
              provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
            in
            let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
+           let triples =
+             Sok_message.Digest.Checked.to_triples sok_digest
+             @ b1 @ b2
+             @ fee_excess
+           in
            Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark
-             ( Sok_message.Digest.Checked.to_triples sok_digest
-             @ b1 @ b2 @ fee_excess )
+             triples
            >>= Field.Checked.Assert.equal top_hash)
       in
       ())
@@ -492,7 +496,8 @@ module Merge = struct
   let disjoint_union_sections = function
     | [] -> failwith "empty list"
     | s :: ss ->
-        Checked.List.fold ~f:Pedersen.Checked.Section.disjoint_union_exn
+      Checked.List.fold ~f:(fun acc x ->
+        Pedersen.Checked.Section.disjoint_union_exn acc x)
           ~init:s ss
 
   module Verifier =
@@ -514,8 +519,11 @@ module Merge = struct
     in
     result
 
-  let input_triples_length_excluding_vk =
-    (2 * state_hash_size_in_triples) + Amount.Signed.length_in_triples
+  let vk_input_offset =
+    Hash_prefix.length_in_triples
+    + Sok_message.Digest.length_in_triples
+    + (2 * state_hash_size_in_triples)
+    + Amount.Signed.length_in_triples
 
   let construct_input_checked ~prefix
       ~(sok_digest: Sok_message.Digest.Checked.t) ~state1 ~state2 ~fee_excess
@@ -589,6 +597,9 @@ module Merge = struct
     let get_proof s = get_transition_data s |> Transition_data.proof |> snd in
     check_snark ~get_proof tock_vk tock_vk_data [input]
 
+  let state1_offset = Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
+  let state2_offset = state1_offset + state_hash_size_in_triples
+
   (* spec for [main top_hash]:
      constraints pass iff
      there exist digest, s1, s3, tock_vk such that
@@ -616,12 +627,12 @@ module Merge = struct
     in
     let%bind s1_section =
       let open Pedersen.Checked.Section in
-      extend empty ~start:Hash_prefix.length_in_triples (bits_to_triples s1)
+      extend empty ~start:state1_offset (bits_to_triples s1)
     in
     let%bind s3_section =
       let open Pedersen.Checked.Section in
       extend empty
-        ~start:(Hash_prefix.length_in_triples + state_hash_size_in_triples)
+        ~start:state2_offset
         (bits_to_triples s3)
     in
     let tock_vk_data =
@@ -632,8 +643,7 @@ module Merge = struct
         Verifier.Verification_key_data.Checked.to_bits tock_vk_data
       in
       Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
-        ~start:
-          (Hash_prefix.length_in_triples + input_triples_length_excluding_vk)
+        ~start:vk_input_offset
         (bits_to_triples bs)
     in
     let%bind () =
@@ -654,7 +664,7 @@ module Merge = struct
       let%bind s2_section =
         let open Pedersen.Checked.Section in
         extend empty
-          ~start:(Hash_prefix.length_in_triples + state_hash_size_in_triples)
+          ~start:state2_offset
           (bits_to_triples s2)
       in
       verify_transition tock_vk tock_vk_data tock_vk_section
@@ -662,7 +672,7 @@ module Merge = struct
     and verify_23 =
       let%bind s2_section =
         let open Pedersen.Checked.Section in
-        extend empty ~start:Hash_prefix.length_in_triples (bits_to_triples s2)
+        extend empty ~start:state1_offset (bits_to_triples s2)
       in
       verify_transition tock_vk tock_vk_data tock_vk_section
         Prover_state.transition23 s2_section s3_section fee_excess23
@@ -737,15 +747,16 @@ module Verification = struct
       Sok_message.Digest.equal t.sok_digest (Sok_message.digest message)
       && verify_against_digest t
 
-    (* The curve pt corresponding to H(merge_prefix, _, _, Amount.Signed.zero, wrap_vk)
+    (* The curve pt corresponding to H(merge_prefix, _digest, _, _, Amount.Signed.zero, wrap_vk)
     (with starting point shifted over by 2 * digest_size so that
-    this can then be used to compute H(merge_prefix, s1, s2, Amount.Signed.zero, wrap_vk) *)
+    this can then be used to compute H(merge_prefix, digest, s1, s2, Amount.Signed.zero, wrap_vk) *)
     let merge_prefix_and_zero_and_vk_curve_pt =
       let open Tick in
       let s =
         { Hash_prefix.merge_snark with
           triples_consumed=
             Hash_prefix.merge_snark.triples_consumed
+            + Sok_message.Digest.length_in_triples
             + (2 * state_hash_size_in_triples) }
       in
       let s =
@@ -756,7 +767,7 @@ module Verification = struct
       in
       let hash_interval = (0, Hash_prefix.length_in_triples) in
       let amount_begin =
-        Hash_prefix.length_in_triples + (2 * state_hash_size_in_triples)
+        Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples + (2 * state_hash_size_in_triples)
       in
       let amount_end = amount_begin + Amount.Signed.length_in_triples in
       let amount_interval = (amount_begin, amount_end) in
