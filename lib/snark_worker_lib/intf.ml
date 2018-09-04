@@ -87,7 +87,5 @@ module type S = sig
   val command : Command.t
 
   val arguments :
-       public_key:Public_key.Compressed.t
-    -> daemon_port:int
-    -> string list
+    public_key:Public_key.Compressed.t -> daemon_port:int -> string list
 end
