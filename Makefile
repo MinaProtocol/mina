@@ -113,57 +113,17 @@ test-all: | test-runtest \
 			test-sigs \
 			test-stakes 
 
-MYPROCS := $(shell nproc --all)
+test-runtest: SHELL := /bin/bash
 test-runtest:
-	$(WRAP) dune runtest --verbose -j$(MYPROCS)
+	source test_all.sh ; test_runtest
 
-SIGNATURE=CODA_CONSENSUS_MECHANISM=proof_of_signature
-test-sigs: | test-full-test-sig \
-			 test-coda-peers-test-sig \
-			 test-coda-block-production-test-sig \
-			 test-coda-shared-prefix-test-who-proposes-0-sig \
-			 test-coda-shared-prefix-test-who-proposes-1-sig \
-			 test-coda-shared-state-test-sig \
-			 test-transaction-snark-profiler-sig
+test-sigs: SHELL := /bin/bash
+test-sigs:
+	source test_all.sh ; test_method proof_of_signature
 
-test-full-test-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- full-test
-test-coda-peers-test-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- coda-peers-test
-test-coda-block-production-test-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- coda-block-production-test
-test-coda-shared-prefix-test-who-proposes-0-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- coda-shared-prefix-test -who-proposes 0
-test-coda-shared-prefix-test-who-proposes-1-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- coda-shared-prefix-test -who-proposes 1
-test-coda-shared-state-test-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- coda-shared-state-test
-test-transaction-snark-profiler-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- transaction-snark-profiler -check-only
-
-STAKE=CODA_CONSENSUS_MECHANISM=proof_of_stake
-test-stakes: | test-full-test-stake \
-			   test-coda-peers-test-stake \
-			   test-coda-block-production-test-stake \
-			   test-coda-shared-prefix-test-who-proposes-0-stake \
-			   test-coda-shared-prefix-test-who-proposes-1-stake \
-			   test-coda-shared-state-test-stake \
-			   test-transaction-snark-profiler-stake
-
-test-full-test-stake:
-	$(WRAP) $(STAKE) dune exec cli -- full-test
-test-coda-peers-test-stake:
-	$(WRAP) $(STAKE) dune exec cli -- coda-peers-test
-test-coda-block-production-test-stake:
-	$(WRAP) $(STAKE) dune exec cli -- coda-block-production-test
-test-coda-shared-prefix-test-who-proposes-0-stake:
-	$(WRAP) $(STAKE) dune exec cli -- coda-shared-prefix-test -who-proposes 0
-test-coda-shared-prefix-test-who-proposes-1-stake:
-	$(WRAP) $(STAKE) dune exec cli -- coda-shared-prefix-test -who-proposes 1
-test-coda-shared-state-test-stake:
-	$(WRAP) $(STAKE) dune exec cli -- coda-shared-state-test
-test-transaction-snark-profiler-stake:
-	$(WRAP) $(STAKE) dune exec cli -- transaction-snark-profiler -check-only
+test-stakes: SHELL := /bin/bash
+test-stakes:
+	source test_all.sh ; test_method proof_of_stake
 
 
 ########################################
