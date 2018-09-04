@@ -32,8 +32,8 @@ struct
         let%bind () =
           Deferred.List.all_unit
             (List.mapi workers ~f:(fun i worker ->
-                let update_block = ref 0 in
-                let last_balance = ref (Currency.Balance.of_int 0) in
+                 let update_block = ref 0 in
+                 let last_balance = ref (Currency.Balance.of_int 0) in
                  let%bind strongest_ledgers =
                    Coda_process.strongest_ledgers_exn worker
                  in
@@ -67,8 +67,7 @@ struct
                  in
                  don't_wait_for
                    (Linear_pipe.iter strongest_ledgers ~f:(fun (prev, curr) ->
-                        if i = 0 then(
-                        blocks := !blocks + 1 );
+                        if i = 0 then blocks := !blocks + 1 ;
                         let diff = !blocks - !update_block in
                         Logger.debug log "%d blocks/update_block diff %d %d %d"
                           i !blocks !update_block diff ;
