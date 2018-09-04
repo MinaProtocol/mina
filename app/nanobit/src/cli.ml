@@ -224,10 +224,13 @@ let () =
             Coda_shared_prefix_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_shared_state_test =
             Coda_shared_state_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
+          let module Coda_transitive_peers_test =
+            Coda_transitive_peers_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           [ (Coda_peers_test.name, Coda_peers_test.command)
           ; ( Coda_block_production_test.name
             , Coda_block_production_test.command )
           ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
+          ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
           ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
@@ -254,10 +257,13 @@ let () =
             Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           let module Coda_shared_state_test =
             Coda_shared_state_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
+          let module Coda_transitive_peers_test =
+            Coda_transitive_peers_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           [ (Coda_peers_test.name, Coda_peers_test.command)
           ; ( Coda_block_production_test.name
             , Coda_block_production_test.command )
           ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
+          ; (Coda_transitive_peers_test.name, Coda_transitive_peers_test.command)
           ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
