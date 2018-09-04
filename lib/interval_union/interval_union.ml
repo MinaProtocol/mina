@@ -36,7 +36,7 @@ let union_intervals_exn (a1, b1) (a2, b2) =
   else if b2 = a1 then `Combine (a2, b1)
   else if b1 < a2 then `Disjoint_ordered
   else if b2 < a1 then `Disjoint_inverted
-  else failwith "Intervals not disjoint"
+  else failwithf "Intervals not disjoint: (%d, %d) and (%d, %d)" a1 b1 a2 b2 ()
 
 let of_interval i = [i]
 
