@@ -145,11 +145,6 @@ struct
       create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
           let%map (module W) = Worker_state.get w in
           if Insecure.verify_blockchain then true else W.verify state proof )
-
-    let verify_transaction_snark =
-      create Transaction_snark.bin_t bin_bool (fun w proof ->
-          let%map (module W) = Worker_state.get w in
-          W.Transaction_snark.verify proof )
   end
 
   module Worker = struct
@@ -165,8 +160,7 @@ struct
               * Consensus_mechanism.Snark_transition.value
             , Blockchain.t )
             F.t
-        ; verify_blockchain: ('w, Blockchain.t, bool) F.t
-        ; verify_transaction_snark: ('w, Transaction_snark.t, bool) F.t }
+        ; verify_blockchain: ('w, Blockchain.t, bool) F.t }
 
       module Worker_state = Worker_state
 
@@ -190,8 +184,7 @@ struct
           let open Functions in
           { initialized= f initialized
           ; extend_blockchain= f extend_blockchain
-          ; verify_blockchain= f verify_blockchain
-          ; verify_transaction_snark= f verify_transaction_snark }
+          ; verify_blockchain= f verify_blockchain }
 
         let init_worker_state () = Worker_state.create ()
 
@@ -225,8 +218,4 @@ struct
   let verify_blockchain {connection; _} chain =
     Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
       ~arg:chain
-
-  let verify_transaction_snark {connection; _} snark =
-    Worker.Connection.run connection
-      ~f:Worker.functions.verify_transaction_snark ~arg:snark
 end

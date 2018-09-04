@@ -10,7 +10,13 @@ module Inputs = struct
     let worker_wait_time = 1.
   end
 
-  module Proof = Transaction_snark.Statement
+  module Proof = struct
+    type t =
+      Transaction_snark.Statement.t
+      * Nanobit_base.Sok_message.Digest.Stable.V1.t
+    [@@deriving bin_io]
+  end
+
   module Statement = Transaction_snark.Statement
 
   module Public_key = struct
@@ -22,8 +28,10 @@ module Inputs = struct
   module Super_transaction = Nanobit_base.Super_transaction
   module Sparse_ledger = Nanobit_base.Sparse_ledger
 
-  let perform_single () ~message:_ s =
-    Ok (Snark_work_lib.Work.Single.Spec.statement s)
+  let perform_single () ~message s =
+    Ok
+      ( Snark_work_lib.Work.Single.Spec.statement s
+      , Nanobit_base.Sok_message.digest message )
 end
 
 module Worker = Worker.Make (Inputs)
