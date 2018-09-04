@@ -978,7 +978,7 @@ module type S = sig
     -> Tick.Handler.t
     -> t
 
-  val merge : sok_digest:Sok_message.Digest.t -> t -> t -> t Or_error.t
+  val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
 let check_tagged_transaction sok_message source target transaction handler =
@@ -1082,7 +1082,7 @@ struct
   let of_fee_transfer ~sok_digest ~source ~target transfer handler =
     of_transition ~sok_digest ~source ~target (Fee_transfer transfer) handler
 
-  let merge ~sok_digest t1 t2 =
+  let merge t1 t2 ~sok_digest =
     if not (Ledger_hash.( = ) t1.target t2.source) then
       failwithf
         !"Transaction_snark.merge: t1.target <> t2.source \

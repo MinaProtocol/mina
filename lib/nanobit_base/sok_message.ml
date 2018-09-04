@@ -53,7 +53,7 @@ module Digest = struct
     Typ.transport
       (Typ.list ~length:length_in_bits Boolean.typ)
       ~there:(fun (s: t) ->
-        List.init 256 ~f:(fun i ->
+        List.init length_in_bits ~f:(fun i ->
             (Char.to_int s.[i / 8] lsr (7 - (i % 8))) land 1 = 1 ) )
       ~back:Sha256_lib.Sha256.bits_to_string
 

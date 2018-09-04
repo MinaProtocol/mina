@@ -157,7 +157,7 @@ module type S = sig
     -> Tick.Handler.t
     -> t
 
-  val merge : sok_digest:Sok_message.Digest.t -> t -> t -> t Or_error.t
+  val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
 val handle_with_ledger : Ledger.t -> Tick.Handler.t
