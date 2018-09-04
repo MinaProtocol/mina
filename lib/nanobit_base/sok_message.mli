@@ -3,6 +3,7 @@ open Snark_params
 open Tick
 open Fold_lib
 open Tuple_lib
+open Import
 
 type t = {fee: Currency.Fee.t; prover: Public_key.Compressed.t}
 [@@deriving bin_io]

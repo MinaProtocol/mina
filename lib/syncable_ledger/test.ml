@@ -41,7 +41,7 @@ module Make (Input : Input_intf) = struct
     let l1, _k1 = L.load_ledger num_accts 1 in
     let l2, _k2 = L.load_ledger num_accts 2 in
     let desired_root = L.merkle_root l2 in
-    let lsync = SL.create l1 desired_root in
+    let lsync = SL.create l1 in
     let qr = SL.query_reader lsync in
     let aw = SL.answer_writer lsync in
     let seen_queries = ref [] in
@@ -52,7 +52,7 @@ module Make (Input : Input_intf) = struct
            Linear_pipe.write aw (desired_root, answ) )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
-          SL.wait_until_valid lsync desired_root )
+          SL.fetch lsync desired_root )
     with
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
@@ -64,7 +64,7 @@ module Make (Input : Input_intf) = struct
     let l2, _k2 = L.load_ledger num_accts 2 in
     let l3, _k3 = L.load_ledger num_accts 3 in
     let desired_root = ref @@ L.merkle_root l2 in
-    let lsync = SL.create l1 !desired_root in
+    let lsync = SL.create l1 in
     let qr = SL.query_reader lsync in
     let aw = SL.answer_writer lsync in
     let seen_queries = ref [] in
@@ -91,7 +91,7 @@ module Make (Input : Input_intf) = struct
              res )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
-          SL.wait_until_valid lsync !desired_root )
+          SL.fetch lsync !desired_root )
     with
     | `Ok _ -> failwith "shouldn't happen"
     | `Target_changed ->
@@ -145,4 +145,40 @@ module TestL16_65536 = Make (Test_ledger.Make (struct
   let depth = 16
 
   let num_accts = 65536
+end))
+
+module TestDB3_3 = Make (Test_db.Make (struct
+  let depth = 3
+
+  let num_accts = 3
+end))
+
+module TestDB3_8 = Make (Test_db.Make (struct
+  let depth = 3
+
+  let num_accts = 7
+end))
+
+module TestDB16_20 = Make (Test_db.Make (struct
+  let depth = 16
+
+  let num_accts = 20
+end))
+
+module TestDB16_1024 = Make (Test_db.Make (struct
+  let depth = 16
+
+  let num_accts = 1024
+end))
+
+module TestDB16_1025 = Make (Test_db.Make (struct
+  let depth = 16
+
+  let num_accts = 80
+end))
+
+module TestDB16_65536 = Make (Test_db.Make (struct
+  let depth = 16
+
+  let num_accts = 65535
 end))

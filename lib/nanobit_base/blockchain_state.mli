@@ -58,7 +58,7 @@ val fold : t -> bool Triple.t Fold.t
 val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
 module Message :
-  Snarky.Signature.Message_intf
+  Signature_lib.Checked.Message_intf
   with type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
    and type boolean_var := Tick.Boolean.var
    and type curve_scalar := Inner_curve.Scalar.t
@@ -67,7 +67,7 @@ module Message :
    and type var = var
 
 module Signature :
-  Snarky.Signature.S
+  Signature_lib.Checked.S
   with type ('a, 'b) typ := ('a, 'b) Tick.Typ.t
    and type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
    and type boolean_var := Tick.Boolean.var

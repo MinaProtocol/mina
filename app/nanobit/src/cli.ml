@@ -187,7 +187,10 @@ let () =
               (* TODO: choose reasonable values *)
               let genesis_state_timestamp = Time.now ()
 
-              let genesis_ledger_total_currency = Currency.Amount.zero
+              let genesis_ledger_total_currency =
+                Nanobit_base.Genesis_ledger.total_currency
+
+              let genesis_ledger = Nanobit_base.Genesis_ledger.ledger
 
               let coinbase = Currency.Amount.of_int 20
 
@@ -219,9 +222,12 @@ let () =
             Coda_block_production_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_shared_prefix_test =
             Coda_shared_prefix_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
+          let module Coda_shared_state_test =
+            Coda_shared_state_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           [ (Coda_peers_test.name, Coda_peers_test.command)
           ; ( Coda_block_production_test.name
             , Coda_block_production_test.command )
+          ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
           ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
@@ -246,9 +252,12 @@ let () =
               (Coda) in
           let module Coda_shared_prefix_test =
             Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
+          let module Coda_shared_state_test =
+            Coda_shared_state_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           [ (Coda_peers_test.name, Coda_peers_test.command)
           ; ( Coda_block_production_test.name
             , Coda_block_production_test.command )
+          ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
           ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )

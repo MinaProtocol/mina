@@ -1,5 +1,6 @@
 open Core
 open Async
+open Signature_lib
 
 module type Inputs_intf = sig
   module Sparse_ledger : sig
@@ -86,7 +87,7 @@ module type S = sig
   val command : Command.t
 
   val arguments :
-       public_key:Nanobit_base.Public_key.Compressed.t
+       public_key:Public_key.Compressed.t
     -> daemon_port:int
     -> string list
 end

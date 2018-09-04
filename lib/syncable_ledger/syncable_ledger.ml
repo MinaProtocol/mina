@@ -3,18 +3,6 @@ open Async_kernel
 
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
-module type Hash_intf = sig
-  type t [@@deriving sexp, hash, compare, bin_io, eq]
-
-  type account
-
-  val empty_hash : t
-
-  val merge : height:int -> t -> t -> t
-
-  val hash_account : account -> t
-end
-
 module type Merkle_tree_intf = sig
   type root_hash
 
@@ -81,7 +69,7 @@ module type S = sig
     val answer_query : t -> query -> answer
   end
 
-  val create : merkle_tree -> root_hash -> t
+  val create : merkle_tree -> t
 
   val answer_writer : t -> (root_hash * answer) Linear_pipe.Writer.t
 
@@ -92,6 +80,9 @@ module type S = sig
   val new_goal : t -> root_hash -> unit
 
   val wait_until_valid :
+    t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
+
+  val fetch :
     t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
 
   val apply_or_queue_diff : t -> diff -> unit
@@ -112,9 +103,9 @@ module type Validity_intf = sig
 
   type hash' = hash_status * hash
 
-  val create : hash -> t
+  val create : unit -> t
 
-  val set : t -> addr -> hash' -> unit
+  val set : t -> addr -> hash' -> bool
 
   val get : t -> addr -> hash' option
 
@@ -177,11 +168,16 @@ with the hashes in the bottomost N-1 internal nodes).
 module Make
     (Addr : Merkle_address.S) (Account : sig
         type t [@@deriving bin_io, sexp]
-    end)
-    (Hash : Hash_intf with type account := Account.t) (Root_hash : sig
-        type t [@@deriving eq]
+    end) (Hash : sig
+      type t [@@deriving bin_io, sexp, eq]
 
-        val to_hash : t -> Hash.t
+      include Merkle_ledger.Intf.Hash
+              with type account := Account.t
+               and type t := t
+    end) (Root_hash : sig
+      type t [@@deriving eq]
+
+      val to_hash : t -> Hash.t
     end)
     (MT : Merkle_tree_intf
           with type hash := Hash.t
@@ -215,7 +211,7 @@ struct
 
     type t = tree ref [@@deriving sexp]
 
-    let create h = ref (Leaf (Some (Stale, h)))
+    let create () = ref (Leaf None)
 
     let set t a (s, h) =
       let rec go node dirs depth =
@@ -230,7 +226,7 @@ struct
                   "why are we descending into the children of a fresh leaf?"
             | Leaf None ->
                 failwith
-                  "why are we descending into an `Unknown? take care of this \
+                  "why are we descending into the unknown? take care of this \
                    leaf first"
             | Leaf (Some (Stale, l)) ->
                 (* otherwise we'd have to synthesize hashes *)
@@ -238,7 +234,7 @@ struct
                 node := Node ((Stale, l), ref (Leaf None), ref (Leaf None)) ;
                 go node dirs depth
             | Node (_, l, r) ->
-                go (accessor (l, r)) ds (depth + 1) ;
+                let res = go (accessor (l, r)) ds (depth + 1) in
                 match !node with
                 | Node
                     ( (Stale, h)
@@ -249,10 +245,19 @@ struct
                     let mh =
                       Hash.merge ~height:(max 0 (MT.depth - depth - 1)) lh rh
                     in
-                    if Hash.equal mh h then node := Leaf (Some (Fresh, h))
-                    else ()
-                | _ -> () )
-        | [] -> node := Leaf (Some (s, h))
+                    if Hash.equal mh h then (
+                      node := Leaf (Some (Fresh, h)) ;
+                      res )
+                    else res
+                | _ -> res )
+        | [] ->
+            let changed =
+              match !node with
+              | Leaf (Some (s', _)) | Node ((s', _), _, _) -> s = s'
+              | _ -> false
+            in
+            node := Leaf (Some (s, h)) ;
+            changed
       in
       go t (Addr.dirs_from_root a) 0
 
@@ -314,7 +319,7 @@ struct
   type waiting = {expected: Hash.t; children: (Addr.t * Hash.t) list}
 
   type t =
-    { mutable desired_root: Root_hash.t
+    { mutable desired_root: Root_hash.t option
     ; tree: MT.t
     ; mutable validity: Valid.t
     ; answers: (Root_hash.t * answer) Linear_pipe.Reader.t
@@ -324,6 +329,8 @@ struct
     ; waiting_parents: waiting Addr.Table.t
     ; waiting_content: Hash.t Addr.Table.t
     ; mutable validity_listener: [`Ok | `Target_changed] Ivar.t }
+
+  let desired_root_exn {desired_root; _} = desired_root |> Option.value_exn
 
   let destroy t =
     Linear_pipe.close_read t.answers ;
@@ -351,6 +358,12 @@ struct
     Addr.Table.remove t.waiting_content addr ;
     Ok expected
 
+  let validity_changed_at t a =
+    (* TODO #537: This is probably obnoxiously slow. *)
+    let filter a' = not @@ Addr.is_parent_of a ~maybe_child:a' in
+    Addr.Table.filter_keys_inplace t.waiting_content ~f:filter ;
+    Addr.Table.filter_keys_inplace t.waiting_parents ~f:filter
+
   let add_child_hash_to :
          t
       -> Addr.t
@@ -374,10 +387,12 @@ struct
       (* we check the validity tree first because the underlying MT hashes might not be current *)
       if should_skip then []
       else if Hash.equal (MT.get_inner_hash_at_addr_exn t.tree addr) hash then (
-        Valid.set t.validity addr (Fresh, hash) ;
+        if Valid.set t.validity addr (Fresh, hash) then
+          validity_changed_at t addr ;
         [] )
       else (
-        Valid.set t.validity addr (Stale, hash) ;
+        if Valid.set t.validity addr (Stale, hash) then
+          validity_changed_at t addr ;
         [(addr, hash)] )
     in
     match children with
@@ -395,7 +410,7 @@ struct
     | _ -> `More
 
   let all_done t res =
-    if not (Root_hash.equal (MT.merkle_root t.tree) t.desired_root) then
+    if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
     else (
       destroy t ;
@@ -406,7 +421,7 @@ struct
     let rec go prev ctr =
       if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
     in
-    go Hash.empty_hash 0
+    go Hash.empty 0
 
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
@@ -422,22 +437,22 @@ struct
     if Addr.depth addr >= MT.depth - Subtree_height.subtree_height then (
       expect_content t addr exp_hash ;
       Linear_pipe.write_without_pushback t.queries
-        (t.desired_root, What_contents addr) )
+        (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
       Linear_pipe.write_without_pushback t.queries
-        (t.desired_root, What_hash (Addr.child_exn addr Direction.Left)) ;
+        (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Left)) ;
       Linear_pipe.write_without_pushback t.queries
-        (t.desired_root, What_hash (Addr.child_exn addr Direction.Right)) )
+        (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
 
   let num_accounts t n content_hash =
-    let rh = Root_hash.to_hash t.desired_root in
+    let rh = Root_hash.to_hash (desired_root_exn t) in
     let height = Int.ceil_log2 n in
     if not (Hash.equal (complete_with_empties content_hash height MT.depth) rh)
     then failwith "reported content hash doesn't match desired root hash!" ;
     Addr.Table.clear t.waiting_parents ;
     Addr.Table.clear t.waiting_content ;
-    Valid.set t.validity (Addr.root ()) (Stale, rh) ;
+    Valid.set t.validity (Addr.root ()) (Stale, rh) |> ignore ;
     handle_node t (Addr.root ()) rh
 
   (* Assumption: only ever one answer is received for a given query
@@ -446,7 +461,7 @@ struct
      node to never be verified *)
   let main_loop t =
     let handle_answer (root_hash, a) =
-      if not (Root_hash.equal root_hash t.desired_root) then ()
+      if not (Root_hash.equal root_hash (desired_root_exn t)) then ()
       else
         let res =
           match a with
@@ -467,7 +482,7 @@ struct
                 failwith "figure out how to handle peers lying" )
           | Contents_are (addr, leafs) ->
               let subtree_hash = add_content t addr leafs |> Or_error.ok_exn in
-              Valid.set t.validity addr (Fresh, subtree_hash)
+              Valid.set t.validity addr (Fresh, subtree_hash) |> ignore
           | Num_accounts (n, h) -> num_accounts t n h
         in
         if Valid.completely_fresh t.validity then all_done t res else res
@@ -477,18 +492,26 @@ struct
   let new_goal t h =
     Ivar.fill_if_empty t.validity_listener `Target_changed ;
     t.validity_listener <- Ivar.create () ;
-    t.desired_root <- h ;
+    t.desired_root <- Some h ;
+    Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h) |> ignore ;
     Linear_pipe.write_without_pushback t.queries (h, Num_accounts)
 
-  let create mt h =
+  let wait_until_valid t h =
+    if not (Root_hash.equal h (desired_root_exn t)) then return `Target_changed
+    else
+      Deferred.map (Ivar.read t.validity_listener) ~f:(function
+        | `Target_changed -> `Target_changed
+        | `Ok -> `Ok t.tree )
+
+  let fetch t rh = new_goal t rh ; wait_until_valid t rh
+
+  let create mt =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
-      { desired_root= h
+      { desired_root= None
       ; tree= mt
-      ; validity=
-          Valid.create (Root_hash.to_hash h)
-          (* this gets tossed and remade when we hear Num_accounts *)
+      ; validity= Valid.create ()
       ; answers= ar
       ; answer_writer= aw
       ; queries= qw
@@ -497,16 +520,8 @@ struct
       ; waiting_content= Addr.Table.create ()
       ; validity_listener= Ivar.create () }
     in
-    new_goal t h ;
     don't_wait_for (main_loop t) ;
     t
-
-  let wait_until_valid t h =
-    if not (Root_hash.equal h t.desired_root) then return `Target_changed
-    else
-      Deferred.map (Ivar.read t.validity_listener) ~f:(function
-        | `Target_changed -> `Target_changed
-        | `Ok -> `Ok t.tree )
 
   let apply_or_queue_diff _ _ =
     (* Need some interface for the diffs, not sure the layering is right here. *)

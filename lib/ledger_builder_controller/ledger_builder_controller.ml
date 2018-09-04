@@ -78,9 +78,6 @@ module type Inputs_intf = sig
 
     (* This checks the SNARKs in State/LB and does the transition *)
 
-    val step :
-      Consensus_state.value -> Consensus_state.value Deferred.Or_error.t
-
     val select :
       Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
   end
@@ -141,7 +138,7 @@ module type Inputs_intf = sig
       val answer_query : t -> query -> answer
     end
 
-    val create : Ledger.t -> Ledger_hash.t -> t
+    val create : Ledger.t -> t
 
     val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
 
@@ -149,9 +146,7 @@ module type Inputs_intf = sig
 
     val destroy : t -> unit
 
-    val new_goal : t -> Ledger_hash.t -> unit
-
-    val wait_until_valid :
+    val fetch :
       t -> Ledger_hash.t -> [`Ok of Ledger.t | `Target_changed] Deferred.t
   end
 
@@ -251,7 +246,7 @@ end = struct
               |> Blockchain_state.ledger_hash
         in
         let ledger_builder_hash = Ledger_builder.hash tip.ledger_builder in
-        let%bind () =
+        let%map () =
           if
             verified
             && Ledger_builder_hash.equal ledger_builder_hash
@@ -265,15 +260,6 @@ end = struct
                  (new_state |> Protocol_state.previous_state_hash)
           then Deferred.return (Ok ())
           else Deferred.Or_error.error_string "TODO: Punish"
-        in
-        let%map consensus_state =
-          Consensus_mechanism.step (Protocol_state.consensus_state new_state)
-        in
-        let new_state =
-          Protocol_state.create_value
-            ~previous_state_hash:(Protocol_state.previous_state_hash new_state)
-            ~blockchain_state:(Protocol_state.blockchain_state new_state)
-            ~consensus_state
         in
         { tip with
           protocol_state= new_state
@@ -338,6 +324,7 @@ end = struct
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder = Ledger_builder
       module Protocol_state_proof = Protocol_state_proof
+      module Consensus_mechanism = Consensus_mechanism
       module Protocol_state = Protocol_state
       module External_transition = External_transition
       module Tip = Tip
@@ -372,24 +359,7 @@ end = struct
 
   let create (config: Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
-    let storage_controller =
-      Store.Controller.create ~parent_log:log
-        [%bin_type_class : Transition_logic_state.t]
-    in
-    let%bind state =
-      match%map Store.load storage_controller config.disk_location with
-      | Ok state -> state
-      | Error (`IO_error e) ->
-          Logger.info log "Ledger failed to load from storage %s; recreating"
-            (Error.to_string_hum e) ;
-          Transition_logic_state.create config.genesis_tip
-      | Error `No_exist ->
-          Logger.info log "Ledger doesn't exist in storage; recreating" ;
-          Transition_logic_state.create config.genesis_tip
-      | Error `Checksum_no_match ->
-          Logger.warn log "Checksum failed when loading ledger, recreating" ;
-          Transition_logic_state.create config.genesis_tip
-    in
+    let state = Transition_logic_state.create config.genesis_tip in
     let%map net = config.net_deferred in
     let net = Net.create net in
     let catchup = Catchup.create net log in
@@ -424,13 +394,11 @@ end = struct
                     ( new_state |> Transition_logic_state.longest_branch_tip
                     |> Tip.state ))
              then
-               let lb =
-                 (new_state |> Transition_logic_state.longest_branch_tip)
-                   .ledger_builder
-               in
+               let tip = Transition_logic_state.longest_branch_tip new_state in
                Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-                 strongest_ledgers_reader (lb, transition) ) ;
-           Store.store storage_controller config.disk_location new_state )) ;
+                 strongest_ledgers_reader
+                 (tip.ledger_builder, transition) ) ;
+           Deferred.return () )) ;
     (* Handle new transitions *)
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
@@ -632,8 +600,6 @@ let%test_module "test" =
       module Consensus_mechanism = struct
         module Consensus_state = Consensus_mechanism_state
 
-        let step = Deferred.Or_error.return
-
         let select Consensus_state.({strength= s1})
             Consensus_state.({strength= s2}) =
           if s1 >= s2 then `Keep else `Take
@@ -697,7 +663,7 @@ let%test_module "test" =
               (Ledger_hash.t * query) Linear_pipe.Reader.t
               * (Ledger_hash.t * query) Linear_pipe.Writer.t }
 
-        let create ledger _goal =
+        let create ledger =
           let t =
             { ledger
             ; answer_pipe= Linear_pipe.create ()
@@ -715,9 +681,7 @@ let%test_module "test" =
 
         let destroy _t = ()
 
-        let new_goal _t _h = ()
-
-        let wait_until_valid t _h = return (`Ok t.ledger)
+        let fetch t _h = return (`Ok t.ledger)
       end
 
       module Store = Storage.Memory

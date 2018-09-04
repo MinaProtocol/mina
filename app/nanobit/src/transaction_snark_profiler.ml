@@ -1,4 +1,5 @@
 open Core
+open Signature_lib
 open Nanobit_base
 open Snark_params
 
@@ -7,7 +8,7 @@ let create_ledger_and_transactions num_transitions =
   let num_accounts = 4 in
   let ledger = Ledger.create () in
   let keys =
-    Array.init num_accounts ~f:(fun _ -> Signature_keypair.create ())
+    Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
   in
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
@@ -16,7 +17,7 @@ let create_ledger_and_transactions num_transitions =
         ; balance= Currency.Balance.of_int 10_000
         ; receipt_chain_hash= Receipt.Chain_hash.empty
         ; nonce= Account.Nonce.zero } ) ;
-  let txn from_kp (to_kp: Signature_keypair.t) amount fee nonce =
+  let txn from_kp (to_kp: Signature_lib.Keypair.t) amount fee nonce =
     let payload : Transaction.Payload.t =
       {receiver= Public_key.compress to_kp.public_key; fee; amount; nonce}
     in

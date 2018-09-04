@@ -1,4 +1,5 @@
 open Core
+open Signature_lib
 
 let int16 =
   let max_port = 1 lsl 16 in
@@ -29,30 +30,27 @@ end
 
 let public_key_compressed =
   let module Pk = Key_arg_type (struct
-    open Nanobit_base
     include Public_key.Compressed
 
     let name = "public key"
 
-    let random () =
-      Public_key.compress (Signature_keypair.create ()).public_key
+    let random () = Public_key.compress (Keypair.create ()).public_key
   end) in
   Pk.arg_type
 
 let public_key =
-  Command.Arg_type.map public_key_compressed
-    ~f:Nanobit_base.Public_key.decompress_exn
+  Command.Arg_type.map public_key_compressed ~f:Public_key.decompress_exn
 
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
 let private_key =
   let module Sk = Key_arg_type (struct
-    include Nanobit_base.Private_key
+    include Private_key
 
     let name = "private key"
 
-    let random () = (Nanobit_base.Signature_keypair.create ()).private_key
+    let random () = Private_key.create ()
   end) in
   Sk.arg_type
 

@@ -1,16 +1,16 @@
 open Core_kernel
 open Async_kernel
+open Snark_params
 
 module T = struct
-  type t = Snark_params.Tick.Inner_curve.Scalar.t [@@deriving bin_io, sexp]
+  type t = Tick.Inner_curve.Scalar.t [@@deriving bin_io, sexp]
 end
 
 include T
 
 let create () =
-  if Insecure.private_key_generation then
-    Snark_params.Tick.Inner_curve.Scalar.random ()
-  else failwith "Insecure.private_key_generation"
+  (* This calls into libsnark which uses /dev/urandom *)
+  Tick.Inner_curve.Scalar.random ()
 
 let gen =
   let open Bignum_bigint in

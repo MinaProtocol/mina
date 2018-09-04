@@ -2,6 +2,7 @@ open Core
 open Snark_params
 open Tick
 open Fold_lib
+open Import
 
 module T = struct
   type t =

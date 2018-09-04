@@ -20,7 +20,7 @@ module Inputs = struct
   module Statement = Transaction_snark.Statement
 
   module Public_key = struct
-    include Nanobit_base.Public_key.Compressed
+    include Signature_lib.Public_key.Compressed
 
     let arg_type = Cli_lib.public_key_compressed
   end

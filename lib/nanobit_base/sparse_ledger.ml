@@ -1,4 +1,5 @@
 open Core
+open Import
 open Snark_params.Tick
 
 include Sparse_ledger_lib.Sparse_ledger.Make (struct

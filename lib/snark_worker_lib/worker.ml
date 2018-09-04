@@ -105,7 +105,7 @@ struct
 
   let arguments ~public_key ~daemon_port =
     [ "-public-key"
-    ; Nanobit_base.Public_key.Compressed.to_base64 public_key
+    ; Signature_lib.Public_key.Compressed.to_base64 public_key
     ; "-daemon-port"
     ; Int.to_string daemon_port ]
 end
