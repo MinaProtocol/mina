@@ -48,18 +48,16 @@ module Digest = struct
   let gen = String.gen_with_length length_in_bytes Char.gen
 
   let%test_unit "to_bits compatible with fold" =
-    Quickcheck.test gen ~f:(fun t ->
-      assert (Fold.to_list (fold t) = to_bits t))
+    Quickcheck.test gen ~f:(fun t -> assert (Fold.to_list (fold t) = to_bits t))
 
   let of_bits = Sha256_lib.Sha256.bits_to_string
 
   let%test_unit "of_bits . to_bits = id" =
-    Quickcheck.test gen ~f:(fun t ->
-      assert (equal (of_bits (to_bits t)) t))
+    Quickcheck.test gen ~f:(fun t -> assert (equal (of_bits (to_bits t)) t))
 
   let%test_unit "to_bits . of_bits = id" =
     Quickcheck.test (List.gen_with_length length_in_bits Bool.gen) ~f:(fun t ->
-      assert (to_bits (of_bits t) = t))
+        assert (to_bits (of_bits t) = t) )
 
   let fold t = Fold.group3 ~default:false (fold t)
 
@@ -73,8 +71,7 @@ module Digest = struct
   let typ =
     Typ.transport
       (Typ.list ~length:length_in_bits Boolean.typ)
-      ~there:to_bits
-      ~back:of_bits
+      ~there:to_bits ~back:of_bits
 
   let default = String.init length_in_bytes ~f:(fun _ -> '\000')
 end

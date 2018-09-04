@@ -409,11 +409,9 @@ module Base = struct
            let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
            let triples =
              Sok_message.Digest.Checked.to_triples sok_digest
-             @ b1 @ b2
-             @ fee_excess
+             @ b1 @ b2 @ fee_excess
            in
-           Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark
-             triples
+           Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark triples
            >>= Field.Checked.Assert.equal top_hash)
       in
       ())
@@ -496,8 +494,8 @@ module Merge = struct
   let disjoint_union_sections = function
     | [] -> failwith "empty list"
     | s :: ss ->
-      Checked.List.fold ~f:(fun acc x ->
-        Pedersen.Checked.Section.disjoint_union_exn acc x)
+        Checked.List.fold
+          ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
           ~init:s ss
 
   module Verifier =
@@ -520,8 +518,7 @@ module Merge = struct
     result
 
   let vk_input_offset =
-    Hash_prefix.length_in_triples
-    + Sok_message.Digest.length_in_triples
+    Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
     + (2 * state_hash_size_in_triples)
     + Amount.Signed.length_in_triples
 
@@ -597,7 +594,9 @@ module Merge = struct
     let get_proof s = get_transition_data s |> Transition_data.proof |> snd in
     check_snark ~get_proof tock_vk tock_vk_data [input]
 
-  let state1_offset = Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
+  let state1_offset =
+    Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
+
   let state2_offset = state1_offset + state_hash_size_in_triples
 
   (* spec for [main top_hash]:
@@ -631,9 +630,7 @@ module Merge = struct
     in
     let%bind s3_section =
       let open Pedersen.Checked.Section in
-      extend empty
-        ~start:state2_offset
-        (bits_to_triples s3)
+      extend empty ~start:state2_offset (bits_to_triples s3)
     in
     let tock_vk_data =
       Verifier.Verification_key.Checked.to_full_data tock_vk
@@ -643,8 +640,7 @@ module Merge = struct
         Verifier.Verification_key_data.Checked.to_bits tock_vk_data
       in
       Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
-        ~start:vk_input_offset
-        (bits_to_triples bs)
+        ~start:vk_input_offset (bits_to_triples bs)
     in
     let%bind () =
       let%bind total_fees =
@@ -663,9 +659,7 @@ module Merge = struct
     and verify_12 =
       let%bind s2_section =
         let open Pedersen.Checked.Section in
-        extend empty
-          ~start:state2_offset
-          (bits_to_triples s2)
+        extend empty ~start:state2_offset (bits_to_triples s2)
       in
       verify_transition tock_vk tock_vk_data tock_vk_section
         Prover_state.transition12 s1_section s2_section fee_excess12
@@ -767,7 +761,8 @@ module Verification = struct
       in
       let hash_interval = (0, Hash_prefix.length_in_triples) in
       let amount_begin =
-        Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples + (2 * state_hash_size_in_triples)
+        Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
+        + (2 * state_hash_size_in_triples)
       in
       let amount_end = amount_begin + Amount.Signed.length_in_triples in
       let amount_interval = (amount_begin, amount_end) in
