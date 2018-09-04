@@ -6,6 +6,12 @@
   (flags (:standard -short-paths -warn-error -32))
   (inline_tests)
   (library_flags (-linkall))
-  (libraries (core_kernel nanobit_base snark_params rc_pool test_util))
+  (libraries
+    ( core_kernel
+      nanobit_base
+      snark_params
+      rc_pool
+      test_util
+      vrf_lib))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Consensus mechanisms")))

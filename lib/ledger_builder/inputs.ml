@@ -26,12 +26,15 @@ module type S = sig
     type t
   end
 
+  module Sok_message :
+    Sok_message_intf with type public_key_compressed := Compressed_public_key.t
+
   module Ledger_proof : sig
     include Coda_pow.Ledger_proof_intf
             with type statement := Ledger_proof_statement.t
-             and type message := Fee.Unsigned.t * Compressed_public_key.t
              and type ledger_hash := Ledger_hash.t
              and type proof := Proof.t
+             and type sok_digest := Sok_message.Digest.t
 
     include Binable.S with type t := t
 
@@ -41,7 +44,7 @@ module type S = sig
   module Ledger_proof_verifier :
     Ledger_proof_verifier_intf
     with type statement := Ledger_proof_statement.t
-     and type message := Fee.Unsigned.t * Compressed_public_key.t
+     and type message := Sok_message.t
      and type ledger_proof := Ledger_proof.t
 
   module Ledger :

@@ -235,11 +235,10 @@ let () =
       let module Kernel =
         Make_kernel (Ledger_proof.Debug) (Consensus_mechanism.Make) in
       let module Coda = struct
-        type ledger_proof = Ledger_proof_statement.t
+        type ledger_proof = Ledger_proof.Debug.t
 
         module Make
-            (Init : Init_intf
-                    with type Ledger_proof.t = Ledger_proof_statement.t)
+            (Init : Init_intf with type Ledger_proof.t = Ledger_proof.Debug.t)
             () =
           Coda_without_snark (Init) ()
       end in

@@ -7,12 +7,12 @@ let int16 =
       if 0 <= x && x < max_port then x
       else failwithf "Port not between 0 and %d" max_port () )
 
-let base64_of_binable m x = B64.encode (Binable.to_string m x)
-
-let binable_of_base64 m s = Binable.of_string m (B64.decode s)
-
 module Key_arg_type (Key : sig
-  include Binable.S
+  type t
+
+  val of_base64_exn : string -> t
+
+  val to_base64 : t -> string
 
   val name : string
 
@@ -21,10 +21,10 @@ end) =
 struct
   let arg_type =
     Command.Arg_type.create (fun s ->
-        try binable_of_base64 (module Key) s with e ->
+        try Key.of_base64_exn s with e ->
           failwithf "Couldn't read %s %s -- here's a sample one: %s" Key.name
             (Error.to_string_hum (Error.of_exn e))
-            (base64_of_binable (module Key) (Key.random ()))
+            (Key.to_base64 (Key.random ()))
             () )
 end
 
