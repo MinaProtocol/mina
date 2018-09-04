@@ -52,7 +52,7 @@ struct
 
                let key_to_bool_list =
                  let open B.Step_base.Verifier.Verification_key_data in
-                 Fn.compose to_bits of_verification_key
+                 Fn.compose to_bits full_data_of_verification_key
 
                let input = B.wrap_input
              end) in
