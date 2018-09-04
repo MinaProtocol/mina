@@ -118,7 +118,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
                   Hash_prefix.transition_system_snark
                   Fold.(
                     Step.Verifier.Verification_key_data.(
-                      to_bits (of_verification_key wrap_vk))
+                      to_bits (full_data_of_verification_key wrap_vk))
                     |> of_list |> group3 ~default:false)
               in
               fun state ->
@@ -129,7 +129,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
             module Verification_key = struct
               let to_bool_list =
                 let open Step.Verifier.Verification_key_data in
-                Fn.compose to_bits of_verification_key
+                Fn.compose to_bits full_data_of_verification_key
             end
 
             let main x =

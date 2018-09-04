@@ -111,21 +111,22 @@ r1cs_se_ppzksnark_verification_key_variable<ppT>::r1cs_se_ppzksnark_verification
     this->G_gamma.reset(new G1_variable<ppT>(pb, FMT(annotation_prefix, " G_gamma")));
     this->H_gamma.reset(new G2_variable<ppT>(pb, FMT(annotation_prefix, " H_gamma")));
     this->G_alpha_H_beta_inv.reset(new Fqk_variable<ppT>(pb, FMT(annotation_prefix,  "G_alpha_H_beta_inv")));
-    // assert(all_bits.size() == (G1_variable<ppT>::size_in_bits() * num_G1 + G2_variable<ppT>::size_in_bits() * num_G2));
 
-    all_G1_vars = { this->G_alpha, this->G_gamma };
-    all_G2_vars = { this->H, this->H_beta, this->H_gamma };
-    all_GT_vars = { this->G_alpha_H_beta_inv };
-
+    all_G1_vars = { };
     this->query.resize(input_size);
     this->query_base.reset(new G1_variable<ppT>(pb, FMT(annotation_prefix, " query_base")));
-    this->all_G1_vars.emplace_back(this->query_base);
+    all_G1_vars.emplace_back(this->query_base);
 
     for (size_t i = 0; i < input_size; ++i)
     {
         this->query[i].reset(new G1_variable<ppT>(pb, FMT(annotation_prefix, " query_%zu", i)));
         all_G1_vars.emplace_back(this->query[i]);
     }
+    all_G1_vars.emplace_back(this->G_alpha);
+    all_G1_vars.emplace_back(this->G_gamma);
+
+    all_G2_vars = { this->H, this->H_beta, this->H_gamma };
+    all_GT_vars = { this->G_alpha_H_beta_inv };
 
     for (auto &G1_var : all_G1_vars)
     {
@@ -155,21 +156,20 @@ void r1cs_se_ppzksnark_verification_key_variable<ppT>::generate_r1cs_witness(con
     std::vector<libff::G2<other_curve<ppT> > > G2_elems;
     std::vector<libff::Fqk<other_curve<ppT>>> GT_elems;
 
-    G1_elems = { vk.G_alpha, vk.G_gamma };
-    G2_elems = { vk.H, vk.H_beta, vk.H_gamma };
-
-    // TODO: We should really have this take a processed verification key so we don't have
-    // to do a pairing here (or just stick the final exp'd value in the vk, which is probably
-    // better anyway).
-    libff::Fqk< other_curve<ppT> > G_alpha_H_beta_inv = vk.G_alpha_H_beta.unitary_inverse();
-    GT_elems = { G_alpha_H_beta_inv };
-
+    G1_elems = {};
     assert(vk.query.size() == input_size + 1);
     G1_elems.emplace_back(vk.query[0]);
     for (size_t i = 0; i < input_size; ++i)
     {
         G1_elems.emplace_back(vk.query[i+1]);
     }
+    G1_elems.emplace_back(vk.G_alpha);
+    G1_elems.emplace_back(vk.G_gamma);
+
+    G2_elems = { vk.H, vk.H_beta, vk.H_gamma };
+
+    libff::Fqk< other_curve<ppT> > G_alpha_H_beta_inv = vk.G_alpha_H_beta.unitary_inverse();
+    GT_elems = { G_alpha_H_beta_inv };
 
     assert(G1_elems.size() == all_G1_vars.size());
     assert(G2_elems.size() == all_G2_vars.size());
@@ -284,15 +284,9 @@ r1cs_se_ppzksnark_online_verifier_gadget<ppT>::r1cs_se_ppzksnark_online_verifier
                                                                                   const pb_variable<FieldT> &result,
                                                                                   const std::string &annotation_prefix) :
     gadget<FieldT>(pb, annotation_prefix),
-    pvk(pvk),
-    input(input),
-    elt_size(elt_size),
-    proof(proof),
-    result(result),
     input_len(input.size())
 {
     // accumulate input and store base in acc
-    // TODO: Check why base (i.e., pvk.query[0]) goes in this vector
     acc.reset(new G1_variable<ppT>(pb, FMT(annotation_prefix, " acc")));
     std::vector<G1_variable<ppT> > IC_terms;
     for (size_t i = 0; i < pvk.query.size(); ++i)
@@ -301,7 +295,47 @@ r1cs_se_ppzksnark_online_verifier_gadget<ppT>::r1cs_se_ppzksnark_online_verifier
     }
     accumulate_input.reset(
         new G1_multiscalar_mul_gadget<ppT>(pb, *(pvk.query_base), input, elt_size, IC_terms, *acc, FMT(annotation_prefix, " accumulate_input")));
+    accumulated_verifier.reset(
+        new r1cs_se_ppzksnark_accumulated_online_verifier_gadget<ppT>(
+          pb, pvk, *acc, proof, result, FMT(annotation_prefix, " accumulated_verifier")));
+}
 
+template<typename ppT>
+void r1cs_se_ppzksnark_online_verifier_gadget<ppT>::generate_r1cs_constraints()
+{
+    PROFILE_CONSTRAINTS(this->pb, "accumulate verifier input")
+    {
+        libff::print_indent(); printf("* Number of bits as an input to verifier gadget: %zu\n", input_len);
+        accumulate_input->generate_r1cs_constraints();
+    }
+
+    PROFILE_CONSTRAINTS(this->pb, "rest of the verifier")
+    {
+        accumulated_verifier->generate_r1cs_constraints();
+    }
+}
+
+template<typename ppT>
+void r1cs_se_ppzksnark_online_verifier_gadget<ppT>::generate_r1cs_witness()
+{
+    accumulate_input->generate_r1cs_witness();
+    accumulated_verifier->generate_r1cs_witness();
+}
+
+template<typename ppT>
+r1cs_se_ppzksnark_accumulated_online_verifier_gadget<ppT>::r1cs_se_ppzksnark_accumulated_online_verifier_gadget(
+    protoboard<FieldT> &pb,
+    const r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key_variable<ppT> &pvk,
+    const G1_variable<ppT> &acc,
+    const r1cs_se_ppzksnark_proof_variable<ppT> &proof,
+    const pb_variable<FieldT> &result,
+    const std::string &annotation_prefix) :
+    gadget<FieldT>(pb, annotation_prefix),
+    pvk(pvk),
+    acc(acc),
+    proof(proof),
+    result(result)
+{
     // allocate results for precomputation
     proof_A_G_alpha_precomp.reset(new G1_precomputation<ppT>());
     proof_B_H_beta_precomp.reset(new G2_precomputation<ppT>());
@@ -331,7 +365,7 @@ r1cs_se_ppzksnark_online_verifier_gadget<ppT>::r1cs_se_ppzksnark_online_verifier
           FMT(annotation_prefix, " compute_proof_B_H_beta_precomp")));
 
     compute_acc_precomp.reset(
-        new precompute_G1_gadget<ppT>(pb, *acc, *acc_precomp,
+        new precompute_G1_gadget<ppT>(pb, acc, *acc_precomp,
           FMT(annotation_prefix, " compute_acc_precomp")));
 
     compute_proof_A_precomp.reset(
@@ -382,15 +416,9 @@ r1cs_se_ppzksnark_online_verifier_gadget<ppT>::r1cs_se_ppzksnark_online_verifier
 }
 
 template<typename ppT>
-void r1cs_se_ppzksnark_online_verifier_gadget<ppT>::generate_r1cs_constraints()
+void r1cs_se_ppzksnark_accumulated_online_verifier_gadget<ppT>::generate_r1cs_constraints()
 {
-    PROFILE_CONSTRAINTS(this->pb, "accumulate verifier input")
-    {
-        libff::print_indent(); printf("* Number of bits as an input to verifier gadget: %zu\n", input.size());
-        accumulate_input->generate_r1cs_constraints();
-    }
-
-    PROFILE_CONSTRAINTS(this->pb, "rest of the verifier")
+    PROFILE_CONSTRAINTS(this->pb, "the accumulated verifier")
     {
         compute_proof_A_G_alpha->generate_r1cs_constraints();
         compute_proof_B_H_beta->generate_r1cs_constraints();
@@ -412,10 +440,8 @@ void r1cs_se_ppzksnark_online_verifier_gadget<ppT>::generate_r1cs_constraints()
 }
 
 template<typename ppT>
-void r1cs_se_ppzksnark_online_verifier_gadget<ppT>::generate_r1cs_witness()
+void r1cs_se_ppzksnark_accumulated_online_verifier_gadget<ppT>::generate_r1cs_witness()
 {
-    accumulate_input->generate_r1cs_witness();
-
     compute_proof_A_G_alpha->generate_r1cs_witness();
     compute_proof_B_H_beta->generate_r1cs_witness();
 
@@ -469,6 +495,43 @@ void r1cs_se_ppzksnark_verifier_gadget<ppT>::generate_r1cs_witness()
     compute_pvk->generate_r1cs_witness();
     online_verifier->generate_r1cs_witness();
 }
+
+// accumulated verifier
+template<typename ppT>
+r1cs_se_ppzksnark_accumulated_verifier_gadget<ppT>::r1cs_se_ppzksnark_accumulated_verifier_gadget(protoboard<FieldT> &pb,
+                                   const r1cs_se_ppzksnark_verification_key_variable<ppT> &vk,
+                                   const G1_variable<ppT> &acc,
+                                   const r1cs_se_ppzksnark_proof_variable<ppT> &proof,
+                                   const pb_variable<FieldT> &result,
+                                   const std::string &annotation_prefix) :
+    gadget<FieldT>(pb, annotation_prefix)
+{
+    pvk.reset(new r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key_variable<ppT>());
+    compute_pvk.reset(new r1cs_se_ppzksnark_verifier_process_vk_gadget<ppT>(pb, vk, *pvk, FMT(annotation_prefix, " compute_pvk")));
+    online_verifier.reset(new r1cs_se_ppzksnark_accumulated_online_verifier_gadget<ppT>(pb, *pvk, acc, proof, result, FMT(annotation_prefix, " online_verifier")));
+}
+
+template<typename ppT>
+void r1cs_se_ppzksnark_accumulated_verifier_gadget<ppT>::generate_r1cs_constraints()
+{
+    PROFILE_CONSTRAINTS(this->pb, "precompute pvk")
+    {
+        compute_pvk->generate_r1cs_constraints();
+    }
+
+    PROFILE_CONSTRAINTS(this->pb, "online verifier")
+    {
+        online_verifier->generate_r1cs_constraints();
+    }
+}
+
+template<typename ppT>
+void r1cs_se_ppzksnark_accumulated_verifier_gadget<ppT>::generate_r1cs_witness()
+{
+    compute_pvk->generate_r1cs_witness();
+    online_verifier->generate_r1cs_witness();
+}
+
 
 } // libsnark
 
