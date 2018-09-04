@@ -133,20 +133,15 @@ public:
 };
 
 template<typename ppT>
-class r1cs_se_ppzksnark_online_verifier_gadget : public gadget<libff::Fr<ppT> > {
+class r1cs_se_ppzksnark_accumulated_online_verifier_gadget : public gadget<libff::Fr<ppT> > {
 public:
     typedef libff::Fr<ppT> FieldT;
 
     r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key_variable<ppT> pvk;
 
-    pb_variable_array<FieldT> input;
-    size_t elt_size;
+    G1_variable<ppT> acc;
     r1cs_se_ppzksnark_proof_variable<ppT> proof;
     pb_variable<FieldT> result;
-    const size_t input_len;
-
-    std::shared_ptr<G1_variable<ppT> > acc;
-    std::shared_ptr<G1_multiscalar_mul_gadget<ppT> > accumulate_input;
 
     std::shared_ptr<G1_precomputation<ppT> > proof_A_G_alpha_precomp;
       std::shared_ptr<precompute_G1_gadget<ppT> > compute_proof_A_G_alpha_precomp;
@@ -178,13 +173,54 @@ public:
     pb_variable_array<FieldT> all_test_results;
     std::shared_ptr<conjunction_gadget<FieldT> > all_tests_pass;
 
-    r1cs_se_ppzksnark_online_verifier_gadget(protoboard<FieldT> &pb,
+    r1cs_se_ppzksnark_accumulated_online_verifier_gadget(protoboard<FieldT> &pb,
                                           const r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key_variable<ppT> &pvk,
-                                          const pb_variable_array<FieldT> &input,
-                                          const size_t elt_size,
+                                          const G1_variable<ppT> &acc,
                                           const r1cs_se_ppzksnark_proof_variable<ppT> &proof,
                                           const pb_variable<FieldT> &result,
                                           const std::string &annotation_prefix);
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+};
+
+template<typename ppT>
+class r1cs_se_ppzksnark_accumulated_verifier_gadget : public gadget<libff::Fr<ppT> > {
+public:
+    typedef libff::Fr<ppT> FieldT;
+
+    std::shared_ptr<r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key_variable<ppT> > pvk;
+    std::shared_ptr<r1cs_se_ppzksnark_verifier_process_vk_gadget<ppT> > compute_pvk;
+    std::shared_ptr<r1cs_se_ppzksnark_accumulated_online_verifier_gadget<ppT> > online_verifier;
+
+    r1cs_se_ppzksnark_accumulated_verifier_gadget(protoboard<FieldT> &pb,
+                                   const r1cs_se_ppzksnark_verification_key_variable<ppT> &vk,
+                                   const G1_variable<ppT> &acc,
+                                   const r1cs_se_ppzksnark_proof_variable<ppT> &proof,
+                                   const pb_variable<FieldT> &result,
+                                   const std::string &annotation_prefix);
+
+    void generate_r1cs_constraints();
+    void generate_r1cs_witness();
+};
+
+template<typename ppT>
+class r1cs_se_ppzksnark_online_verifier_gadget : public gadget<libff::Fr<ppT> > {
+public:
+    typedef libff::Fr<ppT> FieldT;
+
+    size_t input_len;
+    std::shared_ptr<G1_variable<ppT> > acc;
+    std::shared_ptr<G1_multiscalar_mul_gadget<ppT> > accumulate_input;
+    std::shared_ptr<r1cs_se_ppzksnark_accumulated_online_verifier_gadget<ppT> > accumulated_verifier;
+
+    r1cs_se_ppzksnark_online_verifier_gadget(protoboard<FieldT> &pb,
+                                   const r1cs_se_ppzksnark_preprocessed_r1cs_se_ppzksnark_verification_key_variable<ppT> &pvk,
+                                   const pb_variable_array<FieldT> &input,
+                                   const size_t elt_size,
+                                   const r1cs_se_ppzksnark_proof_variable<ppT> &proof,
+                                   const pb_variable<FieldT> &result,
+                                   const std::string &annotation_prefix);
+
     void generate_r1cs_constraints();
     void generate_r1cs_witness();
 };
