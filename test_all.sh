@@ -13,7 +13,10 @@ test_runtest() {
 test_method() {
   export CODA_CONSENSUS_MECHANISM="$1"
   for test in full-test coda-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' coda-shared-state-test 'transaction-snark-profiler -check-only'; do
+    echo "------------------------------------------------------------------------------------------"
     date
+    echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM}"
+    sleep 1
     dune exec cli -- $test
   done
 }
