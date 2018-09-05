@@ -84,11 +84,14 @@ module Compressed = struct
   let var_of_t ({x; is_odd}: t) : var =
     {x= Field.Checked.constant x; is_odd= Boolean.var_of_value is_odd}
 
-  let assert_equal (t1: var) (t2: var) =
+  let check_equal (t1: var) (t2: var) : (Boolean.var, _) Checked.t =
     let open Let_syntax in
-    let%map () = Field.Checked.Assert.equal t1.x t2.x
-    and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
-    ()
+    let%bind x_eq = Field.Checked.equal t1.x t2.x in
+    let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
+    Boolean.(x_eq && odd_eq)
+
+  let assert_equal (t1: var) (t2: var) =
+    Checked.(check_equal t1 t2 >>= Boolean.Assert.is_true)
 
   let fold_bits {is_odd; x} =
     {Fold.fold= (fun ~init ~f -> f ((Field.Bits.fold x).fold ~init ~f) is_odd)}

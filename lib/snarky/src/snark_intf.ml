@@ -198,6 +198,8 @@ module type Basic = sig
 
     val typ_unchecked : (var, value) Typ.t
 
+    val equal : var -> var -> (var, _) Checked.t
+
     module Expr : sig
       type t
 

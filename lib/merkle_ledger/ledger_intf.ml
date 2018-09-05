@@ -60,6 +60,8 @@ module type S = sig
 
   val extend_with_empty_to_fit : t -> int -> unit
 
+  val remove_accounts_exn : t -> key list -> unit
+
   include Syncable_intf.S
           with type root_hash := hash
            and type hash := hash

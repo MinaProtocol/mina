@@ -1202,6 +1202,8 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let%map both_false = not x && not y in
         not both_false
 
+      let equal x y = equal x y
+
       let any = function
         | [] -> return false_
         | [b1] -> return b1

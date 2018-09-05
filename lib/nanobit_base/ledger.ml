@@ -44,15 +44,34 @@ let validate_nonces txn_nonce account_nonce =
         transaction %{sexp: Account.Nonce.t}"
       account_nonce txn_nonce
 
+let get_or_make ledger key =
+  match get ledger key with
+  | Some acct -> ([], acct)
+  | None ->
+      let acct = Account.empty_with_key key in
+      set ledger key acct ;
+      ([key], acct)
+
+let get_empty ledger k =
+  let acct = Account.empty () in
+  set ledger k acct ;
+  (merkle_path ledger k |> Option.value_exn, acct)
+
 module Undo = struct
   type transaction =
     { transaction: Transaction.t
+    ; previous_empty_accounts: Public_key.Compressed.t list
     ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+  [@@deriving sexp]
+
+  type fee_transfer =
+    { fee_transfer: Fee_transfer.t
+    ; previous_empty_accounts: Public_key.Compressed.t list }
   [@@deriving sexp]
 
   type t =
     | Transaction of transaction
-    | Fee_transfer of Fee_transfer.t
+    | Fee_transfer of fee_transfer
     | Coinbase of Coinbase.t
   [@@deriving sexp]
 end
@@ -79,40 +98,52 @@ let apply_transaction_unchecked ledger
   in
   let undo =
     { Undo.transaction
+    ; previous_empty_accounts= []
     ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
   in
   if Public_key.Compressed.equal sender receiver then (
     set ledger sender sender_account_without_balance_modified ;
     return undo )
   else
-    let%bind receiver_account = get' ledger "receiver" receiver in
+    let previous_empty_accounts, receiver_account =
+      get_or_make ledger receiver
+    in
     let%map receiver_balance' = add_amount receiver_account.balance amount in
     set ledger sender
       {sender_account_without_balance_modified with balance= sender_balance'} ;
     set ledger receiver {receiver_account with balance= receiver_balance'} ;
-    undo
+    {undo with previous_empty_accounts}
 
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
   apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
 let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
-  let open Or_error.Let_syntax in
   match transfer with
   | One (pk, fee) ->
-      let%map a = get' t "One-pk" pk in
-      set t pk {a with balance= modify_balance a.balance fee}
+      let emptys, a = get_or_make t pk in
+      set t pk {a with balance= modify_balance a.balance fee} ;
+      emptys
   | Two ((pk1, fee1), (pk2, fee2)) ->
-      let%map a1 = get' t "Two-pk1" pk1 and a2 = get' t "Two-pk2" pk2 in
+      let emptys1, a1 = get_or_make t pk1
+      and emptys2, a2 = get_or_make t pk2 in
       set t pk1 {a1 with balance= modify_balance a1.balance fee1} ;
-      set t pk2 {a2 with balance= modify_balance a2.balance fee2}
+      set t pk2 {a2 with balance= modify_balance a2.balance fee2} ;
+      emptys1 @ emptys2
 
 let apply_fee_transfer t transfer =
-  process_fee_transfer t transfer ~modify_balance:(fun b f ->
-      Option.value_exn (Balance.add_amount b (Amount.of_fee f)) )
+  let previous_empty_accounts =
+    process_fee_transfer t transfer ~modify_balance:(fun b f ->
+        Option.value_exn (Balance.add_amount b (Amount.of_fee f)) )
+  in
+  Or_error.return {Undo.fee_transfer= transfer; previous_empty_accounts}
 
-let undo_fee_transfer t transfer =
-  process_fee_transfer t transfer ~modify_balance:(fun b f ->
+let undo_fee_transfer t
+    ({previous_empty_accounts; fee_transfer}: Undo.fee_transfer) =
+  process_fee_transfer t fee_transfer ~modify_balance:(fun b f ->
       Option.value_exn (Balance.sub_amount b (Amount.of_fee f)) )
+  |> ignore ;
+  remove_accounts_exn t previous_empty_accounts ;
+  Or_error.return ()
 
 (* TODO: Better system needed for making atomic changes. Could use a monad. *)
 let apply_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
@@ -163,6 +194,7 @@ let undo_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
 
 let undo_transaction ledger
     { Undo.transaction= {payload; sender; signature= _}
+    ; previous_empty_accounts
     ; previous_receipt_chain_hash } =
   let sender = Public_key.compress sender in
   let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
@@ -186,13 +218,14 @@ let undo_transaction ledger
     let%map receiver_balance' = sub_amount receiver_account.balance amount in
     set ledger sender
       {sender_account_without_balance_modified with balance= sender_balance'} ;
-    set ledger receiver {receiver_account with balance= receiver_balance'}
+    set ledger receiver {receiver_account with balance= receiver_balance'} ;
+    remove_accounts_exn ledger previous_empty_accounts
 
 let undo : t -> Undo.t -> unit Or_error.t =
  fun ledger undo ->
   let open Or_error.Let_syntax in
   match undo with
-  | Fee_transfer t -> undo_fee_transfer ledger t
+  | Fee_transfer u -> undo_fee_transfer ledger u
   | Transaction u -> undo_transaction ledger u
   | Coinbase c -> undo_coinbase ledger c ; Ok ()
 
@@ -202,8 +235,8 @@ let apply_super_transaction ledger (t: Super_transaction.t) =
       Or_error.map (apply_transaction ledger txn) ~f:(fun u ->
           Undo.Transaction u )
   | Fee_transfer t ->
-      Or_error.map (apply_fee_transfer ledger t) ~f:(fun () ->
-          Undo.Fee_transfer t )
+      Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
+          Undo.Fee_transfer u )
   | Coinbase t ->
       Or_error.map (apply_coinbase ledger t) ~f:(fun () -> Undo.Coinbase t)
 

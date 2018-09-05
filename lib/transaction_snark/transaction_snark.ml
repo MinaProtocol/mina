@@ -326,7 +326,8 @@ module Base = struct
         in
         let%bind root =
           let%bind sender_compressed = Public_key.compress_var sender in
-          Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
+          Ledger_hash.modify_account_send root sender_compressed
+            ~is_fee_transfer ~f:(fun account ->
               let%bind next_nonce =
                 Account.Nonce.increment_if_var account.nonce is_normal
               in
@@ -349,12 +350,16 @@ module Base = struct
               let%map balance =
                 Balance.Checked.add_signed_amount account.balance sender_delta
               in
-              {account with balance; nonce= next_nonce; receipt_chain_hash} )
+              { Account.balance
+              ; public_key= sender_compressed
+              ; nonce= next_nonce
+              ; receipt_chain_hash } )
         in
+        (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
-          Ledger_hash.modify_account root receiver ~f:(fun account ->
+          Ledger_hash.modify_account_recv root receiver ~f:(fun account ->
               let%map balance = Balance.Checked.(account.balance + amount) in
-              {account with balance} )
+              {account with balance; public_key= receiver} )
         in
         (root, excess) )
 
@@ -363,7 +368,7 @@ module Base = struct
    - apply a transaction where the signature is incorrect
    - apply a transaction where the sender does not have enough money in their account
    - apply a transaction and stuff in the wrong target hash
-*)
+    *)
 
   module Prover_state = struct
     type t =

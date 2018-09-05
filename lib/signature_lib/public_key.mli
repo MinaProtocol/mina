@@ -58,6 +58,8 @@ module Compressed : sig
   val of_base64_exn : string -> t
 
   val to_base64 : t -> string
+
+  val check_equal : var -> var -> (Boolean.var, _) Checked.t
 end
 
 val of_bigstring : Bigstring.t -> t Or_error.t

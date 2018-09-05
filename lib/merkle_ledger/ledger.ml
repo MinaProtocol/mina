@@ -246,6 +246,24 @@ end = struct
       recompute_layers 1 (get_leaf_hash t) t.tree.nodes layer_dirty_indices ;
       (t.tree).dirty_indices <- [] )
 
+  let remove_accounts_exn t keys =
+    let len = List.length keys in
+    if len <> 0 then (
+      assert (not t.tree.syncing) ;
+      let indices =
+        List.map keys ~f:(fun k -> index_of_key_exn t k)
+        |> List.sort ~compare:Int.compare
+      in
+      let least = List.hd_exn indices in
+      assert (least = length t - len) ;
+      List.iter keys ~f:(fun k -> Key.Table.remove t.accounts k) ;
+      Dyn_array.delete_range t.tree.leafs least len ;
+      (* TODO: fixup hashes in a less terrible way *)
+      (t.tree).dirty_indices <- List.init least ~f:(fun i -> i) ;
+      (t.tree).nodes_height <- 0 ;
+      (t.tree).nodes <- [] ;
+      recompute_tree t )
+
   let merkle_root t =
     recompute_tree t ;
     let height = t.tree.nodes_height in

@@ -12,17 +12,28 @@ include Sparse_ledger_lib.Sparse_ledger.Make (struct
             let key {Account.public_key; _} = public_key
 
             let hash = Fn.compose Merkle_hash.of_digest Account.digest
+
+            let empty_with_key = Account.empty_with_key
           end)
 
-let of_ledger_subset_exn ledger keys =
-  List.fold keys
-    ~f:(fun acc key ->
-      add_path acc
-        (Option.value_exn (Ledger.merkle_path ledger key))
-        (Option.value_exn (Ledger.get ledger key)) )
-    ~init:
-      (of_hash ~depth:Ledger.depth
-         (Merkle_hash.of_digest (Ledger.merkle_root ledger :> Pedersen.Digest.t)))
+let of_ledger_subset_exn (ledger: Ledger.t) keys =
+  let new_keys, sparse =
+    List.fold keys
+      ~f:(fun (new_keys, sl) key ->
+        match (Ledger.merkle_path ledger key, Ledger.get ledger key) with
+        | Some path, Some acct -> (new_keys, add_path sl path key acct)
+        | None, None ->
+            let path, acct = Ledger.get_empty ledger key in
+            (key :: new_keys, add_path sl path key acct)
+        | _ -> failwith "unreachable" )
+      ~init:
+        ( []
+        , of_hash ~depth:Ledger.depth
+            (Merkle_hash.of_digest
+               (Ledger.merkle_root ledger :> Pedersen.Digest.t)) )
+  in
+  Ledger.remove_accounts_exn ledger new_keys ;
+  sparse
 
 let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
   let {Transaction_payload.amount; fee; receiver; nonce} = payload in
@@ -49,7 +60,8 @@ let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
   let receiver_account = get_exn t receiver_idx in
   set_exn t receiver_idx
     { receiver_account with
-      balance=
+      public_key= receiver
+    ; balance=
         Option.value_exn (Balance.add_amount receiver_account.balance amount)
     }
 
@@ -60,7 +72,8 @@ let apply_fee_transfer_exn =
     let open Currency in
     set_exn t index
       { account with
-        balance=
+        public_key= pk
+      ; balance=
           Option.value_exn
             (Balance.add_amount account.balance (Amount.of_fee fee)) }
   in

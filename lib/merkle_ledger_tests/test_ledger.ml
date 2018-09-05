@@ -273,4 +273,18 @@ let%test_module "test functor on in memory databases" =
           L16.set_inner_hash_at_addr_exn ledger a old_hash ;
           res ) ;
       assert (mr_start = L16.merkle_root ledger)
+
+    let%test_unit "remove last two accounts is as if they were never there" =
+      let l1, _ = L16.load_ledger 8 1 in
+      let l2, k2 = L16.load_ledger 10 1 in
+      let keys_to_remove = List.drop k2 8 in
+      L16.remove_accounts_exn l2 keys_to_remove ;
+      assert (L16.merkle_root l1 = L16.merkle_root l2)
+
+    let%test_unit "remove last account is as if it was never there" =
+      let l1, _ = L16.load_ledger 9 1 in
+      let l2, k2 = L16.load_ledger 10 1 in
+      let keys_to_remove = [List.last_exn k2] in
+      L16.remove_accounts_exn l2 keys_to_remove ;
+      assert (L16.merkle_root l1 = L16.merkle_root l2)
   end )

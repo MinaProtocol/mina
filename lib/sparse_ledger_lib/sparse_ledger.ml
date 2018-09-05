@@ -33,7 +33,8 @@ module type S = sig
 
   val find_index_exn : t -> key -> index
 
-  val add_path : t -> [`Left of hash | `Right of hash] list -> account -> t
+  val add_path :
+    t -> [`Left of hash | `Right of hash] list -> key -> account -> t
 
   val merkle_root : t -> hash
 end
@@ -46,8 +47,6 @@ end) (Key : sig
   type t [@@deriving bin_io, eq, sexp]
 end) (Account : sig
   type t [@@deriving bin_io, eq, sexp]
-
-  val key : t -> Key.t
 
   val hash : t -> Hash.t
 end) =
@@ -106,14 +105,14 @@ struct
     in
     union (depth0 - 1) tree0 (List.rev path0)
 
-  let add_path t path account =
+  let add_path t path key account =
     let index =
       List.foldi path ~init:0 ~f:(fun i acc x ->
           match x with `Right _ -> acc + (1 lsl i) | `Left _ -> acc )
     in
     { t with
       tree= add_path t.depth t.tree path account
-    ; indexes= (Account.key account, index) :: t.indexes }
+    ; indexes= (key, index) :: t.indexes }
 
   let ith_bit idx i = (idx lsr i) land 1 = 1
 
@@ -143,6 +142,15 @@ struct
       | _ -> failwith "Sparse_ledger.get: Bad index"
     in
     {t with tree= go (t.depth - 1) t.tree}
+
+  (*let find_index_or_make t pk =
+    match List.Assoc.find t.indexes ~equal:Key.equal pk with
+    | Some idx -> (idx, t)
+    | None ->
+        let idx = fst t.empty in
+        let acct = Account.empty_with_key pk in
+        let t = set_exn t idx acct in
+        (idx, t)*)
 
   let path_exn {tree; depth; _} idx =
     let rec go acc i tree =
@@ -233,7 +241,8 @@ let%test_module "sparse-ledger-test" =
           let t' =
             List.fold t.indexes ~init:root ~f:(fun acc (_, index) ->
                 let account = get_exn t index in
-                add_path acc (path_exn t index) account )
+                add_path acc (path_exn t index) (Account.key account) account
+            )
           in
           assert (equal_tree t'.tree t.tree) )
   end )
