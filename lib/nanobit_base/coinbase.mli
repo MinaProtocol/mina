@@ -3,5 +3,6 @@ open Import
 
 type t =
   { proposer: Public_key.Compressed.t
-  ; other_recipient: Public_key.Compressed.t option }
+  ; fee_transfer: Fee_transfer.single option
+  }
 [@@deriving sexp, bin_io, compare, eq]

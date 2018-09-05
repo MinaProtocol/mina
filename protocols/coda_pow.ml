@@ -235,8 +235,6 @@ end
 
 module type Coinbase_intf = sig
   type t [@@deriving sexp, compare, eq]
-
-  type public_key
 end
 
 module type Super_transaction_intf = sig
@@ -718,7 +716,7 @@ module type Inputs_intf = sig
     Fee_transfer_intf with type public_key := Public_key.Compressed.t
 
   module Coinbase :
-    Coinbase_intf with type public_key := Public_key.Compressed.t
+    Coinbase_intf
 
   module Super_transaction :
     Super_transaction_intf
