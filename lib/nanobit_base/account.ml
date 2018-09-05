@@ -63,6 +63,12 @@ type value =
   (Public_key.Compressed.t, Balance.t, Nonce.t, Receipt.Chain_hash.t) t_
 [@@deriving sexp]
 
+let initialize public_key : t =
+  { public_key
+  ; balance= Balance.zero
+  ; nonce= Nonce.zero
+  ; receipt_chain_hash= Receipt.Chain_hash.empty }
+
 let empty_hash =
   Pedersen.digest_fold
     (Pedersen.State.create Pedersen.params)
