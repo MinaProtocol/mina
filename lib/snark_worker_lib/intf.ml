@@ -85,11 +85,11 @@ module type S = sig
     end
 
     module Submit_work : sig
-      type msg = Work.Result.t
+      type query = Work.Result.t
 
       type response = unit
 
-      val rpc : (msg, response) Rpc.Rpc.t
+      val rpc : (query, response) Rpc.Rpc.t
     end
   end
 

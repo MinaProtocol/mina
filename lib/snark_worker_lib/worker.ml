@@ -48,17 +48,13 @@ struct
         Ok {Snark_work_lib.Work.Result.proofs= List.rev res; spec} )
 
   let dispatch rpc query port =
-    Tcp.with_connection
-      (Tcp.Where_to_connect.of_host_and_port
-         (Host_and_port.create ~host:"127.0.0.1" ~port))
-      ~timeout:(Time.Span.of_sec 1.)
-      (fun _ r w ->
-        let open Deferred.Let_syntax in
-        match%bind
-          Rpc.Connection.create r w ~connection_state:(fun _ -> ())
-        with
-        | Error exn -> return (Or_error.of_exn exn)
-        | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
+    let%map res =
+      Rpc.Connection.with_client
+        (Tcp.Where_to_connect.of_host_and_port
+           (Host_and_port.create ~host:"127.0.0.1" ~port))
+        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
+    in
+    match res with Error exn -> Or_error.of_exn exn | Ok res -> res
 
   let main daemon_port public_key =
     let log = Logger.create () in

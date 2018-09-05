@@ -23,7 +23,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
   end
 
   module Submit_work = struct
-    type msg =
+    type query =
       ( ( Statement.t
         , Super_transaction.t
         , Sparse_ledger.t
@@ -36,8 +36,7 @@ module Make (Inputs : Intf.Inputs_intf) = struct
 
     type response = unit [@@deriving bin_io, sexp]
 
-    let rpc : (msg, response) Rpc.Rpc.t =
-      Rpc.Rpc.create ~name:"Submit_work" ~version:0 ~bin_query:bin_msg
-        ~bin_response
+    let rpc : (query, response) Rpc.Rpc.t =
+      Rpc.Rpc.create ~name:"Submit_work" ~version:0 ~bin_query ~bin_response
   end
 end
