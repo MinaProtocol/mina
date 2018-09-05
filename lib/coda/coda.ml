@@ -289,7 +289,6 @@ module type State_with_witness_intf = sig
   module Stripped : sig
     type t =
       {ledger_builder_transition: ledger_builder_transition; state: state}
-  
   end
 
   val strip : t -> Stripped.t

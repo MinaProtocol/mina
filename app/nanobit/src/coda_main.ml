@@ -435,7 +435,6 @@ struct
       type t =
         { ledger_builder_transition: Ledger_builder_transition.t
         ; state: Proof_carrying_state.t }
-      
     end
 
     let strip {ledger_builder_transition; state} =

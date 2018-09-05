@@ -26,8 +26,7 @@ struct
 
   module L = struct
     module MT =
-      Merkle_ledger.Database.Make (Account) (Hash) (Depth)
-        (In_memory_kvdb)
+      Merkle_ledger.Database.Make (Account) (Hash) (Depth) (In_memory_kvdb)
         (In_memory_sdb)
     module Addr = MT.Addr
 

@@ -75,8 +75,7 @@ end = struct
     in
     {accounts= Key.Table.copy t.accounts; tree= copy_tree t.tree}
 
-  module Path =
-    Merkle_path.Make(Hash)
+  module Path = Merkle_path.Make (Hash)
 
   type path = Path.t
 

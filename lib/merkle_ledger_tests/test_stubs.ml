@@ -94,7 +94,7 @@ module In_memory_sdb : Intf.Stack_database = struct
 
   let length ls = List.length !ls
 
-  let copy stack = ref (!stack)
+  let copy stack = ref !stack
 end
 
 module Key = struct

@@ -1,6 +1,5 @@
 open Core
 open Unsigned
-
 module Intf = Merkle_ledger.Intf
 module Ledger = Merkle_ledger.Ledger
 
@@ -135,7 +134,7 @@ let%test_module "test functor on in memory databases" =
       let root3 = L16.merkle_root ledger in
       assert (root3 = root1)
 
-    module Path = Merkle_ledger.Merkle_path.Make(Hash)
+    module Path = Merkle_ledger.Merkle_path.Make (Hash)
 
     let check_path account (path: Path.t) root =
       Path.check_path path (Hash.hash_account account) root

@@ -987,12 +987,6 @@ let%test_module "test" =
         type ledger_hash = Ledger_hash.t
 
         type super_transaction = Super_transaction.t [@@deriving sexp]
-(* 
-        let hash : t -> Ppx_hash_lib.Std.Hash.hash_value = fun t -> !t
-
-        let hash_fold_t :
-            Ppx_hash_lib.Std.Hash.state -> t -> Ppx_hash_lib.Std.Hash.state =
-         fun s _ -> s *)
 
         module Undo = struct
           type t = super_transaction [@@deriving sexp]

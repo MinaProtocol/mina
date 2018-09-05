@@ -1,4 +1,3 @@
-
 open Core
 
 module type S = sig
@@ -15,10 +14,13 @@ module type S = sig
   val check_path : t -> hash -> hash -> bool
 end
 
-module Make(Hash: sig
+module Make (Hash : sig
   type t [@@deriving sexp]
+
   val merge : height:int -> t -> t -> t
-end) : S with type hash := Hash.t = struct
+end) :
+  S with type hash := Hash.t =
+struct
   type elem = [`Left of Hash.t | `Right of Hash.t] [@@deriving sexp]
 
   let elem_hash = function `Left h | `Right h -> h
@@ -35,11 +37,9 @@ end) : S with type hash := Hash.t = struct
         (acc, height + 1) )
     |> fst
 
-  let check_path t leaf_hash root_hash = 
+  let check_path t leaf_hash root_hash =
     let path_root, _ =
-      List.fold t
-        ~init:(leaf_hash, 0)
-        ~f:(fun (a, height) b ->
+      List.fold t ~init:(leaf_hash, 0) ~f:(fun (a, height) b ->
           let a =
             match b with
             | `Left b -> Hash.merge ~height a b

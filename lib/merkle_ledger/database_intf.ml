@@ -9,12 +9,13 @@ module type S = sig
 
   type t
 
-  type error = Account_key_not_found | Out_of_leaves | Malformed_database  [@@deriving sexp]
+  type error = Account_key_not_found | Out_of_leaves | Malformed_database
+  [@@deriving sexp]
 
   module Addr : Merkle_address.S
 
   module Path : Merkle_path.S with type hash := hash
-  
+
   type path = Path.t
 
   val copy : t -> t
@@ -27,7 +28,11 @@ module type S = sig
 
   val get_key_of_account : t -> account -> (key, error) Result.t
 
+  (* TODO: rename get_account to get *)
+
   val get_account : t -> key -> account option
+
+  (* TODO: rename get_account to set *)
 
   val set_account : t -> account -> (unit, error) Result.t
 

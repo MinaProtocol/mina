@@ -2,80 +2,78 @@ open Core
 open Snark_params
 open Currency
 
-
-let of_public_key_to_string key =
-  Public_key.Compressed.to_base64 key
+let of_public_key_to_string key = Public_key.Compressed.to_base64 key
 
 module Account = struct
   include Account
 
   let set_balance t new_balance = {t with balance= new_balance}
 
-  let public_key (t: t) = 
-  public_key t |> of_public_key_to_string
+  let public_key (t: t) = public_key t |> of_public_key_to_string
 end
 
 module Base = struct
   include Merkle_ledger.Database.Make (Account)
-          (struct
-            type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
+            (struct
+              type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
 
-            let merge = Merkle_hash.merge
+              let merge = Merkle_hash.merge
 
-            let empty = Merkle_hash.empty_hash
+              let empty = Merkle_hash.empty_hash
 
-            let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
-          end)
-          (struct
-            let depth = ledger_depth
-          end)
-          (Merkle_ledger_tests.Test_stubs.In_memory_kvdb)
-          (Merkle_ledger_tests.Test_stubs.In_memory_sdb)
+              let hash_account =
+                Fn.compose Merkle_hash.of_digest Account.digest
+            end)
+            (struct
+              let depth = ledger_depth
+            end)
+            (Merkle_ledger_tests.Test_stubs.In_memory_kvdb)
+            (Merkle_ledger_tests.Test_stubs.In_memory_sdb)
 
+  type key = Public_key.Compressed.t
 
-    type key = Public_key.Compressed.t
+  let to_index ledger key =
+    of_public_key_to_string key |> of_public_key_string_to_index ledger
 
-    let to_index ledger key = 
-      of_public_key_to_string key |> of_public_key_string_to_index ledger
+  let index_of_key ledger key =
+    to_index ledger key |> Option.map ~f:Key.to_index
 
-    let index_of_key ledger key =
-      to_index ledger key |> Option.map ~f:Key.to_index
+  (* TODO: Figure out who calls this *)
+  let index_of_key_exn ledger key = index_of_key ledger key |> Option.value_exn
 
-    (* TODO: Figure out who calls this *)
-    let index_of_key_exn ledger key = 
-      index_of_key ledger key |> Option.value_exn
-    
-    let merkle_path ledger key = to_index ledger key |> 
-      (Option.map ~f:(merkle_path ledger))
+  let merkle_path ledger key =
+    to_index ledger key |> Option.map ~f:(merkle_path ledger)
 
-    let merkle_path_at_index_exn t index =
+  let merkle_path_at_index_exn t index =
     merkle_path_at_addr t (Addr.of_index_exn index)
 
-    let get_at_index_exn t index = 
-      get_account t (Key.of_index index) |> Option.value_exn
+  let get_at_index_exn t index =
+    get_account t (Key.of_index index) |> Option.value_exn
 
-    let set_at_index_exn t index account = 
-      update_account t (Key.of_index index) account
+  let set_at_index_exn t index account =
+    update_account t (Key.of_index index) account
 
-    let merkle_path_at_addr_exn = merkle_path_at_addr
+  let merkle_path_at_addr_exn = merkle_path_at_addr
 
-    let depth = ledger_depth
+  let depth = ledger_depth
 
-    let max_depth = ledger_depth
+  let max_depth = ledger_depth
 
-    let length = num_accounts
+  let length = num_accounts
 
-    let get_account ledger key = (to_index ledger key) 
-      |> Option.bind ~f:(get_account ledger)
+  let get_account ledger key =
+    to_index ledger key |> Option.bind ~f:(get_account ledger)
 
-    let copy t = t
+  let get = get_account
 
-    let t_of_sexp = opaque_of_sexp
+  let copy t = t
 
-    let sexp_of_t = sexp_of_opaque
+  let t_of_sexp = opaque_of_sexp
 
-    let create () = create ~key_value_db_dir:"" ~stack_db_file:""
-  end
+  let sexp_of_t = sexp_of_opaque
+
+  let create () = create ~key_value_db_dir:"" ~stack_db_file:""
+end
 
 include Base
 
@@ -91,12 +89,11 @@ let get' ledger tag key =
   error_opt (sprintf "%s not found" tag) (get_account ledger key)
 
 let set' ledger account : unit Or_error.t =
-  set_account ledger account |>
-  Result.map_error ~f:(fun error -> 
-    Error.create "Cannot set account" error [%sexp_of: error])
+  set_account ledger account
+  |> Result.map_error ~f:(fun error ->
+         Error.create "Cannot set account" error [%sexp_of : error] )
 
-let set t account = 
-  set' t account |> Or_error.ok |> Option.value_exn
+let set t account = set' t account |> Or_error.ok |> Option.value_exn
 
 let add_amount balance amount =
   error_opt "overflow" (Balance.add_amount balance amount)
@@ -131,7 +128,6 @@ end
 let apply_transaction_unchecked ledger
     ({payload; sender; _} as transaction: Transaction.t) =
   let sender = Public_key.compress sender in
-  
   let {Transaction.Payload.fee; amount; receiver; nonce} = payload in
   let open Or_error.Let_syntax in
   let%bind sender_account = get' ledger "sender" sender in
@@ -150,15 +146,19 @@ let apply_transaction_unchecked ledger
     { Undo.transaction
     ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
   in
-  if Public_key.Compressed.equal sender receiver then (
+  if Public_key.Compressed.equal sender receiver then
     let%bind () = set' ledger sender_account_without_balance_modified in
-    return undo )
+    return undo
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
     let%bind receiver_balance' = add_amount receiver_account.balance amount in
-    let%bind () = set' ledger
-      {sender_account_without_balance_modified with balance= sender_balance'} in
-    let%map () = set' ledger {receiver_account with balance= receiver_balance'} in
+    let%bind () =
+      set' ledger
+        {sender_account_without_balance_modified with balance= sender_balance'}
+    in
+    let%map () =
+      set' ledger {receiver_account with balance= receiver_balance'}
+    in
     undo
 
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
@@ -199,14 +199,15 @@ let undo_transaction ledger
   let sender_account_without_balance_modified =
     {sender_account with nonce; receipt_chain_hash= previous_receipt_chain_hash}
   in
-  if Public_key.Compressed.equal sender receiver then (
+  if Public_key.Compressed.equal sender receiver then
     set' ledger sender_account_without_balance_modified
-    )
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
     let%bind receiver_balance' = sub_amount receiver_account.balance amount in
-    let%bind () = set' ledger 
-      {sender_account_without_balance_modified with balance= sender_balance'} in
+    let%bind () =
+      set' ledger
+        {sender_account_without_balance_modified with balance= sender_balance'}
+    in
     set' ledger {receiver_account with balance= receiver_balance'}
 
 let undo : t -> Undo.t -> unit Or_error.t =

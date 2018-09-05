@@ -9,10 +9,10 @@ module Make
     (Sdb : Intf.Stack_database) : sig
   module Key : sig
     type t
-    
-    val of_index: int -> t
 
-    val to_index: t -> int
+    val of_index : int -> t
+
+    val to_index : t -> int
   end
 
   include Database_intf.S
@@ -20,9 +20,9 @@ module Make
            and type hash := Hash.t
            and type key := Key.t
 
-  val update_account: t -> Key.t -> Account.t -> unit
+  val update_account : t -> Key.t -> Account.t -> unit
 
-  val of_public_key_string_to_index: t -> string -> Key.t option
+  val of_public_key_string_to_index : t -> string -> Key.t option
 
   module For_tests : sig
     val gen_account_key : Key.t Core.Quickcheck.Generator.t
@@ -33,9 +33,10 @@ end = struct
 
   let () = assert (max_depth < 0xfe)
 
-  type error = Account_key_not_found | Out_of_leaves | Malformed_database [@@deriving sexp]
+  type error = Account_key_not_found | Out_of_leaves | Malformed_database
+  [@@deriving sexp]
 
-  module Path = Merkle_path.Make(Hash)
+  module Path = Merkle_path.Make (Hash)
 
   type path = Path.t
 
@@ -69,7 +70,7 @@ end = struct
       | Hash of Addr.t
 
     let is_generic = function Generic _ -> true | _ -> false
- 
+
     let is_account = function Account _ -> true | _ -> false
 
     let is_hash = function Hash _ -> true | _ -> false
@@ -123,7 +124,7 @@ end = struct
 
     let of_index index = Account (Addr.of_index_exn index)
 
-    let to_index  = Fn.compose Addr.to_int get_path
+    let to_index = Fn.compose Addr.to_int get_path
 
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
@@ -162,7 +163,6 @@ end = struct
       match last_direction (path key) with
       | Left -> (base, sibling)
       | Right -> (sibling, base)
-
   end
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
@@ -206,7 +206,7 @@ end = struct
   let get_generic mdb key =
     assert (Key.is_generic key) ;
     get_raw mdb key
-  
+
   let get_account mdb key =
     assert (Key.is_account key) ;
     get_bin mdb key Account.bin_read_t
@@ -252,7 +252,7 @@ end = struct
   module Account_key = struct
     let build_key account =
       Key.build_generic
-        (Bigstring.of_string ("$" ^ Account.public_key account ))
+        (Bigstring.of_string ("$" ^ Account.public_key account))
 
     let get mdb account =
       match get_generic mdb (build_key account) with
@@ -323,24 +323,12 @@ end = struct
 
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in
-
-    (* TODO: determine how compare works *)
-    (* let last_key = 
-      Account_key.last_key_address mdb |>
-      Option.value_exn in
-    
-    let min_node = min last_key last_node in
-
-    (Core.printf !"Last Key Address \n: %{sexp: Addr.t}" last_key); *)
-    
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account = get_account mdb (Key.Account bit_index)
-          in
+          let account = get_account mdb (Key.Account bit_index) in
           account :: acc )
     in
     List.rev_filter_map result ~f:Fn.id
-    
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
@@ -350,8 +338,6 @@ end = struct
           update_account mdb (Key.Account bit_index) head ;
           tail
       | [] ->
-          (* TODO: should this happen *)
-          (* assert (Addr.equal last_node bit_index) ; *)
           [] )
     |> ignore
 
@@ -361,27 +347,28 @@ end = struct
     let key = if Key.is_account key then Key.Hash (Key.path key) else key in
     assert (Key.is_hash key) ;
     let rec loop k =
-      if (Key.height k) = 0 then []
-      else (
+      if Key.height k = max_depth then []
+      else
         let sibling = Key.sibling k in
         let sibling_dir = Key.last_direction (Key.path k) in
         let hash = get_hash mdb sibling in
-        (Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)) 
-          :: loop (Key.parent k)  
-      )
+        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        :: loop (Key.parent k)
     in
     loop key
 
   let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
 
-  let copy {kvdb; sdb} = {kvdb=Kvdb.copy kvdb; sdb=Sdb.copy sdb} 
+  let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
 
   let of_public_key_string_to_index mdb public_key =
-      (* TODO: duplicated code *)
-      let open Option.Let_syntax in
-      let%bind account_key_bin = get_generic mdb (Key.build_generic 
-      (Bigstring.of_string ("$" ^  public_key))) in
-      match Key.parse account_key_bin with
-      | Ok account_key -> Some account_key 
-      | Error () -> None
+    (* TODO: duplicated code *)
+    let open Option.Let_syntax in
+    let%bind account_key_bin =
+      get_generic mdb
+        (Key.build_generic (Bigstring.of_string ("$" ^ public_key)))
+    in
+    match Key.parse account_key_bin with
+    | Ok account_key -> Some account_key
+    | Error () -> None
 end
