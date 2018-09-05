@@ -143,7 +143,9 @@ struct
 
   type change = Tip_change of Tip.t
 
-  type t = {transitions: (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t}
+  type t =
+    { transitions:
+        (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t }
   [@@deriving fields]
 
   let transition_capacity = 64

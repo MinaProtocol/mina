@@ -761,14 +761,14 @@ struct
       not
         (time_in_epoch_slot that
            Time.(of_span_since_epoch (Span.of_ms time_received)))
-    then `Keep (* compare last or curr? *)
+    then `Keep
     else if
-      this.last_epoch_data.lock_checkpoint
-      = that.last_epoch_data.lock_checkpoint
+      Nanobit_base.State_hash.equal this.last_epoch_data.lock_checkpoint
+        that.last_epoch_data.lock_checkpoint
     then if Length.compare this.length that.length < 0 then `Take else `Keep
     else if
-      this.last_epoch_data.start_checkpoint
-      = that.last_epoch_data.start_checkpoint
+      Nanobit_base.State_hash.equal this.last_epoch_data.start_checkpoint
+        that.last_epoch_data.start_checkpoint
     then
       if
         Length.compare this.last_epoch_data.length that.last_epoch_data.length

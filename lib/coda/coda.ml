@@ -54,7 +54,8 @@ module type Network_intf = sig
 
   type transaction_pool_diff
 
-  val states : t -> (state_with_witness * Unix_timestamp.t) Linear_pipe.Reader.t
+  val states :
+    t -> (state_with_witness * Unix_timestamp.t) Linear_pipe.Reader.t
 
   val peers : t -> Kademlia.Peer.t list
 
@@ -255,7 +256,8 @@ module type Proposer_intf = sig
     -> time_controller:time_controller
     -> t
 
-  val transitions : t -> (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
+  val transitions :
+    t -> (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
 end
 
 module type Witness_change_intf = sig
