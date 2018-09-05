@@ -18,6 +18,7 @@ test_method() {
     SECONDS=0
     echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM}"
     sleep 1
+    unset -e
     dune exec cli -- $test 2>&1 >> test.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
@@ -28,7 +29,9 @@ test_method() {
       ss -nlp
       ps auxf
       tail -n 100 test.log
+      exit 2
     fi
+    set -e
   done
 }
 
