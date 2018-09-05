@@ -233,15 +233,26 @@ module type Fee_transfer_intf = sig
   val receivers : t -> public_key list
 end
 
+module type Coinbase_intf = sig
+  type t [@@deriving sexp, compare, eq]
+end
+
 module type Super_transaction_intf = sig
   type valid_transaction
 
   type fee_transfer
 
-  type t = Transaction of valid_transaction | Fee_transfer of fee_transfer
+  type coinbase
+
+  type t =
+    | Transaction of valid_transaction
+    | Fee_transfer of fee_transfer
+    | Coinbase of coinbase
   [@@deriving sexp, compare, eq, bin_io]
 
   val fee_excess : t -> Fee.Unsigned.t Or_error.t
+
+  val supply_increase : t -> Currency.Amount.t Or_error.t
 end
 
 module type Ledger_proof_statement_intf = sig
@@ -706,10 +717,13 @@ module type Inputs_intf = sig
   module Fee_transfer :
     Fee_transfer_intf with type public_key := Public_key.Compressed.t
 
+  module Coinbase : Coinbase_intf
+
   module Super_transaction :
     Super_transaction_intf
     with type valid_transaction := Transaction.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
+     and type coinbase := Coinbase.t
 
   module Ledger_hash : Ledger_hash_intf
 
