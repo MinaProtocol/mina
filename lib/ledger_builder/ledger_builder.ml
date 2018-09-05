@@ -871,10 +871,6 @@ let%test_module "test" =
         let receiver _ = "R"
       end
 
-      module Coinbase = struct
-        type t = unit [@@deriving sexp, bin_io, compare, eq]
-      end
-
       module Fee_transfer = struct
         type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare, eq]
@@ -910,6 +906,26 @@ let%test_module "test" =
         let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)
       end
 
+      module Coinbase = struct
+        type t =
+          { proposer: Compressed_public_key.t
+          ; fee_transfer: Fee_transfer.single option }
+        [@@deriving sexp, bin_io, compare, eq]
+
+        let supply_increase {proposer= _; fee_transfer} =
+          match fee_transfer with
+          | None -> Ok Protocols.Coda_praos.coinbase_amount
+          | Some (_, fee) ->
+              Currency.Amount.sub Protocols.Coda_praos.coinbase_amount
+                (Currency.Amount.of_fee fee)
+              |> Option.value_map ~f:Or_error.return
+                   ~default:(Or_error.error_string "Coinbase underflow")
+
+        let fee_excess t =
+          Or_error.map (supply_increase t) ~f:(fun _increase ->
+              Currency.Fee.zero )
+      end
+
       module Super_transaction = struct
         type valid_transaction = Transaction.With_valid_signature.t
         [@@deriving sexp, bin_io, compare, eq]
@@ -932,7 +948,11 @@ let%test_module "test" =
           match t with
           | Transaction t' -> Ok (Transaction.fee t')
           | Fee_transfer f -> Fee_transfer.fee_excess f
-          | Coinbase _ -> failwith "Coinbases not yet implemented"
+          | Coinbase t -> Coinbase.fee_excess t
+
+        let supply_increase = function
+          | Transaction _ | Fee_transfer _ -> Ok Currency.Amount.zero
+          | Coinbase t -> Coinbase.supply_increase t
       end
 
       module Ledger_hash = struct
