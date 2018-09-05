@@ -430,10 +430,10 @@ end = struct
       | Coinbase _ -> failwith "Coinbases not yet implemented"
     in
     let open Or_error.Let_syntax in
+    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
     let%map undo, statement =
       apply_super_transaction_and_get_statement ledger s
     in
-    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
     (undo, {Super_transaction_with_witness.transaction= s; witness; statement})
 
   let update_ledger_and_get_statements ledger ts =

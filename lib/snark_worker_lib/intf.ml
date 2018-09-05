@@ -78,14 +78,19 @@ module type S = sig
     end
 
     module Submit_work : sig
-      type msg = Work.Result.t
+      type query = Work.Result.t
 
-      val rpc : msg Rpc.One_way.t
+      type response = unit
+
+      val rpc : (query, response) Rpc.Rpc.t
     end
   end
 
   val command : Command.t
 
   val arguments :
-    public_key:Public_key.Compressed.t -> daemon_port:int -> string list
+       public_key:Public_key.Compressed.t
+    -> daemon_port:int
+    -> shutdown_on_disconnect:bool
+    -> string list
 end
