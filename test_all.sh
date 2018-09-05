@@ -18,6 +18,11 @@ test_method() {
     SECONDS=0
     echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM}"
     set +e
+    # ugly hack to clean up dead processes
+    pkill -9 exe
+    pkill -9 kademlia
+    pkill -9 cli
+    sleep 1
     dune exec cli -- $test 2>&1 >> test.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
@@ -25,9 +30,7 @@ test_method() {
       echo "PASSED"
     else
       echo "FAILED"
-      ss -nlp
-      ps auxf
-      tail -n 100 test.log
+      tail -n 30 test.log
       exit 2
     fi
     set -e
