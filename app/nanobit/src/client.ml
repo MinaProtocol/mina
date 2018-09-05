@@ -98,6 +98,18 @@ let send_txn =
           | Ok () -> printf "Successfully enqueued txn in pool\n"
           | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e))
 
+let generate_keypair =
+  Command.async ~summary:"Generate a public-key/private-key pair"
+    (Command.Param.return (fun () ->
+         let keypair = Keypair.create () in
+         printf "public-key: %s\nprivate-key: %s\n"
+           (Public_key.Compressed.to_base64
+              (Public_key.compress keypair.public_key))
+           (Private_key.to_base64 keypair.private_key) ;
+         exit 0 ))
+
 let command =
   Command.group ~summary:"Lightweight client process"
-    [("get-balance", get_balance); ("send-txn", send_txn)]
+    [ ("get-balance", get_balance)
+    ; ("send-txn", send_txn)
+    ; ("generate-keypair", generate_keypair) ]
