@@ -50,7 +50,10 @@ module Undo = struct
     ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
   [@@deriving sexp]
 
-  type t = Transaction of transaction | Fee_transfer of Fee_transfer.t
+  type t =
+    | Transaction of transaction
+    | Fee_transfer of Fee_transfer.t
+    | Coinbase of Coinbase.t
   [@@deriving sexp]
 end
 
@@ -143,6 +146,7 @@ let undo : t -> Undo.t -> unit Or_error.t =
   match undo with
   | Fee_transfer t -> undo_fee_transfer ledger t
   | Transaction u -> undo_transaction ledger u
+  | Coinbase _ -> failwith "Coinbases not yet implemented"
 
 let apply_super_transaction ledger (t: Super_transaction.t) =
   match t with
@@ -152,6 +156,7 @@ let apply_super_transaction ledger (t: Super_transaction.t) =
   | Fee_transfer t ->
       Or_error.map (apply_fee_transfer ledger t) ~f:(fun () ->
           Undo.Fee_transfer t )
+  | Coinbase _ -> failwith "Coinbases not yet implemented"
 
 let merkle_root_after_transaction_exn ledger transaction =
   let undo = Or_error.ok_exn (apply_transaction ledger transaction) in
