@@ -48,7 +48,10 @@ struct
         | Ok res -> Continue (res :: acc)
         | Error e -> Stop (Error e) )
       ~finish:(fun res ->
-        Ok {Snark_work_lib.Work.Result.proofs= List.rev res; spec} )
+        Ok
+          { Snark_work_lib.Work.Result.proofs= List.rev res
+          ; spec
+          ; pk= public_key } )
 
   let shutdown_on_disconnect log connection =
     upon (Rpc.Connection.close_finished connection) (fun () ->
