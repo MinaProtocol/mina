@@ -255,12 +255,14 @@ struct
   end
 
   module Fee_transfer = Nanobit_base.Fee_transfer
+  module Coinbase = Nanobit_base.Coinbase
 
   module Super_transaction = struct
     module T = struct
       type t = Transaction_snark.Transition.t =
         | Transaction of Transaction.With_valid_signature.t
         | Fee_transfer of Fee_transfer.t
+        | Coinbase of Coinbase.t
       [@@deriving compare, eq]
 
       let fee_excess = function
@@ -272,6 +274,7 @@ struct
             let open Or_error.Let_syntax in
             let%map fee = Fee_transfer.fee_excess t in
             Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
+        | Coinbase _ -> failwith "Coinbases not yet implemented"
     end
 
     include T
@@ -307,6 +310,7 @@ struct
       module Compressed_public_key = Public_key.Compressed
       module Transaction = Transaction
       module Fee_transfer = Fee_transfer
+      module Coinbase = Coinbase
       module Super_transaction = Super_transaction
       module Ledger = Ledger
       module Ledger_proof = Ledger_proof
