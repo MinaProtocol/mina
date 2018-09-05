@@ -368,7 +368,7 @@ end = struct
     in
     loop key
 
-  let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
+  let merkle_path_at_addr_exn t addr = merkle_path t (Key.Hash addr)
 
   let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
 end

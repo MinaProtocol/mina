@@ -46,7 +46,7 @@ struct
 
     let length = MT.length
 
-    let merkle_path_at_addr_exn = MT.merkle_path_at_addr
+    let merkle_path_at_addr_exn = MT.merkle_path_at_addr_exn
 
     let merkle_root = MT.merkle_root
 

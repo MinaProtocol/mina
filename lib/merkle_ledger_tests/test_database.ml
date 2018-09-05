@@ -172,7 +172,7 @@ let%test_module "test functor on in memory databases" =
                 in
                 let padded_directions = List.concat [offset; directions] in
                 let address = MT.Addr.of_directions padded_directions in
-                let path = MT.merkle_path_at_addr mdb address in
+                let path = MT.merkle_path_at_addr_exn mdb address in
                 let leaf_hash = MT.get_inner_hash_at_addr_exn mdb address in
                 let root_hash =
                   MT.get_inner_hash_at_addr_exn mdb (MT.Addr.root ())

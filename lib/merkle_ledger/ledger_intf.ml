@@ -7,8 +7,6 @@ module type S = sig
 
   type key
 
-  val depth : int
-
   type index = int
 
   type t [@@deriving sexp, bin_io]
@@ -25,15 +23,11 @@ module type S = sig
 
   val create : unit -> t
 
-  val length : t -> int
-
   val get : t -> key -> account option
 
   val set : t -> key -> account -> unit
 
   val update : t -> key -> f:(account option -> account) -> unit
-
-  val merkle_root : t -> hash
 
   val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
 
@@ -62,21 +56,19 @@ module type S = sig
 
   val set_at_index_exn : t -> index -> account -> unit
 
-  val merkle_path_at_addr_exn : t -> Addr.t -> path
-
   val merkle_path_at_index_exn : t -> index -> path
 
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
-  val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
-
-  val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
-
   val extend_with_empty_to_fit : t -> int -> unit
 
-  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
-
-  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
+  include Merkle_tree_intf.S
+          with type root_hash := hash
+           and type hash := hash
+           and type account := account
+           and type addr := Addr.t
+           and type t := t
+           and type path := Path.t
 
   val recompute_tree : t -> unit
 end

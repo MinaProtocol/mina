@@ -24,25 +24,19 @@ module type S = sig
 
   val destroy : t -> unit
 
-  val length : t -> int
-
   val get_key_of_account : t -> account -> (key, error) Result.t
 
   val get : t -> key -> account option
 
   val set : t -> account -> (unit, error) Result.t
 
-  val merkle_root : t -> hash
-
   val merkle_path : t -> key -> path
 
-  val merkle_path_at_addr : t -> Addr.t -> path
-
-  val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
-
-  val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
-
-  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
-
-  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
+  include Merkle_tree_intf.S
+          with type root_hash := hash
+           and type hash := hash
+           and type account := account
+           and type addr := Addr.t
+           and type t := t
+           and type path := Path.t
 end

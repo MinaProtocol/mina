@@ -43,14 +43,12 @@ module Base = struct
     to_index ledger key |> Option.map ~f:(merkle_path ledger)
 
   let merkle_path_at_index_exn t index =
-    merkle_path_at_addr t (Addr.of_index_exn index)
+    merkle_path_at_addr_exn t (Addr.of_index_exn index)
 
   let get_at_index_exn t index = get t (Key.of_index index) |> Option.value_exn
 
   let set_at_index_exn t index account =
     update_account t (Key.of_index index) account
-
-  let merkle_path_at_addr_exn = merkle_path_at_addr
 
   let depth = ledger_depth
 
