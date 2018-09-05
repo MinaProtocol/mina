@@ -1,4 +1,5 @@
 open Core
+open Import
 
 type single = Public_key.Compressed.t * Currency.Fee.Stable.V1.t
 [@@deriving bin_io, sexp, compare, eq]

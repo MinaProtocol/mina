@@ -1,5 +1,6 @@
 module Bignum_bigint = Bigint
 open Core_kernel
+open Snarky
 
 module type Message_intf = sig
   type boolean_var
@@ -117,8 +118,6 @@ module Schnorr
 
           val ( * ) : t -> t -> t
 
-          val ( + ) : t -> t -> t
-
           val ( - ) : t -> t -> t
 
           val test_bit : t -> int -> bool
@@ -127,6 +126,9 @@ module Schnorr
 
           module Checked : sig
             val equal : var -> var -> (Boolean.var, _) Checked.t
+
+            val to_bits :
+              var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
             module Assert : sig
               val equal : var -> var -> (unit, _) Checked.t
@@ -138,29 +140,11 @@ module Schnorr
 
         type var = Field.Checked.t * Field.Checked.t
 
-        module Checked : sig
-          module Shifted : sig
-            module type S =
-              Curves.Shifted_intf
-              with type curve_var := var
-               and type boolean_var := Boolean.var
-               and type ('a, 'b) checked := ('a, 'b) Checked.t
-          end
-
-          val scale_known :
-               (module Shifted.S with type t = 'shifted)
-            -> t
-            -> Scalar.var
-            -> init:'shifted
-            -> ('shifted, _) Checked.t
-
-          val scale :
-               (module Shifted.S with type t = 'shifted)
-            -> var
-            -> Scalar.var
-            -> init:'shifted
-            -> ('shifted, _) Checked.t
-        end
+        module Checked :
+          Curves.Weierstrass_checked_intf
+          with module Impl := Impl
+           and type t := t
+           and type var := var
 
         val one : t
 
@@ -169,8 +153,6 @@ module Schnorr
         val add : t -> t -> t
 
         val double : t -> t
-
-        val typ : (var, t) Typ.t
 
         val scale : t -> Scalar.t -> t
 
@@ -195,7 +177,7 @@ struct
   open Impl
 
   module Signature = struct
-    type 'a t_ = 'a * 'a [@@deriving eq, sexp]
+    type 'a t_ = 'a * 'a [@@deriving sexp]
 
     type var = Curve.Scalar.var t_
 
@@ -218,8 +200,6 @@ struct
     type t = Curve.t
 
     type var = Curve.var
-
-    val typ : (var, t) Typ.t
   end = Curve
 
   let sign (k: Private_key.t) m =
@@ -270,10 +250,14 @@ struct
         (let%bind pre_r =
            (* s * g + h * public_key *)
            let%bind s_g =
-             Curve.Checked.scale_known shifted Curve.one s ~init:Shifted.zero
+             Curve.Checked.scale_known shifted Curve.one
+               (Curve.Scalar.Checked.to_bits s)
+               ~init:Shifted.zero
            in
            let%bind s_g_h_pk =
-             Curve.Checked.scale shifted public_key h ~init:s_g
+             Curve.Checked.scale shifted public_key
+               (Curve.Scalar.Checked.to_bits h)
+               ~init:s_g
            in
            Shifted.unshift_nonzero s_g_h_pk
          in

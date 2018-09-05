@@ -6,7 +6,6 @@ module Make (Inputs : Intf.Inputs_intf) :
   Intf.S
   with type transition := Inputs.Super_transaction.t
    and type sparse_ledger := Inputs.Sparse_ledger.t
-   and type public_key := Inputs.Public_key.t
    and type statement := Inputs.Statement.t
    and type proof := Inputs.Proof.t =
 struct
@@ -41,7 +40,11 @@ struct
       ({instances; fee} as spec: Work.Spec.t) =
     List.fold_until instances ~init:[]
       ~f:(fun acc w ->
-        match perform_single s ~message:(fee, public_key) w with
+        match
+          perform_single s
+            ~message:(Nanobit_base.Sok_message.create ~fee ~prover:public_key)
+            w
+        with
         | Ok res -> Continue (res :: acc)
         | Error e -> Stop (Error e) )
       ~finish:(fun res ->
@@ -92,14 +95,14 @@ struct
           ~doc:"port daemon is listening on locally"
       and public_key =
         flag "public-key"
-          (required Public_key.arg_type)
+          (required Cli_lib.public_key_compressed)
           ~doc:"Public key to send SNARKing fees to"
       in
       fun () -> main daemon_port public_key)
 
   let arguments ~public_key ~daemon_port =
     [ "-public-key"
-    ; Cli_lib.base64_of_binable (module Public_key) public_key
+    ; Signature_lib.Public_key.Compressed.to_base64 public_key
     ; "-daemon-port"
     ; Int.to_string daemon_port ]
 end
