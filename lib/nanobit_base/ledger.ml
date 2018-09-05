@@ -190,11 +190,11 @@ let apply_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
         in
         let receiver_account = get_or_initialize receiver in
         let%map balance = add_amount receiver_account.balance fee in
-        (proposer_reward, Some ({receiver_account with balance}))
+        (proposer_reward, Some {receiver_account with balance})
   in
   let proposer_account = get_or_initialize proposer in
   let%map balance = add_amount proposer_account.balance proposer_reward in
-  set t  {proposer_account with balance} ;
+  set t {proposer_account with balance} ;
   Option.iter receiver_update ~f:(fun a -> set t a)
 
 (* Don't have to be atomic here because these should never fail. In fact, none of
