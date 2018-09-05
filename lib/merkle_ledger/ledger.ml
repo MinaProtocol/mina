@@ -339,7 +339,6 @@ end = struct
     in
     go (empty_hash_at_height start_height) hash start_height
 
-  (* Change the logic of this so that it performs like db *)
   let get_inner_hash_at_addr_exn t a =
     let adepth = Addr.depth a in
     assert (adepth < depth) ;

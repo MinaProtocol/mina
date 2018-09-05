@@ -8,8 +8,6 @@ let of_public_key_to_string key = Public_key.Compressed.to_base64 key
 module Account = struct
   include Account
 
-  let set_balance t new_balance = {t with balance= new_balance}
-
   let public_key (t: t) = public_key t |> of_public_key_to_string
 end
 
@@ -39,7 +37,6 @@ module Base = struct
   let index_of_key ledger key =
     to_index ledger key |> Option.map ~f:Key.to_index
 
-  (* TODO: Figure out who calls this *)
   let index_of_key_exn ledger key = index_of_key ledger key |> Option.value_exn
 
   let merkle_path ledger key =
@@ -48,8 +45,7 @@ module Base = struct
   let merkle_path_at_index_exn t index =
     merkle_path_at_addr t (Addr.of_index_exn index)
 
-  let get_at_index_exn t index =
-    get_account t (Key.of_index index) |> Option.value_exn
+  let get_at_index_exn t index = get t (Key.of_index index) |> Option.value_exn
 
   let set_at_index_exn t index account =
     update_account t (Key.of_index index) account
@@ -58,14 +54,7 @@ module Base = struct
 
   let depth = ledger_depth
 
-  let max_depth = ledger_depth
-
-  let length = num_accounts
-
-  let get_account ledger key =
-    to_index ledger key |> Option.bind ~f:(get_account ledger)
-
-  let get = get_account
+  let get ledger key = to_index ledger key |> Option.bind ~f:(get ledger)
 
   let copy t = t
 
@@ -86,15 +75,14 @@ let error s = Or_error.errorf "Ledger.apply_transaction: %s" s
 let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
 
 let get' ledger tag key =
-  (* TODO: this needs to be set by public key, not account index *)
-  error_opt (sprintf "%s not found" tag) (get_account ledger key)
+  error_opt (sprintf "%s not found" tag) (get ledger key)
 
 let set' ledger account : unit Or_error.t =
-  set_account ledger account
+  set ledger account
   |> Result.map_error ~f:(fun error ->
-         Error.create "Cannot set account" error [%sexp_of : error] )
+         Error.create "Cannot create account" error [%sexp_of : error] )
 
-let set t account = set' t account |> Or_error.ok |> Option.value_exn
+let set t account = set t account |> Result.ok |> Option.value_exn
 
 let add_amount balance amount =
   error_opt "overflow" (Balance.add_amount balance amount)
@@ -235,12 +223,4 @@ let merkle_root_after_transaction_exn ledger transaction =
   let undo = Or_error.ok_exn (apply_transaction ledger transaction) in
   let root = merkle_root ledger in
   Or_error.ok_exn (undo_transaction ledger undo) ;
-  root
-
-let merkle_root_after_transactions t ts =
-  let undos_rev =
-    List.rev_map ts ~f:(fun txn -> Or_error.ok_exn (apply_transaction t txn))
-  in
-  let root = merkle_root t in
-  List.iter undos_rev ~f:(fun u -> Or_error.ok_exn (undo_transaction t u)) ;
   root

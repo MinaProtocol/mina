@@ -81,7 +81,7 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
           List.iteri accounts ~f:(fun i account ->
-              assert (DB.set_account db account = Ok ()) ;
+              assert (DB.set db account = Ok ()) ;
               Ledger.set ledger (Int.to_string i) account ) ;
           Ledger.recompute_tree ledger ;
           let binary_tree = Binary_tree.set_accounts accounts in

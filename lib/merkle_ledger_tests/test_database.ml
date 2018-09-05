@@ -40,36 +40,35 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "getting a non existing account returns None" =
         with_test_instance (fun mdb ->
             Quickcheck.test MT.For_tests.gen_account_key ~f:(fun key ->
-                assert (MT.get_account mdb key = None) ) )
+                assert (MT.get mdb key = None) ) )
 
       let%test "add and retrieve an account" =
         with_test_instance (fun mdb ->
             let account = Quickcheck.random_value Account.gen in
-            assert (MT.set_account mdb account = Ok ()) ;
+            assert (MT.set mdb account = Ok ()) ;
             let key =
               MT.get_key_of_account mdb account
               |> Result.map_error ~f:exn_of_error
               |> Result.ok_exn
             in
-            Account.equal (Option.value_exn (MT.get_account mdb key)) account
-        )
+            Account.equal (Option.value_exn (MT.get mdb key)) account )
 
       let%test "accounts are atomic" =
         with_test_instance (fun mdb ->
             let account = Quickcheck.random_value Account.gen in
-            assert (MT.set_account mdb account = Ok ()) ;
+            assert (MT.set mdb account = Ok ()) ;
             let key =
               MT.get_key_of_account mdb account
               |> Result.map_error ~f:exn_of_error
               |> Result.ok_exn
             in
-            assert (MT.set_account mdb account = Ok ()) ;
+            assert (MT.set mdb account = Ok ()) ;
             let key' =
               MT.get_key_of_account mdb account
               |> Result.map_error ~f:exn_of_error
               |> Result.ok_exn
             in
-            key = key' && MT.get_account mdb key = MT.get_account mdb key' )
+            key = key' && MT.get mdb key = MT.get mdb key' )
 
       let%test_unit "num_accounts" =
         with_test_instance (fun mdb ->
@@ -94,23 +93,23 @@ let%test_module "test functor on in memory databases" =
             in
             let num_initial_accounts = List.length accounts in
             List.iter accounts ~f:(fun account ->
-                assert (MT.set_account mdb account = Ok ()) ) ;
-            assert (MT.num_accounts mdb = num_initial_accounts) )
+                assert (MT.set mdb account = Ok ()) ) ;
+            assert (MT.length mdb = num_initial_accounts) )
 
       let%test "deleted account keys are reassigned" =
         with_test_instance (fun mdb ->
             let account = Quickcheck.random_value Account.gen in
             let account' = Quickcheck.random_value Account.gen in
-            assert (MT.set_account mdb account = Ok ()) ;
+            assert (MT.set mdb account = Ok ()) ;
             let key =
               MT.get_key_of_account mdb account
               |> Result.map_error ~f:exn_of_error
               |> Result.ok_exn
             in
             let account = Account.set_balance account Balance.zero in
-            assert (MT.set_account mdb account = Ok ()) ;
-            assert (MT.set_account mdb account' = Ok ()) ;
-            MT.get_account mdb key = Some account' )
+            assert (MT.set mdb account = Ok ()) ;
+            assert (MT.set mdb account' = Ok ()) ;
+            MT.get mdb key = Some account' )
 
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =
@@ -133,7 +132,7 @@ let%test_module "test functor on in memory databases" =
             (Quickcheck.Generator.list_with_length num_accounts Account.gen)
         in
         List.iter initial_accounts ~f:(fun account ->
-            ignore @@ MT.set_account mdb account )
+            ignore @@ MT.set mdb account )
 
       let%test_unit "If the entire database is full,\n \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
@@ -190,7 +189,7 @@ let%test_module "test functor on in memory databases" =
                       (Quickcheck.random_value gen_balance) )
               in
               List.iter accounts ~f:(fun account ->
-                  assert (MT.set_account mdb account = Ok ()) ) ;
+                  assert (MT.set mdb account = Ok ()) ) ;
               let retrieved_accounts =
                 MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in

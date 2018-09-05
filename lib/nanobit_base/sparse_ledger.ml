@@ -19,9 +19,9 @@ let of_ledger_subset_exn ledger keys =
     ~f:(fun acc key ->
       add_path acc
         (Option.value_exn (Ledger.merkle_path ledger key))
-        (Option.value_exn (Ledger.get_account ledger key)) )
+        (Option.value_exn (Ledger.get ledger key)) )
     ~init:
-      (of_hash ~depth:Ledger.max_depth
+      (of_hash ~depth:Ledger.depth
          (Merkle_hash.of_digest (Ledger.merkle_root ledger :> Pedersen.Digest.t)))
 
 let apply_transaction_exn t ({sender; payload; _}: Transaction.t) =

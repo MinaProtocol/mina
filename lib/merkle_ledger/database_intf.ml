@@ -24,17 +24,13 @@ module type S = sig
 
   val destroy : t -> unit
 
-  val num_accounts : t -> int
+  val length : t -> int
 
   val get_key_of_account : t -> account -> (key, error) Result.t
 
-  (* TODO: rename get_account to get *)
+  val get : t -> key -> account option
 
-  val get_account : t -> key -> account option
-
-  (* TODO: rename get_account to set *)
-
-  val set_account : t -> account -> (unit, error) Result.t
+  val set : t -> account -> (unit, error) Result.t
 
   val merkle_root : t -> hash
 
