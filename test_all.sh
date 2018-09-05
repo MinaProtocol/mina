@@ -15,9 +15,17 @@ test_method() {
   for test in full-test coda-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' coda-shared-state-test 'transaction-snark-profiler -check-only'; do
     echo "------------------------------------------------------------------------------------------"
     date
+    SECONDS=0
     echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM}"
     sleep 1
-    dune exec cli -- $test
+    dune exec cli -- $test >> test.log
+    OUT=$?
+    echo "TESTING ${test} took ${SECONDS} seconds"
+    if [ $OUT -eq 0 ];then
+      echo "PASSED"
+    else
+      echo "FAILED"
+    fi
   done
 }
 
