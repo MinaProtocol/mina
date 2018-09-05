@@ -427,6 +427,7 @@ end = struct
       | Transaction t ->
           let t = (t :> Transaction.t) in
           [Transaction.sender t; Transaction.receiver t]
+      | Coinbase _ -> failwith "Coinbases not yet implemented"
     in
     let open Or_error.Let_syntax in
     let%map undo, statement =
@@ -870,6 +871,10 @@ let%test_module "test" =
         let receiver _ = "R"
       end
 
+      module Coinbase = struct
+        type t = unit [@@deriving sexp, bin_io, compare, eq]
+      end
+
       module Fee_transfer = struct
         type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare, eq]
@@ -912,11 +917,14 @@ let%test_module "test" =
         type fee_transfer = Fee_transfer.t
         [@@deriving sexp, bin_io, compare, eq]
 
+        type coinbase = Coinbase.t [@@deriving sexp, bin_io, compare, eq]
+
         type unsigned_fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
         type t =
           | Transaction of valid_transaction
           | Fee_transfer of fee_transfer
+          | Coinbase of coinbase
         [@@deriving sexp, bin_io, compare, eq]
 
         let fee_excess : t -> unsigned_fee Or_error.t =
@@ -924,6 +932,7 @@ let%test_module "test" =
           match t with
           | Transaction t' -> Ok (Transaction.fee t')
           | Fee_transfer f -> Fee_transfer.fee_excess f
+          | Coinbase _ -> failwith "Coinbases not yet implemented"
       end
 
       module Ledger_hash = struct
@@ -1026,6 +1035,7 @@ let%test_module "test" =
               let t' = Fee_transfer.fee_excess_int f in
               t := !t + t' ;
               Or_error.return (Super_transaction.Fee_transfer f)
+          | Coinbase _ -> failwith "Coinbases not yet implemented"
 
         let undo_super_transaction : t -> super_transaction -> unit Or_error.t =
          fun t s ->
@@ -1033,6 +1043,7 @@ let%test_module "test" =
             match s with
             | Transaction t' -> fst t'
             | Fee_transfer f -> Fee_transfer.fee_excess_int f
+            | Coinbase _ -> failwith "Coinbases not yet implemented"
           in
           t := !t - v ;
           Or_error.return ()
