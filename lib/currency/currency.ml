@@ -8,7 +8,9 @@ open Fold_lib
 open Tuple_lib
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, eq, hash]
+  type t [@@deriving bin_io, sexp, compare, hash]
+
+  include Comparable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
 
@@ -167,11 +169,12 @@ end = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Unsigned.t [@@deriving bin_io, sexp, eq, compare, hash]
+        type t = Unsigned.t [@@deriving bin_io, sexp, compare, hash]
       end
 
       include T
       include Hashable.Make (T)
+      include Comparable.Make (T)
     end
   end
 
@@ -214,17 +217,17 @@ end = struct
   let var_of_bits (bits: Boolean.var Bitstring.Lsb_first.t) : var =
     let bits = (bits :> Boolean.var list) in
     let n = List.length bits in
-    assert (n <= M.length) ;
+    assert (Int.( <= ) n M.length) ;
     let padding = M.length - n in
     bits @ List.init padding ~f:(fun _ -> Boolean.false_)
 
   let zero = Unsigned.zero
 
-  let sub x y = if compare x y < 0 then None else Some (Unsigned.sub x y)
+  let sub x y = if x < y then None else Some (Unsigned.sub x y)
 
   let add x y =
     let z = Unsigned.add x y in
-    if compare z x < 0 then None else Some z
+    if z < x then None else Some z
 
   let ( + ) = add
 
@@ -299,10 +302,10 @@ end = struct
       | Pos, Neg | Neg, Pos ->
           let c = compare_magnitude x.magnitude y.magnitude in
           Some
-            ( if c < 0 then
+            ( if Int.( < ) c 0 then
                 { sgn= y.sgn
                 ; magnitude= Unsigned.Infix.(y.magnitude - x.magnitude) }
-            else if c > 0 then
+            else if Int.( > ) c 0 then
               { sgn= x.sgn
               ; magnitude= Unsigned.Infix.(x.magnitude - y.magnitude) }
             else zero )
@@ -504,6 +507,8 @@ end
 
 module Balance = struct
   include (Amount : Basic with type t = Amount.t and type var = Amount.var)
+
+  let of_amount = Fn.id
 
   let add_amount = Amount.add
 
