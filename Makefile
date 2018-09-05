@@ -110,41 +110,20 @@ test:
 	$(WRAP) make test-all
 
 test-all: | test-runtest \
-			test-full-sig \
-			test-codapeers-sig \
-			test-coda-block-production-sig \
-			test-transaction-snark-profiler-sig \
-			test-full-stake \
-			test-codapeers-stake \
-			test-coda-block-production-stake \
-			test-transaction-snark-profiler-stake
+			test-sigs \
+			test-stakes 
 
-MYPROCS := $(shell nproc --all)
+test-runtest: SHELL := /bin/bash
 test-runtest:
-	$(WRAP) dune runtest --verbose -j$(MYPROCS)
+	source test_all.sh ; test_runtest
 
-SIGNATURE=CODA_CONSENSUS_MECHANISM=proof_of_signature
-STAKE=CODA_CONSENSUS_MECHANISM=proof_of_stake
+test-sigs: SHELL := /bin/bash
+test-sigs:
+	source test_all.sh ; test_method proof_of_signature
 
-test-full-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- full-test
-test-full-stake:
-	$(WRAP) $(STAKE) dune exec cli -- full-test
-
-test-codapeers-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- coda-peers-test
-test-codapeers-stake:
-	$(WRAP) $(STAKE) dune exec cli -- coda-peers-test
-
-test-coda-block-production-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- coda-block-production-test
-test-coda-block-production-stake:
-	$(WRAP) $(STAKE) dune exec cli -- coda-block-production-test
-
-test-transaction-snark-profiler-sig:
-	$(WRAP) $(SIGNATURE) dune exec cli -- transaction-snark-profiler -check-only
-test-transaction-snark-profiler-stake:
-	$(WRAP) $(STAKE) dune exec cli -- transaction-snark-profiler -check-only
+test-stakes: SHELL := /bin/bash
+test-stakes:
+	source test_all.sh ; test_method proof_of_stake
 
 
 ########################################
