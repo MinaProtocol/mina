@@ -3,6 +3,7 @@ open Async
 open Nanobit_base
 open Signature_lib
 open Coda_main
+open Signature_lib
 
 module Make
     (Ledger_proof : Ledger_proof_intf)

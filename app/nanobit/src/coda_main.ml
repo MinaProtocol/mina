@@ -27,13 +27,12 @@ module Ledger_hash = struct
   let to_bytes = Ledger_hash.to_bytes
 end
 
-module type Ledger_proof_intf = sig
-  type t [@@deriving sexp, bin_io]
-
-  val statement : t -> Transaction_snark.Statement.t
-
-  val proof : t -> Proof.t
-end
+module type Ledger_proof_intf =
+  Protocols.Coda_pow.Ledger_proof_intf
+  with type sok_digest := Sok_message.Digest.t
+   and type ledger_hash := Ledger_hash.t
+   and type proof := Proof.t
+   and type statement = Transaction_snark.Statement.t
 
 module type Ledger_proof_verifier_intf = sig
   type ledger_proof
@@ -41,7 +40,7 @@ module type Ledger_proof_verifier_intf = sig
   val verify :
        ledger_proof
     -> Transaction_snark.Statement.t
-    -> message:Currency.Fee.t * Public_key.Compressed.t
+    -> message:Sok_message.t
     -> bool Deferred.t
 end
 
@@ -223,6 +222,8 @@ struct
       Block_time.Span.( < ) (Block_time.diff t now) limit
   end
 
+  module Sok_message = Sok_message
+
   module Amount = struct
     module Signed = struct
       include Currency.Amount.Signed
@@ -283,17 +284,7 @@ struct
   end
 
   module Proof = Nanobit_base.Proof.Stable.V1
-
-  module Ledger_proof = struct
-    include Ledger_proof
-
-    type statement = Transaction_snark.Statement.t
-
-    let statement_target (t: Transaction_snark.Statement.t) = t.target
-
-    let underlying_proof = Ledger_proof.proof
-  end
-
+  module Ledger_proof = Ledger_proof
   module Sparse_ledger = Nanobit_base.Sparse_ledger
 
   module Completed_work_proof = struct
@@ -302,6 +293,7 @@ struct
 
   module Ledger_builder = struct
     module Inputs = struct
+      module Sok_message = Sok_message
       module Proof = Proof
       module Sparse_ledger = Sparse_ledger
       module Amount = Amount
@@ -321,7 +313,7 @@ struct
       module Config = Protocol_constants
 
       let check (Completed_work.({fee; prover; proofs}) as t) stmts =
-        let message = (fee, prover) in
+        let message = Sok_message.create ~fee ~prover in
         match List.zip proofs stmts with
         | None -> return None
         | Some ps ->
@@ -676,8 +668,7 @@ module Coda_with_snark
     () =
 struct
   module Ledger_proof_verifier = struct
-    (* TODO: Use the message once SOK is implemented *)
-    let verify t stmt ~message:_ =
+    let verify t stmt ~message =
       if
         not
           (Int.( = )
@@ -687,7 +678,9 @@ struct
              0)
       then Deferred.return false
       else
-        match%map Init.Verifier.verify_transaction_snark Init.verifier t with
+        match%map
+          Init.Verifier.verify_transaction_snark Init.verifier t ~message
+        with
         | Ok b -> b
         | Error e ->
             Logger.warn Init.logger
@@ -802,7 +795,6 @@ module type Main_intf = sig
       Snark_worker_lib.Intf.S
       with type proof := Ledger_proof.t
        and type statement := Ledger_proof.statement
-       and type public_key := Public_key.Compressed.t
        and type transition := Super_transaction.t
        and type sparse_ledger := Sparse_ledger.t
 

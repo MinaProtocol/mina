@@ -117,11 +117,14 @@ struct
     in
     let snark_transition =
       Snark_transition.create_value
-        ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
-        ~consensus_data:consensus_transition_data
-        ~ledger_proof:
+        ?sok_digest:
+          (Option.map ledger_proof_opt ~f:(fun (p, _) ->
+               Ledger_proof.sok_digest p ))
+        ?ledger_proof:
           (Option.map ledger_proof_opt
              ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+        ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
+        ~consensus_data:consensus_transition_data ()
     in
     let internal_transition =
       Internal_transition.create ~snark_transition
