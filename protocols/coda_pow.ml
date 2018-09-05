@@ -715,8 +715,7 @@ module type Inputs_intf = sig
   module Fee_transfer :
     Fee_transfer_intf with type public_key := Public_key.Compressed.t
 
-  module Coinbase :
-    Coinbase_intf
+  module Coinbase : Coinbase_intf
 
   module Super_transaction :
     Super_transaction_intf
