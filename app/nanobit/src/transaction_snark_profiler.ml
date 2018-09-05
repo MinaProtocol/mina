@@ -1,4 +1,5 @@
 open Core
+open Signature_lib
 open Nanobit_base
 open Snark_params
 
@@ -7,7 +8,7 @@ let create_ledger_and_transactions num_transitions =
   let num_accounts = 4 in
   let ledger = Ledger.create () in
   let keys =
-    Array.init num_accounts ~f:(fun _ -> Signature_keypair.create ())
+    Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
   in
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
@@ -16,7 +17,7 @@ let create_ledger_and_transactions num_transitions =
         ; balance= Currency.Balance.of_int 10_000
         ; receipt_chain_hash= Receipt.Chain_hash.empty
         ; nonce= Account.Nonce.zero } ) ;
-  let txn from_kp (to_kp: Signature_keypair.t) amount fee nonce =
+  let txn from_kp (to_kp: Signature_lib.Keypair.t) amount fee nonce =
     let payload : Transaction.Payload.t =
       {receiver= Public_key.compress to_kp.public_key; fee; amount; nonce}
     in
@@ -96,9 +97,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         in
         let span, proof =
           time (fun () ->
-              T.of_transition
-                (Sparse_ledger.merkle_root sparse_ledger)
-                (Sparse_ledger.merkle_root sparse_ledger')
+              T.of_transition ~sok_digest:Sok_message.Digest.default
+                ~source:(Sparse_ledger.merkle_root sparse_ledger)
+                ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 t
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
@@ -112,7 +113,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
           List.fold_map (pair_up proofs) ~init:Time.Span.zero ~f:
             (fun max_time (x, y) ->
               let pair_time, proof =
-                time (fun () -> T.merge x y |> Or_error.ok_exn)
+                time (fun () ->
+                    T.merge ~sok_digest:Sok_message.Digest.default x y
+                    |> Or_error.ok_exn )
               in
               (Time.Span.max max_time pair_time, proof) )
         in
@@ -125,14 +128,18 @@ let check_base_snarks sparse_ledger0
     (transitions: Transaction_snark.Transition.t list) =
   let module Sparse_ledger = Nanobit_base.Sparse_ledger in
   let _ =
+    let sok_message =
+      Sok_message.create ~fee:Currency.Fee.zero
+        ~prover:Public_key.(compress (of_private_key (Private_key.create ())))
+    in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
           Sparse_ledger.apply_super_transaction_exn sparse_ledger t
         in
         let () =
-          Transaction_snark.check_transition
-            (Sparse_ledger.merkle_root sparse_ledger)
-            (Sparse_ledger.merkle_root sparse_ledger')
+          Transaction_snark.check_transition ~sok_message
+            ~source:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target:(Sparse_ledger.merkle_root sparse_ledger')
             t
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
@@ -150,7 +157,8 @@ let run profiler num_transactions =
                List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
            | Transaction t ->
                let t = (t :> Transaction.t) in
-               [t.payload.receiver; Public_key.compress t.sender] ))
+               [t.payload.receiver; Public_key.compress t.sender]
+           | Coinbase _ -> failwith "Coinbases not yet implemented" ))
   in
   let message = profiler sparse_ledger transitions in
   Core.printf !"%s\n%!" message ;

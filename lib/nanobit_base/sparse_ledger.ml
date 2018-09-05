@@ -1,4 +1,5 @@
 open Core
+open Import
 open Snark_params.Tick
 
 include Sparse_ledger_lib.Sparse_ledger.Make (struct
@@ -69,6 +70,7 @@ let apply_super_transaction_exn t transition =
   match transition with
   | Super_transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
   | Transaction tr -> apply_transaction_exn t (tr :> Transaction.t)
+  | Coinbase _ -> failwith "Coinbases not yet implemented"
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 

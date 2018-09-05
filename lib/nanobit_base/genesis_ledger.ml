@@ -1,4 +1,5 @@
 open Core_kernel
+open Import
 
 let pk = Public_key.Compressed.of_base64_exn
 

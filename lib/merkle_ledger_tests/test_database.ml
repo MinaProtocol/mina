@@ -175,9 +175,10 @@ let%test_module "test functor on in memory databases" =
                 let address = MT.Addr.of_directions padded_directions in
                 let path = MT.merkle_path_at_addr mdb address in
                 let leaf_hash = MT.get_inner_hash_at_addr_exn mdb address in
-                let root_hash = MT.get_inner_hash_at_addr_exn mdb (MT.Addr.root ()) in
-                assert (MT.Path.check_path path leaf_hash root_hash) )
-        )
+                let root_hash =
+                  MT.get_inner_hash_at_addr_exn mdb (MT.Addr.root ())
+                in
+                assert (MT.Path.check_path path leaf_hash root_hash) ) )
 
       let%test_unit "Add 2^d accounts (for testing, d is small)" =
         if Depth.depth <= 8 then
@@ -188,9 +189,8 @@ let%test_module "test functor on in memory databases" =
                     Account.create (Int.to_string public_key)
                       (Quickcheck.random_value gen_balance) )
               in
-              assert (
-                Sequence.for_all (Sequence.of_list accounts) ~f:(fun account ->
-                    MT.set_account mdb account = Ok () ) ) ;
+              List.iter accounts ~f:(fun account ->
+                  assert (MT.set_account mdb account = Ok ()) ) ;
               let retrieved_accounts =
                 MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in

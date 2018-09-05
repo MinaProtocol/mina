@@ -4,6 +4,7 @@ open Core
 module Make
     (Key : Intf.Key) (Account : sig
         type t [@@deriving sexp, bin_io]
+
         include Intf.Account with type key := Key.t and type t := t
     end)
     (Hash : sig

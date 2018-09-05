@@ -13,6 +13,18 @@ module type Time_controller_intf = sig
   val create : unit -> t
 end
 
+module type Sok_message_intf = sig
+  type public_key_compressed
+
+  module Digest : sig
+    type t
+  end
+
+  type t
+
+  val create : fee:Currency.Fee.t -> prover:public_key_compressed -> t
+end
+
 module type Time_intf = sig
   module Stable : sig
     module V1 : sig
@@ -221,12 +233,21 @@ module type Fee_transfer_intf = sig
   val receivers : t -> public_key list
 end
 
+module type Coinbase_intf = sig
+  type t [@@deriving sexp, compare, eq]
+end
+
 module type Super_transaction_intf = sig
   type valid_transaction
 
   type fee_transfer
 
-  type t = Transaction of valid_transaction | Fee_transfer of fee_transfer
+  type coinbase
+
+  type t =
+    | Transaction of valid_transaction
+    | Fee_transfer of fee_transfer
+    | Coinbase of coinbase
   [@@deriving sexp, compare, eq, bin_io]
 
   val fee_excess : t -> Fee.Unsigned.t Or_error.t
@@ -252,13 +273,17 @@ module type Ledger_proof_intf = sig
 
   type statement
 
-  type message
-
   type proof
 
-  type t [@@deriving sexp]
+  type sok_digest
+
+  type t [@@deriving sexp, bin_io]
 
   val statement_target : statement -> ledger_hash
+
+  val statement : t -> statement
+
+  val sok_digest : t -> sok_digest
 
   val underlying_proof : t -> proof
 end
@@ -411,6 +436,7 @@ module type Ledger_builder_intf = sig
 
   val create_diff :
        t
+    -> logger:Logger.t
     -> transactions_by_fee:transaction_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
@@ -495,6 +521,8 @@ module type Consensus_mechanism_intf = sig
 
   type transaction
 
+  type sok_digest
+
   type ledger
 
   module Local_state : sig
@@ -541,9 +569,11 @@ module type Consensus_mechanism_intf = sig
     type var
 
     val create_value :
-         blockchain_state:blockchain_state
+         ?sok_digest:sok_digest
+      -> ?ledger_proof:proof
+      -> blockchain_state:blockchain_state
       -> consensus_data:Consensus_transition_data.value
-      -> ledger_proof:proof option
+      -> unit
       -> value
 
     val blockchain_state : value -> blockchain_state
@@ -685,10 +715,13 @@ module type Inputs_intf = sig
   module Fee_transfer :
     Fee_transfer_intf with type public_key := Public_key.Compressed.t
 
+  module Coinbase : Coinbase_intf
+
   module Super_transaction :
     Super_transaction_intf
     with type valid_transaction := Transaction.With_valid_signature.t
      and type fee_transfer := Fee_transfer.t
+     and type coinbase := Coinbase.t
 
   module Ledger_hash : Ledger_hash_intf
 
@@ -696,19 +729,22 @@ module type Inputs_intf = sig
     type t
   end
 
+  module Sok_message :
+    Sok_message_intf with type public_key_compressed := Public_key.Compressed.t
+
   module Ledger_proof_statement :
     Ledger_proof_statement_intf with type ledger_hash := Ledger_hash.t
 
   module Ledger_proof :
     Ledger_proof_intf
-    with type message := Fee.Unsigned.t * Public_key.Compressed.t
-     and type ledger_hash := Ledger_hash.t
+    with type ledger_hash := Ledger_hash.t
      and type statement := Ledger_proof_statement.t
      and type proof := Proof.t
+     and type sok_digest := Sok_message.Digest.t
 
   module Ledger_proof_verifier :
     Ledger_proof_verifier_intf
-    with type message := Fee.Unsigned.t * Public_key.Compressed.t
+    with type message := Sok_message.t
      and type ledger_proof := Ledger_proof.t
      and type statement := Ledger_proof_statement.t
 
@@ -821,6 +857,7 @@ Merge Snark:
      and type proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
      and type transaction := Transaction.t
+     and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
 
   module Tip :
