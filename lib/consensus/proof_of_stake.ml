@@ -757,6 +757,10 @@ struct
     let open Consensus_state in
     let open Epoch_data in
     (* TODO: add fork_before_checkpoint check *)
+    (* not (List.exists this.checkpoints ~f:(fun c ->
+     *   List.exists that.checkpoints ~f:(
+     *     Nanobit_base.State_hash.equal c)))
+     *)
     if
       not
         (time_in_epoch_slot that
