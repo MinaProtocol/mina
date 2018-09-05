@@ -25,6 +25,9 @@ test_method() {
       echo "PASSED"
     else
       echo "FAILED"
+      ss -nlp
+      ps auxf
+      tail -n 100 test.log
     fi
   done
 }
