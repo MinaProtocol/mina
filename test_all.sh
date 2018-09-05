@@ -17,8 +17,7 @@ test_method() {
     date
     SECONDS=0
     echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM}"
-    sleep 1
-    unset -e
+    set +e
     dune exec cli -- $test 2>&1 >> test.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
