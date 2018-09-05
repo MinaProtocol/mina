@@ -24,11 +24,12 @@ let of_ledger_subset_exn ledger keys =
       (of_hash ~depth:Ledger.depth
          (Merkle_hash.of_digest (Ledger.merkle_root ledger :> Pedersen.Digest.t)))
 
-let apply_transaction_exn t ({sender; payload; _}: Transaction.t) =
-  let {Transaction_payload.amount; fee; receiver; _} = payload in
+let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
+  let {Transaction_payload.amount; fee; receiver; nonce} = payload in
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in
+  assert (Account.Nonce.equal sender_account.nonce nonce) ;
   if not Insecure.fee_collection then
     failwith "Bundle.Sparse_ledger: Insecure.fee_collection" ;
   let open Currency in
@@ -66,11 +67,32 @@ let apply_fee_transfer_exn =
   fun t transfer ->
     List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
 
+let apply_coinbase_exn t ({proposer; fee_transfer}: Coinbase.t) =
+  let open Currency in
+  let add_to_balance t pk amount =
+    let idx = find_index_exn t pk in
+    let a = get_exn t idx in
+    set_exn t idx
+      {a with balance= Option.value_exn (Balance.add_amount a.balance amount)}
+  in
+  let proposer_reward, t =
+    match fee_transfer with
+    | None -> (Protocols.Coda_praos.coinbase_amount, t)
+    | Some (receiver, fee) ->
+        let fee = Amount.of_fee fee in
+        let reward =
+          Amount.sub Protocols.Coda_praos.coinbase_amount fee
+          |> Option.value_exn
+        in
+        (reward, add_to_balance t receiver fee)
+  in
+  add_to_balance t proposer proposer_reward
+
 let apply_super_transaction_exn t transition =
   match transition with
   | Super_transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
   | Transaction tr -> apply_transaction_exn t (tr :> Transaction.t)
-  | Coinbase _ -> failwith "Coinbases not yet implemented"
+  | Coinbase c -> apply_coinbase_exn t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)
 

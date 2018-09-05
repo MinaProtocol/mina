@@ -264,12 +264,11 @@ struct
         | Fee_transfer of Fee_transfer.t
         | Coinbase of Coinbase.t
       [@@deriving compare, eq]
-
-      let fee_excess = function
-        | Transaction t -> Ok (Transaction.fee (t :> Transaction.t))
-        | Fee_transfer t -> Fee_transfer.fee_excess t
-        | Coinbase _ -> failwith "Coinbases not yet implemented"
     end
+
+    let fee_excess = Super_transaction.fee_excess
+
+    let supply_increase = Super_transaction.supply_increase
 
     include T
 
