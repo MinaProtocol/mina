@@ -5,7 +5,9 @@ open Fold_lib
 open Tuple_lib
 
 module type Basic = sig
-  type t [@@deriving bin_io, sexp, compare, eq, hash]
+  type t [@@deriving bin_io, sexp, compare, hash]
+
+  include Comparable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
 
@@ -203,4 +205,6 @@ module Balance : sig
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
   end
+
+  val of_amount : Amount.t -> t
 end
