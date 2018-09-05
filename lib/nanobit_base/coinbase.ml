@@ -42,4 +42,5 @@ let supply_increase {proposer= _; fee_transfer} =
            ~default:(Or_error.error_string "Coinbase underflow")
 
 let fee_excess t =
-  Or_error.map (supply_increase t) ~f:(fun _increase -> Currency.Fee.zero)
+  Or_error.map (supply_increase t) ~f:(fun _increase ->
+      Currency.Fee.Signed.zero )
