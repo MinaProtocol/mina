@@ -64,6 +64,7 @@ struct
           (let%bind good_body =
              let%bind correct_transaction_snark =
                T.verify_complete_merge
+                 (Snark_transition.sok_digest transition)
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state

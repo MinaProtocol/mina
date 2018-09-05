@@ -32,14 +32,16 @@ module Inputs = struct
   module Sparse_ledger = Nanobit_base.Sparse_ledger
 
   (* TODO: Use public_key once SoK is implemented *)
-  let perform_single ((module M): Worker_state.t) ~message:_ =
+  let perform_single ((module M): Worker_state.t) ~message =
     let open Snark_work_lib in
+    let sok_digest = Nanobit_base.Sok_message.digest message in
     function
       | Work.Single.Spec.Transition (input, t, l) ->
           Or_error.return
-            (M.of_transition input.Statement.source input.target t
+            (M.of_transition ~sok_digest ~source:input.Statement.source
+               ~target:input.target t
                (unstage (Nanobit_base.Sparse_ledger.handler l)))
-      | Merge (_, proof1, proof2) -> M.merge proof1 proof2
+      | Merge (_, proof1, proof2) -> M.merge ~sok_digest proof1 proof2
 end
 
 module Worker = Worker.Make (Inputs)
