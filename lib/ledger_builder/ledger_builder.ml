@@ -418,7 +418,7 @@ end = struct
     ( undo
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger
-      ; fee_excess= Fee.Signed.of_unsigned fee_excess
+      ; fee_excess
       ; proof_type= `Base } )
 
   let apply_super_transaction_and_get_witness ledger s =
@@ -923,7 +923,7 @@ let%test_module "test" =
 
         let fee_excess t =
           Or_error.map (supply_increase t) ~f:(fun _increase ->
-              Currency.Fee.zero )
+              Currency.Fee.Signed.zero )
       end
 
       module Super_transaction = struct
@@ -943,11 +943,15 @@ let%test_module "test" =
           | Coinbase of coinbase
         [@@deriving sexp, bin_io, compare, eq]
 
-        let fee_excess : t -> unsigned_fee Or_error.t =
+        let fee_excess : t -> Fee.Signed.t Or_error.t =
          fun t ->
+          let open Or_error.Let_syntax in
           match t with
-          | Transaction t' -> Ok (Transaction.fee t')
-          | Fee_transfer f -> Fee_transfer.fee_excess f
+          | Transaction t' ->
+              Ok (Currency.Fee.Signed.of_unsigned (Transaction.fee t'))
+          | Fee_transfer f ->
+              let%map fee = Fee_transfer.fee_excess f in
+              Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
           | Coinbase t -> Coinbase.fee_excess t
 
         let supply_increase = function
