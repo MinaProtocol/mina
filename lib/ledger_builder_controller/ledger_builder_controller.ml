@@ -81,7 +81,7 @@ module type Inputs_intf = sig
     val select :
          Consensus_state.value
       -> Consensus_state.value
-      -> time_received:Int64.t
+      -> time_received:Unix_timestamp.t
       -> [`Keep | `Take]
   end
 
@@ -193,7 +193,7 @@ end = struct
       { parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
       ; external_transitions:
-          (External_transition.t * Int64.t) Linear_pipe.Reader.t
+          (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; disk_location: string }
     [@@deriving make]
@@ -709,7 +709,7 @@ let%test_module "test" =
              let%bind () = after (Time_ns.Span.of_ms 100.) in
              let time =
                Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
-               |> Int64.of_float
+               |> Unix_timestamp.of_float
              in
              Linear_pipe.write w (x, time) )) ;
       r

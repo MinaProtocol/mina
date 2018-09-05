@@ -1,0 +1,8 @@
+(jbuild_version  1)
+
+(library
+ ((name unix_timestamp)
+  (public_name unix_timestamp)
+  (library_flags (-linkall))
+  (inline_tests)
+  (libraries (core_kernel))))

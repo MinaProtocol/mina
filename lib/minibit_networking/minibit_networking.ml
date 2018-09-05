@@ -219,7 +219,7 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { gossip_net: Gossip_net.t
     ; log: Logger.t
-    ; states: (External_transition.t * Int64.t) Linear_pipe.Reader.t
+    ; states: (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
     ; transaction_pool_diffs: Transaction_pool_diff.t Linear_pipe.Reader.t
     ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t }
   [@@deriving fields]
@@ -260,7 +260,7 @@ module Make (Inputs : Inputs_intf) = struct
               `Fst
                 ( s
                 , Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
-                  |> Int64.of_float )
+                  |> Unix_timestamp.of_float )
           | Snark_pool_diff d -> `Snd d
           | Transaction_pool_diff d -> `Trd d )
     in

@@ -14,7 +14,7 @@ module type Inputs_intf = sig
     val select :
          Consensus_state.value
       -> Consensus_state.value
-      -> time_received:Int64.t
+      -> time_received:Unix_timestamp.t
       -> [`Keep | `Take]
   end
 
@@ -95,7 +95,7 @@ module type S = sig
        catchup
     -> t
     -> transition
-    -> time_received:Int64.t
+    -> time_received:Unix_timestamp.t
     -> ( handler_state_change list
        * (transition, handler_state_change list) Job.t option )
        Deferred.t
@@ -277,7 +277,7 @@ struct
           | None -> return (Or_error.error_string "Not found locally")
 
   let on_new_transition catchup ({state; log} as t)
-      (transition: External_transition.t) ~(time_received: Int64.t) :
+      (transition: External_transition.t) ~(time_received: Unix_timestamp.t) :
       ( Transition_logic_state.Change.t list
       * (External_transition.t, Transition_logic_state.Change.t list) Job.t
         option )
