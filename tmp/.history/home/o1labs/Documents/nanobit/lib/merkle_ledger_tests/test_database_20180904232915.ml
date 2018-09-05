@@ -147,7 +147,8 @@ let%test_module "test functor on in memory databases" =
                       Direction.Left )
                 in
                 let padded_directions = List.concat [offset; directions] in
-                let address = MT.Addr.of_directions padded_directions in   
+                let address = MT.Addr.of_directions padded_directions in
+                
                 let num_accounts =
                   1 lsl (Depth.depth - List.length padded_directions)
                 in

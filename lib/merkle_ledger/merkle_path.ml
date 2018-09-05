@@ -11,6 +11,8 @@ module type S = sig
   type t = elem list [@@deriving sexp]
 
   val implied_root : t -> hash -> hash
+
+  val check_path : t -> hash -> hash -> bool
 end
 
 module Make(Hash: sig
@@ -32,4 +34,18 @@ end) : S with type hash := Hash.t = struct
         in
         (acc, height + 1) )
     |> fst
+
+  let check_path t leaf_hash root_hash = 
+    let path_root, _ =
+      List.fold t
+        ~init:(leaf_hash, 0)
+        ~f:(fun (a, height) b ->
+          let a =
+            match b with
+            | `Left b -> Hash.merge ~height a b
+            | `Right b -> Hash.merge ~height b a
+          in
+          (a, height + 1) )
+    in
+    path_root = root_hash
 end

@@ -138,18 +138,7 @@ let%test_module "test functor on in memory databases" =
     module Path = Merkle_ledger.Merkle_path.Make(Hash)
 
     let check_path account (path: Path.t) root =
-      let path_root, _ =
-        List.fold path
-          ~init:(Hash.hash_account account, 0)
-          ~f:(fun (a, height) b ->
-            let a =
-              match b with
-              | `Left b -> Hash.merge ~height a b
-              | `Right b -> Hash.merge ~height b a
-            in
-            (a, height + 1) )
-      in
-      path_root = root
+      Path.check_path path (Hash.hash_account account) root
 
     let%test_unit "merkle_path" =
       let b1 = 10 in

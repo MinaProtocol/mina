@@ -288,7 +288,7 @@ struct
   let%test_unit "parent_exn(child_exn(node)) = node" =
     Quickcheck.test ~sexp_of:[%sexp_of : Direction.t List.t * Direction.t]
       (Quickcheck.Generator.tuple2
-         (Direction.gen_list Input.depth)
+         (Direction.gen_var_length_list Input.depth)
          Direction.gen)
       ~f:(fun (path, direction) ->
         let address = of_directions path in
@@ -303,20 +303,15 @@ struct
 
   let%test_unit "of_index_exn(to_index(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-    (Quickcheck.Generator.(list_with_length Input.depth (Direction.gen)))
+    (Direction.gen_list Input.depth)
     ~f:(fun directions -> 
       let address = of_directions directions in
       [%test_result : t] ~expect:address (of_index_exn @@ to_index address)
       )
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
-    let gen_non_empty_directions = 
-      let open Quickcheck.Let_syntax in
-      let%bind length = Int.gen_incl 1 Input.depth in
-      Quickcheck.Generator.list_with_length length Direction.gen
-    in
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
-      gen_non_empty_directions
+      (Direction.gen_var_length_list ~start:1 Input.depth)
       ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result : t] ~expect:address (sibling @@ sibling address)

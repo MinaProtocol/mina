@@ -69,7 +69,7 @@ end = struct
       | Hash of Addr.t
 
     let is_generic = function Generic _ -> true | _ -> false
-
+ 
     let is_account = function Account _ -> true | _ -> false
 
     let is_hash = function Hash _ -> true | _ -> false
@@ -361,11 +361,14 @@ end = struct
     let key = if Key.is_account key then Key.Hash (Key.path key) else key in
     assert (Key.is_hash key) ;
     let rec loop k =
-      let sibling = Key.sibling k in
-      let sibling_dir = Key.last_direction (Key.path k) in
-      let hash = get_hash mdb sibling in
-      (Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash))
-      :: (if Key.height key < max_depth then loop (Key.parent k) else [])
+      if (Key.height k) = 0 then []
+      else (
+        let sibling = Key.sibling k in
+        let sibling_dir = Key.last_direction (Key.path k) in
+        let hash = get_hash mdb sibling in
+        (Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)) 
+          :: loop (Key.parent k)  
+      )
     in
     loop key
 
