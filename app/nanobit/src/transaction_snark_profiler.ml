@@ -157,7 +157,8 @@ let run profiler num_transactions =
                List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
            | Transaction t ->
                let t = (t :> Transaction.t) in
-               [t.payload.receiver; Public_key.compress t.sender] ))
+               [t.payload.receiver; Public_key.compress t.sender]
+           | Coinbase _ -> failwith "Coinbases not yet implemented" ))
   in
   let message = profiler sparse_ledger transitions in
   Core.printf !"%s\n%!" message ;

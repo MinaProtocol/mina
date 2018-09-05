@@ -115,6 +115,7 @@ module Transition = struct
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
     | Transaction t -> (Normal, (t :> Transaction.t))
+    | Coinbase _ -> failwith "Coinbases not yet implemented"
 end
 
 module Proof_type = struct
