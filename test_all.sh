@@ -32,7 +32,11 @@ test_method() {
       echo "PASSED"
     else
       echo "FAILED"
+      echo "------------------------------------------------------------------------------------------"
+      echo "RECENT LOG OUTPUT:"
       tail -n 30 test.log
+      echo "------------------------------------------------------------------------------------------"
+      echo "See above for stack trace..."
       exit 2
     fi
     set -e
