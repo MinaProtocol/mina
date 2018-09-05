@@ -1,6 +1,5 @@
 open Core
 open Async
-open Blockchain_snark
 
 module Make (Inputs : Intf.Inputs_intf) :
   Intf.S
@@ -50,20 +49,22 @@ struct
       ~finish:(fun res ->
         Ok {Snark_work_lib.Work.Result.proofs= List.rev res; spec} )
 
-  let shutdown_on_disconnect log connection =
-    upon (Rpc.Connection.close_finished connection) (fun () ->
-        Logger.info log "Connection to daemon closed, shutting down." ;
-        Shutdown.shutdown 0 )
-
-  let main daemon_port public_key =
-    let%bind conn =
-      Rpc.Connection.client
+  let dispatch rpc shutdown_on_disconnect query port =
+    let%map res =
+      Rpc.Connection.with_client
         (Tcp.Where_to_connect.of_host_and_port
-           (Host_and_port.create ~host:"127.0.0.1" ~port:daemon_port))
-      >>| Result.ok_exn
+           (Host_and_port.create ~host:"127.0.0.1" ~port))
+        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
     in
+    match res with
+    | Error exn ->
+        if shutdown_on_disconnect then
+          failwithf !"Shutting down. Error: %s" (Exn.to_string_mach exn) ()
+        else Or_error.of_exn exn
+    | Ok res -> res
+
+  let main daemon_port public_key shutdown_on_disconnect =
     let log = Logger.create () in
-    shutdown_on_disconnect log conn ;
     let%bind state = Worker_state.create () in
     let wait ?(sec= 0.5) () = after (Time.Span.of_sec sec) in
     let rec go () =
@@ -73,20 +74,25 @@ struct
         go ()
       in
       Logger.info log "Asking for work again..." ;
-      match%bind Rpc.Rpc.dispatch Rpcs.Get_work.rpc conn () with
+      match%bind
+        dispatch Rpcs.Get_work.rpc shutdown_on_disconnect () daemon_port
+      with
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
           Logger.info log "No work; waiting a few seconds before retrying" ;
           let%bind () = wait ~sec:Worker_state.worker_wait_time () in
           go ()
       | Ok (Some work) ->
-          Logger.info log "Got some work" ;
+          Logger.info log "Got some work\n" ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result ->
-            match Rpc.One_way.dispatch Rpcs.Submit_work.rpc conn result with
-            | Error e -> log_and_retry "submitting work" e
-            | Ok () -> go ()
+              match%bind
+                dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
+                  daemon_port
+              with
+              | Error e -> log_and_retry "submitting work" e
+              | Ok () -> go ()
     in
     go ()
 
@@ -100,12 +106,20 @@ struct
         flag "public-key"
           (required Cli_lib.public_key_compressed)
           ~doc:"Public key to send SNARKing fees to"
+      and shutdown_on_disconnect =
+        flag "shutdown-on-disconnect" (optional bool)
+          ~doc:
+            "true|false Shutdown when disconnected from daemon (default:true)"
       in
-      fun () -> main daemon_port public_key)
+      fun () ->
+        main daemon_port public_key
+          (Option.value ~default:true shutdown_on_disconnect))
 
-  let arguments ~public_key ~daemon_port =
+  let arguments ~public_key ~daemon_port ~shutdown_on_disconnect =
     [ "-public-key"
     ; Signature_lib.Public_key.Compressed.to_base64 public_key
     ; "-daemon-port"
-    ; Int.to_string daemon_port ]
+    ; Int.to_string daemon_port
+    ; "-shutdown-on-disconnect"
+    ; Bool.to_string shutdown_on_disconnect ]
 end
