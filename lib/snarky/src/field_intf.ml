@@ -33,7 +33,6 @@ module type S = sig
 end
 
 module type Extended = sig
-  open Core_kernel
 
   include S
 
