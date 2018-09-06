@@ -37,6 +37,7 @@ test_method() {
       tail -n 30 test.log
       echo "------------------------------------------------------------------------------------------"
       echo "See above for stack trace..."
+      cat test.log
       exit 2
     fi
     set -e
