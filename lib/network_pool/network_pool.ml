@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Snark_pool
 
 module type Pool_intf = sig
   type t
