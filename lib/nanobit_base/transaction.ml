@@ -1,6 +1,5 @@
 open Core
 open Import
-open Util
 open Snark_params
 open Coda_numbers
 open Tick
