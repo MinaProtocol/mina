@@ -1,0 +1,43 @@
+module type S = sig
+  type root_hash
+
+  type hash
+
+  type account
+
+  type key
+
+  type t [@@deriving sexp]
+
+  module Addr : Merkle_address.S
+
+  module Path : Merkle_path_intf.S with type hash := hash
+
+  include Syncable_intf.S
+          with type root_hash := root_hash
+           and type hash := hash
+           and type account := account
+           and type addr := Addr.t
+           and type path = Path.t
+           and type t := t
+
+  val create : unit -> t
+
+  val get : t -> key -> account option
+
+  val set : t -> key -> account -> unit
+
+  val get_at_index_exn : t -> int -> account
+
+  val set_at_index_exn : t -> int -> account -> unit
+
+  val index_of_key_exn : t -> key -> int
+
+  val merkle_root : t -> root_hash
+
+  val merkle_path : t -> key -> Path.t option
+
+  val merkle_path_at_index_exn : t -> int -> Path.t
+
+  val copy : t -> t
+end
