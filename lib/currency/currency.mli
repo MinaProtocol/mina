@@ -7,6 +7,8 @@ open Tuple_lib
 module type Basic = sig
   type t [@@deriving bin_io, sexp, compare, hash]
 
+  val max_value : t
+
   include Comparable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
@@ -68,6 +70,9 @@ module type Checked_arithmetic_intf = sig
   val add : var -> var -> (var, _) Checked.t
 
   val sub : var -> var -> (var, _) Checked.t
+
+  val sub_flagged
+    : var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
 
   val ( + ) : var -> var -> (var, _) Checked.t
 
