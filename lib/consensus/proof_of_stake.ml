@@ -670,12 +670,12 @@ struct
         previous_consensus_state.last_epoch_data.ledger.hash
         <> next_consensus_state.last_epoch_data.ledger.hash
       then (
-        (if
-           Nanobit_base.Ledger_hash.equal
-             previous_consensus_state.last_epoch_data.ledger.hash
-             genesis_ledger_hash
-         then
-           Ledger_pool.free previous_consensus_state.last_epoch_data.ledger.hash) ;
+        if
+          Nanobit_base.Ledger_hash.equal
+            previous_consensus_state.last_epoch_data.ledger.hash
+            genesis_ledger_hash
+        then
+          Ledger_pool.free previous_consensus_state.last_epoch_data.ledger.hash ;
         Ledger_pool.save local_state ledger ) ;
       next_consensus_state
 
