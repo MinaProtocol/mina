@@ -10,6 +10,8 @@ open Tuple_lib
 module type Basic = sig
   type t [@@deriving bin_io, sexp, compare, hash]
 
+  val max_value : t
+
   include Comparable.S with type t := t
 
   val gen : t Quickcheck.Generator.t
@@ -139,6 +141,9 @@ module type Checked_arithmetic_intf = sig
 
   val sub : var -> var -> (var, _) Checked.t
 
+  val sub_flagged
+    : var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
+
   val ( + ) : var -> var -> (var, _) Checked.t
 
   val ( - ) : var -> var -> (var, _) Checked.t
@@ -190,6 +195,8 @@ end = struct
   end
 
   include Stable.V1
+
+  let max_value = Unsigned.max_int
 
   let of_int = Unsigned.of_int
 
@@ -412,6 +419,14 @@ end = struct
     (* Unpacking protects against underflow *)
     let sub (x: Unpacked.var) (y: Unpacked.var) =
       unpack_var (Field.Checked.sub (pack_var x) (pack_var y))
+
+    let sub_flagged x y =
+      let z = Field.Checked.sub (pack_var x) (pack_var y) in
+      let%map (bits, `Success no_underflow) =
+        Field.Checked.unpack_flagged z ~length:length_in_bits
+      in
+      (bits, `Underflow (Boolean.not no_underflow))
+
 
     (* Unpacking protects against overflow *)
     let add (x: Unpacked.var) (y: Unpacked.var) =
