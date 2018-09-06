@@ -261,6 +261,7 @@ module type Ledger_proof_statement_intf = sig
   type t =
     { source: ledger_hash
     ; target: ledger_hash
+    ; supply_increase: Currency.Amount.t
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
