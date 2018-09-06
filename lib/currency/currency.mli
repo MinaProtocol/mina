@@ -7,8 +7,6 @@ open Tuple_lib
 module type Basic = sig
   type t [@@deriving bin_io, sexp, compare, hash]
 
-  val max_value : t
-
   include Comparable.S with type t := t
 
   val gen : t Quickcheck.Generator.t

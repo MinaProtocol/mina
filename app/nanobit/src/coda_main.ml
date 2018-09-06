@@ -515,8 +515,8 @@ struct
       apply_and_broadcast t
         (Add_solved_work
            ( List.map res.spec.instances ~f:Single.Spec.statement
-           , { proof= res.proofs
-             ; fee= {fee= res.spec.fee; prover= Init.fee_public_key} } ))
+           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
+           ))
   end
 
   module type S_tmp =
@@ -931,12 +931,11 @@ module Run (Program : Main_intf) = struct
                 | Some _ -> () ) ;
                 r
             | `Eof -> assert false )
-      ; Rpc.One_way.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
-            don't_wait_for
-              (let%map () =
-                 Snark_pool.add_completed_work (snark_pool minibit) work
-               in
-               Linear_pipe.write_without_pushback solved_work_writer ()) ) ]
+      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
+            let%map () =
+              Snark_pool.add_completed_work (snark_pool minibit) work
+            in
+            Linear_pipe.write_without_pushback solved_work_writer () ) ]
     in
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
@@ -960,14 +959,15 @@ module Run (Program : Main_intf) = struct
                    Logger.error log "%s" (Exn.to_string_mach exn) ;
                    Deferred.unit )) ))
 
-  let create_snark_worker ~log ~public_key ~client_port =
+  let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect =
     let open Snark_worker_lib in
     let%map p =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
           ( Program.snark_worker_command_name
-          :: Snark_worker.arguments ~public_key ~daemon_port:client_port )
+          :: Snark_worker.arguments ~public_key ~daemon_port:client_port
+               ~shutdown_on_disconnect )
     in
     let log = Logger.child log "snark_worker" in
     Pipe.iter_without_pushback
@@ -980,9 +980,12 @@ module Run (Program : Main_intf) = struct
     |> don't_wait_for ;
     Deferred.unit
 
-  let run_snark_worker ~log ~client_port run_snark_worker =
+  let run_snark_worker ?shutdown_on_disconnect:(s = true) ~log ~client_port
+      run_snark_worker =
     match run_snark_worker with
     | `Don't_run -> ()
     | `With_public_key public_key ->
-        create_snark_worker ~log ~public_key ~client_port |> ignore
+        create_snark_worker ~shutdown_on_disconnect:s ~log ~public_key
+          ~client_port
+        |> ignore
 end
