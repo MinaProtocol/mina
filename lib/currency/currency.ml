@@ -103,6 +103,12 @@ module type Signed_intf = sig
   val of_unsigned : magnitude -> t
 
   module Checked : sig
+    val constant : t -> var
+
+    val of_unsigned : magnitude_var -> var
+
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
     val to_triples : var -> Boolean.var Triple.t list
 
     val add : var -> var -> (var, _) Checked.t
@@ -119,11 +125,15 @@ module type Signed_intf = sig
 end
 
 module type Checked_arithmetic_intf = sig
+  type t
+
   type var
 
   type signed_var
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
+  val if_value : Boolean.var -> then_:t -> else_:t -> var
 
   val add : var -> var -> (var, _) Checked.t
 
@@ -148,6 +158,7 @@ module type S = sig
     Checked_arithmetic_intf
     with type var := var
      and type signed_var := Signed.var
+     and type t := t
 end
 
 module Make
@@ -242,6 +253,10 @@ end = struct
 
   let fold t = Fold.group3 ~default:false (fold t)
 
+  let if_ cond ~then_ ~else_ =
+    Field.Checked.if_ cond ~then_:(pack_var then_) ~else_:(pack_var else_)
+    >>= unpack_var
+
   module Signed = struct
     module Stable = struct
       module V1 = struct
@@ -320,6 +335,17 @@ end = struct
       let to_bits {magnitude; sgn} =
         var_to_bits magnitude @ [Sgn.Checked.is_pos sgn]
 
+      let constant { magnitude; sgn } =
+        { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }
+
+      let of_unsigned magnitude = { magnitude; sgn = Sgn.Checked.pos }
+
+      let if_ cond ~then_ ~else_ =
+        let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
+        and magnitude = if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
+        in
+        { sgn; magnitude }
+
       let to_triples t =
         Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
 
@@ -373,9 +399,15 @@ end = struct
   end
 
   module Checked = struct
-    let if_ cond ~then_ ~else_ =
-      Field.Checked.if_ cond ~then_:(pack_var then_) ~else_:(pack_var else_)
-      >>= unpack_var
+    let if_ = if_
+
+    let if_value cond ~then_ ~else_ : var =
+      List.init M.length ~f:(fun i ->
+        match Vector.get then_ i, Vector.get else_ i with
+        | true, true -> Boolean.true_
+        | false, false -> Boolean.false_
+        | true, false -> cond
+        | false, true -> Boolean.not cond)
 
     (* Unpacking protects against underflow *)
     let sub (x: Unpacked.var) (y: Unpacked.var) =

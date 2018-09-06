@@ -55,11 +55,15 @@ module type Arithmetic_intf = sig
 end
 
 module type Checked_arithmetic_intf = sig
+  type t
+
   type var
 
   type signed_var
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
+  val if_value : Boolean.var -> then_:t -> else_:t -> var
 
   val add : var -> var -> (var, _) Checked.t
 
@@ -118,6 +122,12 @@ module type Signed_intf = sig
   val of_unsigned : magnitude -> t
 
   module Checked : sig
+    val constant : t -> var
+
+    val of_unsigned : magnitude_var -> var
+
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
     val to_triples : var -> Boolean.var Triple.t list
 
     val add : var -> var -> (var, _) Checked.t
@@ -147,6 +157,7 @@ module Fee : sig
     include Checked_arithmetic_intf
             with type var := var
              and type signed_var := Signed.var
+             and type t := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
@@ -172,6 +183,7 @@ module Amount : sig
     include Checked_arithmetic_intf
             with type var := var
              and type signed_var := Signed.var
+             and type t := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
