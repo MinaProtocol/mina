@@ -174,62 +174,81 @@ module Tagged_transaction = struct
 
     (* Someday: Have a more structured "case" construct *)
     let changes ((tag, t) : var) =
-      let open Let_syntax in
-      let if_ cond ~then_:(t1, t2) ~else_:(e1, e2) =
-        let%map x1 = Amount.Signed.Checked.if_ cond ~then_:t1 ~else_:e1
-        and x2 = Amount.Signed.Checked.if_ cond ~then_:t2 ~else_:e2 in
-        (x1, x2)
-      in
-      let is_coinbase = Tag.Checked.is_coinbase tag in
-      let%map excess, sender_delta =
-        let%bind non_coinbase_case =
-          let%bind amount_plus_fee = Amount.Checked.add_fee t.payload.amount t.payload.fee in
-          let open Amount.Signed in
-          let neg_amount_plus_fee =
-            create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee
-          in
-          let pos_fee =
-            create ~sgn:Sgn.Pos ~magnitude:(Amount.Checked.of_fee t.payload.fee)
-          in
-          (* If tag = Normal:
-          sender gets -(amount + fee)
-          excess is +fee
-
-          If tag = Fee_transfer:
-          "sender" gets +fee
-          excess is -(amount + fee) (since "receiver" gets amount)
-          *)
-          Checked.cswap (Tag.Checked.is_fee_transfer tag) (pos_fee, neg_amount_plus_fee)
+      with_label __LOC__ begin
+        let open Let_syntax in
+        let if_ cond ~then_:(t1, t2) ~else_:(e1, e2) =
+          with_label __LOC__ begin
+            let%map x1 = Amount.Signed.Checked.if_ cond ~then_:t1 ~else_:e1
+            and x2 = Amount.Signed.Checked.if_ cond ~then_:t2 ~else_:e2 in
+            (x1, x2)
+          end
         in
-        let%bind coinbase_case =
-          (* If tag = Coinbase:
+        let is_coinbase = Tag.Checked.is_coinbase tag in
+        let%map excess, sender_delta =
+          let%bind non_coinbase_case =
+            with_label __LOC__ begin
+              let%bind amount_plus_fee = Amount.Checked.add_fee t.payload.amount t.payload.fee in
+              let open Amount.Signed in
+              let neg_amount_plus_fee =
+                create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee
+              in
+              let pos_fee =
+                create ~sgn:Sgn.Pos ~magnitude:(Amount.Checked.of_fee t.payload.fee)
+              in
+              (* If tag = Normal:
+              sender gets -(amount + fee)
+              excess is +fee
 
-            "sender" gets (coinbase_amount - amount)
-            excess is zero *)
-          let%map proposer_reward =
-            Amount.Checked.sub
-              (Amount.var_of_t Protocols.Coda_praos.coinbase_amount)
-              t.payload.amount
+              If tag = Fee_transfer:
+              "sender" gets +fee
+              excess is -(amount + fee) (since "receiver" gets amount)
+              *)
+              Checked.cswap (Tag.Checked.is_fee_transfer tag) (pos_fee, neg_amount_plus_fee)
+            end
           in
-          let excess = Amount.Signed.Checked.constant Amount.Signed.zero in
-          (excess, Amount.Signed.Checked.of_unsigned proposer_reward)
+          let%bind coinbase_case =
+            with_label __LOC__ begin
+              (* If tag = Coinbase:
+
+                "sender" gets (coinbase_amount - amount)
+                excess is zero *)
+              let%map proposer_reward =
+                let%bind res, `Underflow underflow =
+                  Amount.Checked.sub_flagged
+                    (Amount.var_of_t Protocols.Coda_praos.coinbase_amount)
+                    t.payload.amount
+                in
+                let%map () =
+                  (* Only need to check that the subtraction actually succeeded in
+                     the coinbase case. *)
+                  Boolean.Assert.any
+                    [ Boolean.not underflow
+                    ; Boolean.not is_coinbase
+                    ]
+                in
+                res
+              in
+              let excess = Amount.Signed.Checked.constant Amount.Signed.zero in
+              (excess, Amount.Signed.Checked.of_unsigned proposer_reward)
+            end
+          in
+          if_ is_coinbase ~then_:coinbase_case ~else_:non_coinbase_case
         in
-        if_ is_coinbase ~then_:coinbase_case ~else_:non_coinbase_case
-      in
-      let supply_increase =
-        Amount.Checked.if_value is_coinbase
-          ~then_:Protocols.Coda_praos.coinbase_amount
-          ~else_:Amount.zero
-      in
-      { excess; sender_delta; supply_increase }
+        let supply_increase =
+          Amount.Checked.if_value is_coinbase
+            ~then_:Protocols.Coda_praos.coinbase_amount
+            ~else_:Amount.zero
+        in
+        { excess; sender_delta; supply_increase }
+      end
   end
 end
 
+let dummy_signature =
+  Schnorr.sign (Private_key.create ()) Transaction_payload.dummy
+
 module Fee_transfer = struct
   include Fee_transfer
-
-  let dummy_signature =
-    Schnorr.sign (Private_key.create ()) Transaction_payload.dummy
 
   let two (pk1, fee1) (pk2, fee2) : Tagged_transaction.t =
     ( Fee_transfer
@@ -252,7 +271,18 @@ module Transition = struct
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
     | Transaction t -> (Normal, (t :> Transaction.t))
-    | Coinbase _ -> failwith "Coinbases not yet implemented"
+    | Coinbase { proposer; fee_transfer } ->
+      let (receiver, amount) = Option.value ~default:(proposer, Fee.zero) fee_transfer in
+      let t : Transaction.t =
+        { payload=
+            { receiver
+            ; amount = Amount.of_fee amount
+            ; fee=Fee.zero
+            ; nonce= Account.Nonce.zero }
+        ; sender= Public_key.decompress_exn proposer
+        ; signature= dummy_signature }
+      in
+      (Coinbase, t)
 end
 
 module Proof_type = struct
@@ -459,6 +489,7 @@ module Base = struct
         let%bind root =
           let%bind sender_compressed = Public_key.compress_var sender in
           Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
+            with_label __LOC__ begin
               let%bind next_nonce =
                 Account.Nonce.increment_if_var account.nonce
                   (Tag.Checked.should_increment_nonce tag)
@@ -485,7 +516,8 @@ module Base = struct
               let%map balance =
                 Balance.Checked.add_signed_amount account.balance sender_delta
               in
-              {account with balance; nonce= next_nonce; receipt_chain_hash} )
+              {account with balance; nonce= next_nonce; receipt_chain_hash}
+            end)
         in
         let%map root =
           Ledger_hash.modify_account root receiver ~f:(fun account ->
