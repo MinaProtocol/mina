@@ -298,8 +298,8 @@ module type Basic = sig
 
       val unpack : t -> length:int -> (Boolean.var list, _) Checked.t
 
-      val unpack_flagged
-        : t
+      val unpack_flagged :
+           t
         -> length:int
         -> (Boolean.var list * [`Success of Boolean.var], _) Checked.t
 

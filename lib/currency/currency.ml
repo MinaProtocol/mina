@@ -139,8 +139,8 @@ module type Checked_arithmetic_intf = sig
 
   val sub : var -> var -> (var, _) Checked.t
 
-  val sub_flagged
-    : var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
+  val sub_flagged :
+    var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
 
   val ( + ) : var -> var -> (var, _) Checked.t
 
@@ -338,16 +338,17 @@ end = struct
       let to_bits {magnitude; sgn} =
         var_to_bits magnitude @ [Sgn.Checked.is_pos sgn]
 
-      let constant { magnitude; sgn } =
-        { magnitude = var_of_t magnitude; sgn = Sgn.Checked.constant sgn }
+      let constant {magnitude; sgn} =
+        {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
 
-      let of_unsigned magnitude = { magnitude; sgn = Sgn.Checked.pos }
+      let of_unsigned magnitude = {magnitude; sgn= Sgn.Checked.pos}
 
       let if_ cond ~then_ ~else_ =
         let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
-        and magnitude = if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
+        and magnitude =
+          if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
         in
-        { sgn; magnitude }
+        {sgn; magnitude}
 
       let to_triples t =
         Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
@@ -406,11 +407,11 @@ end = struct
 
     let if_value cond ~then_ ~else_ : var =
       List.init M.length ~f:(fun i ->
-        match Vector.get then_ i, Vector.get else_ i with
-        | true, true -> Boolean.true_
-        | false, false -> Boolean.false_
-        | true, false -> cond
-        | false, true -> Boolean.not cond)
+          match (Vector.get then_ i, Vector.get else_ i) with
+          | true, true -> Boolean.true_
+          | false, false -> Boolean.false_
+          | true, false -> cond
+          | false, true -> Boolean.not cond )
 
     (* Unpacking protects against underflow *)
     let sub (x: Unpacked.var) (y: Unpacked.var) =
@@ -418,11 +419,10 @@ end = struct
 
     let sub_flagged x y =
       let z = Field.Checked.sub (pack_var x) (pack_var y) in
-      let%map (bits, `Success no_underflow) =
+      let%map bits, `Success no_underflow =
         Field.Checked.unpack_flagged z ~length:length_in_bits
       in
       (bits, `Underflow (Boolean.not no_underflow))
-
 
     (* Unpacking protects against overflow *)
     let add (x: Unpacked.var) (y: Unpacked.var) =
