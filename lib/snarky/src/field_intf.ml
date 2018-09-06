@@ -33,7 +33,6 @@ module type S = sig
 end
 
 module type Extended = sig
-
   include S
 
   val negate : t -> t

@@ -1,2 +1,1 @@
-
 val string : unit -> string

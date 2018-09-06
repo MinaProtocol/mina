@@ -386,33 +386,37 @@ module Base = struct
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
   let main top_hash =
     with_label __LOC__
-      (let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
-      let%bind root_before =
-        provide_witness' Ledger_hash.typ ~f:Prover_state.state1
-      in
-      let%bind t =
-        with_label __LOC__
-          (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
-      in
-      let%bind root_after, fee_excess =
-        apply_tagged_transaction (module Shifted) root_before t
-      in
-      let%map () =
-        with_label __LOC__
-          (let%bind b1 = Ledger_hash.var_to_triples root_before
-           and b2 = Ledger_hash.var_to_triples root_after
-           and sok_digest =
-             provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
-           in
-           let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
-           let triples =
-             Sok_message.Digest.Checked.to_triples sok_digest
-             @ b1 @ b2 @ fee_excess
-           in
-           Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark triples
-           >>= Field.Checked.Assert.equal top_hash)
-      in
-      ())
+      (let%bind (module Shifted) =
+         Tick.Inner_curve.Checked.Shifted.create ()
+       in
+       let%bind root_before =
+         provide_witness' Ledger_hash.typ ~f:Prover_state.state1
+       in
+       let%bind t =
+         with_label __LOC__
+           (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
+       in
+       let%bind root_after, fee_excess =
+         apply_tagged_transaction (module Shifted) root_before t
+       in
+       let%map () =
+         with_label __LOC__
+           (let%bind b1 = Ledger_hash.var_to_triples root_before
+            and b2 = Ledger_hash.var_to_triples root_after
+            and sok_digest =
+              provide_witness' Sok_message.Digest.typ
+                ~f:Prover_state.sok_digest
+            in
+            let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
+            let triples =
+              Sok_message.Digest.Checked.to_triples sok_digest
+              @ b1 @ b2 @ fee_excess
+            in
+            Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark
+              triples
+            >>= Field.Checked.Assert.equal top_hash)
+       in
+       ())
 
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
