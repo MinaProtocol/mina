@@ -69,21 +69,37 @@ struct
       ~blockchain_state ~consensus_data () =
     {blockchain_state; consensus_data; ledger_proof; sok_digest}
 
-  let to_hlist {blockchain_state; consensus_data; sok_digest; ledger_proof= _} =
-    H_list.[blockchain_state; consensus_data; sok_digest]
-
-  let of_hlist :
-      (unit, 'ps -> 'cd -> 'dig -> unit) H_list.t -> ('ps, 'cd, 'dig) t =
-   fun H_list.([blockchain_state; consensus_data; sok_digest]) ->
-    {blockchain_state; consensus_data; sok_digest; ledger_proof= None}
-
-  let data_spec =
-    let open Snark_params.Tick.Data_spec in
-    [Blockchain_state.typ; Consensus_data.typ; Sok_message.Digest.typ]
-
   let typ =
-    Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    let open Snark_params.Tick.Typ in
+    let store {blockchain_state; consensus_data; sok_digest; ledger_proof} =
+      let open Store.Let_syntax in
+      let%map blockchain_state = Blockchain_state.typ.store blockchain_state
+      and consensus_data = Consensus_data.typ.store consensus_data
+      and sok_digest = Sok_message.Digest.typ.store sok_digest in
+      {blockchain_state; consensus_data; sok_digest; ledger_proof}
+    in
+    let read {blockchain_state; consensus_data; sok_digest; ledger_proof} =
+      let open Read.Let_syntax in
+      let%map blockchain_state = Blockchain_state.typ.read blockchain_state
+      and consensus_data = Consensus_data.typ.read consensus_data
+      and sok_digest = Sok_message.Digest.typ.read sok_digest in
+      {blockchain_state; consensus_data; sok_digest; ledger_proof}
+    in
+    let check {blockchain_state; consensus_data; sok_digest; ledger_proof= _} =
+      let open Snark_params.Tick.Let_syntax in
+      let%map () = Blockchain_state.typ.check blockchain_state
+      and () = Consensus_data.typ.check consensus_data
+      and () = Sok_message.Digest.typ.check sok_digest in
+      ()
+    in
+    let alloc =
+      let open Alloc.Let_syntax in
+      let%map blockchain_state = Blockchain_state.typ.alloc
+      and consensus_data = Consensus_data.typ.alloc
+      and sok_digest = Sok_message.Digest.typ.alloc in
+      {blockchain_state; consensus_data; sok_digest; ledger_proof= None}
+    in
+    {store; read; check; alloc}
 
   let genesis =
     { blockchain_state= Blockchain_state.genesis
