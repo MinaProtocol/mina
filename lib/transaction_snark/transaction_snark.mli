@@ -18,6 +18,7 @@ module Statement : sig
   type t =
     { source: Nanobit_base.Ledger_hash.Stable.V1.t
     ; target: Nanobit_base.Ledger_hash.Stable.V1.t
+    ; supply_increase : Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
   [@@deriving sexp, bin_io, hash, compare, eq]
@@ -37,6 +38,7 @@ val create :
      source:Ledger_hash.t
   -> target:Ledger_hash.t
   -> proof_type:Proof_type.t
+  -> supply_increase:Currency.Amount.t
   -> fee_excess:Currency.Amount.Signed.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
