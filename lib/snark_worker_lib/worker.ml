@@ -47,7 +47,10 @@ struct
         | Ok res -> Continue (res :: acc)
         | Error e -> Stop (Error e) )
       ~finish:(fun res ->
-        Ok {Snark_work_lib.Work.Result.proofs= List.rev res; spec} )
+        Ok
+          { Snark_work_lib.Work.Result.proofs= List.rev res
+          ; spec
+          ; prover= public_key } )
 
   let dispatch rpc shutdown_on_disconnect query port =
     let%map res =
