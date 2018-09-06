@@ -253,9 +253,10 @@ end = struct
           |> Result.map_error ~f:(fun () -> Malformed_database)
 
     let set mdb account key = set_raw mdb (build_key account) key
-    
+
     let last_key () =
       Key.build_generic (Bigstring.of_string "last_account_key")
+
     let increment_last_account_key mdb =
       let key = last_key () in
       match get_generic mdb key with
@@ -290,8 +291,7 @@ end = struct
 
     let last_key_address mdb =
       match
-        last_key ()
-        |> get_raw mdb |> Result.of_option ~error:()
+        last_key () |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Key.parse
       with
       | Error () -> None
