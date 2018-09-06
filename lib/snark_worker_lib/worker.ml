@@ -50,7 +50,7 @@ struct
         Ok
           { Snark_work_lib.Work.Result.proofs= List.rev res
           ; spec
-          ; pk= public_key } )
+          ; prover= public_key } )
 
   let dispatch rpc shutdown_on_disconnect query port =
     let%map res =

@@ -515,7 +515,8 @@ struct
       apply_and_broadcast t
         (Add_solved_work
            ( List.map res.spec.instances ~f:Single.Spec.statement
-           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.pk}} ))
+           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
+           ))
   end
 
   module type S_tmp =

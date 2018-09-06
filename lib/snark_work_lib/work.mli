@@ -23,6 +23,6 @@ module Result : sig
   type ('spec, 'single) t =
     { proofs: 'single list
     ; spec: 'spec
-    ; pk: Signature_lib.Public_key.Compressed.t }
+    ; prover: Signature_lib.Public_key.Compressed.t }
   [@@deriving bin_io, fields]
 end
