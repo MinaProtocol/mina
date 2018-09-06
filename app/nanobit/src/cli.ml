@@ -185,7 +185,12 @@ let () =
               module Time = Nanobit_base.Block_time
 
               (* TODO: choose reasonable values *)
-              let genesis_state_timestamp = Time.now ()
+              let genesis_state_timestamp =
+                Core.Time.of_date_ofday
+                  (Core.Time.Zone.of_utc_offset ~hours:(-7))
+                  (Core.Date.create_exn ~y:2018 ~m:Month.Sep ~d:1)
+                  (Core.Time.Ofday.create ~hr:10 ())
+                |> Time.of_time
 
               let genesis_ledger_total_currency =
                 Nanobit_base.Genesis_ledger.total_currency

@@ -89,7 +89,7 @@ struct
            let%bind consensus_state =
              Consensus_mechanism.next_state_checked
                (Protocol_state.consensus_state previous_state)
-               transition
+               previous_state_hash transition
            in
            let new_state =
              Protocol_state.create_var ~previous_state_hash
