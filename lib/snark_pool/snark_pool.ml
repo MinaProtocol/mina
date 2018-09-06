@@ -1,7 +1,6 @@
 open Protocols
 open Core_kernel
 open Async_kernel
-open Coda_pow
 
 module Priced_proof = struct
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}
@@ -114,7 +113,6 @@ let%test_module "random set test" =
     module Mock_snark_pool = Make (Mock_proof) (Mock_fee) (Mock_work)
 
     let gen =
-      let open Quickcheck in
       let open Quickcheck.Generator.Let_syntax in
       let gen_entry () =
         Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
