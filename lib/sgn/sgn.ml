@@ -54,7 +54,11 @@ module Checked = struct
 
   let negate t = Field.Checked.scale t neg_one
 
-  let neg = Field.Checked.constant (to_field Neg)
+  let constant = Fn.compose Field.Checked.constant to_field
 
-  let pos = Field.Checked.constant (to_field Pos)
+  let neg = constant Neg
+
+  let pos = constant Pos
+
+  let if_ = Field.Checked.if_
 end
