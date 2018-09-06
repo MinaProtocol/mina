@@ -21,11 +21,17 @@ module type S = sig
            and type path = Path.t
            and type t := t
 
+  module Location : sig
+    type t
+  end
+
+  val location_of_key : t -> key -> Location.t
+
   val create : unit -> t
 
-  val get : t -> key -> account option
+  val get : t -> Location.t -> account option
 
-  val set : t -> key -> account -> unit
+  val set : t -> Location.t -> account -> unit
 
   val get_at_index_exn : t -> int -> account
 
@@ -35,7 +41,7 @@ module type S = sig
 
   val merkle_root : t -> root_hash
 
-  val merkle_path : t -> key -> Path.t option
+  val merkle_path : t -> Location.t -> Path.t option
 
   val merkle_path_at_index_exn : t -> int -> Path.t
 
