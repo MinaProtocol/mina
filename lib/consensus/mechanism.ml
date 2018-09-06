@@ -87,6 +87,7 @@ module type S = sig
   val select :
        Consensus_state.value
     -> Consensus_state.value
+    -> logger:Logger.t
     -> time_received:Int64.t
     -> [`Keep | `Take]
   (**

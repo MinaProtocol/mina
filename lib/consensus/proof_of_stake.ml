@@ -753,20 +753,22 @@ struct
       ( transition |> Snark_transition.blockchain_state
       |> Nanobit_base.Blockchain_state.ledger_hash )
 
-  let select this that ~time_received =
+  let select this that ~logger ~time_received =
     let open Consensus_state in
     let open Epoch_data in
+    let logger = Logger.child logger "proof_of_stake" in
+    (* TODO: update time_received check and `Keep when it is not met *)
+    if
+      not
+        (time_in_epoch_slot that
+           Time.(of_span_since_epoch (Span.of_ms time_received)))
+    then Logger.error logger "received a transition outside of it's slot time" ;
     (* TODO: add fork_before_checkpoint check *)
     (* not (List.exists this.checkpoints ~f:(fun c ->
      *   List.exists that.checkpoints ~f:(
      *     Nanobit_base.State_hash.equal c)))
      *)
     if
-      not
-        (time_in_epoch_slot that
-           Time.(of_span_since_epoch (Span.of_ms time_received)))
-    then `Keep
-    else if
       Nanobit_base.State_hash.equal this.last_epoch_data.lock_checkpoint
         that.last_epoch_data.lock_checkpoint
     then if Length.compare this.length that.length < 0 then `Take else `Keep

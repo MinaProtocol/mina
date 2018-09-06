@@ -14,6 +14,7 @@ module type Inputs_intf = sig
     val select :
          Consensus_state.value
       -> Consensus_state.value
+      -> logger:Logger.t
       -> time_received:Unix_timestamp.t
       -> [`Keep | `Take]
   end
@@ -307,7 +308,7 @@ struct
             Consensus_mechanism.select
               (Protocol_state.consensus_state source_state)
               (Protocol_state.consensus_state target_state)
-              ~time_received
+              ~logger:log ~time_received
           with
           | `Keep -> return ([], None)
           | `Take -> return ([], Some (Catchup.sync catchup state transition))
@@ -325,7 +326,7 @@ struct
               |> Protocol_state.consensus_state )
               ( best_tip |> External_transition.target_state
               |> Protocol_state.consensus_state )
-              ~time_received
+              ~logger:log ~time_received
           with
           | `Keep -> return ([], Some (Catchup.sync catchup state transition))
           | `Take -> return ([], None) )

@@ -174,7 +174,7 @@ struct
     ()
 
   let select Consensus_state.({length= l1; _})
-      Consensus_state.({length= l2; _}) ~time_received:_ =
+      Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
 
   let genesis_protocol_state =
