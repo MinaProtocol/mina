@@ -35,11 +35,7 @@ end
 module Tag : sig
   open Tick
 
-  type t =
-    | Normal
-    | Fee_transfer
-    | Coinbase
-  [@@deriving sexp]
+  type t = Normal | Fee_transfer | Coinbase [@@deriving sexp]
 
   type var
 
@@ -47,87 +43,103 @@ module Tag : sig
 
   module Checked : sig
     val normal : var
+
     val fee_transfer : var
+
     val coinbase : var
 
     val is_normal : var -> Boolean.var
+
     val is_fee_transfer : var -> Boolean.var
+
     val is_coinbase : var -> Boolean.var
 
     val should_check_signature : var -> Boolean.var
+
     val should_check_if_nonce_matches : var -> Boolean.var
+
     val should_increment_nonce : var -> Boolean.var
+
     val should_cons_to_receipt_chain : var -> Boolean.var
   end
 end = struct
   open Tick
 
-(* This could definitely be more efficient, but I decided to do
+  (* This could definitely be more efficient, but I decided to do
    it in a relatively straightforward way I could think of since the
    constraints saved were not significant. *)
 
-  type t =
-    | Normal
-    | Fee_transfer
-    | Coinbase
-  [@@deriving sexp]
+  type t = Normal | Fee_transfer | Coinbase [@@deriving sexp]
 
   let gen =
     let open Quickcheck.Generator in
     map (variant3 Unit.gen Unit.gen Unit.gen) ~f:(function
       | `A () -> Normal
-      | `B  ()-> Fee_transfer
-      | `C () -> Coinbase)
+      | `B () -> Fee_transfer
+      | `C () -> Coinbase )
 
   (* We encode this as a one-hot vector essentially *)
   type var =
-    { normal       : Boolean.var
-    ; fee_transfer : Boolean.var
-    ; coinbase     : Boolean.var
-    }
+    {normal: Boolean.var; fee_transfer: Boolean.var; coinbase: Boolean.var}
 
   let typ : (var, t) Typ.t =
     let typ =
-      Typ.of_hlistable Data_spec.[Boolean.typ; Boolean.typ; Boolean.typ]
-        ~var_to_hlist:(fun { normal ; fee_transfer ;coinbase } -> [ normal ; fee_transfer ;coinbase ])
-        ~var_of_hlist:(fun Snarky.H_list.[normal; fee_transfer; coinbase] -> { normal; fee_transfer; coinbase })
+      Typ.of_hlistable
+        Data_spec.[Boolean.typ; Boolean.typ; Boolean.typ]
+        ~var_to_hlist:(fun {normal; fee_transfer; coinbase} ->
+          [normal; fee_transfer; coinbase] )
+        ~var_of_hlist:(fun Snarky.H_list.([normal; fee_transfer; coinbase]) ->
+          {normal; fee_transfer; coinbase} )
         ~value_to_hlist:(function
-          | Normal -> [ true; false; false ]
-          | Fee_transfer -> [ false; true; false ]
-          | Coinbase -> [ false; false; true ])
-        ~value_of_hlist:Snarky.H_list.(function
-          | [ true; false; false] -> Normal
-          | [ false; true; false ] -> Fee_transfer
-          | [ false; false; true ] -> Coinbase
-          | _ -> assert false)
+            | Normal -> [true; false; false]
+            | Fee_transfer -> [false; true; false]
+            | Coinbase -> [false; false; true])
+        ~value_of_hlist:
+          Snarky.H_list.(
+            function
+              | [true; false; false] -> Normal
+              | [false; true; false] -> Fee_transfer
+              | [false; false; true] -> Coinbase
+              | _ -> assert false)
     in
-    let check ({ normal; fee_transfer ; coinbase } as t) =
+    let check ({normal; fee_transfer; coinbase} as t) =
       let open Let_syntax in
       let%map () = typ.check t
-      and () = Boolean.Assert.exactly_one [ normal; fee_transfer; coinbase ] in
+      and () = Boolean.Assert.exactly_one [normal; fee_transfer; coinbase] in
       ()
     in
-    { typ with check }
+    {typ with check}
 
   module Checked = struct
     let constant : t -> var =
-      let all_false = { normal=Boolean.false_; fee_transfer=Boolean.false_; coinbase=Boolean.false_ } in
+      let all_false =
+        { normal= Boolean.false_
+        ; fee_transfer= Boolean.false_
+        ; coinbase= Boolean.false_ }
+      in
       function
-      | Normal -> { all_false with normal=Boolean.true_ }
-      | Fee_transfer -> { all_false with fee_transfer=Boolean.true_ }
-      | Coinbase -> { all_false with coinbase=Boolean.true_ }
+        | Normal -> {all_false with normal= Boolean.true_}
+        | Fee_transfer -> {all_false with fee_transfer= Boolean.true_}
+        | Coinbase -> {all_false with coinbase= Boolean.true_}
 
     let normal = constant Normal
+
     let fee_transfer = constant Fee_transfer
+
     let coinbase = constant Coinbase
 
-    let is_normal { normal; _ } = normal
-    let is_fee_transfer { fee_transfer; _ } = fee_transfer
-    let is_coinbase { coinbase; _ } = coinbase
+    let is_normal {normal; _} = normal
+
+    let is_fee_transfer {fee_transfer; _} = fee_transfer
+
+    let is_coinbase {coinbase; _} = coinbase
 
     let should_check_signature = is_normal
+
     let should_check_if_nonce_matches = is_normal
+
     let should_increment_nonce = is_normal
+
     let should_cons_to_receipt_chain = is_normal
   end
 end
@@ -152,50 +164,49 @@ module Tagged_transaction = struct
         in
         Amount.Signed.create ~sgn:Sgn.Neg ~magnitude
     | Coinbase ->
-      let _magnitude =
-        Amount.sub Protocols.Coda_praos.coinbase_amount
-          t.payload.amount
-        |> Option.value_exn
-      in
-      Currency.Amount.Signed.zero
+        let _magnitude =
+          Amount.sub Protocols.Coda_praos.coinbase_amount t.payload.amount
+          |> Option.value_exn
+        in
+        Currency.Amount.Signed.zero
 
-  let supply_increase ((tag, _t) : t) =
+  let supply_increase ((tag, _t): t) =
     match tag with
     | Normal | Fee_transfer -> Amount.zero
-    | Coinbase ->
-      Protocols.Coda_praos.coinbase_amount
+    | Coinbase -> Protocols.Coda_praos.coinbase_amount
 
   module Checked = struct
     type changes =
-      { sender_delta : Amount.Signed.var
-      ; excess : Amount.Signed.var
-      ; supply_increase : Amount.var
-      }
+      { sender_delta: Amount.Signed.var
+      ; excess: Amount.Signed.var
+      ; supply_increase: Amount.var }
 
     (* Someday: Have a more structured "case" construct *)
-    let changes ((tag, t) : var) =
-      with_label __LOC__ begin
-        let open Let_syntax in
+    let changes ((tag, t): var) =
+      with_label __LOC__
+        (let open Let_syntax in
         let if_ cond ~then_:(t1, t2) ~else_:(e1, e2) =
-          with_label __LOC__ begin
-            let%map x1 = Amount.Signed.Checked.if_ cond ~then_:t1 ~else_:e1
-            and x2 = Amount.Signed.Checked.if_ cond ~then_:t2 ~else_:e2 in
-            (x1, x2)
-          end
+          with_label __LOC__
+            (let%map x1 = Amount.Signed.Checked.if_ cond ~then_:t1 ~else_:e1
+             and x2 = Amount.Signed.Checked.if_ cond ~then_:t2 ~else_:e2 in
+             (x1, x2))
         in
         let is_coinbase = Tag.Checked.is_coinbase tag in
         let%map excess, sender_delta =
           let%bind non_coinbase_case =
-            with_label __LOC__ begin
-              let%bind amount_plus_fee = Amount.Checked.add_fee t.payload.amount t.payload.fee in
-              let open Amount.Signed in
-              let neg_amount_plus_fee =
-                create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee
-              in
-              let pos_fee =
-                create ~sgn:Sgn.Pos ~magnitude:(Amount.Checked.of_fee t.payload.fee)
-              in
-              (* If tag = Normal:
+            with_label __LOC__
+              (let%bind amount_plus_fee =
+                 Amount.Checked.add_fee t.payload.amount t.payload.fee
+               in
+               let open Amount.Signed in
+               let neg_amount_plus_fee =
+                 create ~sgn:Sgn.Neg ~magnitude:amount_plus_fee
+               in
+               let pos_fee =
+                 create ~sgn:Sgn.Pos
+                   ~magnitude:(Amount.Checked.of_fee t.payload.fee)
+               in
+               (* If tag = Normal:
               sender gets -(amount + fee)
               excess is +fee
 
@@ -203,44 +214,42 @@ module Tagged_transaction = struct
               "sender" gets +fee
               excess is -(amount + fee) (since "receiver" gets amount)
               *)
-              Checked.cswap (Tag.Checked.is_fee_transfer tag) (pos_fee, neg_amount_plus_fee)
-            end
+               Checked.cswap
+                 (Tag.Checked.is_fee_transfer tag)
+                 (pos_fee, neg_amount_plus_fee))
           in
           let%bind coinbase_case =
-            with_label __LOC__ begin
+            with_label __LOC__
               (* If tag = Coinbase:
 
                 "sender" gets (coinbase_amount - amount)
                 excess is zero *)
-              let%map proposer_reward =
-                let%bind res, `Underflow underflow =
-                  Amount.Checked.sub_flagged
-                    (Amount.var_of_t Protocols.Coda_praos.coinbase_amount)
-                    t.payload.amount
-                in
-                let%map () =
-                  (* Only need to check that the subtraction actually succeeded in
+              (let%map proposer_reward =
+                 let%bind res, `Underflow underflow =
+                   Amount.Checked.sub_flagged
+                     (Amount.var_of_t Protocols.Coda_praos.coinbase_amount)
+                     t.payload.amount
+                 in
+                 let%map () =
+                   (* Only need to check that the subtraction actually succeeded in
                      the coinbase case. *)
-                  Boolean.Assert.any
-                    [ Boolean.not underflow
-                    ; Boolean.not is_coinbase
-                    ]
-                in
-                res
-              in
-              let excess = Amount.Signed.Checked.constant Amount.Signed.zero in
-              (excess, Amount.Signed.Checked.of_unsigned proposer_reward)
-            end
+                   Boolean.Assert.any
+                     [Boolean.not underflow; Boolean.not is_coinbase]
+                 in
+                 res
+               in
+               let excess =
+                 Amount.Signed.Checked.constant Amount.Signed.zero
+               in
+               (excess, Amount.Signed.Checked.of_unsigned proposer_reward))
           in
           if_ is_coinbase ~then_:coinbase_case ~else_:non_coinbase_case
         in
         let supply_increase =
           Amount.Checked.if_value is_coinbase
-            ~then_:Protocols.Coda_praos.coinbase_amount
-            ~else_:Amount.zero
+            ~then_:Protocols.Coda_praos.coinbase_amount ~else_:Amount.zero
         in
-        { excess; sender_delta; supply_increase }
-      end
+        {excess; sender_delta; supply_increase})
   end
 end
 
@@ -271,18 +280,20 @@ module Transition = struct
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
     | Transaction t -> (Normal, (t :> Transaction.t))
-    | Coinbase { proposer; fee_transfer } ->
-      let (receiver, amount) = Option.value ~default:(proposer, Fee.zero) fee_transfer in
-      let t : Transaction.t =
-        { payload=
-            { receiver
-            ; amount = Amount.of_fee amount
-            ; fee=Fee.zero
-            ; nonce= Account.Nonce.zero }
-        ; sender= Public_key.decompress_exn proposer
-        ; signature= dummy_signature }
-      in
-      (Coinbase, t)
+    | Coinbase {proposer; fee_transfer} ->
+        let receiver, amount =
+          Option.value ~default:(proposer, Fee.zero) fee_transfer
+        in
+        let t : Transaction.t =
+          { payload=
+              { receiver
+              ; amount= Amount.of_fee amount
+              ; fee= Fee.zero
+              ; nonce= Account.Nonce.zero }
+          ; sender= Public_key.decompress_exn proposer
+          ; signature= dummy_signature }
+        in
+        (Coinbase, t)
 end
 
 module Proof_type = struct
@@ -296,7 +307,7 @@ module Statement = struct
     type t =
       { source: Nanobit_base.Ledger_hash.Stable.V1.t
       ; target: Nanobit_base.Ledger_hash.Stable.V1.t
-      ; supply_increase : Currency.Amount.Stable.V1.t
+      ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
     [@@deriving sexp, bin_io, hash, compare, eq]
@@ -313,8 +324,11 @@ module Statement = struct
         Currency.Amount.add s1.supply_increase s2.supply_increase
         |> option "Error adding supply_increase"
       in
-      {source= s1.source; target= s2.target; fee_excess; proof_type= `Merge; supply_increase
-      }
+      { source= s1.source
+      ; target= s2.target
+      ; fee_excess
+      ; proof_type= `Merge
+      ; supply_increase }
   end
 
   include T
@@ -341,7 +355,14 @@ type t =
   ; proof: Proof.Stable.V1.t }
 [@@deriving fields, sexp, bin_io]
 
-let statement {source; target; proof_type; fee_excess; supply_increase; sok_digest= _; proof= _} =
+let statement
+    { source
+    ; target
+    ; proof_type
+    ; fee_excess
+    ; supply_increase
+    ; sok_digest= _
+    ; proof= _ } =
   { Statement.source
   ; target
   ; proof_type
@@ -355,7 +376,8 @@ let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
 
 let create = Fields.create
 
-let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase ~fee_excess =
+let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
+    ~fee_excess =
   let fold =
     let open Fold in
     Sok_message.Digest.fold sok_digest
@@ -470,7 +492,7 @@ module Base = struct
     with_label __LOC__
       ( if not Insecure.transaction_replay then
           failwith "Insecure.transaction_replay false" ;
-        let {Transaction.Payload.receiver; amount; fee=_; nonce} = payload in
+        let {Transaction.Payload.receiver; amount; fee= _; nonce} = payload in
         let%bind payload_section = Schnorr.Message.var_of_payload payload in
         let%bind () =
           with_label __LOC__
@@ -480,44 +502,45 @@ module Base = struct
              in
              (* Should only assert_verifies if the tag is Normal *)
              Boolean.Assert.any
-               [ Boolean.not (Tag.Checked.should_check_signature tag)
-               ; verifies ])
+               [Boolean.not (Tag.Checked.should_check_signature tag); verifies])
         in
-        let%bind { excess; sender_delta; supply_increase } =
+        let%bind {excess; sender_delta; supply_increase} =
           Tagged_transaction.Checked.changes txn
         in
         let%bind root =
           let%bind sender_compressed = Public_key.compress_var sender in
           Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
-            with_label __LOC__ begin
-              let%bind next_nonce =
-                Account.Nonce.increment_if_var account.nonce
-                  (Tag.Checked.should_increment_nonce tag)
-              in
-              let%bind () =
-                with_label __LOC__
-                  (let%bind nonce_matches =
-                     Account.Nonce.equal_var nonce account.nonce
+              with_label __LOC__
+                (let%bind next_nonce =
+                   Account.Nonce.increment_if_var account.nonce
+                     (Tag.Checked.should_increment_nonce tag)
+                 in
+                 let%bind () =
+                   with_label __LOC__
+                     (let%bind nonce_matches =
+                        Account.Nonce.equal_var nonce account.nonce
+                      in
+                      Boolean.Assert.any
+                        [ Boolean.not
+                            (Tag.Checked.should_check_if_nonce_matches tag)
+                        ; nonce_matches ])
+                 in
+                 let%bind receipt_chain_hash =
+                   let current = account.receipt_chain_hash in
+                   let%bind r =
+                     Receipt.Chain_hash.Checked.cons ~payload:payload_section
+                       current
                    in
-                   Boolean.Assert.any
-                     [ Boolean.not (Tag.Checked.should_check_if_nonce_matches tag)
-                     ; nonce_matches ])
-              in
-              let%bind receipt_chain_hash =
-                let current = account.receipt_chain_hash in
-                let%bind r =
-                  Receipt.Chain_hash.Checked.cons ~payload:payload_section
-                    current
-                in
-                Receipt.Chain_hash.Checked.if_ (Tag.Checked.should_cons_to_receipt_chain tag)
-                  ~then_:r
-                  ~else_:current
-              in
-              let%map balance =
-                Balance.Checked.add_signed_amount account.balance sender_delta
-              in
-              {account with balance; nonce= next_nonce; receipt_chain_hash}
-            end)
+                   Receipt.Chain_hash.Checked.if_
+                     (Tag.Checked.should_cons_to_receipt_chain tag)
+                     ~then_:r ~else_:current
+                 in
+                 let%map balance =
+                   Balance.Checked.add_signed_amount account.balance
+                     sender_delta
+                 in
+                 {account with balance; nonce= next_nonce; receipt_chain_hash})
+          )
         in
         let%map root =
           Ledger_hash.modify_account root receiver ~f:(fun account ->
@@ -691,12 +714,11 @@ module Merge = struct
   let vk_input_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
     + (2 * state_hash_size_in_triples)
-    + Amount.length_in_triples
-    + Amount.Signed.length_in_triples
+    + Amount.length_in_triples + Amount.Signed.length_in_triples
 
   let construct_input_checked ~prefix
-      ~(sok_digest: Sok_message.Digest.Checked.t) ~state1 ~state2 ~supply_increase ~fee_excess
-      ?tock_vk () =
+      ~(sok_digest: Sok_message.Digest.Checked.t) ~state1 ~state2
+      ~supply_increase ~fee_excess ?tock_vk () =
     let prefix_section =
       Pedersen.Checked.Section.create ~acc:prefix
         ~support:
@@ -713,14 +735,12 @@ module Merge = struct
         ~start:
           ( Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
           + state_hash_size_in_triples + state_hash_size_in_triples )
-        (Amount.var_to_triples supply_increase @
-          Amount.Signed.Checked.to_triples fee_excess)
+        ( Amount.var_to_triples supply_increase
+        @ Amount.Signed.Checked.to_triples fee_excess )
     in
     disjoint_union_sections
-      ([ prefix_and_sok_digest_and_supply_increase_and_fee
-       ; state1
-       ; state2
-       ] @ Option.to_list tock_vk)
+      ( [prefix_and_sok_digest_and_supply_increase_and_fee; state1; state2]
+      @ Option.to_list tock_vk )
 
   (* spec for [verify_transition tock_vk proof_field s1 s2]:
      returns a bool which is true iff
@@ -747,8 +767,7 @@ module Merge = struct
              ~else_:Hash_prefix.merge_snark.acc)
       in
       construct_input_checked ~prefix ~sok_digest ~state1:s1 ~state2:s2
-        ~supply_increase
-        ~fee_excess ()
+        ~supply_increase ~fee_excess ()
     in
     let%bind with_vk_top_hash =
       with_label __LOC__
@@ -799,10 +818,12 @@ module Merge = struct
         ~f:(Fn.compose Transition_data.fee_excess Prover_state.transition23)
     and supply_increase12 =
       provide_witness' Amount.typ
-        ~f:(Fn.compose Transition_data.supply_increase Prover_state.transition12)
+        ~f:
+          (Fn.compose Transition_data.supply_increase Prover_state.transition12)
     and supply_increase23 =
       provide_witness' Amount.typ
-        ~f:(Fn.compose Transition_data.supply_increase Prover_state.transition23)
+        ~f:
+          (Fn.compose Transition_data.supply_increase Prover_state.transition23)
     in
     let bits_to_triples bits =
       Fold.(to_list (group3 ~default:Boolean.false_ (of_list bits)))
@@ -837,8 +858,7 @@ module Merge = struct
           provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
         in
         construct_input_checked ~prefix:(`Value Hash_prefix.merge_snark.acc)
-          ~sok_digest ~state1:s1_section ~state2:s3_section
-          ~supply_increase
+          ~sok_digest ~state1:s1_section ~state2:s3_section ~supply_increase
           ~fee_excess:total_fees ~tock_vk:tock_vk_section ()
         >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
       in
@@ -849,14 +869,16 @@ module Merge = struct
         extend empty ~start:state2_offset (bits_to_triples s2)
       in
       verify_transition tock_vk tock_vk_data tock_vk_section
-        Prover_state.transition12 s1_section s2_section supply_increase12 fee_excess12
+        Prover_state.transition12 s1_section s2_section supply_increase12
+        fee_excess12
     and verify_23 =
       let%bind s2_section =
         let open Pedersen.Checked.Section in
         extend empty ~start:state1_offset (bits_to_triples s2)
       in
       verify_transition tock_vk tock_vk_data tock_vk_section
-        Prover_state.transition23 s2_section s3_section supply_increase23 fee_excess23
+        Prover_state.transition23 s2_section s3_section supply_increase23
+        fee_excess23
     in
     Boolean.Assert.all [verify_12; verify_23]
 
@@ -913,11 +935,18 @@ module Verification = struct
 
     (* someday: Reorganize this module so that the inputs are separated from the proof. *)
     let verify_against_digest
-          {source; target; proof; proof_type; fee_excess; sok_digest; supply_increase} =
+        { source
+        ; target
+        ; proof
+        ; proof_type
+        ; fee_excess
+        ; sok_digest
+        ; supply_increase } =
       let input =
         match proof_type with
         | `Base ->
-            base_top_hash ~sok_digest ~state1:source ~state2:target ~fee_excess ~supply_increase
+            base_top_hash ~sok_digest ~state1:source ~state2:target ~fee_excess
+              ~supply_increase
         | `Merge ->
             merge_top_hash ~sok_digest wrap_vk_bits ~state1:source
               ~state2:target ~fee_excess ~supply_increase
@@ -935,16 +964,11 @@ module Verification = struct
     let merge_prefix_and_zero_and_vk_curve_pt =
       let open Tick in
       let excess_begin =
-        Hash_prefix.length_in_triples
-        + Sok_message.Digest.length_in_triples
-        + 2 * state_hash_size_in_triples
+        Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
+        + (2 * state_hash_size_in_triples)
         + Amount.length_in_triples
       in
-      let s =
-        { Hash_prefix.merge_snark with
-          triples_consumed= excess_begin
-        }
-      in
+      let s = {Hash_prefix.merge_snark with triples_consumed= excess_begin} in
       let s =
         Pedersen.State.update_fold s
           Fold.(
@@ -990,8 +1014,7 @@ module Verification = struct
           = Hash_prefix.length_in_triples
             + Sok_message.Digest.length_in_triples
             + (2 * Ledger_hash.length_in_triples)
-            + Amount.length_in_triples
-            + Amount.Signed.length_in_triples
+            + Amount.length_in_triples + Amount.Signed.length_in_triples
             + Nanobit_base.Util.bit_length_to_triple_length
                 (List.length wrap_vk_bits)
         then digest
@@ -1000,21 +1023,17 @@ module Verification = struct
             !"%d = Hash_prefix.length_in_triples aka %d\n            \
               + Sok_message.Digest.length_in_triples aka %d\n\
               + (2 * Ledger_hash.length_in_triples) aka %d \n            \
-              + Amount.length aka %d \
-              + Amount.Signed.length aka %d \
-              + List.length wrap_vk_triples aka \
-              %d ) aka %d"
+              + Amount.length aka %d + Amount.Signed.length aka %d + \
+              List.length wrap_vk_triples aka %d ) aka %d"
             n Hash_prefix.length_in_triples
             Sok_message.Digest.length_in_triples
             (2 * Ledger_hash.length_in_triples)
-            Amount.length_in_triples
-            Amount.Signed.length_in_triples
+            Amount.length_in_triples Amount.Signed.length_in_triples
             (Nanobit_base.Util.bit_length_to_triple_length
                (List.length wrap_vk_bits))
             ( Hash_prefix.length_in_triples
             + (2 * Ledger_hash.length_in_triples)
-            + Amount.length_in_triples
-            + Amount.Signed.length_in_triples
+            + Amount.length_in_triples + Amount.Signed.length_in_triples
             + Nanobit_base.Util.bit_length_to_triple_length
                 (List.length wrap_vk_bits) )
             ()
@@ -1226,8 +1245,7 @@ struct
       |> Option.value_exn
     in
     let supply_increase =
-      Amount.add transition12.supply_increase
-        transition23.supply_increase
+      Amount.add transition12.supply_increase transition23.supply_increase
       |> Option.value_exn
     in
     let top_hash =
@@ -1258,7 +1276,7 @@ struct
     ; target
     ; proof_type= `Base
     ; fee_excess= Tagged_transaction.excess transaction
-    ; supply_increase = Tagged_transaction.supply_increase transaction
+    ; supply_increase= Tagged_transaction.supply_increase transaction
     ; proof= wrap `Base proof top_hash }
 
   let of_transition ~sok_digest ~source ~target transition handler =
@@ -1306,7 +1324,8 @@ struct
       Amount.add t1.supply_increase t2.supply_increase
       |> Option.value_map ~f:Or_error.return
            ~default:
-             (Or_error.errorf "Transaction_snark.merge: Supply change amount overflow")
+             (Or_error.errorf
+                "Transaction_snark.merge: Supply change amount overflow")
     in
     { source= t1.source
     ; target= t2.target
@@ -1560,6 +1579,6 @@ let%test_module "transaction_snark" =
           Tock.verify proof13.proof keys.verification.wrap (wrap_input ())
             (embed
                (merge_top_hash ~sok_digest ~state1 ~state2:state3
-                  ~supply_increase:Amount.zero
-                  ~fee_excess:total_fees wrap_vk_bits)) )
+                  ~supply_increase:Amount.zero ~fee_excess:total_fees
+                  wrap_vk_bits)) )
   end )

@@ -164,8 +164,8 @@ let run profiler num_transactions =
            | Transaction t ->
                let t = (t :> Transaction.t) in
                [t.payload.receiver; Public_key.compress t.sender]
-           | Coinbase { proposer; fee_transfer } ->
-             proposer :: Option.to_list (Option.map fee_transfer ~f:fst)  ))
+           | Coinbase {proposer; fee_transfer} ->
+               proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
   let message = profiler sparse_ledger transitions in
   Core.printf !"%s\n%!" message ;

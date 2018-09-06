@@ -69,8 +69,8 @@ module type Checked_arithmetic_intf = sig
 
   val sub : var -> var -> (var, _) Checked.t
 
-  val sub_flagged
-    : var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
+  val sub_flagged :
+    var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
 
   val ( + ) : var -> var -> (var, _) Checked.t
 

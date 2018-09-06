@@ -1339,7 +1339,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
           let x = Bigint.of_field x in
           List.init length ~f:(fun i -> Bigint.test_bit x i))
 
-    let packing_sum (bits : Boolean.var list) =
+    let packing_sum (bits: Boolean.var list) =
       let ts, _ =
         List.fold_left bits ~init:([], Field.one) ~f:(fun (acc, c) v ->
             ((c, v) :: acc, Field.add c c) )
@@ -1355,7 +1355,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
       in
       bits
 
-    let choose_preimage_flagged (v : Cvar.t) ~length =
+    let choose_preimage_flagged (v: Cvar.t) ~length =
       let open Let_syntax in
       let%bind bits = choose_preimage_unchecked v ~length in
       let lc = packing_sum bits in
