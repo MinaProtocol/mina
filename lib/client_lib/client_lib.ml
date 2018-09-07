@@ -35,3 +35,31 @@ module Get_nonce = struct
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_nonce" ~version:0 ~bin_query ~bin_response
 end
+
+module Status = struct
+  (* NOTE: yojson deriving generates code that violates warning 39 *)
+  type t =
+    { num_accounts : int
+    ; block_count : int
+    ; uptime_secs : int
+    ; conf_dir : string
+    ; peers : string list
+    ; local_txn_count : int
+    ; run_snark_worker : bool
+    ; propose : bool
+    }
+  [@@deriving yojson, bin_io]
+end
+
+module Get_status = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = Status.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
+end
+
+

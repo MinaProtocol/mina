@@ -1,6 +1,7 @@
 open Core_kernel
 open Tuple_lib
 open Fold_lib
+open Coda_numbers
 
 module type S = sig
   module Local_state : sig
@@ -33,6 +34,8 @@ module type S = sig
          Snark_params.Tick.Checked.t
 
     val fold : value -> bool Triple.t Fold.t
+
+    val length : value -> Length.t
   end
 
   module Protocol_state :

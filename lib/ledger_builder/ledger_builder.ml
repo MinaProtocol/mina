@@ -1049,6 +1049,8 @@ let%test_module "test" =
 
         let merkle_root : t -> ledger_hash = fun t -> Int.to_string !t
 
+        let num_accounts _ = 0
+
         let apply_super_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
           match s with
