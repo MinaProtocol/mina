@@ -158,6 +158,7 @@ struct
       Interruptible.uninterruptible (Tip.transition_unchecked h t)
 
     let run (t: t0) new_tree old_tree new_best_path _logger _transition =
+      Logger.fatal _logger "RPT A";
       let locked_tip = Transition_logic_state.locked_tip t.state
       and longest_branch_tip =
         Transition_logic_state.longest_branch_tip t.state
@@ -179,6 +180,7 @@ struct
             transition_unchecked locked_tip new_head
           else return locked_tip
         in
+        Logger.fatal _logger "RPT B";
         (* Now adjust the longest_branch_tip *)
         let tip, path =
           match
@@ -192,20 +194,29 @@ struct
         let last_transition = List.last_exn path.Path.path in
         (* Now step over the path *)
         assert (Protocol_state.equal_value (Tip.state tip) path.Path.source) ;
+        Logger.fatal _logger "RPT C";
         let%map result =
           List.fold path.Path.path ~init:(Interruptible.return (Some tip)) ~f:
             (fun work curr ->
+              Logger.fatal _logger "RPT C1";
               match%bind work with
-              | None -> return None
+              | None -> 
+                  Logger.fatal _logger "RPT C11";
+                return None
               | Some tip ->
+                  Logger.fatal _logger "RPT C2";
                   match%bind step tip curr with
-                  | Ok tip -> return (Some tip)
+                  | Ok tip -> 
+                    Logger.fatal _logger "RPT C20";
+                    return (Some tip)
                   | Error e ->
                       (* TODO: Punish sender *)
-                      Logger.info t.log "Recieved malicious transition %s"
+                      Logger.fatal _logger "RPT C21";
+                      Logger.fatal t.log "Recieved malicious transition %s"
                         (Error.to_string_hum e) ;
                       return None )
         in
+        Logger.fatal _logger "RPT D";
         match result with
         | Some tip ->
             assert (
@@ -215,6 +226,7 @@ struct
             ; Transition_logic_state.Change.Ktree new_tree ]
         | None -> []
       in
+      Logger.fatal _logger "RPT E";
       (work, ivar)
 
     let create (t: t0) new_tree old_tree new_best_path (logger: Logger.t)
@@ -290,14 +302,17 @@ struct
       * (External_transition.t, Transition_logic_state.Change.t list) Job.t
         option )
       Deferred.t =
+    Logger.fatal log "A";
     let longest_branch_tip = Transition_logic_state.longest_branch_tip t.state
     and ktree = Transition_logic_state.ktree t.state in
     match ktree with
     | None -> (
+        Logger.fatal log "B";
         let source_state = Tip.state longest_branch_tip in
         let target_state = External_transition.target_state transition in
         if Tip.is_parent_of ~child:transition ~parent:longest_branch_tip then (
           (* Bootstrap from genesis *)
+          Logger.fatal log "D";
           let tree = Transition_tree.singleton transition in
           match%map Step.step longest_branch_tip transition with
           | Ok tip ->
@@ -311,20 +326,23 @@ struct
                 (Error.to_string_hum e) ;
               ([], None) )
         else
+          (Logger.fatal log "E";
           match
             Consensus_mechanism.select
               (Protocol_state.consensus_state source_state)
               (Protocol_state.consensus_state target_state)
           with
           | `Keep -> return ([], None)
-          | `Take -> return ([], Some (Catchup.sync catchup state transition))
+          | `Take -> return ([], Some (Catchup.sync catchup state transition)))
         )
     | Some old_tree ->
+      Logger.fatal log "C";
       match
         Transition_tree.add old_tree transition ~parent:(fun x ->
             External_transition.is_parent_of ~child:transition ~parent:x )
       with
       | `No_parent ->
+          Logger.fatal log "F";
           let best_tip = locked_and_best old_tree |> snd in
           if
             External_transition.equal
@@ -334,13 +352,17 @@ struct
           else return ([], None)
       | `Repeat -> return ([], None)
       | `Added new_tree ->
+          Logger.fatal log "G";
           let old_locked_head, old_best_tip = locked_and_best old_tree in
           let new_head, new_tip = locked_and_best new_tree in
           if
             External_transition.equal old_locked_head new_head
             && External_transition.equal old_best_tip new_tip
-          then return ([Transition_logic_state.Change.Ktree new_tree], None)
+          then 
+            (Logger.fatal log "H";
+            return ([Transition_logic_state.Change.Ktree new_tree], None))
           else
+            (Logger.fatal log "I";
             let new_best_path =
               Transition_tree.longest_path new_tree |> Path.of_tree_path
             in
@@ -348,5 +370,5 @@ struct
               ( []
               , Some
                   (Path_traversal.create t new_tree old_tree new_best_path log
-                     transition) )
+                     transition) ))
 end

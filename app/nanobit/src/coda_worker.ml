@@ -18,6 +18,7 @@ struct
   type input =
     { host: string
     ; should_propose: bool
+    ; transition_interval: float
     ; snark_worker_config: Snark_worker_config.t option
     ; conf_dir: string
     ; program_dir: string
@@ -119,6 +120,7 @@ struct
       let init_worker_state
           { host
           ; should_propose
+          ; transition_interval
           ; snark_worker_config
           ; conf_dir
           ; program_dir
@@ -136,7 +138,7 @@ struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let transition_interval = Time.Span.of_ms 1000.0
+          let transition_interval = Time.Span.of_ms transition_interval
 
           let fee_public_key = Genesis_ledger.high_balance_pk
 

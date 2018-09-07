@@ -378,6 +378,7 @@ end = struct
     (* The mutation "thread" *)
     don't_wait_for
       (Linear_pipe.iter mutate_state_reader ~f:(fun (changes, transition) ->
+
            let old_state = Transition_logic.state t.handler in
            (* TODO: We can make change-resolving more intelligent if different
          * concurrent processes took different times to finish. Since we
@@ -403,9 +404,23 @@ end = struct
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.external_transitions ~f:(fun transition ->
+
+          let bits_to_str b =
+            let str =
+              String.concat
+                (List.map b ~f:(fun x -> if x then "1" else "0"))
+            in
+            let hash = Md5.digest_string str in
+            Md5.to_hex hash
+          in
+          let s = External_transition.protocol_state transition in
+          let c = Protocol_state.hash s in
+          let c = State_hash.to_bits c in
+          let s = bits_to_str c in
           let%bind changes, job =
             Transition_logic.on_new_transition catchup t.handler transition
           in
+          Logger.fatal log "%s %d %b" s (List.length changes) (Option.is_some job);
           let%map () =
             match changes with
             | [] -> return ()
@@ -444,6 +459,20 @@ end = struct
                     | Ok [] -> ()
                     | Ok changes ->
                         (* TODO fix this *)
+                      let bits_to_str b =
+                        let str =
+                          String.concat
+                            (List.map b ~f:(fun x -> if x then "1" else "0"))
+                        in
+                        let hash = Md5.digest_string str in
+                        Md5.to_hex hash
+                      in
+                      let s = External_transition.protocol_state current_transition in
+                      let c = Protocol_state.hash s in
+                      let c = State_hash.to_bits c in
+                      let s = bits_to_str c in
+
+                        Logger.fatal log "write %s" s;
                         Linear_pipe.write_without_pushback mutate_state_writer
                           (changes, current_transition)
                     | Error () -> () )

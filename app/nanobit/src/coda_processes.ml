@@ -24,7 +24,7 @@ struct
     in
     (discovery_ports, external_ports, peers)
 
-  let spawn_local_processes_exn ?(should_propose= Fn.const true)
+  let spawn_local_processes_exn ?(transition_interval= 1000.0) ?(should_propose= Fn.const true)
       ?(first_delay= 3.0) n ~program_dir ~snark_worker_public_keys ~f =
     let fns =
       let discovery_ports, external_ports, peers = net_configs n in
@@ -46,8 +46,8 @@ struct
                       ; port= 20000 + i } ) )
           in
           Coda_process.spawn_local_exn ~peers ~discovery_port ~external_port
-            ~snark_worker_config ~program_dir
-            ~should_propose:(should_propose i) )
+            ~snark_worker_config ~program_dir ~transition_interval
+            ~should_propose:(should_propose i) () )
     in
     let first = List.hd_exn fns in
     let rest = List.drop fns 1 in
