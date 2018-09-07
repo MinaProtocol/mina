@@ -1003,7 +1003,9 @@ module Verification = struct
       let%bind top_hash_section =
         Pedersen.Checked.Section.extend merge_prefix_and_zero_and_vk_curve_pt
           ~start:Hash_prefix.length_in_triples
-          (Sok_message.Digest.Checked.to_triples sok_digest @ s1 @ s2 @ Amount.var_to_triples supply_increase)
+          ( Sok_message.Digest.Checked.to_triples sok_digest
+          @ s1 @ s2
+          @ Amount.var_to_triples supply_increase )
       in
       let digest =
         let digest, `Length_in_triples n =
