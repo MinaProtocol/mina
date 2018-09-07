@@ -66,7 +66,7 @@ let send_txn =
         (required private_key)
     and fee =
       flag "fee"
-        ~doc:"VALUE  Transaction fee you're willing to pay (default: 0)"
+        ~doc:"VALUE  Transaction fee you're willing to pay (default: 1)"
         (optional txn_fee)
     and amount =
       flag "amount" ~doc:"VALUE Transaction amount you want to send"
