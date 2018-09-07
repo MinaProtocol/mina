@@ -19,7 +19,9 @@ let var_of_t (x, y) =
 
 let ( = ) = equal
 
-let of_inner_curve p = Tick.Inner_curve.(to_coords (scale_field Tick.Inner_curve.one p))
+let of_inner_curve_exn = Tick.Inner_curve.to_coords
+
+let to_inner_curve = Tick.Inner_curve.of_coords
 
 let gen : t Quickcheck.Generator.t =
   Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->

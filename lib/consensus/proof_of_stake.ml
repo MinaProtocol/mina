@@ -290,7 +290,7 @@ struct
 
     let hash msg g =
       let open Fold in
-      let compressed_g = Non_zero_curve_point.(g |> of_inner_curve |> compress)
+      let compressed_g = Non_zero_curve_point.(g |> of_inner_curve |> compress) in
       let digest =
         Snark_params.Tick.Pedersen.digest_fold
           Nanobit_base.Hash_prefix.vrf_output
@@ -724,6 +724,10 @@ struct
     Nanobit_base.External_transition.Make (Ledger_builder_diff)
       (Protocol_state)
 
+  let calculate_threshold ~my_stake ~total_stake =
+    let stake_fraction = my_stake /. total_stake in
+    (2 ** Vrf_output.length_in_bits) *. (1 -. (1 -. active_slots) ** stake_fraction)
+
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~previous_protocol_state ~blockchain_state
       ~local_state ~time ~transactions:_ ~ledger =
@@ -732,8 +736,17 @@ struct
     in
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
-    (* TODO: mock VRF *)
-    let proposer_vrf_result = List.init 256 ~f:(fun _ -> false) in
+    let proposer_vrf_result =
+      Vrf.eval
+        (module Shifted)
+        ~private_key
+        { epoch
+        ; slot
+        ; last_epoch_seed= previous_protocol_state.last_epoch_data.seed
+        ; last_epoch_ledger_hash= previous_protocol_state.last_epoch_data.ledger.hash }
+    in
+    let threshold = calculate_threshold ~my_stake ~total_stake in
+
     let consensus_transition_data =
       Consensus_transition_data.{epoch; slot; proposer_vrf_result}
     in
