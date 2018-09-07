@@ -1,4 +1,3 @@
-open Util
 open Core_kernel
 open Snark_params.Tick
 open Tuple_lib

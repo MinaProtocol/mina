@@ -157,7 +157,7 @@ struct
       (Public_key.var_of_t Global_keypair.public_key)
       (transition |> Snark_transition.blockchain_state)
 
-  let next_state_checked (state: Consensus_state.var) _block =
+  let next_state_checked (state: Consensus_state.var) _state_hash _block =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in
@@ -176,7 +176,7 @@ struct
     ()
 
   let select Consensus_state.({length= l1; _})
-      Consensus_state.({length= l2; _}) =
+      Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
 
   let genesis_protocol_state =

@@ -59,7 +59,7 @@ module type S = sig
        previous_protocol_state:Protocol_state.value
     -> blockchain_state:Nanobit_base.Blockchain_state.value
     -> local_state:Local_state.t
-    -> time:Int64.t
+    -> time:Unix_timestamp.t
     -> transactions:Nanobit_base.Transaction.t list
     -> ledger:Nanobit_base.Ledger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
@@ -79,6 +79,7 @@ module type S = sig
 
   val next_state_checked :
        Consensus_state.var
+    -> Nanobit_base.State_hash.var
     -> Snark_transition.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
   (**
@@ -86,7 +87,12 @@ module type S = sig
    * a given consensus state and snark transition.
    *)
 
-  val select : Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
+  val select :
+       Consensus_state.value
+    -> Consensus_state.value
+    -> logger:Logger.t
+    -> time_received:Int64.t
+    -> [`Keep | `Take]
   (**
    * Select between two ledger builder controller tips given the consensus
    * states for the two tips. Returns `\`Keep` if the first tip should be

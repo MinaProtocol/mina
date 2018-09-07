@@ -47,15 +47,9 @@ struct
 
     let depth = Depth.depth
 
-    let length = MT.num_accounts
+    let length = MT.length
 
-    let clear_syncing _ = ()
-
-    let set_syncing _ = ()
-
-    let extend_with_empty_to_fit _ _ = ()
-
-    let merkle_path_at_addr_exn = MT.merkle_path_at_addr
+    let merkle_path_at_addr_exn = MT.merkle_path_at_addr_exn
 
     let merkle_root = MT.merkle_root
 

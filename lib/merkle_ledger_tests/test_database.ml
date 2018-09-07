@@ -71,20 +71,6 @@ let%test_module "test functor on in memory databases" =
             in
             key = key' && MT.get_account mdb key = MT.get_account mdb key' )
 
-      let%test "accounts can be deleted" =
-        with_test_instance (fun mdb ->
-            let account = Quickcheck.random_value Account.gen in
-            assert (MT.set_account mdb account = Ok ()) ;
-            let key =
-              MT.get_key_of_account mdb account
-              |> Result.map_error ~f:exn_of_error
-              |> Result.ok_exn
-            in
-            assert (Option.is_some (MT.get_account mdb key)) ;
-            let account = Account.set_balance account Balance.zero in
-            assert (MT.set_account mdb account = Ok ()) ;
-            MT.get_account mdb key = None )
-
       let%test_unit "num_accounts" =
         with_test_instance (fun mdb ->
             let open Quickcheck.Generator in
@@ -109,7 +95,7 @@ let%test_module "test functor on in memory databases" =
             let num_initial_accounts = List.length accounts in
             List.iter accounts ~f:(fun account ->
                 assert (MT.set_account mdb account = Ok ()) ) ;
-            assert (MT.num_accounts mdb = num_initial_accounts) )
+            assert (MT.length mdb = num_initial_accounts) )
 
       let%test "deleted account keys are reassigned" =
         with_test_instance (fun mdb ->
