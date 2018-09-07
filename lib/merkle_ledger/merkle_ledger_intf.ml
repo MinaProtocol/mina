@@ -27,6 +27,8 @@ module type S = sig
 
   val location_of_key : t -> key -> Location.t option
 
+  val create_account_exn : t -> key -> account -> Location.t
+
   val create : unit -> t
 
   val get : t -> Location.t -> account option
