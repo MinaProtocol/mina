@@ -104,11 +104,11 @@ struct
       (let open Command.Let_syntax in
       let%map_open daemon_port =
         flag "daemon-port" (required int)
-          ~doc:"port daemon is listening on locally"
+          ~doc:"PORT port daemon is listening on locally"
       and public_key =
         flag "public-key"
           (required Cli_lib.public_key_compressed)
-          ~doc:"Public key to send SNARKing fees to"
+          ~doc:"PUBLICKEY Public key to send SNARKing fees to"
       and shutdown_on_disconnect =
         flag "shutdown-on-disconnect" (optional bool)
           ~doc:
