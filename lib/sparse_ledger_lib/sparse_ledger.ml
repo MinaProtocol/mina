@@ -143,15 +143,6 @@ struct
     in
     {t with tree= go (t.depth - 1) t.tree}
 
-  (*let find_index_or_make t pk =
-    match List.Assoc.find t.indexes ~equal:Key.equal pk with
-    | Some idx -> (idx, t)
-    | None ->
-        let idx = fst t.empty in
-        let acct = Account.empty_with_key pk in
-        let t = set_exn t idx acct in
-        (idx, t)*)
-
   let path_exn {tree; depth; _} idx =
     let rec go acc i tree =
       if i < 0 then acc
