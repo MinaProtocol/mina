@@ -33,8 +33,6 @@ module type S = sig
 end
 
 module type Extended = sig
-  open Core_kernel
-
   include S
 
   val negate : t -> t
