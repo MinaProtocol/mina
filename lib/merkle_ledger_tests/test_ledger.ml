@@ -134,34 +134,10 @@ let%test_module "test functor on in memory databases" =
       let root3 = L16.merkle_root ledger in
       assert (root3 = root1)
 
-    let check_path account (path: L16.Path.t) root =
-      let path_root, _ =
-        List.fold path
-          ~init:(Hash.hash_account account, 0)
-          ~f:(fun (a, height) b ->
-            let a =
-              match b with
-              | `Left b -> Hash.merge ~height a b
-              | `Right b -> Hash.merge ~height b a
-            in
-            (a, height + 1) )
-      in
-      path_root = root
+    module Path = Merkle_ledger.Merkle_path.Make (Hash)
 
-    let little_check_path account (path: L3.Path.t) root =
-      let path_root, _ =
-        List.fold
-          ~init:(Hash.hash_account account, 0)
-          path
-          ~f:(fun (a, height) b ->
-            let a =
-              match b with
-              | `Left b -> Hash.merge ~height a b
-              | `Right b -> Hash.merge ~height b a
-            in
-            (a, height + 1) )
-      in
-      path_root = root
+    let check_path account (path: Path.t) root =
+      Path.check_path path (Hash.hash_account account) root
 
     let%test_unit "merkle_path" =
       let b1 = 10 in
@@ -187,7 +163,7 @@ let%test_module "test functor on in memory databases" =
           let account = L3.get ledger key |> Option.value_exn in
           let root = L3.merkle_root ledger in
           assert (List.length path = 3) ;
-          assert (little_check_path account path root) )
+          assert (check_path account path root) )
 
     let%test_unit "merkle_path_at_index" =
       let b1 = 10 in

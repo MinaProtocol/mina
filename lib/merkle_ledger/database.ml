@@ -23,19 +23,7 @@ end = struct
 
   type error = Account_key_not_found | Out_of_leaves | Malformed_database
 
-  module MerklePath = struct
-    type t = Direction.t * Hash.t
-
-    let implied_root path leaf_hash =
-      let rec loop sibling_hash ~height = function
-        | [] -> sibling_hash
-        | (Direction.Left, hash) :: t ->
-            loop (Hash.merge ~height hash sibling_hash) ~height:(height + 1) t
-        | (Direction.Right, hash) :: t ->
-            loop (Hash.merge ~height sibling_hash hash) ~height:(height + 1) t
-      in
-      loop leaf_hash ~height:0 path
-  end
+  module Path = Merkle_path.Make (Hash)
 
   module Addr = Merkle_address.Make (struct
     let depth = Depth.depth
@@ -366,10 +354,13 @@ end = struct
     let key = if Key.is_account key then Key.Hash (Key.path key) else key in
     assert (Key.is_hash key) ;
     let rec loop k =
-      let sibling = Key.sibling k in
-      let sibling_dir = Key.last_direction (Key.path k) in
-      (sibling_dir, get_hash mdb sibling)
-      :: (if Key.height key < Depth.depth then loop (Key.parent k) else [])
+      if Key.height k >= Depth.depth then []
+      else
+        let sibling = Key.sibling k in
+        let sibling_dir = Key.last_direction (Key.path k) in
+        let hash = get_hash mdb sibling in
+        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        :: loop (Key.parent k)
     in
     loop key
 
