@@ -52,7 +52,7 @@ let get_nonce addr port =
   | Error e -> Error (Error.to_string_hum e)
 
 let status =
-  Command.async ~summary:"Get the status of this daemon"
+  Command.async ~summary:"Get the status of the daemon at the specified port"
     (let open Command.Let_syntax in
     let%map_open port = daemon_port_flag in
     fun () ->

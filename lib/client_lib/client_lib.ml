@@ -44,7 +44,7 @@ module Status = struct
     ; uptime_secs : int
     ; conf_dir : string
     ; peers : string list
-    ; local_txn_count : int
+    ; transactions_sent : int
     ; run_snark_worker : bool
     ; propose : bool
     }
