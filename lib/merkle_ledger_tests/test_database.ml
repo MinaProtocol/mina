@@ -95,7 +95,7 @@ let%test_module "test functor on in memory databases" =
             let num_initial_accounts = List.length accounts in
             List.iter accounts ~f:(fun account ->
                 assert (MT.set_account mdb account = Ok ()) ) ;
-            assert (MT.num_accounts mdb = num_initial_accounts) )
+            assert (MT.length mdb = num_initial_accounts) )
 
       let%test "deleted account keys are reassigned" =
         with_test_instance (fun mdb ->
