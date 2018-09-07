@@ -2,7 +2,7 @@ open Core
 open Async_kernel
 
 module type Ledger_intf = sig
-  include Syncable_ledger.Merkle_tree_intf
+  include Merkle_ledger.Merkle_tree_intf.S
 
   val load_ledger : int -> int -> t * string list
 end

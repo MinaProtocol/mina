@@ -132,7 +132,7 @@ module type Proof_intf = sig
 end
 
 module type Ledger_intf = sig
-  type t [@@deriving sexp, compare, hash, bin_io]
+  type t [@@deriving sexp]
 
   module Undo : sig
     type t [@@deriving sexp]
@@ -390,7 +390,7 @@ module type Ledger_builder_transition_intf = sig
 end
 
 module type Ledger_builder_intf = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp]
 
   type diff
 

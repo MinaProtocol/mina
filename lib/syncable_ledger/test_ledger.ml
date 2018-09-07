@@ -14,15 +14,11 @@ struct
 
     let to_hash = Fn.id
 
-    let empty_hash = empty
-
     type account = Account.t
   end
 
   module L = struct
     include Merkle_ledger.Ledger.Make (Key) (Account) (Hash) (Inputs)
-
-    type path = Path.t
 
     type addr = Addr.t
 

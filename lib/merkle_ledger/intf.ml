@@ -8,24 +8,12 @@ module type Key = sig
   include Hashable.S_binable with type t := t
 end
 
-module type Balance = sig
-  type t [@@deriving eq]
-
-  val zero : t
-end
-
 module type Account = sig
   type t [@@deriving bin_io, eq]
 
-  type balance
+  type key
 
-  val empty : t
-
-  val balance : t -> balance
-
-  val set_balance : t -> balance -> t
-
-  val public_key : t -> string
+  val public_key : t -> key
 end
 
 module type Hash = sig
@@ -47,6 +35,8 @@ end
 module type Key_value_database = sig
   type t
 
+  val copy : t -> t
+
   val create : directory:string -> t
 
   val destroy : t -> unit
@@ -60,6 +50,8 @@ end
 
 module type Stack_database = sig
   type t
+
+  val copy : t -> t
 
   val create : filename:string -> t
 

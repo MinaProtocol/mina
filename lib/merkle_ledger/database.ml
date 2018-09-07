@@ -2,40 +2,45 @@ open Core
 open Unsigned
 
 module Make
-    (Balance : Intf.Balance)
-    (Account : Intf.Account with type balance := Balance.t)
+    (Account : Intf.Account with type key := String.t)
     (Hash : Intf.Hash with type account := Account.t)
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
     (Sdb : Intf.Stack_database) : sig
+  module Key : sig
+    type t
+
+    val of_index : int -> t
+
+    val to_index : t -> int
+  end
+
   include Database_intf.S
           with type account := Account.t
            and type hash := Hash.t
+           and type key := Key.t
+
+  val update_account : t -> Key.t -> Account.t -> unit
+
+  val of_public_key_string_to_index : t -> string -> Key.t option
 
   module For_tests : sig
-    val gen_account_key : key Core.Quickcheck.Generator.t
+    val gen_account_key : Key.t Core.Quickcheck.Generator.t
   end
 end = struct
+  include Depth
+
   (* The max depth of a merkle tree can never be greater than 253. *)
   let max_depth = Depth.depth
 
   let () = assert (max_depth < 0xfe)
 
   type error = Account_key_not_found | Out_of_leaves | Malformed_database
+  [@@deriving sexp]
 
-  module MerklePath = struct
-    type t = Direction.t * Hash.t
+  module Path = Merkle_path.Make (Hash)
 
-    let implied_root path leaf_hash =
-      let rec loop sibling_hash ~height = function
-        | [] -> sibling_hash
-        | (Direction.Left, hash) :: t ->
-            loop (Hash.merge ~height hash sibling_hash) ~height:(height + 1) t
-        | (Direction.Right, hash) :: t ->
-            loop (Hash.merge ~height sibling_hash hash) ~height:(height + 1) t
-      in
-      loop leaf_hash ~height:0 path
-  end
+  type path = Path.t
 
   module Addr = Merkle_address.Make (struct
     let depth = max_depth
@@ -115,6 +120,10 @@ end = struct
       | Generic _ ->
           raise (Invalid_argument "to_path_exn: generic does not have a path")
 
+    let of_index index = Account (Addr.of_index_exn index)
+
+    let to_index = Fn.compose Addr.to_int to_path_exn
+
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
       | Account path ->
@@ -153,8 +162,6 @@ end = struct
       | Left -> (base, sibling)
       | Right -> (sibling, base)
   end
-
-  type key = Key.t
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
@@ -198,7 +205,7 @@ end = struct
     assert (Key.is_generic key) ;
     get_raw mdb key
 
-  let get_account mdb key =
+  let get mdb key =
     assert (Key.is_account key) ;
     get_bin mdb key Account.bin_read_t
 
@@ -216,8 +223,6 @@ end = struct
     let buf = Bigstring.create size in
     ignore (bin_write buf ~pos:0 v) ;
     set_raw mdb key buf
-
-  let delete_raw {kvdb; _} key = Kvdb.delete kvdb ~key:(Key.serialize key)
 
   let rec set_hash mdb key new_hash =
     assert (Key.is_hash key) ;
@@ -243,20 +248,17 @@ end = struct
     set_bin mdb (Key.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
   module Account_key = struct
-    let build_key account =
-      Key.build_generic
-        (Bigstring.of_string ("$" ^ Account.public_key account))
+    let build_key pk = Key.build_generic (Bigstring.of_string ("$" ^ pk))
 
     let get mdb account =
-      match get_generic mdb (build_key account) with
+      match get_generic mdb (build_key (Account.public_key account)) with
       | None -> Error Account_key_not_found
       | Some key_bin ->
           Key.parse key_bin
           |> Result.map_error ~f:(fun () -> Malformed_database)
 
-    let set mdb account key = set_raw mdb (build_key account) key
-
-    let delete mdb account = delete_raw mdb (build_key account)
+    let set mdb account key =
+      set_raw mdb (build_key (Account.public_key account)) key
 
     let last_key () =
       Key.build_generic (Bigstring.of_string "last_account_key")
@@ -304,34 +306,29 @@ end = struct
 
   let get_key_of_account = Account_key.get
 
+  let of_public_key_string_to_index mdb public_key =
+    let open Option.Let_syntax in
+    let%bind account_key_bin =
+      get_generic mdb @@ Account_key.build_key public_key
+    in
+    match Key.parse account_key_bin with
+    | Ok account_key -> Some account_key
+    | Error () -> None
+
   let update_account mdb key account =
     set_bin mdb key Account.bin_size_t Account.bin_write_t account ;
     set_hash mdb (Key.Hash (Key.path key)) (Hash.hash_account account)
 
-  let delete_account mdb account =
-    match Account_key.get mdb account with
-    | Error Account_key_not_found -> Ok ()
-    | Error err -> Error err
-    | Ok key ->
-        Kvdb.delete mdb.kvdb ~key:(Key.serialize key) ;
-        set_hash mdb (Key.Hash (Key.path key)) Hash.empty ;
-        Account_key.delete mdb account ;
-        Sdb.push mdb.sdb (Key.serialize key) ;
-        Ok ()
+  let set mdb account =
+    let key_result =
+      match Account_key.get mdb account with
+      | Error Account_key_not_found -> Account_key.allocate mdb account
+      | Error err -> Error err
+      | Ok key -> Ok key
+    in
+    Result.map key_result ~f:(fun key -> update_account mdb key account)
 
-  let set_account mdb account =
-    if Balance.equal (Account.balance account) Balance.zero then
-      delete_account mdb account
-    else
-      let key_result =
-        match Account_key.get mdb account with
-        | Error Account_key_not_found -> Account_key.allocate mdb account
-        | Error err -> Error err
-        | Ok key -> Ok key
-      in
-      Result.map key_result ~f:(fun key -> update_account mdb key account)
-
-  let num_accounts t =
+  let length t =
     match Account_key.last_key_address t with
     | None -> 0
     | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
@@ -340,13 +337,10 @@ end = struct
     let first_node, last_node = Addr.Range.subtree_range address in
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account =
-            Option.value ~default:Account.empty
-              (get_account mdb (Key.Account bit_index))
-          in
+          let account = get mdb (Key.Account bit_index) in
           account :: acc )
     in
-    List.rev result
+    List.rev_filter_map result ~f:Fn.id
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
@@ -355,9 +349,7 @@ end = struct
       | head :: tail ->
           update_account mdb (Key.Account bit_index) head ;
           tail
-      | [] ->
-          assert (Addr.equal last_node bit_index) ;
-          [] )
+      | [] -> [] )
     |> ignore
 
   let merkle_root mdb = get_hash mdb Key.root_hash
@@ -366,12 +358,17 @@ end = struct
     let key = if Key.is_account key then Key.Hash (Key.path key) else key in
     assert (Key.is_hash key) ;
     let rec loop k =
-      let sibling = Key.sibling k in
-      let sibling_dir = Key.last_direction (Key.path k) in
-      (sibling_dir, get_hash mdb sibling)
-      :: (if Key.height key < max_depth then loop (Key.parent k) else [])
+      if Key.height k >= max_depth then []
+      else
+        let sibling = Key.sibling k in
+        let sibling_dir = Key.last_direction (Key.path k) in
+        let hash = get_hash mdb sibling in
+        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        :: loop (Key.parent k)
     in
     loop key
 
-  let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
+  let merkle_path_at_addr_exn t addr = merkle_path t (Key.Hash addr)
+
+  let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
 end

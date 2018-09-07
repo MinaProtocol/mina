@@ -3,19 +3,67 @@ open Import
 open Snark_params
 open Currency
 
-include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
-          (struct
-            type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
+let of_public_key_to_string key = Public_key.Compressed.to_base64 key
 
-            let merge = Merkle_hash.merge
+module Account = struct
+  include Account
 
-            let empty = Merkle_hash.empty_hash
+  let public_key (t: t) = public_key t |> of_public_key_to_string
+end
 
-            let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
-          end)
-          (struct
-            let depth = ledger_depth
-          end)
+module Base = struct
+  include Merkle_ledger.Database.Make (Account)
+            (struct
+              type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
+
+              let merge = Merkle_hash.merge
+
+              let empty = Merkle_hash.empty_hash
+
+              let hash_account =
+                Fn.compose Merkle_hash.of_digest Account.digest
+            end)
+            (struct
+              let depth = ledger_depth
+            end)
+            (Merkle_ledger_tests.Test_stubs.In_memory_kvdb)
+            (Merkle_ledger_tests.Test_stubs.In_memory_sdb)
+
+  type key = Public_key.Compressed.t
+
+  let to_index ledger key =
+    of_public_key_to_string key |> of_public_key_string_to_index ledger
+
+  let index_of_key ledger key =
+    to_index ledger key |> Option.map ~f:Key.to_index
+
+  let index_of_key_exn ledger key = index_of_key ledger key |> Option.value_exn
+
+  let merkle_path ledger key =
+    to_index ledger key |> Option.map ~f:(merkle_path ledger)
+
+  let merkle_path_at_index_exn t index =
+    merkle_path_at_addr_exn t (Addr.of_index_exn index)
+
+  let get_at_index_exn t index = get t (Key.of_index index) |> Option.value_exn
+
+  let set_at_index_exn t index account =
+    update_account t (Key.of_index index) account
+
+  let depth = ledger_depth
+
+  let get ledger key = to_index ledger key |> Option.bind ~f:(get ledger)
+
+  let copy t = t
+
+  let t_of_sexp = opaque_of_sexp
+
+  let sexp_of_t = sexp_of_opaque
+
+  let create () = create ~key_value_db_dir:"" ~stack_db_file:""
+end
+
+include Base
 
 let merkle_root t =
   Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
@@ -26,6 +74,13 @@ let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
 
 let get' ledger tag key =
   error_opt (sprintf "%s not found" tag) (get ledger key)
+
+let set' ledger account : unit Or_error.t =
+  set ledger account
+  |> Result.map_error ~f:(fun error ->
+         Error.create "Cannot create account" error [%sexp_of : error] )
+
+let set t account = set t account |> Result.ok |> Option.value_exn
 
 let add_amount balance amount =
   error_opt "overflow" (Balance.add_amount balance amount)
@@ -81,15 +136,19 @@ let apply_transaction_unchecked ledger
     { Undo.transaction
     ; previous_receipt_chain_hash= sender_account.receipt_chain_hash }
   in
-  if Public_key.Compressed.equal sender receiver then (
-    set ledger sender sender_account_without_balance_modified ;
-    return undo )
+  if Public_key.Compressed.equal sender receiver then
+    let%bind () = set' ledger sender_account_without_balance_modified in
+    return undo
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
-    let%map receiver_balance' = add_amount receiver_account.balance amount in
-    set ledger sender
-      {sender_account_without_balance_modified with balance= sender_balance'} ;
-    set ledger receiver {receiver_account with balance= receiver_balance'} ;
+    let%bind receiver_balance' = add_amount receiver_account.balance amount in
+    let%bind () =
+      set' ledger
+        {sender_account_without_balance_modified with balance= sender_balance'}
+    in
+    let%map () =
+      set' ledger {receiver_account with balance= receiver_balance'}
+    in
     undo
 
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
@@ -99,12 +158,12 @@ let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
   let open Or_error.Let_syntax in
   match transfer with
   | One (pk, fee) ->
-      let%map a = get' t "One-pk" pk in
-      set t pk {a with balance= modify_balance a.balance fee}
+      let%bind a = get' t "One-pk" pk in
+      set' t {a with balance= modify_balance a.balance fee}
   | Two ((pk1, fee1), (pk2, fee2)) ->
-      let%map a1 = get' t "Two-pk1" pk1 and a2 = get' t "Two-pk2" pk2 in
-      set t pk1 {a1 with balance= modify_balance a1.balance fee1} ;
-      set t pk2 {a2 with balance= modify_balance a2.balance fee2}
+      let%bind a1 = get' t "Two-pk1" pk1 and a2 = get' t "Two-pk2" pk2 in
+      let%bind () = set' t {a1 with balance= modify_balance a1.balance fee1} in
+      set' t {a2 with balance= modify_balance a2.balance fee2}
 
 let apply_fee_transfer t transfer =
   process_fee_transfer t transfer ~modify_balance:(fun b f ->
@@ -131,12 +190,12 @@ let apply_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
         in
         let receiver_account = get_or_initialize receiver in
         let%map balance = add_amount receiver_account.balance fee in
-        (proposer_reward, Some (receiver, {receiver_account with balance}))
+        (proposer_reward, Some {receiver_account with balance})
   in
   let proposer_account = get_or_initialize proposer in
   let%map balance = add_amount proposer_account.balance proposer_reward in
-  set t proposer {proposer_account with balance} ;
-  Option.iter receiver_update ~f:(fun (k, a) -> set t k a)
+  set t {proposer_account with balance} ;
+  Option.iter receiver_update ~f:(fun a -> set t a)
 
 (* Don't have to be atomic here because these should never fail. In fact, none of
    the undo functions should ever return an error. This should be fixed in the types. *)
@@ -147,7 +206,7 @@ let undo_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
         let receiver_account = Or_error.ok_exn (get' t "receiver" receiver) in
-        set t receiver
+        set t
           { receiver_account with
             balance=
               Option.value_exn
@@ -155,7 +214,7 @@ let undo_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
         Amount.sub Protocols.Coda_praos.coinbase_amount fee |> Option.value_exn
   in
   let proposer_account = Or_error.ok_exn (get' t "proposer" proposer) in
-  set t proposer
+  set t
     { proposer_account with
       balance=
         Option.value_exn
@@ -178,19 +237,19 @@ let undo_transaction ledger
   let sender_account_without_balance_modified =
     {sender_account with nonce; receipt_chain_hash= previous_receipt_chain_hash}
   in
-  if Public_key.Compressed.equal sender receiver then (
-    set ledger sender sender_account_without_balance_modified ;
-    return () )
+  if Public_key.Compressed.equal sender receiver then
+    set' ledger sender_account_without_balance_modified
   else
     let%bind receiver_account = get' ledger "receiver" receiver in
-    let%map receiver_balance' = sub_amount receiver_account.balance amount in
-    set ledger sender
-      {sender_account_without_balance_modified with balance= sender_balance'} ;
-    set ledger receiver {receiver_account with balance= receiver_balance'}
+    let%bind receiver_balance' = sub_amount receiver_account.balance amount in
+    let%bind () =
+      set' ledger
+        {sender_account_without_balance_modified with balance= sender_balance'}
+    in
+    set' ledger {receiver_account with balance= receiver_balance'}
 
 let undo : t -> Undo.t -> unit Or_error.t =
  fun ledger undo ->
-  let open Or_error.Let_syntax in
   match undo with
   | Fee_transfer t -> undo_fee_transfer ledger t
   | Transaction u -> undo_transaction ledger u
@@ -211,12 +270,4 @@ let merkle_root_after_transaction_exn ledger transaction =
   let undo = Or_error.ok_exn (apply_transaction ledger transaction) in
   let root = merkle_root ledger in
   Or_error.ok_exn (undo_transaction ledger undo) ;
-  root
-
-let merkle_root_after_transactions t ts =
-  let undos_rev =
-    List.rev_map ts ~f:(fun txn -> Or_error.ok_exn (apply_transaction t txn))
-  in
-  let root = merkle_root t in
-  List.iter undos_rev ~f:(fun u -> Or_error.ok_exn (undo_transaction t u)) ;
   root

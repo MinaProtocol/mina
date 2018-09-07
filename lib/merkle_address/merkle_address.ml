@@ -30,6 +30,8 @@ module type S = sig
 
   val child_exn : t -> Direction.t -> t
 
+  val of_index_exn : int -> t
+
   val parent_exn : t -> t
 
   val dirs_from_root : t -> Direction.t list
@@ -263,17 +265,55 @@ struct
       (first_node, last_node)
   end
 
+  let to_index a =
+    List.foldi
+      (List.rev @@ dirs_from_root a)
+      ~init:0
+      ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
+
+  let of_index_exn index =
+    if index >= 1 lsl Input.depth then failwith "Index is too large"
+    else
+      let buf = create_bitstring Input.depth in
+      Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
+        (Input.depth - 1) 0
+      |> Sequence.fold ~init:index ~f:(fun i pos ->
+             Bitstring.put buf pos (i % 2) ;
+             i / 2 )
+      |> ignore ;
+      buf
+
   let%test "the merkle root should have no path" =
     dirs_from_root (root ()) = []
 
   let%test_unit "parent_exn(child_exn(node)) = node" =
     Quickcheck.test ~sexp_of:[%sexp_of : Direction.t List.t * Direction.t]
       (Quickcheck.Generator.tuple2
-         (Direction.gen_list Input.depth)
+         (Direction.gen_var_length_list Input.depth)
          Direction.gen)
       ~f:(fun (path, direction) ->
         let address = of_directions path in
         [%test_eq : t] (parent_exn (child_exn address direction)) address )
+
+  let%test_unit "to_index(of_index_exn(i)) = i" =
+    Quickcheck.test ~sexp_of:[%sexp_of : int]
+      (Int.gen_incl 0 ((1 lsl Input.depth) - 1))
+      ~f:(fun index ->
+        [%test_result : int] ~expect:index (to_index @@ of_index_exn index) )
+
+  let%test_unit "of_index_exn(to_index(addr)) = addr" =
+    Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
+      (Direction.gen_list Input.depth) ~f:(fun directions ->
+        let address = of_directions directions in
+        [%test_result : t] ~expect:address (of_index_exn @@ to_index address)
+    )
+
+  let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
+    Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
+      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:
+      (fun directions ->
+        let address = of_directions directions in
+        [%test_result : t] ~expect:address (sibling @@ sibling address) )
 end
 
 let%test_module "Address" =
