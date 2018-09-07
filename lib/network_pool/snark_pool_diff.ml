@@ -1,7 +1,4 @@
-open Protocols
-open Coda_pow
 open Core_kernel
-open Snark_pool
 open Async
 
 type ('work, 'priced_proof) diff = Add_solved_work of 'work * 'priced_proof
