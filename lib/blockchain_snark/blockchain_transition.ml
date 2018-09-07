@@ -103,7 +103,6 @@ module Keys = struct
   end
 
   let load ({proving; verification}: Location.t) =
-    let open Storage.Disk in
     let%map proving, proving_checksum = Proving.load proving
     and verification, verification_checksum = Verification.load verification in
     ( {proving; verification}

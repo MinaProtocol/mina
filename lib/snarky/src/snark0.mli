@@ -1,5 +1,3 @@
-open Core_kernel
-
 module Make (Backend : Backend_intf.S) :
   Snark_intf.S
   with type field = Backend.Field.t
