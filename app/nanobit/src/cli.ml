@@ -74,7 +74,9 @@ let daemon (type ledger_proof) (module Kernel
        let client_port =
          Option.value ~default:default_client_port client_port
        in
-       let should_propose_flag = Option.value ~default:true should_propose_flag in
+       let should_propose_flag =
+         Option.value ~default:true should_propose_flag
+       in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
@@ -120,8 +122,8 @@ let daemon (type ledger_proof) (module Kernel
        let%bind () =
          let open M in
          let run_snark_worker_action =
-           Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:(fun k ->
-               `With_public_key k )
+           Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
+             (fun k -> `With_public_key k )
          in
          let net_config =
            { Inputs.Net.Config.parent_log= log
@@ -135,7 +137,9 @@ let daemon (type ledger_proof) (module Kernel
          in
          let%map minibit =
            Run.create
-             (Run.Config.make ~log ~net_config ~should_propose:should_propose_flag ~run_snark_worker:(Option.is_some run_snark_worker_flag)
+             (Run.Config.make ~log ~net_config
+                ~should_propose:should_propose_flag
+                ~run_snark_worker:(Option.is_some run_snark_worker_flag)
                 ~ledger_builder_persistant_location:
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")

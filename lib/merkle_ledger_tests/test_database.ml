@@ -131,7 +131,8 @@ let%test_module "test functor on in memory databases" =
                 let result = MT.get_inner_hash_at_addr_exn mdb address in
                 assert (Hash.equal result hash_account) ) )
 
-      let%test_unit "If the entire database is full,\n \
+      let%test_unit "If the entire database is full,\n\
+                     \ \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
                      = accounts" =
         with_test_instance (fun mdb ->

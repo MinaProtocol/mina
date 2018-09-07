@@ -21,8 +21,8 @@ module type Consensus_state_intf = sig
 
   val fold : value -> bool Triple.t Fold.t
 
-  (** For status *)
   val length : value -> Length.t
+  (** For status *)
 end
 
 module type S = sig

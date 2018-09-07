@@ -159,7 +159,8 @@ struct
         in
         let%bind coda =
           Main.create
-            (Main.Config.make ~log ~net_config ~should_propose ~run_snark_worker:(Option.is_some snark_worker_config)
+            (Main.Config.make ~log ~net_config ~should_propose
+               ~run_snark_worker:(Option.is_some snark_worker_config)
                ~ledger_builder_persistant_location:"ledger_builder"
                ~transaction_pool_disk_location:"transaction_pool"
                ~snark_pool_disk_location:"snark_pool"

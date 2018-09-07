@@ -18,8 +18,7 @@ let dispatch rpc query port =
 let daemon_port_flag =
   Command.Param.flag "daemon-port"
     ~doc:
-      (Printf.sprintf
-         "PORT Client to daemon local communication (default: %d)"
+      (Printf.sprintf "PORT Client to daemon local communication (default: %d)"
          default_client_port)
     (Command.Param.optional int16)
 
@@ -30,8 +29,7 @@ let get_balance =
       flag "address"
         ~doc:"KEY Public-key address of which you want to see the balance"
         (required public_key)
-    and port = daemon_port_flag
-    in
+    and port = daemon_port_flag in
     fun () ->
       let open Deferred.Let_syntax in
       let port = Option.value ~default:default_client_port port in
@@ -58,10 +56,9 @@ let status =
     fun () ->
       let open Deferred.Let_syntax in
       let port = Option.value ~default:default_client_port port in
-      match%map
-        dispatch Client_lib.Get_status.rpc () port
-      with
-      | Ok s -> printf "%s" (Client_lib.Status.to_yojson s |> Yojson.Safe.to_string)
+      match%map dispatch Client_lib.Get_status.rpc () port with
+      | Ok s ->
+          printf "%s" (Client_lib.Status.to_yojson s |> Yojson.Safe.to_string)
       | Error e -> eprintf "%s" (Error.to_string_hum e))
 
 let send_txn =

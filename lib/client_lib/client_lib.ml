@@ -39,15 +39,14 @@ end
 module Status = struct
   (* NOTE: yojson deriving generates code that violates warning 39 *)
   type t =
-    { num_accounts : int
-    ; block_count : int
-    ; uptime_secs : int
-    ; conf_dir : string
-    ; peers : string list
-    ; transactions_sent : int
-    ; run_snark_worker : bool
-    ; propose : bool
-    }
+    { num_accounts: int
+    ; block_count: int
+    ; uptime_secs: int
+    ; conf_dir: string
+    ; peers: string list
+    ; transactions_sent: int
+    ; run_snark_worker: bool
+    ; propose: bool }
   [@@deriving yojson, bin_io]
 end
 
@@ -61,5 +60,3 @@ module Get_status = struct
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
 end
-
-

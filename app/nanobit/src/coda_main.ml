@@ -849,12 +849,15 @@ module type Main_intf = sig
   type t
 
   val should_propose : t -> bool
+
   val run_snark_worker : t -> bool
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
   val best_ledger : t -> Inputs.Ledger.t
-  val best_protocol_state : t -> Inputs.Consensus_mechanism.Protocol_state.value
+
+  val best_protocol_state :
+    t -> Inputs.Consensus_mechanism.Protocol_state.value
 
   val peers : t -> Kademlia.Peer.t list
 
@@ -901,6 +904,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   (** For status *)
   let txn_count = ref 0
+
   let send_txn log t txn =
     let open Deferred.Let_syntax in
     assert (is_valid_transaction t txn) ;
@@ -909,7 +913,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
       txn ;
-    txn_count := !txn_count + 1;
+    txn_count := !txn_count + 1 ;
     Deferred.unit
 
   let get_nonce t (addr: Public_key.Compressed.t) =
@@ -924,17 +928,22 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let ledger = best_ledger t in
     let num_accounts = Ledger.num_accounts ledger in
     let state = best_protocol_state t in
-    let block_count = state |> Consensus_mechanism.Protocol_state.consensus_state |> Consensus_mechanism.Consensus_state.length in
-    let uptime_secs = Time_ns.diff (Time_ns.now ()) start_time |> Time_ns.Span.to_sec |> Int.of_float in
+    let block_count =
+      state |> Consensus_mechanism.Protocol_state.consensus_state
+      |> Consensus_mechanism.Consensus_state.length
+    in
+    let uptime_secs =
+      Time_ns.diff (Time_ns.now ()) start_time
+      |> Time_ns.Span.to_sec |> Int.of_float
+    in
     { Client_lib.Status.num_accounts
-    ; block_count = Int.of_string (Length.to_string block_count)
+    ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
-    ; conf_dir = Config_in.conf_dir
-    ; peers = List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
-    ; local_txn_count = !txn_count
-    ; run_snark_worker = run_snark_worker t
-    ; propose = should_propose t
-    }
+    ; conf_dir= Config_in.conf_dir
+    ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
+    ; local_txn_count= !txn_count
+    ; run_snark_worker= run_snark_worker t
+    ; propose= should_propose t }
 
   let setup_local_server ~minibit ~log ~client_port =
     let log = Logger.child log "client" in

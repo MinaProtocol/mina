@@ -411,6 +411,7 @@ module Make (Inputs : Inputs_intf) = struct
     ; ledger_builder_transition_backup_capacity: int }
 
   let run_snark_worker t = t.run_snark_worker
+
   let should_propose t = t.should_propose
 
   let best_ledger_builder t =
@@ -550,8 +551,8 @@ module Make (Inputs : Inputs_intf) = struct
     else don't_wait_for (Linear_pipe.drain (Proposer.transitions proposer)) ;
     return
       { proposer
-      ; should_propose = config.should_propose
-      ; run_snark_worker = config.run_snark_worker
+      ; should_propose= config.should_propose
+      ; run_snark_worker= config.run_snark_worker
       ; net
       ; external_transitions= external_transitions_writer
       ; transaction_pool

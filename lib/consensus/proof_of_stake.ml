@@ -710,7 +710,7 @@ struct
       ; last_epoch_data
       ; curr_epoch_data }
 
-    let length (t : value) = t.length
+    let length (t: value) = t.length
   end
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)
