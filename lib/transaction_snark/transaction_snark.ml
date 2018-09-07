@@ -914,6 +914,7 @@ module Verification = struct
          Sok_message.Digest.Checked.t
       -> Ledger_hash.var
       -> Ledger_hash.var
+      -> Currency.Amount.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
   end
@@ -994,7 +995,7 @@ module Verification = struct
       We precompute the parts of the pedersen involving wrap_vk and
       Amount.Signed.zero outside the SNARK since this saves us many constraints.
     *)
-    let verify_complete_merge sok_digest s1 s2 get_proof =
+    let verify_complete_merge sok_digest s1 s2 supply_increase get_proof =
       let open Tick in
       let open Let_syntax in
       let%bind s1 = Ledger_hash.var_to_triples s1
@@ -1002,7 +1003,7 @@ module Verification = struct
       let%bind top_hash_section =
         Pedersen.Checked.Section.extend merge_prefix_and_zero_and_vk_curve_pt
           ~start:Hash_prefix.length_in_triples
-          (Sok_message.Digest.Checked.to_triples sok_digest @ s1 @ s2)
+          (Sok_message.Digest.Checked.to_triples sok_digest @ s1 @ s2 @ Amount.var_to_triples supply_increase)
       in
       let digest =
         let digest, `Length_in_triples n =

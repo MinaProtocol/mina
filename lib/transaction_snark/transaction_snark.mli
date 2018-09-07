@@ -107,6 +107,7 @@ module Verification : sig
          Sok_message.Digest.Checked.t
       -> Ledger_hash.var
       -> Ledger_hash.var
+      -> Currency.Amount.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
   end
