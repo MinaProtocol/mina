@@ -1,5 +1,4 @@
 open Core
-open Protocols
 
 type transaction = Transaction.With_valid_signature.t [@@deriving bin_io, sexp]
 
