@@ -617,12 +617,15 @@ end = struct
 
   module Resources = struct
     module Queue_consumption = struct
-      type t = {fee_transfers: Compressed_public_key.Set.t; transactions: int}
+      type t =
+        { fee_transfers: Compressed_public_key.Set.t
+        ; transactions: int
+        ; coinbase: int }
       [@@deriving sexp]
 
-      let count {fee_transfers; transactions} =
+      let count {fee_transfers; transactions; coinbase} =
         (* This is ceil(Set.length fee_transfers / 2) *)
-        transactions + ((Set.length fee_transfers + 1) / 2)
+        coinbase + transactions + ((Set.length fee_transfers + 1) / 2)
 
       let add_transaction t = {t with transactions= t.transactions + 1}
 
@@ -631,26 +634,21 @@ end = struct
 
       let init ~self =
         { transactions= 0
-        ; fee_transfers= Compressed_public_key.Set.singleton self }
+        ; fee_transfers= Compressed_public_key.Set.singleton self
+        ; coinbase= 0 }
     end
 
     type t =
       { budget: Fee.Signed.t
       ; queue_consumption: Queue_consumption.t
       ; available_queue_space: int
-      ; max_throughput: int
       ; work_done: int
       ; transactions: (Transaction.With_valid_signature.t * Ledger.Undo.t) list
       ; completed_works: Completed_work.Checked.t list }
     [@@deriving sexp]
 
     let space_available t =
-      let can_add =
-        if t.available_queue_space < t.max_throughput then
-          t.available_queue_space
-        else t.max_throughput
-      in
-      Queue_consumption.count t.queue_consumption < can_add
+      Queue_consumption.count t.queue_consumption < t.available_queue_space
 
     let budget_non_neg t = Fee.Signed.sgn t.budget = Sgn.Pos
 
@@ -692,9 +690,8 @@ end = struct
         ; work_done= t.work_done + List.length w.proofs
         ; completed_works= wc :: t.completed_works }
 
-    let init ~available_queue_space ~max_throughput ~self =
+    let init ~available_queue_space ~self =
       { available_queue_space
-      ; max_throughput
       ; work_done= 0
       ; queue_consumption= Queue_consumption.init ~self
       ; budget= Fee.Signed.zero
@@ -734,72 +731,139 @@ end = struct
         def_val
     | Ok value -> value
 
-  let rec check_resources_and_add logger ws_seq ts_seq get_completed_work
-      ledger (valid: Resources.t) (resources: Resources.t) =
+  (*The total fee_excess when one iteration of the scan finalizes, is determined by the payments, fee transfers included in the slots starting from 0 to 2n and therefore, in order to produce zero fee excess, all those transactions added to the queue should be*)
+
+  let partitions start max total : int * int option =
+    if max <= total - start then (max, None)
+    else (total - start, Some (max - (total - start)))
+
+  module Resource_util = struct
+    type t =
+      { resources: Resources.t
+      ; coinbase_added: bool
+      ; work_to_do: Completed_work.Statement.t Sequence.t
+      ; txns_to_include: Transaction.With_valid_signature.t Sequence.t }
+  end
+
+  let rec check_resources_and_add logger get_completed_work ledger
+      (valid: Resource_util.t) (current: Resource_util.t) =
     match
-      ( Sequence.next ws_seq
-      , Sequence.next ts_seq
-      , Resources.space_available resources )
+      ( Sequence.next current.work_to_do
+      , Sequence.next current.txns_to_include
+      , Resources.space_available current.resources )
     with
-    | None, None, _ -> (valid, txns_not_included valid resources)
+    | None, None, _ ->
+        (valid, txns_not_included valid.resources current.resources)
     | None, Some (t, ts), true ->
         let r_transaction =
           log_error_and_return_value logger
-            (add_transaction ledger t resources)
-            resources
+            (add_transaction ledger t current.resources)
+            current.resources
+        in
+        let new_res_util =
+          { Resource_util.resources= r_transaction
+          ; coinbase_added= false
+          ; work_to_do= Sequence.empty
+          ; txns_to_include= ts }
         in
         if Resources.budget_non_neg r_transaction then
-          check_resources_and_add logger Sequence.empty ts get_completed_work
-            ledger r_transaction r_transaction
+          check_resources_and_add logger get_completed_work ledger new_res_util
+            new_res_util
         else
-          check_resources_and_add logger Sequence.empty ts get_completed_work
-            ledger valid r_transaction
+          check_resources_and_add logger get_completed_work ledger valid
+            new_res_util
     | Some (w, ws), Some (t, ts), true -> (
         let enough_work_added_to_include_one_more =
-          resources.work_done
-          = (Resources.Queue_consumption.count resources.queue_consumption + 1)
+          current.resources.work_done
+          = ( Resources.Queue_consumption.count
+                current.resources.queue_consumption
+            + 1 )
             * 2
         in
         if enough_work_added_to_include_one_more then
           let r_transaction =
             log_error_and_return_value logger
-              (add_transaction ledger t resources)
-              resources
+              (add_transaction ledger t current.resources)
+              current.resources
+          in
+          let new_res_util =
+            { Resource_util.resources= r_transaction
+            ; coinbase_added= false
+            ; work_to_do= Sequence.append (Sequence.singleton w) ws
+            ; txns_to_include= ts }
           in
           if Resources.budget_non_neg r_transaction then
-            check_resources_and_add logger
-              (Sequence.append (Sequence.singleton w) ws)
-              ts get_completed_work ledger r_transaction r_transaction
+            check_resources_and_add logger get_completed_work ledger
+              new_res_util new_res_util
           else
-            check_resources_and_add logger
-              (Sequence.append (Sequence.singleton w) ws)
-              ts get_completed_work ledger valid r_transaction
+            check_resources_and_add logger get_completed_work ledger valid
+              new_res_util
         else
-          match add_work w resources get_completed_work with
+          match add_work w current.resources get_completed_work with
           | Ok r_work ->
-              check_resources_and_add logger ws
-                (Sequence.append (Sequence.singleton t) ts)
-                get_completed_work ledger valid r_work
+              check_resources_and_add logger get_completed_work ledger valid
+                { resources= r_work
+                ; coinbase_added= false
+                ; work_to_do= ws
+                ; txns_to_include= Sequence.append (Sequence.singleton t) ts }
           | Error e ->
               Logger.error logger "%s" (Error.to_string_hum e) ;
-              (valid, txns_not_included valid resources) )
-    | _, _, _ -> (valid, txns_not_included valid resources)
+              (valid, txns_not_included valid.resources current.resources) )
+    | _, _, _ -> (valid, txns_not_included valid.resources current.resources)
 
   let undo_txns ledger txns =
     List.fold txns ~init:() ~f:(fun _ (_, u) ->
         Or_error.ok_exn (Ledger.undo ledger u) )
 
-  let process_works_add_txns logger ws_seq ts_seq ps_free_space max_throughput
-      get_completed_work ledger self : Resources.t =
-    let resources =
-      Resources.init ~available_queue_space:ps_free_space ~max_throughput ~self
-    in
-    let valid, txns_to_undo =
-      check_resources_and_add logger ws_seq ts_seq get_completed_work ledger
-        resources resources
+  let add_coinbase (res_util: Resource_util.t) : Resource_util.t =
+    if
+      not res_util.coinbase_added
+      && Resources.space_available res_util.resources
+    then failwith "add coinbases accordingly"
+    else res_util
+
+  let allocate_resources logger get_completed_work ledger init_res_util :
+      Resource_util.t =
+    let res_util, txns_to_undo =
+      check_resources_and_add logger get_completed_work ledger init_res_util
+        init_res_util
     in
     let _ = undo_txns ledger txns_to_undo in
-    valid
+    add_coinbase res_util
+
+  let process_works_add_txns logger ws_seq ts_seq max_throughput ps_free_space
+      get_completed_work ledger self : Resources.t * Resources.t option =
+    let max =
+      if ps_free_space < max_throughput then ps_free_space else max_throughput
+    in
+    let p1, maybe_p2 = partitions 0 max (max_throughput * 2) in
+    let init_resources = Resources.init ~available_queue_space:p1 ~self in
+    let init_res_util =
+      { Resource_util.resources= init_resources
+      ; coinbase_added= false
+      ; work_to_do= ws_seq
+      ; txns_to_include= ts_seq }
+    in
+    let valid_res_util =
+      allocate_resources logger get_completed_work ledger init_res_util
+    in
+    let valid_resources2 =
+      Option.map maybe_p2 ~f:(fun p2 ->
+          let init_resources =
+            Resources.init ~available_queue_space:p2 ~self
+          in
+          let init_res_util : Resource_util.t =
+            { Resource_util.resources= init_resources
+            ; coinbase_added= valid_res_util.coinbase_added
+            ; work_to_do= valid_res_util.work_to_do
+            ; txns_to_include= valid_res_util.txns_to_include }
+          in
+          let valid_res_util2 =
+            allocate_resources logger get_completed_work ledger init_res_util
+          in
+          valid_res_util2.resources )
+    in
+    (valid_res_util.resources, valid_resources2)
 
   let create_diff t ~logger
       ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
@@ -810,9 +874,10 @@ end = struct
     let t' = copy t in
     let ledger = ledger t' in
     let max_throughput = Int.pow 2 (Inputs.Config.parallelism_log_2 - 1) in
-    let resources =
+    let _ = partitions 0 max_throughput 1 in
+    let resources, _ =
       process_works_add_txns logger (work_to_do t'.scan_state)
-        transactions_by_fee (free_space t') max_throughput get_completed_work
+        transactions_by_fee max_throughput (free_space t') get_completed_work
         ledger t'.public_key
     in
     (* We have to reverse here because we only know they work in THIS order *)
