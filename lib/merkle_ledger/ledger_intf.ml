@@ -15,7 +15,7 @@ module type S = sig
 
   val copy : t -> t
 
-  module Path : Merkle_path_intf.S with type hash := hash
+  module Path : Merkle_path.S with type hash := hash
 
   module Addr : Merkle_address.S
 
