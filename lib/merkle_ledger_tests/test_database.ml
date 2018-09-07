@@ -161,7 +161,7 @@ let%test_module "test functor on in memory databases" =
                 let result = MT.get_all_accounts_rooted_at_exn mdb address in
                 assert (List.equal ~equal:Account.equal accounts result) ) )
 
-      let%test_unit "merkle_root(account) = root_hash" =
+      let%test_unit "implied_root(account) = root_hash" =
         with_test_instance (fun mdb ->
             let max_height = Int.min Depth.depth 5 in
             populate_db mdb max_height ;
