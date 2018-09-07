@@ -3,3 +3,4 @@ _build*
 .merlin
 result
 test.log
+build.log

@@ -280,7 +280,6 @@ module Make_compiler (Program : Program_intf) = struct
 
   let compile_value_op : type a. a Op.Value.t -> a Id.t =
    fun op ->
-    let open Type in
     let open Op.Value in
     let type_ = Op.Value.typ op.op in
     let type_id = register_type type_ in

@@ -1,4 +1,3 @@
-open Core
 open Import
 open Snark_params
 open Snarky
