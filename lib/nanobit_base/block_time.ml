@@ -3,7 +3,6 @@ open Core_kernel
 open Async_kernel
 open Snark_params
 open Tick
-open Let_syntax
 open Unsigned_extended
 open Snark_bits
 open Fold_lib

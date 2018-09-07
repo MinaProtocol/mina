@@ -1,9 +1,6 @@
 (* TODO: rename *)
 
 open Core_kernel
-open Nanobit_base
-open Coda_numbers
-open Util
 open Snark_params
 open Tick
 open Nanobit_base

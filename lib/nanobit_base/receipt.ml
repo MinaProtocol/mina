@@ -1,5 +1,4 @@
 open Core
-open Util
 open Snark_params.Tick
 open Fold_lib
 
