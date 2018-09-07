@@ -31,6 +31,7 @@ struct
       ~transition_interval
       n ~program_dir
       ~snark_worker_public_keys
+      (*~first_delay:5.0*)
       ~should_propose:(fun i -> i = 0)
       ~f:(fun workers ->
         let blocks = ref 0 in

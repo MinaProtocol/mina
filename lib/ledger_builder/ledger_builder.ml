@@ -522,6 +522,7 @@ end = struct
     let completed_works = diff.completed_works in
     let%bind () =
       let curr_hash = hash t in
+      Logger.fatal !Coda.global_log !"%{sexp:Ledger_builder_hash.t} %{sexp:Ledger_builder_hash.t}" curr_hash diff.prev_hash;
       check_or_error
         (sprintf
            !"bad prev_hash: Expected %{sexp:Ledger_builder_hash.t}, got \

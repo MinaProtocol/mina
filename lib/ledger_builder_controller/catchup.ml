@@ -13,7 +13,7 @@ module type Inputs_intf = sig
   end
 
   module Ledger_builder_hash : sig
-    type t
+    type t [@@deriving eq, sexp]
   end
 
   module Ledger_builder : sig
@@ -26,6 +26,8 @@ module type Inputs_intf = sig
     end
 
     val ledger : t -> Ledger.t
+
+    val hash : t -> Ledger_builder_hash.t
 
     val of_aux_and_ledger : Ledger.t -> Aux.t -> t Or_error.t
 
@@ -138,13 +140,24 @@ module Make (Inputs : Inputs_intf) = struct
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
             | Ok lb ->
+                if not (Ledger_builder_hash.equal 
+                    (Ledger_builder.hash lb) 
+                    (External_transition.ledger_builder_hash transition))
+                then (
+                  Logger.fatal !Coda.global_log !"hashes did not match %{sexp:Ledger_builder_hash.t} %{sexp:Ledger_builder_hash.t}" (Ledger_builder.hash lb) (External_transition.ledger_builder_hash transition)
+                );
                 let new_tree =
                   Transition_logic_state.Transition_tree.singleton transition
                 in
                 sl_ref := None ;
                 let new_tip = Tip.of_transition_and_lb transition lb in
                 let open Transition_logic_state.Change in
-                [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
+                let changes = [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip] in
+               let changes_sexp = Printf.sprintf !"%{sexp:Transition_logic_state.Change.t list}" changes in
+               let hash2 = Md5.digest_string changes_sexp |> Md5.to_hex in
+               Logger.fatal !Coda.global_log !"changes catchup %s" hash2;
+
+                changes
             | Error e ->
                 Logger.info log "Malicious aux data received from net %s"
                   (Error.to_string_hum e) ;
