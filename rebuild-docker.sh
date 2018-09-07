@@ -19,5 +19,5 @@ docker build --file $dockerfile --tag $imagename .
 # Retag with new image name
 if [[ ! -z $3 ]]; then
   echo "Retagging as ${imagename}:$3"
-  docker tag $imagename $imagename:$3
+  docker tag $imagename $1:$3
 fi
