@@ -20,7 +20,8 @@ let get_balance =
     (let open Command.Let_syntax in
     let%map_open address =
       flag "address"
-        ~doc:"PUBLICKEY Public-key address of which you want to check the balance"
+        ~doc:
+          "PUBLICKEY Public-key address of which you want to check the balance"
         (required public_key)
     and port =
       flag "daemon-port"
@@ -37,7 +38,8 @@ let get_balance =
         dispatch Client_lib.Get_balance.rpc (Public_key.compress address) port
       with
       | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
-      | Ok None -> printf "No account found at that public_key (zero balance)\n"
+      | Ok None ->
+          printf "No account found at that public_key (zero balance)\n"
       | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e))
 
 let get_nonce addr port =
@@ -58,7 +60,9 @@ let send_txn =
         (required public_key)
     and from_account =
       flag "from"
-        ~doc:"PRIVATEKEY Private-key address from which you would like to send money"
+        ~doc:
+          "PRIVATEKEY Private-key address from which you would like to send \
+           money"
         (required private_key)
     and fee =
       flag "fee"
@@ -96,7 +100,8 @@ let send_txn =
               port
           with
           | Ok () -> printf "Successfully enqueued transaction in pool\n"
-          | Error e -> printf "Failed to send transaction %s\n" (Error.to_string_hum e))
+          | Error e ->
+              printf "Failed to send transaction %s\n" (Error.to_string_hum e))
 
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
