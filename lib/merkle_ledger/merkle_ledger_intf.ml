@@ -25,7 +25,7 @@ module type S = sig
     type t
   end
 
-  val location_of_key : t -> key -> Location.t
+  val location_of_key : t -> key -> Location.t option
 
   val create : unit -> t
 
