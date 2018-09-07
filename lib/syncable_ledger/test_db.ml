@@ -59,9 +59,9 @@ struct
 
     let merkle_root = MT.merkle_root
 
-    let get_all_accounts_rooted_at_exn = MT.get_all_accounts_rooted_at_exn
+    let get_accounts_starting_with_exn = MT.get_accounts_starting_with_exn
 
-    let set_all_accounts_rooted_at_exn = MT.set_all_accounts_rooted_at_exn
+    let set_accounts_starting_with_exn = MT.set_accounts_starting_with_exn
 
     let get_inner_hash_at_addr_exn = MT.get_inner_hash_at_addr_exn
 

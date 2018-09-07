@@ -26,9 +26,9 @@ module type Merkle_tree_intf = sig
 
   val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
 
-  val set_all_accounts_rooted_at_exn : t -> addr -> account list -> unit
+  val set_accounts_starting_with_exn : t -> addr -> account list -> unit
 
-  val get_all_accounts_rooted_at_exn : t -> addr -> account list
+  val get_accounts_starting_with_exn : t -> addr -> account list
 
   val merkle_root : t -> root_hash
 end
@@ -304,7 +304,7 @@ struct
       match q with
       | What_hash a -> Has_hash (a, MT.get_inner_hash_at_addr_exn mt a)
       | What_contents a ->
-          Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
+          Contents_are (a, MT.get_accounts_starting_with_exn mt a)
       | Num_accounts ->
           let len = MT.length mt in
           let height = Int.ceil_log2 len in
@@ -354,7 +354,7 @@ struct
    fun t addr content ->
     let expected = Addr.Table.find_exn t.waiting_content addr in
     (* TODO #444 should we batch all the updates and do them at the end? *)
-    MT.set_all_accounts_rooted_at_exn t.tree addr content ;
+    MT.set_accounts_starting_with_exn t.tree addr content ;
     Addr.Table.remove t.waiting_content addr ;
     Ok expected
 

@@ -41,7 +41,7 @@ module type S = sig
 
   val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
 
-  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
+  val get_accounts_starting_with_exn : t -> Addr.t -> account list
 
-  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
+  val set_accounts_starting_with_exn : t -> Addr.t -> account list -> unit
 end

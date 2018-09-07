@@ -318,28 +318,23 @@ end = struct
     | None -> 0
     | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
 
-  let get_all_accounts_rooted_at_exn mdb address =
+  let get_accounts_starting_with_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account =
-            Option.value ~default:Account.empty
-              (get_account mdb (Key.Account bit_index))
-          in
+          let account = get_account mdb (Key.Account bit_index) in
           account :: acc )
     in
-    List.rev result
+    List.rev_filter_map result ~f:Fn.id
 
-  let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
+  let set_accounts_starting_with_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
     Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
         function
       | head :: tail ->
           update_account mdb (Key.Account bit_index) head ;
           tail
-      | [] ->
-          assert (Addr.equal last_node bit_index) ;
-          [] )
+      | [] -> [] )
     |> ignore
 
   let merkle_root mdb = get_hash mdb Key.root_hash
