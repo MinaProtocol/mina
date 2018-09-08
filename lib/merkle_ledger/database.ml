@@ -306,7 +306,7 @@ end = struct
     | None -> 0
     | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
 
-  let get_accounts_starting_with_exn mdb address =
+  let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
@@ -315,7 +315,7 @@ end = struct
     in
     List.rev_filter_map result ~f:Fn.id
 
-  let set_accounts_starting_with_exn mdb address (accounts: Account.t list) =
+  let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
     Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
         function

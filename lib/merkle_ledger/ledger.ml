@@ -360,7 +360,7 @@ end = struct
     let index = to_index a in
     DynArray.set l index hash
 
-  let set_accounts_starting_with_exn t a accounts =
+  let set_all_accounts_rooted_at_exn t a accounts =
     let height = depth - Addr.depth a in
     let first_index = to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in
@@ -372,7 +372,7 @@ end = struct
         Key.Table.set t.accounts ~key:pk ~data:entry ;
         Dyn_array.set t.tree.leafs (first_index + i) pk )
 
-  let get_accounts_starting_with_exn t a =
+  let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
     let first_index = to_index a lsl height in
     let count = min (1 lsl height) (length t - first_index) in

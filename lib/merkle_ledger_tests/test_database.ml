@@ -136,7 +136,7 @@ let%test_module "test functor on in memory databases" =
             ignore @@ MT.set_account mdb account )
 
       let%test_unit "If the entire database is full,\n \
-                     set_accounts_starting_with_exn(address,accounts);get_accounts_starting_with_exn(address) \
+                     set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
                      = accounts" =
         with_test_instance (fun mdb ->
             let max_height = Int.min Depth.depth 5 in
@@ -157,8 +157,8 @@ let%test_module "test functor on in memory databases" =
                     (Quickcheck.Generator.list_with_length num_accounts
                        Account.gen)
                 in
-                MT.set_accounts_starting_with_exn mdb address accounts ;
-                let result = MT.get_accounts_starting_with_exn mdb address in
+                MT.set_all_accounts_rooted_at_exn mdb address accounts ;
+                let result = MT.get_all_accounts_rooted_at_exn mdb address in
                 assert (List.equal ~equal:Account.equal accounts result) ) )
 
       let%test_unit "implied_root(account) = root_hash" =
@@ -190,7 +190,7 @@ let%test_module "test functor on in memory databases" =
               List.iter accounts ~f:(fun account ->
                   assert (MT.set_account mdb account = Ok ()) ) ;
               let retrieved_accounts =
-                MT.get_accounts_starting_with_exn mdb (MT.Addr.root ())
+                MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
               assert (List.length accounts = List.length retrieved_accounts) ;
               assert (
