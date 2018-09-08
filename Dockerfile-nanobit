@@ -1,4 +1,4 @@
-FROM gcr.io/o1labs-192920/ocaml-base:84caab05b51117a57df2c1d550716f78449ae67b
+FROM gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
 
 WORKDIR /app
 ADD ./ /app
