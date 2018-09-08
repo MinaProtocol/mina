@@ -15,7 +15,7 @@ module type Inputs_intf = sig
   end
 
   module Ledger_hash : sig
-    type t [@@deriving eq]
+    type t [@@deriving sexp, eq]
   end
 
   module Ledger_builder_diff : sig
@@ -34,6 +34,10 @@ module type Inputs_intf = sig
     val merkle_root : t -> Ledger_hash.t
   end
 
+  module Ledger_builder_aux_hash : sig
+    type t [@@deriving sexp]
+  end
+
   module Ledger_builder : sig
     type t [@@deriving bin_io]
 
@@ -41,6 +45,8 @@ module type Inputs_intf = sig
 
     module Aux : sig
       type t [@@deriving bin_io]
+
+      val hash : t -> Ledger_builder_aux_hash.t
     end
 
     val ledger : t -> Ledger.t
@@ -52,6 +58,8 @@ module type Inputs_intf = sig
     val copy : t -> t
 
     val hash : t -> Ledger_builder_hash.t
+
+    val aux : t -> Aux.t
 
     val apply :
          t
@@ -248,7 +256,13 @@ end = struct
               |> Blockchain_state.ledger_hash
         in
         let ledger_builder_hash = Ledger_builder.hash tip.ledger_builder in
+        Logger.fatal !Coda.global_log !"out aux nhash %{sexp: Ledger_builder_aux_hash.t}" (Ledger_builder.Aux.hash (Ledger_builder.aux tip.ledger_builder));
         Logger.fatal !Coda.global_log !"out %{sexp:Ledger_builder_hash.t}" ledger_builder_hash;
+        let lb2 =
+          Ledger_builder.of_aux_and_ledger (Ledger_builder.ledger tip.ledger_builder) (Ledger_builder.aux tip.ledger_builder) |> Or_error.ok_exn
+        in
+        Logger.fatal !Coda.global_log !"out redo lb %{sexp:Ledger_builder_hash.t} %{sexp:Ledger_builder_hash.t}" (Ledger_builder.hash tip.ledger_builder) (Ledger_builder.hash lb2);
+        Logger.fatal !Coda.global_log !"out ledger_hash %{sexp:Ledger_hash.t}" (Ledger.merkle_root (Ledger_builder.ledger tip.ledger_builder));
         let%map () =
           if
             verified
@@ -324,6 +338,7 @@ end = struct
     module Catchup = Catchup.Make (struct
       module Ledger_hash = Ledger_hash
       module Ledger = Ledger
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder = Ledger_builder
       module Protocol_state_proof = Protocol_state_proof
@@ -568,11 +583,17 @@ let%test_module "test" =
         let copy t = t
       end
 
+      module Ledger_builder_aux_hash = struct
+        type t = int [@@deriving sexp]
+      end
+
       module Ledger_builder = struct
         type t = int ref [@@deriving sexp, bin_io]
 
         module Aux = struct
           type t = int [@@deriving bin_io]
+
+          let hash t = t
         end
 
         type proof = ()
@@ -586,6 +607,8 @@ let%test_module "test" =
         let hash t = !t
 
         let of_aux_and_ledger _aux l = Ok (create l)
+
+        let aux t = !t
 
         let apply (t: t) (x: Ledger_builder_diff.t) =
           t := x ;

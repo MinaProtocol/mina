@@ -3,17 +3,23 @@ open Async_kernel
 
 module type Inputs_intf = sig
   module Ledger_hash : sig
-    type t
+    type t [@@deriving sexp]
   end
 
   module Ledger : sig
     type t
 
     val copy : t -> t
+
+    val merkle_root : t -> Ledger_hash.t
   end
 
   module Ledger_builder_hash : sig
     type t [@@deriving eq, sexp]
+  end
+
+  module Ledger_builder_aux_hash : sig
+    type t [@@deriving sexp]
   end
 
   module Ledger_builder : sig
@@ -23,6 +29,8 @@ module type Inputs_intf = sig
 
     module Aux : sig
       type t [@@deriving bin_io]
+
+      val hash : t -> Ledger_builder_aux_hash.t
     end
 
     val ledger : t -> Ledger.t
@@ -144,7 +152,11 @@ module Make (Inputs : Inputs_intf) = struct
                     (Ledger_builder.hash lb) 
                     (External_transition.ledger_builder_hash transition))
                 then (
-                  Logger.fatal !Coda.global_log !"hashes did not match %{sexp:Ledger_builder_hash.t} %{sexp:Ledger_builder_hash.t}" (Ledger_builder.hash lb) (External_transition.ledger_builder_hash transition)
+                  Logger.fatal !Coda.global_log !"hashes did not match %{sexp:Ledger_builder_hash.t} %{sexp:Ledger_builder_hash.t}" (Ledger_builder.hash lb) (External_transition.ledger_builder_hash transition);
+
+                  let lh = Ledger.merkle_root ledger in
+                  Logger.fatal !Coda.global_log !"Ledger-hashes Lh1: %{sexp: Ledger_hash.t}; Lh2: %{sexp:Ledger_hash.t}" h lh;
+                  Logger.fatal !Coda.global_log !"Aux nhash %{sexp: Ledger_builder_aux_hash.t}" (Ledger_builder.Aux.hash aux)
                 );
                 let new_tree =
                   Transition_logic_state.Transition_tree.singleton transition

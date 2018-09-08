@@ -583,6 +583,7 @@ struct
       module Ledger = Ledger
       module Ledger_builder_diff = Ledger_builder_diff
 
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Ledger_builder = struct
         include Ledger_builder
 
