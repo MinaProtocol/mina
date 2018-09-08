@@ -309,13 +309,10 @@ end = struct
     let first_node, last_node = Addr.Range.subtree_range address in
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account =
-            Option.value ~default:Account.empty
-              (get_account mdb (Key.Account bit_index))
-          in
+          let account = get_account mdb (Key.Account bit_index) in
           account :: acc )
     in
-    List.rev result
+    List.rev_filter_map result ~f:Fn.id
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
@@ -324,9 +321,7 @@ end = struct
       | head :: tail ->
           update_account mdb (Key.Account bit_index) head ;
           tail
-      | [] ->
-          assert (Addr.equal last_node bit_index) ;
-          [] )
+      | [] -> [] )
     |> ignore
 
   let merkle_root mdb = get_hash mdb Key.root_hash
