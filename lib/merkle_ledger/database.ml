@@ -2,8 +2,7 @@ open Core
 open Unsigned
 
 module Make
-    (Balance : Intf.Balance)
-    (Account : Intf.Account with type balance := Balance.t)
+    (Account : Intf.Account)
     (Hash : Intf.Hash with type account := Account.t)
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
