@@ -9,7 +9,7 @@ let%test_module "test functor on in memory databases" =
 
       module Make (Depth : Intf.Depth) = struct
         module MT =
-          Database.Make (Balance) (Account) (Hash) (Depth) (In_memory_kvdb)
+          Database.Make (Account) (Hash) (Depth) (In_memory_kvdb)
             (In_memory_sdb)
         include MT
       end
@@ -81,12 +81,10 @@ let%test_module "test functor on in memory databases" =
               let%map accounts =
                 list_with_length num_initial_accounts Account.gen
               in
-              List.filter accounts ~f:(fun account ->
-                  not (Balance.equal (Account.balance account) Balance.zero) )
-              |> List.dedup_and_sort ~compare:(fun account1 account2 ->
-                     String.compare
-                       (Account.public_key account1)
-                       (Account.public_key account2) )
+              List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
+                  String.compare
+                    (Account.public_key account1)
+                    (Account.public_key account2) )
             in
             let accounts =
               Quickcheck.random_value
@@ -96,21 +94,6 @@ let%test_module "test functor on in memory databases" =
             List.iter accounts ~f:(fun account ->
                 assert (MT.set_account mdb account = Ok ()) ) ;
             assert (MT.length mdb = num_initial_accounts) )
-
-      let%test "deleted account keys are reassigned" =
-        with_test_instance (fun mdb ->
-            let account = Quickcheck.random_value Account.gen in
-            let account' = Quickcheck.random_value Account.gen in
-            assert (MT.set_account mdb account = Ok ()) ;
-            let key =
-              MT.get_key_of_account mdb account
-              |> Result.map_error ~f:exn_of_error
-              |> Result.ok_exn
-            in
-            let account = Account.set_balance account Balance.zero in
-            assert (MT.set_account mdb account = Ok ()) ;
-            assert (MT.set_account mdb account' = Ok ()) ;
-            MT.get_account mdb key = Some account' )
 
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =
