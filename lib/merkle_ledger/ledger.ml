@@ -292,24 +292,18 @@ end = struct
         (DynArray.init (new_size - len) (fun _ -> Key.empty)) ;
     recompute_tree t
 
-  let to_index a =
-    List.foldi
-      (List.rev @@ Addr.dirs_from_root a)
-      ~init:0
-      ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
-
   module For_tests = struct
-    let get_leaf_hash_at_addr t addr = get_leaf_hash t (to_index addr)
+    let get_leaf_hash_at_addr t addr = get_leaf_hash t (Addr.to_int addr)
   end
 
   (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
     assert (Addr.depth a = Depth.depth - 1) ;
-    merkle_path_at_index_exn t (to_index a)
+    merkle_path_at_index_exn t (Addr.to_int a)
 
   let set_at_addr_exn t addr acct =
     assert (Addr.depth addr = Depth.depth - 1) ;
-    set_at_index_exn t (to_index addr) acct
+    set_at_index_exn t (Addr.to_int addr) acct
 
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
@@ -325,7 +319,7 @@ end = struct
     let adepth = Addr.depth a in
     assert (adepth < depth) ;
     let height = Addr.height a in
-    let index = to_index a in
+    let index = Addr.to_int a in
     recompute_tree t ;
     if height < t.tree.nodes_height && index < num_accounts t then
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
@@ -341,12 +335,12 @@ end = struct
     assert (path_length < depth) ;
     (t.tree).dirty <- true ;
     let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
-    let index = to_index a in
+    let index = Addr.to_int a in
     DynArray.set l index hash
 
   let set_all_accounts_rooted_at_exn t a accounts =
     let height = depth - Addr.depth a in
-    let first_index = to_index a lsl height in
+    let first_index = Addr.to_int a lsl height in
     let count = min (1 lsl height) (num_accounts t - first_index) in
     assert (List.length accounts = count) ;
     List.iteri accounts ~f:(fun i a ->
@@ -358,7 +352,7 @@ end = struct
 
   let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
-    let first_index = to_index a lsl height in
+    let first_index = Addr.to_int a lsl height in
     let count = min (1 lsl height) (num_accounts t - first_index) in
     let subarr = Dyn_array.sub t.tree.leafs first_index count in
     Dyn_array.to_list
