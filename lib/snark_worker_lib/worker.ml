@@ -21,15 +21,16 @@ struct
           , Sparse_ledger.t
           , Proof.t )
           Work.Single.Spec.t
+        [@@deriving sexp]
       end
     end
 
     module Spec = struct
-      type t = Single.Spec.t Work.Spec.t
+      type t = Single.Spec.t Work.Spec.t [@@deriving sexp]
     end
 
     module Result = struct
-      type t = (Spec.t, Proof.t) Work.Result.t
+      type t = (Spec.t, Proof.t) Work.Result.t [@@deriving sexp]
     end
   end
 
@@ -86,16 +87,23 @@ struct
           let%bind () = wait ~sec:Worker_state.worker_wait_time () in
           go ()
       | Ok (Some work) ->
-          Logger.info log "Got some work\n" ;
+          Logger.info log !"Got work %{sexp:Work.Spec.t}\n" work ;
           match perform state public_key work with
           | Error e -> log_and_retry "performing work" e
           | Ok result ->
+              Logger.info log
+                !"Successfully completed work %{sexp:Work.Spec.t}"
+                work ;
               match%bind
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
                   daemon_port
               with
               | Error e -> log_and_retry "submitting work" e
-              | Ok () -> go ()
+              | Ok () ->
+                  Logger.info log
+                    !"Successfully submitted work %{sexp:Work.Spec.t}"
+                    work ;
+                  go ()
     in
     go ()
 

@@ -4,19 +4,19 @@ open Signature_lib
 
 module type Inputs_intf = sig
   module Sparse_ledger : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   module Super_transaction : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   module Proof : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   module Statement : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   open Snark_work_lib
