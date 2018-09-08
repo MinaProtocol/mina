@@ -41,7 +41,7 @@ struct
 
     type addr = Addr.t
 
-    type path = MT.MerklePath.t list
+    type path = MT.Path.t
 
     type t = MT.t
 
