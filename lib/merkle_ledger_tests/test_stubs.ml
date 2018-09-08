@@ -25,8 +25,6 @@ module Account = struct
     let balance = Balance.of_string string_balance in
     {public_key; balance}
 
-  let empty = {public_key= ""; balance= Balance.zero}
-
   let create public_key balance = {public_key; balance= UInt64.of_int balance}
 
   let gen =
@@ -46,7 +44,7 @@ module Hash = struct
 
   let hash_account account = Md5.digest_string ("0" ^ Account.show account)
 
-  let empty = hash_account Account.empty
+  let empty = Md5.digest_string ""
 
   let merge ~height a b =
     let res =
@@ -99,6 +97,8 @@ module Key = struct
   end
 
   let empty = ""
+
+  let to_string = Fn.id
 
   include T
   include Hashable.Make_binable (T)
