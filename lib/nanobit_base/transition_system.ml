@@ -140,7 +140,7 @@ struct
            Verifier.Verification_key_data.Checked.Assert.equal wrap_vk_data
              other_wrap_vk_data
          in
-         result)
+         if Insecure.with_snark then result else Boolean.true_)
 
     let provide_witness' typ ~f =
       provide_witness typ As_prover.(map get_state ~f)
