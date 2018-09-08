@@ -140,7 +140,7 @@ end = struct
       | Left -> (base, sibling)
       | Right -> (sibling, base)
   end
-  
+
   type key = Key.t
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
@@ -292,13 +292,13 @@ end = struct
     set_hash mdb (Key.Hash (Key.path key)) (Hash.hash_account account)
 
   let set_account mdb account =
-      let key_result =
-        match Account_key.get mdb account with
-        | Error Account_key_not_found -> Account_key.allocate mdb account
-        | Error err -> Error err
-        | Ok key -> Ok key
-      in
-      Result.map key_result ~f:(fun key -> update_account mdb key account)
+    let key_result =
+      match Account_key.get mdb account with
+      | Error Account_key_not_found -> Account_key.allocate mdb account
+      | Error err -> Error err
+      | Ok key -> Ok key
+    in
+    Result.map key_result ~f:(fun key -> update_account mdb key account)
 
   let length t =
     match Account_key.last_key_address t with

@@ -82,9 +82,9 @@ let%test_module "test functor on in memory databases" =
                 list_with_length num_initial_accounts Account.gen
               in
               List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
-                     String.compare
-                       (Account.public_key account1)
-                       (Account.public_key account2) )
+                  String.compare
+                    (Account.public_key account1)
+                    (Account.public_key account2) )
             in
             let accounts =
               Quickcheck.random_value
