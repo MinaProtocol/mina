@@ -709,7 +709,10 @@ end = struct
                You should not add work if it would cause the person's
                balance to overflow *)
         Resources.add_work resources w
-    | None -> Error (Error.of_string "Work not found")
+    | None ->
+        Or_error.errorf
+          !"Work not found for %{sexp:Completed_work.Statement.t}"
+          work
 
   let add_transaction ledger txn resources =
     match Ledger.apply_super_transaction ledger (Transaction txn) with
