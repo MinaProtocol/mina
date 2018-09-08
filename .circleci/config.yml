@@ -33,7 +33,7 @@ jobs:
     test-runtest:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:84caab05b51117a57df2c1d550716f78449ae67b
+        - image: gcr.io/o1labs-192920/ocaml-base:2c231a11923259c6fa3a1ea4c1241aec4fc10481
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -65,7 +65,7 @@ jobs:
     test-sig:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:84caab05b51117a57df2c1d550716f78449ae67b
+        - image: gcr.io/o1labs-192920/ocaml-base:2c231a11923259c6fa3a1ea4c1241aec4fc10481
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS

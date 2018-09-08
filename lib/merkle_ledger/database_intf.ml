@@ -13,11 +13,7 @@ module type S = sig
 
   module Addr : Merkle_address.S
 
-  module MerklePath : sig
-    type t = Direction.t * hash
-
-    val implied_root : t list -> hash -> hash
-  end
+  module Path : Merkle_path.S with type hash := hash
 
   val create : key_value_db_dir:string -> stack_db_file:string -> t
 
@@ -29,7 +25,7 @@ module type S = sig
 
   val set_account : t -> account -> (unit, error) Result.t
 
-  val merkle_path : t -> key -> MerklePath.t list
+  val merkle_path : t -> key -> Path.t
 
   include Syncable_intf.S
           with type root_hash := hash
@@ -37,5 +33,5 @@ module type S = sig
            and type account := account
            and type addr := Addr.t
            and type t := t
-           and type path := MerklePath.t list
+           and type path := Path.t
 end

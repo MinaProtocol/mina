@@ -11,7 +11,7 @@ module type S = sig
 
   module Addr : Merkle_address.S
 
-  module Path : Merkle_path_intf.S with type hash := hash
+  module Path : Merkle_path.S with type hash := hash
 
   include Syncable_intf.S
           with type root_hash := root_hash

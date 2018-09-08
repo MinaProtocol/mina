@@ -20,8 +20,8 @@ RUN sudo apt-get install --yes librocksdb4.5 librocksdb-dev
 RUN sudo apt-get install --yes zlib1g-dev
 
 RUN opam update -y && opam upgrade -y
-RUN opam depext -i jbuilder
-RUN opam install jbuilder
+RUN opam depext -i dune
+RUN opam install dune
 RUN opam install num
 RUN opam install core
 RUN opam install async
