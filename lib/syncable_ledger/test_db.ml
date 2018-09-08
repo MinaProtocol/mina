@@ -36,7 +36,7 @@ struct
 
     type account = Account.t
 
-    type key = MT.key
+    type key = MT.location
 
     type addr = Addr.t
 

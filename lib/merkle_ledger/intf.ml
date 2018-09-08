@@ -17,9 +17,9 @@ end
 module type Account = sig
   type t [@@deriving bin_io, eq]
 
-  val empty : t
+  type key
 
-  val public_key : t -> string
+  val public_key : t -> key
 end
 
 module type Hash = sig

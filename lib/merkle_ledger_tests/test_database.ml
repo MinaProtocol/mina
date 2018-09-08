@@ -9,7 +9,7 @@ let%test_module "test functor on in memory databases" =
 
       module Make (Depth : Intf.Depth) = struct
         module MT =
-          Database.Make (Account) (Hash) (Depth) (In_memory_kvdb)
+          Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
             (In_memory_sdb)
         include MT
       end
@@ -33,45 +33,29 @@ let%test_module "test functor on in memory databases" =
           cleanup () ; result
         with exn -> cleanup () ; raise exn
 
-      exception Error_exception of MT.error
-
-      let exn_of_error err = Error_exception err
-
       let%test_unit "getting a non existing account returns None" =
         with_test_instance (fun mdb ->
-            Quickcheck.test MT.For_tests.gen_account_key ~f:(fun key ->
-                assert (MT.get_account mdb key = None) ) )
+            Quickcheck.test MT.For_tests.gen_account_location ~f:
+              (fun location -> assert (MT.get mdb location = None) ) )
+
+      let create_account mdb ({Account.public_key; _} as account) =
+        MT.create_account_exn mdb public_key account
 
       let%test "add and retrieve an account" =
         with_test_instance (fun mdb ->
             let account = Quickcheck.random_value Account.gen in
-            assert (MT.set_account mdb account = Ok ()) ;
-            let key =
-              MT.get_key_of_account mdb account
-              |> Result.map_error ~f:exn_of_error
-              |> Result.ok_exn
-            in
-            Account.equal (Option.value_exn (MT.get_account mdb key)) account
-        )
+            let location = create_account mdb account in
+            Account.equal (Option.value_exn (MT.get mdb location)) account )
 
       let%test "accounts are atomic" =
         with_test_instance (fun mdb ->
             let account = Quickcheck.random_value Account.gen in
-            assert (MT.set_account mdb account = Ok ()) ;
-            let key =
-              MT.get_key_of_account mdb account
-              |> Result.map_error ~f:exn_of_error
-              |> Result.ok_exn
-            in
-            assert (MT.set_account mdb account = Ok ()) ;
-            let key' =
-              MT.get_key_of_account mdb account
-              |> Result.map_error ~f:exn_of_error
-              |> Result.ok_exn
-            in
-            key = key' && MT.get_account mdb key = MT.get_account mdb key' )
+            let location = create_account mdb account in
+            let location' = create_account mdb account in
+            location = location' && MT.get mdb location = MT.get mdb location'
+        )
 
-      let%test_unit "num_accounts" =
+      let%test_unit "length" =
         with_test_instance (fun mdb ->
             let open Quickcheck.Generator in
             let max_accounts = Int.min (1 lsl Depth.depth) (1 lsl 5) in
@@ -92,8 +76,33 @@ let%test_module "test functor on in memory databases" =
             in
             let num_initial_accounts = List.length accounts in
             List.iter accounts ~f:(fun account ->
-                assert (MT.set_account mdb account = Ok ()) ) ;
-            assert (MT.length mdb = num_initial_accounts) )
+                ignore @@ create_account mdb account ) ;
+            let result = MT.length mdb in
+            [%test_eq : int] result num_initial_accounts )
+
+      let%test_unit "create_account t account = location_of_key account.key" =
+        with_test_instance (fun mdb ->
+            let accounts_gen =
+              let open Quickcheck.Let_syntax in
+              let max_height = Int.min Depth.depth 5 in
+              let%bind num_accounts = Int.gen_incl 0 (1 lsl max_height) in
+              Quickcheck.Generator.list_with_length num_accounts Account.gen
+            in
+            let accounts = Quickcheck.random_value accounts_gen in
+            Sequence.of_list accounts
+            |> Sequence.iter ~f:(fun ({public_key; _} as account) ->
+                   let location = create_account mdb account in
+                   let location' =
+                     MT.location_of_key mdb public_key |> Option.value_exn
+                   in
+                   assert (location = location') ) )
+
+      let%test_unit "get t (create_account t account) = account" =
+        with_test_instance (fun mdb ->
+            let account = Quickcheck.random_value Account.gen in
+            let location = create_account mdb account in
+            let account' = MT.get mdb location |> Option.value_exn in
+            assert (account = account') )
 
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =
@@ -116,7 +125,7 @@ let%test_module "test functor on in memory databases" =
             (Quickcheck.Generator.list_with_length num_accounts Account.gen)
         in
         List.iter initial_accounts ~f:(fun account ->
-            ignore @@ MT.set_account mdb account )
+            ignore @@ create_account mdb account )
 
       let%test_unit "If the entire database is full,\n\
                      \ \
@@ -172,7 +181,7 @@ let%test_module "test functor on in memory databases" =
                       (Quickcheck.random_value gen_balance) )
               in
               List.iter accounts ~f:(fun account ->
-                  assert (MT.set_account mdb account = Ok ()) ) ;
+                  ignore @@ create_account mdb account ) ;
               let retrieved_accounts =
                 MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
