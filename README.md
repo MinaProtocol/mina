@@ -116,6 +116,6 @@ FIXME: Everything Testbridge is Deprecated
     List the pods: `kubectl get pods`, copy one down here:
     `kubectl exec -it testbridge-fwzgsxbvyj-4178240947-10vsn -- /bin/bash`
 * Is there anything interesting in the logs?
-    `jbuilder exec fetch_logs`, then `cat /tmp/testbridge_logs/<your-pod-name>`
+    `dune exec fetch_logs`, then `cat /tmp/testbridge_logs/<your-pod-name>`
    If you see a build failure, but no failure locally:
     a. Did you need to remake the Docker containers? Esp. base? If so, make sure you also cleanup/redeploy pods
