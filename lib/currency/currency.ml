@@ -80,9 +80,9 @@ module type Signed_intf = sig
 
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) t_
 
-  val sgn : t -> Sgn.t
+  val sgn : (_, 'sgn) t_ -> 'sgn
 
-  val magnitude : t -> magnitude
+  val magnitude : ('magnitude, _) t_ -> 'magnitude
 
   type nonrec var = (magnitude_var, Sgn.var) t_
 
