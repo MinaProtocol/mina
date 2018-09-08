@@ -90,13 +90,23 @@ struct
               ; update= block }
             in
             let prev_proof =
-              Tick.prove
-                (Tick.Keypair.pk Keys.Step.keys)
-                (Keys.Step.input ()) prover_state Keys.Step.main
-                next_state_top_hash
+              if Insecure.with_snark then
+                Tick.prove
+                  (Tick.Keypair.pk Keys.Step.keys)
+                  (Keys.Step.input ()) prover_state Keys.Step.main
+                  next_state_top_hash
+                |> wrap next_state_top_hash
+              else (
+                Tick.run_and_check
+                  (Tick.Checked.map
+                     (Keys.Step.main
+                        (Tick.Field.Checked.constant next_state_top_hash))
+                     ~f:Tick.As_prover.return)
+                  prover_state
+                |> Or_error.ok_exn |> ignore ;
+                Dummy_values.Tock.proof )
             in
-            { Blockchain.state= next_state
-            ; proof= wrap next_state_top_hash prev_proof }
+            {Blockchain.state= next_state; proof= prev_proof}
 
           let verify state proof =
             Tock.verify proof
