@@ -14,6 +14,7 @@
       sgn
       snark_params
       unsigned_extended
+      test_util
       ))
   (preprocess (pps (ppx_jane ppx_deriving.std)))
   (synopsis "Currency types")))

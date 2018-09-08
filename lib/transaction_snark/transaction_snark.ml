@@ -164,10 +164,9 @@ module Tagged_transaction = struct
         in
         Amount.Signed.create ~sgn:Sgn.Neg ~magnitude
     | Coinbase ->
-        let _magnitude =
-          Amount.sub Protocols.Coda_praos.coinbase_amount t.payload.amount
-          |> Option.value_exn
-        in
+        assert (
+          Amount.( <= ) t.payload.amount Protocols.Coda_praos.coinbase_amount
+        ) ;
         Currency.Amount.Signed.zero
 
   let supply_increase ((tag, _t): t) =

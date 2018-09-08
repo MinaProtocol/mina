@@ -424,6 +424,25 @@ end = struct
       in
       (bits, `Underflow (Boolean.not no_underflow))
 
+    let%test_unit "sub_flagged" =
+      let sub_flagged_unchecked (x, y) =
+        if x < y then (zero, true) else (Option.value_exn (x - y), false)
+      in
+      let sub_flagged_checked =
+        let f (x, y) =
+          Checked.map (sub_flagged x y) ~f:(fun (r, `Underflow u) -> (r, u))
+        in
+        Test_util.checked_to_unchecked (Typ.tuple2 typ typ)
+          (Typ.tuple2 typ Boolean.typ)
+          f
+      in
+      Quickcheck.test ~trials:100 (Quickcheck.Generator.tuple2 gen gen) ~f:
+        (fun p ->
+          let m, u = sub_flagged_unchecked p in
+          let m_checked, u_checked = sub_flagged_checked p in
+          assert (Bool.equal u u_checked) ;
+          if not u then [%test_eq : magnitude] m m_checked )
+
     (* Unpacking protects against overflow *)
     let add (x: Unpacked.var) (y: Unpacked.var) =
       unpack_var (Field.Checked.add (pack_var x) (pack_var y))
