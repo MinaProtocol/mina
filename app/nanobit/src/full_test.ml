@@ -59,7 +59,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
           let%bind () = after (Time_ns.Span.of_sec 10.) in
           go ()
     in
-    Deferred.any [after (Time_ns.Span.of_min 3.); go ()]
+    Deferred.any [after (Time_ns.Span.of_min 5.); go ()]
   in
   let open Genesis_ledger in
   let assert_balance pk amount =
@@ -175,7 +175,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         go ()
     in
     let timeout =
-      let%map () = after (Time_ns.Span.of_min 3.) in
+      let%map () = after (Time_ns.Span.of_min 5.) in
       false
     in
     Deferred.any [timeout; go ()]
