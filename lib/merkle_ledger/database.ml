@@ -17,28 +17,16 @@ module Make
   end
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
-  let max_depth = Depth.depth
+  include Depth
 
-  let () = assert (max_depth < 0xfe)
+  let () = assert (Depth.depth < 0xfe)
 
   type error = Account_key_not_found | Out_of_leaves | Malformed_database
 
-  module MerklePath = struct
-    type t = Direction.t * Hash.t
-
-    let implied_root path leaf_hash =
-      let rec loop sibling_hash ~height = function
-        | [] -> sibling_hash
-        | (Direction.Left, hash) :: t ->
-            loop (Hash.merge ~height hash sibling_hash) ~height:(height + 1) t
-        | (Direction.Right, hash) :: t ->
-            loop (Hash.merge ~height sibling_hash hash) ~height:(height + 1) t
-      in
-      loop leaf_hash ~height:0 path
-  end
+  module Path = Merkle_path.Make (Hash)
 
   module Addr = Merkle_address.Make (struct
-    let depth = max_depth
+    let depth = Depth.depth
   end)
 
   (* Keys are a bitstring prefixed by a byte. In the case of accounts, the prefix
@@ -55,7 +43,7 @@ end = struct
 
       let account = UInt8.of_int 0xfe
 
-      let hash depth = UInt8.of_int (max_depth - depth)
+      let hash depth = UInt8.of_int (Depth.depth - depth)
     end
 
     type t =
@@ -97,9 +85,9 @@ end = struct
         let path = Addr.of_byte_string (Bigstring.to_string data) in
         let slice_path = Addr.slice path 0 in
         if prefix = Prefix.account then
-          Result.return (Account (slice_path max_depth))
-        else if UInt8.to_int prefix <= max_depth then
-          Result.return (Hash (slice_path (max_depth - UInt8.to_int prefix)))
+          Result.return (Account (slice_path Depth.depth))
+        else if UInt8.to_int prefix <= Depth.depth then
+          Result.return (Hash (slice_path (Depth.depth - UInt8.to_int prefix)))
         else Result.fail ()
 
     let prefix_bigstring prefix src =
@@ -118,10 +106,10 @@ end = struct
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
       | Account path ->
-          assert (Addr.depth path = max_depth) ;
+          assert (Addr.depth path = Depth.depth) ;
           prefix_bigstring Prefix.account (Addr.serialize path)
       | Hash path ->
-          assert (Addr.depth path <= max_depth) ;
+          assert (Addr.depth path <= Depth.depth) ;
           prefix_bigstring
             (Prefix.hash (Addr.depth path))
             (Addr.serialize path)
@@ -179,9 +167,9 @@ end = struct
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:(max_depth + 1) Hash.empty in
+    let empty_hashes = Array.create ~len:(Depth.depth + 1) Hash.empty in
     let rec loop last_hash height =
-      if height <= max_depth then (
+      if height <= Depth.depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
@@ -221,7 +209,7 @@ end = struct
     assert (Key.is_hash key) ;
     set_bin mdb key Hash.bin_size_t Hash.bin_write_t new_hash ;
     let height = Key.height key in
-    if height < max_depth then
+    if height < Depth.depth then
       let sibling_hash = get_hash mdb (Key.sibling key) in
       let parent_hash =
         let left_hash, right_hash =
@@ -233,11 +221,11 @@ end = struct
       set_hash mdb (Key.parent key) parent_hash
 
   let get_inner_hash_at_addr_exn mdb address =
-    assert (Addr.depth address <= max_depth) ;
+    assert (Addr.depth address <= Depth.depth) ;
     get_hash mdb (Key.Hash address)
 
   let set_inner_hash_at_addr_exn mdb address hash =
-    assert (Addr.depth address <= max_depth) ;
+    assert (Addr.depth address <= Depth.depth) ;
     set_bin mdb (Key.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
   module Account_key = struct
@@ -264,7 +252,7 @@ end = struct
           let first_key =
             Key.Account
               ( Addr.of_directions
-              @@ List.init max_depth ~f:(fun _ -> Direction.Left) )
+              @@ List.init Depth.depth ~f:(fun _ -> Direction.Left) )
           in
           set_raw mdb key (Key.serialize first_key) ;
           Result.return first_key
@@ -313,7 +301,7 @@ end = struct
     in
     Result.map key_result ~f:(fun key -> update_account mdb key account)
 
-  let num_accounts t =
+  let length t =
     match Account_key.last_key_address t with
     | None -> 0
     | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
@@ -343,12 +331,15 @@ end = struct
     let key = if Key.is_account key then Key.Hash (Key.path key) else key in
     assert (Key.is_hash key) ;
     let rec loop k =
-      let sibling = Key.sibling k in
-      let sibling_dir = Key.last_direction (Key.path k) in
-      (sibling_dir, get_hash mdb sibling)
-      :: (if Key.height key < max_depth then loop (Key.parent k) else [])
+      if Key.height k >= Depth.depth then []
+      else
+        let sibling = Key.sibling k in
+        let sibling_dir = Key.last_direction (Key.path k) in
+        let hash = get_hash mdb sibling in
+        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        :: loop (Key.parent k)
     in
     loop key
 
-  let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
+  let merkle_path_at_addr_exn t addr = merkle_path t (Key.Hash addr)
 end

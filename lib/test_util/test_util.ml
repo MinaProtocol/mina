@@ -42,7 +42,6 @@ let test_to_triples typ fold var_to_triples input =
       (List.length unchecked) ()
 
 let test_equal ?(equal= ( = )) typ1 typ2 checked unchecked input =
-  let open Tick in
   let checked_result = checked_to_unchecked typ1 typ2 checked input in
   assert (equal checked_result (unchecked input))
 

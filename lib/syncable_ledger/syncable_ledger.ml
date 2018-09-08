@@ -3,36 +3,6 @@ open Async_kernel
 
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
-module type Merkle_tree_intf = sig
-  type root_hash
-
-  type hash
-
-  type account
-
-  type addr
-
-  type t
-
-  type path
-
-  val depth : int
-
-  val length : t -> int
-
-  val merkle_path_at_addr_exn : t -> addr -> path
-
-  val get_inner_hash_at_addr_exn : t -> addr -> hash
-
-  val set_inner_hash_at_addr_exn : t -> addr -> hash -> unit
-
-  val set_accounts_starting_with_exn : t -> addr -> account list -> unit
-
-  val get_accounts_starting_with_exn : t -> addr -> account list
-
-  val merkle_root : t -> root_hash
-end
-
 module type S = sig
   type t
 
@@ -179,7 +149,7 @@ module Make
 
       val to_hash : t -> Hash.t
     end)
-    (MT : Merkle_tree_intf
+    (MT : Merkle_ledger.Syncable_intf.S
           with type hash := Hash.t
            and type root_hash := Root_hash.t
            and type addr := Addr.t

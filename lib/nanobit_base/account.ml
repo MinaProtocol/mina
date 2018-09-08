@@ -1,7 +1,6 @@
 open Core
 open Import
 open Coda_numbers
-open Util
 open Snark_params
 open Tick
 open Let_syntax

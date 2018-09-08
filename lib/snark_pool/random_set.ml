@@ -1,6 +1,4 @@
 open Core
-open Nanobit_base
-open Dyn_array
 
 module type S = sig
   type t [@@deriving sexp, bin_io]
@@ -60,7 +58,6 @@ struct
   let length t = DynArray.length t.keys
 
   let gen =
-    let open Quickcheck in
     let open Quickcheck.Generator.Let_syntax in
     let%map sample_list = Quickcheck.Generator.list Key.gen in
     let t = create () in

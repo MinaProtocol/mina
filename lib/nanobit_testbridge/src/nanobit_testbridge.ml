@@ -1,7 +1,5 @@
 open Core
 open Async
-open Nanobit_base
-open Blockchain_snark
 
 module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
   module Blockchain = Blockchain_snark.Blockchain.Make (Consensus_mechanism)

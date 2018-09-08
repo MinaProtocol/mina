@@ -1,4 +1,3 @@
-open Core
 open Snark_params.Tick
 
 module Chain_hash : sig
