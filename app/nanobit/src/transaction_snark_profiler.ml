@@ -142,6 +142,7 @@ let check_base_snarks sparse_ledger0
             ~target:(Sparse_ledger.merkle_root sparse_ledger')
             t
             (unstage (Sparse_ledger.handler sparse_ledger))
+          |> Or_error.ok_exn |> ignore
         in
         sparse_ledger' )
   in

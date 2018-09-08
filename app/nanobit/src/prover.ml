@@ -146,10 +146,7 @@ struct
         , transition )
         ->
           let%map (module W) = Worker_state.get w in
-          if Insecure.extend_blockchain then
-            let proof = Precomputed_values.base_proof in
-            {Blockchain.proof; state= next_state}
-          else W.extend_blockchain chain next_state transition )
+          W.extend_blockchain chain next_state transition )
 
     let verify_blockchain =
       create Blockchain.bin_t bin_bool (fun w {Blockchain.state; proof} ->
