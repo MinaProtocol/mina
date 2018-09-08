@@ -4,7 +4,7 @@ WORKDIR /testbridge
 ADD ./lib/testbridge/container/ /testbridge
 ADD ./lib/testbridge/container/testbridge.opam.in /testbridge/testbridge.opam
 RUN sudo chown -R opam /testbridge
-RUN eval `opam config env` && jbuilder build
+RUN eval `opam config env` && dune build
 
 CMD bash -c "while true; do ./_build/install/default/bin/container; sleep 1; done"
 
