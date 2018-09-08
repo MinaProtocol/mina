@@ -37,7 +37,7 @@ val create :
      source:Ledger_hash.t
   -> target:Ledger_hash.t
   -> proof_type:Proof_type.t
-  -> fee_excess:Currency.Amount.Signed.t
+  -> fee_excess:Currency.Fee.Signed.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
   -> t
@@ -115,13 +115,20 @@ module Verification : sig
     S
 end
 
+val check_merge :
+     ?wrap_vk:Tock.Verification_key.t
+  -> sok_message:Sok_message.t
+  -> t
+  -> t
+  -> Statement.t Or_error.t
+
 val check_transition :
      sok_message:Sok_message.t
   -> source:Ledger_hash.t
   -> target:Ledger_hash.t
   -> Transition.t
   -> Tick.Handler.t
-  -> unit
+  -> Statement.t Or_error.t
 
 val check_transaction :
      sok_message:Sok_message.t
@@ -129,7 +136,7 @@ val check_transaction :
   -> target:Ledger_hash.t
   -> Transaction.With_valid_signature.t
   -> Tick.Handler.t
-  -> unit
+  -> Statement.t Or_error.t
 
 module type S = sig
   include Verification.S

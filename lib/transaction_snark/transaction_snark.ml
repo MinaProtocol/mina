@@ -28,7 +28,7 @@ module Input = struct
   type t =
     { source: Ledger_hash.Stable.V1.t
     ; target: Ledger_hash.Stable.V1.t
-    ; fee_excess: Currency.Amount.Signed.t }
+    ; fee_excess: Currency.Fee.Signed.t }
   [@@deriving bin_io]
 end
 
@@ -67,6 +67,11 @@ end = struct
   end
 end
 
+let signed_fee_of_signed_amount amt =
+  Fee.Signed.create
+    ~magnitude:(Amount.Checked.to_fee (Amount.Signed.magnitude amt))
+    ~sgn:(Amount.Signed.sgn amt)
+
 module Tagged_transaction = struct
   open Tick
 
@@ -78,14 +83,13 @@ module Tagged_transaction = struct
 
   let excess ((tag, t): t) =
     match tag with
-    | Normal ->
-        Amount.Signed.create ~sgn:Sgn.Pos
-          ~magnitude:(Amount.of_fee t.payload.fee)
+    | Normal -> Fee.Signed.create ~sgn:Sgn.Pos ~magnitude:t.payload.fee
     | Fee_transfer ->
         let magnitude =
-          Amount.add_fee t.payload.amount t.payload.fee |> Option.value_exn
+          Fee.add (Amount.to_fee t.payload.amount) t.payload.fee
+          |> Option.value_exn
         in
-        Amount.Signed.create ~sgn:Sgn.Neg ~magnitude
+        Fee.Signed.create ~sgn:Sgn.Neg ~magnitude
 end
 
 module Fee_transfer = struct
@@ -162,19 +166,13 @@ type t =
   { source: Ledger_hash.Stable.V1.t
   ; target: Ledger_hash.Stable.V1.t
   ; proof_type: Proof_type.t
-  ; fee_excess: Amount.Signed.Stable.V1.t
+  ; fee_excess: Fee.Signed.Stable.V1.t
   ; sok_digest: Sok_message.Digest.Stable.V1.t
   ; proof: Proof.Stable.V1.t }
 [@@deriving fields, sexp, bin_io]
 
 let statement {source; target; proof_type; fee_excess; sok_digest= _; proof= _} =
-  { Statement.source
-  ; target
-  ; proof_type
-  ; fee_excess=
-      Currency.Fee.Signed.create
-        ~magnitude:Currency.Amount.(to_fee (Signed.magnitude fee_excess))
-        ~sgn:(Currency.Amount.Signed.sgn fee_excess) }
+  {Statement.source; target; proof_type; fee_excess}
 
 let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
 
@@ -185,7 +183,7 @@ let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~fee_excess =
     let open Fold in
     Sok_message.Digest.fold sok_digest
     +> Ledger_hash.fold state1 +> Ledger_hash.fold state2
-    +> Amount.Signed.fold fee_excess
+    +> Fee.Signed.fold fee_excess
   in
   match proof_type with
   | `Base -> Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
@@ -358,7 +356,7 @@ module Base = struct
               let%map balance = Balance.Checked.(account.balance + amount) in
               {account with balance} )
         in
-        (root, excess) )
+        (root, signed_fee_of_signed_amount excess) )
 
   (* Someday:
    write the following soundness tests:
@@ -407,7 +405,7 @@ module Base = struct
            and sok_digest =
              provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
            in
-           let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
+           let fee_excess = Fee.Signed.Checked.to_triples fee_excess in
            let triples =
              Sok_message.Digest.Checked.to_triples sok_digest
              @ b1 @ b2 @ fee_excess
@@ -463,7 +461,7 @@ end
 module Transition_data = struct
   type t =
     { proof: Proof_type.t * Tock_curve.Proof.t
-    ; fee_excess: Amount.Signed.t
+    ; fee_excess: Fee.Signed.t
     ; sok_digest: Sok_message.Digest.t }
   [@@deriving fields]
 end
@@ -542,7 +540,7 @@ module Merge = struct
         ~start:
           ( Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
           + state_hash_size_in_triples + state_hash_size_in_triples )
-        (Amount.Signed.Checked.to_triples fee_excess)
+        (Fee.Signed.Checked.to_triples fee_excess)
     in
     disjoint_union_sections
       ([prefix_and_sok_digest_and_fee; state1; state2] @ Option.to_list tock_vk)
@@ -616,10 +614,10 @@ module Merge = struct
     and s2 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash2
     and s3 = provide_witness' wrap_input_typ ~f:Prover_state.ledger_hash3
     and fee_excess12 =
-      provide_witness' Amount.Signed.typ
+      provide_witness' Fee.Signed.typ
         ~f:(Fn.compose Transition_data.fee_excess Prover_state.transition12)
     and fee_excess23 =
-      provide_witness' Amount.Signed.typ
+      provide_witness' Fee.Signed.typ
         ~f:(Fn.compose Transition_data.fee_excess Prover_state.transition23)
     in
     let bits_to_triples bits =
@@ -644,9 +642,7 @@ module Merge = struct
         ~start:vk_input_offset (bits_to_triples bs)
     in
     let%bind () =
-      let%bind total_fees =
-        Amount.Signed.Checked.add fee_excess12 fee_excess23
-      in
+      let%bind total_fees = Fee.Signed.Checked.add fee_excess12 fee_excess23 in
       let%bind input =
         let%bind sok_digest =
           provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
@@ -672,7 +668,8 @@ module Merge = struct
       verify_transition tock_vk tock_vk_data tock_vk_section
         Prover_state.transition23 s2_section s3_section fee_excess23
     in
-    Boolean.Assert.all [verify_12; verify_23]
+    if Insecure.with_snark then Boolean.Assert.all [verify_12; verify_23]
+    else return ()
 
   let create_keys () = generate_keypair ~exposing:(input ()) main
 
@@ -742,9 +739,9 @@ module Verification = struct
       Sok_message.Digest.equal t.sok_digest (Sok_message.digest message)
       && verify_against_digest t
 
-    (* The curve pt corresponding to H(merge_prefix, _digest, _, _, Amount.Signed.zero, wrap_vk)
+    (* The curve pt corresponding to H(merge_prefix, _digest, _, _, Fee.Signed.zero, wrap_vk)
     (with starting point shifted over by 2 * digest_size so that
-    this can then be used to compute H(merge_prefix, digest, s1, s2, Amount.Signed.zero, wrap_vk) *)
+    this can then be used to compute H(merge_prefix, digest, s1, s2, Fee.Signed.zero, wrap_vk) *)
     let merge_prefix_and_zero_and_vk_curve_pt =
       let open Tick in
       let s =
@@ -757,7 +754,7 @@ module Verification = struct
       let s =
         Pedersen.State.update_fold s
           Fold.(
-            Amount.Signed.(fold zero)
+            Fee.Signed.(fold zero)
             +> group3 ~default:false (of_list wrap_vk_bits))
       in
       let hash_interval = (0, Hash_prefix.length_in_triples) in
@@ -972,6 +969,51 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
+let check_merge ?(wrap_vk= Dummy_values.Tock.verification_key) ~sok_message
+    proof1 proof2 =
+  let wrap_vk_data =
+    Merge.Verifier.Verification_key_data.full_data_of_verification_key wrap_vk
+  in
+  let wrap_vk_bits =
+    Merge.Verifier.Verification_key_data.to_bits wrap_vk_data
+  in
+  let sok_digest = Sok_message.digest sok_message in
+  let fee_excess =
+    Option.value_exn (Fee.Signed.add proof1.fee_excess proof2.fee_excess)
+  in
+  let result =
+    { Statement.source= proof1.source
+    ; target= proof2.target
+    ; fee_excess
+    ; proof_type= `Merge }
+  in
+  let prover_state : Merge.Prover_state.t =
+    { tock_vk= wrap_vk
+    ; sok_digest
+    ; ledger_hash1= Ledger_hash.to_bits proof1.source
+    ; ledger_hash2= Ledger_hash.to_bits proof1.target
+    ; ledger_hash3= Ledger_hash.to_bits proof2.target
+    ; transition12=
+        { Transition_data.proof= (proof1.proof_type, proof1.proof)
+        ; fee_excess= proof1.fee_excess
+        ; sok_digest= proof1.sok_digest }
+    ; transition23=
+        { Transition_data.proof= (proof2.proof_type, proof2.proof)
+        ; fee_excess= proof2.fee_excess
+        ; sok_digest= proof2.sok_digest } }
+  in
+  let top_hash =
+    merge_top_hash wrap_vk_bits ~sok_digest ~state1:result.source
+      ~state2:result.target ~fee_excess
+  in
+  let open Tick in
+  let main =
+    Checked.map
+      (Merge.main (Field.Checked.constant top_hash))
+      ~f:As_prover.return
+  in
+  Or_error.map (run_and_check main prover_state) ~f:(fun _ -> result)
+
 let check_tagged_transaction sok_message source target transaction handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
@@ -989,7 +1031,8 @@ let check_tagged_transaction sok_message source target transaction handler =
          ~f:As_prover.return)
       handler
   in
-  Or_error.ok_exn (run_and_check main prover_state) |> ignore
+  Or_error.map (run_and_check main prover_state) ~f:(fun _ ->
+      {Statement.source; target; fee_excess; proof_type= `Base} )
 
 let check_transition ~sok_message ~source ~target (t: Transition.t) handler =
   check_tagged_transaction sok_message source target
@@ -1028,7 +1071,7 @@ struct
   let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
       transition12 transition23 =
     let fee_excess =
-      Amount.Signed.add transition12.Transition_data.fee_excess
+      Fee.Signed.add transition12.Transition_data.fee_excess
         transition23.Transition_data.fee_excess
       |> Option.value_exn
     in
@@ -1097,10 +1140,9 @@ struct
     in
     let open Or_error.Let_syntax in
     let%map fee_excess =
-      Amount.Signed.add t1.fee_excess t2.fee_excess
+      Fee.Signed.add t1.fee_excess t2.fee_excess
       |> Option.value_map ~f:Or_error.return
-           ~default:
-             (Or_error.errorf "Transaction_snark.merge: Amount overflow")
+           ~default:(Or_error.errorf "Transaction_snark.merge: Fee overflow")
     in
     { source= t1.source
     ; target= t2.target
@@ -1340,10 +1382,10 @@ let%test_module "transaction_snark" =
           let proof12 = of_transaction' sok_digest ledger t1 in
           let proof23 = of_transaction' sok_digest ledger t2 in
           let total_fees =
-            let open Amount in
+            let open Fee in
             let magnitude =
-              of_fee (t1 :> Transaction.t).payload.fee
-              + of_fee (t2 :> Transaction.t).payload.fee
+              (t1 :> Transaction.t).payload.fee
+              + (t2 :> Transaction.t).payload.fee
               |> Option.value_exn
             in
             Signed.create ~magnitude ~sgn:Sgn.Pos
