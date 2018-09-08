@@ -19,8 +19,6 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let lbc_tree_max_depth = `Finite 50
 
-    let transition_interval = Time.Span.of_ms 1000.0
-
     let fee_public_key = Genesis_ledger.high_balance_pk
 
     let genesis_proof = Precomputed_values.base_proof

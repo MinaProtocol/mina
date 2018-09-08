@@ -16,6 +16,8 @@ module type Inputs_intf = sig
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
   end
+
+  val proposal_interval : Unix_timestamp.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -176,6 +178,12 @@ struct
   let select Consensus_state.({length= l1; _})
       Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
+
+  let next_proposal_time now _state =
+    let open Unix_timestamp in
+    let time_since_last_interval = modulus now Inputs.proposal_interval in
+    let proposal_time = add (sub now time_since_last_interval) Inputs.proposal_interval in
+    `Propose proposal_time
 
   let genesis_protocol_state =
     Protocol_state.create_value

@@ -12,10 +12,6 @@ module type Inputs_intf = sig
       -> Consensus_mechanism.Internal_transition.t
       -> Protocol_state_proof.t Deferred.Or_error.t
   end
-
-  module Proposal_interval : sig
-    val t : Time.Span.t
-  end
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -183,20 +179,16 @@ struct
       upon (External_transition_result.result result) write_result ;
       result
     in
-    let schedule_transition tip =
+    let schedule_proposal tip =
+      match Consensus_mechanism.next_proposal_time (Time.now time_controller) tip.protocol_state with
+      | `Check_again time -> schedule_at time (fun () -> schedule_proposal tip)
+
+
       let time_now = Time.now time_controller in
-      let time_after_last_transition =
-        Time.modulus time_now Proposal_interval.t
-      in
-      let last_transition_time =
-        Time.sub time_now time_after_last_transition
-      in
-      let time_of_next_transition =
-        Time.add last_transition_time Proposal_interval.t
-      in
-      let time_till_transition = Time.diff time_of_next_transition time_now in
+      let time_till_proposal = Time.diff next_proposal_time (Time.now time_controller) in
       Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
-      Time.Timeout.create time_controller time_till_transition ~f:(fun _ ->
+
+      Time.Timeout.create time_controller time_till_proposal ~f:(fun _ ->
           Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
           create_result tip )
     in

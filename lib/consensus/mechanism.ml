@@ -88,11 +88,22 @@ module type S = sig
        Consensus_state.value
     -> Consensus_state.value
     -> logger:Logger.t
-    -> time_received:Int64.t
+    -> time_received:Unix_timestamp.t
     -> [`Keep | `Take]
   (**
    * Select between two ledger builder controller tips given the consensus
    * states for the two tips. Returns `\`Keep` if the first tip should be
    * kept, or `\`Take` if the second tip should be taken instead.
+   *)
+
+  val next_proposal :
+       Unix_timestamp.t
+    -> Consensus_state.value
+    -> logger:Logger.t
+    -> [`Check_again of Unix_timestamp.t | `Propose of Unix_timestamp.t]
+  (**
+   * Determine if and when to perform the next transition proposal. Either
+   * informs the callee to check again at some time in the future, or to
+   * schedule a proposal at some time in the future.
    *)
 end

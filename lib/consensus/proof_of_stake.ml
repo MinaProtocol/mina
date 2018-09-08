@@ -788,8 +788,40 @@ struct
       else `Keep
     else `Keep
 
-  (* TODO *)
+  let winning_slot _ _ _ _ = true (* TODO check vrf *)
 
+  let rec find_winning_slot epoch slot seed lock_checkpoint =
+    if Epoch.size >= Epoch.Slot.to_int slot then
+      None
+    else if winning_slot epoch slot seed lock_checkpoint then
+      Some slot
+    else
+      find_proposal epoch (Epoch.Slot.succ slot)
+
+  let next_proposal now state ~logger =
+    let logger = Logger.child logger "proof_of_stake" in
+    let (epoch, slot) = Epoch.epoch_and_slot_of_time_exn now in
+
+    (* When we first enter an epoch, the protocol state may still be a previous
+     * epoch. If that is the case, we need to select the staged vrf inputs
+     * instead of the last vrf inputs, since if the protocol state were actually
+     * up to date with the epoch, those would be the last vrf inputs.
+     *)
+    let (seed, lock_checkpoint) =
+      if Epoch.equal epoch state.curr_epoch then
+        (state.last_epoch_data.seed, state.last_epoch_data.lock_checkpoint.hash)
+      else if Epoch.compare epoch state.curr_epoch > 0 then
+        (state.curr_epoch_data.seed, state.curr_epoch_data.lock_checkpoint.hash)
+      else (
+        Logger.error logger "system time is out of sync with protocol state time";
+        failwith "TIME OUT OF SYNC")
+    in
+
+    match find_proposal epoch (Epoch.Slot.succ slot) seed lock_checkpoint with
+    | Some slot -> `Propose (Epoch.slot_start_time epoch slot)
+    | None      -> `Check_again (Epoch.end_time epoch)
+
+  (* TODO *)
   let genesis_protocol_state =
     let consensus_state =
       Or_error.ok_exn
