@@ -105,7 +105,7 @@ end = struct
         ; nodes= []
         ; dirty_indices= [] } }
 
-  let length t = Key.Table.length t.accounts
+  let num_accounts t = Key.Table.length t.accounts
 
   let key_of_index t index =
     if index >= Dyn_array.length t.tree.leafs then None

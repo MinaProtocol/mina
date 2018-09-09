@@ -600,8 +600,8 @@ end = struct
           match Sequence.next seq with
           | None -> Done
           | Some (x, seq) ->
-            (*allow a chunk of 1 proof as well*)
-            match Sequence.next seq with
+            match (*allow a chunk of 1 proof as well*)
+                  Sequence.next seq with
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) )
 
@@ -1048,6 +1048,8 @@ let%test_module "test" =
         let copy : t -> t = fun t -> ref !t
 
         let merkle_root : t -> ledger_hash = fun t -> Int.to_string !t
+
+        let num_accounts _ = 0
 
         let apply_super_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->

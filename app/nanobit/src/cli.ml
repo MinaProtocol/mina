@@ -31,7 +31,7 @@ let daemon (type ledger_proof) (module Kernel
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
-     and should_propose =
+     and should_propose_flag =
        flag "propose" ~doc:"true|false Run the proposer (default:true)"
          (optional bool)
      and peers =
@@ -39,7 +39,7 @@ let daemon (type ledger_proof) (module Kernel
          ~doc:
            "HOST:PORT TCP daemon communications (can be given multiple times)"
          (listed peer)
-     and run_snark_worker =
+     and run_snark_worker_flag =
        flag "run-snark-worker" ~doc:"KEY Run the SNARK worker with a key"
          (optional public_key_compressed)
      and external_port =
@@ -74,7 +74,9 @@ let daemon (type ledger_proof) (module Kernel
        let client_port =
          Option.value ~default:default_client_port client_port
        in
-       let should_propose = Option.value ~default:true should_propose in
+       let should_propose_flag =
+         Option.value ~default:true should_propose_flag
+       in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers =
@@ -116,12 +118,12 @@ let daemon (type ledger_proof) (module Kernel
        end in
        let%bind (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
-       let module Run = Run (M) in
+       let module Run = Run (Config) (M) in
        let%bind () =
          let open M in
-         let run_snark_worker =
-           Option.value_map run_snark_worker ~default:`Don't_run ~f:(fun k ->
-               `With_public_key k )
+         let run_snark_worker_action =
+           Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
+             (fun k -> `With_public_key k )
          in
          let net_config =
            { Inputs.Net.Config.parent_log= log
@@ -135,7 +137,9 @@ let daemon (type ledger_proof) (module Kernel
          in
          let%map minibit =
            Run.create
-             (Run.Config.make ~log ~net_config ~should_propose
+             (Run.Config.make ~log ~net_config
+                ~should_propose:should_propose_flag
+                ~run_snark_worker:(Option.is_some run_snark_worker_flag)
                 ~ledger_builder_persistant_location:
                   (conf_dir ^/ "ledger_builder")
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
@@ -145,7 +149,7 @@ let daemon (type ledger_proof) (module Kernel
          in
          don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers minibit)) ;
          Run.setup_local_server ~minibit ~client_port ~log ;
-         Run.run_snark_worker ~log ~client_port run_snark_worker
+         Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
        Async.never ())
 

@@ -21,6 +21,8 @@ module type S = sig
 
   val create : unit -> t
 
+  val num_accounts : t -> int
+
   val get : t -> key -> account option
 
   val set : t -> key -> account -> unit
