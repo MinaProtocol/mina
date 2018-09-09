@@ -27,7 +27,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   end in
   let%bind (module Init) = make_init (module Config) (module Kernel) in
   let module Main = Coda.Make (Init) () in
-  let module Run = Run (Main) in
+  let module Run = Run (Config) (Main) in
   let open Main in
   let net_config =
     { Inputs.Net.Config.parent_log= log
@@ -43,6 +43,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   let%bind minibit =
     Main.create
       (Main.Config.make ~log ~net_config ~should_propose
+         ~run_snark_worker:with_snark
          ~ledger_builder_persistant_location:"ledger_builder"
          ~transaction_pool_disk_location:"transaction_pool"
          ~snark_pool_disk_location:"snark_pool"
