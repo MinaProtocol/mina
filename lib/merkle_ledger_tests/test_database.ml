@@ -118,7 +118,8 @@ let%test_module "test functor on in memory databases" =
         List.iter initial_accounts ~f:(fun account ->
             ignore @@ MT.set_account mdb account )
 
-      let%test_unit "If the entire database is full,\n \
+      let%test_unit "If the entire database is full,\n\
+                     \ \
                      set_all_accounts_rooted_at_exn(address,accounts);get_all_accounts_rooted_at_exn(address) \
                      = accounts" =
         with_test_instance (fun mdb ->

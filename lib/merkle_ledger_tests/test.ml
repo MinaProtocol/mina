@@ -52,10 +52,10 @@ let%test_module "Database integration test" =
         (l1, h1) (l2, h2) =
       if not (Hash.equal h1 h2) then
         failwithf
-          !"\n                   \
-            Expected:\n\
-            %{sexp:L1.tree}\n\n\n \
-            Actual:\n\
+          !"\n\
+            \                   Expected:\n\
+            %{sexp:L1.tree}\n\n\n\
+            \ Actual:\n\
             %{sexp:L2.tree}"
           (L1.to_tree l1) (L2.to_tree l2) ()
 

@@ -392,6 +392,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t =
     { proposer: Proposer.t
+    ; should_propose: bool
+    ; run_snark_worker: bool
     ; net: Net.t
     ; external_transitions:
         (Consensus_mechanism.External_transition.t * Unix_timestamp.t)
@@ -408,8 +410,15 @@ module Make (Inputs : Inputs_intf) = struct
         Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
     ; ledger_builder_transition_backup_capacity: int }
 
+  let run_snark_worker t = t.run_snark_worker
+
+  let should_propose t = t.should_propose
+
   let best_ledger_builder t =
     (Ledger_builder_controller.strongest_tip t.ledger_builder).ledger_builder
+
+  let best_protocol_state t =
+    (Ledger_builder_controller.strongest_tip t.ledger_builder).protocol_state
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
@@ -437,6 +446,7 @@ module Make (Inputs : Inputs_intf) = struct
     type t =
       { log: Logger.t
       ; should_propose: bool
+      ; run_snark_worker: bool
       ; net_config: Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
@@ -541,6 +551,8 @@ module Make (Inputs : Inputs_intf) = struct
     else don't_wait_for (Linear_pipe.drain (Proposer.transitions proposer)) ;
     return
       { proposer
+      ; should_propose= config.should_propose
+      ; run_snark_worker= config.run_snark_worker
       ; net
       ; external_transitions= external_transitions_writer
       ; transaction_pool

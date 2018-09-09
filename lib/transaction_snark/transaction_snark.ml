@@ -809,11 +809,11 @@ module Verification = struct
         then digest
         else
           failwithf
-            !"%d = Hash_prefix.length_in_triples aka %d\n            \
-              + Sok_message.Digest.length_in_triples aka %d\n\
-              + (2 * Ledger_hash.length_in_triples) aka %d \n            \
-              + Amount.Signed.length aka %d + List.length wrap_vk_triples aka \
-              %d ) aka %d"
+            !"%d = Hash_prefix.length_in_triples aka %d\n\
+              \            + Sok_message.Digest.length_in_triples aka %d\n\
+              + (2 * Ledger_hash.length_in_triples) aka %d \n\
+              \            + Amount.Signed.length aka %d + List.length \
+              wrap_vk_triples aka %d ) aka %d"
             n Hash_prefix.length_in_triples
             Sok_message.Digest.length_in_triples
             (2 * Ledger_hash.length_in_triples)
