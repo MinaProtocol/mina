@@ -1,9 +1,7 @@
 open Core
 open Signature_lib
 open Nanobit_base
-open Util
 open Snark_params
-open Snarky
 open Currency
 open Fold_lib
 
@@ -388,34 +386,37 @@ module Base = struct
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
   let main top_hash =
     with_label __LOC__
-      (let open Let_syntax in
-      let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
-      let%bind root_before =
-        provide_witness' Ledger_hash.typ ~f:Prover_state.state1
-      in
-      let%bind t =
-        with_label __LOC__
-          (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
-      in
-      let%bind root_after, fee_excess =
-        apply_tagged_transaction (module Shifted) root_before t
-      in
-      let%map () =
-        with_label __LOC__
-          (let%bind b1 = Ledger_hash.var_to_triples root_before
-           and b2 = Ledger_hash.var_to_triples root_after
-           and sok_digest =
-             provide_witness' Sok_message.Digest.typ ~f:Prover_state.sok_digest
-           in
-           let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
-           let triples =
-             Sok_message.Digest.Checked.to_triples sok_digest
-             @ b1 @ b2 @ fee_excess
-           in
-           Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark triples
-           >>= Field.Checked.Assert.equal top_hash)
-      in
-      ())
+      (let%bind (module Shifted) =
+         Tick.Inner_curve.Checked.Shifted.create ()
+       in
+       let%bind root_before =
+         provide_witness' Ledger_hash.typ ~f:Prover_state.state1
+       in
+       let%bind t =
+         with_label __LOC__
+           (provide_witness' Tagged_transaction.typ ~f:Prover_state.transaction)
+       in
+       let%bind root_after, fee_excess =
+         apply_tagged_transaction (module Shifted) root_before t
+       in
+       let%map () =
+         with_label __LOC__
+           (let%bind b1 = Ledger_hash.var_to_triples root_before
+            and b2 = Ledger_hash.var_to_triples root_after
+            and sok_digest =
+              provide_witness' Sok_message.Digest.typ
+                ~f:Prover_state.sok_digest
+            in
+            let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
+            let triples =
+              Sok_message.Digest.Checked.to_triples sok_digest
+              @ b1 @ b2 @ fee_excess
+            in
+            Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark
+              triples
+            >>= Field.Checked.Assert.equal top_hash)
+       in
+       ())
 
   let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
@@ -553,7 +554,6 @@ module Merge = struct
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
   let verify_transition tock_vk tock_vk_data tock_vk_section
       get_transition_data s1 s2 fee_excess =
-    let open Let_syntax in
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
       with_label __LOC__
@@ -809,11 +809,11 @@ module Verification = struct
         then digest
         else
           failwithf
-            !"%d = Hash_prefix.length_in_triples aka %d\n            \
-              + Sok_message.Digest.length_in_triples aka %d\n\
-              + (2 * Ledger_hash.length_in_triples) aka %d \n            \
-              + Amount.Signed.length aka %d + List.length wrap_vk_triples aka \
-              %d ) aka %d"
+            !"%d = Hash_prefix.length_in_triples aka %d\n\
+              \            + Sok_message.Digest.length_in_triples aka %d\n\
+              + (2 * Ledger_hash.length_in_triples) aka %d \n\
+              \            + Amount.Signed.length aka %d + List.length \
+              wrap_vk_triples aka %d ) aka %d"
             n Hash_prefix.length_in_triples
             Sok_message.Digest.length_in_triples
             (2 * Ledger_hash.length_in_triples)
@@ -1121,7 +1121,6 @@ module Keys = struct
   end
 
   let checksum ~prefix ~base ~merge ~wrap =
-    let open Cached in
     Md5.digest_string
       ( "Transaction_snark_" ^ prefix ^ Md5.to_hex base ^ Md5.to_hex merge
       ^ Md5.to_hex wrap )

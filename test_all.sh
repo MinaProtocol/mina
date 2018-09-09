@@ -13,7 +13,7 @@ test_runtest() {
 
 test_method() {
   export CODA_CONSENSUS_MECHANISM="$1"
-  for test in full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' coda-shared-state-test 'transaction-snark-profiler -check-only'; do
+  for test in full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' 'transaction-snark-profiler -check-only'; do
     echo "------------------------------------------------------------------------------------------"
 
     date
@@ -32,7 +32,11 @@ test_method() {
       echo "PASSED"
     else
       echo "FAILED"
+      echo "------------------------------------------------------------------------------------------"
+      echo "RECENT LOG OUTPUT:"
       tail -n 30 test.log
+      echo "------------------------------------------------------------------------------------------"
+      echo "See above for stack trace..."
       exit 2
     fi
     set -e

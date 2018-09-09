@@ -3,6 +3,7 @@ open Async
 open Nanobit_base
 open Signature_lib
 open Blockchain_snark
+open Coda_numbers
 module Fee = Protocols.Coda_pow.Fee
 
 module Ledger_builder_aux_hash = struct
@@ -515,8 +516,8 @@ struct
       apply_and_broadcast t
         (Add_solved_work
            ( List.map res.spec.instances ~f:Single.Spec.statement
-           , { proof= res.proofs
-             ; fee= {fee= res.spec.fee; prover= Init.fee_public_key} } ))
+           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
+           ))
   end
 
   module type S_tmp =
@@ -749,6 +750,8 @@ module type Main_intf = sig
       val copy : t -> t
 
       val get : t -> Public_key.Compressed.t -> Account.t option
+
+      val num_accounts : t -> int
     end
 
     module Ledger_builder_diff : sig
@@ -834,6 +837,7 @@ module type Main_intf = sig
     type t =
       { log: Logger.t
       ; should_propose: bool
+      ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
@@ -845,9 +849,16 @@ module type Main_intf = sig
 
   type t
 
+  val should_propose : t -> bool
+
+  val run_snark_worker : t -> bool
+
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
   val best_ledger : t -> Inputs.Ledger.t
+
+  val best_protocol_state :
+    t -> Inputs.Consensus_mechanism.Protocol_state.value
 
   val peers : t -> Kademlia.Peer.t list
 
@@ -867,7 +878,7 @@ module type Main_intf = sig
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 end
 
-module Run (Program : Main_intf) = struct
+module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program
   open Inputs
 
@@ -892,6 +903,9 @@ module Run (Program : Main_intf) = struct
     in
     Option.is_some remainder
 
+  (** For status *)
+  let txn_count = ref 0
+
   let send_txn log t txn =
     let open Deferred.Let_syntax in
     assert (is_valid_transaction t txn) ;
@@ -900,6 +914,7 @@ module Run (Program : Main_intf) = struct
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
       txn ;
+    txn_count := !txn_count + 1 ;
     Deferred.unit
 
   let get_nonce t (addr: Public_key.Compressed.t) =
@@ -907,6 +922,29 @@ module Run (Program : Main_intf) = struct
     let ledger = best_ledger t in
     let%map account = Ledger.get ledger addr in
     account.Account.nonce
+
+  let start_time = Time_ns.now ()
+
+  let get_status t =
+    let ledger = best_ledger t in
+    let num_accounts = Ledger.num_accounts ledger in
+    let state = best_protocol_state t in
+    let block_count =
+      state |> Consensus_mechanism.Protocol_state.consensus_state
+      |> Consensus_mechanism.Consensus_state.length
+    in
+    let uptime_secs =
+      Time_ns.diff (Time_ns.now ()) start_time
+      |> Time_ns.Span.to_sec |> Int.of_float
+    in
+    { Client_lib.Status.num_accounts
+    ; block_count= Int.of_string (Length.to_string block_count)
+    ; uptime_secs
+    ; conf_dir= Config_in.conf_dir
+    ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
+    ; transactions_sent= !txn_count
+    ; run_snark_worker= run_snark_worker t
+    ; propose= should_propose t }
 
   let setup_local_server ~minibit ~log ~client_port =
     let log = Logger.child log "client" in
@@ -917,7 +955,9 @@ module Run (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance minibit pk) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
-            return (get_nonce minibit pk) ) ]
+            return (get_nonce minibit pk) )
+      ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
+            return (get_status minibit) ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in
@@ -932,12 +972,11 @@ module Run (Program : Main_intf) = struct
                 | Some _ -> () ) ;
                 r
             | `Eof -> assert false )
-      ; Rpc.One_way.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
-            don't_wait_for
-              (let%map () =
-                 Snark_pool.add_completed_work (snark_pool minibit) work
-               in
-               Linear_pipe.write_without_pushback solved_work_writer ()) ) ]
+      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
+            let%map () =
+              Snark_pool.add_completed_work (snark_pool minibit) work
+            in
+            Linear_pipe.write_without_pushback solved_work_writer () ) ]
     in
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
@@ -961,14 +1000,15 @@ module Run (Program : Main_intf) = struct
                    Logger.error log "%s" (Exn.to_string_mach exn) ;
                    Deferred.unit )) ))
 
-  let create_snark_worker ~log ~public_key ~client_port =
+  let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect =
     let open Snark_worker_lib in
     let%map p =
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
           ( Program.snark_worker_command_name
-          :: Snark_worker.arguments ~public_key ~daemon_port:client_port )
+          :: Snark_worker.arguments ~public_key ~daemon_port:client_port
+               ~shutdown_on_disconnect )
     in
     let log = Logger.child log "snark_worker" in
     Pipe.iter_without_pushback
@@ -981,9 +1021,12 @@ module Run (Program : Main_intf) = struct
     |> don't_wait_for ;
     Deferred.unit
 
-  let run_snark_worker ~log ~client_port run_snark_worker =
+  let run_snark_worker ?shutdown_on_disconnect:(s = true) ~log ~client_port
+      run_snark_worker =
     match run_snark_worker with
     | `Don't_run -> ()
     | `With_public_key public_key ->
-        create_snark_worker ~log ~public_key ~client_port |> ignore
+        create_snark_worker ~shutdown_on_disconnect:s ~log ~public_key
+          ~client_port
+        |> ignore
 end

@@ -12,4 +12,4 @@ val create :
 
 val supply_increase : t -> Currency.Amount.t Or_error.t
 
-val fee_excess : t -> Currency.Fee.t Or_error.t
+val fee_excess : t -> Currency.Fee.Signed.t Or_error.t

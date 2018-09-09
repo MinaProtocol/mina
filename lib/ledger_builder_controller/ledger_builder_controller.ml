@@ -87,7 +87,11 @@ module type Inputs_intf = sig
     (* This checks the SNARKs in State/LB and does the transition *)
 
     val select :
-      Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
+         Consensus_state.value
+      -> Consensus_state.value
+      -> logger:Logger.t
+      -> time_received:Unix_timestamp.t
+      -> [`Keep | `Take]
   end
 
   module Protocol_state : sig
@@ -197,7 +201,8 @@ end = struct
     type t =
       { parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
-      ; external_transitions: External_transition.t Linear_pipe.Reader.t
+      ; external_transitions:
+          (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; disk_location: string }
     [@@deriving make]
@@ -432,7 +437,7 @@ end = struct
     (* Handle new transitions *)
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
-        config.external_transitions ~f:(fun transition ->
+        config.external_transitions ~f:(fun (transition, time_received) ->
 
           (*let bits_to_str b =
             let str =
@@ -448,6 +453,7 @@ end = struct
           let s = bits_to_str c in*)
           let%bind changes, job =
             Transition_logic.on_new_transition catchup t.handler transition
+              ~time_received
           in
           (*Logger.fatal log "%s %d %b" s (List.length changes) (Option.is_some job);*)
           let%map () =
@@ -459,10 +465,9 @@ end = struct
                Logger.fatal !Coda.global_log !"changes %s" hash2;
                 Linear_pipe.write mutate_state_writer (changes, transition)
           in
-          job )
+          Option.map job ~f:(fun job -> (job, time_received)) )
     in
-    let replace last job =
-      let current_transition, _ = job in
+    let replace last ((current_transition, _), time_received) =
       match last with
       | None -> `Cancel_and_do_next
       | Some last ->
@@ -473,14 +478,15 @@ end = struct
                  (Inputs.External_transition.protocol_state last_transition))
               (Protocol_state.consensus_state
                  (Inputs.External_transition.protocol_state current_transition))
+              ~logger:log ~time_received
           with
           | `Keep -> `Skip
           | `Take -> `Cancel_and_do_next
     in
     don't_wait_for
-      ( Linear_pipe.fold possibly_jobs ~init:None ~f:(fun last job ->
-            let current_transition, _ = job in
-            match replace last job with
+      ( Linear_pipe.fold possibly_jobs ~init:None ~f:
+          (fun last ((((current_transition, _) as job), _) as job_with_time) ->
+            match replace last job_with_time with
             | `Skip -> return last
             | `Cancel_and_do_next ->
                 Option.iter last ~f:(fun (input, ivar) ->
@@ -673,7 +679,7 @@ let%test_module "test" =
         module Consensus_state = Consensus_mechanism_state
 
         let select Consensus_state.({strength= s1})
-            Consensus_state.({strength= s2}) =
+            Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
           if s1 >= s2 then `Keep else `Take
       end
 
@@ -774,7 +780,11 @@ let%test_module "test" =
         (Deferred.List.iter xs ~f:(fun x ->
              (* Without the wait here, we get interrupted before doing anything interesting *)
              let%bind () = after (Time_ns.Span.of_ms 100.) in
-             Linear_pipe.write w x )) ;
+             let time =
+               Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
+               |> Unix_timestamp.of_float
+             in
+             Linear_pipe.write w (x, time) )) ;
       r
 
     let config transitions =

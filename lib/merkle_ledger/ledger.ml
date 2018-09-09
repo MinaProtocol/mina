@@ -76,23 +76,7 @@ end = struct
     in
     {accounts= Key.Table.copy t.accounts; tree= copy_tree t.tree}
 
-  module Path = struct
-    type elem = [`Left of Hash.t | `Right of Hash.t] [@@deriving sexp]
-
-    let elem_hash = function `Left h | `Right h -> h
-
-    type t = elem list [@@deriving sexp]
-
-    let implied_root (t: t) hash =
-      List.fold t ~init:(hash, 0) ~f:(fun (acc, height) elem ->
-          let acc =
-            match elem with
-            | `Left h -> Hash.merge ~height acc h
-            | `Right h -> Hash.merge ~height h acc
-          in
-          (acc, height + 1) )
-      |> fst
-  end
+  module Path = Merkle_path.Make (Hash)
 
   let create_account_table () = Key.Table.create ()
 
@@ -121,7 +105,7 @@ end = struct
         ; nodes= []
         ; dirty_indices= [] } }
 
-  let length t = Key.Table.length t.accounts
+  let num_accounts t = Key.Table.length t.accounts
 
   let key_of_index t index =
     if index >= Dyn_array.length t.tree.leafs then None

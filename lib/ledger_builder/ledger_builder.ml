@@ -415,7 +415,7 @@ end = struct
     ( undo
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger
-      ; fee_excess= Fee.Signed.of_unsigned fee_excess
+      ; fee_excess
       ; proof_type= `Base } )
 
   let apply_super_transaction_and_get_witness ledger s =
@@ -427,10 +427,10 @@ end = struct
       | Coinbase _ -> failwith "Coinbases not yet implemented"
     in
     let open Or_error.Let_syntax in
+    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
     let%map undo, statement =
       apply_super_transaction_and_get_statement ledger s
     in
-    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
     (undo, {Super_transaction_with_witness.transaction= s; witness; statement})
 
   let update_ledger_and_get_statements ledger ts =
@@ -598,8 +598,8 @@ end = struct
           match Sequence.next seq with
           | None -> Done
           | Some (x, seq) ->
-            (*allow a chunk of 1 proof as well*)
-            match Sequence.next seq with
+            match (*allow a chunk of 1 proof as well*)
+                  Sequence.next seq with
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) )
 
@@ -921,7 +921,7 @@ let%test_module "test" =
 
         let fee_excess t =
           Or_error.map (supply_increase t) ~f:(fun _increase ->
-              Currency.Fee.zero )
+              Currency.Fee.Signed.zero )
       end
 
       module Super_transaction = struct
@@ -941,11 +941,15 @@ let%test_module "test" =
           | Coinbase of coinbase
         [@@deriving sexp, bin_io, compare, eq]
 
-        let fee_excess : t -> unsigned_fee Or_error.t =
+        let fee_excess : t -> Fee.Signed.t Or_error.t =
          fun t ->
+          let open Or_error.Let_syntax in
           match t with
-          | Transaction t' -> Ok (Transaction.fee t')
-          | Fee_transfer f -> Fee_transfer.fee_excess f
+          | Transaction t' ->
+              Ok (Currency.Fee.Signed.of_unsigned (Transaction.fee t'))
+          | Fee_transfer f ->
+              let%map fee = Fee_transfer.fee_excess f in
+              Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
           | Coinbase t -> Coinbase.fee_excess t
 
         let supply_increase = function
@@ -1042,6 +1046,8 @@ let%test_module "test" =
         let copy : t -> t = fun t -> ref !t
 
         let merkle_root : t -> ledger_hash = fun t -> Int.to_string !t
+
+        let num_accounts _ = 0
 
         let apply_super_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
