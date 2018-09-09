@@ -17,13 +17,7 @@ end
 module type Account = sig
   type t [@@deriving bin_io, eq]
 
-  type balance
-
   val empty : t
-
-  val balance : t -> balance
-
-  val set_balance : t -> balance -> t
 
   val public_key : t -> string
 end
