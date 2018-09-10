@@ -214,114 +214,127 @@ struct
       (epoch, slot)
   end
 
-  module Vrf_scalar = struct
-    type value =
-      Crypto_params.Tock_curve.Field.t (* TODO? *)
+  module Vrf = struct
+    module Scalar = struct
+      type value =
+        Crypto_params.Tock_curve.Field.t (* TODO? *)
 
-    type var =
-      Snark_params.Tick.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
-  end
-
-  module Vrf_group = struct
-    open Snark_params.Tick
-
-    type value = Inner_curve.t
-    type var = Inner_curve.var
-
-    let scale = Inner_curve.scale
-
-    module Checked = struct
-      include Inner_curve.Checked
-
-      let scale_generator shifted s ~init =
-        scale_known shifted Inner_curve.one s ~init
+      type var =
+        Snark_params.Tick.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
     end
-  end
 
-  module Vrf_message = struct
-    type ('epoch, 'slot, 'epoch_seed, 'ledger_hash) t =
-      { epoch: 'epoch
-      ; slot: 'slot
-      ; last_epoch_seed: 'epoch_seed
-      ; last_epoch_ledger_hash: 'ledger_hash }
+    module Group = struct
+      open Snark_params.Tick
 
-    type value = (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Nanobit_base.Ledger_hash.t) t
-    type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var, Epoch_seed.var, Nanobit_base.Ledger_hash.var) t
+      type value = Inner_curve.t
+      type var = Inner_curve.var
 
-    let fold {epoch; slot; last_epoch_seed; last_epoch_ledger_hash} =
-      let open Fold in
-      Epoch.fold epoch
-      +> Epoch.Slot.fold slot
-      +> Epoch_seed.fold last_epoch_seed
-      +> Nanobit_base.Ledger_hash.fold last_epoch_ledger_hash
+      let scale = Inner_curve.scale
 
-    let hash_to_group msg =
-      let msg_hash_state =
-        Snark_params.Tick.Pedersen.hash_fold
-          Nanobit_base.Hash_prefix.vrf_message
-          (fold msg)
-      in
-      msg_hash_state.acc
+      module Checked = struct
+        include Inner_curve.Checked
 
-    module Checked = struct
-      let var_to_triples {epoch; slot; last_epoch_seed; last_epoch_ledger_hash} =
-        let open Snark_params.Tick.Let_syntax in
-        let%map epoch_seed_triples = Epoch_seed.var_to_triples last_epoch_seed
-        and last_epoch_ledger_hash_triples = Nanobit_base.Ledger_hash.var_to_triples last_epoch_ledger_hash
-        in
-        Epoch.Unpacked.var_to_triples epoch
-        @ Epoch.Slot.Unpacked.var_to_triples slot
-        @ epoch_seed_triples
-        @ last_epoch_ledger_hash_triples
+        let scale_generator shifted s ~init =
+          scale_known shifted Inner_curve.one s ~init
+      end
+    end
+
+    module Message = struct
+      type ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
+        { epoch: 'epoch
+        ; slot: 'slot
+        ; seed: 'epoch_seed
+        ; lock_checkpoint: 'state_hash }
+
+      type value = (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Nanobit_base.State_hash.t) t
+      type var = (Epoch.Unpacked.var, Epoch.Slot.Unpacked.var, Epoch_seed.var, Nanobit_base.State_hash.var) t
+
+      let fold {epoch; slot; seed; lock_checkpoint} =
+        let open Fold in
+        Epoch.fold epoch
+        +> Epoch.Slot.fold slot
+        +> Epoch_seed.fold seed
+        +> Nanobit_base.Ledger_hash.fold lock_checkpoint
 
       let hash_to_group msg =
-        let open Snark_params.Tick in
-        let open Snark_params.Tick.Let_syntax in
-        let%bind msg_triples = var_to_triples msg in
-        Pedersen.Checked.hash_triples
-          ~init:Nanobit_base.Hash_prefix.vrf_message
-          msg_triples
-    end
-  end
-
-  module Vrf_output = struct
-    type value = Sha256.Digest.t
-    type var = Sha256.Digest.var
-
-    let hash msg g =
-      let open Fold in
-      let compressed_g = Non_zero_curve_point.(g |> of_inner_curve |> compress) in
-      let digest =
-        Snark_params.Tick.Pedersen.digest_fold
-          Nanobit_base.Hash_prefix.vrf_output
-          (Vrf_message.fold msg +> Non_zero_curve_point.Compressed.fold compressed_g)
-      in
-      Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
-        |> Non_zero_curve_point.Compressed.of_bits
-        |> Non_zero_curve_point.decompress
-        |> Non_zero_curve_point.to_inner_curve
-
-    module Checked = struct
-      let hash msg g =
-        let open Snark_params.Tick.Let_syntax in
-        let%bind msg_triples = Vrf_message.Checked.var_to_triples msg in
-        let%bind g_triples = Non_zero_curve_point.(compress_checked g >>= Compressed.var_to_triples) in
-        let%bind pedersen_digest =
-          Snark_params.Tick.Pedersen.Checked.digest_triples
-            ~init:Nanobit_base.Hash_prefix.vrf_output
-            (msg_triples @ g_triples)
-          >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
+        let msg_hash_state =
+          Snark_params.Tick.Pedersen.hash_fold
+            Nanobit_base.Hash_prefix.vrf_message
+            (fold msg)
         in
-        Sha256.Checked.digest (pedersen_digest :> Snark_params.Tick.Boolean.var list)
-    end
-  end
+        msg_hash_state.acc
 
-  module Vrf = Vrf_lib.Integrated.Make
-    (Snark_params.Tick)
-    (Vrf_scalar)
-    (Vrf_group)
-    (Vrf_message)
-    (Vrf_output)
+      module Checked = struct
+        let var_to_triples {epoch; slot; seed; lock_checkpoint} =
+          let open Snark_params.Tick.Let_syntax in
+          let%map seed_triples = Epoch_seed.var_to_triples seed
+          and lock_checkpoint_triples = Nanobit_base.Ledger_hash.var_to_triples lock_checkpoint
+          in
+          Epoch.Unpacked.var_to_triples epoch
+          @ Epoch.Slot.Unpacked.var_to_triples slot
+          @ seed_triples
+          @ lock_checkpoint_triples
+
+        let hash_to_group msg =
+          let open Snark_params.Tick in
+          let open Snark_params.Tick.Let_syntax in
+          let%bind msg_triples = var_to_triples msg in
+          Pedersen.Checked.hash_triples
+            ~init:Nanobit_base.Hash_prefix.vrf_message
+            msg_triples
+      end
+    end
+
+    module Output = struct
+      type value = Sha256.Digest.t
+      type var = Sha256.Digest.var
+
+      let hash msg g =
+        let open Fold in
+        let compressed_g = Non_zero_curve_point.(g |> of_inner_curve_exn |> compress) in
+        let digest =
+          Snark_params.Tick.Pedersen.digest_fold
+            Nanobit_base.Hash_prefix.vrf_output
+            (Message.fold msg +> Non_zero_curve_point.Compressed.fold compressed_g)
+        in
+        Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+
+      module Checked = struct
+        let hash msg g =
+          let open Snark_params.Tick.Let_syntax in
+          let%bind msg_triples = Message.Checked.var_to_triples msg in
+          let%bind g_triples = Non_zero_curve_point.(compress_var g >>= Compressed.var_to_triples) in
+          let%bind pedersen_digest =
+            Snark_params.Tick.Pedersen.Checked.digest_triples
+              ~init:Nanobit_base.Hash_prefix.vrf_output
+              (msg_triples @ g_triples)
+            >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
+          in
+          Sha256.Checked.digest (pedersen_digest :> Snark_params.Tick.Boolean.var list)
+      end
+    end
+
+    module Threshold = struct
+      include Bignum_bigint
+
+      let create ~my_stake ~total_stake =
+        UInt64.div my_stake total_stake
+        |> UInt64.to_int64
+        |> of_int64_exn
+        |> ( * ) (of_int_exn Int.Infix.(256 / 64))
+    end
+
+    include Vrf_lib.Integrated.Make
+        (Snark_params.Tick)
+        (Scalar)
+        (Group)
+        (Message)
+        (Output)
+
+    let winning_slot msg ~private_key ~my_stake ~total_stake =
+      let open Threshold in
+      of_bits_lsb (eval ~private_key msg) <= create ~my_stake ~total_stake
+  end
 
   module Epoch_ledger = struct
     type ('ledger_hash, 'amount) t =
@@ -724,13 +737,17 @@ struct
     Nanobit_base.External_transition.Make (Ledger_builder_diff)
       (Protocol_state)
 
-  let calculate_threshold ~my_stake ~total_stake =
-    let stake_fraction = my_stake /. total_stake in
-    (2 ** Vrf_output.length_in_bits) *. (1 -. (1 -. active_slots) ** stake_fraction)
-
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
-  let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state ~time ~transactions:_ ~ledger =
+  let generate_transition
+      ~previous_protocol_state
+      ~blockchain_state
+      ~local_state
+      ~time
+      ~keypair
+      ~transactions:_
+      ~ledger =
+    let open Signature_lib.Keypair in
+    let open Option.Let_syntax in
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -738,15 +755,18 @@ struct
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
     let proposer_vrf_result =
       Vrf.eval
-        (module Shifted)
-        ~private_key
-        { epoch
+        ~private_key:keypair.private_key
+        { Vrf.Message.epoch
         ; slot
-        ; last_epoch_seed= previous_protocol_state.last_epoch_data.seed
-        ; last_epoch_ledger_hash= previous_protocol_state.last_epoch_data.ledger.hash }
+        ; seed= previous_protocol_state.last_epoch_data.seed
+        ; lock_checkpoint= previous_protocol_state.last_epoch_data.lock_checkpoint }
     in
-    let threshold = calculate_threshold ~my_stake ~total_stake in
-
+    let threshold =
+      Vrf.Threshold.create
+        ~my_stake:(Ledger.get keypair.public_key)
+        ~total_stake:previous_consensus_state.last_epoch_data.ledger.total_currency
+    in
+    let%map () = if Vrf.Threshold.(proposer_vrf_result <= threshold) then Some () else None in
     let consensus_transition_data =
       Consensus_transition_data.{epoch; slot; proposer_vrf_result}
     in
@@ -760,7 +780,7 @@ struct
         ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
         ~blockchain_state ~consensus_state
     in
-    Some (protocol_state, consensus_transition_data)
+    (protocol_state, consensus_transition_data)
 
   let is_transition_valid_checked _transition =
     Snark_params.Tick.(Let_syntax.return Boolean.true_)

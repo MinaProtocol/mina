@@ -17,6 +17,8 @@ type var = Tick.Field.var * Tick.Field.var
 let var_of_t (x, y) =
   (Tick.Field.Checked.constant x, Tick.Field.Checked.constant y)
 
+let typ : (var, t) Tick.Typ.t = Tick.Typ.(field * field)
+
 let ( = ) = equal
 
 let of_inner_curve_exn = Tick.Inner_curve.to_coords
