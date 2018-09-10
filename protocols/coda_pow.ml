@@ -218,7 +218,17 @@ module type Public_key_intf = sig
 
   module Compressed : Compressed_public_key_intf
 
-  val of_private_key : Private_key.t -> t
+  val of_private_key_exn : Private_key.t -> t
+
+  val compress : t -> Compressed.t
+end
+
+module type Keypair_intf = sig
+  type private_key
+
+  type public_key
+
+  type t = {public_key: public_key; private_key: private_key}
 end
 
 module type Fee_transfer_intf = sig
@@ -527,6 +537,8 @@ module type Consensus_mechanism_intf = sig
 
   type ledger
 
+  type keypair
+
   module Local_state : sig
     type t [@@deriving sexp]
 
@@ -615,6 +627,7 @@ module type Consensus_mechanism_intf = sig
     -> blockchain_state:blockchain_state
     -> local_state:Local_state.t
     -> time:Int64.t
+    -> keypair:keypair
     -> transactions:transaction list
     -> ledger:ledger
     -> (Protocol_state.value * Consensus_transition_data.value) option
@@ -710,6 +723,11 @@ module type Inputs_intf = sig
     Public_key_intf
     with module Private_key := Private_key
      and module Compressed = Compressed_public_key
+
+  module Keypair :
+    Keypair_intf
+    with type private_key := Private_key.t
+     and type public_key := Public_key.t
 
   module Transaction :
     Transaction_intf with type public_key := Public_key.Compressed.t
@@ -861,6 +879,7 @@ Merge Snark:
      and type transaction := Transaction.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
+     and type keypair := Keypair.t
 
   module Tip :
     Tip_intf

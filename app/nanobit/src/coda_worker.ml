@@ -138,7 +138,11 @@ struct
 
           let transition_interval = Time.Span.of_ms 1000.0
 
-          let fee_public_key = Genesis_ledger.high_balance_pk
+          let keypair =
+            let open Keypair in
+            { public_key=
+                Public_key.decompress_exn Genesis_ledger.high_balance_pk
+            ; private_key= Genesis_ledger.high_balance_sk }
 
           let genesis_proof = Precomputed_values.base_proof
         end in
@@ -165,7 +169,7 @@ struct
                ~transaction_pool_disk_location:"transaction_pool"
                ~snark_pool_disk_location:"snark_pool"
                ~time_controller:(Main.Inputs.Time.Controller.create ())
-               ())
+               ~keypair:Config.keypair ())
         in
         Option.iter snark_worker_config ~f:(fun config ->
             let run_snark_worker = `With_public_key config.public_key in
@@ -176,7 +180,7 @@ struct
         let coda_get_balance pk = return (Run.get_balance coda pk) in
         let coda_send_transaction (sk, pk, amount, fee) =
           let pk_of_sk sk =
-            Public_key.of_private_key sk |> Public_key.compress
+            Public_key.of_private_key_exn sk |> Public_key.compress
           in
           let build_txn amount sender_sk receiver_pk fee =
             let nonce =
@@ -185,7 +189,7 @@ struct
             let payload : Transaction.Payload.t =
               {receiver= receiver_pk; amount; fee; nonce}
             in
-            Transaction.sign (Keypair.of_private_key sender_sk) payload
+            Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
           in
           let transaction = build_txn amount sk pk fee in
           Run.send_txn log coda (transaction :> Transaction.t)

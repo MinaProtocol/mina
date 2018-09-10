@@ -151,9 +151,7 @@ module type Config_intf = sig
 
   val transition_interval : Time.Span.t
 
-  (* Public key to allocate fees to *)
-
-  val fee_public_key : Public_key.Compressed.t
+  val keypair : Keypair.t
 
   val genesis_proof : Snark_params.Tock.Proof.t
 end
@@ -327,7 +325,10 @@ struct
     include Ledger_builder.Make (Inputs)
 
     let of_aux_and_ledger ledger aux =
-      Ok (make ~public_key:Init.fee_public_key ~aux ~ledger)
+      Ok
+        (make
+           ~public_key:(Public_key.compress Init.keypair.public_key)
+           ~aux ~ledger)
   end
 
   module Ledger_builder_aux = Ledger_builder.Aux
@@ -384,7 +385,7 @@ struct
       ; ledger_builder }
   end
 
-  let fee_public_key = Init.fee_public_key
+  let keypair = Init.keypair
 end
 
 module Make_inputs
@@ -408,6 +409,7 @@ struct
   module Public_key = Public_key
   module Compressed_public_key = Public_key.Compressed
   module Private_key = Private_key
+  module Keypair = Keypair
 
   module Proof_carrying_state = struct
     type t =
@@ -585,7 +587,8 @@ struct
 
         type proof = Ledger_proof.t
 
-        let create ledger = create ~ledger ~self:Init.fee_public_key
+        let create ledger =
+          create ~ledger ~self:(Public_key.compress keypair.public_key)
 
         let apply t diff =
           Deferred.Or_error.map
@@ -626,6 +629,7 @@ struct
     module Transaction = Transaction
     module Public_key = Public_key
     module Private_key = Private_key
+    module Keypair = Keypair
     module Blockchain_state = Nanobit_base.Blockchain_state
     module Compressed_public_key = Public_key.Compressed
 
@@ -838,7 +842,8 @@ module type Main_intf = sig
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
-      ; time_controller: Inputs.Time.Controller.t }
+      ; time_controller: Inputs.Time.Controller.t
+      ; keypair: Keypair.t }
     [@@deriving make]
   end
 

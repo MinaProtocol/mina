@@ -1,70 +1,62 @@
 module Make
-  (Impl : Snarky.Snark_intf.S)
-  (Scalar : sig
+    (Impl : Snarky.Snark_intf.S) (Scalar : sig
+        type value
+
+        type var
+    end) (Group : sig
+      open Impl
+
       type value
 
       type var
-  end)
-  (Group : sig
-    open Impl
 
-    type value
+      val scale : value -> Scalar.value -> value
 
-    type var
+      module Checked : sig
+        module Shifted : sig
+          module type S =
+            Snarky.Curves.Shifted_intf
+            with type ('a, 'b) checked := ('a, 'b) Checked.t
+             and type boolean_var := Boolean.var
+             and type curve_var := var
 
-    val scale :
-         value
-      -> Scalar.value
-      -> value
+          type 'a m = (module S with type t = 'a)
+        end
 
-    module Checked : sig
-      module Shifted : sig
-        module type S =
-          Snarky.Curves.Shifted_intf
-          with type ('a, 'b) checked := ('a, 'b) Checked.t
-           and type boolean_var := Boolean.var
-           and type curve_var := var
+        val scale :
+             (module Shifted.S with type t = 'shifted)
+          -> var
+          -> Scalar.var
+          -> init:'shifted
+          -> ('shifted, _) Checked.t
 
-        type 'a m = (module S with type t = 'a)
+        val scale_generator :
+             (module Shifted.S with type t = 'shifted)
+          -> Scalar.var
+          -> init:'shifted
+          -> ('shifted, _) Checked.t
       end
+    end) (Message : sig
+      type value
 
-      val scale :
-           (module Shifted.S with type t = 'shifted)
-        -> var
-        -> Scalar.var
-        -> init:'shifted
-        -> ('shifted, _) Checked.t
+      type var
 
-      val scale_generator :
-           (module Shifted.S with type t = 'shifted)
-        -> Scalar.var
-        -> init:'shifted
-        -> ('shifted, _) Checked.t
-    end
-  end)
-  (Message : sig
-    type value
+      val hash_to_group : value -> Group.value
 
-    type var
+      module Checked : sig
+        val hash_to_group : var -> (Group.var, _) Impl.Checked.t
+      end
+    end) (Output_hash : sig
+      type value
 
-    val hash_to_group : value -> Group.value
+      type var
 
-    module Checked : sig
-      val hash_to_group : var -> (Group.var, _) Impl.Checked.t
-    end
-  end)
-  (Output_hash : sig
-    type value
+      val hash : Message.value -> Group.value -> value
 
-    type var
-
-    val hash : Message.value -> Group.value -> value
-
-    module Checked : sig
-      val hash : Message.var -> Group.var -> (var, _) Impl.Checked.t
-    end
-  end)
-: sig
+      module Checked : sig
+        val hash : Message.var -> Group.var -> (var, _) Impl.Checked.t
+      end
+    end) : sig
   val eval : private_key:Scalar.value -> Message.value -> Output_hash.value
 
   module Checked : sig
@@ -104,11 +96,13 @@ end = struct
       Output_hash.Checked.hash m u
 
     let eval_and_check_public_key (type shifted)
-        ((module Shifted): shifted Group.Checked.Shifted.m) ~private_key ~public_key
-        message =
+        ((module Shifted): shifted Group.Checked.Shifted.m) ~private_key
+        ~public_key message =
       let%bind () =
         let%bind public_key_shifted = Shifted.(add zero public_key) in
-        Group.Checked.scale_generator (module Shifted) private_key ~init:Shifted.zero
+        Group.Checked.scale_generator
+          (module Shifted)
+          private_key ~init:Shifted.zero
         >>= Shifted.Assert.equal public_key_shifted
       in
       eval (module Shifted) ~private_key message

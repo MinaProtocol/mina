@@ -103,6 +103,13 @@ let daemon (type ledger_proof) (module Kernel
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
+       let keypair =
+         let open Signature_lib.Keypair in
+         { public_key=
+             Signature_lib.Public_key.decompress_exn
+               Genesis_ledger.high_balance_pk
+         ; private_key= Genesis_ledger.high_balance_sk }
+       in
        let module Config = struct
          let logger = log
 
@@ -112,7 +119,7 @@ let daemon (type ledger_proof) (module Kernel
 
          let transition_interval = Time.Span.of_sec 5.0
 
-         let fee_public_key = Genesis_ledger.high_balance_pk
+         let keypair = keypair
 
          let genesis_proof = Precomputed_values.base_proof
        end in
@@ -145,7 +152,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ())
+                ~keypair ())
          in
          don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers minibit)) ;
          Run.setup_local_server ~minibit ~client_port ~log ;

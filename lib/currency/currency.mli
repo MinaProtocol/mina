@@ -186,6 +186,10 @@ end
 module Balance : sig
   include Basic
 
+  val of_amount : Amount.t -> t
+
+  val to_amount : t -> Amount.t
+
   val add_amount : t -> Amount.t -> t option
 
   val sub_amount : t -> Amount.t -> t option
@@ -205,6 +209,4 @@ module Balance : sig
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
   end
-
-  val of_amount : Amount.t -> t
 end

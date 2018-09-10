@@ -510,6 +510,8 @@ module Balance = struct
 
   let of_amount = Fn.id
 
+  let to_amount = Fn.id
+
   let add_amount = Amount.add
 
   let sub_amount = Amount.sub
