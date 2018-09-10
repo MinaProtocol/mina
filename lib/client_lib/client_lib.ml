@@ -51,24 +51,31 @@ module Status = struct
 
   (* Text response *)
   let to_text s =
-    let output = "Coda Daemon Status\n" in
+    let title = "Coda Daemon Status\n-----------------------------------\n" in
+
+    let entries = [
+      ("Uptime",  sprintf "%ds" s.uptime_secs)
+      ;("Block Count", Int.to_string s.block_count)
+      ;("Number of Accounts", Int.to_string s.num_accounts)
+      ;("Transactions Sent", Int.to_string s.transactions_sent)
+      ;("Snark Worker Running", Bool.to_string s.run_snark_worker)
+      ;("Proposer Running", Bool.to_string s.propose)
+      ;("Peers", List.to_string ~f:Fn.id s.peers)
+    ] in
+
+    let max_key_length = 
+      List.map ~f:(fun (s, _) -> String.length s) entries
+      |> List.max_elt ~compare:Int.compare |> Option.value_exn
+      in
+
     let output =
-      output ^ sprintf "Uptime:             \t%ds\n" s.uptime_secs
-    in
-    let output = output ^ sprintf "Block Count:        \t%d\n" s.block_count in
-    let output =
-      output ^ sprintf "Number of Accounts: \t%d\n" s.num_accounts
-    in
-    let output =
-      output ^ sprintf "Transactions Sent:  \t%d\n" s.transactions_sent
-    in
-    let output =
-      output ^ sprintf "Snark Worker Running: \t%B\n" s.run_snark_worker
-    in
-    let output = output ^ sprintf "Proposer Running: \t%B\n" s.propose in
-    let output = output ^ sprintf "Peers: \t" in
-    let output = output ^ List.to_string ~f:Fn.id s.peers in
-    output
+      List.map entries ~f:(fun (s, x) ->
+        let padding = String.init (max_key_length - String.length s) ~f:(fun _ -> ' ') in
+        sprintf "%s: %s\t%s" s padding x)
+        |> String.concat ~sep:"\n" 
+        in
+
+    title ^ output ^ "\n"
 end
 
 module Get_status = struct
