@@ -5,6 +5,8 @@ open Snark_params.Tick
 
 type t
 
+val ledger_hash : t -> Ledger_hash.t
+
 include Hashable.S with type t := t
 
 type var
