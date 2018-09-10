@@ -170,8 +170,11 @@ let () =
            | Some v -> v
            | None ->
                exit1
-                 ~msg:(Printf.sprintf "Inside env var %s, there was a value I don't understand \"%s\"" name x)
-       )
+                 ~msg:
+                   (Printf.sprintf
+                      "Inside env var %s, there was a value I don't \
+                       understand \"%s\""
+                      name x) )
     |> Option.value ~default
   in
   let commands =

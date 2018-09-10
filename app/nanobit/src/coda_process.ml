@@ -12,12 +12,10 @@ struct
 
   type t = Coda_worker.Connection.t * Process.t
 
-  let spawn_exn (config : Coda_worker.Input.t) =
+  let spawn_exn (config: Coda_worker.Input.t) =
     let%bind conn, process =
-      Coda_worker.spawn_in_foreground_exn
-        ~env:config.env
-        ~on_failure:Error.raise
-        ~cd:config.program_dir ~shutdown_on:Disconnect
+      Coda_worker.spawn_in_foreground_exn ~env:config.env
+        ~on_failure:Error.raise ~cd:config.program_dir ~shutdown_on:Disconnect
         ~connection_state_init_arg:()
         ~connection_timeout:(Time.Span.of_sec 15.) config
     in
@@ -25,18 +23,18 @@ struct
     File_system.dup_stderr process ;
     return (conn, process)
 
-  let spawn_local_exn ?proposal_interval ~peers ~discovery_port ~external_port ~program_dir
-      ~should_propose ~f ~snark_worker_config () =
+  let spawn_local_exn ?proposal_interval ~peers ~discovery_port ~external_port
+      ~program_dir ~should_propose ~f ~snark_worker_config () =
     let host = "127.0.0.1" in
     let conf_dir =
       "/tmp/" ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
     in
     let config =
       { Coda_worker.Input.host
-      ; env =
-        Option.map proposal_interval ~f:(fun interval ->
-          ["CODA_PROPOSAL_INTERVAL", Int.to_string interval]
-        ) |> Option.value ~default:[]
+      ; env=
+          Option.map proposal_interval ~f:(fun interval ->
+              [("CODA_PROPOSAL_INTERVAL", Int.to_string interval)] )
+          |> Option.value ~default:[]
       ; should_propose
       ; external_port
       ; snark_worker_config

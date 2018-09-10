@@ -28,6 +28,7 @@ struct
       ; peers: Host_and_port.t list }
     [@@deriving bin_io]
   end
+
   open Input
 
   module T = struct
