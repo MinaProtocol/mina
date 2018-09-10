@@ -9,11 +9,7 @@ include Sparse_ledger_lib.Sparse_ledger.Make (struct
           (struct
             include Account.Stable.V1
 
-            let key {Account.public_key; _} = public_key
-
             let hash = Fn.compose Merkle_hash.of_digest Account.digest
-
-            let empty_with_key = Account.empty_with_key
           end)
 
 let of_ledger_subset_exn (ledger: Ledger.t) keys =
@@ -23,7 +19,7 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
         match (Ledger.merkle_path ledger key, Ledger.get ledger key) with
         | Some path, Some acct -> (new_keys, add_path sl path key acct)
         | None, None ->
-            let path, acct = Ledger.get_empty ledger key in
+            let path, acct = Ledger.create_empty ledger key in
             (key :: new_keys, add_path sl path key acct)
         | _ -> failwith "unreachable" )
       ~init:

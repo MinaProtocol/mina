@@ -58,14 +58,15 @@ let reraise_merkle_requests (With { request; respond }) =
 
 
 (*
-   [modify_account_send t pk ~filter ~f] implements the following spec:
+   [modify_account t pk ~filter ~f] implements the following spec:
 
-   - finds an account [account] in [t] at path [addr] whose public key is
-   [pk] OR which is an empty account and where [filter account] holds
+   - finds an account [account] in [t] for [pk] at path [addr] where [filter account] holds.
+     note that the account is not guaranteed to have public key [pk]; it might be a new account
+     created to satisfy this request.
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account t pk ~(filter:Account.var -> (Boolean.var, _) Checked.t) ~f =
+let modify_account t pk ~(filter:Account.var -> (unit, _) Checked.t) ~f =
   with_label __LOC__ begin
     let%bind addr =
       request_witness Account.Index.Unpacked.typ
@@ -75,8 +76,7 @@ let modify_account t pk ~(filter:Account.var -> (Boolean.var, _) Checked.t) ~f =
     in
     handle
       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr ~f:(fun account ->
-        let%bind fine = filter account in
-        let%bind () = Boolean.Assert.is_true fine in
+        let%bind () = filter account in
         f account))
       reraise_merkle_requests
     >>| var_of_hash_packed
@@ -90,10 +90,10 @@ let modify_account t pk ~(filter:Account.var -> (Boolean.var, _) Checked.t) ~f =
    which is [t] but with the account [f account] at path [addr].
 *)
 let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(fun account ->
-        let%bind account_already_there = Public_key.Compressed.check_equal account.public_key pk in
-        let%bind account_not_there = Public_key.Compressed.check_equal account.public_key Public_key.Compressed.(var_of_t empty) in
+        let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
+        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
         let%bind fee_transfer = Boolean.(account_not_there && is_fee_transfer) in
-        Boolean.(account_already_there || fee_transfer)
+        Boolean.Assert.any [account_already_there; fee_transfer]
 ) ~f
 
 (*
@@ -104,7 +104,7 @@ let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(
    which is [t] but with the account [f account] at path [addr].
 *)
 let modify_account_recv t pk ~f = modify_account t pk ~filter:(fun account ->
-        let%bind account_already_there = Public_key.Compressed.check_equal account.public_key pk in
-        let%bind account_not_there = Public_key.Compressed.check_equal account.public_key Public_key.Compressed.(var_of_t empty) in
-        Boolean.(account_already_there || account_not_there)
+        let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
+        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
+        Boolean.Assert.any [account_already_there; account_not_there]
 ) ~f

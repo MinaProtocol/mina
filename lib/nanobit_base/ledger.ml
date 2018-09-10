@@ -44,7 +44,7 @@ let validate_nonces txn_nonce account_nonce =
         transaction %{sexp: Account.Nonce.t}"
       account_nonce txn_nonce
 
-let get_or_make ledger key =
+let get_or_create ledger key =
   match get ledger key with
   | Some acct -> ([], acct)
   | None ->
@@ -52,10 +52,9 @@ let get_or_make ledger key =
       set ledger key acct ;
       ([key], acct)
 
-let get_empty ledger k =
-  let acct = Account.empty () in
-  set ledger k acct ;
-  (merkle_path ledger k |> Option.value_exn, acct)
+let create_empty ledger k =
+  set ledger k Account.empty ;
+  (merkle_path ledger k |> Option.value_exn, Account.empty)
 
 module Undo = struct
   type transaction =
@@ -106,7 +105,7 @@ let apply_transaction_unchecked ledger
     return undo )
   else
     let previous_empty_accounts, receiver_account =
-      get_or_make ledger receiver
+      get_or_create ledger receiver
     in
     let%map receiver_balance' = add_amount receiver_account.balance amount in
     set ledger sender
@@ -120,12 +119,12 @@ let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
 let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
   match transfer with
   | One (pk, fee) ->
-      let emptys, a = get_or_make t pk in
+      let emptys, a = get_or_create t pk in
       set t pk {a with balance= modify_balance a.balance fee} ;
       emptys
   | Two ((pk1, fee1), (pk2, fee2)) ->
-      let emptys1, a1 = get_or_make t pk1
-      and emptys2, a2 = get_or_make t pk2 in
+      let emptys1, a1 = get_or_create t pk1
+      and emptys2, a2 = get_or_create t pk2 in
       set t pk1 {a1 with balance= modify_balance a1.balance fee1} ;
       set t pk2 {a2 with balance= modify_balance a2.balance fee2} ;
       emptys1 @ emptys2

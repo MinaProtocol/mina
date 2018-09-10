@@ -119,19 +119,17 @@ let hash_prefix = Hash_prefix.account
 
 let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
 
-let empty () =
+let empty =
   { public_key= Public_key.Compressed.empty
   ; balance= Balance.zero
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty }
 
-let empty_with_key pk =
-  let empt = empty () in
-  {empt with public_key= pk}
+let empty_with_key pk = {empty with public_key= pk}
 
 let digest t = Pedersen.State.digest (hash t)
 
-let empty_hash = digest (empty ())
+let empty_hash = digest empty
 
 let pubkey t = t.public_key
 
