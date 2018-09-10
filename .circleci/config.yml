@@ -85,5 +85,5 @@ workflows:
         jobs:
             - build
             - test-sig
-            - test-stake
+              #- test-stake
             - test-runtest
