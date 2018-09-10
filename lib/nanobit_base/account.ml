@@ -125,8 +125,6 @@ let empty =
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty }
 
-let empty_with_key pk = {empty with public_key= pk}
-
 let digest t = Pedersen.State.digest (hash t)
 
 let empty_hash = digest empty
