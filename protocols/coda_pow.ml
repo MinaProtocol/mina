@@ -116,8 +116,6 @@ module type Ledger_builder_hash_intf = sig
 
   type ledger_builder_aux_hash
 
-  val of_bytes : string -> t
-
   val of_aux_and_ledger_hash : ledger_builder_aux_hash -> ledger_hash -> t
 
   include Hashable.S_binable with type t := t
@@ -147,6 +145,8 @@ module type Ledger_intf = sig
   val create : unit -> t
 
   val copy : t -> t
+
+  val num_accounts : t -> int
 
   val merkle_root : t -> ledger_hash
 

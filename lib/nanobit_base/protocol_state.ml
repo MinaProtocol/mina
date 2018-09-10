@@ -2,6 +2,7 @@ open Core_kernel
 open Snark_params.Tick
 open Tuple_lib
 open Fold_lib
+open Coda_numbers
 
 module type Consensus_state_intf = sig
   type value [@@deriving hash, compare, bin_io, sexp]
@@ -19,6 +20,9 @@ module type Consensus_state_intf = sig
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
   val fold : value -> bool Triple.t Fold.t
+
+  val length : value -> Length.t
+  (** For status *)
 end
 
 module type S = sig

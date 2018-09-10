@@ -111,6 +111,8 @@ struct
     let update state =
       { length= Length.succ state.length
       ; signer_public_key= Public_key.compress Global_keypair.public_key }
+
+    let length t = t.length
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)

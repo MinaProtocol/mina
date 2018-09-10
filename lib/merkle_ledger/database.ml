@@ -2,8 +2,7 @@ open Core
 open Unsigned
 
 module Make
-    (Balance : Intf.Balance)
-    (Account : Intf.Account with type balance := Balance.t)
+    (Account : Intf.Account)
     (Hash : Intf.Hash with type account := Account.t)
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
@@ -23,19 +22,7 @@ end = struct
 
   type error = Account_key_not_found | Out_of_leaves | Malformed_database
 
-  module MerklePath = struct
-    type t = Direction.t * Hash.t
-
-    let implied_root path leaf_hash =
-      let rec loop sibling_hash ~height = function
-        | [] -> sibling_hash
-        | (Direction.Left, hash) :: t ->
-            loop (Hash.merge ~height hash sibling_hash) ~height:(height + 1) t
-        | (Direction.Right, hash) :: t ->
-            loop (Hash.merge ~height sibling_hash hash) ~height:(height + 1) t
-      in
-      loop leaf_hash ~height:0 path
-  end
+  module Path = Merkle_path.Make (Hash)
 
   module Addr = Merkle_address.Make (struct
     let depth = Depth.depth
@@ -322,13 +309,10 @@ end = struct
     let first_node, last_node = Addr.Range.subtree_range address in
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account =
-            Option.value ~default:Account.empty
-              (get_account mdb (Key.Account bit_index))
-          in
+          let account = get_account mdb (Key.Account bit_index) in
           account :: acc )
     in
-    List.rev result
+    List.rev_filter_map result ~f:Fn.id
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
@@ -337,9 +321,7 @@ end = struct
       | head :: tail ->
           update_account mdb (Key.Account bit_index) head ;
           tail
-      | [] ->
-          assert (Addr.equal last_node bit_index) ;
-          [] )
+      | [] -> [] )
     |> ignore
 
   let merkle_root mdb = get_hash mdb Key.root_hash
@@ -348,10 +330,13 @@ end = struct
     let key = if Key.is_account key then Key.Hash (Key.path key) else key in
     assert (Key.is_hash key) ;
     let rec loop k =
-      let sibling = Key.sibling k in
-      let sibling_dir = Key.last_direction (Key.path k) in
-      (sibling_dir, get_hash mdb sibling)
-      :: (if Key.height key < Depth.depth then loop (Key.parent k) else [])
+      if Key.height k >= Depth.depth then []
+      else
+        let sibling = Key.sibling k in
+        let sibling_dir = Key.last_direction (Key.path k) in
+        let hash = get_hash mdb sibling in
+        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        :: loop (Key.parent k)
     in
     loop key
 
