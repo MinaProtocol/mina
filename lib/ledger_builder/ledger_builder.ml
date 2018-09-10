@@ -327,10 +327,8 @@ end = struct
     ; public_key }
 
   let hash {scan_state; ledger; public_key= _} : Ledger_builder_hash.t =
-    let h = Cryptokit.Hash.sha3 256 in
-    h#add_string (Ledger_hash.to_bytes (Ledger.merkle_root ledger)) ;
-    h#add_string (Aux.hash_to_string scan_state) ;
-    Ledger_builder_hash.of_bytes h#result
+    Ledger_builder_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
+      (Ledger.merkle_root ledger)
 
   let ledger {ledger; _} = ledger
 
@@ -1111,8 +1109,6 @@ let%test_module "test" =
         type ledger_hash = Ledger_hash.t
 
         type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
-
-        let of_bytes : string -> t = fun s -> s
 
         let of_aux_and_ledger_hash :
             ledger_builder_aux_hash -> ledger_hash -> t =
