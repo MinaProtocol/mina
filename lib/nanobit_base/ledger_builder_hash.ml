@@ -1,29 +1,66 @@
 open Core
+open Fold_lib
+open Tuple_lib
 open Snark_params.Tick
 
-module Hash = struct
+module Aux_hash = struct
   let length_in_bits = 256
 
-  include Data_hash.Make_small (struct
-    let length_in_bits = length_in_bits
-  end)
+  let length_in_bytes = length_in_bits / 8
 
-  let of_bytes s =
-    Z.of_bits s |> Bignum_bigint.of_zarith_bigint |> Bigint.of_bignum_bigint
-    |> Bigint.to_field |> of_hash |> Or_error.ok_exn
+  module Stable = struct
+    module V1 = struct
+      type t = string [@@deriving bin_io, sexp, eq, compare, hash]
+    end
+  end
 
-  let dummy = of_bytes (String.init (length_in_bits / 8) ~f:(fun _ -> '\000'))
+  include Stable.V1
+
+  let of_bytes = Fn.id
+
+  let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
+
+  let fold = Fold.string_triples
 end
 
-module Aux_hash = Hash
-include Hash
+module Stable = struct
+  module V1 = struct
+    module T = struct
+      type t = {ledger_hash: Ledger_hash.Stable.V1.t; aux_hash: Aux_hash.t}
+      [@@deriving bin_io, sexp, eq, compare, hash]
+    end
 
-type sibling_hash = Hash.Stable.V1.t [@@deriving bin_io]
+    include T
+    include Hashable.Make_binable (T)
+  end
+end
 
-type ledger_builder_aux_hash = Aux_hash.Stable.V1.t [@@deriving bin_io]
+include Stable.V1
 
-let of_aux_and_ledger_hash ledger_builder_aux_hash ledger_hash =
-  let h = Cryptokit.Hash.sha3 256 in
+let dummy =
+  {ledger_hash= Ledger_hash.of_hash Field.zero; aux_hash= Aux_hash.dummy}
+
+let of_aux_and_ledger_hash aux_hash ledger_hash = {aux_hash; ledger_hash}
+
+let length_in_bits = 256
+
+let length_in_triples = (length_in_bits + 2) / 3
+
+let digest {ledger_hash; aux_hash} =
+  let h = Cryptokit.Hash.sha3 length_in_bits in
   h#add_string (Ledger_hash.to_bytes ledger_hash) ;
-  h#add_string (to_bytes ledger_builder_aux_hash) ;
-  of_bytes h#result
+  h#add_string aux_hash ;
+  h#result
+
+let fold t = Fold.string_triples (digest t)
+
+type var = Boolean.var Triple.t list
+
+let var_to_triples = Checked.return
+
+let typ : (var, t) Typ.t =
+  let triple t = Typ.tuple3 t t t in
+  Typ.transport
+    (Typ.list ~length:length_in_triples (triple Boolean.typ))
+    ~there:(Fn.compose Fold.to_list fold)
+    ~back:(fun _ -> failwith "Cannot read a ledger_builder_hash from a var")
