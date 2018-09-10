@@ -4,15 +4,14 @@ set -eo pipefail
 
 eval `opam config env`
 
-test_runtest() {
+run_unit_tests() {
   date
   myprocs=`nproc --all`  # Linux specific
   dune runtest --verbose -j${myprocs}
 }
 
 
-test_method() {
-  export CODA_CONSENSUS_MECHANISM="$1"
+run_integration_tests() {
   for test in full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' 'transaction-snark-profiler -check-only'; do
     echo "------------------------------------------------------------------------------------------"
 
@@ -33,8 +32,8 @@ test_method() {
     else
       echo "FAILED"
       echo "------------------------------------------------------------------------------------------"
-      echo "RECENT LOG OUTPUT:"
-      tail -n 30 test.log
+      echo "LOG OUTPUT:"
+      tail -n 100 test.log | dune exec logproc
       echo "------------------------------------------------------------------------------------------"
       echo "See above for stack trace..."
       exit 2
@@ -44,9 +43,17 @@ test_method() {
 }
 
 main() {
-  test_runtest
-  test_method 'proof_of_signature'
-  test_method 'proof_of_stake'
+  export CODA_PROPOSAL_INTERVAL=1000
+  export CODA_SLOT_INTERVAL=1000
+  export CODA_UNFORKABLE_TRANSITION_COUNT=4
+  export CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=1
+
+  run_unit_tests
+
+  CODA_CONSENSUS_MECHANISM=proof_of_signature \
+    run_integration_tests
+  CODA_CONSENSUS_MECHANISM=proof_of_stake \
+    run_integration_tests
 }
 
 # Only run main if called directly

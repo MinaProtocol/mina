@@ -154,17 +154,32 @@ let daemon (type ledger_proof) (module Kernel
        Async.never ())
 
 let () =
+  Random.self_init () ;
+  let exit1 ?msg =
+    match msg with
+    | None -> Core.exit 1
+    | Some msg ->
+        Core.Printf.eprintf "%s\n" msg ;
+        Core.exit 1
+  in
+  let env name ~f ~default =
+    let name = Printf.sprintf "CODA_%s" name in
+    Unix.getenv name
+    |> Option.map ~f:(fun x ->
+           match f @@ String.uppercase x with
+           | Some v -> v
+           | None ->
+               exit1
+                 ~msg:(Printf.sprintf "Inside env var %s, there was a value I don't understand \"%s\"" name x)
+       )
+    |> Option.value ~default
+  in
   let commands =
-    let consensus_mechanism_of_string = function
-      | "PROOF_OF_SIGNATURE" -> `Proof_of_signature
-      | "PROOF_OF_STAKE" -> `Proof_of_stake
-      | _ -> failwith "invalid consensus mechanism"
-    in
     let consensus_mechanism =
-      Unix.getenv "CODA_CONSENSUS_MECHANISM"
-      |> Option.map
-           ~f:(Fn.compose consensus_mechanism_of_string String.uppercase)
-      |> Option.value ~default:`Proof_of_signature
+      env "CONSENSUS_MECHANISM" ~default:`Proof_of_signature ~f:(function
+        | "PROOF_OF_SIGNATURE" -> Some `Proof_of_signature
+        | "PROOF_OF_STAKE" -> Some `Proof_of_stake
+        | _ -> None )
     in
     let (module Consensus_mechanism : Consensus_mechanism_intf) =
       match consensus_mechanism with
@@ -176,6 +191,14 @@ let () =
             Consensus.Proof_of_signature.Make (struct
               module Proof = Nanobit_base.Proof
               module Ledger_builder_diff = Ledger_builder_diff
+              module Time = Nanobit_base.Block_time
+
+              let proposal_interval =
+                env "PROPOSAL_INTERVAL"
+                  ~default:(Time.Span.of_ms @@ Int64.of_int 5000)
+                  ~f:(fun str ->
+                    try Some (Time.Span.of_ms @@ Int64.of_string str)
+                    with _ -> None )
             end)
           end )
       | `Proof_of_stake ->
@@ -196,18 +219,43 @@ let () =
                   (Core.Time.Ofday.create ~hr:10 ())
                 |> Time.of_time
 
+              let genesis_ledger = Nanobit_base.Genesis_ledger.ledger
+
               let genesis_ledger_total_currency =
                 Nanobit_base.Genesis_ledger.total_currency
 
-              let genesis_ledger = Nanobit_base.Genesis_ledger.ledger
+              let genesis_state_timestamp =
+                let default =
+                  Core.Time.of_date_ofday
+                    (Core.Time.Zone.of_utc_offset ~hours:(-7))
+                    (Core.Date.create_exn ~y:2018 ~m:Month.Sep ~d:1)
+                    (Core.Time.Ofday.create ~hr:10 ())
+                  |> Time.of_time
+                in
+                env "GENESIS_STATE_TIMESTAMP" ~default ~f:(fun str ->
+                    try Some (Time.of_time @@ Core.Time.of_string str)
+                    with _ -> None )
 
-              let coinbase = Currency.Amount.of_int 20
+              let coinbase =
+                env "COINBASE" ~default:(Currency.Amount.of_int 20) ~f:
+                  (fun str ->
+                    try Some (Currency.Amount.of_int @@ Int.of_string str)
+                    with _ -> None )
 
-              let slot_interval = Time.Span.of_ms (Int64.of_int 500)
+              let slot_interval =
+                env "SLOT_INTERVAL"
+                  ~default:(Time.Span.of_ms (Int64.of_int 5000))
+                  ~f:(fun str ->
+                    try Some (Time.Span.of_ms @@ Int64.of_string str)
+                    with _ -> None )
 
-              let unforkable_transition_count = 12
+              let unforkable_transition_count =
+                env "UNFORKABLE_TRANSITION_COUNT" ~default:12 ~f:(fun str ->
+                    try Some (Int.of_string str) with _ -> None )
 
-              let probable_slots_per_transition_count = 8
+              let probable_slots_per_transition_count =
+                env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8 ~f:
+                  (fun str -> try Some (Int.of_string str) with _ -> None )
             end)
           end )
     in
@@ -285,7 +333,6 @@ let () =
       [("transaction-snark-profiler", Transaction_snark_profiler.command)]
     else []
   in
-  Random.self_init () ;
   Command.group ~summary:"Current"
     ( [ (Parallel.worker_command_name, Parallel.worker_command)
       ; ( Snark_worker_lib.Debug.command_name

@@ -50,7 +50,7 @@ struct
             !"lengths: %{sexp: int list} shared_prefix: %{sexp: string \
               option} shared_prefix_dist: %d"
             lengths newest_shared shared_prefix_dist ;
-          assert (shared_prefix_dist <= 5) ;
+          assert (shared_prefix_dist <= 1) ;
           if Array.fold ~init:0 (Array.map chains List.length) ~f:Int.max > 30
           then exit 0
           else Deferred.unit
