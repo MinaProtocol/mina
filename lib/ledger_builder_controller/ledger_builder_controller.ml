@@ -335,11 +335,15 @@ end = struct
         State_hash.equal
           (Protocol_state.hash (state t))
           (Protocol_state.hash (External_transition.target_state transition))
+
+      let ledger_builder_ledger_hash t =
+        Ledger.merkle_root (Ledger_builder.ledger t.ledger_builder)
     end
 
     module Transition_logic_state =
       Transition_logic_state.Make (Security) (External_transition) (Tip)
 
+    module Ledger_hash = Ledger_hash
     module Catchup = Catchup.Make (struct
       module Ledger_hash = Ledger_hash
       module Ledger = Ledger
@@ -430,6 +434,7 @@ end = struct
                     |> Tip.state ))
              then
                let tip = Transition_logic_state.longest_branch_tip new_state in
+               Logger.fatal !Coda.global_log !"Right before strongest_ledger_writer %{sexp:Ledger_hash.t}" (Ledger.merkle_root (Ledger_builder.ledger tip.ledger_builder));
                Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
                  strongest_ledgers_reader
                  (tip.ledger_builder, transition) ) ;

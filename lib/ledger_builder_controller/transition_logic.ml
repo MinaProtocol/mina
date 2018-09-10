@@ -29,10 +29,16 @@ module type Inputs_intf = sig
     val hash : value -> State_hash.t
   end
 
+  module Ledger_hash : sig
+    type t [@@deriving sexp, eq]
+  end
+
   module External_transition : sig
     type t [@@deriving eq, sexp, compare, bin_io]
 
     val target_state : t -> Protocol_state.value
+
+    val ledger_hash : t -> Ledger_hash.t
 
     val is_parent_of : child:t -> parent:t -> bool
   end
@@ -49,6 +55,8 @@ module type Inputs_intf = sig
     val is_parent_of : child:External_transition.t -> parent:t -> bool
 
     val is_materialization_of : t -> External_transition.t -> bool
+
+    val ledger_builder_ledger_hash : t -> Ledger_hash.t
   end
 
   module Transition_logic_state :
@@ -193,7 +201,14 @@ struct
                 return None
               | Some tip ->
                   match%bind step tip curr with
-                  | Ok tip -> 
+                  | Ok tip ->
+                    Logger.fatal t.log !"Tip's ledger_hash: %{sexp: Ledger_hash.t} transition lh %{sexp: Ledger_hash.t}" (Tip.ledger_builder_ledger_hash tip) (External_transition.ledger_hash curr);
+                    (* TODO: Enable this assertion when we fix this bug *)
+                    (*assert (
+                      Ledger_hash.equal
+                        (Tip.ledger_builder_ledger_hash tip)
+                        (External_transition.ledger_hash curr)
+                    ); *)
                     return (Some tip)
                   | Error e ->
                       (* TODO: Punish sender *)
@@ -203,6 +218,11 @@ struct
         in
         match result with
         | Some tip ->
+            assert (
+              Ledger_hash.equal
+                (Tip.ledger_builder_ledger_hash tip)
+                (External_transition.ledger_hash last_transition)
+            );
             assert (
               Protocol_state.equal_value (Tip.state tip)
                 (External_transition.target_state last_transition) ) ;
@@ -317,7 +337,10 @@ struct
               ~logger:log ~time_received
           with
           | `Keep -> return ([], None)
-          | `Take -> return ([], Some (Catchup.sync catchup state transition)))
+          | `Take ->
+              let lh = External_transition.ledger_hash transition in
+              Logger.fatal t.log !"Branch No ktree for transition: lh:%{sexp: Ledger_hash.t} state:%{sexp:Protocol_state.value}" lh target_state ;
+              return ([], Some (Catchup.sync catchup state transition)))
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition ~parent:(fun x ->
@@ -333,7 +356,9 @@ struct
               |> Protocol_state.consensus_state )
               ~logger:log ~time_received
           with
-          | `Keep -> return ([], Some (Catchup.sync catchup state transition))
+          | `Keep ->
+              Logger.fatal t.log "Branch noparent";
+              return ([], Some (Catchup.sync catchup state transition))
           | `Take -> return ([], None) )
       | `Repeat -> return ([], None)
       | `Added new_tree ->
