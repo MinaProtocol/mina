@@ -154,6 +154,25 @@ let%test_module "test functor on in memory databases" =
                 let result = MT.get_all_accounts_rooted_at_exn mdb address in
                 assert (List.equal ~equal:Account.equal accounts result) ) )
 
+      let%test_unit "copy" =
+        with_test_instance (fun mdb ->
+            let gift = 1 in
+            let balance_gen = Int.gen_incl gift (Int.max_value - gift) in
+            let public_key = "pk" in
+            let balance = Quickcheck.random_value balance_gen in
+            let account = Account.create public_key balance in
+            let account_location = create_account mdb account in
+            let mdb_copy = MT.copy mdb in
+            let updated_account =
+              Account.set_balance account (Balance.of_int (balance + gift))
+            in
+            MT.set mdb_copy account_location updated_account ;
+            let account' = MT.get mdb account_location |> Option.value_exn in
+            let updated_account' =
+              MT.get mdb_copy account_location |> Option.value_exn
+            in
+            assert (account' <> updated_account') )
+
       let%test_unit "implied_root(account) = root_hash" =
         with_test_instance (fun mdb ->
             let max_height = Int.min Depth.depth 5 in

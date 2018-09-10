@@ -41,6 +41,8 @@ end
 module type Key_value_database = sig
   type t
 
+  val copy : t -> t
+
   val create : directory:string -> t
 
   val destroy : t -> unit
@@ -54,6 +56,8 @@ end
 
 module type Stack_database = sig
   type t
+
+  val copy : t -> t
 
   val create : filename:string -> t
 
