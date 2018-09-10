@@ -28,7 +28,7 @@ containers=$3
 set -e
 
 cd ../../
-jbuilder build
+dune build
 
 cd lib/nanobit_testbridge/$loc
 

@@ -20,7 +20,7 @@ module type S = sig
   val stop : t -> unit Deferred.t
 end
 
-(* Unfortunately, `jbuilder runtest` runs in a pwd deep inside the build
+(* Unfortunately, `dune runtest` runs in a pwd deep inside the build
  * directory, this prefix normalizes it to working-dir *)
 let test_prefix = "../../../../"
 

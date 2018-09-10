@@ -54,7 +54,8 @@ module type Network_intf = sig
 
   type transaction_pool_diff
 
-  val states : t -> state_with_witness Linear_pipe.Reader.t
+  val states :
+    t -> (state_with_witness * Unix_timestamp.t) Linear_pipe.Reader.t
 
   val peers : t -> Kademlia.Peer.t list
 
@@ -187,7 +188,8 @@ module type Ledger_builder_controller_intf = sig
     type t =
       { parent_log: Logger.t
       ; net_deferred: net Deferred.t
-      ; external_transitions: external_transition Linear_pipe.Reader.t
+      ; external_transitions:
+          (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
       ; disk_location: string }
     [@@deriving make]
@@ -254,7 +256,8 @@ module type Proposer_intf = sig
     -> time_controller:time_controller
     -> t
 
-  val transitions : t -> external_transition Linear_pipe.Reader.t
+  val transitions :
+    t -> (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
 end
 
 module type Witness_change_intf = sig
@@ -389,9 +392,12 @@ module Make (Inputs : Inputs_intf) = struct
 
   type t =
     { proposer: Proposer.t
+    ; should_propose: bool
+    ; run_snark_worker: bool
     ; net: Net.t
     ; external_transitions:
-        Consensus_mechanism.External_transition.t Linear_pipe.Writer.t
+        (Consensus_mechanism.External_transition.t * Unix_timestamp.t)
+        Linear_pipe.Writer.t
         (* TODO: Is this the best spot for the transaction_pool ref? *)
     ; transaction_pool: Transaction_pool.t
     ; snark_pool: Snark_pool.t
@@ -404,8 +410,15 @@ module Make (Inputs : Inputs_intf) = struct
         Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
     ; ledger_builder_transition_backup_capacity: int }
 
+  let run_snark_worker t = t.run_snark_worker
+
+  let should_propose t = t.should_propose
+
   let best_ledger_builder t =
     (Ledger_builder_controller.strongest_tip t.ledger_builder).ledger_builder
+
+  let best_protocol_state t =
+    (Ledger_builder_controller.strongest_tip t.ledger_builder).protocol_state
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
@@ -433,6 +446,7 @@ module Make (Inputs : Inputs_intf) = struct
     type t =
       { log: Logger.t
       ; should_propose: bool
+      ; run_snark_worker: bool
       ; net_config: Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
@@ -466,7 +480,7 @@ module Make (Inputs : Inputs_intf) = struct
           let%bind lbc = lbc_deferred in
           (* TODO: Just make lbc do this *)
           match%map Ledger_builder_controller.local_get_ledger lbc hash with
-          | Ok (lb, state) ->
+          | Ok (lb, _state) ->
               Some
                 ( Ledger_builder.aux lb
                 , Ledger.merkle_root (Ledger_builder.ledger lb) )
@@ -537,6 +551,8 @@ module Make (Inputs : Inputs_intf) = struct
     else don't_wait_for (Linear_pipe.drain (Proposer.transitions proposer)) ;
     return
       { proposer
+      ; should_propose= config.should_propose
+      ; run_snark_worker= config.run_snark_worker
       ; net
       ; external_transitions= external_transitions_writer
       ; transaction_pool

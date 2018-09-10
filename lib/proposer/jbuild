@@ -13,6 +13,7 @@
       coda
       nanobit_base
       protocols
-      async_extra ))
+      async_extra
+      unix_timestamp ))
   (preprocess (pps (ppx_jane)))
   (synopsis "Coda block proposer")))

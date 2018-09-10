@@ -1,8 +1,6 @@
 module State = Blockchain_state
 open Core_kernel
-open Async_kernel
 open Nanobit_base
-open Snark_params
 
 module type S = sig
   module Consensus_mechanism : Consensus.Mechanism.S

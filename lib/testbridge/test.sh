@@ -23,7 +23,7 @@ bin=$2
 set -e
 
 cd ../../
-jbuilder build
+dune build
 
 cd lib/testbridge/$loc
 

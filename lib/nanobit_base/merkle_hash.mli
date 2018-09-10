@@ -1,5 +1,4 @@
 open Core
-open Util
 open Snark_params
 
 type t = private Tick.Pedersen.Digest.t
