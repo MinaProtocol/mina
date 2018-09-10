@@ -324,8 +324,7 @@ end = struct
 
   let create_account_exn mdb key account =
     create_account mdb key account
-    |> Result.map_error ~f:(fun err ->
-           Error_exception err )
+    |> Result.map_error ~f:(fun err -> Error_exception err)
     |> Result.ok_exn
 
   let length t =
