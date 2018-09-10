@@ -16,10 +16,6 @@ module Ledger_builder_hash = struct
   include Ledger_builder_hash.Stable.V1
 
   let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
-
-  let to_bytes = Ledger_builder_hash.to_bytes
-
-  let of_bytes = Ledger_builder_hash.of_bytes
 end
 
 module Ledger_hash = struct
