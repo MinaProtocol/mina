@@ -10,6 +10,7 @@ module Transition : sig
   type t = Super_transaction.t =
     | Transaction of Transaction.With_valid_signature.t
     | Fee_transfer of Fee_transfer.t
+    | Coinbase of Coinbase.t
   [@@deriving bin_io, sexp]
 end
 
@@ -37,12 +38,15 @@ val create :
   -> target:Ledger_hash.t
   -> proof_type:Proof_type.t
   -> fee_excess:Currency.Amount.Signed.t
+  -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
   -> t
 
 val proof : t -> Tock.Proof.t
 
 val statement : t -> Statement.t
+
+val sok_digest : t -> Sok_message.Digest.t
 
 module Keys : sig
   module Proving : sig
@@ -93,10 +97,13 @@ end
 
 module Verification : sig
   module type S = sig
-    val verify : t -> bool
+    val verify : t -> message:Sok_message.t -> bool
+
+    val verify_against_digest : t -> bool
 
     val verify_complete_merge :
-         Ledger_hash.var
+         Sok_message.Digest.Checked.t
+      -> Ledger_hash.var
       -> Ledger_hash.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
@@ -109,11 +116,17 @@ module Verification : sig
 end
 
 val check_transition :
-  Ledger_hash.t -> Ledger_hash.t -> Transition.t -> Tick.Handler.t -> unit
+     sok_message:Sok_message.t
+  -> source:Ledger_hash.t
+  -> target:Ledger_hash.t
+  -> Transition.t
+  -> Tick.Handler.t
+  -> unit
 
 val check_transaction :
-     Ledger_hash.t
-  -> Ledger_hash.t
+     sok_message:Sok_message.t
+  -> source:Ledger_hash.t
+  -> target:Ledger_hash.t
   -> Transaction.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
@@ -122,19 +135,30 @@ module type S = sig
   include Verification.S
 
   val of_transition :
-    Ledger_hash.t -> Ledger_hash.t -> Transition.t -> Tick.Handler.t -> t
+       sok_digest:Sok_message.Digest.t
+    -> source:Ledger_hash.t
+    -> target:Ledger_hash.t
+    -> Transition.t
+    -> Tick.Handler.t
+    -> t
 
   val of_transaction :
-       Ledger_hash.t
-    -> Ledger_hash.t
+       sok_digest:Sok_message.Digest.t
+    -> source:Ledger_hash.t
+    -> target:Ledger_hash.t
     -> Transaction.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
   val of_fee_transfer :
-    Ledger_hash.t -> Ledger_hash.t -> Fee_transfer.t -> Tick.Handler.t -> t
+       sok_digest:Sok_message.Digest.t
+    -> source:Ledger_hash.t
+    -> target:Ledger_hash.t
+    -> Fee_transfer.t
+    -> Tick.Handler.t
+    -> t
 
-  val merge : t -> t -> t Or_error.t
+  val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
 val handle_with_ledger : Ledger.t -> Tick.Handler.t

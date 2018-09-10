@@ -117,11 +117,14 @@ struct
     in
     let snark_transition =
       Snark_transition.create_value
-        ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
-        ~consensus_data:consensus_transition_data
-        ~ledger_proof:
+        ?sok_digest:
+          (Option.map ledger_proof_opt ~f:(fun (p, _) ->
+               Ledger_proof.sok_digest p ))
+        ?ledger_proof:
           (Option.map ledger_proof_opt
              ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+        ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
+        ~consensus_data:consensus_transition_data ()
     in
     let internal_transition =
       Internal_transition.create ~snark_transition
@@ -140,7 +143,9 @@ struct
 
   type change = Tip_change of Tip.t
 
-  type t = {transitions: External_transition.t Linear_pipe.Reader.t}
+  type t =
+    { transitions:
+        (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t }
   [@@deriving fields]
 
   let transition_capacity = 64
@@ -149,7 +154,12 @@ struct
     let logger = Logger.child parent_log "proposer" in
     let r, w = Linear_pipe.create () in
     let write_result = function
-      | Ok t -> Linear_pipe.write_or_exn ~capacity:transition_capacity w r t
+      | Ok t ->
+          let time =
+            Time.now time_controller |> Time.to_span_since_epoch
+            |> Time.Span.to_ms
+          in
+          Linear_pipe.write_or_exn ~capacity:transition_capacity w r (t, time)
       | Error e ->
           Logger.error logger "%s\n"
             Error.(to_string_hum (tag e ~tag:"signer"))

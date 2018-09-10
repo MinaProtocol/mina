@@ -7,7 +7,7 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries
-    ( core_kernel currency
+    ( core_kernel currency signature_lib
       ))
   (preprocess (pps (ppx_jane)))
   (synopsis "Snark work types")))

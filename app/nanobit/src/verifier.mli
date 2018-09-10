@@ -11,7 +11,10 @@ module type S = sig
   val verify_blockchain : t -> blockchain -> bool Or_error.t Deferred.t
 
   val verify_transaction_snark :
-    t -> Transaction_snark.t -> bool Or_error.t Deferred.t
+       t
+    -> Transaction_snark.t
+    -> message:Nanobit_base.Sok_message.t
+    -> bool Or_error.t Deferred.t
 end
 
 module Make

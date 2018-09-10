@@ -1,13 +1,8 @@
 open Core
 open Async
+open Signature_lib
 
 module type Inputs_intf = sig
-  module Public_key : sig
-    type t [@@deriving bin_io]
-
-    val arg_type : t Command.Arg_type.t
-  end
-
   module Sparse_ledger : sig
     type t [@@deriving bin_io]
   end
@@ -36,7 +31,7 @@ module type Inputs_intf = sig
 
   val perform_single :
        Worker_state.t
-    -> message:Currency.Fee.t * Public_key.t
+    -> message:Nanobit_base.Sok_message.t
     -> ( Statement.t
        , Super_transaction.t
        , Sparse_ledger.t
@@ -53,8 +48,6 @@ module type S = sig
   type transition
 
   type sparse_ledger
-
-  type public_key
 
   module Work : sig
     open Snark_work_lib
@@ -85,13 +78,19 @@ module type S = sig
     end
 
     module Submit_work : sig
-      type msg = Work.Result.t
+      type query = Work.Result.t
 
-      val rpc : msg Rpc.One_way.t
+      type response = unit
+
+      val rpc : (query, response) Rpc.Rpc.t
     end
   end
 
   val command : Command.t
 
-  val arguments : public_key:public_key -> daemon_port:int -> string list
+  val arguments :
+       public_key:Public_key.Compressed.t
+    -> daemon_port:int
+    -> shutdown_on_disconnect:bool
+    -> string list
 end

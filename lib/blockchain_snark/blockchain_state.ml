@@ -1,9 +1,6 @@
 (* TODO: rename *)
 
 open Core_kernel
-open Nanobit_base
-open Coda_numbers
-open Util
 open Snark_params
 open Tick
 open Nanobit_base
@@ -64,6 +61,7 @@ struct
           (let%bind good_body =
              let%bind correct_transaction_snark =
                T.verify_complete_merge
+                 (Snark_transition.sok_digest transition)
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state
@@ -88,7 +86,7 @@ struct
            let%bind consensus_state =
              Consensus_mechanism.next_state_checked
                (Protocol_state.consensus_state previous_state)
-               transition
+               previous_state_hash transition
            in
            let new_state =
              Protocol_state.create_var ~previous_state_hash

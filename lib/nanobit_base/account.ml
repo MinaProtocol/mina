@@ -1,7 +1,6 @@
 open Core
 open Import
 open Coda_numbers
-open Util
 open Snark_params
 open Tick
 open Let_syntax
@@ -62,6 +61,12 @@ type var =
 type value =
   (Public_key.Compressed.t, Balance.t, Nonce.t, Receipt.Chain_hash.t) t_
 [@@deriving sexp]
+
+let initialize public_key : t =
+  { public_key
+  ; balance= Balance.zero
+  ; nonce= Nonce.zero
+  ; receipt_chain_hash= Receipt.Chain_hash.empty }
 
 let empty_hash =
   Pedersen.digest_fold

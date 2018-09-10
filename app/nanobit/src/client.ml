@@ -15,21 +15,22 @@ let dispatch rpc query port =
       | Error exn -> return (Or_error.of_exn exn)
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
+let daemon_port_flag =
+  Command.Param.flag "daemon-port"
+    ~doc:
+      (Printf.sprintf "PORT Client to daemon local communication (default: %d)"
+         default_client_port)
+    (Command.Param.optional int16)
+
 let get_balance =
   Command.async ~summary:"Get balance associated with an address"
     (let open Command.Let_syntax in
     let%map_open address =
       flag "address"
-        ~doc:"KEY Public-key address of which you want to see the balance"
-        (required public_key)
-    and port =
-      flag "daemon-port"
         ~doc:
-          (Printf.sprintf
-             "PORT Client to daemon local communication (default: %d)"
-             default_client_port)
-        (optional int16)
-    in
+          "PUBLICKEY Public-key address of which you want to check the balance"
+        (required public_key)
+    and port = daemon_port_flag in
     fun () ->
       let open Deferred.Let_syntax in
       let port = Option.value ~default:default_client_port port in
@@ -37,7 +38,8 @@ let get_balance =
         dispatch Client_lib.Get_balance.rpc (Public_key.compress address) port
       with
       | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
-      | Ok None -> printf "No account found at that public_key (zero balance)"
+      | Ok None ->
+          printf "No account found at that public_key (zero balance)\n"
       | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e))
 
 let get_nonce addr port =
@@ -49,16 +51,30 @@ let get_nonce addr port =
   | Ok None -> Error "No account found at that public_key"
   | Error e -> Error (Error.to_string_hum e)
 
+let status =
+  Command.async ~summary:"Get the status of the daemon at the specified port"
+    (let open Command.Let_syntax in
+    let%map_open port = daemon_port_flag in
+    fun () ->
+      let open Deferred.Let_syntax in
+      let port = Option.value ~default:default_client_port port in
+      match%map dispatch Client_lib.Get_status.rpc () port with
+      | Ok s ->
+          printf "%s" (Client_lib.Status.to_yojson s |> Yojson.Safe.to_string)
+      | Error e -> eprintf "%s" (Error.to_string_hum e))
+
 let send_txn =
   Command.async ~summary:"Send transaction to an address"
     (let open Command.Let_syntax in
     let%map_open address =
       flag "receiver"
-        ~doc:"KEY Public-key address to which you want to send money"
+        ~doc:"PUBLICKEY Public-key address to which you want to send money"
         (required public_key)
     and from_account =
       flag "from"
-        ~doc:"KEY Private-key address from which you would like to send money"
+        ~doc:
+          "PRIVATEKEY Private-key address from which you would like to send \
+           money"
         (required private_key)
     and fee =
       flag "fee"
@@ -67,14 +83,7 @@ let send_txn =
     and amount =
       flag "amount" ~doc:"VALUE Transaction amount you want to send"
         (required txn_amount)
-    and port =
-      flag "daemon-port"
-        ~doc:
-          (Printf.sprintf
-             "PORT Client to daemon local communication (default: %d)"
-             default_client_port)
-        (optional int16)
-    in
+    and port = daemon_port_flag in
     fun () ->
       let open Deferred.Let_syntax in
       let receiver_compressed = Public_key.compress address in
@@ -95,9 +104,23 @@ let send_txn =
               (txn :> Transaction.t)
               port
           with
-          | Ok () -> printf "Successfully enqueued txn in pool\n"
-          | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e))
+          | Ok () -> printf "Successfully enqueued transaction in pool\n"
+          | Error e ->
+              printf "Failed to send transaction %s\n" (Error.to_string_hum e))
+
+let generate_keypair =
+  Command.async ~summary:"Generate a new public-key/private-key pair"
+    (Command.Param.return (fun () ->
+         let keypair = Keypair.create () in
+         printf "public-key: %s\nprivate-key: %s\n"
+           (Public_key.Compressed.to_base64
+              (Public_key.compress keypair.public_key))
+           (Private_key.to_base64 keypair.private_key) ;
+         exit 0 ))
 
 let command =
   Command.group ~summary:"Lightweight client process"
-    [("get-balance", get_balance); ("send-txn", send_txn)]
+    [ ("get-balance", get_balance)
+    ; ("send-txn", send_txn)
+    ; ("status", status)
+    ; ("generate-keypair", generate_keypair) ]

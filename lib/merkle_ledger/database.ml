@@ -2,8 +2,7 @@ open Core
 open Unsigned
 
 module Make
-    (Balance : Intf.Balance)
-    (Account : Intf.Account with type balance := Balance.t)
+    (Account : Intf.Account)
     (Hash : Intf.Hash with type account := Account.t)
     (Depth : Intf.Depth)
     (Kvdb : Intf.Key_value_database)
@@ -17,28 +16,16 @@ module Make
   end
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
-  let max_depth = Depth.depth
+  include Depth
 
-  let () = assert (max_depth < 0xfe)
+  let () = assert (Depth.depth < 0xfe)
 
   type error = Account_key_not_found | Out_of_leaves | Malformed_database
 
-  module MerklePath = struct
-    type t = Direction.t * Hash.t
-
-    let implied_root path leaf_hash =
-      let rec loop sibling_hash ~height = function
-        | [] -> sibling_hash
-        | (Direction.Left, hash) :: t ->
-            loop (Hash.merge ~height hash sibling_hash) ~height:(height + 1) t
-        | (Direction.Right, hash) :: t ->
-            loop (Hash.merge ~height sibling_hash hash) ~height:(height + 1) t
-      in
-      loop leaf_hash ~height:0 path
-  end
+  module Path = Merkle_path.Make (Hash)
 
   module Addr = Merkle_address.Make (struct
-    let depth = max_depth
+    let depth = Depth.depth
   end)
 
   (* Keys are a bitstring prefixed by a byte. In the case of accounts, the prefix
@@ -55,7 +42,7 @@ end = struct
 
       let account = UInt8.of_int 0xfe
 
-      let hash depth = UInt8.of_int (max_depth - depth)
+      let hash depth = UInt8.of_int (Depth.depth - depth)
     end
 
     type t =
@@ -89,10 +76,6 @@ end = struct
 
     let build_generic (data: Bigstring.t) : t = Generic data
 
-    let build_empty_account () : t =
-      Account
-        (Addr.of_directions @@ List.init max_depth ~f:(fun _ -> Direction.Left))
-
     let parse (str: Bigstring.t) : (t, unit) Result.t =
       let prefix = Bigstring.get str 0 |> Char.to_int |> UInt8.of_int in
       let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
@@ -101,9 +84,9 @@ end = struct
         let path = Addr.of_byte_string (Bigstring.to_string data) in
         let slice_path = Addr.slice path 0 in
         if prefix = Prefix.account then
-          Result.return (Account (slice_path max_depth))
-        else if UInt8.to_int prefix <= max_depth then
-          Result.return (Hash (slice_path (max_depth - UInt8.to_int prefix)))
+          Result.return (Account (slice_path Depth.depth))
+        else if UInt8.to_int prefix <= Depth.depth then
+          Result.return (Hash (slice_path (Depth.depth - UInt8.to_int prefix)))
         else Result.fail ()
 
     let prefix_bigstring prefix src =
@@ -122,10 +105,10 @@ end = struct
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
       | Account path ->
-          assert (Addr.depth path = max_depth) ;
+          assert (Addr.depth path = Depth.depth) ;
           prefix_bigstring Prefix.account (Addr.serialize path)
       | Hash path ->
-          assert (Addr.depth path <= max_depth) ;
+          assert (Addr.depth path <= Depth.depth) ;
           prefix_bigstring
             (Prefix.hash (Addr.depth path))
             (Addr.serialize path)
@@ -183,9 +166,9 @@ end = struct
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:(max_depth + 1) Hash.empty in
+    let empty_hashes = Array.create ~len:(Depth.depth + 1) Hash.empty in
     let rec loop last_hash height =
-      if height <= max_depth then (
+      if height <= Depth.depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
@@ -221,13 +204,11 @@ end = struct
     ignore (bin_write buf ~pos:0 v) ;
     set_raw mdb key buf
 
-  let delete_raw {kvdb; _} key = Kvdb.delete kvdb ~key:(Key.serialize key)
-
   let rec set_hash mdb key new_hash =
     assert (Key.is_hash key) ;
     set_bin mdb key Hash.bin_size_t Hash.bin_write_t new_hash ;
     let height = Key.height key in
-    if height < max_depth then
+    if height < Depth.depth then
       let sibling_hash = get_hash mdb (Key.sibling key) in
       let parent_hash =
         let left_hash, right_hash =
@@ -239,11 +220,11 @@ end = struct
       set_hash mdb (Key.parent key) parent_hash
 
   let get_inner_hash_at_addr_exn mdb address =
-    assert (Addr.depth address <= max_depth) ;
+    assert (Addr.depth address <= Depth.depth) ;
     get_hash mdb (Key.Hash address)
 
   let set_inner_hash_at_addr_exn mdb address hash =
-    assert (Addr.depth address <= max_depth) ;
+    assert (Addr.depth address <= Depth.depth) ;
     set_bin mdb (Key.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
   module Account_key = struct
@@ -260,30 +241,34 @@ end = struct
 
     let set mdb account key = set_raw mdb (build_key account) key
 
-    let delete mdb account = delete_raw mdb (build_key account)
+    let last_key () =
+      Key.build_generic (Bigstring.of_string "last_account_key")
 
-    let next_free_key mdb =
-      let key =
-        Key.build_generic (Bigstring.of_string "next_free_account_key")
-      in
-      let account_key_result =
-        match get_generic mdb key with
-        | None -> Result.return (Key.build_empty_account ())
-        | Some key -> Key.parse key
-      in
-      match account_key_result with
-      | Error () -> Error Malformed_database
-      | Ok account_key ->
-          Key.next account_key
-          |> Result.of_option ~error:Out_of_leaves
-          |> Result.map ~f:(fun next_account_key ->
-                 set_raw mdb key (Key.serialize next_account_key) ;
-                 account_key )
+    let increment_last_account_key mdb =
+      let key = last_key () in
+      match get_generic mdb key with
+      | None ->
+          let first_key =
+            Key.Account
+              ( Addr.of_directions
+              @@ List.init Depth.depth ~f:(fun _ -> Direction.Left) )
+          in
+          set_raw mdb key (Key.serialize first_key) ;
+          Result.return first_key
+      | Some prev_key ->
+        match Key.parse prev_key with
+        | Error () -> Error Malformed_database
+        | Ok prev_account_key ->
+            Key.next prev_account_key
+            |> Result.of_option ~error:Out_of_leaves
+            |> Result.map ~f:(fun next_account_key ->
+                   set_raw mdb key (Key.serialize next_account_key) ;
+                   next_account_key )
 
     let allocate mdb account =
       let key_result =
         match Sdb.pop mdb.sdb with
-        | None -> next_free_key mdb
+        | None -> increment_last_account_key mdb
         | Some key ->
             Key.parse key |> Result.map_error ~f:(fun () -> Malformed_database)
       in
@@ -291,15 +276,13 @@ end = struct
           set mdb account (Key.serialize key) ;
           key )
 
-    let last_free_key_address mdb =
+    let last_key_address mdb =
       match
-        Key.build_generic (Bigstring.of_string "next_free_account_key")
-        |> get_raw mdb
-        |> Option.value_map ~f:Key.parse
-             ~default:(Result.return @@ Key.build_empty_account ())
+        last_key () |> get_raw mdb |> Result.of_option ~error:()
+        |> Result.bind ~f:Key.parse
       with
-      | Error () -> failwith "Could not get retrieve last key"
-      | Ok parsed_key -> Key.to_path_exn parsed_key
+      | Error () -> None
+      | Ok parsed_key -> Some (Key.to_path_exn parsed_key)
   end
 
   let get_key_of_account = Account_key.get
@@ -308,43 +291,28 @@ end = struct
     set_bin mdb key Account.bin_size_t Account.bin_write_t account ;
     set_hash mdb (Key.Hash (Key.path key)) (Hash.hash_account account)
 
-  let delete_account mdb account =
-    match Account_key.get mdb account with
-    | Error Account_key_not_found -> Ok ()
-    | Error err -> Error err
-    | Ok key ->
-        Kvdb.delete mdb.kvdb ~key:(Key.serialize key) ;
-        set_hash mdb (Key.Hash (Key.path key)) Hash.empty ;
-        Account_key.delete mdb account ;
-        Sdb.push mdb.sdb (Key.serialize key) ;
-        Ok ()
-
   let set_account mdb account =
-    if Balance.equal (Account.balance account) Balance.zero then
-      delete_account mdb account
-    else
-      let key_result =
-        match Account_key.get mdb account with
-        | Error Account_key_not_found -> Account_key.allocate mdb account
-        | Error err -> Error err
-        | Ok key -> Ok key
-      in
-      Result.map key_result ~f:(fun key -> update_account mdb key account)
+    let key_result =
+      match Account_key.get mdb account with
+      | Error Account_key_not_found -> Account_key.allocate mdb account
+      | Error err -> Error err
+      | Ok key -> Ok key
+    in
+    Result.map key_result ~f:(fun key -> update_account mdb key account)
 
-  let num_accounts t =
-    Addr.to_int (Account_key.last_free_key_address t) - Sdb.length t.sdb
+  let length t =
+    match Account_key.last_key_address t with
+    | None -> 0
+    | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
 
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Addr.Range.subtree_range address in
     let result =
       Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
-          let account =
-            Option.value ~default:Account.empty
-              (get_account mdb (Key.Account bit_index))
-          in
+          let account = get_account mdb (Key.Account bit_index) in
           account :: acc )
     in
-    List.rev result
+    List.rev_filter_map result ~f:Fn.id
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Addr.Range.subtree_range address in
@@ -353,9 +321,7 @@ end = struct
       | head :: tail ->
           update_account mdb (Key.Account bit_index) head ;
           tail
-      | [] ->
-          assert (Addr.equal last_node bit_index) ;
-          [] )
+      | [] -> [] )
     |> ignore
 
   let merkle_root mdb = get_hash mdb Key.root_hash
@@ -364,12 +330,15 @@ end = struct
     let key = if Key.is_account key then Key.Hash (Key.path key) else key in
     assert (Key.is_hash key) ;
     let rec loop k =
-      let sibling = Key.sibling k in
-      let sibling_dir = Key.last_direction (Key.path k) in
-      (sibling_dir, get_hash mdb sibling)
-      :: (if Key.height key < max_depth then loop (Key.parent k) else [])
+      if Key.height k >= Depth.depth then []
+      else
+        let sibling = Key.sibling k in
+        let sibling_dir = Key.last_direction (Key.path k) in
+        let hash = get_hash mdb sibling in
+        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        :: loop (Key.parent k)
     in
     loop key
 
-  let merkle_path_at_addr t addr = merkle_path t (Key.Hash addr)
+  let merkle_path_at_addr_exn t addr = merkle_path t (Key.Hash addr)
 end

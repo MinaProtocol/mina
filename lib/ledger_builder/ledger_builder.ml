@@ -327,10 +327,8 @@ end = struct
     ; public_key }
 
   let hash {scan_state; ledger; public_key= _} : Ledger_builder_hash.t =
-    let h = Cryptokit.Hash.sha3 256 in
-    h#add_string (Ledger_hash.to_bytes (Ledger.merkle_root ledger)) ;
-    h#add_string (Aux.hash_to_string scan_state) ;
-    Ledger_builder_hash.of_bytes h#result
+    Ledger_builder_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
+      (Ledger.merkle_root ledger)
 
   let ledger {ledger; _} = ledger
 
@@ -418,7 +416,7 @@ end = struct
     ( undo
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger
-      ; fee_excess= Fee.Signed.of_unsigned fee_excess
+      ; fee_excess
       ; proof_type= `Base } )
 
   let apply_super_transaction_and_get_witness ledger s =
@@ -427,12 +425,13 @@ end = struct
       | Transaction t ->
           let t = (t :> Transaction.t) in
           [Transaction.sender t; Transaction.receiver t]
+      | Coinbase _ -> failwith "Coinbases not yet implemented"
     in
     let open Or_error.Let_syntax in
+    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
     let%map undo, statement =
       apply_super_transaction_and_get_statement ledger s
     in
-    let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
     (undo, {Super_transaction_with_witness.transaction= s; witness; statement})
 
   let update_ledger_and_get_statements ledger ts =
@@ -469,7 +468,7 @@ end = struct
       in
       Deferred.List.for_all (List.zip_exn jobses completed_works) ~f:
         (fun (jobs, work) ->
-          let message = (work.fee, work.prover) in
+          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
           Deferred.List.for_all (List.zip_exn jobs work.proofs) ~f:
             (fun (job, proof) -> verify ~message job proof ) )
       |> Deferred.map ~f:(check_or_error "proofs did not verify"))
@@ -599,8 +598,8 @@ end = struct
           match Sequence.next seq with
           | None -> Done
           | Some (x, seq) ->
-            (*allow a chunk of 1 proof as well*)
-            match Sequence.next seq with
+            match (*allow a chunk of 1 proof as well*)
+                  Sequence.next seq with
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) )
 
@@ -836,6 +835,13 @@ let%test_module "test" =
       open Coda_pow
       module Compressed_public_key = String
 
+      module Sok_message = struct
+        module Digest = Unit
+        include Unit
+
+        let create ~fee:_ ~prover:_ = ()
+      end
+
       module Transaction = struct
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
@@ -898,6 +904,26 @@ let%test_module "test" =
         let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)
       end
 
+      module Coinbase = struct
+        type t =
+          { proposer: Compressed_public_key.t
+          ; fee_transfer: Fee_transfer.single option }
+        [@@deriving sexp, bin_io, compare, eq]
+
+        let supply_increase {proposer= _; fee_transfer} =
+          match fee_transfer with
+          | None -> Ok Protocols.Coda_praos.coinbase_amount
+          | Some (_, fee) ->
+              Currency.Amount.sub Protocols.Coda_praos.coinbase_amount
+                (Currency.Amount.of_fee fee)
+              |> Option.value_map ~f:Or_error.return
+                   ~default:(Or_error.error_string "Coinbase underflow")
+
+        let fee_excess t =
+          Or_error.map (supply_increase t) ~f:(fun _increase ->
+              Currency.Fee.Signed.zero )
+      end
+
       module Super_transaction = struct
         type valid_transaction = Transaction.With_valid_signature.t
         [@@deriving sexp, bin_io, compare, eq]
@@ -905,18 +931,30 @@ let%test_module "test" =
         type fee_transfer = Fee_transfer.t
         [@@deriving sexp, bin_io, compare, eq]
 
+        type coinbase = Coinbase.t [@@deriving sexp, bin_io, compare, eq]
+
         type unsigned_fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
         type t =
           | Transaction of valid_transaction
           | Fee_transfer of fee_transfer
+          | Coinbase of coinbase
         [@@deriving sexp, bin_io, compare, eq]
 
-        let fee_excess : t -> unsigned_fee Or_error.t =
+        let fee_excess : t -> Fee.Signed.t Or_error.t =
          fun t ->
+          let open Or_error.Let_syntax in
           match t with
-          | Transaction t' -> Ok (Transaction.fee t')
-          | Fee_transfer f -> Fee_transfer.fee_excess f
+          | Transaction t' ->
+              Ok (Currency.Fee.Signed.of_unsigned (Transaction.fee t'))
+          | Fee_transfer f ->
+              let%map fee = Fee_transfer.fee_excess f in
+              Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
+          | Coinbase t -> Coinbase.fee_excess t
+
+        let supply_increase = function
+          | Transaction _ | Fee_transfer _ -> Ok Currency.Amount.zero
+          | Coinbase t -> Coinbase.supply_increase t
       end
 
       module Ledger_hash = struct
@@ -961,11 +999,11 @@ let%test_module "test" =
           {source; target; fee_excess; proof_type}
       end
 
-      module Proof = String
+      module Proof = Ledger_proof_statement
 
       module Ledger_proof = struct
-        (*A proof here is statement.target*)
-        include String
+        (*A proof here is a statement *)
+        include Ledger_proof_statement
 
         type ledger_hash = Ledger_hash.t
 
@@ -973,6 +1011,10 @@ let%test_module "test" =
          fun statement -> statement.target
 
         let underlying_proof = Fn.id
+
+        let sok_digest _ = ()
+
+        let statement = Fn.id
       end
 
       module Ledger_proof_verifier = struct
@@ -1005,6 +1047,8 @@ let%test_module "test" =
 
         let merkle_root : t -> ledger_hash = fun t -> Int.to_string !t
 
+        let num_accounts _ = 0
+
         let apply_super_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
           match s with
@@ -1015,6 +1059,7 @@ let%test_module "test" =
               let t' = Fee_transfer.fee_excess_int f in
               t := !t + t' ;
               Or_error.return (Super_transaction.Fee_transfer f)
+          | Coinbase _ -> failwith "Coinbases not yet implemented"
 
         let undo_super_transaction : t -> super_transaction -> unit Or_error.t =
          fun t s ->
@@ -1022,6 +1067,7 @@ let%test_module "test" =
             match s with
             | Transaction t' -> fst t'
             | Fee_transfer f -> Fee_transfer.fee_excess_int f
+            | Coinbase _ -> failwith "Coinbases not yet implemented"
           in
           t := !t - v ;
           Or_error.return ()
@@ -1049,8 +1095,6 @@ let%test_module "test" =
         type ledger_hash = Ledger_hash.t
 
         type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
-
-        let of_bytes : string -> t = fun s -> s
 
         let of_aux_and_ledger_hash :
             ledger_builder_aux_hash -> ledger_hash -> t =
@@ -1168,13 +1212,12 @@ let%test_module "test" =
 
     let stmt_to_work (stmts: Test_input1.Completed_work.Statement.t) :
         Test_input1.Completed_work.Checked.t option =
-      let proofs = List.map stmts ~f:(fun stmt -> stmt.target) in
       let prover =
         List.fold stmts ~init:"P" ~f:(fun p stmt -> p ^ stmt.target)
       in
       Some
         { Test_input1.Completed_work.Checked.fee= Fee.Unsigned.of_int 1
-        ; proofs
+        ; proofs= stmts
         ; prover }
 
     let create_and_apply lb logger txns =
