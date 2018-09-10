@@ -48,6 +48,27 @@ module Status = struct
     ; run_snark_worker: bool
     ; propose: bool }
   [@@deriving yojson, bin_io]
+
+  (* Text response *)
+  let to_text s =
+    let output = "Coda Daemon Status\n" in
+    let output =
+      output ^ sprintf "Uptime:             \t%ds\n" s.uptime_secs
+    in
+    let output = output ^ sprintf "Block Count:        \t%d\n" s.block_count in
+    let output =
+      output ^ sprintf "Number of Accounts: \t%d\n" s.num_accounts
+    in
+    let output =
+      output ^ sprintf "Transactions Sent:  \t%d\n" s.transactions_sent
+    in
+    let output =
+      output ^ sprintf "Snark Worker Running: \t%B\n" s.run_snark_worker
+    in
+    let output = output ^ sprintf "Proposer Running: \t%B\n" s.propose in
+    let output = output ^ sprintf "Peers: \t" in
+    let output = output ^ List.to_string ~f:Fn.id s.peers in
+    output
 end
 
 module Get_status = struct
