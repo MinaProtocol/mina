@@ -12,7 +12,10 @@ module type S = sig
   module Fee_transfer :
     Coda_pow.Fee_transfer_intf with type public_key := Compressed_public_key.t
 
-  module Coinbase : Coda_pow.Coinbase_intf
+  module Coinbase :
+    Coda_pow.Coinbase_intf
+    with type public_key := Compressed_public_key.t
+     and type fee_transfer := Fee_transfer.single
 
   module Super_transaction :
     Coda_pow.Super_transaction_intf

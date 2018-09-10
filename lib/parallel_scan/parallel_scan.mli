@@ -58,3 +58,5 @@ val fill_in_completed_jobs :
   -> 'a option Or_error.t
 
 val last_emitted_value : ('a, 'd) State.t -> 'a option
+
+val partitions : total_slots:int -> ('a, 'd) State.t -> int * int option

@@ -235,6 +235,16 @@ end
 
 module type Coinbase_intf = sig
   type t [@@deriving sexp, compare, eq]
+
+  type public_key
+
+  type fee_transfer
+
+  val create :
+       amount:Currency.Amount.t
+    -> proposer:public_key
+    -> fee_transfer:fee_transfer option
+    -> t Or_error.t
 end
 
 module type Super_transaction_intf = sig
@@ -358,7 +368,8 @@ module type Ledger_builder_diff_intf = sig
     { prev_hash: ledger_builder_hash
     ; completed_works: completed_work list
     ; transactions: transaction list
-    ; creator: public_key }
+    ; creator: public_key
+    ; coinbase: int }
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs : sig
@@ -366,7 +377,8 @@ module type Ledger_builder_diff_intf = sig
       { prev_hash: ledger_builder_hash
       ; completed_works: completed_work_checked list
       ; transactions: transaction_with_valid_signature list
-      ; creator: public_key }
+      ; creator: public_key
+      ; coinbase: int }
     [@@deriving sexp]
   end
 
@@ -717,7 +729,10 @@ module type Inputs_intf = sig
   module Fee_transfer :
     Fee_transfer_intf with type public_key := Public_key.Compressed.t
 
-  module Coinbase : Coinbase_intf
+  module Coinbase :
+    Coinbase_intf
+    with type public_key := Public_key.Compressed.t
+     and type fee_transfer := Fee_transfer.single
 
   module Super_transaction :
     Super_transaction_intf

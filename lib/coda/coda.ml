@@ -552,11 +552,13 @@ module Make (Inputs : Inputs_intf) = struct
       { Ledger_builder_diff.With_valid_signatures_and_proofs.prev_hash
       ; completed_works
       ; transactions
-      ; creator } =
+      ; creator
+      ; coinbase } =
     { Ledger_builder_diff.prev_hash
     ; completed_works= List.map completed_works ~f:Completed_work.forget
     ; transactions= (transactions :> Transaction.t list)
-    ; creator }
+    ; creator
+    ; coinbase }
 
   let forget_transition_validity
       {Ledger_builder_transition.With_valid_signatures_and_proofs.old; diff} =

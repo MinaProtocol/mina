@@ -313,6 +313,17 @@ let fill_in_completed_jobs :
 
 let last_emitted_value (state: ('a, 'd) State1.t) = snd state.acc
 
+let partitions ~total_slots state =
+  let n =
+    if free_space ~state < total_slots then free_space ~state else total_slots
+  in
+  let parallelism = State1.parallelism state in
+  match State1.base_none_pos state with
+  | None -> (0, None)
+  | Some start ->
+      if n <= parallelism - start then (n, None)
+      else (parallelism - start, Some (n - (parallelism - start)))
+
 let gen :
        gen_data:'d Quickcheck.Generator.t
     -> f_job_done:(('a, 'd) Available_job.t -> 'a State.Completed_job.t)
