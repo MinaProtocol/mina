@@ -32,8 +32,10 @@ run_integration_tests() {
     else
       echo "FAILED"
       echo "------------------------------------------------------------------------------------------"
-      echo "LOG OUTPUT:"
-      tail -n 100 test.log | dune exec logproc
+      echo "RECENT LOGPROCED OUTPUT:"
+      tail -n 50 test.log | dune exec logproc
+      echo "RECENT RAW LOG OUTPUT:"
+      tail -n 30 test.log
       echo "------------------------------------------------------------------------------------------"
       echo "See above for stack trace..."
       exit 2
