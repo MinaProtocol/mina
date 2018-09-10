@@ -163,7 +163,9 @@ let apply_coinbase t ({proposer; fee_transfer} as cb: Coinbase.t) =
         in
         let emptys, receiver_account = get_or_create t receiver in
         let%map balance = add_amount receiver_account.balance fee in
-        (proposer_reward, emptys, Some (receiver, {receiver_account with balance}))
+        ( proposer_reward
+        , emptys
+        , Some (receiver, {receiver_account with balance}) )
   in
   let emptys2, proposer_account = get_or_create t proposer in
   let%map balance = add_amount proposer_account.balance proposer_reward in
@@ -173,7 +175,8 @@ let apply_coinbase t ({proposer; fee_transfer} as cb: Coinbase.t) =
 
 (* Don't have to be atomic here because these should never fail. In fact, none of
    the undo functions should ever return an error. This should be fixed in the types. *)
-let undo_coinbase t ({Undo.coinbase= {proposer; fee_transfer}; previous_empty_accounts}) =
+let undo_coinbase t
+    {Undo.coinbase= {proposer; fee_transfer}; previous_empty_accounts} =
   let proposer_reward =
     match fee_transfer with
     | None -> Protocols.Coda_praos.coinbase_amount
