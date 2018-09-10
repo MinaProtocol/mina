@@ -1,10 +1,8 @@
 open Core
 open Import
-open Util
 open Snark_params
 open Coda_numbers
 open Tick
-open Let_syntax
 module Fee = Currency.Fee
 module Payload = Transaction_payload
 

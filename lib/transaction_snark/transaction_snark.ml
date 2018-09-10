@@ -1,9 +1,7 @@
 open Core
 open Signature_lib
 open Nanobit_base
-open Util
 open Snark_params
-open Snarky
 open Currency
 open Fold_lib
 
@@ -577,8 +575,7 @@ module Base = struct
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
   let main top_hash =
     with_label __LOC__
-      (let open Let_syntax in
-      let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
+      (let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
       let%bind root_before =
         provide_witness' Ledger_hash.typ ~f:Prover_state.state1
       in
@@ -747,7 +744,6 @@ module Merge = struct
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
   let verify_transition tock_vk tock_vk_data tock_vk_section
       get_transition_data s1 s2 supply_increase fee_excess =
-    let open Let_syntax in
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
       with_label __LOC__
@@ -1349,7 +1345,6 @@ module Keys = struct
   end
 
   let checksum ~prefix ~base ~merge ~wrap =
-    let open Cached in
     Md5.digest_string
       ( "Transaction_snark_" ^ prefix ^ Md5.to_hex base ^ Md5.to_hex merge
       ^ Md5.to_hex wrap )

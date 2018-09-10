@@ -269,7 +269,7 @@ struct
   let%test_unit "parent_exn(child_exn(node)) = node" =
     Quickcheck.test ~sexp_of:[%sexp_of : Direction.t List.t * Direction.t]
       (Quickcheck.Generator.tuple2
-         (Direction.gen_list Input.depth)
+         (Direction.gen_var_length_list Input.depth)
          Direction.gen)
       ~f:(fun (path, direction) ->
         let address = of_directions path in

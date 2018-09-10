@@ -27,8 +27,6 @@ module Account = struct
 
   let empty = {public_key= ""; balance= Balance.zero}
 
-  let set_balance {public_key; _} balance = {public_key; balance}
-
   let create public_key balance = {public_key; balance= UInt64.of_int balance}
 
   let gen =

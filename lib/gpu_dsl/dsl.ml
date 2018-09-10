@@ -262,7 +262,7 @@ module Arguments_spec = struct
     match (t, args) with
     | [], Id.List.([]) -> []
     | _ :: arg_spec_tail, Id.List.(arg :: arg_tail) ->
-        List.(id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper)
+        id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper
 
   type generator = {generate: 'a. 'a Type.t -> 'a Id.t}
 
@@ -273,11 +273,11 @@ module Arguments_spec = struct
       -> types Type.List.t * types Id.List.t * k =
    fun t gen f ->
     match t with
-    | [] -> (Type.[], Id.List.[], f)
+    | [] -> ([], Id.List.[], f)
     | head :: tail ->
         let c = gen.generate head in
         let ts, ats, k = apply tail gen (f c) in
-        (Type.(head :: ts), Id.List.(c :: ats), k)
+        (head :: ts, Id.List.(c :: ats), k)
 end
 
 module Local_variables_spec = struct
@@ -295,7 +295,7 @@ module Local_variables_spec = struct
     match (t, args) with
     | [], Id.PointerList.([]) -> []
     | _ :: arg_spec_tail, Id.PointerList.(arg :: arg_tail) ->
-        List.(id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper)
+        id_mapper.map_id arg :: map_ids arg_spec_tail arg_tail id_mapper
 
   type generator = {generate: 'a. 'a Type.t -> 'a Pointer.t Id.t}
 
