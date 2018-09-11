@@ -320,7 +320,8 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
-  let scan_statement (state: scan_state) : (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t =
+  let scan_statement (state: scan_state) :
+      (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t =
     with_return (fun {return} ->
         let ok_or_return = function
           | Ok x -> x
@@ -360,13 +361,13 @@ end = struct
                   then merge_acc acc_statement statement
                   else
                     return
-                      (Error (`Error (Error.of_string
-                         "Ledger_builder.scan_statement: Bad base statement")))
-          )
+                      (Error
+                         (`Error
+                           (Error.of_string
+                              "Ledger_builder.scan_statement: Bad base \
+                               statement"))) )
         in
-        match res with
-        | None -> Error `Empty
-        | Some res -> Ok res )
+        match res with None -> Error `Empty | Some res -> Ok res )
 
   let of_aux_and_ledger ~snarked_ledger_hash ~public_key ~ledger ~aux =
     let check cond err =
@@ -379,18 +380,20 @@ end = struct
       | Error (`Error e) -> Error e
       | Error `Empty -> Ok ()
       | Ok {fee_excess; source; target; proof_type= _} ->
-        let%map () =
-          check
-            (Ledger_hash.equal snarked_ledger_hash source)
-            "did not connect with snarked ledger hash"
-        and () =
-          check
-            (Ledger_hash.equal (Ledger.merkle_root ledger) target)
-            "incorrect statement target hash"
-        and () =
-          check (Fee.Signed.equal Fee.Signed.zero fee_excess) "nonzero fee excess"
-        in
-        ()
+          let%map () =
+            check
+              (Ledger_hash.equal snarked_ledger_hash source)
+              "did not connect with snarked ledger hash"
+          and () =
+            check
+              (Ledger_hash.equal (Ledger.merkle_root ledger) target)
+              "incorrect statement target hash"
+          and () =
+            check
+              (Fee.Signed.equal Fee.Signed.zero fee_excess)
+              "nonzero fee excess"
+          in
+          ()
     in
     {ledger; scan_state= aux; public_key}
 
