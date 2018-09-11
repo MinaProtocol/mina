@@ -71,7 +71,10 @@ let main () =
     else
       let module Consensus_mechanism =
       Consensus.Proof_of_signature.Make (struct
+        module Time = Nanobit_base.Block_time
         module Proof = Nanobit_base.Proof
+
+        let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
 
         module Ledger_builder_diff = Ledger_builder.Make_diff (struct
           open Signature_lib
