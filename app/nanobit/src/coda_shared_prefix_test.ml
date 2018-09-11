@@ -91,7 +91,7 @@ struct
          flag "who-proposes" ~doc:"ID node number which will be proposing"
            (required int)
        and proposal_interval =
-         flag "proposal_interval"
+         flag "proposal-interval"
            ~doc:"MILLIS proposal interval in proof of sig" (optional int)
        in
        main who_proposes proposal_interval)
