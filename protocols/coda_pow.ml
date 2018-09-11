@@ -364,25 +364,37 @@ module type Ledger_builder_diff_intf = sig
 
   type completed_work_checked
 
-  type t =
-    { prev_hash: ledger_builder_hash
-    ; completed_works: completed_work list
+  type pre_diff =
+    { completed_works: completed_work list
     ; transactions: transaction list
-    ; creator: public_key
-    ; coinbase: int }
+    ; coinbase_parts: int }
   [@@deriving sexp, bin_io]
 
+  type t = 
+    { pre_diffs: pre_diff * pre_diff option
+    ; prev_hash: ledger_builder_hash
+    ; creator: public_key }
+    [@@deriving sexp, bin_io]
+
   module With_valid_signatures_and_proofs : sig
-    type t =
-      { prev_hash: ledger_builder_hash
-      ; completed_works: completed_work_checked list
+    type pre_diff =
+      { completed_works: completed_work_checked list
       ; transactions: transaction_with_valid_signature list
-      ; creator: public_key
-      ; coinbase: int }
+      ; coinbase_parts: int }
+      [@@deriving sexp]
+
+    type t = 
+      { pre_diffs: pre_diff * pre_diff option
+      ; prev_hash: ledger_builder_hash
+      ; creator: public_key }
     [@@deriving sexp]
+
+    val transactions : t -> transaction_with_valid_signature list
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
+
+  val transactions : t -> transaction list
 end
 
 module type Ledger_builder_transition_intf = sig
