@@ -310,20 +310,20 @@ end = struct
       (Location.Hash (Location.path location))
       (Hash.hash_account account)
 
-  let create_account mdb key account =
-    let location_result =
-      match Account_location.get mdb key with
-      | Error Account_location_not_found -> Account_location.allocate mdb key
-      | Error err -> Error err
-      | Ok location -> Ok location
-    in
-    Result.map location_result ~f:(fun location ->
-        set mdb location account ; location )
+  let get_or_create_account mdb key account =
+    match Account_location.get mdb key with
+    | Error Account_location_not_found ->
+        Account_location.allocate mdb key
+        |> Result.map ~f:(fun location ->
+               set mdb location account ;
+               (`Added, location) )
+    | Error err -> Error err
+    | Ok location -> Ok (`Existed, location)
 
   exception Error_exception of error
 
-  let create_account_exn mdb key account =
-    create_account mdb key account
+  let get_or_create_account_exn mdb key account =
+    get_or_create_account mdb key account
     |> Result.map_error ~f:(fun err -> Error_exception err)
     |> Result.ok_exn
 

@@ -82,7 +82,7 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
           List.iteri accounts ~f:(fun i ({public_key; _} as account) ->
-              ignore @@ DB.create_account_exn db public_key account ;
+              ignore @@ DB.get_or_create_account_exn db public_key account ;
               Ledger.set ledger (Int.to_string i) account ) ;
           Ledger.recompute_tree ledger ;
           let binary_tree = Binary_tree.set_accounts accounts in

@@ -30,9 +30,11 @@ module type S = sig
 
   val set : t -> location -> account -> unit
 
-  val create_account : t -> key -> account -> (location, error) result
+  val get_or_create_account :
+    t -> key -> account -> ([`Added | `Existed] * location, error) result
 
-  val create_account_exn : t -> key -> account -> location
+  val get_or_create_account_exn :
+    t -> key -> account -> [`Added | `Existed] * location
 
   val merkle_path : t -> location -> Path.t
 
