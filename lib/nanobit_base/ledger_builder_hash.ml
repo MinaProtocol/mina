@@ -37,6 +37,8 @@ end
 
 include Stable.V1
 
+let ledger_hash {ledger_hash; _} = ledger_hash
+
 let dummy =
   {ledger_hash= Ledger_hash.of_hash Field.zero; aux_hash= Aux_hash.dummy}
 
