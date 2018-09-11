@@ -1294,7 +1294,7 @@ let%test_module "transaction_snark" =
       in
       of_transaction ~sok_digest ~source ~target transaction handler
 
-    (*let%test_unit "new_account" =
+    let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
@@ -1306,13 +1306,16 @@ let%test_module "transaction_snark" =
               Account.Nonce.zero
           in
           let target = Ledger.merkle_root_after_transaction_exn ledger t1 in
-          let sparse_ledger = Sparse_ledger.of_ledger_subset_exn ledger (Transaction.public_keys (t1 :> Transaction.t)) in
+          let mentioned_keys = Transaction.public_keys (t1 :> Transaction.t) in
+          printf !"current keys: %{sexp:Public_key.Compressed.t list}\n%!" mentioned_keys;
+          let sparse_ledger = Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys in
+          printf !"current sparse_ledger for transaction %{sexp:Transaction.t} is %{sexp:Sparse_ledger.t}\n%!" (t1:>Transaction.t) sparse_ledger ;
           let sok_message =
             Sok_message.create ~fee:Fee.zero
               ~prover:wallets.(1).account.public_key
           in
           check_transaction ~sok_message ~source:(Ledger.merkle_root ledger) ~target:target t1 (unstage @@ Sparse_ledger.handler sparse_ledger)
-      )*)
+      )
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1336,10 +1339,16 @@ let%test_module "transaction_snark" =
             |> Sok_message.digest
           in
           let state1 = Ledger.merkle_root ledger in
-          let sparse_ledger = Sparse_ledger.of_ledger_subset_exn ledger (List.concat_map ~f:(fun t -> Transaction.public_keys (t :> Transaction.t)) [t1; t2]) in
-          let handler = unstage (Sparse_ledger.handler sparse_ledger) in
-          let proof12 = of_transaction' sok_digest ledger t1 handler in
-          let proof23 = of_transaction' sok_digest ledger t2 handler in
+          let sparse_ledger =
+            Sparse_ledger.of_ledger_subset_exn ledger
+              (List.concat_map
+                 ~f:(fun t -> Transaction.public_keys (t :> Transaction.t))
+                 [t1; t2])
+          in
+          let proof12 = of_transaction' sok_digest ledger t1 (unstage @@ Sparse_ledger.handler sparse_ledger) in
+          let sparse_ledger = Sparse_ledger.apply_transaction_exn sparse_ledger (t1 :> Transaction.t) in
+          let proof23 = of_transaction' sok_digest ledger t2 (unstage @@ Sparse_ledger.handler sparse_ledger) in
+          let sparse_ledger = Sparse_ledger.apply_transaction_exn sparse_ledger (t2 :> Transaction.t) in
           let total_fees =
             let open Amount in
             let magnitude =
