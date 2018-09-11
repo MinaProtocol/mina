@@ -126,13 +126,6 @@ let%test_module "test functor on in memory databases" =
                    in
                    assert (location = location') ) )
 
-      let%test_unit "get t (get_or_create_account t account) = account" =
-        with_test_instance (fun mdb ->
-            let account = Quickcheck.random_value Account.gen in
-            let location = create_new_account_exn mdb account in
-            let account' = MT.get mdb location |> Option.value_exn in
-            assert (account = account') )
-
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =
         let random_hash =
