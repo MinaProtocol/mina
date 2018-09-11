@@ -56,3 +56,5 @@ end
 val sign : Signature_keypair.t -> Payload.t -> With_valid_signature.t
 
 val check : t -> With_valid_signature.t option
+
+val public_keys : t -> Public_key.Compressed.t list
