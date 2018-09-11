@@ -20,6 +20,9 @@ module State : sig
 
   type ('a, 'd) t [@@deriving sexp, bin_io]
 
+  val fold_chronological :
+    ('a, 'd) t -> init:'acc -> f:('acc -> ('a, 'd) Job.t -> 'acc) -> 'acc
+
   val copy : ('a, 'd) t -> ('a, 'd) t
 
   module Hash : sig

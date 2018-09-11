@@ -10,12 +10,14 @@ module type Inputs_intf = sig
 
   module Security : Protocols.Coda_pow.Security_intf
 
-  module Ledger_builder_hash : sig
-    type t [@@deriving eq, bin_io, sexp]
+  module Ledger_hash : sig
+    type t [@@deriving eq, bin_io, sexp, eq]
   end
 
-  module Ledger_hash : sig
-    type t [@@deriving sexp, eq]
+  module Ledger_builder_hash : sig
+    type t [@@deriving eq, bin_io, sexp]
+
+    val ledger_hash : t -> Ledger_hash.t
   end
 
   module Ledger_builder_diff : sig
@@ -53,7 +55,11 @@ module type Inputs_intf = sig
 
     val create : Ledger.t -> t
 
-    val of_aux_and_ledger : Ledger.t -> Aux.t -> t Or_error.t
+    val of_aux_and_ledger :
+         snarked_ledger_hash:Ledger_hash.t
+      -> ledger:Ledger.t
+      -> aux:Aux.t
+      -> t Or_error.t
 
     val copy : t -> t
 
@@ -263,11 +269,6 @@ end = struct
         let ledger_builder_hash = Ledger_builder.hash tip.ledger_builder in
         Logger.fatal !Coda.global_log !"out aux nhash %{sexp: Ledger_builder_aux_hash.t}" (Ledger_builder.Aux.hash (Ledger_builder.aux tip.ledger_builder));
         Logger.fatal !Coda.global_log !"out %{sexp:Ledger_builder_hash.t}" ledger_builder_hash;
-        let lb2 =
-          Ledger_builder.of_aux_and_ledger (Ledger_builder.ledger tip.ledger_builder) (Ledger_builder.aux tip.ledger_builder) |> Or_error.ok_exn
-        in
-        Logger.fatal !Coda.global_log !"out redo lb %{sexp:Ledger_builder_hash.t} %{sexp:Ledger_builder_hash.t}" (Ledger_builder.hash tip.ledger_builder) (Ledger_builder.hash lb2);
-        Logger.fatal !Coda.global_log !"out ledger_hash %{sexp:Ledger_hash.t}" (Ledger.merkle_root (Ledger_builder.ledger tip.ledger_builder));
         let%map () =
           if
             verified
@@ -581,7 +582,12 @@ let%test_module "test" =
         let max_depth = `Finite 50
       end
 
-      module Ledger_builder_hash = Int
+      module Ledger_builder_hash = struct
+        include Int
+
+        let ledger_hash = Fn.id
+      end
+
       module Ledger_hash = Int
       (* A ledger_builder transition will just add to a "ledger" integer *)
       module Ledger_builder_diff = Int
@@ -617,7 +623,8 @@ let%test_module "test" =
 
         let hash t = !t
 
-        let of_aux_and_ledger _aux l = Ok (create l)
+        let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
+          Ok (create ledger)
 
         let aux t = !t
 

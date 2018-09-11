@@ -160,6 +160,7 @@ end = struct
   [@@deriving sexp, bin_io]
 
   module Super_transaction_with_witness = struct
+    (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction: Super_transaction.t
       ; statement: Ledger_proof_statement.t
@@ -319,7 +320,82 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
-  let make ~public_key ~ledger ~aux = {public_key; ledger; scan_state= aux}
+  let scan_statement (state: scan_state) :
+      (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t =
+    with_return (fun {return} ->
+        let ok_or_return = function
+          | Ok x -> x
+          | Error e -> return (Error (`Error e))
+        in
+        let merge s1 s2 = ok_or_return (Ledger_proof_statement.merge s1 s2) in
+        let merge_acc acc s2 =
+          match acc with None -> Some s2 | Some s1 -> Some (merge s1 s2)
+        in
+        let res =
+          Parallel_scan.State.fold_chronological state ~init:None ~f:
+            (fun acc_statement job ->
+              match job with
+              | Merge (None, Some (_, s)) | Merge (Some (_, s), None) ->
+                  merge_acc acc_statement s
+              | Merge (None, None) -> acc_statement
+              | Merge (Some (_, s1), Some (_, s2)) ->
+                  merge_acc acc_statement (merge s1 s2)
+              | Base None -> acc_statement
+              | Base (Some {transaction; statement; witness}) ->
+                  let source = Sparse_ledger.merkle_root witness in
+                  let after =
+                    Or_error.try_with (fun () ->
+                        Sparse_ledger.apply_super_transaction_exn witness
+                          transaction )
+                    |> ok_or_return
+                  in
+                  let target = Sparse_ledger.merkle_root after in
+                  let expected_statement =
+                    { Ledger_proof_statement.source
+                    ; target
+                    ; fee_excess=
+                        ok_or_return (Super_transaction.fee_excess transaction)
+                    ; proof_type= `Base }
+                  in
+                  if Ledger_proof_statement.equal statement expected_statement
+                  then merge_acc acc_statement statement
+                  else
+                    return
+                      (Error
+                         (`Error
+                           (Error.of_string
+                              "Ledger_builder.scan_statement: Bad base \
+                               statement"))) )
+        in
+        match res with None -> Error `Empty | Some res -> Ok res )
+
+  let of_aux_and_ledger ~snarked_ledger_hash ~public_key ~ledger ~aux =
+    let check cond err =
+      if not cond then Or_error.errorf "Ledger_hash.of_aux_and_ledger: %s" err
+      else Ok ()
+    in
+    let open Or_error.Let_syntax in
+    let%map () =
+      match scan_statement aux with
+      | Error (`Error e) -> Error e
+      | Error `Empty -> Ok ()
+      | Ok {fee_excess; source; target; proof_type= _} ->
+          let%map () =
+            check
+              (Ledger_hash.equal snarked_ledger_hash source)
+              "did not connect with snarked ledger hash"
+          and () =
+            check
+              (Ledger_hash.equal (Ledger.merkle_root ledger) target)
+              "incorrect statement target hash"
+          and () =
+            check
+              (Fee.Signed.equal Fee.Signed.zero fee_excess)
+              "nonzero fee excess"
+          in
+          ()
+    in
+    {ledger; scan_state= aux; public_key}
 
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
@@ -1082,6 +1158,13 @@ let%test_module "test" =
         let of_ledger_subset_exn :
             Ledger.t -> Compressed_public_key.t list -> t =
          fun ledger _ -> !ledger
+
+        let merkle_root t = Ledger.merkle_root (ref t)
+
+        let apply_super_transaction_exn t txn =
+          let l : Ledger.t = ref t in
+          Or_error.ok_exn (Ledger.apply_super_transaction l txn) |> ignore ;
+          !l
       end
 
       module Ledger_builder_aux_hash = struct
