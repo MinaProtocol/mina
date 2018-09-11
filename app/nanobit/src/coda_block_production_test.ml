@@ -20,7 +20,12 @@ struct
     let log = Logger.create () in
     let log = Logger.child log name in
     let n = 1 in
-    Coda_worker_testnet.test log n
+    let should_propose = fun i -> false in
+    let snark_work_public_keys = fun i -> None in
+    let%bind (api, finished) = 
+      Coda_worker_testnet.test log n should_propose snark_work_public_keys
+    in
+    finished
 
   let command =
     Command.async_spec ~summary:"Simple use of Async Rpc_parallel V2"

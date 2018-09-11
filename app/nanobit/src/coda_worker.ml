@@ -32,6 +32,15 @@ struct
 
   open Input
 
+  module Send_transaction_input = struct
+    type t =
+      Private_key.t
+      * Public_key.Compressed.t
+      * Currency.Amount.t
+      * Currency.Fee.t
+    [@@deriving bin_io]
+  end
+
   module T = struct
     module Peers = struct
       type t = Kademlia.Peer.t List.t [@@deriving bin_io]
@@ -45,14 +54,6 @@ struct
       type t = Currency.Balance.t option [@@deriving bin_io]
     end
 
-    module Send_transaction_input = struct
-      type t =
-        Private_key.t
-        * Public_key.Compressed.t
-        * Currency.Amount.t
-        * Currency.Fee.t
-      [@@deriving bin_io]
-    end
 
     type 'worker functions =
       { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
