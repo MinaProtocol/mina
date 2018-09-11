@@ -10,12 +10,14 @@ module type Inputs_intf = sig
 
   module Security : Protocols.Coda_pow.Security_intf
 
-  module Ledger_builder_hash : sig
-    type t [@@deriving eq, bin_io]
-  end
-
   module Ledger_hash : sig
     type t [@@deriving eq]
+  end
+
+  module Ledger_builder_hash : sig
+    type t [@@deriving eq, bin_io]
+
+    val ledger_hash : t -> Ledger_hash.t
   end
 
   module Ledger_builder_diff : sig
@@ -47,7 +49,11 @@ module type Inputs_intf = sig
 
     val create : Ledger.t -> t
 
-    val of_aux_and_ledger : Ledger.t -> Aux.t -> t Or_error.t
+    val of_aux_and_ledger :
+         snarked_ledger_hash:Ledger_hash.t
+      -> ledger:Ledger.t
+      -> aux:Aux.t
+      -> t Or_error.t
 
     val copy : t -> t
 
@@ -512,7 +518,12 @@ let%test_module "test" =
         let max_depth = `Finite 50
       end
 
-      module Ledger_builder_hash = Int
+      module Ledger_builder_hash = struct
+        include Int
+
+        let ledger_hash = Fn.id
+      end
+
       module Ledger_hash = Int
       (* A ledger_builder transition will just add to a "ledger" integer *)
       module Ledger_builder_diff = Int
@@ -542,7 +553,8 @@ let%test_module "test" =
 
         let hash t = !t
 
-        let of_aux_and_ledger _aux l = Ok (create l)
+        let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
+          Ok (create ledger)
 
         let apply (t: t) (x: Ledger_builder_diff.t) =
           t := x ;
