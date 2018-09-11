@@ -20,11 +20,14 @@ struct
     let log = Logger.create () in
     let log = Logger.child log name in
     let n = 1 in
-    let should_propose = fun i -> false in
+    let should_propose = fun i -> true in
     let snark_work_public_keys = fun i -> None in
     let%bind (api, finished) = 
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
+    Logger.fatal log "before";
+    let%bind () = after (Time.Span.of_sec 30.) in
+    Logger.fatal log "after";
     finished
 
   let command =
