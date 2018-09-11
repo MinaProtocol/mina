@@ -10,9 +10,6 @@ let split_kv s =
   match String.index s ':' with
   | None -> None
   | Some i ->
-    let n = String.length s in
-    Some
-    ( String.sub s ~pos:0 ~len:i
-    , String.sub s ~pos:(i + 1) ~len:(n - i - 1)
-    )
-
+      let n = String.length s in
+      Some
+        (String.sub s ~pos:0 ~len:i, String.sub s ~pos:(i + 1) ~len:(n - i - 1))

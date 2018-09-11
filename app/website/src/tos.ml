@@ -1,7 +1,8 @@
 open Stationary
 
-let content = Html.text
-  {literal|<p><strong><span class="smallcaps">Website Terms of Use</span></strong></p>
+let content =
+  Html.text
+    {literal|<p><strong><span class="smallcaps">Website Terms of Use</span></strong></p>
   <p><strong><span class="smallcaps">Version 1.0</span></strong></p>
   <p><strong><span class="smallcaps">Last revised on: May 9th, 2018</span></strong></p>
   <p>The website located at codaprotocol.com (the "<strong>Site</strong>") is a copyrighted work belonging to O(1) Labs Operating Corporation ("<strong>Company</strong>", "<strong>us</strong>", "<strong>our</strong>", and "<strong>we</strong>"). Certain features of the Site may be subject to additional guidelines, terms, or rules, which will be posted on the Site in connection with such features. All such additional terms, guidelines, and rules are incorporated by reference into these Terms.</p>
@@ -90,4 +91,3 @@ let content = Html.text
   </blockquote>
   <p><sup>* * *</sup></p>
   |literal}
-

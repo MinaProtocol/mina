@@ -1,7 +1,8 @@
 open Stationary
 
-let content = Html.text
-  {literal|<p><strong>O(1) LABS OPERATING CORPORATION</strong></p>
+let content =
+  Html.text
+    {literal|<p><strong>O(1) LABS OPERATING CORPORATION</strong></p>
   <p><strong>PRIVACY POLICY</strong></p>
   <p><strong>Last Updated: May 9th, 2018</strong></p>
   <p>This privacy policy ("<strong>Policy</strong>") describes how O(1) Labs Operating Corporation and its related companies ("<strong>Company</strong>") collect, use and share personal information of consumer users of this website, codaprotocol.com (the "<strong>Site</strong>"). This Policy also applies to any of our other websites that post this Policy. This Policy does not apply to websites that post different statements.</p>

@@ -9,7 +9,4 @@ let of_class s = [s]
 
 let empty = []
 
-let render t =
-  let open Html_concise in
-  class_ (String.concat ~sep:" " t)
-
+let render t = Html_concise.(class_ (String.concat ~sep:" " t))
