@@ -219,11 +219,6 @@ struct
         match result with
         | Some tip ->
             assert (
-              Ledger_hash.equal
-                (Tip.ledger_builder_ledger_hash tip)
-                (External_transition.ledger_hash last_transition)
-            );
-            assert (
               Protocol_state.equal_value (Tip.state tip)
                 (External_transition.target_state last_transition) ) ;
             let changes = [ Transition_logic_state.Change.Longest_branch_tip tip
