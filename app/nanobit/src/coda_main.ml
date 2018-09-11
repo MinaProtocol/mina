@@ -15,6 +15,8 @@ end
 module Ledger_builder_hash = struct
   include Ledger_builder_hash.Stable.V1
 
+  let ledger_hash = Ledger_builder_hash.ledger_hash
+
   let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
 end
 
@@ -325,9 +327,6 @@ struct
     end
 
     include Ledger_builder.Make (Inputs)
-
-    let of_aux_and_ledger ledger aux =
-      Ok (make ~public_key:Init.fee_public_key ~aux ~ledger)
   end
 
   module Ledger_builder_aux = Ledger_builder.Aux
@@ -593,6 +592,9 @@ struct
             ~f:
               (Option.map ~f:(fun proof ->
                    ((Ledger_proof.statement proof).target, proof) ))
+
+        let of_aux_and_ledger =
+          of_aux_and_ledger ~public_key:Init.fee_public_key
       end
 
       module Consensus_mechanism = Consensus_mechanism

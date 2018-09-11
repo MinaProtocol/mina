@@ -14,6 +14,8 @@ module type Inputs_intf = sig
 
   module Ledger_builder_hash : sig
     type t
+
+    val ledger_hash : t -> Ledger_hash.t
   end
 
   module Ledger_builder : sig
@@ -27,7 +29,11 @@ module type Inputs_intf = sig
 
     val ledger : t -> Ledger.t
 
-    val of_aux_and_ledger : Ledger.t -> Aux.t -> t Or_error.t
+    val of_aux_and_ledger :
+         snarked_ledger_hash:Ledger_hash.t
+      -> ledger:Ledger.t
+      -> aux:Aux.t
+      -> t Or_error.t
 
     val copy : t -> t
   end
@@ -103,7 +109,11 @@ module Make (Inputs : Inputs_intf) = struct
   (* Perform the `Sync interruptible work *)
   let do_sync {net; log; sl_ref} (state: Transition_logic_state.t) transition =
     let locked_tip = Transition_logic_state.locked_tip state in
-    let h = External_transition.ledger_hash transition in
+    let snarked_ledger_hash = External_transition.ledger_hash transition in
+    let h =
+      External_transition.ledger_builder_hash transition
+      |> Ledger_builder_hash.ledger_hash
+    in
     (* Lazily recreate the sync_ledger if necessary *)
     let sl : Sync_ledger.t =
       match !sl_ref with
@@ -134,7 +144,10 @@ module Make (Inputs : Inputs_intf) = struct
                  (External_transition.ledger_builder_hash transition))
           with
           | Ok aux -> (
-            match Ledger_builder.of_aux_and_ledger ledger aux with
+            match
+              Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
+                ~aux
+            with
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
             | Ok lb ->
