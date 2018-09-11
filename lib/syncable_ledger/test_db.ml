@@ -68,7 +68,7 @@ struct
       in
       List.iter keys ~f:(fun key ->
           let account = Account.create key balance in
-          MT.create_account_exn ledger key account |> ignore ) ;
+          MT.get_or_create_account_exn ledger key account |> ignore ) ;
       (ledger, keys)
   end
 
