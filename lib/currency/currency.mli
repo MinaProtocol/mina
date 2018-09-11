@@ -4,6 +4,8 @@ open Snark_bits
 open Fold_lib
 open Tuple_lib
 
+type uint64 = Unsigned.uint64
+
 module type Basic = sig
   type t [@@deriving bin_io, sexp, compare, hash]
 
@@ -36,6 +38,10 @@ module type Basic = sig
   val of_int : int -> t
 
   val to_int : t -> int
+
+  val to_uint64 : t -> uint64
+
+  val of_uint64 : uint64 -> t
 
   val var_of_t : t -> var
 
@@ -185,10 +191,6 @@ end
 
 module Balance : sig
   include Basic
-
-  val of_amount : Amount.t -> t
-
-  val to_amount : t -> Amount.t
 
   val add_amount : t -> Amount.t -> t option
 

@@ -103,13 +103,7 @@ let daemon (type ledger_proof) (module Kernel
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
-       let keypair =
-         let open Signature_lib.Keypair in
-         { public_key=
-             Signature_lib.Public_key.decompress_exn
-               Genesis_ledger.high_balance_pk
-         ; private_key= Genesis_ledger.high_balance_sk }
-       in
+       let keypair = Signature_lib.Keypair.of_private_key_exn Genesis_ledger.high_balance_sk in
        let module Config = struct
          let logger = log
 

@@ -12,11 +12,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
-  let keypair =
-    let open Keypair in
-    { public_key= Public_key.decompress_exn Genesis_ledger.high_balance_pk
-    ; private_key= Genesis_ledger.high_balance_sk }
-  in
+  let keypair = Keypair.of_private_key_exn Genesis_ledger.high_balance_sk in
   let module Config = struct
     let logger = log
 

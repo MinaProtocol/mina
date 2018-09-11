@@ -1,8 +1,13 @@
+open Core_kernel
+open Signature_lib
+
 module Make
     (Impl : Snarky.Snark_intf.S) (Scalar : sig
         type value
 
         type var
+
+        val typ : (var, value) Impl.Typ.t
     end) (Group : sig
       open Impl
 
@@ -21,6 +26,8 @@ module Make
              and type curve_var := var
 
           type 'a m = (module S with type t = 'a)
+
+          val create : unit -> ((module S), 'a) Checked.t
         end
 
         val scale :
@@ -41,13 +48,17 @@ module Make
 
       type var
 
+      val typ : (var, value) Impl.Typ.t
+
+      val gen : value Quickcheck.Generator.t
+
       val hash_to_group : value -> Group.value
 
       module Checked : sig
         val hash_to_group : var -> (Group.var, _) Impl.Checked.t
       end
     end) (Output_hash : sig
-      type value
+      type value [@@deriving eq]
 
       type var
 
@@ -107,4 +118,20 @@ end = struct
       in
       eval (module Shifted) ~private_key message
   end
+
+  let%test_unit "eval unchecked vs. checked equality" =
+    let gen =
+      let open Quickcheck.Let_syntax in
+      let%map pk = Private_key.gen and msg = Message.gen in
+      (pk, msg)
+    in
+    Quickcheck.test gen ~f:(
+      Test_util.test_equal
+        ~equal:Output_hash.equal_value
+        Typ.(Scalar.typ * Message.typ)
+        Output_hash.typ
+        (fun (private_key, msg) ->
+           Checked.eval (Group.Checked.Shifted.create ()) ~private_key msg)
+        (fun (private_key, msg) ->
+           eval ~private_key msg))
 end

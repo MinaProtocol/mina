@@ -6,7 +6,6 @@
   (flags (:standard -short-paths))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries
-   ( core snarky))
+  (libraries (core snarky signature_lib test_util))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "VRF instantiation")))

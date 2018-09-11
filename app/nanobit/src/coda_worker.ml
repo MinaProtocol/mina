@@ -139,10 +139,7 @@ struct
           let transition_interval = Time.Span.of_ms 1000.0
 
           let keypair =
-            let open Keypair in
-            { public_key=
-                Public_key.decompress_exn Genesis_ledger.high_balance_pk
-            ; private_key= Genesis_ledger.high_balance_sk }
+            Keypair.of_private_key_exn Genesis_ledger.high_balance_sk
 
           let genesis_proof = Precomputed_values.base_proof
         end in

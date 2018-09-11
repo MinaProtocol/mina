@@ -188,7 +188,7 @@ struct
         Core.Int.gen_incl 0 (UInt32.to_int unforkable_count * 3)
         >>| UInt32.of_int
 
-      let%test_unit "in_seed_update_range_var" =
+      let%test_unit "in_seed_update_range unchecked vs. checked equality" =
         Quickcheck.test gen ~f:(fun slot ->
             Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
               in_seed_update_range_var in_seed_update_range slot )
@@ -216,7 +216,7 @@ struct
 
   module Vrf = struct
     module Scalar = struct
-      type value = Crypto_params.Tock_curve.Field.t
+      type value = Snark_params.Tick.Inner_curve.Scalar.t
 
       type var =
         Snark_params.Tick.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
@@ -256,6 +256,25 @@ struct
         , Nanobit_base.State_hash.var )
         t
 
+      let to_hlist {epoch; slot; seed; lock_checkpoint} =
+        Nanobit_base.H_list.[epoch; slot; seed; lock_checkpoint]
+
+      let of_hlist : (unit, 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> unit) Nanobit_base.H_list.t -> ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
+        fun Nanobit_base.H_list.[epoch; slot; seed; lock_checkpoint] ->
+          {epoch; slot; seed; lock_checkpoint}
+
+      let data_spec =
+        Snark_params.Tick.Data_spec.
+          [ Epoch.Unpacked.typ
+          ; Epoch.Slot.Unpacked.typ
+          ; Epoch_seed.typ
+          ; Nanobit_base.State_hash.typ ]
+
+      let typ =
+        Snark_params.Tick.Typ.of_hlistable data_spec
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
       let fold {epoch; slot; seed; lock_checkpoint} =
         let open Fold in
         Epoch.fold epoch +> Epoch.Slot.fold slot +> Epoch_seed.fold seed
@@ -264,7 +283,8 @@ struct
       let hash_to_group msg =
         let msg_hash_state =
           Snark_params.Tick.Pedersen.hash_fold
-            Nanobit_base.Hash_prefix.vrf_message (fold msg)
+            Nanobit_base.Hash_prefix.vrf_message
+            (fold msg)
         in
         msg_hash_state.acc
 
@@ -286,6 +306,15 @@ struct
           Pedersen.Checked.hash_triples
             ~init:Nanobit_base.Hash_prefix.vrf_message msg_triples
       end
+
+      let gen =
+        let open Quickcheck.Let_syntax in
+        let%map epoch = Epoch.gen
+        and slot = Epoch.Slot.gen
+        and seed = Epoch_seed.gen
+        and lock_checkpoint = Nanobit_base.State_hash.gen
+        in
+        {epoch; slot; seed; lock_checkpoint}
     end
 
     module Output = struct
@@ -322,15 +351,40 @@ struct
           Sha256.Checked.digest
             (pedersen_digest :> Snark_params.Tick.Boolean.var list)
       end
+
+      let gen =
+        Quickcheck.Generator.list_with_length 256 Bool.gen
+
+      let%test_unit "hash unchecked vs. checked equality" =
+        let gen_inner_curve_point =
+          let open Quickcheck.Generator.Let_syntax in
+          let%map compressed = Non_zero_curve_point.gen in
+          Non_zero_curve_point.to_inner_curve compressed
+        in
+        let gen_message_and_curve_point =
+          let open Quickcheck.Generator.Let_syntax in
+          let%map msg = Message.gen and g = gen_inner_curve_point in
+          (msg, g)
+        in
+        Quickcheck.test gen_message_and_curve_point ~f:(
+          Test_util.test_equal
+            ~equal:(List.equal ~equal:Bool.equal)
+            Snark_params.Tick.Typ.(Message.typ * Snark_params.Tick.Inner_curve.typ)
+            (Snark_params.Tick.Typ.list ~length:256 Snark_params.Tick.Boolean.typ)
+            (fun (msg, g) -> Checked.hash msg g)
+            (fun (msg, g) -> hash msg g))
     end
 
     module Threshold = struct
       include Bignum_bigint
 
+      let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
+
       let create ~my_stake ~total_stake =
-        UInt64.div my_stake total_stake
-        |> UInt64.to_int64 |> of_int64_exn
-        |> ( * ) (of_int_exn Int.Infix.(256 / 64))
+        let my_stake = Balance.to_uint64 my_stake in
+        let total_stake = Amount.to_uint64 total_stake in
+        let stake_ratio = of_uint64_exn (UInt64.div my_stake total_stake) in
+        stake_ratio * pow (of_int 2) (of_int 256)
 
       let satisfies threshold output = of_bits_lsb output <= threshold
     end
@@ -850,14 +904,11 @@ struct
     let my_currency =
       Nanobit_base.Ledger.get ledger
         (Signature_lib.Public_key.compress keypair.public_key)
-      |> Option.map
-           ~f:(Fn.compose Balance.to_amount Nanobit_base.Account.balance)
-      |> Option.value ~default:Amount.zero
-      |> Amount.to_int |> UInt64.of_int
+      |> Option.map ~f:Nanobit_base.Account.balance
+      |> Option.value ~default:Balance.zero
     in
     let total_currency =
       previous_consensus_state.last_epoch_data.ledger.total_currency
-      |> Amount.to_int |> UInt64.of_int
     in
     let vrf_message =
       { Vrf.Message.epoch
