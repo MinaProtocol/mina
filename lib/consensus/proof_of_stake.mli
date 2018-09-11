@@ -46,6 +46,10 @@ module type Inputs_intf = sig
   val unforkable_transition_count : int
 
   val probable_slots_per_transition_count : int
+
+  val expected_network_delay : Time.Span.t
+
+  val approximate_network_diameter : int
 end
 
 module Make (Inputs : Inputs_intf) :
