@@ -454,7 +454,12 @@ module type Ledger_builder_intf = sig
 
   val aux : t -> Aux.t
 
-  val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
+  val of_aux_and_ledger :
+       snarked_ledger_hash:ledger_hash
+    -> public_key:public_key
+    -> ledger:ledger
+    -> aux:Aux.t
+    -> t Or_error.t
 
   val random_work_spec_chunk :
        t
