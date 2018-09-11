@@ -259,6 +259,18 @@ let () =
               let probable_slots_per_transition_count =
                 env "PROBABLE_SLOTS_PER_TRANSITION_COUNT" ~default:8 ~f:
                   (fun str -> try Some (Int.of_string str) with _ -> None )
+
+              (* Conservatively pick 1seconds *)
+              let expected_network_delay =
+                env "EXPECTED_NETWORK_DELAY"
+                  ~default:(Time.Span.of_ms (Int64.of_int 1000))
+                  ~f:(fun str ->
+                    try Some (Time.Span.of_ms @@ Int64.of_string str)
+                    with _ -> None )
+
+              let approximate_network_diameter =
+                env "APPROXIMATE_NETWORK_DIAMETER" ~default:3 ~f:(fun str ->
+                    try Some (Int.of_string str) with _ -> None )
             end)
           end )
     in
