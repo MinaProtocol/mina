@@ -320,11 +320,11 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
-  let scan_statement (state: scan_state) : Ledger_proof_statement.t Or_error.t =
+  let scan_statement (state: scan_state) : (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t =
     with_return (fun {return} ->
         let ok_or_return = function
           | Ok x -> x
-          | Error e -> return (Error e)
+          | Error e -> return (Error (`Error e))
         in
         let merge s1 s2 = ok_or_return (Ledger_proof_statement.merge s1 s2) in
         let merge_acc acc s2 =
@@ -360,14 +360,12 @@ end = struct
                   then merge_acc acc_statement statement
                   else
                     return
-                      (Or_error.error_string
-                         "Ledger_builder.scan_statement: Bad base statement")
+                      (Error (`Error (Error.of_string
+                         "Ledger_builder.scan_statement: Bad base statement")))
           )
         in
         match res with
-        | None ->
-            Or_error.error_string
-              "Ledger_builder.scan_statement: Empty scan state"
+        | None -> Error `Empty
         | Some res -> Ok res )
 
   let of_aux_and_ledger ~snarked_ledger_hash ~public_key ~ledger ~aux =
@@ -376,19 +374,23 @@ end = struct
       else Ok ()
     in
     let open Or_error.Let_syntax in
-    let%bind {fee_excess; source; target; proof_type= _} =
-      scan_statement aux
-    in
     let%map () =
-      check
-        (Ledger_hash.equal snarked_ledger_hash source)
-        "did not connect with snarked ledger hash"
-    and () =
-      check
-        (Ledger_hash.equal (Ledger.merkle_root ledger) target)
-        "incorrect statement target hash"
-    and () =
-      check (Fee.Signed.equal Fee.Signed.zero fee_excess) "nonzero fee excess"
+      match scan_statement aux with
+      | Error (`Error e) -> Error e
+      | Error `Empty -> Ok ()
+      | Ok {fee_excess; source; target; proof_type= _} ->
+        let%map () =
+          check
+            (Ledger_hash.equal snarked_ledger_hash source)
+            "did not connect with snarked ledger hash"
+        and () =
+          check
+            (Ledger_hash.equal (Ledger.merkle_root ledger) target)
+            "incorrect statement target hash"
+        and () =
+          check (Fee.Signed.equal Fee.Signed.zero fee_excess) "nonzero fee excess"
+        in
+        ()
     in
     {ledger; scan_state= aux; public_key}
 
