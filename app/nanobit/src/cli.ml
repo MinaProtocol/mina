@@ -57,6 +57,12 @@ let daemon (type ledger_proof) (module Kernel
               "PORT Client to daemon local communication (default: %d)"
               default_client_port)
          (optional int16)
+     and rest_server_port =
+       flag "rest-port"
+         ~doc:
+           "PORT local REST-server for daemon interaction (default no \
+            rest-server)"
+         (optional int16)
      and ip =
        flag "ip" ~doc:"IP External IP address for others to connect"
          (optional string)
@@ -148,7 +154,7 @@ let daemon (type ledger_proof) (module Kernel
                 ())
          in
          don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers minibit)) ;
-         Run.setup_local_server ~minibit ~client_port ~log ;
+         Run.setup_local_server ?rest_server_port ~minibit ~client_port ~log () ;
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
        Async.never ())
