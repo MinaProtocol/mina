@@ -48,6 +48,33 @@ module Status = struct
     ; run_snark_worker: bool
     ; propose: bool }
   [@@deriving yojson, bin_io]
+
+  (* Text response *)
+  let to_text s =
+    let title = "Coda Daemon Status\n-----------------------------------\n" in
+    let entries =
+      [ ("Uptime", sprintf "%ds" s.uptime_secs)
+      ; ("Block Count", Int.to_string s.block_count)
+      ; ("Number of Accounts", Int.to_string s.num_accounts)
+      ; ("Transactions Sent", Int.to_string s.transactions_sent)
+      ; ("Snark Worker Running", Bool.to_string s.run_snark_worker)
+      ; ("Proposer Running", Bool.to_string s.propose)
+      ; ("Peers", List.to_string ~f:Fn.id s.peers) ]
+    in
+    let max_key_length =
+      List.map ~f:(fun (s, _) -> String.length s) entries
+      |> List.max_elt ~compare:Int.compare
+      |> Option.value_exn
+    in
+    let output =
+      List.map entries ~f:(fun (s, x) ->
+          let padding =
+            String.init (max_key_length - String.length s) ~f:(fun _ -> ' ')
+          in
+          sprintf "%s: %s\t%s" s padding x )
+      |> String.concat ~sep:"\n"
+    in
+    title ^ output ^ "\n"
 end
 
 module Get_status = struct
