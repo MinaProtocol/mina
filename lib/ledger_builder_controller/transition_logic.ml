@@ -203,7 +203,7 @@ struct
                   | Ok tip -> return (Some tip)
                   | Error e ->
                       (* TODO: Punish sender *)
-                      Logger.error t.log "Recieved malicious transition %s"
+                      Logger.warn t.log "Recieved malicious transition %s"
                         (Error.to_string_hum e) ;
                       return None )
         in

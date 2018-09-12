@@ -75,7 +75,7 @@ struct
                         let diff = !blocks - !update_block in
                         assert (diff < max_dist || !blocks < start_margin) ;
                         let%bind () =
-                          if !blocks > 10 + start_margin then exit 0
+                          if !blocks > 20 + start_margin then exit 0
                           else Deferred.unit
                         in
                         let%bind () =

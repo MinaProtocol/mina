@@ -2,8 +2,6 @@ open Core_kernel
 open Async_kernel
 open Protocols
 
-let global_log = ref (Logger.create ())
-
 module type Ledger_builder_io_intf = sig
   type t
 
@@ -459,7 +457,6 @@ module Make (Inputs : Inputs_intf) = struct
   end
 
   let create (config: Config.t) =
-    global_log := config.log ;
     let external_transitions_reader, external_transitions_writer =
       Linear_pipe.create ()
     in
