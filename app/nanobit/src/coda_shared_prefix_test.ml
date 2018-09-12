@@ -11,8 +11,8 @@ module Make
 struct
   module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
   open Coda_processes
-
-  module Coda_worker_testnet = Coda_worker_testnet.Make (Ledger_proof) (Kernel) (Coda)
+  module Coda_worker_testnet =
+    Coda_worker_testnet.Make (Ledger_proof) (Kernel) (Coda)
 
   let name = "coda-shared-prefix-test"
 
@@ -20,10 +20,11 @@ struct
     let log = Logger.create () in
     let log = Logger.child log name in
     let n = 2 in
-    let should_propose = fun i -> i = who_proposes in
-    let snark_work_public_keys = fun i -> None in
-    let%bind (api, finished) = 
-      Coda_worker_testnet.test log n ?proposal_interval should_propose snark_work_public_keys 
+    let should_propose i = i = who_proposes in
+    let snark_work_public_keys i = None in
+    let%bind api, finished =
+      Coda_worker_testnet.test log n ?proposal_interval should_propose
+        snark_work_public_keys
     in
     let%bind () = after (Time.Span.of_sec 30.) in
     finished

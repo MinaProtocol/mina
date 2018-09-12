@@ -54,7 +54,6 @@ struct
       type t = Currency.Balance.t option [@@deriving bin_io]
     end
 
-
     type 'worker functions =
       { peers: ('worker, unit, Peers.t) Rpc_parallel.Function.t
       ; get_balance:
