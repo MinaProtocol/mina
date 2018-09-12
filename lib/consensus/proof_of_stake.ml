@@ -52,6 +52,10 @@ module type Inputs_intf = sig
   val unforkable_transition_count : int
 
   val probable_slots_per_transition_count : int
+
+  val expected_network_delay : Time.Span.t
+
+  val approximate_network_diameter : int
 end
 
 module Segment_id = Nat.Make32 ()
@@ -709,6 +713,8 @@ struct
       ; total_currency
       ; last_epoch_data
       ; curr_epoch_data }
+
+    let length (t: value) = t.length
   end
 
   module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)

@@ -11,7 +11,7 @@ run_unit_tests() {
 }
 
 run_integration_tests() {
-  for test in full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' 'transaction-snark-profiler -check-only'; do
+  for test in full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-state-test' 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' 'transaction-snark-profiler -check-only'; do
     echo "------------------------------------------------------------------------------------------"
 
     date
@@ -23,7 +23,7 @@ run_integration_tests() {
     pkill -9 kademlia
     pkill -9 cli
     sleep 1
-    dune exec cli -- $test 2>&1 >> test.log
+    dune exec cli -- integration-tests $test 2>&1 >> test.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
     if [ $OUT -eq 0 ];then
@@ -31,8 +31,8 @@ run_integration_tests() {
     else
       echo "FAILED"
       echo "------------------------------------------------------------------------------------------"
-      echo "LOG OUTPUT:"
-      cat test.log | dune exec logproc -- -c '(level=error) || (level=debug)'
+      echo "RECENT OUTPUT:"
+      tail -n 50 test.log | dune exec logproc
       echo "------------------------------------------------------------------------------------------"
       echo "See above for stack trace..."
       exit 2
@@ -48,8 +48,10 @@ main() {
   export CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=1
 
   run_unit_tests
-  CODA_CONSENSUS_MECHANISM=proof_of_signature run_integration_tests
-  CODA_CONSENSUS_MECHANISM=proof_of_stake run_integration_tests
+  CODA_CONSENSUS_MECHANISM=proof_of_signature \
+    run_integration_tests
+  CODA_CONSENSUS_MECHANISM=proof_of_stake \
+    run_integration_tests
 }
 
 # Only run main if called directly

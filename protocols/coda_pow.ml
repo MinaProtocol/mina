@@ -116,8 +116,6 @@ module type Ledger_builder_hash_intf = sig
 
   type ledger_builder_aux_hash
 
-  val of_bytes : string -> t
-
   val of_aux_and_ledger_hash : ledger_builder_aux_hash -> ledger_hash -> t
 
   include Hashable.S_binable with type t := t
@@ -147,6 +145,8 @@ module type Ledger_intf = sig
   val create : unit -> t
 
   val copy : t -> t
+
+  val num_accounts : t -> int
 
   val merkle_root : t -> ledger_hash
 
@@ -261,6 +261,7 @@ module type Ledger_proof_statement_intf = sig
   type t =
     { source: ledger_hash
     ; target: ledger_hash
+    ; supply_increase: Currency.Amount.t
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
@@ -453,7 +454,12 @@ module type Ledger_builder_intf = sig
 
   val aux : t -> Aux.t
 
-  val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
+  val of_aux_and_ledger :
+       snarked_ledger_hash:ledger_hash
+    -> public_key:public_key
+    -> ledger:ledger
+    -> aux:Aux.t
+    -> t Or_error.t
 
   val random_work_spec_chunk :
        t
@@ -573,6 +579,7 @@ module type Consensus_mechanism_intf = sig
     val create_value :
          ?sok_digest:sok_digest
       -> ?ledger_proof:proof
+      -> supply_increase:Currency.Amount.t
       -> blockchain_state:blockchain_state
       -> consensus_data:Consensus_transition_data.value
       -> unit

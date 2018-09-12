@@ -1,9 +1,11 @@
 module type Inputs_intf = sig
+  module Time : Protocols.Coda_pow.Time_intf
+
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
   end
 
-  val proposal_interval : Unix_timestamp.t
+  val proposal_interval : Time.Span.t
 end
 
 module Make (Inputs : Inputs_intf) :

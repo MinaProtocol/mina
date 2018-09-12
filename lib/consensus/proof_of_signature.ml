@@ -13,11 +13,13 @@ module Global_keypair = struct
 end
 
 module type Inputs_intf = sig
+  module Time : Protocols.Coda_pow.Time_intf
+
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
   end
 
-  val proposal_interval : Unix_timestamp.t
+  val proposal_interval : Time.Span.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -113,6 +115,8 @@ struct
     let update state =
       { length= Length.succ state.length
       ; signer_public_key= Public_key.compress Global_keypair.public_key }
+
+    let length t = t.length
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)

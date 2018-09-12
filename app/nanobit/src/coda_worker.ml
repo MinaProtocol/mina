@@ -15,16 +15,22 @@ struct
     [@@deriving bin_io]
   end
 
-  type input =
-    { host: string
-    ; should_propose: bool
-    ; snark_worker_config: Snark_worker_config.t option
-    ; conf_dir: string
-    ; program_dir: string
-    ; external_port: int
-    ; discovery_port: int
-    ; peers: Host_and_port.t list }
-  [@@deriving bin_io]
+  module Input = struct
+    type t =
+      { host: string
+      ; env: (string * string) list
+      ; transition_interval: float
+      ; should_propose: bool
+      ; snark_worker_config: Snark_worker_config.t option
+      ; conf_dir: string
+      ; program_dir: string
+      ; external_port: int
+      ; discovery_port: int
+      ; peers: Host_and_port.t list }
+    [@@deriving bin_io]
+  end
+
+  open Input
 
   module T = struct
     module Peers = struct
@@ -70,7 +76,7 @@ struct
       }
 
     module Worker_state = struct
-      type init_arg = input [@@deriving bin_io]
+      type init_arg = Input.t [@@deriving bin_io]
 
       type t = coda_functions
     end
@@ -119,6 +125,7 @@ struct
       let init_worker_state
           { host
           ; should_propose
+          ; transition_interval
           ; snark_worker_config
           ; conf_dir
           ; program_dir
@@ -142,7 +149,7 @@ struct
         end in
         let%bind (module Init) = make_init (module Config) (module Kernel) in
         let module Main = Coda.Make (Init) () in
-        let module Run = Run (Main) in
+        let module Run = Run (Config) (Main) in
         let net_config =
           { Main.Inputs.Net.Config.parent_log= log
           ; gossip_net_params=
@@ -158,6 +165,7 @@ struct
         let%bind coda =
           Main.create
             (Main.Config.make ~log ~net_config ~should_propose
+               ~run_snark_worker:(Option.is_some snark_worker_config)
                ~ledger_builder_persistant_location:"ledger_builder"
                ~transaction_pool_disk_location:"transaction_pool"
                ~snark_pool_disk_location:"snark_pool"
@@ -166,7 +174,8 @@ struct
         in
         Option.iter snark_worker_config ~f:(fun config ->
             let run_snark_worker = `With_public_key config.public_key in
-            Run.setup_local_server ~client_port:config.port ~minibit:coda ~log ;
+            Run.setup_local_server ~client_port:config.port ~minibit:coda ~log
+              () ;
             Run.run_snark_worker ~log ~client_port:config.port run_snark_worker
         ) ;
         let coda_peers () = return (Main.peers coda) in

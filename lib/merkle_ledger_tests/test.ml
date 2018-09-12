@@ -10,7 +10,7 @@ let%test_module "Database integration test" =
     end
 
     module DB =
-      Database.Make (Balance) (Account) (Hash) (Depth) (In_memory_kvdb)
+      Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
         (In_memory_sdb)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
     module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
@@ -53,10 +53,10 @@ let%test_module "Database integration test" =
         (l1, h1) (l2, h2) =
       if not (Hash.equal h1 h2) then
         failwithf
-          !"\n                   \
-            Expected:\n\
-            %{sexp:L1.tree}\n\n\n \
-            Actual:\n\
+          !"\n\
+            \                   Expected:\n\
+            %{sexp:L1.tree}\n\n\n\
+            \ Actual:\n\
             %{sexp:L2.tree}"
           (L1.to_tree l1) (L2.to_tree l2) ()
 
@@ -81,8 +81,8 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Left)
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
-          List.iteri accounts ~f:(fun i account ->
-              assert (DB.set_account db account = Ok ()) ;
+          List.iteri accounts ~f:(fun i ({public_key; _} as account) ->
+              ignore @@ DB.get_or_create_account_exn db public_key account ;
               Ledger.set ledger (Int.to_string i) account ) ;
           Ledger.recompute_tree ledger ;
           let binary_tree = Binary_tree.set_accounts accounts in

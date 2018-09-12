@@ -5,7 +5,7 @@ set -e
 trap 'kill $(jobs -p)' EXIT
 cd "$(dirname "$0")"/../../
 
-eval `opam config env` && jbuilder build >> /app/logs 2>&1
+eval `opam config env` && dune build >> /app/logs 2>&1
 
 pushd app/kademlia-haskell
 . ~/.profile

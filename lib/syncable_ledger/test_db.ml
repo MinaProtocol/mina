@@ -26,7 +26,7 @@ struct
 
   module L = struct
     module MT =
-      Merkle_ledger.Database.Make (Balance) (Account) (Hash) (Depth)
+      Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth)
         (In_memory_kvdb)
         (In_memory_sdb)
     module Addr = MT.Addr
@@ -37,25 +37,19 @@ struct
 
     type account = Account.t
 
-    type key = MT.key
+    type key = MT.location
 
     type addr = Addr.t
 
-    type path = MT.MerklePath.t list
+    type path = MT.Path.t
 
     type t = MT.t
 
     let depth = Depth.depth
 
-    let length = MT.num_accounts
+    let num_accounts = MT.num_accounts
 
-    let clear_syncing _ = ()
-
-    let set_syncing _ = ()
-
-    let extend_with_empty_to_fit _ _ = ()
-
-    let merkle_path_at_addr_exn = MT.merkle_path_at_addr
+    let merkle_path_at_addr_exn = MT.merkle_path_at_addr_exn
 
     let merkle_root = MT.merkle_root
 
@@ -74,8 +68,7 @@ struct
       in
       List.iter keys ~f:(fun key ->
           let account = Account.create key balance in
-          assert (MT.set_account ledger account = Ok ()) )
-      |> ignore ;
+          MT.get_or_create_account_exn ledger key account |> ignore ) ;
       (ledger, keys)
   end
 
