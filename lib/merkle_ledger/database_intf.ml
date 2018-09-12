@@ -30,6 +30,12 @@ module type S = sig
 
   val set : t -> location -> account -> unit
 
+  val get_at_index_exn : t -> int -> account
+
+  val set_at_index_exn : t -> int -> account -> unit
+
+  val index_of_key_exn : t -> key -> int
+
   val get_or_create_account :
     t -> key -> account -> ([`Added | `Existed] * location, error) result
 
