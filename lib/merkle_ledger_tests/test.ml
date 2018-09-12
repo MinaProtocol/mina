@@ -12,6 +12,7 @@ let%test_module "Database integration test" =
     module DB =
       Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
         (In_memory_sdb)
+        (Storage_locations)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
     module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
 

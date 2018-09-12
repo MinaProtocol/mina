@@ -43,7 +43,7 @@ module type Key_value_database = sig
 
   val copy : t -> t
 
-  val create : unit -> t
+  val create : directory:string -> t
 
   val destroy : t -> unit
 
@@ -59,7 +59,7 @@ module type Stack_database = sig
 
   val copy : t -> t
 
-  val create : unit -> t
+  val create : filename:string -> t
 
   val destroy : t -> unit
 
@@ -68,4 +68,10 @@ module type Stack_database = sig
   val pop : t -> Bigstring.t option
 
   val length : t -> int
+end
+
+module type Storage_locations = sig
+  val key_value_db_dir : string
+
+  val stack_db_file : string
 end

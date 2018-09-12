@@ -269,6 +269,7 @@ let%test_module "test functor on in memory databases" =
       module MT =
         Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
           (In_memory_sdb)
+          (Storage_locations)
 
       (* TODO: this function should work with dynamic modules *)
       let with_instance (f: (module DB with type t = MT.t) -> MT.t -> 'a) =

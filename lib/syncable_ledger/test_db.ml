@@ -29,6 +29,7 @@ struct
       Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth)
         (In_memory_kvdb)
         (In_memory_sdb)
+        (Storage_locations)
     module Addr = MT.Addr
 
     type root_hash = Hash.t
