@@ -33,6 +33,7 @@ let main dry_run check path =
         | `Dir ->
             not (String.is_suffix ~suffix:".git" path)
             && not (String.is_suffix ~suffix:"_build" path)
+            && not (String.is_suffix ~suffix:"stationary" path)
             && not (String.is_suffix ~suffix:".un~" path)
             && not (String.is_suffix ~suffix:"external" path)
             && not (String.is_suffix ~suffix:"ocamlformat" path)
