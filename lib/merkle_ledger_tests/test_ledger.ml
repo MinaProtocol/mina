@@ -22,9 +22,11 @@ let%test_module "test functor on in memory databases" =
         let ledger = create () in
         let keys = List.init n ~f:(fun i -> Int.to_string i) in
         List.iter keys ~f:(fun k ->
-            ignore
-            @@ create_account_exn ledger k
-                 {Account.balance= UInt64.of_int b; public_key= k} ) ;
+            let action, _ =
+              get_or_create_account_exn ledger k
+                {Account.balance= UInt64.of_int b; public_key= k}
+            in
+            assert (action = `Added) ) ;
         (ledger, keys)
     end
 
@@ -53,11 +55,6 @@ let%test_module "test functor on in memory databases" =
       let%bind location = L.location_of_key ledger public_key in
       L.get ledger location
 
-    let set (type t key account location) (module L
-        : Merkle_ledger.Ledger_intf.S with type t = t and type key = key and type account = 
-          account and type Location.t = location) ledger public_key account =
-      ignore @@ L.create_account_exn ledger public_key account
-
     let gkey = Option.map ~f:(Fn.compose UInt64.to_int Account.balance)
 
     let%test "key_retrieval" =
@@ -84,9 +81,12 @@ let%test_module "test functor on in memory databases" =
       let initial_balance = 100 in
       let ledger, keys = L16.load_ledger 10 initial_balance in
       let public_key = List.nth_exn keys 0 in
-      assert (Some initial_balance = gkey @@ get (module L16) ledger public_key) ;
-      set (module L16) ledger public_key {balance= UInt64.of_int 50; public_key} ;
-      assert (Some 50 = gkey @@ get (module L16) ledger public_key)
+      let location =
+        L16.location_of_key ledger public_key |> Option.value_exn
+      in
+      assert (Some initial_balance = gkey @@ L16.get ledger location) ;
+      L16.set ledger location {balance= UInt64.of_int 50; public_key} ;
+      assert (Some 50 = gkey @@ L16.get ledger location)
 
     let%test_unit "modify_account_by_idx" =
       let b = 100 in
@@ -127,14 +127,17 @@ let%test_module "test functor on in memory databases" =
       let ledger, keys = L16.load_ledger n b1 in
       let public_key = List.nth_exn keys 0 in
       let root0 = L16.merkle_root ledger in
+      let location =
+        L16.location_of_key ledger public_key |> Option.value_exn
+      in
       assert (Hash.empty <> root0) ;
-      set (module L16) ledger public_key {balance= b2; public_key} ;
+      L16.set ledger location {balance= b2; public_key} ;
       let root1 = L16.merkle_root ledger in
       assert (root1 <> root0) ;
-      set (module L16) ledger public_key {balance= UInt64.of_int b1; public_key} ;
+      L16.set ledger location {balance= UInt64.of_int b1; public_key} ;
       let root2 = L16.merkle_root ledger in
       assert (root2 = root0) ;
-      set (module L16) ledger public_key {balance= b2; public_key} ;
+      L16.set ledger location {balance= b2; public_key} ;
       let root3 = L16.merkle_root ledger in
       assert (root3 = root1)
 
@@ -150,19 +153,6 @@ let%test_module "test functor on in memory databases" =
       |> Option.value_exn |> L.merkle_path ledger
 
     let%test_unit "merkle_path" =
-      let b1 = 10 in
-      List.iter
-        (List.range ~stop:`inclusive 1 (1 lsl 3))
-        ~f:(fun n ->
-          let ledger, keys = L3.load_ledger n b1 in
-          let key = List.nth_exn keys 0 in
-          let path = merkle_path (module L3) ledger key in
-          let account = get (module L3) ledger key |> Option.value_exn in
-          let root = L3.merkle_root ledger in
-          assert (List.length path = 3) ;
-          assert (check_path account path root) )
-
-    let%test_unit "little_merkle_path" =
       let b1 = 10 in
       List.iter
         (List.range ~stop:`inclusive 1 (1 lsl 3))
@@ -193,14 +183,12 @@ let%test_module "test functor on in memory databases" =
       let ledger, keys = L16.load_ledger n b1 in
       List.iter (List.range 0 n) ~f:(fun i ->
           let public_key = List.nth_exn keys i in
-          set
-            (module L16)
-            ledger public_key
-            {balance= UInt64.of_int b2; public_key} ;
-          let path = merkle_path (module L16) ledger public_key in
-          let account =
-            get (module L16) ledger public_key |> Option.value_exn
+          let location =
+            L16.location_of_key ledger public_key |> Option.value_exn
           in
+          L16.set ledger location {balance= UInt64.of_int b2; public_key} ;
+          let path = merkle_path (module L16) ledger public_key in
+          let account = L16.get ledger location |> Option.value_exn in
           let root = L16.merkle_root ledger in
           assert (check_path account path root) )
 

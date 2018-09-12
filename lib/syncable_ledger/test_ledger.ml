@@ -35,7 +35,7 @@ struct
       let keys = List.init n ~f:(fun i -> Int.to_string i) in
       List.iter keys ~f:(fun k ->
           ignore
-          @@ create_account_exn ledger k
+          @@ get_or_create_account_exn ledger k
                {Account.balance= UInt64.of_int b; public_key= k} ) ;
       (ledger, keys)
   end

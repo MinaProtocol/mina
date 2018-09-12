@@ -1316,8 +1316,8 @@ let%test_module "transaction_snark" =
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
           Array.iter wallets ~f:(fun {account; private_key= _} ->
-              Ledger.create_account_exn ledger account.public_key account
-              |> ignore ) ;
+              Ledger.create_new_account_exn ledger account.public_key account
+          ) ;
           let t1 =
             transaction wallets 0 1 8
               (Fee.of_int (Random.int 20))

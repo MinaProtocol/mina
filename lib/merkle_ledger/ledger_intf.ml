@@ -29,7 +29,8 @@ module type S = sig
 
   val set : t -> Location.t -> account -> unit
 
-  val create_account_exn : t -> key -> account -> Location.t
+  val get_or_create_account_exn :
+    t -> key -> account -> [`Added | `Existed] * Location.t
 
   val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
 

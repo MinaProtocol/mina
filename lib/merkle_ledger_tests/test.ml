@@ -77,10 +77,10 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Left)
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
-          List.iteri accounts ~f:(fun i ({public_key; _} as account) ->
+          List.iter accounts ~f:(fun ({public_key; _} as account) ->
               ignore @@ DB.get_or_create_account_exn db public_key account ;
               ignore
-              @@ Ledger.create_account_exn ledger (Int.to_string i) account ) ;
+              @@ Ledger.get_or_create_account_exn ledger public_key account ) ;
           let binary_tree = Binary_tree.set_accounts accounts in
           Sequence.iter
             (enumerate_dir_combinations Depth.depth |> Sequence.of_list)

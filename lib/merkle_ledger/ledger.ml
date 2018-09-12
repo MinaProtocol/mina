@@ -113,23 +113,30 @@ end = struct
     get t index
     |> Option.value_exn ~message:(index_not_found "get_at_index_exn" index)
 
-  let replace t index key account =
+  let replace t index old_key account =
     Dyn_array.set t.accounts index account ;
-    Hashtbl.remove t.tree.leafs key ;
+    Hashtbl.remove t.tree.leafs old_key ;
     Hashtbl.set t.tree.leafs ~key:(Account.public_key account) ~data:index ;
     (t.tree).dirty_indices <- index :: t.tree.dirty_indices
 
-  let create_account_exn t key account =
-    match Hashtbl.find t.tree.leafs key with
+  let allocate t key account =
+    let merkle_index = Dyn_array.length t.accounts in
+    Dyn_array.add t.accounts account ;
+    Hashtbl.set t.tree.leafs ~key ~data:merkle_index ;
+    (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
+    merkle_index
+
+  let get_or_create_account_exn t key account =
+    match location_of_key t key with
     | None ->
-        let merkle_index = Dyn_array.length t.accounts in
-        Dyn_array.add t.accounts account ;
-        Hashtbl.set t.tree.leafs ~key ~data:merkle_index ;
-        (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
-        merkle_index
-    | Some merkle_index ->
-        replace t merkle_index key account ;
-        merkle_index
+        let new_index = allocate t key account in
+        let max_accounts = 1 lsl Depth.depth in
+        if new_index > 1 lsl Depth.depth then
+          failwith
+            (sprintf "Reached max capacity for number of accounts %d"
+               max_accounts)
+        else (`Added, new_index)
+    | Some index -> (`Existed, index)
 
   let set_at_index_exn t index account =
     let leafs = t.tree.leafs in

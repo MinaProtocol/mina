@@ -71,7 +71,7 @@ let total_currency =
 let ledger =
   let ledger = Ledger.create () in
   let create_account pk account =
-    Ledger.create_account_exn ledger pk account |> ignore
+    Ledger.create_new_account_exn ledger pk account
   in
   create_account high_balance_pk
     { Account.public_key= high_balance_pk

@@ -17,6 +17,10 @@ include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
             let depth = ledger_depth
           end)
 
+let create_new_account_exn t pk account =
+  let action, _ = get_or_create_account_exn t pk account in
+  assert (action = `Added)
+
 let merkle_root t =
   Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
 
@@ -127,14 +131,10 @@ let undo_fee_transfer t transfer =
 (* TODO: Better system needed for making atomic changes. Could use a monad. *)
 let apply_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
   let get_or_initialize pk =
-    match location_of_key t pk with
-    | None -> (None, Account.initialize pk)
-    | Some l -> (Some l, get t l |> Option.value_exn)
-  in
-  let update_account location pk account =
-    match location with
-    | None -> create_account_exn t pk account |> ignore
-    | Some l -> set t l account
+    let initial_account = Account.initialize pk in
+    match get_or_create_account_exn t pk (Account.initialize pk) with
+    | `Added, location -> (location, initial_account)
+    | `Existed, location -> (location, get t location |> Option.value_exn)
   in
   let open Or_error.Let_syntax in
   let%bind proposer_reward, receiver_update =
@@ -149,13 +149,12 @@ let apply_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
         let reciever_location, receiver_account = get_or_initialize receiver in
         let%map balance = add_amount receiver_account.balance fee in
         ( proposer_reward
-        , Some (receiver, reciever_location, {receiver_account with balance})
-        )
+        , Some (reciever_location, {receiver_account with balance}) )
   in
   let proposer_location, proposer_account = get_or_initialize proposer in
   let%map balance = add_amount proposer_account.balance proposer_reward in
-  update_account proposer_location proposer {proposer_account with balance} ;
-  Option.iter receiver_update ~f:(fun (k, l, a) -> update_account l k a)
+  set t proposer_location {proposer_account with balance} ;
+  Option.iter receiver_update ~f:(fun (l, a) -> set t l a)
 
 (* Don't have to be atomic here because these should never fail. In fact, none of
    the undo functions should ever return an error. This should be fixed in the types. *)
