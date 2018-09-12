@@ -165,12 +165,12 @@ let%test_module "test functor on in memory databases" =
           assert (List.length path = 3) ;
           assert (check_path account path root) )
 
-    let%test_unit "merkle_path_at_index" =
+    let%test_unit "merkle_path_at_index_exn" =
       let b1 = 10 in
       let idx = 0 in
       List.iter (List.range 1 20) ~f:(fun n ->
           let ledger, _ = L16.load_ledger n b1 in
-          let path = L16.merkle_path_at_index ledger idx in
+          let path = L16.merkle_path_at_index_exn ledger idx in
           let account = L16.get_at_index_exn ledger idx in
           let root = L16.merkle_root ledger in
           assert (List.length path = 16) ;

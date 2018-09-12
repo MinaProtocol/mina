@@ -225,37 +225,41 @@ end = struct
 
   let compare t t' = Hash.compare (merkle_root t) (merkle_root t')
 
-  let merkle_path_at_index t index =
-    recompute_tree t ;
-    let rec go height addr layers acc =
-      match layers with
-      | [] -> (acc, height)
-      | curr :: layers ->
-          let is_left = addr mod 2 = 0 in
-          let hash =
-            let sibling = addr lxor 1 in
-            if sibling < Dyn_array.length curr then Dyn_array.get curr sibling
-            else empty_hash_at_height height
-          in
-          go (height + 1) (addr lsr 1) layers
-            ((if is_left then `Left hash else `Right hash) :: acc)
-    in
-    let leaf_hash_idx = index lxor 1 in
-    let leaf_hash =
-      if leaf_hash_idx >= Hashtbl.length t.tree.leafs then Hash.empty
-      else Hash.hash_account (Dyn_array.get t.accounts leaf_hash_idx)
-    in
-    let is_left = index mod 2 = 0 in
-    let non_root_nodes = List.take t.tree.nodes (depth - 1) in
-    let base_path, base_path_height =
-      go 1 (index lsr 1) non_root_nodes
-        [(if is_left then `Left leaf_hash else `Right leaf_hash)]
-    in
-    List.rev_append base_path
-      (List.init (depth - base_path_height) ~f:(fun i ->
-           `Left (empty_hash_at_height (i + base_path_height)) ))
+  let merkle_path_at_index_exn t index =
+    if index >= Dyn_array.length t.accounts then
+      failwith (index_not_found "merkle_path_at_index_exn" index)
+    else (
+      recompute_tree t ;
+      let rec go height addr layers acc =
+        match layers with
+        | [] -> (acc, height)
+        | curr :: layers ->
+            let is_left = addr mod 2 = 0 in
+            let hash =
+              let sibling = addr lxor 1 in
+              if sibling < Dyn_array.length curr then
+                Dyn_array.get curr sibling
+              else empty_hash_at_height height
+            in
+            go (height + 1) (addr lsr 1) layers
+              ((if is_left then `Left hash else `Right hash) :: acc)
+      in
+      let leaf_hash_idx = index lxor 1 in
+      let leaf_hash =
+        if leaf_hash_idx >= Hashtbl.length t.tree.leafs then Hash.empty
+        else Hash.hash_account (Dyn_array.get t.accounts leaf_hash_idx)
+      in
+      let is_left = index mod 2 = 0 in
+      let non_root_nodes = List.take t.tree.nodes (depth - 1) in
+      let base_path, base_path_height =
+        go 1 (index lsr 1) non_root_nodes
+          [(if is_left then `Left leaf_hash else `Right leaf_hash)]
+      in
+      List.rev_append base_path
+        (List.init (depth - base_path_height) ~f:(fun i ->
+             `Left (empty_hash_at_height (i + base_path_height)) )) )
 
-  let merkle_path = merkle_path_at_index
+  let merkle_path = merkle_path_at_index_exn
 
   module For_tests = struct
     let get_leaf_hash_at_addr t addr = get_leaf_hash t (Addr.to_int addr)
@@ -264,7 +268,7 @@ end = struct
   (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
     assert (Addr.depth a = Depth.depth - 1) ;
-    merkle_path_at_index t (Addr.to_int a)
+    merkle_path_at_index_exn t (Addr.to_int a)
 
   let set_at_addr_exn t addr acct =
     assert (Addr.depth addr = Depth.depth - 1) ;

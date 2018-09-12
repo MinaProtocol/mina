@@ -47,7 +47,7 @@ module type S = sig
 
   val index_of_key_exn : t -> key -> index
 
-  val merkle_path_at_index : t -> index -> Path.t
+  val merkle_path_at_index_exn : t -> index -> Path.t
 
   val get_at_index_exn : t -> index -> account
 

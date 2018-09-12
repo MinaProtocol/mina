@@ -435,7 +435,8 @@ end
 let handle_with_ledger (ledger: Ledger.t) =
   let open Tick in
   let path_at_index idx =
-    List.map ~f:Ledger.Path.elem_hash (Ledger.merkle_path_at_index ledger idx)
+    List.map ~f:Ledger.Path.elem_hash
+      (Ledger.merkle_path_at_index_exn ledger idx)
   in
   fun (With {request; respond}) ->
     let open Ledger_hash in
