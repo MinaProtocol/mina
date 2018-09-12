@@ -93,7 +93,7 @@ let%test_module "test functor on in memory databases" =
             let num_initial_accounts = List.length accounts in
             List.iter accounts ~f:(fun account ->
                 assert (MT.set_account mdb account = Ok ()) ) ;
-            assert (MT.length mdb = num_initial_accounts) )
+            assert (MT.num_accounts mdb = num_initial_accounts) )
 
       let%test_unit "set_inner_hash_at_addr_exn(address,hash); \
                      get_inner_hash_at_addr_exn(address) = hash" =

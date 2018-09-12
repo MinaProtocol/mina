@@ -300,7 +300,7 @@ end = struct
     in
     Result.map key_result ~f:(fun key -> update_account mdb key account)
 
-  let length t =
+  let num_accounts t =
     match Account_key.last_key_address t with
     | None -> 0
     | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
