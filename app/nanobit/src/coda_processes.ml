@@ -24,9 +24,9 @@ struct
     in
     (discovery_ports, external_ports, peers)
 
-  let spawn_local_processes_exn ?proposal_interval
-      ?(should_propose= Fn.const true) ?(first_delay= 3.0) n ~program_dir
-      ~snark_worker_public_keys ~f =
+  let spawn_local_processes_exn ?(transition_interval= 1000.0)
+      ?proposal_interval ?(should_propose= Fn.const true) ?(first_delay= 3.0) n
+      ~program_dir ~snark_worker_public_keys ~f =
     let fns =
       let discovery_ports, external_ports, peers = net_configs n in
       let peers = [] :: List.drop peers 1 in

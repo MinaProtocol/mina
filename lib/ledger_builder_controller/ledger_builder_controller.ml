@@ -11,11 +11,11 @@ module type Inputs_intf = sig
   module Security : Protocols.Coda_pow.Security_intf
 
   module Ledger_hash : sig
-    type t [@@deriving eq]
+    type t [@@deriving eq, bin_io, sexp, eq]
   end
 
   module Ledger_builder_hash : sig
-    type t [@@deriving eq, bin_io]
+    type t [@@deriving eq, bin_io, sexp]
 
     val ledger_hash : t -> Ledger_hash.t
   end
@@ -36,6 +36,10 @@ module type Inputs_intf = sig
     val merkle_root : t -> Ledger_hash.t
   end
 
+  module Ledger_builder_aux_hash : sig
+    type t [@@deriving sexp]
+  end
+
   module Ledger_builder : sig
     type t [@@deriving bin_io]
 
@@ -43,6 +47,8 @@ module type Inputs_intf = sig
 
     module Aux : sig
       type t [@@deriving bin_io]
+
+      val hash : t -> Ledger_builder_aux_hash.t
     end
 
     val ledger : t -> Ledger.t
@@ -58,6 +64,8 @@ module type Inputs_intf = sig
     val copy : t -> t
 
     val hash : t -> Ledger_builder_hash.t
+
+    val aux : t -> Aux.t
 
     val apply :
          t
@@ -324,14 +332,19 @@ end = struct
         State_hash.equal
           (Protocol_state.hash (state t))
           (Protocol_state.hash (External_transition.target_state transition))
+
+      let ledger_builder_ledger_hash t =
+        Ledger.merkle_root (Ledger_builder.ledger t.ledger_builder)
     end
 
     module Transition_logic_state =
       Transition_logic_state.Make (Security) (External_transition) (Tip)
+    module Ledger_hash = Ledger_hash
 
     module Catchup = Catchup.Make (struct
       module Ledger_hash = Ledger_hash
       module Ledger = Ledger
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder = Ledger_builder
       module Protocol_state_proof = Protocol_state_proof
@@ -455,7 +468,6 @@ end = struct
                   Deferred.upon w.Interruptible.d (function
                     | Ok [] -> ()
                     | Ok changes ->
-                        (* TODO fix this *)
                         Linear_pipe.write_without_pushback mutate_state_writer
                           (changes, current_transition)
                     | Error () -> () )
@@ -536,11 +548,17 @@ let%test_module "test" =
         let copy t = t
       end
 
+      module Ledger_builder_aux_hash = struct
+        type t = int [@@deriving sexp]
+      end
+
       module Ledger_builder = struct
         type t = int ref [@@deriving sexp, bin_io]
 
         module Aux = struct
           type t = int [@@deriving bin_io]
+
+          let hash t = t
         end
 
         type proof = ()
@@ -555,6 +573,8 @@ let%test_module "test" =
 
         let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
           Ok (create ledger)
+
+        let aux t = !t
 
         let apply (t: t) (x: Ledger_builder_diff.t) =
           t := x ;
