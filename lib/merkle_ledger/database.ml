@@ -310,6 +310,19 @@ end = struct
       (Location.Hash (Location.path location))
       (Hash.hash_account account)
 
+  let index_of_key_exn mdb key =
+    let location = location_of_key mdb key |> Option.value_exn in
+    let addr = Location.to_path_exn location in
+    Addr.to_int addr
+
+  let get_at_index_exn mdb index =
+    let addr = Addr.of_int_exn index in
+    get mdb (Location.Account addr) |> Option.value_exn
+
+  let set_at_index_exn mdb index account =
+    let addr = Addr.of_int_exn index in
+    set mdb (Location.Account addr) account
+
   let get_or_create_account mdb key account =
     match Account_location.get mdb key with
     | Error Account_location_not_found ->

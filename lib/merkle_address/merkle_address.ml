@@ -62,6 +62,8 @@ module type S = sig
   val height : t -> int
 
   val to_int : t -> int
+
+  val of_int_exn : int -> t
 end
 
 module Make (Input : sig
@@ -190,6 +192,18 @@ struct
            let index = depth path - 1 - i in
            acc + ((if get path index <> 0 then 1 else 0) lsl i) )
 
+  let of_int_exn index =
+    if index >= 1 lsl Input.depth then failwith "Index is too large"
+    else
+      let buf = create_bitstring Input.depth in
+      Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
+        (Input.depth - 1) 0
+      |> Sequence.fold ~init:index ~f:(fun i pos ->
+             Bitstring.put buf pos (i % 2) ;
+             i / 2 )
+      |> ignore ;
+      buf
+
   let dirs_from_root t =
     List.init (depth t) ~f:(fun pos -> Direction.of_bool (is_set t pos))
 
@@ -274,6 +288,25 @@ struct
       ~f:(fun (path, direction) ->
         let address = of_directions path in
         [%test_eq : t] (parent_exn (child_exn address direction)) address )
+
+  let%test_unit "to_index(of_index_exn(i)) = i" =
+    Quickcheck.test ~sexp_of:[%sexp_of : int]
+      (Int.gen_incl 0 ((1 lsl Input.depth) - 1))
+      ~f:(fun index ->
+        [%test_result : int] ~expect:index (to_int @@ of_int_exn index) )
+
+  let%test_unit "of_index_exn(to_index(addr)) = addr" =
+    Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
+      (Direction.gen_list Input.depth) ~f:(fun directions ->
+        let address = of_directions directions in
+        [%test_result : t] ~expect:address (of_int_exn @@ to_int address) )
+
+  let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
+    Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
+      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:
+      (fun directions ->
+        let address = of_directions directions in
+        [%test_result : t] ~expect:address (sibling @@ sibling address) )
 end
 
 let%test_module "Address" =
