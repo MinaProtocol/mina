@@ -190,7 +190,7 @@ let%test_module "test functor on in memory databases" =
             let public_key = "pk" in
             let balance = Quickcheck.random_value balance_gen in
             let account = Account.create public_key balance in
-            let account_location = create_account mdb account in
+            let account_location = create_new_account_exn mdb account in
             let mdb_copy = MT.copy mdb in
             let updated_account =
               Account.set_balance account (Balance.of_int (balance + gift))
