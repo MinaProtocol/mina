@@ -1023,7 +1023,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
-          ( Program.snark_worker_command_name
+          ( "internal" :: Program.snark_worker_command_name
           :: Snark_worker.arguments ~public_key ~daemon_port:client_port
                ~shutdown_on_disconnect )
     in
