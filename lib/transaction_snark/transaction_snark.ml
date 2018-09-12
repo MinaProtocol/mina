@@ -5,8 +5,6 @@ open Snark_params
 open Currency
 open Fold_lib
 
-let bundle_length = 1
-
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
 let tick_input () =
@@ -240,8 +238,7 @@ end
 let handle_with_ledger (ledger: Ledger.t) =
   let open Tick in
   let path_at_index idx =
-    List.map ~f:Ledger.Path.elem_hash
-      (Ledger.merkle_path_at_index_exn ledger idx)
+    List.map ~f:Ledger.Path.elem_hash (Ledger.merkle_path_at_index ledger idx)
   in
   fun (With {request; respond}) ->
     let open Ledger_hash in
@@ -1319,7 +1316,8 @@ let%test_module "transaction_snark" =
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
           Array.iter wallets ~f:(fun {account; private_key= _} ->
-              Ledger.set ledger account.public_key account ) ;
+              Ledger.create_account_exn ledger account.public_key account
+              |> ignore ) ;
           let t1 =
             transaction wallets 0 1 8
               (Fee.of_int (Random.int 20))

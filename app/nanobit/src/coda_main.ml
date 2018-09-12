@@ -747,7 +747,10 @@ module type Main_intf = sig
 
       val copy : t -> t
 
-      val get : t -> Public_key.Compressed.t -> Account.t option
+      val location_of_key :
+        t -> Public_key.Compressed.t -> Ledger.Location.t option
+
+      val get : t -> Ledger.Location.t -> Account.t option
 
       val num_accounts : t -> int
     end
@@ -889,7 +892,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    let%map account = Ledger.get ledger addr in
+    let%bind location = Ledger.location_of_key ledger addr in
+    let%map account = Ledger.get ledger location in
     account.Account.balance
 
   let is_valid_transaction t (txn: Transaction.t) =
@@ -918,7 +922,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_nonce t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    let%map account = Ledger.get ledger addr in
+    let%bind location = Ledger.location_of_key ledger addr in
+    let%map account = Ledger.get ledger location in
     account.Account.nonce
 
   let start_time = Time_ns.now ()
