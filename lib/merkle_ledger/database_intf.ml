@@ -38,6 +38,8 @@ module type S = sig
 
   val merkle_path : t -> location -> Path.t
 
+  val copy : t -> t
+
   include Syncable_intf.S
           with type root_hash := hash
            and type hash := hash

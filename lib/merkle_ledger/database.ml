@@ -353,6 +353,8 @@ end = struct
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 
+  let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
+
   let merkle_path mdb location =
     let location =
       if Location.is_account location then
