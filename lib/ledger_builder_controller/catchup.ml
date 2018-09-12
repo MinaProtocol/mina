@@ -161,35 +161,20 @@ module Make (Inputs : Inputs_intf) = struct
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
             | Ok lb ->
-                if not (Ledger_builder_hash.equal 
-                    (Ledger_builder.hash lb) 
-                    (External_transition.ledger_builder_hash transition))
-                then (
-                  Logger.fatal !Coda.global_log !"hashes did not match %{sexp:Ledger_builder_hash.t} %{sexp:Ledger_builder_hash.t}" (Ledger_builder.hash lb) (External_transition.ledger_builder_hash transition);
-
-                  let lh = Ledger.merkle_root ledger in
-                  Logger.fatal !Coda.global_log !"Ledger-hashes Lh1: %{sexp: Ledger_hash.t}; Lh2: %{sexp:Ledger_hash.t}" h lh;
-                  Logger.fatal !Coda.global_log !"Aux nhash %{sexp: Ledger_builder_aux_hash.t}" (Ledger_builder.Aux.hash aux)
-                );
+                sl_ref := None ;
                 let new_tree =
                   Transition_logic_state.Transition_tree.singleton transition
                 in
-                sl_ref := None ;
                 let new_tip = Tip.of_transition_and_lb transition lb in
                 let open Transition_logic_state.Change in
-                let changes = [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip] in
-               let changes_sexp = Printf.sprintf !"%{sexp:Transition_logic_state.Change.t list}" changes in
-               let hash2 = Md5.digest_string changes_sexp |> Md5.to_hex in
-               Logger.fatal !Coda.global_log !"changes catchup %s" hash2;
-
-                changes
+                [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
             | Error e ->
-                Logger.info log "Malicious aux data received from net %s"
+                Logger.warn log "Malicious aux data received from net %s"
                   (Error.to_string_hum e) ;
                 (* TODO: Retry? see #361 *)
                 [] )
           | Error e ->
-              Logger.info log "Network failed to send aux %s"
+              Logger.warn log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;
               [] )
       | `Target_changed -> return []

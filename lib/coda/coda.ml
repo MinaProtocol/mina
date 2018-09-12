@@ -483,10 +483,8 @@ module Make (Inputs : Inputs_intf) = struct
         ~get_ledger_builder_aux_at_hash:(fun hash ->
           let%bind lbc = lbc_deferred in
           (* TODO: Just make lbc do this *)
-          Logger.fatal config.log !"Trying to get lbc at %{sexp:Ledger_builder_hash.t}" hash;
           match%map Ledger_builder_controller.local_get_ledger lbc hash with
           | Ok (lb, _state) ->
-              Logger.fatal config.log !"Got a local_ledger\nlb_hash:%{sexp:Ledger_builder_hash.t} for\nhash:%{sexp:Ledger_builder_hash.t} aux hash:%{sexp:Ledger_builder_aux_hash.t}\nLedger:%{sexp:Ledger_hash.t}" (Ledger_builder.hash lb) hash (Ledger_builder.aux lb |> Ledger_builder.Aux.hash) (Ledger.merkle_root (Ledger_builder.ledger lb));
               Some
                 ( Ledger_builder.aux lb
                 , Ledger.merkle_root (Ledger_builder.ledger lb) )

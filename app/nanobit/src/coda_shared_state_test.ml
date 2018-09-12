@@ -27,11 +27,10 @@ struct
       Some [Some Genesis_ledger.high_balance_pk; None]
     in
     Coda_processes.init () ;
-    Coda_processes.spawn_local_processes_exn 
+    Coda_processes.spawn_local_processes_exn
       ~transition_interval
       n ~program_dir
       ~snark_worker_public_keys
-      (*~first_delay:5.0*)
       ~should_propose:(fun i -> i = 0)
       ~f:(fun workers ->
         let blocks = ref 0 in
@@ -56,10 +55,6 @@ struct
                       if i=1 then (Logger.trace log !"got balance %{sexp: Currency.Balance.t option}" b);
                       Option.iter b ~f:(fun b ->
                           if b <> !last_balance then (
-                            (*Logger.debug log
-                              !"%d got updated balance %{sexp: \
-                                Currency.Balance.t}"
-                              i b ;*)
                             update_block := !blocks ;
                             last_balance := b ) ) ;
                       let%bind () = after (Time.Span.of_sec 0.5) in
@@ -77,19 +72,6 @@ struct
                    (Linear_pipe.iter strongest_ledgers ~f:(fun (prev, curr) ->
                         if i = 0 then blocks := !blocks + 1 ;
                         let diff = !blocks - !update_block in
-                        let bits_to_str b =
-                          let str =
-                            String.concat
-                              (List.map b ~f:(fun x -> if x then "1" else "0"))
-                          in
-                          let hash = Md5.digest_string str in
-                          Md5.to_hex hash
-                        in
-                        (*let prev_str = bits_to_str prev in*)
-                        let curr_str = bits_to_str curr in
-                        (*Logger.debug log "%d blocks/update_block diff %d %d %d %s %s"
-                          i !blocks !update_block diff prev_str curr_str;*)
-                        Logger.debug log "%d %s" i curr_str;
                         assert (diff < max_dist || !blocks < start_margin) ;
                         let%bind () =
                           if !blocks > (10 + start_margin) then exit 0 else Deferred.unit

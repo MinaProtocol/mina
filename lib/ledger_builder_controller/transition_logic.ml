@@ -201,18 +201,10 @@ struct
                 return None
               | Some tip ->
                   match%bind step tip curr with
-                  | Ok tip ->
-                    Logger.fatal t.log !"Tip's ledger_hash: %{sexp: Ledger_hash.t} transition lh %{sexp: Ledger_hash.t}" (Tip.ledger_builder_ledger_hash tip) (External_transition.ledger_hash curr);
-                    (* TODO: Enable this assertion when we fix this bug *)
-                    (*assert (
-                      Ledger_hash.equal
-                        (Tip.ledger_builder_ledger_hash tip)
-                        (External_transition.ledger_hash curr)
-                    ); *)
-                    return (Some tip)
+                  | Ok tip -> return (Some tip)
                   | Error e ->
                       (* TODO: Punish sender *)
-                      Logger.fatal t.log "Recieved malicious transition %s"
+                      Logger.error t.log "Recieved malicious transition %s"
                         (Error.to_string_hum e) ;
                       return None )
         in
@@ -221,12 +213,8 @@ struct
             assert (
               Protocol_state.equal_value (Tip.state tip)
                 (External_transition.target_state last_transition) ) ;
-            let changes = [ Transition_logic_state.Change.Longest_branch_tip tip
-            ; Transition_logic_state.Change.Ktree new_tree ] in
-               let changes_sexp = Printf.sprintf !"%{sexp:Transition_logic_state.Change.t list}" changes in
-               let hash2 = Md5.digest_string changes_sexp |> Md5.to_hex in
-               Logger.fatal !Coda.global_log !"changes PT %s" hash2;
-               changes
+            [ Transition_logic_state.Change.Longest_branch_tip tip
+            ; Transition_logic_state.Change.Ktree new_tree ]
         | None -> []
       in
       (work, ivar)
@@ -334,7 +322,7 @@ struct
           | `Keep -> return ([], None)
           | `Take ->
               let lh = External_transition.ledger_hash transition in
-              Logger.fatal t.log !"Branch No ktree for transition: lh:%{sexp: Ledger_hash.t} state:%{sexp:Protocol_state.value}" lh target_state ;
+              Logger.debug t.log !"Branch catchup for transition: lh:%{sexp: Ledger_hash.t} state:%{sexp:Protocol_state.value}" lh target_state ;
               return ([], Some (Catchup.sync catchup state transition)))
     | Some old_tree ->
       match
@@ -352,7 +340,7 @@ struct
               ~logger:log ~time_received
           with
           | `Keep ->
-              Logger.fatal t.log "Branch noparent";
+              Logger.debug t.log "Branch noparent";
               return ([], Some (Catchup.sync catchup state transition))
           | `Take -> return ([], None) )
       | `Repeat -> return ([], None)

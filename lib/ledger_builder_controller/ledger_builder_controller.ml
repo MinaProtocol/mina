@@ -249,8 +249,6 @@ end = struct
         let open Deferred.Or_error.Let_syntax in
         let old_state = tip.protocol_state in
         let new_state = External_transition.protocol_state transition in
-        let ledger_builder_hash = Ledger_builder.hash tip.ledger_builder in
-        Logger.fatal !Coda.global_log !"start apply %{sexp:Ledger_builder_hash.t}" ledger_builder_hash;
         let%bind verified =
           verify_blockchain
             (External_transition.protocol_state_proof transition)
@@ -267,8 +265,6 @@ end = struct
               |> Blockchain_state.ledger_hash
         in
         let ledger_builder_hash = Ledger_builder.hash tip.ledger_builder in
-        Logger.fatal !Coda.global_log !"out aux nhash %{sexp: Ledger_builder_aux_hash.t}" (Ledger_builder.Aux.hash (Ledger_builder.aux tip.ledger_builder));
-        Logger.fatal !Coda.global_log !"out %{sexp:Ledger_builder_hash.t}" ledger_builder_hash;
         let%map () =
           if
             verified
@@ -386,8 +382,6 @@ end = struct
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
   let create (config: Config.t) =
-    let ledger_builder_hash = Ledger_builder.hash config.genesis_tip.ledger_builder in
-    Logger.fatal !Coda.global_log !"init %{sexp:Ledger_builder_hash.t}" ledger_builder_hash;
     let log = Logger.child config.parent_log "ledger_builder_controller" in
     let state = Transition_logic_state.create config.genesis_tip in
     let%map net = config.net_deferred in
@@ -416,15 +410,6 @@ end = struct
            let new_state =
              Transition_logic_state.apply_all old_state changes
            in
-           let old_tip = Transition_logic_state.longest_branch_tip old_state in
-           let new_tip = Transition_logic_state.longest_branch_tip new_state in
-           let old_tip = Ledger_builder.hash old_tip.ledger_builder in
-           let new_tip = Ledger_builder.hash new_tip.ledger_builder in
-           let sexp_t = External_transition.sexp_of_t transition in
-           let hash = Md5.digest_string (Sexp.to_string sexp_t) |> Md5.to_hex in
-           let changes_sexp = Printf.sprintf !"%{sexp:Transition_logic_state.Change.t list}" changes in
-           let hash2 = Md5.digest_string changes_sexp |> Md5.to_hex in
-           Logger.fatal !Coda.global_log !"old,new %{sexp:Ledger_builder_hash.t} %{sexp:Ledger_builder_hash.t} %s %s %d" old_tip new_tip hash hash2 (List.length changes);
            t.handler <- Transition_logic.create new_state log ;
            ( if
                not
@@ -435,7 +420,6 @@ end = struct
                     |> Tip.state ))
              then
                let tip = Transition_logic_state.longest_branch_tip new_state in
-               Logger.fatal !Coda.global_log !"Right before strongest_ledger_writer %{sexp:Ledger_hash.t}" (Ledger.merkle_root (Ledger_builder.ledger tip.ledger_builder));
                Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
                  strongest_ledgers_reader
                  (tip.ledger_builder, transition) ) ;
@@ -444,32 +428,14 @@ end = struct
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.external_transitions ~f:(fun (transition, time_received) ->
-
-          (*let bits_to_str b =
-            let str =
-              String.concat
-                (List.map b ~f:(fun x -> if x then "1" else "0"))
-            in
-            let hash = Md5.digest_string str in
-            Md5.to_hex hash
-          in
-          let s = External_transition.protocol_state transition in
-          let c = Protocol_state.hash s in
-          let c = State_hash.to_bits c in
-          let s = bits_to_str c in*)
           let%bind changes, job =
             Transition_logic.on_new_transition catchup t.handler transition
               ~time_received
           in
-          (*Logger.fatal log "%s %d %b" s (List.length changes) (Option.is_some job);*)
           let%map () =
             match changes with
             | [] -> return ()
-            | changes ->
-               let changes_sexp = Printf.sprintf !"%{sexp:Transition_logic_state.Change.t list}" changes in
-               let hash2 = Md5.digest_string changes_sexp |> Md5.to_hex in
-               Logger.fatal !Coda.global_log !"changes %s" hash2;
-                Linear_pipe.write mutate_state_writer (changes, transition)
+            | changes -> Linear_pipe.write mutate_state_writer (changes, transition)
           in
           Option.map job ~f:(fun job -> (job, time_received)) )
     in
@@ -502,24 +468,6 @@ end = struct
                   Deferred.upon w.Interruptible.d (function
                     | Ok [] -> ()
                     | Ok changes ->
-                        (* TODO fix this *)
-                      (*let bits_to_str b =
-                        let str =
-                          String.concat
-                            (List.map b ~f:(fun x -> if x then "1" else "0"))
-                        in
-                        let hash = Md5.digest_string str in
-                        Md5.to_hex hash
-                      in
-                      let s = External_transition.protocol_state current_transition in
-                      let c = Protocol_state.hash s in
-                      let c = State_hash.to_bits c in
-                      let s = bits_to_str c in
-
-                        Logger.fatal log "write %s" s;*)
-               let changes_sexp = Printf.sprintf !"%{sexp:Transition_logic_state.Change.t list}" changes in
-               let hash2 = Md5.digest_string changes_sexp |> Md5.to_hex in
-               Logger.fatal !Coda.global_log !"changes2 %s" hash2;
                         Linear_pipe.write_without_pushback mutate_state_writer
                           (changes, current_transition)
                     | Error () -> () )
