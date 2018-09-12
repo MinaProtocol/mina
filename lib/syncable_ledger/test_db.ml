@@ -47,7 +47,7 @@ struct
 
     let depth = Depth.depth
 
-    let length = MT.length
+    let num_accounts = MT.num_accounts
 
     let merkle_path_at_addr_exn = MT.merkle_path_at_addr_exn
 

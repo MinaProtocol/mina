@@ -327,7 +327,7 @@ end = struct
     |> Result.map_error ~f:(fun err -> Error_exception err)
     |> Result.ok_exn
 
-  let length t =
+  let num_accounts t =
     match Account_location.last_location_address t with
     | None -> 0
     | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1

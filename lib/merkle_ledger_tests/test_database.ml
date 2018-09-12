@@ -86,7 +86,7 @@ let%test_module "test functor on in memory databases" =
             let num_initial_accounts = List.length accounts in
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn mdb account ) ;
-            let result = MT.length mdb in
+            let result = MT.num_accounts mdb in
             [%test_eq : int] result num_initial_accounts )
 
       let%test "get_or_create_acount does not update an account if key \
