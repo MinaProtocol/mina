@@ -31,8 +31,6 @@ module type S = sig
 
   val create_account_exn : t -> key -> account -> Location.t
 
-  val update : t -> key -> f:(account option -> account) -> unit
-
   val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
 
   val hash_fold_t :

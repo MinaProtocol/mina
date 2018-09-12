@@ -88,16 +88,6 @@ let%test_module "test functor on in memory databases" =
       set (module L16) ledger public_key {balance= UInt64.of_int 50; public_key} ;
       assert (Some 50 = gkey @@ get (module L16) ledger public_key)
 
-    let%test_unit "update_account" =
-      let b = 100 in
-      let ledger, keys = L16.load_ledger 10 b in
-      let public_key = List.nth_exn keys 0 in
-      L16.update ledger public_key ~f:(function
-        | None -> assert false
-        | Some {balance; public_key} ->
-            {balance= UInt64.succ balance; public_key} ) ;
-      assert (Some (b + 1) = gkey @@ get (module L16) ledger public_key)
-
     let%test_unit "modify_account_by_idx" =
       let b = 100 in
       let ledger, _ = L16.load_ledger 10 b in
