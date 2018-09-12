@@ -544,11 +544,11 @@ module Make (Inputs : Inputs_intf) = struct
                   [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
                     fee_excess ;
                   [%test_eq : Ledger_hash.t]
-                    (Ledger_builder.ledger ledger_builder |> Ledger.merkle_root)
-                    target ;
-                  [%test_eq : Ledger_hash.t]
                     (Blockchain_state.ledger_hash bc_state)
-                    source ) ;
+                    source ;
+                  [%test_eq : Ledger_hash.t]
+                    (Ledger_builder.ledger ledger_builder |> Ledger.merkle_root)
+                    target ) ;
           Proposer.Tip_change
             { protocol_state=
                 ( protocol_state
