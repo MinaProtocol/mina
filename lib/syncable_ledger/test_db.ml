@@ -29,6 +29,7 @@ struct
       Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth)
         (In_memory_kvdb)
         (In_memory_sdb)
+        (Storage_locations)
     module Addr = MT.Addr
 
     type root_hash = Hash.t
@@ -62,7 +63,7 @@ struct
     let set_inner_hash_at_addr_exn = MT.set_inner_hash_at_addr_exn
 
     let load_ledger num_accounts (balance: int) =
-      let ledger = MT.create ~key_value_db_dir:"" ~stack_db_file:"" in
+      let ledger = MT.create () in
       let keys =
         List.init num_accounts ~f:(( + ) 1) |> List.map ~f:Int.to_string
       in
