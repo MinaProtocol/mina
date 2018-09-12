@@ -26,7 +26,8 @@ struct
 
   module L = struct
     module MT =
-      Merkle_ledger.Database.Make (Account) (Hash) (Depth) (In_memory_kvdb)
+      Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth)
+        (In_memory_kvdb)
         (In_memory_sdb)
     module Addr = MT.Addr
 
@@ -36,7 +37,7 @@ struct
 
     type account = Account.t
 
-    type key = MT.key
+    type key = MT.location
 
     type addr = Addr.t
 
@@ -67,8 +68,7 @@ struct
       in
       List.iter keys ~f:(fun key ->
           let account = Account.create key balance in
-          assert (MT.set_account ledger account = Ok ()) )
-      |> ignore ;
+          MT.get_or_create_account_exn ledger key account |> ignore ) ;
       (ledger, keys)
   end
 

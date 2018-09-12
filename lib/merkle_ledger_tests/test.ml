@@ -10,7 +10,8 @@ let%test_module "Database integration test" =
     end
 
     module DB =
-      Database.Make (Account) (Hash) (Depth) (In_memory_kvdb) (In_memory_sdb)
+      Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
+        (In_memory_sdb)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
     module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
 
@@ -80,8 +81,8 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Left)
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
-          List.iteri accounts ~f:(fun i account ->
-              assert (DB.set_account db account = Ok ()) ;
+          List.iteri accounts ~f:(fun i ({public_key; _} as account) ->
+              ignore @@ DB.get_or_create_account_exn db public_key account ;
               Ledger.set ledger (Int.to_string i) account ) ;
           Ledger.recompute_tree ledger ;
           let binary_tree = Binary_tree.set_accounts accounts in
