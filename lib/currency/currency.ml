@@ -103,6 +103,12 @@ module type Signed_intf = sig
   val of_unsigned : magnitude -> t
 
   module Checked : sig
+    val constant : t -> var
+
+    val of_unsigned : magnitude_var -> var
+
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
     val to_triples : var -> Boolean.var Triple.t list
 
     val add : var -> var -> (var, _) Checked.t
@@ -119,15 +125,22 @@ module type Signed_intf = sig
 end
 
 module type Checked_arithmetic_intf = sig
+  type t
+
   type var
 
   type signed_var
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
+  val if_value : Boolean.var -> then_:t -> else_:t -> var
+
   val add : var -> var -> (var, _) Checked.t
 
   val sub : var -> var -> (var, _) Checked.t
+
+  val sub_flagged :
+    var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
 
   val ( + ) : var -> var -> (var, _) Checked.t
 
@@ -148,6 +161,7 @@ module type S = sig
     Checked_arithmetic_intf
     with type var := var
      and type signed_var := Signed.var
+     and type t := t
 end
 
 module Make
@@ -242,6 +256,10 @@ end = struct
 
   let fold t = Fold.group3 ~default:false (fold t)
 
+  let if_ cond ~then_ ~else_ =
+    Field.Checked.if_ cond ~then_:(pack_var then_) ~else_:(pack_var else_)
+    >>= unpack_var
+
   module Signed = struct
     module Stable = struct
       module V1 = struct
@@ -320,6 +338,18 @@ end = struct
       let to_bits {magnitude; sgn} =
         var_to_bits magnitude @ [Sgn.Checked.is_pos sgn]
 
+      let constant {magnitude; sgn} =
+        {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
+
+      let of_unsigned magnitude = {magnitude; sgn= Sgn.Checked.pos}
+
+      let if_ cond ~then_ ~else_ =
+        let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
+        and magnitude =
+          if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
+        in
+        {sgn; magnitude}
+
       let to_triples t =
         Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
 
@@ -373,13 +403,45 @@ end = struct
   end
 
   module Checked = struct
-    let if_ cond ~then_ ~else_ =
-      Field.Checked.if_ cond ~then_:(pack_var then_) ~else_:(pack_var else_)
-      >>= unpack_var
+    let if_ = if_
+
+    let if_value cond ~then_ ~else_ : var =
+      List.init M.length ~f:(fun i ->
+          match (Vector.get then_ i, Vector.get else_ i) with
+          | true, true -> Boolean.true_
+          | false, false -> Boolean.false_
+          | true, false -> cond
+          | false, true -> Boolean.not cond )
 
     (* Unpacking protects against underflow *)
     let sub (x: Unpacked.var) (y: Unpacked.var) =
       unpack_var (Field.Checked.sub (pack_var x) (pack_var y))
+
+    let sub_flagged x y =
+      let z = Field.Checked.sub (pack_var x) (pack_var y) in
+      let%map bits, `Success no_underflow =
+        Field.Checked.unpack_flagged z ~length:length_in_bits
+      in
+      (bits, `Underflow (Boolean.not no_underflow))
+
+    let%test_unit "sub_flagged" =
+      let sub_flagged_unchecked (x, y) =
+        if x < y then (zero, true) else (Option.value_exn (x - y), false)
+      in
+      let sub_flagged_checked =
+        let f (x, y) =
+          Checked.map (sub_flagged x y) ~f:(fun (r, `Underflow u) -> (r, u))
+        in
+        Test_util.checked_to_unchecked (Typ.tuple2 typ typ)
+          (Typ.tuple2 typ Boolean.typ)
+          f
+      in
+      Quickcheck.test ~trials:100 (Quickcheck.Generator.tuple2 gen gen) ~f:
+        (fun p ->
+          let m, u = sub_flagged_unchecked p in
+          let m_checked, u_checked = sub_flagged_checked p in
+          assert (Bool.equal u u_checked) ;
+          if not u then [%test_eq : magnitude] m m_checked )
 
     (* Unpacking protects against overflow *)
     let add (x: Unpacked.var) (y: Unpacked.var) =
