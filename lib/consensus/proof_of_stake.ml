@@ -1039,5 +1039,9 @@ let%test_module "Proof_of_stake tests" =
       let unforkable_transition_count = 24
 
       let probable_slots_per_transition_count = 8
+
+      let expected_network_delay = Nanobit_base.Block_time.Span.of_ms (Int64.of_int 1000)
+
+      let approximate_network_diameter = 3
     end)
   end )

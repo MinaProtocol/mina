@@ -595,7 +595,7 @@ struct
                    ((Ledger_proof.statement proof).target, proof) ))
 
         let of_aux_and_ledger =
-          of_aux_and_ledger ~public_key:Init.fee_public_key
+          of_aux_and_ledger ~public_key:(Public_key.compress keypair.public_key)
       end
 
       module Consensus_mechanism = Consensus_mechanism
