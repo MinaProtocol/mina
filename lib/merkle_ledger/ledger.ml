@@ -3,7 +3,7 @@ open Core
 (* SOMEDAY: handle empty wallets *)
 module Make
     (Key : Intf.Key) (Account : sig
-        type t [@@deriving sexp]
+        type t [@@deriving sexp, bin_io]
 
         include Intf.Account with type t := t and type key := Key.t
     end)
@@ -48,22 +48,6 @@ end = struct
   [@@deriving sexp, bin_io]
 
   type t = {accounts: accounts; tree: tree} [@@deriving sexp, bin_io]
-
-  module Container0 :
-    Container.S0 with type t := t and type elt := Account.t =
-  Container.Make0 (struct
-    module Elt = Account
-
-    type nonrec t = t
-
-    let fold t ~init ~f =
-      Hashtbl.fold t.accounts ~init ~f:(fun ~key:_ ~data:{account; _} acc ->
-          f acc account )
-
-    let iter = `Define_using_fold
-  end)
-
-  include Container0
 
   let copy t =
     let copy_tree tree =
@@ -343,7 +327,7 @@ end = struct
     let height = Addr.height a in
     let index = to_index a in
     recompute_tree t ;
-    if height < t.tree.nodes_height && index < length t then
+    if height < t.tree.nodes_height && index < num_accounts t then
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
       DynArray.get l index
     else if index = 0 && not (t.tree.nodes_height = 0) then
@@ -363,7 +347,7 @@ end = struct
   let set_all_accounts_rooted_at_exn t a accounts =
     let height = depth - Addr.depth a in
     let first_index = to_index a lsl height in
-    let count = min (1 lsl height) (length t - first_index) in
+    let count = min (1 lsl height) (num_accounts t - first_index) in
     assert (List.length accounts = count) ;
     List.iteri accounts ~f:(fun i a ->
         let pk = Account.public_key a in
@@ -375,7 +359,7 @@ end = struct
   let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
     let first_index = to_index a lsl height in
-    let count = min (1 lsl height) (length t - first_index) in
+    let count = min (1 lsl height) (num_accounts t - first_index) in
     let subarr = Dyn_array.sub t.tree.leafs first_index count in
     Dyn_array.to_list
       (Dyn_array.map
