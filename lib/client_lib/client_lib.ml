@@ -71,7 +71,7 @@ module Status = struct
           let padding =
             String.init (max_key_length - String.length s) ~f:(fun _ -> ' ')
           in
-          sprintf "%s: %s\t%s" s padding x )
+          sprintf "%s: %s %s" s padding x )
       |> String.concat ~sep:"\n"
     in
     title ^ output ^ "\n"
