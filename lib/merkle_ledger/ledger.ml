@@ -49,22 +49,6 @@ end = struct
 
   type t = {accounts: accounts; tree: tree} [@@deriving sexp, bin_io]
 
-  module Container0 :
-    Container.S0 with type t := t and type elt := Account.t =
-  Container.Make0 (struct
-    module Elt = Account
-
-    type nonrec t = t
-
-    let fold t ~init ~f =
-      Hashtbl.fold t.accounts ~init ~f:(fun ~key:_ ~data:{account; _} acc ->
-          f acc account )
-
-    let iter = `Define_using_fold
-  end)
-
-  (*include Container0*)
-
   let copy t =
     let copy_tree tree =
       { leafs= Dyn_array.copy tree.leafs
