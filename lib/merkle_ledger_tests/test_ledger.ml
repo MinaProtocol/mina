@@ -108,7 +108,7 @@ let%test_module "test functor on in memory databases" =
     let%test "merkle_root" =
       let ledger = L16.create () in
       let root = L16.merkle_root ledger in
-      compose_hash 16 Hash.empty = root
+      compose_hash 16 Hash.empty_account = root
 
     let%test "merkle_root_nonempty" =
       let l = (1 lsl (3 - 1)) + 1 in

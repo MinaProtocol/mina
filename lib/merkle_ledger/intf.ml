@@ -32,6 +32,8 @@ module type Hash = sig
   val merge : height:int -> t -> t -> t
 
   val hash_account : account -> t
+
+  val empty_account : t
 end
 
 module type Depth = sig

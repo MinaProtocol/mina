@@ -46,7 +46,7 @@ module Hash = struct
 
   let hash_account account = Md5.digest_string ("0" ^ Account.show account)
 
-  let empty = hash_account Account.empty
+  let empty = Md5.digest_string "nothing up my sleeve"
 
   let merge ~height a b =
     let res =
@@ -54,6 +54,8 @@ module Hash = struct
         (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
     in
     res
+
+  let empty_account = hash_account Account.empty
 end
 
 module Intf = Merkle_ledger.Intf

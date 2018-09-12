@@ -22,6 +22,8 @@ struct
     let hash_account = Hash.hash_account
 
     let to_hash = Fn.id
+
+    let empty_account = hash_account Account.empty
   end
 
   module L = struct

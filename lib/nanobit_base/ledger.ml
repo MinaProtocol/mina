@@ -12,6 +12,8 @@ include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
             let empty = Merkle_hash.empty_hash
 
             let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
+
+            let empty_account = hash_account Account.empty
           end)
           (struct
             let depth = ledger_depth
