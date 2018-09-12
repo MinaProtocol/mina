@@ -33,8 +33,8 @@ struct
         Logger.debug log
           !"connecting to peers %{sexp: Host_and_port.t list}\n"
           peers ;
-        Coda_process.spawn_local_exn () ~peers ~external_port ~discovery_port
-          ~snark_worker_config:None ~should_propose:false ~program_dir ~f:
+        Coda_process.spawn_local_exn ~peers ~external_port ~discovery_port
+          ~snark_worker_config:None ~should_propose:false ~program_dir () ~f:
           (fun worker ->
             let%bind _ = after (Time.Span.of_sec 10.) in
             let%bind peers = Coda_process.peers_exn worker in
