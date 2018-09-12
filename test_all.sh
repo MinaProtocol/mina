@@ -24,7 +24,7 @@ run_integration_tests() {
     pkill -9 kademlia
     pkill -9 cli
     sleep 1
-    dune exec cli -- $test 2>&1 >> test.log
+    dune exec cli -- integration-tests $test 2>&1 >> test.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
     if [ $OUT -eq 0 ];then

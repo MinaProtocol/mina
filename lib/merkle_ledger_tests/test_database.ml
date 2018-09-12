@@ -64,6 +64,12 @@ let%test_module "test functor on in memory databases" =
             location = location' && MT.get mdb location' = MT.get mdb location
         )
 
+      let dedup_accounts accounts =
+        List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
+            String.compare
+              (Account.public_key account1)
+              (Account.public_key account2) )
+
       let%test_unit "length" =
         with_test_instance (fun mdb ->
             let open Quickcheck.Generator in
@@ -74,10 +80,7 @@ let%test_module "test functor on in memory databases" =
               let%map accounts =
                 list_with_length num_initial_accounts Account.gen
               in
-              List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
-                  String.compare
-                    (Account.public_key account1)
-                    (Account.public_key account2) )
+              dedup_accounts accounts
             in
             let accounts =
               Quickcheck.random_value
@@ -140,21 +143,27 @@ let%test_module "test functor on in memory databases" =
                 let result = MT.get_inner_hash_at_addr_exn mdb address in
                 assert (Hash.equal result random_hash) ) )
 
-      let populate_db mdb max_height =
+      let random_accounts max_height =
         let num_accounts = 1 lsl max_height in
-        let initial_accounts =
-          Quickcheck.random_value
-            (Quickcheck.Generator.list_with_length num_accounts Account.gen)
-        in
-        List.iter initial_accounts ~f:(fun account ->
-            let action, location =
-              MT.get_or_create_account_exn mdb
-                (Account.public_key account)
-                account
-            in
-            match action with
-            | `Added -> ()
-            | `Existed -> MT.set mdb location account )
+        Quickcheck.random_value
+          (Quickcheck.Generator.list_with_length num_accounts Account.gen)
+
+      let populate_db mdb max_height =
+        random_accounts max_height
+        |> List.iter ~f:(fun account ->
+               let action, location =
+                 MT.get_or_create_account_exn mdb
+                   (Account.public_key account)
+                   account
+               in
+               match action with
+               | `Added -> ()
+               | `Existed -> MT.set mdb location account )
+
+      let build_padded_address directions offset =
+        let padding = List.init offset ~f:(fun _ -> Direction.Left) in
+        let padded_directions = List.concat [padding; directions] in
+        MT.Addr.of_directions padded_directions
 
       let%test_unit "If the entire database is full,\n\
                      \ \
@@ -165,14 +174,11 @@ let%test_module "test functor on in memory databases" =
             populate_db mdb max_height ;
             Quickcheck.test (Direction.gen_var_length_list max_height)
               ~sexp_of:[%sexp_of : Direction.t List.t] ~f:(fun directions ->
-                let offset =
-                  List.init (Depth.depth - max_height) ~f:(fun _ ->
-                      Direction.Left )
+                let address =
+                  build_padded_address directions (Depth.depth - max_height)
                 in
-                let padded_directions = List.concat [offset; directions] in
-                let address = MT.Addr.of_directions padded_directions in
                 let num_accounts =
-                  1 lsl (Depth.depth - List.length padded_directions)
+                  1 lsl (Depth.depth - MT.Addr.depth address)
                 in
                 let accounts =
                   Quickcheck.random_value
@@ -201,6 +207,34 @@ let%test_module "test functor on in memory databases" =
               MT.get mdb_copy account_location |> Option.value_exn
             in
             assert (account' <> updated_account') )
+
+      let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
+        with_test_instance (fun mdb ->
+            let max_height = Int.min Depth.depth 5 in
+            let accounts = random_accounts max_height |> dedup_accounts in
+            List.iter accounts ~f:(fun account ->
+                ignore @@ create_new_account_exn mdb account ) ;
+            Sequence.of_list accounts
+            |> Sequence.for_all ~f:(fun ({public_key; _} as account) ->
+                   let indexed_account =
+                     MT.index_of_key_exn mdb public_key
+                     |> MT.get_at_index_exn mdb
+                   in
+                   Account.equal account indexed_account ) )
+
+      let%test_unit "set_at_index_exn t index  account; get_at_index_exn t \
+                     index = account" =
+        with_test_instance (fun mdb ->
+            let max_height = Int.min Depth.depth 5 in
+            populate_db mdb max_height ;
+            Quickcheck.test
+              (Int.gen_incl 0 ((1 lsl max_height) - 1))
+              ~sexp_of:[%sexp_of : int]
+              ~f:(fun index ->
+                let account = Quickcheck.random_value Account.gen in
+                MT.set_at_index_exn mdb index account ;
+                let result = MT.get_at_index_exn mdb index in
+                assert (account = result) ) )
 
       let%test_unit "implied_root(account) = root_hash" =
         with_test_instance (fun mdb ->
