@@ -578,6 +578,7 @@ struct
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
       module Ledger_builder_diff = Ledger_builder_diff
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
 
       module Ledger_builder = struct
         include Ledger_builder
@@ -1022,7 +1023,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
-          ( Program.snark_worker_command_name
+          ( "internal" :: Program.snark_worker_command_name
           :: Snark_worker.arguments ~public_key ~daemon_port:client_port
                ~shutdown_on_disconnect )
     in
