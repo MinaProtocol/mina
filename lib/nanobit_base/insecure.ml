@@ -17,17 +17,16 @@ let randomness = true
 
 let integration_tests = true
 
-(* Enabling this will SPEED UP builds as keys are generated at compile-time *)
-let key_generation = true
-
-let verify_blockchain = true
-
-let compute_base_hash = true
-
-let compute_base_proof = true
-
-let extend_blockchain = true
-
-(* set this to true to enable snark verification *)
-(* (the above flags, from key_generation down, must be false *)
+(* set this to true to enable snarks and all the other tunables below *)
 let with_snark = false
+
+(* when true, these SPEED UP builds as keys are generated at compile-time *)
+let key_generation = not with_snark
+
+let verify_blockchain = not with_snark
+
+let compute_base_hash = not with_snark
+
+let compute_base_proof = not with_snark
+
+let extend_blockchain = not with_snark
