@@ -94,7 +94,7 @@ let apply_transaction_unchecked ledger
     @@ set ledger sender_location sender_account_without_balance_modified ;
     return undo )
   else
-    let%bind receiver_location = location_of_key' ledger "reciever" receiver in
+    let%bind receiver_location = location_of_key' ledger "receiver" receiver in
     let%bind receiver_account = get' ledger "receiver" receiver_location in
     let%map receiver_balance' = add_amount receiver_account.balance amount in
     set ledger sender_location
@@ -146,10 +146,10 @@ let apply_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
           error_opt "Coinbase fee transfer too large"
             (Amount.sub Protocols.Coda_praos.coinbase_amount fee)
         in
-        let reciever_location, receiver_account = get_or_initialize receiver in
+        let receiver_location, receiver_account = get_or_initialize receiver in
         let%map balance = add_amount receiver_account.balance fee in
         ( proposer_reward
-        , Some (reciever_location, {receiver_account with balance}) )
+        , Some (receiver_location, {receiver_account with balance}) )
   in
   let proposer_location, proposer_account = get_or_initialize proposer in
   let%map balance = add_amount proposer_account.balance proposer_reward in
@@ -164,13 +164,13 @@ let undo_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
     | None -> Protocols.Coda_praos.coinbase_amount
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
-        let reciever_location =
-          Or_error.ok_exn (location_of_key' t "reciever" receiver)
+        let receiver_location =
+          Or_error.ok_exn (location_of_key' t "receiver" receiver)
         in
         let receiver_account =
-          Or_error.ok_exn (get' t "receiver" reciever_location)
+          Or_error.ok_exn (get' t "receiver" receiver_location)
         in
-        set t reciever_location
+        set t receiver_location
           { receiver_account with
             balance=
               Option.value_exn
@@ -178,7 +178,7 @@ let undo_coinbase t ({proposer; fee_transfer}: Coinbase.t) =
         Amount.sub Protocols.Coda_praos.coinbase_amount fee |> Option.value_exn
   in
   let proposer_location =
-    Or_error.ok_exn (location_of_key' t "reciever" proposer)
+    Or_error.ok_exn (location_of_key' t "receiver" proposer)
   in
   let proposer_account =
     Or_error.ok_exn (get' t "proposer" proposer_location)
@@ -211,12 +211,12 @@ let undo_transaction ledger
     set ledger sender_location sender_account_without_balance_modified ;
     return () )
   else
-    let%bind reciever_location = location_of_key' ledger "receiver" receiver in
-    let%bind receiver_account = get' ledger "receiver" reciever_location in
+    let%bind receiver_location = location_of_key' ledger "receiver" receiver in
+    let%bind receiver_account = get' ledger "receiver" receiver_location in
     let%map receiver_balance' = sub_amount receiver_account.balance amount in
     set ledger sender_location
       {sender_account_without_balance_modified with balance= sender_balance'} ;
-    set ledger reciever_location
+    set ledger receiver_location
       {receiver_account with balance= receiver_balance'}
 
 let undo : t -> Undo.t -> unit Or_error.t =
