@@ -5,11 +5,16 @@ module type S = sig
 
   type hash
 
+  type location [@@deriving sexp]
+
   type key
 
   type t
 
-  type error = Account_key_not_found | Out_of_leaves | Malformed_database
+  type error =
+    | Account_location_not_found
+    | Out_of_leaves
+    | Malformed_database
 
   module Addr : Merkle_address.S
 
@@ -17,15 +22,23 @@ module type S = sig
 
   val create : key_value_db_dir:string -> stack_db_file:string -> t
 
+  val location_of_key : t -> key -> location option
+
   val destroy : t -> unit
 
-  val get_key_of_account : t -> account -> (key, error) Result.t
+  val get : t -> location -> account option
 
-  val get_account : t -> key -> account option
+  val set : t -> location -> account -> unit
 
-  val set_account : t -> account -> (unit, error) Result.t
+  val get_or_create_account :
+    t -> key -> account -> ([`Added | `Existed] * location, error) result
 
-  val merkle_path : t -> key -> Path.t
+  val get_or_create_account_exn :
+    t -> key -> account -> [`Added | `Existed] * location
+
+  val merkle_path : t -> location -> Path.t
+
+  val copy : t -> t
 
   include Syncable_intf.S
           with type root_hash := hash
