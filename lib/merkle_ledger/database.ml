@@ -15,10 +15,6 @@ end)
           with type account := Account.t
            and type hash := Hash.t
            and type key := Key.t
-
-  module For_tests : sig
-    val gen_account_location : location Core.Quickcheck.Generator.t
-  end
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
@@ -157,9 +153,9 @@ end = struct
 
   type t = {kvdb: Kvdb.t; sdb: Sdb.t}
 
-  let create ~key_value_db_dir ~stack_db_file =
-    let kvdb = Kvdb.create ~directory:key_value_db_dir in
-    let sdb = Sdb.create ~filename:stack_db_file in
+  let create () =
+    let kvdb = Kvdb.create () in
+    let sdb = Sdb.create () in
     {kvdb; sdb}
 
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb

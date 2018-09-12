@@ -61,7 +61,7 @@ module Intf = Merkle_ledger.Intf
 module In_memory_kvdb : Intf.Key_value_database = struct
   type t = (string, Bigstring.t) Hashtbl.t
 
-  let create ~directory:_ = Hashtbl.create (module String)
+  let create () = Hashtbl.create (module String)
 
   let destroy _ = ()
 
@@ -77,7 +77,7 @@ end
 module In_memory_sdb : Intf.Stack_database = struct
   type t = Bigstring.t list ref
 
-  let create ~filename:_ = ref []
+  let create () = ref []
 
   let destroy _ = ()
 

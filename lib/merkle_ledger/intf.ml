@@ -43,7 +43,7 @@ module type Key_value_database = sig
 
   val copy : t -> t
 
-  val create : directory:string -> t
+  val create : unit -> t
 
   val destroy : t -> unit
 
@@ -59,7 +59,7 @@ module type Stack_database = sig
 
   val copy : t -> t
 
-  val create : filename:string -> t
+  val create : unit -> t
 
   val destroy : t -> unit
 

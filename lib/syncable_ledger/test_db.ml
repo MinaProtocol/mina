@@ -62,7 +62,7 @@ struct
     let set_inner_hash_at_addr_exn = MT.set_inner_hash_at_addr_exn
 
     let load_ledger num_accounts (balance: int) =
-      let ledger = MT.create ~key_value_db_dir:"" ~stack_db_file:"" in
+      let ledger = MT.create () in
       let keys =
         List.init num_accounts ~f:(( + ) 1) |> List.map ~f:Int.to_string
       in
