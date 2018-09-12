@@ -12,6 +12,7 @@ let%test_module "Database integration test" =
     module DB =
       Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
         (In_memory_sdb)
+        (Storage_locations)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
     module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
 
@@ -72,7 +73,7 @@ let%test_module "Database integration test" =
             List.mapi balances ~f:(fun account_id balance ->
                 Account.create (Int.to_string account_id) balance )
           in
-          let db = DB.create ~key_value_db_dir:"" ~stack_db_file:"" in
+          let db = DB.create () in
           let ledger = Ledger.create () in
           let enumerate_dir_combinations max_depth =
             Sequence.range 0 (max_depth - 1)
