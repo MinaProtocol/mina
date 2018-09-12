@@ -78,7 +78,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   in
   let client_port = 8123 in
   let run_snark_worker = `With_public_key Genesis_ledger.high_balance_pk in
-  Run.setup_local_server ~client_port ~minibit ~log ;
+  Run.setup_local_server ~client_port ~minibit ~log () ;
   Run.run_snark_worker ~log ~client_port run_snark_worker ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in

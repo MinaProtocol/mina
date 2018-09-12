@@ -15,6 +15,8 @@ end
 module Ledger_builder_hash = struct
   include Ledger_builder_hash.Stable.V1
 
+  let ledger_hash = Ledger_builder_hash.ledger_hash
+
   let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
 end
 
@@ -323,12 +325,6 @@ struct
     end
 
     include Ledger_builder.Make (Inputs)
-
-    let of_aux_and_ledger ledger aux =
-      Ok
-        (make
-           ~public_key:(Public_key.compress Init.keypair.public_key)
-           ~aux ~ledger)
   end
 
   module Ledger_builder_aux = Ledger_builder.Aux
@@ -581,6 +577,7 @@ struct
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
       module Ledger_builder_diff = Ledger_builder_diff
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
 
       module Ledger_builder = struct
         include Ledger_builder
@@ -596,6 +593,9 @@ struct
             ~f:
               (Option.map ~f:(fun proof ->
                    ((Ledger_proof.statement proof).target, proof) ))
+
+        let of_aux_and_ledger =
+          of_aux_and_ledger ~public_key:Init.fee_public_key
       end
 
       module Consensus_mechanism = Consensus_mechanism
@@ -946,7 +946,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; run_snark_worker= run_snark_worker t
     ; propose= should_propose t }
 
-  let setup_local_server ~minibit ~log ~client_port =
+  let setup_local_server ?rest_server_port ~minibit ~log ~client_port () =
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
@@ -978,6 +978,25 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             in
             Linear_pipe.write_without_pushback solved_work_writer () ) ]
     in
+    Option.iter rest_server_port ~f:(fun rest_server_port ->
+        ignore
+          Cohttp_async.(
+            Server.create
+              ~on_handler_error:
+                (`Call
+                  (fun net exn ->
+                    Logger.error log "%s" (Exn.to_string_mach exn) ))
+              (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
+              (fun ~body _sock req ->
+                let uri = Cohttp.Request.uri req in
+                match Uri.path uri with
+                | "/status" ->
+                    Server.respond_string
+                      ( get_status minibit |> Client_lib.Status.to_yojson
+                      |> Yojson.Safe.pretty_to_string )
+                | _ ->
+                    Server.respond_string ~status:`Not_found "Route not found"
+                )) ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
     in
@@ -1006,7 +1025,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
-          ( Program.snark_worker_command_name
+          ( "internal" :: Program.snark_worker_command_name
           :: Snark_worker.arguments ~public_key ~daemon_port:client_port
                ~shutdown_on_disconnect )
     in

@@ -121,23 +121,27 @@ module Haskell_process = struct
             let prefix_size = prefix_name_size + 2 in
             (* a colon and a space *)
             let prefix = String.prefix line prefix_name_size in
-            let line_no_prefix =
-              String.slice line prefix_size (String.length line)
+            let pass_through () =
+              Logger.warn log "Unexpected output from Kademlia Haskell: %s"
+                line ;
+              None
             in
-            match prefix with
-            | "DBUG" ->
-                Logger.debug log "%s" line_no_prefix ;
-                None
-            | "EROR" ->
-                Logger.error log "%s" line_no_prefix ;
-                None
-            | "DATA" ->
-                Logger.info log "%s" line_no_prefix ;
-                Some line_no_prefix
-            | _ ->
-                Logger.warn log "Unexpected output from Kademlia Haskell: %s"
-                  line ;
-                None ) )
+            if String.length line < prefix_size then pass_through ()
+            else
+              let line_no_prefix =
+                String.slice line prefix_size (String.length line)
+              in
+              match prefix with
+              | "DBUG" ->
+                  Logger.debug log "%s" line_no_prefix ;
+                  None
+              | "EROR" ->
+                  Logger.error log "%s" line_no_prefix ;
+                  None
+              | "DATA" ->
+                  Logger.info log "%s" line_no_prefix ;
+                  Some line_no_prefix
+              | _ -> pass_through () ) )
 end
 
 module Make (P : sig
@@ -349,36 +353,43 @@ let node me peers conf_dir =
 
 let conf_dir = "/tmp/.kademlia-test-"
 
+let retry n f =
+  let rec go i = try f () with e -> if i = 0 then raise e else go (i - 1) in
+  go n
+
 let%test_unit "connect" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
-      let open Deferred.Let_syntax in
-      let conf_dir_1 = conf_dir ^ "1" and conf_dir_2 = conf_dir ^ "2" in
-      let wait_sec s =
-        let open Core in
-        Async.(after (Time.Span.of_sec s))
-      in
-      let%bind () = Async.Unix.mkdir ~p:() conf_dir_1 in
-      let%bind () = Async.Unix.mkdir ~p:() conf_dir_2 in
-      File_system.with_temp_dirs [conf_dir_1; conf_dir_2] ~f:(fun () ->
-          let%bind _n0 = node (addr 0) [] conf_dir_1
-          and _n1 = node (addr 1) [fst (addr 0)] conf_dir_2 in
-          let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
-          let%bind n0_peers =
-            Deferred.any
-              [ Haskell.first_peers n0
-              ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
+  (* This flakes 1 in 20 times, so try a couple times if it fails *)
+  retry 3 (fun () ->
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let open Deferred.Let_syntax in
+          let conf_dir_1 = conf_dir ^ "1" and conf_dir_2 = conf_dir ^ "2" in
+          let wait_sec s =
+            let open Core in
+            Async.(after (Time.Span.of_sec s))
           in
-          assert (List.length n0_peers <> 0) ;
-          let%bind n1_peers =
-            Deferred.any
-              [ Haskell.first_peers n1
-              ; Deferred.map (wait_sec 5.) ~f:(fun () -> []) ]
-          in
-          assert (List.length n1_peers <> 0) ;
-          assert (
-            List.hd_exn n0_peers = addr 1 && List.hd_exn n1_peers = addr 0 ) ;
-          let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
-          Deferred.unit ) )
+          let%bind () = Async.Unix.mkdir ~p:() conf_dir_1 in
+          let%bind () = Async.Unix.mkdir ~p:() conf_dir_2 in
+          File_system.with_temp_dirs [conf_dir_1; conf_dir_2] ~f:(fun () ->
+              let%bind _n0 = node (addr 0) [] conf_dir_1
+              and _n1 = node (addr 1) [fst (addr 0)] conf_dir_2 in
+              let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
+              let%bind n0_peers =
+                Deferred.any
+                  [ Haskell.first_peers n0
+                  ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
+              in
+              assert (List.length n0_peers <> 0) ;
+              let%bind n1_peers =
+                Deferred.any
+                  [ Haskell.first_peers n1
+                  ; Deferred.map (wait_sec 5.) ~f:(fun () -> []) ]
+              in
+              assert (List.length n1_peers <> 0) ;
+              assert (
+                List.hd_exn n0_peers = addr 1 && List.hd_exn n1_peers = addr 0
+              ) ;
+              let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
+              Deferred.unit ) ) )
 
 let%test_unit "lockfile does not exist after connection calling stop" =
   Async.Thread_safe.block_on_async_exn (fun () ->

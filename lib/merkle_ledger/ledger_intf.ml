@@ -11,8 +11,6 @@ module type S = sig
 
   type t [@@deriving sexp, bin_io]
 
-  include Container.S0 with type t := t and type elt := account
-
   val copy : t -> t
 
   module Path : Merkle_path.S with type hash := hash
@@ -20,8 +18,6 @@ module type S = sig
   module Addr : Merkle_address.S
 
   val create : unit -> t
-
-  val num_accounts : t -> int
 
   val get : t -> key -> account option
 

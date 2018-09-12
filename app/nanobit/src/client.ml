@@ -52,15 +52,20 @@ let get_nonce addr port =
   | Error e -> Error (Error.to_string_hum e)
 
 let status =
-  Command.async ~summary:"Get the status of the daemon at the specified port"
+  Command.async ~summary:"Get running daemon status"
     (let open Command.Let_syntax in
-    let%map_open port = daemon_port_flag in
+    let%map_open json =
+      flag "json" no_arg ~doc:" use json output (default: plaintext)"
+    and port = daemon_port_flag in
     fun () ->
       let open Deferred.Let_syntax in
       let port = Option.value ~default:default_client_port port in
       match%map dispatch Client_lib.Get_status.rpc () port with
       | Ok s ->
-          printf "%s" (Client_lib.Status.to_yojson s |> Yojson.Safe.to_string)
+          if json then
+            printf "%s\n"
+              (Client_lib.Status.to_yojson s |> Yojson.Safe.pretty_to_string)
+          else printf "%s\n" (Client_lib.Status.to_text s)
       | Error e -> eprintf "%s" (Error.to_string_hum e))
 
 let send_txn =
