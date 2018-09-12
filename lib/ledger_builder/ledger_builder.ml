@@ -355,8 +355,9 @@ end = struct
                     ; target
                     ; fee_excess=
                         ok_or_return (Super_transaction.fee_excess transaction)
-                    ; supply_increase =
-                        ok_or_return (Super_transaction.supply_increase transaction)
+                    ; supply_increase=
+                        ok_or_return
+                          (Super_transaction.supply_increase transaction)
                     ; proof_type= `Base }
                   in
                   if Ledger_proof_statement.equal statement expected_statement
@@ -381,7 +382,7 @@ end = struct
       match scan_statement aux with
       | Error (`Error e) -> Error e
       | Error `Empty -> Ok ()
-      | Ok {fee_excess; source; target; supply_increase=_; proof_type= _} ->
+      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
           let%map () =
             check
               (Ledger_hash.equal snarked_ledger_hash source)
