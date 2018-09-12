@@ -176,9 +176,3 @@ module TestDB16_1026 = Make (Test_db.Make (struct
 
   let num_accts = 1026
 end))
-
-module TestDB16_65536 = Make (Test_db.Make (struct
-  let depth = 16
-
-  let num_accts = 65536
-end))
