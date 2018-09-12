@@ -536,12 +536,11 @@ module Make (Inputs : Inputs_intf) = struct
           Debug_assert.debug_assert (fun () ->
               match Ledger_builder.statement_exn ledger_builder with
               | `Empty -> ()
-              | `Non_empty {source; target; fee_excess; proof_type} ->
+              | `Non_empty {source; target; fee_excess; proof_type= _} ->
                   let bc_state =
                     Consensus_mechanism.Protocol_state.blockchain_state
                       protocol_state
                   in
-                  [%test_eq : [`Base | `Merge]] `Merge proof_type ;
                   [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
                     fee_excess ;
                   [%test_eq : Ledger_hash.t]
