@@ -166,7 +166,9 @@ end = struct
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:(Depth.depth + 1) Hash.empty_account in
+    let empty_hashes =
+      Array.create ~len:(Depth.depth + 1) Hash.empty_account
+    in
     let rec loop last_hash height =
       if height <= Depth.depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in

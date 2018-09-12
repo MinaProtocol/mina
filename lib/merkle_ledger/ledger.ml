@@ -81,7 +81,9 @@ end = struct
   let create_account_table () = Key.Table.create ()
 
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights = Array.create ~len:(depth + 1) Hash.empty_account in
+    let empty_hash_at_heights =
+      Array.create ~len:(depth + 1) Hash.empty_account
+    in
     let rec go i =
       if i <= depth then (
         let h = empty_hash_at_heights.(i - 1) in
@@ -291,7 +293,8 @@ end = struct
         in
         let leaf_hash_idx = addr0 lxor 1 in
         let leaf_hash =
-          if leaf_hash_idx >= Dyn_array.length t.tree.leafs then Hash.empty_account
+          if leaf_hash_idx >= Dyn_array.length t.tree.leafs then
+            Hash.empty_account
           else
             Hash.hash_account
               (Hashtbl.find_exn t.accounts
