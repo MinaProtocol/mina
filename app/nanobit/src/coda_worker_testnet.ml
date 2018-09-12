@@ -87,10 +87,9 @@ struct
               in
               let curr = bits_to_str curr in
               let chain = Array.get chains i in
-              let chain = chain @ [ curr ] in
+              let chain = curr::chain in
               last_time := Time.now ();
               Array.set chains i chain;
-              Logger.info log "got block %d" i;
               check_chains chains;
               return chains
             )

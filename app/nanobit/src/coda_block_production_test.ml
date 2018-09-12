@@ -25,13 +25,11 @@ struct
     let%bind (api, finished) = 
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
-    Logger.fatal log "before";
     let%bind () = after (Time.Span.of_sec 30.) in
-    Logger.fatal log "after";
     finished
 
   let command =
-    Command.async_spec ~summary:"Simple use of Async Rpc_parallel V2"
+    Command.async_spec ~summary:"Test that blocks get produced"
       Command.Spec.(empty)
       main
 end
