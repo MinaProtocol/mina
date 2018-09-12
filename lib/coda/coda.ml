@@ -530,10 +530,31 @@ module Make (Inputs : Inputs_intf) = struct
     let proposer =
       Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
         (fun (ledger_builder, transition) ->
+          let protocol_state =
+            Consensus_mechanism.External_transition.protocol_state transition
+          in
+          Debug_assert.debug_assert (fun () ->
+              match Ledger_builder.statement_exn ledger_builder with
+              | `Empty ->
+                  [%test_eq : Consensus_mechanism.Protocol_state.value]
+                    Genesis.state protocol_state
+              | `Non_empty {source; target; fee_excess; proof_type} ->
+                  let bc_state =
+                    Consensus_mechanism.Protocol_state.blockchain_state
+                      protocol_state
+                  in
+                  [%test_eq : [`Base | `Merge]] `Merge proof_type ;
+                  [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
+                    fee_excess ;
+                  [%test_eq : Ledger_hash.t]
+                    (Ledger_builder.ledger ledger_builder |> Ledger.merkle_root)
+                    target ;
+                  [%test_eq : Ledger_hash.t]
+                    (Blockchain_state.ledger_hash bc_state)
+                    source ) ;
           Proposer.Tip_change
             { protocol_state=
-                ( Consensus_mechanism.External_transition.protocol_state
-                    transition
+                ( protocol_state
                 , Consensus_mechanism.External_transition.protocol_state_proof
                     transition )
             ; ledger_builder

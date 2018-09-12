@@ -86,7 +86,7 @@ module type Time_intf = sig
 end
 
 module type Ledger_hash_intf = sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   val to_bytes : t -> string
 
@@ -471,6 +471,8 @@ module type Ledger_builder_intf = sig
        list
        option
        * (ledger_proof_statement_set * ledger_proof_statement option)
+
+  val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 end
 
 module type Tip_intf = sig
@@ -551,7 +553,7 @@ module type Consensus_mechanism_intf = sig
   end
 
   module Protocol_state : sig
-    type value [@@deriving sexp, bin_io]
+    type value [@@deriving sexp, bin_io, eq, compare]
 
     type var
 
