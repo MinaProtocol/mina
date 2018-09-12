@@ -121,23 +121,27 @@ module Haskell_process = struct
             let prefix_size = prefix_name_size + 2 in
             (* a colon and a space *)
             let prefix = String.prefix line prefix_name_size in
-            let line_no_prefix =
-              String.slice line prefix_size (String.length line)
+            let pass_through () =
+              Logger.warn log "Unexpected output from Kademlia Haskell: %s"
+                line ;
+              None
             in
-            match prefix with
-            | "DBUG" ->
-                Logger.debug log "%s" line_no_prefix ;
-                None
-            | "EROR" ->
-                Logger.error log "%s" line_no_prefix ;
-                None
-            | "DATA" ->
-                Logger.info log "%s" line_no_prefix ;
-                Some line_no_prefix
-            | _ ->
-                Logger.warn log "Unexpected output from Kademlia Haskell: %s"
-                  line ;
-                None ) )
+            if String.length line < prefix_size then pass_through ()
+            else
+              let line_no_prefix =
+                String.slice line prefix_size (String.length line)
+              in
+              match prefix with
+              | "DBUG" ->
+                  Logger.debug log "%s" line_no_prefix ;
+                  None
+              | "EROR" ->
+                  Logger.error log "%s" line_no_prefix ;
+                  None
+              | "DATA" ->
+                  Logger.info log "%s" line_no_prefix ;
+                  Some line_no_prefix
+              | _ -> pass_through () ) )
 end
 
 module Make (P : sig
