@@ -150,15 +150,15 @@ let%test_module "test functor on in memory databases" =
 
       let populate_db mdb max_height =
         random_accounts max_height
-        |>  List.iter ~f:(fun account ->
-            let action, location =
-              MT.get_or_create_account_exn mdb
-                (Account.public_key account)
-                account
-            in
-            match action with
-            | `Added -> () 
-            | `Existed -> MT.set mdb location account )
+        |> List.iter ~f:(fun account ->
+               let action, location =
+                 MT.get_or_create_account_exn mdb
+                   (Account.public_key account)
+                   account
+               in
+               match action with
+               | `Added -> ()
+               | `Existed -> MT.set mdb location account )
 
       let build_padded_address directions offset =
         let padding = List.init offset ~f:(fun _ -> Direction.Left) in
@@ -207,7 +207,7 @@ let%test_module "test functor on in memory databases" =
               MT.get mdb_copy account_location |> Option.value_exn
             in
             assert (account' <> updated_account') )
-      
+
       let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
         with_test_instance (fun mdb ->
             let max_height = Int.min Depth.depth 5 in

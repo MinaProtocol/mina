@@ -37,7 +37,7 @@ module type S = sig
   val index_of_key_exn : t -> key -> int
 
   val get_or_create_account :
-  t -> key -> account -> ([`Added | `Existed] * location, error) result
+    t -> key -> account -> ([`Added | `Existed] * location, error) result
 
   val get_or_create_account_exn :
     t -> key -> account -> [`Added | `Existed] * location
