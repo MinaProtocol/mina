@@ -22,7 +22,7 @@ struct
       -> Currency.Fee.t -> unit Deferred.t
     }
 
-  let start_prefix_check log transitions =
+  let start_prefix_check log transitions proposal_interval =
     let all_transitions_r, all_transitions_w = Linear_pipe.create () in
     let chains = Array.init (List.length transitions) ~f:(fun i -> []) in
     let check_chains chains = 
@@ -63,7 +63,7 @@ struct
       let rec go () = 
         let diff = Time.diff (Time.now ()) !last_time in
         let diff = Time.Span.to_sec diff in
-        if not (diff < 1. +. epsilon)
+        if not (diff < ((Float.of_int proposal_interval) /. 1000.) +. epsilon)
         then (
           Logger.fatal log "no recent blocks";
           ignore (exit 1)
@@ -104,13 +104,13 @@ struct
           end
          )
 
-  let start_checks workers log =
+  let start_checks log workers proposal_interval =
     don't_wait_for begin
     let%map transitions =
       Deferred.List.all
       (List.map workers ~f:(fun w -> Coda_process.strongest_ledgers_exn w))
     in
-    start_prefix_check log transitions;
+    start_prefix_check log transitions proposal_interval;
     ()
   end
 
@@ -119,6 +119,7 @@ struct
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
   let test 
+      ?(proposal_interval=1000)
       log 
       n 
       should_propose 
@@ -133,11 +134,14 @@ struct
                 don't_wait_for begin
                   let%bind program_dir = Unix.getcwd () in
                   Coda_processes.init () ;
-                  let%map () = Coda_processes.spawn_local_processes_exn n ~program_dir
+                  let%map () = Coda_processes.spawn_local_processes_exn n 
+                      ~proposal_interval
+                      ~program_dir
                       ~should_propose
+                      
                       ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
                       ~f:(fun workers ->
-                          start_checks workers log;
+                          start_checks log workers proposal_interval;
                           Option.value_exn !fill_ready workers;
                           return () ) in
                   Ivar.fill finished_ivar ()

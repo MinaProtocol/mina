@@ -23,7 +23,7 @@ struct
     let should_propose = fun i -> i = who_proposes in
     let snark_work_public_keys = fun i -> None in
     let%bind (api, finished) = 
-      Coda_worker_testnet.test log n should_propose snark_work_public_keys
+      Coda_worker_testnet.test log n ?proposal_interval should_propose snark_work_public_keys 
     in
     let%bind () = after (Time.Span.of_sec 30.) in
     finished
