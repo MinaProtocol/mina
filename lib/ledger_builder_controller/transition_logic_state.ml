@@ -21,6 +21,7 @@ module type S = sig
       | Locked_tip of tip
       | Longest_branch_tip of tip
       | Ktree of Transition_tree.t
+    [@@deriving sexp]
   end
 
   val apply_all : t -> Change.t list -> t
