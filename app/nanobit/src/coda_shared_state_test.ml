@@ -21,16 +21,14 @@ struct
     let log = Logger.create () in
     let log = Logger.child log name in
     let transition_interval = 1000.0 in
-    let start_margin = Float.to_int (8000.0/.transition_interval) in
+    let start_margin = Float.to_int (8000.0 /. transition_interval) in
     let max_dist = 5 in
     let snark_worker_public_keys =
       Some [Some Genesis_ledger.high_balance_pk; None]
     in
     Coda_processes.init () ;
-    Coda_processes.spawn_local_processes_exn
-      ~transition_interval
-      n ~program_dir
-      ~snark_worker_public_keys
+    Coda_processes.spawn_local_processes_exn ~transition_interval n
+      ~program_dir ~snark_worker_public_keys
       ~should_propose:(fun i -> i = 0)
       ~f:(fun workers ->
         let blocks = ref 0 in
@@ -52,7 +50,10 @@ struct
                       let%bind b =
                         Coda_process.get_balance_exn worker sender_pk
                       in
-                      if i=1 then (Logger.trace log !"got balance %{sexp: Currency.Balance.t option}" b);
+                      if i = 1 then
+                        Logger.trace log
+                          !"got balance %{sexp: Currency.Balance.t option}"
+                          b ;
                       Option.iter b ~f:(fun b ->
                           if b <> !last_balance then (
                             update_block := !blocks ;
@@ -62,10 +63,10 @@ struct
                     in
                     go ()) ;
                  let%bind () =
-                   if i = 0 then
-                     (Logger.trace log "send transaction";
+                   if i = 0 then (
+                     Logger.trace log "send transaction" ;
                      Coda_process.send_transaction_exn worker sender_sk
-                       receiver_pk send_amount fee)
+                       receiver_pk send_amount fee )
                    else Deferred.unit
                  in
                  don't_wait_for
@@ -74,13 +75,14 @@ struct
                         let diff = !blocks - !update_block in
                         assert (diff < max_dist || !blocks < start_margin) ;
                         let%bind () =
-                          if !blocks > (10 + start_margin) then exit 0 else Deferred.unit
+                          if !blocks > 10 + start_margin then exit 0
+                          else Deferred.unit
                         in
                         let%bind () =
-                          if i = 0 then(
-                            Logger.trace log "send transaction";
+                          if i = 0 then (
+                            Logger.trace log "send transaction" ;
                             Coda_process.send_transaction_exn worker sender_sk
-                              receiver_pk send_amount fee)
+                              receiver_pk send_amount fee )
                           else Deferred.unit
                         in
                         return () )) ;

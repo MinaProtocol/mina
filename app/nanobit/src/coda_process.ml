@@ -23,8 +23,9 @@ struct
     File_system.dup_stderr process ;
     return (conn, process)
 
-  let spawn_local_exn ?(transition_interval= 1000.0) ?proposal_interval ~peers ~discovery_port ~external_port
-      ~program_dir ~should_propose ~snark_worker_config ~f () =
+  let spawn_local_exn ?(transition_interval= 1000.0) ?proposal_interval ~peers
+      ~discovery_port ~external_port ~program_dir ~should_propose
+      ~snark_worker_config ~f () =
     let host = "127.0.0.1" in
     let conf_dir =
       "/tmp/" ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])

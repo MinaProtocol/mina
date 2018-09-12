@@ -339,8 +339,8 @@ end = struct
 
     module Transition_logic_state =
       Transition_logic_state.Make (Security) (External_transition) (Tip)
-
     module Ledger_hash = Ledger_hash
+
     module Catchup = Catchup.Make (struct
       module Ledger_hash = Ledger_hash
       module Ledger = Ledger
@@ -402,7 +402,6 @@ end = struct
     (* The mutation "thread" *)
     don't_wait_for
       (Linear_pipe.iter mutate_state_reader ~f:(fun (changes, transition) ->
-
            let old_state = Transition_logic.state t.handler in
            (* TODO: We can make change-resolving more intelligent if different
          * concurrent processes took different times to finish. Since we
@@ -435,7 +434,8 @@ end = struct
           let%map () =
             match changes with
             | [] -> return ()
-            | changes -> Linear_pipe.write mutate_state_writer (changes, transition)
+            | changes ->
+                Linear_pipe.write mutate_state_writer (changes, transition)
           in
           Option.map job ~f:(fun job -> (job, time_received)) )
     in

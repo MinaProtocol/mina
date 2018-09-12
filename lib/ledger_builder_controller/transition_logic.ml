@@ -197,8 +197,7 @@ struct
           List.fold path.Path.path ~init:(Interruptible.return (Some tip)) ~f:
             (fun work curr ->
               match%bind work with
-              | None -> 
-                return None
+              | None -> return None
               | Some tip ->
                   match%bind step tip curr with
                   | Ok tip -> return (Some tip)
@@ -322,8 +321,11 @@ struct
           | `Keep -> return ([], None)
           | `Take ->
               let lh = External_transition.ledger_hash transition in
-              Logger.debug t.log !"Branch catchup for transition: lh:%{sexp: Ledger_hash.t} state:%{sexp:Protocol_state.value}" lh target_state ;
-              return ([], Some (Catchup.sync catchup state transition)))
+              Logger.debug t.log
+                !"Branch catchup for transition: lh:%{sexp: Ledger_hash.t} \
+                  state:%{sexp:Protocol_state.value}"
+                lh target_state ;
+              return ([], Some (Catchup.sync catchup state transition)) )
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition ~parent:(fun x ->
@@ -340,7 +342,7 @@ struct
               ~logger:log ~time_received
           with
           | `Keep ->
-              Logger.debug t.log "Branch noparent";
+              Logger.debug t.log "Branch noparent" ;
               return ([], Some (Catchup.sync catchup state transition))
           | `Take -> return ([], None) )
       | `Repeat -> return ([], None)
@@ -350,8 +352,7 @@ struct
           if
             External_transition.equal old_locked_head new_head
             && External_transition.equal old_best_tip new_tip
-          then 
-            return ([Transition_logic_state.Change.Ktree new_tree], None)
+          then return ([Transition_logic_state.Change.Ktree new_tree], None)
           else
             let new_best_path =
               Transition_tree.longest_path new_tree |> Path.of_tree_path
