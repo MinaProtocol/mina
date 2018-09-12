@@ -261,6 +261,7 @@ module type Ledger_proof_statement_intf = sig
   type t =
     { source: ledger_hash
     ; target: ledger_hash
+    ; supply_increase: Currency.Amount.t
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
@@ -578,6 +579,7 @@ module type Consensus_mechanism_intf = sig
     val create_value :
          ?sok_digest:sok_digest
       -> ?ledger_proof:proof
+      -> supply_increase:Currency.Amount.t
       -> blockchain_state:blockchain_state
       -> consensus_data:Consensus_transition_data.value
       -> unit

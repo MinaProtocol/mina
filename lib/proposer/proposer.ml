@@ -123,6 +123,10 @@ struct
         ?ledger_proof:
           (Option.map ledger_proof_opt
              ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+        ~supply_increase:
+          (Option.value_map ~default:Currency.Amount.zero
+             ~f:(fun (_p, statement) -> statement.supply_increase)
+             ledger_proof_opt)
         ~blockchain_state:(Protocol_state.blockchain_state protocol_state)
         ~consensus_data:consensus_transition_data ()
     in
