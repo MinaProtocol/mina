@@ -3,19 +3,25 @@ open Async_kernel
 
 module type Inputs_intf = sig
   module Ledger_hash : sig
-    type t
+    type t [@@deriving sexp]
   end
 
   module Ledger : sig
     type t
 
     val copy : t -> t
+
+    val merkle_root : t -> Ledger_hash.t
   end
 
   module Ledger_builder_hash : sig
-    type t
+    type t [@@deriving eq, sexp]
 
     val ledger_hash : t -> Ledger_hash.t
+  end
+
+  module Ledger_builder_aux_hash : sig
+    type t [@@deriving sexp]
   end
 
   module Ledger_builder : sig
@@ -25,9 +31,13 @@ module type Inputs_intf = sig
 
     module Aux : sig
       type t [@@deriving bin_io]
+
+      val hash : t -> Ledger_builder_aux_hash.t
     end
 
     val ledger : t -> Ledger.t
+
+    val hash : t -> Ledger_builder_hash.t
 
     val of_aux_and_ledger :
          snarked_ledger_hash:Ledger_hash.t
@@ -151,20 +161,20 @@ module Make (Inputs : Inputs_intf) = struct
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
             | Ok lb ->
+                sl_ref := None ;
                 let new_tree =
                   Transition_logic_state.Transition_tree.singleton transition
                 in
-                sl_ref := None ;
                 let new_tip = Tip.of_transition_and_lb transition lb in
                 let open Transition_logic_state.Change in
                 [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
             | Error e ->
-                Logger.info log "Malicious aux data received from net %s"
+                Logger.warn log "Malicious aux data received from net %s"
                   (Error.to_string_hum e) ;
                 (* TODO: Retry? see #361 *)
                 [] )
           | Error e ->
-              Logger.info log "Network failed to send aux %s"
+              Logger.warn log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;
               [] )
       | `Target_changed -> return []
