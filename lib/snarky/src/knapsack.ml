@@ -1,4 +1,5 @@
 open Core_kernel
+open Bitstring_lib
 
 module Make (Impl : Snark_intf.S) = struct
   open Impl
@@ -111,6 +112,9 @@ module Make (Impl : Snark_intf.S) = struct
       in
       go [] 0 xs ys
 
-    let assert_equal = Impl.Bitstring_checked.Assert.equal
+    let assert_equal a b =
+      Impl.Bitstring_checked.Assert.equal
+        (Bitstring.Lsb_first.of_list a)
+        (Bitstring.Lsb_first.of_list b)
   end
 end

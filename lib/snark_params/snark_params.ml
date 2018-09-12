@@ -1,4 +1,5 @@
 open Core_kernel
+open Bitstring_lib
 open Snark_bits
 module Tick_curve = Crypto_params.Tick_curve
 module Tock_curve = Crypto_params.Tock_curve
@@ -58,12 +59,13 @@ struct
 
   open Impl
 
-  type var = Boolean.var list
+  type var = Bitstring_checked.t
 
-  let typ =
+  let typ : (var, t) Typ.t =
     Typ.transport
-      (Typ.list ~length:size_in_bits Boolean.typ)
-      ~there:unpack ~back:project
+      (Boolean.bitstring_lsb_first_typ ~length:size_in_bits)
+      ~there:(Fn.compose Bitstring.Lsb_first.of_list unpack)
+      ~back:(Fn.compose project Bitstring.Lsb_first.to_list)
 
   let gen : t Quickcheck.Generator.t =
     Quickcheck.Generator.map
@@ -76,10 +78,11 @@ struct
   module Checked = struct
     let equal = Bitstring_checked.equal
 
-    let to_bits xs = Bitstring_lib.Bitstring.Lsb_first.of_list xs
+    let to_bits = Fn.id
 
     module Assert = struct
-      let equal = Bitstring_checked.Assert.equal
+      let equal : var -> var -> (unit, _) Checked.t =
+        Bitstring_checked.Assert.equal
     end
   end
 end

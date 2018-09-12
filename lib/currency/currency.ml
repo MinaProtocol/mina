@@ -156,14 +156,15 @@ module type S = sig
      and type signed_var := Signed.var
 end
 
-module Make
-    (Unsigned : sig
-        include Unsigned_extended.S
-        val to_uint64 : t -> uint64
-        val of_uint64 : uint64 -> t
-    end) (M : sig
-        val length : int
-    end) : sig
+module Make (Unsigned : sig
+  include Unsigned_extended.S
+
+  val to_uint64 : t -> uint64
+
+  val of_uint64 : uint64 -> t
+end) (M : sig
+  val length : int
+end) : sig
   include S with type t = Unsigned.t and type var = Boolean.var list
 
   val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var

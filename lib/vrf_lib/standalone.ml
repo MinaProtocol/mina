@@ -1,3 +1,5 @@
+open Bitstring_lib
+
 module Context = struct
   type ('message, 'pk) t = {message: 'message; public_key: 'pk}
   [@@deriving sexp]
@@ -363,7 +365,10 @@ let%test_module "vrf-test" =
         let to_bits xs = Bitstring_lib.Bitstring.Lsb_first.of_list xs
 
         module Assert = struct
-          let equal = Bitstring_checked.Assert.equal
+          let equal a b =
+            Bitstring_checked.Assert.equal
+              (Bitstring.Lsb_first.of_list a)
+              (Bitstring.Lsb_first.of_list b)
         end
       end
     end

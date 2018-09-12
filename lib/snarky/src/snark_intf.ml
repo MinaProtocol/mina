@@ -198,6 +198,12 @@ module type Basic = sig
 
     val typ_unchecked : (var, value) Typ.t
 
+    val bitstring_lsb_first_typ :
+         length:int
+      -> ( var Bitstring_lib.Bitstring.Lsb_first.t
+         , value Bitstring_lib.Bitstring.Lsb_first.t )
+         Typ.t
+
     module Expr : sig
       type t
 
@@ -352,7 +358,7 @@ module type Basic = sig
   end
 
   module Bitstring_checked : sig
-    type t = Boolean.var list
+    type t = Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
     val equal : t -> t -> (Boolean.var, _) Checked.t
 

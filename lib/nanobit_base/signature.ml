@@ -10,4 +10,4 @@ end
 include Stable.V1
 open Snark_params.Tick
 
-type var = Boolean.var list * Boolean.var list
+type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var

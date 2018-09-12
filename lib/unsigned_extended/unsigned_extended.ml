@@ -82,7 +82,8 @@ module Extend
       val of_uint64 : uint64 -> Unsigned.t
 
       val length : int
-    end) : S with type t = Unsigned.t =
+    end) :
+  S with type t = Unsigned.t =
 struct
   ;; assert (M.length < Tick.Field.size_in_bits - 3)
 
@@ -155,7 +156,9 @@ module UInt32 =
 
       let of_signed = Unsigned.UInt32.of_int32
 
-      let to_uint64 = Fn.compose Unsigned.UInt64.of_int64 Unsigned.UInt32.to_int64
+      let to_uint64 =
+        Fn.compose Unsigned.UInt64.of_int64 Unsigned.UInt32.to_int64
 
-      let of_uint64 = Fn.compose Unsigned.UInt32.of_int64 Unsigned.UInt64.to_int64 
+      let of_uint64 =
+        Fn.compose Unsigned.UInt32.of_int64 Unsigned.UInt64.to_int64
     end)

@@ -1,5 +1,6 @@
 module Bignum_bigint = Bigint
 open Core_kernel
+open Bitstring_lib
 
 let () = Camlsnark_c.linkme
 
@@ -1245,6 +1246,38 @@ module Make_basic (Backend : Backend_intf.S) = struct
         let check v = assert_ (Constraint.boolean ~label:"boolean-alloc" v) in
         {read; store; alloc; check}
 
+      (* TODO: move bitstring lib into snarky? *)
+      let bitstring_lsb_first_typ ~length =
+        let open Typ in
+        let store ts =
+          let n = Bitstring.Lsb_first.length ts in
+          if n <> length then
+            failwithf "Typ.list: Expected length %d, got %d" length n () ;
+          Store.map
+            (Store.all
+               (Bitstring.Lsb_first.to_list
+                  (Bitstring.Lsb_first.map ~f:typ.store ts)))
+            Bitstring.Lsb_first.of_list
+        in
+        let alloc =
+          Alloc.map
+            (Alloc.all (List.init length (fun _ -> typ.alloc)))
+            Bitstring.Lsb_first.of_list
+        in
+        let check ts =
+          Checked1.all_unit
+            (Bitstring.Lsb_first.to_list
+               (Bitstring.Lsb_first.map ts ~f:typ.check))
+        in
+        let read vs =
+          Read.map
+            (Read.all
+               (Bitstring.Lsb_first.to_list
+                  (Bitstring.Lsb_first.map vs ~f:typ.read)))
+            Bitstring.Lsb_first.of_list
+        in
+        {read; store; alloc; check}
+
       let if_ (b: var) ~then_ ~else_ =
         let open Checked1 in
         with_label "if_"
@@ -1500,10 +1533,9 @@ module Make_basic (Backend : Backend_intf.S) = struct
   end
 
   module Bitstring_checked = struct
-    type t = Checked.Boolean.var list
+    type t = Checked.Boolean.var Bitstring.Lsb_first.t
 
-    let chunk_for_equality (t1: Checked.Boolean.var list)
-        (t2: Checked.Boolean.var list) =
+    let chunk_for_equality (t1: t) (t2: t) =
       let chunk_size = Field.size_in_bits - 1 in
       let rec go acc t1 t2 =
         match (t1, t2) with
@@ -1513,20 +1545,25 @@ module Make_basic (Backend : Backend_intf.S) = struct
             let t2_a, t2_b = List.split_n t2 chunk_size in
             go ((Cvar1.pack t1_a, Cvar1.pack t2_a) :: acc) t1_b t2_b
       in
-      go [] t1 t2
+      Bitstring.Lsb_first.of_list
+        (go []
+           (Bitstring.Lsb_first.to_list t1)
+           (Bitstring.Lsb_first.to_list t2))
 
     let equal t1 t2 =
       let open Checked in
       all
-        (Core_kernel.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
-             equal x1 x2 ))
+        (Bitstring.Lsb_first.to_list
+           (Bitstring.Lsb_first.map (chunk_for_equality t1 t2) ~f:
+              (fun (x1, x2) -> equal x1 x2 )))
       >>= Boolean.all
 
     module Assert = struct
       let equal t1 t2 =
         let open Checked in
-        Core_kernel.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
+        Bitstring.Lsb_first.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
             Constraint.equal x1 x2 )
+        |> Bitstring.Lsb_first.to_list
         |> assert_all ~label:"Bitstring.Assert.equal"
     end
   end

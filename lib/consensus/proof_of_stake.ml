@@ -189,7 +189,7 @@ struct
         >>| UInt32.of_int
 
       let%test_unit "in_seed_update_range unchecked vs. checked equality" =
-        Quickcheck.test gen ~f:(fun slot ->
+        Quickcheck.test ~trials:100 gen ~f:(fun slot ->
             Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
               in_seed_update_range_var in_seed_update_range slot )
     end
@@ -220,6 +220,8 @@ struct
 
       type var =
         Snark_params.Tick.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+
+      let typ = Snark_params.Tick.Inner_curve.Scalar.typ
     end
 
     module Group = struct
@@ -259,21 +261,25 @@ struct
       let to_hlist {epoch; slot; seed; lock_checkpoint} =
         Nanobit_base.H_list.[epoch; slot; seed; lock_checkpoint]
 
-      let of_hlist : (unit, 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> unit) Nanobit_base.H_list.t -> ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
-        fun Nanobit_base.H_list.[epoch; slot; seed; lock_checkpoint] ->
-          {epoch; slot; seed; lock_checkpoint}
+      let of_hlist :
+             ( unit
+             , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> unit )
+             Nanobit_base.H_list.t
+          -> ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
+       fun Nanobit_base.H_list.([epoch; slot; seed; lock_checkpoint]) ->
+        {epoch; slot; seed; lock_checkpoint}
 
       let data_spec =
-        Snark_params.Tick.Data_spec.
-          [ Epoch.Unpacked.typ
-          ; Epoch.Slot.Unpacked.typ
-          ; Epoch_seed.typ
-          ; Nanobit_base.State_hash.typ ]
+        let open Snark_params.Tick.Data_spec in
+        [ Epoch.Unpacked.typ
+        ; Epoch.Slot.Unpacked.typ
+        ; Epoch_seed.typ
+        ; Nanobit_base.State_hash.typ ]
 
       let typ =
-        Snark_params.Tick.Typ.of_hlistable data_spec
-          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+        Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+          ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+          ~value_of_hlist:of_hlist
 
       let fold {epoch; slot; seed; lock_checkpoint} =
         let open Fold in
@@ -283,8 +289,7 @@ struct
       let hash_to_group msg =
         let msg_hash_state =
           Snark_params.Tick.Pedersen.hash_fold
-            Nanobit_base.Hash_prefix.vrf_message
-            (fold msg)
+            Nanobit_base.Hash_prefix.vrf_message (fold msg)
         in
         msg_hash_state.acc
 
@@ -312,15 +317,16 @@ struct
         let%map epoch = Epoch.gen
         and slot = Epoch.Slot.gen
         and seed = Epoch_seed.gen
-        and lock_checkpoint = Nanobit_base.State_hash.gen
-        in
+        and lock_checkpoint = Nanobit_base.State_hash.gen in
         {epoch; slot; seed; lock_checkpoint}
     end
 
     module Output = struct
-      type value = Sha256.Digest.t
+      type value = Sha256.Digest.t [@@deriving eq]
 
       type var = Sha256.Digest.var
+
+      let typ : (var, value) Snark_params.Tick.Typ.t = Sha256.Digest.typ
 
       let hash msg g =
         let open Fold in
@@ -352,8 +358,7 @@ struct
             (pedersen_digest :> Snark_params.Tick.Boolean.var list)
       end
 
-      let gen =
-        Quickcheck.Generator.list_with_length 256 Bool.gen
+      let gen = Quickcheck.Generator.list_with_length 256 Bool.gen
 
       let%test_unit "hash unchecked vs. checked equality" =
         let gen_inner_curve_point =
@@ -366,13 +371,16 @@ struct
           let%map msg = Message.gen and g = gen_inner_curve_point in
           (msg, g)
         in
-        Quickcheck.test gen_message_and_curve_point ~f:(
-          Test_util.test_equal
-            ~equal:(List.equal ~equal:Bool.equal)
-            Snark_params.Tick.Typ.(Message.typ * Snark_params.Tick.Inner_curve.typ)
-            (Snark_params.Tick.Typ.list ~length:256 Snark_params.Tick.Boolean.typ)
-            (fun (msg, g) -> Checked.hash msg g)
-            (fun (msg, g) -> hash msg g))
+        Quickcheck.test ~trials:10 gen_message_and_curve_point
+          ~f:
+            (Test_util.test_equal
+               ~equal:(List.equal ~equal:Bool.equal)
+               Snark_params.Tick.Typ.(
+                 Message.typ * Snark_params.Tick.Inner_curve.typ)
+               (Snark_params.Tick.Typ.list ~length:256
+                  Snark_params.Tick.Boolean.typ)
+               (fun (msg, g) -> Checked.hash msg g)
+               (fun (msg, g) -> hash msg g))
     end
 
     module Threshold = struct
@@ -1004,3 +1012,28 @@ struct
       ~blockchain_state:Snark_transition.(blockchain_state genesis)
       ~consensus_state
 end
+
+let%test_module "Proof_of_stake tests" =
+  ( module struct
+    module Proof_of_stake = Make (struct
+      module Ledger_builder_diff = struct
+        type t = int [@@deriving bin_io, sexp]
+      end
+
+      module Time = Nanobit_base.Block_time
+
+      let genesis_state_timestamp = Nanobit_base.Block_time.now ()
+
+      let genesis_ledger_total_currency = Amount.zero
+
+      let genesis_ledger = Nanobit_base.Ledger.create ()
+
+      let coinbase = Amount.of_int 20
+
+      let slot_interval = Nanobit_base.Block_time.Span.of_ms (Int64.of_int 200)
+
+      let unforkable_transition_count = 24
+
+      let probable_slots_per_transition_count = 8
+    end)
+  end )
