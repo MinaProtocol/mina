@@ -55,7 +55,10 @@ let get_or_create ledger key =
       ([key], acct)
 
 let create_empty ledger k =
+  let start_hash = merkle_root ledger in
   set ledger k Account.empty ;
+  (* FIXME: debug assert *)
+  [%test_eq : Ledger_hash.t] start_hash (merkle_root ledger) ;
   (merkle_path ledger k |> Option.value_exn, Account.empty)
 
 module Undo = struct
@@ -75,11 +78,13 @@ module Undo = struct
     ; previous_empty_accounts: Public_key.Compressed.t list }
   [@@deriving sexp]
 
-  type t =
+  type varying =
     | Transaction of transaction
     | Fee_transfer of fee_transfer
     | Coinbase of coinbase
   [@@deriving sexp]
+
+  type t = {previous_hash: Ledger_hash.t; varying: varying} [@@deriving sexp]
 end
 
 (* someday: It would probably be better if we didn't modify the receipt chain hash
@@ -232,21 +237,29 @@ let undo_transaction ledger
 let undo : t -> Undo.t -> unit Or_error.t =
  fun ledger undo ->
   let open Or_error.Let_syntax in
-  match undo with
-  | Fee_transfer u -> undo_fee_transfer ledger u
-  | Transaction u -> undo_transaction ledger u
-  | Coinbase c -> undo_coinbase ledger c ; Ok ()
+  let%map res =
+    match undo.varying with
+    | Fee_transfer u -> undo_fee_transfer ledger u
+    | Transaction u -> undo_transaction ledger u
+    | Coinbase c -> undo_coinbase ledger c ; Ok ()
+  in
+  (*FIXME:debug_assert*)
+  [%test_eq : Ledger_hash.t] undo.previous_hash (merkle_root ledger) ;
+  res
 
 let apply_super_transaction ledger (t: Super_transaction.t) =
-  match t with
-  | Transaction txn ->
-      Or_error.map (apply_transaction ledger txn) ~f:(fun u ->
-          Undo.Transaction u )
-  | Fee_transfer t ->
-      Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
-          Undo.Fee_transfer u )
-  | Coinbase t ->
-      Or_error.map (apply_coinbase ledger t) ~f:(fun u -> Undo.Coinbase u)
+  let previous_hash = merkle_root ledger in
+  Or_error.map
+    ( match t with
+    | Transaction txn ->
+        Or_error.map (apply_transaction ledger txn) ~f:(fun u ->
+            Undo.Transaction u )
+    | Fee_transfer t ->
+        Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
+            Undo.Fee_transfer u )
+    | Coinbase t ->
+        Or_error.map (apply_coinbase ledger t) ~f:(fun u -> Undo.Coinbase u) )
+    ~f:(fun varying -> {Undo.previous_hash; varying})
 
 let merkle_root_after_transaction_exn ledger transaction =
   let undo = Or_error.ok_exn (apply_transaction ledger transaction) in

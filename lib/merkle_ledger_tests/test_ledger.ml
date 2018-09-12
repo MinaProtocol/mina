@@ -263,4 +263,10 @@ let%test_module "test functor on in memory databases" =
       let keys_to_remove = [List.last_exn k2] in
       L16.remove_accounts_exn l2 keys_to_remove ;
       assert (L16.merkle_root l1 = L16.merkle_root l2)
+
+    let%test_unit "removing all accounts is as if there were never accounts" =
+      let og_hash = L16.merkle_root (L16.create ()) in
+      let l1, keys = L16.load_ledger 10 1 in
+      L16.remove_accounts_exn l1 keys ;
+      [%test_eq : Hash.t] (L16.merkle_root l1) og_hash
   end )

@@ -29,7 +29,24 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
                (Ledger.merkle_root ledger :> Pedersen.Digest.t)) )
   in
   Ledger.remove_accounts_exn ledger new_keys ;
+  (* FIXME: debug_assert *)
+  [%test_eq : Ledger_hash.t]
+    (Ledger.merkle_root ledger)
+    ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash) ;
   sparse
+
+let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
+  let keygen () =
+    let privkey = Private_key.create () in
+    (privkey, Public_key.of_private_key privkey |> Public_key.compress)
+  in
+  let ledger = Ledger.create () in
+  let _, pub1 = keygen () in
+  let _, pub2 = keygen () in
+  let sl = of_ledger_subset_exn ledger [pub1; pub2] in
+  [%test_eq : Ledger_hash.t]
+    (Ledger.merkle_root ledger)
+    ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
 let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
   let {Transaction_payload.amount; fee; receiver; nonce} = payload in
@@ -68,7 +85,7 @@ let apply_fee_transfer_exn =
     let open Currency in
     set_exn t index
       { account with
-        public_key= pk
+        public_key= pk (* explicitly set because receipient could be new *)
       ; balance=
           Option.value_exn
             (Balance.add_amount account.balance (Amount.of_fee fee)) }
@@ -82,7 +99,10 @@ let apply_coinbase_exn t ({proposer; fee_transfer}: Coinbase.t) =
     let idx = find_index_exn t pk in
     let a = get_exn t idx in
     set_exn t idx
-      {a with balance= Option.value_exn (Balance.add_amount a.balance amount)}
+      { a with
+        public_key= pk
+      ; (* set as above *)
+      balance= Option.value_exn (Balance.add_amount a.balance amount) }
   in
   let proposer_reward, t =
     match fee_transfer with
