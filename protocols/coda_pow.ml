@@ -228,17 +228,23 @@ module type Fee_transfer_intf = sig
 
   type single = public_key * Fee.Unsigned.t
 
+  val of_single : public_key * Fee.Unsigned.t -> t
+
   val of_single_list : (public_key * Fee.Unsigned.t) list -> t list
 
   val receivers : t -> public_key list
 end
 
 module type Coinbase_intf = sig
-  type t [@@deriving sexp, compare, eq]
-
   type public_key
 
   type fee_transfer
+
+  type t = private
+    { proposer: public_key
+    ; amount: Currency.Amount.t
+    ; fee_transfer: fee_transfer option }
+  [@@deriving sexp, bin_io, compare, eq]
 
   val create :
        amount:Currency.Amount.t
@@ -370,20 +376,20 @@ module type Ledger_builder_diff_intf = sig
     ; coinbase_parts: int }
   [@@deriving sexp, bin_io]
 
-  type t = 
+  type t =
     { pre_diffs: pre_diff * pre_diff option
     ; prev_hash: ledger_builder_hash
     ; creator: public_key }
-    [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs : sig
     type pre_diff =
       { completed_works: completed_work_checked list
       ; transactions: transaction_with_valid_signature list
       ; coinbase_parts: int }
-      [@@deriving sexp]
+    [@@deriving sexp]
 
-    type t = 
+    type t =
       { pre_diffs: pre_diff * pre_diff option
       ; prev_hash: ledger_builder_hash
       ; creator: public_key }
