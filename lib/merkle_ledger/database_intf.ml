@@ -44,6 +44,8 @@ module type S = sig
 
   val merkle_path : t -> location -> Path.t
 
+  val merkle_path_at_index_exn : t -> int -> Path.t
+
   val copy : t -> t
 
   include Syncable_intf.S
