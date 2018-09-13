@@ -21,3 +21,7 @@ val transition_system_snark : Tick.Pedersen.State.t
 val receipt_chain : Tick.Pedersen.State.t
 
 val epoch_seed : Tick.Pedersen.State.t
+
+val vrf_message : Tick.Pedersen.State.t
+
+val vrf_output : Tick.Pedersen.State.t

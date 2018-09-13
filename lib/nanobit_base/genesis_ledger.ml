@@ -70,18 +70,21 @@ let total_currency =
 
 let ledger =
   let ledger = Ledger.create () in
-  Ledger.set ledger high_balance_pk
+  let create_account pk account =
+    Ledger.create_new_account_exn ledger pk account
+  in
+  create_account high_balance_pk
     { Account.public_key= high_balance_pk
     ; balance= initial_high_balance
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; nonce= Account.Nonce.zero } ;
-  Ledger.set ledger low_balance_pk
+  create_account low_balance_pk
     { Account.public_key= low_balance_pk
     ; balance= initial_low_balance
     ; receipt_chain_hash= Receipt.Chain_hash.empty
     ; nonce= Account.Nonce.zero } ;
   List.fold pks ~init:() ~f:(fun _ pk ->
-      Ledger.set ledger pk
+      create_account pk
         { Account.public_key= pk
         ; balance= Currency.Balance.of_int init_balance
         ; receipt_chain_hash= Receipt.Chain_hash.empty

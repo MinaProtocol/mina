@@ -20,7 +20,7 @@ module type S = sig
 
   module Path : Merkle_path.S with type hash := hash
 
-  val create : key_value_db_dir:string -> stack_db_file:string -> t
+  val create : unit -> t
 
   val location_of_key : t -> key -> location option
 
@@ -44,6 +44,8 @@ module type S = sig
 
   val merkle_path : t -> location -> Path.t
 
+  val merkle_path_at_index_exn : t -> int -> Path.t
+
   val copy : t -> t
 
   include Syncable_intf.S
@@ -53,4 +55,8 @@ module type S = sig
            and type addr := Addr.t
            and type t := t
            and type path := Path.t
+
+  module For_tests : sig
+    val gen_account_location : location Core.Quickcheck.Generator.t
+  end
 end

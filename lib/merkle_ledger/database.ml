@@ -10,15 +10,12 @@ end)
 (Hash : Intf.Hash with type account := Account.t)
 (Depth : Intf.Depth)
 (Kvdb : Intf.Key_value_database)
-(Sdb : Intf.Stack_database) : sig
+(Sdb : Intf.Stack_database)
+(Storage_locations : Intf.Storage_locations) : sig
   include Database_intf.S
           with type account := Account.t
            and type hash := Hash.t
            and type key := Key.t
-
-  module For_tests : sig
-    val gen_account_location : location Core.Quickcheck.Generator.t
-  end
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
@@ -155,11 +152,11 @@ end = struct
 
   type location = Location.t [@@deriving sexp]
 
-  type t = {kvdb: Kvdb.t; sdb: Sdb.t}
+  type t = {kvdb: Kvdb.t sexp_opaque; sdb: Sdb.t sexp_opaque} [@@deriving sexp]
 
-  let create ~key_value_db_dir ~stack_db_file =
-    let kvdb = Kvdb.create ~directory:key_value_db_dir in
-    let sdb = Sdb.create ~filename:stack_db_file in
+  let create () =
+    let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
+    let sdb = Sdb.create ~filename:Storage_locations.stack_db_file in
     {kvdb; sdb}
 
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
@@ -387,4 +384,8 @@ end = struct
     loop location
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
+
+  let merkle_path_at_index_exn t index =
+    let addr = Addr.of_int_exn index in
+    merkle_path_at_addr_exn t addr
 end
