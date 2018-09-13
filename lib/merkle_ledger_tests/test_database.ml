@@ -210,14 +210,18 @@ let%test_module "test functor on in memory databases" =
                    in
                    Account.equal account indexed_account ) )
 
+      let test_subtree_range (type t) (module MT : DB with type t = t) mdb ~f
+          max_height =
+        populate_db (module MT) mdb max_height ;
+        Sequence.range 0 (1 lsl max_height) |> Sequence.iter ~f
+
       let%test_unit "set_at_index_exn t index  account; get_at_index_exn t \
                      index = account" =
         Test.with_instance (fun (module MT) mdb ->
             let max_height = Int.min MT.depth 5 in
-            populate_db (module MT) mdb max_height ;
-            Quickcheck.test
-              (Int.gen_incl 0 ((1 lsl max_height) - 1))
-              ~sexp_of:[%sexp_of : int]
+            test_subtree_range
+              (module MT)
+              mdb max_height
               ~f:(fun index ->
                 let account = Quickcheck.random_value Account.gen in
                 MT.set_at_index_exn mdb index account ;
@@ -237,6 +241,20 @@ let%test_module "test functor on in memory databases" =
                 let address = MT.Addr.of_directions padded_directions in
                 let path = MT.merkle_path_at_addr_exn mdb address in
                 let leaf_hash = MT.get_inner_hash_at_addr_exn mdb address in
+                let root_hash = MT.merkle_root mdb in
+                assert (MT.Path.check_path path leaf_hash root_hash) ) )
+
+      let%test_unit "implied_root(index) = root_hash" =
+        Test.with_instance (fun (module MT) mdb ->
+            let max_height = Int.min MT.depth 5 in
+            test_subtree_range
+              (module MT)
+              mdb max_height
+              ~f:(fun index ->
+                let path = MT.merkle_path_at_index_exn mdb index in
+                let leaf_hash =
+                  MT.get_inner_hash_at_addr_exn mdb (MT.Addr.of_int_exn index)
+                in
                 let root_hash = MT.merkle_root mdb in
                 assert (MT.Path.check_path path leaf_hash root_hash) ) )
 

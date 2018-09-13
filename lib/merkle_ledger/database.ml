@@ -152,7 +152,7 @@ end = struct
 
   type location = Location.t [@@deriving sexp]
 
-  type t = {kvdb: Kvdb.t; sdb: Sdb.t}
+  type t = {kvdb: Kvdb.t sexp_opaque; sdb: Sdb.t sexp_opaque} [@@deriving sexp]
 
   let create () =
     let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
@@ -384,4 +384,8 @@ end = struct
     loop location
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
+
+  let merkle_path_at_index_exn t index =
+    let addr = Addr.of_int_exn index in
+    merkle_path_at_addr_exn t addr
 end
