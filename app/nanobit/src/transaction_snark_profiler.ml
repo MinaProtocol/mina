@@ -12,7 +12,7 @@ let create_ledger_and_transactions num_transitions =
   in
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
-      Ledger.set ledger public_key
+      Ledger.create_new_account_exn ledger public_key
         { public_key
         ; balance= Currency.Balance.of_int 10_000
         ; receipt_chain_hash= Receipt.Chain_hash.empty
@@ -41,7 +41,7 @@ let create_ledger_and_transactions num_transitions =
   in
   match num_transitions with
   | `Count n ->
-      let num_transactions = n - 1 in
+      let num_transactions = n - 2 in
       let transactions =
         List.rev (List.init num_transactions (fun _ -> random_transaction ()))
       in
@@ -53,10 +53,16 @@ let create_ledger_and_transactions num_transitions =
         in
         Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
       in
+      let coinbase =
+        Coinbase.create
+          ~proposer:(Public_key.compress keys.(0).public_key)
+          ~fee_transfer:None
+        |> Or_error.ok_exn
+      in
       let transitions =
         List.map transactions ~f:(fun t ->
             Transaction_snark.Transition.Transaction t )
-        @ [Fee_transfer fee_transfer]
+        @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)
   | `Two_from_same ->
@@ -130,7 +136,8 @@ let check_base_snarks sparse_ledger0
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
-        ~prover:Public_key.(compress (of_private_key (Private_key.create ())))
+        ~prover:
+          Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
@@ -159,7 +166,8 @@ let run profiler num_transactions =
            | Transaction t ->
                let t = (t :> Transaction.t) in
                [t.payload.receiver; Public_key.compress t.sender]
-           | Coinbase _ -> failwith "Coinbases not yet implemented" ))
+           | Coinbase {proposer; fee_transfer} ->
+               proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
   let message = profiler sparse_ledger transitions in
   Core.printf !"%s\n%!" message ;

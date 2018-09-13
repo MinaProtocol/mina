@@ -3,17 +3,25 @@ open Async_kernel
 
 module type Inputs_intf = sig
   module Ledger_hash : sig
-    type t
+    type t [@@deriving sexp]
   end
 
   module Ledger : sig
     type t
 
     val copy : t -> t
+
+    val merkle_root : t -> Ledger_hash.t
   end
 
   module Ledger_builder_hash : sig
-    type t
+    type t [@@deriving eq, sexp]
+
+    val ledger_hash : t -> Ledger_hash.t
+  end
+
+  module Ledger_builder_aux_hash : sig
+    type t [@@deriving sexp]
   end
 
   module Ledger_builder : sig
@@ -23,11 +31,19 @@ module type Inputs_intf = sig
 
     module Aux : sig
       type t [@@deriving bin_io]
+
+      val hash : t -> Ledger_builder_aux_hash.t
     end
 
     val ledger : t -> Ledger.t
 
-    val of_aux_and_ledger : Ledger.t -> Aux.t -> t Or_error.t
+    val hash : t -> Ledger_builder_hash.t
+
+    val of_aux_and_ledger :
+         snarked_ledger_hash:Ledger_hash.t
+      -> ledger:Ledger.t
+      -> aux:Aux.t
+      -> t Or_error.t
 
     val copy : t -> t
   end
@@ -50,12 +66,15 @@ module type Inputs_intf = sig
     val ledger_builder_hash : t -> Ledger_builder_hash.t
   end
 
-  module Tip :
-    Protocols.Coda_pow.Tip_intf
-    with type ledger_builder := Ledger_builder.t
-     and type protocol_state := Protocol_state.value
-     and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := External_transition.t
+  module Tip : sig
+    include Protocols.Coda_pow.Tip_intf
+            with type ledger_builder := Ledger_builder.t
+             and type protocol_state := Protocol_state.value
+             and type protocol_state_proof := Protocol_state_proof.t
+             and type external_transition := External_transition.t
+
+    val assert_materialization_of : t -> External_transition.t -> unit
+  end
 
   module Transition_logic_state :
     Transition_logic_state.S
@@ -103,7 +122,11 @@ module Make (Inputs : Inputs_intf) = struct
   (* Perform the `Sync interruptible work *)
   let do_sync {net; log; sl_ref} (state: Transition_logic_state.t) transition =
     let locked_tip = Transition_logic_state.locked_tip state in
-    let h = External_transition.ledger_hash transition in
+    let snarked_ledger_hash = External_transition.ledger_hash transition in
+    let h =
+      External_transition.ledger_builder_hash transition
+      |> Ledger_builder_hash.ledger_hash
+    in
     (* Lazily recreate the sync_ledger if necessary *)
     let sl : Sync_ledger.t =
       match !sl_ref with
@@ -121,6 +144,9 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let open Interruptible.Let_syntax in
     let ivar : External_transition.t Ivar.t = Ivar.create () in
+    Logger.debug log
+      !"Attempting to catchup to ledger-hash %{sexp: Ledger_hash.t}"
+      h ;
     let work =
       match%bind
         Interruptible.lift (Sync_ledger.fetch sl h)
@@ -134,24 +160,28 @@ module Make (Inputs : Inputs_intf) = struct
                  (External_transition.ledger_builder_hash transition))
           with
           | Ok aux -> (
-            match Ledger_builder.of_aux_and_ledger ledger aux with
+            match
+              Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
+                ~aux
+            with
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
             | Ok lb ->
+                sl_ref := None ;
                 let new_tree =
                   Transition_logic_state.Transition_tree.singleton transition
                 in
-                sl_ref := None ;
                 let new_tip = Tip.of_transition_and_lb transition lb in
+                Tip.assert_materialization_of new_tip transition ;
                 let open Transition_logic_state.Change in
                 [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
             | Error e ->
-                Logger.info log "Malicious aux data received from net %s"
+                Logger.warn log "Malicious aux data received from net %s"
                   (Error.to_string_hum e) ;
                 (* TODO: Retry? see #361 *)
                 [] )
           | Error e ->
-              Logger.info log "Network failed to send aux %s"
+              Logger.warn log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;
               [] )
       | `Target_changed -> return []

@@ -13,6 +13,7 @@
       rc_pool
       test_util
       vrf_lib
-      unix_timestamp ))
+      unix_timestamp
+      non_zero_curve_point ))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Consensus mechanisms")))

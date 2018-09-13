@@ -315,17 +315,14 @@ module Make (Inputs : Inputs_intf) = struct
       Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
     let get_ledger_builder_aux_at_hash t ledger_builder_hash =
-      Print.printf "A\n" ;
       let peers = Gossip_net.random_peers t.gossip_net 8 in
       find_map' peers ~f:(fun peer ->
-          Print.printf "B\n" ;
           match%map
             Gossip_net.query_peer t.gossip_net peer
               Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
               ledger_builder_hash
           with
           | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
-              Print.printf "C\n" ;
               if
                 Ledger_builder_hash.equal
                   (Ledger_builder_hash.of_aux_and_ledger_hash

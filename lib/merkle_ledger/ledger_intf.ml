@@ -7,39 +7,30 @@ module type S = sig
 
   type key
 
-  val depth : int
-
   type index = int
 
   type t [@@deriving sexp, bin_io]
 
-  include Container.S0 with type t := t and type elt := account
-
   val copy : t -> t
 
-  module Path : sig
-    type elem = [`Left of hash | `Right of hash] [@@deriving sexp]
-
-    val elem_hash : elem -> hash
-
-    type t = elem list [@@deriving sexp]
-
-    val implied_root : t -> hash -> hash
-  end
+  module Path : Merkle_path.S with type hash := hash
 
   module Addr : Merkle_address.S
 
+  module Location : sig
+    type t
+  end
+
   val create : unit -> t
 
-  val length : t -> int
+  val location_of_key : t -> key -> Location.t option
 
-  val get : t -> key -> account option
+  val get : t -> Location.t -> account option
 
-  val set : t -> key -> account -> unit
+  val set : t -> Location.t -> account -> unit
 
-  val update : t -> key -> f:(account option -> account) -> unit
-
-  val merkle_root : t -> hash
+  val get_or_create_account_exn :
+    t -> key -> account -> [`Added | `Existed] * Location.t
 
   val hash : t -> Ppx_hash_lib.Std.Hash.hash_value
 
@@ -48,41 +39,29 @@ module type S = sig
 
   val compare : t -> t -> int
 
-  val merkle_path : t -> key -> Path.t option
+  val merkle_path : t -> Location.t -> Path.t
 
   val key_of_index : t -> index -> key option
-
-  val index_of_key : t -> key -> index option
 
   val key_of_index_exn : t -> index -> key
 
   val index_of_key_exn : t -> key -> index
 
-  val get_at_index : t -> index -> [`Ok of account | `Index_not_found]
-
-  val set_at_index : t -> index -> account -> [`Ok | `Index_not_found]
-
-  val merkle_path_at_index : t -> index -> [`Ok of Path.t | `Index_not_found]
+  val merkle_path_at_index_exn : t -> index -> Path.t
 
   val get_at_index_exn : t -> index -> account
 
   val set_at_index_exn : t -> index -> account -> unit
 
-  val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
-
-  val merkle_path_at_index_exn : t -> index -> Path.t
-
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
-  val get_inner_hash_at_addr_exn : t -> Addr.t -> hash
-
-  val set_inner_hash_at_addr_exn : t -> Addr.t -> hash -> unit
-
-  val extend_with_empty_to_fit : t -> int -> unit
-
-  val set_all_accounts_rooted_at_exn : t -> Addr.t -> account list -> unit
-
-  val get_all_accounts_rooted_at_exn : t -> Addr.t -> account list
+  include Syncable_intf.S
+          with type root_hash := hash
+           and type hash := hash
+           and type account := account
+           and type addr := Addr.t
+           and type t := t
+           and type path := Path.t
 
   val recompute_tree : t -> unit
 end

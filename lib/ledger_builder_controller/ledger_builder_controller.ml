@@ -3,19 +3,21 @@ open Async_kernel
 
 module type Inputs_intf = sig
   module State_hash : sig
-    type t [@@deriving eq]
+    type t [@@deriving eq, sexp, compare]
 
     val to_bits : t -> bool list
   end
 
   module Security : Protocols.Coda_pow.Security_intf
 
-  module Ledger_builder_hash : sig
-    type t [@@deriving eq, bin_io]
+  module Ledger_hash : sig
+    type t [@@deriving eq, bin_io, sexp, eq]
   end
 
-  module Ledger_hash : sig
-    type t [@@deriving eq]
+  module Ledger_builder_hash : sig
+    type t [@@deriving eq, bin_io, sexp, compare]
+
+    val ledger_hash : t -> Ledger_hash.t
   end
 
   module Ledger_builder_diff : sig
@@ -34,6 +36,10 @@ module type Inputs_intf = sig
     val merkle_root : t -> Ledger_hash.t
   end
 
+  module Ledger_builder_aux_hash : sig
+    type t [@@deriving sexp]
+  end
+
   module Ledger_builder : sig
     type t [@@deriving bin_io]
 
@@ -41,17 +47,25 @@ module type Inputs_intf = sig
 
     module Aux : sig
       type t [@@deriving bin_io]
+
+      val hash : t -> Ledger_builder_aux_hash.t
     end
 
     val ledger : t -> Ledger.t
 
     val create : Ledger.t -> t
 
-    val of_aux_and_ledger : Ledger.t -> Aux.t -> t Or_error.t
+    val of_aux_and_ledger :
+         snarked_ledger_hash:Ledger_hash.t
+      -> ledger:Ledger.t
+      -> aux:Aux.t
+      -> t Or_error.t
 
     val copy : t -> t
 
     val hash : t -> Ledger_builder_hash.t
+
+    val aux : t -> Aux.t
 
     val apply :
          t
@@ -218,13 +232,6 @@ end = struct
     let previous_state_hash t = protocol_state t |> previous_state_hash
   end
 
-  let assert_valid_state (witness: External_transition.t) builder =
-    assert (
-      Ledger_builder_hash.equal
-        (External_transition.ledger_builder_hash witness)
-        (Ledger_builder.hash builder) ) ;
-    ()
-
   module Transition_logic_inputs = struct
     module State_hash = State_hash
     module Consensus_mechanism = Consensus_mechanism
@@ -287,6 +294,23 @@ end = struct
 
       let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
 
+      let assert_materialization_of t transition =
+        [%test_result : State_hash.t]
+          ~message:
+            "Protocol state in tip should be the target state of the transition"
+          ~expect:
+            (Protocol_state.hash (External_transition.target_state transition))
+          (Protocol_state.hash (state t)) ;
+        [%test_result : Ledger_builder_hash.t]
+          ~message:
+            (Printf.sprintf
+               !"Ledger_builder_hash inside protocol state inconsistent with \
+                 materialized ledger_builder's hash for transition: %{sexp: \
+                 External_transition.t}"
+               transition)
+          ~expect:(External_transition.ledger_builder_hash transition)
+          (Ledger_builder.hash t.ledger_builder)
+
       let transition_unchecked t transition =
         let%map () =
           let open Deferred.Let_syntax in
@@ -304,10 +328,13 @@ end = struct
                 "We should have already verified patches can be applied: %s"
                 (Error.to_string_hum e) ()
         in
-        assert_valid_state transition t.ledger_builder ;
-        { t with
-          protocol_state= External_transition.target_state transition
-        ; proof= External_transition.protocol_state_proof transition }
+        let res =
+          { t with
+            protocol_state= External_transition.target_state transition
+          ; proof= External_transition.protocol_state_proof transition }
+        in
+        assert_materialization_of res transition ;
+        res
 
       let is_parent_of ~child ~parent =
         State_hash.equal
@@ -316,16 +343,18 @@ end = struct
 
       let is_materialization_of t transition =
         State_hash.equal
-          (Protocol_state.hash (state t))
           (Protocol_state.hash (External_transition.target_state transition))
+          (Protocol_state.hash (state t))
     end
 
     module Transition_logic_state =
       Transition_logic_state.Make (Security) (External_transition) (Tip)
+    module Ledger_hash = Ledger_hash
 
     module Catchup = Catchup.Make (struct
       module Ledger_hash = Ledger_hash
       module Ledger = Ledger
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder = Ledger_builder
       module Protocol_state_proof = Protocol_state_proof
@@ -354,10 +383,12 @@ end = struct
 
   let transition_tree t =
     let state = Transition_logic.state t.handler in
+    Transition_logic_state.assert_state_valid state ;
     Transition_logic_state.ktree state
 
   let strongest_tip t =
     let state = Transition_logic.state t.handler in
+    Transition_logic_state.assert_state_valid state ;
     Transition_logic_state.longest_branch_tip state
 
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
@@ -449,7 +480,6 @@ end = struct
                   Deferred.upon w.Interruptible.d (function
                     | Ok [] -> ()
                     | Ok changes ->
-                        (* TODO fix this *)
                         Linear_pipe.write_without_pushback mutate_state_writer
                           (changes, current_transition)
                     | Error () -> () )
@@ -512,8 +542,14 @@ let%test_module "test" =
         let max_depth = `Finite 50
       end
 
-      module Ledger_builder_hash = Int
       module Ledger_hash = Int
+
+      module Ledger_builder_hash = struct
+        include Int
+
+        let ledger_hash = Fn.id
+      end
+
       (* A ledger_builder transition will just add to a "ledger" integer *)
       module Ledger_builder_diff = Int
 
@@ -525,11 +561,17 @@ let%test_module "test" =
         let copy t = t
       end
 
+      module Ledger_builder_aux_hash = struct
+        type t = int [@@deriving sexp]
+      end
+
       module Ledger_builder = struct
         type t = int ref [@@deriving sexp, bin_io]
 
         module Aux = struct
           type t = int [@@deriving bin_io]
+
+          let hash t = t
         end
 
         type proof = ()
@@ -542,7 +584,10 @@ let%test_module "test" =
 
         let hash t = !t
 
-        let of_aux_and_ledger _aux l = Ok (create l)
+        let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
+          Ok (create ledger)
+
+        let aux t = !t
 
         let apply (t: t) (x: Ledger_builder_diff.t) =
           t := x ;
@@ -687,7 +732,7 @@ let%test_module "test" =
 
         let destroy _t = ()
 
-        let fetch t _h = return (`Ok t.ledger)
+        let fetch _t h = return (`Ok h)
       end
 
       module Store = Storage.Memory
@@ -745,18 +790,13 @@ let%test_module "test" =
 
     let assert_strongest_ledgers lbc_deferred ~transitions:_ ~expected =
       Backtrace.elide := false ;
-      let res =
-        Async.Thread_safe.block_on_async (fun () ->
-            let%bind lbc = lbc_deferred in
-            let%map results =
-              take_map (Lbc.strongest_ledgers lbc) (List.length expected) ~f:
-                (fun (lb, _) -> !lb )
-            in
-            assert (List.equal results expected ~equal:Int.equal) )
-      in
-      match res with
-      | Ok () -> ()
-      | Error e -> printf !"Got exn %s\n%!" (Exn.to_string e)
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let%bind lbc = lbc_deferred in
+          let%map results =
+            take_map (Lbc.strongest_ledgers lbc) (List.length expected) ~f:
+              (fun (lb, _) -> !lb )
+          in
+          assert (List.equal results expected ~equal:Int.equal) )
 
     let%test_unit "strongest_ledgers updates appropriately when new_states \
                    flow in within tree" =

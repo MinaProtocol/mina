@@ -4,7 +4,7 @@ open Nanobit_base
 open Coda_main
 open Signature_lib
 
-let pk_of_sk sk = Public_key.of_private_key sk |> Public_key.compress
+let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
 let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
@@ -12,6 +12,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
+  let keypair = Keypair.of_private_key_exn Genesis_ledger.high_balance_sk in
   let module Config = struct
     let logger = log
 
@@ -21,13 +22,15 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let transition_interval = Time.Span.of_ms 1000.0
 
-    let fee_public_key = Genesis_ledger.high_balance_pk
+    let keypair = keypair
 
     let genesis_proof = Precomputed_values.base_proof
+
+    let transaction_capacity_log_2 = 3
   end in
   let%bind (module Init) = make_init (module Config) (module Kernel) in
   let module Main = Coda.Make (Init) () in
-  let module Run = Run (Main) in
+  let module Run = Run (Config) (Main) in
   let open Main in
   let net_config =
     { Inputs.Net.Config.parent_log= log
@@ -43,11 +46,12 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   let%bind minibit =
     Main.create
       (Main.Config.make ~log ~net_config ~should_propose
+         ~run_snark_worker:with_snark
          ~ledger_builder_persistant_location:"ledger_builder"
          ~transaction_pool_disk_location:"transaction_pool"
          ~snark_pool_disk_location:"snark_pool"
          ~time_controller:(Inputs.Time.Controller.create ())
-         ())
+         ~keypair ())
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers minibit)) ;
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
@@ -76,7 +80,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   in
   let client_port = 8123 in
   let run_snark_worker = `With_public_key Genesis_ledger.high_balance_pk in
-  Run.setup_local_server ~client_port ~minibit ~log ;
+  Run.setup_local_server ~client_port ~minibit ~log () ;
   Run.run_snark_worker ~log ~client_port run_snark_worker ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
@@ -97,7 +101,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     let payload : Transaction.Payload.t =
       {receiver= receiver_pk; amount; fee; nonce}
     in
-    Transaction.sign (Keypair.of_private_key sender_sk) payload
+    Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
   in
   let test_sending_transaction sender_sk receiver_pk =
     let transaction =

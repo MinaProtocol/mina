@@ -38,6 +38,16 @@ build:
 
 dev: docker container build
 
+# snark tunable
+
+withsnark:
+	sed -i '/let with_snark =/c\let with_snark = true' lib/nanobit_base/insecure.ml
+
+withoutsnark:
+	sed -i '/let with_snark =/c\let with_snark = false' lib/nanobit_base/insecure.ml
+
+showsnark:
+	@grep 'let with_snark' lib/nanobit_base/insecure.ml
 
 ########################################
 ## Lint
@@ -115,15 +125,15 @@ test-all: | test-runtest \
 
 test-runtest: SHELL := /bin/bash
 test-runtest:
-	source test_all.sh ; test_runtest
+	source test_all.sh ; run_unit_tests
 
 test-sigs: SHELL := /bin/bash
 test-sigs:
-	source test_all.sh ; test_method proof_of_signature
+	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_signature run_integration_tests
 
 test-stakes: SHELL := /bin/bash
 test-stakes:
-	source test_all.sh ; test_method proof_of_stake
+	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_stake run_integration_tests
 
 
 ########################################

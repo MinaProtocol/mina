@@ -33,6 +33,7 @@ module Inputs = struct
     Transaction_snark.create ~source:statement.source ~target:statement.target
       ~proof_type:statement.proof_type ~fee_excess:statement.fee_excess
       ~sok_digest ~proof:Dummy_values.Tock.proof
+      ~supply_increase:statement.supply_increase
 
   type single_spec =
     ( Statement.t
