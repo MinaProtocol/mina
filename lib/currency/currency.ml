@@ -7,6 +7,8 @@ open Bitstring_lib
 open Fold_lib
 open Tuple_lib
 
+type uint64 = Unsigned.uint64
+
 module type Basic = sig
   type t [@@deriving bin_io, sexp, compare, hash]
 
@@ -39,6 +41,10 @@ module type Basic = sig
   val of_int : int -> t
 
   val to_int : t -> int
+
+  val to_uint64 : t -> uint64
+
+  val of_uint64 : uint64 -> t
 
   val var_of_t : t -> var
 
@@ -164,10 +170,15 @@ module type S = sig
      and type t := t
 end
 
-module Make
-    (Unsigned : Unsigned_extended.S) (M : sig
-        val length : int
-    end) : sig
+module Make (Unsigned : sig
+  include Unsigned_extended.S
+
+  val to_uint64 : t -> uint64
+
+  val of_uint64 : uint64 -> t
+end) (M : sig
+  val length : int
+end) : sig
   include S with type t = Unsigned.t and type var = Boolean.var list
 
   val var_of_bits : Boolean.var Bitstring.Lsb_first.t -> var
@@ -193,6 +204,10 @@ end = struct
   end
 
   include Stable.V1
+
+  let to_uint64 = Unsigned.to_uint64
+
+  let of_uint64 = Unsigned.of_uint64
 
   let of_int = Unsigned.of_int
 
@@ -569,8 +584,6 @@ end
 
 module Balance = struct
   include (Amount : Basic with type t = Amount.t and type var = Amount.var)
-
-  let of_amount = Fn.id
 
   let add_amount = Amount.add
 
