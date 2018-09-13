@@ -535,10 +535,11 @@ module Make (Inputs : Inputs_intf) = struct
               { protocol_state=
                   ( Consensus_mechanism.External_transition.protocol_state
                       transition
-                  , Consensus_mechanism.External_transition.protocol_state_proof
-                      transition )
+                  , Consensus_mechanism.External_transition.
+                    protocol_state_proof transition )
               ; ledger_builder
-              ; transactions= Transaction_pool.transactions transaction_pool } )
+              ; transactions= Transaction_pool.transactions transaction_pool }
+        )
         |> don't_wait_for ;
         let proposer =
           Proposer.create ~parent_log:config.log ~change_feeder:tips_r
@@ -548,11 +549,11 @@ module Make (Inputs : Inputs_intf) = struct
         don't_wait_for
           (Linear_pipe.transfer_id
              (Proposer.transitions proposer)
-             external_transitions_writer);
-        Some proposer)
+             external_transitions_writer) ;
+        Some proposer )
       else (
-        don't_wait_for (Linear_pipe.drain strongest_ledgers_for_miner);
-        None)
+        don't_wait_for (Linear_pipe.drain strongest_ledgers_for_miner) ;
+        None )
     in
     return
       { proposer
