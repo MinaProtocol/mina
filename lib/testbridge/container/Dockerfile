@@ -11,7 +11,7 @@ RUN sudo mkdir /app
 
 RUN sudo chown -R opam /testbridge
 
-RUN eval `opam config env` && jbuilder build
+RUN eval `opam config env` && dune build
 
 RUN sudo chown -R opam /app
 

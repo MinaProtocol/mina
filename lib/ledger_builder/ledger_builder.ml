@@ -190,6 +190,7 @@ end = struct
   [@@deriving sexp, bin_io]
 
   module Super_transaction_with_witness = struct
+    (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction: Super_transaction.t
       ; statement: Ledger_proof_statement.t
@@ -349,7 +350,91 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
-  let make ~public_key ~ledger ~aux = {public_key; ledger; scan_state= aux}
+  let scan_statement (state: scan_state) :
+      (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t =
+    with_return (fun {return} ->
+        let ok_or_return = function
+          | Ok x -> x
+          | Error e -> return (Error (`Error e))
+        in
+        let merge s1 s2 = ok_or_return (Ledger_proof_statement.merge s1 s2) in
+        let merge_acc acc s2 =
+          match acc with None -> Some s2 | Some s1 -> Some (merge s1 s2)
+        in
+        let res =
+          Parallel_scan.State.fold_chronological state ~init:None ~f:
+            (fun acc_statement job ->
+              match job with
+              | Merge (None, Some (_, s)) | Merge (Some (_, s), None) ->
+                  merge_acc acc_statement s
+              | Merge (None, None) -> acc_statement
+              | Merge (Some (_, s1), Some (_, s2)) ->
+                  merge_acc acc_statement (merge s1 s2)
+              | Base None -> acc_statement
+              | Base (Some {transaction; statement; witness}) ->
+                  let source = Sparse_ledger.merkle_root witness in
+                  let after =
+                    Or_error.try_with (fun () ->
+                        Sparse_ledger.apply_super_transaction_exn witness
+                          transaction )
+                    |> ok_or_return
+                  in
+                  let target = Sparse_ledger.merkle_root after in
+                  let expected_statement =
+                    { Ledger_proof_statement.source
+                    ; target
+                    ; fee_excess=
+                        ok_or_return (Super_transaction.fee_excess transaction)
+                    ; supply_increase=
+                        ok_or_return
+                          (Super_transaction.supply_increase transaction)
+                    ; proof_type= `Base }
+                  in
+                  if Ledger_proof_statement.equal statement expected_statement
+                  then merge_acc acc_statement statement
+                  else
+                    return
+                      (Error
+                         (`Error
+                           (Error.of_string
+                              "Ledger_builder.scan_statement: Bad base \
+                               statement"))) )
+        in
+        match res with None -> Error `Empty | Some res -> Ok res )
+
+  let statement_exn t =
+    match scan_statement t.scan_state with
+    | Ok s -> `Non_empty s
+    | Error `Empty -> `Empty
+    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
+
+  let of_aux_and_ledger ~snarked_ledger_hash ~public_key ~ledger ~aux =
+    let check cond err =
+      if not cond then Or_error.errorf "Ledger_hash.of_aux_and_ledger: %s" err
+      else Ok ()
+    in
+    let open Or_error.Let_syntax in
+    let%map () =
+      match scan_statement aux with
+      | Error (`Error e) -> Error e
+      | Error `Empty -> Ok ()
+      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
+          let%map () =
+            check
+              (Ledger_hash.equal snarked_ledger_hash source)
+              "did not connect with snarked ledger hash"
+          and () =
+            check
+              (Ledger_hash.equal (Ledger.merkle_root ledger) target)
+              "incorrect statement target hash"
+          and () =
+            check
+              (Fee.Signed.equal Fee.Signed.zero fee_excess)
+              "nonzero fee excess"
+          in
+          ()
+    in
+    {ledger; scan_state= aux; public_key}
 
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
@@ -357,16 +442,16 @@ end = struct
     ; public_key }
 
   let hash {scan_state; ledger; public_key= _} : Ledger_builder_hash.t =
-    let h = Cryptokit.Hash.sha3 256 in
-    h#add_string (Ledger_hash.to_bytes (Ledger.merkle_root ledger)) ;
-    h#add_string (Aux.hash_to_string scan_state) ;
-    Ledger_builder_hash.of_bytes h#result
+    Ledger_builder_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
+      (Ledger.merkle_root ledger)
 
   let ledger {ledger; _} = ledger
 
   let create ~ledger ~self : t =
     let open Config in
-    { scan_state= Parallel_scan.start ~parallelism_log_2
+    (* Transaction capacity log_2 is half the capacity for work parallelism *)
+    { scan_state=
+        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
     ; ledger
     ; public_key= self }
 
@@ -381,11 +466,13 @@ end = struct
         let%bind () =
           Option.some_if (Ledger_hash.equal stmt1.target stmt2.source) ()
         in
-        let%map fee_excess =
-          Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        let%map fee_excess = Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        and supply_increase =
+          Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
         in
         { Ledger_proof_statement.source= stmt1.source
         ; target= stmt2.target
+        ; supply_increase
         ; fee_excess
         ; proof_type= `Merge }
 
@@ -398,11 +485,15 @@ end = struct
         let%map fee_excess =
           Fee.Signed.add s.fee_excess s'.fee_excess
           |> option "Error adding fees"
+        and supply_increase =
+          Currency.Amount.add s.supply_increase s'.supply_increase
+          |> option "Error adding supply_increases"
         in
         Parallel_scan.State.Completed_job.Merged
           ( proof
           , { Ledger_proof_statement.source= s.source
             ; target= s'.target
+            ; supply_increase
             ; fee_excess
             ; proof_type= `Merge } )
 
@@ -442,13 +533,15 @@ end = struct
 
   let apply_super_transaction_and_get_statement ledger s =
     let open Or_error.Let_syntax in
-    let%bind fee_excess = Super_transaction.fee_excess s in
+    let%bind fee_excess = Super_transaction.fee_excess s
+    and supply_increase = Super_transaction.supply_increase s in
     let source = Ledger.merkle_root ledger in
     let%map undo = Ledger.apply_super_transaction ledger s in
     ( undo
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger
       ; fee_excess
+      ; supply_increase
       ; proof_type= `Base } )
 
   let apply_super_transaction_and_get_witness ledger s public_key =
@@ -727,8 +820,8 @@ end = struct
           match Sequence.next seq with
           | None -> Done
           | Some (x, seq) ->
-            (*allow a chunk of 1 proof as well*)
-            match Sequence.next seq with
+            match (*allow a chunk of 1 proof as well*)
+                  Sequence.next seq with
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) )
 
@@ -1207,7 +1300,7 @@ end = struct
     let curr_hash = hash t in
     let t' = copy t in
     let ledger = ledger t' in
-    let max_throughput = Int.pow 2 (Inputs.Config.parallelism_log_2 - 1) in
+    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let partitions =
       Parallel_scan.partitions ~max_slots:max_throughput t'.scan_state
     in
@@ -1402,6 +1495,7 @@ let%test_module "test" =
           type t =
             { source: Ledger_hash.t
             ; target: Ledger_hash.t
+            ; supply_increase: Currency.Amount.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
           [@@deriving sexp, bin_io, compare, hash]
@@ -1411,9 +1505,13 @@ let%test_module "test" =
             let%map fee_excess =
               Fee.Signed.add s1.fee_excess s2.fee_excess
               |> option "Error adding fees"
+            and supply_increase =
+              Currency.Amount.add s1.supply_increase s2.supply_increase
+              |> option "Error adding supply increases"
             in
             { source= s1.source
             ; target= s2.target
+            ; supply_increase
             ; fee_excess
             ; proof_type= `Merge }
         end
@@ -1423,14 +1521,15 @@ let%test_module "test" =
 
         let gen =
           let open Quickcheck.Generator.Let_syntax in
-          let%bind source = Ledger_hash.gen in
-          let%bind target = Ledger_hash.gen in
-          let%bind fee_excess = Fee.Signed.gen in
+          let%bind source = Ledger_hash.gen
+          and target = Ledger_hash.gen
+          and fee_excess = Fee.Signed.gen
+          and supply_increase = Currency.Amount.gen in
           let%map proof_type =
             Quickcheck.Generator.bool
             >>| function true -> `Base | false -> `Merge
           in
-          {source; target; fee_excess; proof_type}
+          {source; target; supply_increase; fee_excess; proof_type}
       end
 
       module Proof = Ledger_proof_statement
@@ -1481,6 +1580,8 @@ let%test_module "test" =
 
         let merkle_root : t -> ledger_hash = fun t -> Int.to_string !t
 
+        let num_accounts _ = 0
+
         let apply_super_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
           match s with
@@ -1528,6 +1629,13 @@ let%test_module "test" =
         let of_ledger_subset_exn :
             Ledger.t -> Compressed_public_key.t list -> t =
          fun ledger _ -> !ledger
+
+        let merkle_root t = Ledger.merkle_root (ref t)
+
+        let apply_super_transaction_exn t txn =
+          let l : Ledger.t = ref t in
+          Or_error.ok_exn (Ledger.apply_super_transaction l txn) |> ignore ;
+          !l
       end
 
       module Ledger_builder_aux_hash = struct
@@ -1542,8 +1650,6 @@ let%test_module "test" =
         type ledger_hash = Ledger_hash.t
 
         type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
-
-        let of_bytes : string -> t = fun s -> s
 
         let of_aux_and_ledger_hash :
             ledger_builder_aux_hash -> ledger_hash -> t =
@@ -1673,7 +1779,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let parallelism_log_2 = 8
+        let transaction_capacity_log_2 = 7
       end
 
       let check :
@@ -1714,7 +1820,7 @@ let%test_module "test" =
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
@@ -1766,7 +1872,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
@@ -1818,7 +1924,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
       Backtrace.elide := false ;
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in

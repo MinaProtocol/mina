@@ -86,7 +86,7 @@ module type Time_intf = sig
 end
 
 module type Ledger_hash_intf = sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
 
   val to_bytes : t -> string
 
@@ -115,8 +115,6 @@ module type Ledger_builder_hash_intf = sig
   type ledger_hash
 
   type ledger_builder_aux_hash
-
-  val of_bytes : string -> t
 
   val of_aux_and_ledger_hash : ledger_builder_aux_hash -> ledger_hash -> t
 
@@ -147,6 +145,8 @@ module type Ledger_intf = sig
   val create : unit -> t
 
   val copy : t -> t
+
+  val num_accounts : t -> int
 
   val merkle_root : t -> ledger_hash
 
@@ -218,7 +218,17 @@ module type Public_key_intf = sig
 
   module Compressed : Compressed_public_key_intf
 
-  val of_private_key : Private_key.t -> t
+  val of_private_key_exn : Private_key.t -> t
+
+  val compress : t -> Compressed.t
+end
+
+module type Keypair_intf = sig
+  type private_key
+
+  type public_key
+
+  type t = {public_key: public_key; private_key: private_key}
 end
 
 module type Fee_transfer_intf = sig
@@ -277,6 +287,7 @@ module type Ledger_proof_statement_intf = sig
   type t =
     { source: ledger_hash
     ; target: ledger_hash
+    ; supply_increase: Currency.Amount.t
     ; fee_excess: Fee.Signed.t
     ; proof_type: [`Base | `Merge] }
   [@@deriving sexp, bin_io, compare]
@@ -485,7 +496,12 @@ module type Ledger_builder_intf = sig
 
   val aux : t -> Aux.t
 
-  val make : public_key:public_key -> ledger:ledger -> aux:Aux.t -> t
+  val of_aux_and_ledger :
+       snarked_ledger_hash:ledger_hash
+    -> public_key:public_key
+    -> ledger:ledger
+    -> aux:Aux.t
+    -> t Or_error.t
 
   val random_work_spec_chunk :
        t
@@ -498,6 +514,8 @@ module type Ledger_builder_intf = sig
        list
        option
        * (ledger_proof_statement_set * ledger_proof_statement option)
+
+  val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 end
 
 module type Tip_intf = sig
@@ -559,6 +577,8 @@ module type Consensus_mechanism_intf = sig
 
   type ledger
 
+  type keypair
+
   module Local_state : sig
     type t [@@deriving sexp]
 
@@ -578,7 +598,7 @@ module type Consensus_mechanism_intf = sig
   end
 
   module Protocol_state : sig
-    type value [@@deriving sexp, bin_io]
+    type value [@@deriving sexp, bin_io, eq, compare]
 
     type var
 
@@ -605,6 +625,7 @@ module type Consensus_mechanism_intf = sig
     val create_value :
          ?sok_digest:sok_digest
       -> ?ledger_proof:proof
+      -> supply_increase:Currency.Amount.t
       -> blockchain_state:blockchain_state
       -> consensus_data:Consensus_transition_data.value
       -> unit
@@ -647,6 +668,7 @@ module type Consensus_mechanism_intf = sig
     -> blockchain_state:blockchain_state
     -> local_state:Local_state.t
     -> time:Int64.t
+    -> keypair:keypair
     -> transactions:transaction list
     -> ledger:ledger
     -> (Protocol_state.value * Consensus_transition_data.value) option
@@ -742,6 +764,11 @@ module type Inputs_intf = sig
     Public_key_intf
     with module Private_key := Private_key
      and module Compressed = Compressed_public_key
+
+  module Keypair :
+    Keypair_intf
+    with type private_key := Private_key.t
+     and type public_key := Public_key.t
 
   module Transaction :
     Transaction_intf with type public_key := Public_key.Compressed.t
@@ -896,6 +923,7 @@ Merge Snark:
      and type transaction := Transaction.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
+     and type keypair := Keypair.t
 
   module Tip :
     Tip_intf

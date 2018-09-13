@@ -9,13 +9,17 @@ module Global_keypair = struct
     Private_key.of_base64_exn
       "JgDwuhZ+kgxR1jBT+F9hpH96nxD/TIGZ7fVSpw9YAGDlhwltebhc"
 
-  let public_key = Public_key.of_private_key private_key
+  let public_key = Public_key.of_private_key_exn private_key
 end
 
 module type Inputs_intf = sig
+  module Time : Protocols.Coda_pow.Time_intf
+
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
   end
+
+  val proposal_interval : Time.Span.t
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -111,6 +115,8 @@ struct
     let update state =
       { length= Length.succ state.length
       ; signer_public_key= Public_key.compress Global_keypair.public_key }
+
+    let length t = t.length
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
@@ -121,7 +127,7 @@ struct
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~transactions:_ ~ledger:_ =
+      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -155,7 +161,7 @@ struct
       (Public_key.var_of_t Global_keypair.public_key)
       (transition |> Snark_transition.blockchain_state)
 
-  let next_state_checked (state: Consensus_state.var) _block =
+  let next_state_checked (state: Consensus_state.var) _state_hash _block =
     let open Consensus_state in
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in
@@ -164,7 +170,7 @@ struct
       @@ Public_key.compress Global_keypair.public_key
     in
     let%map () =
-      Public_key.Compressed.assert_equal state.signer_public_key
+      Public_key.Compressed.Checked.Assert.equal state.signer_public_key
         signer_public_key
     in
     {length; signer_public_key}
@@ -174,7 +180,7 @@ struct
     ()
 
   let select Consensus_state.({length= l1; _})
-      Consensus_state.({length= l2; _}) =
+      Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
 
   let genesis_protocol_state =

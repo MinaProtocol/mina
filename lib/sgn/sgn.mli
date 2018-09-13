@@ -14,6 +14,8 @@ val typ : (var, t) Typ.t
 val negate : t -> t
 
 module Checked : sig
+  val constant : t -> var
+
   val neg : var
 
   val pos : var
@@ -27,4 +29,6 @@ module Checked : sig
   val neg_if_true : Boolean.var -> var
 
   val negate : var -> var
+
+  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 end

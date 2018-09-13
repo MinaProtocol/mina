@@ -12,6 +12,8 @@
       snark_params
       rc_pool
       test_util
-      vrf_lib))
+      vrf_lib
+      unix_timestamp
+      non_zero_curve_point ))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "Consensus mechanisms")))

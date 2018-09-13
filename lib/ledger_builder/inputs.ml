@@ -63,6 +63,10 @@ module type S = sig
     type t [@@deriving sexp, bin_io]
 
     val of_ledger_subset_exn : Ledger.t -> Compressed_public_key.t list -> t
+
+    val merkle_root : t -> Ledger_hash.t
+
+    val apply_super_transaction_exn : t -> Super_transaction.t -> t
   end
 
   module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
@@ -89,7 +93,7 @@ module type S = sig
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Config : sig
-    val parallelism_log_2 : int
+    val transaction_capacity_log_2 : int
   end
 
   val check :

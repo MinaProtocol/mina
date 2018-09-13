@@ -1,7 +1,5 @@
-open Protocols
 open Core_kernel
 open Async_kernel
-open Coda_pow
 
 module Priced_proof : sig
   type ('proof, 'fee) t = {proof: 'proof; fee: 'fee}

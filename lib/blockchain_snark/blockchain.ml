@@ -1,6 +1,5 @@
 module State = Blockchain_state
 open Core_kernel
-open Async
 open Nanobit_base
 
 module type S = sig

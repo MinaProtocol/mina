@@ -12,7 +12,11 @@ module type Inputs_intf = sig
     end
 
     val select :
-      Consensus_state.value -> Consensus_state.value -> [`Keep | `Take]
+         Consensus_state.value
+      -> Consensus_state.value
+      -> logger:Logger.t
+      -> time_received:Unix_timestamp.t
+      -> [`Keep | `Take]
   end
 
   module Protocol_state : sig
@@ -25,10 +29,16 @@ module type Inputs_intf = sig
     val hash : value -> State_hash.t
   end
 
+  module Ledger_hash : sig
+    type t [@@deriving sexp, eq]
+  end
+
   module External_transition : sig
     type t [@@deriving eq, sexp, compare, bin_io]
 
     val target_state : t -> Protocol_state.value
+
+    val ledger_hash : t -> Ledger_hash.t
 
     val is_parent_of : child:t -> parent:t -> bool
   end
@@ -45,6 +55,8 @@ module type Inputs_intf = sig
     val is_parent_of : child:External_transition.t -> parent:t -> bool
 
     val is_materialization_of : t -> External_transition.t -> bool
+
+    val assert_materialization_of : t -> External_transition.t -> unit
   end
 
   module Transition_logic_state :
@@ -92,6 +104,7 @@ module type S = sig
        catchup
     -> t
     -> transition
+    -> time_received:Unix_timestamp.t
     -> ( handler_state_change list
        * (transition, handler_state_change list) Job.t option )
        Deferred.t
@@ -137,18 +150,6 @@ struct
   let locked_and_best tree =
     let path = Transition_tree.longest_path tree in
     (List.hd_exn path, List.last_exn path)
-
-  let select_transition x y =
-    let f = External_transition.target_state in
-    let sx = f x in
-    let sy = f y in
-    match
-      Consensus_mechanism.select
-        (Protocol_state.consensus_state sx)
-        (Protocol_state.consensus_state sy)
-    with
-    | `Keep -> x
-    | `Take -> y
 
   module Path_traversal = struct
     type t =
@@ -202,15 +203,13 @@ struct
                   | Ok tip -> return (Some tip)
                   | Error e ->
                       (* TODO: Punish sender *)
-                      Logger.info t.log "Recieved malicious transition %s"
+                      Logger.warn t.log "Recieved malicious transition %s"
                         (Error.to_string_hum e) ;
                       return None )
         in
         match result with
         | Some tip ->
-            assert (
-              Protocol_state.equal_value (Tip.state tip)
-                (External_transition.target_state last_transition) ) ;
+            Tip.assert_materialization_of tip last_transition ;
             [ Transition_logic_state.Change.Longest_branch_tip tip
             ; Transition_logic_state.Change.Ktree new_tree ]
         | None -> []
@@ -285,7 +284,7 @@ struct
           | None -> return (Or_error.error_string "Not found locally")
 
   let on_new_transition catchup ({state; log} as t)
-      (transition: External_transition.t) :
+      (transition: External_transition.t) ~(time_received: Unix_timestamp.t) :
       ( Transition_logic_state.Change.t list
       * (External_transition.t, Transition_logic_state.Change.t list) Job.t
         option )
@@ -315,23 +314,35 @@ struct
             Consensus_mechanism.select
               (Protocol_state.consensus_state source_state)
               (Protocol_state.consensus_state target_state)
+              ~logger:log ~time_received
           with
           | `Keep -> return ([], None)
-          | `Take -> return ([], Some (Catchup.sync catchup state transition))
-        )
+          | `Take ->
+              let lh = External_transition.ledger_hash transition in
+              Logger.debug t.log
+                !"Branch catchup for transition: lh:%{sexp: Ledger_hash.t} \
+                  state:%{sexp:Protocol_state.value}"
+                lh target_state ;
+              return ([], Some (Catchup.sync catchup state transition)) )
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition ~parent:(fun x ->
             External_transition.is_parent_of ~child:transition ~parent:x )
       with
-      | `No_parent ->
+      | `No_parent -> (
           let best_tip = locked_and_best old_tree |> snd in
-          if
-            External_transition.equal
-              (select_transition best_tip transition)
-              transition
-          then return ([], Some (Catchup.sync catchup state transition))
-          else return ([], None)
+          match
+            Consensus_mechanism.select
+              ( transition |> External_transition.target_state
+              |> Protocol_state.consensus_state )
+              ( best_tip |> External_transition.target_state
+              |> Protocol_state.consensus_state )
+              ~logger:log ~time_received
+          with
+          | `Keep ->
+              Logger.debug t.log "Branch noparent" ;
+              return ([], Some (Catchup.sync catchup state transition))
+          | `Take -> return ([], None) )
       | `Repeat -> return ([], None)
       | `Added new_tree ->
           let old_locked_head, old_best_tip = locked_and_best old_tree in

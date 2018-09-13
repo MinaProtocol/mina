@@ -17,15 +17,9 @@ end
 module type Account = sig
   type t [@@deriving bin_io, eq]
 
-  type balance
+  type key
 
-  val empty : t
-
-  val balance : t -> balance
-
-  val set_balance : t -> balance -> t
-
-  val public_key : t -> string
+  val public_key : t -> key
 end
 
 module type Hash = sig
@@ -33,11 +27,11 @@ module type Hash = sig
 
   type account
 
-  val empty : t
-
   val merge : height:int -> t -> t -> t
 
   val hash_account : account -> t
+
+  val empty_account : t
 end
 
 module type Depth = sig
@@ -46,6 +40,8 @@ end
 
 module type Key_value_database = sig
   type t
+
+  val copy : t -> t
 
   val create : directory:string -> t
 
@@ -61,6 +57,8 @@ end
 module type Stack_database = sig
   type t
 
+  val copy : t -> t
+
   val create : filename:string -> t
 
   val destroy : t -> unit
@@ -70,4 +68,10 @@ module type Stack_database = sig
   val pop : t -> Bigstring.t option
 
   val length : t -> int
+end
+
+module type Storage_locations = sig
+  val key_value_db_dir : string
+
+  val stack_db_file : string
 end

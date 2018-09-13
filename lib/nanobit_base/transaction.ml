@@ -1,10 +1,8 @@
 open Core
 open Import
-open Util
 open Snark_params
 open Coda_numbers
 open Tick
-open Let_syntax
 module Fee = Currency.Fee
 module Payload = Transaction_payload
 
@@ -32,6 +30,9 @@ include Stable.V1
 type value = t
 
 type var = (Payload.var, Public_key.var, Signature.var) t_
+
+let public_keys ({payload= {Payload.receiver; _}; sender; _}: value) =
+  [receiver; Public_key.compress sender]
 
 let sign (kp: Signature_keypair.t) (payload: Payload.t) : t =
   { payload

@@ -6,7 +6,6 @@ module Direction = struct
 end
 
 module Ring_buffer = Ring_buffer
-module State = State
 module Queue = Queue
 
 module Available_job = struct
@@ -21,7 +20,7 @@ module type Spec_intf = sig
   type output [@@deriving sexp_of]
 end
 
-module State1 = struct
+module State = struct
   include State
 
   (* Creates state that placeholders-out all the right jobs in the right spot
@@ -145,16 +144,28 @@ module State1 = struct
       | _, Base _ -> failwith "This shouldn't have occured"
       | _ -> false
 
-  let next_position t =
+  let next_position t position =
     let p = parallelism t in
-    if t.jobs.position = p - 2 then
+    if position = p - 2 then
       let base_pos =
         match t.base_none_pos with None -> p - 1 | Some pos -> pos
       in
-      (t.jobs).position <- base_pos
-    else if t.jobs.position >= p - 1 then
-      (t.jobs).position <- next_pos p t.jobs.position
-    else Ring_buffer.forwards ~n:1 t.jobs
+      base_pos
+    else if position >= p - 1 then next_pos p position
+    else Int.( % ) (position + 1) (Array.length t.jobs.data)
+
+  let set_next_position t =
+    (t.jobs).position <- next_position t t.jobs.position
+
+  let fold_chronological t ~init ~f =
+    let n = Array.length t.jobs.data in
+    let rec go acc i pos =
+      if Int.equal i n then acc
+      else
+        let x = (t.jobs.data).(pos) in
+        go (f acc x) (i + 1) (next_position t pos)
+    in
+    go init 0 0
 
   let jobs_list t =
     let rec go count t =
@@ -162,7 +173,7 @@ module State1 = struct
       else
         let j = Ring_buffer.read t.jobs in
         let pos = t.jobs.position in
-        next_position t ;
+        set_next_position t ;
         (j, pos) :: go (count + 1) t
     in
     (t.jobs).position <- 0 ;
@@ -242,7 +253,7 @@ module State1 = struct
           | Work.Not_done -> j :: js
           | Work.Work_done -> js
         in
-        next_position t ; consume t next jobs_copy
+        set_next_position t ; consume t next jobs_copy
 
   let include_one_datum state value base_pos : unit Or_error.t =
     let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
@@ -264,19 +275,17 @@ module State1 = struct
             state.base_none_pos <- next_base_none_pos state pos )
 end
 
-let start : type a d. parallelism_log_2:int -> (a, d) State.t = State1.create
+let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
 
-let next_jobs : state:('a, 'd) State1.t -> ('a, 'd) Available_job.t list =
- fun ~state -> State1.jobs_ready state
+let next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list =
+ fun ~state -> State.jobs_ready state
 
 let next_k_jobs :
-       state:('a, 'd) State1.t
-    -> k:int
-    -> ('a, 'd) Available_job.t list Or_error.t =
+    state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t =
  fun ~state ~k ->
-  if k > State1.parallelism state then
+  if k > State.parallelism state then
     Or_error.errorf "You asked for %d jobs, but it's only safe to ask for %d" k
-      (State1.parallelism state)
+      (State.parallelism state)
   else
     let possible_jobs = List.take (next_jobs ~state) k in
     let len = List.length possible_jobs in
@@ -285,10 +294,10 @@ let next_k_jobs :
       Or_error.errorf "You asked for %d jobs, but I only have %d available" k
         len
 
-let free_space : state:('a, 'd) State1.t -> int =
- fun ~state -> state.State1.capacity - State.current_data_length state
+let free_space : state:('a, 'd) State.t -> int =
+ fun ~state -> state.State.capacity - State.current_data_length state
 
-let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
+let enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t =
  fun ~state ~data ->
   if free_space ~state < List.length data then
     Or_error.error_string
@@ -297,21 +306,21 @@ let enqueue_data : state:('a, 'd) State1.t -> data:'d list -> unit Or_error.t =
          (free_space ~state) (List.length data))
   else (
     state.current_data_length <- state.current_data_length + List.length data ;
-    State1.include_many_data state data )
+    State.include_many_data state data )
 
 let fill_in_completed_jobs :
-       state:('a, 'd) State1.t
-    -> completed_jobs:'a State1.Completed_job.t list
+       state:('a, 'd) State.t
+    -> completed_jobs:'a State.Completed_job.t list
     -> 'b option Or_error.t =
  fun ~state ~completed_jobs ->
   let open Or_error.Let_syntax in
   let old_jobs = Ring_buffer.copy state.jobs in
   let last_acc = state.acc in
-  let%map () = State1.consume state completed_jobs old_jobs in
+  let%map () = State.consume state completed_jobs old_jobs in
   (state.jobs).position <- 0 ;
   if not (fst last_acc = fst state.acc) then snd state.acc else None
 
-let last_emitted_value (state: ('a, 'd) State1.t) = snd state.acc
+let last_emitted_value (state: ('a, 'd) State.t) = snd state.acc
 
 let partitions ~max_slots state =
   let n =
@@ -334,8 +343,8 @@ let gen :
  fun ~gen_data ~f_job_done ~f_acc ->
   let open Quickcheck.Generator.Let_syntax in
   let%bind parallelism_log_2 = Int.gen_incl 2 7 in
-  let s = State1.create ~parallelism_log_2 in
-  let parallelism = State1.parallelism s in
+  let s = State.create ~parallelism_log_2 in
+  let parallelism = State.parallelism s in
   let%bind data_chunk_size =
     Int.gen_incl ((parallelism / 2) - 1) (parallelism / 2)
   in
@@ -452,7 +461,7 @@ let%test_module "scans" =
               Async.Thread_safe.block_on_async_exn (fun () ->
                   let do_one_next = ref false in
                   (* For any arbitrary intermediate state *)
-                  let parallelism = State1.parallelism s in
+                  let parallelism = State.parallelism s in
                   (* if we then add 1 and a bunch of zeros *)
                   let one_then_zeros =
                     Linear_pipe.create_reader ~close_on_exception:true
@@ -483,15 +492,15 @@ let%test_module "scans" =
                   in
                   (* after we flush intermediate work *)
                   let old_acc =
-                    State1.acc s |> Option.value ~default:Int64.zero
+                    State.acc s |> Option.value ~default:Int64.zero
                   in
                   let%bind v = fill_some_zeros Int64.zero s in
                   do_one_next := true ;
-                  let acc = State1.acc s |> Option.value_exn in
+                  let acc = State.acc s |> Option.value_exn in
                   assert (acc <> old_acc) ;
                   (* eventually we'll emit the acc+1 element *)
                   let%map _ = fill_some_zeros v s in
-                  let acc_plus_one = State1.acc s |> Option.value_exn in
+                  let acc_plus_one = State.acc s |> Option.value_exn in
                   assert (Int64.(equal acc_plus_one (acc + one))) ) )
       end )
 

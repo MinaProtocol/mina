@@ -14,13 +14,13 @@ struct
 
   let name = "coda-shared-prefix-test"
 
-  let main who_proposes () =
+  let main who_proposes proposal_interval () =
     let%bind program_dir = Unix.getcwd () in
     let n = 2 in
     let log = Logger.create () in
     let log = Logger.child log name in
     Coda_processes.init () ;
-    Coda_processes.spawn_local_processes_exn n ~program_dir
+    Coda_processes.spawn_local_processes_exn n ?proposal_interval ~program_dir
       ~should_propose:(fun i -> i = who_proposes)
       ~snark_worker_public_keys:None
       ~f:(fun workers ->
@@ -90,6 +90,9 @@ struct
       (let%map_open who_proposes =
          flag "who-proposes" ~doc:"ID node number which will be proposing"
            (required int)
+       and proposal_interval =
+         flag "proposal-interval"
+           ~doc:"MILLIS proposal interval in proof of sig" (optional int)
        in
-       main who_proposes)
+       main who_proposes proposal_interval)
 end

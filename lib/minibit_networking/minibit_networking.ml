@@ -219,7 +219,7 @@ module Make (Inputs : Inputs_intf) = struct
   type t =
     { gossip_net: Gossip_net.t
     ; log: Logger.t
-    ; states: External_transition.t Linear_pipe.Reader.t
+    ; states: (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
     ; transaction_pool_diffs: Transaction_pool_diff.t Linear_pipe.Reader.t
     ; snark_pool_diffs: Snark_pool_diff.t Linear_pipe.Reader.t }
   [@@deriving fields]
@@ -256,7 +256,11 @@ module Make (Inputs : Inputs_intf) = struct
     let states, snark_pool_diffs, transaction_pool_diffs =
       Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(fun x ->
           match x with
-          | New_state s -> `Fst s
+          | New_state s ->
+              `Fst
+                ( s
+                , Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
+                  |> Unix_timestamp.of_float )
           | Snark_pool_diff d -> `Snd d
           | Transaction_pool_diff d -> `Trd d )
     in
@@ -311,17 +315,14 @@ module Make (Inputs : Inputs_intf) = struct
       Deferred.any (none_worked :: List.map ~f:(filter ~f:Or_error.is_ok) ds)
 
     let get_ledger_builder_aux_at_hash t ledger_builder_hash =
-      Print.printf "A\n" ;
       let peers = Gossip_net.random_peers t.gossip_net 8 in
       find_map' peers ~f:(fun peer ->
-          Print.printf "B\n" ;
           match%map
             Gossip_net.query_peer t.gossip_net peer
               Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
               ledger_builder_hash
           with
           | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
-              Print.printf "C\n" ;
               if
                 Ledger_builder_hash.equal
                   (Ledger_builder_hash.of_aux_and_ledger_hash

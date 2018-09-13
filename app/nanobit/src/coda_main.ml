@@ -3,6 +3,7 @@ open Async
 open Nanobit_base
 open Signature_lib
 open Blockchain_snark
+open Coda_numbers
 module Fee = Protocols.Coda_pow.Fee
 
 module Ledger_builder_aux_hash = struct
@@ -14,11 +15,9 @@ end
 module Ledger_builder_hash = struct
   include Ledger_builder_hash.Stable.V1
 
+  let ledger_hash = Ledger_builder_hash.ledger_hash
+
   let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
-
-  let to_bytes = Ledger_builder_hash.to_bytes
-
-  let of_bytes = Ledger_builder_hash.of_bytes
 end
 
 module Ledger_hash = struct
@@ -154,11 +153,12 @@ module type Config_intf = sig
 
   val transition_interval : Time.Span.t
 
-  (* Public key to allocate fees to *)
-
-  val fee_public_key : Public_key.Compressed.t
+  val keypair : Keypair.t
 
   val genesis_proof : Snark_params.Tock.Proof.t
+
+  val transaction_capacity_log_2 : int
+  (** Capacity of transactions per block *)
 end
 
 module type Init_intf = sig
@@ -313,7 +313,7 @@ struct
       module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Config = Protocol_constants
+      module Config = Init
 
       let check (Completed_work.({fee; prover; proofs}) as t) stmts =
         let message = Sok_message.create ~fee ~prover in
@@ -328,9 +328,6 @@ struct
     end
 
     include Ledger_builder.Make (Inputs)
-
-    let of_aux_and_ledger ledger aux =
-      Ok (make ~public_key:Init.fee_public_key ~aux ~ledger)
   end
 
   module Ledger_builder_aux = Ledger_builder.Aux
@@ -387,7 +384,7 @@ struct
       ; ledger_builder }
   end
 
-  let fee_public_key = Init.fee_public_key
+  let keypair = Init.keypair
 end
 
 module Make_inputs
@@ -411,6 +408,7 @@ struct
   module Public_key = Public_key
   module Compressed_public_key = Public_key.Compressed
   module Private_key = Private_key
+  module Keypair = Keypair
 
   module Proof_carrying_state = struct
     type t =
@@ -515,8 +513,8 @@ struct
       apply_and_broadcast t
         (Add_solved_work
            ( List.map res.spec.instances ~f:Single.Spec.statement
-           , { proof= res.proofs
-             ; fee= {fee= res.spec.fee; prover= Init.fee_public_key} } ))
+           , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}}
+           ))
   end
 
   module type S_tmp =
@@ -533,7 +531,7 @@ struct
 
         let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
 
-        let empty = Merkle_hash.empty_hash
+        let empty_account = hash_account Account.empty
       end)
       (struct
         include Ledger_hash
@@ -582,13 +580,15 @@ struct
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
       module Ledger_builder_diff = Ledger_builder_diff
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
 
       module Ledger_builder = struct
         include Ledger_builder
 
         type proof = Ledger_proof.t
 
-        let create ledger = create ~ledger ~self:Init.fee_public_key
+        let create ledger =
+          create ~ledger ~self:(Public_key.compress keypair.public_key)
 
         let apply t diff =
           Deferred.Or_error.map
@@ -596,6 +596,10 @@ struct
             ~f:
               (Option.map ~f:(fun proof ->
                    ((Ledger_proof.statement proof).target, proof) ))
+
+        let of_aux_and_ledger =
+          of_aux_and_ledger
+            ~public_key:(Public_key.compress keypair.public_key)
       end
 
       module Consensus_mechanism = Consensus_mechanism
@@ -629,6 +633,7 @@ struct
     module Transaction = Transaction
     module Public_key = Public_key
     module Private_key = Private_key
+    module Keypair = Keypair
     module Blockchain_state = Nanobit_base.Blockchain_state
     module Compressed_public_key = Public_key.Compressed
 
@@ -742,12 +747,23 @@ module type Main_intf = sig
   module Inputs : sig
     module Time : Protocols.Coda_pow.Time_intf
 
+    module Ledger_hash : sig
+      type t [@@deriving sexp]
+    end
+
     module Ledger : sig
       type t [@@deriving sexp]
 
       val copy : t -> t
 
-      val get : t -> Public_key.Compressed.t -> Account.t option
+      val location_of_key :
+        t -> Public_key.Compressed.t -> Ledger.Location.t option
+
+      val get : t -> Ledger.Location.t -> Account.t option
+
+      val num_accounts : t -> int
+
+      val merkle_root : t -> Ledger_hash.t
     end
 
     module Ledger_builder_diff : sig
@@ -833,20 +849,29 @@ module type Main_intf = sig
     type t =
       { log: Logger.t
       ; should_propose: bool
+      ; run_snark_worker: bool
       ; net_config: Inputs.Net.Config.t
       ; ledger_builder_persistant_location: string
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
-      ; time_controller: Inputs.Time.Controller.t }
+      ; time_controller: Inputs.Time.Controller.t
+      ; keypair: Keypair.t }
     [@@deriving make]
   end
 
   type t
 
+  val should_propose : t -> bool
+
+  val run_snark_worker : t -> bool
+
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
   val best_ledger : t -> Inputs.Ledger.t
+
+  val best_protocol_state :
+    t -> Inputs.Consensus_mechanism.Protocol_state.value
 
   val peers : t -> Kademlia.Peer.t list
 
@@ -866,7 +891,7 @@ module type Main_intf = sig
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
 end
 
-module Run (Program : Main_intf) = struct
+module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   include Program
   open Inputs
 
@@ -879,7 +904,8 @@ module Run (Program : Main_intf) = struct
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    let%map account = Ledger.get ledger addr in
+    let%bind location = Ledger.location_of_key ledger addr in
+    let%map account = Ledger.get ledger location in
     account.Account.balance
 
   let is_valid_transaction t (txn: Transaction.t) =
@@ -891,6 +917,9 @@ module Run (Program : Main_intf) = struct
     in
     Option.is_some remainder
 
+  (** For status *)
+  let txn_count = ref 0
+
   let send_txn log t txn =
     let open Deferred.Let_syntax in
     assert (is_valid_transaction t txn) ;
@@ -899,15 +928,44 @@ module Run (Program : Main_intf) = struct
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
       txn ;
+    txn_count := !txn_count + 1 ;
     Deferred.unit
 
   let get_nonce t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    let%map account = Ledger.get ledger addr in
+    let%bind location = Ledger.location_of_key ledger addr in
+    let%map account = Ledger.get ledger location in
     account.Account.nonce
 
-  let setup_local_server ~minibit ~log ~client_port =
+  let start_time = Time_ns.now ()
+
+  let get_status t =
+    let ledger = best_ledger t in
+    let ledger_merkle_root =
+      Ledger.merkle_root ledger |> [%sexp_of : Ledger_hash.t] |> Sexp.to_string
+    in
+    let num_accounts = Ledger.num_accounts ledger in
+    let state = best_protocol_state t in
+    let block_count =
+      state |> Consensus_mechanism.Protocol_state.consensus_state
+      |> Consensus_mechanism.Consensus_state.length
+    in
+    let uptime_secs =
+      Time_ns.diff (Time_ns.now ()) start_time
+      |> Time_ns.Span.to_sec |> Int.of_float
+    in
+    { Client_lib.Status.num_accounts
+    ; block_count= Int.of_string (Length.to_string block_count)
+    ; uptime_secs
+    ; ledger_merkle_root
+    ; conf_dir= Config_in.conf_dir
+    ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
+    ; transactions_sent= !txn_count
+    ; run_snark_worker= run_snark_worker t
+    ; propose= should_propose t }
+
+  let setup_local_server ?rest_server_port ~minibit ~log ~client_port () =
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
@@ -916,7 +974,9 @@ module Run (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance minibit pk) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
-            return (get_nonce minibit pk) ) ]
+            return (get_nonce minibit pk) )
+      ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
+            return (get_status minibit) ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in
@@ -937,6 +997,25 @@ module Run (Program : Main_intf) = struct
             in
             Linear_pipe.write_without_pushback solved_work_writer () ) ]
     in
+    Option.iter rest_server_port ~f:(fun rest_server_port ->
+        ignore
+          Cohttp_async.(
+            Server.create
+              ~on_handler_error:
+                (`Call
+                  (fun net exn ->
+                    Logger.error log "%s" (Exn.to_string_mach exn) ))
+              (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
+              (fun ~body _sock req ->
+                let uri = Cohttp.Request.uri req in
+                match Uri.path uri with
+                | "/status" ->
+                    Server.respond_string
+                      ( get_status minibit |> Client_lib.Status.to_yojson
+                      |> Yojson.Safe.pretty_to_string )
+                | _ ->
+                    Server.respond_string ~status:`Not_found "Route not found"
+                )) ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
     in
@@ -965,7 +1044,7 @@ module Run (Program : Main_intf) = struct
       let our_binary = Sys.executable_name in
       Process.create_exn () ~prog:our_binary
         ~args:
-          ( Program.snark_worker_command_name
+          ( "internal" :: Program.snark_worker_command_name
           :: Snark_worker.arguments ~public_key ~daemon_port:client_port
                ~shutdown_on_disconnect )
     in
