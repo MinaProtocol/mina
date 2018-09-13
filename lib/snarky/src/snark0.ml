@@ -606,6 +606,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
       ; read= (fun v -> Read.map ~f:back (read v))
       ; check }
 
+    let transport_var ({read; store; alloc; check}: ('var1, 'value) t)
+        ~(there: 'var2 -> 'var1) ~(back: 'var1 -> 'var2) : ('var2, 'value) t =
+      { alloc= Alloc.map alloc back
+      ; store= (fun x -> Store.map (store x) back)
+      ; read= (fun x -> read (there x))
+      ; check= (fun x -> check (there x)) }
+
     (* TODO: Do a CPS style thing instead if it ends up being an issue converting
      back and forth. *)
     let of_hlistable (spec: (unit, unit, 'k_var, 'k_value) Data_spec.t)
@@ -1515,8 +1522,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
   module Bitstring_checked = struct
     type t = Checked.Boolean.var list
 
-    let chunk_for_equality (t1: Checked.Boolean.var list)
-        (t2: Checked.Boolean.var list) =
+    let chunk_for_equality (t1: t) (t2: t) =
       let chunk_size = Field.size_in_bits - 1 in
       let rec go acc t1 t2 =
         match (t1, t2) with
@@ -1531,14 +1537,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let equal t1 t2 =
       let open Checked in
       all
-        (Core_kernel.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
+        (Core.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
              equal x1 x2 ))
       >>= Boolean.all
 
     module Assert = struct
       let equal t1 t2 =
         let open Checked in
-        Core_kernel.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
+        Core.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
             Constraint.equal x1 x2 )
         |> assert_all ~label:"Bitstring.Assert.equal"
     end
