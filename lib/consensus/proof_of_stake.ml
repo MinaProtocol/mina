@@ -913,9 +913,12 @@ struct
     in
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
-    let my_currency =
-      Nanobit_base.Ledger.get ledger
+    let%bind my_account_location =
+      Nanobit_base.Ledger.location_of_key ledger
         (Signature_lib.Public_key.compress keypair.public_key)
+    in
+    let my_currency =
+      Nanobit_base.Ledger.get ledger my_account_location
       |> Option.map ~f:Nanobit_base.Account.balance
       |> Option.value ~default:Balance.zero
     in
