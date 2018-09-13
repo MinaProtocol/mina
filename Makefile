@@ -2,6 +2,8 @@
 ## Docker Wrapper 
 ## Hint: export USEDOCKER=TRUE
 
+GITHASH = $(shell git rev-parse --short HEAD)
+
 MYUID = $(shell id -u)
 DOCKERNAME = nanotest-$(MYUID)
 
@@ -103,8 +105,13 @@ container:
 
 deb:
 	$(WRAP) ./rebuild-deb.sh
-	@mkdir /tmp/artifacts
+	@mkdir -p /tmp/artifacts
 	@cp _build/codaclient.deb /tmp/artifacts/.
+
+provingkeys:
+	$(WRAP) tar -cvjf _build/nanobit_cache_dir_$(GITHASH).tar.bz2  /tmp/nanobit_cache_dir
+	@mkdir -p /tmp/artifacts
+	@cp _build/nanobit_cache_dir*.tar.bz2 /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
