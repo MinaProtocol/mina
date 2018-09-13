@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries
-   ( core))
+   ( core_kernel ))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "fold types")))
