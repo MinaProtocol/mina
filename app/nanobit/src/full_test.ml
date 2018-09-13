@@ -26,7 +26,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let genesis_proof = Precomputed_values.base_proof
 
-    let transaction_capacity_log_2 = 3
+    let transaction_capacity_log_2 = 2
   end in
   let%bind (module Init) = make_init (module Config) (module Kernel) in
   let module Main = Coda.Make (Init) () in
