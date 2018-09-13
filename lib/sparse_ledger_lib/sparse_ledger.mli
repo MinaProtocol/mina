@@ -23,7 +23,8 @@ module type S = sig
 
   val find_index_exn : t -> key -> index
 
-  val add_path : t -> [`Left of hash | `Right of hash] list -> account -> t
+  val add_path :
+    t -> [`Left of hash | `Right of hash] list -> key -> account -> t
 
   val merkle_root : t -> hash
 end
@@ -38,8 +39,6 @@ end) (Account : sig
   type t [@@deriving bin_io, eq, sexp]
 
   val hash : t -> Hash.t
-
-  val key : t -> Key.t
 end) :
   S
   with type hash := Hash.t

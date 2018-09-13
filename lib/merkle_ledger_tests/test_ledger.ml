@@ -112,13 +112,13 @@ let%test_module "test functor on in memory databases" =
     let%test "merkle_root" =
       let ledger = L16.create () in
       let root = L16.merkle_root ledger in
-      compose_hash 16 Hash.empty = root
+      compose_hash 16 Hash.empty_account = root
 
     let%test "merkle_root_nonempty" =
       let l = (1 lsl (3 - 1)) + 1 in
       let ledger, _ = L3.load_ledger l 1 in
       let root = L3.merkle_root ledger in
-      Hash.empty <> root
+      Hash.empty_account <> root
 
     let%test_unit "merkle_root_edit" =
       let b1 = 10 in
@@ -130,7 +130,7 @@ let%test_module "test functor on in memory databases" =
       let location =
         L16.location_of_key ledger public_key |> Option.value_exn
       in
-      assert (Hash.empty <> root0) ;
+      assert (Hash.empty_account <> root0) ;
       L16.set ledger location {balance= b2; public_key} ;
       let root1 = L16.merkle_root ledger in
       assert (root1 <> root0) ;
@@ -231,7 +231,7 @@ let%test_module "test functor on in memory databases" =
       let ledger, _ = L16.load_ledger count 1 in
       let mr_start = L16.merkle_root ledger in
       let max_height = Int.ceil_log2 count in
-      let hash_to_set = Hash.(merge ~height:80 empty empty) in
+      let hash_to_set = Hash.(merge ~height:80 empty_account empty_account) in
       let open Quickcheck.Generator in
       Quickcheck.test
         (tuple2 (Int.gen_incl 0 8192) (Int.gen_incl 0 (max_height - 1)))
@@ -252,4 +252,24 @@ let%test_module "test functor on in memory databases" =
           L16.set_inner_hash_at_addr_exn ledger a old_hash ;
           res ) ;
       assert (mr_start = L16.merkle_root ledger)
+
+    let%test_unit "remove last two accounts is as if they were never there" =
+      let l1, _ = L16.load_ledger 8 1 in
+      let l2, k2 = L16.load_ledger 10 1 in
+      let keys_to_remove = List.drop k2 8 in
+      L16.remove_accounts_exn l2 keys_to_remove ;
+      assert (L16.merkle_root l1 = L16.merkle_root l2)
+
+    let%test_unit "remove last account is as if it was never there" =
+      let l1, _ = L16.load_ledger 9 1 in
+      let l2, k2 = L16.load_ledger 10 1 in
+      let keys_to_remove = [List.last_exn k2] in
+      L16.remove_accounts_exn l2 keys_to_remove ;
+      assert (L16.merkle_root l1 = L16.merkle_root l2)
+
+    let%test_unit "removing all accounts is as if there were never accounts" =
+      let og_hash = L16.merkle_root (L16.create ()) in
+      let l1, keys = L16.load_ledger 10 1 in
+      L16.remove_accounts_exn l1 keys ;
+      [%test_eq : Hash.t] (L16.merkle_root l1) og_hash
   end )
