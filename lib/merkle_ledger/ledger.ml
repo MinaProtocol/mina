@@ -64,7 +64,9 @@ end = struct
   module Path = Merkle_path.Make (Hash)
 
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights = Array.create ~len:(depth + 1) Hash.empty in
+    let empty_hash_at_heights =
+      Array.create ~len:(depth + 1) Hash.empty_account
+    in
     let rec go i =
       if i <= depth then (
         let h = empty_hash_at_heights.(i - 1) in
@@ -189,7 +191,7 @@ end = struct
   let get_leaf_hash t i =
     if i < Dyn_array.length t.accounts then
       Hash.hash_account (Dyn_array.get t.accounts i)
-    else Hash.empty
+    else Hash.empty_account
 
   let recompute_tree t =
     if not (List.is_empty t.tree.dirty_indices) then (
@@ -202,12 +204,30 @@ end = struct
       recompute_layers 1 (get_leaf_hash t) t.tree.nodes layer_dirty_indices ;
       (t.tree).dirty_indices <- [] )
 
+  let remove_accounts_exn t keys =
+    let len = List.length keys in
+    if len <> 0 then (
+      assert (not t.tree.syncing) ;
+      let indices =
+        List.map keys ~f:(fun k -> index_of_key_exn t k)
+        |> List.sort ~compare:Int.compare
+      in
+      let least = List.hd_exn indices in
+      assert (least = num_accounts t - len) ;
+      List.iter keys ~f:(fun k -> Key.Table.remove t.tree.leafs k) ;
+      Dyn_array.delete_range t.accounts least len ;
+      (* TODO: fixup hashes in a less terrible way *)
+      (t.tree).dirty_indices <- List.init least ~f:(fun i -> i) ;
+      (t.tree).nodes_height <- 0 ;
+      (t.tree).nodes <- [] ;
+      recompute_tree t )
+
   let merkle_root t =
     recompute_tree t ;
     let height = t.tree.nodes_height in
     let base_root =
       match List.last t.tree.nodes with
-      | None -> Hash.empty
+      | None -> Hash.empty_account
       | Some a -> Dyn_array.get a 0
     in
     let rec go i hash =
@@ -246,7 +266,7 @@ end = struct
       in
       let leaf_hash_idx = index lxor 1 in
       let leaf_hash =
-        if leaf_hash_idx >= Hashtbl.length t.tree.leafs then Hash.empty
+        if leaf_hash_idx >= Hashtbl.length t.tree.leafs then Hash.empty_account
         else Hash.hash_account (Dyn_array.get t.accounts leaf_hash_idx)
       in
       let is_left = index mod 2 = 0 in
