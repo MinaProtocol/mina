@@ -48,8 +48,6 @@ module Hash = struct
 
   let hash_account account = Md5.digest_string ("0" ^ Account.show account)
 
-  let empty = Md5.digest_string "nothing up my sleeve"
-
   let merge ~height a b =
     let res =
       Md5.digest_string
