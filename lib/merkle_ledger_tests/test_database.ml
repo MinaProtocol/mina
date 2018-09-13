@@ -27,7 +27,7 @@ let%test_module "test functor on in memory databases" =
               (fun location -> assert (MT.get mdb location = None) ) )
 
       let create_new_account_exn (type t location) (module MT
-          : DB with type t = t and type location = location) mdb
+          : DB with type t = t and type Location.t = location) mdb
           ({Account.public_key; _} as account) =
         let action, location =
           MT.get_or_create_account_exn mdb public_key account

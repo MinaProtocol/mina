@@ -259,7 +259,12 @@ struct
 end
 
 module Ledger = struct
-  include Merkle_ledger.Ledger.Make (Public_key.Compressed) (Account)
+  include Merkle_ledger.Database.Make (struct
+              include Public_key.Compressed
+
+              let to_string = Public_key.Compressed.to_base64
+            end)
+            (Account)
             (struct
               type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
 
@@ -273,6 +278,9 @@ module Ledger = struct
             (struct
               let depth = ledger_depth
             end)
+            (Merkle_ledger_tests.Test_stubs.In_memory_kvdb)
+            (Merkle_ledger_tests.Test_stubs.In_memory_sdb)
+            (Merkle_ledger_tests.Test_stubs.Storage_locations)
 
   type path = Path.t
 end

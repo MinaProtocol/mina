@@ -5,11 +5,9 @@ module type S = sig
 
   type hash
 
-  type location [@@deriving sexp]
-
   type key
 
-  type t
+  type t [@@deriving sexp]
 
   type error =
     | Account_location_not_found
@@ -20,15 +18,19 @@ module type S = sig
 
   module Path : Merkle_path.S with type hash := hash
 
+  module Location : sig
+    type t
+  end
+
   val create : unit -> t
 
-  val location_of_key : t -> key -> location option
+  val location_of_key : t -> key -> Location.t option
 
   val destroy : t -> unit
 
-  val get : t -> location -> account option
+  val get : t -> Location.t -> account option
 
-  val set : t -> location -> account -> unit
+  val set : t -> Location.t -> account -> unit
 
   val get_at_index_exn : t -> int -> account
 
@@ -37,12 +39,12 @@ module type S = sig
   val index_of_key_exn : t -> key -> int
 
   val get_or_create_account :
-    t -> key -> account -> ([`Added | `Existed] * location, error) result
+    t -> key -> account -> ([`Added | `Existed] * Location.t, error) result
 
   val get_or_create_account_exn :
-    t -> key -> account -> [`Added | `Existed] * location
+    t -> key -> account -> [`Added | `Existed] * Location.t
 
-  val merkle_path : t -> location -> Path.t
+  val merkle_path : t -> Location.t -> Path.t
 
   val merkle_path_at_index_exn : t -> int -> Path.t
 
@@ -57,6 +59,6 @@ module type S = sig
            and type path := Path.t
 
   module For_tests : sig
-    val gen_account_location : location Core.Quickcheck.Generator.t
+    val gen_account_location : Location.t Core.Quickcheck.Generator.t
   end
 end

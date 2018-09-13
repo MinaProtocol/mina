@@ -38,8 +38,6 @@ struct
 
     type account = Account.t
 
-    type key = MT.location
-
     type addr = Addr.t
 
     type path = MT.Path.t
