@@ -54,11 +54,7 @@ let%test_module "Database integration test" =
         (l1, h1) (l2, h2) =
       if not (Hash.equal h1 h2) then
         failwithf
-          !"\n\
-            \                   Expected:\n\
-            %{sexp:L1.tree}\n\n\n\
-            \ Actual:\n\
-            %{sexp:L2.tree}"
+          !"\n\ Expected:\n%{sexp:L1.tree}\n\n\n\ Actual:\n%{sexp:L2.tree}"
           (L1.to_tree l1) (L2.to_tree l2) ()
 
     let%test_unit "databases have equivalent hash values" =
@@ -82,10 +78,10 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Left)
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
-          List.iteri accounts ~f:(fun i ({public_key; _} as account) ->
+          List.iter accounts ~f:(fun ({public_key; _} as account) ->
               ignore @@ DB.get_or_create_account_exn db public_key account ;
-              Ledger.set ledger (Int.to_string i) account ) ;
-          Ledger.recompute_tree ledger ;
+              ignore
+              @@ Ledger.get_or_create_account_exn ledger public_key account ) ;
           let binary_tree = Binary_tree.set_accounts accounts in
           Sequence.iter
             (enumerate_dir_combinations Depth.depth |> Sequence.of_list)
@@ -101,11 +97,11 @@ let%test_module "Database integration test" =
                 Binary_tree.get_inner_hash_at_addr_exn binary_tree dirs
               in
               check_hash
+                (module Binary_tree_visualizor)
                 (module Ledger_visualizor)
-                (module Binary_tree_visualizor)
-                (ledger, ledger_hash) (binary_tree, binary_hash) ;
+                (binary_tree, binary_hash) (ledger, ledger_hash) ;
               check_hash
-                (module DB_visualizor)
                 (module Binary_tree_visualizor)
-                (db, db_hash) (binary_tree, binary_hash) ) )
+                (module DB_visualizor)
+                (binary_tree, binary_hash) (db, db_hash) ) )
   end )
