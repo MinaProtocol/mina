@@ -27,8 +27,6 @@ module type Hash = sig
 
   type account
 
-  val empty : t
-
   val merge : height:int -> t -> t -> t
 
   val hash_account : account -> t

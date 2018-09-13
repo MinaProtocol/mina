@@ -64,8 +64,7 @@ let get_or_create ledger key =
 let create_empty ledger k =
   let start_hash = merkle_root ledger in
   match get_or_create_account_exn ledger k Account.empty with
-  | `Existed, _ ->
-      failwith "why did we create_empty for a key already present?"
+  | `Existed, _ -> failwith "create_empty for a key already present"
   | `Added, new_loc ->
       Debug_assert.debug_assert (fun () ->
           [%test_eq : Ledger_hash.t] start_hash (merkle_root ledger) ) ;
