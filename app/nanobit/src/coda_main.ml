@@ -151,9 +151,7 @@ module type Config_intf = sig
 
   val lbc_tree_max_depth : [`Infinity | `Finite of int]
 
-  (* Public key to allocate fees to *)
-
-  val fee_public_key : Public_key.Compressed.t
+  val keypair : Keypair.t
 
   val genesis_proof : Snark_params.Tock.Proof.t
 end
@@ -381,7 +379,7 @@ struct
       ; ledger_builder }
   end
 
-  let fee_public_key = Init.fee_public_key
+  let keypair = Init.keypair
 end
 
 module Make_inputs
@@ -405,6 +403,7 @@ struct
   module Public_key = Public_key
   module Compressed_public_key = Public_key.Compressed
   module Private_key = Private_key
+  module Keypair = Keypair
 
   module Proof_carrying_state = struct
     type t =
@@ -583,7 +582,8 @@ struct
 
         type proof = Ledger_proof.t
 
-        let create ledger = create ~ledger ~self:Init.fee_public_key
+        let create ledger =
+          create ~ledger ~self:(Public_key.compress keypair.public_key)
 
         let apply t diff =
           Deferred.Or_error.map
@@ -593,7 +593,8 @@ struct
                    ((Ledger_proof.statement proof).target, proof) ))
 
         let of_aux_and_ledger =
-          of_aux_and_ledger ~public_key:Init.fee_public_key
+          of_aux_and_ledger
+            ~public_key:(Public_key.compress keypair.public_key)
       end
 
       module Consensus_mechanism = Consensus_mechanism
@@ -627,6 +628,7 @@ struct
     module Transaction = Transaction
     module Public_key = Public_key
     module Private_key = Private_key
+    module Keypair = Keypair
     module Blockchain_state = Nanobit_base.Blockchain_state
     module Compressed_public_key = Public_key.Compressed
 
@@ -741,7 +743,10 @@ module type Main_intf = sig
 
       val copy : t -> t
 
-      val get : t -> Public_key.Compressed.t -> Account.t option
+      val location_of_key :
+        t -> Public_key.Compressed.t -> Ledger.Location.t option
+
+      val get : t -> Ledger.Location.t -> Account.t option
 
       val num_accounts : t -> int
     end
@@ -835,7 +840,8 @@ module type Main_intf = sig
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
-      ; time_controller: Inputs.Time.Controller.t }
+      ; time_controller: Inputs.Time.Controller.t
+      ; keypair: Keypair.t }
     [@@deriving make]
   end
 
@@ -883,7 +889,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_balance t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    let%map account = Ledger.get ledger addr in
+    let%bind location = Ledger.location_of_key ledger addr in
+    let%map account = Ledger.get ledger location in
     account.Account.balance
 
   let is_valid_transaction t (txn: Transaction.t) =
@@ -912,7 +919,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_nonce t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
     let ledger = best_ledger t in
-    let%map account = Ledger.get ledger addr in
+    let%bind location = Ledger.location_of_key ledger addr in
+    let%map account = Ledger.get ledger location in
     account.Account.nonce
 
   let start_time = Time_ns.now ()

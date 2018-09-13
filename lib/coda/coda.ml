@@ -239,6 +239,8 @@ module type Proposer_intf = sig
 
   type time_controller
 
+  type keypair
+
   module Tip : sig
     type t =
       { protocol_state: protocol_state * protocol_state_proof
@@ -254,6 +256,7 @@ module type Proposer_intf = sig
                            -> completed_work_checked option)
     -> change_feeder:change Linear_pipe.Reader.t
     -> time_controller:time_controller
+    -> keypair:keypair
     -> t
 
   val transitions :
@@ -375,6 +378,7 @@ module type Inputs_intf = sig
      and type completed_work_checked := Completed_work.Checked.t
      and type external_transition := Consensus_mechanism.External_transition.t
      and type time_controller := Time.Controller.t
+     and type keypair := Keypair.t
 
   module Genesis : sig
     val state : Consensus_mechanism.Protocol_state.value
@@ -383,8 +387,6 @@ module type Inputs_intf = sig
 
     val proof : Protocol_state_proof.t
   end
-
-  val fee_public_key : Public_key.Compressed.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -452,7 +454,8 @@ module Make (Inputs : Inputs_intf) = struct
       ; transaction_pool_disk_location: string
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
-      ; time_controller: Time.Controller.t }
+      ; time_controller: Time.Controller.t
+      ; keypair: Keypair.t }
     [@@deriving make]
   end
 
@@ -468,7 +471,7 @@ module Make (Inputs : Inputs_intf) = struct
            ~genesis_tip:
              { ledger_builder=
                  Ledger_builder.create ~ledger:Genesis.ledger
-                   ~self:fee_public_key
+                   ~self:(Public_key.compress config.keypair.public_key)
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
            ~disk_location:config.ledger_builder_persistant_location
@@ -541,7 +544,7 @@ module Make (Inputs : Inputs_intf) = struct
       |> don't_wait_for ;
       Proposer.create ~parent_log:config.log ~change_feeder:tips_r
         ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
-        ~time_controller:config.time_controller
+        ~time_controller:config.time_controller ~keypair:config.keypair
     in
     if config.should_propose then
       don't_wait_for

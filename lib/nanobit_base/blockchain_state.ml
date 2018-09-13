@@ -5,6 +5,7 @@ open Snark_params
 open Tick
 open Let_syntax
 open Fold_lib
+open Bitstring_lib
 
 module Digest = Pedersen.Digest
 
@@ -115,7 +116,7 @@ module Message = struct
        let%map bs =
          Pedersen.Checked.Digest.choose_preimage hash
        in
-       List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits)
+       Bitstring.Lsb_first.of_list (List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits))
 end
 
 module Signature = Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve) (Message)

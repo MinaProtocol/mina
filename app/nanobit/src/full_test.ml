@@ -4,7 +4,7 @@ open Nanobit_base
 open Coda_main
 open Signature_lib
 
-let pk_of_sk sk = Public_key.of_private_key sk |> Public_key.compress
+let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
 let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
@@ -12,6 +12,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   Parallel.init_master () ;
   let log = Logger.create () in
   let conf_dir = "/tmp" in
+  let keypair = Keypair.of_private_key_exn Genesis_ledger.high_balance_sk in
   let module Config = struct
     let logger = log
 
@@ -19,7 +20,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let lbc_tree_max_depth = `Finite 50
 
-    let fee_public_key = Genesis_ledger.high_balance_pk
+    let keypair = keypair
 
     let genesis_proof = Precomputed_values.base_proof
   end in
@@ -46,7 +47,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
          ~transaction_pool_disk_location:"transaction_pool"
          ~snark_pool_disk_location:"snark_pool"
          ~time_controller:(Inputs.Time.Controller.create ())
-         ())
+         ~keypair ())
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers minibit)) ;
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
@@ -96,7 +97,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     let payload : Transaction.Payload.t =
       {receiver= receiver_pk; amount; fee; nonce}
     in
-    Transaction.sign (Keypair.of_private_key sender_sk) payload
+    Transaction.sign (Keypair.of_private_key_exn sender_sk) payload
   in
   let test_sending_transaction sender_sk receiver_pk =
     let transaction =
