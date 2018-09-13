@@ -118,7 +118,7 @@ let%test_module "test functor on in memory databases" =
       let l = (1 lsl (3 - 1)) + 1 in
       let ledger, _ = L3.load_ledger l 1 in
       let root = L3.merkle_root ledger in
-      Hash.empty <> root
+      Hash.empty_account <> root
 
     let%test_unit "merkle_root_edit" =
       let b1 = 10 in
@@ -130,7 +130,7 @@ let%test_module "test functor on in memory databases" =
       let location =
         L16.location_of_key ledger public_key |> Option.value_exn
       in
-      assert (Hash.empty <> root0) ;
+      assert (Hash.empty_account <> root0) ;
       L16.set ledger location {balance= b2; public_key} ;
       let root1 = L16.merkle_root ledger in
       assert (root1 <> root0) ;
@@ -231,7 +231,7 @@ let%test_module "test functor on in memory databases" =
       let ledger, _ = L16.load_ledger count 1 in
       let mr_start = L16.merkle_root ledger in
       let max_height = Int.ceil_log2 count in
-      let hash_to_set = Hash.(merge ~height:80 empty empty) in
+      let hash_to_set = Hash.(merge ~height:80 empty_account empty_account) in
       let open Quickcheck.Generator in
       Quickcheck.test
         (tuple2 (Int.gen_incl 0 8192) (Int.gen_incl 0 (max_height - 1)))
