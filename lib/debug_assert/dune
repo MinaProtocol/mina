@@ -1,0 +1,5 @@
+(library
+ (name debug_assert)
+  (public_name debug_assert)
+  (synopsis "Debug assertion library")
+ )

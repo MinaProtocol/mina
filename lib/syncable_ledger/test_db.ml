@@ -28,8 +28,10 @@ struct
 
   module L = struct
     module MT =
-      Merkle_ledger.Database.Make (Account) (Hash) (Depth) (In_memory_kvdb)
+      Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth)
+        (In_memory_kvdb)
         (In_memory_sdb)
+        (Storage_locations)
     module Addr = MT.Addr
 
     type root_hash = Hash.t
@@ -38,7 +40,7 @@ struct
 
     type account = Account.t
 
-    type key = MT.key
+    type key = MT.location
 
     type addr = Addr.t
 
@@ -48,7 +50,7 @@ struct
 
     let depth = Depth.depth
 
-    let length = MT.length
+    let num_accounts = MT.num_accounts
 
     let merkle_path_at_addr_exn = MT.merkle_path_at_addr_exn
 
@@ -63,14 +65,13 @@ struct
     let set_inner_hash_at_addr_exn = MT.set_inner_hash_at_addr_exn
 
     let load_ledger num_accounts (balance: int) =
-      let ledger = MT.create ~key_value_db_dir:"" ~stack_db_file:"" in
+      let ledger = MT.create () in
       let keys =
         List.init num_accounts ~f:(( + ) 1) |> List.map ~f:Int.to_string
       in
       List.iter keys ~f:(fun key ->
           let account = Account.create key balance in
-          assert (MT.set_account ledger account = Ok ()) )
-      |> ignore ;
+          MT.get_or_create_account_exn ledger key account |> ignore ) ;
       (ledger, keys)
   end
 

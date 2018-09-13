@@ -155,6 +155,12 @@ module type Basic = sig
       -> back:('value1 -> 'value2)
       -> ('var, 'value2) t
 
+    val transport_var :
+         ('var1, 'value) t
+      -> there:('var2 -> 'var1)
+      -> back:('var1 -> 'var2)
+      -> ('var2, 'value) t
+
     val of_hlistable :
          (unit, unit, 'k_var, 'k_value) Data_spec.t
       -> var_to_hlist:('var -> (unit, 'k_var) H_list.t)
@@ -299,6 +305,11 @@ module type Basic = sig
       val pack : Boolean.var list -> t
 
       val unpack : t -> length:int -> (Boolean.var list, _) Checked.t
+
+      val unpack_flagged :
+           t
+        -> length:int
+        -> (Boolean.var list * [`Success of Boolean.var], _) Checked.t
 
       val unpack_full :
         t -> (Boolean.var Bitstring_lib.Bitstring.Lsb_first.t, _) Checked.t

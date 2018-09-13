@@ -27,7 +27,8 @@ module type S = sig
 
   val location_of_key : t -> key -> Location.t option
 
-  val create_account_exn : t -> key -> account -> Location.t
+  val get_or_create_account_exn :
+    t -> key -> account -> [`Added | `Existed] * Location.t
 
   val create : unit -> t
 
@@ -43,7 +44,7 @@ module type S = sig
 
   val merkle_root : t -> root_hash
 
-  val merkle_path : t -> Location.t -> Path.t option
+  val merkle_path : t -> Location.t -> Path.t
 
   val merkle_path_at_index_exn : t -> int -> Path.t
 

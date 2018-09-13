@@ -25,9 +25,11 @@ module Account = struct
     let balance = Balance.of_string string_balance in
     {public_key; balance}
 
-  let empty = {public_key= ""; balance= Balance.zero}
+  let set_balance {public_key; _} balance = {public_key; balance}
 
   let create public_key balance = {public_key; balance= UInt64.of_int balance}
+
+  let empty = {public_key= ""; balance= Balance.zero}
 
   let gen =
     let open Quickcheck.Let_syntax in
@@ -72,6 +74,8 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let set tbl ~key ~data = Hashtbl.set tbl ~key:(Bigstring.to_string key) ~data
 
   let delete tbl ~key = Hashtbl.remove tbl (Bigstring.to_string key)
+
+  let copy tbl = Hashtbl.copy tbl
 end
 
 module In_memory_sdb : Intf.Stack_database = struct
@@ -91,6 +95,15 @@ module In_memory_sdb : Intf.Stack_database = struct
         Some h
 
   let length ls = List.length !ls
+
+  let copy stack = ref !stack
+end
+
+module Storage_locations : Intf.Storage_locations = struct
+  (* TODO: The names of these values should be dynamically generated per test run*)
+  let stack_db_file = ""
+
+  let key_value_db_dir = ""
 end
 
 module Key = struct
@@ -101,6 +114,8 @@ module Key = struct
   end
 
   let empty = ""
+
+  let to_string = Fn.id
 
   include T
   include Hashable.Make_binable (T)

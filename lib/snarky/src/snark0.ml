@@ -606,6 +606,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
       ; read= (fun v -> Read.map ~f:back (read v))
       ; check }
 
+    let transport_var ({read; store; alloc; check}: ('var1, 'value) t)
+        ~(there: 'var2 -> 'var1) ~(back: 'var1 -> 'var2) : ('var2, 'value) t =
+      { alloc= Alloc.map alloc back
+      ; store= (fun x -> Store.map (store x) back)
+      ; read= (fun x -> read (there x))
+      ; check= (fun x -> check (there x)) }
+
     (* TODO: Do a CPS style thing instead if it ends up being an issue converting
      back and forth. *)
     let of_hlistable (spec: (unit, unit, 'k_var, 'k_value) Data_spec.t)
@@ -1329,31 +1336,40 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     type _ Request.t += Choose_preimage: Field.t * int -> bool list Request.t
 
+    let choose_preimage_unchecked v ~length =
+      exists
+        (Typ.list Boolean.typ ~length)
+        ~request:
+          As_prover.(
+            map (read_var v) ~f:(fun x -> Choose_preimage (x, length)))
+        ~compute:
+          (let open As_prover.Let_syntax in
+          let%map x = As_prover.read_var v in
+          let x = Bigint.of_field x in
+          List.init length ~f:(fun i -> Bigint.test_bit x i))
+
+    let packing_sum (bits: Boolean.var list) =
+      let ts, _ =
+        List.fold_left bits ~init:([], Field.one) ~f:(fun (acc, c) v ->
+            ((c, v) :: acc, Field.add c c) )
+      in
+      Cvar.linear_combination ts
+
     let choose_preimage (v: Cvar.t) ~length : (Boolean.var list, 's) t =
       let open Let_syntax in
-      let%bind res =
-        exists
-          (Typ.list Boolean.typ ~length)
-          ~request:
-            As_prover.(
-              map (read_var v) ~f:(fun x -> Choose_preimage (x, length)))
-          ~compute:
-            (let open As_prover.Let_syntax in
-            let%map x = As_prover.read_var v in
-            let x = Bigint.of_field x in
-            List.init length ~f:(fun i -> Bigint.test_bit x i))
-      in
-      let lc =
-        let ts, _ =
-          List.fold_left res ~init:([], Field.one) ~f:(fun (acc, c) v ->
-              ((c, v) :: acc, Field.add c c) )
-        in
-        Cvar.linear_combination ts
-      in
+      let%bind bits = choose_preimage_unchecked v ~length in
+      let lc = packing_sum bits in
       let%map () =
         assert_r1cs ~label:"Choose_preimage" lc (Cvar.constant Field.one) v
       in
-      res
+      bits
+
+    let choose_preimage_flagged (v: Cvar.t) ~length =
+      let open Let_syntax in
+      let%bind bits = choose_preimage_unchecked v ~length in
+      let lc = packing_sum bits in
+      let%map success = equal lc v in
+      (bits, `Success success)
 
     module List =
       Monad_sequence.List (Checked1)
@@ -1499,13 +1515,16 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let unpack v ~length =
       assert (length < Field.size_in_bits) ;
       Checked.choose_preimage v ~length
+
+    let unpack_flagged v ~length =
+      assert (length < Field.size_in_bits) ;
+      Checked.choose_preimage_flagged v ~length
   end
 
   module Bitstring_checked = struct
     type t = Checked.Boolean.var list
 
-    let chunk_for_equality (t1: Checked.Boolean.var list)
-        (t2: Checked.Boolean.var list) =
+    let chunk_for_equality (t1: t) (t2: t) =
       let chunk_size = Field.size_in_bits - 1 in
       let rec go acc t1 t2 =
         match (t1, t2) with
@@ -1520,14 +1539,14 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let equal t1 t2 =
       let open Checked in
       all
-        (Core_kernel.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
+        (Core.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
              equal x1 x2 ))
       >>= Boolean.all
 
     module Assert = struct
       let equal t1 t2 =
         let open Checked in
-        Core_kernel.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
+        Core.List.map (chunk_for_equality t1 t2) ~f:(fun (x1, x2) ->
             Constraint.equal x1 x2 )
         |> assert_all ~label:"Bitstring.Assert.equal"
     end

@@ -10,7 +10,9 @@ let%test_module "Database integration test" =
     end
 
     module DB =
-      Database.Make (Account) (Hash) (Depth) (In_memory_kvdb) (In_memory_sdb)
+      Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
+        (In_memory_sdb)
+        (Storage_locations)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)
     module Binary_tree = Binary_tree.Make (Account) (Hash) (Depth)
 
@@ -52,11 +54,7 @@ let%test_module "Database integration test" =
         (l1, h1) (l2, h2) =
       if not (Hash.equal h1 h2) then
         failwithf
-          !"\n\
-            \                   Expected:\n\
-            %{sexp:L1.tree}\n\n\n\
-            \ Actual:\n\
-            %{sexp:L2.tree}"
+          !"\n\ Expected:\n%{sexp:L1.tree}\n\n\n\ Actual:\n%{sexp:L2.tree}"
           (L1.to_tree l1) (L2.to_tree l2) ()
 
     let%test_unit "databases have equivalent hash values" =
@@ -71,7 +69,7 @@ let%test_module "Database integration test" =
             List.mapi balances ~f:(fun account_id balance ->
                 Account.create (Int.to_string account_id) balance )
           in
-          let db = DB.create ~key_value_db_dir:"" ~stack_db_file:"" in
+          let db = DB.create () in
           let ledger = Ledger.create () in
           let enumerate_dir_combinations max_depth =
             Sequence.range 0 (max_depth - 1)
@@ -80,10 +78,10 @@ let%test_module "Database integration test" =
                    @ List.map acc ~f:(List.cons Direction.Left)
                    @ List.map acc ~f:(List.cons Direction.Right) )
           in
-          List.iteri accounts ~f:(fun i account ->
-              assert (DB.set_account db account = Ok ()) ;
-              Ledger.set ledger (Int.to_string i) account ) ;
-          Ledger.recompute_tree ledger ;
+          List.iter accounts ~f:(fun ({public_key; _} as account) ->
+              ignore @@ DB.get_or_create_account_exn db public_key account ;
+              ignore
+              @@ Ledger.get_or_create_account_exn ledger public_key account ) ;
           let binary_tree = Binary_tree.set_accounts accounts in
           Sequence.iter
             (enumerate_dir_combinations Depth.depth |> Sequence.of_list)
@@ -99,11 +97,11 @@ let%test_module "Database integration test" =
                 Binary_tree.get_inner_hash_at_addr_exn binary_tree dirs
               in
               check_hash
+                (module Binary_tree_visualizor)
                 (module Ledger_visualizor)
-                (module Binary_tree_visualizor)
-                (ledger, ledger_hash) (binary_tree, binary_hash) ;
+                (binary_tree, binary_hash) (ledger, ledger_hash) ;
               check_hash
-                (module DB_visualizor)
                 (module Binary_tree_visualizor)
-                (db, db_hash) (binary_tree, binary_hash) ) )
+                (module DB_visualizor)
+                (binary_tree, binary_hash) (db, db_hash) ) )
   end )

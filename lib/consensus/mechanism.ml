@@ -60,6 +60,7 @@ module type S = sig
     -> blockchain_state:Nanobit_base.Blockchain_state.value
     -> local_state:Local_state.t
     -> time:Unix_timestamp.t
+    -> keypair:Signature_lib.Keypair.t
     -> transactions:Nanobit_base.Transaction.t list
     -> ledger:Nanobit_base.Ledger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option

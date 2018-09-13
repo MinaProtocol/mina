@@ -13,7 +13,7 @@ module type S = sig
 
   val depth : int
 
-  val length : t -> int
+  val num_accounts : t -> int
 
   val merkle_path_at_addr_exn : t -> addr -> path
 

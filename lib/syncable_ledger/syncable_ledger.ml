@@ -276,7 +276,7 @@ struct
       | What_contents a ->
           Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
       | Num_accounts ->
-          let len = MT.length mt in
+          let len = MT.num_accounts mt in
           let height = Int.ceil_log2 len in
           let content_root_addr =
             funpow (MT.depth - height)

@@ -16,12 +16,11 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
   let new_keys, sparse =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
-        match (Ledger.merkle_path ledger key, Ledger.get ledger key) with
-        | Some path, Some acct -> (new_keys, add_path sl path key acct)
-        | None, None ->
+        match Ledger.location_of_key ledger key with
+        | Some loc -> (new_keys, add_path sl (Ledger.merkle_path ledger loc) key (Ledger.get ledger loc |> Option.value_exn))
+        | None ->
             let path, acct = Ledger.create_empty ledger key in
-            (key :: new_keys, add_path sl path key acct)
-        | _ -> failwith "unreachable" )
+            (key :: new_keys, add_path sl path key acct))
       ~init:
         ( []
         , of_hash ~depth:Ledger.depth
@@ -38,7 +37,7 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
 let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
   let keygen () =
     let privkey = Private_key.create () in
-    (privkey, Public_key.of_private_key privkey |> Public_key.compress)
+    (privkey, Public_key.of_private_key_exn privkey |> Public_key.compress)
   in
   let ledger = Ledger.create () in
   let _, pub1 = keygen () in
