@@ -1051,7 +1051,7 @@ module Verification = struct
         in
         result
       in
-      result
+      if Insecure.with_snark then result else Boolean.true_
   end
 end
 
