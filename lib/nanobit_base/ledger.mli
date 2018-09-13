@@ -35,7 +35,8 @@ end
 
 val create_new_account_exn : t -> Public_key.Compressed.t -> Account.t -> unit
 
-val apply_transaction : t -> Super_transaction.transaction -> Undo.transaction Or_error.t
+val apply_transaction :
+  t -> Super_transaction.transaction -> Undo.transaction Or_error.t
 
 val apply_super_transaction : t -> Super_transaction.t -> Undo.t Or_error.t
 
@@ -44,4 +45,4 @@ val undo : t -> Undo.t -> unit Or_error.t
 val merkle_root_after_transaction_exn :
   t -> Super_transaction.transaction -> Ledger_hash.t
 
-val create_empty : t -> Public_key.Compressed.t -> (Path.t * Account.t)
+val create_empty : t -> Public_key.Compressed.t -> Path.t * Account.t

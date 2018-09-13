@@ -48,7 +48,7 @@ module type S = sig
 
   val merkle_path_at_index_exn : t -> int -> Path.t
 
-  val remove_accounts_exn : t -> key list -> unit  
+  val remove_accounts_exn : t -> key list -> unit
 
   val copy : t -> t
 end
