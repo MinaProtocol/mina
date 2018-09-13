@@ -943,7 +943,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   let get_status t =
     let ledger = best_ledger t in
     let ledger_merkle_root =
-      Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
+      Ledger.merkle_root ledger |> [%sexp_of : Ledger_hash.t] |> Sexp.to_string
     in
     let num_accounts = Ledger.num_accounts ledger in
     let state = best_protocol_state t in

@@ -42,7 +42,7 @@ module Status = struct
     { num_accounts: int
     ; block_count: int
     ; uptime_secs: int
-    ; ledger_merkle_root : string
+    ; ledger_merkle_root: string
     ; conf_dir: string
     ; peers: string list
     ; transactions_sent: int
@@ -55,26 +55,20 @@ module Status = struct
     let title = "Coda Daemon Status\n-----------------------------------\n" in
     let entries =
       let f x = Field.get x s in
-      Fields.fold
-        ~init:[]
+      Fields.fold ~init:[]
         ~num_accounts:(fun acc x ->
-          ("Number of Accounts", Int.to_string (f x)) :: acc)
-        ~block_count:(fun acc x ->
-          ("Block Count", Int.to_string (f x)) :: acc)
-        ~uptime_secs:(fun acc x ->
-          ("Uptime", sprintf "%ds" (f x)) :: acc)
-        ~ledger_merkle_root:(fun acc x ->
-          ("Ledger Merkle Root", (f x)) :: acc)
-        ~conf_dir:(fun acc x ->
-          ("Configuration Dir", (f x)) :: acc)
-        ~peers:(fun acc x ->
-          ("Peers", List.to_string ~f:Fn.id (f x)) :: acc)
+          ("Number of Accounts", Int.to_string (f x)) :: acc )
+        ~block_count:(fun acc x -> ("Block Count", Int.to_string (f x)) :: acc)
+        ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
+        ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
+        ~conf_dir:(fun acc x -> ("Configuration Dir", f x) :: acc)
+        ~peers:(fun acc x -> ("Peers", List.to_string ~f:Fn.id (f x)) :: acc)
         ~transactions_sent:(fun acc x ->
-          ("Transactions Sent", Int.to_string (f x)) :: acc)
+          ("Transactions Sent", Int.to_string (f x)) :: acc )
         ~run_snark_worker:(fun acc x ->
-          ("Snark Worker Running", Bool.to_string (f x)) :: acc)
+          ("Snark Worker Running", Bool.to_string (f x)) :: acc )
         ~propose:(fun acc x ->
-          ("Proposer Running", Bool.to_string (f x)) :: acc)
+          ("Proposer Running", Bool.to_string (f x)) :: acc )
       |> List.rev
     in
     let max_key_length =
