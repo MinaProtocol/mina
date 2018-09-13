@@ -42,24 +42,34 @@ module Status = struct
     { num_accounts: int
     ; block_count: int
     ; uptime_secs: int
+    ; ledger_merkle_root: string
     ; conf_dir: string
     ; peers: string list
     ; transactions_sent: int
     ; run_snark_worker: bool
     ; propose: bool }
-  [@@deriving yojson, bin_io]
+  [@@deriving yojson, bin_io, fields]
 
   (* Text response *)
   let to_text s =
     let title = "Coda Daemon Status\n-----------------------------------\n" in
     let entries =
-      [ ("Uptime", sprintf "%ds" s.uptime_secs)
-      ; ("Block Count", Int.to_string s.block_count)
-      ; ("Number of Accounts", Int.to_string s.num_accounts)
-      ; ("Transactions Sent", Int.to_string s.transactions_sent)
-      ; ("Snark Worker Running", Bool.to_string s.run_snark_worker)
-      ; ("Proposer Running", Bool.to_string s.propose)
-      ; ("Peers", List.to_string ~f:Fn.id s.peers) ]
+      let f x = Field.get x s in
+      Fields.fold ~init:[]
+        ~num_accounts:(fun acc x ->
+          ("Number of Accounts", Int.to_string (f x)) :: acc )
+        ~block_count:(fun acc x -> ("Block Count", Int.to_string (f x)) :: acc)
+        ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
+        ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
+        ~conf_dir:(fun acc x -> ("Configuration Dir", f x) :: acc)
+        ~peers:(fun acc x -> ("Peers", List.to_string ~f:Fn.id (f x)) :: acc)
+        ~transactions_sent:(fun acc x ->
+          ("Transactions Sent", Int.to_string (f x)) :: acc )
+        ~run_snark_worker:(fun acc x ->
+          ("Snark Worker Running", Bool.to_string (f x)) :: acc )
+        ~propose:(fun acc x ->
+          ("Proposer Running", Bool.to_string (f x)) :: acc )
+      |> List.rev
     in
     let max_key_length =
       List.map ~f:(fun (s, _) -> String.length s) entries

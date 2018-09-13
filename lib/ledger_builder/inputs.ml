@@ -90,7 +90,7 @@ module type S = sig
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Config : sig
-    val parallelism_log_2 : int
+    val transaction_capacity_log_2 : int
   end
 
   val check :
