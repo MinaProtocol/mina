@@ -36,7 +36,9 @@ struct
     in
     let max_num_accts = 1 lsl Depth.depth in
     let num_empty_hashes = max_num_accts - List.length list in
-    let empty_hashes = List.init num_empty_hashes ~f:(fun _ -> Hash.empty) in
+    let empty_hashes =
+      List.init num_empty_hashes ~f:(fun _ -> Hash.empty_account)
+    in
     let tree, remaining_nodes, _ =
       go (List.map ~f:Hash.hash_account list @ empty_hashes) max_num_accts
     in

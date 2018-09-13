@@ -103,6 +103,22 @@ module Compressed = struct
     Bitstring_lib.Bitstring.pad_to_triple_list
       (x_bits @ [is_odd])
       ~default:Boolean.false_
+
+  module Checked = struct
+    open Let_syntax
+
+    let equal t1 t2 =
+      let%bind x_eq = Field.Checked.equal t1.x t2.x in
+      let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in
+      Boolean.(x_eq && odd_eq)
+
+    module Assert = struct
+      let equal t1 t2 =
+        let%map () = Field.Checked.Assert.equal t1.x t2.x
+        and () = Boolean.Assert.(t1.is_odd = t2.is_odd) in
+        ()
+    end
+  end
 end
 
 open Tick

@@ -14,8 +14,6 @@ struct
 
     let to_hash = Fn.id
 
-    let empty_hash = empty
-
     type account = Account.t
   end
 
