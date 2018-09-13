@@ -21,6 +21,8 @@ module type S = sig
            and type path = Path.t
            and type t := t
 
+  include Container_intf.S with type t := t and type elt := account
+
   module Location : sig
     type t
   end
