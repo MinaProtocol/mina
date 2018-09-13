@@ -144,18 +144,28 @@ module State = struct
       | _, Base _ -> failwith "This shouldn't have occured"
       | _ -> false
 
-  let fold_chronological t ~init ~f = Array.fold t.jobs.data ~init ~f
-
-  let next_position t =
+  let next_position t position =
     let p = parallelism t in
-    if t.jobs.position = p - 2 then
+    if position = p - 2 then
       let base_pos =
         match t.base_none_pos with None -> p - 1 | Some pos -> pos
       in
-      (t.jobs).position <- base_pos
-    else if t.jobs.position >= p - 1 then
-      (t.jobs).position <- next_pos p t.jobs.position
-    else Ring_buffer.forwards ~n:1 t.jobs
+      base_pos
+    else if position >= p - 1 then next_pos p position
+    else Int.( % ) (position + 1) (Array.length t.jobs.data)
+
+  let set_next_position t =
+    (t.jobs).position <- next_position t t.jobs.position
+
+  let fold_chronological t ~init ~f =
+    let n = Array.length t.jobs.data in
+    let rec go acc i pos =
+      if Int.equal i n then acc
+      else
+        let x = (t.jobs.data).(pos) in
+        go (f acc x) (i + 1) (next_position t pos)
+    in
+    go init 0 0
 
   let jobs_list t =
     let rec go count t =
@@ -163,7 +173,7 @@ module State = struct
       else
         let j = Ring_buffer.read t.jobs in
         let pos = t.jobs.position in
-        next_position t ;
+        set_next_position t ;
         (j, pos) :: go (count + 1) t
     in
     (t.jobs).position <- 0 ;
@@ -243,7 +253,7 @@ module State = struct
           | Work.Not_done -> j :: js
           | Work.Work_done -> js
         in
-        next_position t ; consume t next jobs_copy
+        set_next_position t ; consume t next jobs_copy
 
   let include_one_datum state value base_pos : unit Or_error.t =
     let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =

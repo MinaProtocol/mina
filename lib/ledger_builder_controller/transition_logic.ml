@@ -56,7 +56,7 @@ module type Inputs_intf = sig
 
     val is_materialization_of : t -> External_transition.t -> bool
 
-    val ledger_builder_ledger_hash : t -> Ledger_hash.t
+    val assert_materialization_of : t -> External_transition.t -> unit
   end
 
   module Transition_logic_state :
@@ -209,9 +209,7 @@ struct
         in
         match result with
         | Some tip ->
-            assert (
-              Protocol_state.equal_value (Tip.state tip)
-                (External_transition.target_state last_transition) ) ;
+            Tip.assert_materialization_of tip last_transition ;
             [ Transition_logic_state.Change.Longest_branch_tip tip
             ; Transition_logic_state.Change.Ktree new_tree ]
         | None -> []

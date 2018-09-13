@@ -66,12 +66,15 @@ module type Inputs_intf = sig
     val ledger_builder_hash : t -> Ledger_builder_hash.t
   end
 
-  module Tip :
-    Protocols.Coda_pow.Tip_intf
-    with type ledger_builder := Ledger_builder.t
-     and type protocol_state := Protocol_state.value
-     and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := External_transition.t
+  module Tip : sig
+    include Protocols.Coda_pow.Tip_intf
+            with type ledger_builder := Ledger_builder.t
+             and type protocol_state := Protocol_state.value
+             and type protocol_state_proof := Protocol_state_proof.t
+             and type external_transition := External_transition.t
+
+    val assert_materialization_of : t -> External_transition.t -> unit
+  end
 
   module Transition_logic_state :
     Transition_logic_state.S
@@ -141,6 +144,9 @@ module Make (Inputs : Inputs_intf) = struct
     in
     let open Interruptible.Let_syntax in
     let ivar : External_transition.t Ivar.t = Ivar.create () in
+    Logger.debug log
+      !"Attempting to catchup to ledger-hash %{sexp: Ledger_hash.t}"
+      h ;
     let work =
       match%bind
         Interruptible.lift (Sync_ledger.fetch sl h)
@@ -166,6 +172,7 @@ module Make (Inputs : Inputs_intf) = struct
                   Transition_logic_state.Transition_tree.singleton transition
                 in
                 let new_tip = Tip.of_transition_and_lb transition lb in
+                Tip.assert_materialization_of new_tip transition ;
                 let open Transition_logic_state.Change in
                 [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
             | Error e ->
