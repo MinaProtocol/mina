@@ -1294,7 +1294,7 @@ let%test_module "transaction_snark" =
       in
       of_transaction ~sok_digest ~source ~target transaction handler
 
-    (*let%test_unit "new_account" =
+    let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
@@ -1309,18 +1309,9 @@ let%test_module "transaction_snark" =
           in
           let target = Ledger.merkle_root_after_transaction_exn ledger t1 in
           let mentioned_keys = Transaction.public_keys (t1 :> Transaction.t) in
-          printf
-            !"current keys: %{sexp:Public_key.Compressed.t list}\n%!"
-            mentioned_keys ;
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
           in
-          printf
-            !"current sparse_ledger for transaction %{sexp:Transaction.t} is \
-              %{sexp:Sparse_ledger.t}\n\
-              %!"
-            (t1 :> Transaction.t)
-            sparse_ledger ;
           let sok_message =
             Sok_message.create ~fee:Fee.zero
               ~prover:wallets.(1).account.public_key
@@ -1328,7 +1319,7 @@ let%test_module "transaction_snark" =
           check_transaction ~sok_message
             ~source:(Ledger.merkle_root ledger)
             ~target t1
-            (unstage @@ Sparse_ledger.handler sparse_ledger) )*)
+            (unstage @@ Sparse_ledger.handler sparse_ledger) )
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1366,6 +1357,10 @@ let%test_module "transaction_snark" =
             Sparse_ledger.apply_transaction_exn sparse_ledger
               (t1 :> Transaction.t)
           in
+          Ledger.apply_transaction ledger t1 |> Or_error.ok_exn |> ignore ;
+          [%test_eq : Ledger_hash.t]
+            (Ledger.merkle_root ledger)
+            (Sparse_ledger.merkle_root sparse_ledger) ;
           let proof23 =
             of_transaction' sok_digest ledger t2
               (unstage @@ Sparse_ledger.handler sparse_ledger)
@@ -1374,6 +1369,10 @@ let%test_module "transaction_snark" =
             Sparse_ledger.apply_transaction_exn sparse_ledger
               (t2 :> Transaction.t)
           in
+          Ledger.apply_transaction ledger t2 |> Or_error.ok_exn |> ignore ;
+          [%test_eq : Ledger_hash.t]
+            (Ledger.merkle_root ledger)
+            (Sparse_ledger.merkle_root sparse_ledger) ;
           let total_fees =
             let open Amount in
             let magnitude =
