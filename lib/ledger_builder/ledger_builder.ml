@@ -413,7 +413,9 @@ end = struct
 
   let create ~ledger ~self : t =
     let open Config in
-    { scan_state= Parallel_scan.start ~parallelism_log_2
+    (* Transaction capacity log_2 is half the capacity for work parallelism *)
+    { scan_state=
+        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
     ; ledger
     ; public_key= self }
 
@@ -894,7 +896,7 @@ end = struct
     let curr_hash = hash t in
     let t' = copy t in
     let ledger = ledger t' in
-    let max_throughput = Int.pow 2 (Inputs.Config.parallelism_log_2 - 1) in
+    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let resources =
       process_works_add_txns logger (work_to_do t'.scan_state)
         transactions_by_fee (free_space t') max_throughput get_completed_work
@@ -1294,7 +1296,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let parallelism_log_2 = 8
+        let transaction_capacity_log_2 = 7
       end
 
       let check :
@@ -1335,7 +1337,7 @@ let%test_module "test" =
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
@@ -1364,7 +1366,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
@@ -1392,7 +1394,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
       Backtrace.elide := false ;
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
