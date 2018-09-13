@@ -5,8 +5,6 @@ open Snark_params
 open Currency
 open Fold_lib
 
-let bundle_length = 1
-
 let state_hash_size_in_triples = Tick.Field.size_in_triples
 
 let tick_input () =
@@ -1504,7 +1502,7 @@ let%test_module "transaction_snark" =
         { private_key
         ; account=
             { public_key=
-                Public_key.compress (Public_key.of_private_key private_key)
+                Public_key.compress (Public_key.of_private_key_exn private_key)
             ; balance= Balance.of_int (50 + Random.int 100)
             ; receipt_chain_hash= Receipt.Chain_hash.empty
             ; nonce= Account.Nonce.zero } }
@@ -1524,7 +1522,7 @@ let%test_module "transaction_snark" =
       let signature = Schnorr.sign sender.private_key payload in
       Transaction.check
         { Transaction.payload
-        ; sender= Public_key.of_private_key sender.private_key
+        ; sender= Public_key.of_private_key_exn sender.private_key
         ; signature }
       |> Option.value_exn
 
@@ -1547,7 +1545,8 @@ let%test_module "transaction_snark" =
           let wallets = random_wallets () in
           let ledger = Ledger.create () in
           Array.iter wallets ~f:(fun {account; private_key= _} ->
-              Ledger.set ledger account.public_key account ) ;
+              Ledger.create_new_account_exn ledger account.public_key account
+          ) ;
           let t1 =
             transaction wallets 0 1 8
               (Fee.of_int (Random.int 20))

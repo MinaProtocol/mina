@@ -45,4 +45,8 @@ let signature = salt "CodaSignature"
 
 let receipt_chain = salt "CodaReceiptChain"
 
-let epoch_seed = salt "EpochSeed"
+let epoch_seed = salt "CodaEpochSeed"
+
+let vrf_message = salt "CodaVrfMessage"
+
+let vrf_output = salt "CodaVrfOutput"

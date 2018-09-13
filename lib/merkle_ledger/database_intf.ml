@@ -20,7 +20,7 @@ module type S = sig
 
   module Path : Merkle_path.S with type hash := hash
 
-  val create : key_value_db_dir:string -> stack_db_file:string -> t
+  val create : unit -> t
 
   val location_of_key : t -> key -> location option
 
@@ -30,6 +30,12 @@ module type S = sig
 
   val set : t -> location -> account -> unit
 
+  val get_at_index_exn : t -> int -> account
+
+  val set_at_index_exn : t -> int -> account -> unit
+
+  val index_of_key_exn : t -> key -> int
+
   val get_or_create_account :
     t -> key -> account -> ([`Added | `Existed] * location, error) result
 
@@ -37,6 +43,8 @@ module type S = sig
     t -> key -> account -> [`Added | `Existed] * location
 
   val merkle_path : t -> location -> Path.t
+
+  val merkle_path_at_index_exn : t -> int -> Path.t
 
   val copy : t -> t
 
@@ -47,4 +55,8 @@ module type S = sig
            and type addr := Addr.t
            and type t := t
            and type path := Path.t
+
+  module For_tests : sig
+    val gen_account_location : location Core.Quickcheck.Generator.t
+  end
 end

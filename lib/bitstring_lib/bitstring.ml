@@ -6,6 +6,10 @@ module type S = sig
   include Container.S1 with type 'a t := 'a t
 
   val of_list : 'a list -> 'a t
+
+  val init : int -> f:(int -> 'a) -> 'a t
+
+  val map : 'a t -> f:('a -> 'b) -> 'b t
 end
 
 module T = struct

@@ -155,6 +155,12 @@ module type Basic = sig
       -> back:('value1 -> 'value2)
       -> ('var, 'value2) t
 
+    val transport_var :
+         ('var1, 'value) t
+      -> there:('var2 -> 'var1)
+      -> back:('var1 -> 'var2)
+      -> ('var2, 'value) t
+
     val of_hlistable :
          (unit, unit, 'k_var, 'k_value) Data_spec.t
       -> var_to_hlist:('var -> (unit, 'k_var) H_list.t)

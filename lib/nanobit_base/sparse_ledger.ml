@@ -17,9 +17,13 @@ include Sparse_ledger_lib.Sparse_ledger.Make (struct
 let of_ledger_subset_exn ledger keys =
   List.fold keys
     ~f:(fun acc key ->
-      add_path acc
-        (Option.value_exn (Ledger.merkle_path ledger key))
-        (Option.value_exn (Ledger.get ledger key)) )
+      let open Option.Let_syntax in
+      let path =
+        let%bind location = Ledger.location_of_key ledger key in
+        let%map account = Ledger.get ledger location in
+        add_path acc (Ledger.merkle_path ledger location) account
+      in
+      Option.value_exn path )
     ~init:
       (of_hash ~depth:Ledger.depth
          (Merkle_hash.of_digest (Ledger.merkle_root ledger :> Pedersen.Digest.t)))

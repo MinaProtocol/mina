@@ -1,6 +1,7 @@
 open Core_kernel
 open Snark_params
 open Fold_lib
+open Bitstring_lib
 
 module Message = struct
   module Scalar = Tick.Inner_curve.Scalar
@@ -52,7 +53,8 @@ module Message = struct
          d
        in
        let%bind bs = Pedersen.Checked.Digest.choose_preimage digest in
-       Sha256_lib.Sha256.Checked.digest (bs :> Boolean.var list))
+       let%map d = Sha256_lib.Sha256.Checked.digest (bs :> Boolean.var list) in
+       Bitstring.Lsb_first.of_list (d :> Boolean.var list))
 end
 
 include Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
