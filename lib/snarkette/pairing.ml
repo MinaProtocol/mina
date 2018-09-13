@@ -1,3 +1,5 @@
+open Core_kernel
+
 module Extended_projective = struct
   type 'a t =
     { x : 'a
@@ -20,11 +22,13 @@ module type S = sig
 
   module G1_precomputation : sig
     type t
+    [@@deriving bin_io, sexp]
     val create : G1.t -> t
   end
 
   module G2_precomputation : sig
     type t
+    [@@deriving bin_io, sexp]
     val create : G2.t -> t
   end
 
@@ -71,6 +75,7 @@ module Make
       ; px_twist : Fq_twist.t
       ; py_twist : Fq_twist.t
       }
+    [@@deriving bin_io, sexp]
 
     let create (p : G1.t) =
       let (px, py) = G1.to_affine_coordinates p in
@@ -88,6 +93,7 @@ module Make
       ; c_J : Fq_twist.t
       ; c_L : Fq_twist.t
       }
+    [@@deriving bin_io, sexp]
   end
 
   module Add_coeffs = struct
@@ -95,6 +101,7 @@ module Make
       { c_L1 : Fq_twist.t
       ; c_RZ : Fq_twist.t
       }
+    [@@deriving bin_io, sexp]
   end
 
   let loop_count_size_in_bits = N.num_bits Info.loop_count
@@ -109,6 +116,7 @@ module Make
       ; dbl_coeffs : Dbl_coeffs.t array
       ; add_coeffs : Add_coeffs.t array
       }
+    [@@deriving bin_io, sexp]
 
     let twist_inv = Fq_twist.inv Info.twist
 

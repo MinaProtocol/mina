@@ -12,6 +12,7 @@ end = struct
   let ( * ) = Big_int.mult_big_int
   let ( % ) = Big_int.mod_big_int
   let ( // ) = Big_int.div_big_int
+  let (<) = Big_int.lt_big_int
 
   let of_int = Big_int.big_int_of_int
 
@@ -24,6 +25,7 @@ end = struct
   let shift_left = Big_int.shift_left_big_int
 
   let log_and = Big_int.and_big_int
+  let log_or = Big_int.or_big_int
 
   let test_bit t i =
     equal

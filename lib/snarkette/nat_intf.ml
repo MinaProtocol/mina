@@ -6,6 +6,8 @@ module type S = sig
 
   val of_string : string -> t
 
+  val (<) : t -> t -> bool
+
   val (+) : t -> t -> t
   val ( * ) : t -> t -> t
   val ( - ) : t -> t -> t
@@ -16,6 +18,7 @@ module type S = sig
   val shift_right : t -> int -> t
 
   val log_and : t -> t -> t
+  val log_or : t -> t -> t
 
   val test_bit : t -> int -> bool
   val num_bits : t -> int

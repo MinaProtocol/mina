@@ -5,7 +5,7 @@ module type Backend_intf = sig
 
   module G1 : sig
     type t
-    [@@deriving bin_io]
+    [@@deriving sexp, bin_io]
 
     val zero : t
 
@@ -18,7 +18,7 @@ module type Backend_intf = sig
 
   module G2 : sig
     type t
-    [@@deriving bin_io]
+    [@@deriving sexp, bin_io]
 
     val (+) : t -> t -> t
 
@@ -52,7 +52,7 @@ module Make
       ; h_gamma : G2.t
       ; query : G1.t array
       }
-    [@@deriving bin_io]
+    [@@deriving bin_io, sexp]
 
     module Processed = struct
       type t =
@@ -64,6 +64,7 @@ module Make
         ; h_pc : Pairing.G2_precomputation.t
         ; query : G1.t array
         }
+      [@@deriving bin_io, sexp]
 
       let create { h ; g_alpha; h_beta; g_gamma; h_gamma; query } =
         { g_alpha

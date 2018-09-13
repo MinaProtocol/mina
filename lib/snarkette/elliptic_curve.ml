@@ -1,5 +1,7 @@
 open Core_kernel
 
+let (=) = `Don't_use_polymorphic_compare
+
 module Make
     (N : Nat_intf.S)
     (Fq : Fields.Intf)
@@ -13,7 +15,7 @@ module Make
     ; y : Fq.t
     ; z : Fq.t
     }
-  [@@deriving bin_io]
+  [@@deriving bin_io, sexp]
 
   let zero =
     { x = Fq.zero
@@ -35,11 +37,11 @@ module Make
     let x2 = square x in
     let y2 = square y in
     let z2 = square z in
-    (z * (y2 - Coefficients.b * z2) = x * (x2 + Coefficients.a * z2))
+    equal (z * (y2 - Coefficients.b * z2)) (x * (x2 + Coefficients.a * z2))
 
   let (+) t1 t2 =
     if is_zero t1
-    then t1
+    then t2
     else if is_zero t2
     then t1
     else
@@ -48,7 +50,7 @@ module Make
       let x2z1 = t1.z * t2.x in
       let y1z2 = t1.y * t2.z in
       let y2z1 = t1.z * t2.y in
-      if (x1z2 = x2z1) && (y1z2 = y2z1)
+      if equal x1z2 x2z1 && equal y1z2 y2z1
       then
         (* Double case *)
         let xx   = square (t1.x) in
