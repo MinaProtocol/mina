@@ -59,13 +59,14 @@ struct
 
   open Impl
 
-  type var = Bitstring_checked.t
+  type var = Boolean.var Bitstring.Lsb_first.t
 
   let typ : (var, t) Typ.t =
-    Typ.transport
-      (Boolean.bitstring_lsb_first_typ ~length:size_in_bits)
-      ~there:(Fn.compose Bitstring.Lsb_first.of_list unpack)
-      ~back:(Fn.compose project Bitstring.Lsb_first.to_list)
+    Typ.transport_var
+      (Typ.transport
+         (Typ.list ~length:size_in_bits Boolean.typ)
+         ~there:unpack ~back:project)
+      ~there:Bitstring.Lsb_first.to_list ~back:Bitstring.Lsb_first.of_list
 
   let gen : t Quickcheck.Generator.t =
     Quickcheck.Generator.map
@@ -76,13 +77,19 @@ struct
   let test_bit x i = Other_impl.Bigint.(test_bit (of_field x) i)
 
   module Checked = struct
-    let equal = Bitstring_checked.equal
+    let equal a b =
+      Bitstring_checked.equal
+        (Bitstring.Lsb_first.to_list a)
+        (Bitstring.Lsb_first.to_list b)
 
     let to_bits = Fn.id
 
     module Assert = struct
       let equal : var -> var -> (unit, _) Checked.t =
+       fun a b ->
         Bitstring_checked.Assert.equal
+          (Bitstring.Lsb_first.to_list a)
+          (Bitstring.Lsb_first.to_list b)
     end
   end
 end
