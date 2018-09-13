@@ -373,7 +373,8 @@ module type Ledger_builder_diff_intf = sig
   type pre_diff =
     { completed_works: completed_work list
     ; transactions: transaction list
-    ; coinbase_parts: int }
+    ; coinbase_parts: int
+    ; completed_works_for_coinbase: completed_work list }
   [@@deriving sexp, bin_io]
 
   type t =
@@ -386,7 +387,8 @@ module type Ledger_builder_diff_intf = sig
     type pre_diff =
       { completed_works: completed_work_checked list
       ; transactions: transaction_with_valid_signature list
-      ; coinbase_parts: int }
+      ; coinbase_parts: int
+      ; completed_works_for_coinbase: completed_work_checked list }
     [@@deriving sexp]
 
     type t =

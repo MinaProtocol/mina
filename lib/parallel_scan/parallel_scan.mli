@@ -59,4 +59,4 @@ val fill_in_completed_jobs :
 
 val last_emitted_value : ('a, 'd) State.t -> 'a option
 
-val partitions : total_slots:int -> ('a, 'd) State.t -> int * int option
+val partitions : max_slots:int -> ('a, 'd) State.t -> int * int option

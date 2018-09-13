@@ -313,16 +313,16 @@ let fill_in_completed_jobs :
 
 let last_emitted_value (state: ('a, 'd) State1.t) = snd state.acc
 
-let partitions ~total_slots state =
+let partitions ~max_slots state =
   let n =
-    if free_space ~state < total_slots then free_space ~state else total_slots
+    if free_space ~state < max_slots then free_space ~state else max_slots
   in
   let parallelism = State1.parallelism state in
-  let offset = (parallelism - 1) in
+  let offset = parallelism - 1 in
   match State1.base_none_pos state with
   | None -> (0, None)
   | Some start ->
-      let start_0 = start-offset in
+      let start_0 = start - offset in
       if n <= parallelism - start_0 then (n, None)
       else (parallelism - start_0, Some (n - (parallelism - start_0)))
 
