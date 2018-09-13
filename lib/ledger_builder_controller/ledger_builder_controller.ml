@@ -383,10 +383,12 @@ end = struct
 
   let transition_tree t =
     let state = Transition_logic.state t.handler in
+    Transition_logic_state.assert_state_valid state ;
     Transition_logic_state.ktree state
 
   let strongest_tip t =
     let state = Transition_logic.state t.handler in
+    Transition_logic_state.assert_state_valid state ;
     Transition_logic_state.longest_branch_tip state
 
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io

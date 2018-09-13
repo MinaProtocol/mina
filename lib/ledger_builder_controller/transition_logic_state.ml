@@ -16,6 +16,8 @@ module type S = sig
 
   val ktree : t -> Transition_tree.t option
 
+  val assert_state_valid : t -> unit
+
   module Change : sig
     type t =
       | Locked_tip of tip
