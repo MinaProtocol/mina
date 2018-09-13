@@ -106,6 +106,7 @@ module Compressed = struct
 
   module Checked = struct
     open Let_syntax
+
     let equal t1 t2 =
       let%bind x_eq = Field.Checked.equal t1.x t2.x in
       let%bind odd_eq = Boolean.equal t1.is_odd t2.is_odd in

@@ -480,7 +480,9 @@ module Base = struct
         in
         let%bind root =
           let%bind sender_compressed = Public_key.compress_var sender in
-          Ledger_hash.modify_account_send root ~is_fee_transfer:(Tag.Checked.is_fee_transfer tag) sender_compressed ~f:(fun account ->
+          Ledger_hash.modify_account_send root
+            ~is_fee_transfer:(Tag.Checked.is_fee_transfer tag)
+            sender_compressed ~f:(fun account ->
               with_label __LOC__
                 (let%bind next_nonce =
                    Account.Nonce.increment_if_var account.nonce
@@ -510,8 +512,10 @@ module Base = struct
                    Balance.Checked.add_signed_amount account.balance
                      sender_delta
                  in
-                 {Account.balance; public_key=sender_compressed; nonce= next_nonce; receipt_chain_hash})
-          )
+                 { Account.balance
+                 ; public_key= sender_compressed
+                 ; nonce= next_nonce
+                 ; receipt_chain_hash }) )
         in
         (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
@@ -1523,7 +1527,8 @@ let%test_module "transaction_snark" =
           Array.iter
             (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
             ~f:(fun {account; private_key= _} ->
-              Ledger.create_new_account_exn ledger account.public_key account ) ;
+              Ledger.create_new_account_exn ledger account.public_key account
+              ) ;
           let t1 =
             transaction wallets 1 0 8
               (Fee.of_int (Random.int 20))

@@ -54,19 +54,22 @@ let validate_nonces txn_nonce account_nonce =
       account_nonce txn_nonce
 
 let get_or_create ledger key =
-  let key, loc = match get_or_create_account_exn ledger key (Account.initialize key) with
-  | `Existed, loc -> [], loc
-  | `Added, loc -> [key], loc
-  in key, get ledger loc |> Option.value_exn, loc
+  let key, loc =
+    match get_or_create_account_exn ledger key (Account.initialize key) with
+    | `Existed, loc -> ([], loc)
+    | `Added, loc -> ([key], loc)
+  in
+  (key, get ledger loc |> Option.value_exn, loc)
 
 let create_empty ledger k =
   let start_hash = merkle_root ledger in
   match get_or_create_account_exn ledger k Account.empty with
-  | `Existed, _ -> failwith "why did we create_empty for a key already present?"
+  | `Existed, _ ->
+      failwith "why did we create_empty for a key already present?"
   | `Added, new_loc ->
-    (* FIXME: debug assert *)
-    [%test_eq : Ledger_hash.t] start_hash (merkle_root ledger) ;
-    (merkle_path ledger new_loc, Account.empty)
+      (* FIXME: debug assert *)
+      [%test_eq : Ledger_hash.t] start_hash (merkle_root ledger) ;
+      (merkle_path ledger new_loc, Account.empty)
 
 module Undo = struct
   type transaction =
@@ -131,7 +134,8 @@ let apply_transaction_unchecked ledger
     let%map receiver_balance' = add_amount receiver_account.balance amount in
     set ledger sender_location
       {sender_account_without_balance_modified with balance= sender_balance'} ;
-    set ledger receiver_location {receiver_account with balance= receiver_balance'} ;
+    set ledger receiver_location
+      {receiver_account with balance= receiver_balance'} ;
     {undo with previous_empty_accounts}
 
 let apply_transaction ledger (transaction: Transaction.With_valid_signature.t) =
@@ -183,13 +187,17 @@ let apply_coinbase t ({proposer; fee_transfer} as cb: Coinbase.t) =
           error_opt "Coinbase fee transfer too large"
             (Amount.sub Protocols.Coda_praos.coinbase_amount fee)
         in
-        let receiver_location, receiver_account, emptys = get_or_initialize receiver in
+        let receiver_location, receiver_account, emptys =
+          get_or_initialize receiver
+        in
         let%map balance = add_amount receiver_account.balance fee in
         ( proposer_reward
         , emptys
         , Some (receiver_location, {receiver_account with balance}) )
   in
-  let proposer_location, proposer_account, emptys2 = get_or_initialize proposer in
+  let proposer_location, proposer_account, emptys2 =
+    get_or_initialize proposer
+  in
   let%map balance = add_amount proposer_account.balance proposer_reward in
   set t proposer_location {proposer_account with balance} ;
   Option.iter receiver_update ~f:(fun (l, a) -> set t l a) ;
@@ -258,7 +266,8 @@ let undo_transaction ledger
     let%map receiver_balance' = sub_amount receiver_account.balance amount in
     set ledger sender_location
       {sender_account_without_balance_modified with balance= sender_balance'} ;
-    set ledger receiver_location {receiver_account with balance= receiver_balance'} ;
+    set ledger receiver_location
+      {receiver_account with balance= receiver_balance'} ;
     remove_accounts_exn ledger previous_empty_accounts
 
 let undo : t -> Undo.t -> unit Or_error.t =

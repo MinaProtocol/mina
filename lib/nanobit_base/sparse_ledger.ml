@@ -17,10 +17,15 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
     List.fold keys
       ~f:(fun (new_keys, sl) key ->
         match Ledger.location_of_key ledger key with
-        | Some loc -> (new_keys, add_path sl (Ledger.merkle_path ledger loc) key (Ledger.get ledger loc |> Option.value_exn))
+        | Some loc ->
+            ( new_keys
+            , add_path sl
+                (Ledger.merkle_path ledger loc)
+                key
+                (Ledger.get ledger loc |> Option.value_exn) )
         | None ->
             let path, acct = Ledger.create_empty ledger key in
-            (key :: new_keys, add_path sl path key acct))
+            (key :: new_keys, add_path sl path key acct) )
       ~init:
         ( []
         , of_hash ~depth:Ledger.depth
