@@ -13,24 +13,24 @@ struct
   open Coda_processes
 
   module Api = struct
-    type t = { stop: int -> unit
-             ; start: int -> unit
-             ; send_transaction:
-                 int
-                 -> Private_key.t
-                 -> Public_key.Compressed.t
-                 -> Currency.Amount.t
-                 -> Currency.Fee.t
-                 -> unit Deferred.t }
+    type t =
+      { stop: int -> unit
+      ; start: int -> unit
+      ; send_transaction:
+             int
+          -> Private_key.t
+          -> Public_key.Compressed.t
+          -> Currency.Amount.t
+          -> Currency.Fee.t
+          -> unit Deferred.t }
 
-    let create workers = 
+    let create workers =
       { stop= (fun i -> failwith "nyi")
-                  ; start= (fun i -> failwith "nyi")
-                  ; send_transaction=
-                      (fun i sk pk amount fee ->
-                        Coda_process.send_transaction_exn
-                          (List.nth_exn workers i) sk pk amount fee ) }
-
+      ; start= (fun i -> failwith "nyi")
+      ; send_transaction=
+          (fun i sk pk amount fee ->
+            Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk
+              amount fee ) }
   end
 
   let start_prefix_check log transitions proposal_interval =
@@ -128,14 +128,14 @@ struct
           let finished =
             let%bind program_dir = Unix.getcwd () in
             Coda_processes.init () ;
-            Coda_processes.spawn_local_processes_exn n
-              ~proposal_interval ~program_dir ~should_propose
+            Coda_processes.spawn_local_processes_exn n ~proposal_interval
+              ~program_dir ~should_propose
               ~snark_worker_public_keys:
                 (Some (List.init n snark_work_public_keys))
               ~f:(fun workers ->
-                  start_checks log workers proposal_interval ;
-                  Option.value_exn !fill_ready workers ;
-                  return () )
+                start_checks log workers proposal_interval ;
+                Option.value_exn !fill_ready workers ;
+                return () )
           in
           fill_ready :=
             Some
