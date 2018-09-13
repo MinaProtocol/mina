@@ -534,6 +534,9 @@ module Make (Inputs : Inputs_intf) = struct
               ; ledger_builder= tip.ledger_builder })) ;
         Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
           (fun (ledger_builder, transition) ->
+            let protocol_state =
+              Consensus_mechanism.External_transition.protocol_state transition
+            in
             Debug_assert.debug_assert (fun () ->
                 match Ledger_builder.statement_exn ledger_builder with
                 | `Empty -> ()
@@ -558,8 +561,7 @@ module Make (Inputs : Inputs_intf) = struct
                       target ) ;
             Proposer.Tip_change
               { protocol_state=
-                  ( Consensus_mechanism.External_transition.protocol_state
-                      transition
+                  ( protocol_state
                   , Consensus_mechanism.External_transition.
                     protocol_state_proof transition )
               ; ledger_builder
