@@ -372,6 +372,12 @@ end = struct
         in
         match res with None -> Error `Empty | Some res -> Ok res )
 
+  let statement_exn t =
+    match scan_statement t.scan_state with
+    | Ok s -> `Non_empty s
+    | Error `Empty -> `Empty
+    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
+
   let of_aux_and_ledger ~snarked_ledger_hash ~public_key ~ledger ~aux =
     let check cond err =
       if not cond then Or_error.errorf "Ledger_hash.of_aux_and_ledger: %s" err
