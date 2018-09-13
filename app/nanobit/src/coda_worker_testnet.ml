@@ -12,16 +12,26 @@ struct
   module Coda_processes = Coda_processes.Make (Ledger_proof) (Kernel) (Coda)
   open Coda_processes
 
-  type api =
-    { stop: int -> unit
-    ; start: int -> unit
-    ; send_transaction:
-           int
-        -> Private_key.t
-        -> Public_key.Compressed.t
-        -> Currency.Amount.t
-        -> Currency.Fee.t
-        -> unit Deferred.t }
+  module Api = struct
+    type t = { stop: int -> unit
+             ; start: int -> unit
+             ; send_transaction:
+                 int
+                 -> Private_key.t
+                 -> Public_key.Compressed.t
+                 -> Currency.Amount.t
+                 -> Currency.Fee.t
+                 -> unit Deferred.t }
+
+    let create workers = 
+      { stop= (fun i -> failwith "nyi")
+                  ; start= (fun i -> failwith "nyi")
+                  ; send_transaction=
+                      (fun i sk pk amount fee ->
+                        Coda_process.send_transaction_exn
+                          (List.nth_exn workers i) sk pk amount fee ) }
+
+  end
 
   let start_prefix_check log transitions proposal_interval =
     let all_transitions_r, all_transitions_w = Linear_pipe.create () in
@@ -104,7 +114,9 @@ struct
        ())
 
   (* note: this is very declarative, maybe this should be more imperative? *)
-  (* step 2:
+  (* next steps:
+   *   add more powerful api hooks to enable sending transactions on certain conditions
+   *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
   let test ?(proposal_interval= 1000) log n should_propose
@@ -114,33 +126,21 @@ struct
       Deferred.create (fun ready_ivar ->
           let fill_ready = ref None in
           let finished =
-            Deferred.create (fun finished_ivar ->
-                don't_wait_for
-                  (let%bind program_dir = Unix.getcwd () in
-                   Coda_processes.init () ;
-                   let%map () =
-                     Coda_processes.spawn_local_processes_exn n
-                       ~proposal_interval ~program_dir ~should_propose
-                       ~snark_worker_public_keys:
-                         (Some (List.init n snark_work_public_keys))
-                       ~f:(fun workers ->
-                         start_checks log workers proposal_interval ;
-                         Option.value_exn !fill_ready workers ;
-                         return () )
-                   in
-                   Ivar.fill finished_ivar ()) )
+            let%bind program_dir = Unix.getcwd () in
+            Coda_processes.init () ;
+            Coda_processes.spawn_local_processes_exn n
+              ~proposal_interval ~program_dir ~should_propose
+              ~snark_worker_public_keys:
+                (Some (List.init n snark_work_public_keys))
+              ~f:(fun workers ->
+                  start_checks log workers proposal_interval ;
+                  Option.value_exn !fill_ready workers ;
+                  return () )
           in
           fill_ready :=
             Some
               (fun workers ->
-                let api =
-                  { stop= (fun i -> failwith "nyi")
-                  ; start= (fun i -> failwith "nyi")
-                  ; send_transaction=
-                      (fun i sk pk amount fee ->
-                        Coda_process.send_transaction_exn
-                          (List.nth_exn workers i) sk pk amount fee ) }
-                in
+                let api = Api.create workers in
                 Ivar.fill ready_ivar (api, finished) ) )
     in
     ready
