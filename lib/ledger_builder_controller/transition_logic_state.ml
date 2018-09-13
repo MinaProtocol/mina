@@ -16,6 +16,8 @@ module type S = sig
 
   val ktree : t -> Transition_tree.t option
 
+  val assert_state_valid : t -> unit
+
   module Change : sig
     type t =
       | Locked_tip of tip
@@ -37,7 +39,7 @@ end) (Transition : sig
 end) (Tip : sig
   type t [@@deriving sexp]
 
-  val is_materialization_of : t -> Transition.t -> bool
+  val assert_materialization_of : t -> Transition.t -> unit
 end) :
   S with type tip := Tip.t and type external_transition := Transition.t =
 struct
@@ -82,25 +84,25 @@ struct
     | Ktree k -> {t with ktree= Some k}
 
   (* Invariant: state is consistent after change applications *)
-  let state_valid t =
-    match t.ktree with
-    | None -> true
-    | Some ktree ->
-      match Transition_tree.longest_path ktree with
-      | [] -> failwith "Impossible, paths are non-empty"
-      | [x] ->
-          Tip.is_materialization_of t.locked_tip x
-          && Tip.is_materialization_of t.longest_branch_tip x
-      | x :: y :: rest ->
-          let last = List.last_exn (y :: rest) in
-          Tip.is_materialization_of t.locked_tip x
-          && Tip.is_materialization_of t.longest_branch_tip last
+  let assert_state_valid t =
+    Debug_assert.debug_assert (fun () ->
+        match t.ktree with
+        | None -> ()
+        | Some ktree ->
+          match Transition_tree.longest_path ktree with
+          | [] -> failwith "Impossible, paths are non-empty"
+          | [x] ->
+              Tip.assert_materialization_of t.locked_tip x ;
+              Tip.assert_materialization_of t.longest_branch_tip x
+          | x :: y :: rest ->
+              let last = List.last_exn (y :: rest) in
+              Tip.assert_materialization_of t.locked_tip x ;
+              Tip.assert_materialization_of t.longest_branch_tip last )
 
   let apply_all t changes =
-    assert (state_valid t) ;
+    assert_state_valid t ;
     let t' = List.fold changes ~init:t ~f:apply in
-    assert (state_valid t') ;
-    t'
+    assert_state_valid t' ; t'
 
   let create genesis_heavy =
     {locked_tip= genesis_heavy; longest_branch_tip= genesis_heavy; ktree= None}
