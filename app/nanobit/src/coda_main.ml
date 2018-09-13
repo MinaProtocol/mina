@@ -158,6 +158,9 @@ module type Config_intf = sig
   val fee_public_key : Public_key.Compressed.t
 
   val genesis_proof : Snark_params.Tock.Proof.t
+
+  val transaction_capacity_log_2 : int
+  (** Capacity of transactions per block *)
 end
 
 module type Init_intf = sig
@@ -312,7 +315,7 @@ struct
       module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Config = Protocol_constants
+      module Config = Init
 
       let check (Completed_work.({fee; prover; proofs}) as t) stmts =
         let message = Sok_message.create ~fee ~prover in
