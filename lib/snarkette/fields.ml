@@ -24,6 +24,8 @@ module type Fp_intf = sig
   val of_int : int -> t
 
   val of_string : string -> t
+
+  val of_bits : bool list -> t option
 end
 
 module type Extension_intf = sig
@@ -38,19 +40,44 @@ end
 
 module Make_fp
     (N : Nat_intf.S)
-    (Info : sig val order : N.t end) : Fp_intf
+    (Info : sig val order : N.t end)
+  : sig
+    include Fp_intf
+    val order : N.t
+    val to_bigint : t -> N.t
+  end
 = struct
-  open N
+  include Info
 
   type t = N.t
   [@@deriving eq, bin_io, sexp]
 
+  let to_bigint = Fn.id
+
+  let zero = N.of_int 0
+  let one = N.of_int 1
+
+  let of_bits bits =
+    let rec go acc i = function
+      | [] -> acc
+      | b :: bs ->
+        let acc =
+          if b
+          then N.log_or acc (N.shift_left one i)
+          else acc
+        in
+        go acc (i + 1) bs
+    in
+    let r = go zero 0 bits in
+    if N.(<) r Info.order
+    then Some r
+    else None
+
+  open N
+
   let of_int = N.of_int
 
   let of_string = N.of_string
-
-  let zero = of_int 0
-  let one = of_int 1
 
   let rec extended_euclidean a b =
     if equal b zero then a, one, zero
