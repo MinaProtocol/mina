@@ -1,4 +1,5 @@
 open Core_kernel
+open Bitstring_lib
 
 module Make (Impl : Snark_intf.S) = struct
   open Impl

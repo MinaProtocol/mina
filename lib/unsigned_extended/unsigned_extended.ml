@@ -1,6 +1,8 @@
 open Core_kernel
 open Snark_params
 
+type uint64 = Unsigned.uint64
+
 module type S = sig
   type t [@@deriving bin_io, sexp, hash, compare, eq]
 
@@ -9,6 +11,10 @@ module type S = sig
   include Hashable.S with type t := t
 
   include Unsigned.S with type t := t
+
+  val to_uint64 : t -> uint64
+
+  val of_uint64 : uint64 -> t
 
   val ( < ) : t -> t -> bool
 
@@ -30,6 +36,10 @@ end) -> functor (M :sig
                       val to_signed : Unsigned.t -> Signed.t
 
                       val of_signed : Signed.t -> Unsigned.t
+
+                      val to_uint64 : Unsigned.t -> uint64
+
+                      val of_uint64 : uint64 -> Unsigned.t
 
                       val length : int
 end) -> S with type t = Unsigned.t
@@ -67,8 +77,13 @@ module Extend
 
       val of_signed : Signed.t -> Unsigned.t
 
+      val to_uint64 : Unsigned.t -> uint64
+
+      val of_uint64 : uint64 -> Unsigned.t
+
       val length : int
-    end) =
+    end) :
+  S with type t = Unsigned.t =
 struct
   ;; assert (M.length < Tick.Field.size_in_bits - 3)
 
@@ -103,6 +118,10 @@ struct
 
   include (Unsigned : Unsigned_intf with type t := t)
 
+  let to_uint64 = M.to_uint64
+
+  let of_uint64 = M.of_uint64
+
   let ( < ) x y = compare x y < 0
 
   let ( > ) x y = compare x y > 0
@@ -122,6 +141,10 @@ module UInt64 =
       let to_signed = Unsigned.UInt64.to_int64
 
       let of_signed = Unsigned.UInt64.of_int64
+
+      let to_uint64 = Fn.id
+
+      let of_uint64 = Fn.id
     end)
 
 module UInt32 =
@@ -132,4 +155,10 @@ module UInt32 =
       let to_signed = Unsigned.UInt32.to_int32
 
       let of_signed = Unsigned.UInt32.of_int32
+
+      let to_uint64 =
+        Fn.compose Unsigned.UInt64.of_int64 Unsigned.UInt32.to_int64
+
+      let of_uint64 =
+        Fn.compose Unsigned.UInt32.of_int64 Unsigned.UInt64.to_int64
     end)

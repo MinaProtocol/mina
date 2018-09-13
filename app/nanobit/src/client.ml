@@ -92,7 +92,7 @@ let send_txn =
     fun () ->
       let open Deferred.Let_syntax in
       let receiver_compressed = Public_key.compress address in
-      let sender_kp = Keypair.of_private_key from_account in
+      let sender_kp = Keypair.of_private_key_exn from_account in
       let port = Option.value ~default:default_client_port port in
       match%bind get_nonce sender_kp.public_key port with
       | Error e ->

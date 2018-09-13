@@ -136,7 +136,8 @@ let check_base_snarks sparse_ledger0
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero
-        ~prover:Public_key.(compress (of_private_key (Private_key.create ())))
+        ~prover:
+          Public_key.(compress (of_private_key_exn (Private_key.create ())))
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
