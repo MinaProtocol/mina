@@ -744,6 +744,10 @@ module type Main_intf = sig
   module Inputs : sig
     module Time : Protocols.Coda_pow.Time_intf
 
+    module Ledger_hash : sig
+      type t [@@deriving sexp]
+    end
+
     module Ledger : sig
       type t [@@deriving sexp]
 
@@ -755,6 +759,8 @@ module type Main_intf = sig
       val get : t -> Ledger.Location.t -> Account.t option
 
       val num_accounts : t -> int
+
+      val merkle_root : t -> Ledger_hash.t
     end
 
     module Ledger_builder_diff : sig
@@ -933,6 +939,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let get_status t =
     let ledger = best_ledger t in
+    let ledger_merkle_root =
+      Ledger.merkle_root ledger |> [%sexp_of: Ledger_hash.t] |> Sexp.to_string
+    in
     let num_accounts = Ledger.num_accounts ledger in
     let state = best_protocol_state t in
     let block_count =
@@ -946,6 +955,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     { Client_lib.Status.num_accounts
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
+    ; ledger_merkle_root
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
     ; transactions_sent= !txn_count
