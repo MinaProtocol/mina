@@ -142,7 +142,8 @@ struct
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
-      ; transactions: Transaction.With_valid_signature.t Sequence.t }
+      ; transactions: Transaction.With_valid_signature.t Sequence.t sexp_opaque
+      }
     [@@deriving sexp_of]
   end
 
