@@ -29,7 +29,8 @@ module Make (Inputs : Inputs_intf) :
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
-   and type time_controller := Inputs.Time.Controller.t =
+   and type time_controller := Inputs.Time.Controller.t
+   and type keypair := Inputs.Keypair.t =
 struct
   open Inputs
   open Consensus_mechanism
@@ -82,7 +83,7 @@ struct
 
   let generate_next_state ~previous_protocol_state ~local_state
       ~time_controller ~ledger_builder ~transactions ~get_completed_work
-      ~logger =
+      ~logger ~keypair =
     let open Option.Let_syntax in
     let ( diff
         , `Hash_after_applying next_ledger_builder_hash
@@ -107,7 +108,7 @@ struct
     in
     let%map protocol_state, consensus_transition_data =
       Consensus_mechanism.generate_transition ~previous_protocol_state
-        ~blockchain_state ~local_state ~time
+        ~blockchain_state ~local_state ~time ~keypair
         ~transactions:
           ( diff
               .Ledger_builder_diff.With_valid_signatures_and_proofs.
@@ -154,7 +155,8 @@ struct
 
   let transition_capacity = 64
 
-  let create ~parent_log ~get_completed_work ~change_feeder ~time_controller =
+  let create ~parent_log ~get_completed_work ~change_feeder ~time_controller
+      ~keypair =
     let logger = Logger.child parent_log "proposer" in
     let r, w = Linear_pipe.create () in
     let write_result = function
@@ -178,7 +180,7 @@ struct
       let%map protocol_state, internal_transition =
         generate_next_state ~previous_protocol_state ~local_state
           ~time_controller ~ledger_builder ~transactions ~get_completed_work
-          ~logger
+          ~logger ~keypair
       in
       let result =
         External_transition_result.create ~previous_protocol_state

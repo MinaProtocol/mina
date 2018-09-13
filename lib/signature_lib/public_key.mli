@@ -20,7 +20,7 @@ val typ : (var, t) Typ.t
 
 val var_of_t : t -> var
 
-val of_private_key : Private_key.t -> t
+val of_private_key_exn : Private_key.t -> t
 
 module Compressed : sig
   type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}

@@ -92,20 +92,6 @@ let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
-module Vrf =
-  Vrf_lib.Integrated.Make (Snark_params.Tick)
-    (struct
-      type var =
-        Snark_params.Tick.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
-    end)
-    (struct
-      include Snark_params.Tick.Inner_curve
-      include Checked
-
-      let scale_generator shifted s ~init =
-        scale_known shifted Snark_params.Tick.Inner_curve.one s ~init
-    end)
-
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
   with type Internal_transition.Ledger_builder_diff.t =
@@ -206,8 +192,8 @@ struct
         Core.Int.gen_incl 0 (UInt32.to_int unforkable_count * 3)
         >>| UInt32.of_int
 
-      let%test_unit "in_seed_update_range_var" =
-        Quickcheck.test gen ~f:(fun slot ->
+      let%test_unit "in_seed_update_range unchecked vs. checked equality" =
+        Quickcheck.test ~trials:100 gen ~f:(fun slot ->
             Test_util.test_equal Unpacked.typ Snark_params.Tick.Boolean.typ
               in_seed_update_range_var in_seed_update_range slot )
     end
@@ -230,6 +216,194 @@ struct
           Time.Span.to_ms time_since_epoch / Time.Span.to_ms Slot.interval)
       in
       (epoch, slot)
+  end
+
+  module Vrf = struct
+    module Scalar = struct
+      type value = Snark_params.Tick.Inner_curve.Scalar.t
+
+      type var =
+        Snark_params.Tick.Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
+
+      let typ = Snark_params.Tick.Inner_curve.Scalar.typ
+    end
+
+    module Group = struct
+      open Snark_params.Tick
+
+      type value = Inner_curve.t
+
+      type var = Inner_curve.var
+
+      let scale = Inner_curve.scale
+
+      module Checked = struct
+        include Inner_curve.Checked
+
+        let scale_generator shifted s ~init =
+          scale_known shifted Inner_curve.one s ~init
+      end
+    end
+
+    module Message = struct
+      type ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
+        { epoch: 'epoch
+        ; slot: 'slot
+        ; seed: 'epoch_seed
+        ; lock_checkpoint: 'state_hash }
+
+      type value =
+        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Nanobit_base.State_hash.t) t
+
+      type var =
+        ( Epoch.Unpacked.var
+        , Epoch.Slot.Unpacked.var
+        , Epoch_seed.var
+        , Nanobit_base.State_hash.var )
+        t
+
+      let to_hlist {epoch; slot; seed; lock_checkpoint} =
+        Nanobit_base.H_list.[epoch; slot; seed; lock_checkpoint]
+
+      let of_hlist :
+             ( unit
+             , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> unit )
+             Nanobit_base.H_list.t
+          -> ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
+       fun Nanobit_base.H_list.([epoch; slot; seed; lock_checkpoint]) ->
+        {epoch; slot; seed; lock_checkpoint}
+
+      let data_spec =
+        let open Snark_params.Tick.Data_spec in
+        [ Epoch.Unpacked.typ
+        ; Epoch.Slot.Unpacked.typ
+        ; Epoch_seed.typ
+        ; Nanobit_base.State_hash.typ ]
+
+      let typ =
+        Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+          ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+          ~value_of_hlist:of_hlist
+
+      let fold {epoch; slot; seed; lock_checkpoint} =
+        let open Fold in
+        Epoch.fold epoch +> Epoch.Slot.fold slot +> Epoch_seed.fold seed
+        +> Nanobit_base.State_hash.fold lock_checkpoint
+
+      let hash_to_group msg =
+        let msg_hash_state =
+          Snark_params.Tick.Pedersen.hash_fold
+            Nanobit_base.Hash_prefix.vrf_message (fold msg)
+        in
+        msg_hash_state.acc
+
+      module Checked = struct
+        let var_to_triples {epoch; slot; seed; lock_checkpoint} =
+          let open Snark_params.Tick.Let_syntax in
+          let%map seed_triples = Epoch_seed.var_to_triples seed
+          and lock_checkpoint_triples =
+            Nanobit_base.State_hash.var_to_triples lock_checkpoint
+          in
+          Epoch.Unpacked.var_to_triples epoch
+          @ Epoch.Slot.Unpacked.var_to_triples slot
+          @ seed_triples @ lock_checkpoint_triples
+
+        let hash_to_group msg =
+          let open Snark_params.Tick in
+          let open Snark_params.Tick.Let_syntax in
+          let%bind msg_triples = var_to_triples msg in
+          Pedersen.Checked.hash_triples
+            ~init:Nanobit_base.Hash_prefix.vrf_message msg_triples
+      end
+
+      let gen =
+        let open Quickcheck.Let_syntax in
+        let%map epoch = Epoch.gen
+        and slot = Epoch.Slot.gen
+        and seed = Epoch_seed.gen
+        and lock_checkpoint = Nanobit_base.State_hash.gen in
+        {epoch; slot; seed; lock_checkpoint}
+    end
+
+    module Output = struct
+      type value = Sha256.Digest.t [@@deriving eq]
+
+      type var = Sha256.Digest.var
+
+      let typ : (var, value) Snark_params.Tick.Typ.t = Sha256.Digest.typ
+
+      let hash msg g =
+        let open Fold in
+        let compressed_g =
+          Non_zero_curve_point.(g |> of_inner_curve_exn |> compress)
+        in
+        let digest =
+          Snark_params.Tick.Pedersen.digest_fold
+            Nanobit_base.Hash_prefix.vrf_output
+            ( Message.fold msg
+            +> Non_zero_curve_point.Compressed.fold compressed_g )
+        in
+        Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
+
+      module Checked = struct
+        let hash msg g =
+          let open Snark_params.Tick.Let_syntax in
+          let%bind msg_triples = Message.Checked.var_to_triples msg in
+          let%bind g_triples =
+            Non_zero_curve_point.(compress_var g >>= Compressed.var_to_triples)
+          in
+          let%bind pedersen_digest =
+            Snark_params.Tick.Pedersen.Checked.digest_triples
+              ~init:Nanobit_base.Hash_prefix.vrf_output
+              (msg_triples @ g_triples)
+            >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
+          in
+          Sha256.Checked.digest
+            (pedersen_digest :> Snark_params.Tick.Boolean.var list)
+      end
+
+      let gen = Quickcheck.Generator.list_with_length 256 Bool.gen
+
+      let%test_unit "hash unchecked vs. checked equality" =
+        let gen_inner_curve_point =
+          let open Quickcheck.Generator.Let_syntax in
+          let%map compressed = Non_zero_curve_point.gen in
+          Non_zero_curve_point.to_inner_curve compressed
+        in
+        let gen_message_and_curve_point =
+          let open Quickcheck.Generator.Let_syntax in
+          let%map msg = Message.gen and g = gen_inner_curve_point in
+          (msg, g)
+        in
+        Quickcheck.test ~trials:10 gen_message_and_curve_point
+          ~f:
+            (Test_util.test_equal
+               ~equal:(List.equal ~equal:Bool.equal)
+               Snark_params.Tick.Typ.(
+                 Message.typ * Snark_params.Tick.Inner_curve.typ)
+               (Snark_params.Tick.Typ.list ~length:256
+                  Snark_params.Tick.Boolean.typ)
+               (fun (msg, g) -> Checked.hash msg g)
+               (fun (msg, g) -> hash msg g))
+    end
+
+    module Threshold = struct
+      include Bignum_bigint
+
+      let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
+
+      let create ~my_stake ~total_stake =
+        let my_stake = Balance.to_uint64 my_stake in
+        let total_stake = Amount.to_uint64 total_stake in
+        let stake_ratio = of_uint64_exn (UInt64.div my_stake total_stake) in
+        stake_ratio * pow (of_int 2) (of_int 256)
+
+      let satisfies threshold output = of_bits_lsb output <= threshold
+    end
+
+    include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
+              (Message)
+              (Output)
   end
 
   module Epoch_ledger = struct
@@ -698,6 +872,7 @@ struct
         Amount.Checked.add previous_state.total_currency
           (Amount.var_of_t Inputs.coinbase)
       in
+      (* TODO: check vrf result from transition data *)
       let%map last_epoch_data, curr_epoch_data =
         Epoch_data.update_pair_checked
           (previous_state.last_epoch_data, previous_state.curr_epoch_data)
@@ -727,15 +902,48 @@ struct
       (Protocol_state)
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
-  let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state ~time ~transactions:_ ~ledger =
+  let generate_transition ~(previous_protocol_state: Protocol_state.value)
+      ~blockchain_state ~local_state ~time ~keypair ~transactions:_ ~ledger =
+    let open Consensus_state in
+    let open Epoch_data in
+    let open Signature_lib.Keypair in
+    let open Option.Let_syntax in
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
-    (* TODO: mock VRF *)
-    let proposer_vrf_result = List.init 256 ~f:(fun _ -> false) in
+    let%bind my_account_location =
+      Nanobit_base.Ledger.location_of_key ledger
+        (Signature_lib.Public_key.compress keypair.public_key)
+    in
+    let my_currency =
+      Nanobit_base.Ledger.get ledger my_account_location
+      |> Option.map ~f:Nanobit_base.Account.balance
+      |> Option.value ~default:Balance.zero
+    in
+    let total_currency =
+      previous_consensus_state.last_epoch_data.ledger.total_currency
+    in
+    let vrf_message =
+      { Vrf.Message.epoch
+      ; slot
+      ; seed= previous_consensus_state.last_epoch_data.seed
+      ; lock_checkpoint=
+          previous_consensus_state.last_epoch_data.lock_checkpoint }
+    in
+    let proposer_vrf_result =
+      Vrf.eval ~private_key:keypair.private_key vrf_message
+    in
+    let%map () =
+      if
+        Vrf.Threshold.satisfies
+          (Vrf.Threshold.create ~my_stake:my_currency
+             ~total_stake:total_currency)
+          proposer_vrf_result
+      then Some ()
+      else None
+    in
     let consensus_transition_data =
       Consensus_transition_data.{epoch; slot; proposer_vrf_result}
     in
@@ -752,7 +960,7 @@ struct
         ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
         ~blockchain_state ~consensus_state
     in
-    Some (protocol_state, consensus_transition_data)
+    (protocol_state, consensus_transition_data)
 
   let is_transition_valid_checked _transition =
     Snark_params.Tick.(Let_syntax.return Boolean.true_)
@@ -811,3 +1019,33 @@ struct
       ~blockchain_state:Snark_transition.(blockchain_state genesis)
       ~consensus_state
 end
+
+let%test_module "Proof_of_stake tests" =
+  ( module struct
+    module Proof_of_stake = Make (struct
+      module Ledger_builder_diff = struct
+        type t = int [@@deriving bin_io, sexp]
+      end
+
+      module Time = Nanobit_base.Block_time
+
+      let genesis_state_timestamp = Nanobit_base.Block_time.now ()
+
+      let genesis_ledger_total_currency = Amount.zero
+
+      let genesis_ledger = Nanobit_base.Ledger.create ()
+
+      let coinbase = Amount.of_int 20
+
+      let slot_interval = Nanobit_base.Block_time.Span.of_ms (Int64.of_int 200)
+
+      let unforkable_transition_count = 24
+
+      let probable_slots_per_transition_count = 8
+
+      let expected_network_delay =
+        Nanobit_base.Block_time.Span.of_ms (Int64.of_int 1000)
+
+      let approximate_network_diameter = 3
+    end)
+  end )

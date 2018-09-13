@@ -1502,7 +1502,7 @@ let%test_module "transaction_snark" =
         { private_key
         ; account=
             { public_key=
-                Public_key.compress (Public_key.of_private_key private_key)
+                Public_key.compress (Public_key.of_private_key_exn private_key)
             ; balance= Balance.of_int (50 + Random.int 100)
             ; receipt_chain_hash= Receipt.Chain_hash.empty
             ; nonce= Account.Nonce.zero } }
@@ -1522,7 +1522,7 @@ let%test_module "transaction_snark" =
       let signature = Schnorr.sign sender.private_key payload in
       Transaction.check
         { Transaction.payload
-        ; sender= Public_key.of_private_key sender.private_key
+        ; sender= Public_key.of_private_key_exn sender.private_key
         ; signature }
       |> Option.value_exn
 
