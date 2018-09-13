@@ -355,6 +355,9 @@ end = struct
                     ; target
                     ; fee_excess=
                         ok_or_return (Super_transaction.fee_excess transaction)
+                    ; supply_increase=
+                        ok_or_return
+                          (Super_transaction.supply_increase transaction)
                     ; proof_type= `Base }
                   in
                   if Ledger_proof_statement.equal statement expected_statement
@@ -379,7 +382,7 @@ end = struct
       match scan_statement aux with
       | Error (`Error e) -> Error e
       | Error `Empty -> Ok ()
-      | Ok {fee_excess; source; target; proof_type= _} ->
+      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
           let%map () =
             check
               (Ledger_hash.equal snarked_ledger_hash source)
@@ -410,7 +413,9 @@ end = struct
 
   let create ~ledger ~self : t =
     let open Config in
-    { scan_state= Parallel_scan.start ~parallelism_log_2
+    (* Transaction capacity log_2 is half the capacity for work parallelism *)
+    { scan_state=
+        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
     ; ledger
     ; public_key= self }
 
@@ -425,11 +430,13 @@ end = struct
         let%bind () =
           Option.some_if (Ledger_hash.equal stmt1.target stmt2.source) ()
         in
-        let%map fee_excess =
-          Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        let%map fee_excess = Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        and supply_increase =
+          Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
         in
         { Ledger_proof_statement.source= stmt1.source
         ; target= stmt2.target
+        ; supply_increase
         ; fee_excess
         ; proof_type= `Merge }
 
@@ -442,11 +449,15 @@ end = struct
         let%map fee_excess =
           Fee.Signed.add s.fee_excess s'.fee_excess
           |> option "Error adding fees"
+        and supply_increase =
+          Currency.Amount.add s.supply_increase s'.supply_increase
+          |> option "Error adding supply_increases"
         in
         Parallel_scan.State.Completed_job.Merged
           ( proof
           , { Ledger_proof_statement.source= s.source
             ; target= s'.target
+            ; supply_increase
             ; fee_excess
             ; proof_type= `Merge } )
 
@@ -486,13 +497,15 @@ end = struct
 
   let apply_super_transaction_and_get_statement ledger s =
     let open Or_error.Let_syntax in
-    let%bind fee_excess = Super_transaction.fee_excess s in
+    let%bind fee_excess = Super_transaction.fee_excess s
+    and supply_increase = Super_transaction.supply_increase s in
     let source = Ledger.merkle_root ledger in
     let%map undo = Ledger.apply_super_transaction ledger s in
     ( undo
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger
       ; fee_excess
+      ; supply_increase
       ; proof_type= `Base } )
 
   let apply_super_transaction_and_get_witness ledger s =
@@ -883,7 +896,7 @@ end = struct
     let curr_hash = hash t in
     let t' = copy t in
     let ledger = ledger t' in
-    let max_throughput = Int.pow 2 (Inputs.Config.parallelism_log_2 - 1) in
+    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let resources =
       process_works_add_txns logger (work_to_do t'.scan_state)
         transactions_by_fee (free_space t') max_throughput get_completed_work
@@ -1044,6 +1057,7 @@ let%test_module "test" =
           type t =
             { source: Ledger_hash.t
             ; target: Ledger_hash.t
+            ; supply_increase: Currency.Amount.t
             ; fee_excess: Fee.Signed.t
             ; proof_type: [`Base | `Merge] }
           [@@deriving sexp, bin_io, compare, hash]
@@ -1053,9 +1067,13 @@ let%test_module "test" =
             let%map fee_excess =
               Fee.Signed.add s1.fee_excess s2.fee_excess
               |> option "Error adding fees"
+            and supply_increase =
+              Currency.Amount.add s1.supply_increase s2.supply_increase
+              |> option "Error adding supply increases"
             in
             { source= s1.source
             ; target= s2.target
+            ; supply_increase
             ; fee_excess
             ; proof_type= `Merge }
         end
@@ -1065,14 +1083,15 @@ let%test_module "test" =
 
         let gen =
           let open Quickcheck.Generator.Let_syntax in
-          let%bind source = Ledger_hash.gen in
-          let%bind target = Ledger_hash.gen in
-          let%bind fee_excess = Fee.Signed.gen in
+          let%bind source = Ledger_hash.gen
+          and target = Ledger_hash.gen
+          and fee_excess = Fee.Signed.gen
+          and supply_increase = Currency.Amount.gen in
           let%map proof_type =
             Quickcheck.Generator.bool
             >>| function true -> `Base | false -> `Merge
           in
-          {source; target; fee_excess; proof_type}
+          {source; target; supply_increase; fee_excess; proof_type}
       end
 
       module Proof = Ledger_proof_statement
@@ -1277,7 +1296,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let parallelism_log_2 = 8
+        let transaction_capacity_log_2 = 7
       end
 
       let check :
@@ -1318,7 +1337,7 @@ let%test_module "test" =
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
@@ -1347,7 +1366,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
@@ -1375,7 +1394,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
       Backtrace.elide := false ;
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in

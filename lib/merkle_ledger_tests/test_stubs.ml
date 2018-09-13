@@ -95,6 +95,13 @@ module In_memory_sdb : Intf.Stack_database = struct
   let copy stack = ref !stack
 end
 
+module Storage_locations : Intf.Storage_locations = struct
+  (* TODO: The names of these values should be dynamically generated per test run*)
+  let stack_db_file = ""
+
+  let key_value_db_dir = ""
+end
+
 module Key = struct
   module T = struct
     type t = string [@@deriving sexp, compare, hash, bin_io]
