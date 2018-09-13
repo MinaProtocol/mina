@@ -553,7 +553,8 @@ module Make (Inputs : Inputs_intf) = struct
                       (Blockchain_state.ledger_hash bc_state)
                       source ;
                     [%test_eq : Ledger_hash.t]
-                      (Ledger_builder.ledger ledger_builder |> Ledger.merkle_root)
+                      ( Ledger_builder.ledger ledger_builder
+                      |> Ledger.merkle_root )
                       target ) ;
             Proposer.Tip_change
               { protocol_state=
