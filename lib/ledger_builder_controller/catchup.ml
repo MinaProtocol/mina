@@ -176,12 +176,13 @@ module Make (Inputs : Inputs_intf) = struct
                 let open Transition_logic_state.Change in
                 [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
             | Error e ->
-                Logger.warn log "Malicious aux data received from net %s"
+                Logger.faulty_peer log
+                  "Malicious aux data received from net %s"
                   (Error.to_string_hum e) ;
                 (* TODO: Retry? see #361 *)
                 [] )
           | Error e ->
-              Logger.warn log "Network failed to send aux %s"
+              Logger.faulty_peer log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;
               [] )
       | `Target_changed -> return []
