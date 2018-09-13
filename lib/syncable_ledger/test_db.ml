@@ -13,10 +13,6 @@ struct
 
     type account = Account.t
 
-    let empty = Hash.empty
-
-    let empty_hash = Hash.empty
-
     let merge = Hash.merge
 
     let hash_account = Hash.hash_account
