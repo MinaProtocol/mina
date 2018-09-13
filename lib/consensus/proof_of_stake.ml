@@ -401,9 +401,18 @@ struct
       let satisfies threshold output = of_bits_lsb output <= threshold
     end
 
-    include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
-              (Message)
-              (Output)
+    include Vrf_lib.Integrated.Make
+      (Snark_params.Tick)
+      (Scalar)
+      (Group)
+      (Message)
+      (Output)
+
+    let check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~my_stake ~total_stake =
+      let open Message in
+      let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
+      let threshold = Threshold.create ~my_stake ~total_stake in
+      Option.some_if (Threshold.satisfies threshold result) result
   end
 
   module Epoch_ledger = struct
@@ -925,24 +934,15 @@ struct
     let total_currency =
       previous_consensus_state.last_epoch_data.ledger.total_currency
     in
-    let vrf_message =
-      { Vrf.Message.epoch
-      ; slot
-      ; seed= previous_consensus_state.last_epoch_data.seed
-      ; lock_checkpoint=
-          previous_consensus_state.last_epoch_data.lock_checkpoint }
-    in
-    let proposer_vrf_result =
-      Vrf.eval ~private_key:keypair.private_key vrf_message
-    in
-    let%map () =
-      if
-        Vrf.Threshold.satisfies
-          (Vrf.Threshold.create ~my_stake:my_currency
-             ~total_stake:total_currency)
-          proposer_vrf_result
-      then Some ()
-      else None
+    let%map proposer_vrf_result =
+      Vrf.check
+        ~epoch
+        ~slot
+        ~seed:previous_consensus_state.last_epoch_data.seed
+        ~lock_checkpoint:previous_consensus_state.last_epoch_data.lock_checkpoint
+        ~private_key:keypair.private_key
+        ~my_stake:my_currency
+        ~total_stake:total_currency
     in
     let consensus_transition_data =
       Consensus_transition_data.{epoch; slot; proposer_vrf_result}
@@ -1002,17 +1002,16 @@ struct
       else `Keep
     else `Keep
 
-  let winning_slot _ _ _ _ = true (* TODO check vrf *)
+  let next_proposal now state ~ledger ~keypair ~logger =
+    let rec find_winning_slot ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~my_stake ~total_stake =
+      if Epoch.size >= Epoch.Slot.to_int slot then
+        None
+      else if Option.is_some (Vrf.check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~my_stake ~total_stake) then
+        Some slot
+      else
+        find_winning_slot ~epoch ~slot:(Epoch.Slot.succ slot) ~seed ~lock_checkpoint ~private_key ~my_stake ~total_stake
+    in
 
-  let rec find_winning_slot epoch slot seed lock_checkpoint =
-    if Epoch.size >= Epoch.Slot.to_int slot then
-      None
-    else if winning_slot epoch slot seed lock_checkpoint then
-      Some slot
-    else
-      find_proposal epoch (Epoch.Slot.succ slot)
-
-  let next_proposal now state ~logger =
     let logger = Logger.child logger "proof_of_stake" in
     let (epoch, slot) = Epoch.epoch_and_slot_of_time_exn now in
 
@@ -1031,7 +1030,7 @@ struct
         failwith "TIME OUT OF SYNC")
     in
 
-    match find_proposal epoch (Epoch.Slot.succ slot) seed lock_checkpoint with
+    match find_winning_slot ~epoch ~slot:(Epoch.Slot.succ slot) ~seed ~lock_checkpoint ~private_key:keypair.private_key ~my_stake ~total_stake with
     | Some slot -> `Propose (Epoch.slot_start_time epoch slot)
     | None      -> `Check_again (Epoch.end_time epoch)
 
