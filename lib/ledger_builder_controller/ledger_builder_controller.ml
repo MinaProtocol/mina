@@ -15,7 +15,7 @@ module type Inputs_intf = sig
   end
 
   module Ledger_builder_hash : sig
-    type t [@@deriving eq, sexp]
+    type t [@@deriving eq, sexp, compare]
 
     val ledger_hash : t -> Ledger_hash.t
   end
