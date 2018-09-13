@@ -362,11 +362,7 @@ let statement
     ; supply_increase
     ; sok_digest= _
     ; proof= _ } =
-  { Statement.source
-  ; target
-  ; proof_type
-  ; supply_increase
-  ; fee_excess }
+  {Statement.source; target; proof_type; supply_increase; fee_excess}
 
 let input {source; target; fee_excess; _} = {Input.source; target; fee_excess}
 
@@ -845,9 +841,7 @@ module Merge = struct
         ~start:vk_input_offset (bits_to_triples bs)
     in
     let%bind () =
-      let%bind total_fees =
-        Fee.Signed.Checked.add fee_excess12 fee_excess23
-      in
+      let%bind total_fees = Fee.Signed.Checked.add fee_excess12 fee_excess23 in
       let%bind supply_increase =
         Amount.Checked.add supply_increase12 supply_increase23
       in
@@ -1215,12 +1209,12 @@ let check_merge ?(wrap_vk= Dummy_values.Tock.verification_key) ~sok_message
     ; transition12=
         { Transition_data.proof= (proof1.proof_type, proof1.proof)
         ; fee_excess= proof1.fee_excess
-        ; supply_increase = proof1.supply_increase
+        ; supply_increase= proof1.supply_increase
         ; sok_digest= proof1.sok_digest }
     ; transition23=
         { Transition_data.proof= (proof2.proof_type, proof2.proof)
         ; fee_excess= proof2.fee_excess
-        ; supply_increase = proof2.supply_increase
+        ; supply_increase= proof2.supply_increase
         ; sok_digest= proof2.sok_digest } }
   in
   let top_hash =
@@ -1243,8 +1237,7 @@ let check_tagged_transaction sok_message source target transaction handler =
   let fee_excess = Tagged_transaction.excess transaction in
   let supply_increase = Tagged_transaction.supply_increase transaction in
   let top_hash =
-    base_top_hash ~sok_digest ~state1:source ~state2:target
-      ~fee_excess
+    base_top_hash ~sok_digest ~state1:source ~state2:target ~fee_excess
       ~supply_increase
   in
   let open Tick in
@@ -1256,7 +1249,8 @@ let check_tagged_transaction sok_message source target transaction handler =
       handler
   in
   Or_error.map (run_and_check main prover_state) ~f:(fun _ ->
-    {Statement.source; target; fee_excess; supply_increase; proof_type= `Base} )
+      {Statement.source; target; fee_excess; supply_increase; proof_type= `Base}
+  )
 
 let check_transition ~sok_message ~source ~target (t: Transition.t) handler =
   check_tagged_transaction sok_message source target
