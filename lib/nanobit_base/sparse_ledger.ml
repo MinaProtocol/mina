@@ -33,10 +33,10 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
                (Ledger.merkle_root ledger :> Pedersen.Digest.t)) )
   in
   Ledger.remove_accounts_exn ledger new_keys ;
-  (* FIXME: debug_assert *)
+  Debug_assert.debug_assert (fun () ->
   [%test_eq : Ledger_hash.t]
     (Ledger.merkle_root ledger)
-    ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash) ;
+    ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash)) ;
   sparse
 
 let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
