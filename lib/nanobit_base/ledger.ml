@@ -67,7 +67,8 @@ let create_empty ledger k =
   | `Existed, _ ->
       failwith "why did we create_empty for a key already present?"
   | `Added, new_loc ->
-      Debug_assert.debug_assert (fun () -> [%test_eq : Ledger_hash.t] start_hash (merkle_root ledger) );
+      Debug_assert.debug_assert (fun () ->
+          [%test_eq : Ledger_hash.t] start_hash (merkle_root ledger) ) ;
       (merkle_path ledger new_loc, Account.empty)
 
 module Undo = struct
@@ -278,7 +279,8 @@ let undo : t -> Undo.t -> unit Or_error.t =
     | Transaction u -> undo_transaction ledger u
     | Coinbase c -> undo_coinbase ledger c ; Ok ()
   in
-  Debug_assert.debug_assert (fun () -> [%test_eq : Ledger_hash.t] undo.previous_hash (merkle_root ledger)) ;
+  Debug_assert.debug_assert (fun () ->
+      [%test_eq : Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
   res
 
 let apply_super_transaction ledger (t: Super_transaction.t) =
