@@ -113,16 +113,13 @@ workflows:
             - build_withsnark
             - test-runtest
             - test-sig
-              #- test-stake
-    recurring_coda_parallel_withsnark:
+            #- test-stake
+    nightly:
         triggers:
-            # FIXME: What's up with this yaml?
             - schedule:
-                # Run every 6 hours m-f  (/ notation not allowed)
-                cron: "0 0,6,12,18  * * 1-5"
+                cron: "0 0 * * *"
                 filters:
                     branches:
-                        only:
-                            - master
+                        only: master
         jobs:
             - build_withsnark
