@@ -3,7 +3,7 @@ open Core
 type t
 
 module Level : sig
-  type t = Trace | Debug | Info | Warn | Error | Fatal
+  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
   [@@deriving sexp, bin_io, compare]
 end
 
@@ -46,6 +46,8 @@ val warn : _ logger
 val error : _ logger
 
 val fatal : _ logger
+
+val faulty_peer : _ logger
 
 val extend : t -> Attribute.t list -> t
 
