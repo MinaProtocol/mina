@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 type ('a, 's) fold = init:'s -> f:('s -> 'a -> 's) -> 's
 
