@@ -114,12 +114,13 @@ workflows:
             - test-runtest
             - test-sig
             #- test-stake
-    nightly:
-        triggers:
-            - schedule:
-                cron: "0 0 * * *"
-                filters:
-                    branches:
-                        only: master
-        jobs:
-            - build_withsnark
+    # NOTES: Save this idea for later (nightly/scheduled workflows)
+    # nightly:
+    #     triggers:
+    #         - schedule:
+    #             cron: "0 0 * * *"
+    #             filters:
+    #                 branches:
+    #                     only: master
+    #     jobs:
+    #         - build_withsnark
