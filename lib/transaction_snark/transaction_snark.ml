@@ -432,30 +432,6 @@ module Keys0 = struct
   let dummy : t = {proving= Proving.dummy; verification= Verification.dummy}
 end
 
-let handle_with_ledger (ledger: Ledger.t) =
-  let open Tick in
-  let path_at_index idx =
-    List.map ~f:Ledger.Path.elem_hash
-      (Ledger.merkle_path_at_index_exn ledger idx)
-  in
-  fun (With {request; respond}) ->
-    let open Ledger_hash in
-    match request with
-    | Get_element idx ->
-        let elt = Ledger.get_at_index_exn ledger idx in
-        let path = path_at_index idx in
-        respond (Provide (elt, (path :> Pedersen.Digest.t list)))
-    | Get_path idx ->
-        let path = path_at_index idx in
-        respond (Provide (path :> Pedersen.Digest.t list))
-    | Set (idx, account) ->
-        Ledger.set_at_index_exn ledger idx account ;
-        respond (Provide ())
-    | Find_index pk ->
-        let index = Ledger.index_of_key_exn ledger pk in
-        respond (Provide index)
-    | _ -> unhandled
-
 (* Staging:
    first make tick base.
    then make tick merge (which top_hashes in the tock wrap vk)
@@ -504,7 +480,9 @@ module Base = struct
         in
         let%bind root =
           let%bind sender_compressed = Public_key.compress_var sender in
-          Ledger_hash.modify_account root sender_compressed ~f:(fun account ->
+          Ledger_hash.modify_account_send root
+            ~is_fee_transfer:(Tag.Checked.is_fee_transfer tag)
+            sender_compressed ~f:(fun account ->
               with_label __LOC__
                 (let%bind next_nonce =
                    Account.Nonce.increment_if_var account.nonce
@@ -534,13 +512,16 @@ module Base = struct
                    Balance.Checked.add_signed_amount account.balance
                      sender_delta
                  in
-                 {account with balance; nonce= next_nonce; receipt_chain_hash})
-          )
+                 { Account.balance
+                 ; public_key= sender_compressed
+                 ; nonce= next_nonce
+                 ; receipt_chain_hash }) )
         in
+        (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
-          Ledger_hash.modify_account root receiver ~f:(fun account ->
+          Ledger_hash.modify_account_recv root receiver ~f:(fun account ->
               let%map balance = Balance.Checked.(account.balance + amount) in
-              {account with balance} )
+              {account with balance; public_key= receiver} )
         in
         (root, excess, supply_increase) )
 
@@ -549,7 +530,7 @@ module Base = struct
    - apply a transaction where the signature is incorrect
    - apply a transaction where the sender does not have enough money in their account
    - apply a transaction and stuff in the wrong target hash
-*)
+    *)
 
   module Prover_state = struct
     type t =
@@ -1532,13 +1513,40 @@ let%test_module "transaction_snark" =
       let keys = keys
     end)
 
-    let of_transaction' sok_digest ledger transaction =
+    let of_transaction' sok_digest ledger transaction handler =
       let source = Ledger.merkle_root ledger in
       let target =
         Ledger.merkle_root_after_transaction_exn ledger transaction
       in
-      of_transaction ~sok_digest ~source ~target transaction
-        (handle_with_ledger ledger)
+      of_transaction ~sok_digest ~source ~target transaction handler
+
+    let%test_unit "new_account" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let wallets = random_wallets () in
+          let ledger = Ledger.create () in
+          Array.iter
+            (Array.sub wallets ~pos:1 ~len:(Array.length wallets - 1))
+            ~f:(fun {account; private_key= _} ->
+              Ledger.create_new_account_exn ledger account.public_key account
+              ) ;
+          let t1 =
+            transaction wallets 1 0 8
+              (Fee.of_int (Random.int 20))
+              Account.Nonce.zero
+          in
+          let target = Ledger.merkle_root_after_transaction_exn ledger t1 in
+          let mentioned_keys = Transaction.public_keys (t1 :> Transaction.t) in
+          let sparse_ledger =
+            Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
+          in
+          let sok_message =
+            Sok_message.create ~fee:Fee.zero
+              ~prover:wallets.(1).account.public_key
+          in
+          check_transaction ~sok_message
+            ~source:(Ledger.merkle_root ledger)
+            ~target t1
+            (unstage @@ Sparse_ledger.handler sparse_ledger) )
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1563,8 +1571,36 @@ let%test_module "transaction_snark" =
             |> Sok_message.digest
           in
           let state1 = Ledger.merkle_root ledger in
-          let proof12 = of_transaction' sok_digest ledger t1 in
-          let proof23 = of_transaction' sok_digest ledger t2 in
+          let sparse_ledger =
+            Sparse_ledger.of_ledger_subset_exn ledger
+              (List.concat_map
+                 ~f:(fun t -> Transaction.public_keys (t :> Transaction.t))
+                 [t1; t2])
+          in
+          let proof12 =
+            of_transaction' sok_digest ledger t1
+              (unstage @@ Sparse_ledger.handler sparse_ledger)
+          in
+          let sparse_ledger =
+            Sparse_ledger.apply_transaction_exn sparse_ledger
+              (t1 :> Transaction.t)
+          in
+          Ledger.apply_transaction ledger t1 |> Or_error.ok_exn |> ignore ;
+          [%test_eq : Ledger_hash.t]
+            (Ledger.merkle_root ledger)
+            (Sparse_ledger.merkle_root sparse_ledger) ;
+          let proof23 =
+            of_transaction' sok_digest ledger t2
+              (unstage @@ Sparse_ledger.handler sparse_ledger)
+          in
+          let sparse_ledger =
+            Sparse_ledger.apply_transaction_exn sparse_ledger
+              (t2 :> Transaction.t)
+          in
+          Ledger.apply_transaction ledger t2 |> Or_error.ok_exn |> ignore ;
+          [%test_eq : Ledger_hash.t]
+            (Ledger.merkle_root ledger)
+            (Sparse_ledger.merkle_root sparse_ledger) ;
           let total_fees =
             let open Amount in
             let magnitude =
@@ -1574,7 +1610,7 @@ let%test_module "transaction_snark" =
             in
             Signed.create ~magnitude ~sgn:Sgn.Pos
           in
-          let state3 = Ledger.merkle_root ledger in
+          let state3 = Sparse_ledger.merkle_root sparse_ledger in
           let proof13 = merge ~sok_digest proof12 proof23 |> Or_error.ok_exn in
           Tock.verify proof13.proof keys.verification.wrap (wrap_input ())
             (embed

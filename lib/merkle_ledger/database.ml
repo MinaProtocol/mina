@@ -162,14 +162,16 @@ end = struct
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:(Depth.depth + 1) Hash.empty in
+    let empty_hashes =
+      Array.create ~len:(Depth.depth + 1) Hash.empty_account
+    in
     let rec loop last_hash height =
       if height <= Depth.depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
     in
-    loop Hash.empty 1 ;
+    loop Hash.empty_account 1 ;
     Immutable_array.of_array empty_hashes
 
   let get_raw {kvdb; _} location =
@@ -364,6 +366,8 @@ end = struct
   let merkle_root mdb = get_hash mdb Location.root_hash
 
   let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
+
+  let remove_accounts_exn _ _ = failwith "TODO: Implement"
 
   let merkle_path mdb location =
     let location =

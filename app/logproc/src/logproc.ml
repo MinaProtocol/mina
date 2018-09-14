@@ -23,6 +23,7 @@ let color_of_level : Logger.Level.t -> Color.t = function
   | Info -> Cyan
   | Warn -> Yellow
   | Error -> Red
+  | Faulty_peer -> Magenta
   | Fatal -> Magenta
 
 let colored_level level =

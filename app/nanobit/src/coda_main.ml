@@ -156,6 +156,9 @@ module type Config_intf = sig
   val keypair : Keypair.t
 
   val genesis_proof : Snark_params.Tock.Proof.t
+
+  val transaction_capacity_log_2 : int
+  (** Capacity of transactions per block *)
 end
 
 module type Init_intf = sig
@@ -310,7 +313,7 @@ struct
       module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Config = Protocol_constants
+      module Config = Init
 
       let check (Completed_work.({fee; prover; proofs}) as t) stmts =
         let message = Sok_message.create ~fee ~prover in
@@ -331,7 +334,7 @@ struct
 
   module Ledger_builder_transition = struct
     type t = {old: Ledger_builder.t; diff: Ledger_builder_diff.t}
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp]
 
     module With_valid_signatures_and_proofs = struct
       type t =
@@ -426,7 +429,6 @@ struct
       type t =
         { ledger_builder_transition: Ledger_builder_transition.t
         ; state: Proof_carrying_state.t }
-      [@@deriving bin_io]
     end
 
     let strip {ledger_builder_transition; state} =
@@ -528,7 +530,7 @@ struct
 
         let hash_account = Fn.compose Merkle_hash.of_digest Account.digest
 
-        let empty = Merkle_hash.empty_hash
+        let empty_account = hash_account Account.empty
       end)
       (struct
         include Ledger_hash
@@ -538,8 +540,6 @@ struct
       end)
       (struct
         include Ledger
-
-        type path = Path.t
 
         let f = Account.hash
       end)
@@ -744,6 +744,10 @@ module type Main_intf = sig
   module Inputs : sig
     module Time : Protocols.Coda_pow.Time_intf
 
+    module Ledger_hash : sig
+      type t [@@deriving sexp]
+    end
+
     module Ledger : sig
       type t [@@deriving sexp]
 
@@ -755,6 +759,8 @@ module type Main_intf = sig
       val get : t -> Ledger.Location.t -> Account.t option
 
       val num_accounts : t -> int
+
+      val merkle_root : t -> Ledger_hash.t
     end
 
     module Ledger_builder_diff : sig
@@ -933,6 +939,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let get_status t =
     let ledger = best_ledger t in
+    let ledger_merkle_root =
+      Ledger.merkle_root ledger |> [%sexp_of : Ledger_hash.t] |> Sexp.to_string
+    in
     let num_accounts = Ledger.num_accounts ledger in
     let state = best_protocol_state t in
     let block_count =
@@ -946,6 +955,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     { Client_lib.Status.num_accounts
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
+    ; ledger_merkle_root
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
     ; transactions_sent= !txn_count

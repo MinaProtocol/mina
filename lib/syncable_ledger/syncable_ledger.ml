@@ -391,7 +391,7 @@ struct
     let rec go prev ctr =
       if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
     in
-    go Hash.empty 0
+    go Hash.empty_account 0
 
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =

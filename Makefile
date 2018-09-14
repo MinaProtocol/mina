@@ -38,6 +38,16 @@ build:
 
 dev: docker container build
 
+# snark tunable
+
+withsnark:
+	sed -i '/let with_snark =/c\let with_snark = true' lib/nanobit_base/insecure.ml
+
+withoutsnark:
+	sed -i '/let with_snark =/c\let with_snark = false' lib/nanobit_base/insecure.ml
+
+showsnark:
+	@grep 'let with_snark' lib/nanobit_base/insecure.ml
 
 ########################################
 ## Lint

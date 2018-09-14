@@ -55,6 +55,8 @@ module type S = sig
 
   val set_at_addr_exn : t -> Addr.t -> account -> unit
 
+  val remove_accounts_exn : t -> key list -> unit
+
   include Syncable_intf.S
           with type root_hash := hash
            and type hash := hash

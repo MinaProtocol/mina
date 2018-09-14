@@ -94,6 +94,12 @@ let typ : (var, value) Typ.t =
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
+let var_of_t ({public_key; balance; nonce; receipt_chain_hash}: value) =
+  { public_key= Public_key.Compressed.var_of_t public_key
+  ; balance= Balance.var_of_t balance
+  ; nonce= Nonce.Unpacked.var_of_value nonce
+  ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash }
+
 let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
   let%map public_key = Public_key.Compressed.var_to_triples public_key
   and receipt_chain_hash =
@@ -113,7 +119,15 @@ let hash_prefix = Hash_prefix.account
 
 let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
 
+let empty =
+  { public_key= Public_key.Compressed.empty
+  ; balance= Balance.zero
+  ; nonce= Nonce.zero
+  ; receipt_chain_hash= Receipt.Chain_hash.empty }
+
 let digest t = Pedersen.State.digest (hash t)
+
+let empty_hash = digest empty
 
 let pubkey t = t.public_key
 
