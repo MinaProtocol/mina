@@ -1,5 +1,3 @@
-open Core
-
 module type S = sig
   type hash
 
@@ -23,7 +21,7 @@ module type S = sig
 
   val create : unit -> t
 
-  include Container_intf.S with type t := t and type elt := account
+  val to_list : t -> account list
 
   val location_of_key : t -> key -> Location.t option
 

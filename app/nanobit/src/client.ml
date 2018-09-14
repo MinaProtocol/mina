@@ -23,8 +23,7 @@ let daemon_port_flag =
     (Command.Param.optional int16)
 
 let json_flag =
-  let open Command.Param in
-  flag "json" no_arg ~doc:" use json output (default: plaintext)"
+  Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
 let get_balance =
   Command.async ~summary:"Get balance associated with an address"

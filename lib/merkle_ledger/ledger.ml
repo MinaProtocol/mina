@@ -58,7 +58,7 @@ end = struct
     let iter = `Define_using_fold
   end)
 
-  include Container0
+  let to_list = Container0.to_list
 
   module Location = struct
     type t = index

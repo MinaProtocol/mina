@@ -1,5 +1,3 @@
-open Core
-
 module type S = sig
   type account
 
@@ -20,13 +18,13 @@ module type S = sig
 
   module Path : Merkle_path.S with type hash := hash
 
-  include Container_intf.S with type t := t and type elt := account
-
   val create : unit -> t
 
   val location_of_key : t -> key -> location option
 
   val destroy : t -> unit
+
+  val to_list : t -> account list
 
   val get : t -> location -> account option
 

@@ -383,7 +383,7 @@ end = struct
     let iter = `Define_using_fold
   end)
 
-  include Container0
+  let to_list = Container0.to_list
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 

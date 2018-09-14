@@ -21,7 +21,7 @@ module type S = sig
            and type path = Path.t
            and type t := t
 
-  include Container_intf.S with type t := t and type elt := account
+  val to_list : t -> account list
 
   module Location : sig
     type t
