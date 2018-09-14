@@ -5,10 +5,11 @@ module type S = sig
 
   module Coefficients : sig
     val a : field
+
     val b : field
   end
 
-  val (+) : t -> t -> t
+  val ( + ) : t -> t -> t
 
   val to_affine_coordinates : t -> field * field
 end
