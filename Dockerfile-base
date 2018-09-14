@@ -35,6 +35,5 @@ ADD ./app/kademlia-haskell/prefetch /prefetch
 RUN sudo chown -R opam /prefetch
 RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix
 RUN opam install bitstring orocksdb
-RUN opam install cryptokit
 RUN opam install camlp4
 RUN opam install ppx_deriving_yojson
