@@ -78,14 +78,21 @@ let daemon (type ledger_proof) (module Kernel
            "MILLIS Time between the proposer proposing and waiting (default: \
             5000)"
          (optional int)
+     and is_background =
+       flag "background" no_arg ~doc:"Run process on the background"
      in
      fun () ->
-       Parallel.init_master () ;
-       let open Deferred.Let_syntax in
-       let%bind home = Sys.home_directory () in
+       let home = Core.Sys.home_directory () in
        let conf_dir =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
+       if is_background then
+         Daemon.daemonize
+           ~redirect_stdout:(`File_append (conf_dir ^/ "daemon-stdout"))
+           ~redirect_stderr:(`File_append (conf_dir ^/ "daemon-stderr"))
+           ~allow_threads_to_have_been_created:true () ;
+       let open Deferred.Let_syntax in
+       Parallel.init_master () ;
        let external_port =
          Option.value ~default:default_external_port external_port
        in
