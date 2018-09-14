@@ -46,7 +46,7 @@ end = struct
 
   type t = {accounts: accounts; tree: tree} [@@deriving sexp, bin_io]
 
-  module Container0 :
+  module C :
     Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
     module Elt = Account
@@ -58,7 +58,7 @@ end = struct
     let iter = `Define_using_fold
   end)
 
-  let to_list = Container0.to_list
+  let to_list = C.to_list
 
   module Location = struct
     type t = index

@@ -363,7 +363,7 @@ end = struct
       | [] -> [] )
     |> ignore
 
-  module Container0 :
+  module C :
     Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct
     module Elt = Account
@@ -383,7 +383,7 @@ end = struct
     let iter = `Define_using_fold
   end)
 
-  let to_list = Container0.to_list
+  let to_list = C.to_list
 
   let merkle_root mdb = get_hash mdb Location.root_hash
 
