@@ -367,6 +367,8 @@ end = struct
 
   let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
 
+  let remove_accounts_exn _ _ = failwith "TODO: Implement"
+
   let merkle_path mdb location =
     let location =
       if Location.is_account location then
