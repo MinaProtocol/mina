@@ -363,6 +363,28 @@ end = struct
       | [] -> [] )
     |> ignore
 
+  module C :
+    Container.S0 with type t := t and type elt := Account.t =
+  Container.Make0 (struct
+    module Elt = Account
+
+    type nonrec t = t
+
+    (* TODO: This implementation does not consider empty indices from stack db. *)
+    let fold t ~init ~f =
+      match Account_location.last_location_address t with
+      | None -> init
+      | Some last_addr ->
+          let last = Addr.to_int last_addr in
+          Sequence.range ~stop:`inclusive 0 last
+          |> Sequence.map ~f:(get_at_index_exn t)
+          |> Sequence.fold ~init ~f
+
+    let iter = `Define_using_fold
+  end)
+
+  let to_list = C.to_list
+
   let merkle_root mdb = get_hash mdb Location.root_hash
 
   let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
