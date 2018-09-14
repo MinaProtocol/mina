@@ -761,6 +761,8 @@ module type Main_intf = sig
       val num_accounts : t -> int
 
       val merkle_root : t -> Ledger_hash.t
+
+      val to_list : t -> Account.t list
     end
 
     module Ledger_builder_diff : sig
@@ -905,6 +907,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map account = Ledger.get ledger location in
     account.Account.balance
 
+  let get_public_keys t =
+    let ledger = best_ledger t in
+    Ledger.to_list ledger
+    |> List.map
+         ~f:(Fn.compose Public_key.Compressed.to_base64 Account.public_key)
+
   let is_valid_transaction t (txn: Transaction.t) =
     let remainder =
       let open Option.Let_syntax in
@@ -970,6 +978,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             send_txn log minibit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance minibit pk) )
+      ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->
+            return (get_public_keys minibit) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
             return (get_nonce minibit pk) )
       ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->

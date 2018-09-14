@@ -36,6 +36,20 @@ module Get_nonce = struct
     Rpc.Rpc.create ~name:"Get_nonce" ~version:0 ~bin_query ~bin_response
 end
 
+module type Printable_intf = sig
+  type t [@@deriving yojson]
+
+  val to_text : t -> string
+end
+
+let print (type t) (module Print : Printable_intf with type t = t) is_json =
+  function
+  | Ok t ->
+      if is_json then
+        printf "%s\n" (Print.to_yojson t |> Yojson.Safe.pretty_to_string)
+      else printf "%s\n" (Print.to_text t)
+  | Error e -> eprintf "%s" (Error.to_string_hum e)
+
 module Status = struct
   (* NOTE: yojson deriving generates code that violates warning 39 *)
   type t =
@@ -87,6 +101,21 @@ module Status = struct
     title ^ output ^ "\n"
 end
 
+module Public_key = struct
+  type t = string list [@@deriving yojson]
+
+  let log10 i = i |> Float.of_int |> Float.log10 |> Float.to_int
+
+  let to_text pks =
+    let max_padding = Int.max 1 (List.length pks) |> log10 in
+    List.mapi pks ~f:(fun i pk ->
+        let i = i + 1 in
+        let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
+        let cleaned_string = String.slice pk 0 (String.length pk - 2) in
+        sprintf "%s%i. %s" padding i cleaned_string )
+    |> String.concat ~sep:"\n"
+end
+
 module Get_status = struct
   type query = unit [@@deriving bin_io]
 
@@ -96,4 +125,15 @@ module Get_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
+end
+
+module Get_public_keys = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = string list [@@deriving bin_io, sexp]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_public_keys" ~version:0 ~bin_query ~bin_response
 end

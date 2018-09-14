@@ -1,5 +1,3 @@
-open Core
-
 module type S = sig
   type account
 
@@ -25,6 +23,8 @@ module type S = sig
   val location_of_key : t -> key -> location option
 
   val destroy : t -> unit
+
+  val to_list : t -> account list
 
   val get : t -> location -> account option
 
