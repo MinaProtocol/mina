@@ -49,10 +49,10 @@ let length_in_bits = 256
 let length_in_triples = (length_in_bits + 2) / 3
 
 let digest {ledger_hash; aux_hash} =
-  let h = Cryptokit.Hash.sha3 length_in_bits in
-  h#add_string (Ledger_hash.to_bytes ledger_hash) ;
-  h#add_string aux_hash ;
-  h#result
+  let h = Digestif.SHA256.init () in
+  let h = Digestif.SHA256.feed_string h (Ledger_hash.to_bytes ledger_hash) in
+  let h = Digestif.SHA256.feed_string h aux_hash in
+  (Digestif.SHA256.get h :> string)
 
 let fold t = Fold.string_triples (digest t)
 
