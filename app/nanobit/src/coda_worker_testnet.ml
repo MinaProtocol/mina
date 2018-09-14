@@ -13,26 +13,23 @@ struct
   open Coda_processes
 
   module Api = struct
-    type t = 
+    type t =
       { workers: Coda_process.t list
       ; finish_ivar: unit Ivar.t
-      ; finished:  unit Deferred.t 
-      }
+      ; finished: unit Deferred.t }
 
-    let create workers finish_ivar finished = 
-      { workers; finish_ivar; finished }
+    let create workers finish_ivar finished = {workers; finish_ivar; finished}
 
     let start t i = failwith "nyi"
 
     let stop t i = failwith "nyi"
 
-    let shutdown_testnet t = 
-      Ivar.fill t.finish_ivar ();
-      t.finished
+    let shutdown_testnet t = Ivar.fill t.finish_ivar () ; t.finished
 
-    let send_transaction t i sk pk amount fee = 
-      let { workers } = t in
-      Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk amount fee 
+    let send_transaction t i sk pk amount fee =
+      let {workers} = t in
+      Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk amount
+        fee
   end
 
   let start_prefix_check log transitions proposal_interval =
@@ -135,11 +132,12 @@ struct
               ~snark_worker_public_keys:
                 (Some (List.init n snark_work_public_keys))
               ~f:(fun workers ->
-                  let%bind () = Deferred.create (fun finish_ivar -> 
+                let%bind () =
+                  Deferred.create (fun finish_ivar ->
                       start_checks log workers proposal_interval ;
-                      Option.value_exn !fill_ready (workers, finish_ivar) ;
-                    ) in
-                  return () )
+                      Option.value_exn !fill_ready (workers, finish_ivar) )
+                in
+                return () )
           in
           fill_ready :=
             Some
