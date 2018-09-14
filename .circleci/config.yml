@@ -2,24 +2,20 @@
 defaults: &defaults
     resource_class: large
     docker:
-    - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
-        auth:
+      - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
+    auth:
         username: _json_key
         password: $JSON_GCLOUD_CREDENTIALS
-
-default-steps: &default-steps
-    - checkout
-    - run:
-        name: Build Haskell
-        command: source ~/.profile && make kademlia
-
 
 version: 2
 jobs:
     build:
         <<: *defaults
         steps:
-            <<: *default-steps
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
             - run:
                 name: Lint
                 command: eval `opam config env` && make check-format
@@ -41,7 +37,10 @@ jobs:
     build_withsnark:
         <<: *defaults
         steps:
-            <<: *default-steps
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
             - run:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
@@ -61,7 +60,10 @@ jobs:
     test-runtest:
         <<: *defaults
         steps:
-            <<: *default-steps
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
             - run:
                 name: Test make test-runtest
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
@@ -69,7 +71,10 @@ jobs:
     test-stake:
         <<: *defaults
         steps:
-            <<: *default-steps        
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
             - run:
                 name: Test make test-stakes
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
@@ -77,7 +82,10 @@ jobs:
     test-sig:
         <<: *defaults
         steps:
-            <<: *default-steps        
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
             - run:
                 name: Test make test-sigs
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
