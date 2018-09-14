@@ -13,24 +13,17 @@ struct
   open Coda_processes
 
   module Api = struct
-    type t =
-      { stop: int -> unit
-      ; start: int -> unit
-      ; send_transaction:
-             int
-          -> Private_key.t
-          -> Public_key.Compressed.t
-          -> Currency.Amount.t
-          -> Currency.Fee.t
-          -> unit Deferred.t }
+    type t = Coda_process.t list
 
-    let create workers =
-      { stop= (fun i -> failwith "nyi")
-      ; start= (fun i -> failwith "nyi")
-      ; send_transaction=
-          (fun i sk pk amount fee ->
-            Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk
-              amount fee ) }
+    let create workers = workers
+
+    let start t i = failwith "nyi"
+
+    let stop t i = failwith "nyi"
+
+    let send_transaction t i sk pk amount fee = 
+      let workers = t in
+      Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk amount fee 
   end
 
   let start_prefix_check log transitions proposal_interval =
