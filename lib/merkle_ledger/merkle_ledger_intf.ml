@@ -21,6 +21,8 @@ module type S = sig
            and type path = Path.t
            and type t := t
 
+  val to_list : t -> account list
+
   module Location : sig
     type t
   end
