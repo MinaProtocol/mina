@@ -1595,7 +1595,7 @@ let%test_module "transaction_snark" =
             ~source:(Ledger.merkle_root ledger)
             ~target t1
             (unstage @@ Sparse_ledger.handler sparse_ledger)
-          |> Or_error.ok_exn |> ignore)
+          |> Or_error.ok_exn |> ignore )
 
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
