@@ -40,9 +40,7 @@ end
 let hash {jobs; acc; current_data_length; base_none_pos; capacity} a_to_string
     d_to_string =
   let h = ref (Digestif.SHA256.init ()) in
-  let add_string s =
-    h := Digestif.SHA256.feed_string !h s
-  in
+  let add_string s = h := Digestif.SHA256.feed_string !h s in
   Ring_buffer.iter jobs ~f:(function
     | Base None -> add_string "Base None"
     | Base (Some x) -> add_string ("Base Some " ^ d_to_string x)
@@ -51,8 +49,7 @@ let hash {jobs; acc; current_data_length; base_none_pos; capacity} a_to_string
     | Merge (Some a, None) ->
         add_string ("Merge Some " ^ a_to_string a ^ " None")
     | Merge (Some a1, Some a2) ->
-        add_string
-          ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2) ) ;
+        add_string ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2) ) ;
   let i, a = acc in
   let x = base_none_pos in
   add_string (Int.to_string capacity) ;

@@ -193,9 +193,10 @@ end = struct
     [@@deriving sexp, bin_io]
 
     let hash_to_string scan_state =
-      (Parallel_scan.State.hash scan_state
-        (Binable.to_string (module Snark_with_statement))
-        (Binable.to_string (module Super_transaction_with_witness)) :> string)
+      ( Parallel_scan.State.hash scan_state
+          (Binable.to_string (module Snark_with_statement))
+          (Binable.to_string (module Super_transaction_with_witness))
+        :> string )
 
     let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
   end
