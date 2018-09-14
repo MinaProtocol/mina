@@ -22,11 +22,11 @@ struct
     let n = 1 in
     let should_propose i = true in
     let snark_work_public_keys i = None in
-    let%bind api, finished =
+    let%bind testnet =
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
     let%bind () = after (Time.Span.of_sec 30.) in
-    finished
+    Coda_worker_testnet.Api.shutdown_testnet testnet
 
   let command =
     Command.async_spec ~summary:"Test that blocks get produced"

@@ -13,16 +13,25 @@ struct
   open Coda_processes
 
   module Api = struct
-    type t = Coda_process.t list
+    type t = 
+      { workers: Coda_process.t list
+      ; finish_ivar: unit Ivar.t
+      ; finished:  unit Deferred.t 
+      }
 
-    let create workers = workers
+    let create workers finish_ivar finished = 
+      { workers; finish_ivar; finished }
 
     let start t i = failwith "nyi"
 
     let stop t i = failwith "nyi"
 
+    let shutdown_testnet t = 
+      Ivar.fill t.finish_ivar ();
+      t.finished
+
     let send_transaction t i sk pk amount fee = 
-      let workers = t in
+      let { workers } = t in
       Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk amount fee 
   end
 
@@ -126,15 +135,17 @@ struct
               ~snark_worker_public_keys:
                 (Some (List.init n snark_work_public_keys))
               ~f:(fun workers ->
-                start_checks log workers proposal_interval ;
-                Option.value_exn !fill_ready workers ;
-                return () )
+                  let%bind () = Deferred.create (fun finish_ivar -> 
+                      start_checks log workers proposal_interval ;
+                      Option.value_exn !fill_ready (workers, finish_ivar) ;
+                    ) in
+                  return () )
           in
           fill_ready :=
             Some
-              (fun workers ->
-                let api = Api.create workers in
-                Ivar.fill ready_ivar (api, finished) ) )
+              (fun (workers, finish_ivar) ->
+                let api = Api.create workers finish_ivar finished in
+                Ivar.fill ready_ivar api ) )
     in
     ready
 end
