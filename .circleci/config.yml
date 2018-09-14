@@ -1,20 +1,25 @@
+# Reuse common defaults
+defaults: &defaults
+    resource_class: large
+    docker:
+    - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
+        auth:
+        username: _json_key
+        password: $JSON_GCLOUD_CREDENTIALS
+    steps:
+        - checkout
+        - run:
+            name: Build Haskell
+            command: source ~/.profile && make kademlia
+
+
 version: 2
 jobs:
     build:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
+        <<: *defaults
             - run:
                 name: Lint
                 command: eval `opam config env` && make check-format
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
@@ -31,17 +36,7 @@ jobs:
                 path: /tmp/artifacts
 
     build_withsnark:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
+        <<: *defaults
             - run:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
@@ -57,34 +52,21 @@ jobs:
             - store_artifacts:
                 path: /tmp/artifacts
 
-    # Reused map for all test types
-    test-template: &test-template
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
 
     test-runtest:
-        <<: *test-template
+        <<: *defaults
             - run:
                 name: Test make test-runtest
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
 
     test-stake:
-        <<: *test-template
+        <<: *defaults
             - run:
                 name: Test make test-stakes
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
 
     test-sig:
-        <<: *test-template
+        <<: *defaults
             - run:
                 name: Test make test-sigs
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
@@ -98,13 +80,3 @@ workflows:
             - test-runtest
             - test-sig
             #- test-stake
-    # NOTES: Save this idea for later (nightly/scheduled workflows)
-    # nightly:
-    #     triggers:
-    #         - schedule:
-    #             cron: "0 0 * * *"
-    #             filters:
-    #                 branches:
-    #                     only: master
-    #     jobs:
-    #         - build_withsnark
