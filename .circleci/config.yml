@@ -57,7 +57,8 @@ jobs:
             - store_artifacts:
                 path: /tmp/artifacts
 
-    test-runtest:
+    # Reused map for all test types
+    test-template: &test-template
         resource_class: large
         docker:
         - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
@@ -69,38 +70,21 @@ jobs:
             - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
+
+    test-runtest:
+        <<: *test-template
             - run:
                 name: Test make test-runtest
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
 
     test-stake:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
+        r<<: *test-template
             - run:
                 name: Test make test-stakes
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
 
     test-sig:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
+        <<: *test-template
             - run:
                 name: Test make test-sigs
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
