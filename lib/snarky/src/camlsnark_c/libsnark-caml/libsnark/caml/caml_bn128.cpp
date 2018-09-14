@@ -798,6 +798,19 @@ bool camlsnark_bn128_gm_proof_verify(
     std::vector<FieldT>* primary_input) {
   return r1cs_se_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
 }
+
+libff::G1<ppT>* camlsnark_bn128_gm_proof_a(r1cs_se_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->A);
+}
+
+libff::G2<ppT>* camlsnark_bn128_gm_proof_b(r1cs_se_ppzksnark_proof<ppT>* proof) {
+  return new libff::G2<ppT>(proof->B);
+}
+
+libff::G1<ppT>* camlsnark_bn128_gm_proof_c(r1cs_se_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->C);
+}
+
 // End Groth-Maller specific code
 
 // begin SHA gadget code
