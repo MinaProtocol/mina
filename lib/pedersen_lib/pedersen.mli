@@ -36,18 +36,17 @@ end
 
 module Make (Field : sig
   type t [@@deriving sexp, bin_io, eq]
+
   val fold : t -> bool Triple.t Fold.t
-end)
-(Curve : sig
-    type t
-    [@@deriving sexp]
+end) (Curve : sig
+  type t [@@deriving sexp]
 
-    val to_affine_coordinates : t -> Field.t * Field.t
+  val to_affine_coordinates : t -> Field.t * Field.t
 
-    val zero : t
+  val zero : t
 
-    val (+) : t -> t -> t
+  val ( + ) : t -> t -> t
 
-    val negate : t -> t
+  val negate : t -> t
 end) :
   S with type curve := Curve.t and type Digest.t = Field.t

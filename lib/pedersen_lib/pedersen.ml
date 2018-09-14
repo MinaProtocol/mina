@@ -38,24 +38,24 @@ module Make (Field : sig
   type t [@@deriving sexp, bin_io, eq]
 
   val fold : t -> bool Triple.t Fold.t
-end)
-(Curve : sig
-    type t
-    [@@deriving sexp]
+end) (Curve : sig
+  type t [@@deriving sexp]
 
-    val to_affine_coordinates : t -> Field.t * Field.t
+  val to_affine_coordinates : t -> Field.t * Field.t
 
-    val zero : t
+  val zero : t
 
-    val (+) : t -> t -> t
+  val ( + ) : t -> t -> t
 
-    val negate : t -> t
+  val negate : t -> t
 end) :
   S with type curve := Curve.t and type Digest.t = Field.t =
 struct
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, eq]
+
     let fold = Field.fold
+
     let ( = ) = equal
   end
 
@@ -71,19 +71,17 @@ struct
 
     let local_function params i triple =
       let g = params.(i) in
-      let (a0, a1, sign) = triple in
+      let a0, a1, sign = triple in
       let res =
-        match a0, a1 with
+        match (a0, a1) with
         | false, false -> g
         | true, false -> Curve.(g + g)
         | false, true -> Curve.(g + g + g)
         | true, true ->
-          let gg = Curve.(g + g) in
-          Curve.(gg + gg)
+            let gg = Curve.(g + g) in
+            Curve.(gg + gg)
       in
-      if sign
-      then Curve.negate res
-      else res
+      if sign then Curve.negate res else res
 
     let update_fold (t: t) (fold: bool Triple.t Fold.t) =
       let params = t.params in
