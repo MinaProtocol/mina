@@ -1,5 +1,3 @@
-open Core
-
 module type S = sig
   type hash
 
@@ -22,6 +20,8 @@ module type S = sig
   end
 
   val create : unit -> t
+
+  val to_list : t -> account list
 
   val location_of_key : t -> key -> Location.t option
 
@@ -54,6 +54,8 @@ module type S = sig
   val set_at_index_exn : t -> index -> account -> unit
 
   val set_at_addr_exn : t -> Addr.t -> account -> unit
+
+  val remove_accounts_exn : t -> key list -> unit
 
   include Syncable_intf.S
           with type root_hash := hash

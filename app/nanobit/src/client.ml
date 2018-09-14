@@ -22,6 +22,9 @@ let daemon_port_flag =
          default_client_port)
     (Command.Param.optional int16)
 
+let json_flag =
+  Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
+
 let get_balance =
   Command.async ~summary:"Get balance associated with an address"
     (let open Command.Let_syntax in
@@ -42,6 +45,16 @@ let get_balance =
           printf "No account found at that public_key (zero balance)\n"
       | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e))
 
+let get_public_keys =
+  Command.async ~summary:"Get public keys"
+    (let open Command.Let_syntax in
+    let%map_open json = json_flag and port = daemon_port_flag in
+    fun () ->
+      let open Deferred.Let_syntax in
+      let port = Option.value ~default:default_client_port port in
+      let open Client_lib in
+      dispatch Get_public_keys.rpc () port >>| print (module Public_key) json)
+
 let get_nonce addr port =
   let open Deferred.Let_syntax in
   match%map
@@ -54,19 +67,12 @@ let get_nonce addr port =
 let status =
   Command.async ~summary:"Get running daemon status"
     (let open Command.Let_syntax in
-    let%map_open json =
-      flag "json" no_arg ~doc:" use json output (default: plaintext)"
-    and port = daemon_port_flag in
+    let%map_open json = json_flag and port = daemon_port_flag in
     fun () ->
       let open Deferred.Let_syntax in
       let port = Option.value ~default:default_client_port port in
-      match%map dispatch Client_lib.Get_status.rpc () port with
-      | Ok s ->
-          if json then
-            printf "%s\n"
-              (Client_lib.Status.to_yojson s |> Yojson.Safe.pretty_to_string)
-          else printf "%s\n" (Client_lib.Status.to_text s)
-      | Error e -> eprintf "%s" (Error.to_string_hum e))
+      let open Client_lib in
+      dispatch Get_status.rpc () port >>| print (module Status) json)
 
 let send_txn =
   Command.async ~summary:"Send transaction to an address"
@@ -126,6 +132,7 @@ let generate_keypair =
 let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
+    ; ("get-public-keys", get_public_keys)
     ; ("send-txn", send_txn)
     ; ("status", status)
     ; ("generate-keypair", generate_keypair) ]

@@ -44,7 +44,6 @@ type _ Request.t +=
   | Get_path    : Account.Index.t -> path Request.t
   | Get_element : Account.Index.t -> (Account.t * path) Request.t
   | Set         : Account.Index.t * Account.t -> unit Request.t
-  | Empty_entry : (Account.Index.t * path) Request.t
   | Find_index  : Public_key.Compressed.t -> Account.Index.t Request.t
 
 let reraise_merkle_requests (With { request; respond }) =
@@ -57,14 +56,17 @@ let reraise_merkle_requests (With { request; respond }) =
     respond (Reraise (Get_element addr))
   | _ -> unhandled
 
-(* 
-   [modify_account t pk ~f] implements the following spec:
 
-   - finds an account [account] in [t] at path [addr] whose public key is [pk]
+(*
+   [modify_account t pk ~filter ~f] implements the following spec:
+
+   - finds an account [account] in [t] for [pk] at path [addr] where [filter account] holds.
+     note that the account is not guaranteed to have public key [pk]; it might be a new account
+     created to satisfy this request.
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account t pk ~f =
+let modify_account t pk ~(filter:Account.var -> (unit, _) Checked.t) ~f =
   with_label __LOC__ begin
     let%bind addr =
       request_witness Account.Index.Unpacked.typ
@@ -74,51 +76,35 @@ let modify_account t pk ~f =
     in
     handle
       (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr ~f:(fun account ->
-        let%bind () = Public_key.Compressed.assert_equal account.public_key pk in
+        let%bind () = filter account in
         f account))
       reraise_merkle_requests
     >>| var_of_hash_packed
   end
 
-(* [create_account t pk] implements the following spec:
+(*
+   [modify_account_send t pk ~f] implements the following spec:
 
-   - finds an address [addr] such that the account at path [addr] in [t] has
-   the same hash as [Account.empty_hash]
-   - returns the merkle tree [t'] which is [t] but with the account
-   [{ public_key = pk; balance = Account.Balance.zero; nonce =
-     Account.Nonce.zero }] at [addr] instead of
-   an account with the empty hash
+   - finds an account [account] in [t] at path [addr] whose public key is [pk] OR it is a fee transfer and is an empty account
+   - returns a root [t'] of a tree of depth [depth]
+   which is [t] but with the account [f account] at path [addr].
 *)
-let create_account t pk =
-  let%bind addr, path =
-    request Typ.(Account.Index.Unpacked.typ * Merkle_tree.Path.typ ~depth)
-      Empty_entry
-  in
-  let%bind () =
-    Merkle_tree.implied_root
-      (Field.Checked.constant Account.empty_hash) (* Could save some boolean constraints by unpacking this outside the snark *)
-      addr
-      path
-    >>| var_of_hash_packed
-    >>= assert_equal t
-  in
-  let account : Account.var =
-    { public_key = pk
-    ; balance = Balance.(var_of_t zero)
-    ; nonce = Account.Nonce.(Unpacked.var_of_value zero)
-    ; receipt_chain_hash = Receipt.Chain_hash.(Checked.constant empty)
-    }
-  in
-  (* Could save some constraints applying Account.Balance.zero to the hash
-     (since it's a no-op) *)
-  let%bind account_hash = Account.Checked.digest account in
-  let%bind () =
-    perform As_prover.(Let_syntax.(
-      let%map addr = read Account.Index.Unpacked.typ addr
-      and account = read Account.typ account
-      in
-      Set (addr, account)))
-  in
-  Merkle_tree.implied_root account_hash addr path
-  >>| var_of_hash_packed
+let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(fun account ->
+        let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
+        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
+        let%bind fee_transfer = Boolean.(account_not_there && is_fee_transfer) in
+        Boolean.Assert.any [account_already_there; fee_transfer]
+) ~f
 
+(*
+   [modify_account_recv t ~pk ~f] implements the following spec:
+
+   - finds an account [account] in [t] at path [addr] whose public key is [pk] OR which is an empty account
+   - returns a root [t'] of a tree of depth [depth]
+   which is [t] but with the account [f account] at path [addr].
+*)
+let modify_account_recv t pk ~f = modify_account t pk ~filter:(fun account ->
+        let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
+        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
+        Boolean.Assert.any [account_already_there; account_not_there]
+) ~f
