@@ -6,7 +6,7 @@
   (flags (:standard -short-paths -warn-error -9-58))
   (library_flags (-linkall))
   (inline_tests)
-  (libraries (core extlib))
+  (libraries (core_kernel))
   (preprocess (pps (ppx_jane ppx_deriving.eq)))
   (synopsis "sparse Ledger implementation")))
 

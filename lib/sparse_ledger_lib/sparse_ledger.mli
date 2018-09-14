@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 type ('hash, 'key, 'account) t [@@deriving bin_io, sexp]
 
