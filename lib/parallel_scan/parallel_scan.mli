@@ -26,7 +26,7 @@ module State : sig
   val copy : ('a, 'd) t -> ('a, 'd) t
 
   module Hash : sig
-    type t = Cryptokit.hash
+    type t = Digestif.SHA256.t
   end
 
   val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t

@@ -4,6 +4,8 @@ open Snark_bits
 open Fold_lib
 open Tuple_lib
 
+type uint64 = Unsigned.uint64
+
 module type Basic = sig
   type t [@@deriving bin_io, sexp, compare, hash]
 
@@ -37,6 +39,10 @@ module type Basic = sig
 
   val to_int : t -> int
 
+  val to_uint64 : t -> uint64
+
+  val of_uint64 : uint64 -> t
+
   val var_of_t : t -> var
 
   val var_to_triples : var -> Boolean.var Triple.t list
@@ -55,15 +61,22 @@ module type Arithmetic_intf = sig
 end
 
 module type Checked_arithmetic_intf = sig
+  type t
+
   type var
 
   type signed_var
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
+  val if_value : Boolean.var -> then_:t -> else_:t -> var
+
   val add : var -> var -> (var, _) Checked.t
 
   val sub : var -> var -> (var, _) Checked.t
+
+  val sub_flagged :
+    var -> var -> (var * [`Underflow of Boolean.var], _) Checked.t
 
   val ( + ) : var -> var -> (var, _) Checked.t
 
@@ -118,6 +131,12 @@ module type Signed_intf = sig
   val of_unsigned : magnitude -> t
 
   module Checked : sig
+    val constant : t -> var
+
+    val of_unsigned : magnitude_var -> var
+
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
+
     val to_triples : var -> Boolean.var Triple.t list
 
     val add : var -> var -> (var, _) Checked.t
@@ -147,6 +166,7 @@ module Fee : sig
     include Checked_arithmetic_intf
             with type var := var
              and type signed_var := Signed.var
+             and type t := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
   end
@@ -172,6 +192,7 @@ module Amount : sig
     include Checked_arithmetic_intf
             with type var := var
              and type signed_var := Signed.var
+             and type t := t
 
     val add_signed : var -> Signed.var -> (var, _) Checked.t
 
@@ -205,6 +226,4 @@ module Balance : sig
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
   end
-
-  val of_amount : Amount.t -> t
 end

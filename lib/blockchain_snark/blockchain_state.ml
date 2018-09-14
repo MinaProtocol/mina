@@ -66,6 +66,7 @@ struct
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state
                  |> Blockchain_state.ledger_hash )
+                 (Snark_transition.supply_increase transition)
                  (As_prover.return
                     (Option.value ~default:Tock.Proof.dummy
                        (Snark_transition.ledger_proof transition)))

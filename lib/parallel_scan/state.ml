@@ -33,35 +33,35 @@ type ('a, 'd) t =
 [@@deriving sexp, bin_io]
 
 module Hash = struct
-  type t = Cryptokit.hash
+  type t = Digestif.SHA256.t
 end
 
 (* TODO: This should really be computed iteratively *)
 let hash {jobs; acc; current_data_length; base_none_pos; capacity} a_to_string
     d_to_string =
-  let h = Cryptokit.Hash.sha3 256 in
+  let h = ref (Digestif.SHA256.init ()) in
+  let add_string s = h := Digestif.SHA256.feed_string !h s in
   Ring_buffer.iter jobs ~f:(function
-    | Base None -> h#add_string "Base None"
-    | Base (Some x) -> h#add_string ("Base Some " ^ d_to_string x)
-    | Merge (None, None) -> h#add_string "Merge None None"
-    | Merge (None, Some a) -> h#add_string ("Merge None Some " ^ a_to_string a)
+    | Base None -> add_string "Base None"
+    | Base (Some x) -> add_string ("Base Some " ^ d_to_string x)
+    | Merge (None, None) -> add_string "Merge None None"
+    | Merge (None, Some a) -> add_string ("Merge None Some " ^ a_to_string a)
     | Merge (Some a, None) ->
-        h#add_string ("Merge Some " ^ a_to_string a ^ " None")
+        add_string ("Merge Some " ^ a_to_string a ^ " None")
     | Merge (Some a1, Some a2) ->
-        h#add_string
-          ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2) ) ;
+        add_string ("Merge Some " ^ a_to_string a1 ^ " Some " ^ a_to_string a2) ) ;
   let i, a = acc in
   let x = base_none_pos in
-  h#add_string (Int.to_string capacity) ;
-  h#add_string (Int.to_string i) ;
+  add_string (Int.to_string capacity) ;
+  add_string (Int.to_string i) ;
   ( match a with
-  | None -> h#add_string "None"
-  | Some a -> h#add_string (a_to_string a) ) ;
-  h#add_string (Int.to_string current_data_length) ;
+  | None -> add_string "None"
+  | Some a -> add_string (a_to_string a) ) ;
+  add_string (Int.to_string current_data_length) ;
   ( match x with
-  | None -> h#add_string "None"
-  | Some a -> h#add_string (Int.to_string a) ) ;
-  h
+  | None -> add_string "None"
+  | Some a -> add_string (Int.to_string a) ) ;
+  Digestif.SHA256.get !h
 
 let acc s = snd s.acc
 

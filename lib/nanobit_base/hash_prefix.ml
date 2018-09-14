@@ -25,3 +25,7 @@ let signature = salt signature
 let receipt_chain = salt receipt_chain
 
 let epoch_seed = salt epoch_seed
+
+let vrf_message = salt vrf_message
+
+let vrf_output = salt vrf_output

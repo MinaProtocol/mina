@@ -10,15 +10,12 @@ end)
 (Hash : Intf.Hash with type account := Account.t)
 (Depth : Intf.Depth)
 (Kvdb : Intf.Key_value_database)
-(Sdb : Intf.Stack_database) : sig
+(Sdb : Intf.Stack_database)
+(Storage_locations : Intf.Storage_locations) : sig
   include Database_intf.S
           with type account := Account.t
            and type hash := Hash.t
            and type key := Key.t
-
-  module For_tests : sig
-    val gen_account_location : location Core.Quickcheck.Generator.t
-  end
 end = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
@@ -155,24 +152,26 @@ end = struct
 
   type location = Location.t [@@deriving sexp]
 
-  type t = {kvdb: Kvdb.t; sdb: Sdb.t}
+  type t = {kvdb: Kvdb.t sexp_opaque; sdb: Sdb.t sexp_opaque} [@@deriving sexp]
 
-  let create ~key_value_db_dir ~stack_db_file =
-    let kvdb = Kvdb.create ~directory:key_value_db_dir in
-    let sdb = Sdb.create ~filename:stack_db_file in
+  let create () =
+    let kvdb = Kvdb.create ~directory:Storage_locations.key_value_db_dir in
+    let sdb = Sdb.create ~filename:Storage_locations.stack_db_file in
     {kvdb; sdb}
 
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:(Depth.depth + 1) Hash.empty in
+    let empty_hashes =
+      Array.create ~len:(Depth.depth + 1) Hash.empty_account
+    in
     let rec loop last_hash height =
       if height <= Depth.depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
     in
-    loop Hash.empty 1 ;
+    loop Hash.empty_account 1 ;
     Immutable_array.of_array empty_hashes
 
   let get_raw {kvdb; _} location =
@@ -310,6 +309,19 @@ end = struct
       (Location.Hash (Location.path location))
       (Hash.hash_account account)
 
+  let index_of_key_exn mdb key =
+    let location = location_of_key mdb key |> Option.value_exn in
+    let addr = Location.to_path_exn location in
+    Addr.to_int addr
+
+  let get_at_index_exn mdb index =
+    let addr = Addr.of_int_exn index in
+    get mdb (Location.Account addr) |> Option.value_exn
+
+  let set_at_index_exn mdb index account =
+    let addr = Addr.of_int_exn index in
+    set mdb (Location.Account addr) account
+
   let get_or_create_account mdb key account =
     match Account_location.get mdb key with
     | Error Account_location_not_found ->
@@ -351,9 +363,33 @@ end = struct
       | [] -> [] )
     |> ignore
 
+  module C :
+    Container.S0 with type t := t and type elt := Account.t =
+  Container.Make0 (struct
+    module Elt = Account
+
+    type nonrec t = t
+
+    (* TODO: This implementation does not consider empty indices from stack db. *)
+    let fold t ~init ~f =
+      match Account_location.last_location_address t with
+      | None -> init
+      | Some last_addr ->
+          let last = Addr.to_int last_addr in
+          Sequence.range ~stop:`inclusive 0 last
+          |> Sequence.map ~f:(get_at_index_exn t)
+          |> Sequence.fold ~init ~f
+
+    let iter = `Define_using_fold
+  end)
+
+  let to_list = C.to_list
+
   let merkle_root mdb = get_hash mdb Location.root_hash
 
   let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
+
+  let remove_accounts_exn _ _ = failwith "TODO: Implement"
 
   let merkle_path mdb location =
     let location =
@@ -374,4 +410,8 @@ end = struct
     loop location
 
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
+
+  let merkle_path_at_index_exn t index =
+    let addr = Addr.of_int_exn index in
+    merkle_path_at_addr_exn t addr
 end

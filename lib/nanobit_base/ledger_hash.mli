@@ -13,10 +13,15 @@ type _ Request.t +=
   | Set: Account.Index.t * Account.t -> unit Request.t
   | Find_index: Public_key.Compressed.t -> Account.Index.t Request.t
 
-val modify_account :
+val modify_account_send :
+     var
+  -> Public_key.Compressed.var
+  -> is_fee_transfer:Boolean.var
+  -> f:(Account.var -> (Account.var, 's) Checked.t)
+  -> (var, 's) Checked.t
+
+val modify_account_recv :
      var
   -> Public_key.Compressed.var
   -> f:(Account.var -> (Account.var, 's) Checked.t)
   -> (var, 's) Checked.t
-
-val create_account : var -> Public_key.Compressed.var -> (var, _) Checked.t

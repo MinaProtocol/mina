@@ -27,14 +27,11 @@ end = struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
 
-  type entry = {merkle_index: int; account: Account.t}
-  [@@deriving sexp, bin_io]
-
-  type accounts = entry Key.Table.t [@@deriving sexp, bin_io]
-
   type index = int
 
-  type leafs = Key.t Dyn_array.t [@@deriving sexp, bin_io]
+  type leafs = int Key.Table.t [@@deriving sexp, bin_io]
+
+  type accounts = Account.t Dyn_array.t [@@deriving sexp, bin_io]
 
   type nodes = Hash.t Dyn_array.t list [@@deriving sexp, bin_io]
 
@@ -49,23 +46,41 @@ end = struct
 
   type t = {accounts: accounts; tree: tree} [@@deriving sexp, bin_io]
 
+  module C :
+    Container.S0 with type t := t and type elt := Account.t =
+  Container.Make0 (struct
+    module Elt = Account
+
+    type nonrec t = t
+
+    let fold t ~init ~f = Dyn_array.fold_left f init t.accounts
+
+    let iter = `Define_using_fold
+  end)
+
+  let to_list = C.to_list
+
+  module Location = struct
+    type t = index
+  end
+
   let copy t =
     let copy_tree tree =
-      { leafs= Dyn_array.copy tree.leafs
+      { leafs= Key.Table.copy tree.leafs
       ; dirty= tree.dirty
       ; syncing= false
       ; nodes_height= tree.nodes_height
       ; nodes= List.map tree.nodes ~f:Dyn_array.copy
       ; dirty_indices= tree.dirty_indices }
     in
-    {accounts= Key.Table.copy t.accounts; tree= copy_tree t.tree}
+    {accounts= Dyn_array.copy t.accounts; tree= copy_tree t.tree}
 
   module Path = Merkle_path.Make (Hash)
 
-  let create_account_table () = Key.Table.create ()
-
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights = Array.create ~len:(depth + 1) Hash.empty in
+    let empty_hash_at_heights =
+      Array.create ~len:(depth + 1) Hash.empty_account
+    in
     let rec go i =
       if i <= depth then (
         let h = empty_hash_at_heights.(i - 1) in
@@ -80,86 +95,76 @@ end = struct
 
   (* if depth = N, leafs = 2^N *)
   let create () =
-    { accounts= create_account_table ()
+    { accounts= Dyn_array.create ()
     ; tree=
-        { leafs= Dyn_array.create ()
+        { leafs= Key.Table.create ()
         ; dirty= false
         ; syncing= false
         ; nodes_height= 0
         ; nodes= []
         ; dirty_indices= [] } }
 
-  let num_accounts t = Key.Table.length t.accounts
+  let num_accounts t = Key.Table.length t.tree.leafs
 
   let key_of_index t index =
-    if index >= Dyn_array.length t.tree.leafs then None
-    else Some (Dyn_array.get t.tree.leafs index)
+    if index >= Dyn_array.length t.accounts then None
+    else Some (Dyn_array.get t.accounts index |> Account.public_key)
 
-  let index_of_key t key =
-    Option.map (Hashtbl.find t.accounts key) ~f:(fun {merkle_index; _} ->
-        merkle_index )
+  let location_of_key t key = Hashtbl.find t.tree.leafs key
 
   let key_of_index_exn t index = Option.value_exn (key_of_index t index)
 
-  let index_of_key_exn t key = Option.value_exn (index_of_key t key)
+  let index_of_key_exn t key = Option.value_exn (location_of_key t key)
 
-  let get t key =
-    Option.map (Hashtbl.find t.accounts key) ~f:(fun entry -> entry.account)
+  let get t index =
+    if index >= Dyn_array.length t.accounts then None
+    else
+      let account = Dyn_array.get t.accounts index in
+      Some account
 
   let index_not_found label index =
-    failwithf "Ledger.%s: Index %d not found" label index ()
-
-  let get_at_index t index =
-    if index >= Dyn_array.length t.tree.leafs then `Index_not_found
-    else
-      let key = Dyn_array.get t.tree.leafs index in
-      `Ok (Hashtbl.find_exn t.accounts key).account
+    Core.sprintf "Ledger.%s: Index %d not found" label index
 
   let get_at_index_exn t index =
-    match get_at_index t index with
-    | `Ok account -> account
-    | `Index_not_found -> index_not_found "get_at_index_exn" index
+    get t index
+    |> Option.value_exn ~message:(index_not_found "get_at_index_exn" index)
 
-  let set t key account =
-    match Hashtbl.find t.accounts key with
+  let replace t index old_key account =
+    Dyn_array.set t.accounts index account ;
+    Hashtbl.remove t.tree.leafs old_key ;
+    Hashtbl.set t.tree.leafs ~key:(Account.public_key account) ~data:index ;
+    (t.tree).dirty_indices <- index :: t.tree.dirty_indices
+
+  let allocate t key account =
+    let merkle_index = Dyn_array.length t.accounts in
+    Dyn_array.add t.accounts account ;
+    Hashtbl.set t.tree.leafs ~key ~data:merkle_index ;
+    (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
+    merkle_index
+
+  let get_or_create_account_exn t key account =
+    match location_of_key t key with
     | None ->
-        let merkle_index = Dyn_array.length t.tree.leafs in
-        Hashtbl.set t.accounts ~key ~data:{merkle_index; account} ;
-        Dyn_array.add t.tree.leafs key ;
-        (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices
-    | Some entry ->
-        Hashtbl.set t.accounts ~key
-          ~data:{merkle_index= entry.merkle_index; account} ;
-        (t.tree).dirty_indices <- entry.merkle_index :: t.tree.dirty_indices
-
-  let update t key ~f =
-    match Hashtbl.find t.accounts key with
-    | None ->
-        let merkle_index = Dyn_array.length t.tree.leafs in
-        Hashtbl.set t.accounts ~key ~data:{merkle_index; account= f None} ;
-        Dyn_array.add t.tree.leafs key ;
-        (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices
-    | Some {merkle_index; account} ->
-        Hashtbl.set t.accounts ~key
-          ~data:{merkle_index; account= f (Some account)} ;
-        (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices
-
-  let set_at_index t index account =
-    let leafs = t.tree.leafs in
-    if index < Dyn_array.length leafs then (
-      let key = Dyn_array.get leafs index in
-      Hashtbl.set t.accounts ~key ~data:{merkle_index= index; account} ;
-      (t.tree).dirty_indices <- index :: t.tree.dirty_indices ;
-      `Ok )
-    else `Index_not_found
+        let new_index = allocate t key account in
+        let max_accounts = 1 lsl Depth.depth in
+        if new_index > 1 lsl Depth.depth then
+          failwith
+            (sprintf "Reached max capacity for number of accounts %d"
+               max_accounts)
+        else (`Added, new_index)
+    | Some index -> (`Existed, index)
 
   let set_at_index_exn t index account =
-    match set_at_index t index account with
-    | `Ok -> ()
-    | `Index_not_found -> index_not_found "set_at_index_exn" index
+    let leafs = t.tree.leafs in
+    if index < Hashtbl.length leafs then
+      let old_account = Dyn_array.get t.accounts index in
+      replace t index (Account.public_key old_account) account
+    else failwith (index_not_found "set_at_index_exn" index)
+
+  let set = set_at_index_exn
 
   let extend_tree tree =
-    let leafs = Dyn_array.length tree.leafs in
+    let leafs = Hashtbl.length tree.leafs in
     if leafs <> 0 then (
       let target_height = Int.max 1 (Int.ceil_log2 leafs) in
       let current_height = tree.nodes_height in
@@ -198,10 +203,9 @@ end = struct
         recompute_layers (curr_height + 1) get_curr_hash layers dirty_indices
 
   let get_leaf_hash t i =
-    if i < Dyn_array.length t.tree.leafs then
-      Hash.hash_account
-        (Hashtbl.find_exn t.accounts (Dyn_array.get t.tree.leafs i)).account
-    else Hash.empty
+    if i < Dyn_array.length t.accounts then
+      Hash.hash_account (Dyn_array.get t.accounts i)
+    else Hash.empty_account
 
   let recompute_tree t =
     if not (List.is_empty t.tree.dirty_indices) then (
@@ -214,12 +218,30 @@ end = struct
       recompute_layers 1 (get_leaf_hash t) t.tree.nodes layer_dirty_indices ;
       (t.tree).dirty_indices <- [] )
 
+  let remove_accounts_exn t keys =
+    let len = List.length keys in
+    if len <> 0 then (
+      assert (not t.tree.syncing) ;
+      let indices =
+        List.map keys ~f:(fun k -> index_of_key_exn t k)
+        |> List.sort ~compare:Int.compare
+      in
+      let least = List.hd_exn indices in
+      assert (least = num_accounts t - len) ;
+      List.iter keys ~f:(fun k -> Key.Table.remove t.tree.leafs k) ;
+      Dyn_array.delete_range t.accounts least len ;
+      (* TODO: fixup hashes in a less terrible way *)
+      (t.tree).dirty_indices <- List.init least ~f:(fun i -> i) ;
+      (t.tree).nodes_height <- 0 ;
+      (t.tree).nodes <- [] ;
+      recompute_tree t )
+
   let merkle_root t =
     recompute_tree t ;
     let height = t.tree.nodes_height in
     let base_root =
       match List.last t.tree.nodes with
-      | None -> Hash.empty
+      | None -> Hash.empty_account
       | Some a -> Dyn_array.get a 0
     in
     let rec go i hash =
@@ -237,79 +259,54 @@ end = struct
 
   let compare t t' = Hash.compare (merkle_root t) (merkle_root t')
 
-  let merkle_path t key =
-    recompute_tree t ;
-    Option.map (Hashtbl.find t.accounts key) ~f:(fun entry ->
-        let addr0 = entry.merkle_index in
-        let rec go height addr layers acc =
-          match layers with
-          | [] -> (acc, height)
-          | curr :: layers ->
-              let is_left = addr mod 2 = 0 in
-              let hash =
-                let sibling = addr lxor 1 in
-                if sibling < Dyn_array.length curr then
-                  Dyn_array.get curr sibling
-                else empty_hash_at_height height
-              in
-              go (height + 1) (addr lsr 1) layers
-                ((if is_left then `Left hash else `Right hash) :: acc)
-        in
-        let leaf_hash_idx = addr0 lxor 1 in
-        let leaf_hash =
-          if leaf_hash_idx >= Dyn_array.length t.tree.leafs then Hash.empty
-          else
-            Hash.hash_account
-              (Hashtbl.find_exn t.accounts
-                 (Dyn_array.get t.tree.leafs leaf_hash_idx))
-                .account
-        in
-        let is_left = addr0 mod 2 = 0 in
-        let non_root_nodes = List.take t.tree.nodes (depth - 1) in
-        let base_path, base_path_height =
-          go 1 (addr0 lsr 1) non_root_nodes
-            [(if is_left then `Left leaf_hash else `Right leaf_hash)]
-        in
-        List.rev_append base_path
-          (List.init (depth - base_path_height) ~f:(fun i ->
-               `Left (empty_hash_at_height (i + base_path_height)) )) )
-
-  let merkle_path_at_index t index =
-    match Option.(key_of_index t index >>= merkle_path t) with
-    | None -> `Index_not_found
-    | Some path -> `Ok path
-
   let merkle_path_at_index_exn t index =
-    match merkle_path_at_index t index with
-    | `Ok path -> path
-    | `Index_not_found -> index_not_found "merkle_path_at_index_exn" index
+    if index >= Dyn_array.length t.accounts then
+      failwith (index_not_found "merkle_path_at_index_exn" index)
+    else (
+      recompute_tree t ;
+      let rec go height addr layers acc =
+        match layers with
+        | [] -> (acc, height)
+        | curr :: layers ->
+            let is_left = addr mod 2 = 0 in
+            let hash =
+              let sibling = addr lxor 1 in
+              if sibling < Dyn_array.length curr then
+                Dyn_array.get curr sibling
+              else empty_hash_at_height height
+            in
+            go (height + 1) (addr lsr 1) layers
+              ((if is_left then `Left hash else `Right hash) :: acc)
+      in
+      let leaf_hash_idx = index lxor 1 in
+      let leaf_hash =
+        if leaf_hash_idx >= Hashtbl.length t.tree.leafs then Hash.empty_account
+        else Hash.hash_account (Dyn_array.get t.accounts leaf_hash_idx)
+      in
+      let is_left = index mod 2 = 0 in
+      let non_root_nodes = List.take t.tree.nodes (depth - 1) in
+      let base_path, base_path_height =
+        go 1 (index lsr 1) non_root_nodes
+          [(if is_left then `Left leaf_hash else `Right leaf_hash)]
+      in
+      List.rev_append base_path
+        (List.init (depth - base_path_height) ~f:(fun i ->
+             `Left (empty_hash_at_height (i + base_path_height)) )) )
 
-  let extend_with_empty_to_fit t new_size =
-    let tree = t.tree in
-    let len = DynArray.length tree.leafs in
-    if new_size > len then
-      DynArray.append tree.leafs
-        (DynArray.init (new_size - len) (fun _ -> Key.empty)) ;
-    recompute_tree t
-
-  let to_index a =
-    List.foldi
-      (List.rev @@ Addr.dirs_from_root a)
-      ~init:0
-      ~f:(fun i acc dir -> acc lor (Direction.to_int dir lsl i))
+  let merkle_path = merkle_path_at_index_exn
 
   module For_tests = struct
-    let get_leaf_hash_at_addr t addr = get_leaf_hash t (to_index addr)
+    let get_leaf_hash_at_addr t addr = get_leaf_hash t (Addr.to_int addr)
   end
 
   (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
     assert (Addr.depth a = Depth.depth - 1) ;
-    merkle_path_at_index_exn t (to_index a)
+    merkle_path_at_index_exn t (Addr.to_int a)
 
   let set_at_addr_exn t addr acct =
     assert (Addr.depth addr = Depth.depth - 1) ;
-    set_at_index_exn t (to_index addr) acct
+    set_at_index_exn t (Addr.to_int addr) acct
 
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
@@ -325,7 +322,7 @@ end = struct
     let adepth = Addr.depth a in
     assert (adepth < depth) ;
     let height = Addr.height a in
-    let index = to_index a in
+    let index = Addr.to_int a in
     recompute_tree t ;
     if height < t.tree.nodes_height && index < num_accounts t then
       let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
@@ -341,28 +338,25 @@ end = struct
     assert (path_length < depth) ;
     (t.tree).dirty <- true ;
     let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
-    let index = to_index a in
+    let index = Addr.to_int a in
     DynArray.set l index hash
 
   let set_all_accounts_rooted_at_exn t a accounts =
     let height = depth - Addr.depth a in
-    let first_index = to_index a lsl height in
+    let first_index = Addr.to_int a lsl height in
     let count = min (1 lsl height) (num_accounts t - first_index) in
     assert (List.length accounts = count) ;
     List.iteri accounts ~f:(fun i a ->
-        let pk = Account.public_key a in
-        let entry = {merkle_index= first_index + i; account= a} in
-        (t.tree).dirty_indices <- (first_index + i) :: t.tree.dirty_indices ;
-        Key.Table.set t.accounts ~key:pk ~data:entry ;
-        Dyn_array.set t.tree.leafs (first_index + i) pk )
+        let new_index = first_index + i in
+        (t.tree).dirty_indices <- new_index :: t.tree.dirty_indices ;
+        let pk = key_of_index_exn t i in
+        Key.Table.set t.tree.leafs ~key:pk ~data:new_index ;
+        Dyn_array.set t.accounts new_index a )
 
   let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
-    let first_index = to_index a lsl height in
+    let first_index = Addr.to_int a lsl height in
     let count = min (1 lsl height) (num_accounts t - first_index) in
-    let subarr = Dyn_array.sub t.tree.leafs first_index count in
-    Dyn_array.to_list
-      (Dyn_array.map
-         (fun key -> (Key.Table.find_exn t.accounts key).account)
-         subarr)
+    let subarr = Dyn_array.sub t.accounts first_index count in
+    Dyn_array.to_list subarr
 end

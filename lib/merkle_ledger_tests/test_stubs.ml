@@ -29,6 +29,8 @@ module Account = struct
 
   let create public_key balance = {public_key; balance= UInt64.of_int balance}
 
+  let empty = {public_key= ""; balance= Balance.zero}
+
   let gen =
     let open Quickcheck.Let_syntax in
     let%bind public_key = String.gen in
@@ -46,14 +48,14 @@ module Hash = struct
 
   let hash_account account = Md5.digest_string ("0" ^ Account.show account)
 
-  let empty = Md5.digest_string ""
-
   let merge ~height a b =
     let res =
       Md5.digest_string
         (sprintf "test_ledger_%d:" height ^ Md5.to_hex a ^ Md5.to_hex b)
     in
     res
+
+  let empty_account = hash_account Account.empty
 end
 
 module Intf = Merkle_ledger.Intf
@@ -93,6 +95,13 @@ module In_memory_sdb : Intf.Stack_database = struct
   let length ls = List.length !ls
 
   let copy stack = ref !stack
+end
+
+module Storage_locations : Intf.Storage_locations = struct
+  (* TODO: The names of these values should be dynamically generated per test run*)
+  let stack_db_file = ""
+
+  let key_value_db_dir = ""
 end
 
 module Key = struct

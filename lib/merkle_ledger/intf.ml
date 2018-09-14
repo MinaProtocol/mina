@@ -27,11 +27,11 @@ module type Hash = sig
 
   type account
 
-  val empty : t
-
   val merge : height:int -> t -> t -> t
 
   val hash_account : account -> t
+
+  val empty_account : t
 end
 
 module type Depth = sig
@@ -68,4 +68,10 @@ module type Stack_database = sig
   val pop : t -> Bigstring.t option
 
   val length : t -> int
+end
+
+module type Storage_locations = sig
+  val key_value_db_dir : string
+
+  val stack_db_file : string
 end

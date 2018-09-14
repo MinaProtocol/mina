@@ -27,7 +27,7 @@ let daemon (type ledger_proof) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
     : Coda_intf with type ledger_proof = ledger_proof) =
   let open Command.Let_syntax in
-  Command.async ~summary:"Current daemon"
+  Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
@@ -66,6 +66,18 @@ let daemon (type ledger_proof) (module Kernel
      and ip =
        flag "ip" ~doc:"IP External IP address for others to connect"
          (optional string)
+     and transaction_capacity_log_2 =
+       flag "txn-capacity"
+         ~doc:
+           "CAPACITY_LOG_2 Log of capacity of transactions per transition \
+            (default: 4)"
+         (optional int)
+     and proposal_interval =
+       flag "proposal-interval"
+         ~doc:
+           "MILLIS Time between the proposer proposing and waiting (default: \
+            5000)"
+         (optional int)
      in
      fun () ->
        Parallel.init_master () ;
@@ -82,6 +94,14 @@ let daemon (type ledger_proof) (module Kernel
        in
        let should_propose_flag =
          Option.value ~default:true should_propose_flag
+       in
+       let transaction_capacity_log_2 =
+         Option.value ~default:4 transaction_capacity_log_2
+       in
+       let proposal_interval =
+         Option.value ~default:(Time.Span.of_ms 5000.)
+           (Option.map proposal_interval ~f:(fun millis ->
+                Int.to_float millis |> Time.Span.of_ms ))
        in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
@@ -109,6 +129,10 @@ let daemon (type ledger_proof) (module Kernel
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
+       let keypair =
+         Signature_lib.Keypair.of_private_key_exn
+           Genesis_ledger.high_balance_sk
+       in
        let module Config = struct
          let logger = log
 
@@ -116,11 +140,13 @@ let daemon (type ledger_proof) (module Kernel
 
          let lbc_tree_max_depth = `Finite 50
 
-         let transition_interval = Time.Span.of_sec 5.0
+         let transition_interval = proposal_interval
 
-         let fee_public_key = Genesis_ledger.high_balance_pk
+         let keypair = keypair
 
          let genesis_proof = Precomputed_values.base_proof
+
+         let transaction_capacity_log_2 = transaction_capacity_log_2
        end in
        let%bind (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
@@ -151,7 +177,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ())
+                ~keypair ())
          in
          don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers minibit)) ;
          Run.setup_local_server ?rest_server_port ~minibit ~client_port ~log () ;
@@ -339,29 +365,34 @@ let () =
           let module Coda_transitive_peers_test =
             Coda_transitive_peers_test.Make (Ledger_proof.Debug) (Kernel)
               (Coda) in
-          [ (Coda_peers_test.name, Coda_peers_test.command)
-          ; ( Coda_block_production_test.name
-            , Coda_block_production_test.command )
-          ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
-          ; ( Coda_transitive_peers_test.name
-            , Coda_transitive_peers_test.command )
-          ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
-          ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
+          let group =
+            Command.group ~summary:"Integration tests"
+              [ (Coda_peers_test.name, Coda_peers_test.command)
+              ; ( Coda_block_production_test.name
+                , Coda_block_production_test.command )
+              ; (Coda_shared_state_test.name, Coda_shared_state_test.command)
+              ; ( Coda_transitive_peers_test.name
+                , Coda_transitive_peers_test.command )
+              ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+              ; ("full-test", Full_test.command (module Kernel) (module Coda))
+              ; ( "transaction-snark-profiler"
+                , Transaction_snark_profiler.command ) ]
+          in
+          [("integration-tests", group)]
       else [] )
   in
-  let extra_commands =
-    if Insecure.integration_tests then
-      [("transaction-snark-profiler", Transaction_snark_profiler.command)]
-    else []
+  let internal_commands =
+    [ ( Snark_worker_lib.Debug.command_name
+      , Snark_worker_lib.Debug.Worker.command )
+    ; (Snark_worker_lib.Prod.command_name, Snark_worker_lib.Prod.Worker.command)
+    ]
   in
-  Command.group ~summary:"Current"
-    ( [ (Parallel.worker_command_name, Parallel.worker_command)
-      ; ( Snark_worker_lib.Debug.command_name
-        , Snark_worker_lib.Debug.Worker.command )
-      ; ( Snark_worker_lib.Prod.command_name
-        , Snark_worker_lib.Prod.Worker.command )
+  Command.group ~summary:"Coda"
+    ( [ ( "internal"
+        , Command.group ~summary:"Internal commands" internal_commands )
+      ; (Parallel.worker_command_name, Parallel.worker_command)
       ; ("client", Client.command) ]
-    @ commands @ extra_commands )
+    @ commands )
   |> Command.run
 
 let () = never_returns (Scheduler.go ())

@@ -6,6 +6,7 @@
    (libraries
     ( base64
       core
+      debug_assert
       client_lib
       linear_pipe
       minibit_networking
