@@ -749,7 +749,19 @@ module type Main_intf = sig
 
       val get : t -> Public_key.Compressed.t -> Account.t option
 
+      val merkle_root : t -> Ledger_hash.t
+
+      val merkle_path :
+           t
+        -> Public_key.Compressed.t
+        -> [ `Left of Snark_params.Tick.Pedersen.Digest.t
+           | `Right of Snark_params.Tick.Pedersen.Digest.t ]
+           list
+           option
+
       val num_accounts : t -> int
+
+      val depth : int
     end
 
     module Ledger_builder_diff : sig
@@ -858,6 +870,12 @@ module type Main_intf = sig
   val best_protocol_state :
     t -> Inputs.Consensus_mechanism.Protocol_state.value
 
+  val best_tip :
+       t
+    -> Inputs.Ledger.t
+       * Inputs.Consensus_mechanism.Protocol_state.value
+       * Proof.t
+
   val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
@@ -944,6 +962,39 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; run_snark_worker= run_snark_worker t
     ; propose= should_propose t }
 
+  let get_lite_chain :
+      (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
+    Option.map Consensus_mechanism.Consensus_state.to_lite ~f:
+      (fun consensus_state_to_lite t pks ->
+        let ledger, state, proof = best_tip t in
+        let ledger =
+          List.fold pks
+            ~f:(fun acc key ->
+              Lite_lib.Sparse_ledger.add_path acc
+                (Lite_compat.merkle_path
+                   (Option.value_exn (Ledger.merkle_path ledger key)))
+                (Lite_compat.account (Option.value_exn (Ledger.get ledger key)))
+              )
+            ~init:
+              (Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
+                 (Lite_compat.digest
+                    ( Ledger.merkle_root ledger
+                      :> Snark_params.Tick.Pedersen.Digest.t )))
+        in
+        let protocol_state : Lite_base.Protocol_state.t =
+          { previous_state_hash=
+              Lite_compat.digest
+                ( Consensus_mechanism.Protocol_state.previous_state_hash state
+                  :> Snark_params.Tick.Pedersen.Digest.t )
+          ; blockchain_state=
+              Consensus_mechanism.Protocol_state.blockchain_state state
+          ; consensus_state= () }
+        in
+        { Lite_base.Lite_chain.proof= Lite_compat.proof proof
+        ; ledger
+        ; protocol_state=
+            Consensus_mechanism.Protocol_state.Consensus_state.to_lite } )
+
   let setup_local_server ?rest_server_port ~minibit ~log ~client_port () =
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
@@ -988,6 +1039,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 match Uri.path uri with
+                | "/account" -> failwith "TO" Uri.get_query_param
                 | "/status" ->
                     Server.respond_string
                       ( get_status minibit |> Client_lib.Status.to_yojson

@@ -17,6 +17,8 @@
       coda_numbers
       protocols
       nanobit_base
+      lite_lib
+      lite_compat
       test_util
       ledger_builder
       ledger_builder_controller
