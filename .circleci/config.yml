@@ -6,17 +6,20 @@ defaults: &defaults
         auth:
         username: _json_key
         password: $JSON_GCLOUD_CREDENTIALS
-    steps:
-        - checkout
-        - run:
-            name: Build Haskell
-            command: source ~/.profile && make kademlia
+
+default-steps: &default-steps
+    - checkout
+    - run:
+        name: Build Haskell
+        command: source ~/.profile && make kademlia
 
 
 version: 2
 jobs:
     build:
         <<: *defaults
+        steps:
+            <<: *default-steps
             - run:
                 name: Lint
                 command: eval `opam config env` && make check-format
@@ -37,6 +40,8 @@ jobs:
 
     build_withsnark:
         <<: *defaults
+        steps:
+            <<: *default-steps
             - run:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
@@ -55,18 +60,24 @@ jobs:
 
     test-runtest:
         <<: *defaults
+        steps:
+            <<: *default-steps
             - run:
                 name: Test make test-runtest
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
 
     test-stake:
         <<: *defaults
+        steps:
+            <<: *default-steps        
             - run:
                 name: Test make test-stakes
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
 
     test-sig:
         <<: *defaults
+        steps:
+            <<: *default-steps        
             - run:
                 name: Test make test-sigs
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
