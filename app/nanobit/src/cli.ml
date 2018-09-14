@@ -82,16 +82,21 @@ let daemon (type ledger_proof) (module Kernel
        flag "background" no_arg ~doc:"Run process on the background"
      in
      fun () ->
-       let home = Core.Sys.home_directory () in
-       let conf_dir =
+       let open Deferred.Let_syntax in
+       let compute_conf_dir home =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
-       if is_background then
-         Daemon.daemonize
-           ~redirect_stdout:(`File_append (conf_dir ^/ "daemon-stdout"))
-           ~redirect_stderr:(`File_append (conf_dir ^/ "daemon-stderr"))
-           ~allow_threads_to_have_been_created:true () ;
-       let open Deferred.Let_syntax in
+       let%bind conf_dir =
+         if is_background then (
+           let home = Core.Sys.home_directory () in
+           let conf_dir = compute_conf_dir home in
+           Daemon.daemonize
+             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.stdout"))
+             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.stderr"))
+             ~allow_threads_to_have_been_created:true () ;
+           Deferred.return conf_dir )
+         else Sys.home_directory () >>| compute_conf_dir
+       in
        Parallel.init_master () ;
        let external_port =
          Option.value ~default:default_external_port external_port
