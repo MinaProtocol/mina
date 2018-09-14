@@ -25,7 +25,7 @@ module type Inputs_intf = sig
   end
 
   module Ledger_builder : sig
-    type t [@@deriving bin_io]
+    type t
 
     type proof
 

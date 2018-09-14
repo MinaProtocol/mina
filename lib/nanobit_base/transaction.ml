@@ -31,6 +31,9 @@ type value = t
 
 type var = (Payload.var, Public_key.var, Signature.var) t_
 
+let public_keys ({payload= {Payload.receiver; _}; sender; _}: value) =
+  [receiver; Public_key.compress sender]
+
 let sign (kp: Signature_keypair.t) (payload: Payload.t) : t =
   { payload
   ; sender= kp.public_key
