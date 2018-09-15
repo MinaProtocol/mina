@@ -50,10 +50,16 @@ module type S = sig
   val new_goal : t -> root_hash -> unit
 
   val wait_until_valid :
-    t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
+       t
+    -> root_hash
+    -> [`Ok of merkle_tree | `Target_changed of root_hash option * root_hash]
+       Deferred.t
 
   val fetch :
-    t -> root_hash -> [`Ok of merkle_tree | `Target_changed] Deferred.t
+       t
+    -> root_hash
+    -> [`Ok of merkle_tree | `Target_changed of root_hash option * root_hash]
+       Deferred.t
 
   val apply_or_queue_diff : t -> diff -> unit
 
@@ -298,7 +304,8 @@ struct
     ; query_reader: (Root_hash.t * query) Linear_pipe.Reader.t
     ; waiting_parents: waiting Addr.Table.t
     ; waiting_content: Hash.t Addr.Table.t
-    ; mutable validity_listener: [`Ok | `Target_changed] Ivar.t }
+    ; mutable validity_listener:
+        [`Ok | `Target_changed of Root_hash.t option * Root_hash.t] Ivar.t }
 
   let desired_root_exn {desired_root; _} = desired_root |> Option.value_exn
 
@@ -460,17 +467,19 @@ struct
     Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a ; Deferred.unit)
 
   let new_goal t h =
-    Ivar.fill_if_empty t.validity_listener `Target_changed ;
+    Ivar.fill_if_empty t.validity_listener
+      (`Target_changed (t.desired_root, h)) ;
     t.validity_listener <- Ivar.create () ;
     t.desired_root <- Some h ;
     Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h) |> ignore ;
     Linear_pipe.write_without_pushback t.queries (h, Num_accounts)
 
   let wait_until_valid t h =
-    if not (Root_hash.equal h (desired_root_exn t)) then return `Target_changed
+    if not (Root_hash.equal h (desired_root_exn t)) then
+      return (`Target_changed (t.desired_root, h))
     else
       Deferred.map (Ivar.read t.validity_listener) ~f:(function
-        | `Target_changed -> `Target_changed
+        | `Target_changed payload -> `Target_changed payload
         | `Ok -> `Ok t.tree )
 
   let fetch t rh = new_goal t rh ; wait_until_valid t rh

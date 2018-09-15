@@ -52,6 +52,8 @@ module T = struct
   let return a =
     {interruption_signal= Deferred.never (); d= Deferred.Result.return a}
 
+  let finally t ~f = {t with d= Deferred.map t.d ~f:(fun r -> f () ; r)}
+
   let uninterruptible d =
     { interruption_signal= Deferred.never ()
     ; d= Deferred.map d ~f:(fun x -> Ok x) }
