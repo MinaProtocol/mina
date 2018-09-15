@@ -67,6 +67,8 @@ jobs:
             - run:
                 name: Test make test-runtest
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
+            - store_artifacts:
+                path: /tmp/artifacts
 
     test-stake:
         <<: *defaults
@@ -78,6 +80,8 @@ jobs:
             - run:
                 name: Test make test-stakes
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
+            - store_artifacts:
+                path: /tmp/artifacts
 
     test-sig:
         <<: *defaults
@@ -89,6 +93,235 @@ jobs:
             - run:
                 name: Test make test-sigs
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
+            - store_artifacts:
+                path: /tmp/artifacts
+
+    
+    # Rendered test
+    test-full-test-:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM= dune exec cli -- integration-tests full-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-peers-test-:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM= dune exec cli -- integration-tests coda-peers-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-transitive-peers-test-:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM= dune exec cli -- integration-tests coda-transitive-peers-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-block-production-test-:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM= dune exec cli -- integration-tests coda-block-production-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-shared-state-test-:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM= dune exec cli -- integration-tests coda-shared-state-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-shared-prefix-test-who-proposes0-:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM= dune exec cli -- integration-tests coda-shared-prefix-test -who-proposes 0
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-shared-prefix-test-who-proposes1-:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM= dune exec cli -- integration-tests coda-shared-prefix-test -who-proposes 1
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-transaction-snark-profiler-check-only-:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM= dune exec cli -- integration-tests transaction-snark-profiler -check-only
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-full-test-proof_of_signature:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- integration-tests full-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-peers-test-proof_of_signature:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- integration-tests coda-peers-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-transitive-peers-test-proof_of_signature:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- integration-tests coda-transitive-peers-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-block-production-test-proof_of_signature:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- integration-tests coda-block-production-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-shared-state-test-proof_of_signature:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- integration-tests coda-shared-state-test
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-shared-prefix-test-who-proposes0-proof_of_signature:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- integration-tests coda-shared-prefix-test -who-proposes 0
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-coda-shared-prefix-test-who-proposes1-proof_of_signature:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- integration-tests coda-shared-prefix-test -who-proposes 1
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+    # Rendered test
+    test-transaction-snark-profiler-check-only-proof_of_signature:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_MECHANISM=proof_of_signature dune exec cli -- integration-tests transaction-snark-profiler -check-only
+            - store_artifacts:
+                path: /tmp/artifacts    
+    
+
 
 workflows:
     version: 2
@@ -97,5 +330,38 @@ workflows:
             - build
             - build_withsnark
             - test-runtest
-            - test-sig
+            - test-full-test-
+                requires: [ build ]
+            - test-coda-peers-test-
+                requires: [ build ]
+            - test-coda-transitive-peers-test-
+                requires: [ build ]
+            - test-coda-block-production-test-
+                requires: [ build ]
+            - test-coda-shared-state-test-
+                requires: [ build ]
+            - test-coda-shared-prefix-test-who-proposes0-
+                requires: [ build ]
+            - test-coda-shared-prefix-test-who-proposes1-
+                requires: [ build ]
+            - test-transaction-snark-profiler-check-only-
+                requires: [ build ]
+            - test-full-test-proof_of_signature
+                requires: [ build ]
+            - test-coda-peers-test-proof_of_signature
+                requires: [ build ]
+            - test-coda-transitive-peers-test-proof_of_signature
+                requires: [ build ]
+            - test-coda-block-production-test-proof_of_signature
+                requires: [ build ]
+            - test-coda-shared-state-test-proof_of_signature
+                requires: [ build ]
+            - test-coda-shared-prefix-test-who-proposes0-proof_of_signature
+                requires: [ build ]
+            - test-coda-shared-prefix-test-who-proposes1-proof_of_signature
+                requires: [ build ]
+            - test-transaction-snark-profiler-check-only-proof_of_signature
+                requires: [ build ]
+            
+            #- test-sig
             #- test-stake

@@ -106,7 +106,7 @@ container:
 deb:
 	$(WRAP) ./rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp _build/codaclient.deb /tmp/artifacts/.
+	@cp _build/codaclient.deb /tmp/artifacts/codaclient_$(GITHASH).deb
 
 provingkeys:
 	$(WRAP) tar -cvjf _build/nanobit_cache_dir_$(GITHASH).tar.bz2  /tmp/nanobit_cache_dir
