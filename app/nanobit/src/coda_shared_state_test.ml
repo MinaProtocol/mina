@@ -20,7 +20,7 @@ struct
     let n = 2 in
     let log = Logger.create () in
     let log = Logger.child log name in
-    let transition_interval = 1000.0 in
+    let transition_interval = 5000.0 in
     let start_margin = Float.to_int (8000.0 /. transition_interval) in
     let max_dist = 5 in
     let snark_worker_public_keys =
