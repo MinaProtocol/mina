@@ -10,7 +10,7 @@ let commit_id =
   | Some sha1 -> sha1
   | None -> "[CODA_COMMIT_SHA1 not set]"
 
-let force_updates = true
+let force_updates = false
 
 module type Coda_intf = sig
   type ledger_proof
