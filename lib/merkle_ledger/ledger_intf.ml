@@ -1,5 +1,3 @@
-open Core
-
 module type S = sig
   type hash
 
@@ -22,6 +20,8 @@ module type S = sig
   end
 
   val create : unit -> t
+
+  val to_list : t -> account list
 
   val location_of_key : t -> key -> Location.t option
 

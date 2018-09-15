@@ -46,6 +46,20 @@ end = struct
 
   type t = {accounts: accounts; tree: tree} [@@deriving sexp, bin_io]
 
+  module C :
+    Container.S0 with type t := t and type elt := Account.t =
+  Container.Make0 (struct
+    module Elt = Account
+
+    type nonrec t = t
+
+    let fold t ~init ~f = Dyn_array.fold_left f init t.accounts
+
+    let iter = `Define_using_fold
+  end)
+
+  let to_list = C.to_list
+
   module Location = struct
     type t = index
   end

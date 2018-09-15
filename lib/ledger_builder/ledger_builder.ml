@@ -193,12 +193,10 @@ end = struct
     [@@deriving sexp, bin_io]
 
     let hash_to_string scan_state =
-      let h =
-        Parallel_scan.State.hash scan_state
+      ( Parallel_scan.State.hash scan_state
           (Binable.to_string (module Snark_with_statement))
           (Binable.to_string (module Super_transaction_with_witness))
-      in
-      h#result
+        :> string )
 
     let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
   end
@@ -212,7 +210,7 @@ end = struct
     the above state. *)
     ; ledger: Ledger.t
     ; public_key: Compressed_public_key.t }
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp]
 
   let random_work_spec_chunk t
       (seen_statements:
@@ -1131,12 +1129,6 @@ let%test_module "test" =
         type ledger_hash = Ledger_hash.t
 
         type super_transaction = Super_transaction.t [@@deriving sexp]
-
-        let hash : t -> Ppx_hash_lib.Std.Hash.hash_value = fun t -> !t
-
-        let hash_fold_t :
-            Ppx_hash_lib.Std.Hash.state -> t -> Ppx_hash_lib.Std.Hash.state =
-         fun s _ -> s
 
         module Undo = struct
           type t = super_transaction [@@deriving sexp]

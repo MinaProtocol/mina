@@ -3,9 +3,12 @@
 set -euo pipefail
 
 PROJECT='codaclient'
+
 MAJORVERSION=0
-MINORVERSION=`date +%m-%d-%H%M`
-VERSION="${MAJORVERSION}.${MINORVERSION}"
+DATE=`date +%m-%d`
+GITHASH=`git rev-parse --short HEAD`
+
+VERSION="${MAJORVERSION}.${DATE}.${GITHASH}"
 BUILDDIR="${PROJECT}_${VERSION}"
 
 cd _build
