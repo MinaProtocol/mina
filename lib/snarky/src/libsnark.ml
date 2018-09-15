@@ -1359,11 +1359,11 @@ struct
       let r = stub vk in
       Caml.Gc.finalise delete r ; r
 
-  let a = func "b" G1.typ G1.delete
+  let a = func "a" G1.typ G1.delete
 
   let b = func "b" G2.typ G2.delete
 
-  let c = func "b" G1.typ G1.delete
+  let c = func "c" G1.typ G1.delete
 end
 
 (* TODO: Clean this up and unify with G1 *)
