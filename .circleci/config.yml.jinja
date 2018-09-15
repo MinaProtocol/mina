@@ -120,8 +120,9 @@ workflows:
             - build
             - build_withsnark
             - test-runtest
-            {% for test in tests %}- test-{{test.friendly}}
-                requires: [ build ]
+            {% for test in tests %}- test-{{test.friendly}}:
+                requires:
+                    - build
             {% endfor %}
             #- test-sig
             #- test-stake

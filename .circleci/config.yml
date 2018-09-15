@@ -330,38 +330,54 @@ workflows:
             - build
             - build_withsnark
             - test-runtest
-            - test-full-test-
-                requires: [ build ]
-            - test-coda-peers-test-
-                requires: [ build ]
-            - test-coda-transitive-peers-test-
-                requires: [ build ]
-            - test-coda-block-production-test-
-                requires: [ build ]
-            - test-coda-shared-state-test-
-                requires: [ build ]
-            - test-coda-shared-prefix-test-who-proposes0-
-                requires: [ build ]
-            - test-coda-shared-prefix-test-who-proposes1-
-                requires: [ build ]
-            - test-transaction-snark-profiler-check-only-
-                requires: [ build ]
-            - test-full-test-proof_of_signature
-                requires: [ build ]
-            - test-coda-peers-test-proof_of_signature
-                requires: [ build ]
-            - test-coda-transitive-peers-test-proof_of_signature
-                requires: [ build ]
-            - test-coda-block-production-test-proof_of_signature
-                requires: [ build ]
-            - test-coda-shared-state-test-proof_of_signature
-                requires: [ build ]
-            - test-coda-shared-prefix-test-who-proposes0-proof_of_signature
-                requires: [ build ]
-            - test-coda-shared-prefix-test-who-proposes1-proof_of_signature
-                requires: [ build ]
-            - test-transaction-snark-profiler-check-only-proof_of_signature
-                requires: [ build ]
+            - test-full-test-:
+                requires:
+                    - build
+            - test-coda-peers-test-:
+                requires:
+                    - build
+            - test-coda-transitive-peers-test-:
+                requires:
+                    - build
+            - test-coda-block-production-test-:
+                requires:
+                    - build
+            - test-coda-shared-state-test-:
+                requires:
+                    - build
+            - test-coda-shared-prefix-test-who-proposes0-:
+                requires:
+                    - build
+            - test-coda-shared-prefix-test-who-proposes1-:
+                requires:
+                    - build
+            - test-transaction-snark-profiler-check-only-:
+                requires:
+                    - build
+            - test-full-test-proof_of_signature:
+                requires:
+                    - build
+            - test-coda-peers-test-proof_of_signature:
+                requires:
+                    - build
+            - test-coda-transitive-peers-test-proof_of_signature:
+                requires:
+                    - build
+            - test-coda-block-production-test-proof_of_signature:
+                requires:
+                    - build
+            - test-coda-shared-state-test-proof_of_signature:
+                requires:
+                    - build
+            - test-coda-shared-prefix-test-who-proposes0-proof_of_signature:
+                requires:
+                    - build
+            - test-coda-shared-prefix-test-who-proposes1-proof_of_signature:
+                requires:
+                    - build
+            - test-transaction-snark-profiler-check-only-proof_of_signature:
+                requires:
+                    - build
             
             #- test-sig
             #- test-stake
