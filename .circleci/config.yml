@@ -3,9 +3,9 @@ defaults: &defaults
     resource_class: large
     docker:
       - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
-    auth:
-        username: _json_key
-        password: $JSON_GCLOUD_CREDENTIALS
+        auth:
+            username: _json_key
+            password: $JSON_GCLOUD_CREDENTIALS
 
 version: 2
 jobs:
