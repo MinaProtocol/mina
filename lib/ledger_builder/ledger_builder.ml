@@ -874,9 +874,7 @@ end = struct
 
     let budget_non_neg t = Fee.Signed.sgn t.budget = Sgn.Pos
 
-    let coinbase_added t =
-      (*t.coinbase_total = Protocols.Coda_praos.coinbase_amount*)
-      t.queue_consumption.coinbase_parts > 0
+    let coinbase_added t = t.queue_consumption.coinbase_parts > 0
 
     let add_transaction t ((txv: Transaction.With_valid_signature.t), undo) =
       let tx = (txv :> Transaction.t) in
@@ -917,13 +915,7 @@ end = struct
           t.queue_consumption
         else Queue_consumption.add_fee_transfer t.queue_consumption t.self_pk
       in
-      let queue_consumption =
-        Queue_consumption.add_transaction q
-        (*let queue_consumption =
-                Queue_consumption.add_fee_transfer
-                  (Queue_consumption.add_transaction t.queue_consumption)
-                  t.self_pk*)
-      in
+      let queue_consumption = Queue_consumption.add_transaction q in
       t.work_done = Queue_consumption.count queue_consumption * 2
 
     let enough_work_for_coinbase t =
@@ -1117,14 +1109,21 @@ end = struct
       in
       go res_util res_util n
 
-  let allocate_resources_for_txns logger get_completed_work ledger
+  let allocate_resources coinbase_parts logger get_completed_work ledger
       init_res_util : Resource_util.t =
     let res_util, txns_to_undo =
       check_resources_add_txns logger get_completed_work ledger init_res_util
         init_res_util
     in
     let _ = undo_txns ledger txns_to_undo in
-    res_util
+    let cb = coinbase_parts res_util in
+    let res =
+      { res_util.resources with
+        available_queue_space= cb + res_util.resources.available_queue_space }
+    in
+    update_coinbase_count cb logger
+      {res_util with resources= res}
+      get_completed_work
 
   let process_works_add_txns logger ws_seq ts_seq get_completed_work ledger
       self partitions : Resources.t * Resources.t option =
@@ -1137,34 +1136,26 @@ end = struct
         ~available_queue_space:(fst partitions - reserve_space_for_coinbase)
         ~self
     in
-    let res_util =
-      allocate_resources_for_txns logger get_completed_work ledger
-        { Resource_util.resources= init_resources
-        ; work_to_do= ws_seq
-        ; txns_to_include= ts_seq }
+    let init_res_util =
+      { Resource_util.resources= init_resources
+      ; work_to_do= ws_seq
+      ; txns_to_include= ts_seq }
     in
     (*splitting coinbase into n parts*)
-    let n =
-      Option.value_map (snd partitions) ~default:1 ~f:(fun _ ->
+    let n (res_util: Resource_util.t) =
+      Option.value_map (snd partitions) ~default:reserve_space_for_coinbase ~f:
+        (fun _ ->
           let n' =
             res_util.resources.available_queue_space
             - Resources.Queue_consumption.count
                 res_util.resources.queue_consumption
-            + reserve_space_for_coinbase
           in
           (*if there are no more transactions to be included in the second prediff then don't bother splitting up the coinbase*)
-          if Sequence.length res_util.txns_to_include = 0 then 1 else n' )
+          if n' > 1 && Sequence.length res_util.txns_to_include = 0 then 1
+          else n' )
     in
-    let res =
-      { res_util.resources with
-        available_queue_space=
-          reserve_space_for_coinbase + res_util.resources.available_queue_space
-      }
-    in
-    let res_util_coinbase : Resource_util.t =
-      update_coinbase_count n logger
-        {res_util with resources= res}
-        get_completed_work
+    let res_util_coinbase =
+      allocate_resources n logger get_completed_work ledger init_res_util
     in
     let resources2 =
       Option.map (snd partitions) ~f:(fun p2 ->
@@ -1175,22 +1166,15 @@ end = struct
           let init_resources =
             Resources.init ~available_queue_space:(p2 - coinbase_parts) ~self
           in
-          let res_util_txn =
-            allocate_resources_for_txns logger get_completed_work ledger
-              { Resource_util.resources= init_resources
-              ; work_to_do= res_util_coinbase.work_to_do
-              ; txns_to_include= res_util_coinbase.txns_to_include }
-          in
-          let res =
-            { res_util_txn.resources with
-              available_queue_space=
-                coinbase_parts + res_util_txn.resources.available_queue_space
-            }
+          let init_res_util =
+            { Resource_util.resources= init_resources
+            ; work_to_do= res_util_coinbase.work_to_do
+            ; txns_to_include= res_util_coinbase.txns_to_include }
           in
           let res_util_final =
-            update_coinbase_count coinbase_parts logger
-              {res_util_txn with resources= res}
-              get_completed_work
+            allocate_resources
+              (fun _ -> coinbase_parts)
+              logger get_completed_work ledger init_res_util
           in
           (*All the slots have been filled in the first pre_diff*)
           assert (
