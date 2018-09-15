@@ -22,28 +22,23 @@ struct
     let log = Logger.child log name in
     let n = 2 in
     let should_propose i = i = 0 in
-    let snark_work_public_keys i = 
-      if i = 0
-      then Some Genesis_ledger.high_balance_pk
-      else None
+    let snark_work_public_keys i =
+      if i = 0 then Some Genesis_ledger.high_balance_pk else None
     in
     let receiver_pk = Genesis_ledger.low_balance_pk in
     let sender_sk = Genesis_ledger.high_balance_sk in
     let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
     let%bind testnet =
-      Coda_worker_testnet.test log n should_propose
-        snark_work_public_keys
+      Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
     let rec go i =
       let%bind () = after (Time.Span.of_sec 1.) in
-      let%bind () = 
+      let%bind () =
         Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk
           receiver_pk send_amount fee
       in
-      if i > 0 
-      then (go (i-1))
-      else return ()
+      if i > 0 then go (i - 1) else return ()
     in
     let%bind () = go 30 in
     Coda_worker_testnet.Api.shutdown_testnet testnet
