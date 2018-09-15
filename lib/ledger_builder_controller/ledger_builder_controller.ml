@@ -165,7 +165,11 @@ module type Inputs_intf = sig
     val destroy : t -> unit
 
     val fetch :
-      t -> Ledger_hash.t -> [`Ok of Ledger.t | `Target_changed] Deferred.t
+         t
+      -> Ledger_hash.t
+      -> [ `Ok of Ledger.t
+         | `Target_changed of Ledger_hash.t option * Ledger_hash.t ]
+         Deferred.t
   end
 
   module Net : sig
@@ -451,7 +455,7 @@ end = struct
           in
           Option.map job ~f:(fun job -> (job, time_received)) )
     in
-    let replace last ((current_transition, _), time_received) =
+    let replace last ({Job.input= current_transition; _}, time_received) =
       match last with
       | None -> `Cancel_and_do_next
       | Some last ->
@@ -469,7 +473,9 @@ end = struct
     in
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:
-          (fun last ((((current_transition, _) as job), _) as job_with_time) ->
+          (fun last
+          ((({Job.input= current_transition; _} as job), _) as job_with_time)
+          ->
             match replace last job_with_time with
             | `Skip -> return last
             | `Cancel_and_do_next ->
