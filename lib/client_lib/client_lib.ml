@@ -77,9 +77,10 @@ module Status = struct
         ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
         ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
         ~commit_id:(fun acc x ->
-          match (f x) with
+          match f x with
           | None -> acc
-          | Some sha1 -> ("Git SHA1", Git_sha.sexp_of_t sha1 |> Sexp.to_string) :: acc)
+          | Some sha1 ->
+              ("Git SHA1", Git_sha.sexp_of_t sha1 |> Sexp.to_string) :: acc )
         ~conf_dir:(fun acc x -> ("Configuration Dir", f x) :: acc)
         ~peers:(fun acc x -> ("Peers", List.to_string ~f:Fn.id (f x)) :: acc)
         ~transactions_sent:(fun acc x ->

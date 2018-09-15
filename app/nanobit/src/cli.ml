@@ -6,8 +6,7 @@ open Cli_lib
 open Coda_main
 module Git_sha = Client_lib.Git_sha
 
-let commit_id =
-  Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
+let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
 
 let force_updates = false
 
@@ -219,14 +218,16 @@ let () =
                "The version for the testnet has changed. I am %s, I should be \
                 %s. Please download the latest Coda software at \
                 https://github.com/codaprotocol/coda/releases"
-               (local_id |> Option.map ~f:str |> Option.value ~default:"[COMMIT_SHA1 not set]") (str remote_id))
+               ( local_id |> Option.map ~f:str
+               |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+               (str remote_id))
       in
       match commit_id with
       | None -> finish None remote_id
       | Some sha when Git_sha.equal sha remote_id ->
-        Async.Clock.run_after (Time.Span.of_hr 1.0)
-          (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
-          ()
+          Async.Clock.run_after (Time.Span.of_hr 1.0)
+            (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
+            ()
       | Some _ -> finish commit_id remote_id
     else Deferred.unit
   in
