@@ -3,7 +3,7 @@ open Async_kernel
 
 module type Inputs_intf = sig
   module State_hash : sig
-    type t
+    type t [@@deriving sexp, eq]
   end
 
   module Consensus_mechanism : sig
@@ -128,7 +128,72 @@ struct
   open Inputs
   open Transition_logic_state
 
-  type t = {state: Transition_logic_state.t; log: Logger.t}
+  (* HACK: To prevent a DoS from healthy nodes trying to gossip the same
+   * transition, there's an extra piece of mutable state here that we adjust
+   * whenever starting an async job and use to drop duplicate incoming
+   * transitions *)
+  module Pending_target : sig
+    type t [@@deriving sexp]
+
+    val create : parent_log:Logger.t -> t
+
+    val attempt_replace : t -> External_transition.t -> [`Continue | `Stop]
+
+    val finish_target : t -> External_transition.t -> unit
+  end = struct
+    type t = {mutable data: State_hash.t option; log: Logger.t sexp_opaque}
+    [@@deriving sexp]
+
+    let create ~parent_log =
+      {data= None; log= Logger.child parent_log __MODULE__}
+
+    let attempt_replace t transition =
+      let h' =
+        External_transition.target_state transition |> Protocol_state.hash
+      in
+      match t.data with
+      | None ->
+          Logger.trace t.log
+            !"No existing pending target, now replaced with %{sexp: \
+              State_hash.t}"
+            h' ;
+          t.data <- Some h' ;
+          `Continue
+      | Some h ->
+          if State_hash.equal h h' then (
+            Logger.trace t.log
+              !"Same existing pending target, so dropping %{sexp: State_hash.t}"
+              h' ;
+            `Stop )
+          else (
+            Logger.trace t.log
+              !"Pending target was on %{sexp: State_hash.t} and now is \
+                switching to %{sexp: State_hash.t}"
+              h h' ;
+            t.data <- Some h' ;
+            `Continue )
+
+    let finish_target t transition =
+      let h' =
+        External_transition.target_state transition |> Protocol_state.hash
+      in
+      Option.iter t.data ~f:(fun h ->
+          if State_hash.equal h h' then
+            Logger.trace t.log
+              !"Finishing pending target %{sexp: State_hash.t} cleanly"
+              h
+          else (
+            Logger.warn t.log
+              !"Attempted to finishing pending target %{sexp: State_hash.t}, \
+                but we are pending on %{sexp: State_hash.t}"
+              h h' ;
+            t.data <- None ) )
+  end
+
+  type t =
+    { state: Transition_logic_state.t
+    ; log: Logger.t
+    ; pending_target: Pending_target.t }
 
   let state {state; _} = state
 
@@ -145,7 +210,8 @@ struct
       end)
 
   let create state parent_log : t =
-    {state; log= Logger.child parent_log __MODULE__}
+    let log = Logger.child parent_log __MODULE__ in
+    {state; log; pending_target= Pending_target.create ~parent_log:log}
 
   let locked_and_best tree =
     let path = Transition_tree.longest_path tree in
@@ -218,7 +284,7 @@ struct
 
     let create (t: t0) new_tree old_tree new_best_path (logger: Logger.t)
         (transition: External_transition.t) : t =
-      (transition, run t new_tree old_tree new_best_path logger)
+      Job.create transition ~f:(run t new_tree old_tree new_best_path logger)
   end
 
   let local_get_tip t ~p_tip ~p_trans =
@@ -283,11 +349,10 @@ struct
                         , External_transition.target_state last_transition ) )
           | None -> return (Or_error.error_string "Not found locally")
 
-  let on_new_transition catchup ({state; log} as t)
-      (transition: External_transition.t) ~(time_received: Unix_timestamp.t) :
-      ( Transition_logic_state.Change.t list
-      * (External_transition.t, Transition_logic_state.Change.t list) Job.t
-        option )
+  let unguarded_on_new_transition catchup
+      ({state; log; pending_target= _} as t)
+      (transition: External_transition.t) ~time_received :
+      (Change.t list * (External_transition.t, Change.t list) Job.t option)
       Deferred.t =
     let longest_branch_tip = Transition_logic_state.longest_branch_tip t.state
     and ktree = Transition_logic_state.ktree t.state in
@@ -360,4 +425,25 @@ struct
               , Some
                   (Path_traversal.create t new_tree old_tree new_best_path log
                      transition) )
+
+  let on_new_transition catchup ({state= _; log= _; pending_target} as t)
+      (transition: External_transition.t) ~(time_received: Unix_timestamp.t) :
+      (Change.t list * (External_transition.t, Change.t list) Job.t option)
+      Deferred.t =
+    match Pending_target.attempt_replace pending_target transition with
+    | `Stop -> return ([], None)
+    | `Continue ->
+        let%map changes, job =
+          unguarded_on_new_transition catchup t transition ~time_received
+        in
+        match job with
+        | None ->
+            Pending_target.finish_target pending_target transition ;
+            (changes, job)
+        | Some job ->
+            ( changes
+            , Some
+                (Job.after job ~f:(fun () ->
+                     Pending_target.finish_target pending_target transition ))
+            )
 end

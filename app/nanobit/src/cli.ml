@@ -5,6 +5,13 @@ open Blockchain_snark
 open Cli_lib
 open Coda_main
 
+let commit_id =
+  match [%getenv "CODA_COMMIT_SHA1"] with
+  | Some sha1 -> sha1
+  | None -> "[CODA_COMMIT_SHA1 not set]"
+
+let force_updates = false
+
 module type Coda_intf = sig
   type ledger_proof
 
@@ -194,6 +201,29 @@ let () =
         Core.Printf.eprintf "%s\n" msg ;
         Core.exit 1
   in
+  let rec ensure_testnet_id_still_good () =
+    if force_updates then
+      let open Cohttp_async in
+      let%bind resp, body =
+        Client.get (Uri.of_string "http://updates.o1test.net/testnet_id")
+      in
+      let%map body_string = Body.to_string body in
+      let body_string = String.strip body_string in
+      if commit_id <> body_string then
+        exit1
+          ~msg:
+            (sprintf
+               "The version for the testnet has changed. I am %s, I should be \
+                %s. Please download the latest Coda software at \
+                https://github.com/codaprotocol/coda/releases"
+               commit_id body_string)
+      else
+        Async.Clock.run_after (Time.Span.of_hr 1.0)
+          (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
+          ()
+    else Deferred.unit
+  in
+  ensure_testnet_id_still_good () |> don't_wait_for ;
   let env name ~f ~default =
     let name = Printf.sprintf "CODA_%s" name in
     Unix.getenv name
