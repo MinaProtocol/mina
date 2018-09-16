@@ -57,6 +57,7 @@ module Status = struct
     ; block_count: int
     ; uptime_secs: int
     ; ledger_merkle_root: string
+    ; commit_id: Git_sha.t option
     ; conf_dir: string
     ; peers: string list
     ; transactions_sent: int
@@ -75,6 +76,11 @@ module Status = struct
         ~block_count:(fun acc x -> ("Block Count", Int.to_string (f x)) :: acc)
         ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
         ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
+        ~commit_id:(fun acc x ->
+          match f x with
+          | None -> acc
+          | Some sha1 ->
+              ("Git SHA1", Git_sha.sexp_of_t sha1 |> Sexp.to_string) :: acc )
         ~conf_dir:(fun acc x -> ("Configuration Dir", f x) :: acc)
         ~peers:(fun acc x -> ("Peers", List.to_string ~f:Fn.id (f x)) :: acc)
         ~transactions_sent:(fun acc x ->
@@ -137,3 +143,5 @@ module Get_public_keys = struct
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_public_keys" ~version:0 ~bin_query ~bin_response
 end
+
+module Git_sha = Git_sha
