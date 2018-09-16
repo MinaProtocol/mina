@@ -159,6 +159,8 @@ module type Config_intf = sig
 
   val transaction_capacity_log_2 : int
   (** Capacity of transactions per block *)
+
+  val commit_id : Client_lib.Git_sha.t option
 end
 
 module type Init_intf = sig
@@ -964,6 +966,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
+    ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
     ; transactions_sent= !txn_count
