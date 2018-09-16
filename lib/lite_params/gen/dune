@@ -1,0 +1,16 @@
+(executable
+  (name gen)
+  (libraries
+     async
+      core
+      crypto_params
+      snarky
+      snarkette
+      ppxlib
+      snark_keys
+      nanobit_base
+      lite_compat
+    )
+   (preprocess (pps ppx_jane ppxlib.metaquot ppxlib.runner))
+   (modes native)
+  )
