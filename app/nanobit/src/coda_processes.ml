@@ -24,16 +24,15 @@ struct
     in
     (discovery_ports, external_ports, peers)
 
-  let local_configs ?(transition_interval= 1000.0)
-      ?proposal_interval ?(should_propose= Fn.const true) n
-      ~program_dir ~snark_worker_public_keys =
-      let discovery_ports, external_ports, peers = net_configs n in
-      let peers = [] :: List.drop peers 1 in
-      let args =
-        List.map3_exn discovery_ports external_ports peers ~f:(fun x y z ->
-            (x, y, z) )
-      in
-      let configs = 
+  let local_configs ?(transition_interval= 1000.0) ?proposal_interval
+      ?(should_propose= Fn.const true) n ~program_dir ~snark_worker_public_keys =
+    let discovery_ports, external_ports, peers = net_configs n in
+    let peers = [] :: List.drop peers 1 in
+    let args =
+      List.map3_exn discovery_ports external_ports peers ~f:(fun x y z ->
+          (x, y, z) )
+    in
+    let configs =
       List.mapi args ~f:(fun i (discovery_port, external_port, peers) ->
           let public_key =
             Option.map snark_worker_public_keys ~f:(fun keys ->
@@ -46,8 +45,8 @@ struct
                       { Coda_process.Coda_worker.Snark_worker_config.public_key
                       ; port= 20000 + i } ) )
           in
-          Coda_process.local_config ?proposal_interval ~peers
-            ~discovery_port ~external_port ~snark_worker_config ~program_dir
+          Coda_process.local_config ?proposal_interval ~peers ~discovery_port
+            ~external_port ~snark_worker_config ~program_dir
             ~should_propose:(should_propose i) () )
     in
     configs
@@ -57,6 +56,8 @@ struct
     let rest = List.drop configs 1 in
     let%bind first = Coda_process.spawn_exn first in
     let%bind () = after (Time.Span.of_sec first_delay) in
-    let%map rest = Deferred.List.all (List.map rest ~f:(fun c -> Coda_process.spawn_exn c)) in
-    first::rest
+    let%map rest =
+      Deferred.List.all (List.map rest ~f:(fun c -> Coda_process.spawn_exn c))
+    in
+    first :: rest
 end
