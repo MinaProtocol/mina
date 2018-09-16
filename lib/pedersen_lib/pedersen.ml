@@ -9,6 +9,7 @@ module type S = sig
     type t [@@deriving bin_io, sexp, eq]
 
     val fold_bits : t -> bool Fold.t
+
     val fold : t -> bool Triple.t Fold.t
 
     val ( = ) : t -> t -> bool
@@ -39,6 +40,7 @@ module Make (Field : sig
   type t [@@deriving sexp, bin_io, eq]
 
   val fold_bits : t -> bool Fold.t
+
   val fold : t -> bool Triple.t Fold.t
 end) (Curve : sig
   type t [@@deriving sexp]
@@ -57,6 +59,7 @@ struct
     type t = Field.t [@@deriving sexp, bin_io, eq]
 
     let fold_bits = Field.fold_bits
+
     let fold = Field.fold
 
     let ( = ) = equal
