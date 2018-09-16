@@ -1,8 +1,33 @@
-open Core
+open Core_kernel
 
 type ('a, 's) fold = init:'s -> f:('s -> 'a -> 's) -> 's
 
 type 'a t = {fold: 's. ('a, 's) fold}
+
+let map (t: 'a t) ~(f: 'a -> 'b) : 'b t =
+  { fold=
+      (fun ~init ~f:update -> t.fold ~init ~f:(fun acc x -> update acc (f x)))
+  }
+
+let concat (t: 'a t t) : 'a t =
+  { fold=
+      (fun ~init ~f ->
+        t.fold ~init ~f:(fun acc inner -> inner.fold ~init:acc ~f) ) }
+
+let concat_map (t: 'a t) ~(f: 'a -> 'b t) : 'b t =
+  { fold=
+      (fun ~init ~f:update ->
+        t.fold ~init ~f:(fun acc x -> (f x).fold ~init:acc ~f:update) ) }
+
+include Monad.Make (struct
+  type nonrec 'a t = 'a t
+
+  let map = `Custom map
+
+  let return x = {fold= (fun ~init ~f -> f init x)}
+
+  let bind = concat_map
+end)
 
 let to_list (t: 'a t) : 'a list =
   List.rev (t.fold ~init:[] ~f:(Fn.flip List.cons))
@@ -64,5 +89,20 @@ let string_bits s =
             let update i acc = f acc (ith_bit_int c i) in
             update 0 acc |> update 1 |> update 2 |> update 3 |> update 4
             |> update 5 |> update 6 |> update 7 ) ) }
+
+let bool_t_to_string =
+  let module State = struct
+    type t = {curr: int; acc: char list; i: int}
+  end in
+  let open State in
+  fun t ->
+    let {curr; i; acc} =
+      t.fold ~init:{curr= 0; acc= []; i= 0} ~f:(fun {curr; acc; i} b ->
+          let curr = if b then curr lor (1 lsl i) else curr in
+          if i = 7 then {i= 0; acc= Char.of_int_exn curr :: acc; curr= 0}
+          else {i= i + 1; acc; curr} )
+    in
+    let cs = if i = 0 then acc else Char.of_int_exn curr :: acc in
+    String.of_char_list cs
 
 let string_triples s = group3 ~default:false (string_bits s)
