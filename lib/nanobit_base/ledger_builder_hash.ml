@@ -17,6 +17,7 @@ module Aux_hash = struct
   include Stable.V1
 
   let of_bytes = Fn.id
+
   let to_bytes = Fn.id
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
@@ -39,6 +40,7 @@ end
 include Stable.V1
 
 let ledger_hash {ledger_hash; _} = ledger_hash
+
 let aux_hash {aux_hash; _} = aux_hash
 
 let dummy =
