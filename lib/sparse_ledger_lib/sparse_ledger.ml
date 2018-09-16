@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 type ('hash, 'account) tree =
   | Account of 'account
