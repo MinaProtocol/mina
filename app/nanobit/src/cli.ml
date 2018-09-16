@@ -4,11 +4,9 @@ open Nanobit_base
 open Blockchain_snark
 open Cli_lib
 open Coda_main
+module Git_sha = Client_lib.Git_sha
 
-let commit_id =
-  match [%getenv "CODA_COMMIT_SHA1"] with
-  | Some sha1 -> sha1
-  | None -> "[CODA_COMMIT_SHA1 not set]"
+let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
 
 let force_updates = false
 
@@ -154,6 +152,8 @@ let daemon (type ledger_proof) (module Kernel
          let genesis_proof = Precomputed_values.base_proof
 
          let transaction_capacity_log_2 = transaction_capacity_log_2
+
+         let commit_id = commit_id
        end in
        let%bind (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
@@ -208,19 +208,27 @@ let () =
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id")
       in
       let%map body_string = Body.to_string body in
-      let body_string = String.strip body_string in
-      if commit_id <> body_string then
+      (* Maybe the Git_sha.of_string is a bit gratuitous *)
+      let remote_id = Git_sha.of_string @@ String.strip body_string in
+      let finish local_id remote_id =
+        let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
         exit1
           ~msg:
             (sprintf
                "The version for the testnet has changed. I am %s, I should be \
                 %s. Please download the latest Coda software at \
                 https://github.com/codaprotocol/coda/releases"
-               commit_id body_string)
-      else
-        Async.Clock.run_after (Time.Span.of_hr 1.0)
-          (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
-          ()
+               ( local_id |> Option.map ~f:str
+               |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+               (str remote_id))
+      in
+      match commit_id with
+      | None -> finish None remote_id
+      | Some sha when Git_sha.equal sha remote_id ->
+          Async.Clock.run_after (Time.Span.of_hr 1.0)
+            (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
+            ()
+      | Some _ -> finish commit_id remote_id
     else Deferred.unit
   in
   ensure_testnet_id_still_good () |> don't_wait_for ;
