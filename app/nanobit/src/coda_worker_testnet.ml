@@ -28,7 +28,7 @@ struct
 
     let start t i = failwith "nyi"
 
-    let stop t i = failwith "nyi"
+    let stop t i = Coda_process.disconnect (List.nth_exn t.workers i)
 
     let send_transaction t i sk pk amount fee =
       Linear_pipe.write t.transaction_writer (i, sk, pk, amount, fee)
