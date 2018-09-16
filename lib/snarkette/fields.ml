@@ -27,11 +27,23 @@ end
 module type Fp_intf = sig
   include Intf
 
+  type nat
+
   val of_int : int -> t
 
   val of_string : string -> t
 
   val of_bits : bool list -> t option
+
+  val order : nat
+
+  val to_bigint : t -> nat
+
+  val fold_bits : t -> bool Fold.t
+
+  val fold : t -> bool Triple.t Fold.t
+
+  val length_in_bits : int
 end
 
 module type Extension_intf = sig
@@ -42,24 +54,18 @@ module type Extension_intf = sig
   val scale : t -> base -> t
 
   val of_base : base -> t
+
+  val project_to_base : t -> base
+
+  val to_base_elements : t -> base list
 end
 
 module Make_fp
     (N : Nat_intf.S) (Info : sig
         val order : N.t
-    end) : sig
-  include Fp_intf
-
-  val order : N.t
-
-  val to_bigint : t -> N.t
-
-  val fold_bits : t -> bool Fold.t
-
-  val fold : t -> bool Triple.t Fold.t
-
-  val length_in_bits : int
-end = struct
+    end) :
+  Fp_intf with type nat := N.t
+= struct
   include Info
 
   type t = N.t [@@deriving eq, bin_io, sexp]
@@ -188,9 +194,13 @@ end = struct
 
   type t = Fp.t * Fp.t * Fp.t [@@deriving eq, bin_io, sexp]
 
+  let to_base_elements (x, y, z) = [x; y; z]
+
   let componentwise f (x1, x2, x3) (y1, y2, y3) = (f x1 y1, f x2 y2, f x3 y3)
 
   let of_base x = (x, Fp.zero, Fp.zero)
+
+  let project_to_base (x, _, _) = x
 
   let one = of_base Fp.one
 
@@ -202,7 +212,7 @@ end = struct
 
   let ( + ) = componentwise Fp.( + )
 
-  let ( - ) = componentwise Fp.( + )
+  let ( - ) = componentwise Fp.( - )
 
   let ( * ) (a1, b1, c1) (a2, b2, c2) =
     let a = Fp.(a1 * a2) in
@@ -258,6 +268,10 @@ end = struct
   type t = Fp.t * Fp.t [@@deriving eq, bin_io, sexp]
 
   let of_base x = (x, Fp.zero)
+
+  let to_base_elements (x, y) = [x; y]
+
+  let project_to_base (x, _) = x
 
   let one = of_base Fp.one
 
@@ -325,9 +339,13 @@ end = struct
 
   type base = Fp3.t
 
+  let to_base_elements (x, y) = [x; y]
+
   let int_sub = ( - )
 
   let of_base x = (x, Fp3.zero)
+
+  let project_to_base (x, _) = x
 
   let zero = of_base Fp3.zero
 
@@ -370,7 +388,7 @@ end = struct
     let a = Fp3.(a1 * a2) in
     let b = Fp3.(b1 * b2) in
     let beta_b = mul_by_non_residue b in
-    Fp3.(a + beta_b, ((a1 + b1) * (a1 + b2)) - a - b)
+    Fp3.(a + beta_b, ((a1 + b1) * (a2 + b2)) - a - b)
 
   let inv (a, b) =
     let t1 = Fp3.square b in
@@ -427,14 +445,18 @@ end = struct
     let naf = find_wnaf (module N) 1 exponent in
     let rec go found_nonzero res i =
       if i < 0 then res
-      else
+      else (
         let res = if found_nonzero then cyclotomic_square res else res in
-        let found_nonzero = naf.(i) <> 0 in
-        let res =
-          if found_nonzero then if naf.(i) > 0 then res * x else res * x_inv
-          else res
-        in
-        go found_nonzero res (int_sub i 1)
+        if naf.(i) <> 0 then begin
+          let found_nonzero = true in
+          let res =
+            if naf.(i) > 0 then res * x else res * x_inv
+          in
+          go found_nonzero res (int_sub i 1)
+        end else begin
+          go found_nonzero res (int_sub i 1)
+        end
+      )
     in
     go false one (int_sub (Array.length naf) 1)
 

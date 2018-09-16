@@ -2,6 +2,7 @@ open Core_kernel
 
 module Extended_projective = struct
   type 'a t = {x: 'a; y: 'a; z: 'a; t: 'a}
+  [@@deriving sexp]
 end
 
 module type Simple_elliptic_curve_intf = sig
@@ -48,7 +49,7 @@ end
 
 module Make
     (N : Nat_intf.S)
-    (Fq : Fields.Fp_intf)
+    (Fq : Fields.Fp_intf with type nat := N.t)
     (Fq_twist : Fields.Extension_intf with type base = Fq.t) (Fq_target : sig
         include Fields.Degree_2_extension_intf with type base = Fq_twist.t
 
@@ -134,11 +135,14 @@ struct
         let t = Fq_twist.square z in
         {Extended_projective.x; y; z; t}
       in
-      ( next
-      , { Dbl_coeffs.c_H= Fq_twist.(square (next.z + current.t) - next.t - a)
+      let coeffs =
+        { Dbl_coeffs.c_H= Fq_twist.(square (next.z + current.t) - next.t - a)
         ; c_4C= Fq_twist.(c + c + c + c)
         ; c_J= Fq_twist.(square (f + t) - g - a)
-        ; c_L= Fq_twist.(square (f + current.x) - g - b) } )
+        ; c_L= Fq_twist.(square (f + current.x) - g - b) }
+      in
+      ( next
+      , coeffs )
 
     let mixed_addition_step_for_flipped_miller_loop base_x base_y
         base_y_squared {Extended_projective.x= x1; y= y1; z= z1; t= t1} =
@@ -164,7 +168,7 @@ struct
       let qx, qy = G2.to_affine_coordinates q in
       let qy2 = Fq_twist.square qy in
       let qx_over_twist = Fq_twist.(qx * twist_inv) in
-      let qy_over_twist = Fq_twist.(qx * twist_inv) in
+      let qy_over_twist = Fq_twist.(qy * twist_inv) in
       let rec go found_one r dbl_coeffs add_coeffs i =
         if i < 0 then (r, dbl_coeffs, add_coeffs)
         else
@@ -181,6 +185,7 @@ struct
               let add_coeffs = ac :: add_coeffs in
               go found_one r dbl_coeffs add_coeffs (i - 1)
             else go found_one r dbl_coeffs add_coeffs (i - 1)
+
       in
       let r, dbl_coeffs, add_coeffs =
         go false

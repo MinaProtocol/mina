@@ -181,6 +181,8 @@ module Groth_maller = Groth_maller.Make (struct
   module N = N
   module G1 = G1
   module G2 = G2
+  module Fq = Fq
+  module Fqe = Fq3
   module Fq_target = Fq6
   module Pairing = Pairing
 end)

@@ -22,12 +22,17 @@ struct
 
   let is_zero t = Fq.(equal zero t.x) && Fq.(equal zero t.z)
 
-  let is_well_formed {x; y; z} =
-    let open Fq in
-    let x2 = square x in
-    let y2 = square y in
-    let z2 = square z in
-    equal (z * (y2 - (Coefficients.b * z2))) (x * (x2 + (Coefficients.a * z2)))
+  let is_well_formed ({x; y; z} as t) =
+    if is_zero t
+    then true
+    else
+      let open Fq in
+      let x2 = square x in
+      let y2 = square y in
+      let z2 = square z in
+      equal
+        (z * (y2 - (Coefficients.b * z2)))
+        (x * (x2 + (Coefficients.a * z2)))
 
   let ( + ) t1 t2 =
     if is_zero t1 then t2
