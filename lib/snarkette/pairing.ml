@@ -1,8 +1,7 @@
 open Core_kernel
 
 module Extended_projective = struct
-  type 'a t = {x: 'a; y: 'a; z: 'a; t: 'a}
-  [@@deriving sexp]
+  type 'a t = {x: 'a; y: 'a; z: 'a; t: 'a} [@@deriving sexp]
 end
 
 module type Simple_elliptic_curve_intf = sig
@@ -141,8 +140,7 @@ struct
         ; c_J= Fq_twist.(square (f + t) - g - a)
         ; c_L= Fq_twist.(square (f + current.x) - g - b) }
       in
-      ( next
-      , coeffs )
+      (next, coeffs)
 
     let mixed_addition_step_for_flipped_miller_loop base_x base_y
         base_y_squared {Extended_projective.x= x1; y= y1; z= z1; t= t1} =
@@ -185,7 +183,6 @@ struct
               let add_coeffs = ac :: add_coeffs in
               go found_one r dbl_coeffs add_coeffs (i - 1)
             else go found_one r dbl_coeffs add_coeffs (i - 1)
-
       in
       let r, dbl_coeffs, add_coeffs =
         go false

@@ -1,15 +1,14 @@
 open Core_kernel
 open Fold_lib
 
-let (=) = `Don't_use_polymorphic_equality
+let ( = ) = `Don't_use_polymorphic_equality
 
 module type Backend_intf = sig
   module N : Nat_intf.S
 
   module Fq : Fields.Fp_intf with type nat := N.t
 
-  module Fqe : Fields.Extension_intf
-    with type base = Fq.t
+  module Fqe : Fields.Extension_intf with type base = Fq.t
 
   module G1 : sig
     type t [@@deriving sexp, bin_io]
@@ -63,40 +62,34 @@ module Make (Backend : Backend_intf) = struct
     [@@deriving bin_io, sexp]
 
     let map_to_two t ~f =
-      let (xs, ys) =
+      let xs, ys =
         List.fold_left t ~init:([], []) ~f:(fun (xs, ys) a ->
-          let (x, y) = f a in
-          (x :: xs, y :: ys))
+            let x, y = f a in
+            (x :: xs, y :: ys) )
       in
       (List.rev xs, List.rev ys)
 
-    let fold_bits { h; g_alpha; h_beta; g_alpha_h_beta; g_gamma; h_gamma; query }  =
-      let g1s =
-        Array.to_list query @ [ g_alpha; g_gamma ]
-      in
-      let g2s =
-        [ h; h_beta; h_gamma ]
-      in
-      let gts = [ Fq_target.unitary_inverse g_alpha_h_beta ] in
-      let g1_elts, g1_signs =
-        map_to_two g1s ~f:G1.to_affine_coordinates
-      in
+    let fold_bits {h; g_alpha; h_beta; g_alpha_h_beta; g_gamma; h_gamma; query} =
+      let g1s = Array.to_list query @ [g_alpha; g_gamma] in
+      let g2s = [h; h_beta; h_gamma] in
+      let gts = [Fq_target.unitary_inverse g_alpha_h_beta] in
+      let g1_elts, g1_signs = map_to_two g1s ~f:G1.to_affine_coordinates in
       let non_zero_base_coordinate a =
         let x = Fqe.project_to_base a in
-        assert (not (Fq.equal x Fq.zero));
+        assert (not (Fq.equal x Fq.zero)) ;
         x
       in
       let g2_elts, g2_signs =
         map_to_two g2s ~f:(fun g ->
-          let (x, y) = G2.to_affine_coordinates g in
-          (Fqe.to_base_elements x, non_zero_base_coordinate y))
+            let x, y = G2.to_affine_coordinates g in
+            (Fqe.to_base_elements x, non_zero_base_coordinate y) )
       in
       let gt_elts, gt_signs =
         map_to_two gts ~f:(fun g ->
-          (* g is unitary, so (a, b) satisfy a quadratic over Fqe and thus
+            (* g is unitary, so (a, b) satisfy a quadratic over Fqe and thus
              b is determined by a up to sign *)
-          let (a, b) = g in
-          (Fqe.to_base_elements a, non_zero_base_coordinate b))
+            let a, b = g in
+            (Fqe.to_base_elements a, non_zero_base_coordinate b) )
       in
       let open Fold in
       let of_fq_list_list ls =
@@ -108,14 +101,10 @@ module Make (Backend : Backend_intf) = struct
       let parity_bit x = N.test_bit (Fq.to_bigint x) 0 in
       let parity_bits = Fn.compose (map ~f:parity_bit) of_list in
       concat_map (of_list g1_elts) ~f:Fq.fold_bits
-      +> of_fq_list_list g2_elts
-      +> of_fq_list_list gt_elts
-      +> parity_bits g1_signs
-      +> parity_bits g2_signs
-      +> parity_bits gt_signs
+      +> of_fq_list_list g2_elts +> of_fq_list_list gt_elts
+      +> parity_bits g1_signs +> parity_bits g2_signs +> parity_bits gt_signs
 
-    let fold t =
-      Fold.group3 ~default:false (fold_bits t)
+    let fold t = Fold.group3 ~default:false (fold_bits t)
 
     module Processed = struct
       type t =
@@ -146,7 +135,9 @@ module Make (Backend : Backend_intf) = struct
 
     let is_well_formed {a; b; c} =
       let open Or_error.Let_syntax in
-      let err x = sprintf "proof was not well-formed (%s was off its curve)" x in
+      let err x =
+        sprintf "proof was not well-formed (%s was off its curve)" x
+      in
       let%bind () = check (G1.is_well_formed a) (err "a") in
       let%bind () = check (G2.is_well_formed b) (err "b") in
       let%map () = check (G1.is_well_formed c) (err "c") in
@@ -162,38 +153,39 @@ module Make (Backend : Backend_intf) = struct
         "Input length was not as expected"
     in
     let%bind () = Proof.is_well_formed proof in
-    printf !"Input = %{sexp: N.t list}\n" input;
+    printf !"Input = %{sexp: N.t list}\n" input ;
     let input_acc =
       List.foldi input ~init:(vk.query).(0) ~f:(fun i acc x ->
           let q = (vk.query).(1 + i) in
           G1.(acc + (x * q)) )
     in
-    printf !"input_acc = %{sexp: Fq.t * Fq.t}\n" (G1.to_affine_coordinates input_acc);
+    printf
+      !"input_acc = %{sexp: Fq.t * Fq.t}\n"
+      (G1.to_affine_coordinates input_acc) ;
     let test1 =
       let l =
         Pairing.unreduced_pairing G1.(a + vk.g_alpha) G2.(b + vk.h_beta)
       in
-      printf !"test1_l = %{sexp: Fq_target.t}\n" l;
+      printf !"test1_l = %{sexp: Fq_target.t}\n" l ;
       let r1 = vk.g_alpha_h_beta in
-      printf !"test1_r1 = %{sexp: Fq_target.t}\n" r1;
+      printf !"test1_r1 = %{sexp: Fq_target.t}\n" r1 ;
       let r2 =
         Pairing.miller_loop
           (Pairing.G1_precomputation.create input_acc)
           vk.h_gamma_pc
       in
-      printf !"test1_r2 = %{sexp: Fq_target.t}\n" r2;
+      printf !"test1_r2 = %{sexp: Fq_target.t}\n" r2 ;
       let r3 =
         Pairing.miller_loop (Pairing.G1_precomputation.create c) vk.h_pc
       in
-      printf !"test1_r3 = %{sexp: Fq_target.t}\n" r3;
+      printf !"test1_r3 = %{sexp: Fq_target.t}\n" r3 ;
       let test =
         let open Fq_target in
         Pairing.final_exponentiation (unitary_inverse l * r2 * r3) * r1
       in
-      printf !"test1 = %{sexp: Fq_target.t}\n" test;
-      printf !"one = %{sexp: Fq_target.t}\n" Fq_target.one;
-      printf !"test = one? %b\n"
-        Fq_target.(equal test one);
+      printf !"test1 = %{sexp: Fq_target.t}\n" test ;
+      printf !"one = %{sexp: Fq_target.t}\n" Fq_target.one ;
+      printf !"test = one? %b\n" Fq_target.(equal test one) ;
       Fq_target.(equal test one)
     in
     let%bind () = check test1 "First pairing check failed" in

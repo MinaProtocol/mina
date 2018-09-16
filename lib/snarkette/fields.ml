@@ -64,8 +64,8 @@ module Make_fp
     (N : Nat_intf.S) (Info : sig
         val order : N.t
     end) :
-  Fp_intf with type nat := N.t
-= struct
+  Fp_intf with type nat := N.t =
+struct
   include Info
 
   type t = N.t [@@deriving eq, bin_io, sexp]
@@ -445,18 +445,13 @@ end = struct
     let naf = find_wnaf (module N) 1 exponent in
     let rec go found_nonzero res i =
       if i < 0 then res
-      else (
+      else
         let res = if found_nonzero then cyclotomic_square res else res in
-        if naf.(i) <> 0 then begin
+        if naf.(i) <> 0 then
           let found_nonzero = true in
-          let res =
-            if naf.(i) > 0 then res * x else res * x_inv
-          in
+          let res = if naf.(i) > 0 then res * x else res * x_inv in
           go found_nonzero res (int_sub i 1)
-        end else begin
-          go found_nonzero res (int_sub i 1)
-        end
-      )
+        else go found_nonzero res (int_sub i 1)
     in
     go false one (int_sub (Array.length naf) 1)
 

@@ -23,8 +23,7 @@ struct
   let is_zero t = Fq.(equal zero t.x) && Fq.(equal zero t.z)
 
   let is_well_formed ({x; y; z} as t) =
-    if is_zero t
-    then true
+    if is_zero t then true
     else
       let open Fq in
       let x2 = square x in
