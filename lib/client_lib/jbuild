@@ -7,6 +7,6 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries (core async nanobit_base ppx_deriving_yojson.runtime yojson))
-  (preprocess (pps (ppx_jane ppx_deriving_yojson)))
+  (preprocess (pps (ppx_jane ppx_deriving_yojson ppx_deriving.eq)))
   (synopsis "Lib powering the client interactions with the daemon")))
 
