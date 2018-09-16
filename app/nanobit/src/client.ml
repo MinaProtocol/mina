@@ -25,6 +25,67 @@ let daemon_port_flag =
 let json_flag =
   Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
+let run_daemon ~(f: unit -> unit Deferred.t) () =
+  let our_binary = Sys.executable_name in
+  printf !"%s\n" our_binary ;
+  let%bind p =
+    Process.create_exn () ~prog:our_binary ~args:["daemon"; "-background"]
+  in
+  printf "Daemon created: Daemon Pid: %s\n" (Pid.to_string @@ Process.pid p) ;
+  let%bind () = after (Time.Span.of_sec 5.) in
+  f ()
+
+module Daemon = struct
+  type state =
+    | Start
+    | Show_menu
+    | Select_action
+    | Run_daemon
+    | Run_client
+    | Abort
+
+  let reader = Reader.stdin
+
+  let print_menu () =
+    printf
+      "%!Before starting a client command, you will need to start the Coda \
+        daemon.\n \
+        Would you like to run the daemon?\n-----------------------------------\n\n%!"
+
+  let invoke_daemon () =
+    let our_binary = Sys.executable_name in
+    let%bind p =
+      Process.create_exn () ~prog:our_binary ~args:["daemon"; "-background"]
+    in
+    printf !"Daemon created: Daemon Pid: %s\n%!" (Pid.to_string @@ Process.pid p) ;
+    let%bind () = after (Time.Span.of_sec 5.) in
+    Deferred.unit
+
+  let run ~f =
+    (*  TODO: Maybe return a function *)
+    let rec go = function
+      | Start -> (* TODO: have the option to show daemon *)
+                 go Show_menu
+      | Show_menu -> print_menu () ; go Select_action
+      | Select_action -> (
+        (* TODO: find a way to delete characters *)
+        printf "Y/N: ";
+        match%bind Reader.read_line (Lazy.force reader) with
+        | `Eof -> go Select_action
+        | `Ok input ->
+          match String.capitalize input with
+          | "Y" | "YES" -> go Run_daemon
+          | "N" | "NO" -> go Abort
+          | _ -> go Select_action )
+      | Run_daemon ->
+          let%bind () = invoke_daemon () in
+          go Run_client
+      | Run_client -> f ()
+      | Abort -> Deferred.unit
+    in
+    fun () -> go Start
+end
+
 let get_balance =
   Command.async ~summary:"Get balance associated with an address"
     (let open Command.Let_syntax in
@@ -49,11 +110,12 @@ let get_public_keys =
   Command.async ~summary:"Get public keys"
     (let open Command.Let_syntax in
     let%map_open json = json_flag and port = daemon_port_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let port = Option.value ~default:default_client_port port in
-      let open Client_lib in
-      dispatch Get_public_keys.rpc () port >>| print (module Public_key) json)
+    Daemon.run ~f:(fun () ->
+        let open Deferred.Let_syntax in
+        let port = Option.value ~default:default_client_port port in
+        let open Client_lib in
+        dispatch Get_public_keys.rpc () port >>| print (module Public_key) json
+    ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
