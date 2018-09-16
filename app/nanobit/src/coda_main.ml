@@ -757,12 +757,9 @@ module type Main_intf = sig
       val merkle_path :
            t
         -> Ledger.Location.t
-        -> [ `Left of Merkle_hash.t
-           | `Right of Merkle_hash.t ]
-           list
+        -> [`Left of Merkle_hash.t | `Right of Merkle_hash.t] list
 
       val num_accounts : t -> int
-
 
       val depth : int
 
@@ -992,11 +989,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             ~f:(fun acc key ->
               let loc = Option.value_exn (Ledger.location_of_key ledger key) in
               Lite_lib.Sparse_ledger.add_path acc
-                (Lite_compat.merkle_path
-                   (Ledger.merkle_path ledger loc))
+                (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
                 (Lite_compat.public_key key)
-                (Lite_compat.account
-                   (Option.value_exn (Ledger.get ledger loc)))
+                (Lite_compat.account (Option.value_exn (Ledger.get ledger loc)))
               )
             ~init:
               (Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
@@ -1012,16 +1007,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
           ; blockchain_state=
               Lite_compat.blockchain_state
                 (Consensus_mechanism.Protocol_state.blockchain_state state)
-          ; consensus_state= 
+          ; consensus_state=
               consensus_state_to_lite
-                (Consensus_mechanism.Protocol_state.consensus_state state)
-          }
+                (Consensus_mechanism.Protocol_state.consensus_state state) }
         in
         let proof = Lite_compat.proof proof in
-        { Lite_base.Lite_chain.proof
-        ; ledger
-        ; protocol_state }
-      )
+        {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
   let setup_local_server ?rest_server_port ~minibit ~log ~client_port () =
     let log = Logger.child log "client" in
@@ -1068,29 +1059,28 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
               (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
-                let route_not_found () = Server.respond_string ~status:`Not_found "Route not found" in
+                let route_not_found () =
+                  Server.respond_string ~status:`Not_found "Route not found"
+                in
                 match Uri.path uri with
                 | "/" -> Server.respond_with_file "index.html"
                 | "/_build/default/app/lite/main.bc.js" ->
-                  Server.respond_with_file
-                    "_build/default/app/lite/main.bc.js" 
-                | "/chain" ->
-                  begin match get_lite_chain with
+                    Server.respond_with_file
+                      "_build/default/app/lite/main.bc.js"
+                | "/chain" -> (
+                  match get_lite_chain with
                   | None -> route_not_found ()
                   | Some get_lite_chain ->
-                    Server.respond_string
-                      (B64.encode
-                        (Binable.to_string
-                          (module Lite_base.Lite_chain)
-                          (get_lite_chain minibit [])))
-                  end
+                      Server.respond_string
+                        (B64.encode
+                           (Binable.to_string
+                              (module Lite_base.Lite_chain)
+                              (get_lite_chain minibit []))) )
                 | "/status" ->
                     Server.respond_string
                       ( get_status minibit |> Client_lib.Status.to_yojson
                       |> Yojson.Safe.pretty_to_string )
-                | _ ->
-                    route_not_found ()
-                )) ) ;
+                | _ -> route_not_found () )) ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
     in
