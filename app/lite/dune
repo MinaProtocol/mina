@@ -4,6 +4,7 @@
     base64
     lite_params
     lite_base
+    lite_lib
     snarkette
     pedersen_lib
     num
