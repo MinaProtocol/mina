@@ -153,39 +153,28 @@ module Make (Backend : Backend_intf) = struct
         "Input length was not as expected"
     in
     let%bind () = Proof.is_well_formed proof in
-    printf !"Input = %{sexp: N.t list}\n" input ;
     let input_acc =
       List.foldi input ~init:(vk.query).(0) ~f:(fun i acc x ->
           let q = (vk.query).(1 + i) in
           G1.(acc + (x * q)) )
     in
-    printf
-      !"input_acc = %{sexp: Fq.t * Fq.t}\n"
-      (G1.to_affine_coordinates input_acc) ;
     let test1 =
       let l =
         Pairing.unreduced_pairing G1.(a + vk.g_alpha) G2.(b + vk.h_beta)
       in
-      printf !"test1_l = %{sexp: Fq_target.t}\n" l ;
       let r1 = vk.g_alpha_h_beta in
-      printf !"test1_r1 = %{sexp: Fq_target.t}\n" r1 ;
       let r2 =
         Pairing.miller_loop
           (Pairing.G1_precomputation.create input_acc)
           vk.h_gamma_pc
       in
-      printf !"test1_r2 = %{sexp: Fq_target.t}\n" r2 ;
       let r3 =
         Pairing.miller_loop (Pairing.G1_precomputation.create c) vk.h_pc
       in
-      printf !"test1_r3 = %{sexp: Fq_target.t}\n" r3 ;
       let test =
         let open Fq_target in
         Pairing.final_exponentiation (unitary_inverse l * r2 * r3) * r1
       in
-      printf !"test1 = %{sexp: Fq_target.t}\n" test ;
-      printf !"one = %{sexp: Fq_target.t}\n" Fq_target.one ;
-      printf !"test = one? %b\n" Fq_target.(equal test one) ;
       Fq_target.(equal test one)
     in
     let%bind () = check test1 "First pairing check failed" in
