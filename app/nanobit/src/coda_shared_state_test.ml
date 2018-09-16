@@ -29,11 +29,13 @@ struct
     let sender_sk = Genesis_ledger.high_balance_sk in
     let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
+    let proposal_interval = 5000 in
     let%bind testnet =
-      Coda_worker_testnet.test log n should_propose snark_work_public_keys
+      Coda_worker_testnet.test ~proposal_interval log n should_propose
+        snark_work_public_keys
     in
     let rec go i =
-      let%bind () = after (Time.Span.of_sec 1.) in
+      let%bind () = after (Time.Span.of_ms (Float.of_int proposal_interval)) in
       let%bind () =
         Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk
           receiver_pk send_amount fee
