@@ -15,7 +15,9 @@ struct
   let spawn_exn (config: Coda_worker.Input.t) =
     let%bind conn, process =
       Coda_worker.spawn_in_foreground_exn ~env:config.env
-        ~on_failure:Error.raise ~cd:config.program_dir ~shutdown_on:Disconnect
+        ~on_failure:(fun e ->
+          Print.printf "spawn error %s\n" (Error.to_string_hum e) )
+        ~cd:config.program_dir ~shutdown_on:Disconnect
         ~connection_state_init_arg:()
         ~connection_timeout:(Time.Span.of_sec 15.) config
     in
