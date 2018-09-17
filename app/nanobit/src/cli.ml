@@ -170,6 +170,7 @@ let daemon (type ledger_proof) (module Kernel
        let%bind (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
        let module Run = Run (Config) (M) in
+       Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
