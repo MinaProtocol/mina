@@ -12,7 +12,7 @@ run_unit_tests() {
 
 
 run_integration_tests() {
-  for test in full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-state-test' 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' 'transaction-snark-profiler -check-only'; do
+  for test in full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-state-test' 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1'  'coda-restart-node-test' 'transaction-snark-profiler -check-only'; do
     echo "------------------------------------------------------------------------------------------"
 
     date
