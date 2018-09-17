@@ -57,7 +57,7 @@ module Make (Input : Input_intf) = struct
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
         Root_hash.equal desired_root (L.merkle_root mt)
-    | `Target_changed -> false
+    | `Target_changed _ -> false
 
   let%test_unit "new_goal_soon" =
     let l1, _k1 = L.load_ledger num_accts 1 in
@@ -94,7 +94,7 @@ module Make (Input : Input_intf) = struct
           SL.fetch lsync !desired_root )
     with
     | `Ok _ -> failwith "shouldn't happen"
-    | `Target_changed ->
+    | `Target_changed _ ->
       match
         Async.Thread_safe.block_on_async_exn (fun () ->
             SL.wait_until_valid lsync !desired_root )
@@ -102,7 +102,7 @@ module Make (Input : Input_intf) = struct
       | `Ok mt ->
           [%test_result : Root_hash.t] ~expect:(L.merkle_root l3)
             (L.merkle_root mt)
-      | `Target_changed -> failwith "the target changed again"
+      | `Target_changed _ -> failwith "the target changed again"
 end
 
 module TestL3_3 = Make (Test_ledger.Make (struct

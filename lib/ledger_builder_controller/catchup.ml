@@ -97,7 +97,11 @@ module type Inputs_intf = sig
     val destroy : t -> unit
 
     val fetch :
-      t -> Ledger_hash.t -> [`Ok of Ledger.t | `Target_changed] Deferred.t
+         t
+      -> Ledger_hash.t
+      -> [ `Ok of Ledger.t
+         | `Target_changed of Ledger_hash.t option * Ledger_hash.t ]
+         Deferred.t
   end
 
   module Net : sig
@@ -153,6 +157,9 @@ module Make (Inputs : Inputs_intf) = struct
           (Deferred.map (Ivar.read ivar) ~f:ignore)
       with
       | `Ok ledger -> (
+          Logger.debug log
+            !"Successfully caught up to ledger %{sexp: Ledger_hash.t}"
+            h ;
           (* TODO: This should be parallelized with the syncing *)
           match%map
             Interruptible.uninterruptible
@@ -173,6 +180,10 @@ module Make (Inputs : Inputs_intf) = struct
                 in
                 let new_tip = Tip.of_transition_and_lb transition lb in
                 Tip.assert_materialization_of new_tip transition ;
+                Logger.debug log
+                  !"Successfully caught up to full ledger-builder %{sexp: \
+                    Ledger_builder_hash.t}"
+                  (Ledger_builder.hash lb) ;
                 let open Transition_logic_state.Change in
                 [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
             | Error e ->
@@ -185,10 +196,15 @@ module Make (Inputs : Inputs_intf) = struct
               Logger.faulty_peer log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;
               [] )
-      | `Target_changed -> return []
+      | `Target_changed (old_target, new_target) ->
+          Logger.debug log
+            !"Existing sync-ledger target_changed from %{sexp: Ledger_hash.t \
+              option} to %{sexp: Ledger_hash.t}"
+            old_target new_target ;
+          return []
     in
     (work, ivar)
 
   let sync (t: t) (state: Transition_logic_state.t) transition =
-    (transition, do_sync t state)
+    Job.create transition ~f:(do_sync t state)
 end

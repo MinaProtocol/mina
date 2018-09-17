@@ -136,6 +136,7 @@ struct
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
         in
+        let%bind () = File_system.create_dir conf_dir in
         let module Config = struct
           let logger = log
 
@@ -151,6 +152,8 @@ struct
           let genesis_proof = Precomputed_values.base_proof
 
           let transaction_capacity_log_2 = 3
+
+          let commit_id = None
         end in
         let%bind (module Init) = make_init (module Config) (module Kernel) in
         let module Main = Coda.Make (Init) () in

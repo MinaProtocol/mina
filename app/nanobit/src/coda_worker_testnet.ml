@@ -3,6 +3,7 @@ open Async
 open Coda_worker
 open Coda_main
 open Signature_lib
+open Nanobit_base
 
 module Make
     (Ledger_proof : Ledger_proof_intf)
@@ -15,21 +16,22 @@ struct
   module Api = struct
     type t =
       { workers: Coda_process.t list
-      ; finish_ivar: unit Ivar.t
-      ; finished: unit Deferred.t }
+      ; transaction_writer:
+          ( int
+          * Private_key.t
+          * Public_key.Compressed.t
+          * Currency.Amount.t
+          * Currency.Fee.t )
+          Linear_pipe.Writer.t }
 
-    let create workers finish_ivar finished = {workers; finish_ivar; finished}
+    let create workers transaction_writer = {workers; transaction_writer}
 
     let start t i = failwith "nyi"
 
     let stop t i = failwith "nyi"
 
-    let shutdown_testnet t = Ivar.fill t.finish_ivar () ; t.finished
-
     let send_transaction t i sk pk amount fee =
-      let {workers} = t in
-      Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk amount
-        fee
+      Linear_pipe.write t.transaction_writer (i, sk, pk, amount, fee)
   end
 
   let start_prefix_check log transitions proposal_interval =
@@ -103,13 +105,89 @@ struct
           (Linear_pipe.iter transitions ~f:(fun (prev, curr) ->
                Linear_pipe.write all_transitions_w (prev, curr, i) )) )
 
-  let start_checks log workers proposal_interval =
+  let start_transaction_check log transitions transactions workers
+      proposal_interval =
+    let block_counts = Array.init (List.length workers) ~f:(fun _ -> 0) in
+    let active_accounts = ref [] in
+    let get_balances pk =
+      Deferred.List.all
+        (List.map workers ~f:(fun w -> Coda_process.get_balance_exn w pk))
+    in
+    let add_to_active_accounts pk =
+      match List.findi !active_accounts ~f:(fun i (apk, _, _) -> apk = pk) with
+      | None ->
+          let%map balances = get_balances pk in
+          let send_block_counts = Array.to_list block_counts in
+          assert (List.length balances = List.length send_block_counts) ;
+          active_accounts :=
+            (pk, send_block_counts, balances) :: !active_accounts
+      | Some (i, a) -> return ()
+    in
+    let check_active_accounts () =
+      let%map new_aa =
+        Deferred.List.filter !active_accounts ~f:
+          (fun (pk, send_block_counts, send_balances) ->
+            let%bind balances = get_balances pk in
+            let current_block_counts = Array.to_list block_counts in
+            let%map dones =
+              Deferred.List.all
+                (List.init (List.length send_block_counts) ~f:(fun i ->
+                     let balance = List.nth_exn balances i in
+                     let send_block_count = List.nth_exn send_block_counts i in
+                     let current_block_count =
+                       List.nth_exn current_block_counts i
+                     in
+                     let send_balance = List.nth_exn send_balances i in
+                     if balance <> send_balance then return true
+                     else
+                       let diff = current_block_count - send_block_count in
+                       Logger.warn log
+                         !"%d balance not yet updated %{sexp: \
+                           Currency.Balance.t option} %d"
+                         i balance diff ;
+                       if diff >= 5 then (
+                         Logger.fatal log "balance took too long to update" ;
+                         ignore (exit 1) ) ;
+                       return false ))
+            in
+            let all_done = List.for_all dones ~f:Fn.id in
+            if all_done then false else true )
+      in
+      active_accounts := new_aa
+    in
+    List.iteri transitions ~f:(fun i transition ->
+        don't_wait_for
+          (Linear_pipe.iter transition ~f:(fun t ->
+               block_counts.(i) <- 1 + block_counts.(i) ;
+               Deferred.unit )) ) ;
+    don't_wait_for
+      (Linear_pipe.iter transactions ~f:(fun (i, sk, pk, amount, fee) ->
+           let%bind () = add_to_active_accounts pk in
+           Coda_process.send_transaction_exn (List.nth_exn workers i) sk pk
+             amount fee )) ;
+    don't_wait_for
+      (let rec go () =
+         let%bind () = check_active_accounts () in
+         let%bind () = after (Time.Span.of_sec 0.5) in
+         go ()
+       in
+       go ()) ;
+    ()
+
+  let start_checks log workers proposal_interval transaction_reader =
     don't_wait_for
       (let%map transitions =
          Deferred.List.all
            (List.map workers ~f:(fun w -> Coda_process.strongest_ledgers_exn w))
        in
-       start_prefix_check log transitions proposal_interval ;
+       let transitions =
+         List.map transitions ~f:(fun t -> Linear_pipe.fork2 t)
+       in
+       let prefix_transitions = List.map transitions ~f:fst in
+       let transaction_transitions = List.map transitions ~f:snd in
+       start_prefix_check log prefix_transitions proposal_interval ;
+       start_transaction_check log transaction_transitions transaction_reader
+         workers proposal_interval ;
        ())
 
   (* note: this is very declarative, maybe this should be more imperative? *)
@@ -121,29 +199,16 @@ struct
   let test ?(proposal_interval= 1000) log n should_propose
       snark_work_public_keys =
     let log = Logger.child log "worker_testnet" in
-    let ready =
-      Deferred.create (fun ready_ivar ->
-          let fill_ready = ref None in
-          let finished =
-            let%bind program_dir = Unix.getcwd () in
-            Coda_processes.init () ;
-            Coda_processes.spawn_local_processes_exn n ~proposal_interval
-              ~program_dir ~should_propose
-              ~snark_worker_public_keys:
-                (Some (List.init n snark_work_public_keys))
-              ~f:(fun workers ->
-                let%bind () =
-                  Deferred.create (fun finish_ivar ->
-                      start_checks log workers proposal_interval ;
-                      Option.value_exn !fill_ready (workers, finish_ivar) )
-                in
-                return () )
-          in
-          fill_ready :=
-            Some
-              (fun (workers, finish_ivar) ->
-                let api = Api.create workers finish_ivar finished in
-                Ivar.fill ready_ivar api ) )
+    let%bind program_dir = Unix.getcwd () in
+    Coda_processes.init () ;
+    let configs =
+      Coda_processes.local_configs n ~proposal_interval ~program_dir
+        ~should_propose
+        ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
     in
-    ready
+    let%map workers = Coda_processes.spawn_local_processes_exn configs in
+    let transaction_reader, transaction_writer = Linear_pipe.create () in
+    let api = Api.create workers transaction_writer in
+    start_checks log workers proposal_interval transaction_reader ;
+    api
 end
