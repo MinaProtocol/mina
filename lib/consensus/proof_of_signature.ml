@@ -4,12 +4,16 @@ open Nanobit_base
 open Fold_lib
 open Signature_lib
 
-module Global_keypair = struct
-  let private_key =
-    Private_key.of_base64_exn
-      "JgDwuhZ+kgxR1jBT+F9hpH96nxD/TIGZ7fVSpw9YAGDlhwltebhc"
+let signer_private_key =
+  Private_key.of_base64_exn
+    "JgIac0/nQUXN8aFYi5DReBpp5mDNgJm+pWLEwvXWIVnohK4hyRd9"
 
-  let public_key = Public_key.of_private_key_exn private_key
+module Global_public_key = struct
+  let compressed =
+    Public_key.Compressed.of_base64_exn
+      "JgEXgOrWncISbQXE5jOC2lEX0d3+aONQCdi2Z2ib1H+mLXUKSJU4AQ=="
+
+  let t = Public_key.decompress_exn compressed
 end
 
 module type Inputs_intf = sig
@@ -20,6 +24,8 @@ module type Inputs_intf = sig
   end
 
   val proposal_interval : Time.Span.t
+
+  val private_key : Private_key.t option
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -60,7 +66,8 @@ struct
 
     let create_value blockchain_state =
       { signature=
-          Blockchain_state.Signature.sign Global_keypair.private_key
+          Blockchain_state.Signature.sign
+            (Option.value_exn Inputs.private_key)
             blockchain_state }
 
     let genesis = create_value Blockchain_state.genesis
@@ -82,8 +89,7 @@ struct
       Length.length_in_triples + Public_key.Compressed.length_in_triples
 
     let genesis =
-      { length= Length.zero
-      ; signer_public_key= Public_key.compress Global_keypair.public_key }
+      {length= Length.zero; signer_public_key= Global_public_key.compressed}
 
     let to_hlist {length; signer_public_key} =
       H_list.[length; signer_public_key]
@@ -114,7 +120,7 @@ struct
 
     let update state =
       { length= Length.succ state.length
-      ; signer_public_key= Public_key.compress Global_keypair.public_key }
+      ; signer_public_key= Global_public_key.compressed }
 
     let length t = t.length
   end
@@ -138,7 +144,7 @@ struct
     let consensus_state =
       let open Consensus_state in
       { length= Length.succ previous_consensus_state.length
-      ; signer_public_key= Public_key.compress Global_keypair.public_key }
+      ; signer_public_key= Global_public_key.compressed }
     in
     let protocol_state =
       Protocol_state.create_value
@@ -158,7 +164,7 @@ struct
     Blockchain_state.Signature.Checked.verifies
       (module Shifted)
       signature
-      (Public_key.var_of_t Global_keypair.public_key)
+      (Public_key.var_of_t Global_public_key.t)
       (transition |> Snark_transition.blockchain_state)
 
   let next_state_checked (state: Consensus_state.var) _state_hash _block =
@@ -166,8 +172,7 @@ struct
     let open Snark_params.Tick.Let_syntax in
     let%bind length = Length.increment_var state.length in
     let signer_public_key =
-      Public_key.Compressed.var_of_t
-      @@ Public_key.compress Global_keypair.public_key
+      Public_key.Compressed.var_of_t @@ Global_public_key.compressed
     in
     let%map () =
       Public_key.Compressed.Checked.Assert.equal state.signer_public_key
