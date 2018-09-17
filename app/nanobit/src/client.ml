@@ -40,10 +40,13 @@ module Daemon_cli = struct
   let does_daemon_exist port =
     let open Deferred.Let_syntax in
     let%map result =
-      Rpc.Connection.client ~handshake_timeout:(Time.Span.of_sec 1.)
+      Rpc.Connection.client
         (Tcp.Where_to_connect.of_host_and_port (of_local_port port))
     in
     Result.is_ok result
+
+  let kill p =
+    Process.run_exn () ~prog:"kill" ~args:["-9"; Pid.to_string @@ Process.pid p]
 
   let print_menu () =
     printf
@@ -53,14 +56,27 @@ module Daemon_cli = struct
        -----------------------------------\n\n\
        %!"
 
+  let timeout = Time.Span.of_sec 10.0
+
+  let heartbeat = Time.Span.of_sec 0.5
+
   let invoke_daemon port =
-    let our_binary = Sys.executable_name in
-    let args =
-      ["daemon"; "-background"; "-client-port"; sprintf "%d" port]
+    let rec check_daemon () =
+      let%bind result = does_daemon_exist port in
+      if result then Deferred.unit
+      else
+        let%bind () = Async.after heartbeat in
+        check_daemon ()
     in
-    let%bind _p = Process.run_exn () ~prog:our_binary ~args in
+    let our_binary = Sys.executable_name in
+    let args = ["daemon"; "-background"; "-client-port"; sprintf "%d" 666] in
+    let%bind p = Process.create_exn () ~prog:our_binary ~args in
     (* Wait for process to start the client server *)
-    after (Time.Span.of_sec 5.)
+    match%bind Async.Clock.with_timeout timeout (check_daemon ()) with
+    | `Result _ -> Deferred.unit
+    | `Timeout ->
+        let%bind _ = kill p in
+        failwith "Cannot connect to daemon"
 
   let run ~port ~f =
     let port = Option.value port ~default:default_client_port in
@@ -70,12 +86,12 @@ module Daemon_cli = struct
           if has_daemon then go Run_client else go Show_menu
       | Show_menu -> print_menu () ; go Select_action
       | Select_action -> (
-          printf "Y/N: " ;
+          printf "[Y/n]: " ;
           match%bind Reader.read_line (Lazy.force reader) with
           | `Eof -> go Select_action
           | `Ok input ->
             match String.capitalize input with
-            | "Y" | "YES" -> go Run_daemon
+            | "Y" | "YES" | "" -> go Run_daemon
             | "N" | "NO" -> go Abort
             | _ -> go Select_action )
       | Run_daemon ->
