@@ -507,6 +507,9 @@ end = struct
   (** Returns a reference to a ledger_builder with hash [hash], materialize a
    fresh ledger at a specific hash if necessary; also gives back target_state *)
   let local_get_ledger t hash =
+    Logger.trace t.log
+      !"Attempting to local-get-ledger for %{sexp: Ledger_builder_hash.t}"
+      hash ;
     local_get_ledger' t hash
       ~p_tip:(fun hash tip ->
         Ledger_builder_hash.equal
@@ -525,6 +528,9 @@ end = struct
    fun t (hash, query) ->
     (* TODO: We should cache, but in the future it will be free *)
     let open Deferred.Or_error.Let_syntax in
+    Logger.trace t.log
+      !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
+      hash ;
     let%map ledger =
       local_get_ledger' t hash
         ~p_tip:(fun hash tip ->
