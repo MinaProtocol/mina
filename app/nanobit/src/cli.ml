@@ -93,7 +93,7 @@ let daemon (type ledger_proof) (module Kernel
            Daemon.daemonize
              ~redirect_stdout:(`File_append (conf_dir ^/ "coda.stdout"))
              ~redirect_stderr:(`File_append (conf_dir ^/ "coda.stderr"))
-             ~allow_threads_to_have_been_created:true () ;
+             () ;
            Deferred.return conf_dir )
          else Sys.home_directory () >>| compute_conf_dir
        in
