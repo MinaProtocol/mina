@@ -10,7 +10,7 @@ end
 module type Pool_diff_intf = sig
   type pool
 
-  type t
+  type t [@@deriving sexp]
 
   val apply : pool -> t -> t Deferred.Or_error.t
 end

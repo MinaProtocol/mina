@@ -295,6 +295,7 @@ struct
     in
     match ktree with
     | None ->
+        Logger.trace t.log !"Local-get-tip unsuccessful because no ktree" ;
         return
           (Or_error.error_string "Not found locally, because I have no ktree")
     | Some ktree ->
@@ -326,6 +327,10 @@ struct
               (* Note: We can't have zero transitions because then we would have
              * matched the locked_tip *)
               let last_transition = List.last_exn path.Path.path in
+              Logger.trace t.log
+                !"Attempting a local path traversal to last_transition \
+                  %{sexp: External_transition.t}"
+                last_transition ;
               let job =
                 Path_traversal.create t ktree ktree path t.log last_transition
               in
@@ -344,10 +349,16 @@ struct
                   | None -> Or_error.error_string "Path traversing failed"
                   | Some longest_branch_tip ->
                       assert (p_tip longest_branch_tip) ;
+                      Logger.trace t.log
+                        !"Successfully path traversed to last_transition \
+                          %{sexp: External_transition.t}"
+                        last_transition ;
                       Ok
                         ( longest_branch_tip
                         , External_transition.target_state last_transition ) )
-          | None -> return (Or_error.error_string "Not found locally")
+          | None ->
+              return
+                (Or_error.error_string "Not found locally within our ktree")
 
   let unguarded_on_new_transition catchup
       ({state; log; pending_target= _} as t)
