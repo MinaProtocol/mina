@@ -16,6 +16,9 @@ struct
   module Api = struct
     type t =
       { workers: Coda_process.t list
+      ; configs: Coda_process.Coda_worker.Input.t list
+      ; start_writer:
+          (int * Coda_process.Coda_worker.Input.t) Linear_pipe.Writer.t
       ; transaction_writer:
           ( int
           * Private_key.t
@@ -24,9 +27,11 @@ struct
           * Currency.Fee.t )
           Linear_pipe.Writer.t }
 
-    let create workers transaction_writer = {workers; transaction_writer}
+    let create configs workers transaction_writer start_writer =
+      {workers; configs; start_writer; transaction_writer}
 
-    let start t i = failwith "nyi"
+    let start t i =
+      Linear_pipe.write t.start_writer (i, List.nth_exn t.configs i)
 
     let stop t i = Coda_process.disconnect (List.nth_exn t.workers i)
 
@@ -171,18 +176,25 @@ struct
        go ()) ;
     ()
 
-  let events workers =
+  let events workers start_reader =
     let event_r, event_w = Linear_pipe.create () in
-    List.iteri workers ~f:(fun i w ->
-        don't_wait_for
-          (let%bind transitions = Coda_process.strongest_ledgers_exn w in
-           Linear_pipe.iter transitions ~f:(fun t ->
-               let%map () = Linear_pipe.write event_w (`Transition (i, t)) in
-               () )) ) ;
+    let connect_worker i worker =
+      let%bind transitions = Coda_process.strongest_ledgers_exn worker in
+      Linear_pipe.iter transitions ~f:(fun t ->
+          Linear_pipe.write event_w (`Transition (i, t)) )
+    in
+    don't_wait_for
+      (Linear_pipe.iter start_reader ~f:(fun (i, config) ->
+           don't_wait_for
+             (let%bind worker = Coda_process.spawn_exn config in
+              connect_worker i worker) ;
+           Deferred.unit )) ;
+    List.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
     event_r
 
-  let start_checks log workers proposal_interval transaction_reader =
-    let event_pipe = events workers in
+  let start_checks log workers proposal_interval transaction_reader
+      start_reader =
+    let event_pipe = events workers start_reader in
     let prefix_events, transaction_events = Linear_pipe.fork2 event_pipe in
     start_prefix_check log workers prefix_events proposal_interval ;
     start_transaction_check log transaction_events transaction_reader workers
@@ -206,7 +218,8 @@ struct
     in
     let%map workers = Coda_processes.spawn_local_processes_exn configs in
     let transaction_reader, transaction_writer = Linear_pipe.create () in
-    let api = Api.create workers transaction_writer in
-    start_checks log workers proposal_interval transaction_reader ;
+    let start_reader, start_writer = Linear_pipe.create () in
+    let api = Api.create configs workers transaction_writer start_writer in
+    start_checks log workers proposal_interval transaction_reader start_reader ;
     api
 end
