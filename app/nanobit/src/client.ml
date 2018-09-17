@@ -56,18 +56,16 @@ module Daemon_cli = struct
   let invoke_daemon port =
     let our_binary = Sys.executable_name in
     let args =
-      ["daemon"; "-background"]
-      @ Option.value_map port ~default:[] ~f:(fun p ->
-            ["-client-port"; sprintf "%d" p] )
+      ["daemon"; "-background"; "-client-port"; sprintf "%d" port]
     in
     let%bind _p = Process.run_exn () ~prog:our_binary ~args in
     (* Wait for process to start the client server *)
     after (Time.Span.of_sec 5.)
 
   let run ~port ~f =
+    let port = Option.value port ~default:default_client_port in
     let rec go = function
       | Start ->
-          let port = Option.value port ~default:default_client_port in
           let%bind has_daemon = does_daemon_exist port in
           if has_daemon then go Run_client else go Show_menu
       | Show_menu -> print_menu () ; go Select_action
