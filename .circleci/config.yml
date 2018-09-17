@@ -86,7 +86,7 @@ jobs:
             - checkout
             - store_artifacts:
                 path: /tmp/artifacts
-           - run:
+            - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
