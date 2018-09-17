@@ -40,8 +40,7 @@ struct
       in
       if i > 0 then go (i - 1) else return ()
     in
-    let%bind () = go 30 in
-    Coda_worker_testnet.Api.shutdown_testnet testnet
+    go 30
 
   let command =
     Command.async_spec ~summary:"Test that workers share states"
