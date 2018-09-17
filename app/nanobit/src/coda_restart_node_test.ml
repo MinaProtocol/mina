@@ -39,11 +39,12 @@ struct
     in
     let%bind () = after (Time.Span.of_sec 5.) in
     let%bind () = Coda_worker_testnet.Api.start testnet 1 in
-    let%map () = after (Time.Span.of_sec 30.) in
+    let%map () = after (Time.Span.of_sec 15.) in
     ()
 
   let command =
-    Command.async_spec ~summary:"Simple use of Async Rpc_parallel V2"
+    Command.async_spec
+      ~summary:"Test of stopping, waiting, then starting a node"
       Command.Spec.(empty)
       main
 end
