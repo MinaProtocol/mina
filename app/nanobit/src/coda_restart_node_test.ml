@@ -31,7 +31,7 @@ struct
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
     let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info log "stopping %d" 1 ;
+    Logger.info log "Stopping %d" 1 ;
     let%bind () = Coda_worker_testnet.Api.stop testnet 1 in
     let%bind () =
       Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk receiver_pk
