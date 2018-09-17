@@ -34,9 +34,9 @@ struct
       Linear_pipe.write t.transaction_writer (i, sk, pk, amount, fee)
   end
 
-  let start_prefix_check log transitions proposal_interval =
+  let start_prefix_check log workers events proposal_interval =
     let all_transitions_r, all_transitions_w = Linear_pipe.create () in
-    let chains = Array.init (List.length transitions) ~f:(fun i -> []) in
+    let chains = Array.init (List.length workers) ~f:(fun i -> []) in
     let check_chains chains =
       let lengths =
         Array.to_list (Array.map chains ~f:(fun c -> List.length c))
@@ -100,13 +100,11 @@ struct
               chains.(i) <- chain ;
               check_chains chains ;
               return chains ))) ;
-    List.iteri transitions ~f:(fun i transitions ->
-        don't_wait_for
-          (Linear_pipe.iter transitions ~f:(fun (prev, curr) ->
-               Linear_pipe.write all_transitions_w (prev, curr, i) )) )
+    don't_wait_for
+      (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
+           Linear_pipe.write all_transitions_w (prev, curr, i) ))
 
-  let start_transaction_check log transitions transactions workers
-      proposal_interval =
+  let start_transaction_check log events transactions workers proposal_interval =
     let block_counts = Array.init (List.length workers) ~f:(fun _ -> 0) in
     let active_accounts = ref [] in
     let get_balances pk =
@@ -155,11 +153,10 @@ struct
       in
       active_accounts := new_aa
     in
-    List.iteri transitions ~f:(fun i transition ->
-        don't_wait_for
-          (Linear_pipe.iter transition ~f:(fun t ->
-               block_counts.(i) <- 1 + block_counts.(i) ;
-               Deferred.unit )) ) ;
+    don't_wait_for
+      (Linear_pipe.iter events ~f:(function `Transition (i, t) ->
+           block_counts.(i) <- 1 + block_counts.(i) ;
+           Deferred.unit )) ;
     don't_wait_for
       (Linear_pipe.iter transactions ~f:(fun (i, sk, pk, amount, fee) ->
            let%bind () = add_to_active_accounts pk in
@@ -174,21 +171,22 @@ struct
        go ()) ;
     ()
 
+  let events workers =
+    let event_r, event_w = Linear_pipe.create () in
+    List.iteri workers ~f:(fun i w ->
+        don't_wait_for
+          (let%bind transitions = Coda_process.strongest_ledgers_exn w in
+           Linear_pipe.iter transitions ~f:(fun t ->
+               let%map () = Linear_pipe.write event_w (`Transition (i, t)) in
+               () )) ) ;
+    event_r
+
   let start_checks log workers proposal_interval transaction_reader =
-    don't_wait_for
-      (let%map transitions =
-         Deferred.List.all
-           (List.map workers ~f:(fun w -> Coda_process.strongest_ledgers_exn w))
-       in
-       let transitions =
-         List.map transitions ~f:(fun t -> Linear_pipe.fork2 t)
-       in
-       let prefix_transitions = List.map transitions ~f:fst in
-       let transaction_transitions = List.map transitions ~f:snd in
-       start_prefix_check log prefix_transitions proposal_interval ;
-       start_transaction_check log transaction_transitions transaction_reader
-         workers proposal_interval ;
-       ())
+    let event_pipe = events workers in
+    let prefix_events, transaction_events = Linear_pipe.fork2 event_pipe in
+    start_prefix_check log workers prefix_events proposal_interval ;
+    start_transaction_check log transaction_events transaction_reader workers
+      proposal_interval
 
   (* note: this is very declarative, maybe this should be more imperative? *)
   (* next steps:
