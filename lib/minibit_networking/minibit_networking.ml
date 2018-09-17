@@ -117,11 +117,17 @@ struct
 end
 
 module Message (Inputs : sig
-  module Snark_pool_diff : Binable.S
+  module Snark_pool_diff : sig
+    type t [@@deriving bin_io, sexp]
+  end
 
-  module Transaction_pool_diff : Binable.S
+  module Transaction_pool_diff : sig
+    type t [@@deriving bin_io, sexp]
+  end
 
-  module External_transition : Binable.S
+  module External_transition : sig
+    type t [@@deriving bin_io, sexp]
+  end
 end) =
 struct
   open Inputs
@@ -132,7 +138,7 @@ struct
         | New_state of External_transition.t
         | Snark_pool_diff of Snark_pool_diff.t
         | Transaction_pool_diff of Transaction_pool_diff.t
-      [@@deriving bin_io]
+      [@@deriving sexp, bin_io]
     end
 
     let name = "message"
@@ -160,7 +166,9 @@ struct
 end
 
 module type Inputs_intf = sig
-  module External_transition : Binable.S
+  module External_transition : sig
+    type t [@@deriving sexp, bin_io]
+  end
 
   module Ledger_builder_aux_hash :
     Protocols.Coda_pow.Ledger_builder_aux_hash_intf
@@ -190,9 +198,13 @@ module type Inputs_intf = sig
     val hash : t -> Ledger_builder_aux_hash.t
   end
 
-  module Snark_pool_diff : Binable.S
+  module Snark_pool_diff : sig
+    type t [@@deriving sexp, bin_io]
+  end
 
-  module Transaction_pool_diff : Binable.S
+  module Transaction_pool_diff : sig
+    type t [@@deriving sexp, bin_io]
+  end
 end
 
 module type Config_intf = sig
@@ -268,6 +280,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   (* TODO: Have better pushback behavior *)
   let broadcast t x =
+    Logger.trace t.log !"Broadcasting %{sexp: Message.msg} over gossip net" x ;
     Linear_pipe.write_without_pushback (Gossip_net.broadcast t.gossip_net) x
 
   let broadcast_state t x = broadcast t (New_state x)
@@ -317,22 +330,48 @@ module Make (Inputs : Inputs_intf) = struct
     let get_ledger_builder_aux_at_hash t ledger_builder_hash =
       let peers = Gossip_net.random_peers t.gossip_net 8 in
       find_map' peers ~f:(fun peer ->
+          Logger.trace t.log
+            !"Asking %{sexp: Peer.t} query regarding ledger_builder_hash \
+              %{sexp: Ledger_builder_hash.t}"
+            peer ledger_builder_hash ;
           match%map
             Gossip_net.query_peer t.gossip_net peer
               Rpcs.Get_ledger_builder_aux_at_hash.dispatch_multi
               ledger_builder_hash
           with
           | Ok (Some (ledger_builder_aux, ledger_builder_aux_merkle_sibling)) ->
+              let implied_ledger_builder_hash =
+                Ledger_builder_hash.of_aux_and_ledger_hash
+                  (Ledger_builder_aux.hash ledger_builder_aux)
+                  ledger_builder_aux_merkle_sibling
+              in
               if
-                Ledger_builder_hash.equal
-                  (Ledger_builder_hash.of_aux_and_ledger_hash
-                     (Ledger_builder_aux.hash ledger_builder_aux)
-                     ledger_builder_aux_merkle_sibling)
+                Ledger_builder_hash.equal implied_ledger_builder_hash
                   ledger_builder_hash
-              then Ok ledger_builder_aux
-              else Or_error.error_string "Evil! TODO: Punish"
-          | Ok None -> Or_error.error_string "no ledger builder aux found"
-          | Error err -> Error err )
+              then (
+                Logger.trace t.log
+                  !"%{sexp: Peer.t} sent contents resulting in a good \
+                    Ledger_builder_hash %{sexp: Ledger_builder_hash.t}"
+                  peer ledger_builder_hash ;
+                Ok ledger_builder_aux )
+              else (
+                Logger.faulty_peer t.log
+                  !"%{sexp: Peer.t} sent contents resulting in a bad \
+                    Ledger_builder_hash %{sexp: Ledger_builder_hash.t}, we \
+                    wanted %{sexp: Ledger_builder_hash.t}"
+                  peer implied_ledger_builder_hash ledger_builder_hash ;
+                Or_error.error_string "Evil! TODO: Punish" )
+          | Ok None ->
+              Logger.trace t.log
+                !"%{sexp: Peer.t} didn't find a ledger_builder_aux at \
+                  ledger_builder_hash %{sexp: Ledger_builder_hash.t}"
+                peer ledger_builder_hash ;
+              Or_error.error_string "no ledger builder aux found"
+          | Error err ->
+              Logger.warn t.log
+                !"Ledger_builder_aux acquisition hit network error %s"
+                (Error.to_string_mach err) ;
+              Error err )
 
     (* TODO: Check whether responses are good or not. *)
     let glue_sync_ledger t query_reader response_writer =
@@ -341,22 +380,37 @@ module Make (Inputs : Inputs_intf) = struct
         (fun query ->
           match%bind
             find_map peers ~f:(fun peer ->
+                Logger.trace t.log
+                  !"Asking %{sexp: Peer.t} query regarding ledger_hash \
+                    %{sexp: Ledger_hash.t}"
+                  peer (fst query) ;
                 match%map
                   Gossip_net.query_peer t.gossip_net peer
                     Rpcs.Answer_sync_ledger_query.dispatch_multi query
                 with
-                | Ok (Ok answer) -> Some answer
+                | Ok (Ok answer) ->
+                    Logger.trace t.log
+                      !"Received answer from peer %{sexp: Peer.t} on \
+                        ledger_hash %{sexp: Ledger_hash.t}"
+                      peer (fst answer) ;
+                    Some answer
                 | Ok (Error e) ->
-                    Logger.info t.log "%s" (Error.to_string_mach e) ;
+                    Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
                     None
                 | Error err ->
-                    Logger.warn t.log "%s" (Error.to_string_mach err) ;
+                    Logger.warn t.log "Network error: %s"
+                      (Error.to_string_mach err) ;
                     None )
           with
           | Some answer ->
+              Logger.trace t.log
+                !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
+                (fst answer) ;
               (* TODO *)
               Linear_pipe.write_if_open response_writer answer
-          | None -> Deferred.unit )
+          | None ->
+              Logger.trace t.log !"Querying failed, no nodes responded" ;
+              Deferred.unit )
       |> don't_wait_for
   end
 end

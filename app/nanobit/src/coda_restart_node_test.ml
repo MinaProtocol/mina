@@ -15,16 +15,14 @@ struct
   module Coda_worker_testnet =
     Coda_worker_testnet.Make (Ledger_proof) (Kernel) (Coda)
 
-  let name = "coda-shared-state-test"
+  let name = "coda-restart-node-test"
 
   let main () =
     let log = Logger.create () in
     let log = Logger.child log name in
     let n = 2 in
     let should_propose i = i = 0 in
-    let snark_work_public_keys i =
-      if i = 0 then Some Genesis_ledger.high_balance_pk else None
-    in
+    let snark_work_public_keys i = None in
     let receiver_pk = Genesis_ledger.low_balance_pk in
     let sender_sk = Genesis_ledger.high_balance_sk in
     let send_amount = Currency.Amount.of_int 10 in
@@ -32,18 +30,21 @@ struct
     let%bind testnet =
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
-    let rec go i =
-      let%bind () = after (Time.Span.of_sec 1.) in
-      let%bind () =
-        Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk
-          receiver_pk send_amount fee
-      in
-      if i > 0 then go (i - 1) else return ()
+    let%bind () = after (Time.Span.of_sec 5.) in
+    Logger.info log "Stopping %d" 1 ;
+    let%bind () = Coda_worker_testnet.Api.stop testnet 1 in
+    let%bind () =
+      Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk receiver_pk
+        send_amount fee
     in
-    go 30
+    let%bind () = after (Time.Span.of_sec 5.) in
+    let%bind () = Coda_worker_testnet.Api.start testnet 1 in
+    let%map () = after (Time.Span.of_sec 20.) in
+    ()
 
   let command =
-    Command.async_spec ~summary:"Test that workers share states"
+    Command.async_spec
+      ~summary:"Test of stopping, waiting, then starting a node"
       Command.Spec.(empty)
       main
 end

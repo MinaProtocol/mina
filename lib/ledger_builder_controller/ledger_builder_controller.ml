@@ -156,7 +156,7 @@ module type Inputs_intf = sig
       val answer_query : t -> query -> answer
     end
 
-    val create : Ledger.t -> t
+    val create : Ledger.t -> parent_log:Logger.t -> t
 
     val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
 
@@ -507,6 +507,9 @@ end = struct
   (** Returns a reference to a ledger_builder with hash [hash], materialize a
    fresh ledger at a specific hash if necessary; also gives back target_state *)
   let local_get_ledger t hash =
+    Logger.trace t.log
+      !"Attempting to local-get-ledger for %{sexp: Ledger_builder_hash.t}"
+      hash ;
     local_get_ledger' t hash
       ~p_tip:(fun hash tip ->
         Ledger_builder_hash.equal
@@ -525,6 +528,9 @@ end = struct
    fun t (hash, query) ->
     (* TODO: We should cache, but in the future it will be free *)
     let open Deferred.Or_error.Let_syntax in
+    Logger.trace t.log
+      !"Attempting to handle a sync-ledger query for %{sexp: Ledger_hash.t}"
+      hash ;
     let%map ledger =
       local_get_ledger' t hash
         ~p_tip:(fun hash tip ->
@@ -533,7 +539,10 @@ end = struct
             |> Ledger.merkle_root )
             hash )
         ~p_trans:(fun hash trans ->
-          Ledger_hash.equal (External_transition.ledger_hash trans) hash )
+          Ledger_hash.equal
+            ( External_transition.ledger_builder_hash trans
+            |> Ledger_builder_hash.ledger_hash )
+            hash )
         ~f_result:(fun tip -> tip.Tip.ledger_builder |> Ledger_builder.ledger)
       >>| fst
     in
@@ -720,7 +729,7 @@ let%test_module "test" =
               (Ledger_hash.t * query) Linear_pipe.Reader.t
               * (Ledger_hash.t * query) Linear_pipe.Writer.t }
 
-        let create ledger =
+        let create ledger ~parent_log:_ =
           let t =
             { ledger
             ; answer_pipe= Linear_pipe.create ()

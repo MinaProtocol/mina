@@ -10,7 +10,7 @@ module Make
 struct
   module Coda_worker = Coda_worker.Make (Ledger_proof) (Kernel) (Coda)
 
-  type t = Coda_worker.Connection.t * Process.t
+  type t = Coda_worker.Connection.t * Process.t * Coda_worker.Input.t
 
   let spawn_exn (config: Coda_worker.Input.t) =
     let%bind conn, process =
@@ -21,11 +21,11 @@ struct
     in
     File_system.dup_stdout process ;
     File_system.dup_stderr process ;
-    return (conn, process)
+    return (conn, process, config)
 
-  let spawn_local_exn ?(transition_interval= 1000.0) ?proposal_interval ~peers
+  let local_config ?(transition_interval= 1000.0) ?proposal_interval ~peers
       ~discovery_port ~external_port ~program_dir ~should_propose
-      ~snark_worker_config ~f () =
+      ~snark_worker_config () =
     let host = "127.0.0.1" in
     let conf_dir =
       "/tmp/" ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -45,27 +45,25 @@ struct
       ; program_dir
       ; discovery_port }
     in
-    File_system.with_temp_dirs [conf_dir] ~f:(fun () ->
-        let%bind worker = spawn_exn config in
-        f worker )
+    config
 
-  let disconnect (conn, proc) =
+  let disconnect (conn, proc, _) =
     let%bind () = Coda_worker.Connection.close conn in
     let%bind _ : Unix.Exit_or_signal.t = Process.wait proc in
     return ()
 
-  let peers_exn (conn, proc) =
+  let peers_exn (conn, proc, _) =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
 
-  let get_balance_exn (conn, proc) pk =
+  let get_balance_exn (conn, proc, _) pk =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance
       ~arg:pk
 
-  let send_transaction_exn (conn, proc) sk pk amount fee =
+  let send_transaction_exn (conn, proc, _) sk pk amount fee =
     Coda_worker.Connection.run_exn conn
       ~f:Coda_worker.functions.send_transaction ~arg:(sk, pk, amount, fee)
 
-  let strongest_ledgers_exn (conn, proc) =
+  let strongest_ledgers_exn (conn, proc, _) =
     let%map r =
       Coda_worker.Connection.run_exn conn
         ~f:Coda_worker.functions.strongest_ledgers ~arg:()

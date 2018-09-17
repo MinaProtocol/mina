@@ -57,6 +57,7 @@ module Status = struct
     ; block_count: int
     ; uptime_secs: int
     ; ledger_merkle_root: string
+    ; state_hash: string
     ; commit_id: Git_sha.t option
     ; conf_dir: string
     ; peers: string list
@@ -76,6 +77,7 @@ module Status = struct
         ~block_count:(fun acc x -> ("Block Count", Int.to_string (f x)) :: acc)
         ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
         ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
+        ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
         ~commit_id:(fun acc x ->
           match f x with
           | None -> acc
