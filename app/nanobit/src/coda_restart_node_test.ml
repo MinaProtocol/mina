@@ -2,6 +2,7 @@ open Core
 open Async
 open Coda_worker
 open Coda_main
+open Nanobit_base
 
 module Make
     (Ledger_proof : Ledger_proof_intf)
@@ -17,21 +18,28 @@ struct
   let name = "coda-restart-node-test"
 
   let main () =
-    let%bind program_dir = Unix.getcwd () in
     let log = Logger.create () in
     let log = Logger.child log name in
-    Coda_processes.init () ;
-    let n = 1 in
-    Logger.info log "A" ;
-    let configs =
-      Coda_processes.local_configs n ~program_dir
-        ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
+    let n = 2 in
+    let should_propose i = i = 0 in
+    let snark_work_public_keys i = None in
+    let receiver_pk = Genesis_ledger.low_balance_pk in
+    let sender_sk = Genesis_ledger.high_balance_sk in
+    let send_amount = Currency.Amount.of_int 10 in
+    let fee = Currency.Fee.of_int 0 in
+    let%bind testnet =
+      Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
-    let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-    let worker = List.hd_exn workers in
-    Logger.info log "B" ;
-    let%map () = Coda_process.disconnect worker in
-    Logger.info log "C" ; ()
+    let%bind () = after (Time.Span.of_sec 5.) in
+    let%bind () = Coda_worker_testnet.Api.stop testnet 1 in
+    let%bind () = 
+      Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk
+        receiver_pk send_amount fee
+    in
+    let%bind () = after (Time.Span.of_sec 5.) in
+    let%bind () = Coda_worker_testnet.Api.start testnet 1 in
+    let%map () = after (Time.Span.of_sec 30.) in
+    ()
 
   let command =
     Command.async_spec ~summary:"Simple use of Async Rpc_parallel V2"
