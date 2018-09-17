@@ -1,0 +1,13 @@
+(library
+  (name lite_base)
+  (public_name lite_base)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    base
+    digestif.ocaml
+    hash_prefixes
+    pedersen_lib
+    fold_lib
+    sparse_ledger_lib
+    snarkette
+    bin_prot))
