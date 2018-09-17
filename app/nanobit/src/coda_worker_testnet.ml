@@ -16,8 +16,6 @@ struct
   module Api = struct
     type t =
       { workers: Coda_process.t list
-      ; finish_ivar: unit Ivar.t
-      ; finished: unit Deferred.t
       ; transaction_writer:
           ( int
           * Private_key.t
@@ -26,14 +24,11 @@ struct
           * Currency.Fee.t )
           Linear_pipe.Writer.t }
 
-    let create workers finish_ivar finished transaction_writer =
-      {workers; finish_ivar; finished; transaction_writer}
+    let create workers transaction_writer = {workers; transaction_writer}
 
     let start t i = failwith "nyi"
 
     let stop t i = failwith "nyi"
-
-    let shutdown_testnet t = Ivar.fill t.finish_ivar () ; t.finished
 
     let send_transaction t i sk pk amount fee =
       Linear_pipe.write t.transaction_writer (i, sk, pk, amount, fee)
@@ -204,34 +199,16 @@ struct
   let test ?(proposal_interval= 1000) log n should_propose
       snark_work_public_keys =
     let log = Logger.child log "worker_testnet" in
-    let ready =
-      Deferred.create (fun ready_ivar ->
-          let fill_ready = ref None in
-          let finished =
-            let%bind program_dir = Unix.getcwd () in
-            Coda_processes.init () ;
-            Coda_processes.spawn_local_processes_exn n ~proposal_interval
-              ~program_dir ~should_propose
-              ~snark_worker_public_keys:
-                (Some (List.init n snark_work_public_keys))
-              ~f:(fun workers ->
-                let%bind () =
-                  Deferred.create (fun finish_ivar ->
-                      Option.value_exn !fill_ready (workers, finish_ivar) )
-                in
-                return () )
-          in
-          fill_ready :=
-            Some
-              (fun (workers, finish_ivar) ->
-                let transaction_reader, transaction_writer =
-                  Linear_pipe.create ()
-                in
-                let api =
-                  Api.create workers finish_ivar finished transaction_writer
-                in
-                start_checks log workers proposal_interval transaction_reader ;
-                Ivar.fill ready_ivar api ) )
+    let%bind program_dir = Unix.getcwd () in
+    Coda_processes.init () ;
+    let configs =
+      Coda_processes.local_configs n ~proposal_interval ~program_dir
+        ~should_propose
+        ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
     in
-    ready
+    let%map workers = Coda_processes.spawn_local_processes_exn configs in
+    let transaction_reader, transaction_writer = Linear_pipe.create () in
+    let api = Api.create workers transaction_writer in
+    start_checks log workers proposal_interval transaction_reader ;
+    api
 end

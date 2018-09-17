@@ -25,8 +25,7 @@ struct
     let%bind testnet =
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
-    let%bind () = after (Time.Span.of_sec 30.) in
-    Coda_worker_testnet.Api.shutdown_testnet testnet
+    after (Time.Span.of_sec 30.)
 
   let command =
     Command.async_spec ~summary:"Test that blocks get produced"
