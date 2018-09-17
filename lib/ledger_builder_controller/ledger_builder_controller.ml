@@ -539,7 +539,10 @@ end = struct
             |> Ledger.merkle_root )
             hash )
         ~p_trans:(fun hash trans ->
-          Ledger_hash.equal (External_transition.ledger_hash trans) hash )
+          Ledger_hash.equal
+            ( External_transition.ledger_builder_hash trans
+            |> Ledger_builder_hash.ledger_hash )
+            hash )
         ~f_result:(fun tip -> tip.Tip.ledger_builder |> Ledger_builder.ledger)
       >>| fst
     in
