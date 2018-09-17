@@ -278,6 +278,7 @@ struct
       | Transaction u -> undo_transaction ledger u
       | Coinbase c -> undo_coinbase ledger c ; Ok ()
     in
+    Core.printf !"txn: %{sexp: Undo.t} \n ledger after undoing: %{sexp: t} \n%!" undo ledger;
     Debug_assert.debug_assert (fun () ->
         [%test_eq : Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
