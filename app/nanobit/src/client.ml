@@ -4,10 +4,11 @@ open Cli_lib
 open Signature_lib
 open Nanobit_base
 
+let of_local_port port = Host_and_port.create ~host:"127.0.0.1" ~port
+
 let dispatch rpc query port =
   Tcp.with_connection
-    (Tcp.Where_to_connect.of_host_and_port
-       (Host_and_port.create ~host:"127.0.0.1" ~port))
+    (Tcp.Where_to_connect.of_host_and_port (of_local_port port))
     ~timeout:(Time.Span.of_sec 1.)
     (fun _ r w ->
       let open Deferred.Let_syntax in
@@ -25,16 +26,6 @@ let daemon_port_flag =
 let json_flag =
   Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
-let run_daemon ~(f: unit -> unit Deferred.t) () =
-  let our_binary = Sys.executable_name in
-  printf !"%s\n" our_binary ;
-  let%bind p =
-    Process.create_exn () ~prog:our_binary ~args:["daemon"; "-background"]
-  in
-  printf "Daemon created: Daemon Pid: %s\n" (Pid.to_string @@ Process.pid p) ;
-  let%bind () = after (Time.Span.of_sec 5.) in
-  f ()
-
 module Daemon = struct
   type state =
     | Start
@@ -46,39 +37,51 @@ module Daemon = struct
 
   let reader = Reader.stdin
 
+  let does_daemon_exist port =
+    let open Deferred.Let_syntax in
+    let%map result =
+      Rpc.Connection.client ~handshake_timeout:(Time.Span.of_sec 1.)
+        (Tcp.Where_to_connect.of_host_and_port (of_local_port port))
+    in
+    Result.is_ok result
+
   let print_menu () =
     printf
       "%!Before starting a client command, you will need to start the Coda \
-        daemon.\n \
-        Would you like to run the daemon?\n-----------------------------------\n\n%!"
+       daemon.\n\
+       Would you like to run the daemon?\n\
+       -----------------------------------\n\n\
+       %!"
 
-  let invoke_daemon () =
+  let invoke_daemon port =
     let our_binary = Sys.executable_name in
-    let%bind p =
-      Process.create_exn () ~prog:our_binary ~args:["daemon"; "-background"]
+    let args =
+      ["daemon"; "-background"]
+      @ Option.value_map port ~default:[] ~f:(fun p ->
+            ["-client-port"; sprintf "%d" p] )
     in
-    printf !"Daemon created: Daemon Pid: %s\n%!" (Pid.to_string @@ Process.pid p) ;
-    let%bind () = after (Time.Span.of_sec 5.) in
-    Deferred.unit
+    let%bind _p = Process.run_exn () ~prog:our_binary ~args in
+    (* Wait for process to start the client server *)
+    after (Time.Span.of_sec 5.)
 
-  let run ~f =
-    (*  TODO: Maybe return a function *)
+  let run ~port ~f =
     let rec go = function
-      | Start -> (* TODO: have the option to show daemon *)
-                 go Show_menu
+      | Start ->
+          let port = Option.value port ~default:default_client_port in
+          let%bind has_daemon = does_daemon_exist port in
+          if has_daemon then go Run_client else go Show_menu
       | Show_menu -> print_menu () ; go Select_action
       | Select_action -> (
-        (* TODO: find a way to delete characters *)
-        printf "Y/N: ";
-        match%bind Reader.read_line (Lazy.force reader) with
-        | `Eof -> go Select_action
-        | `Ok input ->
-          match String.capitalize input with
-          | "Y" | "YES" -> go Run_daemon
-          | "N" | "NO" -> go Abort
-          | _ -> go Select_action )
+          printf "Y/N: " ;
+          match%bind Reader.read_line (Lazy.force reader) with
+          | `Eof -> go Select_action
+          | `Ok input ->
+            match String.capitalize input with
+            | "Y" | "YES" -> go Run_daemon
+            | "N" | "NO" -> go Abort
+            | _ -> go Select_action )
       | Run_daemon ->
-          let%bind () = invoke_daemon () in
+          let%bind () = invoke_daemon port in
           go Run_client
       | Run_client -> f ()
       | Abort -> Deferred.unit
@@ -110,7 +113,7 @@ let get_public_keys =
   Command.async ~summary:"Get public keys"
     (let open Command.Let_syntax in
     let%map_open json = json_flag and port = daemon_port_flag in
-    Daemon.run ~f:(fun () ->
+    Daemon.run ~port ~f:(fun () ->
         let open Deferred.Let_syntax in
         let port = Option.value ~default:default_client_port port in
         let open Client_lib in
