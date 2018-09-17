@@ -39,7 +39,7 @@ struct
     in
     let%bind () = after (Time.Span.of_sec 5.) in
     let%bind () = Coda_worker_testnet.Api.start testnet 1 in
-    let%map () = after (Time.Span.of_sec 15.) in
+    let%map () = after (Time.Span.of_sec 20.) in
     ()
 
   let command =

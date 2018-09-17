@@ -207,7 +207,7 @@ struct
            don't_wait_for
              (let%bind worker = Coda_process.spawn_exn config in
               don't_wait_for
-                (let secs_to_catch_up = 5.0 in
+                (let secs_to_catch_up = 10.0 in
                  let%map () = after (Time.Span.of_sec secs_to_catch_up) in
                  started ()) ;
               connect_worker i worker) ;
