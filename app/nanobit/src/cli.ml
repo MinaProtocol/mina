@@ -83,14 +83,26 @@ let daemon (type ledger_proof) (module Kernel
            "MILLIS Time between the proposer proposing and waiting (default: \
             5000)"
          (optional int)
+     and is_background =
+       flag "background" no_arg ~doc:"Run process on the background"
      in
      fun () ->
-       Parallel.init_master () ;
        let open Deferred.Let_syntax in
-       let%bind home = Sys.home_directory () in
-       let conf_dir =
+       let compute_conf_dir home =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
+       let%bind conf_dir =
+         if is_background then (
+           let home = Core.Sys.home_directory () in
+           let conf_dir = compute_conf_dir home in
+           Daemon.daemonize
+             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.stdout"))
+             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.stderr"))
+             () ;
+           Deferred.return conf_dir )
+         else Sys.home_directory () >>| compute_conf_dir
+       in
+       Parallel.init_master () ;
        let external_port =
          Option.value ~default:default_external_port external_port
        in
@@ -158,6 +170,7 @@ let daemon (type ledger_proof) (module Kernel
        let%bind (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
        let module Run = Run (Config) (M) in
+       Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
