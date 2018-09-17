@@ -66,6 +66,8 @@ jobs:
             password: $JSON_GCLOUD_CREDENTIALS
         steps:
             - checkout
+            - store_artifacts:
+                path: /tmp/artifacts
             - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
@@ -82,7 +84,9 @@ jobs:
             password: $JSON_GCLOUD_CREDENTIALS
         steps:
             - checkout
-            - run:
+            - store_artifacts:
+                path: /tmp/artifacts
+           - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
@@ -98,6 +102,8 @@ jobs:
             password: $JSON_GCLOUD_CREDENTIALS
         steps:
             - checkout
+            - store_artifacts:
+                path: /tmp/artifacts
             - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia

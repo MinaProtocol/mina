@@ -34,7 +34,7 @@ run_integration_tests() {
       echo "FAILED"
       echo "------------------------------------------------------------------------------------------"
       echo "RECENT OUTPUT:"
-      tail -n 50 test.log | dune exec logproc
+      tail -n 50  $CIRCLE_ARTIFACTS/${test_no_spaces}.log | dune exec logproc
       echo "------------------------------------------------------------------------------------------"
       echo "See above for stack trace..."
       exit 2
