@@ -158,7 +158,6 @@ struct
                        List.nth_exn current_block_counts i
                      in
                      let send_balance = List.nth_exn send_balances i in
-                     (* TODO should check when comes back online *)
                      if Option.is_none balance || Option.is_none send_balance
                      then return true
                      else if balance <> send_balance then return true
