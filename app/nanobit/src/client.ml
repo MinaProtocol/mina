@@ -69,7 +69,7 @@ module Daemon_cli = struct
         check_daemon ()
     in
     let our_binary = Sys.executable_name in
-    let args = ["daemon"; "-background"; "-client-port"; sprintf "%d" 666] in
+    let args = ["daemon"; "-background"; "-client-port"; sprintf "%d" port] in
     let%bind p = Process.create_exn () ~prog:our_binary ~args in
     (* Wait for process to start the client server *)
     match%bind Async.Clock.with_timeout timeout (check_daemon ()) with
