@@ -243,7 +243,7 @@ module Make (Inputs : Inputs_intf) = struct
       ~(answer_sync_ledger_query:
             Ledger_hash.t * Sync_ledger.query
          -> (Ledger_hash.t * Sync_ledger.answer) Deferred.Or_error.t) =
-    let log = Logger.child config.parent_log "minibit networking" in
+    let log = Logger.child config.parent_log "coda networking" in
     let get_ledger_builder_aux_at_hash_rpc () ~version:_ hash =
       get_ledger_builder_aux_at_hash hash
     in

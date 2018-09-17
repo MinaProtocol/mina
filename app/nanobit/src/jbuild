@@ -9,11 +9,10 @@
       debug_assert
       client_lib
       linear_pipe
-      minibit_networking
+      coda_networking
       proposer
       gossip_net
       kademlia
-      minibit
       coda
       coda_numbers
       protocols

@@ -182,7 +182,7 @@ struct
         in
         Option.iter snark_worker_config ~f:(fun config ->
             let run_snark_worker = `With_public_key config.public_key in
-            Run.setup_local_server ~client_port:config.port ~minibit:coda ~log
+            Run.setup_local_server ~client_port:config.port ~coda ~log
               () ;
             Run.run_snark_worker ~log ~client_port:config.port run_snark_worker
         ) ;

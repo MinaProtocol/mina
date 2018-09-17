@@ -45,7 +45,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000) } }
   in
   let should_propose = true in
-  let%bind minibit =
+  let%bind coda =
     Main.create
       (Main.Config.make ~log ~net_config ~should_propose
          ~run_snark_worker:with_snark
@@ -55,10 +55,10 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
          ~time_controller:(Inputs.Time.Controller.create ())
          ~keypair ())
   in
-  don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers minibit)) ;
+  don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
     let rec go () =
-      match Run.get_balance minibit receiver_pk with
+      match Run.get_balance coda receiver_pk with
       | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
           return ()
       | _ ->
@@ -69,7 +69,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   in
   let open Genesis_ledger in
   let assert_balance pk amount =
-    match Run.get_balance minibit pk with
+    match Run.get_balance coda pk with
     | Some balance ->
         if not (Currency.Balance.equal balance amount) then
           failwithf
@@ -82,7 +82,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   in
   let client_port = 8123 in
   let run_snark_worker = `With_public_key Genesis_ledger.high_balance_pk in
-  Run.setup_local_server ~client_port ~minibit ~log () ;
+  Run.setup_local_server ~client_port ~coda ~log () ;
   Run.run_snark_worker ~log ~client_port run_snark_worker ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
@@ -90,7 +90,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   assert_balance high_balance_pk initial_high_balance ;
   assert_balance low_balance_pk initial_low_balance ;
   (*No proof emitted by the parallel scan at the begining*)
-  assert (Option.is_none @@ Run.For_tests.ledger_proof minibit) ;
+  assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
   (* Note: This is much less than half of the high balance account so we can test
    *       transaction replays being prohibited
    *)
@@ -98,7 +98,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   (* Send money to someone *)
   let build_txn amount sender_sk receiver_pk fee =
     let nonce =
-      Run.get_nonce minibit (pk_of_sk sender_sk) |> Option.value_exn
+      Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
     in
     let payload : Transaction.Payload.t =
       {receiver= receiver_pk; amount; fee; nonce}
@@ -110,19 +110,19 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
       build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
     let prev_sender_balance =
-      Run.get_balance minibit (pk_of_sk sender_sk) |> Option.value_exn
+      Run.get_balance coda (pk_of_sk sender_sk) |> Option.value_exn
     in
     let prev_receiver_balance =
-      Run.get_balance minibit receiver_pk
+      Run.get_balance coda receiver_pk
       |> Option.value ~default:Currency.Balance.zero
     in
-    let%bind () = Run.send_txn log minibit (transaction :> Transaction.t) in
+    let%bind () = Run.send_txn log coda (transaction :> Transaction.t) in
     (* Send a similar the transaction twice on purpose; this second one
     * will be rejected because the nonce is wrong *)
     let transaction' =
       build_txn send_amount sender_sk receiver_pk (Currency.Fee.of_int 0)
     in
-    let%bind () = Run.send_txn log minibit (transaction' :> Transaction.t) in
+    let%bind () = Run.send_txn log coda (transaction' :> Transaction.t) in
     (* Let the system settle, mine some blocks *)
     let%map () =
       balance_change_or_timeout ~initial_receiver_balance:prev_receiver_balance
@@ -149,7 +149,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
           Option.value_exn
             (Currency.Balance.add_amount (Option.value_exn v) amount) )
     in
-    let%map () = Run.send_txn log minibit (transaction :> Transaction.t) in
+    let%map () = Run.send_txn log coda (transaction :> Transaction.t) in
     new_balance_sheet'
   in
   let send_txns balance_sheet f_amount =
@@ -173,7 +173,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   in
   let wait_for_proof_or_timeout () =
     let rec go () =
-      if Option.is_some @@ Run.For_tests.ledger_proof minibit then (
+      if Option.is_some @@ Run.For_tests.ledger_proof coda then (
         Core.printf "Ledger_proof emitted\n %!" ;
         return true )
       else
@@ -206,7 +206,7 @@ let command (type ledger_proof) (module Kernel
     : Coda_intf.S with type ledger_proof = ledger_proof) =
   let open Core in
   let open Async in
-  Command.async ~summary:"Full minibit end-to-end test"
+  Command.async ~summary:"Full coda end-to-end test"
     (let open Command.Let_syntax in
     let%map_open with_snark = flag "with-snark" no_arg ~doc:"Produce snarks" in
     fun () -> run_test with_snark (module Kernel) (module Coda))

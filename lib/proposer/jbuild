@@ -9,7 +9,6 @@
   (libraries
     ( core
       async
-      minibit
       coda
       nanobit_base
       protocols

@@ -549,7 +549,7 @@ struct
         let subtree_height = 3
       end)
 
-  module Net = Minibit_networking.Make (struct
+  module Net = Coda_networking.Make (struct
     include Inputs0
     module Snark_pool = Snark_pool
     module Snark_pool_diff = Snark_pool.Diff
@@ -793,7 +793,7 @@ module type Main_intf = sig
       end
 
       module Config :
-        Minibit_networking.Config_intf
+        Coda_networking.Config_intf
         with type gossip_config := Gossip_net.Config.t
     end
 
@@ -978,20 +978,20 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; run_snark_worker= run_snark_worker t
     ; propose= should_propose t }
 
-  let setup_local_server ?rest_server_port ~minibit ~log ~client_port () =
+  let setup_local_server ?rest_server_port ~coda ~log ~client_port () =
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
       [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun () ->
-            send_txn log minibit )
+            send_txn log coda )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
-            return (get_balance minibit pk) )
+            return (get_balance coda pk) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->
-            return (get_public_keys minibit) )
+            return (get_public_keys coda) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
-            return (get_nonce minibit pk) )
+            return (get_nonce coda pk) )
       ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
-            return (get_status minibit) ) ]
+            return (get_status coda) ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in
@@ -999,7 +999,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
             match%map Linear_pipe.read solved_work_reader with
             | `Ok () ->
-                let r = request_work minibit in
+                let r = request_work coda in
                 ( match r with
                 | None ->
                     Linear_pipe.write_without_pushback solved_work_writer ()
@@ -1008,7 +1008,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             | `Eof -> assert false )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
             let%map () =
-              Snark_pool.add_completed_work (snark_pool minibit) work
+              Snark_pool.add_completed_work (snark_pool coda) work
             in
             Linear_pipe.write_without_pushback solved_work_writer () ) ]
     in
@@ -1026,7 +1026,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 match Uri.path uri with
                 | "/status" ->
                     Server.respond_string
-                      ( get_status minibit |> Client_lib.Status.to_yojson
+                      ( get_status coda |> Client_lib.Status.to_yojson
                       |> Yojson.Safe.pretty_to_string )
                 | _ ->
                     Server.respond_string ~status:`Not_found "Route not found"
