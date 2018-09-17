@@ -20,11 +20,12 @@ run_integration_tests() {
     echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM}"
     set +e
     # ugly hack to clean up dead processes
+    test_no_spaces=`echo -n "${test//[[:space:]]/}"`
     pkill -9 exe
     pkill -9 kademlia
     pkill -9 cli
     sleep 1
-    dune exec cli -- integration-tests $test 2>&1 >> test.log
+    dune exec cli -- integration-tests $test 2>&1 >> $CIRCLE_ARTIFACTS/${test_no_spaces}.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
     if [ $OUT -eq 0 ];then
