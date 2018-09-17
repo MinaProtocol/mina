@@ -16,6 +16,11 @@ struct
   module Api = struct
     type t =
       { workers: Coda_process.t list
+      ; configs: Coda_process.Coda_worker.Input.t list
+      ; start_writer:
+          (int * Coda_process.Coda_worker.Input.t * (unit -> unit))
+          Linear_pipe.Writer.t
+      ; online: bool Array.t
       ; transaction_writer:
           ( int
           * Private_key.t
@@ -24,20 +29,36 @@ struct
           * Currency.Fee.t )
           Linear_pipe.Writer.t }
 
-    let create workers transaction_writer = {workers; transaction_writer}
+    let create configs workers transaction_writer start_writer =
+      let online = Array.init (List.length workers) ~f:(fun _ -> true) in
+      {workers; configs; start_writer; online; transaction_writer}
 
-    let start t i = failwith "nyi"
+    let online t i = (t.online).(i)
 
-    let stop t i = failwith "nyi"
+    let get_balance t i pk =
+      let worker = List.nth_exn t.workers i in
+      if online t i then
+        Deferred.map (Coda_process.get_balance_exn worker pk) ~f:(fun x ->
+            Some x )
+      else return None
+
+    let start t i =
+      Linear_pipe.write t.start_writer
+        (i, List.nth_exn t.configs i, fun () -> (t.online).(i) <- true)
+
+    let stop t i =
+      (t.online).(i) <- false ;
+      Coda_process.disconnect (List.nth_exn t.workers i)
 
     let send_transaction t i sk pk amount fee =
       Linear_pipe.write t.transaction_writer (i, sk, pk, amount, fee)
   end
 
-  let start_prefix_check log transitions proposal_interval =
+  let start_prefix_check log workers events proposal_interval testnet =
     let all_transitions_r, all_transitions_w = Linear_pipe.create () in
-    let chains = Array.init (List.length transitions) ~f:(fun i -> []) in
+    let chains = Array.init (List.length workers) ~f:(fun i -> []) in
     let check_chains chains =
+      let chains = Array.filteri chains ~f:(fun i c -> Api.online testnet i) in
       let lengths =
         Array.to_list (Array.map chains ~f:(fun c -> List.length c))
       in
@@ -100,18 +121,17 @@ struct
               chains.(i) <- chain ;
               check_chains chains ;
               return chains ))) ;
-    List.iteri transitions ~f:(fun i transitions ->
-        don't_wait_for
-          (Linear_pipe.iter transitions ~f:(fun (prev, curr) ->
-               Linear_pipe.write all_transitions_w (prev, curr, i) )) )
+    don't_wait_for
+      (Linear_pipe.iter events ~f:(function `Transition (i, (prev, curr)) ->
+           Linear_pipe.write all_transitions_w (prev, curr, i) ))
 
-  let start_transaction_check log transitions transactions workers
-      proposal_interval =
+  let start_transaction_check log events transactions workers proposal_interval
+      testnet =
     let block_counts = Array.init (List.length workers) ~f:(fun _ -> 0) in
     let active_accounts = ref [] in
     let get_balances pk =
       Deferred.List.all
-        (List.map workers ~f:(fun w -> Coda_process.get_balance_exn w pk))
+        (List.mapi workers ~f:(fun i w -> Api.get_balance testnet i pk))
     in
     let add_to_active_accounts pk =
       match List.findi !active_accounts ~f:(fun i (apk, _, _) -> apk = pk) with
@@ -138,12 +158,14 @@ struct
                        List.nth_exn current_block_counts i
                      in
                      let send_balance = List.nth_exn send_balances i in
-                     if balance <> send_balance then return true
+                     if Option.is_none balance || Option.is_none send_balance
+                     then return true
+                     else if balance <> send_balance then return true
                      else
                        let diff = current_block_count - send_block_count in
                        Logger.warn log
                          !"%d balance not yet updated %{sexp: \
-                           Currency.Balance.t option} %d"
+                           Currency.Balance.t option option} %d"
                          i balance diff ;
                        if diff >= 5 then (
                          Logger.fatal log "balance took too long to update" ;
@@ -155,11 +177,10 @@ struct
       in
       active_accounts := new_aa
     in
-    List.iteri transitions ~f:(fun i transition ->
-        don't_wait_for
-          (Linear_pipe.iter transition ~f:(fun t ->
-               block_counts.(i) <- 1 + block_counts.(i) ;
-               Deferred.unit )) ) ;
+    don't_wait_for
+      (Linear_pipe.iter events ~f:(function `Transition (i, t) ->
+           block_counts.(i) <- 1 + block_counts.(i) ;
+           Deferred.unit )) ;
     don't_wait_for
       (Linear_pipe.iter transactions ~f:(fun (i, sk, pk, amount, fee) ->
            let%bind () = add_to_active_accounts pk in
@@ -174,21 +195,33 @@ struct
        go ()) ;
     ()
 
-  let start_checks log workers proposal_interval transaction_reader =
+  let events workers start_reader =
+    let event_r, event_w = Linear_pipe.create () in
+    let connect_worker i worker =
+      let%bind transitions = Coda_process.strongest_ledgers_exn worker in
+      Linear_pipe.iter transitions ~f:(fun t ->
+          Linear_pipe.write event_w (`Transition (i, t)) )
+    in
     don't_wait_for
-      (let%map transitions =
-         Deferred.List.all
-           (List.map workers ~f:(fun w -> Coda_process.strongest_ledgers_exn w))
-       in
-       let transitions =
-         List.map transitions ~f:(fun t -> Linear_pipe.fork2 t)
-       in
-       let prefix_transitions = List.map transitions ~f:fst in
-       let transaction_transitions = List.map transitions ~f:snd in
-       start_prefix_check log prefix_transitions proposal_interval ;
-       start_transaction_check log transaction_transitions transaction_reader
-         workers proposal_interval ;
-       ())
+      (Linear_pipe.iter start_reader ~f:(fun (i, config, started) ->
+           don't_wait_for
+             (let%bind worker = Coda_process.spawn_exn config in
+              don't_wait_for
+                (let secs_to_catch_up = 10.0 in
+                 let%map () = after (Time.Span.of_sec secs_to_catch_up) in
+                 started ()) ;
+              connect_worker i worker) ;
+           Deferred.unit )) ;
+    List.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
+    event_r
+
+  let start_checks log workers proposal_interval transaction_reader
+      start_reader testnet =
+    let event_pipe = events workers start_reader in
+    let prefix_events, transaction_events = Linear_pipe.fork2 event_pipe in
+    start_prefix_check log workers prefix_events proposal_interval testnet ;
+    start_transaction_check log transaction_events transaction_reader workers
+      proposal_interval testnet
 
   (* note: this is very declarative, maybe this should be more imperative? *)
   (* next steps:
@@ -208,7 +241,9 @@ struct
     in
     let%map workers = Coda_processes.spawn_local_processes_exn configs in
     let transaction_reader, transaction_writer = Linear_pipe.create () in
-    let api = Api.create workers transaction_writer in
-    start_checks log workers proposal_interval transaction_reader ;
-    api
+    let start_reader, start_writer = Linear_pipe.create () in
+    let testnet = Api.create configs workers transaction_writer start_writer in
+    start_checks log workers proposal_interval transaction_reader start_reader
+      testnet ;
+    testnet
 end
