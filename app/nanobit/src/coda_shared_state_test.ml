@@ -26,7 +26,7 @@ struct
       if i = 0 then Some Genesis_ledger.high_balance_pk else None
     in
     let receiver_pk = Genesis_ledger.low_balance_pk in
-    let sender_sk = Genesis_ledger.high_balance_sk in
+    let sender_sk = snd (List.hd_exn Genesis_ledger.extra_accounts) in
     let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
     let%bind testnet =
