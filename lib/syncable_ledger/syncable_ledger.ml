@@ -397,7 +397,6 @@ struct
     if not (Root_hash.equal (MT.merkle_root t.tree) (desired_root_exn t)) then
       failwith "We finished syncing, but made a mistake somewhere :("
     else (
-      destroy t ;
       Ivar.fill t.validity_listener `Ok ) ;
     res
 
