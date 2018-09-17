@@ -39,7 +39,7 @@ module type S = sig
     val answer_query : t -> query -> answer
   end
 
-  val create : merkle_tree -> t
+  val create : merkle_tree -> parent_log:Logger.t -> t
 
   val answer_writer : t -> (root_hash * answer) Linear_pipe.Writer.t
 
@@ -151,7 +151,7 @@ module Make
               with type account := Account.t
                and type t := t
     end) (Root_hash : sig
-      type t [@@deriving eq]
+      type t [@@deriving eq, sexp]
 
       val to_hash : t -> Hash.t
     end)
@@ -298,6 +298,7 @@ struct
     { mutable desired_root: Root_hash.t option
     ; tree: MT.t
     ; mutable validity: Valid.t
+    ; log: Logger.t
     ; answers: (Root_hash.t * answer) Linear_pipe.Reader.t
     ; answer_writer: (Root_hash.t * answer) Linear_pipe.Writer.t
     ; queries: (Root_hash.t * query) Linear_pipe.Writer.t
@@ -319,11 +320,17 @@ struct
 
   let expect_children : t -> Addr.t -> Hash.t -> unit =
    fun t parent_addr expected ->
+    Logger.trace t.log
+      !"Expecting children parent %{sexp: Addr.t}, expected: %{sexp: Hash.t}"
+      parent_addr expected ;
     Addr.Table.add_exn t.waiting_parents ~key:parent_addr
       ~data:{expected; children= []}
 
   let expect_content : t -> Addr.t -> Hash.t -> unit =
    fun t addr expected ->
+    Logger.trace t.log
+      !"Expecting content addr %{sexp: Addr.t}, expected: %{sexp: Hash.t}"
+      addr expected ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
   (* TODO #435: verify content hash matches expected and blame the peer who gave it to us *)
@@ -438,14 +445,23 @@ struct
      node to never be verified *)
   let main_loop t =
     let handle_answer (root_hash, a) =
-      if not (Root_hash.equal root_hash (desired_root_exn t)) then ()
+      Logger.trace t.log !"Handle answer for %{sexp: Root_hash.t}" root_hash ;
+      if not (Root_hash.equal root_hash (desired_root_exn t)) then (
+        Logger.trace t.log
+          !"My desired root was %{sexp: Root_hash.t}, so I'm ignoring %{sexp: \
+            Root_hash.t}"
+          (desired_root_exn t) root_hash ;
+        () )
       else
         let res =
           match a with
           | Has_hash (addr, h') -> (
             match add_child_hash_to t addr h' with
             (* TODO #435: Stick this in a log, punish the sender *)
-            | Error _e ->
+            | Error e ->
+                Logger.faulty_peer t.log
+                  !"Got error when trying to add child_hash %{sexp: Hash.t} %s"
+                  h' (Error.to_string_hum e) ;
                 ()
             | Ok (`Good children_to_verify) ->
                 (* TODO #312: Make sure we don't write too much *)
@@ -462,7 +478,10 @@ struct
               Valid.set t.validity addr (Fresh, subtree_hash) |> ignore
           | Num_accounts (n, h) -> num_accounts t n h
         in
-        if Valid.completely_fresh t.validity then all_done t res else res
+        if Valid.completely_fresh t.validity then (
+          Logger.trace t.log !"We are completely fresh, all done" ;
+          all_done t res )
+        else res
     in
     Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a ; Deferred.unit)
 
@@ -484,12 +503,13 @@ struct
 
   let fetch t rh = new_goal t rh ; wait_until_valid t rh
 
-  let create mt =
+  let create mt ~parent_log =
     let qr, qw = Linear_pipe.create () in
     let ar, aw = Linear_pipe.create () in
     let t =
       { desired_root= None
       ; tree= mt
+      ; log= Logger.child parent_log __MODULE__
       ; validity= Valid.create ()
       ; answers= ar
       ; answer_writer= aw
