@@ -6,6 +6,10 @@ module type Inputs_intf = sig
     type t [@@deriving sexp]
   end
 
+  module Frozen_ledger_hash : sig
+    type t [@@deriving sexp]
+  end
+
   module Ledger : sig
     type t
 
@@ -40,7 +44,7 @@ module type Inputs_intf = sig
     val hash : t -> Ledger_builder_hash.t
 
     val of_aux_and_ledger :
-         snarked_ledger_hash:Ledger_hash.t
+         snarked_ledger_hash:Frozen_ledger_hash.t
       -> ledger:Ledger.t
       -> aux:Aux.t
       -> t Or_error.t
@@ -61,7 +65,7 @@ module type Inputs_intf = sig
 
     val target_state : t -> Protocol_state.value
 
-    val ledger_hash : t -> Ledger_hash.t
+    val ledger_hash : t -> Frozen_ledger_hash.t
 
     val ledger_builder_hash : t -> Ledger_builder_hash.t
   end

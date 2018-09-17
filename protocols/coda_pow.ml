@@ -412,6 +412,7 @@ module type Ledger_builder_intf = sig
   type ledger_builder_hash
 
   type ledger_hash
+  type frozen_ledger_hash
 
   type public_key
 
@@ -465,7 +466,7 @@ module type Ledger_builder_intf = sig
   val aux : t -> Aux.t
 
   val of_aux_and_ledger :
-       snarked_ledger_hash:ledger_hash
+       snarked_ledger_hash:frozen_ledger_hash
     -> public_key:public_key
     -> ledger:ledger
     -> aux:Aux.t
@@ -753,6 +754,7 @@ module type Inputs_intf = sig
      and type coinbase := Coinbase.t
 
   module Ledger_hash : Ledger_hash_intf
+  module Frozen_ledger_hash : Ledger_hash_intf
 
   module Proof : sig
     type t
@@ -762,11 +764,11 @@ module type Inputs_intf = sig
     Sok_message_intf with type public_key_compressed := Public_key.Compressed.t
 
   module Ledger_proof_statement :
-    Ledger_proof_statement_intf with type ledger_hash := Ledger_hash.t
+    Ledger_proof_statement_intf with type ledger_hash := Frozen_ledger_hash.t
 
   module Ledger_proof :
     Ledger_proof_intf
-    with type ledger_hash := Ledger_hash.t
+    with type ledger_hash := Frozen_ledger_hash.t
      and type statement := Ledger_proof_statement.t
      and type proof := Proof.t
      and type sok_digest := Sok_message.Digest.t
@@ -849,6 +851,7 @@ Merge Snark:
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
@@ -871,7 +874,7 @@ Merge Snark:
   module Blockchain_state :
     Blockchain_state_intf
     with type ledger_builder_hash := Ledger_builder_hash.t
-     and type ledger_hash := Ledger_hash.t
+     and type ledger_hash := Frozen_ledger_hash.t
      and type time := Time.t
 
   module Protocol_state_hash : Protocol_state_hash_intf

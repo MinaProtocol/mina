@@ -7,7 +7,7 @@ module Prod :
   with type t = Transaction_snark.t
    and type statement = Transaction_snark.Statement.t
    and type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Ledger_hash.t
+   and type ledger_hash := Frozen_ledger_hash.t
    and type proof := Proof.t =
 struct
   type t = Transaction_snark.t [@@deriving bin_io, sexp]
@@ -28,7 +28,7 @@ module Debug :
   with type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t
    and type statement = Transaction_snark.Statement.t
    and type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Ledger_hash.t
+   and type ledger_hash := Frozen_ledger_hash.t
    and type proof := Proof.t =
 struct
   type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t
