@@ -156,7 +156,7 @@ module type Inputs_intf = sig
       val answer_query : t -> query -> answer
     end
 
-    val create : Ledger.t -> t
+    val create : Ledger.t -> parent_log:Logger.t -> t
 
     val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
 
@@ -720,7 +720,7 @@ let%test_module "test" =
               (Ledger_hash.t * query) Linear_pipe.Reader.t
               * (Ledger_hash.t * query) Linear_pipe.Writer.t }
 
-        let create ledger =
+        let create ledger ~parent_log:_ =
           let t =
             { ledger
             ; answer_pipe= Linear_pipe.create ()
