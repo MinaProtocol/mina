@@ -16,15 +16,10 @@ module type Time_intf = sig
     type t
 
     val of_time_span : Core_kernel.Time.Span.t -> t
-
     val ( < ) : t -> t -> bool
-
     val ( > ) : t -> t -> bool
-
     val ( >= ) : t -> t -> bool
-
     val ( <= ) : t -> t -> bool
-
     val ( = ) : t -> t -> bool
   end
 
@@ -39,7 +34,7 @@ module type Ledger_hash_intf = sig
   include Hashable.S_binable with type t := t
 end
 
-module type State_hash_intf = sig
+module type Chain_state_hash_intf = sig
   type t [@@deriving bin_io, sexp]
 
   include Hashable.S_binable with type t := t
@@ -47,7 +42,6 @@ end
 
 module type Proof_intf = sig
   type input
-
   type t
 
   val verify : t -> input -> bool Deferred.t
@@ -59,19 +53,13 @@ end
 
 module type Ledger_intf = sig
   type t [@@deriving sexp, compare, hash, bin_io]
-
   type ledger_hash
-
   type transition
-
   type key
-
   type amount
 
   val apply_transition : t -> transition -> unit Or_error.t
-
   val merkle_root : t -> ledger_hash
-
   val lookup : t -> key -> amount
 end
 
@@ -147,8 +135,8 @@ module type Epoch_seed_intf = sig
   val empty : t
 end
 
-module type State_intf = sig
-  type state_hash
+module type Chain_state_intf = sig
+  type chain_state_hash
 
   type ledger_hash
 
@@ -172,11 +160,11 @@ module type State_intf = sig
     ; timestamp: time
     ; slot: slot
     ; epoch: epoch
-    ; locked_hash: state_hash
-    ; previous_state_hash: state_hash }
+    ; ancestor_hashes: chain_state_hash list
+    ; previous_chain_state_hash: chain_state_hash }
   [@@deriving sexp, bin_io, fields]
 
-  val hash : t -> state_hash
+  val hash : t -> chain_state_hash
 end
 
 module type Vrf_intf = sig
@@ -240,17 +228,17 @@ module type Time_close_validator_intf = sig
 end
 
 module type Block_state_transition_proof_intf = sig
-  type state
+  type chain_state
 
   type proof
 
   type transition
 
   module Witness : sig
-    type t = {old_state: state; old_proof: proof; transition: transition}
+    type t = {old_chain_state: chain_state; old_proof: proof; transition: transition}
   end
 
-  val prove_zk_state_valid : Witness.t -> new_state:state -> proof Deferred.t
+  val prove_zk_state_valid : Witness.t -> new_chain_state:chain_state -> proof Deferred.t
 end
 
 module Proof_carrying_data = struct
@@ -307,11 +295,11 @@ module type Inputs_intf = sig
   module Time_close_validator :
     Time_close_validator_intf with type time := Time.t
 
-  module State_hash : State_hash_intf
+  module Chain_state_hash : Chain_state_hash_intf
 
-  module State : sig
-    include State_intf
-            with type state_hash := State_hash.t
+  module Chain_state : sig
+    include Chain_state_intf
+            with type chain_state_hash := Chain_state_hash.t
              and type ledger_hash := Ledger_hash.t
              and type seed := Epoch_seed.t
              and type length := Length.t
@@ -329,33 +317,22 @@ module type Inputs_intf = sig
   end
 
   module Validator : sig
-    val validate : State.t -> State.Proof.t -> bool Deferred.t
-    (** This includes the State.Proof.t validation *)
-
-    val prefix_of :
-         candidate_locked:State_hash.t
-      -> curr_locked:State_hash.t
-      -> bool Deferred.t
-    (** This invariant is only checked during tests, in production we just believe this happens *)
-  end
-
-  module State_history : sig
-    val ancestors : State.t -> State.t Sequence.t
-    (** Lazy sequence sorted by slot number descending *)
+    val validate : Chain_state.t -> Chain_state.Proof.t -> bool Deferred.t
+    (** This includes the Chain_state.Proof.t validation *)
   end
 end
 
 module Make
     (Inputs : Inputs_intf)
     (Block_state_transition_proof : Block_state_transition_proof_intf
-                                    with type state := Inputs.State.t
-                                     and type proof := Inputs.State.Proof.t
+                                    with type chain_state := Inputs.Chain_state.t
+                                     and type proof := Inputs.Chain_state.Proof.t
                                      and type transition := Inputs.Transition.t) =
 struct
   open Inputs
 
   module Proof_carrying_state = struct
-    type t = (State.t, State.Proof.t) Proof_carrying_data.t
+    type t = (Chain_state.t, Chain_state.Proof.t) Proof_carrying_data.t
   end
 
   module Event = struct
@@ -364,109 +341,86 @@ struct
       | Candidate_state of Proof_carrying_state.t
   end
 
-  type t = {state: Proof_carrying_state.t} [@@deriving fields]
+  type t = {chain_state: Proof_carrying_state.t} [@@deriving fields]
 
-  let step' t (transition: Transition.t) : t Deferred.t =
-    assert (
-      Ledger_hash.equal
-        (Ledger.merkle_root transition.ledger)
-        t.state.data.ledger_hash ) ;
-    let is_epoch_transition =
-      Epoch.( > ) transition.epoch t.state.data.epoch
-    in
-    let epoch_seed =
-      if is_epoch_transition then t.state.data.next_epoch_seed
-      else t.state.data.epoch_seed
-    in
-    let next_epoch_seed =
-      if is_epoch_transition then Epoch_seed.empty
-      else if
-        Slot.( >= ) transition.slot Constants.forkable_slot
+  let apply_chain_state_transition t (transition: Transition.t) : t Deferred.t =
+    let get_next_epoch_seed prev =
+      if 
+        Slot.(transition.slot  >= Constants.forkable_slot)
         && Slot.(transition.slot < of_int 2 * Constants.forkable_slot)
-      then Vrf.update_seed t.state.data.next_epoch_seed transition.vrf
-      else t.state.data.next_epoch_seed
+      then Vrf.update_seed prev transition.vrf
+      else prev
     in
-    let next_epoch_ledger_hash =
-      if is_epoch_transition then t.state.data.ledger_hash
-      else t.state.data.next_epoch_ledger_hash
+    let epoch_seed, 
+        next_epoch_seed, 
+        next_epoch_ledger_hash,
+        epoch_ledger_hash 
+      =
+      if Epoch.(transition.epoch > t.chain_state.data.epoch) 
+      then t.chain_state.data.next_epoch_seed, 
+           get_next_epoch_seed Epoch_seed.empty,
+           t.chain_state.data.ledger_hash,
+           t.chain_state.data.next_epoch_ledger_hash
+      else t.chain_state.data.epoch_seed, 
+           get_next_epoch_seed t.chain_state.data.next_epoch_seed,
+           t.chain_state.data.next_epoch_ledger_hash,
+           t.chain_state.data.epoch_ledger_hash
     in
-    let epoch_ledger_hash =
-      if is_epoch_transition then t.state.data.next_epoch_ledger_hash
-      else t.state.data.epoch_ledger_hash
-    in
-    assert (
-      Ledger_hash.equal
-        (Ledger.merkle_root transition.epoch_ledger)
-        epoch_ledger_hash ) ;
-    let%bind b =
-      Vrf.verify transition.vrf ~slot:transition.slot ~epoch:transition.epoch
-        ~key:transition.key
-        ~amount:(Ledger.lookup transition.epoch_ledger transition.key)
-        ~seed:epoch_seed
-    in
-    if not b then failwith "VRF verification failed, but we created the VRF!" ;
-    (* TODO: make sure we verify that ledger transitions are valid before this point *)
     let () =
       Ledger.apply_transition transition.ledger transition.ledger_transition
       |> Or_error.ok_exn
     in
-    let ancestors : State.t Sequence.t =
-      State_history.ancestors t.state.data
+    let ancestor_hashes = t.chain_state.data.ancestor_hashes in
+    let ancestor_hashes = (Chain_state.hash t.chain_state.data)::ancestor_hashes in
+    let ancestor_hashes = 
+      if List.length ancestor_hashes > (Slot.to_int Constants.forkable_slot)
+      then List.tl_exn ancestor_hashes
+      else ancestor_hashes
     in
-    let newest_locked_ancestor =
-      Sequence.find ancestors ~f:(fun a ->
-          let open Int64 in
-          let open Constants in
-          Slot.true_slot_position ~slot:a.slot ~inside_epoch:a.epoch
-            ~epoch_slots
-          <= Slot.true_slot_position ~slot:transition.slot
-               ~inside_epoch:transition.epoch ~epoch_slots
-             - of_int (Slot.to_int forkable_slot) )
-    in
-    let locked_hash =
-      newest_locked_ancestor
-      |> Option.map ~f:(fun a -> State.hash a)
-      |> Option.value ~default:t.state.data.locked_hash
-    in
-    let new_state =
-      { State.epoch_seed
+    let new_chain_state =
+      { Chain_state.epoch_seed
       ; timestamp= transition.timestamp
       ; next_epoch_seed
       ; next_epoch_ledger_hash
       ; epoch_ledger_hash
       ; ledger_hash= Ledger.merkle_root transition.ledger
-      ; length= Length.increment t.state.data.length
+      ; length= Length.increment t.chain_state.data.length
       ; slot= transition.slot
       ; epoch= transition.epoch
-      ; locked_hash
-      ; previous_state_hash= State.hash t.state.data }
+      ; ancestor_hashes= ancestor_hashes
+      ; previous_chain_state_hash= Chain_state.hash t.chain_state.data }
     in
     let%map proof =
       Block_state_transition_proof.prove_zk_state_valid
-        {old_state= t.state.data; old_proof= t.state.proof; transition}
-        ~new_state
+        {old_chain_state= t.chain_state.data; old_proof= t.chain_state.proof; transition}
+        ~new_chain_state
     in
-    {state= {data= new_state; proof}}
+    {chain_state= {data= new_chain_state; proof}}
 
-  let create ~initial : t = {state= initial}
+  let create ~initial : t = {chain_state= initial}
 
-  let select (current: Proof_carrying_state.t)
-      (candidate: Proof_carrying_state.t) =
-    let%bind validated = Validator.validate candidate.data candidate.proof in
-    if not validated then return current
+  let select 
+      (current: Proof_carrying_state.t)
+      (candidate: Proof_carrying_state.t) 
+    =
+    let any ls = List.fold ~init:false ~f:(||) ls in
+    let hash_in_current a = 
+      any (List.map current.data.ancestor_hashes ~f:(fun b -> b = a))
+    in
+    let cand_fork_before_checkpoint = 
+      any (List.map candidate.data.ancestor_hashes ~f:hash_in_current)
+    in
+    let%map validated = Validator.validate candidate.data candidate.proof in
+    if not validated || not cand_fork_before_checkpoint
+    then current
     else
-      let%map prefixed =
-        Validator.prefix_of ~candidate_locked:candidate.data.locked_hash
-          ~curr_locked:current.data.locked_hash
-      in
-      if not prefixed then current
-      else if Length.( > ) candidate.data.length current.data.length then
-        candidate
+      if Length.(candidate.data.length > current.data.length) 
+      then candidate
       else current
 
   let step (t: t) = function
-    | Event.Found transition -> step' t transition
+    | Event.Found transition -> apply_chain_state_transition t transition
     | Event.Candidate_state pcd ->
-        let%map state = select t.state pcd in
-        {state}
+        let%map chain_state = select t.chain_state pcd in
+        {chain_state}
 end
