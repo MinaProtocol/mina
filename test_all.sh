@@ -24,7 +24,8 @@ run_integration_tests() {
     pkill -9 kademlia
     pkill -9 cli
     sleep 1
-    dune exec cli -- integration-tests $test 2>&1 >> test.log
+    mkdir -p /tmp/artifacts
+    dune exec cli -- integration-tests $test 2>&1 >> /tmp/artifacts/test.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
     if [ $OUT -eq 0 ];then
@@ -33,7 +34,7 @@ run_integration_tests() {
       echo "FAILED"
       echo "------------------------------------------------------------------------------------------"
       echo "RECENT OUTPUT:"
-      tail -n 50 test.log | dune exec logproc
+      tail -n 10 /tmp/artifacts/test.log | dune exec logproc
       echo "------------------------------------------------------------------------------------------"
       echo "See above for stack trace..."
       exit 2

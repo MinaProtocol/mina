@@ -1,0 +1,108 @@
+# Reuse common defaults
+defaults: &defaults
+    resource_class: large
+    docker:
+      - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
+    auth:
+        username: _json_key
+        password: $JSON_GCLOUD_CREDENTIALS
+
+version: 2
+jobs:
+    build:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Lint
+                command: eval `opam config env` && make check-format
+            - run:
+                name: Build OCaml
+                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                name: Install python -- hack
+                command: sudo apt install -y python
+            - run:
+                name: Count OCaml Warns
+                command: ./scripts/buildwarns.py /tmp/buildocaml.log
+            - run:
+                name: Build deb Package
+                command: make deb
+            - store_artifacts:
+                path: /tmp/artifacts
+
+    build_withsnark:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Enable snarks --  make withsnark
+                command: make withsnark
+            - run:
+                name: Build OCaml
+                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                name: Build deb Package
+                command: make deb
+            - run:
+                name: Build provingkeys
+                command: make provingkeys
+            - store_artifacts:
+                path: /tmp/artifacts
+
+
+    test-runtest:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-runtest
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
+            - store_artifacts:
+                path: /tmp/artifacts
+
+    test-stake:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-stakes
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
+            - store_artifacts:
+                path: /tmp/artifacts
+
+    test-sig:
+        <<: *defaults
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Test make test-sigs
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
+            - store_artifacts:
+                path: /tmp/artifacts
+
+                
+workflows:
+    version: 2
+    coda_parallel:
+        jobs:
+            - build
+            - build_withsnark
+            - test-runtest
+            - test-sig
+            #- test-stake
