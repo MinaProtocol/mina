@@ -26,7 +26,7 @@ let daemon_port_flag =
 let json_flag =
   Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
-module Daemon = struct
+module Daemon_cli = struct
   type state =
     | Start
     | Show_menu
@@ -98,22 +98,25 @@ let get_balance =
           "PUBLICKEY Public-key address of which you want to check the balance"
         (required public_key)
     and port = daemon_port_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let port = Option.value ~default:default_client_port port in
-      match%map
-        dispatch Client_lib.Get_balance.rpc (Public_key.compress address) port
-      with
-      | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
-      | Ok None ->
-          printf "No account found at that public_key (zero balance)\n"
-      | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e))
+    Daemon_cli.run ~port ~f:(fun () ->
+        let open Deferred.Let_syntax in
+        let port = Option.value ~default:default_client_port port in
+        match%map
+          dispatch Client_lib.Get_balance.rpc
+            (Public_key.compress address)
+            port
+        with
+        | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
+        | Ok None ->
+            printf "No account found at that public_key (zero balance)\n"
+        | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)
+    ))
 
 let get_public_keys =
   Command.async ~summary:"Get public keys"
     (let open Command.Let_syntax in
     let%map_open json = json_flag and port = daemon_port_flag in
-    Daemon.run ~port ~f:(fun () ->
+    Daemon_cli.run ~port ~f:(fun () ->
         let open Deferred.Let_syntax in
         let port = Option.value ~default:default_client_port port in
         let open Client_lib in
@@ -133,11 +136,11 @@ let status =
   Command.async ~summary:"Get running daemon status"
     (let open Command.Let_syntax in
     let%map_open json = json_flag and port = daemon_port_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let port = Option.value ~default:default_client_port port in
-      let open Client_lib in
-      dispatch Get_status.rpc () port >>| print (module Status) json)
+    Daemon_cli.run ~port ~f:(fun () ->
+        let open Deferred.Let_syntax in
+        let port = Option.value ~default:default_client_port port in
+        let open Client_lib in
+        dispatch Get_status.rpc () port >>| print (module Status) json ))
 
 let send_txn =
   Command.async ~summary:"Send transaction to an address"
@@ -160,29 +163,30 @@ let send_txn =
       flag "amount" ~doc:"VALUE Transaction amount you want to send"
         (required txn_amount)
     and port = daemon_port_flag in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let receiver_compressed = Public_key.compress address in
-      let sender_kp = Keypair.of_private_key_exn from_account in
-      let port = Option.value ~default:default_client_port port in
-      match%bind get_nonce sender_kp.public_key port with
-      | Error e ->
-          printf "Failed to get nonce %s\n" e ;
-          return ()
-      | Ok nonce ->
-          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-          let payload : Transaction.Payload.t =
-            {receiver= receiver_compressed; amount; fee; nonce}
-          in
-          let txn = Transaction.sign sender_kp payload in
-          match%map
-            dispatch Client_lib.Send_transaction.rpc
-              (txn :> Transaction.t)
-              port
-          with
-          | Ok () -> printf "Successfully enqueued transaction in pool\n"
-          | Error e ->
-              printf "Failed to send transaction %s\n" (Error.to_string_hum e))
+    Daemon_cli.run ~port ~f:(fun () ->
+        let open Deferred.Let_syntax in
+        let receiver_compressed = Public_key.compress address in
+        let sender_kp = Keypair.of_private_key_exn from_account in
+        let port = Option.value ~default:default_client_port port in
+        match%bind get_nonce sender_kp.public_key port with
+        | Error e ->
+            printf "Failed to get nonce %s\n" e ;
+            return ()
+        | Ok nonce ->
+            let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
+            let payload : Transaction.Payload.t =
+              {receiver= receiver_compressed; amount; fee; nonce}
+            in
+            let txn = Transaction.sign sender_kp payload in
+            match%map
+              dispatch Client_lib.Send_transaction.rpc
+                (txn :> Transaction.t)
+                port
+            with
+            | Ok () -> printf "Successfully enqueued transaction in pool\n"
+            | Error e ->
+                printf "Failed to send transaction %s\n"
+                  (Error.to_string_hum e) ))
 
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
