@@ -7,7 +7,7 @@ module Inputs = struct
 
     let create () = Deferred.unit
 
-    let worker_wait_time = 1.
+    let worker_wait_time = 0.5
   end
 
   module Proof = struct
