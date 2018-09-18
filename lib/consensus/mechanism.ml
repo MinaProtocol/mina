@@ -39,30 +39,29 @@ module type S = sig
   end
 
   module Protocol_state :
-    Nanobit_base.Protocol_state.S with module Consensus_state = Consensus_state
+    Coda_base.Protocol_state.S with module Consensus_state = Consensus_state
 
   module Snark_transition :
-    Nanobit_base.Snark_transition.S
+    Coda_base.Snark_transition.S
     with module Consensus_data = Consensus_transition_data
 
   module Internal_transition :
-    Nanobit_base.Internal_transition.S
+    Coda_base.Internal_transition.S
     with module Snark_transition = Snark_transition
 
   module External_transition :
-    Nanobit_base.External_transition.S
-    with module Protocol_state = Protocol_state
+    Coda_base.External_transition.S with module Protocol_state = Protocol_state
 
   val genesis_protocol_state : Protocol_state.value
 
   val generate_transition :
        previous_protocol_state:Protocol_state.value
-    -> blockchain_state:Nanobit_base.Blockchain_state.value
+    -> blockchain_state:Coda_base.Blockchain_state.value
     -> local_state:Local_state.t
     -> time:Unix_timestamp.t
     -> keypair:Signature_lib.Keypair.t
-    -> transactions:Nanobit_base.Transaction.t list
-    -> ledger:Nanobit_base.Ledger.t
+    -> transactions:Coda_base.Transaction.t list
+    -> ledger:Coda_base.Ledger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
   (**
    * Generate a new protocol state and consensus specific transition data
@@ -80,7 +79,7 @@ module type S = sig
 
   val next_state_checked :
        Consensus_state.var
-    -> Nanobit_base.State_hash.var
+    -> Coda_base.State_hash.var
     -> Snark_transition.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
   (**

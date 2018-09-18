@@ -5,9 +5,9 @@ open Async
 let whitelist =
   [ "lib/snark_params/snark_util.ml"
   ; "lib/dummy_values/gen_values/gen_values.ml"
-  ; "lib/nanobit_base/blockchain_state.ml"
-  ; "lib/nanobit_base/ledger_hash.ml"
-  ; "lib/nanobit_base/public_key.ml"
+  ; "lib/coda_base/blockchain_state.ml"
+  ; "lib/coda_base/ledger_hash.ml"
+  ; "lib/coda_base/public_key.ml"
   ; "lib/snarky/src/request.ml"
   ; "lib/snarky/src/request.mli"
   ; "lib/spirv/generator.ml"
