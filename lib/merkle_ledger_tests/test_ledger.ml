@@ -277,14 +277,20 @@ let%test_module "test functor on in memory databases" =
       let l1, _ = L16.load_ledger 1026 1 in
       let l2, _ = L16.load_ledger 2048 1 in
       let left_subtree =
-        L16.get_all_accounts_rooted_at_exn l2 (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Left])
+        L16.get_all_accounts_rooted_at_exn l2
+          (L16.Addr.of_directions
+             Direction.[Left; Left; Left; Left; Left; Left])
       in
       let right_subtree =
-        L16.get_all_accounts_rooted_at_exn l2 (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Right])
+        L16.get_all_accounts_rooted_at_exn l2
+          (L16.Addr.of_directions
+             Direction.[Left; Left; Left; Left; Left; Right])
       in
-      L16.set_all_accounts_rooted_at_exn l1 (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Left])
-      left_subtree;
-      L16.set_all_accounts_rooted_at_exn l1 (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Right])
-      right_subtree;
+      L16.set_all_accounts_rooted_at_exn l1
+        (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Left])
+        left_subtree ;
+      L16.set_all_accounts_rooted_at_exn l1
+        (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Right])
+        right_subtree ;
       [%test_eq : Hash.t] (L16.merkle_root l1) (L16.merkle_root l2)
   end )
