@@ -1216,10 +1216,10 @@ end = struct
       in
       pre_diff
     in
-    let pre_diff1 = gen_diff resources in
     let maybe_pre_diff2 =
       Option.map more_resources ~f:(fun res -> gen_diff res)
     in
+    let pre_diff1 = gen_diff resources in
     let diff =
       { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs=
           (pre_diff1, maybe_pre_diff2)
