@@ -46,7 +46,7 @@ module Daemon_cli = struct
     Result.is_ok result
 
   let kill p =
-    Process.run_exn () ~prog:"kill" ~args:["-9"; Pid.to_string @@ Process.pid p]
+    Process.run_exn () ~prog:"kill" ~args:[Pid.to_string @@ Process.pid p]
 
   let print_menu () =
     printf
