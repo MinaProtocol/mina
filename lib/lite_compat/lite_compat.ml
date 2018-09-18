@@ -44,11 +44,11 @@ let proof proof : Snarkette.Mnt6.Groth_maller.Proof.t =
   {a= P.a proof |> g1; b= P.b proof |> g2; c= P.c proof |> g1}
 
 let merkle_path :
-       Nanobit_base.Ledger.Path.t
+       Coda_base.Ledger.Path.t
     -> [ `Left of Lite_base.Pedersen.Digest.t
        | `Right of Lite_base.Pedersen.Digest.t ]
        list =
-  let f (e: Nanobit_base.Ledger.Path.elem) =
+  let f (e: Coda_base.Ledger.Path.elem) =
     match e with
     | `Left h -> `Left (digest (h :> Snark_params.Tick.Pedersen.Digest.t))
     | `Right h -> `Right (digest (h :> Snark_params.Tick.Pedersen.Digest.t))
@@ -62,17 +62,17 @@ let public_key ({x; is_odd}: Signature_lib.Public_key.Compressed.t) :
 let length =
   Fn.compose Lite_base.Length.t_of_sexp Coda_numbers.Length.sexp_of_t
 
-let account_nonce : Nanobit_base.Account.Nonce.t -> Lite_base.Account.Nonce.t =
+let account_nonce : Coda_base.Account.Nonce.t -> Lite_base.Account.Nonce.t =
   Fn.compose Lite_base.Account.Nonce.t_of_sexp
-    Nanobit_base.Account.Nonce.sexp_of_t
+    Coda_base.Account.Nonce.sexp_of_t
 
 let balance : Currency.Balance.t -> Lite_base.Account.Balance.t =
   Fn.compose Lite_base.Account.Balance.t_of_sexp Currency.Balance.sexp_of_t
 
-let time : Nanobit_base.Block_time.t -> Lite_base.Block_time.t =
-  Fn.compose Lite_base.Block_time.t_of_sexp Nanobit_base.Block_time.sexp_of_t
+let time : Coda_base.Block_time.t -> Lite_base.Block_time.t =
+  Fn.compose Lite_base.Block_time.t_of_sexp Coda_base.Block_time.sexp_of_t
 
-let account (account: Nanobit_base.Account.value) : Lite_base.Account.t =
+let account (account: Coda_base.Account.value) : Lite_base.Account.t =
   { public_key= public_key account.public_key
   ; nonce= account_nonce account.nonce
   ; balance= balance account.balance
@@ -80,18 +80,18 @@ let account (account: Nanobit_base.Account.value) : Lite_base.Account.t =
       digest (account.receipt_chain_hash :> Snark_params.Tick.Pedersen.Digest.t)
   }
 
-let ledger_hash (h: Nanobit_base.Ledger_hash.t) : Lite_base.Ledger_hash.t =
+let ledger_hash (h: Coda_base.Ledger_hash.t) : Lite_base.Ledger_hash.t =
   digest (h :> Snark_params.Tick.Pedersen.Digest.t)
 
-let ledger_builder_hash (h: Nanobit_base.Ledger_builder_hash.t) =
+let ledger_builder_hash (h: Coda_base.Ledger_builder_hash.t) =
   { Lite_base.Ledger_builder_hash.ledger_hash=
-      ledger_hash (Nanobit_base.Ledger_builder_hash.ledger_hash h)
-  ; aux_hash= Nanobit_base.Ledger_builder_hash.(Aux_hash.to_bytes (aux_hash h))
+      ledger_hash (Coda_base.Ledger_builder_hash.ledger_hash h)
+  ; aux_hash= Coda_base.Ledger_builder_hash.(Aux_hash.to_bytes (aux_hash h))
   }
 
 let blockchain_state
     ({ledger_builder_hash= lbh; ledger_hash= lh; timestamp}:
-      Nanobit_base.Blockchain_state.t) : Lite_base.Blockchain_state.t =
+      Coda_base.Blockchain_state.t) : Lite_base.Blockchain_state.t =
   { ledger_builder_hash= ledger_builder_hash lbh
   ; ledger_hash= ledger_hash lh
   ; timestamp= time timestamp }

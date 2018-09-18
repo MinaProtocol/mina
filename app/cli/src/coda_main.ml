@@ -765,7 +765,7 @@ module type Main_intf = sig
 
       val depth : int
 
-      val merkle_root : t -> Nanobit_base.Ledger_hash.t
+      val merkle_root : t -> Coda_base.Ledger_hash.t
 
       val to_list : t -> Account.t list
     end
@@ -1083,7 +1083,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                         (B64.encode
                            (Binable.to_string
                               (module Lite_base.Lite_chain)
-                              (get_lite_chain minibit []))) )
+                              (get_lite_chain coda []))) )
                 | "/status" ->
                     Server.respond_string
                       ( get_status coda |> Client_lib.Status.to_yojson

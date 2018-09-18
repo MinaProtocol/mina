@@ -8,7 +8,7 @@
       snarkette
       ppxlib
       snark_keys
-      nanobit_base
+      coda_base
       lite_compat
     )
    (preprocess (pps ppx_jane ppxlib.metaquot ppxlib.runner))
