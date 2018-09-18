@@ -46,7 +46,7 @@ If developing on a VM, now is a good time to take a snapshot and save your state
 (REMEMBER to change the HOME and SOURCE directory to match yours)
 
 ```bash
-export PATH=~/src/nanobit/scripts:$PATH
+export PATH=~/src/cli/scripts:$PATH
 ```
 
 * Start a build (go stretch your arms)\

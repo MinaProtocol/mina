@@ -35,10 +35,10 @@ dht: kademlia
 build:
 ifeq ($(FORTESTNET),TRUE)
 	$(info INFO ensuring refusal to run when new version is out)
-	sed -i '/let force_updates = /c\let force_updates = true' app/nanobit/src/cli.ml
+	sed -i '/let force_updates = /c\let force_updates = true' app/cli/src/cli.ml
 else
 	$(info INFO will ignore new versions)
-	sed -i '/let force_updates = /c\let force_updates = false' app/nanobit/src/cli.ml
+	sed -i '/let force_updates = /c\let force_updates = false' app/cli/src/cli.ml
 endif
 	$(info Starting Build)
 	ulimit -s 65536
@@ -116,9 +116,9 @@ deb:
 	@cp _build/codaclient.deb /tmp/artifacts/.
 
 provingkeys:
-	$(WRAP) tar -cvjf _build/nanobit_cache_dir_$(GITHASH).tar.bz2  /tmp/nanobit_cache_dir
+	$(WRAP) tar -cvjf _build/cli_cache_dir_$(GITHASH).tar.bz2  /tmp/cli_cache_dir
 	@mkdir -p /tmp/artifacts
-	@cp _build/nanobit_cache_dir*.tar.bz2 /tmp/artifacts/.
+	@cp _build/cli_cache_dir*.tar.bz2 /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
