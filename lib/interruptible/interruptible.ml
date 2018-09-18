@@ -6,6 +6,8 @@ module T = struct
   type ('a, 's) t =
     {interruption_signal: 's Deferred.t; d: ('a, 's) Deferred.Result.t}
 
+  let create d = {interruption_signal= Ivar.create (); d}
+
   let map_signal {interruption_signal; d} ~f =
     { interruption_signal= Deferred.map interruption_signal ~f
     ; d= Deferred.Result.map_error d ~f }
@@ -51,6 +53,11 @@ module T = struct
 
   let return a =
     {interruption_signal= Deferred.never (); d= Deferred.Result.return a}
+
+  let don't_wait_for {d;_} =
+    don't_wait_for @@ Deferred.map d ~f:(function
+      | Ok ()   -> ()
+      | Error _ -> ())
 
   let finally t ~f = {t with d= Deferred.map t.d ~f:(fun r -> f () ; r)}
 
