@@ -77,8 +77,8 @@ docker:
 ci-base-docker:
 	./rebuild-docker.sh o1labs/ci-base Dockerfile-ci-base
 
-nanobit-docker:
-	./rebuild-docker.sh nanobit Dockerfile-nanobit
+coda-docker:
+	./rebuild-docker.sh coda Dockerfile-coda
 
 base-docker:
 	./rebuild-docker.sh ocaml-base Dockerfile-base
@@ -86,14 +86,14 @@ base-docker:
 base-minikube:
 	./rebuild-minikube.sh ocaml-base Dockerfile-base
 
-nanobit-minikube:
-	./rebuild-minikube.sh nanobit Dockerfile-nanobit
+coda-minikube:
+	./rebuild-minikube.sh coda Dockerfile-coda
 
 base-googlecloud:
 	./rebuild-googlecloud.sh ocaml-base Dockerfile-base $(shell git rev-parse HEAD)
 
-nanobit-googlecloud:
-	./rebuild-googlecloud.sh nanobit Dockerfile-nanobit
+coda-googlecloud:
+	./rebuild-googlecloud.sh coda Dockerfile-coda
 
 ocaml407-googlecloud:
 	./rebuild-googlecloud.sh ocaml407 Dockerfile-ocaml407
@@ -155,4 +155,4 @@ test-stakes:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia nanobit-docker nanobit-googlecloud nanobit-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps
