@@ -3,6 +3,7 @@ open Async
 open Coda_worker
 open Coda_main
 open Coda_base
+open Signature_lib
 
 module Make
     (Ledger_proof : Ledger_proof_intf)
@@ -23,7 +24,13 @@ struct
     let n = 2 in
     let should_propose i = i = 0 in
     let snark_work_public_keys i = None in
-    let receiver_pk = Genesis_ledger.low_balance_pk in
+    let send_new = true in
+    let receiver_pk =
+      if send_new then
+        let keypair = Keypair.create () in
+        Public_key.compress keypair.public_key
+      else Genesis_ledger.low_balance_pk
+    in
     let sender_sk = Genesis_ledger.high_balance_sk in
     let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
