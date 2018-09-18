@@ -129,7 +129,7 @@ struct
 
       include (U : module type of U with module Checked := U.Checked)
 
-      module Hash = Nanobit_base.State_hash
+      module Hash = Coda_base.State_hash
 
       module Checked = struct
         include Blockchain.Checked
@@ -138,7 +138,7 @@ struct
     end
   end
 
-  open Nanobit_base
+  open Coda_base
 
   include Transition_system.Make (struct
               module Tick = struct

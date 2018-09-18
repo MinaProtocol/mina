@@ -8,7 +8,7 @@
   (inline_tests)
   (libraries
     ( core
-      nanobit_base ))
+      coda_base ))
   (preprocess (pps (ppx_jane)))
   (synopsis "Some cli utilities")))
 

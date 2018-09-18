@@ -111,7 +111,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
             module Prover_state = Step_prover_state
 
             let instance_hash =
-              let open Nanobit_base in
+              let open Coda_base in
               let s =
                 let wrap_vk = Tock.Keypair.vk Wrap.keys in
                 Tick.Pedersen.State.update_fold

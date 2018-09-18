@@ -1,6 +1,6 @@
 open Core_kernel
 open Async
-open Nanobit_base
+open Coda_base
 open Signature_lib
 
 module Send_transaction = struct
