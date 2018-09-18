@@ -50,13 +50,13 @@ dev: docker container build
 # snark tunable
 
 withsnark:
-	sed -i '/let with_snark =/c\let with_snark = true' lib/nanobit_base/insecure.ml
+	sed -i '/let with_snark =/c\let with_snark = true' lib/coda_base/insecure.ml
 
 withoutsnark:
-	sed -i '/let with_snark =/c\let with_snark = false' lib/nanobit_base/insecure.ml
+	sed -i '/let with_snark =/c\let with_snark = false' lib/coda_base/insecure.ml
 
 showsnark:
-	@grep 'let with_snark' lib/nanobit_base/insecure.ml
+	@grep 'let with_snark' lib/coda_base/insecure.ml
 
 ########################################
 ## Lint

@@ -1,6 +1,6 @@
 open Core
 open Async
-open Nanobit_base
+open Coda_base
 open Signature_lib
 open Blockchain_snark
 open Coda_numbers
@@ -256,8 +256,8 @@ struct
           false
   end
 
-  module Fee_transfer = Nanobit_base.Fee_transfer
-  module Coinbase = Nanobit_base.Coinbase
+  module Fee_transfer = Coda_base.Fee_transfer
+  module Coinbase = Coda_base.Coinbase
 
   module Super_transaction = struct
     module T = struct
@@ -287,9 +287,9 @@ struct
     include Ledger_proof_verifier
   end
 
-  module Proof = Nanobit_base.Proof.Stable.V1
+  module Proof = Coda_base.Proof.Stable.V1
   module Ledger_proof = Ledger_proof
-  module Sparse_ledger = Nanobit_base.Sparse_ledger
+  module Sparse_ledger = Coda_base.Sparse_ledger
 
   module Completed_work_proof = struct
     type t = Ledger_proof.t list [@@deriving sexp, bin_io]
@@ -399,7 +399,7 @@ struct
   open Init
   module Inputs0 = Make_inputs0 (Init) (Ledger_proof_verifier)
   include Inputs0
-  module Blockchain_state = Nanobit_base.Blockchain_state
+  module Blockchain_state = Coda_base.Blockchain_state
   module Ledger_builder_diff = Ledger_builder_diff
   module Completed_work = Completed_work
   module Ledger_builder_hash = Ledger_builder_hash
@@ -603,7 +603,7 @@ struct
 
       module Consensus_mechanism = Consensus_mechanism
       module Protocol_state = Protocol_state
-      module Blockchain_state = Nanobit_base.Blockchain_state
+      module Blockchain_state = Coda_base.Blockchain_state
       module Protocol_state_proof = Protocol_state_proof
       module State_hash = State_hash
       module Valid_transaction = Transaction.With_valid_signature
@@ -633,7 +633,7 @@ struct
     module Public_key = Public_key
     module Private_key = Private_key
     module Keypair = Keypair
-    module Blockchain_state = Nanobit_base.Blockchain_state
+    module Blockchain_state = Coda_base.Blockchain_state
     module Compressed_public_key = Public_key.Compressed
 
     module Prover = struct

@@ -1,6 +1,6 @@
 open Core
 open Async
-open Nanobit_base
+open Coda_base
 open Blockchain_snark
 
 module type S = sig

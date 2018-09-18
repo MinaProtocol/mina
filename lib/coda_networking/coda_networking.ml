@@ -1,7 +1,7 @@
 open Core_kernel
 open Async
 open Kademlia
-open Nanobit_base
+open Coda_base
 
 module type Sync_ledger_intf = sig
   type query [@@deriving bin_io]

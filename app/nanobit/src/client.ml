@@ -2,7 +2,7 @@ open Core
 open Async
 open Cli_lib
 open Signature_lib
-open Nanobit_base
+open Coda_base
 
 let of_local_port port = Host_and_port.create ~host:"127.0.0.1" ~port
 

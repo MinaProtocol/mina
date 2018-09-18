@@ -1,6 +1,6 @@
 open Core
 open Async
-open Nanobit_base
+open Coda_base
 open Signature_lib
 open Coda_main
 open Signature_lib

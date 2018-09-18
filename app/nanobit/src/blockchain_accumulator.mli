@@ -1,4 +1,4 @@
-open Nanobit_base
+open Coda_base
 open Blockchain_snark
 
 module Update : sig

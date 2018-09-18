@@ -13,7 +13,7 @@ module type S = sig
   val verify_transaction_snark :
        t
     -> Transaction_snark.t
-    -> message:Nanobit_base.Sok_message.t
+    -> message:Coda_base.Sok_message.t
     -> bool Or_error.t Deferred.t
 end
 

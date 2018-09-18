@@ -1,6 +1,6 @@
 open Core_kernel
 open Async_kernel
-open Nanobit_base
+open Coda_base
 
 module Make_prod
     (Consensus_mechanism : Consensus.Mechanism.S)

@@ -1,6 +1,6 @@
 open Core
 open Async
-open Nanobit_base
+open Coda_base
 open Util
 open Blockchain_snark
 open Snark_params

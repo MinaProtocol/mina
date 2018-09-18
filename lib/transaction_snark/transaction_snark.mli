@@ -1,5 +1,5 @@
 open Core
-open Nanobit_base
+open Coda_base
 open Snark_params
 
 module Proof_type : sig
@@ -16,8 +16,8 @@ end
 
 module Statement : sig
   type t =
-    { source: Nanobit_base.Ledger_hash.Stable.V1.t
-    ; target: Nanobit_base.Ledger_hash.Stable.V1.t
+    { source: Coda_base.Ledger_hash.Stable.V1.t
+    ; target: Coda_base.Ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }

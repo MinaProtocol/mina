@@ -1,6 +1,6 @@
 open Core
 open Async
-open Nanobit_base
+open Coda_base
 open Blockchain_snark
 open Cli_lib
 open Coda_main
@@ -275,9 +275,9 @@ let () =
               type t [@@deriving sexp, bin_io]
             end) =
             Consensus.Proof_of_signature.Make (struct
-              module Proof = Nanobit_base.Proof
+              module Proof = Coda_base.Proof
               module Ledger_builder_diff = Ledger_builder_diff
-              module Time = Nanobit_base.Block_time
+              module Time = Coda_base.Block_time
 
               let proposal_interval =
                 env "PROPOSAL_INTERVAL"
@@ -293,9 +293,9 @@ let () =
               type t [@@deriving sexp, bin_io]
             end) =
             Consensus.Proof_of_stake.Make (struct
-              module Proof = Nanobit_base.Proof
+              module Proof = Coda_base.Proof
               module Ledger_builder_diff = Ledger_builder_diff
-              module Time = Nanobit_base.Block_time
+              module Time = Coda_base.Block_time
 
               (* TODO: choose reasonable values *)
               let genesis_state_timestamp =
@@ -305,10 +305,10 @@ let () =
                   (Core.Time.Ofday.create ~hr:10 ())
                 |> Time.of_time
 
-              let genesis_ledger = Nanobit_base.Genesis_ledger.ledger
+              let genesis_ledger = Coda_base.Genesis_ledger.ledger
 
               let genesis_ledger_total_currency =
-                Nanobit_base.Genesis_ledger.total_currency
+                Coda_base.Genesis_ledger.total_currency
 
               let genesis_state_timestamp =
                 let default =

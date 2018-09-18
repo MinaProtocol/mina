@@ -16,7 +16,7 @@
       coda
       coda_numbers
       protocols
-      nanobit_base
+      coda_base
       test_util
       ledger_builder
       ledger_builder_controller

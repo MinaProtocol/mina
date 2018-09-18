@@ -2,7 +2,7 @@ open Core
 open Async
 open Coda_worker
 open Coda_main
-open Nanobit_base
+open Coda_base
 
 module Make
     (Ledger_proof : Ledger_proof_intf)
