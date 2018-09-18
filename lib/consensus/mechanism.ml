@@ -63,6 +63,7 @@ module type S = sig
     -> keypair:Signature_lib.Keypair.t
     -> transactions:Nanobit_base.Transaction.t list
     -> ledger:Nanobit_base.Ledger.t
+    -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
   (**
    * Generate a new protocol state and consensus specific transition data
@@ -103,6 +104,8 @@ module type S = sig
   val next_proposal :
        Unix_timestamp.t
     -> Consensus_state.value
+    -> local_state:Local_state.t
+    -> keypair:Signature_lib.Keypair.t
     -> logger:Logger.t
     -> [`Check_again of Unix_timestamp.t | `Propose of Unix_timestamp.t]
   (**

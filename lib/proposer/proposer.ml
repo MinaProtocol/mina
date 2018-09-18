@@ -14,6 +14,44 @@ module type Inputs_intf = sig
   end
 end
 
+module Agent : sig
+  type 'a t
+  val create : f:('a -> 'b) -> 'a Linear_pipe.Reader.t -> 'b t
+  val get : 'a t -> 'a option
+end = struct
+  type 'a t = 'a option ref
+
+  let create ~(f: 'a -> 'b) (reader: 'a Linear_pipe.Reader.t) : 'b t =
+    let agent = ref None in
+    don't_wait_for (Linear_pipe.iter reader ~f:(fun x ->
+      agent := Some (f x);
+      return ()));
+    agent
+
+  let get t = !t
+end
+
+module Interruptible_supervisor : sig
+  type 'a t
+  val create : task:(unit -> 'a Interruptible.t) -> 'a t
+  val cancel : 'a t -> unit
+  val dispatch : 'a t -> 'a Interruptible.t
+end = struct
+  type 'a t =
+    { mutable task: 'a Interruptible.t option
+    ; f: unit -> 'a Interruptible.t }
+
+  let create ~task = {task= None; f= task}
+
+  let cancel {task; _} = ignore (Option.map ~f:Interruptible.cancel)
+
+  let dispatch t =
+    cancel t;
+    let task = t.f () in
+    t.task <- Some task;
+    task
+end
+
 module Make (Inputs : Inputs_intf) :
   Coda.Proposer_intf
   with type external_transition :=
@@ -151,8 +189,7 @@ struct
 
   let transition_capacity = 64
 
-  let create ~parent_log ~get_completed_work ~change_feeder ~time_controller
-      ~keypair =
+  let create ~parent_log ~get_completed_work ~change_feeder ~time_controller ~keypair =
     let logger = Logger.child parent_log "proposer" in
     let r, w = Linear_pipe.create () in
     let write_result = function
@@ -185,19 +222,54 @@ struct
       upon (External_transition_result.result result) write_result ;
       result
     in
+
+    let next_state_of_tip tip =
+      let open Tip in
+      let open Interruptible.Let_syntax in
+      let (previous_protocol_state, previous_protocol_state_proof) = tip.protocol_state in
+      let%bind protocol_state, internal_transition =
+        generate_next_state
+          ~previous_protocol_state
+          ~local_state
+          ~time_controller
+          ~ledger_builder:tip.ledger_builder
+          ~transactions:tip.transactions
+          ~get_completed_work
+          ~logger
+          ~keypair
+      in
+      let%bind protocol_state_proof =
+        prove
+          ~prev_state:previous_protocol_state
+          ~prev_state_proof:previous_protocol_state_proof
+          ~next_state:protocol_state
+          internal_transition
+      in
+      let%map external_transition =
+        External_transition.create
+          ~protocol_state
+          ~protocol_state_proof
+          ~ledger_builder_diff:(Internal_transition.ledger_builder_diff internal_transition)
+      in
+      external_transition
+    in
+
+    let tip_agent = Agent.create tip_reader ~f:(fun (Tip_change tip) -> tip) in
+    let schedule_at ~f time =
+      let span = Time.diff time (Time.now time_controller) in
+      Time.Timeout.create time_controller span ~f
+    in
     let schedule_proposal tip =
       match Consensus_mechanism.next_proposal_time (Time.now time_controller) tip.protocol_state with
-      | `Check_again time -> schedule_at time (fun () -> schedule_proposal tip)
-
-
-      let time_now = Time.now time_controller in
-      let time_till_proposal = Time.diff next_proposal_time (Time.now time_controller) in
-      Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
-
-      Time.Timeout.create time_controller time_till_proposal ~f:(fun _ ->
-          Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
-          create_result tip )
+      | `Check_again time -> schedule_at time ~f:(fun _ -> schedule_proposal tip)
+      | `Propose time     ->
+          schedule_at time ~f:(fun _ ->
+            let tip = Agent.get tip_agent in
+            Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip;
+            Interruptible.finally
+            upon (Interruptible.completion next_state_of_tip) write_state)
     in
+
     don't_wait_for
       ( match%bind Pipe.read change_feeder.Linear_pipe.Reader.pipe with
       | `Eof -> failwith "change_feeder was empty"
