@@ -348,7 +348,7 @@ end = struct
     List.iteri accounts ~f:(fun i a ->
         let new_index = first_index + i in
         (t.tree).dirty_indices <- new_index :: t.tree.dirty_indices ;
-        match key_of_index t i with
+        match key_of_index t new_index with
         | Some pk ->
             Key.Table.set t.tree.leafs ~key:pk ~data:new_index ;
             Dyn_array.set t.accounts new_index a
