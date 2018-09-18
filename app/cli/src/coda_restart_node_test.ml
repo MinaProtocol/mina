@@ -24,11 +24,11 @@ struct
     let n = 2 in
     let should_propose i = i = 0 in
     let snark_work_public_keys i = None in
-    let keypair = Keypair.create () in
     let send_new = true in
     let receiver_pk =
-      if send_new 
-      then Public_key.compress keypair.public_key
+      if send_new then
+        let keypair = Keypair.create () in
+        Public_key.compress keypair.public_key
       else Genesis_ledger.low_balance_pk
     in
     let sender_sk = Genesis_ledger.high_balance_sk in
