@@ -20,25 +20,25 @@ struct
     let log = Logger.create () in
     let log = Logger.child log name in
     Coda_processes.init () ;
-    Coda_processes.spawn_local_processes_exn n ~program_dir
-      ~snark_worker_public_keys:None ~should_propose:(Fn.const false) ~f:
-      (fun workers ->
-        let _, _, expected_peers = Coda_processes.net_configs n in
-        let%bind _ = after (Time.Span.of_sec 10.) in
-        Deferred.all_unit
-          (List.map2_exn workers expected_peers ~f:
-             (fun worker expected_peers ->
-               let%bind peers = Coda_process.peers_exn worker in
-               Logger.debug log
-                 !"got peers %{sexp: Kademlia.Peer.t list} %{sexp: \
-                   Host_and_port.t list}\n"
-                 peers expected_peers ;
-               let module S = Host_and_port.Set in
-               assert (
-                 S.equal
-                   (S.of_list (peers |> List.map ~f:fst))
-                   (S.of_list expected_peers) ) ;
-               Deferred.unit )) )
+    let configs =
+      Coda_processes.local_configs n ~program_dir
+        ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
+    in
+    let%bind workers = Coda_processes.spawn_local_processes_exn configs in
+    let _, _, expected_peers = Coda_processes.net_configs n in
+    let%bind _ = after (Time.Span.of_sec 10.) in
+    Deferred.all_unit
+      (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
+           let%map peers = Coda_process.peers_exn worker in
+           Logger.debug log
+             !"got peers %{sexp: Kademlia.Peer.t list} %{sexp: \
+               Host_and_port.t list}\n"
+             peers expected_peers ;
+           let module S = Host_and_port.Set in
+           assert (
+             S.equal
+               (S.of_list (peers |> List.map ~f:fst))
+               (S.of_list expected_peers) ) ))
 
   let command =
     Command.async_spec ~summary:"Simple use of Async Rpc_parallel V2"

@@ -1,5 +1,3 @@
-open Core
-
 module type S = sig
   type account
 
@@ -26,6 +24,8 @@ module type S = sig
 
   val destroy : t -> unit
 
+  val to_list : t -> account list
+
   val get : t -> location -> account option
 
   val set : t -> location -> account -> unit
@@ -45,6 +45,8 @@ module type S = sig
   val merkle_path : t -> location -> Path.t
 
   val merkle_path_at_index_exn : t -> int -> Path.t
+
+  val remove_accounts_exn : t -> key list -> unit
 
   val copy : t -> t
 

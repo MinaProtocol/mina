@@ -9,24 +9,48 @@ include Sparse_ledger_lib.Sparse_ledger.Make (struct
           (struct
             include Account.Stable.V1
 
-            let key {Account.public_key; _} = public_key
-
             let hash = Fn.compose Merkle_hash.of_digest Account.digest
           end)
 
-let of_ledger_subset_exn ledger keys =
-  List.fold keys
-    ~f:(fun acc key ->
-      let open Option.Let_syntax in
-      let path =
-        let%bind location = Ledger.location_of_key ledger key in
-        let%map account = Ledger.get ledger location in
-        add_path acc (Ledger.merkle_path ledger location) account
-      in
-      Option.value_exn path )
-    ~init:
-      (of_hash ~depth:Ledger.depth
-         (Merkle_hash.of_digest (Ledger.merkle_root ledger :> Pedersen.Digest.t)))
+let of_ledger_subset_exn (ledger: Ledger.t) keys =
+  let new_keys, sparse =
+    List.fold keys
+      ~f:(fun (new_keys, sl) key ->
+        match Ledger.location_of_key ledger key with
+        | Some loc ->
+            ( new_keys
+            , add_path sl
+                (Ledger.merkle_path ledger loc)
+                key
+                (Ledger.get ledger loc |> Option.value_exn) )
+        | None ->
+            let path, acct = Ledger.create_empty ledger key in
+            (key :: new_keys, add_path sl path key acct) )
+      ~init:
+        ( []
+        , of_hash ~depth:Ledger.depth
+            (Merkle_hash.of_digest
+               (Ledger.merkle_root ledger :> Pedersen.Digest.t)) )
+  in
+  Ledger.remove_accounts_exn ledger new_keys ;
+  Debug_assert.debug_assert (fun () ->
+      [%test_eq : Ledger_hash.t]
+        (Ledger.merkle_root ledger)
+        ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash) ) ;
+  sparse
+
+let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
+  let keygen () =
+    let privkey = Private_key.create () in
+    (privkey, Public_key.of_private_key_exn privkey |> Public_key.compress)
+  in
+  let ledger = Ledger.create () in
+  let _, pub1 = keygen () in
+  let _, pub2 = keygen () in
+  let sl = of_ledger_subset_exn ledger [pub1; pub2] in
+  [%test_eq : Ledger_hash.t]
+    (Ledger.merkle_root ledger)
+    ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
 let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
   let {Transaction_payload.amount; fee; receiver; nonce} = payload in
@@ -53,7 +77,8 @@ let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
   let receiver_account = get_exn t receiver_idx in
   set_exn t receiver_idx
     { receiver_account with
-      balance=
+      public_key= receiver
+    ; balance=
         Option.value_exn (Balance.add_amount receiver_account.balance amount)
     }
 
@@ -64,7 +89,8 @@ let apply_fee_transfer_exn =
     let open Currency in
     set_exn t index
       { account with
-        balance=
+        public_key= pk (* explicitly set because receipient could be new *)
+      ; balance=
           Option.value_exn
             (Balance.add_amount account.balance (Amount.of_fee fee)) }
   in
@@ -77,7 +103,10 @@ let apply_coinbase_exn t ({proposer; fee_transfer}: Coinbase.t) =
     let idx = find_index_exn t pk in
     let a = get_exn t idx in
     set_exn t idx
-      {a with balance= Option.value_exn (Balance.add_amount a.balance amount)}
+      { a with
+        public_key= pk
+      ; (* set as above *)
+      balance= Option.value_exn (Balance.add_amount a.balance amount) }
   in
   let proposer_reward, t =
     match fee_transfer with

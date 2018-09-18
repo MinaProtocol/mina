@@ -2,6 +2,8 @@
 ## Docker Wrapper 
 ## Hint: export USEDOCKER=TRUE
 
+GITHASH = $(shell git rev-parse --short HEAD)
+
 MYUID = $(shell id -u)
 DOCKERNAME = nanotest-$(MYUID)
 
@@ -31,13 +33,30 @@ kademlia:
 dht: kademlia
 
 build:
+ifeq ($(FORTESTNET),TRUE)
+	$(info INFO ensuring refusal to run when new version is out)
+	sed -i '/let force_updates = /c\let force_updates = true' app/nanobit/src/cli.ml
+else
+	$(info INFO will ignore new versions)
+	sed -i '/let force_updates = /c\let force_updates = false' app/nanobit/src/cli.ml
+endif
 	$(info Starting Build)
 	ulimit -s 65536
-	$(WRAP) dune build 
+	$(WRAP) env CODA_COMMIT_SHA1=$(shell git rev-parse HEAD) dune build
 	$(info Build complete)
 
 dev: docker container build
 
+# snark tunable
+
+withsnark:
+	sed -i '/let with_snark =/c\let with_snark = true' lib/nanobit_base/insecure.ml
+
+withoutsnark:
+	sed -i '/let with_snark =/c\let with_snark = false' lib/nanobit_base/insecure.ml
+
+showsnark:
+	@grep 'let with_snark' lib/nanobit_base/insecure.ml
 
 ########################################
 ## Lint
@@ -93,8 +112,13 @@ container:
 
 deb:
 	$(WRAP) ./rebuild-deb.sh
-	@mkdir /tmp/artifacts
+	@mkdir -p /tmp/artifacts
 	@cp _build/codaclient.deb /tmp/artifacts/.
+
+provingkeys:
+	$(WRAP) tar -cvjf _build/nanobit_cache_dir_$(GITHASH).tar.bz2  /tmp/nanobit_cache_dir
+	@mkdir -p /tmp/artifacts
+	@cp _build/nanobit_cache_dir*.tar.bz2 /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build

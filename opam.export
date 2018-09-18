@@ -37,7 +37,6 @@ core	v0.11.2	root
 core_kernel	v0.11.1	installed
 cppo	1.6.4	installed
 cppo_ocamlbuild	1.6.0	installed
-cryptokit	1.13	root
 ctypes	0.14.0	root
 ctypes-foreign	0.4.0	root
 depext	1.0.5	root

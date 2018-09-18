@@ -4,6 +4,11 @@ open Nanobit_base
 open Blockchain_snark
 open Cli_lib
 open Coda_main
+module Git_sha = Client_lib.Git_sha
+
+let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
+
+let force_updates = false
 
 module type Coda_intf = sig
   type ledger_proof
@@ -66,14 +71,38 @@ let daemon (type ledger_proof) (module Kernel
      and ip =
        flag "ip" ~doc:"IP External IP address for others to connect"
          (optional string)
+     and transaction_capacity_log_2 =
+       flag "txn-capacity"
+         ~doc:
+           "CAPACITY_LOG_2 Log of capacity of transactions per transition \
+            (default: 4)"
+         (optional int)
+     and proposal_interval =
+       flag "proposal-interval"
+         ~doc:
+           "MILLIS Time between the proposer proposing and waiting (default: \
+            5000)"
+         (optional int)
+     and is_background =
+       flag "background" no_arg ~doc:"Run process on the background"
      in
      fun () ->
-       Parallel.init_master () ;
        let open Deferred.Let_syntax in
-       let%bind home = Sys.home_directory () in
-       let conf_dir =
+       let compute_conf_dir home =
          Option.value ~default:(home ^/ ".current-config") conf_dir
        in
+       let%bind conf_dir =
+         if is_background then (
+           let home = Core.Sys.home_directory () in
+           let conf_dir = compute_conf_dir home in
+           Daemon.daemonize
+             ~redirect_stdout:(`File_append (conf_dir ^/ "coda.stdout"))
+             ~redirect_stderr:(`File_append (conf_dir ^/ "coda.stderr"))
+             () ;
+           Deferred.return conf_dir )
+         else Sys.home_directory () >>| compute_conf_dir
+       in
+       Parallel.init_master () ;
        let external_port =
          Option.value ~default:default_external_port external_port
        in
@@ -82,6 +111,14 @@ let daemon (type ledger_proof) (module Kernel
        in
        let should_propose_flag =
          Option.value ~default:true should_propose_flag
+       in
+       let transaction_capacity_log_2 =
+         Option.value ~default:4 transaction_capacity_log_2
+       in
+       let proposal_interval =
+         Option.value ~default:(Time.Span.of_ms 5000.)
+           (Option.map proposal_interval ~f:(fun millis ->
+                Int.to_float millis |> Time.Span.of_ms ))
        in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
@@ -123,10 +160,15 @@ let daemon (type ledger_proof) (module Kernel
          let keypair = keypair
 
          let genesis_proof = Precomputed_values.base_proof
+
+         let transaction_capacity_log_2 = transaction_capacity_log_2
+
+         let commit_id = commit_id
        end in
        let%bind (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
        let module Run = Run (Config) (M) in
+       Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
@@ -170,6 +212,37 @@ let () =
         Core.Printf.eprintf "%s\n" msg ;
         Core.exit 1
   in
+  let rec ensure_testnet_id_still_good () =
+    if force_updates then
+      let open Cohttp_async in
+      let%bind resp, body =
+        Client.get (Uri.of_string "http://updates.o1test.net/testnet_id")
+      in
+      let%map body_string = Body.to_string body in
+      (* Maybe the Git_sha.of_string is a bit gratuitous *)
+      let remote_id = Git_sha.of_string @@ String.strip body_string in
+      let finish local_id remote_id =
+        let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
+        exit1
+          ~msg:
+            (sprintf
+               "The version for the testnet has changed. I am %s, I should be \
+                %s. Please download the latest Coda software at \
+                https://github.com/codaprotocol/coda/releases"
+               ( local_id |> Option.map ~f:str
+               |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+               (str remote_id))
+      in
+      match commit_id with
+      | None -> finish None remote_id
+      | Some sha when Git_sha.equal sha remote_id ->
+          Async.Clock.run_after (Time.Span.of_hr 1.0)
+            (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
+            ()
+      | Some _ -> finish commit_id remote_id
+    else Deferred.unit
+  in
+  ensure_testnet_id_still_good () |> don't_wait_for ;
   let env name ~f ~default =
     let name = Printf.sprintf "CODA_%s" name in
     Unix.getenv name
@@ -302,6 +375,8 @@ let () =
             Coda_block_production_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_shared_prefix_test =
             Coda_shared_prefix_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
+          let module Coda_restart_node_test =
+            Coda_restart_node_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_shared_state_test =
             Coda_shared_state_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_transitive_peers_test =
@@ -313,6 +388,7 @@ let () =
           ; ( Coda_transitive_peers_test.name
             , Coda_transitive_peers_test.command )
           ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+          ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
     else
@@ -336,6 +412,8 @@ let () =
               (Coda) in
           let module Coda_shared_prefix_test =
             Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
+          let module Coda_restart_node_test =
+            Coda_restart_node_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           let module Coda_shared_state_test =
             Coda_shared_state_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           let module Coda_transitive_peers_test =
@@ -350,6 +428,7 @@ let () =
               ; ( Coda_transitive_peers_test.name
                 , Coda_transitive_peers_test.command )
               ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+              ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
               ; ("full-test", Full_test.command (module Kernel) (module Coda))
               ; ( "transaction-snark-profiler"
                 , Transaction_snark_profiler.command ) ]

@@ -162,14 +162,16 @@ end = struct
   let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
-    let empty_hashes = Array.create ~len:(Depth.depth + 1) Hash.empty in
+    let empty_hashes =
+      Array.create ~len:(Depth.depth + 1) Hash.empty_account
+    in
     let rec loop last_hash height =
       if height <= Depth.depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
     in
-    loop Hash.empty 1 ;
+    loop Hash.empty_account 1 ;
     Immutable_array.of_array empty_hashes
 
   let get_raw {kvdb; _} location =
@@ -361,9 +363,33 @@ end = struct
       | [] -> [] )
     |> ignore
 
+  module C :
+    Container.S0 with type t := t and type elt := Account.t =
+  Container.Make0 (struct
+    module Elt = Account
+
+    type nonrec t = t
+
+    (* TODO: This implementation does not consider empty indices from stack db. *)
+    let fold t ~init ~f =
+      match Account_location.last_location_address t with
+      | None -> init
+      | Some last_addr ->
+          let last = Addr.to_int last_addr in
+          Sequence.range ~stop:`inclusive 0 last
+          |> Sequence.map ~f:(get_at_index_exn t)
+          |> Sequence.fold ~init ~f
+
+    let iter = `Define_using_fold
+  end)
+
+  let to_list = C.to_list
+
   let merkle_root mdb = get_hash mdb Location.root_hash
 
   let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
+
+  let remove_accounts_exn _ _ = failwith "TODO: Implement"
 
   let merkle_path mdb location =
     let location =

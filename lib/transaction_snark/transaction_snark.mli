@@ -164,8 +164,6 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
-val handle_with_ledger : Ledger.t -> Tick.Handler.t
-
 module Make (K : sig
   val keys : Keys.t
 end) :

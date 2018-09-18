@@ -32,6 +32,15 @@ struct
 
   open Input
 
+  module Send_transaction_input = struct
+    type t =
+      Private_key.t
+      * Public_key.Compressed.t
+      * Currency.Amount.t
+      * Currency.Fee.t
+    [@@deriving bin_io]
+  end
+
   module T = struct
     module Peers = struct
       type t = Kademlia.Peer.t List.t [@@deriving bin_io]
@@ -43,15 +52,6 @@ struct
 
     module Maybe_currency = struct
       type t = Currency.Balance.t option [@@deriving bin_io]
-    end
-
-    module Send_transaction_input = struct
-      type t =
-        Private_key.t
-        * Public_key.Compressed.t
-        * Currency.Amount.t
-        * Currency.Fee.t
-      [@@deriving bin_io]
     end
 
     type 'worker functions =
@@ -136,6 +136,7 @@ struct
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
         in
+        let%bind () = File_system.create_dir conf_dir in
         let module Config = struct
           let logger = log
 
@@ -147,6 +148,10 @@ struct
             Keypair.of_private_key_exn Genesis_ledger.high_balance_sk
 
           let genesis_proof = Precomputed_values.base_proof
+
+          let transaction_capacity_log_2 = 3
+
+          let commit_id = None
         end in
         let%bind (module Init) = make_init (module Config) (module Kernel) in
         let module Main = Coda.Make (Init) () in

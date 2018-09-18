@@ -193,12 +193,10 @@ end = struct
     [@@deriving sexp, bin_io]
 
     let hash_to_string scan_state =
-      let h =
-        Parallel_scan.State.hash scan_state
+      ( Parallel_scan.State.hash scan_state
           (Binable.to_string (module Snark_with_statement))
           (Binable.to_string (module Super_transaction_with_witness))
-      in
-      h#result
+        :> string )
 
     let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
   end
@@ -212,7 +210,7 @@ end = struct
     the above state. *)
     ; ledger: Ledger.t
     ; public_key: Compressed_public_key.t }
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp]
 
   let random_work_spec_chunk t
       (seen_statements:
@@ -372,6 +370,12 @@ end = struct
         in
         match res with None -> Error `Empty | Some res -> Ok res )
 
+  let statement_exn t =
+    match scan_statement t.scan_state with
+    | Ok s -> `Non_empty s
+    | Error `Empty -> `Empty
+    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
+
   let of_aux_and_ledger ~snarked_ledger_hash ~public_key ~ledger ~aux =
     let check cond err =
       if not cond then Or_error.errorf "Ledger_hash.of_aux_and_ledger: %s" err
@@ -413,7 +417,9 @@ end = struct
 
   let create ~ledger ~self : t =
     let open Config in
-    { scan_state= Parallel_scan.start ~parallelism_log_2
+    (* Transaction capacity log_2 is half the capacity for work parallelism *)
+    { scan_state=
+        Parallel_scan.start ~parallelism_log_2:(transaction_capacity_log_2 + 1)
     ; ledger
     ; public_key= self }
 
@@ -894,7 +900,7 @@ end = struct
     let curr_hash = hash t in
     let t' = copy t in
     let ledger = ledger t' in
-    let max_throughput = Int.pow 2 (Inputs.Config.parallelism_log_2 - 1) in
+    let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let resources =
       process_works_add_txns logger (work_to_do t'.scan_state)
         transactions_by_fee (free_space t') max_throughput get_completed_work
@@ -1124,12 +1130,6 @@ let%test_module "test" =
 
         type super_transaction = Super_transaction.t [@@deriving sexp]
 
-        let hash : t -> Ppx_hash_lib.Std.Hash.hash_value = fun t -> !t
-
-        let hash_fold_t :
-            Ppx_hash_lib.Std.Hash.state -> t -> Ppx_hash_lib.Std.Hash.state =
-         fun s _ -> s
-
         module Undo = struct
           type t = super_transaction [@@deriving sexp]
         end
@@ -1294,7 +1294,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let parallelism_log_2 = 8
+        let transaction_capacity_log_2 = 7
       end
 
       let check :
@@ -1335,7 +1335,7 @@ let%test_module "test" =
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
@@ -1364,7 +1364,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       Backtrace.elide := false ;
       let logger = Logger.create () in
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
@@ -1392,7 +1392,7 @@ let%test_module "test" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
       Backtrace.elide := false ;
-      let p = Int.pow 2 Test_input1.Config.parallelism_log_2 in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
       let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in

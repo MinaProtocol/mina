@@ -295,7 +295,6 @@ module type State_with_witness_intf = sig
   module Stripped : sig
     type t =
       {ledger_builder_transition: ledger_builder_transition; state: state}
-    [@@deriving bin_io]
   end
 
   val strip : t -> Stripped.t
@@ -393,7 +392,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   type t =
-    { proposer: Proposer.t
+    { proposer: Proposer.t option
     ; should_propose: bool
     ; run_snark_worker: bool
     ; net: Net.t
@@ -504,13 +503,6 @@ module Make (Inputs : Inputs_intf) = struct
            Deferred.unit )) ;
     Ivar.fill net_ivar net ;
     let%bind ledger_builder = lbc_deferred in
-    let tips_r, tips_w = Linear_pipe.create () in
-    (let tip = Ledger_builder_controller.strongest_tip ledger_builder in
-     Linear_pipe.write_without_pushback tips_w
-       (Proposer.Tip_change
-          { protocol_state= (tip.protocol_state, tip.proof)
-          ; transactions= Transaction_pool.transactions transaction_pool
-          ; ledger_builder= tip.ledger_builder })) ;
     don't_wait_for
       (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind snark_pool =
@@ -531,27 +523,67 @@ module Make (Inputs : Inputs_intf) = struct
         Net.broadcast_state net t ; Deferred.unit )
     |> don't_wait_for ;
     let proposer =
-      Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
-        (fun (ledger_builder, transition) ->
-          Proposer.Tip_change
-            { protocol_state=
-                ( Consensus_mechanism.External_transition.protocol_state
-                    transition
-                , Consensus_mechanism.External_transition.protocol_state_proof
-                    transition )
-            ; ledger_builder
-            ; transactions= Transaction_pool.transactions transaction_pool } )
-      |> don't_wait_for ;
-      Proposer.create ~parent_log:config.log ~change_feeder:tips_r
-        ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
-        ~time_controller:config.time_controller ~keypair:config.keypair
+      if config.should_propose then (
+        let tips_r, tips_w = Linear_pipe.create () in
+        (let tip = Ledger_builder_controller.strongest_tip ledger_builder in
+         Linear_pipe.write_without_pushback tips_w
+           (Proposer.Tip_change
+              { protocol_state= (tip.protocol_state, tip.proof)
+              ; transactions= Transaction_pool.transactions transaction_pool
+              ; ledger_builder= tip.ledger_builder })) ;
+        Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
+          (fun (ledger_builder, transition) ->
+            let protocol_state =
+              Consensus_mechanism.External_transition.protocol_state transition
+            in
+            Debug_assert.debug_assert (fun () ->
+                match Ledger_builder.statement_exn ledger_builder with
+                | `Empty -> ()
+                | `Non_empty
+                    { source
+                    ; target
+                    ; fee_excess
+                    ; proof_type= _
+                    ; supply_increase= _ } ->
+                    let bc_state =
+                      Consensus_mechanism.Protocol_state.blockchain_state
+                        protocol_state
+                    in
+                    [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
+                      fee_excess ;
+                    [%test_eq : Ledger_hash.t]
+                      (Blockchain_state.ledger_hash bc_state)
+                      source
+                (* THIS ASSERTION FAILS SOMETIMES
+                     * SEE CRITICAL ISSUE #658 *)
+                (*[%test_eq : Ledger_hash.t]
+                      ( Ledger_builder.ledger ledger_builder
+                      |> Ledger.merkle_root )
+                      target  *)
+            ) ;
+            Proposer.Tip_change
+              { protocol_state=
+                  ( protocol_state
+                  , Consensus_mechanism.External_transition.
+                    protocol_state_proof transition )
+              ; ledger_builder
+              ; transactions= Transaction_pool.transactions transaction_pool }
+        )
+        |> don't_wait_for ;
+        let proposer =
+          Proposer.create ~parent_log:config.log ~change_feeder:tips_r
+            ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
+            ~time_controller:config.time_controller ~keypair:config.keypair
+        in
+        don't_wait_for
+          (Linear_pipe.transfer_id
+             (Proposer.transitions proposer)
+             external_transitions_writer) ;
+        Some proposer )
+      else (
+        don't_wait_for (Linear_pipe.drain strongest_ledgers_for_miner) ;
+        None )
     in
-    if config.should_propose then
-      don't_wait_for
-        (Linear_pipe.transfer_id
-           (Proposer.transitions proposer)
-           external_transitions_writer)
-    else don't_wait_for (Linear_pipe.drain (Proposer.transitions proposer)) ;
     return
       { proposer
       ; should_propose= config.should_propose

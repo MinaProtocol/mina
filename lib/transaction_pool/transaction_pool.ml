@@ -48,7 +48,7 @@ struct
   let transactions t = Sequence.unfold ~init:!t.heap ~f:Fheap.pop
 
   module Diff = struct
-    type t = Transaction.t list [@@deriving bin_io]
+    type t = Transaction.t list [@@deriving bin_io, sexp]
 
     (* TODO: Check signatures *)
     let apply t_ref txns =

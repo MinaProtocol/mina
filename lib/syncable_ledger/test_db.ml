@@ -13,15 +13,13 @@ struct
 
     type account = Account.t
 
-    let empty = Hash.empty
-
-    let empty_hash = Hash.empty
-
     let merge = Hash.merge
 
     let hash_account = Hash.hash_account
 
     let to_hash = Fn.id
+
+    let empty_account = hash_account Account.empty
   end
 
   module L = struct

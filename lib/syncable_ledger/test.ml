@@ -37,11 +37,13 @@ module Make (Input : Input_intf) = struct
    * in before we need it. *)
   let total_queries = ref None
 
+  let parent_log = Logger.create ()
+
   let%test "full_sync_entirely_different" =
     let l1, _k1 = L.load_ledger num_accts 1 in
     let l2, _k2 = L.load_ledger num_accts 2 in
     let desired_root = L.merkle_root l2 in
-    let lsync = SL.create l1 in
+    let lsync = SL.create l1 ~parent_log in
     let qr = SL.query_reader lsync in
     let aw = SL.answer_writer lsync in
     let seen_queries = ref [] in
@@ -57,14 +59,14 @@ module Make (Input : Input_intf) = struct
     | `Ok mt ->
         total_queries := Some (List.length !seen_queries) ;
         Root_hash.equal desired_root (L.merkle_root mt)
-    | `Target_changed -> false
+    | `Target_changed _ -> false
 
   let%test_unit "new_goal_soon" =
     let l1, _k1 = L.load_ledger num_accts 1 in
     let l2, _k2 = L.load_ledger num_accts 2 in
     let l3, _k3 = L.load_ledger num_accts 3 in
     let desired_root = ref @@ L.merkle_root l2 in
-    let lsync = SL.create l1 in
+    let lsync = SL.create l1 ~parent_log in
     let qr = SL.query_reader lsync in
     let aw = SL.answer_writer lsync in
     let seen_queries = ref [] in
@@ -94,7 +96,7 @@ module Make (Input : Input_intf) = struct
           SL.fetch lsync !desired_root )
     with
     | `Ok _ -> failwith "shouldn't happen"
-    | `Target_changed ->
+    | `Target_changed _ ->
       match
         Async.Thread_safe.block_on_async_exn (fun () ->
             SL.wait_until_valid lsync !desired_root )
@@ -102,7 +104,7 @@ module Make (Input : Input_intf) = struct
       | `Ok mt ->
           [%test_result : Root_hash.t] ~expect:(L.merkle_root l3)
             (L.merkle_root mt)
-      | `Target_changed -> failwith "the target changed again"
+      | `Target_changed _ -> failwith "the target changed again"
 end
 
 module TestL3_3 = Make (Test_ledger.Make (struct

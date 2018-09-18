@@ -170,7 +170,7 @@ struct
       @@ Public_key.compress Global_keypair.public_key
     in
     let%map () =
-      Public_key.Compressed.assert_equal state.signer_public_key
+      Public_key.Compressed.Checked.Assert.equal state.signer_public_key
         signer_public_key
     in
     {length; signer_public_key}

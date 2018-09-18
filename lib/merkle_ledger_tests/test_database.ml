@@ -258,6 +258,14 @@ let%test_module "test functor on in memory databases" =
                 let root_hash = MT.merkle_root mdb in
                 assert (MT.Path.check_path path leaf_hash root_hash) ) )
 
+      let%test_unit "iter" =
+        Test.with_instance (fun (module MT) mdb ->
+            let max_height = Int.min MT.depth 5 in
+            let accounts = random_accounts max_height |> dedup_accounts in
+            List.iter accounts ~f:(fun account ->
+                create_new_account_exn (module MT) mdb account |> ignore ) ;
+            assert (accounts = MT.to_list mdb) )
+
       let%test_unit "Add 2^d accounts (for testing, d is small)" =
         if Test.depth <= 8 then
           Test.with_instance (fun (module MT) mdb ->
