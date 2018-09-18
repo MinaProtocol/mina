@@ -348,9 +348,11 @@ end = struct
     List.iteri accounts ~f:(fun i a ->
         let new_index = first_index + i in
         (t.tree).dirty_indices <- new_index :: t.tree.dirty_indices ;
-        let pk = key_of_index_exn t i in
-        Key.Table.set t.tree.leafs ~key:pk ~data:new_index ;
-        Dyn_array.set t.accounts new_index a )
+        match key_of_index t i with
+        | Some pk ->
+            Key.Table.set t.tree.leafs ~key:pk ~data:new_index ;
+            Dyn_array.set t.accounts new_index a
+        | None -> allocate t (Account.public_key a) a |> ignore )
 
   let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
