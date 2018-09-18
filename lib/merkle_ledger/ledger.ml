@@ -351,7 +351,8 @@ end = struct
         let pk = key_of_index_exn t i in
         Key.Table.set t.tree.leafs ~key:pk ~data:new_index ;
         if new_index < Dyn_array.length t.accounts then
-        Dyn_array.set t.accounts new_index a else Dyn_array.add t.accounts a )
+          Dyn_array.set t.accounts new_index a
+        else Dyn_array.add t.accounts a )
 
   let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
