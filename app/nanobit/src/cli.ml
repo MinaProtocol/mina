@@ -279,10 +279,7 @@ let () =
               module Ledger_builder_diff = Ledger_builder_diff
               module Time = Nanobit_base.Block_time
 
-              let private_key =
-                env "PROPOSER_KEY" ~default:None ~f:(fun s ->
-                    try Some (Some (Signature_lib.Private_key.of_base64_exn s))
-                    with _ -> None )
+              let private_key = Consensus.Signer_private_key.signer_private_key
 
               let proposal_interval =
                 env "PROPOSAL_INTERVAL"

@@ -1,5 +1,3 @@
-val signer_private_key : Signature_lib.Private_key.t
-
 module type Inputs_intf = sig
   module Time : Protocols.Coda_pow.Time_intf
 
@@ -8,8 +6,6 @@ module type Inputs_intf = sig
   end
 
   val proposal_interval : Time.Span.t
-
-  val private_key : Signature_lib.Private_key.t option
 end
 
 module Make (Inputs : Inputs_intf) :

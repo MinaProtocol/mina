@@ -4,10 +4,6 @@ open Nanobit_base
 open Fold_lib
 open Signature_lib
 
-let signer_private_key =
-  Private_key.of_base64_exn
-    "JgIac0/nQUXN8aFYi5DReBpp5mDNgJm+pWLEwvXWIVnohK4hyRd9"
-
 module Global_public_key = struct
   let compressed =
     Public_key.Compressed.of_base64_exn
@@ -24,8 +20,6 @@ module type Inputs_intf = sig
   end
 
   val proposal_interval : Time.Span.t
-
-  val private_key : Private_key.t option
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -65,10 +59,12 @@ struct
         ~value_of_hlist:of_hlist
 
     let create_value blockchain_state =
-      { signature=
-          Blockchain_state.Signature.sign
-            (Option.value_exn Inputs.private_key)
-            blockchain_state }
+      match Signer_private_key.signer_private_key with
+      | None ->
+          failwith "This build was not compiled with the signer private key. "
+      | Some private_key ->
+          { signature=
+              Blockchain_state.Signature.sign private_key blockchain_state }
 
     let genesis = create_value Blockchain_state.genesis
   end
