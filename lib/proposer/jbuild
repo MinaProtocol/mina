@@ -9,9 +9,8 @@
   (libraries
     ( core
       async
-      minibit
       coda
-      nanobit_base
+      coda_base
       protocols
       async_extra
       unix_timestamp ))

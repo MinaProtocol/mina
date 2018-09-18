@@ -53,16 +53,16 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     in
     let proof = wrap base_hash tick in
     [%expr
-      Nanobit_base.Proof.Stable.V1.t_of_sexp
+      Coda_base.Proof.Stable.V1.t_of_sexp
         [%e
           Ppx_util.expr_of_sexp ~loc
-            (Nanobit_base.Proof.Stable.V1.sexp_of_t proof)]]
+            (Coda_base.Proof.Stable.V1.sexp_of_t proof)]]
 end
 
 open Async
 
 let main () =
-  let use_dummy_values = Nanobit_base.Insecure.key_generation in
+  let use_dummy_values = Coda_base.Insecure.key_generation in
   let target = Sys.argv.(1) in
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
   let loc = Ppxlib.Location.none in
@@ -71,14 +71,14 @@ let main () =
     else
       let module Consensus_mechanism =
       Consensus.Proof_of_signature.Make (struct
-        module Time = Nanobit_base.Block_time
-        module Proof = Nanobit_base.Proof
+        module Time = Coda_base.Block_time
+        module Proof = Coda_base.Proof
 
         let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
 
         module Ledger_builder_diff = Ledger_builder.Make_diff (struct
           open Signature_lib
-          open Nanobit_base
+          open Coda_base
           module Compressed_public_key = Public_key.Compressed
 
           module Transaction = struct

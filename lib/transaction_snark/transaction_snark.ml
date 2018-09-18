@@ -1,6 +1,6 @@
 open Core
 open Signature_lib
-open Nanobit_base
+open Coda_base
 open Snark_params
 open Currency
 open Fold_lib
@@ -300,8 +300,8 @@ end
 module Statement = struct
   module T = struct
     type t =
-      { source: Nanobit_base.Ledger_hash.Stable.V1.t
-      ; target: Nanobit_base.Ledger_hash.Stable.V1.t
+      { source: Coda_base.Ledger_hash.Stable.V1.t
+      ; target: Coda_base.Ledger_hash.Stable.V1.t
       ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
@@ -332,8 +332,8 @@ module Statement = struct
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map source = Nanobit_base.Ledger_hash.gen
-    and target = Nanobit_base.Ledger_hash.gen
+    let%map source = Coda_base.Ledger_hash.gen
+    and target = Coda_base.Ledger_hash.gen
     and fee_excess = Currency.Fee.Signed.gen
     and supply_increase = Currency.Amount.gen
     and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
@@ -996,7 +996,7 @@ module Verification = struct
             + Sok_message.Digest.length_in_triples
             + (2 * Ledger_hash.length_in_triples)
             + Amount.length_in_triples + Amount.Signed.length_in_triples
-            + Nanobit_base.Util.bit_length_to_triple_length
+            + Coda_base.Util.bit_length_to_triple_length
                 (List.length wrap_vk_bits)
         then digest
         else
@@ -1010,12 +1010,12 @@ module Verification = struct
             Sok_message.Digest.length_in_triples
             (2 * Ledger_hash.length_in_triples)
             Amount.length_in_triples Amount.Signed.length_in_triples
-            (Nanobit_base.Util.bit_length_to_triple_length
+            (Coda_base.Util.bit_length_to_triple_length
                (List.length wrap_vk_bits))
             ( Hash_prefix.length_in_triples
             + (2 * Ledger_hash.length_in_triples)
             + Amount.length_in_triples + Amount.Signed.length_in_triples
-            + Nanobit_base.Util.bit_length_to_triple_length
+            + Coda_base.Util.bit_length_to_triple_length
                 (List.length wrap_vk_bits) )
             ()
       in
