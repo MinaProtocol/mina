@@ -272,9 +272,6 @@ struct
   let undo : t -> Undo.t -> unit Or_error.t =
    fun ledger undo ->
     let open Or_error.Let_syntax in
-    Core.printf
-      !"txn: %{sexp: Undo.t} \n ledger before undoing: %{sexp: t} \n%!"
-      undo ledger ;
     let%map res =
       match undo.varying with
       | Fee_transfer u -> undo_fee_transfer ledger u
