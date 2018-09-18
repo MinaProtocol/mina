@@ -412,6 +412,7 @@ module type Ledger_builder_intf = sig
   type ledger_builder_hash
 
   type ledger_hash
+
   type frozen_ledger_hash
 
   type public_key
@@ -754,6 +755,7 @@ module type Inputs_intf = sig
      and type coinbase := Coinbase.t
 
   module Ledger_hash : Ledger_hash_intf
+
   module Frozen_ledger_hash : Ledger_hash_intf
 
   module Proof : sig

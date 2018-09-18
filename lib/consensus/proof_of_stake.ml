@@ -103,14 +103,16 @@ struct
   module Time = Inputs.Time
 
   let genesis_ledger_hash =
-    Coda_base.Frozen_ledger_hash.of_ledger_hash @@ Coda_base.Ledger.merkle_root Inputs.genesis_ledger
+    Coda_base.Frozen_ledger_hash.of_ledger_hash
+    @@ Coda_base.Ledger.merkle_root Inputs.genesis_ledger
 
   module Ledger_pool =
     Rc_pool.Make (Coda_base.Frozen_ledger_hash)
       (struct
         include Coda_base.Ledger
 
-        let to_key = Fn.compose Coda_base.Frozen_ledger_hash.of_ledger_hash merkle_root
+        let to_key =
+          Fn.compose Coda_base.Frozen_ledger_hash.of_ledger_hash merkle_root
       end)
 
   module Local_state = struct
@@ -433,11 +435,14 @@ struct
 
     let var_to_triples {hash; total_currency} =
       let open Snark_params.Tick.Let_syntax in
-      let%map hash_triples = Coda_base.Frozen_ledger_hash.var_to_triples hash in
+      let%map hash_triples =
+        Coda_base.Frozen_ledger_hash.var_to_triples hash
+      in
       hash_triples @ Amount.var_to_triples total_currency
 
     let fold {hash; total_currency} =
-      Fold.(Coda_base.Frozen_ledger_hash.fold hash +> Amount.fold total_currency)
+      let open Fold in
+      Coda_base.Frozen_ledger_hash.fold hash +> Amount.fold total_currency
 
     let length_in_triples =
       Coda_base.Frozen_ledger_hash.length_in_triples + Amount.length_in_triples
@@ -445,7 +450,8 @@ struct
     let if_ cond ~then_ ~else_ =
       let open Snark_params.Tick.Let_syntax in
       let%map hash =
-        Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash ~else_:else_.hash
+        Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash
+          ~else_:else_.hash
       and total_currency =
         Amount.Checked.if_ cond ~then_:then_.total_currency
           ~else_:else_.total_currency
@@ -839,7 +845,9 @@ struct
       let%map next_consensus_state =
         update_stateless ~previous_consensus_state ~consensus_transition_data
           ~previous_protocol_state_hash
-          ~ledger_hash:(Coda_base.Ledger.merkle_root ledger |> Coda_base.Frozen_ledger_hash.of_ledger_hash)
+          ~ledger_hash:
+            ( Coda_base.Ledger.merkle_root ledger
+            |> Coda_base.Frozen_ledger_hash.of_ledger_hash )
       in
       if
         previous_consensus_state.last_epoch_data.ledger.hash

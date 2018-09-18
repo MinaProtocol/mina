@@ -376,7 +376,8 @@ let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
   let fold =
     let open Fold in
     Sok_message.Digest.fold sok_digest
-    +> Frozen_ledger_hash.fold state1 +> Frozen_ledger_hash.fold state2
+    +> Frozen_ledger_hash.fold state1
+    +> Frozen_ledger_hash.fold state2
     +> Amount.fold supply_increase
     +> Amount.Signed.fold fee_excess
   in
@@ -519,7 +520,8 @@ module Base = struct
         in
         (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
-          Frozen_ledger_hash.modify_account_recv root receiver ~f:(fun account ->
+          Frozen_ledger_hash.modify_account_recv root receiver ~f:
+            (fun account ->
               let%map balance = Balance.Checked.(account.balance + amount) in
               {account with balance; public_key= receiver} )
         in
@@ -1481,18 +1483,17 @@ let%test_module "transaction_snark" =
     module Ledger = struct
       include Ledger
 
-      let merkle_root t =
-        Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
+      let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 
       let merkle_root_after_transaction_exn t txn =
-        Frozen_ledger_hash.of_ledger_hash @@ merkle_root_after_transaction_exn t txn
+        Frozen_ledger_hash.of_ledger_hash
+        @@ merkle_root_after_transaction_exn t txn
     end
 
     module Sparse_ledger = struct
       include Sparse_ledger
 
-      let merkle_root t =
-        Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
+      let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
     end
 
     type wallet = {private_key: Private_key.t; account: Account.t}

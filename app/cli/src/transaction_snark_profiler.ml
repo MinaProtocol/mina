@@ -7,8 +7,7 @@ open Snark_params
 module Sparse_ledger = struct
   include Sparse_ledger
 
-  let merkle_root t =
-    Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
+  let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 end
 
 let create_ledger_and_transactions num_transitions =

@@ -13,6 +13,7 @@ module type Inputs_intf = sig
   module Ledger_hash : sig
     type t [@@deriving eq, bin_io, sexp, eq]
   end
+
   module Frozen_ledger_hash : sig
     type t [@@deriving eq, bin_io, sexp, eq]
   end

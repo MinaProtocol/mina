@@ -400,8 +400,8 @@ struct
           | `Take ->
               let lh = External_transition.ledger_hash transition in
               Logger.debug t.log
-                !"Branch catchup for transition: lh:%{sexp: Frozen_ledger_hash.t} \
-                  state:%{sexp:Protocol_state.value}"
+                !"Branch catchup for transition: lh:%{sexp: \
+                  Frozen_ledger_hash.t} state:%{sexp:Protocol_state.value}"
                 lh target_state ;
               return ([], Some (Catchup.sync catchup state transition)) )
     | Some old_tree ->

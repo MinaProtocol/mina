@@ -30,6 +30,7 @@ module Frozen_ledger_hash = struct
   include Frozen_ledger_hash.Stable.V1
 
   let to_bytes = Frozen_ledger_hash.to_bytes
+
   let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
 end
 

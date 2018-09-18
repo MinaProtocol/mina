@@ -21,13 +21,16 @@ module type S = sig
      and type coinbase := Coinbase.t
 
   module Ledger_hash : Coda_pow.Ledger_hash_intf
+
   module Frozen_ledger_hash : sig
     include Coda_pow.Ledger_hash_intf
+
     val of_ledger_hash : Ledger_hash.t -> t
   end
 
   module Ledger_proof_statement :
-    Coda_pow.Ledger_proof_statement_intf with type ledger_hash := Frozen_ledger_hash.t
+    Coda_pow.Ledger_proof_statement_intf
+    with type ledger_hash := Frozen_ledger_hash.t
 
   module Proof : sig
     type t
