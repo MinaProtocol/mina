@@ -1,6 +1,6 @@
 module State = Blockchain_state
 open Core_kernel
-open Nanobit_base
+open Coda_base
 
 module type S = sig
   module Consensus_mechanism : Consensus.Mechanism.S

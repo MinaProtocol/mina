@@ -27,7 +27,7 @@ Description: Coda Client
 EOF
 
 mkdir -p ${BUILDDIR}/usr/local/bin
-cp ./default/app/nanobit/src/cli.exe ${BUILDDIR}/usr/local/bin/cli
+cp ./default/app/cli/src/cli.exe ${BUILDDIR}/usr/local/bin/cli
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 cp .././app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
 

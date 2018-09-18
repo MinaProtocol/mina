@@ -61,7 +61,7 @@ let txn_amount =
   Command.Arg_type.map Command.Param.string ~f:Currency.Amount.of_string
 
 let txn_nonce =
-  let open Nanobit_base in
+  let open Coda_base in
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
 let default_client_port = 8301

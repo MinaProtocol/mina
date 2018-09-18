@@ -41,7 +41,7 @@ struct
       ~f:(fun acc w ->
         match
           perform_single s
-            ~message:(Nanobit_base.Sok_message.create ~fee ~prover:public_key)
+            ~message:(Coda_base.Sok_message.create ~fee ~prover:public_key)
             w
         with
         | Ok res -> Continue (res :: acc)

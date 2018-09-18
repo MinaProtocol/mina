@@ -37,11 +37,13 @@ module Make (Input : Input_intf) = struct
    * in before we need it. *)
   let total_queries = ref None
 
+  let parent_log = Logger.create ()
+
   let%test "full_sync_entirely_different" =
     let l1, _k1 = L.load_ledger num_accts 1 in
     let l2, _k2 = L.load_ledger num_accts 2 in
     let desired_root = L.merkle_root l2 in
-    let lsync = SL.create l1 in
+    let lsync = SL.create l1 ~parent_log in
     let qr = SL.query_reader lsync in
     let aw = SL.answer_writer lsync in
     let seen_queries = ref [] in
@@ -64,7 +66,7 @@ module Make (Input : Input_intf) = struct
     let l2, _k2 = L.load_ledger num_accts 2 in
     let l3, _k3 = L.load_ledger num_accts 3 in
     let desired_root = ref @@ L.merkle_root l2 in
-    let lsync = SL.create l1 in
+    let lsync = SL.create l1 ~parent_log in
     let qr = SL.query_reader lsync in
     let aw = SL.answer_writer lsync in
     let seen_queries = ref [] in

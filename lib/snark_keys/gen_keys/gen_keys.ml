@@ -132,7 +132,7 @@ let main () =
   let loc = Ppxlib.Location.none in
   (*   let%bind blockchain_expr, transaction_expr = *)
   let%bind bc_proving, bc_verification, tx_proving, tx_verification =
-    match Nanobit_base.Insecure.key_generation with
+    match Coda_base.Insecure.key_generation with
     | true ->
         return
           ( Dummy.Blockchain_keys.Proving.expr ~loc
@@ -145,13 +145,13 @@ let main () =
         in
         let module Consensus_mechanism =
         Consensus.Proof_of_signature.Make (struct
-          module Time = Nanobit_base.Block_time
-          module Proof = Nanobit_base.Proof
+          module Time = Coda_base.Block_time
+          module Proof = Coda_base.Proof
 
           let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
 
           module Ledger_builder_diff = Ledger_builder.Make_diff (struct
-            open Nanobit_base
+            open Coda_base
             module Compressed_public_key = Public_key.Compressed
 
             module Transaction = struct

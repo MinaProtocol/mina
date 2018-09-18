@@ -1,6 +1,6 @@
 open Core_kernel
 open Coda_numbers
-open Nanobit_base
+open Coda_base
 open Fold_lib
 open Signature_lib
 

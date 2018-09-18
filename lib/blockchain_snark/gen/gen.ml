@@ -15,20 +15,20 @@ let expr_of_t ~loc
      ; timestamp
      ; signer_public_key }:
       t) =
-  let open Nanobit_base in
+  let open Coda_base in
   let ident str = Loc.make loc (Longident.parse str) in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
-  let n s = "Nanobit_base." ^ s in
+  let n s = "Coda_base." ^ s in
   let e (type a) name (module M : Sexpable.S with type t = a) (x: a) =
     [%expr
       [%e pexp_ident (ident (sprintf "%s.t_of_sexp" name))]
         [%e Ppx_util.expr_of_sexp ~loc (M.sexp_of_t x)]]
   in
   [%expr
-    { Nanobit_base.Blockchain_state.next_difficulty=
+    { Coda_base.Blockchain_state.next_difficulty=
         [%e e (n "Target") (module Target) next_difficulty]
     ; previous_state_hash=
         [%e e (n "State_hash") (module State_hash) previous_state_hash]
@@ -52,10 +52,10 @@ let genesis_time =
   Time.of_date_ofday ~zone:Time.Zone.utc
     (Date.create_exn ~y:2018 ~m:Month.Feb ~d:2)
     Time.Ofday.start_of_day
-  |> Nanobit_base.Block_time.of_time
+  |> Coda_base.Block_time.of_time
 
 let negative_one =
-  let open Nanobit_base in
+  let open Coda_base in
   let next_difficulty : Target.Unpacked.value =
     if Insecure.initial_difficulty then Target.max
     else
@@ -79,7 +79,7 @@ let negative_one =
       @@ Public_key.of_private_key Global_signer_private_key.t }
 
 let genesis_block, zero =
-  let open Nanobit_base in
+  let open Coda_base in
   let block =
     let open Block in
     let state_transition_data =
@@ -110,32 +110,30 @@ let genesis_block_expr ~loc =
     let loc = loc
   end) in
   let open E in
-  let open Nanobit_base in
+  let open Coda_base in
   [%expr
-    { Nanobit_base.Block.auxillary_data=
-        { Nanobit_base.Block.Auxillary_data.nonce=
-            Nanobit_base.Block.Nonce.of_int
+    { Coda_base.Block.auxillary_data=
+        { Coda_base.Block.Auxillary_data.nonce=
+            Coda_base.Block.Nonce.of_int
               [%e
                 eint
                   (Unsigned.UInt64.to_int genesis_block.auxillary_data.nonce)]
         ; signature=
-            Nanobit_base.Block.State_transition_data.Signature.Signature.
-            t_of_sexp
+            Coda_base.Block.State_transition_data.Signature.Signature.t_of_sexp
               [%e
                 Ppx_util.expr_of_sexp ~loc
                   (Block.State_transition_data.Signature.Signature.sexp_of_t
                      genesis_block.auxillary_data.signature)] }
     ; state_transition_data=
-        { Nanobit_base.Block.State_transition_data.time=
-            Nanobit_base.Block_time.t_of_sexp
+        { Coda_base.Block.State_transition_data.time=
+            Coda_base.Block_time.t_of_sexp
               [%e
                 Ppx_util.expr_of_sexp ~loc
                   (Block_time.sexp_of_t
                      genesis_block.state_transition_data.time)]
-        ; ledger_builder_hash= Nanobit_base.Ledger_builder_hash.dummy
+        ; ledger_builder_hash= Coda_base.Ledger_builder_hash.dummy
         ; target_hash=
-            Nanobit_base.Ledger.merkle_root Nanobit_base.Genesis_ledger.ledger
-        }
+            Coda_base.Ledger.merkle_root Coda_base.Genesis_ledger.ledger }
     ; proof= None }]
 
 let main () =

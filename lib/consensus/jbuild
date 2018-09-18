@@ -8,8 +8,8 @@
   (library_flags (-linkall))
   (libraries
     ( core_kernel
-      nanobit_base
       lite_compat
+      coda_base
       snark_params
       rc_pool
       test_util

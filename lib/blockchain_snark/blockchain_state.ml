@@ -3,7 +3,7 @@
 open Core_kernel
 open Snark_params
 open Tick
-open Nanobit_base
+open Coda_base
 open Let_syntax
 
 module Make (Consensus_mechanism : Consensus.Mechanism.S) :
