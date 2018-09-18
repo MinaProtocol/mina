@@ -12,7 +12,7 @@
       cli_lib
       currency
       snark_work_lib
-      nanobit_base
+      coda_base
       blockchain_snark
       transaction_snark
       keys_lib

@@ -9,7 +9,7 @@
   (libraries
     ( core
       async
-      nanobit_base
+      coda_base
       snark_keys
       blockchain_snark
       transaction_snark ))

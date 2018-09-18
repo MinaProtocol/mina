@@ -35,10 +35,10 @@ dht: kademlia
 build:
 ifeq ($(FORTESTNET),TRUE)
 	$(info INFO ensuring refusal to run when new version is out)
-	sed -i '/let force_updates = /c\let force_updates = true' app/nanobit/src/cli.ml
+	sed -i '/let force_updates = /c\let force_updates = true' app/cli/src/cli.ml
 else
 	$(info INFO will ignore new versions)
-	sed -i '/let force_updates = /c\let force_updates = false' app/nanobit/src/cli.ml
+	sed -i '/let force_updates = /c\let force_updates = false' app/cli/src/cli.ml
 endif
 	$(info Starting Build)
 	ulimit -s 65536
@@ -50,13 +50,13 @@ dev: docker container build
 # snark tunable
 
 withsnark:
-	sed -i '/let with_snark =/c\let with_snark = true' lib/nanobit_base/insecure.ml
+	sed -i '/let with_snark =/c\let with_snark = true' lib/coda_base/insecure.ml
 
 withoutsnark:
-	sed -i '/let with_snark =/c\let with_snark = false' lib/nanobit_base/insecure.ml
+	sed -i '/let with_snark =/c\let with_snark = false' lib/coda_base/insecure.ml
 
 showsnark:
-	@grep 'let with_snark' lib/nanobit_base/insecure.ml
+	@grep 'let with_snark' lib/coda_base/insecure.ml
 
 ########################################
 ## Lint
@@ -77,8 +77,8 @@ docker:
 ci-base-docker:
 	./rebuild-docker.sh o1labs/ci-base Dockerfile-ci-base
 
-nanobit-docker:
-	./rebuild-docker.sh nanobit Dockerfile-nanobit
+coda-docker:
+	./rebuild-docker.sh coda Dockerfile-coda
 
 base-docker:
 	./rebuild-docker.sh ocaml-base Dockerfile-base
@@ -86,14 +86,14 @@ base-docker:
 base-minikube:
 	./rebuild-minikube.sh ocaml-base Dockerfile-base
 
-nanobit-minikube:
-	./rebuild-minikube.sh nanobit Dockerfile-nanobit
+coda-minikube:
+	./rebuild-minikube.sh coda Dockerfile-coda
 
 base-googlecloud:
 	./rebuild-googlecloud.sh ocaml-base Dockerfile-base $(shell git rev-parse HEAD)
 
-nanobit-googlecloud:
-	./rebuild-googlecloud.sh nanobit Dockerfile-nanobit
+coda-googlecloud:
+	./rebuild-googlecloud.sh coda Dockerfile-coda
 
 ocaml407-googlecloud:
 	./rebuild-googlecloud.sh ocaml407 Dockerfile-ocaml407
@@ -116,9 +116,9 @@ deb:
 	@cp _build/codaclient.deb /tmp/artifacts/.
 
 provingkeys:
-	$(WRAP) tar -cvjf _build/nanobit_cache_dir_$(GITHASH).tar.bz2  /tmp/nanobit_cache_dir
+	$(WRAP) tar -cvjf _build/cli_cache_dir_$(GITHASH).tar.bz2  /tmp/cli_cache_dir
 	@mkdir -p /tmp/artifacts
-	@cp _build/nanobit_cache_dir*.tar.bz2 /tmp/artifacts/.
+	@cp _build/cli_cache_dir*.tar.bz2 /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
@@ -155,4 +155,4 @@ test-stakes:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia nanobit-docker nanobit-googlecloud nanobit-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps

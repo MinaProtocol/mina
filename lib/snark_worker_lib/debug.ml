@@ -12,8 +12,7 @@ module Inputs = struct
 
   module Proof = struct
     type t =
-      Transaction_snark.Statement.t
-      * Nanobit_base.Sok_message.Digest.Stable.V1.t
+      Transaction_snark.Statement.t * Coda_base.Sok_message.Digest.Stable.V1.t
     [@@deriving bin_io]
   end
 
@@ -25,13 +24,13 @@ module Inputs = struct
     let arg_type = Cli_lib.public_key_compressed
   end
 
-  module Super_transaction = Nanobit_base.Super_transaction
-  module Sparse_ledger = Nanobit_base.Sparse_ledger
+  module Super_transaction = Coda_base.Super_transaction
+  module Sparse_ledger = Coda_base.Sparse_ledger
 
   let perform_single () ~message s =
     Ok
       ( Snark_work_lib.Work.Single.Spec.statement s
-      , Nanobit_base.Sok_message.digest message )
+      , Coda_base.Sok_message.digest message )
 end
 
 module Worker = Worker.Make (Inputs)

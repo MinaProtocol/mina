@@ -43,7 +43,7 @@ module type Inputs_intf = sig
 
   val genesis_ledger_total_currency : Amount.t
 
-  val genesis_ledger : Nanobit_base.Ledger.t
+  val genesis_ledger : Coda_base.Ledger.t
 
   val coinbase : Amount.t
 
@@ -61,7 +61,7 @@ end
 module Segment_id = Nat.Make32 ()
 
 module Epoch_seed = struct
-  include Nanobit_base.Data_hash.Make_full_size ()
+  include Coda_base.Data_hash.Make_full_size ()
 
   let zero = Snark_params.Tick.Pedersen.zero_hash
 
@@ -71,7 +71,7 @@ module Epoch_seed = struct
   let update seed vrf_result =
     let open Snark_params.Tick in
     of_hash
-      (Pedersen.digest_fold Nanobit_base.Hash_prefix.epoch_seed
+      (Pedersen.digest_fold Coda_base.Hash_prefix.epoch_seed
          (fold_vrf_result seed vrf_result))
 
   let update_var (seed: var) (vrf_result: Sha256.Digest.var) :
@@ -80,7 +80,7 @@ module Epoch_seed = struct
     let open Snark_params.Tick.Let_syntax in
     let%bind seed_triples = var_to_triples seed in
     let%map hash =
-      Pedersen.Checked.digest_triples ~init:Nanobit_base.Hash_prefix.epoch_seed
+      Pedersen.Checked.digest_triples ~init:Coda_base.Hash_prefix.epoch_seed
         ( seed_triples
         @ Fold.(to_list (group3 ~default:Boolean.false_ (of_list vrf_result)))
         )
@@ -102,13 +102,12 @@ struct
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
-  let genesis_ledger_hash =
-    Nanobit_base.Ledger.merkle_root Inputs.genesis_ledger
+  let genesis_ledger_hash = Coda_base.Ledger.merkle_root Inputs.genesis_ledger
 
   module Ledger_pool =
-    Rc_pool.Make (Nanobit_base.Ledger_hash)
+    Rc_pool.Make (Coda_base.Ledger_hash)
       (struct
-        include Nanobit_base.Ledger
+        include Coda_base.Ledger
 
         let to_key = merkle_root
       end)
@@ -253,24 +252,24 @@ struct
         ; lock_checkpoint: 'state_hash }
 
       type value =
-        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Nanobit_base.State_hash.t) t
+        (Epoch.t, Epoch.Slot.t, Epoch_seed.t, Coda_base.State_hash.t) t
 
       type var =
         ( Epoch.Unpacked.var
         , Epoch.Slot.Unpacked.var
         , Epoch_seed.var
-        , Nanobit_base.State_hash.var )
+        , Coda_base.State_hash.var )
         t
 
       let to_hlist {epoch; slot; seed; lock_checkpoint} =
-        Nanobit_base.H_list.[epoch; slot; seed; lock_checkpoint]
+        Coda_base.H_list.[epoch; slot; seed; lock_checkpoint]
 
       let of_hlist :
              ( unit
              , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> unit )
-             Nanobit_base.H_list.t
+             Coda_base.H_list.t
           -> ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
-       fun Nanobit_base.H_list.([epoch; slot; seed; lock_checkpoint]) ->
+       fun Coda_base.H_list.([epoch; slot; seed; lock_checkpoint]) ->
         {epoch; slot; seed; lock_checkpoint}
 
       let data_spec =
@@ -278,7 +277,7 @@ struct
         [ Epoch.Unpacked.typ
         ; Epoch.Slot.Unpacked.typ
         ; Epoch_seed.typ
-        ; Nanobit_base.State_hash.typ ]
+        ; Coda_base.State_hash.typ ]
 
       let typ =
         Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -288,12 +287,12 @@ struct
       let fold {epoch; slot; seed; lock_checkpoint} =
         let open Fold in
         Epoch.fold epoch +> Epoch.Slot.fold slot +> Epoch_seed.fold seed
-        +> Nanobit_base.State_hash.fold lock_checkpoint
+        +> Coda_base.State_hash.fold lock_checkpoint
 
       let hash_to_group msg =
         let msg_hash_state =
           Snark_params.Tick.Pedersen.hash_fold
-            Nanobit_base.Hash_prefix.vrf_message (fold msg)
+            Coda_base.Hash_prefix.vrf_message (fold msg)
         in
         msg_hash_state.acc
 
@@ -302,7 +301,7 @@ struct
           let open Snark_params.Tick.Let_syntax in
           let%map seed_triples = Epoch_seed.var_to_triples seed
           and lock_checkpoint_triples =
-            Nanobit_base.State_hash.var_to_triples lock_checkpoint
+            Coda_base.State_hash.var_to_triples lock_checkpoint
           in
           Epoch.Unpacked.var_to_triples epoch
           @ Epoch.Slot.Unpacked.var_to_triples slot
@@ -312,8 +311,8 @@ struct
           let open Snark_params.Tick in
           let open Snark_params.Tick.Let_syntax in
           let%bind msg_triples = var_to_triples msg in
-          Pedersen.Checked.hash_triples
-            ~init:Nanobit_base.Hash_prefix.vrf_message msg_triples
+          Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
+            msg_triples
       end
 
       let gen =
@@ -321,7 +320,7 @@ struct
         let%map epoch = Epoch.gen
         and slot = Epoch.Slot.gen
         and seed = Epoch_seed.gen
-        and lock_checkpoint = Nanobit_base.State_hash.gen in
+        and lock_checkpoint = Coda_base.State_hash.gen in
         {epoch; slot; seed; lock_checkpoint}
     end
 
@@ -339,7 +338,7 @@ struct
         in
         let digest =
           Snark_params.Tick.Pedersen.digest_fold
-            Nanobit_base.Hash_prefix.vrf_output
+            Coda_base.Hash_prefix.vrf_output
             ( Message.fold msg
             +> Non_zero_curve_point.Compressed.fold compressed_g )
         in
@@ -354,8 +353,7 @@ struct
           in
           let%bind pedersen_digest =
             Snark_params.Tick.Pedersen.Checked.digest_triples
-              ~init:Nanobit_base.Hash_prefix.vrf_output
-              (msg_triples @ g_triples)
+              ~init:Coda_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
             >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
           in
           Sha256.Checked.digest
@@ -411,21 +409,21 @@ struct
       {hash: 'ledger_hash; total_currency: 'amount}
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    type value = (Nanobit_base.Ledger_hash.t, Amount.t) t
+    type value = (Coda_base.Ledger_hash.t, Amount.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    type var = (Nanobit_base.Ledger_hash.var, Amount.var) t
+    type var = (Coda_base.Ledger_hash.var, Amount.var) t
 
     let to_hlist {hash; total_currency} =
-      Nanobit_base.H_list.[hash; total_currency]
+      Coda_base.H_list.[hash; total_currency]
 
     let of_hlist :
-           (unit, 'ledger_hash -> 'total_currency -> unit) Nanobit_base.H_list.t
+           (unit, 'ledger_hash -> 'total_currency -> unit) Coda_base.H_list.t
         -> ('ledger_hash, 'total_currency) t =
-     fun Nanobit_base.H_list.([hash; total_currency]) -> {hash; total_currency}
+     fun Coda_base.H_list.([hash; total_currency]) -> {hash; total_currency}
 
     let data_spec =
-      Snark_params.Tick.Data_spec.[Nanobit_base.Ledger_hash.typ; Amount.typ]
+      Snark_params.Tick.Data_spec.[Coda_base.Ledger_hash.typ; Amount.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -434,19 +432,19 @@ struct
 
     let var_to_triples {hash; total_currency} =
       let open Snark_params.Tick.Let_syntax in
-      let%map hash_triples = Nanobit_base.Ledger_hash.var_to_triples hash in
+      let%map hash_triples = Coda_base.Ledger_hash.var_to_triples hash in
       hash_triples @ Amount.var_to_triples total_currency
 
     let fold {hash; total_currency} =
-      Fold.(Nanobit_base.Ledger_hash.fold hash +> Amount.fold total_currency)
+      Fold.(Coda_base.Ledger_hash.fold hash +> Amount.fold total_currency)
 
     let length_in_triples =
-      Nanobit_base.Ledger_hash.length_in_triples + Amount.length_in_triples
+      Coda_base.Ledger_hash.length_in_triples + Amount.length_in_triples
 
     let if_ cond ~then_ ~else_ =
       let open Snark_params.Tick.Let_syntax in
       let%map hash =
-        Nanobit_base.Ledger_hash.if_ cond ~then_:then_.hash ~else_:else_.hash
+        Coda_base.Ledger_hash.if_ cond ~then_:then_.hash ~else_:else_.hash
       and total_currency =
         Amount.Checked.if_ cond ~then_:then_.total_currency
           ~else_:else_.total_currency
@@ -468,19 +466,18 @@ struct
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type value =
-      (Epoch_ledger.value, Epoch_seed.t, Nanobit_base.State_hash.t, Length.t) t
+      (Epoch_ledger.value, Epoch_seed.t, Coda_base.State_hash.t, Length.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
     type var =
       ( Epoch_ledger.var
       , Epoch_seed.var
-      , Nanobit_base.State_hash.var
+      , Coda_base.State_hash.var
       , Length.Unpacked.var )
       t
 
     let to_hlist {ledger; seed; start_checkpoint; lock_checkpoint; length} =
-      let open Nanobit_base.H_list in
-      [ledger; seed; start_checkpoint; lock_checkpoint; length]
+      Coda_base.H_list.[ledger; seed; start_checkpoint; lock_checkpoint; length]
 
     let of_hlist :
            ( unit
@@ -490,21 +487,21 @@ struct
              -> 'protocol_state_hash
              -> 'length
              -> unit )
-           Nanobit_base.H_list.t
+           Coda_base.H_list.t
         -> ('ledger, 'seed, 'protocol_state_hash, 'length) t =
-     fun Nanobit_base.H_list.([ ledger
-                              ; seed
-                              ; start_checkpoint
-                              ; lock_checkpoint
-                              ; length ]) ->
+     fun Coda_base.H_list.([ ledger
+                           ; seed
+                           ; start_checkpoint
+                           ; lock_checkpoint
+                           ; length ]) ->
       {ledger; seed; start_checkpoint; lock_checkpoint; length}
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
       [ Epoch_ledger.typ
       ; Epoch_seed.typ
-      ; Nanobit_base.State_hash.typ
-      ; Nanobit_base.State_hash.typ
+      ; Coda_base.State_hash.typ
+      ; Coda_base.State_hash.typ
       ; Length.Unpacked.typ ]
 
     let typ =
@@ -518,9 +515,9 @@ struct
       let%map ledger_triples = Epoch_ledger.var_to_triples ledger
       and seed_triples = Epoch_seed.var_to_triples seed
       and start_checkpoint_triples =
-        Nanobit_base.State_hash.var_to_triples start_checkpoint
+        Coda_base.State_hash.var_to_triples start_checkpoint
       and lock_checkpoint_triples =
-        Nanobit_base.State_hash.var_to_triples lock_checkpoint
+        Coda_base.State_hash.var_to_triples lock_checkpoint
       in
       ledger_triples @ seed_triples @ start_checkpoint_triples
       @ lock_checkpoint_triples
@@ -529,14 +526,14 @@ struct
     let fold {ledger; seed; start_checkpoint; lock_checkpoint; length} =
       let open Fold in
       Epoch_ledger.fold ledger +> Epoch_seed.fold seed
-      +> Nanobit_base.State_hash.fold start_checkpoint
-      +> Nanobit_base.State_hash.fold lock_checkpoint
+      +> Coda_base.State_hash.fold start_checkpoint
+      +> Coda_base.State_hash.fold lock_checkpoint
       +> Length.fold length
 
     let length_in_triples =
       Epoch_ledger.length_in_triples + Epoch_seed.length_in_triples
-      + Nanobit_base.State_hash.length_in_triples
-      + Nanobit_base.State_hash.length_in_triples + Length.length_in_triples
+      + Coda_base.State_hash.length_in_triples
+      + Coda_base.State_hash.length_in_triples + Length.length_in_triples
 
     let if_ cond ~then_ ~else_ =
       let open Snark_params.Tick.Let_syntax in
@@ -544,10 +541,10 @@ struct
         Epoch_ledger.if_ cond ~then_:then_.ledger ~else_:else_.ledger
       and seed = Epoch_seed.if_ cond ~then_:then_.seed ~else_:else_.seed
       and start_checkpoint =
-        Nanobit_base.State_hash.if_ cond ~then_:then_.start_checkpoint
+        Coda_base.State_hash.if_ cond ~then_:then_.start_checkpoint
           ~else_:else_.start_checkpoint
       and lock_checkpoint =
-        Nanobit_base.State_hash.if_ cond ~then_:then_.lock_checkpoint
+        Coda_base.State_hash.if_ cond ~then_:then_.lock_checkpoint
           ~else_:else_.lock_checkpoint
       and length = Length.if_ cond ~then_:then_.length ~else_:else_.length in
       {ledger; seed; start_checkpoint; lock_checkpoint; length}
@@ -557,8 +554,8 @@ struct
           Epoch_ledger.genesis
           (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
       ; seed= Epoch_seed.(of_hash zero)
-      ; start_checkpoint= Nanobit_base.State_hash.(of_hash zero)
-      ; lock_checkpoint= Nanobit_base.State_hash.(of_hash zero)
+      ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
+      ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
       ; length= Length.zero }
 
     let update_pair (last_data, curr_data) ~prev_epoch ~next_epoch ~next_slot
@@ -571,7 +568,7 @@ struct
           , { seed= Epoch_seed.(of_hash zero)
             ; ledger= {hash= ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
-            ; lock_checkpoint= Nanobit_base.State_hash.(of_hash zero)
+            ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
             ; length= Length.zero } )
         else (last_data, curr_data)
       in
@@ -601,8 +598,7 @@ struct
               { seed= Epoch_seed.(var_of_t (of_hash zero))
               ; ledger= {hash= ledger_hash; total_currency}
               ; start_checkpoint= prev_protocol_state_hash
-              ; lock_checkpoint=
-                  Nanobit_base.State_hash.(var_of_t (of_hash zero))
+              ; lock_checkpoint= Coda_base.State_hash.(var_of_t (of_hash zero))
               ; length= Length.Unpacked.var_of_value Length.zero }
             ~else_:curr_data
         in
@@ -618,7 +614,7 @@ struct
           Epoch_seed.if_ in_seed_update_range ~then_:updated_curr_seed
             ~else_:curr_data.seed
         and curr_lock_checkpoint =
-          Nanobit_base.State_hash.if_ in_seed_update_range
+          Coda_base.State_hash.if_ in_seed_update_range
             ~then_:prev_protocol_state_hash ~else_:curr_data.lock_checkpoint
         in
         (curr_seed, curr_lock_checkpoint)
@@ -646,12 +642,12 @@ struct
       ; proposer_vrf_result= List.init 256 ~f:(fun _ -> false) }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =
-      Nanobit_base.H_list.[epoch; slot; proposer_vrf_result]
+      Coda_base.H_list.[epoch; slot; proposer_vrf_result]
 
     let of_hlist :
-           (unit, 'epoch -> 'slot -> 'vrf_result -> unit) Nanobit_base.H_list.t
+           (unit, 'epoch -> 'slot -> 'vrf_result -> unit) Coda_base.H_list.t
         -> ('epoch, 'slot, 'vrf_result) t =
-     fun Nanobit_base.H_list.([epoch; slot; proposer_vrf_result]) ->
+     fun Coda_base.H_list.([epoch; slot; proposer_vrf_result]) ->
       {epoch; slot; proposer_vrf_result}
 
     let data_spec =
@@ -707,7 +703,7 @@ struct
         ; curr_slot
         ; last_epoch_data
         ; curr_epoch_data } =
-      let open Nanobit_base.H_list in
+      let open Coda_base.H_list in
       [ length
       ; total_currency
       ; curr_epoch
@@ -724,14 +720,14 @@ struct
              -> 'epoch_data
              -> 'epoch_data
              -> unit )
-           Nanobit_base.H_list.t
+           Coda_base.H_list.t
         -> ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
-     fun Nanobit_base.H_list.([ length
-                              ; total_currency
-                              ; curr_epoch
-                              ; curr_slot
-                              ; last_epoch_data
-                              ; curr_epoch_data ]) ->
+     fun Coda_base.H_list.([ length
+                           ; total_currency
+                           ; curr_epoch
+                           ; curr_slot
+                           ; last_epoch_data
+                           ; curr_epoch_data ]) ->
       { length
       ; total_currency
       ; curr_epoch
@@ -805,8 +801,8 @@ struct
 
     let update_stateless ~(previous_consensus_state: value)
         ~(consensus_transition_data: Consensus_transition_data.value)
-        ~(previous_protocol_state_hash: Nanobit_base.State_hash.t)
-        ~(ledger_hash: Nanobit_base.Ledger_hash.t) : value Or_error.t =
+        ~(previous_protocol_state_hash: Coda_base.State_hash.t)
+        ~(ledger_hash: Coda_base.Ledger_hash.t) : value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
@@ -835,21 +831,21 @@ struct
 
     let update ~(previous_consensus_state: value)
         ~(consensus_transition_data: Consensus_transition_data.value)
-        ~(previous_protocol_state_hash: Nanobit_base.State_hash.t)
-        ~(local_state: Local_state.t) ~(ledger: Nanobit_base.Ledger.t) :
+        ~(previous_protocol_state_hash: Coda_base.State_hash.t)
+        ~(local_state: Local_state.t) ~(ledger: Coda_base.Ledger.t) :
         value Or_error.t =
       let open Or_error.Let_syntax in
       let%map next_consensus_state =
         update_stateless ~previous_consensus_state ~consensus_transition_data
           ~previous_protocol_state_hash
-          ~ledger_hash:(Nanobit_base.Ledger.merkle_root ledger)
+          ~ledger_hash:(Coda_base.Ledger.merkle_root ledger)
       in
       if
         previous_consensus_state.last_epoch_data.ledger.hash
         <> next_consensus_state.last_epoch_data.ledger.hash
       then (
         if
-          Nanobit_base.Ledger_hash.equal
+          Coda_base.Ledger_hash.equal
             previous_consensus_state.last_epoch_data.ledger.hash
             genesis_ledger_hash
         then
@@ -860,8 +856,8 @@ struct
 
     let update_var (previous_state: var)
         (transition_data: Consensus_transition_data.var)
-        (previous_protocol_state_hash: Nanobit_base.State_hash.var)
-        (ledger_hash: Nanobit_base.Ledger_hash.var) :
+        (previous_protocol_state_hash: Coda_base.State_hash.var)
+        (ledger_hash: Coda_base.Ledger_hash.var) :
         (var, _) Snark_params.Tick.Checked.t =
       let open Snark_params.Tick.Let_syntax in
       let%bind length = Length.increment_var previous_state.length
@@ -892,14 +888,12 @@ struct
     let length (t: value) = t.length
   end
 
-  module Protocol_state = Nanobit_base.Protocol_state.Make (Consensus_state)
-  module Snark_transition = Nanobit_base.Snark_transition.Make (Consensus_transition_data)
+  module Protocol_state = Coda_base.Protocol_state.Make (Consensus_state)
+  module Snark_transition = Coda_base.Snark_transition.Make (Consensus_transition_data)
   module Internal_transition =
-    Nanobit_base.Internal_transition.Make (Ledger_builder_diff)
-      (Snark_transition)
+    Coda_base.Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition =
-    Nanobit_base.External_transition.Make (Ledger_builder_diff)
-      (Protocol_state)
+    Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state: Protocol_state.value)
@@ -914,12 +908,12 @@ struct
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
     let%bind my_account_location =
-      Nanobit_base.Ledger.location_of_key ledger
+      Coda_base.Ledger.location_of_key ledger
         (Signature_lib.Public_key.compress keypair.public_key)
     in
     let my_currency =
-      Nanobit_base.Ledger.get ledger my_account_location
-      |> Option.map ~f:Nanobit_base.Account.balance
+      Coda_base.Ledger.get ledger my_account_location
+      |> Option.map ~f:Coda_base.Account.balance
       |> Option.value ~default:Balance.zero
     in
     let total_currency =
@@ -970,7 +964,7 @@ struct
       (Snark_transition.consensus_data transition)
       previous_state_hash
       ( transition |> Snark_transition.blockchain_state
-      |> Nanobit_base.Blockchain_state.ledger_hash )
+      |> Coda_base.Blockchain_state.ledger_hash )
 
   let select this that ~logger ~time_received =
     let open Consensus_state in
@@ -985,14 +979,14 @@ struct
     (* TODO: add fork_before_checkpoint check *)
     (* not (List.exists this.checkpoints ~f:(fun c ->
      *   List.exists that.checkpoints ~f:(
-     *     Nanobit_base.State_hash.equal c)))
+     *     Coda_base.State_hash.equal c)))
      *)
     if
-      Nanobit_base.State_hash.equal this.last_epoch_data.lock_checkpoint
+      Coda_base.State_hash.equal this.last_epoch_data.lock_checkpoint
         that.last_epoch_data.lock_checkpoint
     then if Length.compare this.length that.length < 0 then `Take else `Keep
     else if
-      Nanobit_base.State_hash.equal this.last_epoch_data.start_checkpoint
+      Coda_base.State_hash.equal this.last_epoch_data.start_checkpoint
         that.last_epoch_data.start_checkpoint
     then
       if
@@ -1027,24 +1021,24 @@ let%test_module "Proof_of_stake tests" =
         type t = int [@@deriving bin_io, sexp]
       end
 
-      module Time = Nanobit_base.Block_time
+      module Time = Coda_base.Block_time
 
-      let genesis_state_timestamp = Nanobit_base.Block_time.now ()
+      let genesis_state_timestamp = Coda_base.Block_time.now ()
 
       let genesis_ledger_total_currency = Amount.zero
 
-      let genesis_ledger = Nanobit_base.Ledger.create ()
+      let genesis_ledger = Coda_base.Ledger.create ()
 
       let coinbase = Amount.of_int 20
 
-      let slot_interval = Nanobit_base.Block_time.Span.of_ms (Int64.of_int 200)
+      let slot_interval = Coda_base.Block_time.Span.of_ms (Int64.of_int 200)
 
       let unforkable_transition_count = 24
 
       let probable_slots_per_transition_count = 8
 
       let expected_network_delay =
-        Nanobit_base.Block_time.Span.of_ms (Int64.of_int 1000)
+        Coda_base.Block_time.Span.of_ms (Int64.of_int 1000)
 
       let approximate_network_diameter = 3
     end)
