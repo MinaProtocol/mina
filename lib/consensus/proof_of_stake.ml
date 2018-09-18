@@ -102,8 +102,7 @@ struct
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
-  let genesis_ledger_hash =
-    Coda_base.Ledger.merkle_root Inputs.genesis_ledger
+  let genesis_ledger_hash = Coda_base.Ledger.merkle_root Inputs.genesis_ledger
 
   module Ledger_pool =
     Rc_pool.Make (Coda_base.Ledger_hash)
@@ -312,8 +311,8 @@ struct
           let open Snark_params.Tick in
           let open Snark_params.Tick.Let_syntax in
           let%bind msg_triples = var_to_triples msg in
-          Pedersen.Checked.hash_triples
-            ~init:Coda_base.Hash_prefix.vrf_message msg_triples
+          Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
+            msg_triples
       end
 
       let gen =
@@ -354,8 +353,7 @@ struct
           in
           let%bind pedersen_digest =
             Snark_params.Tick.Pedersen.Checked.digest_triples
-              ~init:Coda_base.Hash_prefix.vrf_output
-              (msg_triples @ g_triples)
+              ~init:Coda_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
             >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
           in
           Sha256.Checked.digest
@@ -479,8 +477,7 @@ struct
       t
 
     let to_hlist {ledger; seed; start_checkpoint; lock_checkpoint; length} =
-      let open Coda_base.H_list in
-      [ledger; seed; start_checkpoint; lock_checkpoint; length]
+      Coda_base.H_list.[ledger; seed; start_checkpoint; lock_checkpoint; length]
 
     let of_hlist :
            ( unit
@@ -493,10 +490,10 @@ struct
            Coda_base.H_list.t
         -> ('ledger, 'seed, 'protocol_state_hash, 'length) t =
      fun Coda_base.H_list.([ ledger
-                              ; seed
-                              ; start_checkpoint
-                              ; lock_checkpoint
-                              ; length ]) ->
+                           ; seed
+                           ; start_checkpoint
+                           ; lock_checkpoint
+                           ; length ]) ->
       {ledger; seed; start_checkpoint; lock_checkpoint; length}
 
     let data_spec =
@@ -601,8 +598,7 @@ struct
               { seed= Epoch_seed.(var_of_t (of_hash zero))
               ; ledger= {hash= ledger_hash; total_currency}
               ; start_checkpoint= prev_protocol_state_hash
-              ; lock_checkpoint=
-                  Coda_base.State_hash.(var_of_t (of_hash zero))
+              ; lock_checkpoint= Coda_base.State_hash.(var_of_t (of_hash zero))
               ; length= Length.Unpacked.var_of_value Length.zero }
             ~else_:curr_data
         in
@@ -727,11 +723,11 @@ struct
            Coda_base.H_list.t
         -> ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
      fun Coda_base.H_list.([ length
-                              ; total_currency
-                              ; curr_epoch
-                              ; curr_slot
-                              ; last_epoch_data
-                              ; curr_epoch_data ]) ->
+                           ; total_currency
+                           ; curr_epoch
+                           ; curr_slot
+                           ; last_epoch_data
+                           ; curr_epoch_data ]) ->
       { length
       ; total_currency
       ; curr_epoch
@@ -895,11 +891,9 @@ struct
   module Protocol_state = Coda_base.Protocol_state.Make (Consensus_state)
   module Snark_transition = Coda_base.Snark_transition.Make (Consensus_transition_data)
   module Internal_transition =
-    Coda_base.Internal_transition.Make (Ledger_builder_diff)
-      (Snark_transition)
+    Coda_base.Internal_transition.Make (Ledger_builder_diff) (Snark_transition)
   module External_transition =
-    Coda_base.External_transition.Make (Ledger_builder_diff)
-      (Protocol_state)
+    Coda_base.External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state: Protocol_state.value)

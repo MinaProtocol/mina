@@ -50,8 +50,7 @@ module type S = sig
     with module Snark_transition = Snark_transition
 
   module External_transition :
-    Coda_base.External_transition.S
-    with module Protocol_state = Protocol_state
+    Coda_base.External_transition.S with module Protocol_state = Protocol_state
 
   val genesis_protocol_state : Protocol_state.value
 

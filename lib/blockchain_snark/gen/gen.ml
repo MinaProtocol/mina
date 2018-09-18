@@ -119,8 +119,7 @@ let genesis_block_expr ~loc =
                 eint
                   (Unsigned.UInt64.to_int genesis_block.auxillary_data.nonce)]
         ; signature=
-            Coda_base.Block.State_transition_data.Signature.Signature.
-            t_of_sexp
+            Coda_base.Block.State_transition_data.Signature.Signature.t_of_sexp
               [%e
                 Ppx_util.expr_of_sexp ~loc
                   (Block.State_transition_data.Signature.Signature.sexp_of_t
@@ -134,8 +133,7 @@ let genesis_block_expr ~loc =
                      genesis_block.state_transition_data.time)]
         ; ledger_builder_hash= Coda_base.Ledger_builder_hash.dummy
         ; target_hash=
-            Coda_base.Ledger.merkle_root Coda_base.Genesis_ledger.ledger
-        }
+            Coda_base.Ledger.merkle_root Coda_base.Genesis_ledger.ledger }
     ; proof= None }]
 
 let main () =

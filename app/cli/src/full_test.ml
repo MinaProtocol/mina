@@ -97,9 +97,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   let send_amount = Currency.Amount.of_int 10 in
   (* Send money to someone *)
   let build_txn amount sender_sk receiver_pk fee =
-    let nonce =
-      Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn
-    in
+    let nonce = Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn in
     let payload : Transaction.Payload.t =
       {receiver= receiver_pk; amount; fee; nonce}
     in
