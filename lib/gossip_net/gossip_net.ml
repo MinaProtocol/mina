@@ -194,12 +194,12 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
   let random_peers t n = random_sublist (Hash_set.to_list t.peers) n
 
   let query_peer t (peer: Peer.t) rpc query =
-    Logger.trace t.log "querying peer"
-      ~attrs:[("peer", [%sexp_of : Peer.t] peer)] ;
+    Logger.trace t.log !"Querying peer %{sexp: Peer.t}" peer ;
     let peer = Peer.external_rpc peer in
     try_call_rpc peer t.timeout rpc query
 
   let query_random_peers t n rpc query =
     let peers = random_sublist (Hash_set.to_list t.peers) n in
+    Logger.trace t.log !"Querying random peers: %{sexp: Peer.t list}" peers ;
     List.map peers ~f:(fun peer -> query_peer t peer rpc query)
 end

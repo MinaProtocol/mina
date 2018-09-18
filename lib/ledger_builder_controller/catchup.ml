@@ -88,7 +88,7 @@ module type Inputs_intf = sig
 
     type query [@@deriving bin_io]
 
-    val create : Ledger.t -> t
+    val create : Ledger.t -> parent_log:Logger.t -> t
 
     val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
 
@@ -138,7 +138,7 @@ module Make (Inputs : Inputs_intf) = struct
           let ledger =
             Ledger_builder.ledger locked_tip.ledger_builder |> Ledger.copy
           in
-          let sl = Sync_ledger.create ledger in
+          let sl = Sync_ledger.create ledger ~parent_log:log in
           Net.glue_sync_ledger net
             (Sync_ledger.query_reader sl)
             (Sync_ledger.answer_writer sl) ;
@@ -174,6 +174,7 @@ module Make (Inputs : Inputs_intf) = struct
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
             | Ok lb ->
+                Sync_ledger.destroy (!sl_ref |> Option.value_exn) ;
                 sl_ref := None ;
                 let new_tree =
                   Transition_logic_state.Transition_tree.singleton transition

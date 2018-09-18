@@ -170,6 +170,7 @@ let daemon (type ledger_proof) (module Kernel
        let%bind (module Init) = make_init (module Config) (module Kernel) in
        let module M = Coda.Make (Init) () in
        let module Run = Run (Config) (M) in
+       Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
        let%bind () =
          let open M in
          let run_snark_worker_action =
@@ -376,6 +377,8 @@ let () =
             Coda_block_production_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_shared_prefix_test =
             Coda_shared_prefix_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
+          let module Coda_restart_node_test =
+            Coda_restart_node_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_shared_state_test =
             Coda_shared_state_test.Make (Ledger_proof.Prod) (Kernel) (Coda) in
           let module Coda_transitive_peers_test =
@@ -387,6 +390,7 @@ let () =
           ; ( Coda_transitive_peers_test.name
             , Coda_transitive_peers_test.command )
           ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+          ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
           ; ("full-test", Full_test.command (module Kernel) (module Coda)) ]
       else [] )
     else
@@ -410,6 +414,8 @@ let () =
               (Coda) in
           let module Coda_shared_prefix_test =
             Coda_shared_prefix_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
+          let module Coda_restart_node_test =
+            Coda_restart_node_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           let module Coda_shared_state_test =
             Coda_shared_state_test.Make (Ledger_proof.Debug) (Kernel) (Coda) in
           let module Coda_transitive_peers_test =
@@ -424,6 +430,7 @@ let () =
               ; ( Coda_transitive_peers_test.name
                 , Coda_transitive_peers_test.command )
               ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
+              ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
               ; ("full-test", Full_test.command (module Kernel) (module Coda))
               ; ( "transaction-snark-profiler"
                 , Transaction_snark_profiler.command ) ]

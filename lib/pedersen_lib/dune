@@ -1,0 +1,5 @@
+(library
+  (name pedersen_lib)
+  (public_name pedersen_lib)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries tuple_lib fold_lib core_kernel))
