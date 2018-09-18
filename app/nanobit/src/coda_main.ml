@@ -954,6 +954,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     let num_accounts = Ledger.num_accounts ledger in
     let state = best_protocol_state t in
+    let state_hash =
+      Consensus_mechanism.Protocol_state.hash state
+      |> [%sexp_of : State_hash.t] |> Sexp.to_string
+    in
     let block_count =
       state |> Consensus_mechanism.Protocol_state.consensus_state
       |> Consensus_mechanism.Consensus_state.length
@@ -966,6 +970,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
+    ; state_hash
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
