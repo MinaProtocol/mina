@@ -7,7 +7,7 @@
       dummy_values
       snarky
       snark_keys
-      nanobit_base
+      coda_base
       ))
   (ppx_runtime_libraries (base))
   (preprocess (pps (ppx_jane ppxlib.metaquot ppxlib.runner)))))

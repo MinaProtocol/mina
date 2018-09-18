@@ -272,4 +272,13 @@ let%test_module "test functor on in memory databases" =
       let l1, keys = L16.load_ledger 10 1 in
       L16.remove_accounts_exn l1 keys ;
       [%test_eq : Hash.t] (L16.merkle_root l1) og_hash
+
+    let%test_unit "set_all_accounts_rooted_at can grow the ledger" =
+      let l1, keys2 = L16.load_ledger 9 1 in
+      let l2, keys2 = L16.load_ledger 10 1 in
+      let all_accts =
+        L16.get_all_accounts_rooted_at_exn l2 (L16.Addr.root ())
+      in
+      L16.set_all_accounts_rooted_at_exn l1 (L16.Addr.root ()) all_accts ;
+      [%test_eq : Hash.t] (L16.merkle_root l1) (L16.merkle_root l2)
   end )

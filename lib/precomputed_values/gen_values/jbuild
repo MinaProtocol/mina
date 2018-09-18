@@ -7,7 +7,7 @@
       core
       snarky
       snark_params
-      nanobit_base
+      coda_base
       blockchain_snark
       keys_lib
       snark_keys

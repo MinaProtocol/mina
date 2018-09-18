@@ -31,7 +31,7 @@ module type Inputs_intf = sig
 
   val perform_single :
        Worker_state.t
-    -> message:Nanobit_base.Sok_message.t
+    -> message:Coda_base.Sok_message.t
     -> ( Statement.t
        , Super_transaction.t
        , Sparse_ledger.t

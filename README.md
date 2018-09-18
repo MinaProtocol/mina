@@ -46,7 +46,7 @@ If developing on a VM, now is a good time to take a snapshot and save your state
 (REMEMBER to change the HOME and SOURCE directory to match yours)
 
 ```bash
-export PATH=~/src/nanobit/scripts:$PATH
+export PATH=~/src/cli/scripts:$PATH
 ```
 
 * Start a build (go stretch your arms)\
@@ -81,41 +81,3 @@ Container Stages:
 * ocaml-base (built by us, stored in gcr, ~7.1GB -- external dependancies and haskell)
 * nanotest (built with `make docker`, used with `make dev`, ~7.8GBm)
 
-# ~~How to Testbridge~~
-FIXME: Everything Testbridge is Deprecated
-
-### Docker image related setup
-
-* If you or a colleague has changed any opam dependencies: `make update-deps`.
-* Update the relevant containers `make nanobit-googlecloud && make testbridge-googlecloud`.
-
-### Gcloud related setup
-
-* Install `gcloud`, `kubectl`. If you use the docker dev environment, just run `make dev`.
-* `gcloud auth login` (follow the instructions)
-* `gcloud config set project o1labs-192920`
-
-### Kubernetes related setup
-
-* Get kubectl to work: `gcloud container clusters get-credentials testbridge-n1-standard-2 --zone us-west1-a`
-* Check to see if any pods are "Running": `kubectl get pods`
-* If they are all "Pending", it is possible you need to cleanup `./lib/testbridge/cleanup.sh` (goto 2)
-   Else they are missing, you may need to resize the cluster:
-   `kubectl get nodes` (you should see 2), otherwise: `gcloud container clusters resize testbridge-n1-standard-2 --size=2 --zone us-west1-a`
-* Now you can run a testbridge: (ex) `run-in-docker lib/nanobit_testbridge/run.sh recent_sca/ ../../_build/install/default/bin/nanobit_testbridge_recent_sca 4 gcr.io/o1labs-192920/testbridge-nanobit:latest`
-* If you see `have (x/4) pods`, just wait until it's `(4/4)`. Keep restarting whenever it times out.
-* Finally, things may work.
-
-### Cleaning up
-* Run `./lib/testbridge/cleanup.sh`
-* Make the cluster size=0 so we don't burn money `gcloud container clusters resize testbridge-n1-standard-2 --size=0 --zone us-west1-a`
-
-### If things aren't working
-
-* Can you spawn a bash shell in a kubernetes pod?
-    List the pods: `kubectl get pods`, copy one down here:
-    `kubectl exec -it testbridge-fwzgsxbvyj-4178240947-10vsn -- /bin/bash`
-* Is there anything interesting in the logs?
-    `dune exec fetch_logs`, then `cat /tmp/testbridge_logs/<your-pod-name>`
-   If you see a build failure, but no failure locally:
-    a. Did you need to remake the Docker containers? Esp. base? If so, make sure you also cleanup/redeploy pods

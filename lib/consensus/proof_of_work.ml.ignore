@@ -1,6 +1,6 @@
 open Core_kernel
-open Nanobit_base
-open Nanobit_base.Util
+open Coda_base
+open Coda_base.Util
 open Snark_bits
 open Snark_params
 

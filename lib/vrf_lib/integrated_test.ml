@@ -28,45 +28,45 @@ end
 module Message = struct
   type 'state_hash t = {state_hash: 'state_hash}
 
-  type value = Nanobit_base.State_hash.t t
+  type value = Coda_base.State_hash.t t
 
-  type var = Nanobit_base.State_hash.var t
+  type var = Coda_base.State_hash.var t
 
-  let to_hlist {state_hash} = Nanobit_base.H_list.[state_hash]
+  let to_hlist {state_hash} = Coda_base.H_list.[state_hash]
 
   let of_hlist :
-      (unit, 'state_hash -> unit) Nanobit_base.H_list.t -> 'state_hash t =
-   fun Nanobit_base.H_list.([state_hash]) -> {state_hash}
+      (unit, 'state_hash -> unit) Coda_base.H_list.t -> 'state_hash t =
+   fun Coda_base.H_list.([state_hash]) -> {state_hash}
 
-  let data_spec = Tick.Data_spec.[Nanobit_base.State_hash.typ]
+  let data_spec = Tick.Data_spec.[Coda_base.State_hash.typ]
 
   let typ =
     Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let fold {state_hash} = Nanobit_base.State_hash.fold state_hash
+  let fold {state_hash} = Coda_base.State_hash.fold state_hash
 
   let gen =
     let open Quickcheck.Let_syntax in
-    let%map state_hash = Nanobit_base.State_hash.gen in
+    let%map state_hash = Coda_base.State_hash.gen in
     {state_hash}
 
   let hash_to_group msg =
     let msg_hash_state =
-      Snark_params.Tick.Pedersen.hash_fold Nanobit_base.Hash_prefix.vrf_message
+      Snark_params.Tick.Pedersen.hash_fold Coda_base.Hash_prefix.vrf_message
         (fold msg)
     in
     msg_hash_state.acc
 
   module Checked = struct
     let var_to_triples {state_hash} =
-      Nanobit_base.State_hash.var_to_triples state_hash
+      Coda_base.State_hash.var_to_triples state_hash
 
     let hash_to_group msg =
       let open Snark_params.Tick in
       let open Snark_params.Tick.Let_syntax in
       let%bind msg_triples = var_to_triples msg in
-      Pedersen.Checked.hash_triples ~init:Nanobit_base.Hash_prefix.vrf_message
+      Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
         msg_triples
   end
 end
@@ -84,8 +84,7 @@ module Output_hash = struct
       Non_zero_curve_point.(g |> of_inner_curve_exn |> compress)
     in
     let digest =
-      Snark_params.Tick.Pedersen.digest_fold
-        Nanobit_base.Hash_prefix.vrf_output
+      Snark_params.Tick.Pedersen.digest_fold Coda_base.Hash_prefix.vrf_output
         (Message.fold msg +> Non_zero_curve_point.Compressed.fold compressed_g)
     in
     Sha256.digest (Snark_params.Tick.Pedersen.Digest.Bits.to_bits digest)
@@ -99,7 +98,7 @@ module Output_hash = struct
       in
       let%bind pedersen_digest =
         Snark_params.Tick.Pedersen.Checked.digest_triples
-          ~init:Nanobit_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
+          ~init:Coda_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
         >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
       in
       Sha256.Checked.digest
