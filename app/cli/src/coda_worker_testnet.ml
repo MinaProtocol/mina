@@ -111,7 +111,7 @@ struct
                  ~f:(fun x -> fst x))
       in
       let shared_prefix_age = shared_idx in
-      Logger.info log
+      Logger.debug log
         !"lengths: %{sexp: int list} shared_prefix: %{sexp: string option} \
           shared_prefix_age: %d"
         lengths newest_shared shared_prefix_age ;
