@@ -1,4 +1,5 @@
-[%%import "../../../../config.mlh"]
+[%%import
+"../../../../config.mlh"]
 
 module Bignum_bigint = Bigint
 open Core_kernel
@@ -238,13 +239,16 @@ struct
       let h' = Message.hash ~nonce:r m in
       Curve.Scalar.equal h' h
 
-  [%%if log_calls]
+  [%%if
+  log_calls]
+
   let verify s pk m =
-    Coda_debug.Call_logger.record_call "Signature_lib.Schnorr.verify";
-    (if Random.int 1000 = 0 then (
-      print_endline "SCHNORR BACKTRACE:";
-      Printexc.print_backtrace stdout));
+    Coda_debug.Call_logger.record_call "Signature_lib.Schnorr.verify" ;
+    if Random.int 1000 = 0 then (
+      print_endline "SCHNORR BACKTRACE:" ;
+      Printexc.print_backtrace stdout ) ;
     verify s pk m
+
   [%%endif]
 
   module Checked = struct
