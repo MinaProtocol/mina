@@ -1,7 +1,10 @@
+[%%import "../../../../../config.mlh"]
+
 open Core
 open Ctypes
 open Foreign
 
+[%%if profile_ffi]
 let genesis = Time.now ()
 let epoch = ref 0
 
@@ -45,6 +48,7 @@ let foreign name t =
     in
     Call_ring.record ring;
     f x)
+[%%endif]
 
 let with_prefix prefix s = sprintf "%s_%s" prefix s
 
