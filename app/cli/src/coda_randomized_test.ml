@@ -21,7 +21,7 @@ struct
   let main () =
     let log = Logger.create () in
     let log = Logger.child log name in
-    let n = 9 in
+    let n = 5 in
     let should_propose i = i = 0 in
     let accounts = Genesis_ledger.extra_accounts in
     let snark_work_public_keys i = Some (fst (List.nth_exn accounts i)) in

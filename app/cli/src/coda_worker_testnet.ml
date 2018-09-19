@@ -82,7 +82,8 @@ struct
           let%bind () = e2fn e in
           go xs
       in
-      go events
+      let%map () = go events in
+      Logger.info log "Done"
 
   end
 
