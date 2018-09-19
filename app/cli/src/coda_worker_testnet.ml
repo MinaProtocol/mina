@@ -226,7 +226,6 @@ struct
   (* note: this is very declarative, maybe this should be more imperative? *)
   (* next steps:
    *   add more powerful api hooks to enable sending transactions on certain conditions
-   *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
   let test ?(proposal_interval= 1000) log n should_propose

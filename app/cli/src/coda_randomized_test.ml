@@ -16,12 +16,12 @@ struct
   module Coda_worker_testnet =
     Coda_worker_testnet.Make (Ledger_proof) (Kernel) (Coda)
 
-  let name = "coda-restart-node-test"
+  let name = "coda-randomized-test"
 
   let main () =
     let log = Logger.create () in
     let log = Logger.child log name in
-    let n = 5 in
+    let n = 9 in
     let should_propose i = i = 0 in
     let snark_work_public_keys i = None in
     let send_new = true in
@@ -51,7 +51,8 @@ struct
 
   let command =
     Command.async_spec
-      ~summary:"Test of stopping, waiting, then starting a node"
+      ~summary:"Test of random behavior given a seed"
       Command.Spec.(empty)
       main
 end
+
