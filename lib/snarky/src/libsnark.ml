@@ -832,7 +832,7 @@ struct
 
   module Bigint : sig
     module R : sig
-      type t
+      type t [@@deriving bin_io]
 
       val typ : t Ctypes.typ
 
@@ -933,6 +933,51 @@ struct
         fun x ->
           let n = stub x in
           Caml.Gc.finalise delete n ; n
+
+      let num_limbs =
+        let stub = foreign (func_name "num_limbs") (void @-> returning int) in
+        stub ()
+
+      module Limb = struct
+        let size_in_bytes =
+          let stub =
+            foreign (func_name "bytes_per_limb") (void @-> returning int)
+          in
+          stub ()
+
+        let () = assert (size_in_bytes = 8)
+
+        type t = int64 [@@deriving bin_io]
+
+        let typ = int64_t
+      end
+
+      let length_in_bytes = num_limbs * Limb.size_in_bytes
+
+      let to_bigstring =
+        let stub =
+          foreign (func_name "to_data") (typ @-> returning (ptr char))
+        in
+        fun t ->
+          let limbs = stub t in
+          Bigstring.init length_in_bytes ~f:(fun i -> Ctypes.(!@(limbs +@ i)))
+
+      let of_bigstring =
+        let stub =
+          foreign (func_name "of_data") (ptr char @-> returning typ)
+        in
+        fun s ->
+          let ptr = Ctypes.bigarray_start Ctypes.array1 s in
+          stub ptr
+
+      include Binable.Of_binable (Bigstring)
+                (struct
+                  type nonrec t = t
+
+                  let to_binable = to_bigstring
+
+                  let of_binable = of_bigstring
+                end)
 
       let to_field =
         let stub =
