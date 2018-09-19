@@ -23,7 +23,9 @@ struct
     let log = Logger.child log name in
     let n = 2 in
     let should_propose i = i = 0 in
-    let snark_work_public_keys i = None in
+    let snark_work_public_keys i =
+      if i = 0 then Some Genesis_ledger.high_balance_pk else None
+    in
     let send_new = true in
     let receiver_pk =
       if send_new then
