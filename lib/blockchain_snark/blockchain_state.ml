@@ -71,7 +71,7 @@ struct
                     (Option.value ~default:Tock.Proof.dummy
                        (Snark_transition.ledger_proof transition)))
              and ledger_hash_didn't_change =
-               Ledger_hash.equal_var
+               Frozen_ledger_hash.equal_var
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state

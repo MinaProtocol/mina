@@ -16,8 +16,8 @@ end
 
 module Statement : sig
   type t =
-    { source: Coda_base.Ledger_hash.Stable.V1.t
-    ; target: Coda_base.Ledger_hash.Stable.V1.t
+    { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
+    ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
@@ -35,8 +35,8 @@ end
 type t [@@deriving bin_io, sexp]
 
 val create :
-     source:Ledger_hash.t
-  -> target:Ledger_hash.t
+     source:Frozen_ledger_hash.t
+  -> target:Frozen_ledger_hash.t
   -> proof_type:Proof_type.t
   -> supply_increase:Currency.Amount.t
   -> fee_excess:Currency.Amount.Signed.t
@@ -105,8 +105,8 @@ module Verification : sig
 
     val verify_complete_merge :
          Sok_message.Digest.Checked.t
-      -> Ledger_hash.var
-      -> Ledger_hash.var
+      -> Frozen_ledger_hash.var
+      -> Frozen_ledger_hash.var
       -> Currency.Amount.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
@@ -120,16 +120,16 @@ end
 
 val check_transition :
      sok_message:Sok_message.t
-  -> source:Ledger_hash.t
-  -> target:Ledger_hash.t
+  -> source:Frozen_ledger_hash.t
+  -> target:Frozen_ledger_hash.t
   -> Transition.t
   -> Tick.Handler.t
   -> unit
 
 val check_transaction :
      sok_message:Sok_message.t
-  -> source:Ledger_hash.t
-  -> target:Ledger_hash.t
+  -> source:Frozen_ledger_hash.t
+  -> target:Frozen_ledger_hash.t
   -> Transaction.With_valid_signature.t
   -> Tick.Handler.t
   -> unit
@@ -139,24 +139,24 @@ module type S = sig
 
   val of_transition :
        sok_digest:Sok_message.Digest.t
-    -> source:Ledger_hash.t
-    -> target:Ledger_hash.t
+    -> source:Frozen_ledger_hash.t
+    -> target:Frozen_ledger_hash.t
     -> Transition.t
     -> Tick.Handler.t
     -> t
 
   val of_transaction :
        sok_digest:Sok_message.Digest.t
-    -> source:Ledger_hash.t
-    -> target:Ledger_hash.t
+    -> source:Frozen_ledger_hash.t
+    -> target:Frozen_ledger_hash.t
     -> Transaction.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
   val of_fee_transfer :
        sok_digest:Sok_message.Digest.t
-    -> source:Ledger_hash.t
-    -> target:Ledger_hash.t
+    -> source:Frozen_ledger_hash.t
+    -> target:Frozen_ledger_hash.t
     -> Fee_transfer.t
     -> Tick.Handler.t
     -> t
