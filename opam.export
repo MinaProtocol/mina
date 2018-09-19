@@ -25,6 +25,7 @@ conduit	1.1.0	installed
 conduit-async	1.2.0	installed
 conf-gmp	1	installed
 conf-gmp-powm-sec	1	installed
+conf-libsodium	1	installed
 conf-m4	1	installed
 conf-openssl	1	installed
 conf-perl	1	installed
@@ -78,6 +79,7 @@ ppx_compare	v0.11.0	installed
 ppx_custom_printf	v0.11.0	installed
 ppx_derivers	1.0	installed
 ppx_deriving	4.2.1	root
+ppx_deriving_yojson	3.1	root
 ppx_enumerate	v0.11.0	installed
 ppx_expect	v0.11.0	installed
 ppx_fail	v0.11.0	installed
@@ -108,6 +110,7 @@ rpc_parallel	v0.11.0	root
 seq	base	installed
 sexplib	v0.11.0	installed
 sexplib0	v0.11.0	installed
+sodium	0.6.0	root
 spawn	v0.12.0	installed
 splittable_random	v0.11.0	installed
 stdio	v0.11.0	installed
