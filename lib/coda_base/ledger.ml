@@ -144,7 +144,7 @@ struct
         emptys
     | Two ((pk1, fee1), (pk2, fee2)) ->
         let emptys1, a1, l1 = get_or_create t pk1 in
-        if pk1 = pk2 then (
+        if Public_key.Compressed.equal pk1 pk2 then (
           let fee = Fee.(fee1 + fee2) |> Option.value_exn in
           set t l1 {a1 with balance= modify_balance a1.balance fee} ;
           emptys1 )
@@ -182,7 +182,7 @@ struct
       match fee_transfer with
       | None -> return (Protocols.Coda_praos.coinbase_amount, [])
       | Some (receiver, fee) ->
-          assert (receiver <> proposer) ;
+          assert (not @@ Public_key.Compressed.equal receiver proposer) ;
           let fee = Amount.of_fee fee in
           let%bind proposer_reward =
             error_opt "Coinbase fee transfer too large"
