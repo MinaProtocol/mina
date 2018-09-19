@@ -28,16 +28,16 @@ struct
     let%bind testnet =
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
-    Coda_worker_testnet.Api.run testnet 
-      [ `Wait 5.
-      ; `Stop 1
-      ; `Send (0, 
-               Genesis_ledger.high_balance_sk, 
-               Genesis_ledger.low_balance_pk, 
-               10, 0)
-      ; `Wait 5.
-      ; `Start 1
-      ; `Wait 20.
+    Coda_worker_testnet.Api.run testnet log
+      [ Wait 5.
+      ; Stop 1
+      ; Send (0, 
+              Genesis_ledger.high_balance_sk, 
+              Genesis_ledger.low_balance_pk, 
+              10, 0)
+      ; Wait 5.
+      ; Start 1
+      ; Wait 20.
       ]
 
   let command =
