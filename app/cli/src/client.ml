@@ -189,15 +189,15 @@ let send_txn =
          let%bind st = Unix.stat from_account in
          if st.perm land 0o777 <> 0o600 then (
            eprintf
-             "Error: insecure permissions on `%s`. They should be 0600, they are \
-             %o"
+             "Error: insecure permissions on `%s`. They should be 0600, they \
+              are %o"
              from_account (st.perm land 0o777) ;
            perm_error := true ) ;
          let%bind st = Unix.stat (Filename.dirname from_account) in
          if st.perm land 0o777 <> 0o700 then (
            eprintf
-             "Error: insecure permissions on `%s`. They should be 0700, they are \
-             %o"
+             "Error: insecure permissions on `%s`. They should be 0700, they \
+              are %o"
              (Filename.dirname from_account)
              (st.perm land 0o777) ;
            perm_error := true ) ;
@@ -241,7 +241,8 @@ let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
     (let open Command.Let_syntax in
     let%map_open privkey_path =
-      flag "privkey-path" ~doc:"PATH Path to write private key to (public key will be PATH.pub)"
+      flag "privkey-path"
+        ~doc:"PATH Path to write private key to (public key will be PATH.pub)"
         (required file)
     in
     fun () ->
@@ -268,7 +269,8 @@ let generate_keypair =
         let%bind () = Unix.chmod privkey_path ~perm:0o600 in
         let%bind f = Writer.open_file (privkey_path ^ ".pub") in
         let pubkey_bytes =
-          Public_key.Compressed.to_base64 (Public_key.compress public_key) |> Bytes.of_string
+          Public_key.Compressed.to_base64 (Public_key.compress public_key)
+          |> Bytes.of_string
         in
         Writer.write_bytes f pubkey_bytes ;
         let%bind () = Writer.close f in
