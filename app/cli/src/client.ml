@@ -185,6 +185,7 @@ let send_txn =
     (Daemon_cli.init flag ~f:(fun port (address, from_account, fee, amount) ->
          let open Deferred.Let_syntax in
          let receiver_compressed = Public_key.compress address in
+         let perm_error = ref false in
          let%bind st = Unix.stat from_account in
          if st.perm land 0o777 <> 0o600 then (
            eprintf
