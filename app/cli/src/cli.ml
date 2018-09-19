@@ -279,6 +279,8 @@ let () =
               module Ledger_builder_diff = Ledger_builder_diff
               module Time = Coda_base.Block_time
 
+              let private_key = Consensus.Signer_private_key.signer_private_key
+
               let proposal_interval =
                 env "PROPOSAL_INTERVAL"
                   ~default:(Time.Span.of_ms @@ Int64.of_int 5000)
