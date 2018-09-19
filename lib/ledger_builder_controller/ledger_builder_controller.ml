@@ -14,6 +14,10 @@ module type Inputs_intf = sig
     type t [@@deriving eq, bin_io, sexp, eq]
   end
 
+  module Frozen_ledger_hash : sig
+    type t [@@deriving eq, bin_io, sexp, eq]
+  end
+
   module Ledger_builder_hash : sig
     type t [@@deriving eq, sexp, compare]
 
@@ -56,7 +60,7 @@ module type Inputs_intf = sig
     val create : Ledger.t -> t
 
     val of_aux_and_ledger :
-         snarked_ledger_hash:Ledger_hash.t
+         snarked_ledger_hash:Frozen_ledger_hash.t
       -> ledger:Ledger.t
       -> aux:Aux.t
       -> t Or_error.t
@@ -70,7 +74,7 @@ module type Inputs_intf = sig
     val apply :
          t
       -> Ledger_builder_diff.t
-      -> (Ledger_hash.t * proof) option Deferred.Or_error.t
+      -> (Frozen_ledger_hash.t * proof) option Deferred.Or_error.t
   end
 
   module Protocol_state_proof : sig
@@ -80,7 +84,7 @@ module type Inputs_intf = sig
   module Blockchain_state : sig
     type value [@@deriving eq]
 
-    val ledger_hash : value -> Ledger_hash.t
+    val ledger_hash : value -> Frozen_ledger_hash.t
 
     val ledger_builder_hash : value -> Ledger_builder_hash.t
   end
@@ -237,6 +241,7 @@ end = struct
   end
 
   module Transition_logic_inputs = struct
+    module Frozen_ledger_hash = Frozen_ledger_hash
     module State_hash = State_hash
     module Consensus_mechanism = Consensus_mechanism
     module Protocol_state = Protocol_state
@@ -268,7 +273,7 @@ end = struct
             && Ledger_builder_hash.equal ledger_builder_hash
                  ( new_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_builder_hash )
-            && Ledger_hash.equal ledger_hash
+            && Frozen_ledger_hash.equal ledger_hash
                  ( new_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
             && State_hash.equal
@@ -357,6 +362,7 @@ end = struct
 
     module Catchup = Catchup.Make (struct
       module Ledger_hash = Ledger_hash
+      module Frozen_ledger_hash = Frozen_ledger_hash
       module Ledger = Ledger
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
       module Ledger_builder_hash = Ledger_builder_hash
@@ -558,6 +564,7 @@ let%test_module "test" =
       end
 
       module Ledger_hash = Int
+      module Frozen_ledger_hash = Int
 
       module Ledger_builder_hash = struct
         include Int
