@@ -5,18 +5,22 @@ let read_password_exn prompt : Bytes.t Async.Deferred.t =
   let open Unix in
   let open Async_unix in
   let open Async.Deferred.Let_syntax in
-  let old_termios = Terminal_io.tcgetattr stdin in
   let isatty = isatty stdin in
+  let old_termios =
+    if isatty then Some (Terminal_io.tcgetattr stdin) else None
+  in
   let () =
     if isatty then
       Terminal_io.tcsetattr ~mode:Terminal_io.TCSANOW
-        {old_termios with c_echo= false; c_echonl= true}
+        {(Option.value_exn old_termios) with c_echo= false; c_echonl= true}
         stdin
   in
   Writer.write (Lazy.force Writer.stdout) prompt ;
   let%map pwd = Reader.read_line (Lazy.force Reader.stdin) in
   if isatty then
-    Terminal_io.tcsetattr ~mode:Terminal_io.TCSANOW old_termios stdin ;
+    Terminal_io.tcsetattr ~mode:Terminal_io.TCSANOW
+      (Option.value_exn old_termios)
+      stdin ;
   match pwd with
   | `Ok pwd -> Bytes.of_string pwd
   | `Eof -> failwith "got EOF while reading password"
