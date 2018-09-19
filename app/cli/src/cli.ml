@@ -37,7 +37,7 @@ let daemon (type ledger_proof) (module Kernel
        flag "config-directory" ~doc:"DIR Configuration directory"
          (optional file)
      and should_propose_flag =
-       flag "propose" ~doc:"true|false Run the proposer (default:true)"
+       flag "propose" ~doc:"true|false Run the proposer (default:false)"
          (optional bool)
      and peers =
        flag "peer"
@@ -110,7 +110,7 @@ let daemon (type ledger_proof) (module Kernel
          Option.value ~default:default_client_port client_port
        in
        let should_propose_flag =
-         Option.value ~default:true should_propose_flag
+         Option.value ~default:false should_propose_flag
        in
        let transaction_capacity_log_2 =
          Option.value ~default:4 transaction_capacity_log_2
