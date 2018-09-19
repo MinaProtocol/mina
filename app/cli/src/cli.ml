@@ -122,7 +122,7 @@ let daemon (type ledger_proof) (module Kernel
        in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
-       let%bind initial_peers =
+       let%bind initial_peers_raw =
          match peers with
          | _ :: _ -> return peers
          | [] ->
@@ -138,6 +138,16 @@ let daemon (type ledger_proof) (module Kernel
                      ([%sexp_of : Host_and_port.t list] default_initial_peers)
                  in
                  []
+       in
+       let%bind initial_peers =
+         Deferred.List.map ~how:(`Max_concurrent_jobs 8) initial_peers_raw ~f:
+           (fun addr ->
+             let%map inet_addr =
+               Unix.Inet_addr.of_string_or_getbyname (Host_and_port.host addr)
+             in
+             Host_and_port.create
+               ~host:(Unix.Inet_addr.to_string inet_addr)
+               ~port:(Host_and_port.port addr) )
        in
        let log = Logger.create () in
        let%bind ip =
