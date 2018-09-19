@@ -17,7 +17,7 @@ RUN sudo apt-get install --yes libgmp3-dev
 RUN sudo apt-get install --yes libboost-dev
 RUN sudo apt-get install --yes libboost-program-options-dev
 RUN sudo apt-get install --yes librocksdb4.5 librocksdb-dev
-RUN sudo apt-get install --yes zlib1g-dev
+RUN sudo apt-get install --yes zlib1g-dev libsodium-dev
 
 RUN opam update -y && opam upgrade -y
 RUN opam depext -i dune
