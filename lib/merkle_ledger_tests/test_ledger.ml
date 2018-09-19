@@ -293,4 +293,50 @@ let%test_module "test functor on in memory databases" =
         (L16.Addr.of_directions Direction.[Left; Left; Left; Left; Left; Right])
         right_subtree ;
       [%test_eq : Hash.t] (L16.merkle_root l1) (L16.merkle_root l2)
+
+    let%test_unit "set_all_accounts_rooted_at . get_all_accounts_rooted_at \
+                   works for any root" =
+      Quickcheck.test (Int.gen_incl 2 10) ~trials:10 ~f:(fun depth ->
+          let module L = Make (struct
+            let depth = depth
+          end) in
+          let gen =
+            let open Quickcheck.Generator.Let_syntax in
+            let%bind subtree_depth = Int.gen_incl 0 depth in
+            let%bind path = Direction.gen_list subtree_depth in
+            let subtree_length = 1 lsl (depth - subtree_depth) in
+            let%bind subtree_accounts =
+              List.gen_with_length subtree_length Account.gen
+            in
+            let%bind allocated_length = Int.gen_incl 0 (1 lsl depth) in
+            return (allocated_length, path, subtree_accounts)
+          in
+          Quickcheck.test gen ~trials:500 ~f:
+            (fun (allocated_length, path, subtree_accounts) ->
+              let l, _ = L.load_ledger allocated_length 10 in
+              L.set_all_accounts_rooted_at_exn l
+                (L.Addr.of_directions path)
+                subtree_accounts ) )
+
+    let%test_unit "get_inner_hash_at_addr_exn doesn't index layers oob" =
+      let l, _ = L16.load_ledger 3001 10 in
+      L16.get_inner_hash_at_addr_exn l
+        (L16.Addr.of_directions Direction.[Left; Left; Left; Right; Left])
+      |> ignore
+
+    let%test_unit "get_inner_hash_at_addr_exn works for any path" =
+      Quickcheck.test
+        (Int.gen_incl 0 (1 lsl 16))
+        ~trials:100 ~shrinker:Int.shrinker
+        ~f:(fun len ->
+          let l, _ = L16.load_ledger len 10 in
+          Quickcheck.test (Direction.gen_var_length_list 16) ~trials:2000
+            ~shrinker:(List.shrinker Direction.shrinker) ~f:(fun path ->
+              try
+                L16.get_inner_hash_at_addr_exn l (L16.Addr.of_directions path)
+                |> ignore
+              with _ ->
+                failwithf
+                  !"len: %{sexp:int} with path %{sexp: Direction.t list}"
+                  len path () ) )
   end )
