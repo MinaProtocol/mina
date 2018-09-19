@@ -322,10 +322,12 @@ let fill_in_completed_jobs :
 
 let last_emitted_value (state: ('a, 'd) State.t) = snd state.acc
 
-let partitions ~max_slots state =
-  let n =
-    if free_space ~state < max_slots then free_space ~state else max_slots
-  in
+(*if the transaction queue does not have at least max_slots number of slots 
+before continuing at the begining of the queue, split the max_slots = (x,y) 
+such that x = number of slots till the end of the queue and y = max_slots - x 
+(starts from the begining of the queue)  *)
+let partition_if_overflowing ~max_slots state =
+  let n = min (free_space ~state) max_slots in
   let parallelism = State.parallelism state in
   let offset = parallelism - 1 in
   match State.base_none_pos state with

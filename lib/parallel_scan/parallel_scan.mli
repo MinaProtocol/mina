@@ -62,4 +62,5 @@ val fill_in_completed_jobs :
 
 val last_emitted_value : ('a, 'd) State.t -> 'a option
 
-val partitions : max_slots:int -> ('a, 'd) State.t -> int * int option
+val partition_if_overflowing :
+  max_slots:int -> ('a, 'd) State.t -> int * int option

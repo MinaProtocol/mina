@@ -542,7 +542,7 @@ end = struct
       ; supply_increase
       ; proof_type= `Base } )
 
-  let apply_super_transaction_and_get_witness ledger s public_key =
+  let apply_super_transaction_and_get_witness ledger s =
     let public_keys = function
       | Super_transaction.Fee_transfer t -> Fee_transfer.receivers t
       | Transaction t ->
@@ -553,7 +553,7 @@ end = struct
             Option.value_map c.fee_transfer ~default:[] ~f:(fun ft ->
                 Fee_transfer.receivers (Fee_transfer.of_single ft) )
           in
-          public_key :: ft_receivers
+          c.proposer :: ft_receivers
     in
     let open Or_error.Let_syntax in
     let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
@@ -562,7 +562,7 @@ end = struct
     in
     (undo, {Super_transaction_with_witness.transaction= s; witness; statement})
 
-  let update_ledger_and_get_statements ledger ts public_key =
+  let update_ledger_and_get_statements ledger ts =
     let undo_transactions undos =
       List.iter undos ~f:(fun u -> Or_error.ok_exn (Ledger.undo ledger u))
     in
@@ -572,7 +572,7 @@ end = struct
             { Result_with_rollback.result= Ok (List.rev acc)
             ; rollback= Call (fun () -> undo_transactions processed) }
       | t :: ts ->
-        match apply_super_transaction_and_get_witness ledger t public_key with
+        match apply_super_transaction_and_get_witness ledger t with
         | Error e ->
             undo_transactions processed ;
             Result_with_rollback.error e
@@ -616,6 +616,25 @@ end = struct
         |> Map.to_alist ~key_order:`Increasing
         |> Fee_transfer.of_single_list )
 
+  (*A Coinbase is a single transaction that accommodates the coinbase amount
+  and a fee transfer for the work required to add the coinbase. Unlike a 
+  transaction, a coinbase (including the fee transfer) just requires one slot 
+  in the jobs queue. 
+  
+  The minimum number of slots required to add a single transaction is three (at 
+  worst case number of provers: when each pair of proofs is from a different 
+  prover). One slot for the transaction and two slots for fee transfers.
+
+  When the diff is split into two prediffs (why? refer to #687) and after 
+  adding transactions, the first prediff has two slots remaining which could 
+  not accommodate transactions, then those slots are filled by splitting the 
+  coinbase into two parts. 
+  If it has one slot, then we simply add one coinbase. It is also possible that 
+  the first prediff may have no slots left after adding transactions (For 
+  example, when there are three slots and 
+  maximum number of provers), in which case, we simply add one coinbase as part 
+  of the second prediff.
+  *)
   let create_coinbase coinbase_parts completed_works proposer =
     let open Or_error.Let_syntax in
     let%bind singles =
@@ -723,7 +742,6 @@ end = struct
       in
       let%bind new_data =
         update_ledger_and_get_statements t.ledger super_transactions
-          t.public_key
       in
       let%map () = check_completed_works t all_completed_works in
       (new_data, all_completed_works)
@@ -790,8 +808,7 @@ end = struct
         List.map super_transactions ~f:(fun s ->
             let _undo, t =
               Or_error.ok_exn
-                (apply_super_transaction_and_get_witness t.ledger s
-                   t.public_key)
+                (apply_super_transaction_and_get_witness t.ledger s)
             in
             t )
       in
@@ -1194,7 +1211,8 @@ end = struct
     let ledger = ledger t' in
     let max_throughput = Int.pow 2 Inputs.Config.transaction_capacity_log_2 in
     let partitions =
-      Parallel_scan.partitions ~max_slots:max_throughput t'.scan_state
+      Parallel_scan.partition_if_overflowing ~max_slots:max_throughput
+        t'.scan_state
     in
     let resources, more_resources =
       process_works_add_txns logger (work_to_do t'.scan_state)
