@@ -26,10 +26,18 @@ module Ledger_hash = struct
   let to_bytes = Ledger_hash.to_bytes
 end
 
+module Frozen_ledger_hash = struct
+  include Frozen_ledger_hash.Stable.V1
+
+  let to_bytes = Frozen_ledger_hash.to_bytes
+
+  let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
+end
+
 module type Ledger_proof_intf =
   Protocols.Coda_pow.Ledger_proof_intf
   with type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Ledger_hash.t
+   and type ledger_hash := Frozen_ledger_hash.t
    and type proof := Proof.t
    and type statement = Transaction_snark.Statement.t
 
@@ -312,6 +320,7 @@ struct
       module Ledger_proof_verifier = Ledger_proof_verifier
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_hash = Ledger_hash
+      module Frozen_ledger_hash = Frozen_ledger_hash
       module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
@@ -406,6 +415,7 @@ struct
   module Ledger_builder_aux_hash = Ledger_builder_aux_hash
   module Ledger_proof_verifier = Ledger_proof_verifier
   module Ledger_hash = Ledger_hash
+  module Frozen_ledger_hash = Frozen_ledger_hash
   module Transaction = Transaction
   module Public_key = Public_key
   module Compressed_public_key = Public_key.Compressed
@@ -576,6 +586,7 @@ struct
       end
 
       module Ledger_hash = Ledger_hash
+      module Frozen_ledger_hash = Frozen_ledger_hash
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
       module Ledger_builder_diff = Ledger_builder_diff
@@ -629,6 +640,7 @@ struct
     module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_hash = Ledger_hash
+    module Frozen_ledger_hash = Frozen_ledger_hash
     module Transaction = Transaction
     module Public_key = Public_key
     module Private_key = Private_key

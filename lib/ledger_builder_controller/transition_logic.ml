@@ -33,12 +33,16 @@ module type Inputs_intf = sig
     type t [@@deriving sexp, eq]
   end
 
+  module Frozen_ledger_hash : sig
+    type t [@@deriving sexp, eq]
+  end
+
   module External_transition : sig
     type t [@@deriving eq, sexp, compare, bin_io]
 
     val target_state : t -> Protocol_state.value
 
-    val ledger_hash : t -> Ledger_hash.t
+    val ledger_hash : t -> Frozen_ledger_hash.t
 
     val is_parent_of : child:t -> parent:t -> bool
   end
@@ -396,8 +400,8 @@ struct
           | `Take ->
               let lh = External_transition.ledger_hash transition in
               Logger.debug t.log
-                !"Branch catchup for transition: lh:%{sexp: Ledger_hash.t} \
-                  state:%{sexp:Protocol_state.value}"
+                !"Branch catchup for transition: lh:%{sexp: \
+                  Frozen_ledger_hash.t} state:%{sexp:Protocol_state.value}"
                 lh target_state ;
               return ([], Some (Catchup.sync catchup state transition)) )
     | Some old_tree ->
