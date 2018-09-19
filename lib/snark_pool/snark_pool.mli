@@ -15,7 +15,7 @@ module type S = sig
 
   type t [@@deriving bin_io]
 
-  val create : unit -> t
+  val create : parent_log:Logger.t -> t
 
   val add_snark :
        t

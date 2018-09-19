@@ -22,7 +22,7 @@ module Make (Transaction : sig
   type t [@@deriving compare, bin_io, sexp]
 
   module With_valid_signature : sig
-    type nonrec t = private t
+    type nonrec t = private t [@@deriving sexp]
 
     include Comparable with type t := t
   end
@@ -34,40 +34,56 @@ struct
     { heap: Transaction.With_valid_signature.t Fheap.t
     ; set: Transaction.With_valid_signature.Set.t }
 
-  type t = pool ref
+  type t = {mutable pool: pool; log: Logger.t}
 
-  let create () =
-    ref
-      { heap= Fheap.create ~cmp:Transaction.With_valid_signature.compare
-      ; set= Transaction.With_valid_signature.Set.empty }
+  let create ~parent_log =
+    { pool=
+        { heap= Fheap.create ~cmp:Transaction.With_valid_signature.compare
+        ; set= Transaction.With_valid_signature.Set.empty }
+    ; log= Logger.child parent_log __MODULE__ }
 
-  let add' t txn = {heap= Fheap.add t.heap txn; set= Set.add t.set txn}
+  let add' pool txn = {heap= Fheap.add pool.heap txn; set= Set.add pool.set txn}
 
-  let add t_ref txn = t_ref := add' !t_ref txn
+  let add t txn = t.pool <- add' t.pool txn
 
-  let transactions t = Sequence.unfold ~init:!t.heap ~f:Fheap.pop
+  let transactions t = Sequence.unfold ~init:t.pool.heap ~f:Fheap.pop
 
   module Diff = struct
     type t = Transaction.t list [@@deriving bin_io, sexp]
 
+    let summary t =
+      Printf.sprintf "Transaction diff of length %d" (List.length t)
+
     (* TODO: Check signatures *)
-    let apply t_ref txns =
-      let t0 = !t_ref in
-      let t, res =
-        List.fold txns ~init:(t0, []) ~f:(fun (t, acc) txn ->
+    let apply t txns =
+      let pool0 = t.pool in
+      let pool', res =
+        List.fold txns ~init:(pool0, []) ~f:(fun (pool, acc) txn ->
             match Transaction.check txn with
-            | None -> (* TODO Punish *)
-                      (t, acc)
+            | None ->
+                Logger.faulty_peer t.log "Transaction doesn't check" ;
+                (pool, acc)
             | Some txn ->
-                if Set.mem t.set txn then (t, acc)
-                else (add' t txn, (txn :> Transaction.t) :: acc) )
+                if Set.mem pool.set txn then (
+                  Logger.debug t.log
+                    !"Skipping txn %{sexp: \
+                      Transaction.With_valid_signature.t} because I've \
+                      already seen it"
+                    txn ;
+                  (pool, acc) )
+                else (
+                  Logger.debug t.log
+                    !"Adding %{sexp: Transaction.With_valid_signature.t} to \
+                      my pool locally, and scheduling for rebroadcast"
+                    txn ;
+                  (add' pool txn, (txn :> Transaction.t) :: acc) ) )
       in
-      t_ref := t ;
+      t.pool <- pool' ;
       match res with
       | [] -> Deferred.Or_error.error_string "No new transactions"
       | xs -> Deferred.Or_error.return xs
   end
 
   (* TODO: Actually back this by the file-system *)
-  let load ~disk_location = return (create ())
+  let load ~disk_location:_ ~parent_log = return (create ~parent_log)
 end

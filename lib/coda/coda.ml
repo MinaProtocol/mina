@@ -109,7 +109,8 @@ module type Transaction_pool_intf = sig
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
-       disk_location:string
+       parent_log:Logger.t
+    -> disk_location:string
     -> incoming_diffs:pool_diff Linear_pipe.Reader.t
     -> t Deferred.t
 
@@ -128,7 +129,8 @@ module type Snark_pool_intf = sig
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
-       disk_location:string
+       parent_log:Logger.t
+    -> disk_location:string
     -> incoming_diffs:pool_diff Linear_pipe.Reader.t
     -> t Deferred.t
 
@@ -492,7 +494,7 @@ module Make (Inputs : Inputs_intf) = struct
           Ledger_builder_controller.handle_sync_ledger_queries lbc query )
     in
     let%bind transaction_pool =
-      Transaction_pool.load
+      Transaction_pool.load ~parent_log:config.log
         ~disk_location:config.transaction_pool_disk_location
         ~incoming_diffs:(Net.transaction_pool_diffs net)
     in
@@ -506,7 +508,8 @@ module Make (Inputs : Inputs_intf) = struct
     don't_wait_for
       (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind snark_pool =
-      Snark_pool.load ~disk_location:config.snark_pool_disk_location
+      Snark_pool.load ~parent_log:config.log
+        ~disk_location:config.snark_pool_disk_location
         ~incoming_diffs:(Net.snark_pool_diffs net)
     in
     don't_wait_for
@@ -541,7 +544,7 @@ module Make (Inputs : Inputs_intf) = struct
                 | `Empty -> ()
                 | `Non_empty
                     { source
-                    ; target
+                    ; target= _
                     ; fee_excess
                     ; proof_type= _
                     ; supply_increase= _ } ->
