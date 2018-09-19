@@ -938,21 +938,15 @@ struct
         let stub = foreign (func_name "num_limbs") (void @-> returning int) in
         stub ()
 
-      module Limb = struct
-        let size_in_bytes =
-          let stub =
-            foreign (func_name "bytes_per_limb") (void @-> returning int)
-          in
-          stub ()
+      let bytes_per_limb =
+        let stub =
+          foreign (func_name "bytes_per_limb") (void @-> returning int)
+        in
+        let res = stub () in
+        assert (res = 8) ;
+        res
 
-        let () = assert (size_in_bytes = 8)
-
-        type t = int64 [@@deriving bin_io]
-
-        let typ = int64_t
-      end
-
-      let length_in_bytes = num_limbs * Limb.size_in_bytes
+      let length_in_bytes = num_limbs * bytes_per_limb
 
       let to_bigstring =
         let stub =
