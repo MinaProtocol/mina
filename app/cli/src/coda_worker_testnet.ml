@@ -52,6 +52,25 @@ struct
 
     let send_transaction t i sk pk amount fee =
       Linear_pipe.write t.transaction_writer (i, sk, pk, amount, fee)
+
+    let run t events =
+      let e2fn = function
+        | `Wait x -> after (Time.Span.of_sec x)
+        | `Stop i -> stop t i
+        | `Start i -> start t i
+        | `Send (i, sender, receiver, amount, fee) -> 
+          send_transaction t i sender receiver (Currency.Amount.of_int amount) (Currency.Fee.of_int fee)
+      in
+      let rec go xs = 
+        match xs with 
+        | [] -> 
+          return ()
+        | e::xs -> 
+          let%bind () = e2fn e in
+          go xs
+      in
+      go events
+
   end
 
   let start_prefix_check log workers events proposal_interval testnet =

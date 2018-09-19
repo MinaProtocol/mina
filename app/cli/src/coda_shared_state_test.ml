@@ -27,8 +27,7 @@ struct
     in
     let receiver_pk = Genesis_ledger.low_balance_pk in
     let sender_sk = Genesis_ledger.high_balance_sk in
-    let sender2_sk = Genesis_ledger.low_balance_sk in
-    let send_amount = Currency.Amount.of_int 1 in
+    let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
     let%bind testnet =
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
@@ -39,13 +38,9 @@ struct
         Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk
           receiver_pk send_amount fee
       in
-      let%bind () =
-        Coda_worker_testnet.Api.send_transaction testnet 0 sender2_sk
-          receiver_pk send_amount fee
-      in
       if i > 0 then go (i - 1) else return ()
     in
-    go 500
+    go 30
 
   let command =
     Command.async_spec ~summary:"Test that workers share states"

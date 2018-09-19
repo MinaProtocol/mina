@@ -23,31 +23,22 @@ struct
     let log = Logger.child log name in
     let n = 9 in
     let should_propose i = i = 0 in
-    let snark_work_public_keys i = None in
-    let send_new = true in
-    let receiver_pk =
-      if send_new then
-        let keypair = Keypair.create () in
-        Public_key.compress keypair.public_key
-      else Genesis_ledger.low_balance_pk
-    in
-    let sender_sk = Genesis_ledger.high_balance_sk in
-    let send_amount = Currency.Amount.of_int 10 in
-    let fee = Currency.Fee.of_int 0 in
+    let accounts = Genesis_ledger.extra_accounts in
+    let snark_work_public_keys i = Some (fst (List.nth_exn accounts i)) in
     let%bind testnet =
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
     in
-    let%bind () = after (Time.Span.of_sec 5.) in
-    Logger.info log "Stopping %d" 1 ;
-    let%bind () = Coda_worker_testnet.Api.stop testnet 1 in
-    let%bind () =
-      Coda_worker_testnet.Api.send_transaction testnet 0 sender_sk receiver_pk
-        send_amount fee
-    in
-    let%bind () = after (Time.Span.of_sec 5.) in
-    let%bind () = Coda_worker_testnet.Api.start testnet 1 in
-    let%map () = after (Time.Span.of_sec 20.) in
-    ()
+    Coda_worker_testnet.Api.run testnet 
+      [ `Wait 5.
+      ; `Stop 1
+      ; `Send (0, 
+               Genesis_ledger.high_balance_sk, 
+               Genesis_ledger.low_balance_pk, 
+               10, 0)
+      ; `Wait 5.
+      ; `Start 1
+      ; `Wait 20.
+      ]
 
   let command =
     Command.async_spec
