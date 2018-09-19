@@ -34,29 +34,25 @@ struct
     { heap: Transaction.With_valid_signature.t Fheap.t
     ; set: Transaction.With_valid_signature.Set.t }
 
-  type t =
-    { mutable pool : pool
-    ; log : Logger.t
-    }
+  type t = {mutable pool: pool; log: Logger.t}
 
   let create ~parent_log =
-    { pool =
-      { heap= Fheap.create ~cmp:Transaction.With_valid_signature.compare
-      ; set= Transaction.With_valid_signature.Set.empty }
-    ; log = Logger.child parent_log __MODULE__
-    }
+    { pool=
+        { heap= Fheap.create ~cmp:Transaction.With_valid_signature.compare
+        ; set= Transaction.With_valid_signature.Set.empty }
+    ; log= Logger.child parent_log __MODULE__ }
 
   let add' pool txn = {heap= Fheap.add pool.heap txn; set= Set.add pool.set txn}
 
-  let add t txn =
-    t.pool <- add' t.pool txn
+  let add t txn = t.pool <- add' t.pool txn
 
   let transactions t = Sequence.unfold ~init:t.pool.heap ~f:Fheap.pop
 
   module Diff = struct
     type t = Transaction.t list [@@deriving bin_io, sexp]
 
-    let summary t = Printf.sprintf "Transaction diff of length %d" (List.length t)
+    let summary t =
+      Printf.sprintf "Transaction diff of length %d" (List.length t)
 
     (* TODO: Check signatures *)
     let apply t txns =
@@ -65,18 +61,24 @@ struct
         List.fold txns ~init:(pool0, []) ~f:(fun (pool, acc) txn ->
             match Transaction.check txn with
             | None ->
-                Logger.faulty_peer t.log "Transaction doesn't check";
-                      (pool, acc)
+                Logger.faulty_peer t.log "Transaction doesn't check" ;
+                (pool, acc)
             | Some txn ->
                 if Set.mem pool.set txn then (
-                  Logger.debug t.log !"Skipping txn %{sexp: Transaction.With_valid_signature.t} because I've already seen it" txn;
-                  (pool, acc)
-                ) else (
-                  Logger.debug t.log !"Adding %{sexp: Transaction.With_valid_signature.t} to my pool locally, and scheduling for rebroadcast" txn;
-                  (add' pool txn, (txn :> Transaction.t) :: acc) 
-                ))
+                  Logger.debug t.log
+                    !"Skipping txn %{sexp: \
+                      Transaction.With_valid_signature.t} because I've \
+                      already seen it"
+                    txn ;
+                  (pool, acc) )
+                else (
+                  Logger.debug t.log
+                    !"Adding %{sexp: Transaction.With_valid_signature.t} to \
+                      my pool locally, and scheduling for rebroadcast"
+                    txn ;
+                  (add' pool txn, (txn :> Transaction.t) :: acc) ) )
       in
-      t.pool <- pool';
+      t.pool <- pool' ;
       match res with
       | [] -> Deferred.Or_error.error_string "No new transactions"
       | xs -> Deferred.Or_error.return xs

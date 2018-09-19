@@ -494,8 +494,7 @@ module Make (Inputs : Inputs_intf) = struct
           Ledger_builder_controller.handle_sync_ledger_queries lbc query )
     in
     let%bind transaction_pool =
-      Transaction_pool.load
-        ~parent_log:config.log
+      Transaction_pool.load ~parent_log:config.log
         ~disk_location:config.transaction_pool_disk_location
         ~incoming_diffs:(Net.transaction_pool_diffs net)
     in
@@ -509,7 +508,8 @@ module Make (Inputs : Inputs_intf) = struct
     don't_wait_for
       (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind snark_pool =
-      Snark_pool.load ~parent_log:config.log ~disk_location:config.snark_pool_disk_location
+      Snark_pool.load ~parent_log:config.log
+        ~disk_location:config.snark_pool_disk_location
         ~incoming_diffs:(Net.snark_pool_diffs net)
     in
     don't_wait_for
@@ -544,7 +544,7 @@ module Make (Inputs : Inputs_intf) = struct
                 | `Empty -> ()
                 | `Non_empty
                     { source
-                    ; target=_
+                    ; target= _
                     ; fee_excess
                     ; proof_type= _
                     ; supply_increase= _ } ->

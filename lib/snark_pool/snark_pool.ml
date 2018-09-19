@@ -164,9 +164,12 @@ let%test_module "random set test" =
           Mock_snark_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2
           and cheap_fee = min fee_1 fee_2 in
-          ignore (Mock_snark_pool.add_snark t ~work ~proof:cheap_proof ~fee:cheap_fee) ;
+          ignore
+            (Mock_snark_pool.add_snark t ~work ~proof:cheap_proof
+               ~fee:cheap_fee) ;
           assert (
-            Mock_snark_pool.add_snark t ~work ~proof:expensive_proof ~fee:expensive_fee
+            Mock_snark_pool.add_snark t ~work ~proof:expensive_proof
+              ~fee:expensive_fee
             = `Don't_rebroadcast ) ;
           assert (
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}

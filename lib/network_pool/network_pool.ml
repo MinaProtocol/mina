@@ -24,10 +24,14 @@ module type Network_pool_intf = sig
 
   type pool_diff
 
-  val create : parent_log:Logger.t -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t
+  val create :
+    parent_log:Logger.t -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t
 
   val of_pool_and_diffs :
-     pool -> parent_log:Logger.t -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t
+       pool
+    -> parent_log:Logger.t
+    -> incoming_diffs:pool_diff Linear_pipe.Reader.t
+    -> t
 
   val pool : t -> pool
 
@@ -56,10 +60,11 @@ struct
   let apply_and_broadcast t pool_diff =
     match%bind Pool_diff.apply t.pool pool_diff with
     | Ok diff' ->
-        Logger.debug t.log "Broadcasting %s" (Pool_diff.summary diff');
+        Logger.debug t.log "Broadcasting %s" (Pool_diff.summary diff') ;
         Linear_pipe.write t.write_broadcasts diff'
     | Error e ->
-        Logger.info t.log "Pool diff apply feedback: %s" (Error.to_string_hum e);
+        Logger.info t.log "Pool diff apply feedback: %s"
+          (Error.to_string_hum e) ;
         Deferred.unit
 
   let of_pool_and_diffs pool ~parent_log ~incoming_diffs =
@@ -98,7 +103,8 @@ let%test_module "network pool test" =
                    recieved in the pool's reader" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
       let network_pool =
-        Mock_network_pool.create ~parent_log:(Logger.create ()) ~incoming_diffs:pool_reader
+        Mock_network_pool.create ~parent_log:(Logger.create ())
+          ~incoming_diffs:pool_reader
       in
       let work = 1 in
       let priced_proof = {Mock_snark_pool_diff.proof= 0; fee= 0} in
@@ -109,7 +115,7 @@ let%test_module "network pool test" =
              (fun _ ->
                let pool = Mock_network_pool.pool network_pool in
                ( match Mock_snark_pool.request_proof pool 1 with
-               | Some {proof;fee=_} -> assert (proof = priced_proof.proof)
+               | Some {proof; fee= _} -> assert (proof = priced_proof.proof)
                | None -> failwith "There should have been a proof here" ) ;
                Deferred.unit ) ;
         Mock_network_pool.apply_and_broadcast network_pool command )
@@ -125,7 +131,10 @@ let%test_module "network pool test" =
                 (work, {Mock_snark_pool_diff.proof= 0; fee= 0}) )
           |> Linear_pipe.of_list
         in
-        let network_pool = Mock_network_pool.create ~parent_log:(Logger.create ()) ~incoming_diffs:work_diffs in
+        let network_pool =
+          Mock_network_pool.create ~parent_log:(Logger.create ())
+            ~incoming_diffs:work_diffs
+        in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool) ~f:
              (fun work_command ->

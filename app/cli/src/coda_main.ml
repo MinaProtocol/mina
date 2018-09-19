@@ -368,7 +368,8 @@ struct
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
-    let load ~parent_log ~disk_location:_ ~incoming_diffs = return (create ~parent_log ~incoming_diffs)
+    let load ~parent_log ~disk_location:_ ~incoming_diffs =
+      return (create ~parent_log ~incoming_diffs)
 
     let transactions t = Pool.transactions (pool t)
 
