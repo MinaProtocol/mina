@@ -162,10 +162,11 @@ let send_txn =
       (required public_key)
   in
   let from_account_flag =
-    flag "from"
+    flag "privkey-path"
       ~doc:
-        "PRIVATEKEY Private-key address from which you would like to send money"
-      (required private_key)
+        "PATH Path to private-key file for address from which you would like \
+         to send money"
+      (required file)
   in
   let fee_flag =
     flag "fee" ~doc:"VALUE  Transaction fee you're willing to pay (default: 1)"
@@ -184,6 +185,37 @@ let send_txn =
     (Daemon_cli.init flag ~f:(fun port (address, from_account, fee, amount) ->
          let open Deferred.Let_syntax in
          let receiver_compressed = Public_key.compress address in
+         let perm_error = ref false in
+         let%bind st = Unix.stat from_account in
+         if st.perm land 0o777 <> 0o600 then (
+           eprintf
+             "Error: insecure permissions on `%s`. They should be 0600, they \
+              are %o"
+             from_account (st.perm land 0o777) ;
+           perm_error := true ) ;
+         let%bind st = Unix.stat (Filename.dirname from_account) in
+         if st.perm land 0o777 <> 0o700 then (
+           eprintf
+             "Error: insecure permissions on `%s`. They should be 0700, they \
+              are %o"
+             (Filename.dirname from_account)
+             (st.perm land 0o777) ;
+           perm_error := true ) ;
+         let%bind () = if !perm_error then exit 1 else Deferred.unit in
+         let%bind privkey_pass =
+           Cli_lib.read_password_exn "Private key password: "
+         in
+         let%bind privkey_file = Reader.open_file from_account in
+         let%bind privkey_contents =
+           match%map Reader.read_sexp privkey_file with
+           | `Ok s -> s
+           | `Eof -> failwith "unexpected EOF parsing private key file"
+         in
+         let sb = Secret_box.t_of_sexp privkey_contents in
+         let from_account =
+           Secret_box.decrypt_exn privkey_pass sb
+           |> Bigstring.of_bytes |> Private_key.of_bigstring_exn
+         in
          let sender_kp = Keypair.of_private_key_exn from_account in
          match%bind get_nonce sender_kp.public_key port with
          | Error e ->
@@ -207,13 +239,47 @@ let send_txn =
 
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
-    (Command.Param.return (fun () ->
-         let keypair = Keypair.create () in
-         printf "public-key: %s\nprivate-key: %s\n"
-           (Public_key.Compressed.to_base64
-              (Public_key.compress keypair.public_key))
-           (Private_key.to_base64 keypair.private_key) ;
-         exit 0 ))
+    (let open Command.Let_syntax in
+    let%map_open privkey_path =
+      flag "privkey-path"
+        ~doc:"PATH Path to write private key to (public key will be PATH.pub)"
+        (required file)
+    in
+    fun () ->
+      let open Deferred.Let_syntax in
+      let%bind pw1 = read_password_exn "Password for new private key file: " in
+      let%bind pw2 = read_password_exn "Password again: " in
+      if not (Bytes.equal pw1 pw2) then (
+        eprintf "Error: passwords didn't match\n" ;
+        exit 1 )
+      else
+        let {Keypair.public_key; private_key} = Keypair.create () in
+        let sb =
+          Secret_box.encrypt
+            ~plaintext:
+              (Private_key.to_bigstring private_key |> Bigstring.to_bytes)
+            ~password:pw1
+        in
+        let sb =
+          Secret_box.sexp_of_t sb |> Sexp.to_string_mach |> Bytes.of_string
+        in
+        let%bind f = Writer.open_file privkey_path in
+        Writer.write_bytes f sb ;
+        let%bind () = Writer.close f in
+        let%bind () = Unix.chmod privkey_path ~perm:0o600 in
+        let%bind f = Writer.open_file (privkey_path ^ ".pub") in
+        let pubkey_bytes =
+          Public_key.Compressed.to_base64 (Public_key.compress public_key)
+          |> Bytes.of_string
+        in
+        Writer.write_bytes f pubkey_bytes ;
+        let%bind () = Writer.close f in
+        printf
+          "Public key: %s\n\
+           Private key saved to %s, public key saved to %s.pub\n"
+          (Public_key.Compressed.to_base64 (Public_key.compress public_key))
+          privkey_path privkey_path ;
+        exit 0)
 
 let command =
   Command.group ~summary:"Lightweight client process"
