@@ -26,3 +26,9 @@ let gen_var_length_list ?(start= 0) depth =
   Int.gen_incl start (depth - 1) >>= fun l -> list_with_length l gen
 
 let gen_list depth = Quickcheck.Generator.list_with_length depth gen
+
+let shrinker =
+  Quickcheck.Shrinker.create (fun dir ->
+      Sequence.unfold ~init:dir ~f:(function
+        | Left -> None
+        | Right -> Some (Left, Left) ) )
