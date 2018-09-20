@@ -230,6 +230,30 @@ libff::bigint<libff::mnt6_r_limbs>* camlsnark_mnt6_bigint_r_of_decimal_string(ch
   return new libff::bigint<libff::mnt6_r_limbs>(x);
 }
 
+int camlsnark_mnt6_bigint_r_num_limbs() {
+  return libff::mnt6_r_limbs;
+}
+
+char* camlsnark_mnt6_bigint_r_to_data(libff::bigint<libff::mnt6_r_limbs>* x) {
+  return (char *) x->data;
+}
+
+libff::bigint<libff::mnt6_r_limbs>* camlsnark_mnt6_bigint_r_of_data(char* s) {
+  libff::bigint<libff::mnt6_r_limbs>* result = new libff::bigint<libff::mnt6_r_limbs>();
+
+  mp_limb_t* arr = (mp_limb_t *) s;
+
+  for (int i = 0; i < libff::mnt6_r_limbs; ++i) {
+    result->data[i] = arr[i];
+  }
+
+  return result;
+}
+
+int camlsnark_mnt6_bigint_r_bytes_per_limb() {
+  return sizeof(mp_limb_t);
+}
+
 libff::bigint<libff::mnt6_r_limbs>* camlsnark_mnt6_bigint_r_div(
   libff::bigint<libff::mnt6_r_limbs>* x,
   libff::bigint<libff::mnt6_r_limbs>* y) {

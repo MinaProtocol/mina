@@ -70,7 +70,6 @@ struct
 
     let ( = ) = equal
 
-    include Field_bin.Make (Field) (Bigint)
     module Snarkable = Bits.Snarkable.Field
     module Bits = Bits.Make_field (Field) (Bigint)
 
