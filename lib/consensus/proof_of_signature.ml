@@ -7,7 +7,7 @@ open Signature_lib
 module Global_public_key = struct
   let compressed =
     Public_key.Compressed.of_base64_exn
-      "JgEXgOrWncISbQXE5jOC2lEX0d3+aONQCdi2Z2ib1H+mLXUKSJU4AQ=="
+      "KA0mFlIh+GxTxmv22OLTSuKS+7by7RFp1wBPdQnlxmCA/GaZf+8AAAAB"
 
   let t = Public_key.decompress_exn compressed
 end

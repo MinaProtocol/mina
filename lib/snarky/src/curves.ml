@@ -222,8 +222,6 @@ module Edwards = struct
 
     val generator : value
 
-    val scale : value -> Scalar.t -> value
-
     module Checked : sig
       val generator : var
 
@@ -284,17 +282,6 @@ module Edwards = struct
     let identity_value = identity
 
     (* TODO: Assert quadratic non-residuosity of Params.d *)
-
-    let scale x s =
-      let rec go i two_to_the_i_x acc =
-        if i >= Scalar.length_in_bits then acc
-        else
-          let acc' =
-            if Scalar.test_bit s i then add acc two_to_the_i_x else acc
-          in
-          go (i + 1) (add two_to_the_i_x two_to_the_i_x) acc'
-      in
-      go 0 x identity_value
 
     let assert_on_curve (x, y) =
       let open Let_syntax in
