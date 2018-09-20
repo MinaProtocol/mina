@@ -147,8 +147,8 @@ struct
     | Two ((pk1, fee1), (pk2, fee2)) ->
         let emptys1, a1, l1 = get_or_create t pk1 in
         if Public_key.Compressed.equal pk1 pk2 then (
-          let%bind amount = add_fee (Amount.of_fee fee1) fee2 in
-          let%map balance = modify_balance a1.balance (Amount.to_fee amount) in
+          let%bind fee = error_opt "overflow" (Fee.add fee1 fee2) in
+          let%map balance = modify_balance a1.balance fee in
           set t l1 {a1 with balance} ;
           emptys1 )
         else
