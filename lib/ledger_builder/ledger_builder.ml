@@ -139,6 +139,7 @@ module Make (Inputs : Inputs.S) : sig
                       Inputs.Ledger_builder_diff.
                       With_valid_signatures_and_proofs.t
            and type ledger_hash := Inputs.Ledger_hash.t
+           and type frozen_ledger_hash := Inputs.Frozen_ledger_hash.t
            and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
            and type public_key := Inputs.Compressed_public_key.t
            and type ledger := Inputs.Ledger.t
@@ -340,14 +341,20 @@ end = struct
                   merge_acc acc_statement (merge s1 s2)
               | Base None -> acc_statement
               | Base (Some {transaction; statement; witness}) ->
-                  let source = Sparse_ledger.merkle_root witness in
+                  let source =
+                    Frozen_ledger_hash.of_ledger_hash
+                    @@ Sparse_ledger.merkle_root witness
+                  in
                   let after =
                     Or_error.try_with (fun () ->
                         Sparse_ledger.apply_super_transaction_exn witness
                           transaction )
                     |> ok_or_return
                   in
-                  let target = Sparse_ledger.merkle_root after in
+                  let target =
+                    Frozen_ledger_hash.of_ledger_hash
+                    @@ Sparse_ledger.merkle_root after
+                  in
                   let expected_statement =
                     { Ledger_proof_statement.source
                     ; target
@@ -389,11 +396,14 @@ end = struct
       | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
           let%map () =
             check
-              (Ledger_hash.equal snarked_ledger_hash source)
+              (Frozen_ledger_hash.equal snarked_ledger_hash source)
               "did not connect with snarked ledger hash"
           and () =
             check
-              (Ledger_hash.equal (Ledger.merkle_root ledger) target)
+              (Frozen_ledger_hash.equal
+                 ( Ledger.merkle_root ledger
+                 |> Frozen_ledger_hash.of_ledger_hash )
+                 target)
               "incorrect statement target hash"
           and () =
             check
@@ -432,7 +442,9 @@ end = struct
     | Merge ((_, stmt1), (_, stmt2)) ->
         let open Option.Let_syntax in
         let%bind () =
-          Option.some_if (Ledger_hash.equal stmt1.target stmt2.source) ()
+          Option.some_if
+            (Frozen_ledger_hash.equal stmt1.target stmt2.source)
+            ()
         in
         let%map fee_excess = Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
         and supply_increase =
@@ -503,11 +515,13 @@ end = struct
     let open Or_error.Let_syntax in
     let%bind fee_excess = Super_transaction.fee_excess s
     and supply_increase = Super_transaction.supply_increase s in
-    let source = Ledger.merkle_root ledger in
+    let source =
+      Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
+    in
     let%map undo = Ledger.apply_super_transaction ledger s in
     ( undo
     , { Ledger_proof_statement.source
-      ; target= Ledger.merkle_root ledger
+      ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
       ; supply_increase
       ; proof_type= `Base } )
@@ -1054,6 +1068,12 @@ let%test_module "test" =
         include String
 
         let to_bytes : t -> string = fun t -> t
+      end
+
+      module Frozen_ledger_hash = struct
+        include Ledger_hash
+
+        let of_ledger_hash = Fn.id
       end
 
       module Ledger_proof_statement = struct

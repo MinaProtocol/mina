@@ -1,8 +1,0 @@
-(jbuild_version 1)
-
-(library
- ((name testbridge)
-  (public_name testbridge)
-  (libraries (core async async_extra yojson))
-  (preprocess (pps (ppx_jane)))
-  (flags (:standard -short-paths -safe-string -w -40 -g))))

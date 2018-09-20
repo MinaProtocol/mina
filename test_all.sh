@@ -32,9 +32,8 @@ run_integration_tests() {
       echo "FAILED"
       echo "------------------------------------------------------------------------------------------"
       echo "RECENT OUTPUT:"
-      tail -n 50 test.log | dune exec logproc
+      cat test.log | dune exec logproc
       echo "------------------------------------------------------------------------------------------"
-      echo "See above for stack trace..."
       exit 2
     fi
     set -e

@@ -15,7 +15,7 @@ module type S = sig
 
   type t [@@deriving bin_io]
 
-  val create : unit -> t
+  val create : parent_log:Logger.t -> t
 
   val add_snark :
        t
@@ -66,7 +66,7 @@ struct
 
   type t = Priced_proof.t Work.Table.t [@@deriving sexp, bin_io]
 
-  let create () = Work.Table.create ()
+  let create ~parent_log:_ = Work.Table.create ()
 
   let add_snark t ~work ~proof ~fee =
     let update_and_rebroadcast () =
@@ -117,9 +117,9 @@ let%test_module "random set test" =
         Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
       in
       let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
-      let pool = Mock_snark_pool.create () in
+      let pool = Mock_snark_pool.create ~parent_log:(Logger.create ()) in
       List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
-          ignore (Mock_snark_pool.add_snark pool work proof fee) ) ;
+          ignore (Mock_snark_pool.add_snark pool ~work ~proof ~fee) ) ;
       pool
 
     let%test_unit "When two priced proofs of the same work are inserted into \
@@ -138,8 +138,8 @@ let%test_module "random set test" =
         (Quickcheck.Generator.tuple4 gen Mock_work.gen (gen_entry ())
            (gen_entry ()))
         ~f:(fun (t, work, (proof_1, fee_1), (proof_2, fee_2)) ->
-          ignore (Mock_snark_pool.add_snark t work proof_1 fee_1) ;
-          ignore (Mock_snark_pool.add_snark t work proof_2 fee_2) ;
+          ignore (Mock_snark_pool.add_snark t ~work ~proof:proof_1 ~fee:fee_1) ;
+          ignore (Mock_snark_pool.add_snark t ~work ~proof:proof_2 ~fee:fee_2) ;
           let fee_upper_bound = Mock_fee.min fee_1 fee_2 in
           let {Priced_proof.fee; _} =
             Option.value_exn (Mock_snark_pool.request_proof t work)
@@ -164,9 +164,12 @@ let%test_module "random set test" =
           Mock_snark_pool.remove_solved_work t work ;
           let expensive_fee = max fee_1 fee_2
           and cheap_fee = min fee_1 fee_2 in
-          ignore (Mock_snark_pool.add_snark t work cheap_proof cheap_fee) ;
+          ignore
+            (Mock_snark_pool.add_snark t ~work ~proof:cheap_proof
+               ~fee:cheap_fee) ;
           assert (
-            Mock_snark_pool.add_snark t work expensive_proof expensive_fee
+            Mock_snark_pool.add_snark t ~work ~proof:expensive_proof
+              ~fee:expensive_fee
             = `Don't_rebroadcast ) ;
           assert (
             {Priced_proof.fee= cheap_fee; proof= cheap_proof}

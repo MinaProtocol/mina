@@ -3,7 +3,7 @@
 open Core_kernel
 open Snark_params
 open Tick
-open Nanobit_base
+open Coda_base
 open Let_syntax
 
 module Make (Consensus_mechanism : Consensus.Mechanism.S) :
@@ -71,7 +71,7 @@ struct
                     (Option.value ~default:Tock.Proof.dummy
                        (Snark_transition.ledger_proof transition)))
              and ledger_hash_didn't_change =
-               Ledger_hash.equal_var
+               Frozen_ledger_hash.equal_var
                  ( previous_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
                  ( transition |> Snark_transition.blockchain_state

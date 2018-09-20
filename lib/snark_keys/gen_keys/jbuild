@@ -7,7 +7,7 @@
       cache_dir
       remove_snark_keys_trigger
       cached
-      nanobit_base
+      coda_base
       transaction_snark
       blockchain_snark
       async
