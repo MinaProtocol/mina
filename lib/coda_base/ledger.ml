@@ -137,37 +137,44 @@ struct
     apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
   let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
+    let open Or_error.Let_syntax in
     match transfer with
     | One (pk, fee) ->
         let emptys, a, loc = get_or_create t pk in
-        set t loc {a with balance= modify_balance a.balance fee} ;
+        let%map balance = modify_balance a.balance fee in
+        set t loc {a with balance} ;
         emptys
     | Two ((pk1, fee1), (pk2, fee2)) ->
         let emptys1, a1, l1 = get_or_create t pk1 in
         if Public_key.Compressed.equal pk1 pk2 then (
-          let fee = Fee.(fee1 + fee2) |> Option.value_exn in
-          set t l1 {a1 with balance= modify_balance a1.balance fee} ;
+          let%bind amount = add_fee (Amount.of_fee fee1) fee2 in
+          let%map balance = modify_balance a1.balance (Amount.to_fee amount) in
+          set t l1 {a1 with balance} ;
           emptys1 )
         else
           let emptys2, a2, l2 = get_or_create t pk1 in
-          set t l1 {a1 with balance= modify_balance a1.balance fee1} ;
-          set t l2 {a2 with balance= modify_balance a2.balance fee2} ;
+          let%bind balance1 = modify_balance a1.balance fee1 in
+          let%map balance2 = modify_balance a2.balance fee2 in
+          set t l1 {a1 with balance= balance1} ;
+          set t l2 {a2 with balance= balance2} ;
           emptys1 @ emptys2
 
   let apply_fee_transfer t transfer =
-    let previous_empty_accounts =
+    let open Or_error.Let_syntax in
+    let%map previous_empty_accounts =
       process_fee_transfer t transfer ~modify_balance:(fun b f ->
-          Option.value_exn (Balance.add_amount b (Amount.of_fee f)) )
+          add_amount b (Amount.of_fee f) )
     in
-    Or_error.return {Undo.fee_transfer= transfer; previous_empty_accounts}
+    {Undo.fee_transfer= transfer; previous_empty_accounts}
 
   let undo_fee_transfer t
       ({previous_empty_accounts; fee_transfer}: Undo.fee_transfer) =
-    process_fee_transfer t fee_transfer ~modify_balance:(fun b f ->
-        Option.value_exn (Balance.sub_amount b (Amount.of_fee f)) )
-    |> ignore ;
-    remove_accounts_exn t previous_empty_accounts ;
-    Or_error.return ()
+    let open Or_error.Let_syntax in
+    let%map _ =
+      process_fee_transfer t fee_transfer ~modify_balance:(fun b f ->
+          sub_amount b (Amount.of_fee f) )
+    in
+    remove_accounts_exn t previous_empty_accounts
 
   (* TODO: Better system needed for making atomic changes. Could use a monad. *)
   let apply_coinbase t ({proposer; fee_transfer} as cb: Coinbase.t) =
@@ -178,10 +185,11 @@ struct
       | `Existed, location -> (location, get t location |> Option.value_exn, [])
     in
     let open Or_error.Let_syntax in
-    let%bind proposer_reward, emptys1 =
+    let%bind proposer_reward, emptys1, receiver_update =
       match fee_transfer with
-      | None -> return (Protocols.Coda_praos.coinbase_amount, [])
+      | None -> return (Protocols.Coda_praos.coinbase_amount, [], None)
       | Some (receiver, fee) ->
+          (* This assertion will pass because of how coinbase super transactions are produced by Ledger_builder.apply_diff *)
           assert (not @@ Public_key.Compressed.equal receiver proposer) ;
           let fee = Amount.of_fee fee in
           let%bind proposer_reward =
@@ -192,14 +200,16 @@ struct
             get_or_initialize receiver
           in
           let%map balance = add_amount receiver_account.balance fee in
-          set t receiver_location {receiver_account with balance} ;
-          (proposer_reward, emptys)
+          ( proposer_reward
+          , emptys
+          , Some (receiver_location, {receiver_account with balance}) )
     in
     let proposer_location, proposer_account, emptys2 =
       get_or_initialize proposer
     in
     let%map balance = add_amount proposer_account.balance proposer_reward in
     set t proposer_location {proposer_account with balance} ;
+    Option.iter receiver_update ~f:(fun (l, a) -> set t l a) ;
     {Undo.coinbase= cb; previous_empty_accounts= emptys1 @ emptys2}
 
   (* Don't have to be atomic here because these should never fail. In fact, none of
