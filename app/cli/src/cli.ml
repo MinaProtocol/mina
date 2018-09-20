@@ -215,33 +215,42 @@ let () =
         Core.exit 1
   in
   let rec ensure_testnet_id_still_good () =
+    let open Cohttp_async in
+    let try_later hrs =
+      Async.Clock.run_after (Time.Span.of_hr hrs)
+        (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
+        ()
+    in
     if force_updates then
-      let open Cohttp_async in
       let%bind resp, body =
         Client.get (Uri.of_string "http://updates.o1test.net/testnet_id")
       in
-      let%map body_string = Body.to_string body in
-      (* Maybe the Git_sha.of_string is a bit gratuitous *)
-      let remote_id = Git_sha.of_string @@ String.strip body_string in
-      let finish local_id remote_id =
-        let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
-        exit1
-          ~msg:
-            (sprintf
-               "The version for the testnet has changed. I am %s, I should be \
-                %s. Please download the latest Coda software at \
-                https://github.com/codaprotocol/coda/releases"
-               ( local_id |> Option.map ~f:str
-               |> Option.value ~default:"[COMMIT_SHA1 not set]" )
-               (str remote_id))
-      in
-      match commit_id with
-      | None -> finish None remote_id
-      | Some sha when Git_sha.equal sha remote_id ->
-          Async.Clock.run_after (Time.Span.of_hr 1.0)
-            (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
-            ()
-      | Some _ -> finish commit_id remote_id
+      if resp.status <> `OK then (
+        try_later 0.10 ;
+        eprintf
+          "Error %s while getting testnet id, checking again in 6 minutes."
+          (Cohttp.Code.string_of_status resp.status) ;
+        Deferred.unit )
+      else
+        let%map body_string = Body.to_string body in
+        (* Maybe the Git_sha.of_string is a bit gratuitous *)
+        let remote_id = Git_sha.of_string @@ String.strip body_string in
+        let finish local_id remote_id =
+          let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
+          exit1
+            ~msg:
+              (sprintf
+                 "The version for the testnet has changed. I am %s, I should \
+                  be %s. Please download the latest Coda software at \
+                  https://github.com/codaprotocol/coda/releases"
+                 ( local_id |> Option.map ~f:str
+                 |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+                 (str remote_id))
+        in
+        match commit_id with
+        | None -> finish None remote_id
+        | Some sha when Git_sha.equal sha remote_id -> try_later 1.0
+        | Some _ -> finish commit_id remote_id
     else Deferred.unit
   in
   ensure_testnet_id_still_good () |> don't_wait_for ;
