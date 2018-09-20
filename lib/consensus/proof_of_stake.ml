@@ -93,10 +93,7 @@ let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
-let do_if_none ~f opt =
-  match opt with
-  | None   -> f (); None
-  | Some x -> Some x
+let do_if_none ~f opt = match opt with None -> f () ; None | Some x -> Some x
 
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
@@ -407,14 +404,12 @@ struct
       let satisfies threshold output = of_bits_lsb output <= threshold
     end
 
-    include Vrf_lib.Integrated.Make
-      (Snark_params.Tick)
-      (Scalar)
-      (Group)
-      (Message)
-      (Output)
+    include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
+              (Message)
+              (Output)
 
-    let check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~owned_stake ~total_stake =
+    let check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~owned_stake
+        ~total_stake =
       let open Message in
       let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
       let threshold = Threshold.create ~owned_stake ~total_stake in
@@ -476,11 +471,15 @@ struct
       let open Option.Let_syntax in
       let%bind ledger =
         Ledger_pool.find ledger_pool hash
-        |> do_if_none ~f:(fun () -> Logger.warn logger "epoch ledger hash missing from ledger pool")
+        |> do_if_none ~f:(fun () ->
+               Logger.warn logger "epoch ledger hash missing from ledger pool"
+           )
       in
       let%map account_location =
-        Nanobit_base.Ledger.location_of_key ledger (Public_key.compress public_key)
-        |> do_if_none ~f:(fun () -> Logger.warn logger "no account associated with public key")
+        Nanobit_base.Ledger.location_of_key ledger
+          (Public_key.compress public_key)
+        |> do_if_none ~f:(fun () ->
+               Logger.warn logger "no account associated with public key" )
       in
       let balance =
         Nanobit_base.Ledger.get ledger account_location
@@ -935,7 +934,8 @@ struct
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state: Protocol_state.value)
-      ~blockchain_state ~local_state:ledger_pool ~time ~keypair ~transactions:_ ~ledger ~logger =
+      ~blockchain_state ~local_state:ledger_pool ~time ~keypair ~transactions:_
+      ~ledger ~logger =
     let open Consensus_state in
     let open Epoch_data in
     let open Keypair in
@@ -945,21 +945,17 @@ struct
     in
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
-
-    let%bind (proposer_stake, total_stake) =
-      Epoch_ledger.get_stake
-        previous_consensus_state.last_epoch_data.ledger
+    let%bind proposer_stake, total_stake =
+      Epoch_ledger.get_stake previous_consensus_state.last_epoch_data.ledger
         ~logger ~public_key:keypair.public_key ~ledger_pool
     in
     let%map proposer_vrf_result =
-      Vrf.check
-        ~epoch
-        ~slot
+      Vrf.check ~epoch ~slot
         ~seed:previous_consensus_state.last_epoch_data.seed
-        ~lock_checkpoint:previous_consensus_state.last_epoch_data.lock_checkpoint
-        ~private_key:keypair.private_key
-        ~owned_stake:proposer_stake
-        ~total_stake:total_stake
+        ~lock_checkpoint:
+          previous_consensus_state.last_epoch_data.lock_checkpoint
+        ~private_key:keypair.private_key ~owned_stake:proposer_stake
+        ~total_stake
     in
     let consensus_transition_data =
       Consensus_transition_data.{epoch; slot; proposer_vrf_result}
@@ -1020,59 +1016,58 @@ struct
     else `Keep
 
   (* TODO: ---- last epoch ledger!!! *)
-  let next_proposal now (state: Consensus_state.value) ~local_state:ledger_pool ~keypair ~logger =
+  let next_proposal now (state: Consensus_state.value) ~local_state:ledger_pool
+      ~keypair ~logger =
     let open Consensus_state in
     let open Epoch_data in
     let open Keypair in
-
     let logger = Logger.child logger "proof_of_stake" in
-    let (epoch, slot) = Epoch.epoch_and_slot_of_time_exn (Time.of_span_since_epoch (Time.Span.of_ms now)) in
-
+    let epoch, slot =
+      Epoch.epoch_and_slot_of_time_exn
+        (Time.of_span_since_epoch (Time.Span.of_ms now))
+    in
     let next_slot =
       let open Option.Let_syntax in
-
       (* When we first enter an epoch, the protocol state may still be a previous
        * epoch. If that is the case, we need to select the staged vrf inputs
        * instead of the last vrf inputs, since if the protocol state were actually
        * up to date with the epoch, those would be the last vrf inputs.
        *)
       let epoch_data =
-        if Epoch.equal epoch state.curr_epoch then
-          state.last_epoch_data
+        if Epoch.equal epoch state.curr_epoch then state.last_epoch_data
         else if Epoch.equal epoch (Epoch.succ state.curr_epoch) then
           state.curr_epoch_data
         else (
-          Logger.error logger "system time is out of sync with protocol state time";
-          failwith "TIME OUT OF SYNC")
+          Logger.error logger
+            "system time is out of sync with protocol state time" ;
+          failwith "TIME OUT OF SYNC" )
       in
-      let%bind (proposer_stake, total_stake) =
-        Epoch_ledger.get_stake epoch_data.ledger
-          ~logger ~public_key:keypair.public_key ~ledger_pool
+      let%bind proposer_stake, total_stake =
+        Epoch_ledger.get_stake epoch_data.ledger ~logger
+          ~public_key:keypair.public_key ~ledger_pool
       in
       let is_winning_slot slot =
-        Option.is_some (
-          Vrf.check
-            ~epoch
-            ~slot
-            ~seed:epoch_data.seed
-            ~lock_checkpoint:epoch_data.lock_checkpoint
-            ~private_key:keypair.private_key
-            ~owned_stake:proposer_stake
-            ~total_stake:total_stake)
+        Option.is_some
+          (Vrf.check ~epoch ~slot ~seed:epoch_data.seed
+             ~lock_checkpoint:epoch_data.lock_checkpoint
+             ~private_key:keypair.private_key ~owned_stake:proposer_stake
+             ~total_stake)
       in
       let rec find_winning_slot slot =
-        if Epoch.size >= UInt32.of_int (Epoch.Slot.to_int slot) then
-          None
-        else if is_winning_slot slot then
-          Some slot
-        else
-          find_winning_slot (Epoch.Slot.succ slot)
+        if Epoch.size >= UInt32.of_int (Epoch.Slot.to_int slot) then None
+        else if is_winning_slot slot then Some slot
+        else find_winning_slot (Epoch.Slot.succ slot)
       in
       find_winning_slot (Epoch.Slot.succ slot)
     in
     match next_slot with
-    | Some slot -> `Propose (Epoch.slot_start_time epoch slot |> Time.to_span_since_epoch |> Time.Span.to_ms)
-    | None      -> `Check_again (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
+    | Some slot ->
+        `Propose
+          ( Epoch.slot_start_time epoch slot
+          |> Time.to_span_since_epoch |> Time.Span.to_ms )
+    | None ->
+        `Check_again
+          (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
 
   (* TODO *)
   let genesis_protocol_state =

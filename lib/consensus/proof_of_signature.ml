@@ -185,8 +185,12 @@ struct
 
   let next_proposal now _state ~local_state:_ ~keypair:_ ~logger:_ =
     let open Unix_timestamp in
-    let time_since_last_interval = rem now (Time.Span.to_ms Inputs.proposal_interval) in
-    let proposal_time = (now - time_since_last_interval) + Time.Span.to_ms Inputs.proposal_interval in
+    let time_since_last_interval =
+      rem now (Time.Span.to_ms Inputs.proposal_interval)
+    in
+    let proposal_time =
+      now - time_since_last_interval + Time.Span.to_ms Inputs.proposal_interval
+    in
     `Propose proposal_time
 
   let genesis_protocol_state =
