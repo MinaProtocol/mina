@@ -3,7 +3,7 @@
 (library
  ((name cli_lib)
   (public_name cli_lib)
-  (flags (:standard -short-paths -warn-error -58))
+  (flags (:standard -short-paths -warn-error -58-39)) ; 39 for ppx_deriving_yojson
   (library_flags (-linkall))
   (inline_tests)
   (modules (cli_lib secret_box))
@@ -11,7 +11,9 @@
     ( core
       async_unix
       sodium
+      ppx_deriving_yojson.runtime
+      yojson
       coda_base ))
-  (preprocess (pps (ppx_jane)))
+  (preprocess (pps (ppx_jane ppx_deriving_yojson)))
   (synopsis "Some cli utilities")))
 

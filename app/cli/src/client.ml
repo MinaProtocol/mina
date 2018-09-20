@@ -154,6 +154,10 @@ let status =
     (Daemon_cli.init json_flag ~f:(fun port json ->
          dispatch Get_status.rpc () port >>| print (module Status) json ))
 
+let read_all r =
+  let open Deferred in
+  Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss
+
 let send_txn =
   let open Command.Param in
   let address_flag =
@@ -206,12 +210,11 @@ let send_txn =
            Cli_lib.read_password_exn "Private key password: "
          in
          let%bind privkey_file = Reader.open_file from_account in
-         let%bind privkey_contents =
-           match%map Reader.read_sexp privkey_file with
-           | `Ok s -> s
-           | `Eof -> failwith "unexpected EOF parsing private key file"
+         let%bind file_contents = read_all privkey_file in
+         let sb =
+           Secret_box.of_yojson (Yojson.Safe.from_string file_contents)
+           |> Result.ok_or_failwith
          in
-         let sb = Secret_box.t_of_sexp privkey_contents in
          let from_account =
            Secret_box.decrypt_exn privkey_pass sb
            |> Bigstring.of_bytes |> Private_key.of_bigstring_exn
@@ -237,6 +240,53 @@ let send_txn =
                  printf "Failed to send transaction %s\n"
                    (Error.to_string_hum e) ))
 
+let write_keypair {Keypair.private_key; public_key; _} privkey_path pw =
+  let sb =
+    Secret_box.encrypt
+      ~plaintext:(Private_key.to_bigstring private_key |> Bigstring.to_bytes)
+      ~password:pw
+  in
+  let sb =
+    Secret_box.to_yojson sb |> Yojson.Safe.to_string |> Bytes.of_string
+  in
+  let%bind f = Writer.open_file privkey_path in
+  Writer.write_bytes f sb ;
+  let%bind () = Writer.close f in
+  let%bind () = Unix.chmod privkey_path ~perm:0o600 in
+  let%bind f = Writer.open_file (privkey_path ^ ".pub") in
+  let pubkey_bytes =
+    Public_key.Compressed.to_base64 (Public_key.compress public_key)
+    |> Bytes.of_string
+  in
+  Writer.write_bytes f pubkey_bytes ;
+  let%bind () = Writer.close f in
+  Deferred.unit
+
+let prompt_password () =
+  let%bind pw1 = read_password_exn "Password for new private key file: " in
+  let%bind pw2 = read_password_exn "Password again: " in
+  if not (Bytes.equal pw1 pw2) then (
+    eprintf "Error: passwords don't match, try again\n" ;
+    exit 1 )
+  else return pw2
+
+let wrap_key =
+  Command.async ~summary:"Wrap a private key into a private key file"
+    (let open Command.Let_syntax in
+    let%map_open privkey_path =
+      flag "privkey-path"
+        ~doc:
+          "FILE File to write private key into (public key will be PATH.pub)"
+        (required file)
+    in
+    fun () ->
+      let open Deferred.Let_syntax in
+      let%bind privkey = read_hidden_line "Private key: " in
+      let%bind pw = prompt_password () in
+      let pk = Private_key.of_base64_exn (Bytes.to_string privkey) in
+      let kp = Keypair.of_private_key_exn pk in
+      write_keypair kp privkey_path pw)
+
 let generate_keypair =
   Command.async ~summary:"Generate a new public-key/private-key pair"
     (let open Command.Let_syntax in
@@ -247,39 +297,10 @@ let generate_keypair =
     in
     fun () ->
       let open Deferred.Let_syntax in
-      let%bind pw1 = read_password_exn "Password for new private key file: " in
-      let%bind pw2 = read_password_exn "Password again: " in
-      if not (Bytes.equal pw1 pw2) then (
-        eprintf "Error: passwords didn't match\n" ;
-        exit 1 )
-      else
-        let {Keypair.public_key; private_key} = Keypair.create () in
-        let sb =
-          Secret_box.encrypt
-            ~plaintext:
-              (Private_key.to_bigstring private_key |> Bigstring.to_bytes)
-            ~password:pw1
-        in
-        let sb =
-          Secret_box.sexp_of_t sb |> Sexp.to_string_mach |> Bytes.of_string
-        in
-        let%bind f = Writer.open_file privkey_path in
-        Writer.write_bytes f sb ;
-        let%bind () = Writer.close f in
-        let%bind () = Unix.chmod privkey_path ~perm:0o600 in
-        let%bind f = Writer.open_file (privkey_path ^ ".pub") in
-        let pubkey_bytes =
-          Public_key.Compressed.to_base64 (Public_key.compress public_key)
-          |> Bytes.of_string
-        in
-        Writer.write_bytes f pubkey_bytes ;
-        let%bind () = Writer.close f in
-        printf
-          "Public key: %s\n\
-           Private key saved to %s, public key saved to %s.pub\n"
-          (Public_key.Compressed.to_base64 (Public_key.compress public_key))
-          privkey_path privkey_path ;
-        exit 0)
+      let kp = Keypair.create () in
+      let%bind pw = prompt_password () in
+      let%bind () = write_keypair kp privkey_path pw in
+      exit 0)
 
 let command =
   Command.group ~summary:"Lightweight client process"
@@ -287,4 +308,5 @@ let command =
     ; ("get-public-keys", get_public_keys)
     ; ("send-txn", send_txn)
     ; ("status", status)
+    ; ("wrap-key", wrap_key)
     ; ("generate-keypair", generate_keypair) ]
