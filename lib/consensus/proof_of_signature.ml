@@ -65,7 +65,7 @@ struct
 
     let create_value blockchain_state =
       { signature=
-          Blockchain_state.Signature.sign Signer_private_key.private_key
+          Blockchain_state.Signature.sign Signer_private_key.signer_private_key
             blockchain_state }
 
     let genesis = create_value Blockchain_state.genesis
