@@ -6,8 +6,6 @@ module T = struct
   type ('a, 's) t =
     {interruption_signal: 's Deferred.t; d: ('a, 's) Deferred.Result.t}
 
-  let create d = {interruption_signal= Ivar.create (); d}
-
   let map_signal {interruption_signal; d} ~f =
     { interruption_signal= Deferred.map interruption_signal ~f
     ; d= Deferred.Result.map_error d ~f }

@@ -219,8 +219,6 @@ module type Ledger_builder_controller_intf = sig
 end
 
 module type Proposer_intf = sig
-  type t
-
   type ledger_hash
 
   type ledger_builder
@@ -257,10 +255,7 @@ module type Proposer_intf = sig
     -> change_feeder:change Linear_pipe.Reader.t
     -> time_controller:time_controller
     -> keypair:keypair
-    -> t
-
-  val transitions :
-    t -> (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
+    -> (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
 end
 
 module type Witness_change_intf = sig
@@ -392,8 +387,7 @@ module Make (Inputs : Inputs_intf) = struct
   open Inputs
 
   type t =
-    { proposer: Proposer.t option
-    ; should_propose: bool
+    { should_propose: bool
     ; run_snark_worker: bool
     ; net: Net.t
     ; external_transitions:
@@ -522,8 +516,7 @@ module Make (Inputs : Inputs_intf) = struct
     Linear_pipe.iter strongest_ledgers_for_network ~f:(fun (_, t) ->
         Net.broadcast_state net t ; Deferred.unit )
     |> don't_wait_for ;
-    let proposer =
-      if config.should_propose then (
+    (if config.should_propose then (
         let tips_r, tips_w = Linear_pipe.create () in
         (let tip = Ledger_builder_controller.strongest_tip ledger_builder in
          Linear_pipe.write_without_pushback tips_w
@@ -570,23 +563,16 @@ module Make (Inputs : Inputs_intf) = struct
               ; transactions= Transaction_pool.transactions transaction_pool }
         )
         |> don't_wait_for ;
-        let proposer =
+        let transitions =
           Proposer.create ~parent_log:config.log ~change_feeder:tips_r
             ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
             ~time_controller:config.time_controller ~keypair:config.keypair
         in
-        don't_wait_for
-          (Linear_pipe.transfer_id
-             (Proposer.transitions proposer)
-             external_transitions_writer) ;
-        Some proposer )
-      else (
-        don't_wait_for (Linear_pipe.drain strongest_ledgers_for_miner) ;
-        None )
-    in
+        don't_wait_for (Linear_pipe.transfer_id transitions external_transitions_writer))
+      else
+        don't_wait_for (Linear_pipe.drain strongest_ledgers_for_miner));
     return
-      { proposer
-      ; should_propose= config.should_propose
+      { should_propose= config.should_propose
       ; run_snark_worker= config.run_snark_worker
       ; net
       ; external_transitions= external_transitions_writer
