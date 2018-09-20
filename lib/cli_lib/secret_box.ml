@@ -1,6 +1,16 @@
 open Core
 open Sodium
 
+module BytesWr = struct
+  include Bytes
+
+  let to_yojson t = `String (Bytes.to_string t |> B64.encode)
+
+  let of_yojson = function
+    | `String s -> Ok (B64.decode s |> Bytes.of_string)
+    | _ -> Error "Bytes.of_yojson needs a string"
+end
+
 module Stable = struct
   module V1 = struct
     type t =
@@ -14,7 +24,38 @@ module Stable = struct
   end
 end
 
+module Json : sig
+  type t [@@deriving yojson]
+
+  val of_stable : Stable.V1.t -> t
+
+  val to_stable : t -> Stable.V1.t
+end = struct
+  type t =
+    { box_primitive: string
+    ; pw_primitive: string
+    ; nonce: BytesWr.t
+    ; pwsalt: BytesWr.t
+    ; pwdiff: Int64.t * int
+    ; ciphertext: BytesWr.t }
+  [@@deriving yojson]
+
+  let of_stable
+      {Stable.V1.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
+      =
+    {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
+
+  let to_stable
+      {box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext} =
+    {Stable.V1.box_primitive; pw_primitive; nonce; pwsalt; pwdiff; ciphertext}
+end
+
 include Stable.V1
+
+let to_yojson t : Yojson.Safe.json = Json.to_yojson (Json.of_stable t)
+
+let of_yojson (t: Yojson.Safe.json) =
+  Result.map ~f:Json.to_stable (Json.of_yojson t)
 
 (** warning: this will zero [password] *)
 let encrypt ~(password: Bytes.t) ~(plaintext: Bytes.t) =
