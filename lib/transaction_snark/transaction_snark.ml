@@ -22,8 +22,8 @@ let provide_witness' typ ~f =
 
 module Input = struct
   type t =
-    { source: Ledger_hash.Stable.V1.t
-    ; target: Ledger_hash.Stable.V1.t
+    { source: Frozen_ledger_hash.Stable.V1.t
+    ; target: Frozen_ledger_hash.Stable.V1.t
     ; fee_excess: Currency.Amount.Signed.t }
   [@@deriving bin_io]
 end
@@ -300,8 +300,8 @@ end
 module Statement = struct
   module T = struct
     type t =
-      { source: Coda_base.Ledger_hash.Stable.V1.t
-      ; target: Coda_base.Ledger_hash.Stable.V1.t
+      { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
+      ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
       ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
@@ -332,8 +332,8 @@ module Statement = struct
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map source = Coda_base.Ledger_hash.gen
-    and target = Coda_base.Ledger_hash.gen
+    let%map source = Coda_base.Frozen_ledger_hash.gen
+    and target = Coda_base.Frozen_ledger_hash.gen
     and fee_excess = Currency.Fee.Signed.gen
     and supply_increase = Currency.Amount.gen
     and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
@@ -341,8 +341,8 @@ module Statement = struct
 end
 
 type t =
-  { source: Ledger_hash.Stable.V1.t
-  ; target: Ledger_hash.Stable.V1.t
+  { source: Frozen_ledger_hash.Stable.V1.t
+  ; target: Frozen_ledger_hash.Stable.V1.t
   ; proof_type: Proof_type.t
   ; supply_increase: Amount.Stable.V1.t
   ; fee_excess: Amount.Signed.Stable.V1.t
@@ -376,7 +376,8 @@ let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
   let fold =
     let open Fold in
     Sok_message.Digest.fold sok_digest
-    +> Ledger_hash.fold state1 +> Ledger_hash.fold state2
+    +> Frozen_ledger_hash.fold state1
+    +> Frozen_ledger_hash.fold state2
     +> Amount.fold supply_increase
     +> Amount.Signed.fold fee_excess
   in
@@ -480,7 +481,7 @@ module Base = struct
         in
         let%bind root =
           let%bind sender_compressed = Public_key.compress_var sender in
-          Ledger_hash.modify_account_send root
+          Frozen_ledger_hash.modify_account_send root
             ~is_fee_transfer:(Tag.Checked.is_fee_transfer tag)
             sender_compressed ~f:(fun account ->
               with_label __LOC__
@@ -519,7 +520,8 @@ module Base = struct
         in
         (* we explicitly set the public_key because it could be zero if the account is new *)
         let%map root =
-          Ledger_hash.modify_account_recv root receiver ~f:(fun account ->
+          Frozen_ledger_hash.modify_account_recv root receiver ~f:
+            (fun account ->
               let%map balance = Balance.Checked.(account.balance + amount) in
               {account with balance; public_key= receiver} )
         in
@@ -535,8 +537,8 @@ module Base = struct
   module Prover_state = struct
     type t =
       { transaction: Tagged_transaction.t
-      ; state1: Ledger_hash.t
-      ; state2: Ledger_hash.t
+      ; state1: Frozen_ledger_hash.t
+      ; state2: Frozen_ledger_hash.t
       ; sok_digest: Sok_message.Digest.t }
     [@@deriving fields]
   end
@@ -544,8 +546,8 @@ module Base = struct
   (* spec for [main top_hash]:
    constraints pass iff
    there exist
-      l1 : Ledger_hash.t,
-      l2 : Ledger_hash.t,
+      l1 : Frozen_ledger_hash.t,
+      l2 : Frozen_ledger_hash.t,
       fee_excess : Amount.Signed.t,
       supply_increase : Amount.t
       t : Tagged_transaction.t
@@ -558,7 +560,7 @@ module Base = struct
          Tick.Inner_curve.Checked.Shifted.create ()
        in
        let%bind root_before =
-         provide_witness' Ledger_hash.typ ~f:Prover_state.state1
+         provide_witness' Frozen_ledger_hash.typ ~f:Prover_state.state1
        in
        let%bind t =
          with_label __LOC__
@@ -569,8 +571,8 @@ module Base = struct
        in
        let%map () =
          with_label __LOC__
-           (let%bind b1 = Ledger_hash.var_to_triples root_before
-            and b2 = Ledger_hash.var_to_triples root_after
+           (let%bind b1 = Frozen_ledger_hash.var_to_triples root_before
+            and b2 = Frozen_ledger_hash.var_to_triples root_after
             and sok_digest =
               provide_witness' Sok_message.Digest.typ
                 ~f:Prover_state.sok_digest
@@ -890,8 +892,8 @@ module Verification = struct
 
     val verify_complete_merge :
          Sok_message.Digest.Checked.t
-      -> Ledger_hash.var
-      -> Ledger_hash.var
+      -> Frozen_ledger_hash.var
+      -> Frozen_ledger_hash.var
       -> Currency.Amount.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
@@ -976,8 +978,8 @@ module Verification = struct
     let verify_complete_merge sok_digest s1 s2 supply_increase get_proof =
       let open Tick in
       let open Let_syntax in
-      let%bind s1 = Ledger_hash.var_to_triples s1
-      and s2 = Ledger_hash.var_to_triples s2 in
+      let%bind s1 = Frozen_ledger_hash.var_to_triples s1
+      and s2 = Frozen_ledger_hash.var_to_triples s2 in
       let%bind top_hash_section =
         Pedersen.Checked.Section.extend merge_prefix_and_zero_and_vk_curve_pt
           ~start:Hash_prefix.length_in_triples
@@ -994,7 +996,7 @@ module Verification = struct
           n
           = Hash_prefix.length_in_triples
             + Sok_message.Digest.length_in_triples
-            + (2 * Ledger_hash.length_in_triples)
+            + (2 * Frozen_ledger_hash.length_in_triples)
             + Amount.length_in_triples + Amount.Signed.length_in_triples
             + Coda_base.Util.bit_length_to_triple_length
                 (List.length wrap_vk_bits)
@@ -1003,17 +1005,17 @@ module Verification = struct
           failwithf
             !"%d = Hash_prefix.length_in_triples aka %d\n            \
               + Sok_message.Digest.length_in_triples aka %d\n\
-              + (2 * Ledger_hash.length_in_triples) aka %d \n            \
+              + (2 * Frozen_ledger_hash.length_in_triples) aka %d \n            \
               + Amount.length aka %d + Amount.Signed.length aka %d + \
               List.length wrap_vk_triples aka %d ) aka %d"
             n Hash_prefix.length_in_triples
             Sok_message.Digest.length_in_triples
-            (2 * Ledger_hash.length_in_triples)
+            (2 * Frozen_ledger_hash.length_in_triples)
             Amount.length_in_triples Amount.Signed.length_in_triples
             (Coda_base.Util.bit_length_to_triple_length
                (List.length wrap_vk_bits))
             ( Hash_prefix.length_in_triples
-            + (2 * Ledger_hash.length_in_triples)
+            + (2 * Frozen_ledger_hash.length_in_triples)
             + Amount.length_in_triples + Amount.Signed.length_in_triples
             + Coda_base.Util.bit_length_to_triple_length
                 (List.length wrap_vk_bits) )
@@ -1139,24 +1141,24 @@ module type S = sig
 
   val of_transition :
        sok_digest:Sok_message.Digest.t
-    -> source:Ledger_hash.t
-    -> target:Ledger_hash.t
+    -> source:Frozen_ledger_hash.t
+    -> target:Frozen_ledger_hash.t
     -> Transition.t
     -> Tick.Handler.t
     -> t
 
   val of_transaction :
        sok_digest:Sok_message.Digest.t
-    -> source:Ledger_hash.t
-    -> target:Ledger_hash.t
+    -> source:Frozen_ledger_hash.t
+    -> target:Frozen_ledger_hash.t
     -> Transaction.With_valid_signature.t
     -> Tick.Handler.t
     -> t
 
   val of_fee_transfer :
        sok_digest:Sok_message.Digest.t
-    -> source:Ledger_hash.t
-    -> target:Ledger_hash.t
+    -> source:Frozen_ledger_hash.t
+    -> target:Frozen_ledger_hash.t
     -> Fee_transfer.t
     -> Tick.Handler.t
     -> t
@@ -1234,7 +1236,7 @@ struct
         ~state2:ledger_hash3 ~fee_excess ~supply_increase
     in
     let prover_state =
-      let to_bits = Ledger_hash.to_bits in
+      let to_bits = Frozen_ledger_hash.to_bits in
       { Merge.Prover_state.sok_digest
       ; ledger_hash1= to_bits ledger_hash1
       ; ledger_hash2= to_bits ledger_hash2
@@ -1272,10 +1274,10 @@ struct
     of_transition ~sok_digest ~source ~target (Fee_transfer transfer) handler
 
   let merge t1 t2 ~sok_digest =
-    if not (Ledger_hash.( = ) t1.target t2.source) then
+    if not (Frozen_ledger_hash.( = ) t1.target t2.source) then
       failwithf
         !"Transaction_snark.merge: t1.target <> t2.source \
-          (%{sexp:Ledger_hash.t} vs %{sexp:Ledger_hash.t})"
+          (%{sexp:Frozen_ledger_hash.t} vs %{sexp:Frozen_ledger_hash.t})"
         t1.target t2.source () ;
     (*
     let t1_proof_type, t1_total_fees =
@@ -1475,6 +1477,25 @@ end
 
 let%test_module "transaction_snark" =
   ( module struct
+    (* For tests let's just monkey patch ledger and sparse ledger to freeze their
+     * ledger_hashes. The nominal type is just so we don't mix this up in our
+     * real code. *)
+    module Ledger = struct
+      include Ledger
+
+      let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
+
+      let merkle_root_after_transaction_exn t txn =
+        Frozen_ledger_hash.of_ledger_hash
+        @@ merkle_root_after_transaction_exn t txn
+    end
+
+    module Sparse_ledger = struct
+      include Sparse_ledger
+
+      let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
+    end
+
     type wallet = {private_key: Private_key.t; account: Account.t}
 
     let random_wallets () =
@@ -1586,7 +1607,7 @@ let%test_module "transaction_snark" =
               (t1 :> Transaction.t)
           in
           Ledger.apply_transaction ledger t1 |> Or_error.ok_exn |> ignore ;
-          [%test_eq : Ledger_hash.t]
+          [%test_eq : Frozen_ledger_hash.t]
             (Ledger.merkle_root ledger)
             (Sparse_ledger.merkle_root sparse_ledger) ;
           let proof23 =
@@ -1598,7 +1619,7 @@ let%test_module "transaction_snark" =
               (t2 :> Transaction.t)
           in
           Ledger.apply_transaction ledger t2 |> Or_error.ok_exn |> ignore ;
-          [%test_eq : Ledger_hash.t]
+          [%test_eq : Frozen_ledger_hash.t]
             (Ledger.merkle_root ledger)
             (Sparse_ledger.merkle_root sparse_ledger) ;
           let total_fees =

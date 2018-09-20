@@ -109,7 +109,8 @@ module type Transaction_pool_intf = sig
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
-       disk_location:string
+       parent_log:Logger.t
+    -> disk_location:string
     -> incoming_diffs:pool_diff Linear_pipe.Reader.t
     -> t Deferred.t
 
@@ -128,7 +129,8 @@ module type Snark_pool_intf = sig
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
   val load :
-       disk_location:string
+       parent_log:Logger.t
+    -> disk_location:string
     -> incoming_diffs:pool_diff Linear_pipe.Reader.t
     -> t Deferred.t
 
@@ -211,11 +213,6 @@ module type Ledger_builder_controller_intf = sig
        t
     -> ledger_hash * sync_query
     -> (ledger_hash * sync_answer) Deferred.Or_error.t
-
-  (** For tests *)
-  module Transition_tree : Ktree_intf with type elem := external_transition
-
-  val transition_tree : t -> Transition_tree.t option
 end
 
 module type Proposer_intf = sig
@@ -433,9 +430,6 @@ module Make (Inputs : Inputs_intf) = struct
 
   let peers t = Net.peers t.net
 
-  let lbc_transition_tree t =
-    Ledger_builder_controller.transition_tree t.ledger_builder
-
   let ledger_builder_ledger_proof t =
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
@@ -492,7 +486,7 @@ module Make (Inputs : Inputs_intf) = struct
           Ledger_builder_controller.handle_sync_ledger_queries lbc query )
     in
     let%bind transaction_pool =
-      Transaction_pool.load
+      Transaction_pool.load ~parent_log:config.log
         ~disk_location:config.transaction_pool_disk_location
         ~incoming_diffs:(Net.transaction_pool_diffs net)
     in
@@ -506,7 +500,8 @@ module Make (Inputs : Inputs_intf) = struct
     don't_wait_for
       (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind snark_pool =
-      Snark_pool.load ~disk_location:config.snark_pool_disk_location
+      Snark_pool.load ~parent_log:config.log
+        ~disk_location:config.snark_pool_disk_location
         ~incoming_diffs:(Net.snark_pool_diffs net)
     in
     don't_wait_for
@@ -541,7 +536,7 @@ module Make (Inputs : Inputs_intf) = struct
                 | `Empty -> ()
                 | `Non_empty
                     { source
-                    ; target
+                    ; target= _
                     ; fee_excess
                     ; proof_type= _
                     ; supply_increase= _ } ->
@@ -551,7 +546,7 @@ module Make (Inputs : Inputs_intf) = struct
                     in
                     [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
                       fee_excess ;
-                    [%test_eq : Ledger_hash.t]
+                    [%test_eq : Frozen_ledger_hash.t]
                       (Blockchain_state.ledger_hash bc_state)
                       source
                 (* THIS ASSERTION FAILS SOMETIMES
