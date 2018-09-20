@@ -3,7 +3,7 @@ open Async_kernel
 
 module type Inputs_intf = sig
   module State_hash : sig
-    type t [@@deriving eq, sexp, compare]
+    type t [@@deriving eq, sexp, compare, bin_io]
 
     val to_bits : t -> bool list
   end
@@ -235,8 +235,6 @@ end = struct
     let ledger_hash t =
       protocol_state t |> blockchain_state |> Blockchain_state.ledger_hash
 
-    let state_hash t = protocol_state t |> hash
-
     let previous_state_hash t = protocol_state t |> previous_state_hash
   end
 
@@ -247,9 +245,10 @@ end = struct
     module Protocol_state = Protocol_state
 
     module Step = struct
-      let step (tip: Tip.t) transition =
+      let step {With_hash.data= tip; hash= tip_hash}
+          {With_hash.data= transition; hash= transition_target_hash} =
         let open Deferred.Or_error.Let_syntax in
-        let old_state = tip.protocol_state in
+        let old_state = tip.Tip.protocol_state in
         let new_state = External_transition.protocol_state transition in
         let%bind verified =
           verify_blockchain
@@ -276,40 +275,42 @@ end = struct
             && Frozen_ledger_hash.equal ledger_hash
                  ( new_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
-            && State_hash.equal
-                 (Protocol_state.hash old_state)
+            && State_hash.equal tip_hash
                  (new_state |> Protocol_state.previous_state_hash)
           then Deferred.return (Ok ())
           else Deferred.Or_error.error_string "TODO: Punish"
         in
-        { tip with
-          protocol_state= new_state
-        ; proof= External_transition.protocol_state_proof transition }
+        { With_hash.data=
+            { tip with
+              Tip.protocol_state= new_state
+            ; proof= External_transition.protocol_state_proof transition }
+        ; hash= transition_target_hash }
     end
 
     module External_transition = struct
       include External_transition
 
-      let is_parent_of ~child ~parent =
-        State_hash.equal
-          (External_transition.state_hash parent)
+      let is_parent_of ~child:{With_hash.data= child; hash= _}
+          ~parent:{With_hash.hash= parent_state_hash; data= _} =
+        State_hash.equal parent_state_hash
           (External_transition.previous_state_hash child)
     end
 
     module Tip = struct
       include Tip
 
+      type state_hash = State_hash.t [@@deriving sexp, bin_io, compare]
+
       let state tip = tip.protocol_state
 
       let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
 
-      let assert_materialization_of t transition =
+      let assert_materialization_of {With_hash.data= t; hash= tip_state_hash}
+          {With_hash.data= transition; hash= transition_state_hash} =
         [%test_result : State_hash.t]
           ~message:
             "Protocol state in tip should be the target state of the transition"
-          ~expect:
-            (Protocol_state.hash (External_transition.target_state transition))
-          (Protocol_state.hash (state t)) ;
+          ~expect:transition_state_hash tip_state_hash ;
         [%test_result : Ledger_builder_hash.t]
           ~message:
             (Printf.sprintf
@@ -320,7 +321,9 @@ end = struct
           ~expect:(External_transition.ledger_builder_hash transition)
           (Ledger_builder.hash t.ledger_builder)
 
-      let transition_unchecked t transition =
+      let transition_unchecked t
+          ( {With_hash.data= transition; hash= transition_state_hash} as
+          transition_with_hash ) =
         let%map () =
           let open Deferred.Let_syntax in
           match%map
@@ -337,23 +340,23 @@ end = struct
                 "We should have already verified patches can be applied: %s"
                 (Error.to_string_hum e) ()
         in
-        let res =
+        let tip' =
           { t with
             protocol_state= External_transition.target_state transition
           ; proof= External_transition.protocol_state_proof transition }
         in
-        assert_materialization_of res transition ;
+        let res = {With_hash.data= tip'; hash= transition_state_hash} in
+        assert_materialization_of res transition_with_hash ;
         res
 
-      let is_parent_of ~child ~parent =
-        State_hash.equal
-          (Protocol_state.hash (state parent))
+      let is_parent_of ~child:{With_hash.data= child; hash= _}
+          ~parent:{With_hash.data= _; hash= parent_hash} =
+        State_hash.equal parent_hash
           (External_transition.previous_state_hash child)
 
-      let is_materialization_of t transition =
-        State_hash.equal
-          (Protocol_state.hash (External_transition.target_state transition))
-          (Protocol_state.hash (state t))
+      let is_materialization_of {With_hash.data= _; hash= tip_hash}
+          {With_hash.data= _; hash= transition_hash} =
+        State_hash.equal transition_hash tip_hash
     end
 
     module Transition_logic_state =
@@ -391,21 +394,20 @@ end = struct
     ; strongest_ledgers:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
 
-  let transition_tree t =
-    let state = Transition_logic.state t.handler in
-    Transition_logic_state.assert_state_valid state ;
-    Transition_logic_state.ktree state
-
   let strongest_tip t =
     let state = Transition_logic.state t.handler in
     Transition_logic_state.assert_state_valid state ;
-    Transition_logic_state.longest_branch_tip state
+    Transition_logic_state.longest_branch_tip state |> With_hash.data
 
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
   let create (config: Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
-    let state = Transition_logic_state.create config.genesis_tip in
+    let state =
+      Transition_logic_state.create
+        (With_hash.of_data config.genesis_tip ~hash_data:(fun tip ->
+             tip.Tip.protocol_state |> Protocol_state.hash ))
+    in
     let%map net = config.net_deferred in
     let net = Net.create net in
     let catchup = Catchup.create net log in
@@ -436,11 +438,13 @@ end = struct
                not
                  (Protocol_state.equal_value
                     ( old_state |> Transition_logic_state.longest_branch_tip
-                    |> Tip.state )
+                    |> With_hash.data |> Tip.state )
                     ( new_state |> Transition_logic_state.longest_branch_tip
-                    |> Tip.state ))
+                    |> With_hash.data |> Tip.state ))
              then
-               let tip = Transition_logic_state.longest_branch_tip new_state in
+               let {With_hash.data= tip; hash= _} =
+                 Transition_logic_state.longest_branch_tip new_state
+               in
                Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
                  strongest_ledgers_reader
                  (tip.ledger_builder, transition) ) ;
@@ -449,9 +453,13 @@ end = struct
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
         config.external_transitions ~f:(fun (transition, time_received) ->
+          let transition_with_hash =
+            With_hash.of_data transition ~hash_data:(fun t ->
+                t |> External_transition.target_state |> Protocol_state.hash )
+          in
           let%bind changes, job =
-            Transition_logic.on_new_transition catchup t.handler transition
-              ~time_received
+            Transition_logic.on_new_transition catchup t.handler
+              transition_with_hash ~time_received
           in
           let%map () =
             match changes with
@@ -461,11 +469,13 @@ end = struct
           in
           Option.map job ~f:(fun job -> (job, time_received)) )
     in
-    let replace last ({Job.input= current_transition; _}, time_received) =
+    let replace last
+        ( {Job.input= {With_hash.data= current_transition; hash= _}; _}
+        , time_received ) =
       match last with
       | None -> `Cancel_and_do_next
       | Some last ->
-          let last_transition, _ = last in
+          let {With_hash.data= last_transition; _}, _ = last in
           match
             Consensus_mechanism.select
               (Protocol_state.consensus_state
@@ -480,7 +490,10 @@ end = struct
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:
           (fun last
-          ((({Job.input= current_transition; _} as job), _) as job_with_time)
+          ( ( ( { Job.input=
+                    {With_hash.data= current_transition; hash= _} as
+                    current_transition_with_hash; _ } as job )
+            , _ ) as job_with_time )
           ->
             match replace last job_with_time with
             | `Skip -> return last
@@ -496,7 +509,7 @@ end = struct
                           (changes, current_transition)
                     | Error () -> () )
                 in
-                return (Some (current_transition, this_ivar)) )
+                return (Some (current_transition_with_hash, this_ivar)) )
       >>| ignore ) ;
     t
 
@@ -517,15 +530,15 @@ end = struct
       !"Attempting to local-get-ledger for %{sexp: Ledger_builder_hash.t}"
       hash ;
     local_get_ledger' t hash
-      ~p_tip:(fun hash tip ->
+      ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
         Ledger_builder_hash.equal
           (Ledger_builder.hash tip.Tip.ledger_builder)
           hash )
-      ~p_trans:(fun hash trans ->
+      ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
         Ledger_builder_hash.equal
           (External_transition.ledger_builder_hash trans)
           hash )
-      ~f_result:(fun tip -> tip.Tip.ledger_builder)
+      ~f_result:(fun {With_hash.data= tip; hash= _} -> tip.Tip.ledger_builder)
 
   let handle_sync_ledger_queries :
          t
@@ -539,17 +552,18 @@ end = struct
       hash ;
     let%map ledger =
       local_get_ledger' t hash
-        ~p_tip:(fun hash tip ->
+        ~p_tip:(fun hash {With_hash.data= tip; hash= _} ->
           Ledger_hash.equal
             ( tip.Tip.ledger_builder |> Ledger_builder.ledger
             |> Ledger.merkle_root )
             hash )
-        ~p_trans:(fun hash trans ->
+        ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
           Ledger_hash.equal
             ( External_transition.ledger_builder_hash trans
             |> Ledger_builder_hash.ledger_hash )
             hash )
-        ~f_result:(fun tip -> tip.Tip.ledger_builder |> Ledger_builder.ledger)
+        ~f_result:(fun {With_hash.data= tip; hash= _} ->
+          tip.Tip.ledger_builder |> Ledger_builder.ledger )
       >>| fst
     in
     let responder = Sync_ledger.Responder.create ledger ignore in
