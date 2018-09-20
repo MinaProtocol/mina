@@ -630,8 +630,6 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Transition_tree = Ledger_builder_controller.Transition_tree
-
   module Proposer = Proposer.Make (struct
     include Inputs0
     module Ledger_builder_diff = Ledger_builder_diff
@@ -843,10 +841,6 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
-
-    module Transition_tree :
-      Coda.Ktree_intf
-      with type elem := Consensus_mechanism.External_transition.t
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -898,8 +892,6 @@ module type Main_intf = sig
 
   val create : Config.t -> t Deferred.t
 
-  val lbc_transition_tree : t -> Inputs.Transition_tree.t option
-
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
@@ -910,8 +902,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   open Inputs
 
   module For_tests = struct
-    let get_transition_tree t = lbc_transition_tree t
-
     let ledger_proof t = ledger_builder_ledger_proof t
   end
 
