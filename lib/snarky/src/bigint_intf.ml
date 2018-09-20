@@ -11,6 +11,8 @@ end
 module type Extended = sig
   include S
 
+  include Core_kernel.Binable.S with type t := t
+
   val to_field : t -> field
 
   val of_decimal_string : string -> t
