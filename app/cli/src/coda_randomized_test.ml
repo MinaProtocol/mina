@@ -31,19 +31,18 @@ struct
     Coda_worker_testnet.Api.run testnet log
       [ Wait 5.
       ; Stop 1
-      ; Send (0, 
-              Genesis_ledger.high_balance_sk, 
-              Genesis_ledger.low_balance_pk, 
-              10, 0)
+      ; Send
+          ( 0
+          , Genesis_ledger.high_balance_sk
+          , Genesis_ledger.low_balance_pk
+          , 10
+          , 0 )
       ; Wait 5.
       ; Start 1
-      ; Wait 20.
-      ]
+      ; Wait 20. ]
 
   let command =
-    Command.async_spec
-      ~summary:"Test of random behavior given a seed"
+    Command.async_spec ~summary:"Test of random behavior given a seed"
       Command.Spec.(empty)
       main
 end
-

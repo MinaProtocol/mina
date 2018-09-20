@@ -24,9 +24,15 @@ struct
       Coda_processes.local_configs n ~program_dir
         ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
     in
+    let config = List.nth_exn configs 2 in
+    let peers =
+      Host_and_port.create ~host:"1.1.1.1" ~port:8303 :: config.peers
+    in
+    let config = {config with peers} in
+    let configs = List.take configs 2 @ [config] in
     let%bind workers = Coda_processes.spawn_local_processes_exn configs in
     let _, _, expected_peers = Coda_processes.net_configs n in
-    let%bind _ = after (Time.Span.of_sec 10.) in
+    let%bind _ = after (Time.Span.of_sec 10000.) in
     Deferred.all_unit
       (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
            let%map peers = Coda_process.peers_exn worker in

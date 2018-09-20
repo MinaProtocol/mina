@@ -55,10 +55,7 @@ struct
 
     module Event = struct
       type t =
-        | Send of
-            int * Private_key.t *
-            Public_key.Compressed.t * int * 
-            int
+        | Send of int * Private_key.t * Public_key.Compressed.t * int * int
         | Start of int
         | Stop of int
         | Wait of float
@@ -70,21 +67,21 @@ struct
         | Event.Wait x -> after (Time.Span.of_sec x)
         | Stop i -> stop t i
         | Start i -> start t i
-        | Send (i, sender, receiver, amount, fee) -> 
-          send_transaction t i sender receiver (Currency.Amount.of_int amount) (Currency.Fee.of_int fee)
+        | Send (i, sender, receiver, amount, fee) ->
+            send_transaction t i sender receiver
+              (Currency.Amount.of_int amount)
+              (Currency.Fee.of_int fee)
       in
-      let rec go xs = 
-        match xs with 
-        | [] -> 
-          return ()
-        | e::xs -> 
-          Logger.info log !"Running: %{sexp: Event.t}" e;
-          let%bind () = e2fn e in
-          go xs
+      let rec go xs =
+        match xs with
+        | [] -> return ()
+        | e :: xs ->
+            Logger.info log !"Running: %{sexp: Event.t}" e ;
+            let%bind () = e2fn e in
+            go xs
       in
       let%map () = go events in
       Logger.info log "Done"
-
   end
 
   let start_prefix_check log workers events proposal_interval testnet =
