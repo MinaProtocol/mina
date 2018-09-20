@@ -33,17 +33,16 @@ kademlia:
 dht: kademlia
 
 build:
-ifeq ($(FORTESTNET),TRUE)
-	$(info INFO ensuring refusal to run when new version is out)
-	sed -i '/let force_updates = /c\let force_updates = true' app/cli/src/cli.ml
-else
-	$(info INFO will ignore new versions)
-	sed -i '/let force_updates = /c\let force_updates = false' app/cli/src/cli.ml
-endif
 	$(info Starting Build)
 	ulimit -s 65536
 	$(WRAP) env CODA_COMMIT_SHA1=$(shell git rev-parse HEAD) dune build
 	$(info Build complete)
+
+withupdates:
+	sed -i '/let force_updates = /c\let force_updates = true' app/cli/src/cli.ml
+
+withoutupdates:
+	sed -i '/let force_updates = /c\let force_updates = false' app/cli/src/cli.ml
 
 dev: docker container build
 
