@@ -213,11 +213,6 @@ module type Ledger_builder_controller_intf = sig
        t
     -> ledger_hash * sync_query
     -> (ledger_hash * sync_answer) Deferred.Or_error.t
-
-  (** For tests *)
-  module Transition_tree : Ktree_intf with type elem := external_transition
-
-  val transition_tree : t -> Transition_tree.t option
 end
 
 module type Proposer_intf = sig
@@ -434,9 +429,6 @@ module Make (Inputs : Inputs_intf) = struct
   let snark_pool t = t.snark_pool
 
   let peers t = Net.peers t.net
-
-  let lbc_transition_tree t =
-    Ledger_builder_controller.transition_tree t.ledger_builder
 
   let ledger_builder_ledger_proof t =
     let lb = best_ledger_builder t in
