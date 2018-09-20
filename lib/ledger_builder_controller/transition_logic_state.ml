@@ -5,14 +5,17 @@ module type S = sig
 
   type tip
 
+  type state_hash
+
   module Transition_tree :
-    Coda.Ktree_intf with type elem := external_transition
+    Coda.Ktree_intf
+    with type elem := (external_transition, state_hash) With_hash.t
 
   type t
 
-  val locked_tip : t -> tip
+  val locked_tip : t -> (tip, state_hash) With_hash.t
 
-  val longest_branch_tip : t -> tip
+  val longest_branch_tip : t -> (tip, state_hash) With_hash.t
 
   val ktree : t -> Transition_tree.t option
 
@@ -20,8 +23,8 @@ module type S = sig
 
   module Change : sig
     type t =
-      | Locked_tip of tip
-      | Longest_branch_tip of tip
+      | Locked_tip of (tip, state_hash) With_hash.t
+      | Longest_branch_tip of (tip, state_hash) With_hash.t
       | Ktree of Transition_tree.t
     [@@deriving sexp]
   end
@@ -29,7 +32,7 @@ module type S = sig
   val apply_all : t -> Change.t list -> t
   (** Invariant: Changes must be applied to atomically result in a consistent state *)
 
-  val create : tip -> t
+  val create : (tip, state_hash) With_hash.t -> t
 end
 
 module Make (Security : sig
@@ -39,16 +42,29 @@ end) (Transition : sig
 end) (Tip : sig
   type t [@@deriving sexp]
 
-  val assert_materialization_of : t -> Transition.t -> unit
+  type state_hash [@@deriving compare, sexp, bin_io]
+
+  val assert_materialization_of :
+       (t, state_hash) With_hash.t
+    -> (Transition.t, state_hash) With_hash.t
+    -> unit
 end) :
-  S with type tip := Tip.t and type external_transition := Transition.t =
+  S
+  with type tip := Tip.t
+   and type external_transition := Transition.t
+   and type state_hash := Tip.state_hash =
 struct
-  module Transition_tree = Ktree.Make (Transition) (Security)
+  module Transition_tree =
+    Ktree.Make (struct
+        type t = (Transition.t, Tip.state_hash) With_hash.t
+        [@@deriving compare, bin_io, sexp]
+      end)
+      (Security)
 
   module Change = struct
     type t =
-      | Locked_tip of Tip.t
-      | Longest_branch_tip of Tip.t
+      | Locked_tip of (Tip.t, Tip.state_hash) With_hash.t
+      | Longest_branch_tip of (Tip.t, Tip.state_hash) With_hash.t
       | Ktree of Transition_tree.t
     [@@deriving sexp]
   end
@@ -68,8 +84,8 @@ struct
    *    the root and longest_branch with Tip.t's.
    *)
   type t =
-    { locked_tip: Tip.t
-    ; longest_branch_tip: Tip.t
+    { locked_tip: (Tip.t, Tip.state_hash) With_hash.t
+    ; longest_branch_tip: (Tip.t, Tip.state_hash) With_hash.t
     ; ktree: Transition_tree.t option
     (* TODO: This impl assumes we have the original Ouroboros assumption. In
        order to work with the Praos assumption we'll need to keep a linked

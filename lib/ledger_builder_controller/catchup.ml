@@ -77,13 +77,19 @@ module type Inputs_intf = sig
              and type protocol_state_proof := Protocol_state_proof.t
              and type external_transition := External_transition.t
 
-    val assert_materialization_of : t -> External_transition.t -> unit
+    type state_hash
+
+    val assert_materialization_of :
+         (t, state_hash) With_hash.t
+      -> (External_transition.t, state_hash) With_hash.t
+      -> unit
   end
 
   module Transition_logic_state :
     Transition_logic_state.S
     with type tip := Tip.t
      and type external_transition := External_transition.t
+     and type state_hash := Tip.state_hash
 
   module Sync_ledger : sig
     type t
@@ -128,8 +134,14 @@ module Make (Inputs : Inputs_intf) = struct
     {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None}
 
   (* Perform the `Sync interruptible work *)
-  let do_sync {net; log; sl_ref} (state: Transition_logic_state.t) transition =
-    let locked_tip = Transition_logic_state.locked_tip state in
+  let do_sync {net; log; sl_ref} (state: Transition_logic_state.t)
+      transition_with_hash =
+    let {With_hash.data= locked_tip; hash= _} =
+      Transition_logic_state.locked_tip state
+    in
+    let {With_hash.data= transition; hash= transition_state_hash} =
+      transition_with_hash
+    in
     let snarked_ledger_hash = External_transition.ledger_hash transition in
     let h =
       External_transition.ledger_builder_hash transition
@@ -151,7 +163,9 @@ module Make (Inputs : Inputs_intf) = struct
       | Some sl -> sl
     in
     let open Interruptible.Let_syntax in
-    let ivar : External_transition.t Ivar.t = Ivar.create () in
+    let ivar : (External_transition.t, Tip.state_hash) With_hash.t Ivar.t =
+      Ivar.create ()
+    in
     Logger.debug log
       !"Attempting to catchup to ledger-hash %{sexp: Ledger_hash.t}"
       h ;
@@ -181,10 +195,14 @@ module Make (Inputs : Inputs_intf) = struct
                 Sync_ledger.destroy (!sl_ref |> Option.value_exn) ;
                 sl_ref := None ;
                 let new_tree =
-                  Transition_logic_state.Transition_tree.singleton transition
+                  Transition_logic_state.Transition_tree.singleton
+                    transition_with_hash
                 in
-                let new_tip = Tip.of_transition_and_lb transition lb in
-                Tip.assert_materialization_of new_tip transition ;
+                let new_tip =
+                  { With_hash.data= Tip.of_transition_and_lb transition lb
+                  ; hash= transition_state_hash }
+                in
+                Tip.assert_materialization_of new_tip transition_with_hash ;
                 Logger.debug log
                   !"Successfully caught up to full ledger-builder %{sexp: \
                     Ledger_builder_hash.t}"
@@ -210,6 +228,6 @@ module Make (Inputs : Inputs_intf) = struct
     in
     (work, ivar)
 
-  let sync (t: t) (state: Transition_logic_state.t) transition =
-    Job.create transition ~f:(do_sync t state)
+  let sync (t: t) (state: Transition_logic_state.t) transition_with_hash =
+    Job.create transition_with_hash ~f:(do_sync t state)
 end
