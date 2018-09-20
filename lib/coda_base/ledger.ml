@@ -1,7 +1,7 @@
 open Core
-open Import
 open Snark_params
 open Currency
+open Signature_lib
 
 module Make
     (Ledger : Merkle_ledger.Merkle_ledger_intf.S
@@ -137,32 +137,44 @@ struct
     apply_transaction_unchecked ledger (transaction :> Transaction.t)
 
   let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
+    let open Or_error.Let_syntax in
     match transfer with
     | One (pk, fee) ->
         let emptys, a, loc = get_or_create t pk in
-        set t loc {a with balance= modify_balance a.balance fee} ;
+        let%map balance = modify_balance a.balance fee in
+        set t loc {a with balance} ;
         emptys
     | Two ((pk1, fee1), (pk2, fee2)) ->
-        let emptys1, a1, l1 = get_or_create t pk1
-        and emptys2, a2, l2 = get_or_create t pk2 in
-        set t l1 {a1 with balance= modify_balance a1.balance fee1} ;
-        set t l2 {a2 with balance= modify_balance a2.balance fee2} ;
-        emptys1 @ emptys2
+        let emptys1, a1, l1 = get_or_create t pk1 in
+        if Public_key.Compressed.equal pk1 pk2 then (
+          let%bind fee = error_opt "overflow" (Fee.add fee1 fee2) in
+          let%map balance = modify_balance a1.balance fee in
+          set t l1 {a1 with balance} ;
+          emptys1 )
+        else
+          let emptys2, a2, l2 = get_or_create t pk1 in
+          let%bind balance1 = modify_balance a1.balance fee1 in
+          let%map balance2 = modify_balance a2.balance fee2 in
+          set t l1 {a1 with balance= balance1} ;
+          set t l2 {a2 with balance= balance2} ;
+          emptys1 @ emptys2
 
   let apply_fee_transfer t transfer =
-    let previous_empty_accounts =
+    let open Or_error.Let_syntax in
+    let%map previous_empty_accounts =
       process_fee_transfer t transfer ~modify_balance:(fun b f ->
-          Option.value_exn (Balance.add_amount b (Amount.of_fee f)) )
+          add_amount b (Amount.of_fee f) )
     in
-    Or_error.return {Undo.fee_transfer= transfer; previous_empty_accounts}
+    {Undo.fee_transfer= transfer; previous_empty_accounts}
 
   let undo_fee_transfer t
       ({previous_empty_accounts; fee_transfer}: Undo.fee_transfer) =
-    process_fee_transfer t fee_transfer ~modify_balance:(fun b f ->
-        Option.value_exn (Balance.sub_amount b (Amount.of_fee f)) )
-    |> ignore ;
-    remove_accounts_exn t previous_empty_accounts ;
-    Or_error.return ()
+    let open Or_error.Let_syntax in
+    let%map _ =
+      process_fee_transfer t fee_transfer ~modify_balance:(fun b f ->
+          sub_amount b (Amount.of_fee f) )
+    in
+    remove_accounts_exn t previous_empty_accounts
 
   (* TODO: Better system needed for making atomic changes. Could use a monad. *)
   let apply_coinbase t ({proposer; fee_transfer} as cb: Coinbase.t) =
@@ -177,6 +189,8 @@ struct
       match fee_transfer with
       | None -> return (Protocols.Coda_praos.coinbase_amount, [], None)
       | Some (receiver, fee) ->
+          (* This assertion will pass because of how coinbase super transactions are produced by Ledger_builder.apply_diff *)
+          assert (not @@ Public_key.Compressed.equal receiver proposer) ;
           let fee = Amount.of_fee fee in
           let%bind proposer_reward =
             error_opt "Coinbase fee transfer too large"
@@ -303,13 +317,23 @@ struct
     Or_error.ok_exn (undo_transaction ledger undo) ;
     root
 
-  let merkle_root_after_transactions t ts =
-    let undos_rev =
-      List.rev_map ts ~f:(fun txn -> Or_error.ok_exn (apply_transaction t txn))
+  let%test "apply fee transfer to the same account" =
+    let t = create () in
+    let {Keypair.public_key; _} = Signature_lib.Keypair.create () in
+    let public_key = Public_key.compress public_key in
+    let fee1 = 2 in
+    let fee2 = 5 in
+    let fee_transfer =
+      Fee_transfer.Two
+        ((public_key, fee1 |> Fee.of_int), (public_key, fee2 |> Fee.of_int))
     in
-    let root = merkle_root t in
-    List.iter undos_rev ~f:(fun u -> Or_error.ok_exn (undo_transaction t u)) ;
-    root
+    assert (apply_fee_transfer t fee_transfer |> Or_error.is_ok) ;
+    let _, account, _ = get_or_create t public_key in
+    let expected_account =
+      let balance = Balance.of_int (fee1 + fee2) in
+      {(Account.initialize public_key) with balance}
+    in
+    Account.equal expected_account account
 end
 
 module Ledger = struct
@@ -318,8 +342,6 @@ module Ledger = struct
               type t = Merkle_hash.t [@@deriving sexp, hash, compare, bin_io]
 
               let merge = Merkle_hash.merge
-
-              let empty = Merkle_hash.empty_hash
 
               let hash_account =
                 Fn.compose Merkle_hash.of_digest Account.digest
