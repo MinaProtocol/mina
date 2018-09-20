@@ -53,7 +53,8 @@ module Haskell_process = struct
       (Host_and_port.port addr)
 
   let filter_initial_peers initial_peers me =
-    List.filter initial_peers ~f:(fun peer -> Host_and_port.(peer <> fst me))
+    List.filter initial_peers ~f:(fun peer ->
+        not (Host_and_port.equal peer (fst me)) )
 
   let%test "filter_initial_peers_test" =
     let me = (Host_and_port.create ~host:"1.1.1.1" ~port:8000, 8001) in
