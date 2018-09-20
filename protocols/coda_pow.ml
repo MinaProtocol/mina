@@ -501,7 +501,7 @@ module type Tip_intf = sig
     { protocol_state: protocol_state
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 end

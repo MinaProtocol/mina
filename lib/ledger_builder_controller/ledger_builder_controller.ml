@@ -218,7 +218,7 @@ end = struct
       ; external_transitions:
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
-      ; disk_location: string }
+      ; longest_tip_location: string }
     [@@deriving make]
   end
 
@@ -390,6 +390,7 @@ end = struct
   type t =
     { ledger_builder_io: Net.t
     ; log: Logger.t
+    ; store_controller: Tip.t Store.Controller.t
     ; mutable handler: Transition_logic.t
     ; strongest_ledgers:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
@@ -401,11 +402,32 @@ end = struct
 
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
+  let load_tip (controller: Tip.t Store.Controller.t)
+      {Config.longest_tip_location; genesis_tip; _} log =
+    match%map Store.load controller longest_tip_location with
+    | Ok tip -> tip
+    | Error `No_exist -> genesis_tip
+    | Error (`IO_error e) ->
+        Logger.error log
+          !"IO error: %s\nUsing Genesis tip"
+          (Error.to_string_hum e) ;
+        genesis_tip
+    | Error `Checksum_no_match ->
+        Logger.error log
+          !"Checksum from location %s does not match with data\n\
+            Using Genesis tip"
+          longest_tip_location ;
+        genesis_tip
+
   let create (config: Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
+    let store_controller =
+      Store.Controller.create Tip.bin_t ~parent_log:config.parent_log
+    in
+    let%bind tip = load_tip store_controller config log in
     let state =
       Transition_logic_state.create
-        (With_hash.of_data config.genesis_tip ~hash_data:(fun tip ->
+        (With_hash.of_data tip ~hash_data:(fun tip ->
              tip.Tip.protocol_state |> Protocol_state.hash ))
     in
     let%map net = config.net_deferred in
@@ -418,7 +440,8 @@ end = struct
     in
     let t =
       { ledger_builder_io= net
-      ; log= Logger.child config.parent_log "ledger_builder_controller"
+      ; log
+      ; store_controller
       ; strongest_ledgers= strongest_ledgers_reader
       ; handler= Transition_logic.create state log }
     in
@@ -434,21 +457,24 @@ end = struct
              Transition_logic_state.apply_all old_state changes
            in
            t.handler <- Transition_logic.create new_state log ;
-           ( if
-               not
-                 (Protocol_state.equal_value
-                    ( old_state |> Transition_logic_state.longest_branch_tip
-                    |> With_hash.data |> Tip.state )
-                    ( new_state |> Transition_logic_state.longest_branch_tip
-                    |> With_hash.data |> Tip.state ))
-             then
-               let {With_hash.data= tip; hash= _} =
-                 Transition_logic_state.longest_branch_tip new_state
-               in
-               Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-                 strongest_ledgers_reader
-                 (tip.ledger_builder, transition) ) ;
-           Deferred.return () )) ;
+           if
+             not
+               (Protocol_state.equal_value
+                  ( old_state |> Transition_logic_state.longest_branch_tip
+                  |> With_hash.data |> Tip.state )
+                  ( new_state |> Transition_logic_state.longest_branch_tip
+                  |> With_hash.data |> Tip.state ))
+           then
+             let {With_hash.data= tip; hash= _} =
+               Transition_logic_state.longest_branch_tip new_state
+             in
+             let%map () =
+               Store.store store_controller config.longest_tip_location tip
+             in
+             Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
+               strongest_ledgers_reader
+               (tip.ledger_builder, transition)
+           else Deferred.return () )) ;
     (* Handle new transitions *)
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
@@ -512,6 +538,10 @@ end = struct
                 return (Some (current_transition_with_hash, this_ivar)) )
       >>| ignore ) ;
     t
+
+  module For_tests = struct
+    let load_tip t config = load_tip t.store_controller config t.log
+  end
 
   let strongest_ledgers {strongest_ledgers; _} = strongest_ledgers
 
@@ -808,7 +838,7 @@ let%test_module "test" =
           { protocol_state= Inputs.Protocol_state.genesis
           ; proof= ()
           ; ledger_builder= Inputs.Ledger_builder.create 0 }
-        ~disk_location:"/tmp/test_lbc_disk"
+        ~longest_tip_location:"/tmp/test_lbc_disk"
 
     let take_map ~f p cnt =
       let rec go acc cnt =
@@ -824,7 +854,7 @@ let%test_module "test" =
         ; (Async.after (Time.Span.of_sec 3.) >>| fun () -> failwith "Timeout")
         ]
 
-    let assert_strongest_ledgers lbc_deferred ~transitions:_ ~expected =
+    let assert_strongest_ledgers lbc_deferred ~expected =
       Backtrace.elide := false ;
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = lbc_deferred in
@@ -834,16 +864,27 @@ let%test_module "test" =
           in
           assert (List.equal results expected ~equal:Int.equal) )
 
+    let transitions =
+      let f = transition in
+      [f 1 0 1; f 2 1 2; f 3 0 1; f 4 0 1; f 5 2 3; f 6 1 2; f 7 5 4]
+
+    let%test_unit "Files get saved" =
+      Backtrace.elide := false ;
+      let config = config transitions in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          let%bind lbc = Lbc.create config in
+          let%bind _ =
+            take_map (Lbc.strongest_ledgers lbc) 4 ~f:(fun (lb, _) ->
+                let%map tip = Lbc.For_tests.load_tip lbc config in
+                assert (! (Inputs.Tip.ledger_builder tip) = !lb) )
+          in
+          Deferred.unit )
+
     let%test_unit "strongest_ledgers updates appropriately when new_states \
                    flow in within tree" =
       Backtrace.elide := false ;
-      let transitions =
-        let f = transition in
-        [f 1 0 1; f 2 1 2; f 3 0 1; f 4 0 1; f 5 2 3; f 6 1 2; f 7 5 4]
-      in
       let config = config transitions in
-      assert_strongest_ledgers (Lbc.create config) ~transitions
-        ~expected:[1; 2; 5; 7]
+      assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
 
     let%test_unit "strongest_ledgers updates appropriately using the network" =
       Backtrace.elide := false ;
@@ -859,14 +900,10 @@ let%test_module "test" =
       in
       let config = config transitions in
       let lbc_deferred = Lbc.create config in
-      assert_strongest_ledgers lbc_deferred ~transitions ~expected:[1; 2; 3; 5]
+      assert_strongest_ledgers lbc_deferred ~expected:[1; 2; 3; 5]
 
     let%test_unit "local_get_ledger can materialize a ledger locally" =
       Backtrace.elide := false ;
-      let transitions =
-        let f = transition in
-        [f 1 0 1; f 2 1 2; f 3 0 1; f 4 0 1; f 5 2 3; f 6 1 2; f 7 5 4]
-      in
       let config = config transitions in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = Lbc.create config in
