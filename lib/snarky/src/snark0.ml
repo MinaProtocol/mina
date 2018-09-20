@@ -136,37 +136,13 @@ module Make_basic (Backend : Backend_intf.S) = struct
     let of_string s =
       Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.of_string s))
 
-    include Binable.Of_binable (Bigstring)
+    include Binable.Of_binable (Bigint)
               (struct
                 type t = Field.t
 
-                let ( /^ ) x y = Float.(to_int (round_up (x // y)))
+                let to_binable = Bigint.of_field
 
-                let size_in_bytes = size_in_bits /^ 8
-
-                (* Someday: There should be a more efficient way of doing
-          this since bigints are backed by a char[] *)
-                let to_binable x =
-                  let n = Bigint.of_field x in
-                  let b i j =
-                    if Bigint.test_bit n ((8 * i) + j) then 1 lsl j else 0
-                  in
-                  Bigstring.init size_in_bytes ~f:(fun i ->
-                      Char.of_int_exn
-                        (let i = size_in_bytes - 1 - i in
-                         b i 0 lor b i 1 lor b i 2 lor b i 3 lor b i 4
-                         lor b i 5 lor b i 6 lor b i 7) )
-
-                let of_binable =
-                  Fn.compose Bigint.to_field Bigint.of_bignum_bigint
-
-                (* Someday:
-          This/the reader can definitely be made more efficient as well.
-          bin_read should probably be in C. *)
-                let of_binable s =
-                  Bigstring.to_string ~len:size_in_bytes ~pos:0 s
-                  |> Bigint.of_numeral ~base:256
-                  |> Bigint.to_field
+                let of_binable = Bigint.to_field
               end)
 
     module Infix = struct
