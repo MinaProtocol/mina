@@ -25,10 +25,16 @@ let load_with_checksum (c: 'a Controller.t) location =
 let load c location =
   Deferred.Result.map (load_with_checksum c location) ~f:(fun t -> t.data)
 
-let store_with_checksum (c: 'a Controller.t) location data =
+let atomic_write (c: 'a Controller.t) location data =
+  let temp_location = location ^ ".temp" in
   let t = wrap c.tc data in
-  Writer.save_bin_prot location (bin_writer_t c.tc.writer) t
-  >>| fun () -> t.checksum
+  let%bind () =
+    Writer.save_bin_prot temp_location (bin_writer_t c.tc.writer) t
+  in
+  let%map () = Sys.rename temp_location location in
+  t
 
-let store (c: 'a Controller.t) location data =
-  Writer.save_bin_prot location (bin_writer_t c.tc.writer) (wrap c.tc data)
+let store_with_checksum (c: 'a Controller.t) location data =
+  atomic_write c location data >>| fun t -> t.checksum
+
+let store c location data = atomic_write c location data |> Deferred.ignore
