@@ -1,3 +1,5 @@
+(jbuild_version 1)
+
 (library
  ((name snarky)
   (public_name snarky)
@@ -11,6 +13,3 @@
       (-I re2_c/libre2)
       ))
   (preprocess (pps (ppx_jane ppx_deriving.enum ppx_deriving.eq)))))
-
-(jbuild_version 1)
-
