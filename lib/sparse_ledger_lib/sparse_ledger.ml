@@ -14,7 +14,7 @@ type ('hash, 'key, 'account) t =
   ; tree: ('hash, 'account) tree }
 [@@deriving bin_io, sexp]
 
-let tree { tree; _ } = tree
+let tree {tree; _} = tree
 
 module type S = sig
   type hash

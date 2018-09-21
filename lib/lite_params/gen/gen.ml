@@ -51,40 +51,43 @@ let wrap_vk ~loc =
                    (module Snarkette.Mnt6.Groth_maller.Verification_key)
                    vk))])]
 
-module Proof_of_signature = Consensus.Proof_of_signature.Make(struct
-    module Time = Coda_base.Block_time
-    let proposal_interval = Time.Span.of_ms Int64.zero
-    module Ledger_builder_diff = Unit
-  end)
+module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
+  module Time = Coda_base.Block_time
 
-let protocol_state (s : Proof_of_signature.Protocol_state.value) : Lite_base.Protocol_state.t =
+  let proposal_interval = Time.Span.of_ms Int64.zero
+
+  module Ledger_builder_diff = Unit
+end)
+
+let protocol_state (s: Proof_of_signature.Protocol_state.value) :
+    Lite_base.Protocol_state.t =
   let open Proof_of_signature in
   let consensus_state =
     Protocol_state.consensus_state s
     |> Option.value_exn Consensus_state.to_lite
   in
-  { Lite_base.Protocol_state.previous_state_hash =
+  { Lite_base.Protocol_state.previous_state_hash=
       Lite_compat.digest
-        (Protocol_state.previous_state_hash s :> Snark_params.Tick.Pedersen.Digest.t)
-  ; blockchain_state =
+        ( Protocol_state.previous_state_hash s
+          :> Snark_params.Tick.Pedersen.Digest.t )
+  ; blockchain_state=
       Lite_compat.blockchain_state (Protocol_state.blockchain_state s)
-  ; consensus_state
-  }
+  ; consensus_state }
 
 let genesis ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
-  let protocol_state = protocol_state Proof_of_signature.genesis_protocol_state in
+  let protocol_state =
+    protocol_state Proof_of_signature.genesis_protocol_state
+  in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0
       protocol_state.blockchain_state.ledger_builder_hash.ledger_hash
   in
-  let proof =
-    Lite_compat.proof Precomputed_values.base_proof
-  in
-  let chain = { Lite_base.Lite_chain.protocol_state; ledger; proof } in
+  let proof = Lite_compat.proof Precomputed_values.base_proof in
+  let chain = {Lite_base.Lite_chain.protocol_state; ledger; proof} in
   [%expr
     Core_kernel.Binable.of_string
       (module Lite_base.Lite_chain)
@@ -92,9 +95,7 @@ let genesis ~loc =
          [%e
            estring
              (B64.encode
-                (Binable.to_string
-                   (module Lite_base.Lite_chain)
-                   chain))])]
+                (Binable.to_string (module Lite_base.Lite_chain) chain))])]
 
 open Async
 

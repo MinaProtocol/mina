@@ -24,20 +24,18 @@ end = struct
 
   let to_bytes x =
     let n = num_bits x in
-    let num_bytes = (n+7)/8 in
+    let num_bytes = (n + 7) / 8 in
     String.init num_bytes ~f:(fun byte ->
-      let c i =
-        let bit = 8 * byte + i in
-        if test_bit x bit
-        then 1 lsl i
-        else 0
-      in
-      Char.of_int_exn (c 0 lor c 1 lor c 2 lor c 3 lor c 4 lor c 5 lor c 6 lor c 7))
+        let c i =
+          let bit = (8 * byte) + i in
+          if test_bit x bit then 1 lsl i else 0
+        in
+        Char.of_int_exn
+          (c 0 lor c 1 lor c 2 lor c 3 lor c 4 lor c 5 lor c 6 lor c 7) )
 
   let of_bytes x =
     String.foldi x ~init:Big_int.zero_big_int ~f:(fun i acc c ->
-      log_or acc
-        (shift_left (of_int (Char.to_int c)) (8 * i)))
+        log_or acc (shift_left (of_int (Char.to_int c)) (8 * i)) )
 
   let ( + ) = Big_int.add_big_int
 
@@ -60,14 +58,18 @@ end = struct
 
     let to_string = Big_int.string_of_big_int
   end
+
   include Sexpable.Of_stringable (String_hum)
+
   include (String_hum : Stringable.S with type t := t)
 
   include Binable.Of_stringable (struct
-      type nonrec t = t
-      let of_string = of_bytes
-      let to_string = to_bytes
-    end)
+    type nonrec t = t
+
+    let of_string = of_bytes
+
+    let to_string = to_bytes
+  end)
 end
 
 open Fields

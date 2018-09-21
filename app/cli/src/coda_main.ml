@@ -1088,9 +1088,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                         (B64.encode
                            (Binable.to_string
                               (module Lite_base.Lite_chain)
-                              (get_lite_chain coda
-                                 [ merkle_path_pk
-                                 ]))) )
+                              (get_lite_chain coda [merkle_path_pk]))) )
                 | "/status" ->
                     Server.respond_string
                       ( get_status coda |> Client_lib.Status.to_yojson
