@@ -110,7 +110,7 @@ struct
     let query =
       let stub =
         foreign
-          (with_prefix Prefix.prefix "gm_verification_key_query")
+          (with_prefix Prefix.prefix "gm_verification_key_other_query")
           ( Other_curve.Verification_key.typ
           @-> returning Inner_curve.Vector.typ )
       in
