@@ -191,12 +191,12 @@ let read_keypair_exn privkey_path ~password =
     ( Secret_box.decrypt_exn ~password sb
     |> Bigstring.of_bytes |> Private_key.of_bigstring_exn )
 
-let prompt_password prompt =
+let rec prompt_password prompt =
   let%bind pw1 = read_password_exn prompt in
-  let%bind pw2 = read_password_exn "Again to confirm:" in
+  let%bind pw2 = read_password_exn "Again to confirm: " in
   if not (Bytes.equal pw1 pw2) then (
     eprintf "Error: passwords don't match, try again\n" ;
-    exit 1 )
+    prompt_password prompt )
   else return pw2
 
 let privkey_path_flag =
