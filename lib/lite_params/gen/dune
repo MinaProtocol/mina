@@ -10,6 +10,7 @@
       snark_keys
       coda_base
       lite_compat
+      precomputed_values
     )
    (preprocess (pps ppx_jane ppxlib.metaquot ppxlib.runner))
    (modes native)
