@@ -6,8 +6,13 @@ open Signature_lib
 
 module Global_public_key = struct
   let compressed =
-    Public_key.Compressed.of_base64_exn
-      "KA0mFlIh+GxTxmv22OLTSuKS+7by7RFp1wBPdQnlxmCA/GaZf+8AAAAB"
+    match Signer_private_key.mode with
+    | `Dev ->
+        Public_key.Compressed.of_base64_exn
+          "KA0mFlIh+GxTxmv22OLTSuKS+7by7RFp1wBPdQnlxmCA/GaZf+8AAAAB"
+    | `Prod ->
+        Public_key.Compressed.of_base64_exn
+          "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
 
   let t = Public_key.decompress_exn compressed
 end
@@ -59,12 +64,9 @@ struct
         ~value_of_hlist:of_hlist
 
     let create_value blockchain_state =
-      match Signer_private_key.signer_private_key with
-      | None ->
-          failwith "This build was not compiled with the signer private key. "
-      | Some private_key ->
-          { signature=
-              Blockchain_state.Signature.sign private_key blockchain_state }
+      { signature=
+          Blockchain_state.Signature.sign Signer_private_key.signer_private_key
+            blockchain_state }
 
     let genesis = create_value Blockchain_state.genesis
   end
