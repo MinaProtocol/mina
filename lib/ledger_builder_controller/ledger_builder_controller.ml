@@ -450,6 +450,10 @@ end = struct
       ; handler= Transition_logic.create state log }
     in
     let mutate_state_reader, mutate_state_writer = Linear_pipe.create () in
+    let store_tip_reader, store_tip_writer = Linear_pipe.create () in
+    don't_wait_for
+      (Linear_pipe.iter store_tip_reader ~f:(fun tip ->
+           Store.store store_controller config.longest_tip_location tip )) ;
     (* The mutation "thread" *)
     don't_wait_for
       (Linear_pipe.iter mutate_state_reader ~f:(fun (changes, transition) ->
@@ -468,16 +472,16 @@ end = struct
                   |> With_hash.data |> Tip.state )
                   ( new_state |> Transition_logic_state.longest_branch_tip
                   |> With_hash.data |> Tip.state ))
-           then
+           then (
              let {With_hash.data= tip; hash= _} =
                Transition_logic_state.longest_branch_tip new_state
              in
-             let%map () =
-               Store.store store_controller config.longest_tip_location tip
-             in
-             Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-               strongest_ledgers_reader
-               (tip.ledger_builder, transition)
+             Linear_pipe.force_write_maybe_drop_head ~capacity:1
+               store_tip_writer store_tip_reader tip ;
+             Deferred.return
+             @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
+                  strongest_ledgers_reader
+                  (tip.ledger_builder, transition) )
            else Deferred.return () )) ;
     (* Handle new transitions *)
     let possibly_jobs =
@@ -920,20 +924,19 @@ let%test_module "test" =
 
     module Lbc_disk = Make_test (Storage.Disk)
 
-    let%test_unit "Files get saved periodically" =
+    let%test_unit "Files get saved" =
       Backtrace.elide := false ;
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dirs [Lbc_disk.temp_folder] ~f:(fun () ->
               let config = Lbc_disk.config Lbc_disk.transitions in
               let%bind lbc = Lbc_disk.create config in
-              let%bind _ =
-                Lbc_disk.take_map (Lbc_disk.strongest_ledgers lbc) 4 ~f:
-                  (fun (lb, _) ->
-                    let%map tip = Lbc_disk.For_tests.load_tip lbc config in
-                    assert (! (Lbc_disk.Inputs.Tip.ledger_builder tip) = !lb)
-                )
+              let%bind () = after (Time.Span.of_sec 3.0) in
+              let%map tip = Lbc_disk.For_tests.load_tip lbc config in
+              let lb =
+                Lbc_disk.strongest_tip lbc
+                |> Lbc_disk.Inputs.Tip.ledger_builder
               in
-              Deferred.unit ) )
+              assert (! (Lbc_disk.Inputs.Tip.ledger_builder tip) = !lb) ) )
 
     let%test_unit "Continue from last file" =
       Backtrace.elide := false ;
