@@ -150,8 +150,7 @@ let get_nonce addr port =
 let get_nonce_cmd =
   let open Command.Param in
   let address_flag =
-    flag "address"
-      ~doc:"PUBLICKEY Public-key address you want the nonce for"
+    flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
       (required public_key)
   in
   Command.async ~summary:"Send transaction to an address"
@@ -161,8 +160,8 @@ let get_nonce_cmd =
              eprintf "Failed to get nonce: %s\n" e ;
              exit 1
          | Ok nonce ->
-          printf "%s\n" (Account.Nonce.to_string nonce) ;
-                 exit 0 ))
+             printf "%s\n" (Account.Nonce.to_string nonce) ;
+             exit 0 ))
 
 let status =
   let open Deferred.Let_syntax in
