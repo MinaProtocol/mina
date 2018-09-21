@@ -153,7 +153,7 @@ let get_nonce_cmd =
     flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
       (required public_key)
   in
-  Command.async ~summary:"Send transaction to an address"
+  Command.async ~summary:"Get the current nonce for an account"
     (Daemon_cli.init address_flag ~f:(fun port address ->
          match%bind get_nonce address port with
          | Error e ->
