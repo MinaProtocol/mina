@@ -211,21 +211,43 @@ let write_keypair {Keypair.private_key; public_key; _} privkey_path ~password =
   Deferred.unit
 
 let read_keypair_exn privkey_path ~password =
+  let open Deferred.Let_syntax in
   let read_all r =
-    let open Deferred in
     Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss
   in
   let%bind privkey_file =
     handle_open ~mkdir:false ~f:Reader.open_file privkey_path
   in
-  let%map file_contents = read_all privkey_file in
-  let sb =
-    Secret_box.of_yojson (Yojson.Safe.from_string file_contents)
-    |> Result.ok_or_failwith
+  let%bind file_contents = read_all privkey_file in
+  let%bind sb =
+    match Secret_box.of_yojson (Yojson.Safe.from_string file_contents) with
+    | Ok sb -> return sb
+    | Error e ->
+        eprintf "Error parsing %s, is your keyfile corrupt?: %s\n" privkey_path
+          e ;
+        exit 1
   in
-  Keypair.of_private_key_exn
-    ( Secret_box.decrypt_exn ~password sb
-    |> Bigstring.of_bytes |> Private_key.of_bigstring_exn )
+  let%bind pk =
+    match Secret_box.decrypt ~password sb with
+    | Ok pk_bytes -> (
+      try
+        pk_bytes |> Bigstring.of_bytes |> Private_key.of_bigstring_exn
+        |> return
+      with exn ->
+        eprintf
+          "Error parsing decrypted private key, is your keyfile corrupt?: %s\n"
+          (Exn.to_string exn) ;
+        exit 1 )
+    | Error e ->
+        eprintf "Error decrypting %s: %s\n" privkey_path
+          (Error.to_string_hum e) ;
+        exit 1
+  in
+  try return @@ Keypair.of_private_key_exn pk with exn ->
+    eprintf
+      "Error computing public key from private, is your keyfile corrupt?: %s\n"
+      (Exn.to_string exn) ;
+    exit 1
 
 let rec prompt_password prompt =
   let%bind pw1 = read_password_exn prompt in
@@ -282,9 +304,7 @@ let send_txn =
              (st.perm land 0o777) ;
            perm_error := true ) ;
          let%bind () = if !perm_error then exit 1 else Deferred.unit in
-         let%bind privkey_pass =
-           Cli_lib.read_password_exn "Private key password: "
-         in
+         let%bind privkey_pass = read_password_exn "Private key password: " in
          let%bind sender_kp = read_keypair_exn from_account privkey_pass in
          match%bind get_nonce sender_kp.public_key port with
          | Error e ->
@@ -349,6 +369,9 @@ let generate_keypair =
         prompt_password "Password for new private key file: "
       in
       let%bind () = write_keypair kp privkey_path ~password in
+      printf "Public key: %s\n"
+        ( kp.public_key |> Public_key.compress
+        |> Public_key.Compressed.to_base64 ) ;
       exit 0)
 
 let command =

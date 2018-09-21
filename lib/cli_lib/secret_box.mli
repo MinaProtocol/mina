@@ -8,4 +8,4 @@ end
 
 val encrypt : password:Bytes.t -> plaintext:Bytes.t -> t
 
-val decrypt_exn : password:Bytes.t -> t -> Bytes.t
+val decrypt : password:Bytes.t -> t -> Bytes.t Core.Or_error.t
