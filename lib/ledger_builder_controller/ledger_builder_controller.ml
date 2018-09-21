@@ -406,7 +406,11 @@ end = struct
       {Config.longest_tip_location; genesis_tip; _} log =
     match%map Store.load controller longest_tip_location with
     | Ok tip -> tip
-    | Error `No_exist -> genesis_tip
+    | Error `No_exist ->
+        Logger.trace log
+          "File for ledger builder controller tip does not exist. Using \
+           Genesis tip" ;
+        genesis_tip
     | Error (`IO_error e) ->
         Logger.error log
           !"IO error: %s\nUsing Genesis tip"
@@ -602,244 +606,256 @@ end
 
 let%test_module "test" =
   ( module struct
-    module Inputs = struct
-      module Security = struct
-        let max_depth = `Finite 50
-      end
+    open Core
+    open Async
 
-      module Ledger_hash = Int
-      module Frozen_ledger_hash = Int
-
-      module Ledger_builder_hash = struct
-        include Int
-
-        let ledger_hash = Fn.id
-      end
-
-      (* A ledger_builder transition will just add to a "ledger" integer *)
-      module Ledger_builder_diff = Int
-
-      module Ledger = struct
-        include Int
-
-        let merkle_root t = t
-
-        let copy t = t
-      end
-
-      module Ledger_builder_aux_hash = struct
-        type t = int [@@deriving sexp]
-      end
-
-      module Ledger_builder = struct
-        type t = int ref [@@deriving sexp, bin_io]
-
-        module Aux = struct
-          type t = int [@@deriving bin_io]
-
-          let hash t = t
+    module Make_test (Store : Storage.With_checksum_intf) = struct
+      module Inputs = struct
+        module Security = struct
+          let max_depth = `Finite 50
         end
 
-        type proof = ()
+        module Ledger_hash = Int
+        module Frozen_ledger_hash = Int
 
-        let ledger t = !t
+        module Ledger_builder_hash = struct
+          include Int
 
-        let create x = ref x
-
-        let copy t = ref !t
-
-        let hash t = !t
-
-        let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
-          Ok (create ledger)
-
-        let aux t = !t
-
-        let apply (t: t) (x: Ledger_builder_diff.t) =
-          t := x ;
-          return (Ok (Some (x, ())))
-      end
-
-      module State_hash = struct
-        include Int
-
-        let to_bits t = [t <> 0]
-      end
-
-      module Protocol_state_proof = Unit
-
-      module Blockchain_state = struct
-        type t =
-          { ledger_builder_hash: Ledger_builder_hash.t
-          ; ledger_hash: Ledger_hash.t }
-        [@@deriving eq, sexp, fields, bin_io, compare]
-
-        type value = t [@@deriving eq, sexp, bin_io, compare]
-      end
-
-      module Consensus_mechanism_state = struct
-        type value = {strength: int} [@@deriving eq, sexp, bin_io, compare]
-      end
-
-      module Protocol_state = struct
-        type t =
-          { previous_state_hash: State_hash.t
-          ; blockchain_state: Blockchain_state.value
-          ; consensus_state: Consensus_mechanism_state.value }
-        [@@deriving eq, sexp, fields, bin_io, compare]
-
-        type value = t [@@deriving sexp, bin_io, eq, compare]
-
-        let hash t = t.blockchain_state.ledger_builder_hash
-
-        let create_value ~previous_state_hash ~blockchain_state
-            ~consensus_state =
-          {previous_state_hash; blockchain_state; consensus_state}
-
-        let genesis =
-          { previous_state_hash= -1
-          ; blockchain_state= {ledger_builder_hash= 0; ledger_hash= 0}
-          ; consensus_state= {strength= 0} }
-      end
-
-      module External_transition = struct
-        include Protocol_state
-
-        let protocol_state = Fn.id
-
-        let of_state = Fn.id
-
-        let ledger_builder_diff = Protocol_state.hash
-
-        let protocol_state_proof _ = ()
-      end
-
-      module Consensus_mechanism = struct
-        module Consensus_state = Consensus_mechanism_state
-
-        let select Consensus_state.({strength= s1})
-            Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
-          if s1 >= s2 then `Keep else `Take
-      end
-
-      module Tip = struct
-        type t =
-          { protocol_state: Protocol_state.value
-          ; proof: Protocol_state_proof.t
-          ; ledger_builder: Ledger_builder.t }
-        [@@deriving bin_io, sexp, fields]
-
-        let of_transition_and_lb transition ledger_builder =
-          { protocol_state= External_transition.protocol_state transition
-          ; proof= External_transition.protocol_state_proof transition
-          ; ledger_builder }
-      end
-
-      module Internal_transition = External_transition
-      (* Not sure if we even need this *)
-      module Valid_transaction = Int
-
-      module Net = struct
-        type t = Protocol_state.value State_hash.Table.t
-
-        type net = Protocol_state.value list
-
-        let create states =
-          let tbl = State_hash.Table.create () in
-          List.iter states ~f:(fun s ->
-              State_hash.Table.add_exn tbl ~key:(Protocol_state.hash s) ~data:s
-          ) ;
-          tbl
-
-        let get_ledger_builder_aux_at_hash _t hash = return (Ok hash)
-
-        let glue_sync_ledger _t q a =
-          don't_wait_for
-            (Linear_pipe.iter q ~f:(fun (h, _) -> Linear_pipe.write a (h, h)))
-      end
-
-      module Sync_ledger = struct
-        type answer = Ledger.t [@@deriving bin_io]
-
-        type query = unit [@@deriving bin_io]
-
-        module Responder = struct
-          type t = unit
-
-          let create _ = failwith "unused"
-
-          let answer_query _ = failwith "unused"
+          let ledger_hash = Fn.id
         end
 
-        type t =
-          { mutable ledger: Ledger.t
-          ; answer_pipe:
-              (Ledger_hash.t * answer) Linear_pipe.Reader.t
-              * (Ledger_hash.t * answer) Linear_pipe.Writer.t
-          ; query_pipe:
-              (Ledger_hash.t * query) Linear_pipe.Reader.t
-              * (Ledger_hash.t * query) Linear_pipe.Writer.t }
+        (* A ledger_builder transition will just add to a "ledger" integer *)
+        module Ledger_builder_diff = Int
 
-        let create ledger ~parent_log:_ =
-          let t =
-            { ledger
-            ; answer_pipe= Linear_pipe.create ()
-            ; query_pipe= Linear_pipe.create () }
-          in
-          don't_wait_for
-            (Linear_pipe.iter (fst t.answer_pipe) ~f:(fun (h, _l) ->
-                 t.ledger <- h ;
-                 Deferred.return () )) ;
-          t
+        module Ledger = struct
+          include Int
 
-        let answer_writer {answer_pipe; _} = snd answer_pipe
+          let merkle_root t = t
 
-        let query_reader {query_pipe; _} = fst query_pipe
+          let copy t = t
+        end
 
-        let destroy _t = ()
+        module Ledger_builder_aux_hash = struct
+          type t = int [@@deriving sexp]
+        end
 
-        let fetch _t h = return (`Ok h)
+        module Ledger_builder = struct
+          type t = int ref [@@deriving sexp, bin_io]
+
+          module Aux = struct
+            type t = int [@@deriving bin_io]
+
+            let hash t = t
+          end
+
+          type proof = ()
+
+          let ledger t = !t
+
+          let create x = ref x
+
+          let copy t = ref !t
+
+          let hash t = !t
+
+          let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
+            Ok (create ledger)
+
+          let aux t = !t
+
+          let apply (t: t) (x: Ledger_builder_diff.t) =
+            t := x ;
+            return (Ok (Some (x, ())))
+        end
+
+        module State_hash = struct
+          include Int
+
+          let to_bits t = [t <> 0]
+        end
+
+        module Protocol_state_proof = Unit
+
+        module Blockchain_state = struct
+          type t =
+            { ledger_builder_hash: Ledger_builder_hash.t
+            ; ledger_hash: Ledger_hash.t }
+          [@@deriving eq, sexp, fields, bin_io, compare]
+
+          type value = t [@@deriving eq, sexp, bin_io, compare]
+        end
+
+        module Consensus_mechanism_state = struct
+          type value = {strength: int} [@@deriving eq, sexp, bin_io, compare]
+        end
+
+        module Protocol_state = struct
+          type t =
+            { previous_state_hash: State_hash.t
+            ; blockchain_state: Blockchain_state.value
+            ; consensus_state: Consensus_mechanism_state.value }
+          [@@deriving eq, sexp, fields, bin_io, compare]
+
+          type value = t [@@deriving sexp, bin_io, eq, compare]
+
+          let hash t = t.blockchain_state.ledger_builder_hash
+
+          let create_value ~previous_state_hash ~blockchain_state
+              ~consensus_state =
+            {previous_state_hash; blockchain_state; consensus_state}
+
+          let genesis =
+            { previous_state_hash= -1
+            ; blockchain_state= {ledger_builder_hash= 0; ledger_hash= 0}
+            ; consensus_state= {strength= 0} }
+        end
+
+        module External_transition = struct
+          include Protocol_state
+
+          let protocol_state = Fn.id
+
+          let of_state = Fn.id
+
+          let ledger_builder_diff = Protocol_state.hash
+
+          let protocol_state_proof _ = ()
+        end
+
+        module Consensus_mechanism = struct
+          module Consensus_state = Consensus_mechanism_state
+
+          let select Consensus_state.({strength= s1})
+              Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
+            if s1 >= s2 then `Keep else `Take
+        end
+
+        module Tip = struct
+          type t =
+            { protocol_state: Protocol_state.value
+            ; proof: Protocol_state_proof.t
+            ; ledger_builder: Ledger_builder.t }
+          [@@deriving bin_io, sexp, fields]
+
+          let of_transition_and_lb transition ledger_builder =
+            { protocol_state= External_transition.protocol_state transition
+            ; proof= External_transition.protocol_state_proof transition
+            ; ledger_builder }
+        end
+
+        module Internal_transition = External_transition
+        (* Not sure if we even need this *)
+        module Valid_transaction = Int
+
+        module Net = struct
+          type t = Protocol_state.value State_hash.Table.t
+
+          type net = Protocol_state.value list
+
+          let create states =
+            let tbl = State_hash.Table.create () in
+            List.iter states ~f:(fun s ->
+                State_hash.Table.add_exn tbl ~key:(Protocol_state.hash s)
+                  ~data:s ) ;
+            tbl
+
+          let get_ledger_builder_aux_at_hash _t hash = return (Ok hash)
+
+          let glue_sync_ledger _t q a =
+            don't_wait_for
+              (Linear_pipe.iter q ~f:(fun (h, _) -> Linear_pipe.write a (h, h)))
+        end
+
+        module Sync_ledger = struct
+          type answer = Ledger.t [@@deriving bin_io]
+
+          type query = unit [@@deriving bin_io]
+
+          module Responder = struct
+            type t = unit
+
+            let create _ = failwith "unused"
+
+            let answer_query _ = failwith "unused"
+          end
+
+          type t =
+            { mutable ledger: Ledger.t
+            ; answer_pipe:
+                (Ledger_hash.t * answer) Linear_pipe.Reader.t
+                * (Ledger_hash.t * answer) Linear_pipe.Writer.t
+            ; query_pipe:
+                (Ledger_hash.t * query) Linear_pipe.Reader.t
+                * (Ledger_hash.t * query) Linear_pipe.Writer.t }
+
+          let create ledger ~parent_log:_ =
+            let t =
+              { ledger
+              ; answer_pipe= Linear_pipe.create ()
+              ; query_pipe= Linear_pipe.create () }
+            in
+            don't_wait_for
+              (Linear_pipe.iter (fst t.answer_pipe) ~f:(fun (h, _l) ->
+                   t.ledger <- h ;
+                   Deferred.return () )) ;
+            t
+
+          let answer_writer {answer_pipe; _} = snd answer_pipe
+
+          let query_reader {query_pipe; _} = fst query_pipe
+
+          let destroy _t = ()
+
+          let fetch _t h = return (`Ok h)
+        end
+
+        module Store = Store
+
+        let verify_blockchain _ _ = Deferred.Or_error.return true
       end
 
-      module Store = Storage.Memory
+      include Make (Inputs)
 
-      let verify_blockchain _ _ = Deferred.Or_error.return true
-    end
+      let slowly_pipe_of_list xs =
+        let r, w = Linear_pipe.create () in
+        don't_wait_for
+          (Deferred.List.iter xs ~f:(fun x ->
+               (* Without the wait here, we get interrupted before doing anything interesting *)
+               let%bind () = after (Time.Span.of_ms 100.) in
+               let time =
+                 Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
+                 |> Unix_timestamp.of_float
+               in
+               Linear_pipe.write w (x, time) )) ;
+        r
 
-    module Lbc = Make (Inputs)
+    let temp_folder = "~/temp"
 
-    let transition x parent strength =
-      { Inputs.Protocol_state.previous_state_hash= parent
-      ; blockchain_state= {ledger_builder_hash= x; ledger_hash= x}
-      ; consensus_state= {strength} }
+    let storage = "test_lbc_disk"
 
-    let slowly_pipe_of_list xs =
-      let r, w = Linear_pipe.create () in
-      don't_wait_for
-        (Deferred.List.iter xs ~f:(fun x ->
-             (* Without the wait here, we get interrupted before doing anything interesting *)
-             let%bind () = after (Time_ns.Span.of_ms 100.) in
-             let time =
-               Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
-               |> Unix_timestamp.of_float
-             in
-             Linear_pipe.write w (x, time) )) ;
-      r
+      let config transitions =
+        let ledger_builder_transitions = slowly_pipe_of_list transitions in
+        let net_input = transitions in
+        Config.make ~parent_log:(Logger.create ())
+          ~net_deferred:(return net_input)
+          ~external_transitions:
+            (Linear_pipe.map ledger_builder_transitions
+               ~f:Inputs.External_transition.of_state)
+          ~genesis_tip:
+            { protocol_state= Inputs.Protocol_state.genesis
+            ; proof= ()
+            ; ledger_builder= Inputs.Ledger_builder.create 0 }
+          ~longest_tip_location:(temp_folder ^/ storage)
 
-    let config transitions =
-      let ledger_builder_transitions = slowly_pipe_of_list transitions in
-      let net_input = transitions in
-      Lbc.Config.make ~parent_log:(Logger.create ())
-        ~net_deferred:(return net_input)
-        ~external_transitions:
-          (Linear_pipe.map ledger_builder_transitions
-             ~f:Inputs.External_transition.of_state)
-        ~genesis_tip:
-          { protocol_state= Inputs.Protocol_state.genesis
-          ; proof= ()
-          ; ledger_builder= Inputs.Ledger_builder.create 0 }
-        ~longest_tip_location:"/tmp/test_lbc_disk"
+      let transition x parent strength =
+        { Inputs.Protocol_state.previous_state_hash= parent
+        ; blockchain_state= {ledger_builder_hash= x; ledger_hash= x}
+        ; consensus_state= {strength} }
 
+      let transitions =
+        let f = transition in
+        [f 1 0 1; f 2 1 2; f 3 0 1; f 4 0 1; f 5 2 3; f 6 1 2; f 7 5 4]
+    
     let take_map ~f p cnt =
       let rec go acc cnt =
         if cnt = 0 then return acc
@@ -850,46 +866,34 @@ let%test_module "test" =
       in
       let d = go [] cnt >>| List.rev in
       Deferred.any
-        [ d
-        ; (Async.after (Time.Span.of_sec 3.) >>| fun () -> failwith "Timeout")
-        ]
+        [ (d >>| fun d -> Ok d)
+        ; ( Async.after (Time.Span.of_sec 5.)
+          >>| fun () -> Or_error.error_string "Timeout" ) ]
+      >>| Or_error.ok_exn
 
     let assert_strongest_ledgers lbc_deferred ~expected =
       Backtrace.elide := false ;
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = lbc_deferred in
           let%map results =
-            take_map (Lbc.strongest_ledgers lbc) (List.length expected) ~f:
+            take_map (strongest_ledgers lbc) (List.length expected) ~f:
               (fun (lb, _) -> !lb )
           in
           assert (List.equal results expected ~equal:Int.equal) )
+    end
 
-    let transitions =
-      let f = transition in
-      [f 1 0 1; f 2 1 2; f 3 0 1; f 4 0 1; f 5 2 3; f 6 1 2; f 7 5 4]
-
-    let%test_unit "Files get saved" =
-      Backtrace.elide := false ;
-      let config = config transitions in
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind lbc = Lbc.create config in
-          let%bind _ =
-            take_map (Lbc.strongest_ledgers lbc) 4 ~f:(fun (lb, _) ->
-                let%map tip = Lbc.For_tests.load_tip lbc config in
-                assert (! (Inputs.Tip.ledger_builder tip) = !lb) )
-          in
-          Deferred.unit )
+    module Lbc = Make_test (Storage.Memory)
 
     let%test_unit "strongest_ledgers updates appropriately when new_states \
                    flow in within tree" =
       Backtrace.elide := false ;
-      let config = config transitions in
-      assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
+      let config = Lbc.config Lbc.transitions in
+      Lbc.assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
 
     let%test_unit "strongest_ledgers updates appropriately using the network" =
       Backtrace.elide := false ;
       let transitions =
-        let f = transition in
+        let f = Lbc.transition in
         [ f 1 0 1
         ; f 2 1 2
         ; f 3 8 6 (* This one comes over the network *)
@@ -898,19 +902,57 @@ let%test_module "test" =
         ; f 5 3 7
         (* Now we attach to the one from the network *) ]
       in
-      let config = config transitions in
+      let config = Lbc.config transitions in
       let lbc_deferred = Lbc.create config in
-      assert_strongest_ledgers lbc_deferred ~expected:[1; 2; 3; 5]
+      Lbc.assert_strongest_ledgers lbc_deferred ~expected:[1; 2; 3; 5]
 
     let%test_unit "local_get_ledger can materialize a ledger locally" =
       Backtrace.elide := false ;
-      let config = config transitions in
+      let config = Lbc.config Lbc.transitions in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = Lbc.create config in
           (* Drain the first few strongest_ledgers *)
-          let%bind _ = take_map (Lbc.strongest_ledgers lbc) 4 ~f:ignore in
+          let%bind _ = Lbc.take_map (Lbc.strongest_ledgers lbc) 4 ~f:ignore in
           match%map Lbc.local_get_ledger lbc 6 with
           | Ok (lb, _s) -> assert (!lb = 6)
           | Error e ->
               failwithf "Unexpected error %s" (Error.to_string_hum e) () )
+
+    
+    module Lbc_disk = Make_test (Storage.Disk)
+
+    let%test_unit "Files get saved periodically" =
+      Backtrace.elide := false ;
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          File_system.with_temp_dirs [Lbc_disk.temp_folder] ~f:(fun () ->
+              let config =
+                Lbc_disk.config Lbc_disk.transitions
+              in
+              let%bind lbc = Lbc_disk.create config in
+              let%bind _ =
+                Lbc_disk.take_map (Lbc_disk.strongest_ledgers lbc) 4 ~f:(fun (lb, _) ->
+                    let%map tip = Lbc_disk.For_tests.load_tip lbc config in
+                    assert (! (Lbc_disk.Inputs.Tip.ledger_builder tip) = !lb)
+                )
+              in
+              Deferred.unit ) )
+
+    let%test_unit "Continue from last file" =
+      Backtrace.elide := false ;
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          File_system.with_temp_dirs [Lbc_disk.temp_folder] ~f:(fun () ->
+              let config = Lbc_disk.config Lbc_disk.transitions in
+              let%bind lbc = Lbc_disk.create config in
+              let%bind () = after (Time.Span.of_sec 3.0) in
+              let lb =
+                Lbc_disk.strongest_tip lbc
+                |> Lbc_disk.Inputs.Tip.ledger_builder
+              in
+              let config_new = Lbc_disk.config [] in
+              let%map lbc_new = Lbc_disk.create config_new in
+              let lb_new =
+                Lbc_disk.strongest_tip lbc_new
+                |> Lbc_disk.Inputs.Tip.ledger_builder
+              in
+              assert (!lb = !lb_new) ) )
   end )
