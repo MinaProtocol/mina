@@ -693,8 +693,8 @@ end = struct
   worst case number of provers: when each pair of proofs is from a different 
   prover). One slot for the transaction and two slots for fee transfers.
 
-  When the diff is split into two prediffs (why? refer to #687) and after 
-  adding transactions, the first prediff has two slots remaining which could 
+  When the diff is split into two prediffs (why? refer to #687) and if after 
+  adding transactions, the first prediff has two slots remaining which cannot 
   not accommodate transactions, then those slots are filled by splitting the 
   coinbase into two parts. 
   If it has one slot, then we simply add one coinbase. It is also possible that 
