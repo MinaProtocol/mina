@@ -315,7 +315,9 @@ let wrap_key =
     let%map_open privkey_path = privkey_path_flag in
     fun () ->
       let open Deferred.Let_syntax in
-      let%bind privkey = read_hidden_line "Private key: " in
+      let%bind privkey =
+        hidden_line_or_env "Private key: " ~env:"CODA_PRIVKEY"
+      in
       let%bind password =
         prompt_password "Password for new private key file: "
       in
