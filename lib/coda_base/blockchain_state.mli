@@ -11,7 +11,7 @@ type ('ledger_builder_hash, 'ledger_hash, 'time) t_ =
   ; timestamp: 'time }
 [@@deriving sexp, eq, compare, fields]
 
-type t = (Ledger_builder_hash.t, Ledger_hash.t, Block_time.t) t_
+type t = (Ledger_builder_hash.t, Frozen_ledger_hash.t, Block_time.t) t_
 [@@deriving sexp, eq, compare, hash]
 
 module Stable : sig
@@ -22,7 +22,7 @@ module Stable : sig
 
     type nonrec t =
       ( Ledger_builder_hash.Stable.V1.t
-      , Ledger_hash.Stable.V1.t
+      , Frozen_ledger_hash.Stable.V1.t
       , Block_time.Stable.V1.t )
       t_
     [@@deriving bin_io, sexp, eq, compare, hash]
@@ -34,7 +34,7 @@ type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 include Snarkable.S
         with type var =
                     ( Ledger_builder_hash.var
-                    , Ledger_hash.var
+                    , Frozen_ledger_hash.var
                     , Block_time.Unpacked.var )
                     t_
          and type value := value
@@ -43,7 +43,7 @@ module Hash = State_hash
 
 val create_value :
      ledger_builder_hash:Ledger_builder_hash.Stable.V1.t
-  -> ledger_hash:Ledger_hash.Stable.V1.t
+  -> ledger_hash:Frozen_ledger_hash.Stable.V1.t
   -> timestamp:Block_time.Stable.V1.t
   -> value
 

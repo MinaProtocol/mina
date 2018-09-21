@@ -21,7 +21,7 @@ module Stable = struct
       ; timestamp: 'time }
     [@@deriving bin_io, sexp, fields, eq, compare, hash]
 
-    type t = (Ledger_builder_hash.Stable.V1.t, Ledger_hash.Stable.V1.t, Block_time.Stable.V1.t) t_
+    type t = (Ledger_builder_hash.Stable.V1.t, Frozen_ledger_hash.Stable.V1.t, Block_time.Stable.V1.t) t_
     [@@deriving bin_io, sexp, eq, compare, hash]
   end
 end
@@ -30,7 +30,7 @@ include Stable.V1
 
 type var =
   ( Ledger_builder_hash.var
-  , Ledger_hash.var
+  , Frozen_ledger_hash.var
   , Block_time.Unpacked.var 
   ) t_
 
@@ -47,7 +47,7 @@ let of_hlist : (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t
 let data_spec =
   let open Data_spec in
   [ Ledger_builder_hash.typ
-  ; Ledger_hash.typ
+  ; Frozen_ledger_hash.typ
   ; Block_time.Unpacked.typ
   ]
 
@@ -57,7 +57,7 @@ let typ : (var, value) Typ.t =
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let var_to_triples ({ ledger_builder_hash; ledger_hash; timestamp } : var) =
-  let%map ledger_hash_triples = Ledger_hash.var_to_triples ledger_hash
+  let%map ledger_hash_triples = Frozen_ledger_hash.var_to_triples ledger_hash
   and ledger_builder_hash_triples = Ledger_builder_hash.var_to_triples ledger_builder_hash
   in
   ledger_builder_hash_triples
@@ -66,12 +66,12 @@ let var_to_triples ({ ledger_builder_hash; ledger_hash; timestamp } : var) =
 
 let fold ({ ledger_builder_hash; ledger_hash; timestamp } : value) =
   Fold.(Ledger_builder_hash.fold ledger_builder_hash
-  +> Ledger_hash.fold ledger_hash
+  +> Frozen_ledger_hash.fold ledger_hash
   +> Block_time.fold timestamp)
 
 let length_in_triples =
   Ledger_builder_hash.length_in_triples
-  + Ledger_hash.length_in_triples
+  + Frozen_ledger_hash.length_in_triples
   + Block_time.length_in_triples
 
 let set_timestamp t timestamp = { t with timestamp }
@@ -84,7 +84,7 @@ let genesis_time =
 
 let genesis =
   { ledger_builder_hash= Ledger_builder_hash.dummy
-  ; ledger_hash= Ledger.merkle_root Genesis_ledger.ledger
+  ; ledger_hash= Frozen_ledger_hash.of_ledger_hash @@ Ledger.merkle_root Genesis_ledger.ledger
   ; timestamp= genesis_time }
 
 module Message = struct

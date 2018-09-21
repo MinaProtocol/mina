@@ -102,14 +102,17 @@ struct
   module Ledger_builder_diff = Inputs.Ledger_builder_diff
   module Time = Inputs.Time
 
-  let genesis_ledger_hash = Coda_base.Ledger.merkle_root Inputs.genesis_ledger
+  let genesis_ledger_hash =
+    Coda_base.Frozen_ledger_hash.of_ledger_hash
+    @@ Coda_base.Ledger.merkle_root Inputs.genesis_ledger
 
   module Ledger_pool =
-    Rc_pool.Make (Coda_base.Ledger_hash)
+    Rc_pool.Make (Coda_base.Frozen_ledger_hash)
       (struct
         include Coda_base.Ledger
 
-        let to_key = merkle_root
+        let to_key =
+          Fn.compose Coda_base.Frozen_ledger_hash.of_ledger_hash merkle_root
       end)
 
   module Local_state = struct
@@ -409,10 +412,10 @@ struct
       {hash: 'ledger_hash; total_currency: 'amount}
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    type value = (Coda_base.Ledger_hash.t, Amount.t) t
+    type value = (Coda_base.Frozen_ledger_hash.t, Amount.t) t
     [@@deriving sexp, bin_io, eq, compare, hash]
 
-    type var = (Coda_base.Ledger_hash.var, Amount.var) t
+    type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
 
     let to_hlist {hash; total_currency} =
       Coda_base.H_list.[hash; total_currency]
@@ -423,7 +426,7 @@ struct
      fun Coda_base.H_list.([hash; total_currency]) -> {hash; total_currency}
 
     let data_spec =
-      Snark_params.Tick.Data_spec.[Coda_base.Ledger_hash.typ; Amount.typ]
+      Snark_params.Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
 
     let typ =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -432,19 +435,23 @@ struct
 
     let var_to_triples {hash; total_currency} =
       let open Snark_params.Tick.Let_syntax in
-      let%map hash_triples = Coda_base.Ledger_hash.var_to_triples hash in
+      let%map hash_triples =
+        Coda_base.Frozen_ledger_hash.var_to_triples hash
+      in
       hash_triples @ Amount.var_to_triples total_currency
 
     let fold {hash; total_currency} =
-      Fold.(Coda_base.Ledger_hash.fold hash +> Amount.fold total_currency)
+      let open Fold in
+      Coda_base.Frozen_ledger_hash.fold hash +> Amount.fold total_currency
 
     let length_in_triples =
-      Coda_base.Ledger_hash.length_in_triples + Amount.length_in_triples
+      Coda_base.Frozen_ledger_hash.length_in_triples + Amount.length_in_triples
 
     let if_ cond ~then_ ~else_ =
       let open Snark_params.Tick.Let_syntax in
       let%map hash =
-        Coda_base.Ledger_hash.if_ cond ~then_:then_.hash ~else_:else_.hash
+        Coda_base.Frozen_ledger_hash.if_ cond ~then_:then_.hash
+          ~else_:else_.hash
       and total_currency =
         Amount.Checked.if_ cond ~then_:then_.total_currency
           ~else_:else_.total_currency
@@ -802,7 +809,7 @@ struct
     let update_stateless ~(previous_consensus_state: value)
         ~(consensus_transition_data: Consensus_transition_data.value)
         ~(previous_protocol_state_hash: Coda_base.State_hash.t)
-        ~(ledger_hash: Coda_base.Ledger_hash.t) : value Or_error.t =
+        ~(ledger_hash: Coda_base.Frozen_ledger_hash.t) : value Or_error.t =
       let open Or_error.Let_syntax in
       let open Consensus_transition_data in
       let%map total_currency =
@@ -838,14 +845,16 @@ struct
       let%map next_consensus_state =
         update_stateless ~previous_consensus_state ~consensus_transition_data
           ~previous_protocol_state_hash
-          ~ledger_hash:(Coda_base.Ledger.merkle_root ledger)
+          ~ledger_hash:
+            ( Coda_base.Ledger.merkle_root ledger
+            |> Coda_base.Frozen_ledger_hash.of_ledger_hash )
       in
       if
         previous_consensus_state.last_epoch_data.ledger.hash
         <> next_consensus_state.last_epoch_data.ledger.hash
       then (
         if
-          Coda_base.Ledger_hash.equal
+          Coda_base.Frozen_ledger_hash.equal
             previous_consensus_state.last_epoch_data.ledger.hash
             genesis_ledger_hash
         then
@@ -857,7 +866,7 @@ struct
     let update_var (previous_state: var)
         (transition_data: Consensus_transition_data.var)
         (previous_protocol_state_hash: Coda_base.State_hash.var)
-        (ledger_hash: Coda_base.Ledger_hash.var) :
+        (ledger_hash: Coda_base.Frozen_ledger_hash.var) :
         (var, _) Snark_params.Tick.Checked.t =
       let open Snark_params.Tick.Let_syntax in
       let%bind length = Length.increment_var previous_state.length

@@ -323,10 +323,11 @@ end = struct
     assert (adepth < depth) ;
     let height = Addr.height a in
     let index = Addr.to_int a in
+    let layer = List.nth t.tree.nodes (height - 1) in
+    let layer_len = Option.value_map ~f:DynArray.length ~default:0 layer in
     recompute_tree t ;
-    if height < t.tree.nodes_height && index < num_accounts t then
-      let l = List.nth_exn t.tree.nodes (depth - adepth - 1) in
-      DynArray.get l index
+    if height < t.tree.nodes_height && index < layer_len then
+      DynArray.get (Option.value_exn layer) index
     else if index = 0 && not (t.tree.nodes_height = 0) then
       complete_with_empties
         (DynArray.get (List.last_exn t.tree.nodes) 0)
@@ -348,7 +349,7 @@ end = struct
     List.iteri accounts ~f:(fun i a ->
         let new_index = first_index + i in
         (t.tree).dirty_indices <- new_index :: t.tree.dirty_indices ;
-        match key_of_index t i with
+        match key_of_index t new_index with
         | Some pk ->
             Key.Table.set t.tree.leafs ~key:pk ~data:new_index ;
             Dyn_array.set t.accounts new_index a

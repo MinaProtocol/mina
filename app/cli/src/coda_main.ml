@@ -26,10 +26,18 @@ module Ledger_hash = struct
   let to_bytes = Ledger_hash.to_bytes
 end
 
+module Frozen_ledger_hash = struct
+  include Frozen_ledger_hash.Stable.V1
+
+  let to_bytes = Frozen_ledger_hash.to_bytes
+
+  let of_ledger_hash = Frozen_ledger_hash.of_ledger_hash
+end
+
 module type Ledger_proof_intf =
   Protocols.Coda_pow.Ledger_proof_intf
   with type sok_digest := Sok_message.Digest.t
-   and type ledger_hash := Ledger_hash.t
+   and type ledger_hash := Frozen_ledger_hash.t
    and type proof := Proof.t
    and type statement = Transaction_snark.Statement.t
 
@@ -312,6 +320,7 @@ struct
       module Ledger_proof_verifier = Ledger_proof_verifier
       module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_hash = Ledger_hash
+      module Frozen_ledger_hash = Frozen_ledger_hash
       module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder_aux_hash = Ledger_builder_aux_hash
@@ -359,7 +368,8 @@ struct
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
-    let load ~disk_location:_ ~incoming_diffs = return (create ~incoming_diffs)
+    let load ~parent_log ~disk_location:_ ~incoming_diffs =
+      return (create ~parent_log ~incoming_diffs)
 
     let transactions t = Pool.transactions (pool t)
 
@@ -406,6 +416,7 @@ struct
   module Ledger_builder_aux_hash = Ledger_builder_aux_hash
   module Ledger_proof_verifier = Ledger_proof_verifier
   module Ledger_hash = Ledger_hash
+  module Frozen_ledger_hash = Frozen_ledger_hash
   module Transaction = Transaction
   module Public_key = Public_key
   module Compressed_public_key = Public_key.Compressed
@@ -502,10 +513,10 @@ struct
           Completed_work.Checked.create_unsafe
             {Completed_work.fee; proofs= proof; prover} )
 
-    let load ~disk_location ~incoming_diffs =
+    let load ~parent_log ~disk_location ~incoming_diffs =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
-      | Ok pool -> of_pool_and_diffs pool ~incoming_diffs
-      | Error _e -> create ~incoming_diffs
+      | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
+      | Error _e -> create ~parent_log ~incoming_diffs
 
     open Snark_work_lib.Work
 
@@ -576,6 +587,7 @@ struct
       end
 
       module Ledger_hash = Ledger_hash
+      module Frozen_ledger_hash = Frozen_ledger_hash
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger = Ledger
       module Ledger_builder_diff = Ledger_builder_diff
@@ -618,8 +630,6 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Transition_tree = Ledger_builder_controller.Transition_tree
-
   module Proposer = Proposer.Make (struct
     include Inputs0
     module Ledger_builder_diff = Ledger_builder_diff
@@ -629,6 +639,7 @@ struct
     module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_hash = Ledger_hash
+    module Frozen_ledger_hash = Frozen_ledger_hash
     module Transaction = Transaction
     module Public_key = Public_key
     module Private_key = Private_key
@@ -833,10 +844,6 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
-
-    module Transition_tree :
-      Coda.Ktree_intf
-      with type elem := Consensus_mechanism.External_transition.t
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -894,8 +901,6 @@ module type Main_intf = sig
 
   val create : Config.t -> t Deferred.t
 
-  val lbc_transition_tree : t -> Inputs.Transition_tree.t option
-
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
@@ -906,8 +911,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   open Inputs
 
   module For_tests = struct
-    let get_transition_tree t = lbc_transition_tree t
-
     let ledger_proof t = ledger_builder_ledger_proof t
   end
 
