@@ -86,10 +86,8 @@ struct
 
   include Stable.V1
 
-  (* TODO: Pad with zeroes *)
   let to_bytes t =
-    Z.to_bits
-      (Bignum_bigint.to_zarith_bigint Bigint.(to_bignum_bigint (of_field t)))
+    Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
 
   let length_in_bits = M.length_in_bits
 
