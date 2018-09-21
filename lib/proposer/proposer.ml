@@ -23,22 +23,22 @@ module Agent : sig
 
   val with_value : f:('a -> unit) -> 'a t -> unit
 end = struct
-  type 'a t = {signal: unit Ivar.t; mutable mutex: 'a option}
+  type 'a t = {signal: unit Ivar.t; mutable value: 'a option}
 
   let create ~(f: 'a -> 'b) (reader: 'a Linear_pipe.Reader.t) : 'b t =
-    let t = {signal= Ivar.create (); mutex= None} in
+    let t = {signal= Ivar.create (); value= None} in
     don't_wait_for
       (Linear_pipe.iter reader ~f:(fun x ->
-           let old_value = t.mutex in
-           t.mutex <- Some (f x) ;
+           let old_value = t.value in
+           t.value <- Some (f x) ;
            if old_value = None then Ivar.fill t.signal () ;
            return () )) ;
     t
 
-  let get t = t.mutex
+  let get t = t.value
 
   let rec with_value ~f t =
-    match t.mutex with
+    match t.value with
     | Some x -> f x
     | None -> don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
 end
