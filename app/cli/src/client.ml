@@ -154,6 +154,38 @@ let status =
     (Daemon_cli.init json_flag ~f:(fun port json ->
          dispatch Get_status.rpc () port >>| print (module Status) json ))
 
+let handle_open ~mkdir ~(f: string -> _ Deferred.t) path =
+  let open Unix.Error in
+  let dn = Filename.dirname path in
+  let%bind parent_exists =
+    try
+      let%bind stat = Unix.stat dn in
+      if stat.kind <> `Directory then (
+        eprintf "Error: %s is not a directory\n" dn ;
+        exit 1 )
+      else return true
+    with
+    | Unix.Unix_error (ENOENT, _, _) -> return false
+    | Unix.Unix_error (e, _, _) ->
+        eprintf "Error: could not stat %s: %s\n" dn (message e) ;
+        exit 1
+  in
+  let%bind () =
+    try
+      if not parent_exists && mkdir then
+        let%bind () = Unix.mkdir ~p:() dn in
+        Unix.chmod dn 700
+      else (
+        eprintf "Error: %s does not exist\n" dn ;
+        exit 1 )
+    with Unix.Unix_error ((EACCES as e), _, _) ->
+      eprintf "Error: could not mkdir -p %s: %s\n" dn (message e) ;
+      exit 1
+  in
+  try f path with Unix.Unix_error (e, _, _) ->
+    eprintf "Error: could not open %s: %s\n" path (message e) ;
+    exit 1
+
 let write_keypair {Keypair.private_key; public_key; _} privkey_path ~password =
   let sb =
     Secret_box.encrypt
@@ -163,11 +195,13 @@ let write_keypair {Keypair.private_key; public_key; _} privkey_path ~password =
   let sb =
     Secret_box.to_yojson sb |> Yojson.Safe.to_string |> Bytes.of_string
   in
-  let%bind f = Writer.open_file privkey_path in
+  let%bind f = handle_open ~mkdir:true ~f:Writer.open_file privkey_path in
   Writer.write_bytes f sb ;
   let%bind () = Writer.close f in
   let%bind () = Unix.chmod privkey_path ~perm:0o600 in
-  let%bind f = Writer.open_file (privkey_path ^ ".pub") in
+  let%bind f =
+    handle_open ~mkdir:false ~f:Writer.open_file (privkey_path ^ ".pub")
+  in
   let pubkey_bytes =
     Public_key.Compressed.to_base64 (Public_key.compress public_key)
     |> Bytes.of_string
@@ -181,7 +215,9 @@ let read_keypair_exn privkey_path ~password =
     let open Deferred in
     Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss
   in
-  let%bind privkey_file = Reader.open_file privkey_path in
+  let%bind privkey_file =
+    handle_open ~mkdir:false ~f:Reader.open_file privkey_path
+  in
   let%map file_contents = read_all privkey_file in
   let sb =
     Secret_box.of_yojson (Yojson.Safe.from_string file_contents)
