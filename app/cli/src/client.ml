@@ -154,37 +154,48 @@ let status =
     (Daemon_cli.init json_flag ~f:(fun port json ->
          dispatch Get_status.rpc () port >>| print (module Status) json ))
 
-let handle_open ~mkdir ~(f: string -> _ Deferred.t) path =
+let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
   let open Unix.Error in
   let dn = Filename.dirname path in
   let%bind parent_exists =
-    try
-      let%bind stat = Unix.stat dn in
-      if stat.kind <> `Directory then (
-        eprintf "Error: %s is not a directory\n" dn ;
-        exit 1 )
-      else return true
+    match%bind
+      Monitor.try_with (fun () ->
+          let%bind stat = Unix.stat dn in
+          if stat.kind <> `Directory then (
+            eprintf "Error: %s is not a directory\n" dn ;
+            exit 1 )
+          else return true )
     with
-    | Unix.Unix_error (ENOENT, _, _) -> return false
-    | Unix.Unix_error (e, _, _) ->
+    | Ok x -> return x
+    | Error (Unix.Unix_error (ENOENT, _, _)) -> return false
+    | Error (Unix.Unix_error (e, _, _)) ->
         eprintf "Error: could not stat %s: %s\n" dn (message e) ;
         exit 1
+    | Error e -> raise e
   in
   let%bind () =
-    try
-      if not parent_exists && mkdir then
-        let%bind () = Unix.mkdir ~p:() dn in
-        Unix.chmod dn 700
-      else (
-        eprintf "Error: %s does not exist\n" dn ;
-        exit 1 )
-    with Unix.Unix_error ((EACCES as e), _, _) ->
-      eprintf "Error: could not mkdir -p %s: %s\n" dn (message e) ;
-      exit 1
+    match%bind
+      Monitor.try_with (fun () ->
+          if not parent_exists && mkdir then
+            let%bind () = Unix.mkdir ~p:() dn in
+            Unix.chmod dn 700
+          else if not parent_exists then (
+            eprintf "Error: %s does not exist\n" dn ;
+            exit 1 )
+          else Deferred.unit )
+    with
+    | Ok x -> return x
+    | Error (Unix.Unix_error ((EACCES as e), _, _)) ->
+        eprintf "Error: could not mkdir -p %s: %s\n" dn (message e) ;
+        exit 1
+    | Error e -> raise e
   in
-  try f path with Unix.Unix_error (e, _, _) ->
-    eprintf "Error: could not open %s: %s\n" path (message e) ;
-    exit 1
+  match%bind Monitor.try_with (fun () -> f path) with
+  | Ok x -> return x
+  | Error (Unix.Unix_error (e, _, _)) ->
+      eprintf "Error: could not open %s: %s\n" path (message e) ;
+      exit 1
+  | Error e -> raise e
 
 let write_keypair {Keypair.private_key; public_key; _} privkey_path ~password =
   let sb =
