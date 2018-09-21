@@ -381,29 +381,53 @@ module type Ledger_builder_diff_intf = sig
 
   type completed_work_checked
 
-  type pre_diff =
-    { completed_works: completed_work list
-    ; transactions: transaction list
-    ; coinbase_parts: int
-    ; completed_works_for_coinbase: completed_work list }
+  module At_most_two : sig
+    type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
+    [@@deriving sexp, bin_io]
+
+    val increase : 'a t -> 'a list -> 'a t Or_error.t
+  end
+
+  module At_most_one : sig
+    type 'a t = Zero | One of 'a option [@@deriving sexp, bin_io]
+
+    val increase : 'a t -> 'a list -> 'a t Or_error.t
+  end
+
+  type diff =
+    {completed_works: completed_work list; transactions: transaction list}
+  [@@deriving sexp, bin_io]
+
+  type first_pre_diff =
+    {diff: diff; coinbase_parts: completed_work At_most_two.t}
+  [@@deriving sexp, bin_io]
+
+  type second_pre_diff =
+    {diff: diff; coinbase_added: completed_work At_most_one.t}
   [@@deriving sexp, bin_io]
 
   type t =
-    { pre_diffs: pre_diff * pre_diff option
+    { pre_diffs: first_pre_diff * second_pre_diff option
     ; prev_hash: ledger_builder_hash
     ; creator: public_key }
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs : sig
-    type pre_diff =
+    type diff =
       { completed_works: completed_work_checked list
-      ; transactions: transaction_with_valid_signature list
-      ; coinbase_parts: int
-      ; completed_works_for_coinbase: completed_work_checked list }
+      ; transactions: transaction_with_valid_signature list }
+    [@@deriving sexp]
+
+    type first_pre_diff =
+      {diff: diff; coinbase_parts: completed_work_checked At_most_two.t}
+    [@@deriving sexp]
+
+    type second_pre_diff =
+      {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
     [@@deriving sexp]
 
     type t =
-      { pre_diffs: pre_diff * pre_diff option
+      { pre_diffs: first_pre_diff * second_pre_diff option
       ; prev_hash: ledger_builder_hash
       ; creator: public_key }
     [@@deriving sexp]
