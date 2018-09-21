@@ -79,6 +79,9 @@ let account (account: Coda_base.Account.value) : Lite_base.Account.t =
 let ledger_hash (h: Coda_base.Ledger_hash.t) : Lite_base.Ledger_hash.t =
   digest (h :> Snark_params.Tick.Pedersen.Digest.t)
 
+let frozen_ledger_hash (h: Coda_base.Frozen_ledger_hash.t) : Lite_base.Ledger_hash.t =
+  digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+
 let ledger_builder_hash (h: Coda_base.Ledger_builder_hash.t) =
   { Lite_base.Ledger_builder_hash.ledger_hash=
       ledger_hash (Coda_base.Ledger_builder_hash.ledger_hash h)
@@ -88,5 +91,5 @@ let blockchain_state
     ({ledger_builder_hash= lbh; ledger_hash= lh; timestamp}:
       Coda_base.Blockchain_state.t) : Lite_base.Blockchain_state.t =
   { ledger_builder_hash= ledger_builder_hash lbh
-  ; ledger_hash= ledger_hash lh
+  ; ledger_hash= frozen_ledger_hash lh
   ; timestamp= time timestamp }
