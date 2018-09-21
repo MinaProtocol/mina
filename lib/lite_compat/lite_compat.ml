@@ -27,9 +27,6 @@ let verification_key vk =
   let g_alpha = g_alpha vk |> g1 in
   let h_beta = h_beta vk |> g2 in
   let g_alpha_h_beta = Snarkette.Mnt6.Pairing.reduced_pairing g_alpha h_beta in
-  printf
-    !"lite_compat g_alpha_h_beta is %{sexp:Snarkette.Mnt6.Fq6.t}\n"
-    g_alpha_h_beta ;
   { Snarkette.Mnt6.Groth_maller.Verification_key.h= h vk |> g2
   ; g_alpha
   ; h_beta
@@ -40,7 +37,6 @@ let verification_key vk =
 
 let proof proof : Snarkette.Mnt6.Groth_maller.Proof.t =
   let module P = Snarky.Libsnark.Mnt6.GM_proof_accessors in
-  printf "Making proof!\n%!" ;
   {a= P.a proof |> g1; b= P.b proof |> g2; c= P.c proof |> g1}
 
 let merkle_path :
