@@ -1057,6 +1057,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Linear_pipe.write_without_pushback solved_work_writer () ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
+        let merkle_path_pk = List.last_exn Genesis_ledger.pks in
         ignore
           Cohttp_async.(
             Server.create
@@ -1072,6 +1073,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 in
                 match Uri.path uri with
                 | "/" -> Server.respond_with_file "index.html"
+                | "/main.css" -> Server.respond_with_file "main.css"
+                | "/_build/default/app/lite/verifier_main.bc.js" ->
+                    Server.respond_with_file
+                      "_build/default/app/lite/verifier_main.bc.js"
                 | "/_build/default/app/lite/main.bc.js" ->
                     Server.respond_with_file
                       "_build/default/app/lite/main.bc.js"
@@ -1083,7 +1088,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                         (B64.encode
                            (Binable.to_string
                               (module Lite_base.Lite_chain)
-                              (get_lite_chain coda []))) )
+                              (get_lite_chain coda
+                                 [ merkle_path_pk
+                                 ]))) )
                 | "/status" ->
                     Server.respond_string
                       ( get_status coda |> Client_lib.Status.to_yojson
