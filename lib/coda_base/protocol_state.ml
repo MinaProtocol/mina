@@ -215,7 +215,8 @@ let%test_module "Protocol_state tests" =
             (Blockchain_state.create_value
                ~ledger_builder_hash:Ledger_builder_hash.dummy
                ~ledger_hash:
-                 (Ledger_hash.of_hash Snark_params.Tick.Pedersen.zero_hash)
+                 (Frozen_ledger_hash.of_hash
+                    Snark_params.Tick.Pedersen.zero_hash)
                ~timestamp:(Block_time.now ()))
           ~consensus_state:Consensus_state.genesis
       in

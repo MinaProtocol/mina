@@ -481,14 +481,14 @@ struct
            )
       in
       let%map account_location =
-        Nanobit_base.Ledger.location_of_key ledger
+        Coda_base.Ledger.location_of_key ledger
           (Public_key.compress public_key)
         |> do_if_none ~f:(fun () ->
                Logger.warn logger "no account associated with public key" )
       in
       let balance =
-        Nanobit_base.Ledger.get ledger account_location
-        |> Option.map ~f:Nanobit_base.Account.balance
+        Coda_base.Ledger.get ledger account_location
+        |> Option.map ~f:Coda_base.Account.balance
         |> Option.value ~default:Balance.zero
       in
       (balance, total_currency)
@@ -870,7 +870,7 @@ struct
     let update ~(previous_consensus_state: value)
         ~(consensus_transition_data: Consensus_transition_data.value)
         ~(previous_protocol_state_hash: Coda_base.State_hash.t)
-        ~(local_state: Local_state.t) ~(ledger: Coda_base.Ledger.t) :
+        ~(ledger_pool: Ledger_pool.t) ~(ledger: Coda_base.Ledger.t) :
         value Or_error.t =
       let open Or_error.Let_syntax in
       let%map next_consensus_state =
