@@ -39,15 +39,6 @@ type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 let create_value ~ledger_builder_hash ~ledger_hash ~timestamp =
   { ledger_builder_hash; ledger_hash; timestamp }
 
-(*
-let gen =
-  let open Quickcheck.Generator.Let_syntax in
-  let%map ledger_builder_hash = Ledger_builder_hash.gen
-  and ledger_hash = Ledger_hash.gen
-  and timestamp = Block_time.gen in
-  {ledger_builder_hash; ledger_hash; timestamp}
-   *)
-
 let to_hlist { ledger_builder_hash; ledger_hash; timestamp } =
   H_list.([ ledger_builder_hash; ledger_hash; timestamp ])
 let of_hlist : (unit, 'lbh -> 'lh -> 'ti -> unit) H_list.t -> ('lbh, 'lh, 'ti) t_ =
