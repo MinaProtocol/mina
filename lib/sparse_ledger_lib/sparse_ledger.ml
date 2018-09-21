@@ -14,6 +14,8 @@ type ('hash, 'key, 'account) t =
   ; tree: ('hash, 'account) tree }
 [@@deriving bin_io, sexp]
 
+let tree {tree; _} = tree
+
 module type S = sig
   type hash
 
@@ -39,6 +41,8 @@ module type S = sig
   val merkle_root : t -> hash
 end
 
+let of_hash ~depth h = {indexes= []; depth; tree= Hash h}
+
 module Make (Hash : sig
   type t [@@deriving bin_io, eq, sexp]
 
@@ -59,14 +63,14 @@ struct
 
   type t = t_tmp [@@deriving bin_io, sexp]
 
+  let of_hash = of_hash
+
   let hash = function
     | Account a -> Account.hash a
     | Hash h -> h
     | Node (h, _, _) -> h
 
   type index = int [@@deriving bin_io, sexp]
-
-  let of_hash ~depth h = {indexes= []; depth; tree= Hash h}
 
   let merkle_root {tree; _} = hash tree
 
