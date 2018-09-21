@@ -829,9 +829,9 @@ let%test_module "test" =
                Linear_pipe.write w (x, time) )) ;
         r
 
-    let temp_folder = "~/temp"
+      let temp_folder = "~/temp"
 
-    let storage = "test_lbc_disk"
+      let storage = "test_lbc_disk"
 
       let config transitions =
         let ledger_builder_transitions = slowly_pipe_of_list transitions in
@@ -855,31 +855,31 @@ let%test_module "test" =
       let transitions =
         let f = transition in
         [f 1 0 1; f 2 1 2; f 3 0 1; f 4 0 1; f 5 2 3; f 6 1 2; f 7 5 4]
-    
-    let take_map ~f p cnt =
-      let rec go acc cnt =
-        if cnt = 0 then return acc
-        else
-          match%bind Linear_pipe.read p with
-          | `Eof -> return acc
-          | `Ok x -> go (f x :: acc) (cnt - 1)
-      in
-      let d = go [] cnt >>| List.rev in
-      Deferred.any
-        [ (d >>| fun d -> Ok d)
-        ; ( Async.after (Time.Span.of_sec 5.)
-          >>| fun () -> Or_error.error_string "Timeout" ) ]
-      >>| Or_error.ok_exn
 
-    let assert_strongest_ledgers lbc_deferred ~expected =
-      Backtrace.elide := false ;
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          let%bind lbc = lbc_deferred in
-          let%map results =
-            take_map (strongest_ledgers lbc) (List.length expected) ~f:
-              (fun (lb, _) -> !lb )
-          in
-          assert (List.equal results expected ~equal:Int.equal) )
+      let take_map ~f p cnt =
+        let rec go acc cnt =
+          if cnt = 0 then return acc
+          else
+            match%bind Linear_pipe.read p with
+            | `Eof -> return acc
+            | `Ok x -> go (f x :: acc) (cnt - 1)
+        in
+        let d = go [] cnt >>| List.rev in
+        Deferred.any
+          [ (d >>| fun d -> Ok d)
+          ; ( Async.after (Time.Span.of_sec 5.)
+            >>| fun () -> Or_error.error_string "Timeout" ) ]
+        >>| Or_error.ok_exn
+
+      let assert_strongest_ledgers lbc_deferred ~expected =
+        Backtrace.elide := false ;
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            let%bind lbc = lbc_deferred in
+            let%map results =
+              take_map (strongest_ledgers lbc) (List.length expected) ~f:
+                (fun (lb, _) -> !lb )
+            in
+            assert (List.equal results expected ~equal:Int.equal) )
     end
 
     module Lbc = Make_test (Storage.Memory)
@@ -918,19 +918,17 @@ let%test_module "test" =
           | Error e ->
               failwithf "Unexpected error %s" (Error.to_string_hum e) () )
 
-    
     module Lbc_disk = Make_test (Storage.Disk)
 
     let%test_unit "Files get saved periodically" =
       Backtrace.elide := false ;
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dirs [Lbc_disk.temp_folder] ~f:(fun () ->
-              let config =
-                Lbc_disk.config Lbc_disk.transitions
-              in
+              let config = Lbc_disk.config Lbc_disk.transitions in
               let%bind lbc = Lbc_disk.create config in
               let%bind _ =
-                Lbc_disk.take_map (Lbc_disk.strongest_ledgers lbc) 4 ~f:(fun (lb, _) ->
+                Lbc_disk.take_map (Lbc_disk.strongest_ledgers lbc) 4 ~f:
+                  (fun (lb, _) ->
                     let%map tip = Lbc_disk.For_tests.load_tip lbc config in
                     assert (! (Lbc_disk.Inputs.Tip.ledger_builder tip) = !lb)
                 )
