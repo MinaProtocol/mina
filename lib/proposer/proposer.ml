@@ -23,18 +23,16 @@ module Agent : sig
 
   val with_value : f:('a -> unit) -> 'a t -> unit
 end = struct
-  type 'a t =
-    { signal: unit Ivar.t
-    ; mutable mutex: 'a option }
+  type 'a t = {signal: unit Ivar.t; mutable mutex: 'a option}
 
   let create ~(f: 'a -> 'b) (reader: 'a Linear_pipe.Reader.t) : 'b t =
     let t = {signal= Ivar.create (); mutex= None} in
     don't_wait_for
       (Linear_pipe.iter reader ~f:(fun x ->
-         let old_value = t.mutex in
-         t.mutex <- Some (f x) ;
-         (if old_value = None then Ivar.fill t.signal ());
-         return () )) ;
+           let old_value = t.mutex in
+           t.mutex <- Some (f x) ;
+           if old_value = None then Ivar.fill t.signal () ;
+           return () )) ;
     t
 
   let get t = t.mutex
@@ -42,7 +40,7 @@ end = struct
   let rec with_value ~f t =
     match t.mutex with
     | Some x -> f x
-    | None   -> don't_wait_for (Ivar.read t.signal >>| (fun () -> with_value ~f t))
+    | None -> don't_wait_for (Ivar.read t.signal >>| fun () -> with_value ~f t)
 end
 
 module Singleton_supervisor : sig
@@ -279,23 +277,23 @@ struct
     let scheduler = Singleton_scheduler.create time_controller in
     let rec check_for_proposal () =
       Agent.with_value tip_agent ~f:(fun tip ->
-        let open Tip in
-        match
-          Consensus_mechanism.next_proposal
-            (time_to_ms (Time.now time_controller))
-            (Protocol_state.consensus_state (fst tip.protocol_state))
-            ~local_state ~keypair ~logger
-        with
-        | `Check_again time ->
-            Singleton_scheduler.schedule scheduler (time_of_ms time)
-              ~f:check_for_proposal
-        | `Propose time ->
-            Singleton_scheduler.schedule scheduler (time_of_ms time) ~f:
-              (fun () ->
-                ignore
-                  (Interruptible.finally
-                     (Singleton_supervisor.dispatch proposal_supervisor)
-                     ~f:check_for_proposal) ))
+          let open Tip in
+          match
+            Consensus_mechanism.next_proposal
+              (time_to_ms (Time.now time_controller))
+              (Protocol_state.consensus_state (fst tip.protocol_state))
+              ~local_state ~keypair ~logger
+          with
+          | `Check_again time ->
+              Singleton_scheduler.schedule scheduler (time_of_ms time)
+                ~f:check_for_proposal
+          | `Propose time ->
+              Singleton_scheduler.schedule scheduler (time_of_ms time) ~f:
+                (fun () ->
+                  ignore
+                    (Interruptible.finally
+                       (Singleton_supervisor.dispatch proposal_supervisor)
+                       ~f:check_for_proposal) ) )
     in
     check_for_proposal () ; transition_reader
 end

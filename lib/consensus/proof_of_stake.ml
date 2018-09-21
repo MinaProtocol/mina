@@ -881,13 +881,16 @@ struct
             |> Coda_base.Frozen_ledger_hash.of_ledger_hash )
       in
       if
-        previous_consensus_state.last_epoch_data.ledger.hash
-        <> next_consensus_state.last_epoch_data.ledger.hash
+        not
+          (Coda_base.Frozen_ledger_hash.equal
+             previous_consensus_state.last_epoch_data.ledger.hash
+             next_consensus_state.last_epoch_data.ledger.hash)
       then (
         if
-          Coda_base.Frozen_ledger_hash.equal
-            previous_consensus_state.last_epoch_data.ledger.hash
-            genesis_ledger_hash
+          not
+            (Coda_base.Frozen_ledger_hash.equal
+               previous_consensus_state.last_epoch_data.ledger.hash
+               genesis_ledger_hash)
         then
           Ledger_pool.free ledger_pool
             previous_consensus_state.last_epoch_data.ledger.hash ;
