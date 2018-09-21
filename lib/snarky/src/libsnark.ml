@@ -4,7 +4,19 @@ open Foreign
 
 let with_prefix prefix s = sprintf "%s_%s" prefix s
 
-module Make_group (M : sig
+module type Foreign_intf = sig
+  type t
+
+  val typ : t Ctypes.typ
+end
+
+module type Deletable_intf = sig
+  include Foreign_intf
+
+  val delete : t -> unit
+end
+
+module Make_G1 (M : sig
   val prefix : string
 end) (Field : sig
   type t
@@ -832,7 +844,7 @@ struct
 
   module Bigint : sig
     module R : sig
-      type t
+      type t [@@deriving bin_io]
 
       val typ : t Ctypes.typ
 
@@ -933,6 +945,45 @@ struct
         fun x ->
           let n = stub x in
           Caml.Gc.finalise delete n ; n
+
+      let num_limbs =
+        let stub = foreign (func_name "num_limbs") (void @-> returning int) in
+        stub ()
+
+      let bytes_per_limb =
+        let stub =
+          foreign (func_name "bytes_per_limb") (void @-> returning int)
+        in
+        let res = stub () in
+        assert (res = 8) ;
+        res
+
+      let length_in_bytes = num_limbs * bytes_per_limb
+
+      let to_bigstring =
+        let stub =
+          foreign (func_name "to_data") (typ @-> returning (ptr char))
+        in
+        fun t ->
+          let limbs = stub t in
+          Bigstring.init length_in_bytes ~f:(fun i -> Ctypes.(!@(limbs +@ i)))
+
+      let of_bigstring =
+        let stub =
+          foreign (func_name "of_data") (ptr char @-> returning typ)
+        in
+        fun s ->
+          let ptr = Ctypes.bigarray_start Ctypes.array1 s in
+          stub ptr
+
+      include Binable.Of_binable (Bigstring)
+                (struct
+                  type nonrec t = t
+
+                  let to_binable = to_bigstring
+
+                  let of_binable = of_bigstring
+                end)
 
       let to_field =
         let stub =
@@ -1288,14 +1339,129 @@ module Mnt6_0 = Make_full (struct
   let prefix = "camlsnark_mnt6"
 end)
 
+module Make_GM_verification_key_accessors (Prefix : sig
+  val prefix : string
+end)
+(Gm_verification_key : Foreign_intf) (G1 : sig
+    include Deletable_intf
+
+    module Vector : Deletable_intf
+end)
+(G2 : Deletable_intf) =
+struct
+  open Prefix
+
+  let prefix = with_prefix prefix "gm_verification_key"
+
+  let func_name = with_prefix prefix
+
+  let func name ret delete =
+    let stub =
+      foreign (func_name name) (Gm_verification_key.typ @-> returning ret)
+    in
+    fun vk ->
+      let r = stub vk in
+      Caml.Gc.finalise delete r ; r
+
+  let h = func "h" G2.typ G2.delete
+
+  let g_alpha = func "g_alpha" G1.typ G1.delete
+
+  let h_beta = func "h_beta" G2.typ G2.delete
+
+  let g_gamma = func "g_gamma" G1.typ G1.delete
+
+  let h_gamma = func "h_gamma" G2.typ G2.delete
+
+  let query = func "query" G1.Vector.typ G1.Vector.delete
+end
+
+module Make_GM_proof_accessors (Prefix : sig
+  val prefix : string
+end)
+(Proof : Foreign_intf) (G1 : sig
+    include Deletable_intf
+
+    module Vector : Deletable_intf
+end)
+(G2 : Deletable_intf) =
+struct
+  open Prefix
+
+  let prefix = with_prefix prefix "gm_proof"
+
+  let func_name = with_prefix prefix
+
+  let func name ret delete =
+    let stub = foreign (func_name name) (Proof.typ @-> returning ret) in
+    fun vk ->
+      let r = stub vk in
+      Caml.Gc.finalise delete r ; r
+
+  let a = func "a" G1.typ G1.delete
+
+  let b = func "b" G2.typ G2.delete
+
+  let c = func "c" G1.typ G1.delete
+end
+
+(* TODO: Clean this up and unify with G1 *)
+module Make_G2 (Prefix : sig
+  val prefix : string
+end) (Fq : sig
+  include Deletable_intf
+
+  module Vector : Deletable_intf
+end) =
+struct
+  type t = unit ptr
+
+  let typ = ptr void
+
+  let prefix = with_prefix Prefix.prefix "g2"
+
+  let func_name = with_prefix prefix
+
+  let delete = foreign (func_name "delete") (typ @-> returning void)
+
+  let to_coords =
+    let coord name =
+      let stub = foreign (func_name name) (typ @-> returning Fq.Vector.typ) in
+      fun t ->
+        let r = stub t in
+        Caml.Gc.finalise Fq.Vector.delete r ;
+        r
+    in
+    let to_affine =
+      foreign (func_name "to_affine_coordinates") (typ @-> returning void)
+    in
+    let get_x = coord "x" in
+    let get_y = coord "y" in
+    fun t ->
+      to_affine t ;
+      (get_x t, get_y t)
+end
+
 module Mnt4 = struct
   include Mnt4_0
-  include Make_group (Prefix) (Mnt4_0.Field) (Mnt4_0.Bigint.R) (Mnt6_0.Field)
+  module G2 = Make_G2 (Prefix) (Mnt6_0.Field)
+  include Make_G1 (Prefix) (Mnt4_0.Field) (Mnt4_0.Bigint.R) (Mnt6_0.Field)
+  module GM_proof_accessors =
+    Make_GM_proof_accessors (Prefix) (GM.Proof) (Group) (G2)
+  module GM_verification_key_accessors =
+    Make_GM_verification_key_accessors (Prefix) (GM.Verification_key) (Group)
+      (G2)
 end
 
 module Mnt6 = struct
   include Mnt6_0
-  include Make_group (Prefix) (Mnt6_0.Field) (Mnt6_0.Bigint.R) (Mnt4_0.Field)
+  module G2 = Make_G2 (Prefix) (Mnt4_0.Field)
+  include Make_G1 (Prefix) (Mnt6_0.Field) (Mnt6_0.Bigint.R) (Mnt4_0.Field)
+  module GM_proof_accessors =
+    Make_GM_proof_accessors (Prefix) (GM.Proof) (Group) (G2)
+  module GM_verification_key_accessors =
+    Make_GM_verification_key_accessors (Prefix) (GM.Verification_key) (Group)
+      (G2)
 end
 
 module type S = sig

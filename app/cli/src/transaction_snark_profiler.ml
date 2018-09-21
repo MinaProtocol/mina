@@ -3,6 +3,13 @@ open Signature_lib
 open Coda_base
 open Snark_params
 
+(* We're just profiling, so okay to monkey-patch here *)
+module Sparse_ledger = struct
+  include Sparse_ledger
+
+  let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
+end
+
 let create_ledger_and_transactions num_transitions =
   let open Tick in
   let num_accounts = 4 in
@@ -94,7 +101,6 @@ let rec pair_up = function
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
     (transitions: Transaction_snark.Transition.t list) =
-  let module Sparse_ledger = Coda_base.Sparse_ledger in
   let (base_proof_time, _), base_proofs =
     List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:
       (fun (max_span, sparse_ledger) t ->
@@ -132,7 +138,6 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
 
 let check_base_snarks sparse_ledger0
     (transitions: Transaction_snark.Transition.t list) =
-  let module Sparse_ledger = Coda_base.Sparse_ledger in
   let _ =
     let sok_message =
       Sok_message.create ~fee:Currency.Fee.zero

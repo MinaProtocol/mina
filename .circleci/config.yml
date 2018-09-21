@@ -3,7 +3,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
+        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -33,7 +33,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
+        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -60,7 +60,7 @@ jobs:
     test-runtest:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
+        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -76,7 +76,7 @@ jobs:
     test-stake:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
+        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -92,7 +92,7 @@ jobs:
     test-sig:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:4bbb9cb18121aa1a7afb3da55bc76405233ef2ac
+        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS

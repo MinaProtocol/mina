@@ -328,7 +328,7 @@ camlsnark_mnt4_r1cs_se_ppzksnark_verification_key_variable_sign_vars(
 }
 
 std::vector< libff::G1<other_curve<ppT>> >*
-camlsnark_mnt4_gm_verification_key_query(
+camlsnark_mnt4_gm_verification_key_other_query(
     r1cs_se_ppzksnark_verification_key<other_curve<ppT>> *vk)
 {
     return new std::vector<libff::G1<other_curve<ppT>>>(vk->query);
@@ -457,7 +457,7 @@ bool camlsnark_mnt4_g1_equal(libff::G1<ppT>* a, libff::G1<ppT>* b) {
   return *a == *b;
 }
 
-bool camlsnark_mnt4_g1_delete(libff::G1<ppT>* a) {
+void camlsnark_mnt4_g1_delete(libff::G1<ppT>* a) {
   delete a;
 }
 
@@ -498,6 +498,24 @@ libff::G1<ppT>* camlsnark_mnt4_g1_vector_get(std::vector<libff::G1<ppT>>* v, int
 
 void camlsnark_mnt4_g1_vector_delete(std::vector<libff::G1<ppT>>* v) {
   delete v;
+}
+
+void camlsnark_mnt4_g2_delete(libff::G2<ppT>* a) {
+  delete a;
+}
+
+void camlsnark_mnt4_g2_to_affine_coordinates(libff::G2<ppT>* a) {
+  a->to_affine_coordinates();
+}
+
+std::vector<libff::Fq<ppT>>* camlsnark_mnt4_g2_x(libff::G2<ppT>* a) {
+  assert(a->Z() == libff::Fqe<ppT>::one());
+  return new std::vector< libff::Fq<ppT> >(a->X().all_base_field_elements());
+}
+
+std::vector<libff::Fq<ppT>>* camlsnark_mnt4_g2_y(libff::G2<ppT>* a) {
+  assert(a->Z() == libff::Fqe<ppT>::one());
+  return new std::vector< libff::Fq<ppT> >(a->Y().all_base_field_elements());
 }
 
 }
