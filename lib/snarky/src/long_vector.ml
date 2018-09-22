@@ -6,4 +6,6 @@ include Vector.Make (struct
   type elt = Signed.Long.t
 
   let typ = long
+
+  let schedule_delete _ = ()
 end)

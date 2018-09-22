@@ -6,4 +6,6 @@ include Vector.Make (struct
   type elt = bool
 
   let typ = bool
+
+  let schedule_delete _ = ()
 end)
