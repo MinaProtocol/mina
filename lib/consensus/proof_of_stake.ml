@@ -93,7 +93,7 @@ let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
-let do_if_none ~f opt = match opt with None -> f () ; None | Some x -> Some x
+let iter_none ~f opt = match opt with None -> f () ; None | Some x -> Some x
 
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
@@ -476,14 +476,14 @@ struct
       let open Option.Let_syntax in
       let%bind ledger =
         Ledger_pool.find ledger_pool hash
-        |> do_if_none ~f:(fun () ->
+        |> iter_none ~f:(fun () ->
                Logger.warn logger "epoch ledger hash missing from ledger pool"
            )
       in
       let%map account_location =
         Coda_base.Ledger.location_of_key ledger
           (Public_key.compress public_key)
-        |> do_if_none ~f:(fun () ->
+        |> iter_none ~f:(fun () ->
                Logger.warn logger "no account associated with public key" )
       in
       let balance =
@@ -1046,7 +1046,8 @@ struct
         else (
           Logger.error logger
             "system time is out of sync with protocol state time" ;
-          failwith "TIME OUT OF SYNC" )
+          failwith
+            "System time is out of sync. (hint: setup NTP if you haven't)" )
       in
       let%bind proposer_stake, total_stake =
         Epoch_ledger.get_stake epoch_data.ledger ~logger

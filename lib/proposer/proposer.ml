@@ -100,6 +100,10 @@ struct
 
   let time_of_ms = Fn.compose Time.of_span_since_epoch Time.Span.of_ms
 
+  let lift_sync f =
+    Interruptible.uninterruptible
+      (Deferred.create (fun ivar -> Ivar.fill ivar (f ())))
+
   module Singleton_scheduler : sig
     type t
 
@@ -140,72 +144,64 @@ struct
     let%bind ( diff
              , `Hash_after_applying next_ledger_builder_hash
              , `Ledger_proof ledger_proof_opt ) =
-      Interruptible.uninterruptible
-        (Deferred.create (fun ivar ->
-             Ivar.fill ivar
-               (Ledger_builder.create_diff ledger_builder ~logger
-                  ~transactions_by_fee:transactions ~get_completed_work) ))
+      lift_sync (fun () ->
+          Ledger_builder.create_diff ledger_builder ~logger
+            ~transactions_by_fee:transactions ~get_completed_work )
     in
     let%bind transition_opt =
-      Interruptible.uninterruptible
-        (Deferred.create (fun ivar ->
-             let next_ledger_hash =
-               Option.value_map ledger_proof_opt
-                 ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
-                 ~default:
-                   ( previous_protocol_state |> Protocol_state.blockchain_state
-                   |> Blockchain_state.ledger_hash )
-             in
-             let blockchain_state =
-               Blockchain_state.create_value
-                 ~timestamp:(Time.now time_controller)
-                 ~ledger_hash:next_ledger_hash
-                 ~ledger_builder_hash:next_ledger_builder_hash
-             in
-             let time =
-               Time.now time_controller |> Time.to_span_since_epoch
-               |> Time.Span.to_ms
-             in
-             Ivar.fill ivar
-               (Consensus_mechanism.generate_transition
-                  ~previous_protocol_state ~blockchain_state ~local_state ~time
-                  ~keypair
-                  ~transactions:
-                    ( diff
-                        .Ledger_builder_diff.With_valid_signatures_and_proofs.
-                         transactions
-                      :> Transaction.t list )
-                  ~ledger:(Ledger_builder.ledger ledger_builder)
-                  ~logger) ))
+      lift_sync (fun () ->
+          let next_ledger_hash =
+            Option.value_map ledger_proof_opt
+              ~f:(fun (_, stmt) -> Ledger_proof.(statement_target stmt))
+              ~default:
+                ( previous_protocol_state |> Protocol_state.blockchain_state
+                |> Blockchain_state.ledger_hash )
+          in
+          let blockchain_state =
+            Blockchain_state.create_value ~timestamp:(Time.now time_controller)
+              ~ledger_hash:next_ledger_hash
+              ~ledger_builder_hash:next_ledger_builder_hash
+          in
+          let time =
+            Time.now time_controller |> Time.to_span_since_epoch
+            |> Time.Span.to_ms
+          in
+          Consensus_mechanism.generate_transition ~previous_protocol_state
+            ~blockchain_state ~local_state ~time ~keypair
+            ~transactions:
+              ( diff
+                  .Ledger_builder_diff.With_valid_signatures_and_proofs.
+                   transactions
+                :> Transaction.t list )
+            ~ledger:(Ledger_builder.ledger ledger_builder)
+            ~logger )
     in
     Option.value
       ~default:(Interruptible.return None)
       (Option.map transition_opt ~f:
          (fun (protocol_state, consensus_transition_data) ->
-           Interruptible.uninterruptible
-             (Deferred.create (fun ivar ->
-                  let snark_transition =
-                    Snark_transition.create_value
-                      ?sok_digest:
-                        (Option.map ledger_proof_opt ~f:(fun (p, _) ->
-                             Ledger_proof.sok_digest p ))
-                      ?ledger_proof:
-                        (Option.map ledger_proof_opt
-                           ~f:(Fn.compose Ledger_proof.underlying_proof fst))
-                      ~supply_increase:
-                        (Option.value_map ~default:Currency.Amount.zero
-                           ~f:(fun (_p, statement) -> statement.supply_increase)
-                           ledger_proof_opt)
-                      ~blockchain_state:
-                        (Protocol_state.blockchain_state protocol_state)
-                      ~consensus_data:consensus_transition_data ()
-                  in
-                  let internal_transition =
-                    Internal_transition.create ~snark_transition
-                      ~ledger_builder_diff:(Ledger_builder_diff.forget diff)
-                  in
-                  Ivar.fill ivar (Some (protocol_state, internal_transition))
-              )) ))
+           lift_sync (fun () ->
+               let snark_transition =
+                 Snark_transition.create_value
+                   ?sok_digest:
+                     (Option.map ledger_proof_opt ~f:(fun (p, _) ->
+                          Ledger_proof.sok_digest p ))
+                   ?ledger_proof:
+                     (Option.map ledger_proof_opt
+                        ~f:(Fn.compose Ledger_proof.underlying_proof fst))
+                   ~supply_increase:
+                     (Option.value_map ~default:Currency.Amount.zero
+                        ~f:(fun (_p, statement) -> statement.supply_increase)
+                        ledger_proof_opt)
+                   ~blockchain_state:
+                     (Protocol_state.blockchain_state protocol_state)
+                   ~consensus_data:consensus_transition_data ()
+               in
+               let internal_transition =
+                 Internal_transition.create ~snark_transition
+                   ~ledger_builder_diff:(Ledger_builder_diff.forget diff)
+               in
+               Some (protocol_state, internal_transition) ) ))
 
   module Tip = struct
     type t =
@@ -248,30 +244,28 @@ struct
           match next_state_opt with
           | None -> Interruptible.return ()
           | Some (protocol_state, internal_transition) ->
-              Interruptible.uninterruptible
-                (Deferred.create (fun ivar ->
-                     let open Deferred.Or_error.Let_syntax in
-                     ignore
-                       (let%map protocol_state_proof =
-                          Prover.prove ~prev_state:previous_protocol_state
-                            ~prev_state_proof:previous_protocol_state_proof
-                            ~next_state:protocol_state internal_transition
-                        in
-                        let external_transition =
-                          External_transition.create ~protocol_state
-                            ~protocol_state_proof
-                            ~ledger_builder_diff:
-                              (Internal_transition.ledger_builder_diff
-                                 internal_transition)
-                        in
-                        let time =
-                          Time.now time_controller |> Time.to_span_since_epoch
-                          |> Time.Span.to_ms
-                        in
-                        Linear_pipe.write_or_exn ~capacity:transition_capacity
-                          transition_writer transition_reader
-                          (external_transition, time)) ;
-                     Ivar.fill ivar () ))
+              lift_sync (fun () ->
+                  let open Deferred.Or_error.Let_syntax in
+                  ignore
+                    (let%map protocol_state_proof =
+                       Prover.prove ~prev_state:previous_protocol_state
+                         ~prev_state_proof:previous_protocol_state_proof
+                         ~next_state:protocol_state internal_transition
+                     in
+                     let external_transition =
+                       External_transition.create ~protocol_state
+                         ~protocol_state_proof
+                         ~ledger_builder_diff:
+                           (Internal_transition.ledger_builder_diff
+                              internal_transition)
+                     in
+                     let time =
+                       Time.now time_controller |> Time.to_span_since_epoch
+                       |> Time.Span.to_ms
+                     in
+                     Linear_pipe.write_or_exn ~capacity:transition_capacity
+                       transition_writer transition_reader
+                       (external_transition, time)) )
     in
     let proposal_supervisor = Singleton_supervisor.create ~task:propose in
     let scheduler = Singleton_scheduler.create time_controller in
