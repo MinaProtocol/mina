@@ -218,7 +218,8 @@ end = struct
       ; external_transitions:
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
-      ; disk_location: string }
+      ; disk_location: string
+      ; consensus_local_state: Consensus_mechanism.Local_state.t }
     [@@deriving make]
   end
 
@@ -427,9 +428,20 @@ end = struct
     don't_wait_for
       (Linear_pipe.iter mutate_state_reader ~f:(fun (changes, transition) ->
            let old_state = Transition_logic.state t.handler in
+
+           Logger.info logger "calling lock_transition hook";
+           ignore (
+             Option.map (List.find_map changes ~f:(function Locked_tip tip -> Some tip | _ -> None)) ~f:(fun new_locked_tip ->
+                Consensus_mechanism.lock_transition
+                  (old_state.tip |> External_Transition.protocol_state |> Protocol_state.consensus_state)
+                  (new_locked_tip |> External_Transition.protocol_state |> Protocol_state.consensus_state)
+                  ~local_state:consensus_local_state));
+           Logger.info logger "finished calling lock_transition hook";
+
            (* TODO: We can make change-resolving more intelligent if different
-         * concurrent processes took different times to finish. Since we
-         * serialize to one job at a time this shouldn't happen anyway though *)
+            * concurrent processes took different times to finish. Since we
+            * serialize to one job at a time this shouldn't happen anyway though *)
+
            let new_state =
              Transition_logic_state.apply_all old_state changes
            in

@@ -457,6 +457,7 @@ module Make (Inputs : Inputs_intf) = struct
       Linear_pipe.create ()
     in
     let net_ivar = Ivar.create () in
+    let consensus_local_state = Consensus_mechanism.Local_state.create () in
     let lbc_deferred =
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make ~parent_log:config.log
@@ -468,7 +469,8 @@ module Make (Inputs : Inputs_intf) = struct
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
            ~disk_location:config.ledger_builder_persistant_location
-           ~external_transitions:external_transitions_reader)
+           ~external_transitions:external_transitions_reader
+           ~consensus_local_state)
     in
     let%bind net =
       Net.create config.net_config
@@ -569,6 +571,7 @@ module Make (Inputs : Inputs_intf) = struct
           Proposer.create ~parent_log:config.log ~change_feeder:tips_r
             ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
             ~time_controller:config.time_controller ~keypair:config.keypair
+            ~consensus_local_state
         in
         don't_wait_for
           (Linear_pipe.transfer_id

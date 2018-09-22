@@ -486,6 +486,11 @@ struct
       | `Added new_tree ->
           let old_locked_head, old_best_tip = locked_and_best old_tree in
           let new_head, new_tip = locked_and_best new_tree in
+          (* TODO: ask bkase if this is the correct place to put this *)
+          Consensus_mechanism.lock_transition
+            (old_head.data |> External_Transition.protocol_state |> Protocol_state.consensus_state)
+            (new_head.data |> External_Transition.protocol_state |> Protocol_state.consensus_state)
+            ~local_state:consensus_local_state
           if
             With_hash.compare External_transition.compare State_hash.compare
               old_locked_head new_head

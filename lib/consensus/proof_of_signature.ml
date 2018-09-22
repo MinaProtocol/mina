@@ -186,6 +186,8 @@ struct
       Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
 
+  let lock_transition _ _ ~local_state:_ = ()
+
   let genesis_protocol_state =
     Protocol_state.create_value
       ~previous_state_hash:(Protocol_state.hash Protocol_state.negative_one)

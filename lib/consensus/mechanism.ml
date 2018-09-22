@@ -61,7 +61,7 @@ module type S = sig
     -> time:Unix_timestamp.t
     -> keypair:Signature_lib.Keypair.t
     -> transactions:Coda_base.Transaction.t list
-    -> ledger:Coda_base.Ledger.t
+    -> ledger_hash:Coda_base.Ledger_hash.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
   (**
    * Generate a new protocol state and consensus specific transition data
@@ -97,5 +97,14 @@ module type S = sig
    * Select between two ledger builder controller tips given the consensus
    * states for the two tips. Returns `\`Keep` if the first tip should be
    * kept, or `\`Take` if the second tip should be taken instead.
+   *)
+
+  val lock_transition :
+       Consensus_state.value
+    -> Consensus_state.value
+    -> local_state:Local_state.t
+    -> unit
+  (**
+   * A hook for managing local state when the locked tip is updated.
    *)
 end
