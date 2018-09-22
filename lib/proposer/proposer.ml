@@ -109,8 +109,6 @@ struct
 
     val create : Time.Controller.t -> t
 
-    (* val cancel : t -> unit *)
-
     val schedule : t -> Time.t -> f:(unit -> unit) -> unit
   end = struct
     type t =
