@@ -1022,8 +1022,6 @@ struct
     val to_bigstring : t -> Bigstring.t
 
     val of_bigstring : Bigstring.t -> t
-
-    val r1cs_constraint_system : t -> M.R1CS_constraint_system.t
   end = struct
     type t = unit ptr
 
@@ -1034,11 +1032,6 @@ struct
     let func_name = with_prefix prefix
 
     let delete = foreign (with_prefix prefix "delete") (typ @-> returning void)
-
-    let r1cs_constraint_system =
-      foreign
-        (with_prefix M.prefix "proving_key_r1cs_constraint_system")
-        (typ @-> returning M.R1CS_constraint_system.typ)
 
     let to_string : t -> string =
       let stub =
