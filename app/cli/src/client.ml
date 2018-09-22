@@ -147,6 +147,22 @@ let get_nonce addr port =
   | Ok None -> Error "No account found at that public_key"
   | Error e -> Error (Error.to_string_hum e)
 
+let get_nonce_cmd =
+  let open Command.Param in
+  let address_flag =
+    flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
+      (required public_key)
+  in
+  Command.async ~summary:"Get the current nonce for an account"
+    (Daemon_cli.init address_flag ~f:(fun port address ->
+         match%bind get_nonce address port with
+         | Error e ->
+             eprintf "Failed to get nonce: %s\n" e ;
+             exit 1
+         | Ok nonce ->
+             printf "%s\n" (Account.Nonce.to_string nonce) ;
+             exit 0 ))
+
 let status =
   let open Deferred.Let_syntax in
   let open Client_lib in
@@ -317,6 +333,7 @@ let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
     ; ("get-public-keys", get_public_keys)
+    ; ("get-nonce", get_nonce_cmd)
     ; ("send-txn", send_txn)
     ; ("status", status)
     ; ("wrap-key", wrap_key)

@@ -6,8 +6,13 @@ open Signature_lib
 
 module Global_public_key = struct
   let compressed =
-    Public_key.Compressed.of_base64_exn
-      "KA0mFlIh+GxTxmv22OLTSuKS+7by7RFp1wBPdQnlxmCA/GaZf+8AAAAB"
+    match Signer_private_key.mode with
+    | `Dev ->
+        Public_key.Compressed.of_base64_exn
+          "KA0mFlIh+GxTxmv22OLTSuKS+7by7RFp1wBPdQnlxmCA/GaZf+8AAAAB"
+    | `Prod ->
+        Public_key.Compressed.of_base64_exn
+          "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"
 
   let t = Public_key.decompress_exn compressed
 end
@@ -59,12 +64,9 @@ struct
         ~value_of_hlist:of_hlist
 
     let create_value blockchain_state =
-      match Signer_private_key.signer_private_key with
-      | None ->
-          failwith "This build was not compiled with the signer private key. "
-      | Some private_key ->
-          { signature=
-              Blockchain_state.Signature.sign private_key blockchain_state }
+      { signature=
+          Blockchain_state.Signature.sign Signer_private_key.signer_private_key
+            blockchain_state }
 
     let genesis = create_value Blockchain_state.genesis
   end
@@ -129,7 +131,7 @@ struct
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_ =
+      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_ ~logger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -183,6 +185,16 @@ struct
   let select Consensus_state.({length= l1; _})
       Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
+
+  let next_proposal now _state ~local_state:_ ~keypair:_ ~logger:_ =
+    let open Unix_timestamp in
+    let time_since_last_interval =
+      rem now (Time.Span.to_ms Inputs.proposal_interval)
+    in
+    let proposal_time =
+      now - time_since_last_interval + Time.Span.to_ms Inputs.proposal_interval
+    in
+    `Propose proposal_time
 
   let genesis_protocol_state =
     Protocol_state.create_value
