@@ -141,7 +141,10 @@ struct
     {diff: diff; coinbase_added: Completed_work.t At_most_one.t}
   [@@deriving sexp, bin_io]
 
-  type pre_diffs = (diff_with_at_most_one_coinbase, ( diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase))Either.t
+  type pre_diffs =
+    ( diff_with_at_most_one_coinbase
+    , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
+    Either.t
   [@@deriving sexp, bin_io]
 
   type t =
@@ -166,7 +169,10 @@ struct
       ; coinbase_added: Inputs.Completed_work.Checked.t At_most_one.t }
     [@@deriving sexp]
 
-    type pre_diffs = (diff_with_at_most_one_coinbase, ( diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase))Either.t
+    type pre_diffs =
+      ( diff_with_at_most_one_coinbase
+      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
+      Either.t
     [@@deriving sexp]
 
     type t =
@@ -176,7 +182,9 @@ struct
     [@@deriving sexp]
 
     let transactions t =
-      Either.value_map t.pre_diffs ~first:(fun d -> d.diff.transactions) ~second:(fun d -> (fst d).diff.transactions @ (snd d).diff.transactions )
+      Either.value_map t.pre_diffs
+        ~first:(fun d -> d.diff.transactions)
+        ~second:(fun d -> (fst d).diff.transactions @ (snd d).diff.transactions)
   end
 
   let forget_diff
@@ -208,14 +216,18 @@ struct
     {diff= forget_diff diff; coinbase_added= forget_cw}
 
   let forget (t: With_valid_signatures_and_proofs.t) =
-    { pre_diffs= Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one ~second:(fun d ->
-        ( forget_pre_diff_with_at_most_two (fst d)
-        , forget_pre_diff_with_at_most_one (snd d) ))
+    { pre_diffs=
+        Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one ~second:
+          (fun d ->
+            ( forget_pre_diff_with_at_most_two (fst d)
+            , forget_pre_diff_with_at_most_one (snd d) ) )
     ; prev_hash= t.prev_hash
     ; creator= t.creator }
 
   let transactions (t: t) =
-      Either.value_map t.pre_diffs ~first:(fun d -> d.diff.transactions) ~second:(fun d -> (fst d).diff.transactions @ (snd d).diff.transactions )
+    Either.value_map t.pre_diffs
+      ~first:(fun d -> d.diff.transactions)
+      ~second:(fun d -> (fst d).diff.transactions @ (snd d).diff.transactions)
 end
 
 module Make (Inputs : Inputs.S) : sig
@@ -723,7 +735,7 @@ end = struct
       else Some (prover, fee)
     in
     let fee_transfer cw_opt =
-      Option.value_map ~default:None cw_opt ~f:single
+      Option.bind cw_opt ~f:single
     in
     let two_parts amt w1 w2 =
       let%bind rem_coinbase = overflow_err coinbase amt in
@@ -810,12 +822,13 @@ end = struct
     let%map new_data =
       update_ledger_and_get_statements t.ledger super_transactions
     in
-    (new_data, diff.completed_works, coinbase_work )
+    (new_data, diff.completed_works, coinbase_work)
 
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_diff t (diff: Ledger_builder_diff.t) =
     let open Result_with_rollback.Let_syntax in
-    let apply_pre_diff_with_at_most_two (pre_diff1: Ledger_builder_diff.diff_with_at_most_two_coinbase) =
+    let apply_pre_diff_with_at_most_two
+        (pre_diff1: Ledger_builder_diff.diff_with_at_most_two_coinbase) =
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
         | Zero -> `Zero
@@ -824,7 +837,8 @@ end = struct
       in
       apply_pre_diff t coinbase_parts pre_diff1.diff
     in
-    let apply_pre_diff_with_at_most_one (pre_diff2: Ledger_builder_diff.diff_with_at_most_one_coinbase) =
+    let apply_pre_diff_with_at_most_one
+        (pre_diff2: Ledger_builder_diff.diff_with_at_most_one_coinbase) =
       let coinbase_added =
         match pre_diff2.coinbase_added with Zero -> `Zero | One x -> `One x
       in
@@ -840,12 +854,19 @@ end = struct
         (Ledger_builder_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
-    let%bind (data, works) = 
-      Either.value_map diff.pre_diffs ~first:(fun d -> let%map (data, works, cb_works) = apply_pre_diff_with_at_most_one d in  (data, cb_works @ works))
-        ~second:(fun d -> 
-      let%bind data1, works1, cb_works1 = apply_pre_diff_with_at_most_two (fst d) in
-      let%map data2, works2, cb_works2 = apply_pre_diff_with_at_most_one (snd d)
-      in (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2))
+    let%bind data, works =
+      Either.value_map diff.pre_diffs
+        ~first:(fun d ->
+          let%map data, works, cb_works = apply_pre_diff_with_at_most_one d in
+          (data, cb_works @ works) )
+        ~second:(fun d ->
+          let%bind data1, works1, cb_works1 =
+            apply_pre_diff_with_at_most_two (fst d)
+          in
+          let%map data2, works2, cb_works2 =
+            apply_pre_diff_with_at_most_one (snd d)
+          in
+          (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2) )
     in
     let%bind () = check_completed_works t works in
     let%bind res_opt =
@@ -901,7 +922,8 @@ end = struct
       (diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
     let apply_pre_diff_with_at_most_two
         (pre_diff1:
-          Ledger_builder_diff.With_valid_signatures_and_proofs.diff_with_at_most_two_coinbase) =
+          Ledger_builder_diff.With_valid_signatures_and_proofs.
+          diff_with_at_most_two_coinbase) =
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
         | Zero -> `Zero
@@ -916,7 +938,8 @@ end = struct
     in
     let apply_pre_diff_with_at_most_one
         (pre_diff2:
-          Ledger_builder_diff.With_valid_signatures_and_proofs.diff_with_at_most_one_coinbase) =
+          Ledger_builder_diff.With_valid_signatures_and_proofs.
+          diff_with_at_most_one_coinbase) =
       let coinbase_added =
         match pre_diff2.coinbase_added with
         | Zero -> `Zero
@@ -924,18 +947,24 @@ end = struct
       in
       apply_pre_diff_unchecked t coinbase_added pre_diff2.diff
     in
-    let (data, works) = 
-      Either.value_map diff.pre_diffs ~first:(fun d -> let (data, works, cb_works) = apply_pre_diff_with_at_most_one d in  (data, cb_works @ works))
-        ~second:(fun d -> 
-      let data1, works1, cb_works1 = apply_pre_diff_with_at_most_two (fst d) in
-      let data2, works2, cb_works2 = apply_pre_diff_with_at_most_one (snd d)
-      in (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2))
+    let data, works =
+      Either.value_map diff.pre_diffs
+        ~first:(fun d ->
+          let data, works, cb_works = apply_pre_diff_with_at_most_one d in
+          (data, cb_works @ works) )
+        ~second:(fun d ->
+          let data1, works1, cb_works1 =
+            apply_pre_diff_with_at_most_two (fst d)
+          in
+          let data2, works2, cb_works2 =
+            apply_pre_diff_with_at_most_one (snd d)
+          in
+          (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2) )
     in
     let res_opt =
       Or_error.ok_exn (fill_in_completed_work t.scan_state works)
     in
-    Or_error.ok_exn
-      (Parallel_scan.enqueue_data ~state:t.scan_state ~data) ;
+    Or_error.ok_exn (Parallel_scan.enqueue_data ~state:t.scan_state ~data) ;
     res_opt
 
   let sequence_chunks_of seq ~n =
@@ -1002,8 +1031,10 @@ end = struct
       ; self_pk: Compressed_public_key.t }
     [@@deriving sexp]
 
-    let space_available t =
-      Queue_consumption.count t.queue_consumption < t.available_queue_space
+    let available_space t =
+      t.available_queue_space - Queue_consumption.count t.queue_consumption
+
+    let is_space_available t = available_space t > 0
 
     let budget_non_neg t = Fee.Signed.sgn t.budget = Sgn.Pos
 
@@ -1023,7 +1054,7 @@ end = struct
         else Queue_consumption.add_fee_transfer t.queue_consumption t.self_pk
       in
       let queue_consumption = Queue_consumption.add_transaction q in
-      if not (space_available {t with queue_consumption= q}) then
+      if not (is_space_available {t with queue_consumption= q}) then
         Or_error.error_string "Error adding a transaction: Insufficient space"
       else
         Ok
@@ -1034,7 +1065,7 @@ end = struct
 
     let add_coinbase t =
       let open Or_error.Let_syntax in
-      if not (space_available t) then
+      if not (is_space_available t) then
         Or_error.error_string "Error adding coinbase: Insufficient space"
       else
         let queue_consumption =
@@ -1190,7 +1221,7 @@ end = struct
     match
       ( Sequence.next current.work_to_do
       , Sequence.next current.txns_to_include
-      , Resources.space_available current.resources )
+      , Resources.is_space_available current.resources )
     with
     | None, None, _ ->
         (valid, txns_not_included valid.resources current.resources)
@@ -1259,11 +1290,12 @@ end = struct
       in
       if n > 2 then
         log_error_and_return_value logger
-          (Error (Error.of_string "Coinbase splitting more than twice"))
+          (Error
+             (Error.of_string "Tried to split the coinbase more than twice"))
           res_util
       else go res_util res_util n
 
-  let allocate_resources coinbase_parts logger get_completed_work ledger
+  let coinbase_after_txns coinbase_parts logger get_completed_work ledger
       init_res_util : Resource_util.t =
     let res_util, txns_to_undo =
       check_resources_add_txns logger get_completed_work ledger init_res_util
@@ -1279,32 +1311,35 @@ end = struct
       {res_util with resources= res}
       get_completed_work
 
-  let one_prediff logger ws_seq ts_seq get_completed_work ledger self available_queue_space ~add_coinbase=
+  let one_prediff logger ws_seq ts_seq get_completed_work ledger self
+      available_queue_space ~add_coinbase =
     let init_resources =
-      Resources.init
-        ~available_queue_space
-        ~self (Second Ledger_builder_diff.At_most_one.Zero)
+      Resources.init ~available_queue_space ~self
+        (Second Ledger_builder_diff.At_most_one.Zero)
     in
     let init_res_util =
       { Resource_util.resources= init_resources
       ; work_to_do= ws_seq
       ; txns_to_include= ts_seq }
     in
-    let res_util_with_coinbase = if add_coinbase then update_coinbase_count 1 logger init_res_util get_completed_work else init_res_util
+    let res_util_with_coinbase =
+      if add_coinbase then
+        update_coinbase_count 1 logger init_res_util get_completed_work
+      else init_res_util
     in
     let res_util_with_txns, txns_to_undo =
-      check_resources_add_txns logger get_completed_work ledger res_util_with_coinbase res_util_with_coinbase
+      check_resources_add_txns logger get_completed_work ledger
+        res_util_with_coinbase res_util_with_coinbase
     in
     let _ = undo_txns ledger txns_to_undo in
     res_util_with_txns.resources
 
-  let two_prediffs logger ws_seq ts_seq get_completed_work ledger
-      self partitions (*: (Resources_util.t, Resources.t * Resources.t option) Either.t*) =
-    (*Reserve a slot for coinbase when there is one just one diff and allocate resources for txns*)
+  let two_prediffs logger ws_seq ts_seq get_completed_work ledger self
+      partitions
+      (*: (Resources_util.t, Resources.t * Resources.t option) Either.t*) =
     let init_resources =
-      Resources.init
-        ~available_queue_space:(fst partitions)
-        ~self (First Ledger_builder_diff.At_most_two.Zero)
+      Resources.init ~available_queue_space:(fst partitions) ~self
+        (First Ledger_builder_diff.At_most_two.Zero)
     in
     let init_res_util =
       { Resource_util.resources= init_resources
@@ -1313,102 +1348,107 @@ end = struct
     in
     (*splitting coinbase into n parts*)
     let remaining_slots (res_util: Resource_util.t) =
-          let n' =
-            res_util.resources.available_queue_space
-            - Resources.Queue_consumption.count
-                res_util.resources.queue_consumption
-          in
-          (*if there are no more transactions to be included in the second prediff then don't bother splitting up the coinbase*)
-          if n' > 1 && Sequence.length res_util.txns_to_include = 0 then 1
-          else n'
+      let n' = Resources.available_space res_util.resources in
+      (*if there are no more transactions to be included in the second prediff then don't bother splitting up the coinbase*)
+      if n' > 1 && Sequence.length res_util.txns_to_include = 0 then 1 else n'
     in
     let res_util_coinbase =
-      allocate_resources remaining_slots logger get_completed_work ledger init_res_util
+      coinbase_after_txns remaining_slots logger get_completed_work ledger
+        init_res_util
     in
-    let coinbase_not_added = not @@ ((remaining_slots res_util_coinbase) > 0) && (Resources.coinbase_added res_util_coinbase.resources)
+    let unable_to_add_coinbase =
+      Resources.is_space_available res_util_coinbase.resources
+      && not (Resources.coinbase_added res_util_coinbase.resources)
     in
-    if coinbase_not_added then
-      let _ = undo_txns ledger (res_util_coinbase.resources.transactions) in
-      let res = one_prediff logger ws_seq ts_seq get_completed_work ledger self (fst partitions) ~add_coinbase:true
-      in 
+    if unable_to_add_coinbase then
+      (*Not enough work to add coinbase and therefore recompute the diff again
+      by adding coinbase first, resulting in a single pre_diff*)
+      let _ = undo_txns ledger res_util_coinbase.resources.transactions in
+      let res =
+        one_prediff logger ws_seq ts_seq get_completed_work ledger self
+          (fst partitions) ~add_coinbase:true
+      in
       First res
     else
-        (let res_coinbase2 = 
-          one_prediff logger res_util_coinbase.work_to_do res_util_coinbase.txns_to_include get_completed_work ledger self (snd partitions) ~add_coinbase:(not (Resources.coinbase_added res_util_coinbase.resources))
+      let res_coinbase2 =
+        one_prediff logger res_util_coinbase.work_to_do
+          res_util_coinbase.txns_to_include get_completed_work ledger self
+          (snd partitions)
+          ~add_coinbase:
+            (not (Resources.coinbase_added res_util_coinbase.resources))
+      in
+      let coinbase_added =
+        Resources.coinbase_added res_util_coinbase.resources
+        || Resources.coinbase_added res_coinbase2
+      in
+      if coinbase_added then (
+        (*All the slots have been filled in the first pre_diff*)
+        assert (
+          Resources.Queue_consumption.count
+            res_util_coinbase.resources.queue_consumption
+          = fst partitions
+          || List.length res_coinbase2.transactions = 0 ) ;
+        Second (res_util_coinbase.resources, res_coinbase2) )
+      else
+        (*Not enough work to add coinbase and therefore recompute the diff
+        again by adding coinbase first, resulting in a single pre_diff*)
+        let _ =
+          undo_txns ledger
+            ( res_coinbase2.transactions
+            @ res_util_coinbase.resources.transactions )
         in
-        let coinbase_added = (Resources.coinbase_added res_util_coinbase.resources) || (Resources.coinbase_added res_coinbase2)
+        let res =
+          one_prediff logger ws_seq ts_seq get_completed_work ledger self
+            (fst partitions) ~add_coinbase:true
         in
-        if coinbase_added then
-          ((*All the slots have been filled in the first pre_diff*)
-          assert (
-            Resources.Queue_consumption.count
-              res_util_coinbase.resources.queue_consumption
-            = fst partitions
-            || List.length res_coinbase2.transactions = 0 );
-          Second (res_util_coinbase.resources, res_coinbase2))
-        else
-          (let _ = undo_txns ledger (res_coinbase2.transactions @ res_util_coinbase.resources.transactions) 
-          in
-          let res = one_prediff logger ws_seq ts_seq get_completed_work ledger self (fst partitions) ~add_coinbase:true
-          in First res))
-          (*let coinbase_parts =
-            if Resources.coinbase_added res_util_coinbase.resources then 0
-            else 1
-          in
-          let init_resources =
-            Resources.init ~available_queue_space:(snd partitions) ~self
-              (Second Ledger_builder_diff.At_most_one.Zero)
-          in
-          let init_res_util =
-            { Resource_util.resources= init_resources
-            ; work_to_do= res_util_coinbase.work_to_do
-            ; txns_to_include= res_util_coinbase.txns_to_include }
-          in
-          let res_util_final =
-            allocate_resources
-              (fun _ -> coinbase_parts)
-              logger get_completed_work ledger init_res_util*)
+        First res
 
-  let generate_prediff logger ws_seq ts_seq get_completed_work ledger
-  self partitions = 
-    let gen_one_diff (res: Resources.t) :
-        Ledger_builder_diff.With_valid_signatures_and_proofs.diff_with_at_most_one_coinbase = 
+  let generate_prediff logger ws_seq ts_seq get_completed_work ledger self
+      partitions =
+    let diff (res: Resources.t) :
+        Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
       (* We have to reverse here because we only know they work in THIS order *)
-      let diff : Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
-        {transactions= List.rev_map res.transactions ~f:fst; completed_works= List.rev res.completed_works}
-      in
-      match res.coinbase_parts with
-      | First _ -> Logger.error logger "Invalid number of coinbase split";
-                    {diff; coinbase_added= Ledger_builder_diff.At_most_one.Zero}
-      | Second w -> {diff; coinbase_added= w}
+      { transactions= List.rev_map res.transactions ~f:fst
+      ; completed_works= List.rev res.completed_works }
     in
-    let gen_diff_with_two (res: Resources.t):
-        Ledger_builder_diff.With_valid_signatures_and_proofs.diff_with_at_most_two_coinbase = 
-      (* We have to reverse here because we only know they work in THIS order *)
-      let diff : Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
-        {transactions= List.rev_map res.transactions ~f:fst; completed_works= List.rev res.completed_works}
-      in
+    let make_diff_with_one (res: Resources.t) :
+        Ledger_builder_diff.With_valid_signatures_and_proofs.
+        diff_with_at_most_one_coinbase =
       match res.coinbase_parts with
-      | First w -> {diff; coinbase_parts= w}
-      | Second _ -> Logger.error logger "Error while creating a diff: Invalid resource configuration";
-        {diff; coinbase_parts= Ledger_builder_diff.At_most_two.Zero}
+      | First _ ->
+          Logger.error logger
+            "Error while creating a diff: Invalid resource configuration" ;
+          {diff= diff res; coinbase_added= Ledger_builder_diff.At_most_one.Zero}
+      | Second w -> {diff= diff res; coinbase_added= w}
+    in
+    let make_diff_with_two (res: Resources.t) :
+        Ledger_builder_diff.With_valid_signatures_and_proofs.
+        diff_with_at_most_two_coinbase =
+      match res.coinbase_parts with
+      | First w -> {diff= diff res; coinbase_parts= w}
+      | Second _ ->
+          Logger.error logger
+            "Error while creating a diff: Invalid resource configuration" ;
+          {diff= diff res; coinbase_parts= Ledger_builder_diff.At_most_two.Zero}
     in
     match partitions with
-    | `One x -> 
-      let res = one_prediff logger ws_seq ts_seq get_completed_work ledger
-        self x ~add_coinbase:true
-      in 
-      let _ = undo_txns ledger res.transactions in 
-      (First (gen_one_diff res))
-    | `Two (x,y) ->
-      match two_prediffs logger ws_seq ts_seq get_completed_work ledger self (x,y) with
-      | First res -> let _ = undo_txns ledger res.transactions in  (First (gen_one_diff res))
+    | `One x ->
+        let res =
+          one_prediff logger ws_seq ts_seq get_completed_work ledger self x
+            ~add_coinbase:true
+        in
+        let _ = undo_txns ledger res.transactions in
+        First (make_diff_with_one res)
+    | `Two (x, y) ->
+      match
+        two_prediffs logger ws_seq ts_seq get_completed_work ledger self (x, y)
+      with
+      | First res ->
+          let _ = undo_txns ledger res.transactions in
+          First (make_diff_with_one res)
       | Second (res1, res2) ->
-        Core.printf !"Resources %{sexp: Resources.t * Resources.t} \n %!" (res1, res2);
-        let _ = undo_txns ledger (res2.transactions @ res1.transactions) in  
-        let prediffs = (gen_one_diff res2, gen_diff_with_two res1) in
-        Core.printf !"Coinbase %{sexp: Ledger_builder_diff.With_valid_signatures_and_proofs.diff_with_at_most_one_coinbase} \n %!" (fst prediffs);
-        Second (snd prediffs, fst prediffs)
+          let _ = undo_txns ledger (res2.transactions @ res1.transactions) in
+          Second (make_diff_with_two res1, make_diff_with_one res2)
 
   let create_diff t ~logger
       ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
@@ -1424,37 +1464,9 @@ end = struct
         t'.scan_state
     in
     let pre_diffs =
-      generate_prediff logger (work_to_do t'.scan_state)
-        transactions_by_fee get_completed_work ledger t'.public_key partitions
+      generate_prediff logger (work_to_do t'.scan_state) transactions_by_fee
+        get_completed_work ledger t'.public_key partitions
     in
-    (*let gen_diff (res: Resources.t) :
-        ( Ledger_builder_diff.With_valid_signatures_and_proofs.first_pre_diff
-        , Ledger_builder_diff.With_valid_signatures_and_proofs.second_pre_diff
-        )
-        Either.t =
-      (* We have to reverse here because we only know they work in THIS order *)
-      let transactions =
-        List.rev_map res.transactions ~f:(fun (t, u) ->
-            Or_error.ok_exn (Ledger.undo ledger u) ;
-            t )
-      in
-      let diff : Ledger_builder_diff.With_valid_signatures_and_proofs.diff =
-        {transactions; completed_works= List.rev res.completed_works}
-      in
-      match res.coinbase_parts with
-      | First w -> First {diff; coinbase_parts= w}
-      | Second w -> Second {diff; coinbase_added= w}
-    in
-    let maybe_pre_diff2 =
-      Option.map more_resources ~f:(fun res -> gen_diff res)
-    in
-    let pre_diff1 = gen_diff resources in
-    let pre_diffs =
-      match (maybe_pre_diff2, pre_diff1) with
-      | None, First p1 -> (p1, None)
-      | Some (Second p2), First p1 -> (p1, Some p2)
-      | _ -> failwith "invalid prediffs"
-    in*)
     let diff =
       { Ledger_builder_diff.With_valid_signatures_and_proofs.pre_diffs
       ; creator= t'.public_key
@@ -1873,8 +1885,11 @@ let%test_module "test" =
           {diff: diff; coinbase_added: completed_work At_most_one.t}
         [@@deriving sexp, bin_io]
 
-        type pre_diffs = (diff_with_at_most_one_coinbase, ( diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase))Either.t
-          [@@deriving sexp, bin_io]
+        type pre_diffs =
+          ( diff_with_at_most_one_coinbase
+          , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
+          Either.t
+        [@@deriving sexp, bin_io]
 
         type t =
           { pre_diffs: pre_diffs
@@ -1896,8 +1911,12 @@ let%test_module "test" =
             {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
           [@@deriving sexp]
 
-          type pre_diffs = (diff_with_at_most_one_coinbase, ( diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase))Either.t
-            [@@deriving sexp, bin_io]
+          type pre_diffs =
+            ( diff_with_at_most_one_coinbase
+            , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase
+            )
+            Either.t
+          [@@deriving sexp, bin_io]
 
           type t =
             { pre_diffs: pre_diffs
@@ -1906,14 +1925,17 @@ let%test_module "test" =
           [@@deriving sexp]
 
           let transactions t =
-            Either.value_map t.pre_diffs ~first:(fun d -> d.diff.transactions) ~second:(fun d -> (fst d).diff.transactions @ (snd d).diff.transactions )
+            Either.value_map t.pre_diffs
+              ~first:(fun d -> d.diff.transactions)
+              ~second:(fun d ->
+                (fst d).diff.transactions @ (snd d).diff.transactions )
         end
-      
+
         let forget_diff
             {With_valid_signatures_and_proofs.completed_works; transactions} =
           { completed_works= List.map ~f:Completed_work.forget completed_works
           ; transactions= (transactions :> Transaction.t list) }
-      
+
         let forget_pre_diff_with_at_most_two
             {With_valid_signatures_and_proofs.diff; coinbase_parts} =
           let forget_cw =
@@ -1927,7 +1949,7 @@ let%test_module "test" =
                        , Option.map cw_opt ~f:Completed_work.forget ) ))
           in
           {diff= forget_diff diff; coinbase_parts= forget_cw}
-      
+
         let forget_pre_diff_with_at_most_one
             {With_valid_signatures_and_proofs.diff; coinbase_added} =
           let forget_cw =
@@ -1936,16 +1958,21 @@ let%test_module "test" =
             | One cw -> One (Option.map cw ~f:Completed_work.forget)
           in
           {diff= forget_diff diff; coinbase_added= forget_cw}
-      
+
         let forget (t: With_valid_signatures_and_proofs.t) =
-          { pre_diffs= Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one ~second:(fun d ->
-              ( forget_pre_diff_with_at_most_two (fst d)
-              , forget_pre_diff_with_at_most_one (snd d) ))
+          { pre_diffs=
+              Either.map t.pre_diffs ~first:forget_pre_diff_with_at_most_one
+                ~second:(fun d ->
+                  ( forget_pre_diff_with_at_most_two (fst d)
+                  , forget_pre_diff_with_at_most_one (snd d) ) )
           ; prev_hash= t.prev_hash
           ; creator= t.creator }
-      
+
         let transactions (t: t) =
-            Either.value_map t.pre_diffs ~first:(fun d -> d.diff.transactions) ~second:(fun d -> (fst d).diff.transactions @ (snd d).diff.transactions )
+          Either.value_map t.pre_diffs
+            ~first:(fun d -> d.diff.transactions)
+            ~second:(fun d ->
+              (fst d).diff.transactions @ (snd d).diff.transactions )
       end
 
       module Config = struct
@@ -1998,11 +2025,11 @@ let%test_module "test" =
 
     let coinbase_added (diff: Test_input1.Ledger_builder_diff.t) =
       match diff.pre_diffs with
-        | First d -> coinbase_added_second_prediff d.coinbase_added
-        | Second (d1, d2) -> 
+      | First d -> coinbase_added_second_prediff d.coinbase_added
+      | Second (d1, d2) ->
           let x = coinbase_added_first_prediff d1.coinbase_parts in
-          let y = coinbase_added_second_prediff d2.coinbase_added
-          in x + y
+          let y = coinbase_added_second_prediff d2.coinbase_added in
+          x + y
 
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)

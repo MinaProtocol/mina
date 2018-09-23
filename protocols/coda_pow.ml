@@ -406,13 +406,14 @@ module type Ledger_builder_diff_intf = sig
     {diff: diff; coinbase_added: completed_work At_most_one.t}
   [@@deriving sexp, bin_io]
 
-  type pre_diffs = (diff_with_at_most_one_coinbase, ( diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase))Either.t
+  type pre_diffs =
+    ( diff_with_at_most_one_coinbase
+    , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
+    Either.t
   [@@deriving sexp, bin_io]
 
   type t =
-    { pre_diffs: pre_diffs
-    ; prev_hash: ledger_builder_hash
-    ; creator: public_key }
+    {pre_diffs: pre_diffs; prev_hash: ledger_builder_hash; creator: public_key}
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs : sig
@@ -429,7 +430,10 @@ module type Ledger_builder_diff_intf = sig
       {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
     [@@deriving sexp]
 
-    type pre_diffs = (diff_with_at_most_one_coinbase, ( diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase))Either.t
+    type pre_diffs =
+      ( diff_with_at_most_one_coinbase
+      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
+      Either.t
     [@@deriving sexp]
 
     type t =
