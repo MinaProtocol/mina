@@ -1,0 +1,101 @@
+.info {
+  width: 300px;
+  padding: 30px;
+  background-color: #F9FAFC;
+}
+
+.info p {
+  font-size: 14pt;
+}
+
+.main {
+  display: flex;
+  justify-content: space-between;
+  margin-left: auto;
+  margin-right: auto;
+  width: 1700px;
+}
+
+.state-with-proof {
+    width: 500px;
+    display: inline-flex;
+    flex-direction: column;
+}
+
+.state {
+    width: 500px;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+.record {
+    background-color: #F9FAFC;
+    border: 3px solid #1F2D3D;
+    padding: 5px;
+}
+
+.record-entry {
+    border: 3px solid #1F2D3D;
+    background-color: #F9FAFC;
+    margin: 10px;
+    flex-grow: 1;
+    min-width: 1%;
+}
+
+.record-entry-label {
+    background-color: #1F2D3D;
+    height: 20px;
+    font-size: 20px;
+    color: white;
+    padding: 7px;
+}
+
+.record-entry-value {
+    word-wrap: break-word;
+    padding: 10px;
+}
+
+.proof {
+    width: 300px;
+    margin-left:auto;
+    margin-right:auto;
+}
+
+.proof .record-entry-value {
+    font-size: 8pt;
+}
+
+.proof.valid .record-entry-label {
+    background-color: #39B54A;
+}
+
+.proof.valid {
+    border-color: #39B54A;
+}
+
+.proof.verifying .record-entry-label {
+    background-color: #FBB03B;
+}
+
+.proof.verifying {
+    border-color: #FBB03B;
+}
+
+.proof.invalid .record-entry-label {
+    background-color: #ED1C24;
+}
+
+.proof.invalid {
+    border-color: #ED1C24;
+}
+
+.merkle-tree {
+  vertical-align: top;
+  display: inline-block;
+  position: relative;
+}
+
+.record-row {
+  display: flex;
+  width: 100%;
+}
