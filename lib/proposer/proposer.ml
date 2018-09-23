@@ -167,9 +167,9 @@ struct
           Consensus_mechanism.generate_transition ~previous_protocol_state
             ~blockchain_state ~local_state ~time ~keypair
             ~transactions:
-            ( Ledger_builder_diff.With_valid_signatures_and_proofs.transactions
-            diff
-          :> Transaction.t list )
+              ( Ledger_builder_diff.With_valid_signatures_and_proofs.
+                transactions diff
+                :> Transaction.t list )
             ~ledger:(Ledger_builder.ledger ledger_builder)
             ~logger )
     in
