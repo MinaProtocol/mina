@@ -398,16 +398,19 @@ module type Ledger_builder_diff_intf = sig
     {completed_works: completed_work list; transactions: transaction list}
   [@@deriving sexp, bin_io]
 
-  type first_pre_diff =
+  type diff_with_at_most_two_coinbase =
     {diff: diff; coinbase_parts: completed_work At_most_two.t}
   [@@deriving sexp, bin_io]
 
-  type second_pre_diff =
+  type diff_with_at_most_one_coinbase =
     {diff: diff; coinbase_added: completed_work At_most_one.t}
   [@@deriving sexp, bin_io]
 
+  type pre_diffs = (diff_with_at_most_one_coinbase, ( diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase))Either.t
+  [@@deriving sexp, bin_io]
+
   type t =
-    { pre_diffs: first_pre_diff * second_pre_diff option
+    { pre_diffs: pre_diffs
     ; prev_hash: ledger_builder_hash
     ; creator: public_key }
   [@@deriving sexp, bin_io]
@@ -418,16 +421,19 @@ module type Ledger_builder_diff_intf = sig
       ; transactions: transaction_with_valid_signature list }
     [@@deriving sexp]
 
-    type first_pre_diff =
+    type diff_with_at_most_two_coinbase =
       {diff: diff; coinbase_parts: completed_work_checked At_most_two.t}
     [@@deriving sexp]
 
-    type second_pre_diff =
+    type diff_with_at_most_one_coinbase =
       {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
     [@@deriving sexp]
 
+    type pre_diffs = (diff_with_at_most_one_coinbase, ( diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase))Either.t
+    [@@deriving sexp]
+
     type t =
-      { pre_diffs: first_pre_diff * second_pre_diff option
+      { pre_diffs: pre_diffs
       ; prev_hash: ledger_builder_hash
       ; creator: public_key }
     [@@deriving sexp]

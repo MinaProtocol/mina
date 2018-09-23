@@ -331,11 +331,11 @@ let partition_if_overflowing ~max_slots state =
   let parallelism = State.parallelism state in
   let offset = parallelism - 1 in
   match State.base_none_pos state with
-  | None -> (0, None)
+  | None -> `One 0
   | Some start ->
       let start_0 = start - offset in
-      if n <= parallelism - start_0 then (n, None)
-      else (parallelism - start_0, Some (n - (parallelism - start_0)))
+      if n <= parallelism - start_0 then `One n
+      else `Two (parallelism - start_0, n - (parallelism - start_0))
 
 let gen :
        gen_data:'d Quickcheck.Generator.t
