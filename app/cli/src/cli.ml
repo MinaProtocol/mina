@@ -115,11 +115,6 @@ let daemon (type ledger_proof) (module Kernel
        let transaction_capacity_log_2 =
          Option.value ~default:4 transaction_capacity_log_2
        in
-       let proposal_interval =
-         Option.value ~default:(Time.Span.of_ms 5000.)
-           (Option.map proposal_interval ~f:(fun millis ->
-                Int.to_float millis |> Time.Span.of_ms ))
-       in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers_raw =
@@ -166,8 +161,6 @@ let daemon (type ledger_proof) (module Kernel
          let conf_dir = conf_dir
 
          let lbc_tree_max_depth = `Finite 50
-
-         let transition_interval = proposal_interval
 
          let keypair = keypair
 

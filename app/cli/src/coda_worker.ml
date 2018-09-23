@@ -144,8 +144,6 @@ struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let transition_interval = Time.Span.of_ms transition_interval
-
           let keypair =
             Keypair.of_private_key_exn Genesis_ledger.high_balance_sk
 

@@ -1392,9 +1392,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let generate_keypair :
         exposing:((unit, 's) Checked.t, _, 'k_var, _) t -> 'k_var -> Keypair.t =
-     fun ~exposing k ->
-      Backend.Keypair.create (constraint_system ~exposing k)
-      |> Keypair.of_backend_keypair
+     fun ~exposing k -> Keypair.generate (constraint_system ~exposing k)
 
     let verify :
            Proof.t
