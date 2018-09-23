@@ -285,25 +285,6 @@ let merkle_tree =
       go [] 0 0 tree0
     in
     let rendered =
-      let edges =
-        let posns =
-          {Pos.x= -50.; y= top_offset} :: List.map specs ~f:Spec.pos
-        in
-        Svg.path posns
-      in
-      let nodes =
-        let base_height = layer_height *. 0.8 in
-        let base_width = 1.8 *. base_height in
-        let f i = sqrt (Int.to_float (i + 1)) in
-        List.filter_mapi specs ~f:(fun i spec ->
-            let scale = 1. /. f i in
-            let width = scale *. base_width in
-            let height = scale *. base_height in
-            match spec with
-            | Spec.Node {pos; color} ->
-                Some (Svg.rect ~radius:3. ~color ~center:pos ~height ~width)
-            | Spec.Account _ -> None )
-      in
       let account_width = 500 in
       let account =
         match List.last_exn specs with
@@ -333,6 +314,32 @@ let merkle_tree =
             in
             Some (Html.Record.render record)
       in
+      let edges =
+        let posns =
+          let initial =
+            let ledger_hash_y = 390. in
+            let corner_x = 180. in
+            [ {Pos.x= -50.; y= ledger_hash_y}
+            ; {Pos.x= corner_x; y= ledger_hash_y}
+            ; {Pos.x= corner_x; y= top_offset} ]
+          in
+          initial @ List.map specs ~f:Spec.pos
+        in
+        Svg.path posns
+      in
+      let nodes =
+        let base_height = layer_height *. 0.8 in
+        let base_width = 1.8 *. base_height in
+        let f i = sqrt (Int.to_float (i + 1)) in
+        List.filter_mapi specs ~f:(fun i spec ->
+            let scale = 1. /. f i in
+            let width = scale *. base_width in
+            let height = scale *. base_height in
+            match spec with
+            | Spec.Node {pos; color} ->
+                Some (Svg.rect ~radius:3. ~color ~center:pos ~height ~width)
+            | Spec.Account _ -> None )
+      in
       Node.div [Attr.class_ "merkle-tree"]
         ( Svg.main
             ~width:(image_width +. left_offset)
@@ -341,6 +348,28 @@ let merkle_tree =
         :: Option.to_list account )
     in
     rendered
+
+let explanation =
+  let open Node in
+  let open Attr in
+  let t = text in
+  let a url s = a [href url] [t s] in
+  let p = p [] in
+  div [class_ "info"]
+    [ h1 [] [t "What is this?"]
+    ; p
+        [ text
+            {|This is the world's first verified web-page. It's a fully-verifying
+                 state explorer for the |}
+        ; a "https://codaprotocol.com" "Coda protocol"
+        ; text {| alpha testnet.|} ]
+    ; p
+        [ text {|Coda is a new cryptocurrency that compresses the entire blockchain into a
+                 proof so small that it's being delivered to and checked in your browser
+                 right now. That means you can be certain that the account balances and blockchain-state
+                 you're looking at now are backed by a blockchain of valid transactions. No resource-intensive
+                 full-node or delegation of trust to web-wallets required.|} ]
+    ]
 
 let state_html
     { State.verification
@@ -365,7 +394,7 @@ let state_html
     match verification with
     | `Complete (Ok _) -> "proof valid"
     | `Complete (Error _) -> "proof invalid"
-    | `Pending _ -> "proof verifying"
+    | `Pending _ -> "proof verifying shake shake-constant"
   in
   let state_record =
     let open Html.Record in
@@ -374,18 +403,26 @@ let state_html
             (field_to_base64 previous_state_hash) ]
       ; [Entry.create "length" (Length.to_string length)]
       ; [Entry.create "timestamp" timestamp]
+      ; [Entry.create "locked_ledger_hash" (field_to_base64 ledger_hash)]
       ; [ Entry.create "staged_ledger_hash"
-            (field_to_base64 ledger_builder_hash.ledger_hash) ]
-      ; [Entry.create "locked_ledger_hash" (field_to_base64 ledger_hash)] ]
+            (field_to_base64 ledger_builder_hash.ledger_hash) ] ]
   in
   div [class_ "main"]
-    [ div [class_ "state-with-proof"]
-        [ Html.Record.render state_record
-        ; Html.Record.Entry.(
-            create ~class_:proof_class "blockchain_SNARK"
-              (to_base64 (module Proof) proof)
-            |> render) ]
-    ; merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger) ]
+    [ div [class_ "state-explorer"]
+        [ div [class_ "state-with-proof"]
+            [ Html.Record.render state_record
+            ; div
+                [ class_ "proof-struts"
+                ; Attr.style [("width", "0"); ("height", "0")] ]
+                [ Svg.main ~width:500. ~height:200.
+                    [ Svg.path [{x= 150.; y= 0.}; {x= 150.; y= 200.}]
+                    ; Svg.path [{x= 350.; y= 0.}; {x= 350.; y= 200.}] ] ]
+            ; Html.Record.Entry.(
+                create ~class_:proof_class "blockchain_SNARK"
+                  (to_base64 (module Proof) proof)
+                |> render) ]
+        ; merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger) ]
+    ; explanation ]
 
 let main ~render ~get_data =
   let state = ref State.init in
