@@ -970,6 +970,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; state_hash
     ; external_transition_latency=
         Perf_histograms.report ~name:"external_transition_latency"
+    ; snark_worker_transition_time=
+        Perf_histograms.report ~name:"snark_worker_transition_time"
+    ; snark_worker_merge_time=
+        Perf_histograms.report ~name:"snark_worker_merge_time"
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
@@ -1005,7 +1009,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 | Some _ -> () ) ;
                 r
             | `Eof -> assert false )
-      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
+      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
+          (fun () (work: Snark_worker.Work.Result.t) ->
+            List.iter work.metrics ~f:(fun (total, tag) ->
+                match tag with
+                | `Merge ->
+                    Perf_histograms.add_span ~name:"snark_worker_merge_time"
+                      total
+                | `Transition ->
+                    Perf_histograms.add_span
+                      ~name:"snark_worker_transition_time" total ) ;
             let%map () =
               Snark_pool.add_completed_work (snark_pool coda) work
             in
