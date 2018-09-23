@@ -968,6 +968,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; uptime_secs
     ; ledger_merkle_root
     ; state_hash
+    ; external_transition_latency=
+        Perf_histograms.report ~name:"external_transition_latency"
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)

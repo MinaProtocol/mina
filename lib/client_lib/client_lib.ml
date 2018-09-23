@@ -63,6 +63,7 @@ module Status = struct
     ; peers: string list
     ; transactions_sent: int
     ; run_snark_worker: bool
+    ; external_transition_latency: Perf_histograms.Report.t option
     ; propose: bool }
   [@@deriving yojson, bin_io, fields]
 
@@ -89,6 +90,32 @@ module Status = struct
           ("Transactions Sent", Int.to_string (f x)) :: acc )
         ~run_snark_worker:(fun acc x ->
           ("Snark Worker Running", Bool.to_string (f x)) :: acc )
+        ~external_transition_latency:(fun acc x ->
+          match f x with
+          | None -> acc
+          | Some
+              { Perf_histograms.Report.values
+              ; intervals
+              ; overflow= _
+              ; underflow= _ } ->
+              (* Show the largest 3 buckets *)
+              let zipped = List.zip_exn values intervals in
+              let best =
+                List.sort zipped ~compare:(fun (a, _) (a', _) ->
+                    -1 * Int.compare a a' )
+                |> Fn.flip List.take 3
+              in
+              let msgs =
+                List.map best ~f:(fun (v, (lo, hi)) ->
+                    Printf.sprintf
+                      !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
+                      lo hi v )
+              in
+              let best_message =
+                List.fold msgs ~init:"\t" ~f:(fun acc x -> acc ^ "\n\t" ^ x)
+                ^ "\n\t..."
+              in
+              ("Block Latencies (histogram)", best_message) :: acc )
         ~propose:(fun acc x ->
           ("Proposer Running", Bool.to_string (f x)) :: acc )
       |> List.rev

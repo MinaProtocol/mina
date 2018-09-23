@@ -168,6 +168,8 @@ end
 module type Inputs_intf = sig
   module External_transition : sig
     type t [@@deriving sexp, bin_io]
+
+    val timestamp : t -> Block_time.t
   end
 
   module Ledger_builder_aux_hash :
@@ -269,6 +271,9 @@ module Make (Inputs : Inputs_intf) = struct
       Linear_pipe.partition_map3 (Gossip_net.received gossip_net) ~f:(fun x ->
           match x with
           | New_state s ->
+              Perf_histograms.add_span ~name:"external_transition_latency"
+                (Time.abs_diff (Time.now ())
+                   (External_transition.timestamp s |> Block_time.to_time)) ;
               `Fst
                 ( s
                 , Time.now () |> Time.to_span_since_epoch |> Time.Span.to_ms
