@@ -192,17 +192,18 @@ struct
     { completed_works= List.map ~f:Completed_work.forget completed_works
     ; transactions= (transactions :> Transaction.t list) }
 
+  let forget_work_opt = Option.map ~f:Completed_work.forget
+
   let forget_pre_diff_with_at_most_two
       {With_valid_signatures_and_proofs.diff; coinbase_parts} =
     let forget_cw =
       match coinbase_parts with
       | At_most_two.Zero -> At_most_two.Zero
-      | One cw -> One (Option.map cw ~f:Completed_work.forget)
+      | One cw -> One (forget_work_opt cw)
       | Two cw_pair ->
           Two
             (Option.map cw_pair ~f:(fun (cw, cw_opt) ->
-                 ( Completed_work.forget cw
-                 , Option.map cw_opt ~f:Completed_work.forget ) ))
+                 (Completed_work.forget cw, forget_work_opt cw_opt) ))
     in
     {diff= forget_diff diff; coinbase_parts= forget_cw}
 
@@ -211,7 +212,7 @@ struct
     let forget_cw =
       match coinbase_added with
       | At_most_one.Zero -> At_most_one.Zero
-      | One cw -> One (Option.map cw ~f:Completed_work.forget)
+      | One cw -> One (forget_work_opt cw)
     in
     {diff= forget_diff diff; coinbase_added= forget_cw}
 
@@ -734,9 +735,7 @@ end = struct
       then None
       else Some (prover, fee)
     in
-    let fee_transfer cw_opt =
-      Option.bind cw_opt ~f:single
-    in
+    let fee_transfer cw_opt = Option.bind cw_opt ~f:single in
     let two_parts amt w1 w2 =
       let%bind rem_coinbase = overflow_err coinbase amt in
       let%bind _ =
@@ -885,6 +884,8 @@ end = struct
 
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
 
+  let forget_work_opt = Option.map ~f:Completed_work.forget
+
   let apply_pre_diff_unchecked t coinbase_parts
       (diff: Ledger_builder_diff.With_valid_signatures_and_proofs.diff) =
     let payments = diff.transactions in
@@ -927,12 +928,11 @@ end = struct
       let coinbase_parts =
         match pre_diff1.coinbase_parts with
         | Zero -> `Zero
-        | One x -> `One (Option.map x ~f:Completed_work.forget)
+        | One x -> `One (forget_work_opt x)
         | Two x ->
             `Two
               (Option.map x ~f:(fun (w, w_opt) ->
-                   ( Completed_work.forget w
-                   , Option.map w_opt ~f:Completed_work.forget ) ))
+                   (Completed_work.forget w, forget_work_opt w_opt) ))
       in
       apply_pre_diff_unchecked t coinbase_parts pre_diff1.diff
     in
@@ -943,7 +943,7 @@ end = struct
       let coinbase_added =
         match pre_diff2.coinbase_added with
         | Zero -> `Zero
-        | One x -> `One (Option.map x ~f:Completed_work.forget)
+        | One x -> `One (forget_work_opt x)
       in
       apply_pre_diff_unchecked t coinbase_added pre_diff2.diff
     in
@@ -998,7 +998,8 @@ end = struct
       [@@deriving sexp]
 
       let count {fee_transfers; transactions; coinbase_part_count} =
-        (* This is ceil(Set.length fee_transfers / 2) *)
+        (* This is number of coinbase_parts + number of transactions + ceil
+        (Set.length fee_transfers / 2) *)
         coinbase_part_count + transactions
         + ((Set.length fee_transfers + 1) / 2)
 
@@ -1936,17 +1937,18 @@ let%test_module "test" =
           { completed_works= List.map ~f:Completed_work.forget completed_works
           ; transactions= (transactions :> Transaction.t list) }
 
+        let forget_work_opt = Option.map ~f:Completed_work.forget
+
         let forget_pre_diff_with_at_most_two
             {With_valid_signatures_and_proofs.diff; coinbase_parts} =
           let forget_cw =
             match coinbase_parts with
             | At_most_two.Zero -> At_most_two.Zero
-            | One cw -> One (Option.map cw ~f:Completed_work.forget)
+            | One cw -> One (forget_work_opt cw)
             | Two cw_pair ->
                 Two
                   (Option.map cw_pair ~f:(fun (cw, cw_opt) ->
-                       ( Completed_work.forget cw
-                       , Option.map cw_opt ~f:Completed_work.forget ) ))
+                       (Completed_work.forget cw, forget_work_opt cw_opt) ))
           in
           {diff= forget_diff diff; coinbase_parts= forget_cw}
 
@@ -1955,7 +1957,7 @@ let%test_module "test" =
           let forget_cw =
             match coinbase_added with
             | At_most_one.Zero -> At_most_one.Zero
-            | One cw -> One (Option.map cw ~f:Completed_work.forget)
+            | One cw -> One (forget_work_opt cw)
           in
           {diff= forget_diff diff; coinbase_added= forget_cw}
 
@@ -2031,6 +2033,16 @@ let%test_module "test" =
           let y = coinbase_added_second_prediff d2.coinbase_added in
           x + y
 
+    let assert_at_least_coinbase_added txns cb = assert (txns > 0 || cb > 0)
+
+    let expected_ledger no_txns_included txns_sent old_ledger =
+      old_ledger
+      + Currency.Amount.to_int Protocols.Coda_praos.coinbase_amount
+      + List.sum
+          (module Int)
+          (List.take txns_sent no_txns_included)
+          ~f:(fun (t, fee) -> t + fee)
+
     let%test_unit "Max throughput" =
       (*Always at worst case number of provers*)
       let logger = Logger.create () in
@@ -2065,15 +2077,8 @@ let%test_module "test" =
               let x =
                 List.length (Test_input1.Ledger_builder_diff.transactions diff)
               in
-              assert (x > 0 || cb > 0) ;
-              let expected_value =
-                old_ledger
-                + Currency.Amount.to_int Protocols.Coda_praos.coinbase_amount
-                + List.sum
-                    (module Int)
-                    (List.take all_ts x)
-                    ~f:(fun (t, fee) -> t + fee)
-              in
+              assert_at_least_coinbase_added x cb ;
+              let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Lb.ledger lb) = expected_value) ) )
 
     let%test_unit "Be able to include random number of transactions" =
@@ -2109,15 +2114,8 @@ let%test_module "test" =
               let x =
                 List.length (Test_input1.Ledger_builder_diff.transactions diff)
               in
-              assert (x > 0 || cb > 0) ;
-              let expected_value =
-                old_ledger
-                + Currency.Amount.to_int Protocols.Coda_praos.coinbase_amount
-                + List.sum
-                    (module Int)
-                    (List.take all_ts x)
-                    ~f:(fun (t, fee) -> t + fee)
-              in
+              assert_at_least_coinbase_added x cb ;
+              let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Lb.ledger lb) = expected_value) ) )
 
     let%test_unit "Random workspec chunk doesn't send same things again" =
@@ -2191,14 +2189,7 @@ let%test_module "test" =
               let x =
                 List.length (Test_input1.Ledger_builder_diff.transactions diff)
               in
-              assert (x > 0 || cb > 0) ;
-              let expected_value =
-                old_ledger
-                + Currency.Amount.to_int Protocols.Coda_praos.coinbase_amount
-                + List.sum
-                    (module Int)
-                    (List.take all_ts x)
-                    ~f:(fun (t, fee) -> t + fee)
-              in
+              assert_at_least_coinbase_added x cb ;
+              let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Lb.ledger lb) = expected_value) ) )
   end )
