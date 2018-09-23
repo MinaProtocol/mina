@@ -1166,14 +1166,22 @@ end = struct
       ; txns_to_include: Transaction.With_valid_signature.t Sequence.t }
   end
 
-  let add_work ~coinbase work resources get_completed_work =
+  let add_work work resources get_completed_work =
     match get_completed_work work with
     | Some w ->
         (* TODO: There is a subtle error here.
                You should not add work if it would cause the person's
                balance to overflow *)
-        if coinbase then Resources.add_work_for_coinbase resources w
-        else Resources.add_work resources w
+        Resources.add_work resources w
+    | None -> Error (Error.of_string "Work not found")
+
+  let add_work_for_coinbase work resources get_completed_work =
+    match get_completed_work work with
+    | Some w ->
+        (* TODO: There is a subtle error here.
+               You should not add work if it would cause the person's
+               balance to overflow *)
+        Resources.add_work_for_coinbase resources w
     | None -> Error (Error.of_string "Work not found")
 
   let add_transaction ledger txn resources =
@@ -1234,9 +1242,7 @@ end = struct
         if enough_work_added_to_include_one_more then
           add_transaction t ts (Sequence.append (Sequence.singleton w) ws)
         else
-          match
-            add_work ~coinbase:false w current.resources get_completed_work
-          with
+          match add_work w current.resources get_completed_work with
           | Ok r_work ->
               check_resources_add_txns logger get_completed_work ledger valid
                 { resources= r_work
@@ -1279,7 +1285,7 @@ end = struct
               add_coinbase (Sequence.append (Sequence.singleton w) ws) count
             else
               match
-                add_work ~coinbase:true w current.resources get_completed_work
+                add_work_for_coinbase w current.resources get_completed_work
               with
               | Ok r_work ->
                   go valid
