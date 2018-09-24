@@ -105,7 +105,7 @@ module State = struct
     { verification: [`Pending of int | `Complete of unit Or_error.t]
     ; chain: Lite_chain.t; show_modal: Modal_stage.t; tooltip_stage: Tooltip_stage.t }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; show_modal = Problem; tooltip_stage = None}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; show_modal = Hidden; tooltip_stage = None}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
@@ -237,9 +237,9 @@ let merkle_tree =
 
     let pos = function Node {pos; _} -> pos | Account {pos; _} -> pos
   end in
-  let image_width = 500. in
+  let image_width = 400. in
   let top_offset = 30. in
-  let left_offset = 300. in
+  let left_offset = 100. in
   let image_height = 500. in
   let num_layers = num_merkle_layers_shown in
   let layer_height = image_height /. Int.to_float num_layers in
@@ -302,7 +302,7 @@ let merkle_tree =
       go [] 0 0 tree0
     in
     let rendered =
-      let account_width = 500 in
+      let account_width = 400 in
       let account =
         match List.last_exn specs with
         | Spec.Node _ -> None
@@ -508,7 +508,7 @@ let state_html
       ; [ Entry.create "staged_ledger_hash"
             (field_to_base64 ledger_builder_hash.ledger_hash) ] ]
   in
-  let hoverable node target =
+  let hoverable node target attrs =
     let update_tooltip  _ = 
       !g_update_state_and_vdom { state with State.tooltip_stage=target };
       Event.Ignore
@@ -518,23 +518,23 @@ let state_html
     let tooltip_indicator = 
       div [class_ "tooltip_indicator"] [text "?"]
     in
-    div [on_mouseenter update_tooltip] [ tooltip_indicator; node ]
+    div ([on_mouseenter update_tooltip] @ attrs) [ tooltip_indicator; node ]
   in
   let state_explorer =
     div [class_ "state-explorer"]
       [ div [class_ "state-with-proof"]
-          [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state
+          [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state []
           ; div
               [ class_ "proof-struts"
               ; Attr.style [("width", "0"); ("height", "0")] ]
-              [ Svg.main ~width:500. ~height:200.
+              [ Svg.main ~width:400. ~height:200.
                   [ Svg.path [{x= 150.; y= 0.}; {x= 150.; y= 200.}]
                   ; Svg.path [{x= 350.; y= 0.}; {x= 350.; y= 200.}] ] ]
           ; hoverable(Html.Record.Entry.(
               create ~class_:proof_class "blockchain_SNARK"
                 (to_base64 (module Proof) proof)
-              |> render)) Tooltip_stage.Proof ]
-      ; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state ]
+              |> render)) Tooltip_stage.Proof  [] ]
+      ; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"] ] 
   in
   div [] [
     div [class_ "header"] [ div [class_ "logo"] [] ]

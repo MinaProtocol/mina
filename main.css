@@ -1,4 +1,4 @@
-.widthinfo {
+.info {
   width: 300px;
   padding: 30px;
   background-color: #F9FAFC;
@@ -10,7 +10,7 @@
 
 .header {
   display: flex;
-  width: 1600px;
+  width: 1200px;
   height: 100px;
   margin-left: auto;
   margin-right: auto;
@@ -18,11 +18,11 @@
 
 .logo {
   display: flex;
-  width: 100px;
+  width: 170px;
   height: 100px;
   float: left;
   background-image: url(logo.svg);
-  background-size: 100px 100px;
+  background-size: 170px 100px;
 }
 
 .image {
@@ -32,22 +32,28 @@
   background-size: 100px 100px;
 }
 
+.accounts {
+  width: 400px;
+  display: inline-flex;
+  flex-direction: column;
+}
+
 .main {
   display: flex;
   justify-content: space-between;
   margin-left: auto;
   margin-right: auto;
-  width: 1600px;
+  width: 1200px;
 }
 
 .state-with-proof {
-    width: 400px;
+    width: 300px;
     display: inline-flex;
     flex-direction: column;
 }
 
 .state {
-    width: 400px;
+    width: 300px;
     margin-left:auto;
     margin-right:auto;
 }
