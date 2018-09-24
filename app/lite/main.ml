@@ -77,7 +77,6 @@ let get_account _pk on_sucess on_error =
   let url = "/chain" in
   get url
     (fun s ->
-       printf "%s %d\n" s (String.length s);
        let s = String.slice s 0 (String.length s - 1) in
       let chain = Binable.of_string (module Lite_chain) (B64.decode s) in
       on_sucess chain )
