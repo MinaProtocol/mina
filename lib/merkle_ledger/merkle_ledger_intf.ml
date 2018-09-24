@@ -7,7 +7,7 @@ module type S = sig
 
   type key
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   module Addr : Merkle_address.S
 

@@ -384,7 +384,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -724,7 +724,7 @@ module Coda_without_snark
     (Init : Init_intf with module Ledger_proof = Ledger_proof.Debug)
     () =
 struct
-  module Store = Storage.Memory
+  module Store = Storage.Disk
 
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
@@ -969,6 +969,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; uptime_secs
     ; ledger_merkle_root
     ; state_hash
+    ; external_transition_latency=
+        Perf_histograms.report ~name:"external_transition_latency"
+    ; snark_worker_transition_time=
+        Perf_histograms.report ~name:"snark_worker_transition_time"
+    ; snark_worker_merge_time=
+        Perf_histograms.report ~name:"snark_worker_merge_time"
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
@@ -1004,7 +1010,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 | Some _ -> () ) ;
                 r
             | `Eof -> assert false )
-      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
+      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
+          (fun () (work: Snark_worker.Work.Result.t) ->
+            List.iter work.metrics ~f:(fun (total, tag) ->
+                match tag with
+                | `Merge ->
+                    Perf_histograms.add_span ~name:"snark_worker_merge_time"
+                      total
+                | `Transition ->
+                    Perf_histograms.add_span
+                      ~name:"snark_worker_transition_time" total ) ;
             let%map () =
               Snark_pool.add_completed_work (snark_pool coda) work
             in
