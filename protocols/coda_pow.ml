@@ -641,7 +641,16 @@ module type Consensus_mechanism_intf = sig
     -> keypair:keypair
     -> transactions:transaction list
     -> ledger:ledger
+    -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
+
+  val next_proposal :
+       Int64.t
+    -> Consensus_state.value
+    -> local_state:Local_state.t
+    -> keypair:keypair
+    -> logger:Logger.t
+    -> [`Check_again of Int64.t | `Propose of Int64.t]
 end
 
 module type Time_close_validator_intf = sig

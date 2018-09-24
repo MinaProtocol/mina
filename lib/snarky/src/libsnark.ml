@@ -73,14 +73,6 @@ struct
 
     let prefix = with_prefix M.prefix "g1"
 
-    module Vector = Vector.Make (struct
-      type elt = t
-
-      let typ = typ
-
-      let prefix = with_prefix prefix "vector"
-    end)
-
     let func_name s = with_prefix prefix s
 
     let zero =
@@ -94,6 +86,16 @@ struct
     let delete = foreign (func_name "delete") (typ @-> returning void)
 
     let schedule_delete t = Caml.Gc.finalise delete t
+
+    module Vector = Vector.Make (struct
+      type elt = t
+
+      let typ = typ
+
+      let prefix = with_prefix prefix "vector"
+
+      let schedule_delete = schedule_delete
+    end)
 
     let print = foreign (func_name "print") (typ @-> returning void)
 
@@ -292,41 +294,15 @@ struct
       let zero = of_int 0
     end
 
-    module Vector = struct
+    module Vector = Vector.Make (struct
       type elt = T.t
 
-      type t = unit ptr
-
-      let typ = ptr void
+      let typ = T.typ
 
       let prefix = with_prefix M.prefix "field_vector"
 
-      let func_name = with_prefix prefix
-
-      let delete = foreign (func_name "delete") (typ @-> returning void)
-
-      let delete _ = ()
-
-      let create =
-        let stub = foreign (func_name "create") (void @-> returning typ) in
-        fun () ->
-          let t = stub () in
-          Caml.Gc.finalise delete t ; t
-
-      let get =
-        let stub =
-          foreign (func_name "get") (typ @-> int @-> returning T.typ)
-        in
-        fun t i ->
-          let x = stub t i in
-          Caml.Gc.finalise T.delete x ;
-          x
-
-      let length = foreign (func_name "length") (typ @-> returning int)
-
-      let emplace_back =
-        foreign (func_name "emplace_back") (typ @-> T.typ @-> returning void)
-    end
+      let schedule_delete = Caml.Gc.finalise T.delete
+    end)
 
     include T
   end
@@ -439,8 +415,14 @@ struct
         let typ = typ
 
         let prefix = with_prefix prefix "vector"
+
+        let schedule_delete = Caml.Gc.finalise delete
       end)
     end
+
+    let delete = foreign (func_name "delete") (typ @-> returning void)
+
+    let schedule_delete t = Caml.Gc.finalise delete t
 
     module Vector = Vector.Make (struct
       type elt = t
@@ -448,13 +430,11 @@ struct
       let typ = typ
 
       let prefix = with_prefix prefix "vector"
+
+      let schedule_delete = schedule_delete
     end)
 
     let print = foreign (func_name "print") (typ @-> returning void)
-
-    let delete = foreign (func_name "delete") (typ @-> returning void)
-
-    let schedule_delete t = Caml.Gc.finalise delete t
 
     (*
     let substitute =
@@ -974,7 +954,8 @@ struct
         in
         fun s ->
           let ptr = Ctypes.bigarray_start Ctypes.array1 s in
-          stub ptr
+          let t = stub ptr in
+          Caml.Gc.finalise delete t ; t
 
       include Binable.Of_binable (Bigstring)
                 (struct
@@ -1041,8 +1022,6 @@ struct
     val to_bigstring : t -> Bigstring.t
 
     val of_bigstring : Bigstring.t -> t
-
-    val r1cs_constraint_system : t -> M.R1CS_constraint_system.t
   end = struct
     type t = unit ptr
 
@@ -1053,11 +1032,6 @@ struct
     let func_name = with_prefix prefix
 
     let delete = foreign (with_prefix prefix "delete") (typ @-> returning void)
-
-    let r1cs_constraint_system =
-      foreign
-        (with_prefix M.prefix "proving_key_r1cs_constraint_system")
-        (typ @-> returning M.R1CS_constraint_system.typ)
 
     let to_string : t -> string =
       let stub =
@@ -1750,8 +1724,6 @@ module type S = sig
     val to_bigstring : t -> Core.Bigstring.t
 
     val of_bigstring : Core.Bigstring.t -> t
-
-    val r1cs_constraint_system : t -> R1CS_constraint_system.t
   end
 
   module Verification_key : sig
