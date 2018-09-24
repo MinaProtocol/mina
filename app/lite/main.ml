@@ -479,11 +479,15 @@ module Container = struct
   let create ~configuration =
     let open Node in
     let (left_content, left_width), (right_content, right_width), primary_content =
+      let complement = function
+        | `Wide -> `Thin
+        | `Thin -> `Wide
+      in
       match configuration with
-      | `Left_primary (left, right) ->
-        ((left, `Wide), (right, `Thin), left)
-      | `Right_primary (left, right) ->
-        ((left, `Thin), (right, `Wide), right)
+      | `Left_primary ((left, left_width), right) ->
+        ((left, left_width), (right, complement left_width), left)
+      | `Right_primary ((left, left_width), right) ->
+        ((left, left_width), (right, complement left_width), right)
     in
     Mobile_switch.create
       ~not_small:(
@@ -573,10 +577,12 @@ let state_html
         Container.create
           ~configuration:(
             match app_stage with
-            | App | Start ->
-                `Right_primary (Story.create state, state_explorer)
+            | App ->
+                `Right_primary ((Story.create state, `Thin), state_explorer)
+            | Start ->
+                `Left_primary ((Story.create state, `Thin), state_explorer)
             | _ ->
-                `Left_primary (Story.create state, state_explorer)
+                `Left_primary ((Story.create state, `Wide), state_explorer)
           )
       ]
   ]
