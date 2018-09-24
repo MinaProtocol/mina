@@ -1,4 +1,46 @@
 open Verifier
+open Core_kernel
+open Lite_base
+
+let instance_hash =
+  let salt (s: Hash_prefixes.t) =
+    Pedersen.State.salt Lite_params.pedersen_params (s :> string)
+  in
+  let acc =
+    Pedersen.State.update_fold
+      (salt Hash_prefixes.transition_system_snark)
+      (Proof_system.Verification_key.fold Lite_params.wrap_vk)
+  in
+  let hash_state s =
+    Pedersen.digest_fold
+      (salt Hash_prefixes.protocol_state)
+      (Lite_base.Protocol_state.fold s)
+  in
+  fun state ->
+    Pedersen.digest_fold acc (Pedersen.Digest.fold (hash_state state))
+
+let wrap_pvk =
+  Proof_system.Verification_key.Processed.create Lite_params.wrap_vk
+
+(* TODO: This changes when the curves get flipped *)
+let to_wrap_input state = Snarkette.Mnt6.Fq.to_bigint (instance_hash state)
+
+let verify_chain ({protocol_state; ledger; proof}: Lite_chain.t) =
+  let check b lab = if b then Ok () else Or_error.error_string lab in
+  let open Or_error.Let_syntax in
+  let lb_ledger_hash =
+    protocol_state.blockchain_state.ledger_builder_hash.ledger_hash
+  in
+  let%bind () =
+    check
+      (Ledger_hash.equal lb_ledger_hash
+         (Lite_lib.Sparse_ledger.merkle_root ledger))
+      "Incorrect ledger hash"
+  in
+  let%bind () =
+    Proof_system.verify wrap_pvk [to_wrap_input protocol_state] proof
+  in
+  return ()
 
 let () =
   Js_of_ocaml.Worker.set_onmessage (fun (message: Js.js_string Js.t) ->
