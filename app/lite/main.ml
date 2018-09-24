@@ -406,14 +406,21 @@ end
  * On desktop it's 1/3 (thin) or 2/3 (wide)
  *)
 module Pane = struct
-  let create ~content ~width =
+  let create ~content ~width ~bg =
     let open Node in
     let large_width =
-      match width with
-      | `Thin -> Style.of_class "w-30-l"
-      | `Wide -> Style.of_class "w-70-l"
+      Style.of_class @@
+        match width with
+        | `Thin -> "w-30-ns"
+        | `Wide -> "w-70-ns"
     in
-    div [Style.(render ((of_class "w-100 ph2") + large_width))]
+    let bg_color =
+      Style.of_class @@
+        match bg with
+        | `Light -> "bg-white"
+        | `Dark -> "bg-snow"
+    in
+    div [Style.(render ((of_class "w-100 ph3 pv3") + large_width + bg_color))]
       [content]
 end
 
@@ -428,6 +435,16 @@ let images = "/web-demo-art/"
 
 let image_url s = images ^ s
 
+module Breadcrumbs = struct
+  let create () =
+    let open Node in
+    div [] [text "TODO: Breadcrumbs"]
+end
+
+module Story_cell = struct
+  let terminal ?heading:_ ~copy:_ ~next_state:_ = failwith "TODO"
+end
+
 module Story = struct
   let create state =
     let open Node in
@@ -438,6 +455,9 @@ module Story = struct
         Event.Ignore
         ) "Next"
     in
+    let copy copy =
+      div [] [(text copy)]
+    in
     let image url =
       let css = "background-image: url(" ^ url ^ ")" in
       div [ class_ "image"; Attr.style_css css ] []
@@ -445,34 +465,35 @@ module Story = struct
     let contents = 
       match state.app_stage with
       | Start -> [
-        text "This is the start story"
+        copy "This is the start story"
         ; next Intro
       ]
       | Intro -> [
-          text "This is Coda, a cryptocurrency so lightweight, it runs in your browser. Explore the Coda testnet from a verified JavaScript client here"
+          copy "This is Coda, a cryptocurrency so lightweight, it runs in your browser. Explore the Coda testnet from a verified JavaScript client here"
           ; next Problem
         ]
       | Problem -> [
-          text "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
+          copy "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
           ; image (image_url "problem.png")
           ; next Coda
         ]
       | Coda -> [
-          text "Coda is a new cryptocurrency that
+          copy "Coda is a new cryptocurrency that
   puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
           ; image (image_url "your-hands.png")
           ; next Mission
         ]
       | Mission -> [
-          text "This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives. "
+          copy "This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives. "
           ; image (image_url "net-hands.png")
           ; next App
         ]
       | App -> [
-        text "Look at the right"
+        copy "Look at the right"
       ]
     in
-    div [] contents
+    div [Style.(render (of_class "mht6 flex-column"))]
+      contents
 end
 
 module Container = struct
@@ -491,13 +512,13 @@ module Container = struct
     in
     Mobile_switch.create
       ~not_small:(
-        div [Style.(render @@ of_class "flex w-100")]
-          [ Pane.create ~content:left_content  ~width:left_width
-          ; Pane.create ~content:right_content ~width:right_width
+        div [Style.(render @@ of_class "flex w-100 items-center")]
+          [ Pane.create ~content:left_content  ~width:left_width ~bg:`Dark
+          ; Pane.create ~content:right_content ~width:right_width ~bg:`Light
           ]
       )
       ~small:(
-        Pane.create ~content:primary_content ~width:`Wide
+        Pane.create ~content:primary_content ~width:`Wide ~bg:`Light
       )
 
 end
