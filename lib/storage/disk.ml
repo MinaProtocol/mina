@@ -14,13 +14,16 @@ module Controller = struct
 end
 
 let load_with_checksum (c: 'a Controller.t) location =
-  match%map
-    Reader.load_bin_prot
-      ~max_len:(1000 * 1024 * 1024)
-      location (bin_reader_t c.tc.reader)
-  with
-  | Ok t -> if valid c.tc t then Ok t else Error `Checksum_no_match
-  | Error e -> Error (`IO_error e)
+  match%bind Sys.file_exists location with
+  | `Yes -> (
+      match%map
+        Reader.load_bin_prot
+          ~max_len:(1000 * 1024 * 1024)
+          location (bin_reader_t c.tc.reader)
+      with
+      | Ok t -> if valid c.tc t then Ok t else Error `Checksum_no_match
+      | Error e -> Error (`IO_error e) )
+  | `No | `Unknown -> return (Error `No_exist)
 
 let load c location =
   Deferred.Result.map (load_with_checksum c location) ~f:(fun t -> t.data)
