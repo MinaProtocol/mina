@@ -11,12 +11,16 @@ other peers in the network. Much of this is authenticated, meaning we know what
 the resulting hash of some object must be. This happens for the `syncable_ledger`
 queries and the ledger builder aux data. When a peer sends us data that
 results in a state where the hash doesn't match, we know that the peer was
-dishonest or buggy. The other primary method of detecting dishonesty is when a
-SNARK fails verification.
+dishonest or buggy. Some other instances of misbehavior that we want to punish
+with a ban:
+
+- A received SNARK fails to verify
+- An external transition was invalid for any of a number of reasons
+- A VRF proof fails to verify
 
 When a node misbehaves, typically it is trying to mount an attack, often a
 denial of service attack. We can mitigate the effectiveness of these attempts
-by just ignoring that node
+by just ignoring that node's messages.
 
 # Detailed design
 [detailed-design]: #detailed-design
@@ -25,11 +29,41 @@ The basic design is pretty obvious: when a peer misbehaves, notice this, add
 their IP to a list, and refuse to communicate with that IP for some amount of
 time.
 
-First, where the code currently has `TODO: punish`, we should insert
-`Logger.faulty_peer`. `faulty_peer` in turn, should propagate the `peer` into
-the current `Kademlia.Membership` (probably over a pipe), which will run `dead t
-[bad_peer]`, and add the IP to some list that gets filtered out of `lives`
-before `Connect` events are emitted.
+For this we have a persistent table mapping IPs to ban scores.
+
+Introduce the banlist:
+
+```ocaml
+module type Banlist_intf = sig
+  type t
+
+  type ban =
+  { host: string
+  ; score: int
+  ; reason: string option
+  ; remaining_dur: Time.Span.t }
+
+  val record_misbehavior : t -> host:string -> score:int -> ?reason:string -> unit
+
+  val ban : t -> host:string -> ?reason:string -> dur:Time.Span.t -> unit
+
+  val unban : t -> host:string -> unit
+
+  val bans : t -> ban list
+
+  val lookup_score : t -> host:string -> int option
+
+  val flush : t -> unit Deferred.t
+end
+```
+
+First, where the code currently has `TODO: punish` or `Logger.faulty_peer`, we
+should insert a call to `record_misbehavior`. When the score for a host exceeds
+some threshold, the banlist will make sure that:
+
+- The banned hosts won't show up as a result of querying the membership layer
+  for peers
+- RPC connections from those IPs will be rejected.
 
 The banlist should be persistent, and the CLI should allow manually
 adding/removing IPs from the banlist:
@@ -39,6 +73,8 @@ cli client ban add IP duration
 cli client ban remove IP
 cli client ban list
 ```
+
+By default, bans will last for 1 day.
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -74,9 +110,4 @@ insta-bans (most causes of invalid blocks). See in the bitcoin core source:
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- Is blocking peers at the membership layer sufficient? Is there a different
-  place we should do it?
-- How should our code report an IP as misbehaving internally? Tack a channel
-  onto our `Logger.t`? Something else? This is one of those cross-cutting
-  concerns that are so annoying.
-- How long should we ban by default?
+- Is there any reason to have a more sophisticated ban policy?
