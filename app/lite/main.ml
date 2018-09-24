@@ -83,12 +83,29 @@ let get_account _pk on_sucess on_error =
 
 let to_base64 m x = B64.encode (Binable.to_string m x)
 
+module Modal_stage = struct
+  type t = 
+    | Hidden
+    | Intro
+    | Problem
+    | Coda
+    | Mission
+end
+
+module Tooltip_stage = struct
+  type t = 
+    | None
+    | Proof
+    | Blockchain_state
+    | Account_state
+end
+
 module State = struct
   type t =
     { verification: [`Pending of int | `Complete of unit Or_error.t]
-    ; chain: Lite_chain.t }
+    ; chain: Lite_chain.t; show_modal: Modal_stage.t; tooltip_stage: Tooltip_stage.t }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; show_modal = Intro; tooltip_stage = None}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
@@ -349,12 +366,40 @@ let merkle_tree =
     in
     rendered
 
-let explanation =
+let g_update_state_and_vdom = ref (fun _ -> ())
+
+let mk_button fn title =
+  let open Node in
+  let open Attr in
+  div [class_ "button"
+      ; Attr.on_click fn ] 
+    [ text title ]
+
+let explanation state =
   let open Node in
   let open Attr in
   let t = text in
   let a url s = a [href url] [t s] in
   let p = p [] in
+  let on_click_learn_more _ = 
+    !g_update_state_and_vdom { state with State.show_modal=Modal_stage.Intro };
+    Event.Ignore
+  in
+  let on_click_follow_our_progress _ = 
+    (* TODO open twitter in new tab *)
+    Event.Ignore
+  in
+  let hover_box_contents = 
+    match state.tooltip_stage with
+    | None -> "None"
+    | Proof -> "Proof"
+    | Blockchain_state -> "Blockchain_state"
+    | Account_state -> "Account_state"
+  in
+  let hover_box =
+    div [class_ "tooltip"]
+      [text hover_box_contents]
+  in
   div [class_ "info"]
     [ h1 [] [t "What is this?"]
     ; p
@@ -367,17 +412,73 @@ let explanation =
         [ text {|Coda is a new cryptocurrency that compresses the entire blockchain into a
                  proof so small that it's being delivered to and checked in your browser
                  right now. That means you can be certain that the account balances and blockchain-state
-                 you're looking at now are backed by a blockchain of valid transactions. No resource-intensive
-                 full-node or delegation of trust to web-wallets required.|} ]
-    ]
+                 you're looking at now are backed by a blockchain of valid transactions. No delegation of trust required.|} ]
+    ; hover_box
+    ; mk_button on_click_learn_more "learn more" 
+    ; mk_button on_click_follow_our_progress "follow our progress" ]
+
+let modal state =
+  let open Node in
+  let open Attr in
+  let on_click_close _ = 
+    !g_update_state_and_vdom { state with State.show_modal=Hidden };
+    Event.Ignore
+  in
+  let next target =
+    mk_button (fun _ -> 
+      !g_update_state_and_vdom { state with State.show_modal=target };
+      Event.Ignore
+      ) "next"
+  in
+  let hide = 
+    if state.show_modal = Hidden
+    then [ class_ "hidden" ] 
+    else [] 
+  in
+  let image url =
+    let css = "background: url(" ^ url ^ ")" in
+    div [ class_ "image"; Attr.style_css css ] []
+  in
+  let contents = 
+    match state.show_modal with
+    | Hidden -> []
+    | Intro -> [ 
+        text "This is Coda, a cryptocurrency so lightweight, it runs in your browser. Explore the Coda testnet from a verified JavaScript client here"
+        ; next Problem
+      ]
+    | Problem -> [
+        text "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
+        ; image "logo.svg"
+        ; next Coda
+      ]
+    | Coda -> [
+        text "Coda is a new cryptocurrency that
+puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
+        ; image "logo.svg"
+        ; next Mission
+      ]
+    | Mission -> [
+        text "This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives. "
+        ; image "logo.svg"
+        ; mk_button on_click_close "explore"
+      ]
+  in
+  div ([class_ "modal"] @ hide) [
+    mk_button on_click_close "x"
+    ; div [class_ "modal_contents"] contents
+  ]
 
 let state_html
-    { State.verification
-    ; chain=
-        { protocol_state=
-            {previous_state_hash; blockchain_state; consensus_state}
-        ; ledger
-        ; proof } } =
+    state
+     =
+     let { State.verification
+         ; show_modal= _
+         ; tooltip_stage= _
+         ; chain=
+             { protocol_state=
+                 {previous_state_hash; blockchain_state; consensus_state}
+             ; ledger
+             ; proof } } = state in
   let {Blockchain_state.ledger_builder_hash; ledger_hash; timestamp} =
     blockchain_state
   in
@@ -407,22 +508,42 @@ let state_html
       ; [ Entry.create "staged_ledger_hash"
             (field_to_base64 ledger_builder_hash.ledger_hash) ] ]
   in
-  div [class_ "main"]
-    [ div [class_ "state-explorer"]
-        [ div [class_ "state-with-proof"]
-            [ Html.Record.render state_record
-            ; div
-                [ class_ "proof-struts"
-                ; Attr.style [("width", "0"); ("height", "0")] ]
-                [ Svg.main ~width:500. ~height:200.
-                    [ Svg.path [{x= 150.; y= 0.}; {x= 150.; y= 200.}]
-                    ; Svg.path [{x= 350.; y= 0.}; {x= 350.; y= 200.}] ] ]
-            ; Html.Record.Entry.(
-                create ~class_:proof_class "blockchain_SNARK"
-                  (to_base64 (module Proof) proof)
-                |> render) ]
-        ; merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger) ]
-    ; explanation ]
+  let hoverable node target =
+    let update_tooltip  _ = 
+      !g_update_state_and_vdom { state with State.tooltip_stage=target };
+      Event.Ignore
+    in
+    let open Node in
+    let open Attr in
+    let tooltip_indicator = 
+      div [class_ "tooltip_indicator"] [text "?"]
+    in
+    div [on_mouseenter update_tooltip] [ tooltip_indicator; node ]
+  in
+  let state_explorer =
+    div [class_ "state-explorer"]
+      [ div [class_ "state-with-proof"]
+          [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state
+          ; div
+              [ class_ "proof-struts"
+              ; Attr.style [("width", "0"); ("height", "0")] ]
+              [ Svg.main ~width:500. ~height:200.
+                  [ Svg.path [{x= 150.; y= 0.}; {x= 150.; y= 200.}]
+                  ; Svg.path [{x= 350.; y= 0.}; {x= 350.; y= 200.}] ] ]
+          ; hoverable(Html.Record.Entry.(
+              create ~class_:proof_class "blockchain_SNARK"
+                (to_base64 (module Proof) proof)
+              |> render)) Tooltip_stage.Proof ]
+      ; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state ]
+  in
+  div [] [
+    div [class_ "header"] [ div [class_ "logo"] [] ]
+  ; div [class_ "main"]
+      [
+        modal state
+      ; state_explorer
+      ; explanation state ]
+  ]
 
 let main ~render ~get_data =
   let state = ref State.init in
@@ -436,6 +557,7 @@ let main ~render ~get_data =
     Node.Patch.apply patch elt |> ignore ;
     vdom := new_vdom
   in
+  g_update_state_and_vdom := update_state_and_vdom;
   let verifier = Verifier.create () in
   Verifier.set_on_message verifier ~f:(fun resp ->
       match !state.verification with
@@ -453,7 +575,8 @@ let main ~render ~get_data =
         if id > !latest_completed then (
           latest_completed := id ;
           if State.should_update !state res then (
-            update_state_and_vdom {verification= `Pending id; chain= res} ;
+            let new_state = { !state with verification=`Pending id; chain= res } in
+            update_state_and_vdom new_state ;
             Verifier.send_verify_message verifier (res, id) ) ) )
   in
   loop () ;

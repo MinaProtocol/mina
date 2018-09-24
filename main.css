@@ -1,4 +1,4 @@
-.info {
+.widthinfo {
   width: 300px;
   padding: 30px;
   background-color: #F9FAFC;
@@ -8,22 +8,46 @@
   font-size: 14pt;
 }
 
+.header {
+  display: flex;
+  width: 1600px;
+  height: 100px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.logo {
+  display: flex;
+  width: 100px;
+  height: 100px;
+  float: left;
+  background: url(logo.svg);
+  background-size: 100px 100px;
+}
+
+.image {
+  display: flex;
+  width: 100px;
+  height: 100px;
+  background-size: 100px 100px;
+}
+
 .main {
   display: flex;
   justify-content: space-between;
   margin-left: auto;
   margin-right: auto;
-  width: 1700px;
+  width: 1600px;
 }
 
 .state-with-proof {
-    width: 500px;
+    width: 400px;
     display: inline-flex;
     flex-direction: column;
 }
 
 .state {
-    width: 500px;
+    width: 400px;
     margin-left:auto;
     margin-right:auto;
 }
@@ -98,4 +122,41 @@
 .record-row {
   display: flex;
   width: 100%;
+}
+
+
+.modal {
+  position: fixed;
+  top: 200px;
+  bottom: 200px;
+  left: 200px;
+  right: 200px;
+  z-index: 999;
+  border: 1px solid #888;
+  background-color: rgba(255, 255, 255, 0.9);
+}
+
+.button {
+  width: 200px;
+  height: 100px;
+  background-color: red;
+
+}
+
+.hidden {
+  display: none;
+}
+
+.tooltip {
+  width: 200px;
+  height: 200px;
+  border: 1px solid black;
+}
+
+.tooltip_indicator {
+  border: 1px solid black;
+  border-radius: 10px;
+  width: 20px;
+  height: 20px;
+
 }
