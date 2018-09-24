@@ -1076,7 +1076,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 in
                 match Uri.path uri with
                 | "/" -> Server.respond_with_file "index.html"
-                | "/web-demo-art/gods-hands.png" -> Server.respond_with_file "web-demo-art/gods-hands.png"
+                | "/web-demo-art/problem.png" -> Server.respond_with_file "web-demo-art/problem.png"
                 | "/web-demo-art/net-hand.png" -> Server.respond_with_file "web-demo-art/net-hand.png"
                 | "/web-demo-art/your-hands.png" -> Server.respond_with_file "web-demo-art/your-hands.png"
                 | "/logo.svg" -> Server.respond_with_file "logo.svg"

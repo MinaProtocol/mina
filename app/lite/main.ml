@@ -448,7 +448,7 @@ let modal state =
       ]
     | Problem -> [
         text "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
-        ; image "web-demo-art/gods-hands.png"
+        ; image "web-demo-art/problem.png"
         ; next Coda
       ]
     | Coda -> [
