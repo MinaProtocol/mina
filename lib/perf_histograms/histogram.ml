@@ -129,11 +129,14 @@ module Exp_time_spans = Make (struct
 
   let bucket ~params:{Params.a; b; buckets} span =
     let x = Time.Span.to_ms span in
-    (* y = a + b log(x) *)
-    let res = a +. (b *. Float.log x) |> Int.of_float in
-    if res >= buckets then `Overflow
-    else if res < 0 then `Underflow
-    else `Index res
+    if span <= 0 then
+      `Underflow
+    else
+      (* y = a + b log(x) *)
+      let res = a +. (b *. Float.log x) |> Int.of_float in
+      if res >= buckets then `Overflow
+      else if res < 0 then `Underflow
+      else `Index res
 end)
 
 let%test_unit "reports properly with overflows and underflows and table hits" =
