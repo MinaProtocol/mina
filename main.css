@@ -194,9 +194,12 @@
 }
 
 .tooltip_indicator {
-  border: 1px solid black;
-  border-radius: 10px;
+  border: 3px solid #1F2D3D;
+  border-radius: 50px;
   width: 20px;
   height: 20px;
-
+  text-align: center;
+  font-size: 21px;
+  font-weight: bold;
+  position: absolute;
 }

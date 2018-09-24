@@ -417,6 +417,10 @@ let explanation state =
     ; mk_button on_click_learn_more "learn more" 
     ; mk_button on_click_follow_our_progress "follow our progress" ]
 
+let images = "/web-demo-art/"
+
+let image_url s = images ^ s
+
 let modal state =
   let open Node in
   let open Attr in
@@ -453,18 +457,18 @@ let modal state =
       ]
     | Problem -> [
         text "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
-        ; image "web-demo-art/problem.png"
+        ; image (image_url "problem.png")
         ; next Coda
       ]
     | Coda -> [
         text "Coda is a new cryptocurrency that
 puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
-        ; image "web-demo-art/your-hands.png"
+        ; image (image_url "your-hands.png")
         ; next Mission
       ]
     | Mission -> [
         text "This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives. "
-        ; image "web-demo-art/net-hand.png"
+        ; image (image_url "net-hands.png")
         ; mk_button on_click_close "explore"
       ]
   in
