@@ -187,6 +187,7 @@ let make_init (type ledger_proof) (module Config : Config_intf) (module Kernel
   let open Config in
   let open Kernel in
   let%bind prover = Prover.create ~conf_dir in
+  Shutdown.at_shutdown (fun () -> Prover.shutdown prover >>| ignore) ;
   let%map verifier = Verifier.create ~conf_dir in
   let module Init = struct
     include Kernel
