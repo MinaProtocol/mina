@@ -29,8 +29,9 @@ module Inputs = struct
 
   let perform_single () ~message s =
     Ok
-      ( Snark_work_lib.Work.Single.Spec.statement s
-      , Coda_base.Sok_message.digest message )
+      ( ( Snark_work_lib.Work.Single.Spec.statement s
+        , Coda_base.Sok_message.digest message )
+      , Time.Span.zero )
 end
 
 module Worker = Worker.Make (Inputs)

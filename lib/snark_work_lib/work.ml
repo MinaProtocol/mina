@@ -19,6 +19,7 @@ end
 module Result = struct
   type ('spec, 'single) t =
     { proofs: 'single list
+    ; metrics: (Time.Span.t * [`Transition | `Merge]) list
     ; spec: 'spec
     ; prover: Signature_lib.Public_key.Compressed.t }
   [@@deriving bin_io, fields]
