@@ -21,7 +21,7 @@
   width: 100px;
   height: 100px;
   float: left;
-  background: url(logo.svg);
+  background-image: url(logo.svg);
   background-size: 100px 100px;
 }
 

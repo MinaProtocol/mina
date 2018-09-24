@@ -105,7 +105,7 @@ module State = struct
     { verification: [`Pending of int | `Complete of unit Or_error.t]
     ; chain: Lite_chain.t; show_modal: Modal_stage.t; tooltip_stage: Tooltip_stage.t }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; show_modal = Intro; tooltip_stage = None}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; show_modal = Problem; tooltip_stage = None}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
@@ -436,7 +436,7 @@ let modal state =
     else [] 
   in
   let image url =
-    let css = "background: url(" ^ url ^ ")" in
+    let css = "background-image: url(" ^ url ^ ")" in
     div [ class_ "image"; Attr.style_css css ] []
   in
   let contents = 
@@ -448,18 +448,18 @@ let modal state =
       ]
     | Problem -> [
         text "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
-        ; image "logo.svg"
+        ; image "web-demo-art/gods-hands.png"
         ; next Coda
       ]
     | Coda -> [
         text "Coda is a new cryptocurrency that
 puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
-        ; image "logo.svg"
+        ; image "web-demo-art/your-hands.png"
         ; next Mission
       ]
     | Mission -> [
         text "This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives. "
-        ; image "logo.svg"
+        ; image "web-demo-art/net-hand.png"
         ; mk_button on_click_close "explore"
       ]
   in
