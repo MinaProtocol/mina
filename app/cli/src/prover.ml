@@ -208,10 +208,12 @@ struct
   let shutdown t = Worker.shutdown t.worker
 
   let create ~conf_dir =
+    let logger = Logger.(extend (create ()) [("module", Atom "prover")]) in
     let%map worker, process =
       (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
       Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-        ~on_failure:Error.raise ~shutdown_on:Called_shutdown_function ()
+        ~on_failure:(fun e -> Logger.error logger !"%{sexp:Error.t}" e)
+        ~shutdown_on:Called_shutdown_function ()
     in
     let connection =
       Worker_connection.create ~server_name:"coda_prover"
