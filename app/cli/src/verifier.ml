@@ -130,7 +130,7 @@ struct
     Worker.spawn_exn ~on_failure:Error.raise ~shutdown_on:Disconnect
       ~redirect_stdout:(`File_append (conf_dir ^/ "verifier-stdout"))
       ~redirect_stderr:(`File_append (conf_dir ^/ "verifier-stderr"))
-      ~connection_state_init_arg:() ()
+      ~name:"coda-verifier" ~connection_state_init_arg:() ()
 
   let verify_blockchain t chain =
     Worker.Connection.run t ~f:Worker.functions.verify_blockchain ~arg:chain

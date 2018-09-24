@@ -201,7 +201,7 @@ struct
     let%map connection, process =
       (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
       Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-        ~on_failure:Error.raise ~shutdown_on:Disconnect
+        ~on_failure:Error.raise ~shutdown_on:Disconnect ~name:"coda-prover"
         ~connection_state_init_arg:() ()
     in
     File_system.dup_stdout process ;
