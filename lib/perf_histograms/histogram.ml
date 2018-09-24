@@ -129,7 +129,7 @@ module Exp_time_spans = Make (struct
 
   let bucket ~params:{Params.a; b; buckets} span =
     let x = Time.Span.to_ms span in
-    if span <= 0 then `Underflow
+    if Float.( <= ) x 0.0 then `Underflow
     else
       (* y = a + b log(x) *)
       let res = a +. (b *. Float.log x) |> Int.of_float in
