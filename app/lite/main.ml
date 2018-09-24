@@ -84,17 +84,18 @@ let get_account _pk on_sucess on_error =
 
 let to_base64 m x = B64.encode (Binable.to_string m x)
 
-module Modal_stage = struct
-  type t = 
-    | Hidden
+module App_stage = struct
+  type t =
+    | Start
     | Intro
     | Problem
     | Coda
     | Mission
+    | App
 end
 
 module Tooltip_stage = struct
-  type t = 
+  type t =
     | None
     | Proof
     | Blockchain_state
@@ -104,9 +105,12 @@ end
 module State = struct
   type t =
     { verification: [`Pending of int | `Complete of unit Or_error.t]
-    ; chain: Lite_chain.t; show_modal: Modal_stage.t; tooltip_stage: Tooltip_stage.t }
+    ; chain: Lite_chain.t
+    ; app_stage: App_stage.t
+    ; tooltip_stage: Tooltip_stage.t
+    }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; show_modal = Intro; tooltip_stage = None}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; app_stage = Start; tooltip_stage = None}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
@@ -369,6 +373,50 @@ let merkle_tree =
 
 let g_update_state_and_vdom = ref (fun _ -> ())
 
+module Style = struct
+  type t = string list
+
+  let ( + ) = List.append
+
+  let of_class s = [s]
+
+  let empty = []
+
+  let render t = Attr.(class_ (String.concat ~sep:" " t))
+end
+
+module Visibility = struct
+  let no_mobile = Style.of_class "dn db-ns"
+
+  let only_large = Style.of_class "dn db-l"
+
+  let only_mobile = Style.of_class "db dn-ns"
+end
+
+module Mobile_switch = struct
+  let create ~not_small ~small =
+    let open Node in
+    div []
+      [ div [Style.render Visibility.no_mobile] [not_small]
+      ; div [Style.render Visibility.only_mobile] [small] ]
+end
+
+
+(** A Pane is full-width on mobile and on desktop
+ * On desktop it's 1/3 (thin) or 2/3 (wide)
+ *)
+module Pane = struct
+  let create ~content ~width =
+    let open Node in
+    let large_width =
+      match width with
+      | `Thin -> Style.of_class "w-30-l"
+      | `Wide -> Style.of_class "w-70-l"
+    in
+    div [Style.(render ((of_class "w-100 ph2") + large_width))]
+      [content]
+end
+
 let mk_button ?(attrs=[]) fn title =
   let open Node in
   let open Attr in
@@ -376,113 +424,85 @@ let mk_button ?(attrs=[]) fn title =
       ; Attr.on_click fn ] @ attrs)
     [ text title ]
 
-let explanation state =
-  let open Node in
-  let open Attr in
-  let t = text in
-  let a url s = a [href url] [t s] in
-  let p = p [] in
-  let on_click_learn_more _ = 
-    !g_update_state_and_vdom { state with State.show_modal=Modal_stage.Intro };
-    Event.Ignore
-  in
-  let on_click_follow_our_progress _ = 
-    (* TODO open twitter in new tab *)
-    Event.Ignore
-  in
-  let hover_box_contents = 
-    match state.tooltip_stage with
-    | None -> "None"
-    | Proof -> "Proof"
-    | Blockchain_state -> "Blockchain_state"
-    | Account_state -> "Account_state"
-  in
-  let hover_box =
-    div [class_ "tooltip"]
-      [text hover_box_contents]
-  in
-  div [class_ "info"]
-    [ h1 [] [t "What is this?"]
-    ; p
-        [ text
-            {|This is the world's first verified web-page. It's a fully-verifying
-                 state explorer for the |}
-        ; a "https://codaprotocol.com" "Coda protocol"
-        ; text {| alpha testnet.|} ]
-    ; p
-        [ text {|Coda is a new cryptocurrency that compresses the entire blockchain into a
-                 proof so small that it's being delivered to and checked in your browser
-                 right now. That means you can be certain that the account balances and blockchain-state
-                 you're looking at now are backed by a blockchain of valid transactions. No delegation of trust required.|} ]
-    ; hover_box
-    ; mk_button on_click_learn_more "learn more" 
-    ; mk_button on_click_follow_our_progress "follow our progress" ]
-
 let images = "/web-demo-art/"
 
 let image_url s = images ^ s
 
-let modal state =
-  let open Node in
-  let open Attr in
-  let on_click_close _ = 
-    !g_update_state_and_vdom { state with State.show_modal=Hidden };
-    Event.Ignore
-  in
-  let next target =
-    mk_button (fun _ -> 
-      !g_update_state_and_vdom { state with State.show_modal=target };
-      Event.Ignore
-      ) "next"
-  in
-  let hide = 
-    if state.show_modal = Hidden
-    then " hidden" 
-    else "" 
-  in
-  let small = 
-    if state.show_modal = Intro
-    then " small_modal" 
-    else "" 
-  in
-  let image url =
-    let css = "background-image: url(" ^ url ^ ")" in
-    div [ class_ "image"; Attr.style_css css ] []
-  in
-  let contents = 
-    match state.show_modal with
-    | Hidden -> []
-    | Intro -> [ 
-        text "This is Coda, a cryptocurrency so lightweight, it runs in your browser. Explore the Coda testnet from a verified JavaScript client here"
-        ; next Problem
+module Story = struct
+  let create state =
+    let open Node in
+    let open Attr in
+    let next target =
+      mk_button (fun _ -> 
+        !g_update_state_and_vdom { state with State.app_stage=target };
+        Event.Ignore
+        ) "Next"
+    in
+    let image url =
+      let css = "background-image: url(" ^ url ^ ")" in
+      div [ class_ "image"; Attr.style_css css ] []
+    in
+    let contents = 
+      match state.app_stage with
+      | Start -> [
+        text "This is the start story"
+        ; next Intro
       ]
-    | Problem -> [
-        text "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
-        ; image (image_url "problem.png")
-        ; next Coda
+      | Intro -> [
+          text "This is Coda, a cryptocurrency so lightweight, it runs in your browser. Explore the Coda testnet from a verified JavaScript client here"
+          ; next Problem
+        ]
+      | Problem -> [
+          text "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
+          ; image (image_url "problem.png")
+          ; next Coda
+        ]
+      | Coda -> [
+          text "Coda is a new cryptocurrency that
+  puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
+          ; image (image_url "your-hands.png")
+          ; next Mission
+        ]
+      | Mission -> [
+          text "This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives. "
+          ; image (image_url "net-hands.png")
+          ; next App
+        ]
+      | App -> [
+        text "Look at the right"
       ]
-    | Coda -> [
-        text "Coda is a new cryptocurrency that
-puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
-        ; image (image_url "your-hands.png")
-        ; next Mission
-      ]
-    | Mission -> [
-        text "This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives. "
-        ; image (image_url "net-hands.png")
-        ; mk_button on_click_close "explore"
-      ]
-  in
-  div ([class_ ("modal" ^ hide ^ small) ]) [
-    mk_button ~attrs:[class_ "corner"] on_click_close "x"
-    ; div [class_ "modal_contents"] contents
-  ]
+    in
+    div [] contents
+end
+
+module Container = struct
+  let create ~configuration =
+    let open Node in
+    let (left_content, left_width), (right_content, right_width), primary_content =
+      match configuration with
+      | `Left_primary (left, right) ->
+        ((left, `Wide), (right, `Thin), left)
+      | `Right_primary (left, right) ->
+        ((left, `Thin), (right, `Wide), right)
+    in
+    Mobile_switch.create
+      ~not_small:(
+        div [Style.(render @@ of_class "flex w-100")]
+          [ Pane.create ~content:left_content  ~width:left_width
+          ; Pane.create ~content:right_content ~width:right_width
+          ]
+      )
+      ~small:(
+        Pane.create ~content:primary_content ~width:`Wide
+      )
+
+end
 
 let state_html
     state
      =
      let { State.verification
-         ; show_modal= _
+         ; app_stage
          ; tooltip_stage= _
          ; chain=
              { protocol_state=
@@ -550,9 +570,15 @@ let state_html
     div [class_ "header"] [ div [class_ "logo"] [] ]
   ; div [class_ "main"]
       [
-        modal state
-      ; state_explorer
-      ; explanation state ]
+        Container.create
+          ~configuration:(
+            match app_stage with
+            | App | Start ->
+                `Right_primary (Story.create state, state_explorer)
+            | _ ->
+                `Left_primary (Story.create state, state_explorer)
+          )
+      ]
   ]
 
 let main ~render ~get_data =
