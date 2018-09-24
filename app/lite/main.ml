@@ -105,7 +105,7 @@ module State = struct
     { verification: [`Pending of int | `Complete of unit Or_error.t]
     ; chain: Lite_chain.t; show_modal: Modal_stage.t; tooltip_stage: Tooltip_stage.t }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; show_modal = Hidden; tooltip_stage = None}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; show_modal = Intro; tooltip_stage = None}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
@@ -368,11 +368,11 @@ let merkle_tree =
 
 let g_update_state_and_vdom = ref (fun _ -> ())
 
-let mk_button fn title =
+let mk_button ?(attrs=[]) fn title =
   let open Node in
   let open Attr in
-  div [class_ "button"
-      ; Attr.on_click fn ] 
+  div ([class_ "button"
+      ; Attr.on_click fn ] @ attrs)
     [ text title ]
 
 let explanation state =
@@ -432,8 +432,13 @@ let modal state =
   in
   let hide = 
     if state.show_modal = Hidden
-    then [ class_ "hidden" ] 
-    else [] 
+    then " hidden" 
+    else "" 
+  in
+  let small = 
+    if state.show_modal = Intro
+    then " small_modal" 
+    else "" 
   in
   let image url =
     let css = "background-image: url(" ^ url ^ ")" in
@@ -463,8 +468,8 @@ puts control back in the hands of the users. Its resource requirements are so lo
         ; mk_button on_click_close "explore"
       ]
   in
-  div ([class_ "modal"] @ hide) [
-    mk_button on_click_close "x"
+  div ([class_ ("modal" ^ hide ^ small) ]) [
+    mk_button ~attrs:[class_ "corner"] on_click_close "x"
     ; div [class_ "modal_contents"] contents
   ]
 
@@ -516,7 +521,7 @@ let state_html
     let open Node in
     let open Attr in
     let tooltip_indicator = 
-      div [class_ "tooltip_indicator"] [text "?"]
+      div [class_ "tooltip_indicator corner"] [text "?"]
     in
     div ([on_mouseenter update_tooltip] @ attrs) [ tooltip_indicator; node ]
   in
