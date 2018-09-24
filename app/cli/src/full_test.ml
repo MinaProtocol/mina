@@ -60,7 +60,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
       | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
           return ()
       | _ ->
-          let%bind () = after (Time_ns.Span.of_sec 10.) in
+          let%bind () = after (Time_ns.Span.of_sec 15.) in
           go ()
     in
     Deferred.any [after (Time_ns.Span.of_min 3.); go ()]
