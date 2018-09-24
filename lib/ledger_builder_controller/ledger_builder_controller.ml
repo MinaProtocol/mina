@@ -851,13 +851,13 @@ let%test_module "test" =
             ; ledger_builder= Inputs.Ledger_builder.create 0 }
           ~longest_tip_location:(temp_folder ^/ storage)
 
-      let transition x parent strength =
+      let create_transition x parent strength =
         { Inputs.Protocol_state.previous_state_hash= parent
         ; blockchain_state= {ledger_builder_hash= x; ledger_hash= x}
         ; consensus_state= {strength} }
 
-      let transitions =
-        let f = transition in
+      let no_catchup_transitions =
+        let f = create_transition in
         [f 1 0 1; f 2 1 2; f 3 0 1; f 4 0 1; f 5 2 3; f 6 1 2; f 7 5 4]
 
       let take_map ~f p cnt =
@@ -891,13 +891,13 @@ let%test_module "test" =
     let%test_unit "strongest_ledgers updates appropriately when new_states \
                    flow in within tree" =
       Backtrace.elide := false ;
-      let config = Lbc.config Lbc.transitions in
+      let config = Lbc.config Lbc.no_catchup_transitions in
       Lbc.assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
 
     let%test_unit "strongest_ledgers updates appropriately using the network" =
       Backtrace.elide := false ;
       let transitions =
-        let f = Lbc.transition in
+        let f = Lbc.create_transition in
         [ f 1 0 1
         ; f 2 1 2
         ; f 3 8 6 (* This one comes over the network *)
@@ -912,7 +912,7 @@ let%test_module "test" =
 
     let%test_unit "local_get_ledger can materialize a ledger locally" =
       Backtrace.elide := false ;
-      let config = Lbc.config Lbc.transitions in
+      let config = Lbc.config Lbc.no_catchup_transitions in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = Lbc.create config in
           (* Drain the first few strongest_ledgers *)
@@ -922,15 +922,28 @@ let%test_module "test" =
           | Error e ->
               failwithf "Unexpected error %s" (Error.to_string_hum e) () )
 
-    module Lbc_disk = Make_test (Storage.Disk)
+    module Broadcastable_storage_disk (Pipe : sig
+      val writer : [`Finished_write] Linear_pipe.Writer.t
+    end) =
+    struct
+      include Storage.Disk
+
+      let store controller location data =
+        let%bind () = store controller location data in
+        Linear_pipe.write Pipe.writer `Finished_write
+    end
 
     let%test_unit "Files get saved" =
       Backtrace.elide := false ;
+      let reader, writer = Linear_pipe.create () in
+      let module Lbc_disk = Make_test (Broadcastable_storage_disk (struct
+        let writer = writer
+      end)) in
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dirs [Lbc_disk.temp_folder] ~f:(fun () ->
-              let config = Lbc_disk.config Lbc_disk.transitions in
+              let config = Lbc_disk.config Lbc_disk.no_catchup_transitions in
               let%bind lbc = Lbc_disk.create config in
-              let%bind () = after (Time.Span.of_sec 3.0) in
+              let%bind _ = Lbc.take_map reader 4 ~f:ignore in
               let%map tip = Lbc_disk.For_tests.load_tip lbc config in
               let lb =
                 Lbc_disk.strongest_tip lbc
@@ -940,11 +953,15 @@ let%test_module "test" =
 
     let%test_unit "Continue from last file" =
       Backtrace.elide := false ;
+      let reader, writer = Linear_pipe.create () in
+      let module Lbc_disk = Make_test (Broadcastable_storage_disk (struct
+        let writer = writer
+      end)) in
       Async.Thread_safe.block_on_async_exn (fun () ->
           File_system.with_temp_dirs [Lbc_disk.temp_folder] ~f:(fun () ->
-              let config = Lbc_disk.config Lbc_disk.transitions in
+              let config = Lbc_disk.config Lbc_disk.no_catchup_transitions in
               let%bind lbc = Lbc_disk.create config in
-              let%bind () = after (Time.Span.of_sec 3.0) in
+              let%bind _ = Lbc.take_map reader 4 ~f:ignore in
               let lb =
                 Lbc_disk.strongest_tip lbc
                 |> Lbc_disk.Inputs.Tip.ledger_builder
