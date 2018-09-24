@@ -383,7 +383,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -723,7 +723,7 @@ module Coda_without_snark
     (Init : Init_intf with module Ledger_proof = Ledger_proof.Debug)
     () =
 struct
-  module Store = Storage.Memory
+  module Store = Storage.Disk
 
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true

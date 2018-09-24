@@ -193,11 +193,15 @@ module type Ledger_builder_controller_intf = sig
       ; external_transitions:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
-      ; disk_location: string }
+      ; longest_tip_location: string }
     [@@deriving make]
   end
 
   val create : Config.t -> t Deferred.t
+
+  module For_tests : sig
+    val load_tip : t -> Config.t -> tip Deferred.t
+  end
 
   val strongest_tip : t -> tip
 
@@ -461,7 +465,7 @@ module Make (Inputs : Inputs_intf) = struct
                    ~self:(Public_key.compress config.keypair.public_key)
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
-           ~disk_location:config.ledger_builder_persistant_location
+           ~longest_tip_location:config.ledger_builder_persistant_location
            ~external_transitions:external_transitions_reader)
     in
     let%bind net =

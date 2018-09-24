@@ -211,7 +211,7 @@ end = struct
     the above state. *)
     ; ledger: Ledger.t
     ; public_key: Compressed_public_key.t }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   let random_work_spec_chunk t
       (seen_statements:
