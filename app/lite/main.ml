@@ -434,7 +434,7 @@ module Pane = struct
       | Some `Wide -> Style.of_class "minw6-ns"
       | Some `Thin -> Style.of_class "minw5-ns"
     in
-    div [Style.(render ((of_class "flex ml3 mr3 pv3") + minwidth))]
+    div [Style.(render ((of_class "flex ml3 mr3 pv3  overflow-hidden") + minwidth))]
       [content]
 end
 
