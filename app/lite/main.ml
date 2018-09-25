@@ -117,7 +117,7 @@ module State = struct
     ; download_progress: Download_progress.t
     }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; app_stage = Intro; tooltip_stage = None; download_progress = Progress 0}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; app_stage = Intro; tooltip_stage = None; download_progress = Done}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length

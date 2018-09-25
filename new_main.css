@@ -26,3 +26,69 @@
 .bread_button:hover .breadcrumb:hover {
   cursor: pointer;
 }
+
+.state-explorer {
+  width: 200px;
+  font-size: calc(5 * ((100vw) / (1000)));
+}
+
+.accounts {
+  width: 50%;
+  display: inline-flex;
+  flex-direction: column;
+}
+
+.record {
+    background-color: #F9FAFC;
+    border: 3px solid #1F2D3D;
+    padding: 5px;
+}
+
+.record-entry {
+    border: 3px solid #1F2D3D;
+    background-color: #F9FAFC;
+    margin: 10px;
+    flex-grow: 1;
+    min-width: 1%;
+}
+
+.record-entry-label {
+    background-color: #1F2D3D;
+    height: 20px;
+    color: white;
+    padding: 7px;
+}
+
+.record-entry-value {
+    word-wrap: break-word;
+    padding: 10px;
+}
+
+.corner {
+  width: 50px;
+  height: 50px;
+  text-align: center;
+  background-color: #222;
+  color: white;
+  border-radius: 25px;
+  font-family: sans-serif;
+  font-size: 30px;
+  line-height: 50px;
+}
+
+.tooltip {
+  width: 200px;
+  height: 200px;
+  border: 1px solid black;
+}
+
+.tooltip_indicator {
+  border: 3px solid #1F2D3D;
+  border-radius: 50px;
+  width: 20px;
+  height: 20px;
+  text-align: center;
+  font-size: 21px;
+  font-weight: bold;
+  position: absolute;
+}
