@@ -500,10 +500,17 @@ end
 module Story = struct
   module Cell = struct
     let next state target =
-      Button.cta ~button_hint:"Next" ~f:(fun _ -> 
-        !g_update_state_and_vdom { state with State.app_stage=target };
-        Event.Ignore
-      )
+      match state.State.app_stage with 
+      | App -> 
+        Button.cta ~button_hint:"Follow our progress" ~f:(fun _ -> 
+          !g_update_state_and_vdom { state with State.app_stage=target };
+          Event.Ignore
+        )
+      | _ -> 
+        Button.cta ~button_hint:"Next" ~f:(fun _ -> 
+          !g_update_state_and_vdom { state with State.app_stage=target };
+          Event.Ignore
+        )
 
     let style =
       Style.of_class "ml3-ns mw7 h6 flex flex-column justify-between bg-snow"
