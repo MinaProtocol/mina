@@ -188,8 +188,9 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
             let%bind () = Unix.mkdir ~p:() dn in
             Unix.chmod dn 700
           else if not parent_exists then (
-            eprintf "Error: %s does not exist\nHint: mkdir -p %s; chmod 700 %s"
-              dn dn dn ;
+            eprintf
+              "Error: %s does not exist\nHint: mkdir -p %s; chmod 700 %s\n" dn
+              dn dn ;
             exit 1 )
           else Deferred.unit )
     with
