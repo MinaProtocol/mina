@@ -39,6 +39,11 @@ struct
     ; overflow= 0
     ; params }
 
+  let clear t =
+    Array.fill t.buckets ~pos:0 ~len:(Array.length t.buckets) 0 ;
+    t.underflow <- 0 ;
+    t.overflow <- 0
+
   module Pretty = struct
     type t =
       { values: int list
@@ -113,7 +118,7 @@ module Exp_time_spans = Make (struct
       in
       (a, b)
 
-    let create ?(min= Time.Span.of_us 100.) ?(max= Time.Span.of_day 3.)
+    let create ?(min= Time.Span.of_ms 100.) ?(max= Time.Span.of_hr 1.)
         ?(buckets= 50) () =
       let a, b = fit min max buckets in
       {a; b; buckets}
