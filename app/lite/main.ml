@@ -313,7 +313,7 @@ let merkle_tree =
         | Spec.Account
             { pos= {x; y}
             ; account= {public_key; balance; nonce; receipt_chain_hash} } ->
-            let x = x -. Float.of_int (account_width / 2) in
+            let _x = x -. Float.of_int (account_width / 2) in
             let record =
               let open Html.Record in
               create ~class_:"account"
@@ -322,8 +322,7 @@ let merkle_tree =
                       (style
                          [ ("width", sprintf "%dpx" account_width)
                          ; ("position", "absolute")
-                         ; ("top", float_to_string y ^ "px")
-                         ; ("left", float_to_string x ^ "px") ]) ]
+                         ; ("top", float_to_string y ^ "px") ]) ]
                 [ [ Entry.create "balance" ~width:"50%"
                       (Account.Balance.to_string balance)
                   ; Entry.create "nonce" ~width:"50%"
