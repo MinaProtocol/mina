@@ -717,6 +717,48 @@ int camlsnark_bn128_gm_verification_key_size_in_bits(
   return vk->size_in_bits();
 }
 
+libff::G2<ppT>* 
+camlsnark_bn128_gm_verification_key_h(
+    r1cs_se_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::G2<ppT>(vk->H);
+}
+
+libff::G1<ppT>* 
+camlsnark_bn128_gm_verification_key_g_alpha(
+    r1cs_se_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::G1<ppT>(vk->G_alpha);
+}
+
+libff::G2<ppT>* 
+camlsnark_bn128_gm_verification_key_h_beta(
+    r1cs_se_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::G2<ppT>(vk->H_beta);
+}
+
+libff::G1<ppT>* 
+camlsnark_bn128_gm_verification_key_g_gamma (
+    r1cs_se_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::G1<ppT>(vk->G_gamma);
+}
+
+libff::G2<ppT>* 
+camlsnark_bn128_gm_verification_key_h_gamma (
+    r1cs_se_ppzksnark_verification_key<ppT>* vk
+) {
+  return new libff::G2<ppT>(vk->H_gamma);
+}
+
+std::vector< libff::G1<ppT> >*
+camlsnark_bn128_gm_verification_key_query(
+    r1cs_se_ppzksnark_verification_key<ppT> *vk)
+{
+    return new std::vector<libff::G1<ppT>>(vk->query);
+}
+
 std::string* camlsnark_bn128_gm_verification_key_to_string(r1cs_se_ppzksnark_verification_key<ppT>* vk) {
   std::stringstream stream;
   stream << *vk;
@@ -780,6 +822,19 @@ bool camlsnark_bn128_gm_proof_verify(
     std::vector<FieldT>* primary_input) {
   return r1cs_se_ppzksnark_verifier_weak_IC(*key, *primary_input, *proof);
 }
+
+libff::G1<ppT>* camlsnark_bn128_gm_proof_a(r1cs_se_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->A);
+}
+
+libff::G2<ppT>* camlsnark_bn128_gm_proof_b(r1cs_se_ppzksnark_proof<ppT>* proof) {
+  return new libff::G2<ppT>(proof->B);
+}
+
+libff::G1<ppT>* camlsnark_bn128_gm_proof_c(r1cs_se_ppzksnark_proof<ppT>* proof) {
+  return new libff::G1<ppT>(proof->C);
+}
+
 // End Groth-Maller specific code
 
 // begin SHA gadget code

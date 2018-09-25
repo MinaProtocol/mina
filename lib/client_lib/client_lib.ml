@@ -63,6 +63,9 @@ module Status = struct
     ; peers: string list
     ; transactions_sent: int
     ; run_snark_worker: bool
+    ; external_transition_latency: Perf_histograms.Report.t option
+    ; snark_worker_transition_time: Perf_histograms.Report.t option
+    ; snark_worker_merge_time: Perf_histograms.Report.t option
     ; propose: bool }
   [@@deriving yojson, bin_io, fields]
 
@@ -71,6 +74,24 @@ module Status = struct
     let title = "Coda Daemon Status\n-----------------------------------\n" in
     let entries =
       let f x = Field.get x s in
+      let summarize_report
+          {Perf_histograms.Report.values; intervals; overflow= _; underflow= _} =
+        (* Show the largest 3 buckets *)
+        let zipped = List.zip_exn values intervals in
+        let best =
+          List.sort zipped ~compare:(fun (a, _) (a', _) ->
+              -1 * Int.compare a a' )
+          |> Fn.flip List.take 3
+        in
+        let msgs =
+          List.map best ~f:(fun (v, (lo, hi)) ->
+              Printf.sprintf
+                !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
+                lo hi v )
+        in
+        List.fold msgs ~init:"\t" ~f:(fun acc x -> acc ^ "\n\t" ^ x)
+        ^ "\n\t..."
+      in
       Fields.fold ~init:[]
         ~num_accounts:(fun acc x ->
           ("Number of Accounts", Int.to_string (f x)) :: acc )
@@ -89,6 +110,21 @@ module Status = struct
           ("Transactions Sent", Int.to_string (f x)) :: acc )
         ~run_snark_worker:(fun acc x ->
           ("Snark Worker Running", Bool.to_string (f x)) :: acc )
+        ~external_transition_latency:(fun acc x ->
+          match f x with
+          | None -> acc
+          | Some report ->
+              ("Block Latencies (hist.)", summarize_report report) :: acc )
+        ~snark_worker_transition_time:(fun acc x ->
+          match f x with
+          | None -> acc
+          | Some report ->
+              ("Snark Worker a->b (hist.)", summarize_report report) :: acc )
+        ~snark_worker_merge_time:(fun acc x ->
+          match f x with
+          | None -> acc
+          | Some report ->
+              ("Snark Worker Merge (hist.)", summarize_report report) :: acc )
         ~propose:(fun acc x ->
           ("Proposer Running", Bool.to_string (f x)) :: acc )
       |> List.rev

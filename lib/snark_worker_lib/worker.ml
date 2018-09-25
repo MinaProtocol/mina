@@ -37,18 +37,25 @@ struct
 
   let perform (s: Worker_state.t) public_key
       ({instances; fee} as spec: Work.Spec.t) =
-    List.fold_until instances ~init:[]
-      ~f:(fun acc w ->
+    List.fold_until instances ~init:([], [])
+      ~f:(fun (acc1, acc2) w ->
         match
           perform_single s
             ~message:(Coda_base.Sok_message.create ~fee ~prover:public_key)
             w
         with
-        | Ok res -> Continue (res :: acc)
+        | Ok (res, time) ->
+            let tag =
+              match w with
+              | Snark_work_lib.Work.Single.Spec.Transition _ -> `Transition
+              | Merge _ -> `Merge
+            in
+            Continue (res :: acc1, (time, tag) :: acc2)
         | Error e -> Stop (Error e) )
-      ~finish:(fun res ->
+      ~finish:(fun (res, metrics) ->
         Ok
           { Snark_work_lib.Work.Result.proofs= List.rev res
+          ; metrics= List.rev metrics
           ; spec
           ; prover= public_key } )
 

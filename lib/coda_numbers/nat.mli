@@ -22,6 +22,8 @@ module type S = sig
 
   val of_int : int -> t
 
+  val to_int : t -> int
+
   (* Someday: I think this only does ones greater than zero, but it doesn't really matter for
     selecting the nonce *)
 

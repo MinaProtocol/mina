@@ -130,7 +130,7 @@ module type Proof_intf = sig
 end
 
 module type Ledger_intf = sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   module Undo : sig
     type t [@@deriving sexp]
@@ -401,7 +401,7 @@ module type Ledger_builder_transition_intf = sig
 end
 
 module type Ledger_builder_intf = sig
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   type diff
 
@@ -501,7 +501,7 @@ module type Tip_intf = sig
     { protocol_state: protocol_state
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 end
@@ -641,7 +641,16 @@ module type Consensus_mechanism_intf = sig
     -> keypair:keypair
     -> transactions:transaction list
     -> ledger:ledger
+    -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
+
+  val next_proposal :
+       Int64.t
+    -> Consensus_state.value
+    -> local_state:Local_state.t
+    -> keypair:keypair
+    -> logger:Logger.t
+    -> [`Check_again of Int64.t | `Propose of Int64.t]
 end
 
 module type Time_close_validator_intf = sig
