@@ -1,3 +1,6 @@
+[%%import
+"../../../../config.mlh"]
+
 open Core_kernel
 open Snark_params.Tick
 open Tuple_lib
@@ -150,6 +153,15 @@ struct
   let hash s =
     Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state (fold s)
     |> State_hash.of_hash
+
+  [%%if
+  log_calls]
+
+  let hash s =
+    Coda_debug.Call_logger.record_call "Protocol_state.hash" ;
+    hash s
+
+  [%%endif]
 
   let negative_one =
     { previous_state_hash=
