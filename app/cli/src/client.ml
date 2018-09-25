@@ -170,6 +170,14 @@ let status =
     (Daemon_cli.init json_flag ~f:(fun port json ->
          dispatch Get_status.rpc () port >>| print (module Status) json ))
 
+let status_clear_hist =
+  let open Deferred.Let_syntax in
+  let open Client_lib in
+  Command.async ~summary:"Clear histograms reported in status"
+    (Daemon_cli.init json_flag ~f:(fun port json ->
+         dispatch Clear_hist_status.rpc () port >>| print (module Status) json
+     ))
+
 let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
   let open Unix.Error in
   let dn = Filename.dirname path in
@@ -411,6 +419,7 @@ let command =
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-txn", send_txn)
     ; ("status", status)
+    ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("generate-keypair", generate_keypair) ]

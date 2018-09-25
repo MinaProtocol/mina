@@ -21,7 +21,7 @@ module Make (Elem : sig
 end) =
 struct
   type t =
-    { buckets: int Array.t
+    { mutable buckets: int Array.t
     ; intervals: (Elem.t * Elem.t) List.t
     ; mutable underflow: int
     ; mutable overflow: int
@@ -38,6 +38,11 @@ struct
     ; underflow= 0
     ; overflow= 0
     ; params }
+
+  let clear t =
+    t.buckets <- Array.init (Elem.Params.buckets t.params) ~f:(fun _ -> 0) ;
+    t.underflow <- 0 ;
+    t.overflow <- 0
 
   module Pretty = struct
     type t =
@@ -113,7 +118,7 @@ module Exp_time_spans = Make (struct
       in
       (a, b)
 
-    let create ?(min= Time.Span.of_us 100.) ?(max= Time.Span.of_day 3.)
+    let create ?(min= Time.Span.of_ms 100.) ?(max= Time.Span.of_hr 1.)
         ?(buckets= 50) () =
       let a, b = fit min max buckets in
       {a; b; buckets}

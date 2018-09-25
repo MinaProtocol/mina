@@ -75,13 +75,13 @@ module Status = struct
     let entries =
       let f x = Field.get x s in
       let summarize_report
-          {Perf_histograms.Report.values; intervals; overflow= _; underflow= _} =
+          {Perf_histograms.Report.values; intervals; overflow; underflow} =
         (* Show the largest 3 buckets *)
         let zipped = List.zip_exn values intervals in
         let best =
           List.sort zipped ~compare:(fun (a, _) (a', _) ->
               -1 * Int.compare a a' )
-          |> Fn.flip List.take 3
+          |> Fn.flip List.take 4
         in
         let msgs =
           List.map best ~f:(fun (v, (lo, hi)) ->
@@ -89,7 +89,11 @@ module Status = struct
                 !"(%{sexp: Time.Span.t}, %{sexp: Time.Span.t}): %d"
                 lo hi v )
         in
-        List.fold msgs ~init:"\t" ~f:(fun acc x -> acc ^ "\n\t" ^ x)
+        let total = List.sum (module Int) values ~f:Fn.id in
+        List.fold msgs
+          ~init:
+            (Printf.sprintf "Total: %d (overflow:%d) (underflow:%d)\n\t" total
+               overflow underflow) ~f:(fun acc x -> acc ^ "\n\t" ^ x )
         ^ "\n\t..."
       in
       Fields.fold ~init:[]
@@ -105,7 +109,12 @@ module Status = struct
           | Some sha1 ->
               ("Git SHA1", Git_sha.sexp_of_t sha1 |> Sexp.to_string) :: acc )
         ~conf_dir:(fun acc x -> ("Configuration Dir", f x) :: acc)
-        ~peers:(fun acc x -> ("Peers", List.to_string ~f:Fn.id (f x)) :: acc)
+        ~peers:(fun acc x ->
+          let peers = f x in
+          ( "Peers"
+          , Printf.sprintf "Total: %d " (List.length peers)
+            ^ List.to_string ~f:Fn.id peers )
+          :: acc )
         ~transactions_sent:(fun acc x ->
           ("Transactions Sent", Int.to_string (f x)) :: acc )
         ~run_snark_worker:(fun acc x ->
@@ -169,6 +178,18 @@ module Get_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
+end
+
+module Clear_hist_status = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = Status.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_public_keys = struct
