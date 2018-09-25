@@ -987,6 +987,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; run_snark_worker= run_snark_worker t
     ; propose= should_propose t }
 
+  let clear_hist_status t = Perf_histograms.wipe () ; get_status t
+
   let setup_local_server ?rest_server_port ~coda ~log ~client_port () =
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
@@ -1000,7 +1002,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
             return (get_nonce coda pk) )
       ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
-            return (get_status coda) ) ]
+            return (get_status coda) )
+      ; Rpc.Rpc.implement Client_lib.Clear_hist_status.rpc (fun () () ->
+            return (clear_hist_status coda) ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in

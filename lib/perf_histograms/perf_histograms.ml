@@ -14,3 +14,6 @@ let report ~name =
   String.Table.find_and_call t name
     ~if_found:(fun tbl -> Some (Histogram.Exp_time_spans.report tbl))
     ~if_not_found:(fun _ -> None)
+
+let wipe () =
+  String.Table.iter t ~f:(fun tbl -> Histogram.Exp_time_spans.clear tbl)
