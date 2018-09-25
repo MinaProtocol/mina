@@ -314,20 +314,22 @@ let send_txn =
          let open Deferred.Let_syntax in
          let receiver_compressed = Public_key.compress address in
          let perm_error = ref false in
-         let%bind st = Unix.stat from_account in
+         let%bind st = handle_open ~mkdir:false ~f:Unix.stat from_account in
          if st.perm land 0o777 <> 0o600 then (
            eprintf
              "Error: insecure permissions on `%s`. They should be 0600, they \
-              are %o\n"
-             from_account (st.perm land 0o777) ;
+              are %o\n\
+              Hint: chmod 600 %s\n"
+             from_account (st.perm land 0o777) from_account ;
            perm_error := true ) ;
-         let%bind st = Unix.stat (Filename.dirname from_account) in
+         let dn = Filename.dirname from_account in
+         let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
          if st.perm land 0o777 <> 0o700 then (
            eprintf
              "Error: insecure permissions on `%s`. They should be 0700, they \
-              are %o\n"
-             (Filename.dirname from_account)
-             (st.perm land 0o777) ;
+              are %o\n\
+              Hint: chmod 700 %s\n"
+             dn (st.perm land 0o777) dn ;
            perm_error := true ) ;
          let%bind () = if !perm_error then exit 1 else Deferred.unit in
          let%bind sender_kp =
