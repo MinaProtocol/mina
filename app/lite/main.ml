@@ -423,21 +423,15 @@ end
  * On desktop it's 1/3 (thin) or 2/3 (wide)
  *)
 module Pane = struct
-  let create ~content ~width ~bg =
+  let create ~content ~width  =
     let open Node in
     let large_width =
       Style.of_class @@
         match width with
-        | `Thin -> "w-30-ns"
-        | `Wide -> "w-70-ns"
+        | `Thin -> "w-40-ns"
+        | `Wide -> "w-60-ns"
     in
-    let bg_color =
-      Style.of_class @@
-        match bg with
-        | `Light -> "bg-white"
-        | `Dark -> "bg-snow"
-    in
-    div [Style.(render ((of_class "w-100 ph3 pv3") + large_width + bg_color))]
+    div [Style.(render ((of_class "w-100 flex ph3 pv3") + large_width))]
       [content]
 end
 
@@ -510,8 +504,8 @@ module Story = struct
 
     let terminal state ~heading ~copy ~next_state =
       let open Node in
-      div [Style.(render (of_class "w-100 mht6 flex-column"))]
-        [ h1 [ Style.(render (of_class "f1"))] [text heading]
+      div [Style.(render (of_class "ml3 mw7 h6 flex-column bg-snow"))]
+        [ h1 [ Style.(render (of_class "f2"))] [text heading]
         ; div [] [text copy]
         ; next state next_state
         ; Breadcrumbs.create state
@@ -519,7 +513,7 @@ module Story = struct
 
     let comic state ~copy ~img ~alt ~next_state =
       let open Node in
-      div [Style.(render (of_class "w-100 mht6 flex-column"))]
+      div [Style.(render (of_class "ml3 mw7 h6 flex-column bg-snow"))]
         [ div [] [text copy]
         ; Image.draw ~src:img ~alt (`Fixed (100, 100))
         ; next state next_state
@@ -567,12 +561,12 @@ module Container = struct
     Mobile_switch.create
       ~not_small:(
         div [Style.(render @@ of_class "flex w-100 items-center")]
-          [ Pane.create ~content:left_content  ~width:left_width ~bg:`Dark
-          ; Pane.create ~content:right_content ~width:right_width ~bg:`Light
+          [ Pane.create ~content:left_content  ~width:left_width
+          ; Pane.create ~content:right_content ~width:right_width
           ]
       )
       ~small:(
-        Pane.create ~content:primary_content ~width:`Wide ~bg:`Light
+        Pane.create ~content:primary_content ~width:`Wide
       )
 
 end
