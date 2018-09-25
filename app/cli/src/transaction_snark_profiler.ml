@@ -61,7 +61,7 @@ let create_ledger_and_transactions num_transitions =
         Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
       in
       let coinbase =
-        Coinbase.create
+        Coinbase.create ~amount:Protocols.Coda_praos.coinbase_amount
           ~proposer:(Public_key.compress keys.(0).public_key)
           ~fee_transfer:None
         |> Or_error.ok_exn

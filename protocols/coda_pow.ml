@@ -238,13 +238,29 @@ module type Fee_transfer_intf = sig
 
   type single = public_key * Fee.Unsigned.t
 
+  val of_single : public_key * Fee.Unsigned.t -> t
+
   val of_single_list : (public_key * Fee.Unsigned.t) list -> t list
 
   val receivers : t -> public_key list
 end
 
 module type Coinbase_intf = sig
-  type t [@@deriving sexp, compare, eq]
+  type public_key
+
+  type fee_transfer
+
+  type t = private
+    { proposer: public_key
+    ; amount: Currency.Amount.t
+    ; fee_transfer: fee_transfer option }
+  [@@deriving sexp, bin_io, compare, eq]
+
+  val create :
+       amount:Currency.Amount.t
+    -> proposer:public_key
+    -> fee_transfer:fee_transfer option
+    -> t Or_error.t
 end
 
 module type Super_transaction_intf = sig
@@ -365,23 +381,73 @@ module type Ledger_builder_diff_intf = sig
 
   type completed_work_checked
 
+  module At_most_two : sig
+    type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
+    [@@deriving sexp, bin_io]
+
+    val increase : 'a t -> 'a list -> 'a t Or_error.t
+  end
+
+  module At_most_one : sig
+    type 'a t = Zero | One of 'a option [@@deriving sexp, bin_io]
+
+    val increase : 'a t -> 'a list -> 'a t Or_error.t
+  end
+
+  type diff =
+    {completed_works: completed_work list; transactions: transaction list}
+  [@@deriving sexp, bin_io]
+
+  type diff_with_at_most_two_coinbase =
+    {diff: diff; coinbase_parts: completed_work At_most_two.t}
+  [@@deriving sexp, bin_io]
+
+  type diff_with_at_most_one_coinbase =
+    {diff: diff; coinbase_added: completed_work At_most_one.t}
+  [@@deriving sexp, bin_io]
+
+  type pre_diffs =
+    ( diff_with_at_most_one_coinbase
+    , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
+    Either.t
+  [@@deriving sexp, bin_io]
+
   type t =
-    { prev_hash: ledger_builder_hash
-    ; completed_works: completed_work list
-    ; transactions: transaction list
-    ; creator: public_key }
+    {pre_diffs: pre_diffs; prev_hash: ledger_builder_hash; creator: public_key}
   [@@deriving sexp, bin_io]
 
   module With_valid_signatures_and_proofs : sig
+    type diff =
+      { completed_works: completed_work_checked list
+      ; transactions: transaction_with_valid_signature list }
+    [@@deriving sexp]
+
+    type diff_with_at_most_two_coinbase =
+      {diff: diff; coinbase_parts: completed_work_checked At_most_two.t}
+    [@@deriving sexp]
+
+    type diff_with_at_most_one_coinbase =
+      {diff: diff; coinbase_added: completed_work_checked At_most_one.t}
+    [@@deriving sexp]
+
+    type pre_diffs =
+      ( diff_with_at_most_one_coinbase
+      , diff_with_at_most_two_coinbase * diff_with_at_most_one_coinbase )
+      Either.t
+    [@@deriving sexp]
+
     type t =
-      { prev_hash: ledger_builder_hash
-      ; completed_works: completed_work_checked list
-      ; transactions: transaction_with_valid_signature list
+      { pre_diffs: pre_diffs
+      ; prev_hash: ledger_builder_hash
       ; creator: public_key }
     [@@deriving sexp]
+
+    val transactions : t -> transaction_with_valid_signature list
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
+
+  val transactions : t -> transaction list
 end
 
 module type Ledger_builder_transition_intf = sig
@@ -755,7 +821,10 @@ module type Inputs_intf = sig
   module Fee_transfer :
     Fee_transfer_intf with type public_key := Public_key.Compressed.t
 
-  module Coinbase : Coinbase_intf
+  module Coinbase :
+    Coinbase_intf
+    with type public_key := Public_key.Compressed.t
+     and type fee_transfer := Fee_transfer.single
 
   module Super_transaction :
     Super_transaction_intf
