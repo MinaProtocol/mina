@@ -2,11 +2,14 @@ open Core
 open Import
 
 type t = private
-  {proposer: Public_key.Compressed.t; fee_transfer: Fee_transfer.single option}
+  { proposer: Public_key.Compressed.t
+  ; amount: Currency.Amount.t
+  ; fee_transfer: Fee_transfer.single option }
 [@@deriving sexp, bin_io, compare, eq]
 
 val create :
-     proposer:Public_key.Compressed.t
+     amount:Currency.Amount.t
+  -> proposer:Public_key.Compressed.t
   -> fee_transfer:Fee_transfer.single option
   -> t Or_error.t
 

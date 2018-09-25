@@ -85,7 +85,10 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
   (* Check if high balance account has expected balance *)
-  assert_balance high_balance_pk initial_high_balance ;
+  let new_sender, rest_accounts = List.split_n extra_accounts 1 in
+  let new_sender_pk = fst (List.hd_exn new_sender) in
+  let new_sender_sk = snd (List.hd_exn new_sender) in
+  assert_balance new_sender_pk (Currency.Balance.of_int init_balance) ;
   assert_balance low_balance_pk initial_low_balance ;
   (*No proof emitted by the parallel scan at the begining*)
   assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
@@ -148,24 +151,17 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     let%map () = Run.send_txn log coda (transaction :> Transaction.t) in
     new_balance_sheet'
   in
+  let rest_pks = fst @@ List.unzip rest_accounts in
   let send_txns balance_sheet f_amount =
-    Deferred.List.foldi extra_accounts ~init:balance_sheet ~f:
+    Deferred.List.foldi rest_accounts ~init:balance_sheet ~f:
       (fun i acc key_pair ->
         let sender_pk = fst key_pair in
         let receiver =
           List.random_element_exn
-            (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
+            (List.filter rest_pks ~f:(fun pk -> not (pk = sender_pk)))
         in
         send_txn_update_balance_sheet (snd key_pair) sender_pk receiver
           (f_amount i) acc (Currency.Fee.of_int 0) )
-  in
-  let%bind () =
-    test_sending_transaction Genesis_ledger.high_balance_sk
-      Genesis_ledger.low_balance_pk
-  in
-  let%bind () =
-    test_sending_transaction Genesis_ledger.high_balance_sk
-      Genesis_ledger.low_balance_pk
   in
   let wait_for_proof_or_timeout () =
     let rec go () =
@@ -185,7 +181,8 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   (*Include multiple transactions in a block*)
   let balance_sheet =
     Public_key.Compressed.Map.of_alist_exn
-      (List.map pks ~f:(fun pk -> (pk, Currency.Balance.of_int init_balance)))
+      (List.map rest_pks ~f:(fun pk ->
+           (pk, Currency.Balance.of_int init_balance) ))
   in
   let%bind updated_balance_sheet =
     send_txns balance_sheet (fun i -> Currency.Amount.of_int ((i + 1) * 10))
@@ -195,6 +192,13 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   assert emitted ;
   Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
       assert_balance key data ) ;
+  (*test duplicate transactions*)
+  let%bind () =
+    test_sending_transaction new_sender_sk Genesis_ledger.low_balance_pk
+  in
+  let%bind () =
+    test_sending_transaction new_sender_sk Genesis_ledger.low_balance_pk
+  in
   Deferred.unit
 
 let command (type ledger_proof) (module Kernel
