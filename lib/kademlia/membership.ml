@@ -52,12 +52,22 @@ module Haskell_process = struct
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
       (Host_and_port.port addr)
 
+  let filter_initial_peers initial_peers me =
+    List.filter initial_peers ~f:(fun peer ->
+        not (Host_and_port.equal peer (fst me)) )
+
+  let%test "filter_initial_peers_test" =
+    let me = (Host_and_port.create ~host:"1.1.1.1" ~port:8000, 8001) in
+    let other = Host_and_port.create ~host:"1.1.1.2" ~port:8000 in
+    filter_initial_peers [fst me; other] me = [other]
+
   let create ~initial_peers ~me ~log ~conf_dir =
     let lock_path = Filename.concat conf_dir lock_file in
+    let filtered_initial_peers = filter_initial_peers initial_peers me in
     let run_kademlia () =
       let args =
         ["test"; cli_format me]
-        @ List.map initial_peers ~f:cli_format_initial_peer
+        @ List.map filtered_initial_peers ~f:cli_format_initial_peer
       in
       Logger.debug log "Args: %s\n"
         (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;

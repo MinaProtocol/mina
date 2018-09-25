@@ -1,8 +1,18 @@
 open Core_kernel
 
+type ('hash, 'account) tree =
+  | Account of 'account
+  | Hash of 'hash
+  | Node of 'hash * ('hash, 'account) tree * ('hash, 'account) tree
+[@@deriving bin_io, eq, sexp]
+
 type ('hash, 'key, 'account) t [@@deriving bin_io, sexp]
 
 type index = int
+
+val of_hash : depth:int -> 'hash -> ('hash, _, _) t
+
+val tree : ('hash, _, 'account) t -> ('hash, 'account) tree
 
 module type S = sig
   type hash

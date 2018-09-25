@@ -159,8 +159,6 @@ module type Config_intf = sig
 
   val lbc_tree_max_depth : [`Infinity | `Finite of int]
 
-  val transition_interval : Time.Span.t
-
   val keypair : Keypair.t
 
   val genesis_proof : Snark_params.Tock.Proof.t
@@ -385,7 +383,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -630,8 +628,6 @@ struct
     include Ledger_builder_controller.Make (Inputs)
   end
 
-  module Transition_tree = Ledger_builder_controller.Transition_tree
-
   module Proposer = Proposer.Make (struct
     include Inputs0
     module Ledger_builder_diff = Ledger_builder_diff
@@ -659,10 +655,6 @@ struct
           (Init.Consensus_mechanism.Internal_transition.snark_transition
              transition)
         >>| fun {Init.Blockchain.proof; _} -> proof
-    end
-
-    module Proposal_interval = struct
-      let t = Time.Span.of_time_span Init.transition_interval
     end
   end)
 
@@ -731,7 +723,7 @@ module Coda_without_snark
     (Init : Init_intf with module Ledger_proof = Ledger_proof.Debug)
     () =
 struct
-  module Store = Storage.Memory
+  module Store = Storage.Disk
 
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
@@ -843,10 +835,6 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
-
-    module Transition_tree :
-      Coda.Ktree_intf
-      with type elem := Consensus_mechanism.External_transition.t
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -898,8 +886,6 @@ module type Main_intf = sig
 
   val create : Config.t -> t Deferred.t
 
-  val lbc_transition_tree : t -> Inputs.Transition_tree.t option
-
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
@@ -910,8 +896,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   open Inputs
 
   module For_tests = struct
-    let get_transition_tree t = lbc_transition_tree t
-
     let ledger_proof t = ledger_builder_ledger_proof t
   end
 
@@ -984,6 +968,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; uptime_secs
     ; ledger_merkle_root
     ; state_hash
+    ; external_transition_latency=
+        Perf_histograms.report ~name:"external_transition_latency"
+    ; snark_worker_transition_time=
+        Perf_histograms.report ~name:"snark_worker_transition_time"
+    ; snark_worker_merge_time=
+        Perf_histograms.report ~name:"snark_worker_merge_time"
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
@@ -1019,7 +1009,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 | Some _ -> () ) ;
                 r
             | `Eof -> assert false )
-      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
+      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
+          (fun () (work: Snark_worker.Work.Result.t) ->
+            List.iter work.metrics ~f:(fun (total, tag) ->
+                match tag with
+                | `Merge ->
+                    Perf_histograms.add_span ~name:"snark_worker_merge_time"
+                      total
+                | `Transition ->
+                    Perf_histograms.add_span
+                      ~name:"snark_worker_transition_time" total ) ;
             let%map () =
               Snark_pool.add_completed_work (snark_pool coda) work
             in

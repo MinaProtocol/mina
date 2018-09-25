@@ -18,6 +18,8 @@ module type S = sig
   val protocol_state_proof : t -> Proof.t
 
   val ledger_builder_diff : t -> Ledger_builder_diff.t
+
+  val timestamp : t -> Block_time.t
 end
 
 module Make (Ledger_builder_diff : sig
@@ -46,4 +48,8 @@ struct
 
   let create ~protocol_state ~protocol_state_proof ~ledger_builder_diff =
     {protocol_state; protocol_state_proof; ledger_builder_diff}
+
+  let timestamp {protocol_state; _} =
+    Protocol_state.blockchain_state protocol_state
+    |> Blockchain_state.timestamp
 end
