@@ -5,8 +5,6 @@ open Snark_params.Tick
 
 type t
 
-val ledger_hash : t -> Ledger_hash.t
-
 include Hashable.S with type t := t
 
 type var
@@ -40,7 +38,13 @@ module Aux_hash : sig
 
   val of_bytes : string -> t
 
+  val to_bytes : t -> string
+
   val dummy : t
 end
+
+val ledger_hash : t -> Ledger_hash.t
+
+val aux_hash : t -> Aux_hash.t
 
 val of_aux_and_ledger_hash : Aux_hash.t -> Ledger_hash.t -> t

@@ -1,0 +1,9 @@
+(library
+  (name lite_params)
+  (public_name lite_params)
+  (libraries lite_base snarkette core_kernel base64))
+
+(rule
+  (targets lite_params.ml)
+  (deps    gen/gen.exe)
+  (action  (run gen/gen.exe ${@})))

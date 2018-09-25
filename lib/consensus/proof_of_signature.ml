@@ -121,6 +121,12 @@ struct
       ; signer_public_key= Global_public_key.compressed }
 
     let length t = t.length
+
+    let to_lite =
+      Some
+        (fun {length; signer_public_key} ->
+          { Lite_base.Consensus_state.length= Lite_compat.length length
+          ; signer_public_key= Lite_compat.public_key signer_public_key } )
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
