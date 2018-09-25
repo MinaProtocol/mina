@@ -49,6 +49,11 @@
 
 .h6 { height: 32rem; }
 
+@media screen and (min-width:30em) {
+  .minw5-ns { min-width: 16rem; }
+  .minw6-ns { min-width: 32rem; }
+}
+
 .bxs-bb { box-sizing: border-box; }
 .bxs-cb { box-sizing: content-box; }
 

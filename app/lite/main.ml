@@ -403,6 +403,9 @@ module Image = struct
   let draw ?(style= Style.empty) ~src ~alt xy =
     let inline_style =
       match xy with
+      | `Fixed_width x ->
+          let xStr = Int.to_string x in
+          Printf.sprintf "width:%spx" xStr
       | `Fixed (x, y) ->
           let xStr = Int.to_string x in
           let yStr = Int.to_string y in
@@ -423,15 +426,15 @@ end
  * On desktop it's 1/3 (thin) or 2/3 (wide)
  *)
 module Pane = struct
-  let create ~content ~width  =
+  let create ?minwidth ~content () =
     let open Node in
-    let large_width =
-      Style.of_class @@
-        match width with
-        | `Thin -> "w-40-ns"
-        | `Wide -> "w-60-ns"
+    let minwidth =
+      match minwidth with
+      | None -> Style.empty
+      | Some `Wide -> Style.of_class "minw6-ns"
+      | Some `Thin -> Style.of_class "minw5-ns"
     in
-    div [Style.(render ((of_class "w-100 flex ph3 pv3") + large_width))]
+    div [Style.(render ((of_class "flex ml3 mr3 pv3") + minwidth))]
       [content]
 end
 
@@ -449,7 +452,7 @@ module Button = struct
     ] [text button_hint]
 
   let cta ~button_hint ~f =
-    create ~button_hint ~extra_style:(Style.of_class "f3 ph4 pv3") ~f
+    create ~button_hint ~extra_style:(Style.of_class "f4") ~f
 end
 
 let images = "/web-demo-art/"
@@ -483,13 +486,13 @@ module Breadcrumbs = struct
     let dots = 
       List.init 5 ~f:(fun i -> 
           if i = selected 
-          then (div [] [text "*"])
-          else (div [Attr.on_click (select i)] [text "o"]))
+          then (span [Style.(render (of_class "ph1"))] [text "*"])
+          else (span [Attr.on_click (select i)] [text "o"]))
     in
     let last = 
       match state.app_stage with
-      | App -> div [Attr.on_click (select 0)] [text "* start over"]
-      | _ -> div [Attr.on_click (select 4)] [text "* skip"]
+      | App -> button [Attr.on_click (select 0)] [text "* start over"]
+      | _ -> button [Attr.on_click (select 4)] [text "* skip"]
     in
     div [] (dots @ [ last ])
 end
@@ -502,38 +505,59 @@ module Story = struct
         Event.Ignore
       )
 
-    let terminal state ~heading ~copy ~next_state =
+    let style =
+      Style.of_class "ml3-ns mw7 h6 flex flex-column justify-between bg-snow"
+
+    let bottom state next_state =
       let open Node in
-      div [Style.(render (of_class "ml3 mw7 h6 flex-column bg-snow"))]
-        [ h1 [ Style.(render (of_class "f2"))] [text heading]
-        ; div [] [text copy]
-        ; next state next_state
+      div []
+        [ next state next_state
         ; Breadcrumbs.create state
         ]
 
-    let comic state ~copy ~img ~alt ~next_state =
+    let terminal state ~heading ~copy ~next_state =
       let open Node in
-      div [Style.(render (of_class "ml3 mw7 h6 flex-column bg-snow"))]
-        [ div [] [text copy]
-        ; Image.draw ~src:img ~alt (`Fixed (100, 100))
-        ; next state next_state
-        ; Breadcrumbs.create state
+      div [Style.(render style)]
+        [ h1 [ Style.(render (of_class "f2 m0 mt2"))] [text heading]
+        ; div [] [text copy]
+        ; bottom state next_state
         ]
+
+    let comic state ~copy ~strip ~next_state =
+      let open Node in
+      div [Style.(render style)]
+        [ div [Style.(render (of_class "mt2"))] [text copy]
+        ; strip
+        ; bottom state next_state
+        ]
+
+    let simple_comic state ~copy ~img ~alt ~next_state =
+      let open Node in
+      comic state ~copy ~strip:(
+          div [Style.(render (of_class "flex flex-column items-end"))]
+            [ Image.draw ~style:(Style.of_class "mw6-ns") ~src:img ~alt `Free]) ~next_state
+
   end
 
   let create state =
+    let open Node in
     let terminal = Cell.terminal state in
     let comic = Cell.comic state in
+    let simple_comic = Cell.simple_comic state in
     match state.app_stage with
     | Intro -> terminal ~heading:"Coda Protocol Demo" ~copy:"This demo is showing a live browser verified copy of the Coda Protocol Testnet.\n\nCoda enables you to be absolutely certain..." ~next_state:Problem
-    | Problem -> comic
+    | Problem -> simple_comic
       ~copy:"Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user." ~img:(image_url "problem.png") ~alt:"Hand with big blockchain" ~next_state:Coda
     | Coda -> comic
         ~copy:"Coda is a new cryptocurrency that puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
-        ~img:(image_url "your-hands.png")
-        ~alt:"A user of Coda"
+        ~strip:(
+          div [Style.(render (of_class "flex justify-between"))]
+            [ Image.draw ~src:(image_url "compare-outlined.svg") ~alt:"Others vs Coda" (`Fixed_width 200)
+            ; Image.draw ~src:(image_url "your-hands.png") ~alt:"A user of Coda" (`Fixed_width 400)
+            ]
+        )
         ~next_state:Mission
-    | Mission -> comic
+    | Mission -> simple_comic
         ~copy:"This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives."
         ~img:(image_url "net-hand.png")
         ~alt:"Hand with the work"
@@ -547,26 +571,22 @@ end
 module Container = struct
   let create ~configuration =
     let open Node in
-    let (left_content, left_width), (right_content, right_width), primary_content =
-      let complement = function
-        | `Wide -> `Thin
-        | `Thin -> `Wide
-      in
+    let (left_content, left_width), right_content, primary_content =
       match configuration with
       | `Left_primary ((left, left_width), right) ->
-        ((left, left_width), (right, complement left_width), left)
+        ((left, left_width), right, left)
       | `Right_primary ((left, left_width), right) ->
-        ((left, left_width), (right, complement left_width), right)
+        ((left, left_width), right, right)
     in
     Mobile_switch.create
       ~not_small:(
-        div [Style.(render @@ of_class "flex w-100 items-center")]
-          [ Pane.create ~content:left_content  ~width:left_width
-          ; Pane.create ~content:right_content ~width:right_width
+        div [Style.(render @@ of_class "flex w-100")]
+          [ Pane.create ~content:left_content  ~minwidth:left_width ()
+          ; Pane.create ~content:right_content ()
           ]
       )
       ~small:(
-        Pane.create ~content:primary_content ~width:`Wide
+        Pane.create ~content:primary_content ()
       )
 
 end
@@ -624,7 +644,7 @@ let state_html
     div ([on_mouseenter update_tooltip] @ attrs) [ tooltip_indicator; node ]
   in
   let state_explorer =
-    div [class_ "state-explorer"]
+    div [class_ "state-explorer ml3-ns"]
       [ div [class_ "state-with-proof"]
           [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state []
           ; div
