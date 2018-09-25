@@ -35,15 +35,8 @@ struct
   open Lite_base
 
   type t =
-    { location:
-        string
-        (* TODO: change this to the functor instantiation of Lite_base Sparse_ledger *)
-    ; ledger_storage:
-        ( Lite_base.Pedersen.Digest.t
-        , Lite_base.Public_key.Compressed.t
-        , Account.t )
-        Sparse_ledger_lib.Sparse_ledger.t
-        Store.Controller.t
+    { location: string
+    ; ledger_storage: Lite_lib.Sparse_ledger.t Store.Controller.t
     ; proof_storage: Proof.t Store.Controller.t
     ; protocol_state_storage: Protocol_state.t Store.Controller.t
     ; reader: Chain.data Linear_pipe.Reader.t
@@ -76,10 +69,7 @@ struct
     let%bind () = Unix.mkdir location ~p:() in
     let parent_log = log in
     let ledger_storage =
-      Store.Controller.create ~parent_log
-        (failwith
-           "TODO: Replace this with functor instantion of \
-            Lite_base.Sparse_ledger")
+      Store.Controller.create ~parent_log Lite_lib.Sparse_ledger.bin_t
     in
     let proof_storage = Store.Controller.create ~parent_log Proof.bin_t in
     let protocol_state_storage =
