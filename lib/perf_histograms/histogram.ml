@@ -21,7 +21,7 @@ module Make (Elem : sig
 end) =
 struct
   type t =
-    { mutable buckets: int Array.t
+    { buckets: int Array.t
     ; intervals: (Elem.t * Elem.t) List.t
     ; mutable underflow: int
     ; mutable overflow: int
@@ -40,7 +40,7 @@ struct
     ; params }
 
   let clear t =
-    t.buckets <- Array.init (Elem.Params.buckets t.params) ~f:(fun _ -> 0) ;
+    Array.fill t.buckets ~pos:0 ~len:(Array.length t.buckets) 0 ;
     t.underflow <- 0 ;
     t.overflow <- 0
 
