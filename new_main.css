@@ -29,7 +29,7 @@
 
 .state-explorer {
   width: 200px;
-  font-size: calc(5 * ((100vw) / (1000)));
+  font-size: calc((5) * ((100vw) / (1000)));
 }
 
 .accounts {

@@ -672,6 +672,7 @@ let state_html
     in
     div ([on_mouseenter update_tooltip] @ attrs) [ tooltip_indicator; node ]
   in
+  let _ = ledger in
   let state_explorer =
     match download_progress with
     | Progress _ -> div [] [Node.text "downloading..."]
@@ -689,7 +690,7 @@ let state_html
               create ~class_:proof_class "blockchain_SNARK"
                 (to_base64 (module Proof) proof)
               |> render)) Tooltip_stage.Proof  [] ]
-      ; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"] ] 
+      (*; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"]*) ] 
   in
   let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]
   in
