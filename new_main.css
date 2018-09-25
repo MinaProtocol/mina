@@ -2,22 +2,25 @@
 
 .breadcrumb {
   display: inline-block;
-  width: .6em;
-  height: .6em;
+  width: 1.5em;
+  height: 1.5em;
+  margin: .375em;
   border-radius: 100%;
-  margin: .45em;
-  background: #888;
-  padding: 0;
+  border: 1px solid #888;
+  overflow: hidden;
 }
 
 .breadcrumb.full {
-  width: 1.05em;
-  height: 1.05em;
-  margin: .1em;
+  background-color: rgb(25, 146,254);
 }
 
 .bread_button {
   display: inline-block;
+  height: 1.5em;
+  margin: .375em;
+  vertical-align: top;
+  line-height: 1.5em;
+  overflow: hidden;
 }
 
 .bread_button:hover .breadcrumb:hover {

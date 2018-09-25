@@ -500,7 +500,7 @@ module Breadcrumbs = struct
           else empty_dot i)
     in
     let bread_button action title = 
-      div [Attr.on_click action; Attr.class_ "bread_button"] [text title]
+      div [Attr.on_click action; Attr.class_ "bread_button"] [text ("• " ^ title)]
     in
     let last = 
       match state.app_stage with
