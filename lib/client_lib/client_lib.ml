@@ -200,17 +200,21 @@ module Clear_hist_status = struct
 
   type error = unit [@@deriving bin_io]
 
-  let rpc : (query, response) Rpc.Rpc.t = Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query ~bin_response
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_public_keys_with_balances = struct
   type query = unit [@@deriving bin_io]
 
   type response = (int * string) list [@@deriving bin_io, sexp]
-  
+
   type error = unit [@@deriving bin_io]
 
-  let rpc : (query, response) Rpc.Rpc.t = Rpc.Rpc.create ~name:"Get_public_keys_with_balances" ~version:0 ~bin_query ~bin_response
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_public_keys_with_balances" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_public_keys = struct
