@@ -3,12 +3,7 @@ open Async
 
 type t = string
 
-let create () =
-  let s3_path = "SNARKETTE_S3_PATH" in
-  Sys.getenv s3_path
-  |> Result.of_option
-       ~error:
-         (Error.createf !"Could not find environment variable: %s" s3_path)
+let create () = Deferred.Or_error.return "s3://o1labs-snarkette-data"
 
 let put t filenames =
   let subcommand = ["s3"; "cp"] in
