@@ -1,0 +1,17 @@
+
+
+.breadcrumb {
+  display: inline-block;
+  width: .6em;
+  height: .6em;
+  border-radius: 100%;
+  margin: .45em;
+  background: #888;
+  padding: 0;
+}
+
+.breadcrumb.full {
+  width: 1.05em;
+  height: 1.05em;
+  margin: .1em;
+}

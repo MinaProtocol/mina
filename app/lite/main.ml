@@ -483,11 +483,21 @@ module Breadcrumbs = struct
       | Mission -> 3
       | App -> 4
     in
+    let empty_dot i = 
+       div
+        [Attr.on_click (select i); Attr.class_ "breadcrumb"] 
+        [] 
+    in
+    let full_dot = 
+       div
+        [Attr.class_ "breadcrumb full"] 
+        [] 
+    in
     let dots = 
       List.init 5 ~f:(fun i -> 
           if i = selected 
-          then (span [Style.(render (of_class "ph1"))] [text "*"])
-          else (span [Attr.on_click (select i)] [text "o"]))
+          then full_dot
+          else empty_dot i)
     in
     let last = 
       match state.app_stage with
@@ -666,9 +676,11 @@ let state_html
               |> render)) Tooltip_stage.Proof  [] ]
       ; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"] ] 
   in
+  let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]
+  in
   div [] [
-    div [class_ "header"] [ div [class_ "logo"] [] ]
-  ; div [class_ "main"]
+    header
+  ; div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"]
       [
         Container.create
           ~configuration:(
