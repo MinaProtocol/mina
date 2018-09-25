@@ -133,10 +133,21 @@ let get_balance =
 let get_public_keys =
   let open Deferred.Let_syntax in
   let open Client_lib in
+  let open Command.Param in
+  let with_balances_flag =
+    flag "with-balances" no_arg
+      ~doc:"Show corresponding balances to public keys"
+  in
   Command.async ~summary:"Get public keys"
-    (Daemon_cli.init json_flag ~f:(fun port json ->
-         dispatch Get_public_keys.rpc () port
-         >>| print (module Public_key) json ))
+    (Daemon_cli.init
+       (return (fun a b -> (a, b)) <*> with_balances_flag <*> json_flag)
+       ~f:(fun port (is_balance_included, json) ->
+         if is_balance_included then
+           dispatch Get_public_keys_with_balances.rpc () port
+           >>| print (module Public_key_with_balances) json
+         else
+           dispatch Get_public_keys.rpc () port
+           >>| print (module String_list_formatter) json ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
