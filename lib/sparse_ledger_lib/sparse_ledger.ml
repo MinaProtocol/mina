@@ -43,6 +43,23 @@ end
 
 let of_hash ~depth h = {indexes= []; depth; tree= Hash h}
 
+let split {indexes; depth; tree} =
+  let rec get_path index subtree_height = function
+    | Account account when subtree_height = 0 -> Account account
+    | Account _ -> failwith "Account should be a leaf node"
+    | Hash _ -> failwith "Should not traverse to a hash node"
+    | Node (hash, left, right) ->
+        let is_left = index mod 2 = 0 in
+        let child =
+          get_path (index lsr 1) (subtree_height - 1)
+            (if is_left then left else right)
+        in
+        if is_left then Node (hash, child, right) else Node (hash, left, child)
+  in
+  List.map indexes ~f:(fun (key, index) ->
+      let tree = get_path index depth tree in
+      {indexes= [(key, index)]; depth; tree} )
+
 module Make (Hash : sig
   type t [@@deriving bin_io, eq, sexp]
 
@@ -188,7 +205,7 @@ let%test_module "sparse-ledger-test" =
         let%map name = String.gen and favorite_number = Int.gen in
         {name; favorite_number}
 
-      let key {name} = name
+      let key {name; _} = name
 
       let hash t = Md5.digest_string (Binable.to_string (module T) t)
     end
