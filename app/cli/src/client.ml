@@ -208,7 +208,7 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
   | Error e -> raise e
 
 let write_keypair {Keypair.private_key; public_key; _} privkey_path
-    ~(password: unit -> string Deferred.t) =
+    ~(password: unit -> Bytes.t Deferred.t) =
   let%bind privkey_f =
     handle_open ~mkdir:true ~f:Writer.open_file privkey_path
   in
@@ -235,7 +235,7 @@ let write_keypair {Keypair.private_key; public_key; _} privkey_path
   let%bind () = Writer.close pubkey_f in
   Deferred.unit
 
-let read_keypair_exn privkey_path ~(password: unit -> string Deferred.t) =
+let read_keypair_exn privkey_path ~(password: unit -> Bytes.t Deferred.t) =
   let open Deferred.Let_syntax in
   let read_all r =
     Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss
