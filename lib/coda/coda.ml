@@ -193,11 +193,15 @@ module type Ledger_builder_controller_intf = sig
       ; external_transitions:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
-      ; disk_location: string }
+      ; longest_tip_location: string }
     [@@deriving make]
   end
 
   val create : Config.t -> t Deferred.t
+
+  module For_tests : sig
+    val load_tip : t -> Config.t -> tip Deferred.t
+  end
 
   val strongest_tip : t -> tip
 
@@ -471,7 +475,7 @@ module Make (Inputs : Inputs_intf) = struct
                    ~self:(Public_key.compress config.keypair.public_key)
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
-           ~disk_location:config.ledger_builder_persistant_location
+           ~longest_tip_location:config.ledger_builder_persistant_location
            ~external_transitions:external_transitions_reader)
     in
     let%bind net =
@@ -597,18 +601,4 @@ module Make (Inputs : Inputs_intf) = struct
       ; seen_jobs= (Ledger_proof_statement.Set.empty, None)
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
-
-  let forget_diff_validity
-      { Ledger_builder_diff.With_valid_signatures_and_proofs.prev_hash
-      ; completed_works
-      ; transactions
-      ; creator } =
-    { Ledger_builder_diff.prev_hash
-    ; completed_works= List.map completed_works ~f:Completed_work.forget
-    ; transactions= (transactions :> Transaction.t list)
-    ; creator }
-
-  let forget_transition_validity
-      {Ledger_builder_transition.With_valid_signatures_and_proofs.old; diff} =
-    {Ledger_builder_transition.old; diff= forget_diff_validity diff}
 end

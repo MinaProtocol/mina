@@ -37,7 +37,7 @@ module type Inputs_intf = sig
        , Sparse_ledger.t
        , Proof.t )
        Work.Single.Spec.t
-    -> Proof.t Or_error.t
+    -> (Proof.t * Time.Span.t) Or_error.t
 end
 
 module type S = sig
