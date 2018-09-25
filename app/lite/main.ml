@@ -463,9 +463,41 @@ let images = "/web-demo-art/"
 let image_url s = images ^ s
 
 module Breadcrumbs = struct
-  let create () =
+  let create state =
     let open Node in
-    div [] [text "TODO: Breadcrumbs"]
+    let select i _ = 
+      let app_stage = 
+        match i with 
+        | 0 -> App_stage.Intro
+        | 1 -> Problem 
+        | 2 -> Coda    
+        | 3 -> Mission 
+        | 4 -> App     
+        | _ -> failwith "unexpected case"
+      in 
+      !g_update_state_and_vdom { state with State.app_stage=app_stage };
+      Event.Ignore
+    in
+    let selected = 
+      match state.app_stage with
+      | App_stage.Intro -> 0
+      | Problem -> 1
+      | Coda -> 2
+      | Mission -> 3
+      | App -> 4
+    in
+    let dots = 
+      List.init 5 ~f:(fun i -> 
+          if i = selected 
+          then (div [] [text "*"])
+          else (div [Attr.on_click (select i)] [text "o"]))
+    in
+    let last = 
+      match state.app_stage with
+      | App -> div [Attr.on_click (select 0)] [text "* start over"]
+      | _ -> div [Attr.on_click (select 4)] [text "* skip"]
+    in
+    div [] (dots @ [ last ])
 end
 
 module Story = struct
@@ -482,6 +514,7 @@ module Story = struct
         [ h1 [ Style.(render (of_class "f1"))] [text heading]
         ; div [] [text copy]
         ; next state next_state
+        ; Breadcrumbs.create state
         ]
 
     let comic state ~copy ~img ~alt ~next_state =
@@ -490,6 +523,7 @@ module Story = struct
         [ div [] [text copy]
         ; Image.draw ~src:img ~alt (`Fixed (100, 100))
         ; next state next_state
+        ; Breadcrumbs.create state
         ]
   end
 
