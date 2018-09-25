@@ -499,10 +499,13 @@ module Breadcrumbs = struct
           then full_dot
           else empty_dot i)
     in
+    let bread_button action title = 
+      div [Attr.on_click action; Attr.class_ "bread_button"] [text title]
+    in
     let last = 
       match state.app_stage with
-      | App -> button [Attr.on_click (select 0)] [text "* start over"]
-      | _ -> button [Attr.on_click (select 4)] [text "* skip"]
+      | App -> bread_button (select 0) "start over"
+      | _ -> bread_button (select 4) "skip"
     in
     div [] (dots @ [ last ])
 end

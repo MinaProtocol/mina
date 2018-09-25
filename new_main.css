@@ -15,3 +15,11 @@
   height: 1.05em;
   margin: .1em;
 }
+
+.bread_button {
+  display: inline-block;
+}
+
+.bread_button:hover .breadcrumb:hover {
+  cursor: pointer;
+}
