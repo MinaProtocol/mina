@@ -9,6 +9,8 @@ type t = One of single | Two of single * single
 
 let to_list = function One x -> [x] | Two (x, y) -> [x; y]
 
+let of_single s = One s
+
 let of_single_list xs =
   let rec go acc = function
     | x1 :: x2 :: xs -> go (Two (x1, x2) :: acc) xs
