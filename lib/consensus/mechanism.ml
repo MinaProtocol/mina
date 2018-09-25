@@ -62,7 +62,6 @@ module type S = sig
     -> keypair:Signature_lib.Keypair.t
     -> transactions:Coda_base.Transaction.t list
     -> ledger:Coda_base.Ledger.t
-    -> logger:Logger.t
     -> (Protocol_state.value * Consensus_transition_data.value) option
   (**
    * Generate a new protocol state and consensus specific transition data
@@ -92,24 +91,11 @@ module type S = sig
        Consensus_state.value
     -> Consensus_state.value
     -> logger:Logger.t
-    -> time_received:Unix_timestamp.t
+    -> time_received:Int64.t
     -> [`Keep | `Take]
   (**
    * Select between two ledger builder controller tips given the consensus
    * states for the two tips. Returns `\`Keep` if the first tip should be
    * kept, or `\`Take` if the second tip should be taken instead.
-   *)
-
-  val next_proposal :
-       Unix_timestamp.t
-    -> Consensus_state.value
-    -> local_state:Local_state.t
-    -> keypair:Signature_lib.Keypair.t
-    -> logger:Logger.t
-    -> [`Check_again of Unix_timestamp.t | `Propose of Unix_timestamp.t]
-  (**
-   * Determine if and when to perform the next transition proposal. Either
-   * informs the callee to check again at some time in the future, or to
-   * schedule a proposal at some time in the future.
    *)
 end
