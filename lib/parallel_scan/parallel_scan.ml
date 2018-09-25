@@ -322,6 +322,20 @@ let fill_in_completed_jobs :
 
 let last_emitted_value (state: ('a, 'd) State.t) = snd state.acc
 
+(*if the transaction queue does not have at least max_slots number of slots 
+before continuing onto the next queue, split max_slots = (x,y) 
+such that x = number of slots till the end of the current queue and y = max_slots - x (starts from the begining of the next queue)  *)
+let partition_if_overflowing ~max_slots state =
+  let n = min (free_space ~state) max_slots in
+  let parallelism = State.parallelism state in
+  let offset = parallelism - 1 in
+  match State.base_none_pos state with
+  | None -> `One 0
+  | Some start ->
+      let start_0 = start - offset in
+      if n <= parallelism - start_0 then `One n
+      else `Two (parallelism - start_0, n - (parallelism - start_0))
+
 let gen :
        gen_data:'d Quickcheck.Generator.t
     -> f_job_done:(('a, 'd) Available_job.t -> 'a State.Completed_job.t)
@@ -434,6 +448,37 @@ let%test_module "scans" =
           match job with
           | Base x -> Lifted x
           | Merge (x, y) -> Merged (Int64.( + ) x y)
+
+        let%test_unit "Split only if enqueuing onto the next queue" =
+          let p = 3 in
+          let max_slots = Int.pow 2 (p - 1) in
+          let leaves = max_slots * 2 in
+          let offset = leaves - 1 in
+          let last_index = (2 * leaves) - 2 in
+          let g = Int.gen_incl 1 max_slots in
+          let state = State.create ~parallelism_log_2:p in
+          Quickcheck.test g ~trials:1000 ~f:(fun i ->
+              let data = List.init i ~f:Int64.of_int in
+              let partition = partition_if_overflowing ~max_slots:i state in
+              let curr_head = Option.value_exn state.base_none_pos in
+              let jobs = next_jobs ~state in
+              let jobs_done = List.map jobs ~f:job_done in
+              let _ =
+                Or_error.ok_exn
+                @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done
+              in
+              let () = Or_error.ok_exn @@ enqueue_data ~state ~data in
+              match partition with
+              | `One x ->
+                  let expected_base_pos =
+                    if curr_head + x = last_index + 1 then offset
+                    else curr_head + x
+                  in
+                  assert (
+                    Option.value_exn state.base_none_pos = expected_base_pos )
+              | `Two (x, y) ->
+                  assert (x + y = i) ;
+                  assert (Option.value_exn state.base_none_pos = y + offset) )
 
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;

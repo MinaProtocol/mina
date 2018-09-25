@@ -13,7 +13,6 @@
       coda_base
       protocols
       async_extra
-      unix_timestamp
-      interruptible ))
+      unix_timestamp ))
   (preprocess (pps (ppx_jane)))
   (synopsis "Coda block proposer")))

@@ -5,7 +5,6 @@ open Coda_numbers
 open Currency
 open Sha256_lib
 open Fold_lib
-open Signature_lib
 
 module type Inputs_intf = sig
   module Ledger_builder_diff : sig
@@ -92,8 +91,6 @@ end
 let uint32_of_int64 x = x |> Int64.to_int64 |> UInt32.of_int64
 
 let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
-
-let iter_none ~f opt = match opt with None -> f () ; None | Some x -> Some x
 
 module Make (Inputs : Inputs_intf) :
   Mechanism.S
@@ -396,10 +393,10 @@ struct
 
       let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-      let create ~owned_stake ~total_stake =
-        let owned_stake = Balance.to_uint64 owned_stake in
+      let create ~my_stake ~total_stake =
+        let my_stake = Balance.to_uint64 my_stake in
         let total_stake = Amount.to_uint64 total_stake in
-        let stake_ratio = of_uint64_exn (UInt64.div owned_stake total_stake) in
+        let stake_ratio = of_uint64_exn (UInt64.div my_stake total_stake) in
         stake_ratio * pow (of_int 2) (of_int 256)
 
       let satisfies threshold output = of_bits_lsb output <= threshold
@@ -408,13 +405,6 @@ struct
     include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
               (Message)
               (Output)
-
-    let check ~epoch ~slot ~seed ~lock_checkpoint ~private_key ~owned_stake
-        ~total_stake =
-      let open Message in
-      let result = eval ~private_key {epoch; slot; seed; lock_checkpoint} in
-      let threshold = Threshold.create ~owned_stake ~total_stake in
-      Option.some_if (Threshold.satisfies threshold result) result
   end
 
   module Epoch_ledger = struct
@@ -471,27 +461,6 @@ struct
     let genesis =
       { hash= genesis_ledger_hash
       ; total_currency= Inputs.genesis_ledger_total_currency }
-
-    let get_stake ~logger ~public_key ~ledger_pool {hash; total_currency} =
-      let open Option.Let_syntax in
-      let%bind ledger =
-        Ledger_pool.find ledger_pool hash
-        |> iter_none ~f:(fun () ->
-               Logger.warn logger "epoch ledger hash missing from ledger pool"
-           )
-      in
-      let%map account_location =
-        Coda_base.Ledger.location_of_key ledger
-          (Public_key.compress public_key)
-        |> iter_none ~f:(fun () ->
-               Logger.warn logger "no account associated with public key" )
-      in
-      let balance =
-        Coda_base.Ledger.get ledger account_location
-        |> Option.map ~f:Coda_base.Account.balance
-        |> Option.value ~default:Balance.zero
-      in
-      (balance, total_currency)
   end
 
   module Epoch_data = struct
@@ -870,7 +839,7 @@ struct
     let update ~(previous_consensus_state: value)
         ~(consensus_transition_data: Consensus_transition_data.value)
         ~(previous_protocol_state_hash: Coda_base.State_hash.t)
-        ~(ledger_pool: Ledger_pool.t) ~(ledger: Coda_base.Ledger.t) :
+        ~(local_state: Local_state.t) ~(ledger: Coda_base.Ledger.t) :
         value Or_error.t =
       let open Or_error.Let_syntax in
       let%map next_consensus_state =
@@ -881,20 +850,17 @@ struct
             |> Coda_base.Frozen_ledger_hash.of_ledger_hash )
       in
       if
-        not
-          (Coda_base.Frozen_ledger_hash.equal
-             previous_consensus_state.last_epoch_data.ledger.hash
-             next_consensus_state.last_epoch_data.ledger.hash)
+        previous_consensus_state.last_epoch_data.ledger.hash
+        <> next_consensus_state.last_epoch_data.ledger.hash
       then (
         if
-          not
-            (Coda_base.Frozen_ledger_hash.equal
-               previous_consensus_state.last_epoch_data.ledger.hash
-               genesis_ledger_hash)
+          Coda_base.Frozen_ledger_hash.equal
+            previous_consensus_state.last_epoch_data.ledger.hash
+            genesis_ledger_hash
         then
-          Ledger_pool.free ledger_pool
+          Ledger_pool.free local_state
             previous_consensus_state.last_epoch_data.ledger.hash ;
-        Ledger_pool.save ledger_pool ledger ) ;
+        Ledger_pool.save local_state ledger ) ;
       next_consensus_state
 
     let update_var (previous_state: var)
@@ -940,28 +906,46 @@ struct
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state: Protocol_state.value)
-      ~blockchain_state ~local_state:ledger_pool ~time ~keypair ~transactions:_
-      ~ledger ~logger =
+      ~blockchain_state ~local_state ~time ~keypair ~transactions:_ ~ledger =
     let open Consensus_state in
     let open Epoch_data in
-    let open Keypair in
+    let open Signature_lib.Keypair in
     let open Option.Let_syntax in
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
     let time = Time.of_span_since_epoch (Time.Span.of_ms time) in
     let epoch, slot = Epoch.epoch_and_slot_of_time_exn time in
-    let%bind proposer_stake, total_stake =
-      Epoch_ledger.get_stake previous_consensus_state.last_epoch_data.ledger
-        ~logger ~public_key:keypair.public_key ~ledger_pool
+    let%bind my_account_location =
+      Coda_base.Ledger.location_of_key ledger
+        (Signature_lib.Public_key.compress keypair.public_key)
     in
-    let%map proposer_vrf_result =
-      Vrf.check ~epoch ~slot
-        ~seed:previous_consensus_state.last_epoch_data.seed
-        ~lock_checkpoint:
-          previous_consensus_state.last_epoch_data.lock_checkpoint
-        ~private_key:keypair.private_key ~owned_stake:proposer_stake
-        ~total_stake
+    let my_currency =
+      Coda_base.Ledger.get ledger my_account_location
+      |> Option.map ~f:Coda_base.Account.balance
+      |> Option.value ~default:Balance.zero
+    in
+    let total_currency =
+      previous_consensus_state.last_epoch_data.ledger.total_currency
+    in
+    let vrf_message =
+      { Vrf.Message.epoch
+      ; slot
+      ; seed= previous_consensus_state.last_epoch_data.seed
+      ; lock_checkpoint=
+          previous_consensus_state.last_epoch_data.lock_checkpoint }
+    in
+    let proposer_vrf_result =
+      Vrf.eval ~private_key:keypair.private_key vrf_message
+    in
+    let%map () =
+      if
+        Vrf.Threshold.satisfies
+          (Vrf.Threshold.create ~my_stake:my_currency
+             ~total_stake:total_currency)
+          proposer_vrf_result
+      then Some ()
+      else None
     in
     let consensus_transition_data =
       Consensus_transition_data.{epoch; slot; proposer_vrf_result}
@@ -972,7 +956,7 @@ struct
            ~consensus_transition_data
            ~previous_protocol_state_hash:
              (Protocol_state.hash previous_protocol_state)
-           ~ledger_pool ~ledger)
+           ~local_state ~ledger)
     in
     let protocol_state =
       Protocol_state.create_value
@@ -1021,62 +1005,8 @@ struct
       else `Keep
     else `Keep
 
-  (* TODO: ---- last epoch ledger!!! *)
-  let next_proposal now (state: Consensus_state.value) ~local_state:ledger_pool
-      ~keypair ~logger =
-    let open Consensus_state in
-    let open Epoch_data in
-    let open Keypair in
-    let logger = Logger.child logger "proof_of_stake" in
-    let epoch, slot =
-      Epoch.epoch_and_slot_of_time_exn
-        (Time.of_span_since_epoch (Time.Span.of_ms now))
-    in
-    let next_slot =
-      let open Option.Let_syntax in
-      (* When we first enter an epoch, the protocol state may still be a previous
-       * epoch. If that is the case, we need to select the staged vrf inputs
-       * instead of the last vrf inputs, since if the protocol state were actually
-       * up to date with the epoch, those would be the last vrf inputs.
-       *)
-      let epoch_data =
-        if Epoch.equal epoch state.curr_epoch then state.last_epoch_data
-        else if Epoch.equal epoch (Epoch.succ state.curr_epoch) then
-          state.curr_epoch_data
-        else (
-          Logger.error logger
-            "system time is out of sync with protocol state time" ;
-          failwith
-            "System time is out of sync. (hint: setup NTP if you haven't)" )
-      in
-      let%bind proposer_stake, total_stake =
-        Epoch_ledger.get_stake epoch_data.ledger ~logger
-          ~public_key:keypair.public_key ~ledger_pool
-      in
-      let is_winning_slot slot =
-        Option.is_some
-          (Vrf.check ~epoch ~slot ~seed:epoch_data.seed
-             ~lock_checkpoint:epoch_data.lock_checkpoint
-             ~private_key:keypair.private_key ~owned_stake:proposer_stake
-             ~total_stake)
-      in
-      let rec find_winning_slot slot =
-        if Epoch.size >= UInt32.of_int (Epoch.Slot.to_int slot) then None
-        else if is_winning_slot slot then Some slot
-        else find_winning_slot (Epoch.Slot.succ slot)
-      in
-      find_winning_slot (Epoch.Slot.succ slot)
-    in
-    match next_slot with
-    | Some slot ->
-        `Propose
-          ( Epoch.slot_start_time epoch slot
-          |> Time.to_span_since_epoch |> Time.Span.to_ms )
-    | None ->
-        `Check_again
-          (Epoch.end_time epoch |> Time.to_span_since_epoch |> Time.Span.to_ms)
-
   (* TODO *)
+
   let genesis_protocol_state =
     let consensus_state =
       Or_error.ok_exn

@@ -75,18 +75,26 @@ let encrypt ~(password: Bytes.t) ~(plaintext: Bytes.t) =
   ; ciphertext }
 
 (** warning: this will zero [password] *)
-let decrypt_exn ~(password: Bytes.t)
+let decrypt ~(password: Bytes.t)
     { box_primitive
     ; pw_primitive
     ; nonce
     ; pwsalt
     ; pwdiff= mem_limit, ops_limit
     ; ciphertext } =
-  assert (box_primitive = Secret_box.primitive) ;
-  assert (pw_primitive = Password_hash.primitive) ;
-  let nonce = Secret_box.Bytes.to_nonce nonce in
-  let salt = Password_hash.Bytes.to_salt pwsalt in
-  let diff = {Password_hash.mem_limit; ops_limit} in
-  let pw = Password_hash.Bytes.wipe_to_password password in
-  let key = Secret_box.derive_key diff pw salt in
-  Secret_box.Bytes.secret_box_open key ciphertext nonce
+  if box_primitive <> Secret_box.primitive then
+    Or_error.error_string
+      (sprintf "don't know how to handle a %s secret_box" box_primitive)
+  else if pw_primitive <> Password_hash.primitive then
+    Or_error.error_string
+      (sprintf "don't know how to handle a %s password_hash" pw_primitive)
+  else
+    let nonce = Secret_box.Bytes.to_nonce nonce in
+    let salt = Password_hash.Bytes.to_salt pwsalt in
+    let diff = {Password_hash.mem_limit; ops_limit} in
+    let pw = Password_hash.Bytes.wipe_to_password password in
+    let key = Secret_box.derive_key diff pw salt in
+    try
+      Or_error.return @@ Secret_box.Bytes.secret_box_open key ciphertext nonce
+    with Sodium.Verification_failure ->
+      Or_error.error_string "password is wrong"
