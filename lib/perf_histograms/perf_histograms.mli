@@ -12,3 +12,5 @@ end
 val add_span : name:string -> Time.Span.t -> unit
 
 val report : name:string -> Report.t option
+
+val wipe : unit -> unit
