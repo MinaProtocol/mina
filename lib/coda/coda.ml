@@ -130,6 +130,7 @@ module type Snark_pool_intf = sig
 
   val load :
        parent_log:Logger.t
+    -> relevant_work_changes_reader:(completed_work_statement, int) List.Assoc.t Linear_pipe.Reader.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Linear_pipe.Reader.t
     -> t Deferred.t
@@ -186,14 +187,17 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger_hash
 
+  type work
+
   module Config : sig
     type t =
       { parent_log: Logger.t
       ; net_deferred: net Deferred.t
-      ; external_transitions:
+      ; external_transitions_reader:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
-      ; disk_location: string }
+      ; disk_location: string
+      ; relevant_work_changes_writer: (work, int) List.Assoc.t Linear_pipe.Writer.t }
     [@@deriving make]
   end
 
@@ -362,6 +366,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
+     and type work := Completed_work.Statement.t
 
   module Proposer :
     Proposer_intf
@@ -456,6 +461,9 @@ module Make (Inputs : Inputs_intf) = struct
     let external_transitions_reader, external_transitions_writer =
       Linear_pipe.create ()
     in
+    let (relevant_work_changes_reader, relevant_work_changes_writer) : (Completed_work.Statement.t, int) List.Assoc.t Linear_pipe.Reader.t * (Completed_work.Statement.t, int) List.Assoc.t Linear_pipe.Writer.t =
+      Linear_pipe.create ()
+    in
     let net_ivar = Ivar.create () in
     let lbc_deferred =
       Ledger_builder_controller.create
@@ -468,7 +476,8 @@ module Make (Inputs : Inputs_intf) = struct
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
            ~disk_location:config.ledger_builder_persistant_location
-           ~external_transitions:external_transitions_reader)
+           ~external_transitions_reader
+           ~relevant_work_changes_writer)
     in
     let%bind net =
       Net.create config.net_config
@@ -500,7 +509,9 @@ module Make (Inputs : Inputs_intf) = struct
     don't_wait_for
       (Linear_pipe.transfer_id (Net.states net) external_transitions_writer) ;
     let%bind snark_pool =
-      Snark_pool.load ~parent_log:config.log
+      Snark_pool.load
+        ~parent_log:config.log
+        ~relevant_work_changes_reader
         ~disk_location:config.snark_pool_disk_location
         ~incoming_diffs:(Net.snark_pool_diffs net)
     in

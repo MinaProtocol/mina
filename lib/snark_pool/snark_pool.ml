@@ -15,7 +15,10 @@ module type S = sig
 
   type t [@@deriving bin_io]
 
-  val create : parent_log:Logger.t -> t
+  val create :
+       parent_log:Logger.t
+    -> relevant_work_changes_reader:(work, int) List.Assoc.t Linear_pipe.Reader.t
+    -> t
 
   val add_snark :
        t
@@ -46,8 +49,6 @@ end) :
     include S
 
     val sexp_of_t : t -> Sexp.t
-
-    val remove_solved_work : t -> work -> unit
   end
   with type work := Work.t
    and type proof := Proof.t
@@ -64,24 +65,55 @@ struct
     let fee (t: t) = t.fee
   end
 
-  type t = Priced_proof.t Work.Table.t [@@deriving sexp, bin_io]
+  module With_ref_count = struct
+    type 'a t = {value: 'a; ref_count: int}
+    [@@deriving sexp, bin_io]
 
-  let create ~parent_log:_ = Work.Table.create ()
+    let create_unreferenced x = {value= x; ref_count= 0}
+  end
 
-  let add_snark t ~work ~proof ~fee =
-    let update_and_rebroadcast () =
-      Hashtbl.set t ~key:work ~data:(Priced_proof.create proof fee) ;
-      `Rebroadcast
-    in
-    match Work.Table.find t work with
-    | None -> update_and_rebroadcast ()
+  open With_ref_count
+
+  type t = Priced_proof.t option With_ref_count.t Work.Table.t [@@deriving sexp, bin_io]
+
+  let create ~parent_log ~relevant_work_changes_reader =
+    let logger = Logger.child parent_log "Snark_pool" in
+    let work_table = Work.Table.create () in
+    don't_wait_for (
+      Linear_pipe.iter relevant_work_changes_reader ~f:(fun changes ->
+        List.iter changes ~f:(fun (work, ref_count_diff) ->
+          let entry =
+            Hashtbl.find work_table work
+            |> Option.value ~default:(create_unreferenced None)
+          in
+          let ref_count = entry.ref_count + ref_count_diff in
+          if ref_count > 0 then
+            Hashtbl.set work_table ~key:work ~data:{entry with ref_count}
+          else (
+            (if ref_count < 0 then
+              Logger.warn logger "Snark_pool statement ref count went below 0 (this shouldn't happen)");
+            Hashtbl.remove work_table work));
+        Deferred.return ()));
+      work_table
+
+  let add_snark work_table ~work ~proof ~fee =
+    match Work.Table.find work_table work with
+    | None -> `Don't_rebroadcast
     | Some prev ->
-        if Fee.( < ) fee prev.fee then update_and_rebroadcast ()
-        else `Don't_rebroadcast
+        prev.value
+        |> Option.map ~f:(fun current_proof ->
+            if Fee.( < ) fee (Priced_proof.fee current_proof) then (
+              let data = Hashtbl.find_exn work_table work in
+              Hashtbl.set work_table ~key:work ~data:{data with value= Some (Priced_proof.create proof fee)};
+              `Rebroadcast)
+            else
+              `Don't_rebroadcast)
+        |> Option.value ~default:`Don't_rebroadcast
 
-  let request_proof t = Work.Table.find t
-
-  let remove_solved_work = Work.Table.remove
+  let request_proof t work =
+    Work.Table.find t work
+    |> Option.map ~f:(fun {value; _} -> value)
+    |> Option.join
 end
 
 let%test_module "random set test" =
@@ -111,17 +143,6 @@ let%test_module "random set test" =
 
     module Mock_snark_pool = Make (Mock_proof) (Mock_fee) (Mock_work)
 
-    let gen =
-      let open Quickcheck.Generator.Let_syntax in
-      let gen_entry () =
-        Quickcheck.Generator.tuple3 Mock_work.gen Mock_work.gen Mock_fee.gen
-      in
-      let%map sample_solved_work = Quickcheck.Generator.list (gen_entry ()) in
-      let pool = Mock_snark_pool.create ~parent_log:(Logger.create ()) in
-      List.iter sample_solved_work ~f:(fun (work, proof, fee) ->
-          ignore (Mock_snark_pool.add_snark pool ~work ~proof ~fee) ) ;
-      pool
-
     let%test_unit "When two priced proofs of the same work are inserted into \
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
@@ -131,13 +152,17 @@ let%test_module "random set test" =
       Quickcheck.test
         ~sexp_of:
           [%sexp_of
-            : Mock_snark_pool.t
-              * Mock_work.t
+            :   Mock_work.t
               * (Mock_proof.t * Mock_fee.t)
               * (Mock_proof.t * Mock_fee.t)]
-        (Quickcheck.Generator.tuple4 gen Mock_work.gen (gen_entry ())
+        (Quickcheck.Generator.tuple3 Mock_work.gen (gen_entry ())
            (gen_entry ()))
-        ~f:(fun (t, work, (proof_1, fee_1), (proof_2, fee_2)) ->
+        ~f:(fun (work, (proof_1, fee_1), (proof_2, fee_2)) ->
+          let t =
+            Mock_snark_pool.create
+              ~parent_log:(Logger.create ())
+              ~relevant_work_changes_reader:(Linear_pipe.create_reader ~close_on_exception:false (fun _ -> Deferred.return ()))
+          in
           ignore (Mock_snark_pool.add_snark t ~work ~proof:proof_1 ~fee:fee_1) ;
           ignore (Mock_snark_pool.add_snark t ~work ~proof:proof_2 ~fee:fee_2) ;
           let fee_upper_bound = Mock_fee.min fee_1 fee_2 in
@@ -152,16 +177,19 @@ let%test_module "random set test" =
       Quickcheck.test
         ~sexp_of:
           [%sexp_of
-            : Mock_snark_pool.t
-              * Mock_work.t
+            :   Mock_work.t
               * Mock_fee.t
               * Mock_fee.t
               * Mock_proof.t
               * Mock_proof.t]
-        (Quickcheck.Generator.tuple6 gen Mock_work.gen Mock_fee.gen
+        (Quickcheck.Generator.tuple5 Mock_work.gen Mock_fee.gen
            Mock_fee.gen Mock_proof.gen Mock_proof.gen) ~f:
-        (fun (t, work, fee_1, fee_2, cheap_proof, expensive_proof) ->
-          Mock_snark_pool.remove_solved_work t work ;
+        (fun (work, fee_1, fee_2, cheap_proof, expensive_proof) ->
+          let t =
+            Mock_snark_pool.create
+              ~parent_log:(Logger.create ())
+              ~relevant_work_changes_reader:(Linear_pipe.create_reader ~close_on_exception:false (fun _ -> Deferred.return ()))
+          in
           let expensive_fee = max fee_1 fee_2
           and cheap_fee = min fee_1 fee_2 in
           ignore

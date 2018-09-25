@@ -224,7 +224,8 @@ struct
   type t =
     { state: Transition_logic_state.t
     ; log: Logger.t
-    ; pending_target: Pending_target.t }
+    ; pending_target: Pending_target.t
+    ; relevant_work_changes_writer: (Work.t, int) List.Assoc.t Linear_pipe.Writer.t }
 
   let state {state; _} = state
 
@@ -242,9 +243,12 @@ struct
         let target = With_hash.map ~f:External_transition.target_state
       end)
 
-  let create state parent_log : t =
+  let create state ~parent_log ~relevant_work_changes_writer : t =
     let log = Logger.child parent_log __MODULE__ in
-    {state; log; pending_target= Pending_target.create ~parent_log:log}
+    { state
+    ; log
+    ; pending_target= Pending_target.create ~parent_log:log
+    ; relevant_work_changes_writer }
 
   let locked_and_best tree =
     let path = Transition_tree.longest_path tree in
@@ -407,7 +411,8 @@ struct
                 (Or_error.error_string "Not found locally within our ktree")
 
   let unguarded_on_new_transition catchup
-      ({state; log; pending_target= _} as t) transition_with_hash
+      ({state; log; pending_target= _; relevant_work_changes_writer} as t)
+      transition_with_hash
       ~time_received :
       ( Change.t list
       * ( (External_transition.t, State_hash.t) With_hash.t
@@ -483,7 +488,19 @@ struct
                 ([], Some (Catchup.sync catchup state transition_with_hash))
           | `Take -> return ([], None) )
       | `Repeat -> return ([], None)
-      | `Added new_tree ->
+      | `Added (new_tree, removed_trees) ->
+          let relevant_work_changes = Statement.Table.create () in
+          (if List.length removed_trees > 0 then (
+             List.iter removed_trees ~f:(fun tree ->
+               Hashtbl.decr ~remove_if_zero:true tbl statement)));
+          List.iter (statements transition_with_hash.value)
+            ~f:(Hashtbl.incr ~remove_if_zero:true tbl);
+          let%bind () =
+            Linear_pipe.Writer.write
+              relevant_work_changes_writer
+              (Hashtbl.to_alist relevant_work_changes)
+          in
+
           let old_locked_head, old_best_tip = locked_and_best old_tree in
           let new_head, new_tip = locked_and_best new_tree in
           if

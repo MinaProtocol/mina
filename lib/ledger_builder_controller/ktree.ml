@@ -91,24 +91,26 @@ struct
     in
     go tree 0 [] |> fst |> List.rev
 
-  (** Extends tree with e at the first node n where (parent n) returns true *)
+  (** [add t e ~parent] is tree [t] extended by [e] at the depth first node [parent n] *)
   let add t e ~parent =
     if Elem_set.mem t.elems e then `Repeat
     else if Elem_set.find t.elems ~f:parent |> Option.is_none then `No_parent
     else
-      let rec go node depth =
+      (** [insert_at_parent node depth] is the the depth first [parent n] descendent
+       *  [node] with [e] inserted as a descendent paired with the depth of [parent n] *)
+      let rec insert_at_parent node depth =
         let (Rose.Rose (x, xs)) = node in
         if parent x then (Rose.Rose (x, Rose.singleton e :: xs), depth + 1)
         else
           let xs, ds =
-            List.map xs ~f:(fun x -> go x (depth + 1)) |> List.unzip
+            List.map xs ~f:(fun x -> insert_at_parent x (depth + 1)) |> List.unzip
           in
           (Rose.Rose (x, xs), List.fold ds ~init:0 ~f:max)
       in
       let root, tree_and_depths =
         let (Rose.Rose (root, root_children)) = t.tree in
         let children_and_depths =
-          List.map root_children ~f:(fun x -> go x 1)
+          List.map root_children ~f:(fun x -> insert_at_parent x 1)
         in
         if parent root then (root, (Rose.singleton e, 1) :: children_and_depths)
         else (
@@ -116,25 +118,30 @@ struct
           (root, children_and_depths) )
       in
       let default =
-        { tree= Rose.Rose (root, tree_and_depths |> List.map ~f:fst)
+        { tree= Rose.Rose (root, List.map tree_and_depths ~f:fst)
         ; elems= Elem_set.add t.elems e }
       in
       match tree_and_depths with
-      | [] | [_] -> `Added default
+      | [] | [_] -> `Added (default, [])
       | _ ->
-          let longest_subtree, longest_depth =
-            List.max_elt tree_and_depths ~compare:(fun (_, d) (_, d') ->
-                Int.compare d d' )
-            |> Option.value_exn
+          let longest_subtree, longest_depth, other_trees =
+            List.fold_left tree_and_depths
+              ~init:(Rose.singleton TODO, 0, [])
+              ~f:(fun (max_tree, max_depth, rest) (tree, depth) ->
+                if depth > max_depth then
+                  (tree, depth, max_tree :: rest)
+                else
+                  (max_tree, max_depth, tree :: rest))
           in
           let ( >= ) a b =
             match b with `Infinity -> false | `Finite b -> a >= b
           in
           if longest_depth >= Security.max_depth then
             `Added
-              { tree= longest_subtree
+            ( { tree= longest_subtree
               ; elems= Elem_set.of_list (Rose.to_list longest_subtree) }
-          else `Added default
+            , other_tree )
+          else `Added (default, [])
 end
 
 let%test_module "K-tree" =

@@ -15,7 +15,10 @@ module type S = sig
 
   type t [@@deriving bin_io]
 
-  val create : parent_log:Logger.t -> t
+  val create :
+       parent_log:Logger.t
+    -> relevant_work_changes_reader:(work, int) List.Assoc.t Linear_pipe.Reader.t
+    -> t
 
   val add_snark :
        t

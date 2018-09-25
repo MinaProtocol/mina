@@ -391,8 +391,8 @@ end = struct
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; mutable handler: Transition_logic.t
-    ; strongest_ledgers:
-        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
+    ; strongest_ledgers: (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
+    ; ledger_builder_actions: (Ledger_builder.t * [`Add|`Remove]) Linear_pipe.Reader.t }
 
   let strongest_tip t =
     let state = Transition_logic.state t.handler in

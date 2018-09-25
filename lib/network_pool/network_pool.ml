@@ -3,8 +3,6 @@ open Async_kernel
 
 module type Pool_intf = sig
   type t
-
-  val create : parent_log:Logger.t -> t
 end
 
 module type Pool_diff_intf = sig
@@ -25,7 +23,7 @@ module type Network_pool_intf = sig
   type pool_diff
 
   val create :
-    parent_log:Logger.t -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> t
+    parent_log:Logger.t -> incoming_diffs:pool_diff Linear_pipe.Reader.t -> pool:pool -> t
 
   val of_pool_and_diffs :
        pool
@@ -76,9 +74,8 @@ struct
     |> ignore ;
     network_pool
 
-  let create ~parent_log ~incoming_diffs =
-    let log = Logger.child parent_log __MODULE__ in
-    of_pool_and_diffs (Pool.create ~parent_log:log) ~parent_log ~incoming_diffs
+  let create ~parent_log ~incoming_diffs ~pool =
+    of_pool_and_diffs pool ~parent_log ~incoming_diffs
 end
 
 let%test_module "network pool test" =
@@ -102,9 +99,15 @@ let%test_module "network pool test" =
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    recieved in the pool's reader" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
+      let parent_log = Logger.create () in
+      let snark_pool =
+        Mock_snark_pool.create ~parent_log
+          ~relevant_work_changes_reader:(Linear_pipe.create_reader ~close_on_exception:false (fun _ -> Deferred.return ()))
+      in
       let network_pool =
-        Mock_network_pool.create ~parent_log:(Logger.create ())
+        Mock_network_pool.create ~parent_log
           ~incoming_diffs:pool_reader
+          ~pool:snark_pool
       in
       let work = 1 in
       let priced_proof = {Mock_snark_pool_diff.proof= 0; fee= 0} in
@@ -131,9 +134,15 @@ let%test_module "network pool test" =
                 (work, {Mock_snark_pool_diff.proof= 0; fee= 0}) )
           |> Linear_pipe.of_list
         in
+        let parent_log = Logger.create () in
+        let snark_pool =
+          Mock_snark_pool.create ~parent_log
+            ~relevant_work_changes_reader:(Linear_pipe.create_reader ~close_on_exception:false (fun _ -> Deferred.return ()))
+        in
         let network_pool =
-          Mock_network_pool.create ~parent_log:(Logger.create ())
+          Mock_network_pool.create ~parent_log
             ~incoming_diffs:work_diffs
+            ~pool:snark_pool
         in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_network_pool.broadcasts network_pool) ~f:
