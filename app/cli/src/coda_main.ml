@@ -159,6 +159,8 @@ module type Config_intf = sig
 
   val lbc_tree_max_depth : [`Infinity | `Finite of int]
 
+  val transition_interval : Time.Span.t
+
   val keypair : Keypair.t
 
   val genesis_proof : Snark_params.Tock.Proof.t
@@ -655,6 +657,10 @@ struct
           (Init.Consensus_mechanism.Internal_transition.snark_transition
              transition)
         >>| fun {Init.Blockchain.proof; _} -> proof
+    end
+
+    module Proposal_interval = struct
+      let t = Time.Span.of_time_span Init.transition_interval
     end
   end)
 
