@@ -212,7 +212,9 @@ struct
     let%map worker, process =
       (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
       Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-        ~on_failure:(fun e -> Logger.error logger !"%{sexp:Error.t}" e)
+        ~on_failure:(fun e ->
+          Logger.error logger !"%{sexp:Error.t}" e ;
+          Error.raise e )
         ~shutdown_on:Called_shutdown_function ()
     in
     let connection =
