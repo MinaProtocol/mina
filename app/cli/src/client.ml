@@ -159,7 +159,9 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
   let dn = Filename.dirname path in
   let%bind parent_exists =
     match%bind Sys.is_directory ~follow_symlinks:true dn with
-    | `No -> eprintf "Error: %s is not a directory\n" dn ; exit 1
+    | `No ->
+        eprintf "Error: %s is not a directory\n" dn ;
+        exit 1
     | `Unknown -> return false
     | `Yes -> return true
   in
@@ -170,7 +172,8 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
             let%bind () = Unix.mkdir ~p:() dn in
             Unix.chmod dn 700
           else if not parent_exists then (
-            eprintf "Error: %s does not exist\nHint: mkdir -p %s; chmod 700 %s" dn dn dn;
+            eprintf "Error: %s does not exist\nHint: mkdir -p %s; chmod 700 %s"
+              dn dn dn ;
             exit 1 )
           else Deferred.unit )
     with
@@ -187,10 +190,14 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
       exit 1
   | Error e -> raise e
 
-let write_keypair {Keypair.private_key; public_key; _} privkey_path ~(password : unit -> string Deferred.t) =
-  let%bind privkey_f = handle_open ~mkdir:true ~f:Writer.open_file privkey_path in
+let write_keypair {Keypair.private_key; public_key; _} privkey_path
+    ~(password: unit -> string Deferred.t) =
+  let%bind privkey_f =
+    handle_open ~mkdir:true ~f:Writer.open_file privkey_path
+  in
   let%bind pubkey_f =
-    handle_open ~mkdir:false ~f:Writer.open_file (privkey_path ^ ".pub") in
+    handle_open ~mkdir:false ~f:Writer.open_file (privkey_path ^ ".pub")
+  in
   let%bind password = password () in
   let sb =
     Secret_box.encrypt
@@ -211,7 +218,7 @@ let write_keypair {Keypair.private_key; public_key; _} privkey_path ~(password :
   let%bind () = Writer.close pubkey_f in
   Deferred.unit
 
-let read_keypair_exn privkey_path ~(password:unit -> string Deferred.t) =
+let read_keypair_exn privkey_path ~(password: unit -> string Deferred.t) =
   let open Deferred.Let_syntax in
   let read_all r =
     Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss
@@ -306,7 +313,10 @@ let send_txn =
              (st.perm land 0o777) ;
            perm_error := true ) ;
          let%bind () = if !perm_error then exit 1 else Deferred.unit in
-         let%bind sender_kp = read_keypair_exn from_account ~password:(fun () -> prompt_password "Private key password: ") in
+         let%bind sender_kp =
+           read_keypair_exn from_account ~password:(fun () ->
+               prompt_password "Private key password: " )
+         in
          match%bind get_nonce sender_kp.public_key port with
          | Error e ->
              eprintf "Failed to get nonce %s\n" e ;
@@ -341,7 +351,8 @@ let wrap_key =
       in
       let pk = Private_key.of_base64_exn (Bytes.to_string privkey) in
       let kp = Keypair.of_private_key_exn pk in
-      write_keypair kp privkey_path ~password:(fun () -> prompt_password "Password for new private key file: "))
+      write_keypair kp privkey_path ~password:(fun () ->
+          prompt_password "Password for new private key file: " ))
 
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
@@ -349,7 +360,10 @@ let dump_keypair =
     let%map_open privkey_path = privkey_path_flag in
     fun () ->
       let open Deferred.Let_syntax in
-      let%map kp = read_keypair_exn privkey_path ~password:(fun () -> prompt_password "Password for private key file: ") in
+      let%map kp =
+        read_keypair_exn privkey_path ~password:(fun () ->
+            prompt_password "Password for private key file: " )
+      in
       printf "Public key: %s\nPrivate key: %s\n"
         ( kp.public_key |> Public_key.compress
         |> Public_key.Compressed.to_base64 )
@@ -362,7 +376,10 @@ let generate_keypair =
     fun () ->
       let open Deferred.Let_syntax in
       let kp = Keypair.create () in
-      let%bind () = write_keypair kp privkey_path ~password:(fun () -> prompt_password "Password for new private key file: ") in
+      let%bind () =
+        write_keypair kp privkey_path ~password:(fun () ->
+            prompt_password "Password for new private key file: " )
+      in
       printf "Public key: %s\n"
         ( kp.public_key |> Public_key.compress
         |> Public_key.Compressed.to_base64 ) ;
