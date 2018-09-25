@@ -51,7 +51,7 @@ let pks = fst @@ List.unzip extra_accounts
 
 let init_balance = 1000
 
-let initial_high_balance = Currency.Balance.of_int 10_000
+let initial_high_balance = Currency.Balance.of_int 10_000_000
 
 let initial_low_balance = Currency.Balance.of_int 100
 
