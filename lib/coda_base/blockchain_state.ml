@@ -88,7 +88,6 @@ let genesis =
   ; timestamp= genesis_time }
 
 module Message = struct
-  open Util
   open Tick
 
   type nonrec t = t

@@ -26,6 +26,8 @@ module type Consensus_state_intf = sig
 
   val length : value -> Length.t
   (** For status *)
+
+  val to_lite : (value -> Lite_base.Consensus_state.t) option
 end
 
 module type S = sig

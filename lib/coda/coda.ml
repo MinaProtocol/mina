@@ -422,6 +422,10 @@ module Make (Inputs : Inputs_intf) = struct
   let best_protocol_state t =
     (Ledger_builder_controller.strongest_tip t.ledger_builder).protocol_state
 
+  let best_tip t =
+    let tip = Ledger_builder_controller.strongest_tip t.ledger_builder in
+    (Ledger_builder.ledger tip.ledger_builder, tip.protocol_state, tip.proof)
+
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
   let seen_jobs t = t.seen_jobs
