@@ -1,3 +1,6 @@
+[%%import
+"../../../../config.mlh"]
+
 open Core_kernel
 open Async_kernel
 open Protocols
@@ -521,6 +524,15 @@ end = struct
   let hash {scan_state; ledger; public_key= _} : Ledger_builder_hash.t =
     Ledger_builder_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
       (Ledger.merkle_root ledger)
+
+  [%%if
+  log_calls]
+
+  let hash t =
+    Coda_debug.Call_logger.record_call "Ledger_builder.hash" ;
+    hash t
+
+  [%%endif]
 
   let ledger {ledger; _} = ledger
 
