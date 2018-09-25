@@ -1,12 +1,13 @@
-open Bin_prot.Std
-open Sexplib.Std
-
 module type Input_intf = sig
-  type t [@@deriving bin_io, eq, sexp]
+  type t [@@deriving bin_io, eq, sexp, compare]
+
+  include Base.Stringable.S with type t := t
 
   val length_in_bits : int
 
   val one : t
+
+  val zero : t
 
   val logand : t -> t -> t
 
@@ -33,11 +34,17 @@ module Make (M : Input_intf) = struct
 end
 
 module Make32 () = Make (struct
-  type t = int32 [@@deriving bin_io, eq, sexp]
+  type t = Core_kernel.Int32.t [@@deriving bin_io, eq, sexp, compare]
+
+  let to_string = Int32.to_string
+
+  let of_string = Int32.of_string
 
   let logand = Int32.logand
 
   let one = Int32.one
+
+  let zero = Int32.zero
 
   let shift_right_logical = Int32.shift_right_logical
 
@@ -45,11 +52,17 @@ module Make32 () = Make (struct
 end)
 
 module Make64 () = Make (struct
-  type t = int64 [@@deriving bin_io, eq, sexp]
+  type t = Core_kernel.Int64.t [@@deriving bin_io, eq, sexp, compare]
+
+  let to_string = Int64.to_string
+
+  let of_string = Int64.of_string
 
   let logand = Int64.logand
 
   let one = Int64.one
+
+  let zero = Int64.zero
 
   let shift_right_logical = Int64.shift_right_logical
 
