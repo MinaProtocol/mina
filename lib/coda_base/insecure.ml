@@ -18,7 +18,7 @@ let randomness = true
 let integration_tests = true
 
 (* set this to true to enable snarks and all the other tunables below *)
-let with_snark = true
+let with_snark = false
 
 (* when true, these SPEED UP builds as keys are generated at compile-time *)
 let key_generation = not with_snark
