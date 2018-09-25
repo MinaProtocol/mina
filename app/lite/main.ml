@@ -86,7 +86,6 @@ let to_base64 m x = B64.encode (Binable.to_string m x)
 
 module App_stage = struct
   type t =
-    | Start
     | Intro
     | Problem
     | Coda
@@ -110,7 +109,7 @@ module State = struct
     ; tooltip_stage: Tooltip_stage.t
     }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; app_stage = Start; tooltip_stage = None}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; app_stage = Intro; tooltip_stage = None}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
@@ -401,6 +400,25 @@ module Mobile_switch = struct
       ; div [Style.render Visibility.only_mobile] [small] ]
 end
 
+module Image = struct
+  let draw ?(style= Style.empty) ~src ~alt xy =
+    let inline_style =
+      match xy with
+      | `Fixed (x, y) ->
+          let xStr = Int.to_string x in
+          let yStr = Int.to_string y in
+          Printf.sprintf "width:%spx;height:%spx" xStr yStr
+      | `Free -> ""
+    in
+    (* TODO: Why can't we make <img> tags with VirtualDOM!! *)
+    let img = Node.create "img" in
+    let src = Attr.create "src" src in
+    let alt = Attr.create "alt" alt in
+    img
+      [Attr.style_css inline_style; Style.render style; src; alt]
+      []
+end
+
 
 (** A Pane is full-width on mobile and on desktop
  * On desktop it's 1/3 (thin) or 2/3 (wide)
@@ -424,12 +442,22 @@ module Pane = struct
       [content]
 end
 
-let mk_button ?(attrs=[]) fn title =
-  let open Node in
-  let open Attr in
-  div ([class_ "button"
-      ; Attr.on_click fn ] @ attrs)
-    [ text title ]
+module Button = struct
+  let create ~f ~button_hint ~extra_style =
+    let open Node in
+    button [
+      Style.(
+            render
+              ( of_class
+                  "user-select-none hover-bg-black white no-underline ttu \
+                   tracked bg-silver icon-shadow ph3 pv3 br4 tc lh-copy"
+              + extra_style ))
+    ; Attr.on_click f
+    ] [text button_hint]
+
+  let cta ~button_hint ~f =
+    create ~button_hint ~extra_style:(Style.of_class "f3 ph4 pv3") ~f
+end
 
 let images = "/web-demo-art/"
 
@@ -441,59 +469,52 @@ module Breadcrumbs = struct
     div [] [text "TODO: Breadcrumbs"]
 end
 
-module Story_cell = struct
-  let terminal ?heading:_ ~copy:_ ~next_state:_ = failwith "TODO"
-end
-
 module Story = struct
-  let create state =
-    let open Node in
-    let open Attr in
-    let next target =
-      mk_button (fun _ -> 
+  module Cell = struct
+    let next state target =
+      Button.cta ~button_hint:"Next" ~f:(fun _ -> 
         !g_update_state_and_vdom { state with State.app_stage=target };
         Event.Ignore
-        ) "Next"
-    in
-    let copy copy =
-      div [] [(text copy)]
-    in
-    let image url =
-      let css = "background-image: url(" ^ url ^ ")" in
-      div [ class_ "image"; Attr.style_css css ] []
-    in
-    let contents = 
-      match state.app_stage with
-      | Start -> [
-        copy "This is the start story"
-        ; next Intro
-      ]
-      | Intro -> [
-          copy "This is Coda, a cryptocurrency so lightweight, it runs in your browser. Explore the Coda testnet from a verified JavaScript client here"
-          ; next Problem
+      )
+
+    let terminal state ~heading ~copy ~next_state =
+      let open Node in
+      div [Style.(render (of_class "w-100 mht6 flex-column"))]
+        [ h1 [ Style.(render (of_class "f1"))] [text heading]
+        ; div [] [text copy]
+        ; next state next_state
         ]
-      | Problem -> [
-          copy "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user"
-          ; image (image_url "problem.png")
-          ; next Coda
+
+    let comic state ~copy ~img ~alt ~next_state =
+      let open Node in
+      div [Style.(render (of_class "w-100 mht6 flex-column"))]
+        [ div [] [text copy]
+        ; Image.draw ~src:img ~alt (`Fixed (100, 100))
+        ; next state next_state
         ]
-      | Coda -> [
-          copy "Coda is a new cryptocurrency that
-  puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
-          ; image (image_url "your-hands.png")
-          ; next Mission
-        ]
-      | Mission -> [
-          copy "This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives. "
-          ; image (image_url "net-hands.png")
-          ; next App
-        ]
-      | App -> [
-        copy "Look at the right"
-      ]
-    in
-    div [Style.(render (of_class "mht6 flex-column"))]
-      contents
+  end
+
+  let create state =
+    let terminal = Cell.terminal state in
+    let comic = Cell.comic state in
+    match state.app_stage with
+    | Intro -> terminal ~heading:"Coda Protocol Demo" ~copy:"This demo is showing a live browser verified copy of the Coda Protocol Testnet.\n\nCoda enables you to be absolutely certain..." ~next_state:Problem
+    | Problem -> comic
+      ~copy:"Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user." ~img:(image_url "problem.png") ~alt:"Hand with big blockchain" ~next_state:Coda
+    | Coda -> comic
+        ~copy:"Coda is a new cryptocurrency that puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
+        ~img:(image_url "your-hands.png")
+        ~alt:"A user of Coda"
+        ~next_state:Mission
+    | Mission -> comic
+        ~copy:"This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives."
+        ~img:(image_url "net-hand.png")
+        ~alt:"Hand with the work"
+        ~next_state:App
+    | App -> terminal
+        ~heading:"Coda Protocol Demo"
+        ~copy:"This demo is showing a live browser..."
+        ~next_state:Problem
 end
 
 module Container = struct
@@ -600,7 +621,7 @@ let state_html
             match app_stage with
             | App ->
                 `Right_primary ((Story.create state, `Thin), state_explorer)
-            | Start ->
+            | Intro ->
                 `Left_primary ((Story.create state, `Thin), state_explorer)
             | _ ->
                 `Left_primary ((Story.create state, `Wide), state_explorer)
