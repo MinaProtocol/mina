@@ -154,7 +154,7 @@ module Status = struct
     title ^ output ^ "\n"
 end
 
-module Public_key = struct
+module String_list_formatter = struct
   type t = string list [@@deriving yojson]
 
   let log10 i = i |> Float.of_int |> Float.log10 |> Float.to_int
@@ -165,8 +165,21 @@ module Public_key = struct
         let i = i + 1 in
         let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
         let cleaned_string = String.slice pk 0 (String.length pk - 2) in
-        sprintf "%s%i. %s" padding i cleaned_string )
+        sprintf "%s%i, %s" padding i cleaned_string )
     |> String.concat ~sep:"\n"
+end
+
+module Public_key_with_balances = struct
+  type t = (int * string) list [@@deriving yojson]
+
+  type format = {accounts: t} [@@deriving yojson, fields]
+
+  let to_yojson t = format_to_yojson {accounts= t}
+
+  let to_text pk_with_accounts =
+    List.map pk_with_accounts ~f:(fun (pk, account) ->
+        sprintf !"%d, %s" pk account )
+    |> String_list_formatter.to_text
 end
 
 module Get_status = struct
@@ -189,6 +202,18 @@ module Clear_hist_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Get_public_keys_with_balances = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = (int * string) list [@@deriving bin_io, sexp]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_public_keys_with_balances" ~version:0 ~bin_query
       ~bin_response
 end
 
