@@ -12,4 +12,5 @@
       (:standard "\\" -pedantic)
       (-I re2_c/libre2)
       ))
+  (preprocessor_deps ("../../../config.mlh"))
   (preprocess (pps (ppx_jane ppx_deriving.enum ppx_deriving.eq)))))
