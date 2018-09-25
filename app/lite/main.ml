@@ -101,15 +101,23 @@ module Tooltip_stage = struct
     | Account_state
 end
 
+module Download_progress = struct
+  type t = 
+    | Progress of int
+    | Done
+
+end
+
 module State = struct
   type t =
     { verification: [`Pending of int | `Complete of unit Or_error.t]
     ; chain: Lite_chain.t
     ; app_stage: App_stage.t
     ; tooltip_stage: Tooltip_stage.t
+    ; download_progress: Download_progress.t
     }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; app_stage = Intro; tooltip_stage = None}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; app_stage = Intro; tooltip_stage = None; download_progress = Progress 0}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
@@ -617,6 +625,7 @@ let state_html
      let { State.verification
          ; app_stage
          ; tooltip_stage= _
+         ; download_progress
          ; chain=
              { protocol_state=
                  {previous_state_hash; blockchain_state; consensus_state}
@@ -664,6 +673,9 @@ let state_html
     div ([on_mouseenter update_tooltip] @ attrs) [ tooltip_indicator; node ]
   in
   let state_explorer =
+    match download_progress with
+    | Progress _ -> div [] [Node.text "downloading..."]
+    | Done -> 
     div [class_ "state-explorer ml3-ns"]
       [ div [class_ "state-with-proof"]
           [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state []
