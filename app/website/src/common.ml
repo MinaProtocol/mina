@@ -19,10 +19,13 @@ module Image = struct
   let draw ?(style= Style.empty) src xy =
     let inline_style =
       match xy with
+      | `Fixed_width x ->
+          let xStr = Int.to_string x in
+          Printf.sprintf "max-width:%spx" xStr
       | `Fixed (x, y) ->
           let xStr = Int.to_string x in
           let yStr = Int.to_string y in
-          Printf.sprintf "width:%spx;height:%spx" xStr yStr
+          Printf.sprintf "max-width:%spx;max-height:%spx" xStr yStr
       | `Free -> ""
     in
     ksprintf Html.literal
@@ -36,7 +39,8 @@ module Image = struct
     draw ~style
       (Printf.sprintf "http://via.placeholder.com/%sx%s/8492A6/1F2D3D" xStr
          yStr)
-      (`Fixed (x, y))
+      (*(`Fixed (x, y))*)
+      `Free
 end
 
 module Image_positioning = struct
@@ -217,6 +221,28 @@ module Footer = struct
   end
 end
 
+module Compound_chunk = struct
+  let create ?(variant=`With_image) ~important_text ~image ~image_positioning () =
+    let open Html_concise in
+    let left, right =
+      match image_positioning with
+      | Image_positioning.Left -> (image, important_text)
+      | Right -> (important_text, image)
+    in
+    Mobile_switch.create
+      ~not_small:
+        (div
+           [class_ "flex items-center mb5"]
+           [ div [class_ "flex w-50"] [div [class_ "mw6"] [left]]
+           ; div [class_ "flex w-50"] [div [class_ "center"] [right]] ])
+      ~small:
+        (div [class_ "w-100 center mb4"]
+             (match variant with
+             | `With_image -> [div [class_ "flex justify-center mb3"] [image]; important_text]
+             | `No_image_on_small -> [important_text])
+           )
+end
+
 module Section = struct
   let section' ?heading ?(footer= false) content scheme =
     let open Html_concise in
@@ -254,26 +280,38 @@ module Section = struct
           | Some heading -> [heading; content]
           | None -> [content] ) ]
 
+  let carousel ?heading ~pages ~scheme () =
+    let open Html_concise in
+    let control_divs =
+      List.mapi pages ~f:(fun i _ ->
+        div [id (Printf.sprintf "item-%d" i); Style.(render (of_class "control-operator"))] []
+      )
+    in
+    let figures =
+      let figure = Html.node "figure" in
+      List.mapi pages ~f:(fun i page ->
+        figure [Style.(render (of_class "item mt0 mb0 ml0 mr0"))] [page]
+      )
+    in
+    let controls =
+      div [Style.(render (of_class "controls flex justify-center user-select-none"))]
+        [ div []
+          (List.mapi pages ~f:(fun i _ ->
+            a [href (Printf.sprintf "#item-%d" i)
+              ; Style.(render (of_class "control-button"))]
+            [Html.text {literal|•|literal}]
+          ))
+        ]
+    in
+    let carousel =
+      div [Style.(render (of_class (Printf.sprintf "gallery items-%d" (List.length pages))))]
+        (control_divs @ figures @ [controls])
+    in
+    section' ?heading carousel scheme
+
   let major_compound ?heading ~important_text ~image ~image_positioning ~scheme
       () =
-    let open Html_concise in
-    let left, right =
-      match image_positioning with
-      | Image_positioning.Left -> (image, important_text)
-      | Right -> (important_text, image)
-    in
-    let html =
-      Mobile_switch.create
-        ~not_small:
-          (div
-             [class_ "flex items-center mb5"]
-             [ div [class_ "flex w-50"] [div [class_ "mw6"] [left]]
-             ; div [class_ "flex w-50"] [div [class_ "center"] [right]] ])
-        ~small:
-          (div [class_ "w-100 center mb4"]
-             [div [class_ "flex justify-center mb3"] [image]; important_text])
-    in
-    section' ?heading html scheme
+    section' ?heading (Compound_chunk.create ~important_text ~image ~image_positioning ()) scheme
 
   let major_text ?heading ~important_text ~scheme () =
     let open Html_concise in
@@ -430,6 +468,7 @@ let wrap ?(headers= []) ?(fixed_footer= false) ?title sections =
             ~href:
               "https://fonts.googleapis.com/css?family=Alegreya+Sans:300,300i,400,400i,500,500i,700,700i,800,800i,900,900i"
         ; link ~href:"/static/css/common.css"
+        ; link ~href:"/static/css/gallery.css" (* TODO: Only have this on demo *)
         ; literal
             {html|<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.12/css/all.css" integrity="sha384-G0fIWCsCzJIMAVNQPfjH08cyYaUtMwjJwqiRKxxE/rx96Uroj1BtIQ6MLJuheaO9" crossorigin="anonymous">|html}
         ; literal

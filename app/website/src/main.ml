@@ -418,6 +418,66 @@ let jobs () =
   let sections = [top] in
   wrap ~fixed_footer:true sections
 
+let demo () =
+  let comic ~title ~content ~img =
+    let image =
+      match img with
+      | `Placeholder -> Image.placeholder 400 400
+      | `Custom elem -> elem
+      | `Real s ->
+        Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns") ("/static/img/demo/" ^ s) `Free
+    in
+    Compound_chunk.create ~variant:`No_image_on_small ~important_text:(Important_text.create ~title:(`Left title) ~content) ~image ~image_positioning:Image_positioning.Right ()
+  in
+  let top scheme =
+    let open Html_concise in
+    div [] [
+    Section.carousel
+      ~pages:
+      [ comic
+        ~title:"What is this?"
+        ~content:["This is an interactive demo of the Coda testnet. Coda is a cryptocurrency so lightweight, it can run in your browser."
+        ; "On this page you can learn more about Coda, the testnet, and how the protocol works."
+        ]
+        ~img:`Placeholder
+      ; comic
+         ~title:"Problem"
+         ~content:[
+           "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user."]
+         ~img:(`Real "problem.png")
+      ; comic
+        ~title:"Coda"
+        ~content:["Coda is a new cryptocurrency that puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."]
+        ~img:(`Custom (div [Style.(render (of_class "flex"))]
+            [ Image.draw ("/static/img/demo/your-hands.png") (`Fixed (350, 400))
+            ]))
+      ; comic
+        ~title:"Mission"
+        ~content:["This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives."]
+        ~img:(`Real "net-hand.png")
+      ; comic
+        ~title:"Coda Protocol Demo"
+        ~content:
+          [ "This demo is showing a live, browser verified copy of the Coda testnet."
+          ; "Coda enables you to be certain of the balance in an account with just a constant, small amount of bandwidth and computation." ]
+        ~img:`Placeholder
+      ]
+        ~scheme
+        ()
+      (*(Demo.story ())*)
+    ]
+  in
+  let app scheme =
+    let open Html_concise in
+    Section.section'
+      ~heading:"Block Explorer"
+      (div [Style.(render (of_class "flex justify-center"))]
+        [Image.placeholder 1024 800])
+      scheme
+  in
+  let sections = [top; app] in
+  wrap ~fixed_footer:false sections
+
 let job_post name description =
   let content scheme =
     Section.major_text
@@ -444,6 +504,7 @@ let site () : Site.t Deferred.t =
     ( List.map position_files ~f:file
     @ [ file (File.of_html ~name:"index.html" home)
       ; file (File.of_html ~name:"jobs.html" (jobs ()))
+      ; file (File.of_html ~name:"demo.html" (demo ()))
       ; file (File.of_html ~name:"privacy.html" Privacy_policy.content)
       ; file (File.of_html ~name:"tos.html" Tos.content)
       ; file (File.of_path "static/favicon.ico")

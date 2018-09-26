@@ -32,6 +32,11 @@
   .f7-ns { font-size:0.75rem; }
 }
 
+.hauto { height: auto; }
+@media screen and (min-width:30em) {
+  .hauto-ns { height:auto; }
+}
+
 .black { color: #1F2D3D; }
 .silver { color: #8492A6; }
 .darksnow { color: #EFF2F7; }
@@ -131,3 +136,4 @@
   bottom: 0px;
   width: 100%;
 }
+
