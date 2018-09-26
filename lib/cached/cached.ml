@@ -170,4 +170,5 @@ let run
           Core.printf
             "Could not load %s from autogen path %s. Autogenerating...\n" name
             autogen_path ;
+          let%bind () = Unix.mkdir ~p:() autogen_path in
           With_components.store load ~base_path ~env:(create_env input)
