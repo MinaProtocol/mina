@@ -656,7 +656,7 @@
 }
 
 .gallery .item:first-of-type {
-    height: auto;
+  height: auto;
 }
 
 .gallery .controls {

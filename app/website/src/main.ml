@@ -213,7 +213,7 @@ let home () =
                 performed, verifying the blockchain remains inexpensive and \
                 accessible to everyone." ])
       ~image:
-        (Mobile_switch.create
+        (Some (Mobile_switch.create
            ~not_small:
              Html_concise.(
                node "img"
@@ -226,7 +226,7 @@ let home () =
                  [ Attribute.src "/static/img/compare-outlined.svg"
                  ; Attribute.create "width" "600px"
                  ; Attribute.create "height" "200px" ]
-                 []))
+                 [])))
       ~image_positioning:Image_positioning.Right ~scheme ()
   in
   let mission scheme =
@@ -422,10 +422,11 @@ let demo () =
   let comic ~title ~content ~img =
     let image =
       match img with
-      | `Placeholder -> Image.placeholder 400 400
-      | `Custom elem -> elem
+      | `None -> None
+      | `Placeholder -> Some (Image.placeholder 400 400)
+      | `Custom elem -> Some elem
       | `Real s ->
-        Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns") ("/static/img/demo/" ^ s) `Free
+        Some (Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns w-100") ("/static/img/demo/" ^ s) `Free)
     in
     Compound_chunk.create ~variant:`No_image_on_small ~important_text:(Important_text.create ~title:(`Left title) ~content) ~image ~image_positioning:Image_positioning.Right ()
   in
@@ -439,7 +440,7 @@ let demo () =
         ~content:["This is an interactive demo of the Coda testnet. Coda is a cryptocurrency so lightweight, it can even run in your browser."
         ; "On this page you can learn more about Coda, the testnet, and how the protocol works."
         ]
-        ~img:`Placeholder
+        ~img:`None
       ; comic
          ~title:"Problem"
          ~content:[
@@ -449,11 +450,12 @@ let demo () =
         ~title:"Coda"
         ~content:[
           "Coda is a new cryptocurrency with constant, low resource requirements. Its so efficient it can even run in your browser."]
-        ~img:(`Custom (div [Style.(render (of_class "flex"))]
+        (*~img:(`Custom (div [Style.(render (of_class "flex"))]
             [ Image.draw ("/static/img/demo/your-hands.png") (`Fixed (350, 400))
-            ]))
+            ]))*)
+        ~img:(`Real "your-hands.png")
       ; comic
-        ~title:"Mission"
+        ~title:"Coda"
         ~content:[
           "Because resource requirements are constant, it will stay decentralized and in the hands of its users, even at scale. "]
         ~img:(`Real "net-hand.png")
@@ -465,7 +467,7 @@ let demo () =
 ; "Coda enables you to be absolutely certain of the balance in an account with just a constant, small amount of bandwidth and computation - unlike other cryptocurrencies with require downloading and processing an ever-growing amount of data. And, it will keep these properties as it scales to more users and applications."
 
 ; "When released, Coda will put users back in control of cryptocurrency. Its our first step towards building computer systems that put users back in control of their digital lives." ]
-        ~img:`Placeholder
+        ~img:`None
       ]
         ~scheme
         ()

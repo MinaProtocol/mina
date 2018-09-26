@@ -237,6 +237,12 @@ end
 module Compound_chunk = struct
   let create ?(variant=`With_image) ~important_text ~image ~image_positioning () =
     let open Html_concise in
+    match image with 
+    | None -> 
+        (div
+           [class_ "flex items-center mb5"]
+           [ important_text ])
+    | Some image ->
     let left, right =
       match image_positioning with
       | Image_positioning.Left -> (image, important_text)
