@@ -4,11 +4,13 @@ open Snark_params
 open Snark_bits
 open Fold_lib
 module Digest = Tick.Pedersen.Digest
+module Storage = Storage.List.Make (Storage.Disk)
 
 module Keys = struct
   module Per_curve_location = struct
     module T = struct
-      type t = {step: string; wrap: string} [@@deriving sexp]
+      type t = {step: Storage.location; wrap: Storage.location}
+      [@@deriving sexp]
     end
 
     include T
@@ -28,7 +30,7 @@ module Keys = struct
       {step= Dummy_values.Tick.proving_key; wrap= Dummy_values.Tock.proving_key}
 
     let load ({step; wrap}: Location.t) =
-      let open Storage.Disk in
+      let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
         Controller.create ~parent_log Tick.Proving_key.bin_t
@@ -40,7 +42,10 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error _e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _e ->
+            failwithf
+              !"Transaction_snark: load failed on %{sexp:Storage.location}"
+              p ()
       in
       let%map step = load tick_controller step
       and wrap = load tock_controller wrap in
@@ -63,7 +68,7 @@ module Keys = struct
       ; wrap= Dummy_values.Tock.verification_key }
 
     let load ({step; wrap}: Location.t) =
-      let open Storage.Disk in
+      let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
         Controller.create ~parent_log Tick.Verification_key.bin_t
@@ -75,7 +80,10 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error _e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _e ->
+            failwithf
+              !"Transaction_snark: load failed on %{sexp:Storage.location}"
+              p ()
       in
       let%map step = load tick_controller step
       and wrap = load tock_controller wrap in
@@ -209,6 +217,7 @@ struct
           (Tick.constraint_system ~exposing:(Step_base.input ()) Step_base.main)
 
     let cached () =
+      let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
       let%bind step_vk, step_pk = Cached.run step_cached in
       let module Wrap = Wrap_base (struct
         let verification_key = step_vk.value
@@ -235,8 +244,8 @@ struct
       in
       let%map wrap_vk, wrap_pk = Cached.run wrap_cached in
       let location : Location.t =
-        { proving= {step= step_pk.path; wrap= wrap_pk.path}
-        ; verification= {step= step_vk.path; wrap= wrap_vk.path} }
+        { proving= {step= paths step_pk.path; wrap= paths wrap_pk.path}
+        ; verification= {step= paths step_vk.path; wrap= paths wrap_vk.path} }
       in
       let checksum : Checksum.t =
         { proving=
