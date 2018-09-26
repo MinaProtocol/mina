@@ -930,7 +930,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   (** For status *)
   let txn_count = ref 0
 
-  let send_txn log t txn =
+  let send_txn' log t txn =
     let open Deferred.Let_syntax in
     assert (is_valid_transaction t txn) ;
     let txn_pool = transaction_pool t in
@@ -938,7 +938,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
       txn ;
-    txn_count := !txn_count + 1 ;
+    txn_count := !txn_count + 1
+
+  let send_txn log t txn = send_txn' log t txn ; Deferred.unit
+
+  let send_txns log t txns =
+    List.iter txns ~f:(send_txn' log t) ;
     Deferred.unit
 
   let get_nonce t (addr: Public_key.Compressed.t) =
@@ -993,8 +998,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun () ->
-            send_txn log coda )
+      [ Rpc.Rpc.implement Client_lib.Send_transactions.rpc (fun () ->
+            send_txns log coda )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->
