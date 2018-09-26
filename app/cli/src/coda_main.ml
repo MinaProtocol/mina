@@ -886,6 +886,10 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
+
+    module Protocol_state_proof : sig
+      type t
+    end
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -922,6 +926,12 @@ module type Main_intf = sig
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
   val best_ledger : t -> Inputs.Ledger.t
+
+  val best_tip :
+       t
+    -> Inputs.Ledger.t
+       * Inputs.Consensus_mechanism.Protocol_state.value
+       * Inputs.Protocol_state_proof.t
 
   val best_protocol_state :
     t -> Inputs.Consensus_mechanism.Protocol_state.value
