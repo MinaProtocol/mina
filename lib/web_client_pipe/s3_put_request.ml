@@ -5,11 +5,11 @@ type t = string
 
 let create () = Deferred.Or_error.return "s3://o1labs-snarkette-data"
 
-let put t filenames =
-  let subcommand = ["s3"; "cp"] in
+let put t directory =
+  let subcommand = ["s3"; "sync"] in
   let result =
     Process.run ~prog:"aws"
-      ~args:(subcommand @ List.rev_append [t] filenames)
+      ~args:(subcommand @ [directory; t; "--exclude"; "*.temp*"])
       ()
   in
   result |> Deferred.Result.ignore
