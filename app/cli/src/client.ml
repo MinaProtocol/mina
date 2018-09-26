@@ -127,8 +127,8 @@ let get_balance =
          | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
          | Ok None ->
              printf "No account found at that public_key (zero balance)\n"
-         | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)
-     ))
+         | Error e ->
+             printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
 
 let get_public_keys =
   let open Deferred.Let_syntax in
@@ -308,6 +308,102 @@ let privkey_path_flag =
     ~doc:"FILE File to write private key into (public key will be FILE.pub)"
     (required file)
 
+let read_keypair from_account =
+  let open Deferred.Let_syntax in
+  let perm_error = ref false in
+  let%bind st = handle_open ~mkdir:false ~f:Unix.stat from_account in
+  if st.perm land 0o777 <> 0o600 then (
+    eprintf
+      "Error: insecure permissions on `%s`. They should be 0600, they are %o\n\
+       Hint: chmod 600 %s\n"
+      from_account (st.perm land 0o777) from_account ;
+    perm_error := true ) ;
+  let dn = Filename.dirname from_account in
+  let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
+  if st.perm land 0o777 <> 0o700 then (
+    eprintf
+      "Error: insecure permissions on `%s`. They should be 0700, they are %o\n\
+       Hint: chmod 700 %s\n"
+      dn (st.perm land 0o777) dn ;
+    perm_error := true ) ;
+  let%bind () = if !perm_error then exit 1 else Deferred.unit in
+  read_keypair_exn from_account ~password:(fun () ->
+      read_password_exn "Private key password: " )
+
+let get_nonce_exn public_key port =
+  match%bind get_nonce public_key port with
+  | Error e ->
+      eprintf "Failed to get nonce %s\n" e ;
+      exit 1
+  | Ok nonce -> return nonce
+
+let dispatch_with_message rpc arg port ~success ~error =
+  match%bind dispatch rpc arg port with
+  | Ok x ->
+      printf "%s\n" (success x) ;
+      Deferred.unit
+  | Error e ->
+      eprintf "%s\n" (error e) ;
+      exit 1
+
+let batch_send_txns =
+  let module Transaction_info = struct
+    type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
+    [@@deriving sexp]
+  end in
+  let arg =
+    let open Command.Let_syntax in
+    let%map_open privkey_path = privkey_path_flag
+    and transactions_path = anon ("transactions-file" %: string) in
+    (privkey_path, transactions_path)
+  in
+  let get_infos transactions_path =
+    match%bind
+      Reader.load_sexp transactions_path [%of_sexp : Transaction_info.t list]
+    with
+    | Ok x -> return x
+    | Error e ->
+        let sample_info () : Transaction_info.t =
+          let keypair = Keypair.create () in
+          { Transaction_info.receiver=
+              Public_key.(Compressed.to_base64 (compress keypair.public_key))
+          ; amount= Currency.Amount.of_int (Random.int 100)
+          ; fee= Currency.Fee.of_int (Random.int 100) }
+        in
+        eprintf "Could not read transactions from %s.\n" transactions_path ;
+        eprintf
+          "The file should be a sexp list of transactions. Here is an example \
+           file:\n\
+           %s\n"
+          (Sexp.to_string_hum
+             ([%sexp_of : Transaction_info.t list]
+                (List.init 3 ~f:(fun _ -> sample_info ())))) ;
+        exit 1
+  in
+  let main port (privkey_path, transactions_path) =
+    let open Deferred.Let_syntax in
+    let%bind keypair = read_keypair privkey_path
+    and infos = get_infos transactions_path in
+    let%bind nonce0 = get_nonce_exn keypair.public_key port in
+    let _, ts =
+      List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
+          ( Account.Nonce.succ nonce
+          , Transaction.sign keypair
+              { receiver= Public_key.Compressed.of_base64_exn receiver
+              ; amount
+              ; fee
+              ; nonce } ) )
+    in
+    dispatch_with_message Client_lib.Send_transactions.rpc
+      (ts :> Transaction.t list)
+      port
+      ~success:(fun () -> "Successfully enqueued transactions in pool")
+      ~error:(fun e ->
+        sprintf "Failed to send transactions %s" (Error.to_string_hum e) )
+  in
+  Command.async ~summary:"send multiple transactions from a file"
+    (Daemon_cli.init arg ~f:main)
+
 let send_txn =
   let open Command.Param in
   let address_flag =
@@ -331,52 +427,21 @@ let send_txn =
   Command.async ~summary:"Send transaction to an address"
     (Daemon_cli.init flag ~f:(fun port (address, from_account, fee, amount) ->
          let open Deferred.Let_syntax in
+         let%bind sender_kp = read_keypair from_account in
+         let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let receiver_compressed = Public_key.compress address in
-         let perm_error = ref false in
-         let%bind st = handle_open ~mkdir:false ~f:Unix.stat from_account in
-         if st.perm land 0o777 <> 0o600 then (
-           eprintf
-             "Error: insecure permissions on `%s`. They should be 0600, they \
-              are %o\n\
-              Hint: chmod 600 %s\n"
-             from_account (st.perm land 0o777) from_account ;
-           perm_error := true ) ;
-         let dn = Filename.dirname from_account in
-         let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
-         if st.perm land 0o777 <> 0o700 then (
-           eprintf
-             "Error: insecure permissions on `%s`. They should be 0700, they \
-              are %o\n\
-              Hint: chmod 700 %s\n"
-             dn (st.perm land 0o777) dn ;
-           perm_error := true ) ;
-         let%bind () = if !perm_error then exit 1 else Deferred.unit in
-         let%bind sender_kp =
-           read_keypair_exn from_account ~password:(fun () ->
-               read_password_exn "Private key password: " )
+         let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
+         let payload : Transaction.Payload.t =
+           {receiver= receiver_compressed; amount; fee; nonce}
          in
-         match%bind get_nonce sender_kp.public_key port with
-         | Error e ->
-             eprintf "Failed to get nonce %s\n" e ;
-             exit 1
-         | Ok nonce ->
-             let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-             let payload : Transaction.Payload.t =
-               {receiver= receiver_compressed; amount; fee; nonce}
-             in
-             let txn = Transaction.sign sender_kp payload in
-             match%bind
-               dispatch Client_lib.Send_transaction.rpc
-                 (txn :> Transaction.t)
-                 port
-             with
-             | Ok () ->
-                 printf "Successfully enqueued transaction in pool\n" ;
-                 Deferred.unit
-             | Error e ->
-                 eprintf "Failed to send transaction %s\n"
-                   (Error.to_string_hum e) ;
-                 exit 1 ))
+         let txn = Transaction.sign sender_kp payload in
+         dispatch_with_message Client_lib.Send_transactions.rpc
+           [(txn :> Transaction.t)]
+           port
+           ~success:(fun () -> "Successfully enqueued transaction in pool")
+           ~error:(fun e ->
+             sprintf "Failed to send transaction %s" (Error.to_string_hum e) )
+     ))
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
@@ -446,6 +511,7 @@ let command =
     ; ("get-public-keys", get_public_keys)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-txn", send_txn)
+    ; ("batch-send-txns", batch_send_txns)
     ; ("status", status)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
