@@ -32,7 +32,8 @@ end
 type chain =
   { protocol_state: Lite_base.Protocol_state.t
   ; proof: Lite_base.Proof.t
-  ; ledgers: Lite_lib.Sparse_ledger.t list } [@@deriving bin_io]
+  ; ledgers: Lite_lib.Sparse_ledger.t list }
+[@@deriving bin_io]
 
 module type Chain_intf = sig
   type data
