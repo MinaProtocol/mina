@@ -664,6 +664,51 @@ struct
     end
   end)
 
+  module Lite_chain = struct
+    type t = Lite_base.Lite_chain.t
+
+    let create =
+      Option.map Consensus_mechanism.Consensus_state.to_lite ~f:
+        (fun consensus_proof_to_lite
+        proof
+        ledger
+        (state: Consensus_mechanism.Protocol_state.value)
+        pks
+        ->
+          let ledger =
+            List.fold pks
+              ~f:(fun acc key ->
+                let loc =
+                  Option.value_exn (Ledger.location_of_key ledger key)
+                in
+                Lite_lib.Sparse_ledger.add_path acc
+                  (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
+                  (Lite_compat.public_key key)
+                  (Lite_compat.account
+                     (Option.value_exn (Ledger.get ledger loc))) )
+              ~init:
+                (Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
+                   (Lite_compat.digest
+                      ( Ledger.merkle_root ledger
+                        :> Snark_params.Tick.Pedersen.Digest.t )))
+          in
+          let protocol_state =
+            { Lite_base.Protocol_state.previous_state_hash=
+                Lite_compat.digest
+                  ( Consensus_mechanism.Protocol_state.previous_state_hash state
+                    :> Snark_params.Tick.Pedersen.Digest.t )
+            ; blockchain_state=
+                Lite_compat.blockchain_state
+                  (Consensus_mechanism.Protocol_state.blockchain_state state)
+            ; consensus_state=
+                consensus_proof_to_lite
+                  (Consensus_mechanism.Protocol_state.consensus_state state) }
+          in
+          { Lite_base.Lite_chain.proof= Lite_compat.proof proof
+          ; ledger
+          ; protocol_state } )
+  end
+
   let request_work ~best_ledger_builder
       ~(seen_jobs:
          'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
@@ -895,6 +940,9 @@ module type Main_intf = sig
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val get_lite_chain :
+    (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option
 end
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
