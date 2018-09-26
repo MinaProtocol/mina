@@ -1,3 +1,5 @@
 open Core
 
-let cache_dir = Filename.temp_dir_name ^/ "cli_cache_dir"
+let autogen_path = Filename.temp_dir_name ^/ "cli_cache_dir"
+
+let manual_install_path = "/var/lib/coda"

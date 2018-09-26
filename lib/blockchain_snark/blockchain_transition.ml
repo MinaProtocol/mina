@@ -199,7 +199,9 @@ struct
         in
         (verification, proving)
       in
-      Cached.Spec.create ~load ~directory:Cache_dir.cache_dir
+      Cached.Spec.create ~load ~name:"blockchain-snark step keys"
+        ~autogen_path:Cache_dir.autogen_path
+        ~manual_install_path:Cache_dir.manual_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
         ~create_env:Tick.Keypair.generate
@@ -223,7 +225,9 @@ struct
           in
           (verification, proving)
         in
-        Cached.Spec.create ~load ~directory:Cache_dir.cache_dir
+        Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
+          ~autogen_path:Cache_dir.autogen_path
+          ~manual_install_path:Cache_dir.manual_install_path
           ~digest_input:
             (Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
           ~create_env:Tock.Keypair.generate
