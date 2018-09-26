@@ -14,6 +14,17 @@ module Send_transaction = struct
     Rpc.Rpc.create ~name:"Send_transaction" ~version:0 ~bin_query ~bin_response
 end
 
+module Get_ledger = struct
+  type query = Ledger_builder_hash.Stable.V1.t [@@deriving bin_io]
+
+  type response = Ledger.t Or_error.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_ledger" ~version:0 ~bin_query ~bin_response
+end
+
 module Get_balance = struct
   type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
 
@@ -57,6 +68,7 @@ module Status = struct
     ; block_count: int
     ; uptime_secs: int
     ; ledger_merkle_root: string
+    ; ledger_builder_hash: string
     ; state_hash: string
     ; commit_id: Git_sha.t option
     ; conf_dir: string
@@ -102,6 +114,7 @@ module Status = struct
         ~block_count:(fun acc x -> ("Block Count", Int.to_string (f x)) :: acc)
         ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
         ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
+        ~ledger_builder_hash:(fun acc x -> ("Ledger-builder hash", f x) :: acc)
         ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
         ~commit_id:(fun acc x ->
           match f x with
