@@ -1,3 +1,5 @@
 public/
+static/main.bc.js
+static/verifier_main.bc.js
 _build/
 _tags

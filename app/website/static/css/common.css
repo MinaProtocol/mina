@@ -41,6 +41,8 @@
 .silver { color: #8492A6; }
 .darksnow { color: #EFF2F7; }
 
+.wb { word-break: break-all; }
+
 .bg-darksnow { background-color: #EFF2F7; }
 .bg-snow { background-color: #F9FAFC; }
 .bg-white { background-color: #fff; }

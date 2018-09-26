@@ -74,7 +74,7 @@ let get url on_success on_error =
   req ## send Js.Opt.empty
 
 let get_account _pk on_sucess on_error =
-  let url = "/chain" in
+  let url = "/static/chain" in
   get url
     (fun s ->
        let s = String.slice s 0 (String.length s - 1) in
@@ -623,7 +623,7 @@ let state_html
     state
      =
      let { State.verification
-         ; app_stage
+         ; app_stage=_
          ; tooltip_stage= _
          ; download_progress
          ; chain=
@@ -649,6 +649,7 @@ let state_html
     | `Complete (Error _) -> "proof invalid"
     | `Pending _ -> "proof verifying shake shake-constant"
   in
+  let proof_class = proof_class ^ " wb" in
   let state_record =
     let open Html.Record in
     create ~class_:"state"
@@ -677,7 +678,7 @@ let state_html
     match download_progress with
     | Progress _ -> div [] [Node.text "downloading..."]
     | Done -> 
-    div [class_ "state-explorer ml3-ns"]
+    div [class_ "state-explorer mw5"]
       [ div [class_ "state-with-proof"]
           [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state []
           ; div
@@ -692,30 +693,21 @@ let state_html
               |> render)) Tooltip_stage.Proof  [] ]
       (*; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"]*) ] 
   in
-  let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]
-  in
-  div [] [
-    header
-  ; div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"]
-      [
-        Container.create
-          ~configuration:(
-            match app_stage with
-            | App ->
-                `Right_primary ((Story.create state, `Thin), state_explorer)
-            | Intro ->
-                `Left_primary ((Story.create state, `Thin), state_explorer)
-            | _ ->
-                `Left_primary ((Story.create state, `Wide), state_explorer)
-          )
-      ]
-  ]
+  (*let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]*)
+  (*in*)
+  state_explorer
+  (*div [] [*)
+    (*header*)
+  (*; div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"]*)
+      (*[ state_explorer ]*)
+  (*]*)
 
 let main ~render ~get_data =
   let state = ref State.init in
   let vdom = ref (render !state) in
   let elt = (Node.to_dom !vdom :> Dom.element Js.t) in
-  Dom.appendChild Dom_html.document ##. body elt ;
+  let node = Dom_html.getElementById_exn "block-explorer" in
+  Dom.appendChild node elt ;
   let update_state_and_vdom new_state =
     state := new_state ;
     let new_vdom = render new_state in

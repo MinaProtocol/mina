@@ -32,7 +32,7 @@ end
 
 type t = (Js.js_string Js.t, Js.js_string Js.t) Worker.worker Js.t
 
-let verifier_main = "/_build/default/app/lite/verifier_main.bc.js"
+let verifier_main = "/static/verifier_main.bc.js"
 
 let create () = Worker.create verifier_main
 

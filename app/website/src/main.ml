@@ -469,15 +469,13 @@ let demo () =
       ]
         ~scheme
         ()
-      (*(Demo.story ())*)
     ]
   in
   let app scheme =
     let open Html_concise in
     Section.section'
       ~heading:"Block Explorer"
-      (div [Style.(render (of_class "flex justify-center"))]
-        [Image.placeholder 1024 800])
+      (div [Style.(render (of_class "flex justify-center")); id "block-explorer"] [])
       scheme
   in
   let sections = [top; app] in

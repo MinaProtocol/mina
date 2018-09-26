@@ -27,11 +27,6 @@
   cursor: pointer;
 }
 
-.state-explorer {
-  width: 200px;
-  font-size: calc((5) * ((100vw) / (1000)));
-}
-
 .accounts {
   width: 50%;
   display: inline-flex;
@@ -91,4 +86,8 @@
   font-size: 21px;
   font-weight: bold;
   position: absolute;
+}
+
+.proof .record-entry-value {
+  font-size: 0.625rem;
 }
