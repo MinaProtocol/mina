@@ -133,10 +133,21 @@ let get_balance =
 let get_public_keys =
   let open Deferred.Let_syntax in
   let open Client_lib in
+  let open Command.Param in
+  let with_balances_flag =
+    flag "with-balances" no_arg
+      ~doc:"Show corresponding balances to public keys"
+  in
   Command.async ~summary:"Get public keys"
-    (Daemon_cli.init json_flag ~f:(fun port json ->
-         dispatch Get_public_keys.rpc () port
-         >>| print (module Public_key) json ))
+    (Daemon_cli.init
+       (return (fun a b -> (a, b)) <*> with_balances_flag <*> json_flag)
+       ~f:(fun port (is_balance_included, json) ->
+         if is_balance_included then
+           dispatch Get_public_keys_with_balances.rpc () port
+           >>| print (module Public_key_with_balances) json
+         else
+           dispatch Get_public_keys.rpc () port
+           >>| print (module String_list_formatter) json ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
@@ -303,21 +314,23 @@ let read_keypair from_account =
   let%bind st = handle_open ~mkdir:false ~f:Unix.stat from_account in
   if st.perm land 0o777 <> 0o600 then (
     eprintf
-      "Error: insecure permissions on `%s`. They should be 0600, they are %o\n\
-       Hint: chmod 600 %s\n"
+      "Error: insecure permissions on `%s`. They should be 0600, they \
+      are %o\n\
+      Hint: chmod 600 %s\n"
       from_account (st.perm land 0o777) from_account ;
     perm_error := true ) ;
   let dn = Filename.dirname from_account in
   let%bind st = handle_open ~mkdir:false ~f:Unix.stat dn in
   if st.perm land 0o777 <> 0o700 then (
     eprintf
-      "Error: insecure permissions on `%s`. They should be 0700, they are %o\n\
-       Hint: chmod 700 %s\n"
+      "Error: insecure permissions on `%s`. They should be 0700, they \
+      are %o\n\
+      Hint: chmod 700 %s\n"
       dn (st.perm land 0o777) dn ;
     perm_error := true ) ;
   let%bind () = if !perm_error then exit 1 else Deferred.unit in
   read_keypair_exn from_account ~password:(fun () ->
-      prompt_password "Private key password: " )
+      read_password_exn "Private key password: " )
 
 let get_nonce_exn public_key port =
   match%bind get_nonce public_key port with
@@ -432,7 +445,7 @@ let dump_keypair =
       let open Deferred.Let_syntax in
       let%map kp =
         read_keypair_exn privkey_path ~password:(fun () ->
-            prompt_password "Password for private key file: " )
+            read_password_exn "Password for private key file: " )
       in
       printf "Public key: %s\nPrivate key: %s\n"
         ( kp.public_key |> Public_key.compress

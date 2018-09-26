@@ -403,7 +403,7 @@ module Make_inputs
     (Init : Init_intf)
     (Ledger_proof_verifier : Ledger_proof_verifier_intf
                              with type ledger_proof := Init.Ledger_proof.t)
-    (Store : Storage.With_checksum_intf)
+    (Store : Storage.With_checksum_intf with type location = string)
     () =
 struct
   open Init
@@ -681,7 +681,7 @@ struct
 end
 
 module Coda_with_snark
-    (Store : Storage.With_checksum_intf)
+    (Store : Storage.With_checksum_intf with type location = string)
     (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t)
     () =
 struct
@@ -912,11 +912,20 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map account = Ledger.get ledger location in
     account.Account.balance
 
-  let get_public_keys t =
+  let get_accounts t =
     let ledger = best_ledger t in
     Ledger.to_list ledger
-    |> List.map
-         ~f:(Fn.compose Public_key.Compressed.to_base64 Account.public_key)
+
+  let string_of_public_key =
+    Fn.compose Public_key.Compressed.to_base64 Account.public_key
+
+  let get_public_keys t = get_accounts t |> List.map ~f:string_of_public_key
+
+  let get_keys_with_balances t =
+    get_accounts t
+    |> List.map ~f:(fun account ->
+           ( Account.balance account |> Currency.Balance.to_int
+           , string_of_public_key account ) )
 
   let is_valid_transaction t (txn: Transaction.t) =
     let remainder =
@@ -1002,6 +1011,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             send_txns log coda )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
+      ; Rpc.Rpc.implement Client_lib.Get_public_keys_with_balances.rpc
+          (fun () () -> return (get_keys_with_balances coda) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->
             return (get_public_keys coda) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->

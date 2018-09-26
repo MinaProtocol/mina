@@ -186,7 +186,7 @@ module type Inputs_intf = sig
              and type protocol_state := Protocol_state.value
   end
 
-  module Store : Storage.With_checksum_intf
+  module Store : Storage.With_checksum_intf with type location = string
 
   val verify_blockchain :
     Protocol_state_proof.t -> Protocol_state.value -> bool Deferred.Or_error.t
@@ -613,7 +613,9 @@ let%test_module "test" =
     open Core
     open Async
 
-    module Make_test (Store : Storage.With_checksum_intf) = struct
+    module Make_test
+        (Store : Storage.With_checksum_intf with type location = string) =
+    struct
       module Inputs = struct
         module Security = struct
           let max_depth = `Finite 50
