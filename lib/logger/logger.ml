@@ -3,7 +3,7 @@ open Async
 
 module Level = struct
   type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
-  [@@deriving sexp, bin_io, compare]
+  [@@deriving sexp, bin_io, compare, to_yojson]
 end
 
 module Attribute = struct
@@ -13,6 +13,24 @@ module Attribute = struct
 end
 
 module Message = struct
+  module Time = struct
+    include Time
+    let to_yojson t = `String (Time.to_string t)
+  end
+
+  module Pid = struct
+    include Pid
+    let to_yojson t = `Int (Pid.to_int t)
+  end
+
+  module Sexp = struct
+    include Sexp
+
+    let rec to_yojson = function
+      | Atom s -> `String s
+      | List xs ->  `List (List.map ~f:to_yojson xs)
+  end
+
   type t =
     { attributes: Sexp.t String.Map.t
     ; path: string list
@@ -22,7 +40,7 @@ module Message = struct
     ; time: Time.t
     ; location: string option
     ; message: string }
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io, to_yojson]
 end
 
 type t =
