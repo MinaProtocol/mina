@@ -403,7 +403,7 @@ module Make_inputs
     (Init : Init_intf)
     (Ledger_proof_verifier : Ledger_proof_verifier_intf
                              with type ledger_proof := Init.Ledger_proof.t)
-    (Store : Storage.With_checksum_intf)
+    (Store : Storage.With_checksum_intf with type location = string)
     () =
 struct
   open Init
@@ -681,7 +681,7 @@ struct
 end
 
 module Coda_with_snark
-    (Store : Storage.With_checksum_intf)
+    (Store : Storage.With_checksum_intf with type location = string)
     (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t)
     () =
 struct
