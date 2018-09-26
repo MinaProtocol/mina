@@ -667,7 +667,7 @@ struct
   module Lite_chain = struct
     type t = Web_client_pipe.chain
 
-    type chain 
+    type chain
 
     let create =
       Option.map Consensus_mechanism.Consensus_state.to_lite ~f:
@@ -677,13 +677,14 @@ struct
         (state: Consensus_mechanism.Protocol_state.value)
         pks
         ->
-          let empty_ledger = (Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
-                   (Lite_compat.digest
-                      ( Ledger.merkle_root ledger
-                        :> Snark_params.Tick.Pedersen.Digest.t ))) in
+          let empty_ledger =
+            Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
+              (Lite_compat.digest
+                 ( Ledger.merkle_root ledger
+                   :> Snark_params.Tick.Pedersen.Digest.t ))
+          in
           let ledgers =
-            List.map pks
-              ~f:(fun key ->
+            List.map pks ~f:(fun key ->
                 let loc =
                   Option.value_exn (Ledger.location_of_key ledger key)
                 in
@@ -705,9 +706,7 @@ struct
                 consensus_proof_to_lite
                   (Consensus_mechanism.Protocol_state.consensus_state state) }
           in
-          ({ proof= Lite_compat.proof proof
-          ; ledgers
-          ; protocol_state }: t ) )
+          ({proof= Lite_compat.proof proof; ledgers; protocol_state} : t) )
   end
 
   let request_work ~best_ledger_builder
