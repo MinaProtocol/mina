@@ -3,7 +3,23 @@ open Async
 
 type 'a value = {path: string; value: 'a; checksum: Md5.t}
 
-include Monad.S2
+include Applicative.S2
+
+module Let_syntax : sig
+  val return : 'a -> ('a, 'e) t
+
+  module Let_syntax : sig
+    val return : 'a -> ('a, 'e) t
+
+    val map : ('a, 'e) t -> f:('a -> 'b) -> ('b, 'e) t
+
+    val both : ('a, 'e) t -> ('b, 'e) t -> ('a * 'b, 'e) t
+
+    module Open_on_rhs : sig
+      
+    end
+  end
+end
 
 val component :
   label:string -> f:('e -> 'a) -> 'a Bin_prot.Type_class.t -> ('a value, 'e) t
@@ -15,7 +31,9 @@ module Spec : sig
 
   val create :
        load:('a, 'env) cached
-    -> directory:string
+    -> name:string
+    -> autogen_path:string
+    -> manual_install_path:string
     -> digest_input:('input -> string)
     -> create_env:('input -> 'env)
     -> input:'input
