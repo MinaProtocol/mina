@@ -31,6 +31,12 @@ cp ./default/app/cli/src/cli.exe ${BUILDDIR}/usr/local/bin/cli
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 cp .././app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
 
+# verification keys
+if [ -d "/tmp/cli_cache_dir" ]; then
+    mkdir -p ${BUILDDIR}/var/lib/coda
+    cp /tmp/cli_cache_dir/*_verification ${BUILDDIR}/var/lib/coda
+fi
+
 # Ugly hack #1 to patch elf interpreter to get past nix-build
 if [ ! -f /usr/bin/patchelf ]; then
     sudo apt install patchelf

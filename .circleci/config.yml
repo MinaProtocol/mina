@@ -49,7 +49,7 @@ jobs:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Build deb Package
+                name: Build deb Package with verification keys
                 command: make deb
             - run:
                 name: Build provingkeys

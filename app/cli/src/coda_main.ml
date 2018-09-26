@@ -841,6 +841,16 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
+
+    module Ledger_builder_hash : sig
+      type t [@@deriving sexp]
+    end
+
+    module Ledger_builder : sig
+      type t
+
+      val hash : t -> Ledger_builder_hash.t
+    end
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -876,6 +886,8 @@ module type Main_intf = sig
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
+  val best_ledger_builder : t -> Inputs.Ledger_builder.t
+
   val best_ledger : t -> Inputs.Ledger.t
 
   val best_protocol_state :
@@ -895,6 +907,8 @@ module type Main_intf = sig
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
 end
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
@@ -939,7 +953,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   (** For status *)
   let txn_count = ref 0
 
-  let send_txn log t txn =
+  let schedule_transaction log t txn =
     let open Deferred.Let_syntax in
     assert (is_valid_transaction t txn) ;
     let txn_pool = transaction_pool t in
@@ -947,8 +961,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
       txn ;
-    txn_count := !txn_count + 1 ;
+    txn_count := !txn_count + 1
+
+  let send_txn log t txn =
+    schedule_transaction log t txn ;
     Deferred.unit
+
+  let schedule_transactions log t txns =
+    List.iter txns ~f:(schedule_transaction log t)
 
   let get_nonce t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
@@ -982,6 +1002,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
+    ; ledger_builder_hash=
+        best_ledger_builder t |> Ledger_builder.hash
+        |> Ledger_builder_hash.sexp_of_t |> Sexp.to_string
     ; state_hash
     ; external_transition_latency=
         Perf_histograms.report ~name:"external_transition_latency"
@@ -1002,8 +1025,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun () ->
-            send_txn log coda )
+      [ Rpc.Rpc.implement Client_lib.Send_transactions.rpc (fun () ts ->
+            schedule_transactions log coda ts ;
+            Deferred.unit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys_with_balances.rpc
@@ -1015,7 +1039,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
             return (get_status coda) )
       ; Rpc.Rpc.implement Client_lib.Clear_hist_status.rpc (fun () () ->
-            return (clear_hist_status coda) ) ]
+            return (clear_hist_status coda) )
+      ; Rpc.Rpc.implement Client_lib.Get_ledger.rpc (fun () lh ->
+            get_ledger coda lh ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in
