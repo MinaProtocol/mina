@@ -139,8 +139,21 @@ module type Snark_pool_intf = sig
     t -> completed_work_statement -> completed_work_checked option
 end
 
+module type Rose_intf = sig
+  type 'a t = Rose of 'a * 'a t list
+  [@@deriving eq, sexp, bin_io]
+
+  val singleton : 'a -> 'a t
+  val to_list : 'a t -> 'a list
+  val to_array : 'a t -> 'a array
+  val mem : 'a t -> 'a -> equal:('a -> 'a -> bool) -> bool
+  val find : 'a t -> f:('a -> bool) -> 'a option
+end
+
 module type Ktree_intf = sig
   type elem
+
+  type 'a rose
 
   type t [@@deriving sexp]
 
@@ -155,7 +168,7 @@ module type Ktree_intf = sig
   val longest_path : t -> elem list
 
   val add :
-    t -> elem -> parent:(elem -> bool) -> [> `Added of t | `No_parent | `Repeat]
+    t -> elem -> parent:(elem -> bool) -> [> `Added of (t * elem rose list) | `No_parent | `Repeat]
 
   val root : t -> elem
 end
@@ -195,9 +208,9 @@ module type Ledger_builder_controller_intf = sig
       ; net_deferred: net Deferred.t
       ; external_transitions_reader:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
+      ; relevant_work_changes_writer: (work, int) List.Assoc.t Linear_pipe.Writer.t
       ; genesis_tip: tip
-      ; disk_location: string
-      ; relevant_work_changes_writer: (work, int) List.Assoc.t Linear_pipe.Writer.t }
+      ; disk_location: string }
     [@@deriving make]
   end
 

@@ -35,6 +35,8 @@ end
 (** A Rose tree with max-depth k. Whenever we want to add a node that would increase the depth past k, we instead move the tree forward and root it at the node towards that path *)
 module Make (Elem : sig
   type t [@@deriving compare, bin_io, sexp]
+
+  val empty : t
 end)
 (Security : Protocols.Coda_pow.Security_intf) =
 struct
@@ -126,7 +128,7 @@ struct
       | _ ->
           let longest_subtree, longest_depth, other_trees =
             List.fold_left tree_and_depths
-              ~init:(Rose.singleton TODO, 0, [])
+              ~init:(Rose.singleton Elem.empty, 0, [])
               ~f:(fun (max_tree, max_depth, rest) (tree, depth) ->
                 if depth > max_depth then
                   (tree, depth, max_tree :: rest)
@@ -140,7 +142,7 @@ struct
             `Added
             ( { tree= longest_subtree
               ; elems= Elem_set.of_list (Rose.to_list longest_subtree) }
-            , other_tree )
+            , other_trees )
           else `Added (default, [])
 end
 
@@ -148,6 +150,8 @@ let%test_module "K-tree" =
   ( module struct
     module Make_quickchecks (Elem : sig
       type t [@@deriving eq, compare, bin_io, sexp]
+
+      val empty : t
 
       val gen : t Quickcheck.Generator.t
     end) (Security : sig
@@ -171,8 +175,8 @@ let%test_module "K-tree" =
             match add r e ~parent:(Elem.equal parent) with
             | `No_parent -> failwith "Unexpected"
             | `Repeat -> assert (Elem_set.mem r.elems e)
-            | `Added r' -> assert (not (Rose.equal Elem.equal r.tree r'.tree))
-            )
+            | `Added (r', _) ->
+              assert (not (Rose.equal Elem.equal r.tree r'.tree)))
 
       let%test_unit "Adding to the end of the longest_path extends the path \
                      (modulo the last thing / first-thing)" =
@@ -184,7 +188,7 @@ let%test_module "K-tree" =
             let path = longest_path r in
             match add r e ~parent:(Elem.equal (List.last_exn path)) with
             | `No_parent | `Repeat -> failwith "Unexpected"
-            | `Added r' ->
+            | `Added (r', _) ->
                 assert (Elem.equal e (List.last_exn (longest_path r'))) ;
                 (* If there were two paths of the same length, we may be missing the
              * last thing in our first path *)
@@ -227,9 +231,10 @@ let%test_module "K-tree" =
         let (Rose.Rose (head, first_children)) = t.tree in
         match add t e2 ~parent:(Elem.equal e1) with
         | `No_parent | `Repeat -> failwith "Unexpected"
-        | `Added t' ->
+        | `Added (t', removed) ->
             assert (List.length (longest_path t') = Security.max_depth) ;
             assert (not (Rose.mem t'.tree head ~equal:Elem.equal)) ;
+            assert (List.mem removed (Rose.singleton head) ~equal:(Rose.equal Elem.equal));
             assert (
               not
                 (Rose.mem t'.tree
@@ -242,13 +247,13 @@ let%test_module "K-tree" =
     end
 
     module Tree =
-      Make_quickchecks (Int)
+      Make_quickchecks (struct include Int let empty = 0 end)
         (struct
           let max_depth = 10
         end)
 
     module Big_tree =
-      Make_quickchecks (Int)
+      Make_quickchecks (struct include Int let empty = 0 end)
         (struct
           let max_depth = 50
         end)

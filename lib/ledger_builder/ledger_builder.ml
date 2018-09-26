@@ -157,6 +157,8 @@ module Make (Inputs : Inputs.S) : sig
 end = struct
   open Inputs
 
+  type ('a, 'd) parallel_scan_state = ('a, 'd) Parallel_scan.State.t
+
   type 'a with_statement = 'a * Ledger_proof_statement.t
   [@@deriving sexp, bin_io]
 
@@ -166,7 +168,7 @@ end = struct
       { transaction: Super_transaction.t
       ; statement: Ledger_proof_statement.t
       ; witness: Inputs.Sparse_ledger.t }
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp, bin_io, fields]
   end
 
   (* TODO: This is redundant right now, the transaction snark has the statement
@@ -211,7 +213,7 @@ end = struct
     the above state. *)
     ; ledger: Ledger.t
     ; public_key: Compressed_public_key.t }
-  [@@deriving sexp]
+  [@@deriving sexp, fields]
 
   let random_work_spec_chunk t
       (seen_statements:

@@ -2,6 +2,10 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
+  module Work : sig
+    type t
+  end
+
   module State_hash : sig
     type t [@@deriving sexp, eq, compare]
   end
@@ -85,6 +89,7 @@ module type Inputs_intf = sig
     with type tip := Tip.t
      and type external_transition := External_transition.t
      and type state_hash := State_hash.t
+     and type work := Work.t
 
   module Step : sig
     (* This checks the SNARKs in State/LB and does the transition *)
@@ -125,7 +130,7 @@ module type S = sig
 
   type state_hash
 
-  val create : transition_logic_state -> Logger.t -> t
+  val create : parent_log:Logger.t -> transition_logic_state -> t
 
   val state : t -> transition_logic_state
 
@@ -224,8 +229,7 @@ struct
   type t =
     { state: Transition_logic_state.t
     ; log: Logger.t
-    ; pending_target: Pending_target.t
-    ; relevant_work_changes_writer: (Work.t, int) List.Assoc.t Linear_pipe.Writer.t }
+    ; pending_target: Pending_target.t }
 
   let state {state; _} = state
 
@@ -243,12 +247,11 @@ struct
         let target = With_hash.map ~f:External_transition.target_state
       end)
 
-  let create state ~parent_log ~relevant_work_changes_writer : t =
+  let create ~parent_log state : t =
     let log = Logger.child parent_log __MODULE__ in
     { state
     ; log
-    ; pending_target= Pending_target.create ~parent_log:log
-    ; relevant_work_changes_writer }
+    ; pending_target= Pending_target.create ~parent_log:log }
 
   let locked_and_best tree =
     let path = Transition_tree.longest_path tree in
@@ -411,7 +414,7 @@ struct
                 (Or_error.error_string "Not found locally within our ktree")
 
   let unguarded_on_new_transition catchup
-      ({state; log; pending_target= _; relevant_work_changes_writer} as t)
+      ({state; log; pending_target= _} as t)
       transition_with_hash
       ~time_received :
       ( Change.t list
@@ -488,19 +491,7 @@ struct
                 ([], Some (Catchup.sync catchup state transition_with_hash))
           | `Take -> return ([], None) )
       | `Repeat -> return ([], None)
-      | `Added (new_tree, removed_trees) ->
-          let relevant_work_changes = Statement.Table.create () in
-          (if List.length removed_trees > 0 then (
-             List.iter removed_trees ~f:(fun tree ->
-               Hashtbl.decr ~remove_if_zero:true tbl statement)));
-          List.iter (statements transition_with_hash.value)
-            ~f:(Hashtbl.incr ~remove_if_zero:true tbl);
-          let%bind () =
-            Linear_pipe.Writer.write
-              relevant_work_changes_writer
-              (Hashtbl.to_alist relevant_work_changes)
-          in
-
+      | `Added (new_tree, _) ->
           let old_locked_head, old_best_tip = locked_and_best old_tree in
           let new_head, new_tip = locked_and_best new_tree in
           if
@@ -512,9 +503,7 @@ struct
                = 0
           then return ([Transition_logic_state.Change.Ktree new_tree], None)
           else
-            let new_best_path =
-              Transition_tree.longest_path new_tree |> Path.of_tree_path
-            in
+            let new_best_path = Transition_tree.longest_path new_tree |> Path.of_tree_path in
             return
               ( []
               , Some

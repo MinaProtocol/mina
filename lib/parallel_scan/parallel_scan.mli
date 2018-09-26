@@ -6,6 +6,8 @@ module Ring_buffer : sig
   val read_all : 'a t -> 'a list
 
   val read_k : 'a t -> int -> 'a list
+
+  val iter : 'a t -> f:('a -> unit) -> unit
 end
 
 module State : sig
@@ -19,6 +21,8 @@ module State : sig
   end
 
   type ('a, 'd) t [@@deriving sexp, bin_io]
+
+  val jobs : ('a, 'd) t -> ('a, 'd) Job.t Ring_buffer.t
 
   val fold_chronological :
     ('a, 'd) t -> init:'acc -> f:('acc -> ('a, 'd) Job.t -> 'acc) -> 'acc

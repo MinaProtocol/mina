@@ -435,6 +435,16 @@ module type Ledger_builder_intf = sig
 
   type completed_work
 
+  type ('a, 'd) parallel_scan_state
+
+  module Super_transaction_with_witness : sig
+    type t [@@deriving sexp, bin_io]
+
+    val transaction : t -> super_transaction
+    val statement : t -> ledger_proof_statement
+    val witness : t -> sparse_ledger
+  end
+
   val copy : t -> t
 
   val hash : t -> ledger_builder_hash
@@ -446,6 +456,8 @@ module type Ledger_builder_intf = sig
   val current_ledger_proof : t -> ledger_proof option
 
   val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
+
+  val scan_state : t -> (ledger_proof * ledger_proof_statement, Super_transaction_with_witness.t) parallel_scan_state
 
   (* This should memoize the snark verifications *)
 
@@ -501,7 +513,7 @@ module type Tip_intf = sig
     { protocol_state: protocol_state
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
-  [@@deriving sexp]
+  [@@deriving sexp, fields]
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 end

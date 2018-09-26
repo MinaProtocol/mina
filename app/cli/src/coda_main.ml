@@ -513,10 +513,10 @@ struct
           Completed_work.Checked.create_unsafe
             {Completed_work.fee; proofs= proof; prover} )
 
-    let load ~parent_log ~disk_location ~incoming_diffs =
+    let load ~parent_log ~relevant_work_changes_reader ~disk_location ~incoming_diffs =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
       | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
-      | Error _e -> create ~parent_log ~incoming_diffs
+      | Error _e -> create ~parent_log ~incoming_diffs ~pool:(Pool.create ~parent_log ~relevant_work_changes_reader)
 
     open Snark_work_lib.Work
 
@@ -576,6 +576,8 @@ struct
         let max_depth = Init.lbc_tree_max_depth
       end
 
+      module Work = Completed_work.Statement
+      module Ledger_proof = Ledger_proof
       module Tip = Tip
       module Store = Store
       module Snark_pool = Snark_pool

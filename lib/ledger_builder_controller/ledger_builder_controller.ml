@@ -2,10 +2,22 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
+  module Ledger_proof : sig
+    type t
+  end
+
   module State_hash : sig
     type t [@@deriving eq, sexp, compare, bin_io]
 
     val to_bits : t -> bool list
+
+    val zero : t
+  end
+
+  module Work : sig
+    type t
+
+    module Table : Hashtbl.S with type key := t
   end
 
   module Security : Protocols.Coda_pow.Security_intf
@@ -49,6 +61,12 @@ module type Inputs_intf = sig
 
     type proof
 
+    module Super_transaction_with_witness : sig
+      type t
+
+      val statement : t -> Work.t
+    end
+
     module Aux : sig
       type t [@@deriving bin_io]
 
@@ -70,6 +88,8 @@ module type Inputs_intf = sig
     val hash : t -> Ledger_builder_hash.t
 
     val aux : t -> Aux.t
+
+    val scan_state : t -> (Ledger_proof.t * Work.t, Super_transaction_with_witness.t) Parallel_scan.State.t
 
     val apply :
          t
@@ -132,6 +152,8 @@ module type Inputs_intf = sig
     val protocol_state_proof : t -> Protocol_state_proof.t
 
     val ledger_builder_diff : t -> Ledger_builder_diff.t
+
+    val genesis : t
   end
 
   module Tip :
@@ -206,6 +228,7 @@ module Make (Inputs : Inputs_intf) : sig
            and type sync_answer := Inputs.Sync_ledger.answer
            and type external_transition := Inputs.External_transition.t
            and type tip := Inputs.Tip.t
+           and type work := Inputs.Work.t
 
   val ledger_builder_io : t -> Inputs.Net.t
 end = struct
@@ -215,8 +238,10 @@ end = struct
     type t =
       { parent_log: Logger.t
       ; net_deferred: Net.net Deferred.t
-      ; external_transitions:
+      ; external_transitions_reader:
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
+      ; relevant_work_changes_writer:
+          (Work.t, int) List.Assoc.t Linear_pipe.Writer.t
       ; genesis_tip: Tip.t
       ; disk_location: string }
     [@@deriving make]
@@ -239,6 +264,7 @@ end = struct
   end
 
   module Transition_logic_inputs = struct
+    module Work = Work
     module Frozen_ledger_hash = Frozen_ledger_hash
     module State_hash = State_hash
     module Consensus_mechanism = Consensus_mechanism
@@ -360,10 +386,18 @@ end = struct
     end
 
     module Transition_logic_state =
-      Transition_logic_state.Make (Security) (External_transition) (Tip)
+      Transition_logic_state.Make
+        (Security)
+        (Ledger_proof)
+        (Work)
+        (Ledger_builder)
+        (State_hash)
+        (External_transition)
+        (Tip)
     module Ledger_hash = Ledger_hash
 
     module Catchup = Catchup.Make (struct
+      module Work = Work
       module Ledger_hash = Ledger_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
       module Ledger = Ledger
@@ -391,8 +425,7 @@ end = struct
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; mutable handler: Transition_logic.t
-    ; strongest_ledgers: (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
-    ; ledger_builder_actions: (Ledger_builder.t * [`Add|`Remove]) Linear_pipe.Reader.t }
+    ; strongest_ledgers: (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
 
   let strongest_tip t =
     let state = Transition_logic.state t.handler in
@@ -420,7 +453,7 @@ end = struct
       { ledger_builder_io= net
       ; log= Logger.child config.parent_log "ledger_builder_controller"
       ; strongest_ledgers= strongest_ledgers_reader
-      ; handler= Transition_logic.create state log }
+      ; handler= Transition_logic.create ~parent_log:log state }
     in
     let mutate_state_reader, mutate_state_writer = Linear_pipe.create () in
     (* The mutation "thread" *)
@@ -430,10 +463,10 @@ end = struct
            (* TODO: We can make change-resolving more intelligent if different
          * concurrent processes took different times to finish. Since we
          * serialize to one job at a time this shouldn't happen anyway though *)
-           let new_state =
-             Transition_logic_state.apply_all old_state changes
+           let%bind new_state =
+             Transition_logic_state.apply_all ~relevant_work_changes_writer:config.relevant_work_changes_writer old_state changes
            in
-           t.handler <- Transition_logic.create new_state log ;
+           t.handler <- Transition_logic.create ~parent_log:log new_state ;
            ( if
                not
                  (Protocol_state.equal_value
@@ -452,7 +485,7 @@ end = struct
     (* Handle new transitions *)
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
-        config.external_transitions ~f:(fun (transition, time_received) ->
+        config.external_transitions_reader ~f:(fun (transition, time_received) ->
           let transition_with_hash =
             With_hash.of_data transition ~hash_data:(fun t ->
                 t |> External_transition.target_state |> Protocol_state.hash )
@@ -573,6 +606,10 @@ end
 let%test_module "test" =
   ( module struct
     module Inputs = struct
+      module Work = Int
+
+      module Ledger_proof = Int
+
       module Security = struct
         let max_depth = `Finite 50
       end
@@ -604,6 +641,12 @@ let%test_module "test" =
       module Ledger_builder = struct
         type t = int ref [@@deriving sexp, bin_io]
 
+        module Super_transaction_with_witness = struct
+          type t = int
+
+          let statement _ = 0
+        end
+
         module Aux = struct
           type t = int [@@deriving bin_io]
 
@@ -628,12 +671,16 @@ let%test_module "test" =
         let apply (t: t) (x: Ledger_builder_diff.t) =
           t := x ;
           return (Ok (Some (x, ())))
+
+        let scan_state _ = Parallel_scan.start ~parallelism_log_2:1
       end
 
       module State_hash = struct
         include Int
 
         let to_bits t = [t <> 0]
+
+        let zero = 0
       end
 
       module Protocol_state_proof = Unit
@@ -682,6 +729,8 @@ let%test_module "test" =
         let ledger_builder_diff = Protocol_state.hash
 
         let protocol_state_proof _ = ()
+
+        let genesis = Protocol_state.genesis
       end
 
       module Consensus_mechanism = struct
@@ -801,9 +850,11 @@ let%test_module "test" =
       let net_input = transitions in
       Lbc.Config.make ~parent_log:(Logger.create ())
         ~net_deferred:(return net_input)
-        ~external_transitions:
+        ~external_transitions_reader:
           (Linear_pipe.map ledger_builder_transitions
              ~f:Inputs.External_transition.of_state)
+        ~relevant_work_changes_writer:
+          (snd @@ Linear_pipe.create ())
         ~genesis_tip:
           { protocol_state= Inputs.Protocol_state.genesis
           ; proof= ()

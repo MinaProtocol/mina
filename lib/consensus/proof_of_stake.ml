@@ -561,8 +561,8 @@ struct
           Epoch_ledger.genesis
           (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
       ; seed= Epoch_seed.(of_hash zero)
-      ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
-      ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
+      ; start_checkpoint= Coda_base.State_hash.zero
+      ; lock_checkpoint= Coda_base.State_hash.zero
       ; length= Length.zero }
 
     let update_pair (last_data, curr_data) ~prev_epoch ~next_epoch ~next_slot
@@ -575,7 +575,7 @@ struct
           , { seed= Epoch_seed.(of_hash zero)
             ; ledger= {hash= ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
-            ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
+            ; lock_checkpoint= Coda_base.State_hash.zero
             ; length= Length.zero } )
         else (last_data, curr_data)
       in
@@ -605,7 +605,7 @@ struct
               { seed= Epoch_seed.(var_of_t (of_hash zero))
               ; ledger= {hash= ledger_hash; total_currency}
               ; start_checkpoint= prev_protocol_state_hash
-              ; lock_checkpoint= Coda_base.State_hash.(var_of_t (of_hash zero))
+              ; lock_checkpoint= Coda_base.State_hash.(var_of_t zero)
               ; length= Length.Unpacked.var_of_value Length.zero }
             ~else_:curr_data
         in
