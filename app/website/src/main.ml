@@ -436,30 +436,35 @@ let demo () =
       ~pages:
       [ comic
         ~title:"What is this?"
-        ~content:["This is an interactive demo of the Coda testnet. Coda is a cryptocurrency so lightweight, it can run in your browser."
+        ~content:["This is an interactive demo of the Coda testnet. Coda is a cryptocurrency so lightweight, it can even run in your browser."
         ; "On this page you can learn more about Coda, the testnet, and how the protocol works."
         ]
         ~img:`Placeholder
       ; comic
          ~title:"Problem"
          ~content:[
-           "Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user."]
+           "Cryptocurrencies today are growing increasingly large, increasing centralization and bringing them out of reach of the end user"]
          ~img:(`Real "problem.png")
       ; comic
         ~title:"Coda"
-        ~content:["Coda is a new cryptocurrency that puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."]
+        ~content:[
+          "Coda is a new cryptocurrency with constant, low resource requirements. Its so efficient it can even run in your browser."]
         ~img:(`Custom (div [Style.(render (of_class "flex"))]
             [ Image.draw ("/static/img/demo/your-hands.png") (`Fixed (350, 400))
             ]))
       ; comic
         ~title:"Mission"
-        ~content:["This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives."]
+        ~content:[
+          "Because resource requirements are constant, it will stay decentralized and in the hands of its users, even at scale. "]
         ~img:(`Real "net-hand.png")
       ; comic
         ~title:"Coda Protocol Demo"
         ~content:
-          [ "This demo is showing a live, browser verified copy of the Coda testnet."
-          ; "Coda enables you to be certain of the balance in an account with just a constant, small amount of bandwidth and computation." ]
+[ "This demo is showing a live, browser-verified copy of the Coda protocol testnet."
+
+; "Coda enables you to be absolutely certain of the balance in an account with just a constant, small amount of bandwidth and computation - unlike other cryptocurrencies with require downloading and processing an ever-growing amount of data. And, it will keep these properties as it scales to more users and applications."
+
+; "When released, Coda will put users back in control of cryptocurrency. Its our first step towards building computer systems that put users back in control of their digital lives." ]
         ~img:`Placeholder
       ]
         ~scheme
