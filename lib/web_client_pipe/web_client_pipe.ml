@@ -23,10 +23,15 @@ module type Put_request_intf = sig
   val put : t -> string list -> unit Deferred.Or_error.t
 end
 
+type chain =
+  { protocol_state: Lite_base.Protocol_state.t
+  ; proof: Lite_base.Proof.t
+  ; ledgers: Lite_lib.Sparse_ledger.t list }
+
 module Make (Chain : sig
   type data [@@deriving bin_io]
 
-  val create : data -> Lite_base.Lite_chain.t
+  val create : data -> chain
 end)
 (Store : Storage.With_checksum_intf)
 (Request : Put_request_intf) :
@@ -45,14 +50,13 @@ struct
   let write_to_storage
       {location; ledger_storage; proof_storage; protocol_state_storage; _}
       request data =
-    let {Lite_chain.protocol_state; proof; ledger} = Chain.create data in
+    let {protocol_state; proof; ledgers} = Chain.create data in
     let proof_file = location ^/ "proof" in
     let protocol_state_file = location ^/ "protocol-state" in
     let accounts, account_file_names =
-      Sparse_ledger_lib.Sparse_ledger.(split ledger)
-      |> List.mapi ~f:(fun index account ->
-             let account_file = location ^/ sprintf "account%d" index in
-             (Store.store ledger_storage account_file account, account_file) )
+      List.mapi ledgers ~f:(fun index account ->
+          let account_file = location ^/ sprintf "account%d" index in
+          (Store.store ledger_storage account_file account, account_file) )
       |> List.unzip
     in
     let%bind () =
