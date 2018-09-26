@@ -14,6 +14,17 @@ module Send_transaction = struct
     Rpc.Rpc.create ~name:"Send_transaction" ~version:0 ~bin_query ~bin_response
 end
 
+module Get_ledger = struct
+  type query = Ledger_builder_hash.Stable.V1.t [@@deriving bin_io]
+
+  type response = Ledger.t Or_error.t [@@deriving bin_io]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_ledger" ~version:0 ~bin_query ~bin_response
+end
+
 module Get_balance = struct
   type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
 
@@ -57,6 +68,7 @@ module Status = struct
     ; block_count: int
     ; uptime_secs: int
     ; ledger_merkle_root: string
+    ; ledger_builder_hash: string
     ; state_hash: string
     ; commit_id: Git_sha.t option
     ; conf_dir: string
@@ -102,6 +114,7 @@ module Status = struct
         ~block_count:(fun acc x -> ("Block Count", Int.to_string (f x)) :: acc)
         ~uptime_secs:(fun acc x -> ("Uptime", sprintf "%ds" (f x)) :: acc)
         ~ledger_merkle_root:(fun acc x -> ("Ledger Merkle Root", f x) :: acc)
+        ~ledger_builder_hash:(fun acc x -> ("Ledger-builder hash", f x) :: acc)
         ~state_hash:(fun acc x -> ("State Hash", f x) :: acc)
         ~commit_id:(fun acc x ->
           match f x with
@@ -154,7 +167,7 @@ module Status = struct
     title ^ output ^ "\n"
 end
 
-module Public_key = struct
+module String_list_formatter = struct
   type t = string list [@@deriving yojson]
 
   let log10 i = i |> Float.of_int |> Float.log10 |> Float.to_int
@@ -165,8 +178,21 @@ module Public_key = struct
         let i = i + 1 in
         let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
         let cleaned_string = String.slice pk 0 (String.length pk - 2) in
-        sprintf "%s%i. %s" padding i cleaned_string )
+        sprintf "%s%i, %s" padding i cleaned_string )
     |> String.concat ~sep:"\n"
+end
+
+module Public_key_with_balances = struct
+  type t = (int * string) list [@@deriving yojson]
+
+  type format = {accounts: t} [@@deriving yojson, fields]
+
+  let to_yojson t = format_to_yojson {accounts= t}
+
+  let to_text pk_with_accounts =
+    List.map pk_with_accounts ~f:(fun (pk, account) ->
+        sprintf !"%d, %s" pk account )
+    |> String_list_formatter.to_text
 end
 
 module Get_status = struct
@@ -189,6 +215,18 @@ module Clear_hist_status = struct
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query
+      ~bin_response
+end
+
+module Get_public_keys_with_balances = struct
+  type query = unit [@@deriving bin_io]
+
+  type response = (int * string) list [@@deriving bin_io, sexp]
+
+  type error = unit [@@deriving bin_io]
+
+  let rpc : (query, response) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_public_keys_with_balances" ~version:0 ~bin_query
       ~bin_response
 end
 

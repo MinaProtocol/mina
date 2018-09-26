@@ -133,10 +133,21 @@ let get_balance =
 let get_public_keys =
   let open Deferred.Let_syntax in
   let open Client_lib in
+  let open Command.Param in
+  let with_balances_flag =
+    flag "with-balances" no_arg
+      ~doc:"Show corresponding balances to public keys"
+  in
   Command.async ~summary:"Get public keys"
-    (Daemon_cli.init json_flag ~f:(fun port json ->
-         dispatch Get_public_keys.rpc () port
-         >>| print (module Public_key) json ))
+    (Daemon_cli.init
+       (return (fun a b -> (a, b)) <*> with_balances_flag <*> json_flag)
+       ~f:(fun port (is_balance_included, json) ->
+         if is_balance_included then
+           dispatch Get_public_keys_with_balances.rpc () port
+           >>| print (module Public_key_with_balances) json
+         else
+           dispatch Get_public_keys.rpc () port
+           >>| print (module String_list_formatter) json ))
 
 let get_nonce addr port =
   let open Deferred.Let_syntax in
@@ -342,7 +353,7 @@ let send_txn =
          let%bind () = if !perm_error then exit 1 else Deferred.unit in
          let%bind sender_kp =
            read_keypair_exn from_account ~password:(fun () ->
-               prompt_password "Private key password: " )
+               read_password_exn "Private key password: " )
          in
          match%bind get_nonce sender_kp.public_key port with
          | Error e ->
@@ -389,7 +400,7 @@ let dump_keypair =
       let open Deferred.Let_syntax in
       let%map kp =
         read_keypair_exn privkey_path ~password:(fun () ->
-            prompt_password "Password for private key file: " )
+            read_password_exn "Password for private key file: " )
       in
       printf "Public key: %s\nPrivate key: %s\n"
         ( kp.public_key |> Public_key.compress
@@ -412,6 +423,23 @@ let generate_keypair =
         |> Public_key.Compressed.to_base64 ) ;
       exit 0)
 
+let dump_ledger =
+  let lb_hash =
+    let open Command.Param in
+    let h =
+      Arg_type.create (fun s ->
+          Sexp.of_string_conv_exn s Ledger_builder_hash.Stable.V1.t_of_sexp )
+    in
+    anon ("ledger-builder-hash" %: h)
+  in
+  Command.async ~summary:"Print the ledger with given merkle root as a sexp"
+    (Daemon_cli.init lb_hash ~f:(fun port lb_hash ->
+         dispatch Client_lib.Get_ledger.rpc lb_hash port
+         >>| function
+           | Error e -> eprintf !"Error: %{sexp:Error.t}\n" e
+           | Ok (Error e) -> printf !"Ledger not found: %{sexp:Error.t}\n" e
+           | Ok (Ok ledger) -> printf !"%{sexp:Ledger.t}\n" ledger ))
+
 let command =
   Command.group ~summary:"Lightweight client process"
     [ ("get-balance", get_balance)
@@ -422,4 +450,5 @@ let command =
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
+    ; ("dump-ledger", dump_ledger)
     ; ("generate-keypair", generate_keypair) ]
