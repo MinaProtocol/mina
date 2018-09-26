@@ -1326,9 +1326,15 @@ struct
 end
 
 module Keys = struct
+  module Storage = Storage.List.Make (Storage.Disk)
+
   module Per_snark_location = struct
     module T = struct
-      type t = {base: string; merge: string; wrap: string} [@@deriving sexp]
+      type t =
+        { base: Storage.location
+        ; merge: Storage.location
+        ; wrap: Storage.location }
+      [@@deriving sexp]
     end
 
     include T
@@ -1348,7 +1354,7 @@ module Keys = struct
       checksum ~prefix:"verification" ~base ~merge ~wrap
 
     let load ({merge; base; wrap}: Location.t) =
-      let open Storage.Disk in
+      let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
         Controller.create ~parent_log Tick.Verification_key.bin_t
@@ -1360,7 +1366,10 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error _e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _e ->
+            failwithf
+              !"Transaction_snark: load failed on %{sexp:Storage.location}"
+              p ()
       in
       let%map base = load tick_controller base
       and merge = load tick_controller merge
@@ -1379,7 +1388,7 @@ module Keys = struct
       checksum ~prefix:"proving" ~base ~merge ~wrap
 
     let load ({merge; base; wrap}: Location.t) =
-      let open Storage.Disk in
+      let open Storage in
       let parent_log = Logger.create () in
       let tick_controller =
         Controller.create ~parent_log Tick.Proving_key.bin_t
@@ -1391,7 +1400,10 @@ module Keys = struct
       let load c p =
         match%map load_with_checksum c p with
         | Ok x -> x
-        | Error _e -> failwithf "Transaction_snark: load failed on %s" p ()
+        | Error _e ->
+            failwithf
+              !"Transaction_snark: load failed on %{sexp:Storage.location}"
+              p ()
       in
       let%map base = load tick_controller base
       and merge = load tick_controller merge
@@ -1448,6 +1460,7 @@ module Keys = struct
         ; wrap= Tock.Keypair.vk wrap } }
 
   let cached () =
+    let paths path = Cache_dir.possible_paths (Filename.basename path) in
     let open Async in
     let%bind base_vk, base_pk = Cached.run Base.cached
     and merge_vk, merge_pk = Cached.run Merge.cached in
@@ -1466,9 +1479,14 @@ module Keys = struct
           {base= base_vk.value; merge= merge_vk.value; wrap= wrap_vk.value} }
     in
     let location : Location.t =
-      { proving= {base= base_pk.path; merge= merge_pk.path; wrap= wrap_pk.path}
+      { proving=
+          { base= paths base_pk.path
+          ; merge= paths merge_pk.path
+          ; wrap= paths wrap_pk.path }
       ; verification=
-          {base= base_vk.path; merge= merge_vk.path; wrap= wrap_vk.path} }
+          { base= paths base_vk.path
+          ; merge= paths merge_vk.path
+          ; wrap= paths wrap_vk.path } }
     in
     let checksum =
       { Checksum.proving=
