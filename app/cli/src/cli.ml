@@ -197,7 +197,7 @@ let daemon (type ledger_proof) (module Kernel
                ; initial_peers
                ; me } }
          in
-         let%map coda =
+         let%bind coda =
            Run.create
              (Run.Config.make ~log ~net_config
                 ~should_propose:should_propose_flag
@@ -209,7 +209,14 @@ let daemon (type ledger_proof) (module Kernel
                 ~time_controller:(Inputs.Time.Controller.create ())
                 ~keypair ())
          in
-         don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers coda)) ;
+         let request_module = Web_pipe.make_web_request_module () in
+         let (module Web_client_pipe) =
+           Web_pipe.make (module Run) conf_dir log request_module
+         in
+         let%map web_client_pipe = Web_client_pipe.create () in
+         Linear_pipe.iter (Run.strongest_ledgers coda) ~f:(fun _ ->
+             Web_client_pipe.store web_client_pipe coda )
+         |> don't_wait_for ;
          Run.setup_local_server ?rest_server_port ~coda ~client_port ~log () ;
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
