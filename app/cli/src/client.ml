@@ -353,7 +353,7 @@ let send_txn =
          let%bind () = if !perm_error then exit 1 else Deferred.unit in
          let%bind sender_kp =
            read_keypair_exn from_account ~password:(fun () ->
-               prompt_password "Private key password: " )
+               read_password_exn "Private key password: " )
          in
          match%bind get_nonce sender_kp.public_key port with
          | Error e ->
@@ -400,7 +400,7 @@ let dump_keypair =
       let open Deferred.Let_syntax in
       let%map kp =
         read_keypair_exn privkey_path ~password:(fun () ->
-            prompt_password "Password for private key file: " )
+            read_password_exn "Password for private key file: " )
       in
       printf "Public key: %s\nPrivate key: %s\n"
         ( kp.public_key |> Public_key.compress
