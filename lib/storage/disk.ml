@@ -2,7 +2,7 @@ open Core
 open Async
 module Location = String
 
-type location = Location.t
+type location = Location.t [@@deriving sexp]
 
 include Checked_data
 
