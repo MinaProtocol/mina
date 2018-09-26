@@ -43,23 +43,6 @@ end
 
 let of_hash ~depth h = {indexes= []; depth; tree= Hash h}
 
-let split {indexes; depth; tree} =
-  let rec get_path index subtree_height = function
-    | Account account when subtree_height = 0 -> Account account
-    | Account _ -> failwith "Account should be a leaf node"
-    | Hash _ -> failwith "Should not traverse to a hash node"
-    | Node (hash, left, right) ->
-        let is_left = index mod 2 = 0 in
-        let child =
-          get_path (index lsr 1) (subtree_height - 1)
-            (if is_left then left else right)
-        in
-        if is_left then Node (hash, child, right) else Node (hash, left, child)
-  in
-  List.map indexes ~f:(fun (key, index) ->
-      let tree = get_path index depth tree in
-      {indexes= [(key, index)]; depth; tree} )
-
 module Make (Hash : sig
   type t [@@deriving bin_io, eq, sexp]
 
