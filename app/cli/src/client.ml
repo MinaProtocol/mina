@@ -127,8 +127,8 @@ let get_balance =
          | Ok (Some b) -> printf "%s\n" (Currency.Balance.to_string b)
          | Ok None ->
              printf "No account found at that public_key (zero balance)\n"
-         | Error e -> printf "Failed to send txn %s\n" (Error.to_string_hum e)
-     ))
+         | Error e ->
+             printf "Failed to get balance %s\n" (Error.to_string_hum e) ))
 
 let get_public_keys =
   let open Deferred.Let_syntax in
@@ -337,6 +337,15 @@ let get_nonce_exn public_key port =
       exit 1
   | Ok nonce -> return nonce
 
+let dispatch_with_message rpc arg port ~success ~error =
+  match%bind dispatch rpc arg port with
+  | Ok x ->
+      printf "%s\n" (success x) ;
+      Deferred.unit
+  | Error e ->
+      eprintf "%s\n" (error e) ;
+      exit 1
+
 let bulk_send =
   let module Transaction_info = struct
     type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
@@ -365,15 +374,12 @@ let bulk_send =
               ; fee
               ; nonce } ) )
     in
-    match%bind
-      dispatch Client_lib.Send_transactions.rpc (ts :> Transaction.t list) port
-    with
-    | Ok () ->
-        printf "Successfully enqueued transaction in pool\n" ;
-        Deferred.unit
-    | Error e ->
-        eprintf "Failed to send transaction %s\n" (Error.to_string_hum e) ;
-        exit 1
+    dispatch_with_message Client_lib.Send_transactions.rpc
+      (ts :> Transaction.t list)
+      port
+      ~success:(fun () -> "Successfully enqueued transactions in pool")
+      ~error:(fun e ->
+        sprintf "Failed to send transactions %s" (Error.to_string_hum e) )
   in
   Command.async ~summary:"send multiple transactions from a file"
     (Daemon_cli.init arg ~f:main)
@@ -409,17 +415,13 @@ let send_txn =
            {receiver= receiver_compressed; amount; fee; nonce}
          in
          let txn = Transaction.sign sender_kp payload in
-         match%bind
-           dispatch Client_lib.Send_transactions.rpc
-             [(txn :> Transaction.t)]
-             port
-         with
-         | Ok () ->
-             printf "Successfully enqueued transaction in pool\n" ;
-             Deferred.unit
-         | Error e ->
-             eprintf "Failed to send transaction %s\n" (Error.to_string_hum e) ;
-             exit 1 ))
+         dispatch_with_message Client_lib.Send_transactions.rpc
+           [(txn :> Transaction.t)]
+           port
+           ~success:(fun () -> "Successfully enqueued transaction in pool")
+           ~error:(fun e ->
+             sprintf "Failed to send transaction %s" (Error.to_string_hum e) )
+     ))
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
