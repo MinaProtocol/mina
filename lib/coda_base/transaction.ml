@@ -19,9 +19,17 @@ module Stable = struct
     type with_seed = string * t [@@deriving hash]
 
     let compare ~seed (t: t) (t': t) =
-      let hash x = hash_with_seed (seed, x) in
-      let fee_compare = Fee.compare t.payload.fee t'.payload.fee in
-      if fee_compare <> 0 then fee_compare else hash t - hash t'
+      let same_sender = Public_key.equal t.sender t'.sender in
+      let fee_compare = -Fee.compare t.payload.fee t'.payload.fee in
+      if same_sender then
+        (* We pick the one with a smaller nonce to go first *)
+        let nonce_compare =
+          Account_nonce.compare t.payload.nonce t'.payload.nonce
+        in
+        if nonce_compare <> 0 then nonce_compare else fee_compare
+      else
+        let hash x = hash_with_seed (seed, x) in
+        if fee_compare <> 0 then fee_compare else hash t - hash t'
   end
 end
 
