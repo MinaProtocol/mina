@@ -346,7 +346,7 @@ let dispatch_with_message rpc arg port ~success ~error =
       eprintf "%s\n" (error e) ;
       exit 1
 
-let bulk_send =
+let batch_send_txns =
   let module Transaction_info = struct
     type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
     [@@deriving sexp]
@@ -474,6 +474,7 @@ let command =
     ; ("get-public-keys", get_public_keys)
     ; ("get-nonce", get_nonce_cmd)
     ; ("send-txn", send_txn)
+    ; ("batch-send-txns", batch_send_txns)
     ; ("status", status)
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
