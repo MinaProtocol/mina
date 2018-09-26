@@ -19,6 +19,7 @@ These are the categories which branches will fall into:
 - rfc (a new rfc to be discussed)
 - release (a branch with the latest version of a specific release target)
 - release-candidate (a branch for locking and testing a potential future release before we finalize it)
+- tmp (for ad-hoc, temporary, miscellaneous work)
 
 These branch categories can be extended as new types of branches are required. For instance, in the future, we may want to have "environment" branches, where pushing to an "env/..." branch will kick off some CI to deploy the code at that branch to an environment. For example: push "feature/some-experiment" to "env/testbed" to test it in a cluster in the cloud, or push "release-candidate/beta" to "env/staging" to test a release candidate for regressions.
 
