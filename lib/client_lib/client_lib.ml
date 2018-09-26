@@ -3,15 +3,16 @@ open Async
 open Coda_base
 open Signature_lib
 
-module Send_transaction = struct
-  type query = Transaction.Stable.V1.t [@@deriving bin_io]
+module Send_transactions = struct
+  type query = Transaction.Stable.V1.t list [@@deriving bin_io]
 
   type response = unit [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 
   let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Send_transaction" ~version:0 ~bin_query ~bin_response
+    Rpc.Rpc.create ~name:"Send_transactions" ~version:0 ~bin_query
+      ~bin_response
 end
 
 module Get_ledger = struct
