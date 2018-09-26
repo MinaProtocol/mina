@@ -841,6 +841,16 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
+
+    module Ledger_builder_hash : sig
+      type t [@@deriving sexp]
+    end
+
+    module Ledger_builder : sig
+      type t
+
+      val hash : t -> Ledger_builder_hash.t
+    end
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -876,6 +886,8 @@ module type Main_intf = sig
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
+  val best_ledger_builder : t -> Inputs.Ledger_builder.t
+
   val best_ledger : t -> Inputs.Ledger.t
 
   val best_protocol_state :
@@ -895,6 +907,8 @@ module type Main_intf = sig
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
 end
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
@@ -982,6 +996,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
+    ; ledger_builder_hash=
+        best_ledger_builder t |> Ledger_builder.hash
+        |> Ledger_builder_hash.sexp_of_t |> Sexp.to_string
     ; state_hash
     ; external_transition_latency=
         Perf_histograms.report ~name:"external_transition_latency"
@@ -1015,7 +1032,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
             return (get_status coda) )
       ; Rpc.Rpc.implement Client_lib.Clear_hist_status.rpc (fun () () ->
-            return (clear_hist_status coda) ) ]
+            return (clear_hist_status coda) )
+      ; Rpc.Rpc.implement Client_lib.Get_ledger.rpc (fun () lh ->
+            get_ledger coda lh ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in
