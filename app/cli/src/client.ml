@@ -450,4 +450,5 @@ let command =
     ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
+    ; ("dump-ledger", dump_ledger)
     ; ("generate-keypair", generate_keypair) ]
