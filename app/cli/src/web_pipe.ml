@@ -7,7 +7,7 @@ module type Coda_intf = sig
   type t
 
   val get_lite_chain :
-    (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
+    (t -> Signature_lib.Public_key.Compressed.t list -> Web_client_pipe.chain)
     option
 end
 
