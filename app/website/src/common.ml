@@ -303,8 +303,13 @@ module Section = struct
     let controls =
       List.init (List.length pages) ~f:(fun i -> 
         let next =
-          Input_button.cta ~button_hint:"Next" ~label:"demo-next-cta"
-                    ~url:(Printf.sprintf "#item-%d" (i+1)) ~extra_style:"next-button" ~new_tab:false ()
+          let button_hint, label, url =
+            if i = 4
+            then "Start over", "demo-start-over-cta", (Printf.sprintf "#item-%d" 0)
+            else "Next", "demo-next-cta", (Printf.sprintf "#item-%d" (i+1))
+          in 
+            Input_button.cta ~button_hint ~label
+                      ~url ~extra_style:"next-button" ~new_tab:false ()
         in
         div [Style.(render (of_class "controls flex justify-left user-select-none"))]
           [ div []
