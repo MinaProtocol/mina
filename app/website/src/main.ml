@@ -464,7 +464,7 @@ let demo () =
         ~content:
 [ "This demo is showing a live, browser-verified copy of the Coda protocol testnet."
 
-; "Coda enables you to be absolutely certain of the balance in an account with just a constant, small amount of bandwidth and computation - unlike other cryptocurrencies with require downloading and processing an ever-growing amount of data. And, it will keep these properties as it scales to more users and applications."
+; "Coda enables you to verify the balance in an account with just a constant, small amount of bandwidth and computation - unlike other cryptocurrencies with require downloading and processing an ever-growing amount of data. And, it will keep these properties as it scales to more users and applications."
 
 ; "When released, Coda will put users back in control of cryptocurrency. Its our first step towards building computer systems that put users back in control of their digital lives." ]
         ~img:`None
