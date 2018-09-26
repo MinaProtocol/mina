@@ -136,11 +136,11 @@ module Links = struct
 end
 
 module Input_button = struct
-  let create ~label ~button_hint ~extra_style ~url =
+  let create ~label ~button_hint ~extra_style ~url ~new_tab () =
     let open Html in
     let open Html_concise in
     node "a"
-      [ href url
+      ([ href url
       ; Style.(
           render
             ( of_class
@@ -148,20 +148,21 @@ module Input_button = struct
                  tracked bg-silver icon-shadow ph3 pv3 br4 tc lh-copy"
             + extra_style ))
       ; analytics_handler label
-      ; Attribute.create "target" "_blank" ]
+      ] @ (if new_tab then [ Attribute.create "target" "_blank" ] else []))
       [text button_hint]
 
-  let cta ~label ~button_hint ~url =
+  let cta ?(extra_style="") ?(new_tab=true) ~label ~button_hint ~url () =
     let open Html in
     let open Html_concise in
-    create ~button_hint ~extra_style:(Style.of_class "f3 ph4 pv3") ~label ~url
+    create ~button_hint ~new_tab ~extra_style:(Style.of_class ("f3 ph4 pv3 " ^ extra_style)) ~label ~url ()
 
-  let fixed ~button_hint =
+  let fixed ?(new_tab=true) ~button_hint () =
     let open Html in
     let open Html_concise in
     create ~button_hint
       ~extra_style:(Style.of_class "f5 bottomrightfixed br--top")
-      ~label:"fixed" ~url:"https://goo.gl/forms/PTusW11oYpLKJrZH3"
+      ~new_tab
+      ~label:"fixed" ~url:"https://goo.gl/forms/PTusW11oYpLKJrZH3" ()
 end
 
 module Navbar = struct
@@ -229,7 +230,7 @@ module Footer = struct
       (*; p [Style.(render (Styles.copytext + of_class "f6"))] [text copy]*)
       (*; div [] [Input_button.create ~button_hint]*)
       (*]*)
-      div [] [Input_button.fixed ~button_hint]
+      div [] [Input_button.fixed ~button_hint ()]
   end
 end
 
@@ -296,28 +297,40 @@ module Section = struct
     let open Html_concise in
     let control_divs =
       List.mapi pages ~f:(fun i _ ->
-        div [id (Printf.sprintf "item-%d" i); Style.(render (of_class "control-operator"))] []
-      )
-    in
-    let figures =
-      let figure = Html.node "figure" in
-      List.mapi pages ~f:(fun i page ->
-        figure [Style.(render (of_class "item mt0 mb0 ml0 mr0"))] [page]
+        div [id (Printf.sprintf "item-%d" i); Style.(render (of_class "control-operator "))] []
       )
     in
     let controls =
-      div [Style.(render (of_class "controls flex justify-center user-select-none"))]
-        [ div []
-          (List.mapi pages ~f:(fun i _ ->
-            a [href (Printf.sprintf "#item-%d" i)
-              ; Style.(render (of_class "control-button"))]
-            [Html.text {literal|•|literal}]
-          ))
-        ]
+      List.init (List.length pages) ~f:(fun i -> 
+        let next =
+          Input_button.cta ~button_hint:"Next" ~label:"demo-next-cta"
+                    ~url:(Printf.sprintf "#item-%d" (i+1)) ~extra_style:"next-button" ~new_tab:false ()
+        in
+        div [Style.(render (of_class "controls flex justify-left user-select-none"))]
+          [ div []
+            (List.mapi pages ~f:(fun j _ ->
+              let selected = if j=i then " selected" else "" in
+              a [href (Printf.sprintf "#item-%d" j)
+                ; Style.(render (of_class ("control-button" ^ selected)))]
+              [Html.text {literal|•|literal}]
+            ))
+          ; next
+          ]
+        )
+    in
+    let figures =
+      let figure = Html.node "figure" in
+      List.map3_exn 
+        (List.init (List.length pages) ~f:Fn.id) 
+        pages 
+        controls
+        ~f:(fun i page controls ->
+            figure [Style.(render (of_class "item mt0 mb0 ml0 mr0"))] ([ page; controls ])
+      )
     in
     let carousel =
       div [Style.(render (of_class (Printf.sprintf "gallery items-%d" (List.length pages))))]
-        (control_divs @ figures @ [controls])
+        (control_divs @ figures)
     in
     section' ?heading carousel scheme
 
@@ -352,7 +365,7 @@ module Section = struct
         ; div
             [class_ "flex justify-center"]
             [ Input_button.cta ~button_hint:cta_hint ~label:cta_label
-                ~url:cta_url ] ])
+                ~url:cta_url () ] ])
       scheme
 
   let investors ?heading ~investors ~scheme () =

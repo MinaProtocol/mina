@@ -4,13 +4,7 @@
   color: #E5E9F2;
 }
 
-.gallery .control-button:first-of-type,
-.gallery .control-operator:nth-of-type(1):target ~ .controls .control-button:nth-of-type(1),
-.gallery .control-operator:nth-of-type(2):target ~ .controls .control-button:nth-of-type(2),
-.gallery .control-operator:nth-of-type(3):target ~ .controls .control-button:nth-of-type(3),
-.gallery .control-operator:nth-of-type(4):target ~ .controls .control-button:nth-of-type(4),
-.gallery .control-operator:nth-of-type(5):target ~ .controls .control-button:nth-of-type(5) {
-  color: white;
+.gallery a.selected {
   color: #8492A6;
 }
 
@@ -658,6 +652,11 @@
 
 .gallery .item {
   overflow: hidden;
+  height: 100%;
+}
+
+.gallery .item:first-of-type {
+    height: auto;
 }
 
 .gallery .controls {
@@ -675,5 +674,10 @@
   -webkit-transition: color .1s;
   -o-transition: color .1s;
   transition: color .1s;
+}
+
+.gallery .next-button {
+  position: absolute;
+  right: 0;
 }
 
