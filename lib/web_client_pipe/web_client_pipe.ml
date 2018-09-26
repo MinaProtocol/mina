@@ -29,10 +29,15 @@ module type Config_intf = sig
   val log : Logger.t
 end
 
+type chain =
+  { protocol_state: Lite_base.Protocol_state.t
+  ; proof: Lite_base.Proof.t
+  ; ledgers: Lite_lib.Sparse_ledger.t list } [@@deriving bin_io]
+
 module type Chain_intf = sig
   type data
 
-  val create : data -> Lite_base.Lite_chain.t
+  val create : data -> chain
 end
 
 module Make
@@ -49,21 +54,20 @@ struct
     ; ledger_storage: Lite_lib.Sparse_ledger.t Store.Controller.t
     ; proof_storage: Proof.t Store.Controller.t
     ; protocol_state_storage: Protocol_state.t Store.Controller.t
-    ; reader: Lite_base.Lite_chain.t Linear_pipe.Reader.t
-    ; writer: Lite_base.Lite_chain.t Linear_pipe.Writer.t }
+    ; reader: chain Linear_pipe.Reader.t
+    ; writer: chain Linear_pipe.Writer.t }
 
   type data = Chain.data
 
   let write_to_storage
       {location; ledger_storage; proof_storage; protocol_state_storage; _}
-      request {Lite_chain.protocol_state; proof; ledger} =
+      request {protocol_state; proof; ledgers} =
     let proof_file = location ^/ "proof" in
     let protocol_state_file = location ^/ "protocol-state" in
     let accounts, account_file_names =
-      Sparse_ledger_lib.Sparse_ledger.(split ledger)
-      |> List.mapi ~f:(fun index account ->
-             let account_file = location ^/ sprintf "account%d" index in
-             (Store.store ledger_storage account_file account, account_file) )
+      List.mapi ledgers ~f:(fun index account ->
+          let account_file = location ^/ sprintf "account%d" index in
+          (Store.store ledger_storage account_file account, account_file) )
       |> List.unzip
     in
     let%bind () =
@@ -99,8 +103,8 @@ struct
       match%map Request.create () with
       | Ok request ->
           don't_wait_for
-            (Linear_pipe.iter reader ~f:(fun data ->
-                 match%map write_to_storage t request data with
+            (Linear_pipe.iter reader ~f:(fun chain ->
+                 match%map write_to_storage t request chain with
                  | Ok () -> ()
                  | Error e ->
                      Logger.error Config.log

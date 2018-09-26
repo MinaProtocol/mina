@@ -14,8 +14,6 @@ val of_hash : depth:int -> 'hash -> ('hash, _, _) t
 
 val tree : ('hash, _, 'account) t -> ('hash, 'account) tree
 
-val split : ('hash, 'key, 'account) t -> ('hash, 'key, 'account) t list
-
 module type S = sig
   type hash
 
