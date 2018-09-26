@@ -404,7 +404,7 @@ let home () =
     ; jobs
     ; investors ]
   in
-  wrap sections
+  wrap ~page_label:"" sections
 
 let positions =
   [ ("Lead Designer", "lead-designer")
@@ -416,7 +416,7 @@ let jobs () =
     Job_listing.create ~scheme ~title:(`Left "Jobs") ~jobs:positions
   in
   let sections = [top] in
-  wrap ~fixed_footer:true sections
+  wrap ~page_label:(Links.(label jobs)) ~fixed_footer:true sections
 
 let demo () =
   let comic ~title ~content ~img =
@@ -476,7 +476,7 @@ let demo () =
       scheme
   in
   let sections = [top; app] in
-  wrap ~fixed_footer:false sections
+  wrap ~fixed_footer:false ~page_label:(Links.(label demo)) sections
 
 let job_post name description =
   let content scheme =
@@ -485,7 +485,7 @@ let job_post name description =
         (Important_text.create ~title:(`Left name) ~content:[description])
       ~scheme ()
   in
-  wrap [content]
+  wrap ~page_label:(Links.(label jobs)) [content]
 
 let load_job_posts jobs =
   Deferred.List.map jobs ~f:(fun (name, file) ->

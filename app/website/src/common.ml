@@ -105,6 +105,8 @@ let analytics =
 |literal}
 
 module Links = struct
+  let label (_,_,x) = x
+
   let mail = ("contact@o1labs.org", "mailto:contact@o1labs.org", "mail")
 
   let o1www = ("o1labs.org", "https://o1labs.org", "o1www")
@@ -129,6 +131,8 @@ module Links = struct
   let hiring = ("We're Hiring", "jobs.html", "hiring")
 
   let jobs = ("Jobs", "jobs.html", "jobs")
+
+  let demo = ("Demo", "demo.html", "demo")
 end
 
 module Input_button = struct
@@ -161,7 +165,7 @@ module Input_button = struct
 end
 
 module Navbar = struct
-  let navbar =
+  let navbar current_page =
     let open Html in
     let open Html_concise in
     let a style url children label open_new_tab =
@@ -182,9 +186,15 @@ module Navbar = struct
             ; Attribute.src "/static/img/logo.svg" ]
             [] ]
     in
+    let maybe_no_underline label =
+      if current_page = label then
+        Style.empty
+      else
+        Style.of_class "no-underline"
+    in
     let a' ?(open_new_tab= false) ?(style= Style.empty) url children label =
       a
-        Style.(of_class "no-underline fw3 silver tracked ttu" + style)
+        Style.(of_class "fw3 silver tracked ttu" + style + (maybe_no_underline label))
         url children label open_new_tab
     in
     div
@@ -196,12 +206,14 @@ module Navbar = struct
       ; div
           [class_ "flex justify-around w-75"]
           [ (let name, url, label = Links.blog in
-             a' ~open_new_tab:true url [text name] label)
+             a' ~style:Visibility.no_mobile ~open_new_tab:true url [text name] label)
+          ; (let name, url, label = Links.demo in
+             a' url [text name] label)
           ; a' ~style:Visibility.only_large "index.html#community"
               [text "Community"] "community"
           ; (let name, url, label = Links.jobs in
              a' url [text name] label)
-          ; a' ~style:Visibility.no_mobile ~open_new_tab:true
+          ; a' ~style:Visibility.only_large ~open_new_tab:true
               "https://goo.gl/forms/PTusW11oYpLKJrZH3" [text "Sign up"]
               "sign-up" ] ]
 end
@@ -430,7 +442,7 @@ module Section = struct
     section' ?heading content scheme
 end
 
-let wrap ?(headers= []) ?(fixed_footer= false) ?title sections =
+let wrap ?(headers= []) ?(fixed_footer= false) ?title ~page_label sections =
   let title =
     Option.value_map ~default:"Coda Cryptocurrency Protocol" title
       ~f:title_string
@@ -492,7 +504,7 @@ let wrap ?(headers= []) ?(fixed_footer= false) ?title sections =
       ~scheme
   in
   let body =
-    let navbar = Navbar.navbar in
+    let navbar = Navbar.navbar page_label in
     let reified_sections =
       List.mapi
         (sections @ [footer])
