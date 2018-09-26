@@ -357,13 +357,33 @@ let batch_send_txns =
     and transactions_path = anon ("transactions-file" %: string) in
     (privkey_path, transactions_path)
   in
+  let get_infos transactions_path =
+    match%bind
+      Reader.load_sexp transactions_path [%of_sexp : Transaction_info.t list]
+    with
+    | Ok x -> return x
+    | Error e ->
+        let sample_info () : Transaction_info.t =
+          let keypair = Keypair.create () in
+          { Transaction_info.receiver=
+              Public_key.(Compressed.to_base64 (compress keypair.public_key))
+          ; amount= Currency.Amount.of_int (Random.int 100)
+          ; fee= Currency.Fee.of_int (Random.int 100) }
+        in
+        eprintf "Could not read transactions from %s.\n" transactions_path ;
+        eprintf
+          "The file should be a sexp list of transactions. Here is an example \
+           file:\n\
+           %s\n"
+          (Sexp.to_string_hum
+             ([%sexp_of : Transaction_info.t list]
+                (List.init 3 ~f:(fun _ -> sample_info ())))) ;
+        exit 1
+  in
   let main port (privkey_path, transactions_path) =
     let open Deferred.Let_syntax in
     let%bind keypair = read_keypair privkey_path
-    and infos =
-      Reader.load_sexp_exn transactions_path
-        [%of_sexp : Transaction_info.t list]
-    in
+    and infos = get_infos transactions_path in
     let%bind nonce0 = get_nonce_exn keypair.public_key port in
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
