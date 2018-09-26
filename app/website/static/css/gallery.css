@@ -1,7 +1,11 @@
+.bg-extradarksnow { background-color: #8492A6; }
+.bg-extradarksnow { background-color: #8492a6; }
+.bg-extradarksnow { background-color: #E5E9F2; }
+.bg-darksnow { background-color: #EFF2F7; }
 /* gallery-css ; tweaked by bkase */
 .gallery .control-operator:target ~ .controls .control-button {
   color: #ccc;
-  color: #EFF2F7;
+  color: #E5E9F2;
 }
 
 .gallery .control-button:first-of-type,
@@ -11,7 +15,7 @@
 .gallery .control-operator:nth-of-type(4):target ~ .controls .control-button:nth-of-type(4),
 .gallery .control-operator:nth-of-type(5):target ~ .controls .control-button:nth-of-type(5) {
   color: white;
-  color: #E5E9F2;
+  color: #8492A6;
 }
 
 .gallery .item:first-of-type {
@@ -53,51 +57,51 @@
 @-webkit-keyframes controlAnimation-2 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   14.3%, 50% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   64.3%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
 @-o-keyframes controlAnimation-2 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   14.3%, 50% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   64.3%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
 @keyframes controlAnimation-2 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   14.3%, 50% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   64.3%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
@@ -182,51 +186,51 @@
 @-webkit-keyframes controlAnimation-3 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   9.5%, 33.3% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   42.9%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
 @-o-keyframes controlAnimation-3 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   9.5%, 33.3% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   42.9%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
 @keyframes controlAnimation-3 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   9.5%, 33.3% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   42.9%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
@@ -323,51 +327,51 @@
 @-webkit-keyframes controlAnimation-4 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   7.1%, 25% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   32.1%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
 @-o-keyframes controlAnimation-4 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   7.1%, 25% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   32.1%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
 @keyframes controlAnimation-4 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   7.1%, 25% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   32.1%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
@@ -476,51 +480,51 @@
 @-webkit-keyframes controlAnimation-5 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   5.7%, 20% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   25.7%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
 @-o-keyframes controlAnimation-5 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   5.7%, 20% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   25.7%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
 @keyframes controlAnimation-5 {
   0% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 
   5.7%, 20% {
     color: white;
-    color: #E5E9F2;
+    color: #8492A6;
   }
 
   25.7%, 100% {
     color: #ccc;
-    color: #EFF2F7;
+    color: #E5E9F2;
   }
 }
 
@@ -643,7 +647,7 @@
 }
 
 .gallery .control-button:hover {
-  color: #EFF2F7;
+  color: #8492A6;
 }
 
 /*
@@ -669,7 +673,7 @@
 .gallery .control-button {
   display: inline-block;
   margin: 0 .02em;
-  font-size: 3em;
+  font-size: 6em;
   text-align: center;
   text-decoration: none;
   -webkit-transition: color .1s;
