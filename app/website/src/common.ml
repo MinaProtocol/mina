@@ -308,25 +308,31 @@ module Section = struct
     in
     let controls =
       List.init (List.length pages) ~f:(fun i -> 
+        let skip =
+          if i = 4
+          then (a [Style.(render (of_class "jump")); href "#item-0"] [text "start over"] )
+          else (a [Style.(render (of_class "jump")); href "#item-4"] [text "skip"] )
+        in
         let next =
-          let button_hint, label, url =
-            if i = 4
-            then "Start over", "demo-start-over-cta", (Printf.sprintf "#item-%d" 0)
-            else "Next", "demo-next-cta", (Printf.sprintf "#item-%d" (i+1))
-          in 
-            Input_button.cta ~button_hint ~label
-                      ~url ~extra_style:"next-button" ~new_tab:false ()
+          if i = 4
+          then []
+          else
+            let button_hint = "Next" in
+            let label = "demo-next-cta" in
+            let url = Printf.sprintf "#item-%d" (i+1) in
+            [ Input_button.cta ~button_hint ~label
+                ~url ~extra_style:"next-button" ~new_tab:false () ]
         in
         div [Style.(render (of_class "controls flex justify-left user-select-none"))]
-          [ div []
+          ([ div []
             (List.mapi pages ~f:(fun j _ ->
               let selected = if j=i then " selected" else "" in
               a [href (Printf.sprintf "#item-%d" j)
                 ; Style.(render (of_class ("control-button" ^ selected)))]
               [Html.text {literal|•|literal}]
             ))
-          ; next
-          ]
+          ; skip
+          ] @ next)
         )
     in
     let figures =

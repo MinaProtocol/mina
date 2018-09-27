@@ -676,6 +676,19 @@
   transition: color .1s;
 }
 
+.gallery .jump {
+  line-height: 110px;
+  vertical-align: middle;
+  margin-left: 1em;
+  color: #8492A6;
+  text-decoration: none;
+}
+
+.gallery .jump:hover {
+  color: #333;
+  cursor: pointer;
+}
+
 .gallery .next-button {
   position: absolute;
   right: 0;
