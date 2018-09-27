@@ -33,7 +33,7 @@ module Make (Chain : sig
 
   val create : data -> chain
 end)
-(Store : Storage.With_checksum_intf)
+(Store : Storage.With_checksum_intf with type location = string)
 (Request : Put_request_intf) :
   S with type data := Chain.data =
 struct
