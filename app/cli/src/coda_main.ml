@@ -821,6 +821,13 @@ module type Main_intf = sig
       val merkle_root : t -> Ledger_hash.t
 
       val to_list : t -> Account.t list
+
+      val fold_until :
+           t
+        -> init:'accum
+        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
+        -> finish:('accum -> 'stop)
+        -> 'stop
     end
 
     module Ledger_builder_diff : sig

@@ -60,6 +60,8 @@ end = struct
 
   let to_list = C.to_list
 
+  let fold_until = C.fold_until
+
   module Location = struct
     type t = index
   end

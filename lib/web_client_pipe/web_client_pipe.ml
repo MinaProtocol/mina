@@ -20,7 +20,7 @@ module type Put_request_intf = sig
 
   val create : unit -> t Deferred.Or_error.t
 
-  val put : t -> string list -> unit Deferred.Or_error.t
+  val put : t -> string -> unit Deferred.Or_error.t
 end
 
 module type Config_intf = sig
@@ -65,7 +65,7 @@ struct
       request {protocol_state; proof; ledgers} =
     let proof_file = location ^/ "proof" in
     let protocol_state_file = location ^/ "protocol-state" in
-    let accounts, account_file_names =
+    let accounts, _ =
       List.mapi ledgers ~f:(fun index account ->
           let account_file = location ^/ sprintf "account%d" index in
           (Store.store ledger_storage account_file account, account_file) )
@@ -78,7 +78,7 @@ struct
               protocol_state ]
         @ accounts )
     in
-    Request.put request ([proof_file; protocol_state_file] @ account_file_names)
+    Request.put request location
 
   let create () =
     let location = Config.conf_dir ^/ "snarkette-data" in
