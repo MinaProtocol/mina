@@ -23,6 +23,13 @@ module type S = sig
 
   val to_list : t -> account list
 
+  val fold_until :
+       t
+    -> init:'accum
+    -> f:('accum -> account -> ('accum, 'stop) Base.Continue_or_stop.t)
+    -> finish:('accum -> 'stop)
+    -> 'stop
+
   module Location : sig
     type t
   end

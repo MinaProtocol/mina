@@ -219,7 +219,9 @@ let daemon (type ledger_proof) (module Kernel
                 ~time_controller:(Inputs.Time.Controller.create ())
                 ~keypair ())
          in
-         don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers coda)) ;
+         let web_service = Web_pipe.get_service () in
+         Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log
+         |> don't_wait_for ;
          Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
            ~client_port ~log () ;
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
