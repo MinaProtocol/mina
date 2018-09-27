@@ -59,12 +59,11 @@ struct
           ; spec
           ; prover= public_key } )
 
-  let dispatch rpc shutdown_on_disconnect query port =
+  let dispatch rpc shutdown_on_disconnect query address =
     let%map res =
       Rpc.Connection.with_client
-        (Tcp.Where_to_connect.of_host_and_port
-           (Host_and_port.create ~host:"127.0.0.1" ~port))
-        (fun conn -> Rpc.Rpc.dispatch rpc conn query)
+        (Tcp.Where_to_connect.of_host_and_port address) (fun conn ->
+          Rpc.Rpc.dispatch rpc conn query )
     in
     match res with
     | Error exn ->
@@ -73,7 +72,7 @@ struct
         else Or_error.of_exn exn
     | Ok res -> res
 
-  let main daemon_port public_key shutdown_on_disconnect =
+  let main daemon_address public_key shutdown_on_disconnect =
     let log = Logger.create () in
     let%bind state = Worker_state.create () in
     let wait ?(sec= 0.5) () = after (Time.Span.of_sec sec) in
@@ -85,7 +84,7 @@ struct
       in
       Logger.info log "Asking for work again..." ;
       match%bind
-        dispatch Rpcs.Get_work.rpc shutdown_on_disconnect () daemon_port
+        dispatch Rpcs.Get_work.rpc shutdown_on_disconnect () daemon_address
       with
       | Error e -> log_and_retry "getting work" e
       | Ok None ->
@@ -99,7 +98,7 @@ struct
           | Ok result ->
               match%bind
                 dispatch Rpcs.Submit_work.rpc shutdown_on_disconnect result
-                  daemon_port
+                  daemon_address
               with
               | Error e -> log_and_retry "submitting work" e
               | Ok () -> go ()
@@ -110,8 +109,9 @@ struct
     Command.async ~summary:"Snark worker"
       (let open Command.Let_syntax in
       let%map_open daemon_port =
-        flag "daemon-port" (required int)
-          ~doc:"PORT port daemon is listening on locally"
+        flag "daemon-address"
+          (required (Arg_type.create Host_and_port.of_string))
+          ~doc:"HOST-AND-PORT address daemon is listening on"
       and public_key =
         flag "public-key"
           (required Cli_lib.public_key_compressed)
@@ -125,11 +125,11 @@ struct
         main daemon_port public_key
           (Option.value ~default:true shutdown_on_disconnect))
 
-  let arguments ~public_key ~daemon_port ~shutdown_on_disconnect =
+  let arguments ~public_key ~daemon_address ~shutdown_on_disconnect =
     [ "-public-key"
     ; Signature_lib.Public_key.Compressed.to_base64 public_key
-    ; "-daemon-port"
-    ; Int.to_string daemon_port
+    ; "-daemon-address"
+    ; Host_and_port.to_string daemon_address
     ; "-shutdown-on-disconnect"
     ; Bool.to_string shutdown_on_disconnect ]
 end
