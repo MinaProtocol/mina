@@ -429,8 +429,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Ledger_builder.t * Consensus_mechanism.External_transition.t)
         Linear_pipe.Reader.t
     ; log: Logger.t
-    ; mutable seen_jobs:
-        Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
+    ; mutable coordinator_state: Ledger_builder.Coordinator.State.t
     ; ledger_builder_transition_backup_capacity: int }
 
   let run_snark_worker t = t.run_snark_worker
@@ -453,9 +452,10 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
-  let seen_jobs t = t.seen_jobs
+  let coordinator_state t = t.coordinator_state
 
-  let set_seen_jobs t seen_jobs = t.seen_jobs <- seen_jobs
+  let set_coordinator_state t coordinator_state =
+    t.coordinator_state <- coordinator_state
 
   let transaction_pool t = t.transaction_pool
 
@@ -623,7 +623,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder
       ; strongest_ledgers= strongest_ledgers_for_api
       ; log= config.log
-      ; seen_jobs= (Ledger_proof_statement.Set.empty, None)
+      ; coordinator_state= Ledger_builder.Coordinator.State.init
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
 
