@@ -548,7 +548,7 @@ module Make (Inputs : Inputs_intf) = struct
                 | `Empty -> ()
                 | `Non_empty
                     { source
-                    ; target= _
+                    ; target
                     ; fee_excess
                     ; proof_type= _
                     ; supply_increase= _ } ->
@@ -560,14 +560,14 @@ module Make (Inputs : Inputs_intf) = struct
                       fee_excess ;
                     [%test_eq : Frozen_ledger_hash.t]
                       (Blockchain_state.ledger_hash bc_state)
-                      source
-                (* THIS ASSERTION FAILS SOMETIMES
+                      source ;
+                    (* THIS ASSERTION FAILS SOMETIMES
                      * SEE CRITICAL ISSUE #658 *)
-                (*[%test_eq : Ledger_hash.t]
+                    [%test_eq : Frozen_ledger_hash.t]
                       ( Ledger_builder.ledger ledger_builder
-                      |> Ledger.merkle_root )
-                      target  *)
-            ) ;
+                      |> Ledger.merkle_root
+                      |> Frozen_ledger_hash.of_ledger_hash )
+                      target ) ;
             Proposer.Tip_change
               { protocol_state=
                   ( protocol_state
