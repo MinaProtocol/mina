@@ -19,6 +19,8 @@ module type S = sig
 
   val create : conf_dir:string -> t Deferred.t
 
+  val shutdown : t -> unit Deferred.Or_error.t
+
   val initialized : t -> [`Initialized] Deferred.Or_error.t
 
   val extend_blockchain :

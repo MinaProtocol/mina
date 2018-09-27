@@ -21,6 +21,8 @@ module type S = sig
 
   val create : conf_dir:string -> t Deferred.t
 
+  val shutdown : t -> unit Deferred.Or_error.t
+
   val initialized : t -> [`Initialized] Deferred.Or_error.t
 
   val extend_blockchain :
@@ -195,27 +197,46 @@ struct
     include Rpc_parallel.Make (T)
   end
 
-  type t = {connection: Worker.Connection.t; process: Process.t}
+  module Worker_connection = Persistent_connection.Make (struct
+    module Address = Unit
+    include Worker.Connection
+  end)
+
+  type t =
+    {connection: Worker_connection.t; process: Process.t; worker: Worker.t}
+
+  let shutdown t = Worker.shutdown t.worker
 
   let create ~conf_dir =
-    let%map connection, process =
+    let logger = Logger.(extend (create ()) [("module", Atom "prover")]) in
+    let%map worker, process =
       (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
       Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
-        ~on_failure:Error.raise ~shutdown_on:Disconnect
-        ~connection_state_init_arg:() ()
+        ~on_failure:(fun e ->
+          Logger.error logger !"%{sexp:Error.t}" e ;
+          Error.raise e )
+        ~shutdown_on:Called_shutdown_function ()
+    in
+    let connection =
+      Worker_connection.create ~server_name:"coda_prover"
+        ~connect:(fun () -> Worker.Connection.client worker ())
+        (fun () -> Deferred.Result.return ())
     in
     File_system.dup_stdout process ;
     File_system.dup_stderr process ;
-    {connection; process}
+    {worker; connection; process}
+
+  let run conn ~f ~arg =
+    let%bind conn = Worker_connection.connected conn in
+    Worker.Connection.run conn ~f ~arg
 
   let initialized {connection; _} =
-    Worker.Connection.run connection ~f:Worker.functions.initialized ~arg:()
+    run connection ~f:Worker.functions.initialized ~arg:()
 
   let extend_blockchain {connection; _} chain next_state block =
-    Worker.Connection.run connection ~f:Worker.functions.extend_blockchain
+    run connection ~f:Worker.functions.extend_blockchain
       ~arg:(chain, next_state, block)
 
   let verify_blockchain {connection; _} chain =
-    Worker.Connection.run connection ~f:Worker.functions.verify_blockchain
-      ~arg:chain
+    run connection ~f:Worker.functions.verify_blockchain ~arg:chain
 end
