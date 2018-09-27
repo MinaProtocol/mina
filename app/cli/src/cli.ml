@@ -156,6 +156,12 @@ let daemon (type ledger_proof) (module Kernel
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
+       let%bind client_whitelist =
+         Reader.load_sexp
+           (conf_dir ^/ "client_whitelist")
+           [%of_sexp : Unix.Inet_addr.Blocking_sexp.t list]
+         >>| Or_error.ok
+       in
        let keypair =
          Signature_lib.Keypair.of_private_key_exn
            Genesis_ledger.high_balance_sk
@@ -210,7 +216,8 @@ let daemon (type ledger_proof) (module Kernel
                 ~keypair ())
          in
          don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers coda)) ;
-         Run.setup_local_server ?rest_server_port ~coda ~client_port ~log () ;
+         Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
+           ~client_port ~log () ;
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
        Async.never ())

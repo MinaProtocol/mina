@@ -1021,17 +1021,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status t = Perf_histograms.wipe () ; get_status t
 
-  module Inet_addr = struct
-    include Socket.Address.Inet
-    include Comparable.Make (Socket.Address.Inet.Blocking_sexp)
-  end
-
   let setup_local_server ?(external_ip_whitelist= []) ?rest_server_port ~coda
       ~log ~client_port () =
     let client_ip_whitelist =
-      Inet_addr.Set.of_list
-        ( Inet_addr.create Unix.Inet_addr.localhost client_port
-        :: external_ip_whitelist )
+      Unix.Inet_addr.Set.of_list
+        (Unix.Inet_addr.localhost :: external_ip_whitelist)
     in
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
@@ -1111,7 +1105,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
              (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
          where_to_listen
          (fun address reader writer ->
-           if not (Set.mem client_ip_whitelist address) then Deferred.unit
+           if
+             not
+               (Set.mem client_ip_whitelist (Socket.Address.Inet.addr address))
+           then Deferred.unit
            else
              Rpc.Connection.server_with_close reader writer
                ~implementations:
