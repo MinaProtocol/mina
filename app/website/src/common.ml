@@ -314,14 +314,13 @@ module Section = struct
           else (a [Style.(render (of_class "jump")); href "#item-4"] [text "skip"] )
         in
         let next =
-          if i = 4
-          then []
-          else
-            let button_hint = "Next" in
-            let label = "demo-next-cta" in
-            let url = Printf.sprintf "#item-%d" (i+1) in
-            [ Input_button.cta ~button_hint ~label
-                ~url ~extra_style:"next-button" ~new_tab:false () ]
+          let button_hint, label, url, new_tab =
+            if i = 4
+            then "Follow our progress", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
+            else "Next", "demo-next-cta", (Printf.sprintf "#item-%d" (i+1)), false
+          in 
+            Input_button.cta ~button_hint ~label
+                      ~url ~extra_style:"next-button" ~new_tab ()
         in
         div [Style.(render (of_class "controls flex justify-left user-select-none"))]
           ([ div []
@@ -332,7 +331,7 @@ module Section = struct
               [Html.text {literal|•|literal}]
             ))
           ; skip
-          ] @ next)
+          ; next ])
         )
     in
     let figures =
