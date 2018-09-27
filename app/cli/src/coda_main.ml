@@ -1131,7 +1131,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Process.create_exn () ~prog:our_binary
         ~args:
           ( "internal" :: Program.snark_worker_command_name
-          :: Snark_worker.arguments ~public_key ~daemon_port:client_port
+          :: Snark_worker.arguments ~public_key
+               ~daemon_address:
+                 (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect )
     in
     let log = Logger.child log "snark_worker" in
