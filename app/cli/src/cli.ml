@@ -183,7 +183,11 @@ let daemon (type ledger_proof) (module Kernel
 
          let commit_id = commit_id
        end in
-       let%bind (module Init) = make_init (module Config) (module Kernel) in
+       let%bind (module Init) =
+         make_init ~should_propose:should_propose_flag
+           (module Config)
+           (module Kernel)
+       in
        let module M = Coda.Make (Init) () in
        let module Run = Run (Config) (M) in
        Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
