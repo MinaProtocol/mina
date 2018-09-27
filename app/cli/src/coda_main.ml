@@ -664,6 +664,51 @@ struct
     end
   end)
 
+  module Lite_chain_client_data = struct
+    type t = Web_client_pipe.chain
+
+    type chain
+
+    let create =
+      Option.map Consensus_mechanism.Consensus_state.to_lite ~f:
+        (fun consensus_proof_to_lite
+        proof
+        ledger
+        (state: Consensus_mechanism.Protocol_state.value)
+        pks
+        ->
+          let empty_ledger =
+            Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
+              (Lite_compat.digest
+                 ( Ledger.merkle_root ledger
+                   :> Snark_params.Tick.Pedersen.Digest.t ))
+          in
+          let ledgers =
+            List.map pks ~f:(fun key ->
+                let loc =
+                  Option.value_exn (Ledger.location_of_key ledger key)
+                in
+                Lite_lib.Sparse_ledger.add_path empty_ledger
+                  (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
+                  (Lite_compat.public_key key)
+                  (Lite_compat.account
+                     (Option.value_exn (Ledger.get ledger loc))) )
+          in
+          let protocol_state =
+            { Lite_base.Protocol_state.previous_state_hash=
+                Lite_compat.digest
+                  ( Consensus_mechanism.Protocol_state.previous_state_hash state
+                    :> Snark_params.Tick.Pedersen.Digest.t )
+            ; blockchain_state=
+                Lite_compat.blockchain_state
+                  (Consensus_mechanism.Protocol_state.blockchain_state state)
+            ; consensus_state=
+                consensus_proof_to_lite
+                  (Consensus_mechanism.Protocol_state.consensus_state state) }
+          in
+          ({proof= Lite_compat.proof proof; ledgers; protocol_state} : t) )
+  end
+
   let request_work ~best_ledger_builder
       ~(seen_jobs:
          'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
@@ -776,6 +821,13 @@ module type Main_intf = sig
       val merkle_root : t -> Ledger_hash.t
 
       val to_list : t -> Account.t list
+
+      val fold_until :
+           t
+        -> init:'accum
+        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
+        -> finish:('accum -> 'stop)
+        -> 'stop
     end
 
     module Ledger_builder_diff : sig
@@ -842,6 +894,10 @@ module type Main_intf = sig
       val add : t -> Transaction.t -> unit Deferred.t
     end
 
+    module Protocol_state_proof : sig
+      type t
+    end
+
     module Ledger_builder_hash : sig
       type t [@@deriving sexp]
     end
@@ -890,6 +946,12 @@ module type Main_intf = sig
 
   val best_ledger : t -> Inputs.Ledger.t
 
+  val best_tip :
+       t
+    -> Inputs.Ledger.t
+       * Inputs.Consensus_mechanism.Protocol_state.value
+       * Inputs.Protocol_state_proof.t
+
   val best_protocol_state :
     t -> Inputs.Consensus_mechanism.Protocol_state.value
 
@@ -907,6 +969,9 @@ module type Main_intf = sig
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val get_lite_chain :
+    (t -> Public_key.Compressed.t list -> Web_client_pipe.chain) option
 
   val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
 end

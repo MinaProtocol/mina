@@ -10,7 +10,7 @@ module type S = sig
 
   type data
 
-  val create : Config.t -> t Deferred.t
+  val create : unit -> t Deferred.t
 
   val store : t -> data -> unit Deferred.t
 end
@@ -20,40 +20,52 @@ module type Put_request_intf = sig
 
   val create : unit -> t Deferred.Or_error.t
 
-  val put : t -> string list -> unit Deferred.Or_error.t
+  val put : t -> string -> unit Deferred.Or_error.t
+end
+
+module type Config_intf = sig
+  val conf_dir : string
+
+  val log : Logger.t
 end
 
 type chain =
   { protocol_state: Lite_base.Protocol_state.t
   ; proof: Lite_base.Proof.t
   ; ledgers: Lite_lib.Sparse_ledger.t list }
+[@@deriving bin_io]
 
-module Make (Chain : sig
-  type data [@@deriving bin_io]
+module type Chain_intf = sig
+  type data
 
   val create : data -> chain
-end)
-(Store : Storage.With_checksum_intf with type location = string)
-(Request : Put_request_intf) :
-  S with type data := Chain.data =
+end
+
+module Make
+    (Chain : Chain_intf)
+    (Config : Config_intf)
+    (Store : Storage.With_checksum_intf with type location := string)
+    (Request : Put_request_intf) :
+  S with type data = Chain.data =
 struct
   open Lite_base
+
+  type data = Chain.data
 
   type t =
     { location: string
     ; ledger_storage: Lite_lib.Sparse_ledger.t Store.Controller.t
     ; proof_storage: Proof.t Store.Controller.t
     ; protocol_state_storage: Protocol_state.t Store.Controller.t
-    ; reader: Chain.data Linear_pipe.Reader.t
-    ; writer: Chain.data Linear_pipe.Writer.t }
+    ; reader: chain Linear_pipe.Reader.t
+    ; writer: chain Linear_pipe.Writer.t }
 
   let write_to_storage
       {location; ledger_storage; proof_storage; protocol_state_storage; _}
-      request data =
-    let {protocol_state; proof; ledgers} = Chain.create data in
+      request {protocol_state; proof; ledgers} =
     let proof_file = location ^/ "proof" in
     let protocol_state_file = location ^/ "protocol-state" in
-    let accounts, account_file_names =
+    let accounts, _ =
       List.mapi ledgers ~f:(fun index account ->
           let account_file = location ^/ sprintf "account%d" index in
           (Store.store ledger_storage account_file account, account_file) )
@@ -66,12 +78,12 @@ struct
               protocol_state ]
         @ accounts )
     in
-    Request.put request ([proof_file; protocol_state_file] @ account_file_names)
+    Request.put request location
 
-  let create {Config.conf_dir; log} =
-    let location = conf_dir ^/ "snarkette-data" in
+  let create () =
+    let location = Config.conf_dir ^/ "snarkette-data" in
     let%bind () = Unix.mkdir location ~p:() in
-    let parent_log = log in
+    let parent_log = Config.log in
     let ledger_storage =
       Store.Controller.create ~parent_log Lite_lib.Sparse_ledger.bin_t
     in
@@ -92,21 +104,25 @@ struct
       match%map Request.create () with
       | Ok request ->
           don't_wait_for
-            (Linear_pipe.iter reader ~f:(fun data ->
-                 match%map write_to_storage t request data with
+            (Linear_pipe.iter reader ~f:(fun chain ->
+                 match%map write_to_storage t request chain with
                  | Ok () -> ()
                  | Error e ->
-                     Logger.error log
+                     Logger.error Config.log
                        !"Writing data IO_error: %s"
                        (Error.to_string_hum e) ))
       | Error e ->
-          Logger.error log
+          Logger.error Config.log
             !"Unable to create request: %s"
             (Error.to_string_hum e)
     in
     t
 
   let store {reader; writer; _} data =
-    Linear_pipe.force_write_maybe_drop_head ~capacity:1 writer reader data ;
+    let lite_chain = Chain.create data in
+    Linear_pipe.force_write_maybe_drop_head ~capacity:1 writer reader
+      lite_chain ;
     Deferred.unit
 end
+
+module S3_put_request = S3_put_request
