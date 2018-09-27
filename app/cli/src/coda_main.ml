@@ -385,7 +385,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -403,7 +403,7 @@ module Make_inputs
     (Init : Init_intf)
     (Ledger_proof_verifier : Ledger_proof_verifier_intf
                              with type ledger_proof := Init.Ledger_proof.t)
-    (Store : Storage.With_checksum_intf)
+    (Store : Storage.With_checksum_intf with type location = string)
     () =
 struct
   open Init
@@ -681,7 +681,7 @@ struct
 end
 
 module Coda_with_snark
-    (Store : Storage.With_checksum_intf)
+    (Store : Storage.With_checksum_intf with type location = string)
     (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t)
     () =
 struct
@@ -729,7 +729,7 @@ module Coda_without_snark
     (Init : Init_intf with module Ledger_proof = Ledger_proof.Debug)
     () =
 struct
-  module Store = Storage.Memory
+  module Store = Storage.Disk
 
   module Ledger_proof_verifier = struct
     let verify _ _ ~message:_ = return true
@@ -841,6 +841,16 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
+
+    module Ledger_builder_hash : sig
+      type t [@@deriving sexp]
+    end
+
+    module Ledger_builder : sig
+      type t
+
+      val hash : t -> Ledger_builder_hash.t
+    end
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -876,6 +886,8 @@ module type Main_intf = sig
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
+  val best_ledger_builder : t -> Inputs.Ledger_builder.t
+
   val best_ledger : t -> Inputs.Ledger.t
 
   val best_protocol_state :
@@ -895,6 +907,8 @@ module type Main_intf = sig
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
 end
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
@@ -912,11 +926,20 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map account = Ledger.get ledger location in
     account.Account.balance
 
-  let get_public_keys t =
+  let get_accounts t =
     let ledger = best_ledger t in
     Ledger.to_list ledger
-    |> List.map
-         ~f:(Fn.compose Public_key.Compressed.to_base64 Account.public_key)
+
+  let string_of_public_key =
+    Fn.compose Public_key.Compressed.to_base64 Account.public_key
+
+  let get_public_keys t = get_accounts t |> List.map ~f:string_of_public_key
+
+  let get_keys_with_balances t =
+    get_accounts t
+    |> List.map ~f:(fun account ->
+           ( Account.balance account |> Currency.Balance.to_int
+           , string_of_public_key account ) )
 
   let is_valid_transaction t (txn: Transaction.t) =
     let remainder =
@@ -930,7 +953,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   (** For status *)
   let txn_count = ref 0
 
-  let send_txn log t txn =
+  let schedule_transaction log t txn =
     let open Deferred.Let_syntax in
     assert (is_valid_transaction t txn) ;
     let txn_pool = transaction_pool t in
@@ -938,8 +961,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
       txn ;
-    txn_count := !txn_count + 1 ;
+    txn_count := !txn_count + 1
+
+  let send_txn log t txn =
+    schedule_transaction log t txn ;
     Deferred.unit
+
+  let schedule_transactions log t txns =
+    List.iter txns ~f:(schedule_transaction log t)
 
   let get_nonce t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
@@ -973,7 +1002,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
+    ; ledger_builder_hash=
+        best_ledger_builder t |> Ledger_builder.hash
+        |> Ledger_builder_hash.sexp_of_t |> Sexp.to_string
     ; state_hash
+    ; external_transition_latency=
+        Perf_histograms.report ~name:"external_transition_latency"
+    ; snark_worker_transition_time=
+        Perf_histograms.report ~name:"snark_worker_transition_time"
+    ; snark_worker_merge_time=
+        Perf_histograms.report ~name:"snark_worker_merge_time"
     ; commit_id= Config_in.commit_id
     ; conf_dir= Config_in.conf_dir
     ; peers= List.map (peers t) ~f:(fun (p, _) -> Host_and_port.to_string p)
@@ -981,20 +1019,29 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; run_snark_worker= run_snark_worker t
     ; propose= should_propose t }
 
+  let clear_hist_status t = Perf_histograms.wipe () ; get_status t
+
   let setup_local_server ?rest_server_port ~coda ~log ~client_port () =
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun () ->
-            send_txn log coda )
+      [ Rpc.Rpc.implement Client_lib.Send_transactions.rpc (fun () ts ->
+            schedule_transactions log coda ts ;
+            Deferred.unit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
+      ; Rpc.Rpc.implement Client_lib.Get_public_keys_with_balances.rpc
+          (fun () () -> return (get_keys_with_balances coda) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->
             return (get_public_keys coda) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
             return (get_nonce coda pk) )
       ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
-            return (get_status coda) ) ]
+            return (get_status coda) )
+      ; Rpc.Rpc.implement Client_lib.Clear_hist_status.rpc (fun () () ->
+            return (clear_hist_status coda) )
+      ; Rpc.Rpc.implement Client_lib.Get_ledger.rpc (fun () lh ->
+            get_ledger coda lh ) ]
     in
     let snark_worker_impls =
       let solved_work_reader, solved_work_writer = Linear_pipe.create () in
@@ -1009,7 +1056,16 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 | Some _ -> () ) ;
                 r
             | `Eof -> assert false )
-      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc (fun () work ->
+      ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
+          (fun () (work: Snark_worker.Work.Result.t) ->
+            List.iter work.metrics ~f:(fun (total, tag) ->
+                match tag with
+                | `Merge ->
+                    Perf_histograms.add_span ~name:"snark_worker_merge_time"
+                      total
+                | `Transition ->
+                    Perf_histograms.add_span
+                      ~name:"snark_worker_transition_time" total ) ;
             let%map () =
               Snark_pool.add_completed_work (snark_pool coda) work
             in

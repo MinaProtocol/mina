@@ -37,11 +37,20 @@ module Inputs = struct
     let sok_digest = Coda_base.Sok_message.digest message in
     function
       | Work.Single.Spec.Transition (input, t, l) ->
-          Or_error.return
-            (M.of_transition ~sok_digest ~source:input.Statement.source
-               ~target:input.target t
-               (unstage (Coda_base.Sparse_ledger.handler l)))
-      | Merge (_, proof1, proof2) -> M.merge ~sok_digest proof1 proof2
+          let start = Time.now () in
+          let res =
+            M.of_transition ~sok_digest ~source:input.Statement.source
+              ~target:input.target t
+              (unstage (Coda_base.Sparse_ledger.handler l))
+          in
+          let total = Time.abs_diff (Time.now ()) start in
+          Or_error.return (res, total)
+      | Merge (_, proof1, proof2) ->
+          let open Or_error.Let_syntax in
+          let start = Time.now () in
+          let%map res = M.merge ~sok_digest proof1 proof2 in
+          let total = Time.abs_diff (Time.now ()) start in
+          (res, total)
 end
 
 module Worker = Worker.Make (Inputs)

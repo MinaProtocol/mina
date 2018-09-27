@@ -25,11 +25,14 @@ let read_hidden_line prompt : Bytes.t Async.Deferred.t =
   | `Ok pwd -> Bytes.of_string pwd
   | `Eof -> failwith "got EOF while reading password"
 
-let read_password_exn prompt : Bytes.t Async.Deferred.t =
+let hidden_line_or_env prompt ~env : Bytes.t Async.Deferred.t =
   let open Async.Deferred.Let_syntax in
-  match Sys.getenv "CODA_PRIVKEY_PASS" with
+  match Sys.getenv env with
   | Some p -> return (Bytes.of_string p)
   | _ -> read_hidden_line prompt
+
+let read_password_exn prompt =
+  hidden_line_or_env prompt ~env:"CODA_PRIVKEY_PASS"
 
 let int16 =
   let max_port = 1 lsl 16 in
