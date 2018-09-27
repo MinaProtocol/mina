@@ -316,7 +316,7 @@ end = struct
   [@@deriving sexp, bin_io]
 
   let random_work_spec_chunk t
-      (seen_statements:
+      (state:
         Ledger_proof_statement.Set.t * Ledger_proof_statement.t option) =
     let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
     let module A = Parallel_scan.Available_job in
@@ -375,17 +375,17 @@ end = struct
     let n = List.length all_jobs in
     let dirty_jobs =
       List.map all_jobs ~f:(fun j ->
-          L.Set.mem (fst seen_statements) (canonical_statement_of_job j) )
+          L.Set.mem (fst state) (canonical_statement_of_job j) )
     in
     let seen_jobs, jobs =
       List.partition_tf all_jobs ~f:(fun j ->
-          L.Set.mem (fst seen_statements) (canonical_statement_of_job j) )
+          L.Set.mem (fst state) (canonical_statement_of_job j) )
     in
     let seen_statements' =
       List.map seen_jobs ~f:canonical_statement_of_job |> L.Set.of_list
     in
     match jobs with
-    | [] -> (None, seen_statements)
+    | [] -> (None, state)
     | _ ->
         (* It used to be [Random.int (List.length jobs)]. For now, we are making the policy
          to pick the first one. This fixes the issue that the work must be done in order.
@@ -402,7 +402,7 @@ end = struct
             [List.nth_exn all_jobs j; List.nth_exn all_jobs (j + 1)]
           in
           let new_last_job =
-            Option.fold (snd seen_statements) ~init:None ~f:(fun _ stmt ->
+            Option.fold (snd state) ~init:None ~f:(fun _ stmt ->
                 if
                   Ledger_proof_statement.equal stmt
                     (canonical_statement_of_job (List.last_exn all_jobs))
@@ -416,11 +416,11 @@ end = struct
         else
           let last_job = List.nth_exn all_jobs j in
           let last_job_eq =
-            Option.fold (snd seen_statements) ~init:false ~f:(fun _ stmt ->
+            Option.fold (snd state) ~init:false ~f:(fun _ stmt ->
                 Ledger_proof_statement.equal stmt
                   (canonical_statement_of_job last_job) )
           in
-          if last_job_eq then (None, seen_statements)
+          if last_job_eq then (None, state)
           else
             ( Some [single_spec last_job]
             , (seen_statements', Some (canonical_statement_of_job last_job)) )
