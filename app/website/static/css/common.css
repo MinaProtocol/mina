@@ -40,9 +40,13 @@
 .black { color: #1F2D3D; }
 .silver { color: #8492A6; }
 .darksnow { color: #EFF2F7; }
+.blue { color: #4882a0; }
+.green { color: #76cd73; }
 
 .wb { word-break: break-all; }
 
+.bg-green { color: #76cd73; }
+.bg-blue { background-color: #4882a0; }
 .bg-darksnow { background-color: #EFF2F7; }
 .bg-snow { background-color: #F9FAFC; }
 .bg-white { background-color: #fff; }

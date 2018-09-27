@@ -191,6 +191,21 @@ let drop_top_of_tree =
 let style kvs =
   List.map ~f:(fun (k, v) -> sprintf "%s:%s" k v) kvs |> String.concat ~sep:";"
 
+module Style = struct
+  type t = string list
+
+  let ( + ) = List.append
+
+  let of_class s = [s]
+
+  let empty = []
+
+  let render t = Attr.(class_ (String.concat ~sep:" " t))
+
+  let just = Fn.compose render of_class
+end
+
+
 module Html = struct
   open Virtual_dom.Vdom
 
@@ -204,26 +219,28 @@ module Html = struct
       type t =
         { label: string
         ; value: string
-        ; class_: string option
-        ; width: string option }
+        }
 
-      let render {label; value; class_; width} =
-        div
-          ( Attr.class_ (extend_class "record-entry" class_)
-          :: Option.to_list
-               (Option.map width ~f:(fun w ->
-                    Attr.create "style" (sprintf "flex-basis:%s" w) )) )
-          [ div [Attr.class_ "record-entry-label"] [Node.text label]
-          ; div [Attr.class_ "record-entry-value"] [Node.text value] ]
+      let render {label=label_text; value} =
+        let open Node in
+        div [Style.just "br2 shadow-2"]
+          [ div [Style.just "bg-blue"]
+            [span [Style.just "green ml2 ph1"]
+                [text {literal|•|literal}]
+            ; span [Style.just "darksnow ph1"] [text label_text]
+            ]
+          ; div [Style.just "blue wb bg-darksnow"] [text value] ]
 
-      let create ?class_ ?width label value = {label; value; class_; width}
+      let create ?class_ ?width label value =
+        let _ = class_ and _ = width in
+        {label; value}
     end
 
     module Row = struct
       type t = Entry.t list
 
       let render (t: t) =
-        div [Attr.class_ "record-row"] (List.map ~f:Entry.render t)
+        div [Attr.class_ "mb2"] (List.map ~f:Entry.render t)
     end
 
     type t = {class_: string option; attrs: Attr.t list; rows: Row.t list}
@@ -378,18 +395,6 @@ let merkle_tree =
     rendered
 
 let g_update_state_and_vdom = ref (fun _ -> ())
-
-module Style = struct
-  type t = string list
-
-  let ( + ) = List.append
-
-  let of_class s = [s]
-
-  let empty = []
-
-  let render t = Attr.(class_ (String.concat ~sep:" " t))
-end
 
 module Visibility = struct
   let no_mobile = Style.of_class "dn db-ns"
@@ -668,10 +673,7 @@ let state_html
     in
     let open Node in
     let open Attr in
-    let tooltip_indicator = 
-      div [class_ "tooltip_indicator corner"] [text "?"]
-    in
-    div ([on_mouseenter update_tooltip] @ attrs) [ tooltip_indicator; node ]
+    div ([on_mouseenter update_tooltip] @ attrs) [ node ]
   in
   let _ = ledger in
   let state_explorer =
@@ -691,7 +693,7 @@ let state_html
               create ~class_:proof_class "blockchain_SNARK"
                 (to_base64 (module Proof) proof)
               |> render)) Tooltip_stage.Proof  [] ]
-      (*; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"]*) ] 
+      ; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"] ] 
   in
   (*let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]*)
   (*in*)

@@ -510,7 +510,6 @@ let wrap ?(headers= []) ?(fixed_footer= false) ?title ~page_label sections =
               "https://fonts.googleapis.com/css?family=Alegreya+Sans:300,300i,400,400i,500,500i,700,700i,800,800i,900,900i"
         ; link ~href:"/static/css/common.css"
         ; link ~href:"/static/css/gallery.css" (* TODO: Only have this on demo *)
-        ; link ~href:"/static/css/new_main.css" (* TODO: Only have this on demo *)
         ; literal
             {html|<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.12/css/all.css" integrity="sha384-G0fIWCsCzJIMAVNQPfjH08cyYaUtMwjJwqiRKxxE/rx96Uroj1BtIQ6MLJuheaO9" crossorigin="anonymous">|html}
         ; literal
@@ -542,6 +541,6 @@ let wrap ?(headers= []) ?(fixed_footer= false) ?title ~page_label sections =
     in
     node "body"
       [class_ "metropolis bg-white black"]
-      [navbar; node "div" [class_ "wrapper"] reified_sections; node "script" [src "static/main.bc.js"] []]
+      [navbar; node "div" [class_ "wrapper"] reified_sections; literal {html|<script defer src="static/main.bc.js"></script>|html}]
   in
   node "html" [] [head; body]
