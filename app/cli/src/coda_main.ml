@@ -1060,6 +1060,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             match%map Linear_pipe.read solved_work_reader with
             | `Ok () ->
                 let r = request_work coda in
+                Option.iter r ~f:(fun r ->
+                    Logger.info log
+                      !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
+                      r ) ;
                 ( match r with
                 | None ->
                     Linear_pipe.write_without_pushback solved_work_writer ()
@@ -1069,7 +1073,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work: Snark_worker.Work.Result.t) ->
             Logger.info log
-              !"Received completed work: %{sexp:Snark_worker.Work.Spec.t}"
+              !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
               work.spec ;
             List.iter work.metrics ~f:(fun (total, tag) ->
                 match tag with
