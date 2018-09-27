@@ -383,8 +383,7 @@ module Make (Inputs : Inputs_intf) = struct
 
     (* TODO: Check whether responses are good or not. *)
     let glue_sync_ledger t query_reader response_writer =
-      Linear_pipe.iter_unordered ~max_concurrency:8 query_reader ~f:
-        (fun query ->
+      Linear_pipe.iter query_reader ~f:(fun query ->
           let peers = Gossip_net.random_peers t.gossip_net 3 in
           Logger.trace t.log
             !"SL: Querying the following peers %{sexp: Peer.t list}"
