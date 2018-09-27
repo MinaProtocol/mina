@@ -20,6 +20,8 @@ end
 module type Consensus_mechanism_intf = sig
   module Make (Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
+
+    val dummy : t
   end) :
     Consensus.Mechanism.S
     with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
@@ -292,6 +294,8 @@ let () =
           ( module struct
             module Make (Ledger_builder_diff : sig
               type t [@@deriving sexp, bin_io]
+
+              val dummy : t
             end) =
             Consensus.Proof_of_signature.Make (struct
               module Proof = Coda_base.Proof
@@ -312,6 +316,8 @@ let () =
           ( module struct
             module Make (Ledger_builder_diff : sig
               type t [@@deriving sexp, bin_io]
+
+              val dummy : t
             end) =
             Consensus.Proof_of_stake.Make (struct
               module Proof = Coda_base.Proof

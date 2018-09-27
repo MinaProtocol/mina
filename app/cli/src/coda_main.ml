@@ -15,6 +15,8 @@ end
 module Ledger_builder_hash = struct
   include Ledger_builder_hash.Stable.V1
 
+  let dummy = Ledger_builder_hash.dummy
+
   let ledger_hash = Ledger_builder_hash.ledger_hash
 
   let of_aux_and_ledger_hash = Ledger_builder_hash.of_aux_and_ledger_hash
@@ -124,6 +126,8 @@ module Make_kernel
                                                                   [@@deriving
                                                                     sexp
                                                                     , bin_io]
+
+                                                                  val dummy : t
       end) -> Consensus.Mechanism.S
               with type Internal_transition.Ledger_builder_diff.t =
                           Ledger_builder_diff.t
@@ -220,6 +224,8 @@ struct
   module Consensus_mechanism = Consensus_mechanism
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Protocol_state_hash = State_hash.Stable.V1
+
+  module Parallel_scan_state = Parallel_scan.State
 
   module Time : Time_intf with type t = Block_time.t = Block_time
 
@@ -363,13 +369,16 @@ struct
 
   module Transaction_pool = struct
     module Pool = Transaction_pool.Make (Transaction)
-    include Network_pool.Make (Pool) (Pool.Diff)
+    include Network_pool.Make (struct
+      module Pool = Pool
+      module Pool_diff = Pool.Diff
+    end)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
 
     (* TODO *)
     let load ~parent_log ~disk_location:_ ~incoming_diffs =
-      return (create ~parent_log ~incoming_diffs)
+      return (create ~parent_log ~incoming_diffs ~pool:(Pool.create parent_log))
 
     let transactions t = Pool.transactions (pool t)
 
@@ -385,7 +394,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp]
+    [@@deriving sexp, fields]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -468,43 +477,61 @@ struct
 
   module Snark_pool = struct
     module Work = Completed_work.Statement
+    module Statement = Ledger_proof_statement
     module Proof = Completed_work_proof
 
-    module Fee = struct
-      module T = struct
-        type t = {fee: Fee.Unsigned.t; prover: Public_key.Compressed.t}
-        [@@deriving bin_io, sexp]
+    module Inputs = struct
+      module Proof = Completed_work_proof
+      module Statement = Ledger_proof_statement
 
-        (* TODO: Compare in a better way than with public key, like in transaction pool *)
-        let compare t1 t2 =
-          let r = compare t1.fee t2.fee in
-          if Int.( <> ) r 0 then r
-          else Public_key.Compressed.compare t1.prover t2.prover
+      module Work = struct
+        include Completed_work.Statement
+
+        let statements = Fn.id
       end
 
-      include T
-      include Comparable.Make (T)
+      module Fee = struct
+        module T = struct
+          type t = {fee: Fee.Unsigned.t; prover: Public_key.Compressed.t}
+          [@@deriving bin_io, sexp]
 
-      let gen =
-        (* This isn't really a valid public key, but good enough for testing *)
-        let pk =
-          let open Snark_params.Tick in
-          let open Quickcheck.Generator.Let_syntax in
-          let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
-          and is_odd = Bool.gen in
-          let x = Bigint.(to_field (of_bignum_bigint x)) in
-          {Public_key.Compressed.x; is_odd}
-        in
-        Quickcheck.Generator.map2 Fee.Unsigned.gen pk ~f:(fun fee prover ->
-            {fee; prover} )
+          (* TODO: Compare in a better way than with public key, like in transaction pool *)
+          let compare t1 t2 =
+            let r = compare t1.fee t2.fee in
+            if Int.( <> ) r 0 then r
+            else Public_key.Compressed.compare t1.prover t2.prover
+        end
+
+        include T
+        include Comparable.Make (T)
+
+        let gen =
+          (* This isn't really a valid public key, but good enough for testing *)
+          let pk =
+            let open Snark_params.Tick in
+            let open Quickcheck.Generator.Let_syntax in
+            let%map x = Bignum_bigint.(gen_incl zero (Field.size - one))
+            and is_odd = Bool.gen in
+            let x = Bigint.(to_field (of_bignum_bigint x)) in
+            {Public_key.Compressed.x; is_odd}
+          in
+          Quickcheck.Generator.map2 Fee.Unsigned.gen pk ~f:(fun fee prover ->
+              {fee; prover} )
+      end
     end
 
-    module Pool = Snark_pool.Make (Proof) (Fee) (Work)
-    module Diff = Network_pool.Snark_pool_diff.Make (Proof) (Fee) (Work) (Pool)
+    module Pool = Snark_pool.Make (Inputs)
+    module Diff = Network_pool.Snark_pool_diff.Make (struct
+      include Inputs
+      module Snark_pool = Pool
+    end)
 
     type pool_diff = Diff.t
 
-    include Network_pool.Make (Pool) (Diff)
+    include Network_pool.Make (struct
+      module Pool = Pool
+      module Pool_diff = Diff
+    end)
 
     let get_completed_work t statement =
       Option.map
@@ -513,10 +540,10 @@ struct
           Completed_work.Checked.create_unsafe
             {Completed_work.fee; proofs= proof; prover} )
 
-    let load ~parent_log ~relevant_work_changes_reader ~disk_location ~incoming_diffs =
+    let load ~parent_log ~relevant_statement_changes_reader ~disk_location ~incoming_diffs =
       match%map Reader.load_bin_prot disk_location Pool.bin_reader_t with
       | Ok pool -> of_pool_and_diffs pool ~parent_log ~incoming_diffs
-      | Error _e -> create ~parent_log ~incoming_diffs ~pool:(Pool.create ~parent_log ~relevant_work_changes_reader)
+      | Error _e -> create ~parent_log ~incoming_diffs ~pool:(Pool.create ~parent_log ~relevant_statement_changes_reader)
 
     open Snark_work_lib.Work
 
@@ -576,8 +603,8 @@ struct
         let max_depth = Init.lbc_tree_max_depth
       end
 
-      module Work = Completed_work.Statement
       module Ledger_proof = Ledger_proof
+      module Ledger_proof_statement = Ledger_proof_statement
       module Tip = Tip
       module Store = Store
       module Snark_pool = Snark_pool

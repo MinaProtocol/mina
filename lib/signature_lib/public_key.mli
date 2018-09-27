@@ -35,7 +35,7 @@ module Compressed : sig
 
   val gen : t Quickcheck.Generator.t
 
-  val empty : t
+  val zero : t
 
   val length_in_triples : int
 

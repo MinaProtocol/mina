@@ -120,7 +120,7 @@ let hash_prefix = Hash_prefix.account
 let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
 
 let empty =
-  { public_key= Public_key.Compressed.empty
+  { public_key= Public_key.Compressed.zero
   ; balance= Balance.zero
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty }

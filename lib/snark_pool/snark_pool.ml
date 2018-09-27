@@ -6,18 +6,50 @@ module Priced_proof = struct
   [@@deriving bin_io, sexp, fields]
 end
 
+module type Inputs_intf = sig
+  module Proof : sig
+    type t [@@deriving bin_io]
+  end
+
+  module Fee : sig
+    type t [@@deriving sexp, bin_io]
+
+    val gen : t Quickcheck.Generator.t
+
+    include Comparable.S with type t := t
+  end
+
+  module Statement : sig
+    type t [@@deriving sexp, bin_io]
+
+    include Hashable.S_binable with type t := t
+  end
+
+  module Work : sig
+    type t [@@deriving sexp, bin_io]
+
+    val gen : t Quickcheck.Generator.t
+
+    val statements : t -> Statement.t list
+
+    include Hashable.S_binable with type t := t
+  end
+end
+
 module type S = sig
+  type statement
+
   type work
 
   type proof
 
   type fee
 
-  type t [@@deriving bin_io]
+  type t [@@deriving sexp, bin_io]
 
   val create :
        parent_log:Logger.t
-    -> relevant_work_changes_reader:(work, int) List.Assoc.t Linear_pipe.Reader.t
+    -> relevant_statement_changes_reader:(statement, int) List.Assoc.t Linear_pipe.Reader.t
     -> t
 
   val add_snark :
@@ -30,30 +62,15 @@ module type S = sig
   val request_proof : t -> work -> (proof, fee) Priced_proof.t option
 end
 
-module Make (Proof : sig
-  type t [@@deriving bin_io]
-end) (Fee : sig
-  type t [@@deriving sexp, bin_io]
-
-  val gen : t Quickcheck.Generator.t
-
-  include Comparable.S with type t := t
-end) (Work : sig
-  type t [@@deriving sexp, bin_io]
-
-  val gen : t Quickcheck.Generator.t
-
-  include Hashable.S_binable with type t := t
-end) :
-  sig
-    include S
-
-    val sexp_of_t : t -> Sexp.t
-  end
-  with type work := Work.t
-   and type proof := Proof.t
-   and type fee := Fee.t =
+module Make (Inputs : Inputs_intf) :
+  S
+  with type statement := Inputs.Statement.t
+   and type work := Inputs.Work.t
+   and type proof := Inputs.Proof.t
+   and type fee := Inputs.Fee.t =
 struct
+  open Inputs
+
   module Priced_proof = struct
     type t = (Proof.t sexp_opaque, Fee.t) Priced_proof.t
     [@@deriving sexp, bin_io]
@@ -65,107 +82,118 @@ struct
     let fee (t: t) = t.fee
   end
 
-  module With_ref_count = struct
-    type 'a t = {value: 'a; ref_count: int}
-    [@@deriving sexp, bin_io]
+  type t =
+    { statement_ref_count_table: int Statement.Table.t
+    ; work_proof_table: Priced_proof.t Work.Table.t }
+  [@@deriving sexp, bin_io]
 
-    let create_unreferenced x = {value= x; ref_count= 0}
-  end
-
-  open With_ref_count
-
-  type t = Priced_proof.t option With_ref_count.t Work.Table.t [@@deriving sexp, bin_io]
-
-  let create ~parent_log ~relevant_work_changes_reader =
+  let create ~parent_log ~relevant_statement_changes_reader =
     let logger = Logger.child parent_log "Snark_pool" in
-    let work_table = Work.Table.create () in
+    let statement_ref_count_table = Statement.Table.create () in
+    let work_proof_table = Work.Table.create () in
     don't_wait_for (
-      Linear_pipe.iter relevant_work_changes_reader ~f:(fun changes ->
-        List.iter changes ~f:(fun (work, ref_count_diff) ->
-          let entry =
-            Hashtbl.find work_table work
-            |> Option.value ~default:(create_unreferenced None)
-          in
-          let ref_count = entry.ref_count + ref_count_diff in
-          if ref_count > 0 then
-            Hashtbl.set work_table ~key:work ~data:{entry with ref_count}
-          else (
-            (if ref_count < 0 then
-              Logger.warn logger "Snark_pool statement ref count went below 0 (this shouldn't happen)");
-            Hashtbl.remove work_table work));
+      Linear_pipe.iter relevant_statement_changes_reader ~f:(fun changes ->
+        List.iter changes ~f:(fun (statement, ref_count_diff) ->
+          Hashtbl.incr
+            ~remove_if_zero:true
+            statement_ref_count_table
+            statement
+            ~by:ref_count_diff;
+          let ref_count = Hashtbl.find_exn statement_ref_count_table statement in
+          (if ref_count > 0 then (
+            Logger.warn logger "Snark_pool statement ref count went below 0 (this shouldn't happen)");
+            Hashtbl.remove statement_ref_count_table statement));
         Deferred.return ()));
-      work_table
+    {statement_ref_count_table; work_proof_table}
 
-  let add_snark work_table ~work ~proof ~fee =
-    match Work.Table.find work_table work with
-    | None -> `Don't_rebroadcast
-    | Some prev ->
-        prev.value
-        |> Option.map ~f:(fun current_proof ->
-            if Fee.( < ) fee (Priced_proof.fee current_proof) then (
-              let data = Hashtbl.find_exn work_table work in
-              Hashtbl.set work_table ~key:work ~data:{data with value= Some (Priced_proof.create proof fee)};
-              `Rebroadcast)
-            else
-              `Don't_rebroadcast)
-        |> Option.value ~default:`Don't_rebroadcast
+  let add_snark {statement_ref_count_table; work_proof_table} ~work ~proof ~fee =
+    let save_proof () = Hashtbl.set work_proof_table ~key:work ~data:(Priced_proof.create proof fee) in
+    if
+      List.for_all (Work.statements work) ~f:(fun stmt ->
+        Hashtbl.find statement_ref_count_table stmt
+        |> Option.map ~f:(fun ref_count -> ref_count > 0)
+        |> Option.value ~default:false)
+    then
+      (match Hashtbl.find work_proof_table work with
+      | None -> save_proof (); `Rebroadcast
+      | Some prev_proof ->
+          if Fee.( < ) fee (Priced_proof.fee prev_proof) then
+            (save_proof (); `Rebroadcast)
+          else
+            `Don't_rebroadcast)
+    else
+      `Don't_rebroadcast
 
-  let request_proof t work =
-    Work.Table.find t work
-    |> Option.map ~f:(fun {value; _} -> value)
-    |> Option.join
+  let request_proof {work_proof_table; _} = Work.Table.find work_proof_table
 end
 
 let%test_module "random set test" =
   ( module struct
-    module Mock_proof = struct
-      type input = Int.t
+    module Mocks = struct
+      module Proof = struct
+        type input = Int.t
 
-      type t = Int.t [@@deriving sexp, bin_io]
+        type t = Int.t [@@deriving sexp, bin_io]
 
-      let verify _ _ = return true
+        let verify _ _ = return true
 
-      let gen = Int.gen
+        let gen = Int.gen
+      end
+
+      module Fee = Int
+
+      module Statement = Int
+
+      module Work = struct
+        module T = struct
+          type t = Statement.t list
+          [@@deriving sexp, bin_io, hash, compare]
+        end
+
+        include T
+        include Hashable.Make_binable(T)
+
+        let gen = List.gen Int.gen
+
+        let statements = Fn.id
+      end
+
+      module Priced_proof = struct
+        type proof = Proof.t [@@deriving sexp, bin_io]
+
+        type fee = Fee.t [@@deriving sexp, bin_io]
+
+        type t = {proof: proof; fee: fee} [@@deriving sexp, bin_io]
+
+        let proof t = t.proof
+      end
     end
 
-    module Mock_work = Int
-    module Mock_fee = Int
-
-    module Mock_Priced_proof = struct
-      type proof = Mock_proof.t [@@deriving sexp, bin_io]
-
-      type fee = Mock_fee.t [@@deriving sexp, bin_io]
-
-      type t = {proof: proof; fee: fee} [@@deriving sexp, bin_io]
-
-      let proof t = t.proof
-    end
-
-    module Mock_snark_pool = Make (Mock_proof) (Mock_fee) (Mock_work)
+    module Mock_snark_pool = Make (Mocks)
 
     let%test_unit "When two priced proofs of the same work are inserted into \
                    the snark pool, the fee of the work is at most the minimum \
                    of those fees" =
       let gen_entry () =
-        Quickcheck.Generator.tuple2 Mock_proof.gen Mock_fee.gen
+        Quickcheck.Generator.tuple2 Mocks.Proof.gen Mocks.Fee.gen
       in
       Quickcheck.test
         ~sexp_of:
           [%sexp_of
-            :   Mock_work.t
-              * (Mock_proof.t * Mock_fee.t)
-              * (Mock_proof.t * Mock_fee.t)]
-        (Quickcheck.Generator.tuple3 Mock_work.gen (gen_entry ())
+            :   Mocks.Work.t
+              * (Mocks.Proof.t * Mocks.Fee.t)
+              * (Mocks.Proof.t * Mocks.Fee.t)]
+        (Quickcheck.Generator.tuple3 Mocks.Work.gen (gen_entry ())
            (gen_entry ()))
         ~f:(fun (work, (proof_1, fee_1), (proof_2, fee_2)) ->
           let t =
             Mock_snark_pool.create
               ~parent_log:(Logger.create ())
-              ~relevant_work_changes_reader:(Linear_pipe.create_reader ~close_on_exception:false (fun _ -> Deferred.return ()))
+              ~relevant_statement_changes_reader:(Linear_pipe.create_reader ~close_on_exception:false (fun _ -> Deferred.return ()))
           in
           ignore (Mock_snark_pool.add_snark t ~work ~proof:proof_1 ~fee:fee_1) ;
           ignore (Mock_snark_pool.add_snark t ~work ~proof:proof_2 ~fee:fee_2) ;
-          let fee_upper_bound = Mock_fee.min fee_1 fee_2 in
+          let fee_upper_bound = Mocks.Fee.min fee_1 fee_2 in
           let {Priced_proof.fee; _} =
             Option.value_exn (Mock_snark_pool.request_proof t work)
           in
@@ -177,18 +205,18 @@ let%test_module "random set test" =
       Quickcheck.test
         ~sexp_of:
           [%sexp_of
-            :   Mock_work.t
-              * Mock_fee.t
-              * Mock_fee.t
-              * Mock_proof.t
-              * Mock_proof.t]
-        (Quickcheck.Generator.tuple5 Mock_work.gen Mock_fee.gen
-           Mock_fee.gen Mock_proof.gen Mock_proof.gen) ~f:
+            :   Mocks.Work.t
+              * Mocks.Fee.t
+              * Mocks.Fee.t
+              * Mocks.Proof.t
+              * Mocks.Proof.t]
+        (Quickcheck.Generator.tuple5 Mocks.Work.gen Mocks.Fee.gen
+           Mocks.Fee.gen Mocks.Proof.gen Mocks.Proof.gen) ~f:
         (fun (work, fee_1, fee_2, cheap_proof, expensive_proof) ->
           let t =
             Mock_snark_pool.create
               ~parent_log:(Logger.create ())
-              ~relevant_work_changes_reader:(Linear_pipe.create_reader ~close_on_exception:false (fun _ -> Deferred.return ()))
+              ~relevant_statement_changes_reader:(Linear_pipe.create_reader ~close_on_exception:false (fun _ -> Deferred.return ()))
           in
           let expensive_fee = max fee_1 fee_2
           and cheap_fee = min fee_1 fee_2 in

@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
-  module Work : sig
+  module Ledger_proof_statement : sig
     type t
   end
 
@@ -89,7 +89,7 @@ module type Inputs_intf = sig
     with type tip := Tip.t
      and type external_transition := External_transition.t
      and type state_hash := State_hash.t
-     and type work := Work.t
+     and type statement := Ledger_proof_statement.t
 
   module Step : sig
     (* This checks the SNARKs in State/LB and does the transition *)

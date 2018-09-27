@@ -6,18 +6,18 @@ module type Inputs_intf = sig
     type t
   end
 
+  module Ledger_proof_statement : sig
+    type t
+
+    module Table : Hashtbl.S with type key := t
+  end
+
   module State_hash : sig
     type t [@@deriving eq, sexp, compare, bin_io]
 
     val to_bits : t -> bool list
 
     val zero : t
-  end
-
-  module Work : sig
-    type t
-
-    module Table : Hashtbl.S with type key := t
   end
 
   module Security : Protocols.Coda_pow.Security_intf
@@ -64,7 +64,7 @@ module type Inputs_intf = sig
     module Super_transaction_with_witness : sig
       type t
 
-      val statement : t -> Work.t
+      val statement : t -> Ledger_proof_statement.t
     end
 
     module Aux : sig
@@ -89,7 +89,7 @@ module type Inputs_intf = sig
 
     val aux : t -> Aux.t
 
-    val scan_state : t -> (Ledger_proof.t * Work.t, Super_transaction_with_witness.t) Parallel_scan.State.t
+    val scan_state : t -> (Ledger_proof.t * Ledger_proof_statement.t, Super_transaction_with_witness.t) Parallel_scan.State.t
 
     val apply :
          t
@@ -153,7 +153,7 @@ module type Inputs_intf = sig
 
     val ledger_builder_diff : t -> Ledger_builder_diff.t
 
-    val genesis : t
+    val dummy : t
   end
 
   module Tip :
@@ -228,7 +228,7 @@ module Make (Inputs : Inputs_intf) : sig
            and type sync_answer := Inputs.Sync_ledger.answer
            and type external_transition := Inputs.External_transition.t
            and type tip := Inputs.Tip.t
-           and type work := Inputs.Work.t
+           and type statement := Inputs.Ledger_proof_statement.t
 
   val ledger_builder_io : t -> Inputs.Net.t
 end = struct
@@ -240,8 +240,8 @@ end = struct
       ; net_deferred: Net.net Deferred.t
       ; external_transitions_reader:
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
-      ; relevant_work_changes_writer:
-          (Work.t, int) List.Assoc.t Linear_pipe.Writer.t
+      ; relevant_statement_changes_writer:
+          (Ledger_proof_statement.t, int) List.Assoc.t Linear_pipe.Writer.t
       ; genesis_tip: Tip.t
       ; disk_location: string }
     [@@deriving make]
@@ -264,7 +264,7 @@ end = struct
   end
 
   module Transition_logic_inputs = struct
-    module Work = Work
+    module Ledger_proof_statement = Ledger_proof_statement
     module Frozen_ledger_hash = Frozen_ledger_hash
     module State_hash = State_hash
     module Consensus_mechanism = Consensus_mechanism
@@ -389,7 +389,7 @@ end = struct
       Transition_logic_state.Make
         (Security)
         (Ledger_proof)
-        (Work)
+        (Ledger_proof_statement)
         (Ledger_builder)
         (State_hash)
         (External_transition)
@@ -397,7 +397,7 @@ end = struct
     module Ledger_hash = Ledger_hash
 
     module Catchup = Catchup.Make (struct
-      module Work = Work
+      module Ledger_proof_statement = Ledger_proof_statement
       module Ledger_hash = Ledger_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
       module Ledger = Ledger
@@ -464,7 +464,7 @@ end = struct
          * concurrent processes took different times to finish. Since we
          * serialize to one job at a time this shouldn't happen anyway though *)
            let%bind new_state =
-             Transition_logic_state.apply_all ~relevant_work_changes_writer:config.relevant_work_changes_writer old_state changes
+             Transition_logic_state.apply_all ~relevant_statement_changes_writer:config.relevant_statement_changes_writer old_state changes
            in
            t.handler <- Transition_logic.create ~parent_log:log new_state ;
            ( if
@@ -606,9 +606,9 @@ end
 let%test_module "test" =
   ( module struct
     module Inputs = struct
-      module Work = Int
-
       module Ledger_proof = Int
+
+      module Ledger_proof_statement = Int
 
       module Security = struct
         let max_depth = `Finite 50
@@ -730,7 +730,7 @@ let%test_module "test" =
 
         let protocol_state_proof _ = ()
 
-        let genesis = Protocol_state.genesis
+        let dummy = Protocol_state.genesis
       end
 
       module Consensus_mechanism = struct
@@ -853,7 +853,7 @@ let%test_module "test" =
         ~external_transitions_reader:
           (Linear_pipe.map ledger_builder_transitions
              ~f:Inputs.External_transition.of_state)
-        ~relevant_work_changes_writer:
+        ~relevant_statement_changes_writer:
           (snd @@ Linear_pipe.create ())
         ~genesis_tip:
           { protocol_state= Inputs.Protocol_state.genesis

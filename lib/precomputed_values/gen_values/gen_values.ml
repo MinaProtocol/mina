@@ -130,6 +130,8 @@ let main () =
           module Ledger_builder_hash = struct
             include Ledger_builder_hash.Stable.V1
 
+            let dummy = Ledger_builder_hash.dummy
+
             let of_aux_and_ledger_hash =
               Ledger_builder_hash.of_aux_and_ledger_hash
           end

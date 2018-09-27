@@ -55,7 +55,7 @@ module Compressed = struct
 
   let of_base64_exn s = B64.decode s |> Binable.of_string (module Stable.V1)
 
-  let empty = {x= Field.zero; is_odd= false}
+  let zero = {x= Field.zero; is_odd= false}
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in

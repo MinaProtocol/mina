@@ -9,6 +9,8 @@ open Fold_lib
 module type Inputs_intf = sig
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
+
+    val dummy : t
   end
 
   module Time : sig
@@ -1028,6 +1030,8 @@ let%test_module "Proof_of_stake tests" =
     module Proof_of_stake = Make (struct
       module Ledger_builder_diff = struct
         type t = int [@@deriving bin_io, sexp]
+
+        let dummy = 0
       end
 
       module Time = Coda_base.Block_time

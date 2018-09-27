@@ -111,10 +111,10 @@ module Key = struct
     type key = t [@@deriving sexp, bin_io]
   end
 
-  let empty = ""
-
-  let to_string = Fn.id
-
   include T
   include Hashable.Make_binable (T)
+
+  let zero = ""
+
+  let to_string = Fn.id
 end

@@ -3,6 +3,8 @@ open Currency
 module type Inputs_intf = sig
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
+
+    val dummy : t
   end
 
   module Time : sig

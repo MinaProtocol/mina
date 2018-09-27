@@ -112,6 +112,12 @@ struct
     ; creator: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
+  let dummy =
+    { prev_hash= Ledger_builder_hash.dummy
+    ; completed_works= []
+    ; transactions= []
+    ; creator= Compressed_public_key.zero }
+
   module With_valid_signatures_and_proofs = struct
     type t =
       { prev_hash: Ledger_builder_hash.t
@@ -154,10 +160,9 @@ module Make (Inputs : Inputs.S) : sig
            and type ledger_proof_statement_set :=
                       Inputs.Ledger_proof_statement.Set.t
            and type super_transaction := Inputs.Super_transaction.t
+           and type ('a, 'd) parallel_scan_state := ('a, 'd) Parallel_scan.State.t
 end = struct
   open Inputs
-
-  type ('a, 'd) parallel_scan_state = ('a, 'd) Parallel_scan.State.t
 
   type 'a with_statement = 'a * Ledger_proof_statement.t
   [@@deriving sexp, bin_io]
@@ -942,7 +947,10 @@ let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
-      module Compressed_public_key = String
+      module Compressed_public_key = struct
+        include String
+        let zero = ""
+      end
 
       module Sok_message = struct
         module Digest = Unit
@@ -1218,6 +1226,8 @@ let%test_module "test" =
 
         type ledger_builder_aux_hash = Ledger_builder_aux_hash.t
 
+        let dummy = ""
+
         let of_aux_and_ledger_hash :
             ledger_builder_aux_hash -> ledger_hash -> t =
          fun ah h -> ah ^ h
@@ -1294,6 +1304,12 @@ let%test_module "test" =
           ; transactions: transaction list
           ; creator: public_key }
         [@@deriving sexp, bin_io, compare]
+
+        let dummy =
+          { prev_hash= Ledger_builder_hash.dummy
+          ; completed_works= []
+          ; transactions= []
+          ; creator= Compressed_public_key.zero }
 
         module With_valid_signatures_and_proofs = struct
           type t =

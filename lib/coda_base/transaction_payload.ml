@@ -26,7 +26,7 @@ end
 include Stable.V1
 
 let dummy =
-  { receiver= Public_key.Compressed.empty
+  { receiver= Public_key.Compressed.zero
   ; amount= Amount.zero
   ; fee= Fee.zero
   ; nonce= Account_nonce.zero }

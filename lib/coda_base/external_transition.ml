@@ -3,9 +3,13 @@ module type S = sig
 
   module Ledger_builder_diff : sig
     type t [@@deriving sexp, bin_io]
+
+    val dummy : t
   end
 
   type t [@@deriving sexp, bin_io, compare, eq]
+
+  val dummy : t
 
   val create :
        protocol_state:Protocol_state.value
@@ -22,6 +26,8 @@ end
 
 module Make (Ledger_builder_diff : sig
   type t [@@deriving sexp, bin_io]
+
+  val dummy : t
 end)
 (Protocol_state : Protocol_state.S) :
   S
@@ -46,4 +52,9 @@ struct
 
   let create ~protocol_state ~protocol_state_proof ~ledger_builder_diff =
     {protocol_state; protocol_state_proof; ledger_builder_diff}
+
+  let dummy =
+    { protocol_state= Protocol_state.negative_one
+    ; protocol_state_proof= Proof.dummy
+    ; ledger_builder_diff= Ledger_builder_diff.dummy }
 end

@@ -13,6 +13,10 @@ module type Time_controller_intf = sig
   val create : unit -> t
 end
 
+module type Parallel_scan_state_intf = sig
+  type ('a, 'd) t
+end
+
 module type Sok_message_intf = sig
   type public_key_compressed
 
@@ -116,6 +120,8 @@ module type Ledger_builder_hash_intf = sig
 
   type ledger_builder_aux_hash
 
+  val dummy : t
+
   val of_aux_and_ledger_hash : ledger_builder_aux_hash -> ledger_hash -> t
 
   include Hashable.S_binable with type t := t
@@ -207,6 +213,8 @@ end
 
 module type Compressed_public_key_intf = sig
   type t [@@deriving sexp, bin_io, compare]
+
+  val zero : t
 
   include Comparable.S with type t := t
 end
@@ -382,6 +390,8 @@ module type Ledger_builder_diff_intf = sig
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
+
+  val dummy : t
 end
 
 module type Ledger_builder_transition_intf = sig
@@ -738,6 +748,8 @@ end
 module type Inputs_intf = sig
   module Time : Time_intf
 
+  module Parallel_scan_state : Parallel_scan_state_intf
+
   module Private_key : Private_key_intf
 
   module Compressed_public_key : Compressed_public_key_intf
@@ -877,6 +889,7 @@ Merge Snark:
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
      and type super_transaction := Super_transaction.t
+     and type ('a, 'd) parallel_scan_state := ('a, 'd) Parallel_scan_state.t
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf

@@ -2,7 +2,7 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
-  module Work : sig
+  module Ledger_proof_statement : sig
     type t
   end
 
@@ -94,7 +94,7 @@ module type Inputs_intf = sig
     with type tip := Tip.t
      and type external_transition := External_transition.t
      and type state_hash := Tip.state_hash
-     and type work := Work.t
+     and type statement := Ledger_proof_statement.t
 
   module Sync_ledger : sig
     type t

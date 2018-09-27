@@ -120,7 +120,9 @@ end
 module type Snark_pool_intf = sig
   type t
 
-  type completed_work_statement
+  type statement
+
+  type completed_work
 
   type completed_work_checked
 
@@ -130,13 +132,13 @@ module type Snark_pool_intf = sig
 
   val load :
        parent_log:Logger.t
-    -> relevant_work_changes_reader:(completed_work_statement, int) List.Assoc.t Linear_pipe.Reader.t
+    -> relevant_statement_changes_reader:(statement, int) List.Assoc.t Linear_pipe.Reader.t
     -> disk_location:string
     -> incoming_diffs:pool_diff Linear_pipe.Reader.t
     -> t Deferred.t
 
   val get_completed_work :
-    t -> completed_work_statement -> completed_work_checked option
+    t -> completed_work -> completed_work_checked option
 end
 
 module type Rose_intf = sig
@@ -200,7 +202,7 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger_hash
 
-  type work
+  type statement
 
   module Config : sig
     type t =
@@ -208,7 +210,7 @@ module type Ledger_builder_controller_intf = sig
       ; net_deferred: net Deferred.t
       ; external_transitions_reader:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
-      ; relevant_work_changes_writer: (work, int) List.Assoc.t Linear_pipe.Writer.t
+      ; relevant_statement_changes_writer: (statement, int) List.Assoc.t Linear_pipe.Writer.t
       ; genesis_tip: tip
       ; disk_location: string }
     [@@deriving make]
@@ -337,7 +339,8 @@ module type Inputs_intf = sig
 
   module Snark_pool :
     Snark_pool_intf
-    with type completed_work_statement := Completed_work.Statement.t
+    with type statement := Ledger_proof_statement.t
+     and type completed_work := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
 
   module Transaction_pool :
@@ -379,7 +382,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
-     and type work := Completed_work.Statement.t
+     and type statement := Ledger_proof_statement.t
 
   module Proposer :
     Proposer_intf
@@ -474,7 +477,7 @@ module Make (Inputs : Inputs_intf) = struct
     let external_transitions_reader, external_transitions_writer =
       Linear_pipe.create ()
     in
-    let (relevant_work_changes_reader, relevant_work_changes_writer) : (Completed_work.Statement.t, int) List.Assoc.t Linear_pipe.Reader.t * (Completed_work.Statement.t, int) List.Assoc.t Linear_pipe.Writer.t =
+    let (relevant_statement_changes_reader, relevant_statement_changes_writer) : (Ledger_proof_statement.t, int) List.Assoc.t Linear_pipe.Reader.t * (Ledger_proof_statement.t, int) List.Assoc.t Linear_pipe.Writer.t =
       Linear_pipe.create ()
     in
     let net_ivar = Ivar.create () in
@@ -490,7 +493,7 @@ module Make (Inputs : Inputs_intf) = struct
              ; proof= Genesis.proof }
            ~disk_location:config.ledger_builder_persistant_location
            ~external_transitions_reader
-           ~relevant_work_changes_writer)
+           ~relevant_statement_changes_writer)
     in
     let%bind net =
       Net.create config.net_config
@@ -524,7 +527,7 @@ module Make (Inputs : Inputs_intf) = struct
     let%bind snark_pool =
       Snark_pool.load
         ~parent_log:config.log
-        ~relevant_work_changes_reader
+        ~relevant_statement_changes_reader
         ~disk_location:config.snark_pool_disk_location
         ~incoming_diffs:(Net.snark_pool_diffs net)
     in

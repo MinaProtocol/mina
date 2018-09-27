@@ -91,7 +91,7 @@ let modify_account t pk ~(filter:Account.var -> (unit, _) Checked.t) ~f =
 *)
 let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(fun account ->
         let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
-        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
+        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t zero) in
         let%bind fee_transfer = Boolean.(account_not_there && is_fee_transfer) in
         Boolean.Assert.any [account_already_there; fee_transfer]
 ) ~f
@@ -105,6 +105,6 @@ let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(
 *)
 let modify_account_recv t pk ~f = modify_account t pk ~filter:(fun account ->
         let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
-        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
+        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t zero) in
         Boolean.Assert.any [account_already_there; account_not_there]
 ) ~f

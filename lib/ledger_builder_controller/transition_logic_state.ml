@@ -8,7 +8,7 @@ module type S = sig
 
   type state_hash
 
-  type work
+  type statement
 
   module Transition_tree :
     Coda.Ktree_intf
@@ -33,7 +33,7 @@ module type S = sig
     [@@deriving sexp]
   end
 
-  val apply_all : relevant_work_changes_writer: (work, int) List.Assoc.t Linear_pipe.Writer.t -> t -> Change.t list -> t Deferred.t
+  val apply_all : relevant_statement_changes_writer: (statement, int) List.Assoc.t Linear_pipe.Writer.t -> t -> Change.t list -> t Deferred.t
   (** Invariant: Changes must be applied to atomically result in a consistent state *)
 
   val create : (tip, state_hash) With_hash.t -> t
@@ -43,7 +43,7 @@ module Make (Security : sig
   val max_depth : [`Infinity | `Finite of int]
 end) (Ledger_proof : sig
   type t
-end) (Work : sig
+end) (Ledger_proof_statement : sig
   type t
 
   module Table : Hashtbl.S with type key := t
@@ -51,12 +51,12 @@ end) (Ledger_builder : sig
   module Super_transaction_with_witness : sig
     type t
 
-    val statement : t -> Work.t
+    val statement : t -> Ledger_proof_statement.t
   end
 
   type t
 
-  val scan_state : t -> (Ledger_proof.t * Work.t, Super_transaction_with_witness.t) Parallel_scan.State.t
+  val scan_state : t -> (Ledger_proof.t * Ledger_proof_statement.t, Super_transaction_with_witness.t) Parallel_scan.State.t
 end) (State_hash : sig
   type t [@@deriving compare, sexp, bin_io]
 
@@ -64,7 +64,7 @@ end) (State_hash : sig
 end) (Transition : sig
   type t [@@deriving compare, sexp, bin_io]
 
-  val genesis : t
+  val dummy : t
 end) (Tip : sig
   type t [@@deriving sexp]
 
@@ -79,7 +79,7 @@ end) :
   with type tip := Tip.t
    and type external_transition := Transition.t
    and type state_hash := State_hash.t
-   and type work := Work.t =
+   and type statement := Ledger_proof_statement.t =
 struct
   module Transition_tree =
     Ktree.Make (struct
@@ -88,7 +88,7 @@ struct
 
         let empty =
           let open With_hash in
-          { data= Transition.genesis
+          { data= Transition.dummy
           ; hash= State_hash.zero }
       end)
       (Security)
@@ -126,38 +126,38 @@ struct
     }
   [@@deriving fields]
 
-  let apply ~relevant_work_changes_writer t = function
+  let apply ~relevant_statement_changes_writer t = function
     | Locked_tip locked_tip -> Deferred.return {t with locked_tip}
     | Longest_branch_tip longest_branch_tip ->
-        let work_of_tip tip =
-          let work = Work.Table.create () in
-          let incr_work = Hashtbl.incr ~remove_if_zero:true work in
+        let statement_of_tip tip =
+          let statement = Ledger_proof_statement.Table.create () in
+          let incr_statement = Hashtbl.incr ~remove_if_zero:true statement in
           Tip.ledger_builder tip
           |> Ledger_builder.scan_state
           |> (fun state -> Parallel_scan.next_jobs ~state)
           |> List.iter ~f:(function
             | Merge ((_, a), (_, b)) ->
-                incr_work a;
-                incr_work b
+                incr_statement a;
+                incr_statement b
             | Base a ->
-                incr_work (Ledger_builder.Super_transaction_with_witness.statement a));
-          work
+                incr_statement (Ledger_builder.Super_transaction_with_witness.statement a));
+          statement
         in
         let diff_hashtbl a b =
-          let r = Work.Table.create () in
+          let r = Ledger_proof_statement.Table.create () in
           Hashtbl.iteri a ~f:(fun ~key:k ~data:va ->
             let vb = Option.value ~default:0 (Hashtbl.find b k) in
             let diff = va - vb in
             (if diff <> 0 then Hashtbl.set r ~key:k ~data:diff));
           r
         in
-        let old_work = work_of_tip t.longest_branch_tip.data in
-        let new_work = work_of_tip longest_branch_tip.data in
-        let work_changes = diff_hashtbl new_work old_work in
+        let old_statement = statement_of_tip t.longest_branch_tip.data in
+        let new_statement = statement_of_tip longest_branch_tip.data in
+        let statement_changes = diff_hashtbl new_statement old_statement in
         let%map () =
           Linear_pipe.write
-            relevant_work_changes_writer
-            (Hashtbl.to_alist work_changes)
+            relevant_statement_changes_writer
+            (Hashtbl.to_alist statement_changes)
         in
         {t with longest_branch_tip}
     | Ktree k -> Deferred.return {t with ktree= Some k}
@@ -178,9 +178,9 @@ struct
               Tip.assert_materialization_of t.locked_tip x ;
               Tip.assert_materialization_of t.longest_branch_tip last )
 
-  let apply_all ~relevant_work_changes_writer t changes =
+  let apply_all ~relevant_statement_changes_writer t changes =
     assert_state_valid t ;
-    let%map t' = Deferred.List.fold changes ~init:t ~f:(apply ~relevant_work_changes_writer) in
+    let%map t' = Deferred.List.fold changes ~init:t ~f:(apply ~relevant_statement_changes_writer) in
     assert_state_valid t' ;
     t'
 

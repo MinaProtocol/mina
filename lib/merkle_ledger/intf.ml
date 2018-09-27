@@ -3,7 +3,7 @@ open Core
 module type Key = sig
   type t [@@deriving sexp, bin_io]
 
-  val empty : t
+  val zero : t
 
   include Hashable.S_binable with type t := t
 end
