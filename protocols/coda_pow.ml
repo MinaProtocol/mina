@@ -539,17 +539,27 @@ module type Ledger_builder_intf = sig
     -> aux:Aux.t
     -> t Or_error.t
 
-  val random_work_spec_chunk :
-       t
-    -> ledger_proof_statement_set * ledger_proof_statement option
-    -> ( ledger_proof_statement
-       , super_transaction
-       , sparse_ledger
-       , ledger_proof )
-       Snark_work_lib.Work.Single.Spec.t
-       list
-       option
-       * (ledger_proof_statement_set * ledger_proof_statement option)
+  module Coordinator : sig
+    module State : sig
+      type t
+
+      val init : t
+
+      val remove_stale_assignments : t -> t
+    end
+
+    val random_work_spec_chunk :
+         t
+      -> State.t
+      -> ( ledger_proof_statement
+         , super_transaction
+         , sparse_ledger
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+         list
+         option
+         * State.t
+  end
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 end

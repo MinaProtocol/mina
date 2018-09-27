@@ -716,17 +716,18 @@ struct
   end
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs:
-         'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
-      ~(set_seen_jobs:
-            'a
-         -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
-         -> unit) (t: 'a) =
-    let lb = best_ledger_builder t in
-    let maybe_instances, seen_jobs =
-      Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
+      ~(coordinator_state: 'a -> Ledger_builder.Coordinator.State.t)
+      ~(set_coordinator_state:
+         'a -> Ledger_builder.Coordinator.State.t -> unit) (t: 'a) =
+    let coordinator_state =
+      Ledger_builder.Coordinator.State.remove_stale_assignments
+        (coordinator_state t)
     in
-    set_seen_jobs t seen_jobs ;
+    let lb = best_ledger_builder t in
+    let maybe_instances, coordinator_state =
+      Ledger_builder.Coordinator.random_work_spec_chunk lb coordinator_state
+    in
+    set_coordinator_state t coordinator_state ;
     Option.map maybe_instances ~f:(fun instances ->
         {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero} )
 end
@@ -773,7 +774,8 @@ struct
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
   let request_work =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+    Inputs.request_work ~best_ledger_builder ~coordinator_state
+      ~set_coordinator_state
 end
 
 module Coda_without_snark
@@ -799,7 +801,8 @@ struct
   include Coda.Make (Inputs)
 
   let request_work =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+    Inputs.request_work ~best_ledger_builder ~coordinator_state
+      ~set_coordinator_state
 
   let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
@@ -1119,22 +1122,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             get_ledger coda lh ) ]
     in
     let snark_worker_impls =
-      let solved_work_reader, solved_work_writer = Linear_pipe.create () in
-      Linear_pipe.write_without_pushback solved_work_writer () ;
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
-            match%map Linear_pipe.read solved_work_reader with
-            | `Ok () ->
-                let r = request_work coda in
-                Option.iter r ~f:(fun r ->
-                    Logger.info log
-                      !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
-                      r ) ;
-                ( match r with
-                | None ->
-                    Linear_pipe.write_without_pushback solved_work_writer ()
-                | Some _ -> () ) ;
-                r
-            | `Eof -> assert false )
+            let r = request_work coda in
+            Option.iter r ~f:(fun r ->
+                Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
+            ) ;
+            return r )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work: Snark_worker.Work.Result.t) ->
             Logger.info log
@@ -1148,10 +1141,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 | `Transition ->
                     Perf_histograms.add_span
                       ~name:"snark_worker_transition_time" total ) ;
-            let%map () =
-              Snark_pool.add_completed_work (snark_pool coda) work
-            in
-            Linear_pipe.write_without_pushback solved_work_writer () ) ]
+            Snark_pool.add_completed_work (snark_pool coda) work ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         ignore
