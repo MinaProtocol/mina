@@ -716,17 +716,15 @@ struct
   end
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs:
-         'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
-      ~(set_seen_jobs:
-            'a
-         -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
-         -> unit) (t: 'a) =
+      ~(coordinator_state: 'a -> Ledger_builder.Coordinator.State.t)
+      ~(set_coordinator_state:
+         'a -> Ledger_builder.Coordinator.State.t -> unit) (t: 'a) =
     let lb = best_ledger_builder t in
-    let maybe_instances, seen_jobs =
-      Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
+    let maybe_instances, coordinator_state =
+      Ledger_builder.Coordinator.random_work_spec_chunk lb
+        (coordinator_state t)
     in
-    set_seen_jobs t seen_jobs ;
+    set_coordinator_state t coordinator_state ;
     Option.map maybe_instances ~f:(fun instances ->
         {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero} )
 end
@@ -773,7 +771,8 @@ struct
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
   let request_work =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+    Inputs.request_work ~best_ledger_builder ~coordinator_state
+      ~set_coordinator_state
 end
 
 module Coda_without_snark
@@ -799,7 +798,8 @@ struct
   include Coda.Make (Inputs)
 
   let request_work =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+    Inputs.request_work ~best_ledger_builder ~coordinator_state
+      ~set_coordinator_state
 
   let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
