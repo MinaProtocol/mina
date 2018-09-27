@@ -1068,6 +1068,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             | `Eof -> assert false )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work: Snark_worker.Work.Result.t) ->
+            Logger.info log
+              !"Received completed work: %{sexp:Snark_worker.Work.Spec.t}"
+              work.spec ;
             List.iter work.metrics ~f:(fun (total, tag) ->
                 match tag with
                 | `Merge ->

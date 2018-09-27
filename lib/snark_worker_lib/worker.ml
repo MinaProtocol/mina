@@ -21,11 +21,12 @@ struct
           , Sparse_ledger.t
           , Proof.t )
           Work.Single.Spec.t
+        [@@deriving sexp]
       end
     end
 
     module Spec = struct
-      type t = Single.Spec.t Work.Spec.t
+      type t = Single.Spec.t Work.Spec.t [@@deriving sexp]
     end
 
     module Result = struct
