@@ -544,6 +544,8 @@ module type Ledger_builder_intf = sig
       type t
 
       val init : t
+
+      val remove_stale_assignments : t -> t
     end
 
     val random_work_spec_chunk :
