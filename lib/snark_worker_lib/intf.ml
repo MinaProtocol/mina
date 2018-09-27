@@ -90,7 +90,7 @@ module type S = sig
 
   val arguments :
        public_key:Public_key.Compressed.t
-    -> daemon_port:int
+    -> daemon_address:Host_and_port.t
     -> shutdown_on_disconnect:bool
     -> string list
 end
