@@ -1021,7 +1021,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let clear_hist_status t = Perf_histograms.wipe () ; get_status t
 
-  let setup_local_server ?rest_server_port ~coda ~log ~client_port () =
+  let setup_local_server ?(client_whitelist= []) ?rest_server_port ~coda ~log
+      ~client_port () =
+    let client_whitelist =
+      Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
+    in
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
@@ -1091,7 +1095,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                     Server.respond_string ~status:`Not_found "Route not found"
                 )) ) ;
     let where_to_listen =
-      Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
+      Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
     in
     ignore
       (Tcp.Server.create
@@ -1100,17 +1104,25 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
              (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
          where_to_listen
          (fun address reader writer ->
-           Rpc.Connection.server_with_close reader writer
-             ~implementations:
-               (Rpc.Implementations.create_exn
-                  ~implementations:(client_impls @ snark_worker_impls)
-                  ~on_unknown_rpc:`Raise)
-             ~connection_state:(fun _ -> ())
-             ~on_handshake_error:
-               (`Call
-                 (fun exn ->
-                   Logger.error log "%s" (Exn.to_string_mach exn) ;
-                   Deferred.unit )) ))
+           let address = Socket.Address.Inet.addr address in
+           if not (Set.mem client_whitelist address) then (
+             Logger.error log
+               !"Rejecting client connection from \
+                 %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
+               address ;
+             Deferred.unit )
+           else
+             Rpc.Connection.server_with_close reader writer
+               ~implementations:
+                 (Rpc.Implementations.create_exn
+                    ~implementations:(client_impls @ snark_worker_impls)
+                    ~on_unknown_rpc:`Raise)
+               ~connection_state:(fun _ -> ())
+               ~on_handshake_error:
+                 (`Call
+                   (fun exn ->
+                     Logger.error log "%s" (Exn.to_string_mach exn) ;
+                     Deferred.unit )) ))
 
   let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect =
     let open Snark_worker_lib in
