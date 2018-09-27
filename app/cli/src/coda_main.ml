@@ -1104,8 +1104,13 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
              (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
          where_to_listen
          (fun address reader writer ->
-           if not (Set.mem client_whitelist (Socket.Address.Inet.addr address))
-           then Deferred.unit
+           let address = Socket.Address.Inet.addr address in
+           if not (Set.mem client_whitelist address) then (
+             Logger.error log
+               !"Rejecting client connection from \
+                 %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
+               address ;
+             Deferred.unit )
            else
              Rpc.Connection.server_with_close reader writer
                ~implementations:
