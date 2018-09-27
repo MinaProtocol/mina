@@ -13,7 +13,7 @@ module Inputs = struct
   module Proof = struct
     type t =
       Transaction_snark.Statement.t * Coda_base.Sok_message.Digest.Stable.V1.t
-    [@@deriving bin_io]
+    [@@deriving bin_io, sexp]
   end
 
   module Statement = Transaction_snark.Statement

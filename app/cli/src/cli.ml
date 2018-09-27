@@ -115,6 +115,11 @@ let daemon (type ledger_proof) (module Kernel
        let transaction_capacity_log_2 =
          Option.value ~default:4 transaction_capacity_log_2
        in
+       let proposal_interval =
+         Option.value ~default:(Time.Span.of_ms 5000.)
+           (Option.map proposal_interval ~f:(fun millis ->
+                Int.to_float millis |> Time.Span.of_ms ))
+       in
        let discovery_port = external_port + 1 in
        let%bind () = Unix.mkdir ~p:() conf_dir in
        let%bind initial_peers_raw =
@@ -151,6 +156,12 @@ let daemon (type ledger_proof) (module Kernel
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
+       let%bind client_whitelist =
+         Reader.load_sexp
+           (conf_dir ^/ "client_whitelist")
+           [%of_sexp : Unix.Inet_addr.Blocking_sexp.t list]
+         >>| Or_error.ok
+       in
        let keypair =
          Signature_lib.Keypair.of_private_key_exn
            Genesis_ledger.high_balance_sk
@@ -162,6 +173,8 @@ let daemon (type ledger_proof) (module Kernel
 
          let lbc_tree_max_depth = `Finite 50
 
+         let transition_interval = proposal_interval
+
          let keypair = keypair
 
          let genesis_proof = Precomputed_values.base_proof
@@ -170,7 +183,11 @@ let daemon (type ledger_proof) (module Kernel
 
          let commit_id = commit_id
        end in
-       let%bind (module Init) = make_init (module Config) (module Kernel) in
+       let%bind (module Init) =
+         make_init ~should_propose:should_propose_flag
+           (module Config)
+           (module Kernel)
+       in
        let module M = Coda.Make (Init) () in
        let module Run = Run (Config) (M) in
        Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
@@ -203,7 +220,8 @@ let daemon (type ledger_proof) (module Kernel
                 ~keypair ())
          in
          don't_wait_for (Linear_pipe.drain (Run.strongest_ledgers coda)) ;
-         Run.setup_local_server ?rest_server_port ~coda ~client_port ~log () ;
+         Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
+           ~client_port ~log () ;
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
        Async.never ())

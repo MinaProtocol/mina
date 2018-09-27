@@ -144,6 +144,8 @@ struct
 
           let lbc_tree_max_depth = `Finite 50
 
+          let transition_interval = Time.Span.of_ms transition_interval
+
           let keypair =
             Keypair.of_private_key_exn Genesis_ledger.high_balance_sk
 
@@ -153,7 +155,9 @@ struct
 
           let commit_id = None
         end in
-        let%bind (module Init) = make_init (module Config) (module Kernel) in
+        let%bind (module Init) =
+          make_init ~should_propose (module Config) (module Kernel)
+        in
         let module Main = Coda.Make (Init) () in
         let module Run = Run (Config) (Main) in
         let net_config =

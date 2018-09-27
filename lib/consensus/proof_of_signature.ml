@@ -121,6 +121,12 @@ struct
       ; signer_public_key= Global_public_key.compressed }
 
     let length t = t.length
+
+    let to_lite =
+      Some
+        (fun {length; signer_public_key} ->
+          { Lite_base.Consensus_state.length= Lite_compat.length length
+          ; signer_public_key= Lite_compat.public_key signer_public_key } )
   end
 
   module Protocol_state = Protocol_state.Make (Consensus_state)
@@ -131,7 +137,7 @@ struct
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_ ~logger:_ =
+      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -185,16 +191,6 @@ struct
   let select Consensus_state.({length= l1; _})
       Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
-
-  let next_proposal now _state ~local_state:_ ~keypair:_ ~logger:_ =
-    let open Unix_timestamp in
-    let time_since_last_interval =
-      rem now (Time.Span.to_ms Inputs.proposal_interval)
-    in
-    let proposal_time =
-      now - time_since_last_interval + Time.Span.to_ms Inputs.proposal_interval
-    in
-    `Propose proposal_time
 
   let genesis_protocol_state =
     Protocol_state.create_value

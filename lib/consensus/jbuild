@@ -8,6 +8,7 @@
   (library_flags (-linkall))
   (libraries
     ( core_kernel
+      lite_compat
       coda_base
       snark_params
       rc_pool
