@@ -176,25 +176,28 @@ module type Init_intf = sig
 
   include Kernel_intf
 
-  val prover : Prover.t
+  val proposer_prover : [`Proposer of Prover.t | `Non_proposer]
 
   val verifier : Verifier.t
 
   val genesis_proof : Proof.t
 end
 
-let make_init (type ledger_proof) (module Config : Config_intf) (module Kernel
-    : Kernel_intf with type Ledger_proof.t = ledger_proof) :
+let make_init ~should_propose (type ledger_proof) (module Config : Config_intf)
+    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof) :
     (module Init_intf with type Ledger_proof.t = ledger_proof) Deferred.t =
   let open Config in
   let open Kernel in
-  let%bind prover = Prover.create ~conf_dir in
+  let%bind proposer_prover =
+    if should_propose then Prover.create ~conf_dir >>| fun p -> `Proposer p
+    else return `Non_proposer
+  in
   let%map verifier = Verifier.create ~conf_dir in
   let module Init = struct
     include Kernel
     include Config
 
-    let prover = prover
+    let proposer_prover = proposer_prover
 
     let verifier = verifier
   end in
@@ -650,13 +653,16 @@ struct
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
           (transition: Init.Consensus_mechanism.Internal_transition.t) =
-        let open Deferred.Or_error.Let_syntax in
-        Init.Prover.extend_blockchain Init.prover
-          (Init.Blockchain.create ~proof:prev_state_proof ~state:prev_state)
-          next_state
-          (Init.Consensus_mechanism.Internal_transition.snark_transition
-             transition)
-        >>| fun {Init.Blockchain.proof; _} -> proof
+        match Init.proposer_prover with
+        | `Non_proposer -> failwith "prove: Coda not run as proposer"
+        | `Proposer prover ->
+            let open Deferred.Or_error.Let_syntax in
+            Init.Prover.extend_blockchain prover
+              (Init.Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+              next_state
+              (Init.Consensus_mechanism.Internal_transition.snark_transition
+                 transition)
+            >>| fun {Init.Blockchain.proof; _} -> proof
     end
 
     module Proposal_interval = struct

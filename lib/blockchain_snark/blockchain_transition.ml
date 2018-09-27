@@ -44,7 +44,7 @@ module Keys = struct
         | Ok x -> x
         | Error _e ->
             failwithf
-              !"Transaction_snark: load failed on %{sexp:Storage.location}"
+              !"Blockchain_snark: load failed on %{sexp:Storage.location}"
               p ()
       in
       let%map step = load tick_controller step
@@ -82,7 +82,7 @@ module Keys = struct
         | Ok x -> x
         | Error _e ->
             failwithf
-              !"Transaction_snark: load failed on %{sexp:Storage.location}"
+              !"Blockchain_snark: load failed on %{sexp:Storage.location}"
               p ()
       in
       let%map step = load tick_controller step
