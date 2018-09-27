@@ -156,6 +156,12 @@ let daemon (type ledger_proof) (module Kernel
        let me =
          (Host_and_port.create ~host:ip ~port:discovery_port, external_port)
        in
+       let%bind client_whitelist =
+         Reader.load_sexp
+           (conf_dir ^/ "client_whitelist")
+           [%of_sexp : Unix.Inet_addr.Blocking_sexp.t list]
+         >>| Or_error.ok
+       in
        let keypair =
          Signature_lib.Keypair.of_private_key_exn
            Genesis_ledger.high_balance_sk
@@ -177,7 +183,11 @@ let daemon (type ledger_proof) (module Kernel
 
          let commit_id = commit_id
        end in
-       let%bind (module Init) = make_init (module Config) (module Kernel) in
+       let%bind (module Init) =
+         make_init ~should_propose:should_propose_flag
+           (module Config)
+           (module Kernel)
+       in
        let module M = Coda.Make (Init) () in
        let module Run = Run (Config) (M) in
        Async.Scheduler.report_long_cycle_times ~cutoff:(sec 0.5) () ;
@@ -218,7 +228,8 @@ let daemon (type ledger_proof) (module Kernel
                  Linear_pipe.iter (Run.strongest_ledgers coda) ~f:(fun _ ->
                      Web_client_pipe.store web_client_pipe coda ))
                 |> don't_wait_for ) ;
-         Run.setup_local_server ?rest_server_port ~coda ~client_port ~log () ;
+         Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
+           ~client_port ~log () ;
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
        in
        Async.never ())

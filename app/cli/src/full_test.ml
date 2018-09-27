@@ -30,7 +30,12 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
 
     let commit_id = None
   end in
-  let%bind (module Init) = make_init (module Config) (module Kernel) in
+  let should_propose_bool = true in
+  let%bind (module Init) =
+    make_init ~should_propose:should_propose_bool
+      (module Config)
+      (module Kernel)
+  in
   let module Main = Coda.Make (Init) () in
   let module Run = Run (Config) (Main) in
   let open Main in
@@ -44,10 +49,9 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; conf_dir
         ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000) } }
   in
-  let should_propose = true in
   let%bind coda =
     Main.create
-      (Main.Config.make ~log ~net_config ~should_propose
+      (Main.Config.make ~log ~net_config ~should_propose:should_propose_bool
          ~run_snark_worker:with_snark
          ~ledger_builder_persistant_location:"ledger_builder"
          ~transaction_pool_disk_location:"transaction_pool"

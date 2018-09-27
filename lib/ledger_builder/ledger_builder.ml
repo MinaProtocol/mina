@@ -387,7 +387,13 @@ end = struct
     match jobs with
     | [] -> (None, seen_statements)
     | _ ->
-        let i = Random.int (List.length jobs) in
+        (* It used to be [Random.int (List.length jobs)]. For now, we are making the policy
+         to pick the first one. This fixes the issue that the work must be done in order.
+         It is wasteful because it doesn't utilize parallelism across non-communicating nodes,
+         but for now it makes it actually work, as we don't accidentally do later jobs and
+         leave the early jobs undone.
+      *)
+        let i = 0 in
         let j = index_of_nth_occurence dirty_jobs i |> Option.value_exn in
         (*TODO All of this will change, when we fix  #450. 
           There'll be no more bundles! *)
