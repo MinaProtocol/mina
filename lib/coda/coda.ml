@@ -303,7 +303,7 @@ module type State_with_witness_intf = sig
   val forget_witness : t -> state
 end
 
-module type Lite_chain_intf = sig
+module type Lite_chain_client_data_intf = sig
   type t
 
   type proof
@@ -402,8 +402,8 @@ module type Inputs_intf = sig
     val proof : Protocol_state_proof.t
   end
 
-  module Lite_chain :
-    Lite_chain_intf
+  module Lite_chain_client_data :
+    Lite_chain_client_data_intf
     with type ledger := Ledger.t
      and type proof := Protocol_state_proof.t
      and type state := Consensus_mechanism.Protocol_state.value
@@ -624,8 +624,8 @@ module Make (Inputs : Inputs_intf) = struct
           config.ledger_builder_transition_backup_capacity }
 
   let get_lite_chain :
-      (t -> Public_key.Compressed.t list -> Lite_chain.t) option =
-    Option.map Lite_chain.create ~f:(fun create t keys ->
+      (t -> Public_key.Compressed.t list -> Lite_chain_client_data.t) option =
+    Option.map Lite_chain_client_data.create ~f:(fun create t keys ->
         let ledger, state, proof = best_tip t in
         create proof ledger state keys )
 end

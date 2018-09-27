@@ -664,7 +664,7 @@ struct
     end
   end)
 
-  module Lite_chain = struct
+  module Lite_chain_client_data = struct
     type t = Web_client_pipe.chain
 
     type chain
