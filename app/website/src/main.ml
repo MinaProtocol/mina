@@ -444,7 +444,7 @@ let demo () =
       ; comic
          ~title:"Problem"
          ~content:[
-           "Cryptocurrencies today are growing increasingly large, increasing centralization and bringing them out of reach of the end user. And as cryptocurrencies get more centralized, they lose the properties that make them valuable"]
+           "Cryptocurrencies today are growing increasingly large, increasing centralization and bringing them out of reach of the end user. And as cryptocurrencies get more centralized, they lose the properties that make them valuable."]
          ~img:(`Real "problem.png")
       ; comic
         ~title:"Coda"

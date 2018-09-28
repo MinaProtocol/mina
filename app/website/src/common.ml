@@ -240,7 +240,7 @@ module Compound_chunk = struct
     match image with 
     | None -> 
         (div
-           [class_ "flex items-center mb5"]
+           [class_ "flex items-center mb5 fixed_no_img_height"]
            [ important_text ])
     | Some image ->
     let left, right =
@@ -301,61 +301,47 @@ module Section = struct
 
   let carousel ?heading ~pages ~scheme () =
     let open Html_concise in
-    let control_divs =
-      List.mapi pages ~f:(fun i _ ->
-        div [id (Printf.sprintf "item-%d" i); Style.(render (of_class "control-operator "))] []
-      )
-    in
-    let controls =
-      List.init (List.length pages) ~f:(fun i -> 
-        let skip =
-          if i = 4
-          then (a [Style.(render (of_class "jump")); href "#item-0"] [text "start over"] )
-          else (a [Style.(render (of_class "jump")); href "#item-4"] [text "skip"] )
-        in
-        let next =
-            if i = 4
-            then 
-              let button_hint, label, url, new_tab =
-                "Follow our progress", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
-              in
-              Input_button.cta ~button_hint ~label
-                        ~url ~extra_style:"progress-button" ~new_tab ()
-            else
-              a [Style.(render (of_class "next-button")); href (Printf.sprintf "#item-%d" (i+1))] [div [] [text "›"]]
-          (*let button_hint, label, url, new_tab =
-            if i = 4
-            then "Follow our progress", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
-            else "›", "demo-next-cta", (Printf.sprintf "#item-%d" (i+1)), false
-          in 
-            Input_button.cta ~button_hint ~label
-                      ~url ~extra_style:"next-button" ~new_tab ()*)
-        in
-        div [Style.(render (of_class "controls flex justify-left user-select-none"))]
-          ([ div []
-            (List.mapi pages ~f:(fun j _ ->
-              let selected = if j=i then " selected" else "" in
-              a [href (Printf.sprintf "#item-%d" j)
-                ; Style.(render (of_class ("control-button" ^ selected)))]
-              [Html.text {literal|•|literal}]
-            ))
-          ; skip
-          ; next ])
+    let carousel = 
+      let control_divs =
+        List.mapi pages ~f:(fun i _ ->
+          div [id (Printf.sprintf "item-%d" i); Style.(render (of_class "control-operator "))] []
         )
-    in
-    let figures =
-      let figure = Html.node "figure" in
-      List.map3_exn 
-        (List.init (List.length pages) ~f:Fn.id) 
-        pages 
-        controls
-        ~f:(fun i page controls ->
-            figure [Style.(render (of_class "item mt0 mb0 ml0 mr0"))] ([ page; controls ])
-      )
-    in
-    let carousel =
-      div [Style.(render (of_class (Printf.sprintf "gallery items-%d" (List.length pages))))]
-        (control_divs @ figures)
+      in
+      let controls =
+        List.init (List.length pages) ~f:(fun i -> 
+          let skip =
+            if i = 4
+            then (a [Style.(render (of_class "jump")); href "#item-0"] [text "start over"] )
+            else (a [Style.(render (of_class "jump")); href "#item-4"] [text "skip"] )
+          in
+          let next =
+              if i = 4
+              then 
+                let button_hint, label, url, new_tab =
+                  "Follow our progress", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
+                in
+                Input_button.cta ~button_hint ~label
+                          ~url ~extra_style:"progress-button" ~new_tab ()
+              else
+                a [Style.(render (of_class "next-button")); href (Printf.sprintf "#item-%d" (i+1))] [div [] [text "›"]]
+          in
+          div [Style.(render (of_class "controls flex justify-left user-select-none"))]
+            ([ div []
+              (List.mapi pages ~f:(fun j _ ->
+                let selected = if j=i then " selected" else "" in
+                a [href (Printf.sprintf "#item-%d" j)
+                  ; Style.(render (of_class ("control-button" ^ selected)))]
+                [Html.text {literal|•|literal}]
+              ))
+            ; skip
+            ; next ])
+          )
+      in
+      let items = 
+        List.map2_exn pages controls ~f:(fun page control -> div [Style.(render (of_class "item mt0 mb0 ml0 mr0"))] [ page; control ])
+      in
+      div [Style.(render (of_class "gallery"))]
+        (control_divs @ items)
     in
     section' ?heading carousel scheme
 

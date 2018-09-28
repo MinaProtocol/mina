@@ -1,90 +1,47 @@
-/* gallery-css ; tweaked by bkase */
-.gallery .control-operator:target ~ .controls .control-button {
-  color: #ccc;
-  color: #E5E9F2;
-}
 
-.gallery a.selected {
-  color: #8492A6;
-}
-
-.gallery .item:first-of-type {
-  position: static;
-  pointer-events: auto;
-  opacity: 1;
-}
 
 .gallery .item {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  pointer-events: none;
-  opacity: 0;
-  -webkit-transition: opacity .5s;
-  -o-transition: opacity .5s;
-  transition: opacity .5s;
+  display: none;
+  position: relative;
 }
 
 .gallery .control-operator {
   display: none;
 }
 
+.gallery .item:nth-of-type(6) {
+  display: block;
+}
+
 .gallery .control-operator:target ~ .item {
-  pointer-events: none;
-  opacity: 0;
-  -webkit-animation: none;
-  -o-animation: none;
-  animation: none;
+  display: none;
 }
 
-.gallery .control-operator:target ~ .controls .control-button {
-  -webkit-animation: none;
-  -o-animation: none;
-  animation: none;
-}
-
-.gallery .control-operator:nth-of-type(1):target ~ .item:nth-of-type(1),
-.gallery .control-operator:nth-of-type(2):target ~ .item:nth-of-type(2),
-.gallery .control-operator:nth-of-type(3):target ~ .item:nth-of-type(3),
-.gallery .control-operator:nth-of-type(4):target ~ .item:nth-of-type(4),
-.gallery .control-operator:nth-of-type(5):target ~ .item:nth-of-type(5) {
-  pointer-events: auto;
-  opacity: 1;
-}
-
-
-.gallery .control-button {
-  color: #E5E9F2;
-}
-
-.gallery .control-button:hover {
-  color: #8492A6;
-}
-
-/*
-	Theme controls how everything looks in Gallery CSS.
-*/
-
-.gallery {
-  position: relative;
-  /* HACK: :( can't figure out why mobile won't size this right */
-  padding-bottom: 8rem;
+.gallery .control-operator:nth-of-type(1):target ~ .item:nth-of-type(6),
+.gallery .control-operator:nth-of-type(2):target ~ .item:nth-of-type(7),
+.gallery .control-operator:nth-of-type(3):target ~ .item:nth-of-type(8),
+.gallery .control-operator:nth-of-type(4):target ~ .item:nth-of-type(9),
+.gallery .control-operator:nth-of-type(5):target ~ .item:nth-of-type(10) {
+  display: block;
 }
 
 .gallery .item {
-  overflow: hidden;
-  height: 100%;
+  height: 450px;
 }
 
-.gallery .item:nth-of-type(1) {
+.gallery img {
   height: 350px;
+  width: auto;
+}
+
+.fixed_no_img_height {
+  height: 300px;
 }
 
 .gallery .controls {
+  width: 100%;
   position: absolute;
   bottom: 0;
-  width: 100%;
 }
 
 .gallery .control-button {
@@ -150,7 +107,7 @@
   color: #647286;
 }
 
-.gallery .item:first-of-type .next-button {
+.gallery .item:nth-of-type(6) .next-button {
   animation: pulse 2s infinite;
 }
 
@@ -163,4 +120,14 @@
   }
 }
 
+.gallery .control-button {
+  color: #E5E9F2;
+}
 
+.gallery .control-button.selected {
+  color: #8492A6;
+}
+
+.gallery .control-button:hover {
+  color: #8492A6;
+}
