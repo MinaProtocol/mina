@@ -476,6 +476,7 @@ let demo () =
   let app scheme =
     let open Html_concise in
     Section.section'
+      ~heading_size:`Large
       ~heading:"Live Demo"
       (div [Style.(render (of_class "flex justify-center")); id "block-explorer"] [])
       scheme

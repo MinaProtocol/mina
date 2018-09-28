@@ -263,15 +263,20 @@ module Compound_chunk = struct
 end
 
 module Section = struct
-  let section' ?heading ?(footer= false) content scheme =
+  let section' ?(heading_size=`Normal) ?heading ?(footer= false) content scheme =
     let open Html_concise in
     let color, bg_color =
       match scheme with
       | `Light -> ("black", "bg-white")
       | `Dark -> ("silver", "bg-snow")
     in
+    let heading_font = 
+      match heading_size with
+      | `Normal -> "f5"
+      | `Large -> "f3"
+    in
     let heading_style =
-      Style.(Styles.heading_style + of_class color + of_class "tc f5 mt0 mb4")
+      Style.(Styles.heading_style + of_class color + of_class ("tc mt0 mb4 " ^ heading_font))
     in
     let maybe_id =
       match heading with
