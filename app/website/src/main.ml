@@ -481,7 +481,27 @@ let demo () =
       (div [Style.(render (of_class "flex justify-center min-h7")); id "block-explorer"] [])
       scheme
   in
-  let sections = [top; app] in
+  let bottom scheme = 
+    let open Html_concise in
+    Section.section'
+    (div 
+       [Style.(render (of_class "flex justify-center"))]
+      [ Input_button.cta 
+          ~button_hint:"Check Testnet Status"
+          ~label:"check-testnet-status"
+          ~url:"http://status.codaprotocol.com" 
+          ~extra_style:"mh2"
+          ~new_tab:true ()
+      ; Input_button.cta 
+          ~button_hint:"Share on twitter"
+          ~label:"share-demo"
+          ~url:"todo" 
+          ~extra_style:"mh2"
+          ~new_tab:true ()
+      ] )
+    scheme
+  in
+  let sections = [top; app; bottom] in
   wrap ~fixed_footer:false ~page_label:(Links.(label demo)) sections
 
 let job_post name description =
