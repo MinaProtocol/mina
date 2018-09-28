@@ -238,23 +238,73 @@ module Style = struct
   let just = Fn.compose render of_class
 end
 
+module Visibility = struct
+  let no_mobile = Style.of_class "dn db-ns"
+
+  let only_large = Style.of_class "dn db-l"
+
+  let only_mobile = Style.of_class "db dn-ns"
+end
+
+
+module Mobile_switch = struct
+  let create ~not_small ~small =
+    let open Node in
+    div []
+      [ div [Style.render Visibility.no_mobile] [not_small]
+      ; div [Style.render Visibility.only_mobile] [small] ]
+end
+
+let g_update_state_and_vdom = ref (fun _ -> ())
+
+let js_is_mobile_small () : bool =
+  not (Js.Unsafe.js_expr "window.matchMedia(\"(min-width: 30em)\").matches")
+
 module Html = struct
   open Virtual_dom.Vdom
 
   let grouping_style =
-     Style.of_class "br3 bg-darksnow shadow-subtle ph2 pv2"
+     Style.of_class "br3 bg-darksnow shadow-subtle ph2 pv2 relative"
 
   let div = Node.div
 
   let extend_class c co =
     c ^ Option.value_map ~default:"" co ~f:(fun s -> " " ^ s)
 
+
   module Tooltip = struct
-    let create ~active ~text ~arity =
-      let body =
-        div [Style.just "mw5 b-sky shadow-subtle br3 bg-darksnow ph3 pv3 roboto lh-copy bluesilver"]
-            [Node.text text]
+    type t =
+      { active: bool
+      ; text: string
+      ; alt_text: string option
+      ; arity: [`Left | `Right]
+      }
+
+    let create ~active ~text ?alt_text ~arity () =
+      {text; alt_text; active; arity}
+
+    let body ?(extra_style=Style.empty) text =
+        div [Style.(render (of_class "mw5 b-sky shadow-subtle br3 bg-darksnow ph3 pv3 roboto lh-copy bluesilver" + extra_style))]
+            [
+              div [Style.(render (of_class "flex items-center" + extra_style))]
+              [Node.text text]
+            ]
+
+    let render_overlay {active;text;arity=_;alt_text} =
+      let text =
+        Option.value alt_text ~default:text
       in
+      let body = body ~extra_style:(Style.of_class "h-100") text in
+
+      div [Style.render (if active then Style.empty else Style.of_class "dn")]
+        [
+          div
+          [ Style.(render (of_class "absolute left-0 top-0 o-90 h-100 w-100" + Visibility.only_mobile )) ]
+            [body]
+        ]
+
+    let render_wide {active;text;arity;alt_text=_} =
+      let body = body text in
       let chevron =
         match arity with
         | `Left -> "›"
@@ -263,6 +313,7 @@ module Html = struct
       let chevron_dom =
         div [Style.just "silver ml3 mr3 f1 sky"] [Node.text chevron]
       in
+      div [Style.render Visibility.no_mobile] [
       div [Style.(render (of_class "flex items-center animate-opacity" + if active then Style.empty else (of_class "o-10")))]
         (match arity with
         | `Left ->
@@ -271,6 +322,7 @@ module Html = struct
         | `Right ->
           [ chevron_dom
           ; body ])
+      ]
   end
 
   module Record = struct
@@ -289,12 +341,10 @@ module Html = struct
             (of_class "br3 shadow-subtle" + extra_style + 
               (match (important, verification) with
               | true, `Complete (Ok ()) ->
-                  printf "VERIFIED\n";
                   (of_class "grass-gradient b-grass")
               | (true, `Pending _) | (false, _) ->
                   (of_class "silver-gradient br3 b-silver")
               | true, `Complete (Error _) ->
-                  printf "NOT VERIFIED\n";
                   (of_class "bright-red br3 b-silver"))
             )) ]
           [ div [Style.just "br3 pv2 br--top"]
@@ -352,11 +402,11 @@ module Html = struct
         let content =
           match tooltip with
           | `Left tooltip ->
-              [tooltip; record]
+              [Tooltip.render_wide tooltip; record; Tooltip.render_overlay tooltip]
           | `Right tooltip ->
-              [record; tooltip]
+              [record; Tooltip.render_wide tooltip; Tooltip.render_overlay tooltip]
         in
-        div [Style.just "flex items-center mb3"]
+        div [Style.just "flex items-center mb3 relative"]
           content
   end
 end
@@ -376,20 +426,36 @@ let hash_colors =
 
 let color_at_layer i = hash_colors.(i mod (Array.length hash_colors))
 
-let g_update_state_and_vdom = ref (fun _ -> ())
-
 let hoverable state node target attrs =
   let update_tooltip  _ = 
-    !g_update_state_and_vdom { state with State.tooltip_stage=target };
+    if not (js_is_mobile_small ()) then (
+      !g_update_state_and_vdom { state with State.tooltip_stage=target }
+    );
     Event.Ignore
   in
   let reset_tooltip _ =
-    !g_update_state_and_vdom { state with State.tooltip_stage=Tooltip_stage.None };
+    if not (js_is_mobile_small ()) then (
+      !g_update_state_and_vdom { state with State.tooltip_stage=Tooltip_stage.None }
+    );
     Event.Ignore
+  in
+  let mobile_update_toggle _ =
+    printf "I'jm (kinda) inside the mobile toggle";
+    if js_is_mobile_small () then (
+      printf "I'jm inside the mobile toggle";
+      let target' =
+        match (state.State.tooltip_stage, target) with
+        | Tooltip_stage.None, _ -> target
+        | x, y when Tooltip_stage.equal x y -> Tooltip_stage.None
+        | _ -> target
+      in
+      !g_update_state_and_vdom { state with State.tooltip_stage=target' }
+    );
+    Event.Stop_propagation
   in
   let open Node in
   let open Attr in
-  div ([on_mouseenter update_tooltip; on_mouseleave reset_tooltip] @ attrs) [ node ]
+  div ([on_mouseenter update_tooltip; on_mouseleave reset_tooltip; on_click mobile_update_toggle] @ attrs) [ node ]
 
 
 let merkle_tree num_layers_to_show =
@@ -549,34 +615,22 @@ let merkle_tree num_layers_to_show =
                 Some (Svg.circle ~radius ~color ~center:pos)
             | Spec.Account _ -> None )
       in
+      let tooltip =
+        Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"To know the state of a particular account in Coda, a client needs the database merkle root from the protocol state, a merkle path, and the account properties. Because the database is a merkle root, this information is sufficient to determine the balance in an account. And because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data." ()
+      in
       hoverable state (
       Node.div [Style.just "flex items-center"]
-      [ Node.div [Style.(render (of_class "mw5" + Html.grouping_style))]
+      [ Node.div [Style.(render (of_class "mw5 relative" + Html.grouping_style))]
           ( Svg.main
               ~width:(image_width +. left_offset)
               ~height:(image_height +. top_offset)
               (edges :: sibling_edges @ nodes @ sibling_nodes)
-          :: Option.to_list account )
-      ; Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"To know the state of a particular account in Coda, a client needs the database merkle root from the protocol state, a merkle path, and the account properties. Because the database is a merkle root, this information is sufficient to determine the balance in an account. And because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data."
+          :: Option.to_list account
+          @ [Html.Tooltip.render_overlay tooltip])
+      ; Html.Tooltip.render_wide tooltip
       ]) Tooltip_stage.Account_state []
     in
     rendered
-
-module Visibility = struct
-  let no_mobile = Style.of_class "dn db-ns"
-
-  let only_large = Style.of_class "dn db-l"
-
-  let only_mobile = Style.of_class "db dn-ns"
-end
-
-module Mobile_switch = struct
-  let create ~not_small ~small =
-    let open Node in
-    div []
-      [ div [Style.render Visibility.no_mobile] [not_small]
-      ; div [Style.render Visibility.only_mobile] [small] ]
-end
 
 module Image = struct
   let draw ?(style= Style.empty) ~src ~alt xy =
@@ -836,19 +890,28 @@ let state_html
   in
   let hoverable = hoverable state in
   let _ = ledger in
+  let snark_tooltip =
+    Html.Tooltip.create ~active:(Tooltip_stage.(equal Proof state.State.tooltip_stage)) ~arity:`Left
+        ~text:"While other cryptocurrencies require downloading and verifying a lengthy, ever growing blockchain, the Coda network incrementally produces zk-SNARK proofs, which serve as cryptographic certifications of the database. The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."
+        ~alt_text:"The Coda network incrementally produces zk-SNARK proofs which server as certifications of the database. Coda doesn't need the full history. This is equivalent to downloading the entire blockchain in other cryptocurrencies"
+        ()
+  in
+  let state_tooltip =
+    Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"Coda's protocol state is composed of the consensus state and the database state. Our test network is currently using \"proof of signature\", where producing a valid snark for an updated protocol state requires a priveleged private key (Coda will use a fully open consensus protocol in later versions of the testnet). The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed." ()
+  in
   let state_explorer =
     match download_progress with
     | Progress _ -> div [] [Node.text "downloading..."]
     | Done -> 
     div [class_ "state-explorer flex-ll items-center"]
       [ div [class_ "state-with-proof mw7 mr4"]
-          [ hoverable(Html.Record.render
+          [ hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left state_tooltip) state_record `Wide) Tooltip_stage.Blockchain_state []
+          ; hoverable(Html.Record.render
             ~grouping:`Together
-            ~tooltip:(`Left (Html.Tooltip.create ~active:(Tooltip_stage.(equal Proof state.State.tooltip_stage)) ~arity:`Left ~text:"While other cryptocurrencies require downloading and verifying a lengthy, ever growing blockchain, the Coda network incrementally produces zk-SNARK proofs, which serve as cryptographic certifications of the database. The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."))
+            ~tooltip:(`Left snark_tooltip)
             (Html.Record.create
             [[ create_entry ~important:true ~extra_style:proof_style "blockchain_SNARK" (to_base64 (module Proof) proof)
             ]]) `Thin) Tooltip_stage.Proof  []
-          ; hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left (Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"Coda's protocol state is composed of the consensus state and the database state. Our test network is currently using \"proof of signature\", where producing a valid snark for an updated protocol state requires a priveleged private key (Coda will use a fully open consensus protocol in later versions of the testnet). The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed.")) state_record `Wide) Tooltip_stage.Blockchain_state []
           ]
       ; hoverable
           ( let tree = Sparse_ledger_lib.Sparse_ledger.tree ledger in

@@ -478,7 +478,7 @@ let demo () =
     Section.section'
       ~heading_size:`Large
       ~heading:"Live Demo"
-      (div [Style.(render (of_class "flex justify-center")); id "block-explorer"] [])
+      (div [Style.(render (of_class "flex justify-center min-h7")); id "block-explorer"] [])
       scheme
   in
   let sections = [top; app] in
