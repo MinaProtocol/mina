@@ -263,7 +263,7 @@ module Html = struct
       let chevron_dom =
         div [Style.just "silver ml3 mr3 f1 sky"] [Node.text chevron]
       in
-      div [Style.(render (of_class "flex items-center" + if active then Style.empty else (of_class "o-10")))]
+      div [Style.(render (of_class "flex items-center animate-opacity" + if active then Style.empty else (of_class "o-10")))]
         (match arity with
         | `Left ->
           [ body

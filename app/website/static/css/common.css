@@ -183,3 +183,8 @@
   width: 100%;
 }
 
+.animate-opacity {
+  -webkit-transition: opacity .1s;
+  -o-transition: opacity .1s;
+  transition: opacity .1s;
+}
