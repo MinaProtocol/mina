@@ -699,16 +699,23 @@
   right: 0;
   text-decoration: none;
   vertical-align: middle;
-  margin-top: 1px;
   line-height: 80px;
-  height: 80px;
-  width: 80px;
-  border-radius: 100%;
+  margin-top: 25px;
   text-align: center;
-  font-size: 80px;
-  margin-top: 15px;
-  background-color: #EFF2F7;
+  border-radius: 100%;
+  height: 60px;
+  width: 60px;
+  background-color: #F9FAFC;
+  border: 1px solid #EFF2F7;
   color: #8492A6;
+}
+.gallery .next-button > div {
+  position: absolute;
+  top: -16px;
+  left: 2px;
+  font-size: 90px;
+  width: 100%;
+
 }
 
 .gallery .next-button:hover {
@@ -721,10 +728,9 @@
 
 @keyframes pulse {
   0% {
-
-    box-shadow: 0 0 0 0 rgb(132, 146, 166, .5);
+    box-shadow: 0 0 0 0 rgba(239, 242, 247, 1);
   }
   50% {
-    box-shadow: 0 0 2px 20px rgb(132, 146, 166, 0);
+    box-shadow: 0 0 2px 40px rgba(239, 242, 247, 0);
   }
 }
