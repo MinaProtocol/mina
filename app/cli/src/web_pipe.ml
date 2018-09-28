@@ -64,8 +64,9 @@ struct
 
   let run coda =
     (let%bind web_client_pipe = Web_pipe.create () in
-    Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
-        Web_pipe.store web_client_pipe coda ) ) |> don't_wait_for
+     Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+         Web_pipe.store web_client_pipe coda ))
+    |> don't_wait_for
 end
 
 let get_service () =

@@ -58,16 +58,14 @@ struct
     ; reader: chain Linear_pipe.Reader.t
     ; writer: chain Linear_pipe.Writer.t }
 
-  let write_to_storage {location; chain_storage; _}
-      request {protocol_state; proof; ledgers; _} =
+  let write_to_storage {location; chain_storage; _} request
+      {protocol_state; proof; ledgers; _} =
     let chain_file = location ^/ "chain" in
     (* HACK: we are just passing in the proposer path for this demo *)
-    assert (List.length ledgers = 1);
-    let chain = {
-      Lite_chain.proof
-      ; protocol_state      
-      ; ledger = (List.hd_exn ledgers)
-    } in
+    assert (List.length ledgers = 1) ;
+    let chain =
+      {Lite_chain.proof; protocol_state; ledger= List.hd_exn ledgers}
+    in
     let%bind () = Store.store chain_storage chain_file chain in
     Request.put request location
 
@@ -77,12 +75,7 @@ struct
     let parent_log = Config.log in
     let chain_storage = Store.Controller.create ~parent_log Lite_chain.bin_t in
     let reader, writer = Linear_pipe.create () in
-    let t =
-      { location
-      ; chain_storage
-      ; reader
-      ; writer }
-    in
+    let t = {location; chain_storage; reader; writer} in
     let%map () =
       match%map Request.create () with
       | Ok request ->
