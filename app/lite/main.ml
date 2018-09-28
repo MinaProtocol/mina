@@ -127,7 +127,7 @@ let start_time = Time.now ()
 
 module State = struct
   type t =
-    { verification: [`Pending of int | `Complete of unit Or_error.t]
+    { verification: [`Pending of int | `Complete of Verifier.Response.result Or_error.t]
     ; chain: Lite_chain.t
     ; tooltip_stage: Tooltip_stage.t
     }
@@ -312,7 +312,7 @@ module Html = struct
       type t =
         { label: string
         ; value: string
-        ; verification: [`Pending of int | `Complete of unit Or_error.t]
+        ; verification: [`Pending of int | `Complete of Verifier.Response.result Or_error.t]
         ; important: bool
         ; extra_style: Style.t
         }
@@ -322,7 +322,7 @@ module Html = struct
         div [Style.(render
             (of_class "br3 shadow-subtle" + extra_style + 
               (match (important, verification) with
-              | true, `Complete (Ok ()) ->
+              | true, `Complete (Ok _) ->
                   (of_class "grass-gradient b-grass")
               | (true, `Pending _) | (false, _) ->
                   (of_class "silver-gradient br3 b-silver")
@@ -335,7 +335,7 @@ module Html = struct
                 [Style.(render (
                 (of_class "dib ml3 mr2 ph1 br-100 w01 h01")
                   + (match verification with
-                    | `Complete (Ok ()) -> (of_class "shadow-small2 bg-grass")
+                    | `Complete (Ok _) -> (of_class "shadow-small2 bg-grass")
                     | `Pending _ -> (of_class "shadow-small1 bg-dullgrey")
                     | `Complete (Error _) -> (of_class "shadow-small1 bright-red")
                   )))] []
