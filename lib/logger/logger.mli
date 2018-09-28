@@ -35,6 +35,8 @@ type 'a logger =
 
 val create : unit -> t
 
+val null : unit -> t
+
 val trace : _ logger
 
 val debug : _ logger

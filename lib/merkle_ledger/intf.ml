@@ -20,6 +20,8 @@ module type Account = sig
   type key
 
   val public_key : t -> key
+
+  val empty : t
 end
 
 module type Hash = sig
