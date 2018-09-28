@@ -419,7 +419,7 @@ let jobs () =
   wrap ~page_label:(Links.(label jobs)) ~fixed_footer:true sections
 
 let demo () =
-  let comic ?(alt_content=None) ~title ~content ~img () =
+  let comic ~title ~content ~img () =
     let image =
       match img with
       | `None -> None
@@ -428,16 +428,7 @@ let demo () =
       | `Real s ->
         Some (Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns w-100") ("/static/img/demo/" ^ s) `Free)
     in
-    let important_text = 
-      match alt_content with
-      | None -> Important_text.create ~title:(`Left title) ~content
-      | Some alt_content -> (
-          Mobile_switch.create
-            ~small:
-              (Important_text.create ~title:(`Left title) ~content:alt_content)
-            ~not_small:
-              (Important_text.create ~title:(`Left title) ~content))
-    in
+    let important_text = Important_text.create ~title:(`Left title) ~content in
     Compound_chunk.create ~variant:`No_image_on_small ~important_text ~image ~image_positioning:Image_positioning.Right ()
   in
   let top scheme =
@@ -447,14 +438,14 @@ let demo () =
       ~pages:
       [ comic
         ~title:"What is this?"
-        ~content:["This is an interactive demo of the Coda testnet. Coda is a cryptocurrency so lightweight, it can even run in your browser."
+        ~content:["This is an interactive demo of the Coda testnet. Coda is a cryptocurrency *so lightweight*, it can even run in your browser."
         ; "On this page you can learn more about Coda, the testnet, and how the protocol works."
         ]
         ~img:`None ()
       ; comic
          ~title:"Problem"
          ~content:[
-           "Cryptocurrencies today are growing increasingly large. As this happens, decentralization is threatened, as users are increasingly forced to use cryptocurrency through powerful trusted third parties." ]
+           "Cryptocurrencies are growing increasingly large. As this happens, *today decentralization is threatened*, as users are increasingly forced to use cryptocurrency through powerful trusted third parties." ]
          ~img:(`Real "problem.png") ()
       ; comic
         ~title:"Coda"
@@ -472,15 +463,10 @@ let demo () =
       ; comic
         ~title:"Coda Protocol Demo"
         ~content:
-[ "This demo is showing a live, browser-verified copy of the Coda protocol testnet."
-
-; "Coda enables you to verify the balance in an account with just a constant, small amount of bandwidth and computation - unlike other cryptocurrencies with require downloading and processing an ever-growing amount of data. And, it will keep these properties as it scales to more users and applications."
+[ "This demo is showing a *live, browser-verified* copy of the Coda protocol testnet."
 
 ; "When released, Coda will put users back in control of cryptocurrency. Its our first step towards building computer systems that put users back in control of their digital lives." ]
         ~img:`None 
-        ~alt_content: (Some [ "This demo is showing a live, browser-verified copy of the Coda protocol testnet."
-
-; "When released, Coda will put users back in control of cryptocurrency. Its our first step towards building computer systems that put users back in control of their digital lives." ])
         ()
       ]
         ~scheme
