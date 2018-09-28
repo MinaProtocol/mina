@@ -82,6 +82,7 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
     ~conf_dir ~log = function
   | `None ->
       Logger.trace log "Not running a web client pipe" ;
+      don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda)) ;
       Deferred.unit
   | `S3 ->
       Logger.trace log "Running S3 web client pipe" ;
