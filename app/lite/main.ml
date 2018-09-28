@@ -832,7 +832,7 @@ let state_html
     match download_progress with
     | Progress _ -> div [] [Node.text "downloading..."]
     | Done -> 
-    div [class_ "state-explorer flex"]
+    div [class_ "state-explorer flex items-center"]
       [ div [class_ "state-with-proof mw7 mr4"]
           [ hoverable(Html.Record.render
             ~grouping:`Together
