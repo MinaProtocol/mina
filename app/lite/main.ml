@@ -276,6 +276,17 @@ let field_to_base64 =
   Fn.compose Fold_lib.Fold.bool_t_to_string Snarkette.Mnt6.Fq.fold_bits
   |> Fn.compose B64.encode
 
+let hash_colors =
+  [|
+    "#76cd87"
+  ; "#4782a0"
+  ; "#ac80a0"
+  ; "#89aae6"
+  ; "#3685b5"
+  |]
+
+let color_at_layer i = hash_colors.(i mod (Array.length hash_colors))
+
 let merkle_tree num_layers_to_show =
   let module Spec = struct
     type t =
@@ -330,15 +341,15 @@ let merkle_tree num_layers_to_show =
       let rec go acc layer index
           (t: ('h, 'a) Sparse_ledger_lib.Sparse_ledger.tree) =
         let pos : Pos.t = {x= x_pos ~layer ~index; y= y_pos ~layer} in
-        let hash_spec h = Spec.Node {pos; color= color_of_hash h} in
+        let hash_spec = Spec.Node {pos; color= color_at_layer layer} in
         let finish x = List.rev (x :: acc) in
         match t with
         | Account account -> finish (Spec.Account {account; pos})
-        | Hash h -> finish (hash_spec h)
-        | Node (h, Hash _, r) ->
-            go (hash_spec h :: acc) (layer + 1) ((2 * index) + 1) r
-        | Node (h, l, Hash _) ->
-            go (hash_spec h :: acc) (layer + 1) ((2 * index) + 0) l
+        | Hash _h -> finish hash_spec
+        | Node (_h, Hash _, r) ->
+            go (hash_spec :: acc) (layer + 1) ((2 * index) + 1) r
+        | Node (_h, l, Hash _) ->
+            go (hash_spec :: acc) (layer + 1) ((2 * index) + 0) l
         | Node (_, Account _, Node _) | Node (_, Node _, Account _) ->
             failwith "Accounts should only be at leaves"
         | Node (_, Account _, Account _) ->
