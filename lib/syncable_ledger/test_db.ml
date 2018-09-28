@@ -2,8 +2,6 @@ open Core
 
 module Make (Depth : sig
   val depth : int
-
-  val num_accts : int
 end) =
 struct
   open Merkle_ledger_tests.Test_stubs
@@ -60,6 +58,8 @@ struct
 
     let set_inner_hash_at_addr_exn = MT.set_inner_hash_at_addr_exn
 
+    let make_space_for = MT.make_space_for
+
     let load_ledger num_accounts (balance: int) =
       let ledger = MT.create () in
       let keys =
@@ -80,6 +80,4 @@ struct
       end)
 
   module SR = SL.Responder
-
-  let num_accts = Depth.num_accts
 end

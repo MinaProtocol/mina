@@ -29,6 +29,14 @@ module type Config_intf = sig
   val log : Logger.t
 end
 
+module type Storage_intf = sig
+  type data
+
+  type location
+
+  val store : location -> data -> unit Deferred.t
+end
+
 type chain =
   { protocol_state: Lite_base.Protocol_state.t
   ; proof: Lite_base.Proof.t
@@ -44,7 +52,9 @@ end
 module Make
     (Chain : Chain_intf)
     (Config : Config_intf)
-    (Store : Storage.With_checksum_intf with type location := string)
+    (Store : Storage_intf
+             with type location := string
+              and type data := Lite_base.Lite_chain.t)
     (Request : Put_request_intf) :
   S with type data = Chain.data =
 struct
@@ -54,52 +64,25 @@ struct
 
   type t =
     { location: string
-    ; ledger_storage: Lite_lib.Sparse_ledger.t Store.Controller.t
-    ; proof_storage: Proof.t Store.Controller.t
-    ; protocol_state_storage: Protocol_state.t Store.Controller.t
     ; reader: chain Linear_pipe.Reader.t
     ; writer: chain Linear_pipe.Writer.t }
 
-  let write_to_storage
-      {location; ledger_storage; proof_storage; protocol_state_storage; _}
-      request {protocol_state; proof; ledgers} =
-    let proof_file = location ^/ "proof" in
-    let protocol_state_file = location ^/ "protocol-state" in
-    let accounts, _ =
-      List.mapi ledgers ~f:(fun index account ->
-          let account_file = location ^/ sprintf "account%d" index in
-          (Store.store ledger_storage account_file account, account_file) )
-      |> List.unzip
+  let write_to_storage {location; _} request
+      {protocol_state; proof; ledgers; _} =
+    let chain_file = location ^/ "chain" in
+    (* HACK: we are just passing in the proposer path for this demo *)
+    assert (List.length ledgers = 1) ;
+    let chain =
+      {Lite_chain.proof; protocol_state; ledger= List.hd_exn ledgers}
     in
-    let%bind () =
-      Deferred.all_unit
-        ( [ Store.store proof_storage proof_file proof
-          ; Store.store protocol_state_storage protocol_state_file
-              protocol_state ]
-        @ accounts )
-    in
+    let%bind () = Store.store chain_file chain in
     Request.put request location
 
   let create () =
     let location = Config.conf_dir ^/ "snarkette-data" in
     let%bind () = Unix.mkdir location ~p:() in
-    let parent_log = Config.log in
-    let ledger_storage =
-      Store.Controller.create ~parent_log Lite_lib.Sparse_ledger.bin_t
-    in
-    let proof_storage = Store.Controller.create ~parent_log Proof.bin_t in
-    let protocol_state_storage =
-      Store.Controller.create ~parent_log Protocol_state.bin_t
-    in
     let reader, writer = Linear_pipe.create () in
-    let t =
-      { location
-      ; ledger_storage
-      ; proof_storage
-      ; protocol_state_storage
-      ; reader
-      ; writer }
-    in
+    let t = {location; reader; writer} in
     let%map () =
       match%map Request.create () with
       | Ok request ->

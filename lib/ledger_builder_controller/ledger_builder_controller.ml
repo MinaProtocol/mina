@@ -390,7 +390,7 @@ end = struct
   type t =
     { ledger_builder_io: Net.t
     ; log: Logger.t
-    ; store_controller: Tip.t Store.Controller.t
+    ; store_controller: (Tip.t, State_hash.t) With_hash.t Store.Controller.t
     ; mutable handler: Transition_logic.t
     ; strongest_ledgers:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
@@ -402,33 +402,51 @@ end = struct
 
   let ledger_builder_io {ledger_builder_io; _} = ledger_builder_io
 
-  let load_tip (controller: Tip.t Store.Controller.t)
+  let load_tip_and_genesis_hash
+      (controller: (Tip.t, State_hash.t) With_hash.t Store.Controller.t)
       {Config.longest_tip_location; genesis_tip; _} log =
+    let genesis_state_hash =
+      Protocol_state.hash genesis_tip.Tip.protocol_state
+    in
     match%map Store.load controller longest_tip_location with
-    | Ok tip -> tip
+    | Ok tip_and_genesis_hash -> tip_and_genesis_hash
     | Error `No_exist ->
         Logger.trace log
           "File for ledger builder controller tip does not exist. Using \
            Genesis tip" ;
-        genesis_tip
+        {data= genesis_tip; hash= genesis_state_hash}
     | Error (`IO_error e) ->
         Logger.error log
           !"IO error: %s\nUsing Genesis tip"
           (Error.to_string_hum e) ;
-        genesis_tip
+        {data= genesis_tip; hash= genesis_state_hash}
     | Error `Checksum_no_match ->
         Logger.error log
           !"Checksum from location %s does not match with data\n\
             Using Genesis tip"
           longest_tip_location ;
-        genesis_tip
+        {data= genesis_tip; hash= genesis_state_hash}
 
   let create (config: Config.t) =
     let log = Logger.child config.parent_log "ledger_builder_controller" in
     let store_controller =
-      Store.Controller.create Tip.bin_t ~parent_log:config.parent_log
+      Store.Controller.create
+        (With_hash.bin_t Tip.bin_t State_hash.bin_t)
+        ~parent_log:config.parent_log
     in
-    let%bind tip = load_tip store_controller config log in
+    let genesis_tip_state_hash =
+      Protocol_state.hash config.genesis_tip.Tip.protocol_state
+    in
+    let%bind {data= tip; hash= stored_genesis_state_hash} =
+      load_tip_and_genesis_hash store_controller config log
+    in
+    let tip =
+      if State_hash.equal genesis_tip_state_hash stored_genesis_state_hash then
+        tip
+      else (
+        Logger.warn log "HARD RESET DETECTED: reseting to new blockchain" ;
+        config.genesis_tip )
+    in
     let state =
       Transition_logic_state.create
         (With_hash.of_data tip ~hash_data:(fun tip ->
@@ -453,7 +471,12 @@ end = struct
     let store_tip_reader, store_tip_writer = Linear_pipe.create () in
     don't_wait_for
       (Linear_pipe.iter store_tip_reader ~f:(fun tip ->
-           Store.store store_controller config.longest_tip_location tip )) ;
+           let open With_hash in
+           let tip_with_genesis_hash =
+             {data= tip; hash= genesis_tip_state_hash}
+           in
+           Store.store store_controller config.longest_tip_location
+             tip_with_genesis_hash )) ;
     (* The mutation "thread" *)
     don't_wait_for
       (Linear_pipe.iter mutate_state_reader ~f:(fun (changes, transition) ->
@@ -548,7 +571,13 @@ end = struct
     t
 
   module For_tests = struct
-    let load_tip t config = load_tip t.store_controller config t.log
+    let load_tip t config =
+      let open With_hash in
+      let open Deferred.Let_syntax in
+      let%map {data= tip; _} =
+        load_tip_and_genesis_hash t.store_controller config t.log
+      in
+      tip
   end
 
   let strongest_ledgers {strongest_ledgers; _} = strongest_ledgers

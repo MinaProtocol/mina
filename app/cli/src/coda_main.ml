@@ -716,15 +716,12 @@ struct
   end
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs:
-         'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
-      ~(set_seen_jobs:
-            'a
-         -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
-         -> unit) (t: 'a) =
+      ~(seen_jobs: 'a -> Ledger_builder.Coordinator.State.t)
+      ~(set_seen_jobs: 'a -> Ledger_builder.Coordinator.State.t -> unit)
+      (t: 'a) =
     let lb = best_ledger_builder t in
     let maybe_instances, seen_jobs =
-      Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
+      Ledger_builder.Coordinator.random_work_spec_chunk lb (seen_jobs t)
     in
     set_seen_jobs t seen_jobs ;
     Option.map maybe_instances ~f:(fun instances ->
@@ -1026,7 +1023,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let schedule_transaction log t txn =
     let open Deferred.Let_syntax in
-    assert (is_valid_transaction t txn) ;
+    if not (is_valid_transaction t txn) then (
+      Core.Printf.eprintf "Invalid transaction: account balance is too low" ;
+      Core.exit 1 ) ;
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
@@ -1119,22 +1118,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             get_ledger coda lh ) ]
     in
     let snark_worker_impls =
-      let solved_work_reader, solved_work_writer = Linear_pipe.create () in
-      Linear_pipe.write_without_pushback solved_work_writer () ;
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
-            match%map Linear_pipe.read solved_work_reader with
-            | `Ok () ->
-                let r = request_work coda in
-                Option.iter r ~f:(fun r ->
-                    Logger.info log
-                      !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
-                      r ) ;
-                ( match r with
-                | None ->
-                    Linear_pipe.write_without_pushback solved_work_writer ()
-                | Some _ -> () ) ;
-                r
-            | `Eof -> assert false )
+            let r = request_work coda in
+            Option.iter r ~f:(fun r ->
+                Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
+            ) ;
+            return r )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work: Snark_worker.Work.Result.t) ->
             Logger.info log
@@ -1148,10 +1137,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 | `Transition ->
                     Perf_histograms.add_span
                       ~name:"snark_worker_transition_time" total ) ;
-            let%map () =
-              Snark_pool.add_completed_work (snark_pool coda) work
-            in
-            Linear_pipe.write_without_pushback solved_work_writer () ) ]
+            Snark_pool.add_completed_work (snark_pool coda) work ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         ignore
