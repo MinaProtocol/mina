@@ -67,7 +67,7 @@
 }
 
 .gallery .jump:hover {
-  color: #333;
+  filter: brightness(50%);
   cursor: pointer;
 }
 
