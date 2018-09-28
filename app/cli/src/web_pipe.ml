@@ -69,7 +69,7 @@ struct
 end
 
 let get_service () =
-  Async.Unix.getenv "CODA_WEB_CLIENT_SERVICE"
+  Unix.getenv "CODA_WEB_CLIENT_SERVICE"
   |> Option.value_map ~default:`None ~f:(function "S3" -> `S3 | _ -> `None)
 
 let run_service (type t) (module Program : Coda_intf with type t = t) coda
