@@ -44,7 +44,7 @@ struct
 
   let%test "full_sync_entirely_different" =
     let l1, _k1 = L.load_ledger 1 1 in
-    let l2, _k2 = L.load_ledger num_accts 1 in
+    let l2, _k2 = L.load_ledger num_accts 2 in
     let desired_root = L.merkle_root l2 in
     let lsync = SL.create l1 ~parent_log in
     let qr = SL.query_reader lsync in
@@ -52,10 +52,13 @@ struct
     let seen_queries = ref [] in
     let sr = SR.create l2 (fun q -> seen_queries := q :: !seen_queries) in
     don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:8 qr ~f:(fun (_hash, query) ->
+      (Linear_pipe.iter_unordered ~max_concurrency:8 qr ~f:
+         (fun (_hash, query) ->
            let answ = SR.answer_query sr query in
-           let%bind () = Clock_ns.after (Time_ns.Span.randomize
-           (Time_ns.Span.of_ms 2.) ~percent:(Percent.of_percentage 20.))
+           let%bind () =
+             Clock_ns.after
+               (Time_ns.Span.randomize (Time_ns.Span.of_ms 2.)
+                  ~percent:(Percent.of_percentage 20.))
            in
            Linear_pipe.write aw (desired_root, answ) )) ;
     match
