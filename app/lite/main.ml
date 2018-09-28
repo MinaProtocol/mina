@@ -547,8 +547,8 @@ let merkle_tree num_layers_to_show =
           if List.length posns > 1 then
             let src = List.nth_exn posns (List.length posns - 2) in
             let dest = List.nth_exn posns (List.length posns - 1) in
-            (*let last = { Pos.x = image_width /. 3.0; y = dest.y +. (dest.y -. src.y) } in*)
-            let last = { Pos.x = dest.x +. (dest.x -. src.x); y = dest.y +. (dest.y -. src.y) } in
+            let last = { Pos.x = image_width /. 3.0; y = dest.y +. (dest.y -. src.y) } in
+            (*let last = { Pos.x = dest.x +. (dest.x -. src.x); y = dest.y +. (dest.y -. src.y) } in*)
             (drop_last posns) @ [ last ]
           else 
             posns
