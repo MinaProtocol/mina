@@ -125,6 +125,8 @@ module Tooltip_stage = struct
   [@@deriving eq]
 end
 
+let start_time = Time.now ()
+
 module State = struct
   type t =
     { verification: [`Pending of int | `Complete of unit Or_error.t]
@@ -678,6 +680,29 @@ let state_html
   let state_tooltip =
     Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"Coda's protocol state is composed of the consensus state and the database state. Our test network is currently using \"proof of signature\", where producing a valid snark for an updated protocol state requires a priveleged private key (Coda will use a fully open consensus protocol in later versions of the testnet). The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed." ()
   in
+  let age = Time.diff (Time.now ()) (Time.of_string timestamp) in
+  let down_maintenance =
+    if Time.Span.(age > (Time.Span.of_sec 180.0)) 
+    then 
+     (printf "state age: %s\n" (Time.Span.to_string age);
+     [let heading_style =
+      Style.(of_class ("fw4 darksnow tc mt0 mb4 f4 silver-gradient br3 shadow-subtle pa3 dib"))
+    in
+    (div 
+       [Style.(render (of_class "flex justify-center"))]
+       [
+         div [Style.render heading_style] [ 
+              div
+                [Style.(render (
+                (of_class "dib mr3 ml2 ph1 br-100 w01 h01 shadow-small2 bg-dullgrey pr3")
+                  ))] []
+         ; Node.text "System is down for maintenance, check " 
+         ; Node.a [Attr.href "http://status.codaprotocol.com"; Attr.create "target" "_blank"] [ Node.text "status page" ]
+         ; Node.text " for updates" 
+         ] 
+       ]) ])
+    else []
+  in
   let state_explorer =
     div [class_ "state-explorer flex-ll items-center"]
       [ div [class_ "state-with-proof mw7 mr4"]
@@ -699,7 +724,11 @@ let state_html
            Tooltip_stage.Account_state [Style.just "mw7"]
       ] 
   in
-  state_explorer
+  let contents = down_maintenance @ [ state_explorer ] in
+  let page_time = Time.diff (Time.now ()) start_time in
+  if (state.chain = Lite_params.genesis_chain && Time.Span.(page_time < (Time.Span.of_sec 4.0)))
+  then (div [Style.(render (of_class "animate-opacity o-0"))] contents)
+  else (div [Style.(render (of_class "animate-opacity o-100"))] contents)
 
 let main ~render ~get_data =
   let state = ref State.init in
