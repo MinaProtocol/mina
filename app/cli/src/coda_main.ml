@@ -717,14 +717,14 @@ struct
 
   let request_work ~best_ledger_builder
       ~(seen_jobs:
-         'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
+         'a -> Ledger_builder.Coordinator.State.t)
       ~(set_seen_jobs:
             'a
-         -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
+         -> Ledger_builder.Coordinator.State.t
          -> unit) (t: 'a) =
     let lb = best_ledger_builder t in
     let maybe_instances, seen_jobs =
-      Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
+      Ledger_builder.Coordinator.random_work_spec_chunk lb (seen_jobs t)
     in
     set_seen_jobs t seen_jobs ;
     Option.map maybe_instances ~f:(fun instances ->
