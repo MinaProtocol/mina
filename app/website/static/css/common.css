@@ -198,3 +198,9 @@
 .bright-red {
   background-color: #ef5b5b;
 }
+
+.record-title-padding {
+  padding-top: 2px;
+  padding-bottom: 8px;
+
+}

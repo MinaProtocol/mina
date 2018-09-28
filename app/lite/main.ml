@@ -356,12 +356,12 @@ module Html = struct
         div [Style.just "mb2"] (List.map ~f:Entry.render t)
     end
 
-    type t = {style: Style.t; rows: Row.t list}
+    type t = {style: Style.t; rows: Row.t list; heading: string option}
 
-    let create ?(style=Style.empty) rows =
-      {style; rows}
+    let create ?(style=Style.empty) heading rows =
+      {style; rows; heading}
 
-    let render ?tooltip ?(grouping=`Separate) {style; rows} width =
+    let render ?tooltip ?(grouping=`Separate) {style; rows; heading} width =
       let width =
         match width with
         | `Wide -> Style.of_class "mw5"
@@ -376,7 +376,10 @@ module Html = struct
       let record =
           div
               [Style.(render (style + width + grouping))]
-              (List.map rows ~f:Row.render)
+              ((match heading with
+               | None -> []
+               | Some heading -> [ Node.div [Style.just "record-title-padding fw5 silver tc"] [ Node.text heading ] ]
+              ) @ (List.map rows ~f:Row.render))
       in
       match tooltip with
       | None -> record
@@ -524,6 +527,7 @@ let merkle_tree num_layers_to_show =
             let record =
               let open Html.Record in
               create
+                None
                 [[ create_entry ~extra_style:(Style.of_class "mb2") "balance" ~width:"50%"
                       (Account.Balance.to_string balance)
                   ; create_entry ~extra_style:(Style.of_class "mb2") "public_key" ~width:"50%"
@@ -603,7 +607,9 @@ let merkle_tree num_layers_to_show =
       hoverable state (
       Node.div [Style.just "flex items-center"]
       [ Node.div [Style.(render (of_class "mw5 relative" + Html.grouping_style))]
-          ( Svg.main
+          (Node.div [Style.just "record-title-padding fw5 silver tc"] [ Node.text "Merkle Path and Account" ]
+          ::
+           Svg.main
               ~width:(image_width +. left_offset)
               ~height:(image_height +. top_offset)
               (edges :: sibling_edges @ nodes @ sibling_nodes)
@@ -652,6 +658,7 @@ let state_html
   let state_record =
     let open Html.Record in
     create
+      (Some "Protocol State")
       [ [ create_entry "previous_state_hash"
             (field_to_base64 previous_state_hash) ]
       ; [ create_entry "length" (Length.to_string length)]
@@ -679,7 +686,8 @@ let state_html
             ~grouping:`Together
             ~tooltip:(`Left snark_tooltip)
             (Html.Record.create
-            [[ create_entry ~important:true ~extra_style:proof_style "zkSNARK Proof" (to_base64 (module Proof) proof)
+               (Some "Protocol State Proof")
+            [[ create_entry ~important:true ~extra_style:proof_style "zkSNARK" (to_base64 (module Proof) proof)
             ]]) `Thin) Tooltip_stage.Proof  []
           ]
       ; hoverable
