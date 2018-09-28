@@ -220,8 +220,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~keypair ())
          in
          let web_service = Web_pipe.get_service () in
-         Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log
-         |> don't_wait_for ;
+         Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
          Run.setup_local_server ?client_whitelist ?rest_server_port ~coda
            ~client_port ~log () ;
          Run.run_snark_worker ~log ~client_port run_snark_worker_action
