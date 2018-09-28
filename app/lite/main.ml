@@ -314,7 +314,7 @@ module Html = struct
         div [Style.just "silver ml3 mr3 f1 sky"] [Node.text chevron]
       in
       div [Style.render Visibility.no_mobile] [
-      div [Style.(render (of_class "flex items-center animate-opacity" + if active then Style.empty else (of_class "o-10")))]
+      div [Style.(render (of_class "flex items-center animate-opacity" + if active then Style.empty else (of_class "o-30")))]
         (match arity with
         | `Left ->
           [ body
