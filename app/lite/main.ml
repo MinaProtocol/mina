@@ -97,11 +97,17 @@ let get url on_success on_error =
   req ## _open (Js.string "GET") (Js.string url) Js._true ;
   req ## send Js.Opt.empty
 
+let s3_link = "https://s3-us-west-2.amazonaws.com/o1labs-snarkette-data"
+
 let get_account _pk on_sucess on_error =
-  let url = "/static/chain" in
+  let url = sprintf !"%s/chain" s3_link in
+  (* IF serialization does not work, please try the following code:
+  
+  let url = sprintf !"%s/sample_chain" s3_link in
+   *)
   get url
     (fun s ->
-       let s = String.slice s 0 (String.length s - 1) in
+      let s = String.slice s 0 (String.length s - 1) in
       let chain = Binable.of_string (module Lite_chain) (B64.decode s) in
       on_sucess chain )
     on_error
@@ -878,13 +884,13 @@ let main ~render ~get_data =
   let loop () =
     let id = !count in
     incr count ;
-    get_data ~on_result:(fun res ->
+    get_data ~on_result:(fun chain ->
         if id > !latest_completed then (
           latest_completed := id ;
-          if State.should_update !state res then (
-            let new_state = { !state with verification=`Pending id; chain= res } in
+          if State.should_update !state chain then (
+            let new_state = { !state with verification=`Pending id; chain } in
             update_state_and_vdom new_state ;
-            Verifier.send_verify_message verifier (res, id) ) ) )
+            Verifier.send_verify_message verifier (chain, id) ) ) )
   in
   loop () ;
   Dom_html.window ## setInterval (Js.wrap_callback (fun _ -> loop ())) 5_000.
@@ -892,5 +898,7 @@ let main ~render ~get_data =
 let _ =
   main
     ~get_data:(fun ~on_result ->
-      get_account () (fun chain -> on_result chain) (fun _ -> ()) )
-    ~render:(fun s -> state_html s)
+      get_account () on_result (fun e -> 
+      Firebug.console##log (Error.to_string_hum e)
+      ) )
+    ~render:state_html
