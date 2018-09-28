@@ -123,6 +123,7 @@ module Tooltip_stage = struct
     | Proof
     | Blockchain_state
     | Account_state
+  [@@deriving eq]
 end
 
 module Download_progress = struct
@@ -241,9 +242,9 @@ module Html = struct
     c ^ Option.value_map ~default:"" co ~f:(fun s -> " " ^ s)
 
   module Tooltip = struct
-    let create ~text ~arity =
+    let create ~active ~text ~arity =
       let body =
-        div [Style.just "mw5 b-sky shadow-subtle br3 bg-darksnow ph2 pv2"]
+        div [Style.just "mw5 b-sky shadow-subtle br3 bg-darksnow ph3 pv3 roboto lh-copy bluesilver"]
             [Node.text text]
       in
       let chevron =
@@ -254,7 +255,7 @@ module Html = struct
       let chevron_dom =
         div [Style.just "silver ml3 mr3"] [Node.text chevron]
       in
-      div [Style.just "flex items-center o-10"]
+      div [Style.(render (of_class "flex items-center" + if active then Style.empty else (of_class "o-10")))]
         (match arity with
         | `Left ->
           [ body
@@ -359,6 +360,22 @@ let hash_colors =
 
 let color_at_layer i = hash_colors.(i mod (Array.length hash_colors))
 
+let g_update_state_and_vdom = ref (fun _ -> ())
+
+let hoverable state node target attrs =
+  let update_tooltip  _ = 
+    !g_update_state_and_vdom { state with State.tooltip_stage=target };
+    Event.Ignore
+  in
+  let reset_tooltip _ =
+    !g_update_state_and_vdom { state with State.tooltip_stage=Tooltip_stage.None };
+    Event.Ignore
+  in
+  let open Node in
+  let open Attr in
+  div ([on_mouseenter update_tooltip; on_mouseleave reset_tooltip] @ attrs) [ node ]
+
+
 let merkle_tree num_layers_to_show =
   let module Spec = struct
     type t =
@@ -407,7 +424,8 @@ let merkle_tree num_layers_to_show =
 *)
     (x_uncompressed, y_uncompressed)
   in
-  fun verification (tree0: ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree) ->
+  fun state (tree0: ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree) ->
+    let verification = state.State.verification in
     let create_entry = Html.Record.Entry.create verification in
     let tree0 = drop_top_of_tree ~desired_layers:num_layers_to_show tree0 in
     let specs =
@@ -515,6 +533,7 @@ let merkle_tree num_layers_to_show =
                 Some (Svg.circle ~radius ~color ~center:pos)
             | Spec.Account _ -> None )
       in
+      hoverable state (
       Node.div [Style.just "flex items-center"]
       [ Node.div [Style.(render (of_class "mw5" + Html.grouping_style))]
           ( Svg.main
@@ -522,12 +541,10 @@ let merkle_tree num_layers_to_show =
               ~height:(image_height +. top_offset)
               (edges :: sibling_edges @ nodes @ sibling_nodes)
           :: Option.to_list account )
-      ; Html.Tooltip.create ~arity:`Right ~text:"To know the state of a particular account in Coda, a client needs the database merkle root from the protocol state, a merkle path, and the account properties. Because the database is a merkle root, this information is sufficient to determine the balance in an account. And because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data."
-      ]
+      ; Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"To know the state of a particular account in Coda, a client needs the database merkle root from the protocol state, a merkle path, and the account properties. Because the database is a merkle root, this information is sufficient to determine the balance in an account. And because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data."
+      ]) Tooltip_stage.Account_state []
     in
     rendered
-
-let g_update_state_and_vdom = ref (fun _ -> ())
 
 module Visibility = struct
   let no_mobile = Style.of_class "dn db-ns"
@@ -801,15 +818,7 @@ let state_html
       ; [ create_entry "staged_ledger_hash"
             (field_to_base64 ledger_builder_hash.ledger_hash) ] ]
   in
-  let hoverable node target attrs =
-    let update_tooltip  _ = 
-      !g_update_state_and_vdom { state with State.tooltip_stage=target };
-      Event.Ignore
-    in
-    let open Node in
-    let open Attr in
-    div ([on_mouseenter update_tooltip] @ attrs) [ node ]
-  in
+  let hoverable = hoverable state in
   let _ = ledger in
   let state_explorer =
     match download_progress with
@@ -819,17 +828,17 @@ let state_html
       [ div [class_ "state-with-proof mw7 mr4"]
           [ hoverable(Html.Record.render
             ~grouping:`Together
-            ~tooltip:(`Left (Html.Tooltip.create ~arity:`Left ~text:"While other cryptocurrencies require downloading and verifying a lengthy, ever growing blockchain, the Coda network incrementally produces zk-SNARK proofs, which serve as cryptographic certifications of the database. The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."))
+            ~tooltip:(`Left (Html.Tooltip.create ~active:(Tooltip_stage.(equal Proof state.State.tooltip_stage)) ~arity:`Left ~text:"While other cryptocurrencies require downloading and verifying a lengthy, ever growing blockchain, the Coda network incrementally produces zk-SNARK proofs, which serve as cryptographic certifications of the database. The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."))
             (Html.Record.create
             [[ create_entry ~important:true ~extra_style:proof_style "blockchain_SNARK" (to_base64 (module Proof) proof)
             ]]) `Thin) Tooltip_stage.Proof  []
-          ; hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left (Html.Tooltip.create ~arity:`Left ~text:"Coda's protocol state is composed of the consensus state and the database state. Our test network is currently using \"proof of signature\", where producing a valid snark for an updated protocol state requires a priveleged private key (Coda will use a fully open consensus protocol in later versions of the testnet). The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed.")) state_record `Wide) Tooltip_stage.Blockchain_state []
+          ; hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left (Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"Coda's protocol state is composed of the consensus state and the database state. Our test network is currently using \"proof of signature\", where producing a valid snark for an updated protocol state requires a priveleged private key (Coda will use a fully open consensus protocol in later versions of the testnet). The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed.")) state_record `Wide) Tooltip_stage.Blockchain_state []
           ]
       ; hoverable
           ( let tree = Sparse_ledger_lib.Sparse_ledger.tree ledger in
             Mobile_switch.create
-             ~not_small:(merkle_tree num_layers_to_show_desktop verification tree)
-             ~small:(merkle_tree num_layers_to_show_mobile verification tree) )
+             ~not_small:(merkle_tree num_layers_to_show_desktop state tree)
+             ~small:(merkle_tree num_layers_to_show_mobile state tree) )
            Tooltip_stage.Account_state [Style.just "mw7"]
       ] 
   in
