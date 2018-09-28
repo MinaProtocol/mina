@@ -716,12 +716,9 @@ struct
   end
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs:
-         'a -> Ledger_builder.Coordinator.State.t)
-      ~(set_seen_jobs:
-            'a
-         -> Ledger_builder.Coordinator.State.t
-         -> unit) (t: 'a) =
+      ~(seen_jobs: 'a -> Ledger_builder.Coordinator.State.t)
+      ~(set_seen_jobs: 'a -> Ledger_builder.Coordinator.State.t -> unit)
+      (t: 'a) =
     let lb = best_ledger_builder t in
     let maybe_instances, seen_jobs =
       Ledger_builder.Coordinator.random_work_spec_chunk lb (seen_jobs t)
@@ -1120,12 +1117,11 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     in
     let snark_worker_impls =
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
-                let r = request_work coda in
-                Option.iter r ~f:(fun r ->
-                    Logger.info log
-                      !"Get_work: %{sexp:Snark_worker.Work.Spec.t}"
-                      r ) ;
-                return r)
+            let r = request_work coda in
+            Option.iter r ~f:(fun r ->
+                Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
+            ) ;
+            return r )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work: Snark_worker.Work.Result.t) ->
             Logger.info log
@@ -1139,8 +1135,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 | `Transition ->
                     Perf_histograms.add_span
                       ~name:"snark_worker_transition_time" total ) ;
-              Snark_pool.add_completed_work (snark_pool coda) work
-          ) ]
+            Snark_pool.add_completed_work (snark_pool coda) work ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         ignore

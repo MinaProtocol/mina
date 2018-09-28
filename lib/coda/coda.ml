@@ -429,8 +429,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Ledger_builder.t * Consensus_mechanism.External_transition.t)
         Linear_pipe.Reader.t
     ; log: Logger.t
-    ; mutable seen_jobs:
-        Ledger_builder.Coordinator.State.t
+    ; mutable seen_jobs: Ledger_builder.Coordinator.State.t
     ; ledger_builder_transition_backup_capacity: int }
 
   let run_snark_worker t = t.run_snark_worker
