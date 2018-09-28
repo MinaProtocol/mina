@@ -40,7 +40,7 @@ struct
    * in before we need it. *)
   let total_queries = ref None
 
-  let parent_log = Logger.create ()
+  let parent_log = Logger.null ()
 
   let%test "full_sync_entirely_different" =
     let l1, _k1 = L.load_ledger 1 1 in
@@ -52,13 +52,15 @@ struct
     let seen_queries = ref [] in
     let sr = SR.create l2 (fun q -> seen_queries := q :: !seen_queries) in
     don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:8 qr ~f:
+      (Linear_pipe.iter_unordered ~max_concurrency:3 qr ~f:
          (fun (_hash, query) ->
            let answ = SR.answer_query sr query in
            let%bind () =
-             Clock_ns.after
-               (Time_ns.Span.randomize (Time_ns.Span.of_ms 2.)
-                  ~percent:(Percent.of_percentage 20.))
+             if match query with What_contents _ -> true | _ -> false then
+               Clock_ns.after
+                 (Time_ns.Span.randomize (Time_ns.Span.of_ms 0.2)
+                    ~percent:(Percent.of_percentage 20.))
+             else Deferred.unit
            in
            Linear_pipe.write aw (desired_root, answ) )) ;
     match
@@ -135,7 +137,7 @@ let%test_unit "exhaustive depth=10 testing" =
         (struct
           let num_accts = i
         end) in
-    printf "We've done num_accts = %d\n%!" i
+    ()
   done
 
 module TestL3_3 =

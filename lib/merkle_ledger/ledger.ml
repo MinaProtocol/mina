@@ -167,19 +167,19 @@ end = struct
 
   let set = set_at_index_exn
 
-  let extend_tree tree =
-    let leafs = Hashtbl.length tree.leafs in
+  let extend_tree t =
+    let leafs = Dyn_array.length t.accounts in
     if leafs <> 0 then (
       let target_height = Int.max 1 (Int.ceil_log2 leafs) in
-      let current_height = tree.nodes_height in
+      let current_height = t.tree.nodes_height in
       let additional_height = target_height - current_height in
-      tree.nodes_height <- tree.nodes_height + additional_height ;
-      tree.nodes
+      (t.tree).nodes_height <- t.tree.nodes_height + additional_height ;
+      (t.tree).nodes
       <- List.concat
-           [ tree.nodes
+           [ t.tree.nodes
            ; List.init additional_height ~f:(fun _ -> Dyn_array.create ()) ] ;
-      List.iteri tree.nodes ~f:(fun i nodes ->
-          let length = Int.pow 2 (tree.nodes_height - 1 - i) in
+      List.iteri t.tree.nodes ~f:(fun i nodes ->
+          let length = Int.pow 2 (t.tree.nodes_height - 1 - i) in
           let new_elems = length - Dyn_array.length nodes in
           Dyn_array.append
             (Dyn_array.init new_elems (fun _ -> empty_hash_at_height (i + 1)))
@@ -213,7 +213,7 @@ end = struct
 
   let recompute_tree t =
     if not (List.is_empty t.tree.dirty_indices) then (
-      extend_tree t.tree ;
+      extend_tree t ;
       (t.tree).dirty <- false ;
       let layer_dirty_indices =
         Int.Set.to_list
@@ -365,7 +365,6 @@ end = struct
     make_space_for t (first_index + List.length accounts) ;
     List.iteri accounts ~f:(fun i a ->
         let new_index = first_index + i in
-        (t.tree).dirty_indices <- new_index :: t.tree.dirty_indices ;
         if Int.Set.mem t.tree.unset_slots new_index then (
           replace t new_index Key.empty a ;
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
