@@ -755,7 +755,13 @@ let state_html
            Tooltip_stage.Account_state [Style.just "mw7"]
       ] 
   in
-  let contents = down_maintenance @ [ state_explorer ] in
+  let explanation =
+    let heading_style =
+      Style.(of_class "silver tc mt0 mb4 f5 fw3")
+    in
+    Node.h2 [Style.render heading_style] [Node.text "The properties below constitute the full, live Coda protocol state and are being fully verified in your browser. Explore the components to learn more." ]
+  in
+  let contents = [ explanation ] @ down_maintenance @ [ state_explorer ] in
   let page_time = Time.diff (Time.now ()) start_time in
   if (state.chain = Lite_params.genesis_chain && Time.Span.(page_time < (Time.Span.of_sec 4.0)))
   then (div [Style.(render (of_class "animate-opacity o-0"))] contents)
