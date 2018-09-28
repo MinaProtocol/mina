@@ -229,7 +229,8 @@ struct
         | [] ->
             let changed =
               match !node with
-              | Leaf (Some (s', h')) | Node ((s', h'), _, _) -> not @@ Hash.equal h h'
+              | Leaf (Some (s', h')) | Node ((s', h'), _, _) ->
+                  not @@ Hash.equal h h'
               | Leaf None -> false
             in
             node := Leaf (Some (s, h)) ;
@@ -283,7 +284,8 @@ struct
           Contents_are (a, MT.get_all_accounts_rooted_at_exn mt a)
       | Num_accounts ->
           let len = MT.num_accounts mt in
-          let height = Int.ceil_log2 len in (* FIXME: bug when height=0 *)
+          let height = Int.ceil_log2 len in
+          (* FIXME: bug when height=0 *)
           let content_root_addr =
             funpow (MT.depth - height)
               (fun a -> Addr.child_exn a Direction.Left)
@@ -429,9 +431,11 @@ struct
 
   let num_accounts t n content_hash =
     let rh = Root_hash.to_hash (desired_root_exn t) in
-    let height = Int.ceil_log2 n in (* FIXME: bug when height=0 *)
+    let height = Int.ceil_log2 n in
+    (* FIXME: bug when height=0 *)
     if not (Hash.equal (complete_with_empties content_hash height MT.depth) rh)
-    then failwith "reported content hash doesn't match desired root hash!" ; (* TODO: punish *)
+    then failwith "reported content hash doesn't match desired root hash!" ;
+    (* TODO: punish *)
     MT.make_space_for t.tree n ;
     Addr.Table.clear t.waiting_parents ;
     Addr.Table.clear t.waiting_content ;

@@ -243,7 +243,8 @@ end = struct
 
   let merkle_root t =
     recompute_tree t ;
-    if not (Int.Set.is_empty t.tree.unset_slots) then failwithf !"%{sexp:Int.Set.t} remain unset" t.tree.unset_slots ();
+    if not (Int.Set.is_empty t.tree.unset_slots) then
+      failwithf !"%{sexp:Int.Set.t} remain unset" t.tree.unset_slots () ;
     let height = t.tree.nodes_height in
     let base_root =
       match List.last t.tree.nodes with
@@ -349,11 +350,15 @@ end = struct
     DynArray.set l index hash
 
   let make_space_for t total =
-	let len = Dyn_array.length t.accounts in
-	if total > len then (
-		t.tree.unset_slots <- Int.Set.union t.tree.unset_slots (Int.Set.of_list (List.init (total - len) 
-	(fun i -> Dyn_array.add t.accounts Account.empty ; len + i ))) ;
-	)
+    let len = Dyn_array.length t.accounts in
+    if total > len then
+      (t.tree).unset_slots
+      <- Int.Set.union t.tree.unset_slots
+           (Int.Set.of_list
+              (List.init (total - len) (fun i ->
+                   Dyn_array.add t.accounts Account.empty ;
+                   len + i )))
+
   let set_all_accounts_rooted_at_exn t a accounts =
     let height = depth - Addr.depth a in
     let first_index = Addr.to_int a lsl height in
@@ -361,10 +366,12 @@ end = struct
     List.iteri accounts ~f:(fun i a ->
         let new_index = first_index + i in
         (t.tree).dirty_indices <- new_index :: t.tree.dirty_indices ;
-	if Int.Set.mem t.tree.unset_slots new_index then
-	  (replace t new_index Key.empty a ; t.tree.unset_slots <-
-            Int.Set.remove t.tree.unset_slots new_index ; Logger.info
-            (!Logger.global_logger |> Option.value_exn) "removed %d" new_index)
+        if Int.Set.mem t.tree.unset_slots new_index then (
+          replace t new_index Key.empty a ;
+          (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index ;
+          Logger.info
+            (!Logger.global_logger |> Option.value_exn)
+            "removed %d" new_index )
         else set_at_index_exn t new_index a )
 
   let get_all_accounts_rooted_at_exn t a =

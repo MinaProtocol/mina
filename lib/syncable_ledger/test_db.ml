@@ -57,8 +57,8 @@ struct
     let get_inner_hash_at_addr_exn = MT.get_inner_hash_at_addr_exn
 
     let set_inner_hash_at_addr_exn = MT.set_inner_hash_at_addr_exn
-    
-    let make_space_for =  MT.make_space_for 
+
+    let make_space_for = MT.make_space_for
 
     let load_ledger num_accounts (balance: int) =
       let ledger = MT.create () in
