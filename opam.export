@@ -110,7 +110,6 @@ rpc_parallel	v0.11.0	root
 seq	base	installed
 sexplib	v0.11.0	installed
 sexplib0	v0.11.0	installed
-sodium	0.6.0	root
 spawn	v0.12.0	installed
 splittable_random	v0.11.0	installed
 stdio	v0.11.0	installed

@@ -39,8 +39,13 @@ let close = Pipe.close
 
 let closed (reader: 'a Reader.t) = Pipe.closed reader.pipe
 
+let multiple_reads_error () =
+  failwith
+    "Linear_pipe.bracket: the same reader has been used multiple times. If \
+     you want to rebroadcast the reader, use fork"
+
 let bracket (reader: 'a Reader.t) dx =
-  if reader.has_reader then failwith "Linear_pipe.bracket: had reader"
+  if reader.has_reader then multiple_reads_error ()
   else (
     reader.has_reader <- true ;
     let%map x = dx in
@@ -48,7 +53,7 @@ let bracket (reader: 'a Reader.t) dx =
     x )
 
 let set_has_reader (reader: 'a Reader.t) =
-  if reader.has_reader then failwith "Linear_pipe.bracket: had reader"
+  if reader.has_reader then multiple_reads_error ()
   else reader.has_reader <- true
 
 let iter ?consumer ?continue_on_error reader ~f =

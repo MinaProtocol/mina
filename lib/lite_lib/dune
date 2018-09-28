@@ -1,0 +1,10 @@
+(library
+  (name lite_lib)
+  (public_name lite_lib)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (libraries
+    hash_prefixes
+    sparse_ledger_lib
+    lite_base
+    lite_params
+    bin_prot))

@@ -36,6 +36,8 @@ module type S = sig
     val fold : value -> bool Triple.t Fold.t
 
     val length : value -> Length.t
+
+    val to_lite : (value -> Lite_base.Consensus_state.t) option
   end
 
   module Protocol_state :

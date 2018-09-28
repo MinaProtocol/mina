@@ -864,6 +864,8 @@ struct
       ; curr_epoch_data }
 
     let length (t: value) = t.length
+
+    let to_lite = None
   end
 
   module Protocol_state = Coda_base.Protocol_state.Make (Consensus_state)

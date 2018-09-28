@@ -193,11 +193,15 @@ module type Ledger_builder_controller_intf = sig
       ; external_transitions:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
-      ; disk_location: string }
+      ; longest_tip_location: string }
     [@@deriving make]
   end
 
   val create : Config.t -> t Deferred.t
+
+  module For_tests : sig
+    val load_tip : t -> Config.t -> tip Deferred.t
+  end
 
   val strongest_tip : t -> tip
 
@@ -299,6 +303,20 @@ module type State_with_witness_intf = sig
   val forget_witness : t -> state
 end
 
+module type Lite_chain_client_data_intf = sig
+  type t
+
+  type proof
+
+  type ledger
+
+  type state
+
+  type key
+
+  val create : (proof -> ledger -> state -> key list -> t) option
+end
+
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
@@ -383,6 +401,13 @@ module type Inputs_intf = sig
 
     val proof : Protocol_state_proof.t
   end
+
+  module Lite_chain_client_data :
+    Lite_chain_client_data_intf
+    with type ledger := Ledger.t
+     and type proof := Protocol_state_proof.t
+     and type state := Consensus_mechanism.Protocol_state.value
+     and type key := Public_key.Compressed.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -404,8 +429,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Ledger_builder.t * Consensus_mechanism.External_transition.t)
         Linear_pipe.Reader.t
     ; log: Logger.t
-    ; mutable seen_jobs:
-        Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
+    ; mutable seen_jobs: Ledger_builder.Coordinator.State.t
     ; ledger_builder_transition_backup_capacity: int }
 
   let run_snark_worker t = t.run_snark_worker
@@ -417,6 +441,14 @@ module Make (Inputs : Inputs_intf) = struct
 
   let best_protocol_state t =
     (Ledger_builder_controller.strongest_tip t.ledger_builder).protocol_state
+
+  let best_tip t =
+    let tip = Ledger_builder_controller.strongest_tip t.ledger_builder in
+    (Ledger_builder.ledger tip.ledger_builder, tip.protocol_state, tip.proof)
+
+  let get_ledger t lh =
+    Ledger_builder_controller.local_get_ledger t.ledger_builder lh
+    |> Deferred.Or_error.map ~f:(fun (lb, _) -> Ledger_builder.ledger lb)
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
@@ -468,9 +500,9 @@ module Make (Inputs : Inputs_intf) = struct
                    ~self:(Public_key.compress config.keypair.public_key)
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
-           ~disk_location:config.ledger_builder_persistant_location
-           ~external_transitions:external_transitions_reader
-           ~consensus_local_state)
+           ~consensus_local_state
+           ~longest_tip_location:config.ledger_builder_persistant_location
+           ~external_transitions:external_transitions_reader)
     in
     let%bind net =
       Net.create config.net_config
@@ -593,21 +625,13 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder
       ; strongest_ledgers= strongest_ledgers_for_api
       ; log= config.log
-      ; seen_jobs= (Ledger_proof_statement.Set.empty, None)
+      ; seen_jobs= Ledger_builder.Coordinator.State.init
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
 
-  let forget_diff_validity
-      { Ledger_builder_diff.With_valid_signatures_and_proofs.prev_hash
-      ; completed_works
-      ; transactions
-      ; creator } =
-    { Ledger_builder_diff.prev_hash
-    ; completed_works= List.map completed_works ~f:Completed_work.forget
-    ; transactions= (transactions :> Transaction.t list)
-    ; creator }
-
-  let forget_transition_validity
-      {Ledger_builder_transition.With_valid_signatures_and_proofs.old; diff} =
-    {Ledger_builder_transition.old; diff= forget_diff_validity diff}
+  let get_lite_chain :
+      (t -> Public_key.Compressed.t list -> Lite_chain_client_data.t) option =
+    Option.map Lite_chain_client_data.create ~f:(fun create t keys ->
+        let ledger, state, proof = best_tip t in
+        create proof ledger state keys )
 end

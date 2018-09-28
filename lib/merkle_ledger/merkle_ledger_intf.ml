@@ -7,7 +7,7 @@ module type S = sig
 
   type key
 
-  type t [@@deriving sexp]
+  type t [@@deriving sexp, bin_io]
 
   module Addr : Merkle_address.S
 
@@ -22,6 +22,13 @@ module type S = sig
            and type t := t
 
   val to_list : t -> account list
+
+  val fold_until :
+       t
+    -> init:'accum
+    -> f:('accum -> account -> ('accum, 'stop) Base.Continue_or_stop.t)
+    -> finish:('accum -> 'stop)
+    -> 'stop
 
   module Location : sig
     type t

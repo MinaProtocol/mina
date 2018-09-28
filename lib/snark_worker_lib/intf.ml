@@ -4,19 +4,19 @@ open Signature_lib
 
 module type Inputs_intf = sig
   module Sparse_ledger : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   module Super_transaction : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   module Proof : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   module Statement : sig
-    type t [@@deriving bin_io]
+    type t [@@deriving bin_io, sexp]
   end
 
   open Snark_work_lib
@@ -37,7 +37,7 @@ module type Inputs_intf = sig
        , Sparse_ledger.t
        , Proof.t )
        Work.Single.Spec.t
-    -> Proof.t Or_error.t
+    -> (Proof.t * Time.Span.t) Or_error.t
 end
 
 module type S = sig
@@ -56,11 +56,12 @@ module type S = sig
       module Spec : sig
         type t =
           (statement, transition, sparse_ledger, proof) Work.Single.Spec.t
+        [@@deriving sexp]
       end
     end
 
     module Spec : sig
-      type t = Single.Spec.t Work.Spec.t
+      type t = Single.Spec.t Work.Spec.t [@@deriving sexp]
     end
 
     module Result : sig
@@ -90,7 +91,7 @@ module type S = sig
 
   val arguments :
        public_key:Public_key.Compressed.t
-    -> daemon_port:int
+    -> daemon_address:Host_and_port.t
     -> shutdown_on_disconnect:bool
     -> string list
 end

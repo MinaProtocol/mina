@@ -188,7 +188,7 @@ let%test_module "sparse-ledger-test" =
         let%map name = String.gen and favorite_number = Int.gen in
         {name; favorite_number}
 
-      let key {name} = name
+      let key {name; _} = name
 
       let hash t = Md5.digest_string (Binable.to_string (module T) t)
     end
