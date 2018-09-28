@@ -215,14 +215,40 @@ module Style = struct
   let just = Fn.compose render of_class
 end
 
-
 module Html = struct
   open Virtual_dom.Vdom
+
+  let grouping_style =
+     Style.of_class "br3 bg-darksnow shadow-subtle ph2 pv2"
 
   let div = Node.div
 
   let extend_class c co =
     c ^ Option.value_map ~default:"" co ~f:(fun s -> " " ^ s)
+
+  module Tooltip = struct
+    let create ~text ~arity =
+      let body =
+        div [Style.just "mw5 b-sky shadow-subtle br3 bg-darksnow ph2 pv2"]
+            [Node.text text]
+      in
+      let chevron =
+        match arity with
+        | `Left -> "›"
+        | `Right -> "‹"
+      in
+      let chevron_dom =
+        div [Style.just "silver ml3 mr3"] [Node.text chevron]
+      in
+      div [Style.just "flex items-center o-10"]
+        (match arity with
+        | `Left ->
+          [ body
+          ; chevron_dom ]
+        | `Right ->
+          [ chevron_dom
+          ; body ])
+  end
 
   module Record = struct
     module Entry = struct
@@ -253,7 +279,7 @@ module Html = struct
               ; span [Style.just "ph1 fw5 darksnow"] [text label_text]
               ]
             ]
-          ; div [Style.(render (of_class "br3 br--bottom pv2 ph3 ocean wb bg-darksnow" + if important then (of_class "f8") else empty))] [text value] ]
+          ; div [Style.(render (of_class "br3 br--bottom pv3 ph3 ocean wb bg-darksnow" + if important then (of_class "f8") else (of_class "f7")))] [text value] ]
 
       let create verification ?(extra_style=Style.empty) ?width ?(important=false) label value =
         let _ = width in
@@ -264,17 +290,43 @@ module Html = struct
       type t = Entry.t list
 
       let render (t: t) =
-        div [Attr.class_ "mb2"] (List.map ~f:Entry.render t)
+        div [Style.just "mb2"] (List.map ~f:Entry.render t)
     end
 
-    type t = {class_: string option; attrs: Attr.t list; rows: Row.t list}
+    type t = {style: Style.t; rows: Row.t list}
 
-    let create ?(attrs= []) ?class_ rows = {class_; rows; attrs}
+    let create ?(style=Style.empty) rows =
+      {style; rows}
 
-    let render {class_; rows; attrs} =
-      div
-        (Attr.class_ (extend_class "record" class_) :: attrs)
-        (List.map rows ~f:Row.render)
+    let render ?tooltip ?(grouping=`Separate) {style; rows} width =
+      let width =
+        match width with
+        | `Wide -> Style.of_class "mw55"
+        | `Thin -> Style.of_class "mw5"
+      in
+      let grouping =
+        match grouping with
+        | `Thin_together -> Style.of_class "b-silver ph2 pv2"
+        | `Together -> grouping_style
+        | `Separate -> Style.empty
+      in
+      let record =
+          div
+              [Style.(render (style + width + grouping))]
+              (List.map rows ~f:Row.render)
+      in
+      match tooltip with
+      | None -> record
+      | Some tooltip ->
+        let content =
+          match tooltip with
+          | `Left tooltip ->
+              [tooltip; record]
+          | `Right tooltip ->
+              [record; tooltip]
+        in
+        div [Style.just "flex items-center mb3"]
+          content
   end
 end
 
@@ -374,8 +426,7 @@ let merkle_tree num_layers_to_show =
             ; account= {public_key; balance; nonce; receipt_chain_hash} } ->
             let record =
               let open Html.Record in
-              create ~class_:"flex"
-                ~attrs:[]
+              create ~style:(Style.of_class "flex")
                 [ [ create_entry ~extra_style:(Style.of_class "mr2 mb2") "balance" ~width:"50%"
                       (Account.Balance.to_string balance)
                   ; create_entry ~extra_style:(Style.of_class "mr2 mt2") "public_key" ~width:"50%"
@@ -385,7 +436,7 @@ let merkle_tree num_layers_to_show =
                   ; create_entry ~extra_style:(Style.of_class "ml2 mt2") "receipt_chain" ~width:"50%"
                       (field_to_base64 receipt_chain_hash) ] ]
             in
-            Some (Html.Record.render record)
+            Some (Html.Record.render ~grouping:`Thin_together record `Wide)
       in
       let edges =
         let posns =
@@ -404,12 +455,15 @@ let merkle_tree num_layers_to_show =
                 Some (Svg.circle ~radius ~color ~center:pos )
             | Spec.Account _ -> None )
       in
-      Node.div [Attr.class_ "merkle-tree"]
-        ( Svg.main
-            ~width:(image_width +. left_offset)
-            ~height:(image_height +. top_offset)
-            (edges :: nodes)
-        :: Option.to_list account )
+      Node.div [Style.just "flex items-center"]
+      [ Node.div [Style.render Html.grouping_style]
+          ( Svg.main
+              ~width:(image_width +. left_offset)
+              ~height:(image_height +. top_offset)
+              (edges :: nodes)
+          :: Option.to_list account )
+      ; Html.Tooltip.create ~arity:`Right ~text:"To know the state of a particular account in Coda, a client needs the database merkle root from the protocol state, a merkle path, and the account properties. Because the database is a merkle root, this information is sufficient to determine the balance in an account. And because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data."
+      ]
     in
     rendered
 
@@ -678,7 +732,7 @@ let state_html
   let proof_style = Style.(proof_style + (of_class "wb")) in
   let state_record =
     let open Html.Record in
-    create ~class_:"state"
+    create
       [ [ create_entry "previous_state_hash"
             (field_to_base64 previous_state_hash) ]
       ; [ create_entry "length" (Length.to_string length)]
@@ -702,18 +756,21 @@ let state_html
     | Progress _ -> div [] [Node.text "downloading..."]
     | Done -> 
     div [class_ "state-explorer flex"]
-      [ div [class_ "state-with-proof mw5 mr4"]
-          [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state []
-          ; hoverable(Html.Record.Entry.(
-              create_entry ~extra_style:proof_style "blockchain_SNARK"
-                (to_base64 (module Proof) proof)
-              |> render)) Tooltip_stage.Proof  [] ]
+      [ div [class_ "state-with-proof mw7 mr4"]
+          [ hoverable(Html.Record.render
+            ~grouping:`Together
+            ~tooltip:(`Left (Html.Tooltip.create ~arity:`Left ~text:"While other cryptocurrencies require downloading and verifying a lengthy, ever growing blockchain, the Coda network incrementally produces zk-SNARK proofs, which serve as cryptographic certifications of the database. The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."))
+            (Html.Record.create
+            [[ create_entry ~important:true ~extra_style:proof_style "blockchain_SNARK" (to_base64 (module Proof) proof)
+            ]]) `Thin) Tooltip_stage.Proof  []
+          ; hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left (Html.Tooltip.create ~arity:`Left ~text:"Coda's protocol state is composed of the consensus state and the database state. Our test network is currently using \"proof of signature\", where producing a valid snark for an updated protocol state requires a priveleged private key (Coda will use a fully open consensus protocol in later versions of the testnet). The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed.")) state_record `Wide) Tooltip_stage.Blockchain_state []
+          ]
       ; hoverable
           ( let tree = Sparse_ledger_lib.Sparse_ledger.tree ledger in
             Mobile_switch.create
              ~not_small:(merkle_tree num_layers_to_show_desktop verification tree)
              ~small:(merkle_tree num_layers_to_show_mobile verification tree) )
-           Tooltip_stage.Account_state [Style.just "mw55"]
+           Tooltip_stage.Account_state [Style.just "mw7"]
       ] 
   in
   (*let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]*)
