@@ -286,12 +286,16 @@ module Html = struct
       let render {label=label_text; value; verification; important; extra_style} =
         let open Node in
         div [Style.(render
-            (of_class "br3 silver-gradient b-silver shadow-subtle" + extra_style + 
+            (of_class "br3 shadow-subtle" + extra_style + 
               (match (important, verification) with
-              | true, `Complete (Ok ()) -> (of_class "grass-gradient b-grass")
-              | true, `Complete (Error _) | (true, `Pending _) | (false, _) -> (of_class "silver-gradient br3 b-silver"))
+              | true, `Complete (Ok ()) ->
+                  printf "VERIFIED\n";
+                  (of_class "grass-gradient b-grass")
+              | true, `Complete (Error _) | (true, `Pending _) | (false, _) ->
+                  printf "NOT VERIFIED\n";
+                  (of_class "silver-gradient br3 b-silver"))
             )) ]
-          [ div [Style.just "br3 pv1 br--top"]
+          [ div [Style.just "br3 pv2 br--top"]
             [div [Style.just "flex items-center"]
               [div
                 [Style.(render (
@@ -832,7 +836,7 @@ let state_html
     match download_progress with
     | Progress _ -> div [] [Node.text "downloading..."]
     | Done -> 
-    div [class_ "state-explorer flex items-center"]
+    div [class_ "state-explorer flex-ll items-center"]
       [ div [class_ "state-with-proof mw7 mr4"]
           [ hoverable(Html.Record.render
             ~grouping:`Together
