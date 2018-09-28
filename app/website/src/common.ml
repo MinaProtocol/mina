@@ -330,7 +330,7 @@ module Section = struct
                     (div [] [])
                   ~not_small:
                     (Input_button.cta ~button_hint ~label
-                              ~url ~extra_style:"progress-button" ~new_tab ())
+                              ~url ~extra_style:"progress-button follow-button" ~new_tab ())
               else
                 a [Style.(render (of_class "next-button")); href (Printf.sprintf "#item-%d" (i+1))] [div [] [text "›"]]
           in
