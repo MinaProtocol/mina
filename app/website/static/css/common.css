@@ -192,3 +192,7 @@
   -o-transition: opacity .1s;
   transition: opacity .1s;
 }
+
+.bright-red {
+  background-color: #ef5b5b;
+}

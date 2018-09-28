@@ -291,9 +291,11 @@ module Html = struct
               | true, `Complete (Ok ()) ->
                   printf "VERIFIED\n";
                   (of_class "grass-gradient b-grass")
-              | true, `Complete (Error _) | (true, `Pending _) | (false, _) ->
+              | (true, `Pending _) | (false, _) ->
+                  (of_class "silver-gradient br3 b-silver")
+              | true, `Complete (Error _) ->
                   printf "NOT VERIFIED\n";
-                  (of_class "silver-gradient br3 b-silver"))
+                  (of_class "bright-red br3 b-silver"))
             )) ]
           [ div [Style.just "br3 pv2 br--top"]
             [div [Style.just "flex items-center"]
@@ -302,7 +304,9 @@ module Html = struct
                 (of_class "dib ml3 mr2 ph1 br-100 w01 h01")
                   + (match verification with
                     | `Complete (Ok ()) -> (of_class "shadow-small2 bg-grass")
-                    | `Complete (Error _) | `Pending _ -> (of_class "shadow-small1 bg-dullgrey"))))] []
+                    | `Pending _ -> (of_class "shadow-small1 bg-dullgrey")
+                    | `Complete (Error _) -> (of_class "shadow-small1 bright-red")
+                  )))] []
               ; span [Style.just "ph1 fw5 darksnow"] [text label_text]
               ]
             ]
