@@ -681,14 +681,15 @@ let state_html
   let state_explorer =
     div [class_ "state-explorer flex-ll items-center"]
       [ div [class_ "state-with-proof mw7 mr4"]
-          [ hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left state_tooltip) state_record `Wide) Tooltip_stage.Blockchain_state []
-          ; hoverable(Html.Record.render
+          [ 
+          hoverable(Html.Record.render
             ~grouping:`Together
             ~tooltip:(`Left snark_tooltip)
             (Html.Record.create
                (Some "Protocol State Proof")
             [[ create_entry ~important:true ~extra_style:proof_style "zkSNARK" (to_base64 (module Proof) proof)
             ]]) `Thin) Tooltip_stage.Proof  []
+          ; hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left state_tooltip) state_record `Wide) Tooltip_stage.Blockchain_state []
           ]
       ; hoverable
           ( let tree = Sparse_ledger_lib.Sparse_ledger.tree ledger in
