@@ -66,7 +66,8 @@
 .bg-extradarksnow { background-color: #E5E9F2; }
 .bg-silver { background-color: #8492A6; }
 .bg-dullgrey { background-color: #bcbcbc; }
-
+.bg-brightred { background-color: #ef5b5b; }
+.bg-lemoncurry { background-color: #D19C1D; }
 
 .b-silver { border: solid 1px #8192a8; }
 .b-darksnow { border: solid 1px #EFF2F7; }
@@ -193,10 +194,6 @@
   -webkit-transition: opacity .1s;
   -o-transition: opacity .1s;
   transition: opacity .1s;
-}
-
-.bright-red {
-  background-color: #ef5b5b;
 }
 
 .record-title-padding {

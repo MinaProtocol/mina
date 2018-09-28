@@ -310,7 +310,7 @@ module Html = struct
               | (true, `Pending _) | (false, _) ->
                   (of_class "silver-gradient br3 b-silver")
               | true, `Complete (Error _) ->
-                  (of_class "bright-red br3 b-silver"))
+                  (of_class "bg-brightred br3 b-silver"))
             )) ]
           [ div [Style.just "br3 pv2 br--top"]
             [div [Style.just "flex items-center"]
@@ -320,7 +320,7 @@ module Html = struct
                   + (match verification with
                     | `Complete (Ok _) -> (of_class "shadow-small2 bg-grass")
                     | `Pending _ -> (of_class "shadow-small1 bg-dullgrey")
-                    | `Complete (Error _) -> (of_class "shadow-small1 bright-red")
+                    | `Complete (Error _) -> (of_class "shadow-small1 bg-brightred")
                   )))] []
               ; span [Style.just "ph1 fw5 darksnow"] [text label_text]
               ]
@@ -361,7 +361,7 @@ module Html = struct
               [Style.(render (style + width + grouping))]
               ((match heading with
                | None -> []
-               | Some heading -> [ Node.div [Style.just "record-title-padding fw5 silver tc"] [ Node.text heading ] ]
+               | Some heading -> [ Node.div [Style.just "record-title-padding fw5 silver roboto tc"] [ Node.text heading ] ]
               ) @ (List.map rows ~f:Row.render))
       in
       match tooltip with
@@ -712,7 +712,7 @@ let state_html
     then 
      (printf "state age: %s\n" (Time.Span.to_string age);
      [let heading_style =
-      Style.(of_class ("fw4 darksnow tc mt0 mb4 f4 silver-gradient br3 shadow-subtle pa3 dib"))
+      Style.(of_class ("fw4 darksnow tc mt0 mb4 f4 bg-lemoncurry br3 shadow-subtle pa3 dib lh-copy"))
     in
     (div 
        [Style.(render (of_class "flex justify-center"))]
@@ -720,10 +720,15 @@ let state_html
          div [Style.render heading_style] [ 
               div
                 [Style.(render (
-                (of_class "dib mr3 ml2 ph1 br-100 w01 h01 shadow-small2 bg-dullgrey pr3")
+                (of_class "dib mr3 ml2 ph1 br-100 w01 bg-dullgrey h01 pr3")
                   ))] []
          ; Node.text "System is down for maintenance, check " 
-         ; Node.a [Attr.href "http://status.codaprotocol.com"; Attr.create "target" "_blank"] [ Node.text "status page" ]
+         ; Node.a
+            [ Attr.href "http://status.codaprotocol.com"
+            ; Attr.create "target" "_blank"
+            ; Style.(render (of_class "darksnow"))
+            ]
+              [ Node.text "status page" ]
          ; Node.text " for updates" 
          ] 
        ]) ])
