@@ -3,8 +3,6 @@ open Unsigned
 
 module Make (Inputs : sig
   val depth : int
-
-  val num_accts : int
 end) =
 struct
   open Merkle_ledger_tests.Test_stubs
@@ -45,6 +43,4 @@ struct
       end)
 
   module SR = SL.Responder
-
-  let num_accts = Inputs.num_accts
 end

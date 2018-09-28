@@ -26,12 +26,15 @@ module type Input_intf = sig
      and type account := L.account
 
   module SR = SL.Responder
-
-  val num_accts : int
 end
 
-module Make (Input : Input_intf) = struct
+module Make
+    (Input : Input_intf) (Input' : sig
+        val num_accts : int
+    end) =
+struct
   open Input
+  open Input'
 
   (* not really kosher but the tests are run in-order, so this will get filled
    * in before we need it. *)
@@ -40,8 +43,8 @@ module Make (Input : Input_intf) = struct
   let parent_log = Logger.create ()
 
   let%test "full_sync_entirely_different" =
-    let l1, _k1 = L.load_ledger num_accts 1 in
-    let l2, _k2 = L.load_ledger num_accts 2 in
+    let l1, _k1 = L.load_ledger 1 1 in
+    let l2, _k2 = L.load_ledger num_accts 1 in
     let desired_root = L.merkle_root l2 in
     let lsync = SL.create l1 ~parent_log in
     let qr = SL.query_reader lsync in
@@ -107,74 +110,104 @@ module Make (Input : Input_intf) = struct
       | `Target_changed _ -> failwith "the target changed again"
 end
 
-module TestL3_3 = Make (Test_ledger.Make (struct
+module L3 = Test_ledger.Make (struct
   let depth = 3
+end)
 
-  let num_accts = 3
-end))
+module L16 = Test_ledger.Make (struct
+  let depth = 16
+end)
 
-module TestL3_8 = Make (Test_ledger.Make (struct
+module L10 = Test_ledger.Make (struct
+  let depth = 10
+end)
+
+let%test_unit "exhaustive depth=10 testing" =
+  for i = 3 to 1 lsl 10 do
+    let module M =
+      Make (L10)
+        (struct
+          let num_accts = i
+        end) in
+    printf "We've done num_accts = %d\n%!" i
+  done
+
+module TestL3_3 =
+  Make (L3)
+    (struct
+      let num_accts = 3
+    end)
+
+module TestL3_8 =
+  Make (L3)
+    (struct
+      let num_accts = 8
+    end)
+
+module TestL16_3 =
+  Make (L16)
+    (struct
+      let num_accts = 3
+    end)
+
+module TestL16_20 =
+  Make (L16)
+    (struct
+      let num_accts = 20
+    end)
+
+module TestL16_1024 =
+  Make (L16)
+    (struct
+      let num_accts = 1024
+    end)
+
+module TestL16_1025 =
+  Make (L16)
+    (struct
+      let num_accts = 80
+    end)
+
+module TestL16_65536 =
+  Make (L16)
+    (struct
+      let num_accts = 65536
+    end)
+
+module DB3 = Test_db.Make (struct
   let depth = 3
+end)
 
-  let num_accts = 8
-end))
-
-module TestL16_3 = Make (Test_ledger.Make (struct
+module DB16 = Test_db.Make (struct
   let depth = 16
+end)
 
-  let num_accts = 3
-end))
+module TestDB3_3 =
+  Make (DB3)
+    (struct
+      let num_accts = 3
+    end)
 
-module TestL16_20 = Make (Test_ledger.Make (struct
-  let depth = 16
+module TestDB3_8 =
+  Make (DB3)
+    (struct
+      let num_accts = 8
+    end)
 
-  let num_accts = 20
-end))
+module TestDB16_20 =
+  Make (DB16)
+    (struct
+      let num_accts = 20
+    end)
 
-module TestL16_1024 = Make (Test_ledger.Make (struct
-  let depth = 16
+module TestDB16_1024 =
+  Make (DB16)
+    (struct
+      let num_accts = 1024
+    end)
 
-  let num_accts = 1024
-end))
-
-module TestL16_1025 = Make (Test_ledger.Make (struct
-  let depth = 16
-
-  let num_accts = 80
-end))
-
-module TestL16_65536 = Make (Test_ledger.Make (struct
-  let depth = 16
-
-  let num_accts = 65536
-end))
-
-module TestDB3_3 = Make (Test_db.Make (struct
-  let depth = 3
-
-  let num_accts = 3
-end))
-
-module TestDB3_8 = Make (Test_db.Make (struct
-  let depth = 3
-
-  let num_accts = 8
-end))
-
-module TestDB16_20 = Make (Test_db.Make (struct
-  let depth = 16
-
-  let num_accts = 20
-end))
-
-module TestDB16_1024 = Make (Test_db.Make (struct
-  let depth = 16
-
-  let num_accts = 1024
-end))
-
-module TestDB16_1026 = Make (Test_db.Make (struct
-  let depth = 16
-
-  let num_accts = 1026
-end))
+module TestDB16_1026 =
+  Make (DB16)
+    (struct
+      let num_accts = 1026
+    end)
