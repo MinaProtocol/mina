@@ -419,7 +419,7 @@ let jobs () =
   wrap ~page_label:(Links.(label jobs)) ~fixed_footer:true sections
 
 let demo () =
-  let comic ~title ~content ~img =
+  let comic ?(alt_content=None) ~title ~content ~img () =
     let image =
       match img with
       | `None -> None
@@ -428,7 +428,17 @@ let demo () =
       | `Real s ->
         Some (Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns w-100") ("/static/img/demo/" ^ s) `Free)
     in
-    Compound_chunk.create ~variant:`No_image_on_small ~important_text:(Important_text.create ~title:(`Left title) ~content) ~image ~image_positioning:Image_positioning.Right ()
+    let important_text = 
+      match alt_content with
+      | None -> Important_text.create ~title:(`Left title) ~content
+      | Some alt_content -> (
+          Mobile_switch.create
+            ~small:
+              (Important_text.create ~title:(`Left title) ~content:alt_content)
+            ~not_small:
+              (Important_text.create ~title:(`Left title) ~content))
+    in
+    Compound_chunk.create ~variant:`No_image_on_small ~important_text ~image ~image_positioning:Image_positioning.Right ()
   in
   let top scheme =
     let open Html_concise in
@@ -440,12 +450,12 @@ let demo () =
         ~content:["This is an interactive demo of the Coda testnet. Coda is a cryptocurrency so lightweight, it can even run in your browser."
         ; "On this page you can learn more about Coda, the testnet, and how the protocol works."
         ]
-        ~img:`None
+        ~img:`None ()
       ; comic
          ~title:"Problem"
          ~content:[
            "Cryptocurrencies today are growing increasingly large, increasing centralization and bringing them out of reach of the end user. And as cryptocurrencies get more centralized, they lose the properties that make them valuable."]
-         ~img:(`Real "problem.png")
+         ~img:(`Real "problem.png") ()
       ; comic
         ~title:"Coda"
         ~content:[
@@ -453,12 +463,12 @@ let demo () =
         (*~img:(`Custom (div [Style.(render (of_class "flex"))]
             [ Image.draw ("/static/img/demo/your-hands.png") (`Fixed (350, 400))
             ]))*)
-        ~img:(`Real "your-hands.png")
+        ~img:(`Real "your-hands.png") ()
       ; comic
         ~title:"Coda"
         ~content:[
           "Because resource requirements are constant, it will stay decentralized and in the hands of its users, even at scale. "]
-        ~img:(`Real "net-hand.png")
+        ~img:(`Real "net-hand.png") ()
       ; comic
         ~title:"Coda Protocol Demo"
         ~content:
@@ -467,7 +477,11 @@ let demo () =
 ; "Coda enables you to verify the balance in an account with just a constant, small amount of bandwidth and computation - unlike other cryptocurrencies with require downloading and processing an ever-growing amount of data. And, it will keep these properties as it scales to more users and applications."
 
 ; "When released, Coda will put users back in control of cryptocurrency. Its our first step towards building computer systems that put users back in control of their digital lives." ]
-        ~img:`None
+        ~img:`None 
+        ~alt_content: (Some [ "This demo is showing a live, browser-verified copy of the Coda protocol testnet."
+
+; "When released, Coda will put users back in control of cryptocurrency. Its our first step towards building computer systems that put users back in control of their digital lives." ])
+        ()
       ]
         ~scheme
         ()

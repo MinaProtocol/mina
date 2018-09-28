@@ -320,8 +320,12 @@ module Section = struct
                 let button_hint, label, url, new_tab =
                   "Follow our progress", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
                 in
-                Input_button.cta ~button_hint ~label
-                          ~url ~extra_style:"progress-button" ~new_tab ()
+                Mobile_switch.create
+                  ~small:
+                    (div [] [])
+                  ~not_small:
+                    (Input_button.cta ~button_hint ~label
+                              ~url ~extra_style:"progress-button" ~new_tab ())
               else
                 a [Style.(render (of_class "next-button")); href (Printf.sprintf "#item-%d" (i+1))] [div [] [text "›"]]
           in
