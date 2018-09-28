@@ -391,7 +391,7 @@ let merkle_tree num_layers_to_show =
     let pos = function Node {pos; _} -> pos | Account {pos; _} -> pos
   end in
   let layer_height = 25. in
-  let image_width = 320. in
+  let image_width = 256. in
   let top_offset = 15. in
   let left_offset = 0. in
   let image_height = Int.to_float num_layers_to_show *. layer_height in
