@@ -113,7 +113,7 @@ let daemon (type ledger_proof) (module Kernel
          Option.value ~default:false should_propose_flag
        in
        let transaction_capacity_log_2 =
-         Option.value ~default:4 transaction_capacity_log_2
+         Option.value ~default:3 transaction_capacity_log_2
        in
        let proposal_interval =
          Option.value ~default:(Time.Span.of_ms 5000.)
