@@ -316,18 +316,39 @@ end = struct
   [@@deriving sexp, bin_io]
 
   module Coordinator = struct
+    module Job_status = struct
+      type t =
+        | Assigned of Time.t
+
+      let max_age = Time.Span.of_min 2.
+
+      let is_old t ~now =
+        match t with
+        | Assigned at_time ->
+          let delta = Time.diff now at_time in
+          Time.Span.(>) delta max_age
+    end
+
     module State = struct
       type t =
-        { seen_statements : Ledger_proof_statement.Set.t
+        { seen_statements : Job_status.t Ledger_proof_statement.Map.t
         ; last_statement : Ledger_proof_statement.t option
         }
 
-      let init = { seen_statements = Ledger_proof_statement.Set.empty; last_statement = None }
+      let init = { seen_statements = Ledger_proof_statement.Map.empty; last_statement = None }
+
+      let remove_old_assignments t =
+        let now = Time.now () in
+        { t with
+          seen_statements = Map.filter t.seen_statements ~f:(fun status ->
+            not (Job_status.is_old status ~now))
+        }
     end
 
   let random_work_spec_chunk t
       (state:
         State.t) =
+    let state = State.remove_old_assignments state in
     let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
     let module A = Parallel_scan.Available_job in
     let module L = Ledger_proof_statement in
@@ -385,14 +406,17 @@ end = struct
     let n = List.length all_jobs in
     let dirty_jobs =
       List.map all_jobs ~f:(fun j ->
-          L.Set.mem state.seen_statements (canonical_statement_of_job j) )
+          Map.mem state.seen_statements (canonical_statement_of_job j) )
     in
     let seen_jobs, jobs =
-      List.partition_tf all_jobs ~f:(fun j ->
-          L.Set.mem state.seen_statements (canonical_statement_of_job j) )
+      List.partition_map all_jobs ~f:(fun j ->
+        let canonical = canonical_statement_of_job j in
+        match Map.find state.seen_statements canonical with
+        | None -> `Snd j
+        | Some x -> `Fst (canonical, x))
     in
     let seen_statements' =
-      List.map seen_jobs ~f:canonical_statement_of_job |> L.Set.of_list
+      seen_jobs |> L.Map.of_alist_exn
     in
     match jobs with
     | [] -> (None, state)
@@ -420,8 +444,9 @@ end = struct
                 else None )
           in
           ( Some (List.map chunk ~f:single_spec)
-          , { seen_statements = L.Set.add seen_statements'
-                (canonical_statement_of_job @@ List.hd_exn chunk)
+          , { seen_statements = Map.set seen_statements'
+                ~key:(canonical_statement_of_job @@ List.hd_exn chunk)
+                ~data:(Assigned (Time.now ()))
             ; last_statement = new_last_job } )
         else
           let last_job = List.nth_exn all_jobs j in
