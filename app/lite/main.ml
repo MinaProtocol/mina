@@ -100,10 +100,12 @@ let get url on_success on_error =
 let s3_link = "https://s3-us-west-2.amazonaws.com/o1labs-snarkette-data"
 
 let get_account _pk on_sucess on_error =
-  let url = sprintf !"%s/chain" s3_link in
+  let url = sprintf !"%s/sample_chain" s3_link in
   (* IF serialization does not work, please try the following code:
   
   let url = sprintf !"%s/sample_chain" s3_link in
+
+     Use "%s/chain" in production
    *)
   get url
     (fun s ->
@@ -391,7 +393,7 @@ let merkle_tree num_layers_to_show =
     let pos = function Node {pos; _} -> pos | Account {pos; _} -> pos
   end in
   let layer_height = 25. in
-  let image_width = 256. in
+  let image_width = 240. in
   let top_offset = 15. in
   let left_offset = 0. in
   let image_height = Int.to_float num_layers_to_show *. layer_height in
