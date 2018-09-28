@@ -23,9 +23,7 @@ module Svg = struct
       @ Option.to_list (Option.map class_ ~f:Attr.class_) )
       cs
 
-  let line_color = silver
-
-  let path points =
+  let path points line_color =
     let points =
       String.concat ~sep:" "
         (List.map points ~f:(fun {Pos.x; y} ->
@@ -73,7 +71,7 @@ module Svg = struct
     in
     Node.svg "polygon"
       ( [ Attr.create "points" (sprintf "%f,%f %f,%f %f,%f" p0x p0y p1x p1y p2x p2y)
-        ; Attr.create "style" (sprintf "fill:%s" color) ]
+        ; Attr.create "style" (sprintf "stroke:%s;fill:rgba(0,0,0,0)" color) ]
       @ rad_attrs )
       []
 end
@@ -453,7 +451,7 @@ let merkle_tree num_layers_to_show =
 
     let pos = function Node {pos; _} -> pos | Account {pos; _} -> pos
   end in
-  let layer_height = 25. in
+  let layer_height = 20. in
   let image_width = 240. in
   let top_offset = 15. in
   let left_offset = 0. in
@@ -555,7 +553,7 @@ let merkle_tree num_layers_to_show =
           else 
             posns
         in
-        Svg.path posns
+        Svg.path posns "#8492A6"
       in
       let sibling_edge_positions = 
         let srcs = drop_last specs in
@@ -569,6 +567,10 @@ let merkle_tree num_layers_to_show =
               then { pos_dest with x = pos_dest.x +. (x_delta *. 2.0) }
               else { pos_dest with x = pos_dest.x -. (x_delta *. 2.0) }
             in
+            let pos_dest = 
+              { Pos.x = pos_src.x +. (pos_dest.x -. pos_src.x) /. 1.0
+              ; y = pos_src.y +. (pos_dest.y -. pos_src.y) /. 1.0 }
+            in
             pos_src, pos_dest, right
           )
         in
@@ -576,12 +578,23 @@ let merkle_tree num_layers_to_show =
       in
       let sibling_edges = 
         List.map sibling_edge_positions ~f:(fun (src, dest, _) -> 
-            Svg.path [src; dest]
+            Svg.path [src; dest] "#bcbcbc"
           )
       in
+      let colors = 
+        List.filter_map specs ~f:(fun spec ->
+            match spec with
+            | Spec.Node {pos=_; color} -> Some color
+            | Spec.Account _ -> None )
+      in
+      let colors =
+        if List.length colors <> List.length sibling_edge_positions
+        then (drop_last colors)
+        else  colors
+      in
       let sibling_nodes = 
-        List.map sibling_edge_positions ~f:(fun (_, dest, right) -> 
-            let color = "#8492A6" in
+        List.map2_exn sibling_edge_positions colors ~f:(fun (_, dest, right) _ -> 
+            let color = "#bcbcbc" in
             let size = 12.0 in
             let center = 
               if right 
@@ -766,7 +779,8 @@ let main ~render ~get_data =
             Verifier.send_verify_message verifier (chain, id) ) ) )
   in
   loop () ;
-  Dom_html.window ## setInterval (Js.wrap_callback (fun _ -> loop ())) 5_000.
+  ignore(Dom_html.window ## setInterval (Js.wrap_callback (fun _ -> loop ())) 5_000.);
+  Dom_html.window ## setTimeout (Js.wrap_callback (fun _ -> (update_state_and_vdom !state))) 5_000.
 
 let _ =
   main
