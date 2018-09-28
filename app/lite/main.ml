@@ -13,7 +13,7 @@ let float_to_string value = Js.to_string (Js.number_of_float value) ## toString
 module Svg = struct
   open Virtual_dom.Vdom
 
-  let blue_black = "#1F2D3D"
+  let ocean_blacklike = "#1F2D3D"
 
   let main ?class_ ~width ~height cs =
     Node.svg "svg"
@@ -23,7 +23,7 @@ module Svg = struct
       @ Option.to_list (Option.map class_ ~f:Attr.class_) )
       cs
 
-  let line_color = blue_black
+  let line_color = ocean_blacklike
 
   let path points =
     let points =
@@ -219,21 +219,29 @@ module Html = struct
       type t =
         { label: string
         ; value: string
+        ; verification: [`Pending of int | `Complete of unit Or_error.t]
+        ; extra_style: Style.t
         }
 
-      let render {label=label_text; value} =
+      let render {label=label_text; value; verification; extra_style} =
         let open Node in
-        div [Style.just "br2 shadow-2"]
-          [ div [Style.just "bg-blue"]
-            [span [Style.just "green ml2 ph1"]
-                [text {literal|•|literal}]
-            ; span [Style.just "darksnow ph1"] [text label_text]
+        div [Style.(render (of_class "br3 silver-gradient b-silver shadow-subtle" + extra_style))]
+          [ div [Style.just "br3 pv1 br--top"]
+            [div [Style.just "flex items-center"]
+              [div
+                [Style.(render (
+                (of_class "dib ml3 mr2 ph1 br-100 w01 h01")
+                  + (match verification with
+                    | `Complete (Ok ()) -> (of_class "shadow-small2 bg-grass")
+                    | `Complete (Error _) | `Pending _ -> (of_class "shadow-small1 bg-dullgrey"))))] []
+              ; span [Style.just "ph1 fw5 darksnow"] [text label_text]
+              ]
             ]
-          ; div [Style.just "blue wb bg-darksnow"] [text value] ]
+          ; div [Style.just "br3 br--bottom pv2 ph3 ocean wb bg-darksnow"] [text value] ]
 
-      let create ?class_ ?width label value =
-        let _ = class_ and _ = width in
-        {label; value}
+      let create verification ?(extra_style=Style.empty) ?width label value =
+        let _ = width in
+        {label; value; verification; extra_style}
     end
 
     module Row = struct
@@ -306,7 +314,8 @@ let merkle_tree =
 *)
     (x_uncompressed, y_uncompressed)
   in
-  fun (tree0: ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree) ->
+  fun verification (tree0: ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree) ->
+    let create_entry = Html.Record.Entry.create verification in
     let tree0 = drop_top_of_tree tree0 in
     let specs =
       let rec go acc layer index
@@ -339,22 +348,18 @@ let merkle_tree =
             { pos= {x; y}
             ; account= {public_key; balance; nonce; receipt_chain_hash} } ->
             let _x = x -. Float.of_int (account_width / 2) in
+            let _y = y in
             let record =
               let open Html.Record in
-              create ~class_:"account"
-                ~attrs:
-                  [ Attr.create "style"
-                      (style
-                         [ ("width", sprintf "%dpx" account_width)
-                         ; ("position", "absolute")
-                         ; ("top", float_to_string y ^ "px") ]) ]
-                [ [ Entry.create "balance" ~width:"50%"
+              create ~class_:"flex"
+                ~attrs:[]
+                [ [ create_entry ~extra_style:(Style.of_class "mr2 mb2") "balance" ~width:"50%"
                       (Account.Balance.to_string balance)
-                  ; Entry.create "nonce" ~width:"50%"
-                      (Account.Nonce.to_string nonce) ]
-                ; [ Entry.create "public_key" ~width:"50%"
-                      (to_base64 (module Public_key.Compressed) public_key)
-                  ; Entry.create "receipt_chain" ~width:"50%"
+                  ; create_entry ~extra_style:(Style.of_class "mr2 mt2") "public_key" ~width:"50%"
+                      (to_base64 (module Public_key.Compressed) public_key) ]
+                ; [ create_entry ~extra_style:(Style.of_class "ml2 mb2") "nonce" ~width:"50%"
+                      (Account.Nonce.to_string nonce)
+                  ; create_entry ~extra_style:(Style.of_class "ml2 mt2") "receipt_chain" ~width:"50%"
                       (field_to_base64 receipt_chain_hash) ] ]
             in
             Some (Html.Record.render record)
@@ -458,7 +463,7 @@ module Button = struct
       Style.(
             render
               ( of_class
-                  "user-select-none hover-bg-black white no-underline ttu \
+                  "user-select-none hover-bg-blacklike white no-underline ttu \
                    tracked bg-silver icon-shadow ph3 pv3 br4 tc lh-copy"
               + extra_style ))
     ; Attr.on_click f
@@ -648,22 +653,24 @@ let state_html
     in
     Time.to_string_iso8601_basic time ~zone:Time.Zone.utc
   in
-  let proof_class =
-    match verification with
-    | `Complete (Ok _) -> "proof valid"
-    | `Complete (Error _) -> "proof invalid"
-    | `Pending _ -> "proof verifying shake shake-constant"
+  let create_entry = Html.Record.Entry.create verification in
+  let proof_style =
+    Style.of_class @@
+      match verification with
+      | `Complete (Ok _) -> "proof valid"
+      | `Complete (Error _) -> "proof invalid"
+      | `Pending _ -> "proof verifying shake shake-constant"
   in
-  let proof_class = proof_class ^ " wb" in
+  let proof_style = Style.(proof_style + (of_class "wb")) in
   let state_record =
     let open Html.Record in
     create ~class_:"state"
-      [ [ Entry.create "previous_state_hash"
+      [ [ create_entry "previous_state_hash"
             (field_to_base64 previous_state_hash) ]
-      ; [Entry.create "length" (Length.to_string length)]
-      ; [Entry.create "timestamp" timestamp]
-      ; [Entry.create "locked_ledger_hash" (field_to_base64 ledger_hash)]
-      ; [ Entry.create "staged_ledger_hash"
+      ; [ create_entry "length" (Length.to_string length)]
+      ; [ create_entry "timestamp" timestamp]
+      ; [ create_entry "locked_ledger_hash" (field_to_base64 ledger_hash)]
+      ; [ create_entry "staged_ledger_hash"
             (field_to_base64 ledger_builder_hash.ledger_hash) ] ]
   in
   let hoverable node target attrs =
@@ -680,8 +687,8 @@ let state_html
     match download_progress with
     | Progress _ -> div [] [Node.text "downloading..."]
     | Done -> 
-    div [class_ "state-explorer mw5"]
-      [ div [class_ "state-with-proof"]
+    div [class_ "state-explorer mw6"]
+      [ div [class_ "state-with-proof mw55"]
           [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state []
           ; div
               [ class_ "proof-struts"
@@ -690,10 +697,10 @@ let state_html
                   [ Svg.path [{x= 150.; y= 0.}; {x= 150.; y= 200.}]
                   ; Svg.path [{x= 350.; y= 0.}; {x= 350.; y= 200.}] ] ]
           ; hoverable(Html.Record.Entry.(
-              create ~class_:proof_class "blockchain_SNARK"
+              create_entry ~extra_style:proof_style "blockchain_SNARK"
                 (to_base64 (module Proof) proof)
               |> render)) Tooltip_stage.Proof  [] ]
-      ; hoverable(merkle_tree (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"] ] 
+      ; hoverable(merkle_tree verification (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"] ] 
   in
   (*let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]*)
   (*in*)

@@ -25,6 +25,13 @@
     font-weight: 400;
     font-style: normal;
 }
+@font-face {
+    font-family: 'metropolis';
+    src: url('/static/font/metropolis-regular-webfont.woff2') format('woff2'),
+         url('/static/font/metropolis-regular-webfont.woff') format('woff');
+    font-weight: 500;
+    font-style: normal;
+}
 
 
 .f8 { font-size:0.625rem; }
@@ -37,26 +44,36 @@
   .hauto-ns { height:auto; }
 }
 
-.black { color: #1F2D3D; }
+.blacklike { color: #1F2D3D; }
 .silver { color: #8492A6; }
 .darksnow { color: #EFF2F7; }
-.blue { color: #4882a0; }
-.green { color: #76cd73; }
+.ocean { color: #4782a0; }
+.grass { color: #76cd87; }
 
 .wb { word-break: break-all; }
 
-.bg-green { color: #76cd73; }
-.bg-blue { background-color: #4882a0; }
+.bg-grass { background-color: #76cd87; }
+.bg-sky { background-color: #96cbec; }
+.bg-ocean { background-color: #4882a0; }
 .bg-darksnow { background-color: #EFF2F7; }
 .bg-snow { background-color: #F9FAFC; }
 .bg-white { background-color: #fff; }
 .bg-extradarksnow { background-color: #E5E9F2; }
 .bg-silver { background-color: #8492A6; }
+.bg-dullgrey { background-color: #bcbcbc; }
+
+
+.b-silver { border: solid 1px #8192a8; }
+.b-grass { border: solid 1px #76bb81; }
+.b-sky {  border: solid 1px #96cbec; }
 
 .mw55 { max-width: 20rem; }
 @media screen and (min-width:30em) {
   .mw55-ns { max-width: 20rem; }
 }
+
+.w01 { width: 0.75rem; }
+.h01 { height: 0.75rem; }
 
 .h6 { height: 32rem; }
 
@@ -69,7 +86,7 @@
 .bxs-cb { box-sizing: content-box; }
 
 .hover-link:hover { color:#1F2D3D; }
-.hover-bg-black:hover { background-color: #1F2D3D; }
+.hover-bg-blacklike:hover { background-color: #1F2D3D; }
 .force-word-breaks { word-spacing: 100vw; }
 
 .user-select-none { user-select: none; }
@@ -82,6 +99,23 @@
   .ml-2-ns {margin-left:-.5rem;}
   .ml-3-ns {margin-left:-1rem;}
 }
+
+.silver-gradient {
+  background-image: linear-gradient(#8392a7, #8392a7), linear-gradient(to bottom, rgba(26, 26, 26, 0.1), rgba(0, 0, 0, 0.5));
+}
+.grass-gradient {
+  background-image: linear-gradient(#76bb81, #76bb81), linear-gradient(to bottom, rgba(26, 26, 26, 0.1), rgba(0, 0, 0, 0.5));
+}
+.shadow-subtle {
+  box-shadow: 0 2px 30px 0 rgba(0, 0, 0, 0.12);
+}
+.shadow-small1 {
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.2);
+}
+.shadow-small2 {
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.5);
+}
+
 
 .investors-grid {
     display: grid;
