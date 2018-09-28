@@ -160,8 +160,7 @@ end = struct
     | Some index -> (`Existed, index)
 
   let set_at_index_exn t index account =
-    let leafs = t.tree.leafs in
-    if index < Hashtbl.length leafs then
+    if index < Dyn_array.length t.accounts then
       let old_account = Dyn_array.get t.accounts index in
       replace t index (Account.public_key old_account) account
     else failwith (index_not_found "set_at_index_exn" index)
@@ -363,15 +362,13 @@ end = struct
     let height = depth - Addr.depth a in
     let first_index = Addr.to_int a lsl height in
     assert (List.length accounts <= 1 lsl height) ;
+    make_space_for t (first_index + List.length accounts) ;
     List.iteri accounts ~f:(fun i a ->
         let new_index = first_index + i in
         (t.tree).dirty_indices <- new_index :: t.tree.dirty_indices ;
         if Int.Set.mem t.tree.unset_slots new_index then (
           replace t new_index Key.empty a ;
-          (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index ;
-          Logger.info
-            (!Logger.global_logger |> Option.value_exn)
-            "removed %d" new_index )
+          (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
   let get_all_accounts_rooted_at_exn t a =

@@ -339,4 +339,20 @@ let%test_module "test functor on in memory databases" =
                 failwithf
                   !"len: %{sexp:int} with path %{sexp: Direction.t list}"
                   len path () ) )
+
+    let%test_unit "set_all_accounts_rooted_at_exn can work out of order" =
+      let l1, _ = L16.load_ledger 8 1 in
+      let l2, _ = L16.load_ledger 2 1 in
+      let pr = Direction.(List.init 13 (fun _ -> Left)) in
+      let rr = L16.Addr.of_directions Direction.(pr @ [Right; Right]) in
+      let rl = L16.Addr.of_directions Direction.(pr @ [Right; Left]) in
+      let lr = L16.Addr.of_directions Direction.(pr @ [Left; Right]) in
+      let copy addr =
+        L16.set_all_accounts_rooted_at_exn l2 addr
+          (L16.get_all_accounts_rooted_at_exn l1 addr)
+      in
+      copy rr ;
+      copy rl ;
+      copy lr ;
+      assert (L16.num_accounts l2 = 8)
   end )

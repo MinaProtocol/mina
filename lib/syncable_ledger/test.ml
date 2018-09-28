@@ -52,8 +52,11 @@ struct
     let seen_queries = ref [] in
     let sr = SR.create l2 (fun q -> seen_queries := q :: !seen_queries) in
     don't_wait_for
-      (Linear_pipe.iter qr ~f:(fun (_hash, query) ->
+      (Linear_pipe.iter_unordered ~max_concurrency:8 qr ~f:(fun (_hash, query) ->
            let answ = SR.answer_query sr query in
+           let%bind () = Clock_ns.after (Time_ns.Span.randomize
+           (Time_ns.Span.of_ms 2.) ~percent:(Percent.of_percentage 20.))
+           in
            Linear_pipe.write aw (desired_root, answ) )) ;
     match
       Async.Thread_safe.block_on_async_exn (fun () ->
