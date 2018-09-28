@@ -689,8 +689,42 @@
   cursor: pointer;
 }
 
-.gallery .next-button {
+.gallery .progress-button {
   position: absolute;
   right: 0;
 }
 
+.gallery .next-button {
+  position: absolute;
+  right: 0;
+  text-decoration: none;
+  vertical-align: middle;
+  margin-top: 1px;
+  line-height: 80px;
+  height: 80px;
+  width: 80px;
+  border-radius: 100%;
+  text-align: center;
+  font-size: 80px;
+  margin-top: 15px;
+  background-color: #EFF2F7;
+  color: #8492A6;
+}
+
+.gallery .next-button:hover {
+  color: #647286;
+}
+
+.gallery .item:first-of-type .next-button {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% {
+
+    box-shadow: 0 0 0 0 rgb(132, 146, 166, .5);
+  }
+  50% {
+    box-shadow: 0 0 2px 20px rgb(132, 146, 166, 0);
+  }
+}

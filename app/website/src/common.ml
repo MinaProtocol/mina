@@ -314,13 +314,22 @@ module Section = struct
           else (a [Style.(render (of_class "jump")); href "#item-4"] [text "skip"] )
         in
         let next =
-          let button_hint, label, url, new_tab =
+            if i = 4
+            then 
+              let button_hint, label, url, new_tab =
+                "Follow our progress", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
+              in
+              Input_button.cta ~button_hint ~label
+                        ~url ~extra_style:"progress-button" ~new_tab ()
+            else
+              a [Style.(render (of_class "next-button")); href (Printf.sprintf "#item-%d" (i+1))] [text "›"]
+          (*let button_hint, label, url, new_tab =
             if i = 4
             then "Follow our progress", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
-            else "Next", "demo-next-cta", (Printf.sprintf "#item-%d" (i+1)), false
+            else "›", "demo-next-cta", (Printf.sprintf "#item-%d" (i+1)), false
           in 
             Input_button.cta ~button_hint ~label
-                      ~url ~extra_style:"next-button" ~new_tab ()
+                      ~url ~extra_style:"next-button" ~new_tab ()*)
         in
         div [Style.(render (of_class "controls flex justify-left user-select-none"))]
           ([ div []
