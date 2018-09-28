@@ -356,13 +356,19 @@ module Html = struct
         | `Together -> grouping_style
         | `Separate -> Style.empty
       in
+      let maybe_tooltip_overlay =
+        match tooltip with
+        | None -> []
+        | Some (`Left tooltip) | Some (`Right tooltip) ->
+            [Tooltip.render_overlay tooltip]
+      in
       let record =
           div
               [Style.(render (style + width + grouping))]
               ((match heading with
                | None -> []
                | Some heading -> [ Node.div [Style.just "record-title-padding fw5 silver roboto tc"] [ Node.text heading ] ]
-              ) @ (List.map rows ~f:Row.render))
+              ) @ (List.map rows ~f:Row.render) @ maybe_tooltip_overlay)
       in
       match tooltip with
       | None -> record
@@ -370,11 +376,11 @@ module Html = struct
         let content =
           match tooltip with
           | `Left tooltip ->
-              [Tooltip.render_wide tooltip; record; Tooltip.render_overlay tooltip]
+              [Tooltip.render_wide tooltip; record]
           | `Right tooltip ->
-              [record; Tooltip.render_wide tooltip; Tooltip.render_overlay tooltip]
+              [record; Tooltip.render_wide tooltip]
         in
-        div [Style.just "flex items-center mb3 relative"]
+        div [Style.just "flex items-center flex-column flex-row-ns justify-center mb3 relative"]
           content
   end
 end
@@ -625,7 +631,7 @@ let merkle_tree num_layers_to_show =
         Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"To know the state of a particular account in Coda, a client needs the database merkle root from the protocol state, a merkle path, and the account properties. Because the database is a merkle root, this information is sufficient to determine the balance in an account. And because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data." ()
       in
       hoverable state (
-      Node.div [Style.just "flex items-center"]
+      Node.div [Style.just "flex items-center flex-column flex-row-ns justify-center"]
       [ Node.div [Style.(render (of_class "mw5 relative" + Html.grouping_style))]
           (Node.div [Style.just "record-title-padding fw5 silver roboto tc"] [ Node.text "Merkle Path and Account" ]
           ::
@@ -736,7 +742,7 @@ let state_html
   in
   let state_explorer =
     div [class_ "state-explorer flex-ll items-center"]
-      [ div [class_ "state-with-proof mw7 mr4"]
+      [ div [class_ "state-with-proof mw7 mr4-ll"]
           [ 
           hoverable(Html.Record.render
             ~grouping:`Together
