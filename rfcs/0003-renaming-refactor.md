@@ -28,7 +28,7 @@ Now, let's categorize and define the individual name changes of various componen
 |-------------------|----------------------------------------------|---------------------|
 | `Ledger`          | Interface into merkle tree of account states | `Acc_db`            |
 | `Ledger_hash`     | Root hash of a `Acc_db`                      | `Acc_db_root`       |
-| `Merkle_ledger`   | In memory implementation of `Acc_db`         | `Irresolute_acc_db` |
+| `Merkle_ledger`   | In memory implementation of `Acc_db`         | `Ephemeral_acc_db`  |
 | `Merkle_database` | On disk implementation of `Acc_db`           | `Persistent_acc_db` |
 | `Syncable_ledger` | Wrapper of `Acc_db` to sync over network     | `Sync_acc_db`       |
 
@@ -39,7 +39,7 @@ Now, let's categorize and define the individual name changes of various componen
 | `Parallel_scan_state` | State of a series of parallel scan trees                   | "                      |
 | `Ledger_builder`      | State of `Parallel_scan_state` + `Txn_work`                | `Theoretic_txns_state` |
 | `Blockchain_state`    | State of `Acc_db` and `Theoretic_txns` at a block          | `Acc_db_state`         |
-| `Consensus_state`     | Consensus mechanism specific state at a block              | "                      |
+| `Consensus_state`     | Consensus mechanism specific state at a block               | "                      |
 | `Protocol_state`      | The `Acc_db_state` and `Consensus_state` at a block        | `Lite_state`           |
 | `Tip`                 | The `Protocol_state` and `Theoretic_txns_state` at a block | `Full_state`           |
 
@@ -75,7 +75,7 @@ Now, let's categorize and define the individual name changes of various componen
 |-----------------------------|---------------------------------------------------------------------------|-----------------------|
 | `Ledger_builder_controller` | Maintains locked `Full_state` and forks of potential future `Full_state`s | `Full_state_frontier` |
 | `Proposer`                  | Proposes new blocks                                                       | "                     |
-| `Snark_worker`              | Generates `Txn_work`                                                      | "                     |
+| `Snark_worker`              | Generates `Txn_work`                                                      | `Snarker`             |
 
 # Drawbacks
 [drawbacks]: #drawbacks
