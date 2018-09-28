@@ -167,7 +167,7 @@ module State = struct
     in
     go init 0 0
 
-  let foldi_chronological_from start t ~init ~f =
+  let foldi_chronological t ~init ~f =
     let n = Array.length t.jobs.data in
     let rec go acc i pos =
       if Int.equal i n then acc
@@ -175,9 +175,7 @@ module State = struct
         let x = (t.jobs.data).(pos) in
         go (f pos acc x) (i + 1) (next_position t pos)
     in
-    go init 0 start
-
-  let foldi_chronological t ~init ~f = foldi_chronological_from 0 t ~init ~f
+    go init 0 0
 
   let update_cur_job t job pos : unit Or_error.t =
     Ring_buffer.direct_update t.jobs pos ~f:(fun _ -> Ok job)
@@ -197,17 +195,15 @@ module State = struct
     ; current_data_length= t.current_data_length
     ; base_none_pos= t.base_none_pos }
 
-  let custom_fold :
+  let fold_chronological_mutate :
          ('a, 'd) t
-      -> init:'b Or_error.t
+      -> init:'acc Or_error.t
       -> include_job:(('a, 'd) Job.t -> bool)
       -> new_job:(('a, 'd) Job.t -> ('a, 'd) Job.t)
-      -> fa:('a -> 'b Or_error.t)
-      -> fd:('d -> 'b Or_error.t)
-      -> merge_acc:('b -> 'b -> 'b Or_error.t)
-      -> 'b Or_error.t
-         (*'b = staement option Or_error.t or [Ok (`Value s) | Error `Empty | Error (`Error e)]*)
-      =
+      -> fa:('a -> 'acc Or_error.t)
+      -> fd:('d -> 'acc Or_error.t)
+      -> merge_acc:('acc -> 'acc -> 'acc Or_error.t)
+      -> 'acc Or_error.t =
    fun state ~init ~include_job ~new_job ~fa ~fd ~merge_acc ->
     let open Or_error.Let_syntax in
     let job_at i = Ring_buffer.read_i state.jobs i in
@@ -219,50 +215,65 @@ module State = struct
       let r = (pos * 2) + 2 in
       (job_at r, r)
     in
-    let rec oldest_statement dir i : 'b option Or_error.t =
-      let update_job_return_stmt job stmt pos =
-        let%bind stmt = stmt in
-        let%map () = update_cur_job state (new_job job) pos in
-        Some stmt
+    let child dir parent_pos =
+      match dir  with
+      | `Left -> left_child parent_pos
+      | `Right -> right_child parent_pos
+    in
+    let right_sibling_visited i = 
+      let parent = (i-1)/2 in
+      let left, right = ((parent*2)+1, (parent*2)+2)
       in
-      let statement_from_children j pos =
-        Core.printf !"Statement from child at %d \n%!" pos ;
-        match j with
-        | Job.Base (Some d) -> update_job_return_stmt j (fd d) pos
+      let lchild, rchild = (job_at left, job_at right) in
+      match lchild, rchild with
+      | Job.Merge (None, None) , Job.Merge (None, None) ->
+        (match (job_at (left*2 +1)) with
+        | Job.Base _ -> true
+        | _ -> false)
+      | _, _ -> 
+        if i = left && (not @@ include_job rchild )then true
+        else false
+    in
+    let rec oldest_statement (job,i) : 'b option Or_error.t =
+      let update_job_return_stmt j stmt pos =
+        if include_job j then
+          (let%bind stmt = stmt in
+          Core.printf !"updating %d \n %!" pos;
+          let%map () = update_cur_job state (new_job j) pos in
+          Some stmt)
+        else (Ok None)
+      in
+      Core.printf !"Statement from child at %d \n%!" i ;
+      match job with
+        | Job.Base (Some d) -> update_job_return_stmt job (fd d) i
         | Job.Base None -> Ok None
         | Job.Merge (Some a, Some a') ->
             let%bind s = fa a and s' = fa a' in
-            update_job_return_stmt j (merge_acc s s') pos
+            update_job_return_stmt job (merge_acc s s') i
         | Job.Merge (None, Some a') -> (
-            match%bind oldest_statement `Left pos with
+            match%bind oldest_statement (child `Left i) with
             | Some s ->
                 let%bind s' = fa a' in
-                update_job_return_stmt j (merge_acc s s') pos
-            | None -> update_job_return_stmt j (fa a') pos )
+                update_job_return_stmt job (merge_acc s s') i
+            | None -> update_job_return_stmt job (fa a') i )
         | Job.Merge (Some a, None) -> (
-            match%bind oldest_statement `Right pos with
+            match%bind oldest_statement (child `Right i) with
             | Some s' ->
                 let%bind s = fa a in
-                update_job_return_stmt j (merge_acc s s') pos
-            | None -> update_job_return_stmt j (fa a) pos )
+                update_job_return_stmt job (merge_acc s s') i
+            | None -> update_job_return_stmt job (fa a) i )
         | Job.Merge (None, None) ->
-            let%bind l = oldest_statement `Left pos in
-            let%bind r = oldest_statement `Right pos in
+            if right_sibling_visited i then Ok None
+            else 
+            (let%bind l = oldest_statement (child `Left i) in
+            let%bind r = oldest_statement (child `Right i) in
             match (l, r) with
             | None, None -> Ok None
             | Some s, Some s' ->
                 let%map m = merge_acc s s' in
                 Some m
             | None, s' -> Ok s'
-            | s, None -> Ok s
-      in
-      match dir with
-      | `Left ->
-          let j, l = left_child i in
-          statement_from_children j l
-      | `Right ->
-          let j, r = right_child i in
-          statement_from_children j r
+            | s, None -> Ok s)
     in
     foldi_chronological ~init state ~f:(fun i acc_s job ->
         Core.printf !"All Position %d \n%!" i ;
@@ -270,7 +281,10 @@ module State = struct
         if not (include_job job) then Ok acc
         else (
           Core.printf !"Position %d \n%!" i ;
-          match job with
+          match%bind oldest_statement (job,i) with
+          | None -> Ok acc
+          | Some stmt -> merge_acc acc stmt
+          (*match job with
           | Merge (None, Some s) -> (
               match%bind oldest_statement `Left i with
               | None ->
@@ -290,98 +304,23 @@ module State = struct
                   let%bind m = merge_acc stmt s' in
                   merge_acc acc m )
           | Merge (Some a, Some b) ->
-              let%bind s = fa a and s' = fa b in
+              (let%bind s = fa a and s' = fa b in
               let%bind m = merge_acc s s' in
-              merge_acc acc m
+              merge_acc acc m)
+          | Merge (None, None) ->
+            (let%bind l = oldest_statement `Left i in
+            let%bind r = oldest_statement `Right i in
+            match (l, r) with
+            | None, None -> Ok acc
+            | Some s, Some s' ->
+                let%bind m = merge_acc s s' in
+                merge_acc acc m
+            | None, Some s' -> merge_acc acc s'
+            | Some s, None -> merge_acc acc s)
           | Base (Some b) ->
               let%bind stmt = fd b in
               merge_acc acc stmt
-          | _ -> Ok acc ) )
-
-  let scan_statement_with_label :
-         ('a, 'd) t
-      -> visited:(('a, 'd) Job.t -> bool)
-      -> mark_visited:(('a, 'd) Job.t -> ('a, 'd) Job.t)
-      -> get_stmt:('a -> 'b)
-      -> merge_stmt:('b -> 'b -> 'b Or_error.t)
-      -> base_stmt:('d -> 'b Or_error.t)
-      -> merge_acc:('b option -> 'b -> 'b option Or_error.t)
-      -> init:'b option Or_error.t
-      -> 'b option Or_error.t =
-   fun state ~visited ~mark_visited ~get_stmt ~merge_stmt ~base_stmt ~merge_acc
-       ~init ->
-    let open Or_error.Let_syntax in
-    let children_of_i pos =
-      ( `Left (Ring_buffer.read_i state.jobs ((pos * 2) + 1), (pos * 2) + 1)
-      , `Right (Ring_buffer.read_i state.jobs ((pos * 2) + 2), (pos * 2) + 2)
-      )
-    in
-    let rec oldest_statement dir i : 'b option Or_error.t =
-      let update_job j stmt pos =
-        let%bind stmt = stmt in
-        let%map () = update_cur_job state (mark_visited j) pos in
-        Some stmt
-      in
-      let statement_from_children j pos =
-        Core.printf !"Statement from child at %d \n%!" pos ;
-        match j with
-        | Job.Base (Some b) -> update_job j (base_stmt b) pos
-        | Job.Base None -> Ok None
-        | Job.Merge (Some a, Some b) ->
-            update_job j (merge_stmt (get_stmt a) (get_stmt b)) pos
-        | Job.Merge (None, Some b) -> (
-            match%bind oldest_statement `Left pos with
-            | Some a -> update_job j (merge_stmt a (get_stmt b)) pos
-            | None -> update_job j (Ok (get_stmt b)) pos )
-        | Job.Merge (Some a, None) -> (
-            match%bind oldest_statement `Right pos with
-            | Some b -> update_job j (merge_stmt (get_stmt a) b) pos
-            | None -> update_job j (Ok (get_stmt a)) pos )
-        | Job.Merge (None, None) ->
-            let%bind l = oldest_statement `Left pos in
-            let%bind r = oldest_statement `Right pos in
-            match (l, r) with
-            | None, None -> Ok None
-            | Some a, Some b ->
-                let%map m = merge_stmt a b in
-                Some m
-            | None, a -> Ok a
-            | a, None -> Ok a
-      in
-      match dir with
-      | `Left ->
-          let `Left (j, pos), _ = children_of_i i in
-          statement_from_children j pos
-      | `Right ->
-          let _, `Right (j, pos) = children_of_i i in
-          statement_from_children j pos
-    in
-    foldi_chronological ~init state ~f:(fun i acc_s job ->
-        Core.printf !"All Position %d \n%!" i ;
-        let%bind acc = acc_s in
-        if visited job then Ok acc
-        else (
-          Core.printf !"Position %d \n%!" i ;
-          match job with
-          | Merge (None, Some b) -> (
-              match%bind oldest_statement `Left i with
-              | None -> merge_acc acc (get_stmt b)
-              | Some s ->
-                  let%bind m = merge_stmt s (get_stmt b) in
-                  merge_acc acc m )
-          | Merge (Some a, None) -> (
-              match%bind oldest_statement `Right i with
-              | None -> merge_acc acc (get_stmt a)
-              | Some s ->
-                  let%bind m = merge_stmt (get_stmt a) s in
-                  merge_acc acc m )
-          | Merge (Some a, Some b) ->
-              let%bind m = merge_stmt (get_stmt a) (get_stmt b) in
-              merge_acc acc m
-          | Base (Some b) ->
-              let%bind bs = base_stmt b in
-              merge_acc acc bs
-          | _ -> Ok acc ) )
+          | Base None -> Ok acc *) ))
 
   let jobs_list t =
     let rec go count t =

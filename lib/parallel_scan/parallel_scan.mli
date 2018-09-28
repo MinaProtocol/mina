@@ -28,26 +28,15 @@ module State : sig
 
   val copy : ('a, 'd) t -> ('a, 'd) t
 
-  val scan_statement_with_label :
+  val fold_chronological_mutate :
        ('a, 'd) t
-    -> visited:(('a, 'd) Job.t -> bool)
-    -> mark_visited:(('a, 'd) Job.t -> ('a, 'd) Job.t)
-    -> get_stmt:('a -> 'b)
-    -> merge_stmt:('b -> 'b -> 'b Or_error.t)
-    -> base_stmt:('d -> 'b Or_error.t)
-    -> merge_acc:('b option -> 'b -> 'b option Or_error.t)
-    -> init:'b option Or_error.t
-    -> 'b option Or_error.t
-
-  val custom_fold :
-       ('a, 'd) t
-    -> init:'b Or_error.t
+    -> init:'acc Or_error.t
     -> include_job:(('a, 'd) Job.t -> bool)
     -> new_job:(('a, 'd) Job.t -> ('a, 'd) Job.t)
-    -> fa:('a -> 'b Or_error.t)
-    -> fd:('d -> 'b Or_error.t)
-    -> merge_acc:('b -> 'b -> 'b Or_error.t)
-    -> 'b Or_error.t
+    -> fa:('a -> 'acc Or_error.t)
+    -> fd:('d -> 'acc Or_error.t)
+    -> merge_acc:('acc -> 'acc -> 'acc Or_error.t)
+    -> 'acc Or_error.t
 
   module Hash : sig
     type t = Digestif.SHA256.t
