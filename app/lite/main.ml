@@ -353,11 +353,11 @@ let merkle_tree num_layers_to_show =
 
     let pos = function Node {pos; _} -> pos | Account {pos; _} -> pos
   end in
-  let layer_height = 40. in
+  let layer_height = 25. in
   let image_width = 320. in
-  let top_offset = 30. in
+  let top_offset = 15. in
   let left_offset = 0. in
-  let image_height = Int.to_float num_layers_to_show *. layer_height in
+  let image_height = Int.to_float (num_layers_to_show - 1) *. layer_height in
   let x_pos, y_pos =
     let y_uncompressed ~layer =
       top_offset +. (Int.to_float layer *. layer_height)
@@ -445,11 +445,15 @@ let merkle_tree num_layers_to_show =
         Svg.path posns
       in
       let nodes =
-        let base_height = layer_height *. 0.9 in
-        let f i = sqrt (Int.to_float (i + 1)) in
+        (*let base_height = layer_height *. 0.9 in*)
+        (*let f i = sqrt (Int.to_float (i + 1)) in*)
         List.filter_mapi specs ~f:(fun i spec ->
-            let scale = 1. /. f i in
-            let radius = scale *. base_height /. 2. in
+            (*let scale = 1. /. f i in*)
+            let radius = 
+              if i = 0 
+              then 10.0 
+              else 6.0 
+            in
             match spec with
             | Spec.Node {pos; color} ->
                 Some (Svg.circle ~radius ~color ~center:pos )
