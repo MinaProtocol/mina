@@ -80,32 +80,15 @@ let rest_server_port = 8080
 
 let url s = sprintf "http://localhost:%d/%s" rest_server_port s
 
-let get url on_success on_error =
-  let req = XmlHttpRequest.create () in
-  req ##. onerror :=
-    Dom.handler (fun _e ->
-        on_error (Error.of_string "get request failed") ;
-        Js._false ) ;
-  req ##. onload :=
-    Dom.handler (fun _e ->
-        ( match Js.Opt.to_option (File.CoerceTo.string req ##. response) with
-        | None -> on_error (Error.of_string "get request failed")
-        | Some s -> on_success (Js.to_string s) ) ;
-        Js._false ) ;
-  req ## _open (Js.string "GET") (Js.string url) Js._true ;
-  req ## send Js.Opt.empty
-
-let s3_link = "https://s3-us-west-2.amazonaws.com/o1labs-snarkette-data"
-
 let get_account _pk on_sucess on_error =
-  let url = sprintf !"%s/sample_chain" s3_link in
+  let url = sprintf !"%s/sample_chain" Web_response.s3_link in
   (* IF serialization does not work, please try the following code:
   
   let url = sprintf !"%s/sample_chain" s3_link in
 
      Use "%s/chain" in production
    *)
-  get url
+  Web_response.get url
     (fun s ->
       let s = String.slice s 0 (String.length s - 1) in
       let chain = Binable.of_string (module Lite_chain) (B64.decode s) in

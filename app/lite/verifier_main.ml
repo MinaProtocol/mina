@@ -26,7 +26,7 @@ let wrap_pvk =
 (* TODO: This changes when the curves get flipped *)
 let to_wrap_input instance_hash = Snarkette.Mnt6.Fq.to_bigint instance_hash
 
-let verify_chain ({protocol_state; ledger; proof}: Lite_chain.t) =
+let verify_chain pvk ({protocol_state; ledger; proof}: Lite_chain.t) =
   let check b lab = if b then Ok () else Or_error.error_string lab in
   let open Or_error.Let_syntax in
   let lb_ledger_hash =
@@ -39,13 +39,25 @@ let verify_chain ({protocol_state; ledger; proof}: Lite_chain.t) =
       "Incorrect ledger hash"
   in
   let state_hash, instance_hash = state_and_instance_hash protocol_state in
-  let%bind () =
-    Proof_system.verify wrap_pvk [to_wrap_input instance_hash] proof
-  in
-  return {Verifier.Response.state_hash}
+  let%map () = Proof_system.verify pvk [to_wrap_input instance_hash] proof in
+  {Verifier.Response.state_hash}
+
+let get_verification_key on_sucess on_error =
+  let url = sprintf !"%s/client_verification_key" Web_response.s3_link in
+  Web_response.get url
+    (fun s ->
+      (* let s = String.slice s 0 (String.length s - 1) in *)
+      let vk = Binable.of_string (module Proof_system.Verification_key) (B64.decode s) in
+      on_sucess vk )
+    on_error
+
 
 let () =
   Js_of_ocaml.Worker.set_onmessage (fun (message: Js.js_string Js.t) ->
+      get_verification_key (fun vk ->
+      let pvk = Proof_system.Verification_key.Processed.create vk in
       let ((chain, _) as query) = Query.of_string (Js.to_string message) in
-      let res = verify_chain chain in
+      let res = verify_chain pvk chain in
       Worker.post_message (Js.string (Response.to_string (query, res))) )
+      (fun _ -> ())
+  )
