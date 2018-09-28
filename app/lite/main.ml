@@ -436,10 +436,10 @@ let merkle_tree num_layers_to_show =
   end in
   let layer_height = 20. in
   let image_width = 240. in
-  let top_offset = 20. in
+  let top_offset = 15. in
   let left_offset = 0. in
   let image_height = Int.to_float num_layers_to_show *. layer_height in
-  let x_delta = 0.6 *. image_width /. Float.of_int num_layers_to_show in
+  let x_delta = 0.7 *. image_width /. Float.of_int num_layers_to_show in
   let x_pos, y_pos =
     let y_uncompressed ~layer =
       top_offset +. (Int.to_float layer *. layer_height)
@@ -568,7 +568,7 @@ let merkle_tree num_layers_to_show =
               else { pos_dest with x = pos_dest.x -. (x_delta *. 2.0) }
             in
             let pos_dest = 
-              { Pos.x = pos_src.x +. (pos_dest.x -. pos_src.x) /. 1.0
+              { Pos.x = pos_src.x +. (pos_dest.x -. pos_src.x) /. 1.0 
               ; y = pos_src.y +. (pos_dest.y -. pos_src.y) /. 1.0 }
             in
             pos_src, pos_dest, right
@@ -578,6 +578,11 @@ let merkle_tree num_layers_to_show =
       in
       let sibling_edges = 
         List.map sibling_edge_positions ~f:(fun (src, dest, _) -> 
+            let dest = 
+              if src.x < dest.x
+              then { Pos.x = dest.x -. 3.0; y = dest.y -. 6.0 }
+              else { Pos.x = dest.x +. 3.0; y = dest.y -. 6.0 }
+            in
             Svg.path [src; dest] "#bcbcbc"
           )
       in
@@ -694,7 +699,7 @@ let state_html
   let _ = ledger in
   let snark_tooltip =
     Html.Tooltip.create ~active:(Tooltip_stage.(equal Proof state.State.tooltip_stage)) ~arity:`Left
-        ~text:"While other cryptocurrencies require downloading and verifying a lengthy, ever growing blockchain, the Coda network incrementally produces zk-SNARK proofs, which serve as cryptographic certifications of the database. The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."
+        ~text:"While other cryptocurrencies require downloading a gigagbytes-long, ever-growing blockchain, the Coda network incrementally a 1 kilobyte zk-SNARK proof, which serves in place of the blockchain as a cryptographic certificate of the account database's integrity. The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."
         ~alt_text:"The Coda network incrementally produces zk-SNARK proofs which server as certifications of the database. Coda doesn't need the full history. This is equivalent to downloading the entire blockchain in other cryptocurrencies"
         ()
   in

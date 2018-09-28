@@ -502,7 +502,11 @@ let demo () =
     scheme
   in
   let sections = [top; app; bottom] in
-  wrap ~fixed_footer:false ~page_label:(Links.(label demo)) sections
+  wrap
+    ~headers:(
+      [ Html.link ~href:"https://csshake.surge.sh/csshake.min.css"
+      ])
+    ~fixed_footer:false ~page_label:(Links.(label demo)) sections
 
 let job_post name description =
   let content scheme =
