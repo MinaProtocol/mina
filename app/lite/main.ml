@@ -37,6 +37,16 @@ module Svg = struct
           (sprintf "fill:none;stroke:%s;stroke-width:3" line_color) ]
       []
 
+  (* Make little merkle tree for mobile *)
+
+  let circle ~radius ~color ~(center : Pos.t) =
+    Node.svg "circle"
+      [ Attr.create "r" (float_to_string radius)
+      ; Attr.create "cx" (float_to_string center.x)
+      ; Attr.create "cy" (float_to_string center.y)
+      ; Attr.create "style" (sprintf "fill:%s" color)
+      ] []
+
   let rect ?radius ~color ~width ~height ~(center: Pos.t) =
     let corner_x = center.x -. (width /. 2.) in
     let corner_y = center.y -. (height /. 2.) in
@@ -160,9 +170,10 @@ let y_offset =
   in
   go 0. 0.5
 
-let num_merkle_layers_shown = 10
+let num_layers_to_show_desktop = 10
+let num_layers_to_show_mobile = 4
 
-let drop_top_of_tree =
+let drop_top_of_tree ~desired_layers =
   let rec layers = function
     | Sparse_ledger_lib.Sparse_ledger.Node (_, l, r) ->
         1 + max (layers l) (layers r)
@@ -183,7 +194,6 @@ let drop_top_of_tree =
       | Node (_, Node _, Node _) ->
           failwith "Only single account trees supported"
   in
-  let desired_layers = num_merkle_layers_shown in
   fun t ->
     let n = layers t in
     if n <= desired_layers then t else drop (n - desired_layers) t
@@ -266,7 +276,7 @@ let field_to_base64 =
   Fn.compose Fold_lib.Fold.bool_t_to_string Snarkette.Mnt6.Fq.fold_bits
   |> Fn.compose B64.encode
 
-let merkle_tree =
+let merkle_tree num_layers_to_show =
   let module Spec = struct
     type t =
       | Node of {pos: Pos.t; color: string}
@@ -274,18 +284,17 @@ let merkle_tree =
 
     let pos = function Node {pos; _} -> pos | Account {pos; _} -> pos
   end in
+  let layer_height = 50. in
   let image_width = 400. in
   let top_offset = 30. in
   let left_offset = 100. in
-  let image_height = 500. in
-  let num_layers = num_merkle_layers_shown in
-  let layer_height = image_height /. Int.to_float num_layers in
+  let image_height = Int.to_float num_layers_to_show *. layer_height in
   let x_pos, y_pos =
     let y_uncompressed ~layer =
       top_offset +. (Int.to_float layer *. layer_height)
     in
     let x_uncompressed =
-      let delta = 0.5 *. image_width /. Float.of_int num_merkle_layers_shown in
+      let delta = 0.5 *. image_width /. Float.of_int num_layers_to_show in
       fun ~layer ~index ->
         let rec go remaining_depth acc pt =
           if remaining_depth = 0 then acc
@@ -316,7 +325,7 @@ let merkle_tree =
   in
   fun verification (tree0: ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree) ->
     let create_entry = Html.Record.Entry.create verification in
-    let tree0 = drop_top_of_tree tree0 in
+    let tree0 = drop_top_of_tree ~desired_layers:num_layers_to_show tree0 in
     let specs =
       let rec go acc layer index
           (t: ('h, 'a) Sparse_ledger_lib.Sparse_ledger.tree) =
@@ -378,16 +387,14 @@ let merkle_tree =
         Svg.path posns
       in
       let nodes =
-        let base_height = layer_height *. 0.8 in
-        let base_width = 1.8 *. base_height in
+        let base_height = layer_height *. 0.9 in
         let f i = sqrt (Int.to_float (i + 1)) in
         List.filter_mapi specs ~f:(fun i spec ->
             let scale = 1. /. f i in
-            let width = scale *. base_width in
-            let height = scale *. base_height in
+            let radius = scale *. base_height /. 2. in
             match spec with
             | Spec.Node {pos; color} ->
-                Some (Svg.rect ~radius:3. ~color ~center:pos ~height ~width)
+                Some (Svg.circle ~radius ~color ~center:pos )
             | Spec.Account _ -> None )
       in
       Node.div [Attr.class_ "merkle-tree"]
@@ -700,7 +707,13 @@ let state_html
               create_entry ~extra_style:proof_style "blockchain_SNARK"
                 (to_base64 (module Proof) proof)
               |> render)) Tooltip_stage.Proof  [] ]
-      ; hoverable(merkle_tree verification (Sparse_ledger_lib.Sparse_ledger.tree ledger)) Tooltip_stage.Account_state [class_ "accounts"] ] 
+      ; hoverable
+          ( let tree = Sparse_ledger_lib.Sparse_ledger.tree ledger in
+            Mobile_switch.create
+             ~not_small:(merkle_tree num_layers_to_show_desktop verification tree)
+             ~small:(merkle_tree num_layers_to_show_mobile verification tree) )
+           Tooltip_stage.Account_state [class_ "accounts"]
+      ] 
   in
   (*let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]*)
   (*in*)
