@@ -53,13 +53,21 @@ struct
     get_lite_chain_exn coda keys
 end
 
+let to_base64 m x = B64.encode (Binable.to_string m x)
+
+module Storage (Bin : Binable.S) = struct
+  let store location data =
+    Writer.save location ~contents:(to_base64 (module Bin) data)
+end
+
 module Make_broadcaster
     (Config : Web_client_pipe.Config_intf)
     (Program : Coda_intf)
     (Put_request : Web_client_pipe.Put_request_intf) =
 struct
   module Web_pipe =
-    Web_client_pipe.Make (Chain (Program)) (Config) (Storage.Disk)
+    Web_client_pipe.Make (Chain (Program)) (Config)
+      (Storage (Lite_base.Lite_chain))
       (Put_request)
 
   let run coda =

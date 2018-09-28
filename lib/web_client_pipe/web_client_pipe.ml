@@ -29,6 +29,14 @@ module type Config_intf = sig
   val log : Logger.t
 end
 
+module type Storage_intf = sig
+  type data
+
+  type location
+
+  val store : location -> data -> unit Deferred.t
+end
+
 type chain =
   { protocol_state: Lite_base.Protocol_state.t
   ; proof: Lite_base.Proof.t
@@ -44,7 +52,9 @@ end
 module Make
     (Chain : Chain_intf)
     (Config : Config_intf)
-    (Store : Storage.With_checksum_intf with type location := string)
+    (Store : Storage_intf
+             with type location := string
+              and type data := Lite_base.Lite_chain.t)
     (Request : Put_request_intf) :
   S with type data = Chain.data =
 struct
@@ -54,11 +64,10 @@ struct
 
   type t =
     { location: string
-    ; chain_storage: Lite_chain.t Store.Controller.t
     ; reader: chain Linear_pipe.Reader.t
     ; writer: chain Linear_pipe.Writer.t }
 
-  let write_to_storage {location; chain_storage; _} request
+  let write_to_storage {location; _} request
       {protocol_state; proof; ledgers; _} =
     let chain_file = location ^/ "chain" in
     (* HACK: we are just passing in the proposer path for this demo *)
@@ -66,16 +75,14 @@ struct
     let chain =
       {Lite_chain.proof; protocol_state; ledger= List.hd_exn ledgers}
     in
-    let%bind () = Store.store chain_storage chain_file chain in
+    let%bind () = Store.store chain_file chain in
     Request.put request location
 
   let create () =
     let location = Config.conf_dir ^/ "snarkette-data" in
     let%bind () = Unix.mkdir location ~p:() in
-    let parent_log = Config.log in
-    let chain_storage = Store.Controller.create ~parent_log Lite_chain.bin_t in
     let reader, writer = Linear_pipe.create () in
-    let t = {location; chain_storage; reader; writer} in
+    let t = {location; reader; writer} in
     let%map () =
       match%map Request.create () with
       | Ok request ->
