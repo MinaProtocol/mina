@@ -31,6 +31,7 @@ Now, let's categorize and define the individual name changes of various componen
 | `Merkle_ledger`   | In memory implementation of `Acc_db`         | `Ephemeral_acc_db`  |
 | `Merkle_database` | On disk implementation of `Acc_db`           | `Persistent_acc_db` |
 | `Syncable_ledger` | Wrapper of `Acc_db` to sync over network     | `Sync_acc_db`       |
+| `Genesis_ledger`  | The initial `Acc_db` for the protocol        | `Genesis_acc_db`    |
 
 ### States
 
@@ -73,9 +74,12 @@ Now, let's categorize and define the individual name changes of various componen
 
 | Current Name                | Description                                                               | New Name              |
 |-----------------------------|---------------------------------------------------------------------------|-----------------------|
-| `Ledger_builder_controller` | Maintains locked `Full_state` and forks of potential future `Full_state`s | `Full_state_frontier` |
-| `Proposer`                  | Proposes new blocks                                                       | "                     |
-| `Snark_worker`              | Generates `Txn_work`                                                      | `Snarker`             |
+| `Ledger_builder_controller` | Maintains locked `Full_state` and forks of potential future `Full_state`s  | `Full_state_frontier` |
+| `Proposer`                  | Proposes new blocks                                                        | "                     |
+| `Snark_worker`              | Generates `Txn_work`s                                                      | `Snarker`             |
+| `Prover`                    | Proves `Full_state_trans`s                                                 | "                     |
+| `Verifier`                   | Verifies `Full_state_trans_snark`s                                          | "                     |
+| `Lite_client`               | A node which only tracks `Lite_state` a limited number of account balances | "                     |
 
 # Drawbacks
 [drawbacks]: #drawbacks
