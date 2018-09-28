@@ -226,6 +226,8 @@ end = struct
     assert (Addr.depth address <= Depth.depth) ;
     set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
+  let make_space_for t tot = ()
+
   module Account_location = struct
     let build_location key =
       Location.build_generic (Bigstring.of_string ("$" ^ Key.to_string key))
