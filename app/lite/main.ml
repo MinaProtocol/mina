@@ -722,7 +722,7 @@ let state_html
                 [Style.(render (
                 (of_class "dib mr3 ml2 ph1 br-100 w01 bg-dullgrey h01 pr3")
                   ))] []
-         ; Node.text "System is down for maintenance, check " 
+         ; Node.text "System is currently down, check " 
          ; Node.a
             [ Attr.href "http://status.codaprotocol.com"
             ; Attr.create "target" "_blank"
