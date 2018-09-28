@@ -685,11 +685,19 @@ let state_html
       | `Pending _ -> "proof verifying shake shake-constant"
   in
   let proof_style = Style.(proof_style + (of_class "wb")) in
+  let state_hash =
+    match verification with
+    | `Complete Ok { state_hash } -> field_to_base64 state_hash
+    | `Complete Error _e -> "Could not verify SNARK"
+    | `Pending _ -> "Verification pending..."
+  in
   let state_record =
     let open Html.Record in
     create
       (Some "Protocol State")
-      [ [ create_entry "previous_state_hash"
+      [ [ create_entry "state_hash"
+            state_hash ]
+      ; [ create_entry "previous_state_hash"
             (field_to_base64 previous_state_hash) ]
       ; [ create_entry "length" (Length.to_string length)]
       ; [ create_entry "timestamp" timestamp]
