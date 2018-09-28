@@ -62,6 +62,20 @@ module Svg = struct
         ; Attr.create_float "height" height ]
       @ rad_attrs )
       []
+
+  let triangle ?radius ~color ~width ~height ~(center: Pos.t) =
+    let p0x, p0y = (center.x -. width /. 2.0, center.y +. height /. 2.0) in
+    let p1x, p1y = (center.x +. width /. 2.0, center.y +. height /. 2.0) in
+    let p2x, p2y = (center.x, center.y -. height /. 2.0) in
+    let rad_attrs =
+      Option.value_map radius ~default:[] ~f:(fun r ->
+          [Attr.create_float "rx" r; Attr.create_float "ry" r] )
+    in
+    Node.svg "polygon"
+      ( [ Attr.create "points" (sprintf "%f,%f %f,%f %f,%f" p0x p0y p1x p1y p2x p2y)
+        ; Attr.create "style" (sprintf "fill:%s" color) ]
+      @ rad_attrs )
+      []
 end
 
 let rest_server_port = 8080
@@ -357,13 +371,14 @@ let merkle_tree num_layers_to_show =
   let image_width = 320. in
   let top_offset = 15. in
   let left_offset = 0. in
-  let image_height = Int.to_float (num_layers_to_show - 1) *. layer_height in
+  let image_height = Int.to_float num_layers_to_show *. layer_height in
+  let x_delta = 0.5 *. image_width /. Float.of_int num_layers_to_show in
   let x_pos, y_pos =
     let y_uncompressed ~layer =
       top_offset +. (Int.to_float layer *. layer_height)
     in
     let x_uncompressed =
-      let delta = 0.5 *. image_width /. Float.of_int num_layers_to_show in
+      let delta = x_delta in
       fun ~layer ~index ->
         let rec go remaining_depth acc pt =
           if remaining_depth = 0 then acc
@@ -438,25 +453,66 @@ let merkle_tree num_layers_to_show =
             in
             Some (Html.Record.render ~grouping:`Thin_together record `Wide)
       in
+      let drop_last x = List.rev (List.drop (List.rev x) 1) in
       let edges =
         let posns =
           List.map specs ~f:Spec.pos
         in
+        let posns = 
+          if List.length posns > 1 then
+            let src = List.nth_exn posns (List.length posns - 2) in
+            let dest = List.nth_exn posns (List.length posns - 1) in
+            let last = { Pos.x = image_width /. 3.0; y = dest.y +. (dest.y -. src.y) } in
+            (drop_last posns) @ [ last ]
+          else 
+            posns
+        in
         Svg.path posns
       in
+      let sibling_edge_positions = 
+        let srcs = drop_last specs in
+        let dests = List.drop specs 1 in
+        let edges = List.map2_exn srcs dests ~f:(fun src dest -> 
+            let pos_src = Spec.pos src in
+            let pos_dest = Spec.pos dest in
+            let right = pos_src.x > pos_dest.x in
+            let pos_dest = 
+              if right
+              then { pos_dest with x = pos_dest.x +. (x_delta *. 2.0) }
+              else { pos_dest with x = pos_dest.x -. (x_delta *. 2.0) }
+            in
+            pos_src, pos_dest, right
+          )
+        in
+        edges
+      in
+      let sibling_edges = 
+        List.map sibling_edge_positions ~f:(fun (src, dest, _) -> 
+            Svg.path [src; dest]
+          )
+      in
+      let sibling_nodes = 
+        List.map sibling_edge_positions ~f:(fun (_, dest, right) -> 
+            let color = "#8492A6" in
+            let size = 12.0 in
+            let center = 
+              if right 
+              then { Pos.x = dest.Pos.x -. 2.0; y = dest.y }
+              else { Pos.x = dest.Pos.x +. 2.0; y = dest.y }
+            in
+            Svg.triangle ~radius:0.0 ~center ~width:size ~height:size ~color
+          )
+      in
       let nodes =
-        (*let base_height = layer_height *. 0.9 in*)
-        (*let f i = sqrt (Int.to_float (i + 1)) in*)
         List.filter_mapi specs ~f:(fun i spec ->
-            (*let scale = 1. /. f i in*)
             let radius = 
               if i = 0 
-              then 10.0 
-              else 6.0 
+              then 12.0 
+              else 7.0 
             in
             match spec with
             | Spec.Node {pos; color} ->
-                Some (Svg.circle ~radius ~color ~center:pos )
+                Some (Svg.circle ~radius ~color ~center:pos)
             | Spec.Account _ -> None )
       in
       Node.div [Style.just "flex items-center"]
@@ -464,7 +520,7 @@ let merkle_tree num_layers_to_show =
           ( Svg.main
               ~width:(image_width +. left_offset)
               ~height:(image_height +. top_offset)
-              (edges :: nodes)
+              (edges :: sibling_edges @ nodes @ sibling_nodes)
           :: Option.to_list account )
       ; Html.Tooltip.create ~arity:`Right ~text:"To know the state of a particular account in Coda, a client needs the database merkle root from the protocol state, a merkle path, and the account properties. Because the database is a merkle root, this information is sufficient to determine the balance in an account. And because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data."
       ]
