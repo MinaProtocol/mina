@@ -411,7 +411,7 @@ end = struct
     match%map Store.load controller longest_tip_location with
     | Ok tip_and_genesis_hash -> tip_and_genesis_hash
     | Error `No_exist ->
-        Logger.trace log
+        Logger.info log
           "File for ledger builder controller tip does not exist. Using \
            Genesis tip" ;
         {data= genesis_tip; hash= genesis_state_hash}

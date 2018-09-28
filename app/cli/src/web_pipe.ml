@@ -101,10 +101,10 @@ let store_verification_keys () =
 let run_service (type t) (module Program : Coda_intf with type t = t) coda
     ~conf_dir ~log = function
   | `None ->
-      Logger.trace log "Not running a web client pipe" ;
+      Logger.info log "Not running a web client pipe" ;
       don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))
   | `S3 ->
-      Logger.trace log "Running S3 web client pipe" ;
+      Logger.info log "Running S3 web client pipe" ;
       let module Web_config = struct
         let conf_dir = conf_dir
 
@@ -114,10 +114,10 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
         Make_broadcaster (Web_config) (Program)
           (Web_client_pipe.S3_put_request) in
       Broadcaster.run coda |> don't_wait_for ;
-      Logger.trace log "Copying verification keys %s to s3 client"
+      Logger.info log "Copying verification keys %s to s3 client"
         verification_key_location ;
       ( match%map store_verification_keys () with
-      | Ok () -> Logger.trace log "Successfully sent verification keys"
+      | Ok () -> Logger.info log "Successfully sent verification keys"
       | Error e ->
           Logger.error log
             !"Could not send verification keys: %s"
