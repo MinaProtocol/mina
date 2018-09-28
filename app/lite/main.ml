@@ -13,7 +13,7 @@ let float_to_string value = Js.to_string (Js.number_of_float value) ## toString
 module Svg = struct
   open Virtual_dom.Vdom
 
-  let ocean_blacklike = "#1F2D3D"
+  let silver = "#8492A6"
 
   let main ?class_ ~width ~height cs =
     Node.svg "svg"
@@ -23,7 +23,7 @@ module Svg = struct
       @ Option.to_list (Option.map class_ ~f:Attr.class_) )
       cs
 
-  let line_color = ocean_blacklike
+  let line_color = silver
 
   let path points =
     let points =
@@ -34,7 +34,7 @@ module Svg = struct
     Node.svg "polyline"
       [ Attr.create "points" points
       ; Attr.create "style"
-          (sprintf "fill:none;stroke:%s;stroke-width:3" line_color) ]
+          (sprintf "fill:none;stroke:%s;stroke-width:2" line_color) ]
       []
 
   (* Make little merkle tree for mobile *)
@@ -230,12 +230,18 @@ module Html = struct
         { label: string
         ; value: string
         ; verification: [`Pending of int | `Complete of unit Or_error.t]
+        ; important: bool
         ; extra_style: Style.t
         }
 
-      let render {label=label_text; value; verification; extra_style} =
+      let render {label=label_text; value; verification; important; extra_style} =
         let open Node in
-        div [Style.(render (of_class "br3 silver-gradient b-silver shadow-subtle" + extra_style))]
+        div [Style.(render
+            (of_class "br3 silver-gradient b-silver shadow-subtle" + extra_style + 
+              (match (important, verification) with
+              | true, `Complete (Ok ()) -> (of_class "grass-gradient b-grass")
+              | true, `Complete (Error _) | (true, `Pending _) | (false, _) -> (of_class "silver-gradient b-silver"))
+            )) ]
           [ div [Style.just "br3 pv1 br--top"]
             [div [Style.just "flex items-center"]
               [div
@@ -247,11 +253,11 @@ module Html = struct
               ; span [Style.just "ph1 fw5 darksnow"] [text label_text]
               ]
             ]
-          ; div [Style.just "br3 br--bottom pv2 ph3 ocean wb bg-darksnow"] [text value] ]
+          ; div [Style.(render (of_class "br3 br--bottom pv2 ph3 ocean wb bg-darksnow" + if important then (of_class "f8") else empty))] [text value] ]
 
-      let create verification ?(extra_style=Style.empty) ?width label value =
+      let create verification ?(extra_style=Style.empty) ?width ?(important=false) label value =
         let _ = width in
-        {label; value; verification; extra_style}
+        {label; value; verification; extra_style; important}
     end
 
     module Row = struct
@@ -295,10 +301,10 @@ let merkle_tree num_layers_to_show =
 
     let pos = function Node {pos; _} -> pos | Account {pos; _} -> pos
   end in
-  let layer_height = 50. in
+  let layer_height = 40. in
   let image_width = 400. in
   let top_offset = 30. in
-  let left_offset = 100. in
+  let left_offset = 0. in
   let image_height = Int.to_float num_layers_to_show *. layer_height in
   let x_pos, y_pos =
     let y_uncompressed ~layer =
@@ -360,15 +366,12 @@ let merkle_tree num_layers_to_show =
       go [] 0 0 tree0
     in
     let rendered =
-      let account_width = 400 in
       let account =
         match List.last_exn specs with
         | Spec.Node _ -> None
         | Spec.Account
-            { pos= {x; y}
+            { pos=_
             ; account= {public_key; balance; nonce; receipt_chain_hash} } ->
-            let _x = x -. Float.of_int (account_width / 2) in
-            let _y = y in
             let record =
               let open Html.Record in
               create ~class_:"flex"
@@ -386,14 +389,7 @@ let merkle_tree num_layers_to_show =
       in
       let edges =
         let posns =
-          let initial =
-            let ledger_hash_y = 390. in
-            let corner_x = 180. in
-            [ {Pos.x= -50.; y= ledger_hash_y}
-            ; {Pos.x= corner_x; y= ledger_hash_y}
-            ; {Pos.x= corner_x; y= top_offset} ]
-          in
-          initial @ List.map specs ~f:Spec.pos
+          List.map specs ~f:Spec.pos
         in
         Svg.path posns
       in
@@ -675,8 +671,8 @@ let state_html
   let proof_style =
     Style.of_class @@
       match verification with
-      | `Complete (Ok _) -> "proof valid"
-      | `Complete (Error _) -> "proof invalid"
+      | `Complete (Ok _) -> "grass-gradient b-grass"
+      | `Complete (Error _) -> "proof"
       | `Pending _ -> "proof verifying shake shake-constant"
   in
   let proof_style = Style.(proof_style + (of_class "wb")) in
@@ -705,15 +701,9 @@ let state_html
     match download_progress with
     | Progress _ -> div [] [Node.text "downloading..."]
     | Done -> 
-    div [class_ "state-explorer mw6"]
-      [ div [class_ "state-with-proof mw55"]
+    div [class_ "state-explorer flex"]
+      [ div [class_ "state-with-proof mw5 mr4"]
           [ hoverable (Html.Record.render state_record) Tooltip_stage.Blockchain_state []
-          ; div
-              [ class_ "proof-struts"
-              ; Attr.style [("width", "0"); ("height", "0")] ]
-              [ Svg.main ~width:400. ~height:200.
-                  [ Svg.path [{x= 150.; y= 0.}; {x= 150.; y= 200.}]
-                  ; Svg.path [{x= 350.; y= 0.}; {x= 350.; y= 200.}] ] ]
           ; hoverable(Html.Record.Entry.(
               create_entry ~extra_style:proof_style "blockchain_SNARK"
                 (to_base64 (module Proof) proof)
@@ -723,7 +713,7 @@ let state_html
             Mobile_switch.create
              ~not_small:(merkle_tree num_layers_to_show_desktop verification tree)
              ~small:(merkle_tree num_layers_to_show_mobile verification tree) )
-           Tooltip_stage.Account_state [class_ "accounts"]
+           Tooltip_stage.Account_state [Style.just "mw55"]
       ] 
   in
   (*let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]*)
