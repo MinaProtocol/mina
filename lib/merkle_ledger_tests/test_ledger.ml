@@ -347,6 +347,7 @@ let%test_module "test functor on in memory databases" =
       let rr = L16.Addr.of_directions Direction.(pr @ [Right; Right]) in
       let rl = L16.Addr.of_directions Direction.(pr @ [Right; Left]) in
       let lr = L16.Addr.of_directions Direction.(pr @ [Left; Right]) in
+      let _h = L16.get_inner_hash_at_addr_exn l2 lr in
       let copy addr =
         L16.set_all_accounts_rooted_at_exn l2 addr
           (L16.get_all_accounts_rooted_at_exn l1 addr)
