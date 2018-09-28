@@ -123,10 +123,9 @@ module Haskell_process = struct
     | _ -> Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
 
   let output {process; _} ~log =
-    Pipe.map
-      (Reader.pipe (Process.stdout process))
-      ~f:(fun str ->
-        List.filter_map (String.split_lines str) ~f:(fun line ->
+    Pipe.filter_map
+      (Reader.lines (Process.stdout process))
+ ~f:(fun line ->
             let prefix_name_size = 4 in
             let prefix_size = prefix_name_size + 2 in
             (* a colon and a space *)
@@ -145,13 +144,16 @@ module Haskell_process = struct
               | "DBUG" ->
                   Logger.debug log "%s" line_no_prefix ;
                   None
+              | "TRAC" ->
+                  Logger.trace log "%s" line_no_prefix ;
+                  None
               | "EROR" ->
                   Logger.error log "%s" line_no_prefix ;
                   None
               | "DATA" ->
                   Logger.info log "%s" line_no_prefix ;
-                  Some line_no_prefix
-              | _ -> pass_through () ) )
+                  Some [line_no_prefix]
+              | _ -> pass_through () )
 end
 
 module Make (P : sig
