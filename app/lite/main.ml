@@ -132,7 +132,7 @@ module State = struct
     ; tooltip_stage: Tooltip_stage.t
     }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; tooltip_stage = None}
+  let init = {verification= `Pending 0; chain= Lite_params.genesis_chain; tooltip_stage = None}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
