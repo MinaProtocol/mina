@@ -456,7 +456,7 @@ let merkle_tree num_layers_to_show =
   let top_offset = 15. in
   let left_offset = 0. in
   let image_height = Int.to_float num_layers_to_show *. layer_height in
-  let x_delta = 0.5 *. image_width /. Float.of_int num_layers_to_show in
+  let x_delta = 0.8 *. image_width /. Float.of_int num_layers_to_show in
   let x_pos, y_pos =
     let y_uncompressed ~layer =
       top_offset +. (Int.to_float layer *. layer_height)
@@ -517,6 +517,20 @@ let merkle_tree num_layers_to_show =
       in
       go [] 0 0 tree0
     in
+    let xs = List.map specs ~f:(fun spec -> 
+        let pos = Spec.pos spec in
+        pos.x)
+    in
+    let avg_x = List.reduce_exn xs ~f:(fun a b -> a +. b) /. (Float.of_int (List.length xs)) in
+    printf "%f\n" avg_x;
+    let specs = List.map specs ~f:(fun spec -> 
+        match spec with
+        | Spec.Account account -> Spec.Account account
+        | Spec.Node spec -> 
+          let pos = { spec.pos with x = spec.pos.x +. (avg_x *. 0.5) } in
+          Spec.Node { pos = pos; color = spec.color }
+      )
+    in
     let rendered =
       let account =
         match List.last_exn specs with
@@ -548,7 +562,8 @@ let merkle_tree num_layers_to_show =
           if List.length posns > 1 then
             let src = List.nth_exn posns (List.length posns - 2) in
             let dest = List.nth_exn posns (List.length posns - 1) in
-            let last = { Pos.x = image_width /. 3.0; y = dest.y +. (dest.y -. src.y) } in
+            (*let last = { Pos.x = image_width /. 3.0; y = dest.y +. (dest.y -. src.y) } in*)
+            let last = { Pos.x = src.x; y = dest.y +. (dest.y -. src.y) } in
             (drop_last posns) @ [ last ]
           else 
             posns
