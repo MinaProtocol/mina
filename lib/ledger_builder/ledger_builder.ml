@@ -394,7 +394,9 @@ end = struct
       in
       match unseen_jobs with
       | [] -> (None, state)
-      | x :: _ ->
+      | _ ->
+          let i = Random.int (List.length unseen_jobs) in
+          let x = List.nth_exn unseen_jobs i in
           ( Some (pair_to_list x)
           , Map.set state ~key:(statement_pair x)
               ~data:(Assigned (Time.now ())) )
