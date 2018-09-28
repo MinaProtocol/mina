@@ -627,7 +627,7 @@ let merkle_tree num_layers_to_show =
       hoverable state (
       Node.div [Style.just "flex items-center"]
       [ Node.div [Style.(render (of_class "mw5 relative" + Html.grouping_style))]
-          (Node.div [Style.just "record-title-padding fw5 silver tc"] [ Node.text "Merkle Path and Account" ]
+          (Node.div [Style.just "record-title-padding fw5 silver roboto tc"] [ Node.text "Merkle Path and Account" ]
           ::
            Svg.main
               ~width:(image_width +. left_offset)
