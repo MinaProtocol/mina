@@ -116,15 +116,6 @@ let get_account _pk on_sucess on_error =
 
 let to_base64 m x = B64.encode (Binable.to_string m x)
 
-module App_stage = struct
-  type t =
-    | Intro
-    | Problem
-    | Coda
-    | Mission
-    | App
-end
-
 module Tooltip_stage = struct
   type t =
     | None
@@ -134,23 +125,14 @@ module Tooltip_stage = struct
   [@@deriving eq]
 end
 
-module Download_progress = struct
-  type t = 
-    | Progress of int
-    | Done
-
-end
-
 module State = struct
   type t =
     { verification: [`Pending of int | `Complete of unit Or_error.t]
     ; chain: Lite_chain.t
-    ; app_stage: App_stage.t
     ; tooltip_stage: Tooltip_stage.t
-    ; download_progress: Download_progress.t
     }
 
-  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; app_stage = Intro; tooltip_stage = None; download_progress = Done}
+  let init = {verification= `Complete (Ok ()); chain= Lite_params.genesis_chain; tooltip_stage = None}
 
   let chain_length chain =
     chain.Lite_chain.protocol_state.consensus_state.length
@@ -632,225 +614,15 @@ let merkle_tree num_layers_to_show =
     in
     rendered
 
-module Image = struct
-  let draw ?(style= Style.empty) ~src ~alt xy =
-    let inline_style =
-      match xy with
-      | `Fixed_width x ->
-          let xStr = Int.to_string x in
-          Printf.sprintf "width:%spx" xStr
-      | `Fixed (x, y) ->
-          let xStr = Int.to_string x in
-          let yStr = Int.to_string y in
-          Printf.sprintf "width:%spx;height:%spx" xStr yStr
-      | `Free -> ""
-    in
-    (* TODO: Why can't we make <img> tags with VirtualDOM!! *)
-    let img = Node.create "img" in
-    let src = Attr.create "src" src in
-    let alt = Attr.create "alt" alt in
-    img
-      [Attr.style_css inline_style; Style.render style; src; alt]
-      []
-end
-
-
-(** A Pane is full-width on mobile and on desktop
- * On desktop it's 1/3 (thin) or 2/3 (wide)
- *)
-module Pane = struct
-  let create ?minwidth ~content () =
-    let open Node in
-    let minwidth =
-      match minwidth with
-      | None -> Style.empty
-      | Some `Wide -> Style.of_class "minw6-ns"
-      | Some `Thin -> Style.of_class "minw5-ns"
-    in
-    div [Style.(render ((of_class "flex ml3 mr3 pv3  overflow-hidden") + minwidth))]
-      [content]
-end
-
-module Button = struct
-  let create ~f ~button_hint ~extra_style =
-    let open Node in
-    button [
-      Style.(
-            render
-              ( of_class
-                  "user-select-none hover-bg-blacklike white no-underline ttu \
-                   tracked bg-silver icon-shadow ph3 pv3 br4 tc lh-copy"
-              + extra_style ))
-    ; Attr.on_click f
-    ] [text button_hint]
-
-  let cta ~button_hint ~f =
-    create ~button_hint ~extra_style:(Style.of_class "f4") ~f
-end
-
 let images = "/web-demo-art/"
 
 let image_url s = images ^ s
-
-module Breadcrumbs = struct
-  let create state =
-    let open Node in
-    let select i _ = 
-      let app_stage = 
-        match i with 
-        | 0 -> App_stage.Intro
-        | 1 -> Problem 
-        | 2 -> Coda    
-        | 3 -> Mission 
-        | 4 -> App     
-        | _ -> failwith "unexpected case"
-      in 
-      !g_update_state_and_vdom { state with State.app_stage=app_stage };
-      Event.Ignore
-    in
-    let selected = 
-      match state.app_stage with
-      | App_stage.Intro -> 0
-      | Problem -> 1
-      | Coda -> 2
-      | Mission -> 3
-      | App -> 4
-    in
-    let empty_dot i = 
-       div
-        [Attr.on_click (select i); Attr.class_ "breadcrumb"] 
-        [] 
-    in
-    let full_dot = 
-       div
-        [Attr.class_ "breadcrumb full"] 
-        [] 
-    in
-    let dots = 
-      List.init 5 ~f:(fun i -> 
-          if i = selected 
-          then full_dot
-          else empty_dot i)
-    in
-    let bread_button action title = 
-      div [Attr.on_click action; Attr.class_ "bread_button"] [text ("• " ^ title)]
-    in
-    let last = 
-      match state.app_stage with
-      | App -> bread_button (select 0) "start over"
-      | _ -> bread_button (select 4) "skip"
-    in
-    div [] (dots @ [ last ])
-end
-
-module Story = struct
-  module Cell = struct
-    let next state target =
-      match state.State.app_stage with 
-      | App -> 
-        Button.cta ~button_hint:"Follow our progress" ~f:(fun _ -> 
-          !g_update_state_and_vdom { state with State.app_stage=target };
-          Event.Ignore
-        )
-      | _ -> 
-        Button.cta ~button_hint:"Next" ~f:(fun _ -> 
-          !g_update_state_and_vdom { state with State.app_stage=target };
-          Event.Ignore
-        )
-
-    let style =
-      Style.of_class "ml3-ns mw7 h6 flex flex-column justify-between bg-snow"
-
-    let bottom state next_state =
-      let open Node in
-      div []
-        [ next state next_state
-        ; Breadcrumbs.create state
-        ]
-
-    let terminal state ~heading ~copy ~next_state =
-      let open Node in
-      div [Style.(render style)]
-        [ h1 [ Style.(render (of_class "f2 m0 mt2"))] [text heading]
-        ; div [] [text copy]
-        ; bottom state next_state
-        ]
-
-    let comic state ~copy ~strip ~next_state =
-      let open Node in
-      div [Style.(render style)]
-        [ div [Style.(render (of_class "mt2"))] [text copy]
-        ; strip
-        ; bottom state next_state
-        ]
-
-    let simple_comic state ~copy ~img ~alt ~next_state =
-      let open Node in
-      comic state ~copy ~strip:(
-          div [Style.(render (of_class "flex flex-column items-end"))]
-            [ Image.draw ~style:(Style.of_class "mw6-ns") ~src:img ~alt `Free]) ~next_state
-
-  end
-
-  let create state =
-    let open Node in
-    let terminal = Cell.terminal state in
-    let comic = Cell.comic state in
-    let simple_comic = Cell.simple_comic state in
-    match state.app_stage with
-    | Intro -> terminal ~heading:"Coda Protocol Demo" ~copy:"This demo is showing a live browser verified copy of the Coda Protocol Testnet.\n\nCoda enables you to be absolutely certain..." ~next_state:Problem
-    | Problem -> simple_comic
-      ~copy:"Cryptocurrencies today make users give up control to parties running powerful computers, bringing them out of reach of the end user." ~img:(image_url "problem.png") ~alt:"Hand with big blockchain" ~next_state:Coda
-    | Coda -> comic
-        ~copy:"Coda is a new cryptocurrency that puts control back in the hands of the users. Its resource requirements are so low it runs in your browser."
-        ~strip:(
-          div [Style.(render (of_class "flex justify-between"))]
-            [ Image.draw ~src:(image_url "compare-outlined.svg") ~alt:"Others vs Coda" (`Fixed_width 200)
-            ; Image.draw ~src:(image_url "your-hands.png") ~alt:"A user of Coda" (`Fixed_width 400)
-            ]
-        )
-        ~next_state:Mission
-    | Mission -> simple_comic
-        ~copy:"This is our first step towards putting users in control of the computer systems they interact with and back in control of their digital lives."
-        ~img:(image_url "net-hand.png")
-        ~alt:"Hand with the work"
-        ~next_state:App
-    | App -> terminal
-        ~heading:"Coda Protocol Demo"
-        ~copy:"This demo is showing a live browser..."
-        ~next_state:Problem
-end
-
-module Container = struct
-  let create ~configuration =
-    let open Node in
-    let (left_content, left_width), right_content, primary_content =
-      match configuration with
-      | `Left_primary ((left, left_width), right) ->
-        ((left, left_width), right, left)
-      | `Right_primary ((left, left_width), right) ->
-        ((left, left_width), right, right)
-    in
-    Mobile_switch.create
-      ~not_small:(
-        div [Style.(render @@ of_class "flex w-100")]
-          [ Pane.create ~content:left_content  ~minwidth:left_width ()
-          ; Pane.create ~content:right_content ()
-          ]
-      )
-      ~small:(
-        Pane.create ~content:primary_content ()
-      )
-
-end
 
 let state_html
     state
      =
      let { State.verification
-         ; app_stage=_
          ; tooltip_stage= _
-         ; download_progress
          ; chain=
              { protocol_state=
                  {previous_state_hash; blockchain_state; consensus_state}
@@ -900,9 +672,6 @@ let state_html
     Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"Coda's protocol state is composed of the consensus state and the database state. Our test network is currently using \"proof of signature\", where producing a valid snark for an updated protocol state requires a priveleged private key (Coda will use a fully open consensus protocol in later versions of the testnet). The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed." ()
   in
   let state_explorer =
-    match download_progress with
-    | Progress _ -> div [] [Node.text "downloading..."]
-    | Done -> 
     div [class_ "state-explorer flex-ll items-center"]
       [ div [class_ "state-with-proof mw7 mr4"]
           [ hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left state_tooltip) state_record `Wide) Tooltip_stage.Blockchain_state []
@@ -910,7 +679,7 @@ let state_html
             ~grouping:`Together
             ~tooltip:(`Left snark_tooltip)
             (Html.Record.create
-            [[ create_entry ~important:true ~extra_style:proof_style "blockchain_SNARK" (to_base64 (module Proof) proof)
+            [[ create_entry ~important:true ~extra_style:proof_style "zkSNARK Proof" (to_base64 (module Proof) proof)
             ]]) `Thin) Tooltip_stage.Proof  []
           ]
       ; hoverable
@@ -921,14 +690,7 @@ let state_html
            Tooltip_stage.Account_state [Style.just "mw7"]
       ] 
   in
-  (*let header = div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"] [ Node.create "img" [Attr.create "width" "170px" ;Attr.create "src" "logo.svg"] [] ]*)
-  (*in*)
   state_explorer
-  (*div [] [*)
-    (*header*)
-  (*; div [class_ "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m ph6-l ph5-m ph4 mw9-l"]*)
-      (*[ state_explorer ]*)
-  (*]*)
 
 let main ~render ~get_data =
   let state = ref State.init in
