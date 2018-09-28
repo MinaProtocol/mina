@@ -34,7 +34,7 @@ module Svg = struct
     Node.svg "polyline"
       [ Attr.create "points" points
       ; Attr.create "style"
-          (sprintf "fill:none;stroke:%s;stroke-width:2" line_color) ]
+          (sprintf "fill:none;stroke:%s;stroke-width:1" line_color) ]
       []
 
   (* Make little merkle tree for mobile *)
@@ -320,7 +320,7 @@ module Html = struct
       in
       let grouping =
         match grouping with
-        | `Thin_together -> Style.of_class "b-silver ph2 pv2"
+        | `Thin_together -> Style.of_class "b-silver ph2 pv2 br3"
         | `Together -> grouping_style
         | `Separate -> Style.empty
       in
@@ -497,8 +497,8 @@ let merkle_tree num_layers_to_show =
             let size = 12.0 in
             let center = 
               if right 
-              then { Pos.x = dest.Pos.x -. 2.0; y = dest.y }
-              else { Pos.x = dest.Pos.x +. 2.0; y = dest.y }
+              then { Pos.x = dest.Pos.x -. 3.0; y = dest.y }
+              else { Pos.x = dest.Pos.x +. 3.0; y = dest.y }
             in
             Svg.triangle ~radius:0.0 ~center ~width:size ~height:size ~color
           )
