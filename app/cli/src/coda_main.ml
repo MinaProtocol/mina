@@ -1026,7 +1026,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
 
   let schedule_transaction log t txn =
     let open Deferred.Let_syntax in
-    assert (is_valid_transaction t txn) ;
+    (if not (is_valid_transaction t txn) then (
+       Core.Printf.eprintf "Invalid transaction: account balance is too low";
+       Core.exit 1));
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
