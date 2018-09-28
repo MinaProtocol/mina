@@ -203,7 +203,7 @@ module Navbar = struct
           render
             ( of_class "flex items-center mw9 center mt3 mt4-m mt5-l mb4 mb5-m"
             + Spacing.side_padding )) ]
-      [ div [class_ "w-50"] [coda Style.empty]
+      [ div [class_ "w-50"] [a [] "./" [coda Style.empty] "coda-home" false]
       ; div
           [class_ "flex justify-around w-75"]
           [ (let name, url, label = Links.blog in
