@@ -266,7 +266,7 @@ module Html = struct
             (of_class "br3 silver-gradient b-silver shadow-subtle" + extra_style + 
               (match (important, verification) with
               | true, `Complete (Ok ()) -> (of_class "grass-gradient b-grass")
-              | true, `Complete (Error _) | (true, `Pending _) | (false, _) -> (of_class "silver-gradient b-silver"))
+              | true, `Complete (Error _) | (true, `Pending _) | (false, _) -> (of_class "silver-gradient br3 b-silver"))
             )) ]
           [ div [Style.just "br3 pv1 br--top"]
             [div [Style.just "flex items-center"]
@@ -301,7 +301,7 @@ module Html = struct
     let render ?tooltip ?(grouping=`Separate) {style; rows} width =
       let width =
         match width with
-        | `Wide -> Style.of_class "mw55"
+        | `Wide -> Style.of_class "mw5"
         | `Thin -> Style.of_class "mw5"
       in
       let grouping =
@@ -426,15 +426,15 @@ let merkle_tree num_layers_to_show =
             ; account= {public_key; balance; nonce; receipt_chain_hash} } ->
             let record =
               let open Html.Record in
-              create ~style:(Style.of_class "flex")
-                [ [ create_entry ~extra_style:(Style.of_class "mr2 mb2") "balance" ~width:"50%"
+              create
+                [[ create_entry ~extra_style:(Style.of_class "mb2") "balance" ~width:"50%"
                       (Account.Balance.to_string balance)
-                  ; create_entry ~extra_style:(Style.of_class "mr2 mt2") "public_key" ~width:"50%"
-                      (to_base64 (module Public_key.Compressed) public_key) ]
-                ; [ create_entry ~extra_style:(Style.of_class "ml2 mb2") "nonce" ~width:"50%"
+                  ; create_entry ~extra_style:(Style.of_class "mb2") "public_key" ~width:"50%"
+                      (to_base64 (module Public_key.Compressed) public_key)
+                ; create_entry ~extra_style:(Style.of_class "mb2") "nonce" ~width:"50%"
                       (Account.Nonce.to_string nonce)
-                  ; create_entry ~extra_style:(Style.of_class "ml2 mt2") "receipt_chain" ~width:"50%"
-                      (field_to_base64 receipt_chain_hash) ] ]
+                  ; create_entry "receipt_chain" ~width:"50%"
+                      (field_to_base64 receipt_chain_hash) ]]
             in
             Some (Html.Record.render ~grouping:`Thin_together record `Wide)
       in
@@ -460,7 +460,7 @@ let merkle_tree num_layers_to_show =
             | Spec.Account _ -> None )
       in
       Node.div [Style.just "flex items-center"]
-      [ Node.div [Style.render Html.grouping_style]
+      [ Node.div [Style.(render (of_class "mw5" + Html.grouping_style))]
           ( Svg.main
               ~width:(image_width +. left_offset)
               ~height:(image_height +. top_offset)
