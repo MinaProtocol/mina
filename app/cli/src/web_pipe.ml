@@ -48,15 +48,16 @@ struct
   let create coda =
     let open Base in
     let get_lite_chain_exn = get_lite_chain |> Option.value_exn in
-    let ledger = best_ledger coda in
-    let keys =
-      Inputs.Ledger.fold_until ledger ~init:(0, [])
-        ~finish:(fun (_, pks) -> pks)
-        ~f:(fun (count, pks) account ->
-          if count >= max_keys then Stop pks
-          else Continue (count + 1, Account.public_key account :: pks) )
-    in
+    (* HACK: we are just passing in the proposer path for this demo *)
+    let keys = [Coda_base.Genesis_ledger.high_balance_pk] in
     get_lite_chain_exn coda keys
+end
+
+let to_base64 m x = B64.encode (Binable.to_string m x)
+
+module Storage (Bin : Binable.S) = struct
+  let store location data =
+    Writer.save location ~contents:(to_base64 (module Bin) data)
 end
 
 module Make_broadcaster
@@ -65,13 +66,15 @@ module Make_broadcaster
     (Put_request : Web_client_pipe.Put_request_intf) =
 struct
   module Web_pipe =
-    Web_client_pipe.Make (Chain (Program)) (Config) (Storage.Disk)
+    Web_client_pipe.Make (Chain (Program)) (Config)
+      (Storage (Lite_base.Lite_chain))
       (Put_request)
 
   let run coda =
-    let%bind web_client_pipe = Web_pipe.create () in
-    Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
-        Web_pipe.store web_client_pipe coda )
+    (let%bind web_client_pipe = Web_pipe.create () in
+     Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
+         Web_pipe.store web_client_pipe coda ))
+    |> don't_wait_for
 end
 
 let get_service () =
@@ -82,8 +85,7 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
     ~conf_dir ~log = function
   | `None ->
       Logger.trace log "Not running a web client pipe" ;
-      don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda)) ;
-      Deferred.unit
+      don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))
   | `S3 ->
       Logger.trace log "Running S3 web client pipe" ;
       let module Web_config = struct
