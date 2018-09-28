@@ -109,6 +109,9 @@
   font-size: 6em;
   text-align: center;
   text-decoration: none;
+  -webkit-transition: color .1s;
+  -o-transition: color .1s;
+  transition: color .1s;
 }
 
 .gallery .jump {
@@ -117,6 +120,9 @@
   margin-left: 1em;
   color: #8492A6;
   text-decoration: none;
+  -webkit-transition: color .1s;
+  -o-transition: color .1s;
+  transition: color .1s;
 }
 
 .gallery .jump:hover {
@@ -143,6 +149,9 @@
   background-color: #F9FAFC;
   border: 1px solid #EFF2F7;
   color: #8492A6;
+  -webkit-transition: color .1s;
+  -o-transition: color .1s;
+  transition: color .1s;
 }
 .gallery .next-button > div {
   position: absolute;
