@@ -426,7 +426,7 @@ end = struct
 
              Reverting back to random. 
       *)
-          let i = Random.int (List.length jobs / 2) in
+          let i = Random.int (List.length jobs) in
           let j = index_of_nth_occurence dirty_jobs i |> Option.value_exn in
           (*TODO All of this will change, when we fix  #450. 
           There'll be no more bundles! *)
