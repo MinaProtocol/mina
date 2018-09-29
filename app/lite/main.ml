@@ -629,13 +629,7 @@ let merkle_tree num_layers_to_show =
       in
       let tooltip =
         Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right
-          ~text:[
-            "Once a client has a protocol state and a succinct blockchain certifying that state, \
-             they can get their account information with a small amount of additional data.
-             Namely, they need a merkle-path from the protocol state's ledger hash to their account."
-          ; "The succinct blockchain, protocol state, merkle-path, and account information are altogether just a few kilobytes,
-            so Coda can provide a full proof of the state of an account with just this tiny amount of data."
-          ] ()
+          ~text:Copy.account_tooltip ()
       in
       hoverable state (
       Node.div [Style.just "flex items-center flex-column flex-row-ns justify-center"]
@@ -740,29 +734,13 @@ let state_html
   let _ = ledger in
   let snark_tooltip =
     Html.Tooltip.create ~active:(Tooltip_stage.(equal Proof state.State.tooltip_stage)) ~arity:`Left
-      ~text:[
-        "The Coda network compresses its entire blockchain into a 1 kilobyte zk-SNARK proof, \
-         which serves as a cryptographic certificate of the protocol state's integrity
-          called a \"succinct blockchain\". \
-         This takes the place of the gigabytes long, ever-growing blockchain used for \
-         validation in other cryptocurrencies."
-      ; "zk-SNARKs are so tiny and cheap to check that your browser is downloading and \
-         verifying a copy of this zk-SNARK from the Coda testnet every 10 seconds."
-      ]
-      ~alt_text:["The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client on your device."]
+      ~text:Copy.proof_tooltip
+      ~alt_text:Copy.proof_tooltip_alt
         ()
   in
   let state_tooltip =
     Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left
-      ~text:
-        [ "The zk-SNARK proof serves as a succinct blockchain,
-           validating the entire protocol state just as a heavy blockchain \
-           does in existing cryptocurrencies."
-        ; "The staged and locked ledger hashes are the merkle roots of two versions of the database of accounts.
-           Changes to accounts are reflected immediately in the staged ledger hash.
-           The locked ledger hash is set from the staged ledger hash periodically,
-           as zk-SNARK proofs are computed."
-        ] ()
+      ~text:Copy.state_tooltip ()
   in
   let age = Time.diff (Time.now ()) (Time.of_string timestamp) in
   let down_maintenance =
