@@ -137,14 +137,3 @@
   position: relative;
 }
 
-.follow-button::before {
-  content: "";
-  background-image: url(../img/twitter.svg);
-  background-repeat: no-repeat;
-  background-size: auto;
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 100px;
-}

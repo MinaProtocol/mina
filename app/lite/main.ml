@@ -403,7 +403,7 @@ let hash_colors =
 
 let color_at_layer i = hash_colors.(i mod (Array.length hash_colors))
 
-let hoverable state node target attrs =
+let hoverable ?(extra_style=Style.empty) state node target =
   let update_tooltip  _ = 
     if not (js_is_mobile_small ()) then (
       !g_update_state_and_vdom { state with State.tooltip_stage=target }
@@ -432,7 +432,7 @@ let hoverable state node target attrs =
   in
   let open Node in
   let open Attr in
-  div ([on_mouseenter update_tooltip; on_mouseleave reset_tooltip; on_click mobile_update_toggle] @ attrs) [ node ]
+  div ([Style.(render (of_class "mobile-jank-fix" + extra_style)); on_mouseenter update_tooltip; on_mouseleave reset_tooltip; on_click mobile_update_toggle]) [ node ]
 
 
 let merkle_tree num_layers_to_show =
@@ -483,7 +483,7 @@ let merkle_tree num_layers_to_show =
 *)
     (x_uncompressed, y_uncompressed)
   in
-  fun state (tree0: ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree) ->
+  fun state (tree0: ('hash, 'account) Sparse_ledger_lib.Sparse_ledger.tree) ~extra_style ->
     let verification = state.State.verification in
     let create_entry = Html.Record.Entry.create verification in
     let tree0 = drop_top_of_tree ~desired_layers:num_layers_to_show tree0 in
@@ -645,7 +645,7 @@ let merkle_tree num_layers_to_show =
           :: Option.to_list account
           @ [Html.Tooltip.render_overlay tooltip])
       ; Html.Tooltip.render_wide tooltip
-      ]) Tooltip_stage.Account_state []
+      ]) ~extra_style Tooltip_stage.Account_state
     in
     rendered
 
@@ -753,22 +753,24 @@ let state_html
             (Html.Record.create
                (Some "Protocol State Proof")
             [[ create_entry ~important:true ~extra_style:proof_style "zkSNARK" (to_base64 (module Proof) proof)
-            ]]) `Thin) Tooltip_stage.Proof  []
-          ; hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left state_tooltip) state_record `Wide) Tooltip_stage.Blockchain_state []
+            ]]) `Thin) Tooltip_stage.Proof
+          ; hoverable (Html.Record.render ~grouping:`Together ~tooltip:(`Left state_tooltip) state_record `Wide) Tooltip_stage.Blockchain_state
           ]
       ; hoverable
           ( let tree = Sparse_ledger_lib.Sparse_ledger.tree ledger in
+            let extra_style = Style.of_class "mw7" in
             Mobile_switch.create
-             ~not_small:(merkle_tree num_layers_to_show_desktop state tree)
-             ~small:(merkle_tree num_layers_to_show_mobile state tree) )
-           Tooltip_stage.Account_state [Style.just "mw7"]
+             ~not_small:(merkle_tree num_layers_to_show_desktop state tree ~extra_style)
+             ~small:(merkle_tree num_layers_to_show_mobile state tree ~extra_style) )
+           Tooltip_stage.Account_state
       ] 
   in
   let explanation =
     let heading_style =
-      Style.(of_class "silver tc mt0 mb4 f5 mw6 center fw3")
+      Style.(of_class "silver tc mt0 mb4 f5 mw6 center fw3 lh-copy")
     in
-    Node.h2 [Style.render heading_style] [Node.text "The properties below constitute the full, live Coda protocol state and are being fully verified in your browser. Explore the components to learn more." ]
+    let br = Node.create "br" in
+  Node.h2 [Style.render heading_style] [Node.text "The properties below constitute the full, live Coda protocol state and are being fully verified in your browser. Explore the components to learn more."; br [] []; br [] []; Mobile_switch.create ~not_small:(Node.text "Hover over any component below to learn more.") ~small:(Node.text "Tap any component below to learn more.") ]
   in
   let contents = [ explanation ] @ down_maintenance @ [ state_explorer ] in
   let page_time = Time.diff (Time.now ()) start_time in

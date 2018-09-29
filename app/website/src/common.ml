@@ -139,6 +139,11 @@ module Input_button = struct
   let create ~label ~button_hint ~extra_style ~url ~new_tab () =
     let open Html in
     let open Html_concise in
+    let button_node =
+      match button_hint with
+      | `Text button_hint -> text button_hint
+      | `Node n -> n
+    in
     node "a"
       ([ href url
       ; Style.(
@@ -149,17 +154,17 @@ module Input_button = struct
             + extra_style ))
       ; analytics_handler label
       ] @ (if new_tab then [ Attribute.create "target" "_blank" ] else []))
-      [text button_hint]
+      [button_node]
 
   let cta ?(extra_style="") ?(new_tab=true) ~label ~button_hint ~url () =
     let open Html in
     let open Html_concise in
-    create ~button_hint ~new_tab ~extra_style:(Style.of_class ("f3 ph4 pv3 " ^ extra_style)) ~label ~url ()
+    create ~button_hint:(`Text button_hint) ~new_tab ~extra_style:(Style.of_class ("f3 ph4 pv3 " ^ extra_style)) ~label ~url ()
 
   let fixed ?(new_tab=true) ~button_hint () =
     let open Html in
     let open Html_concise in
-    create ~button_hint
+    create ~button_hint:(`Text button_hint)
       ~extra_style:(Style.of_class "f5 bottomrightfixed br--top")
       ~new_tab
       ~label:"fixed" ~url:"https://goo.gl/forms/PTusW11oYpLKJrZH3" ()
@@ -323,14 +328,19 @@ module Section = struct
               if i = 4
               then 
                 let button_hint, label, url, new_tab =
-                  "Follow our progress", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
+                  "Follow us", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
+
+                in
+                let itag = Html.node "i" in
+                let twitter =
+                  itag [Style.just "ml-1 ml-2-ns fab f1 f2-m f1-l fa-twitter mr3 mr2-m mr3-l"] []
                 in
                 Mobile_switch.create
                   ~small:
                     (div [] [])
                   ~not_small:
-                    (Input_button.cta ~button_hint ~label
-                              ~url ~extra_style:"progress-button follow-button" ~new_tab ())
+                    (Input_button.create ~button_hint:(`Node (div [Style.just "flex items-center f3"] [span [] [twitter]; span [] [text button_hint]])) ~label
+                              ~url ~extra_style:(Style.of_class "progress-button follow-button pv2") ~new_tab ())
               else
                 a [Style.(render (of_class "next-button")); href (Printf.sprintf "#item-%d" (i+1))] [div [] [text "›"]]
           in
