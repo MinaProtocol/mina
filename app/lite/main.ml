@@ -704,7 +704,7 @@ let state_html
   let _ = ledger in
   let snark_tooltip =
     Html.Tooltip.create ~active:(Tooltip_stage.(equal Proof state.State.tooltip_stage)) ~arity:`Left
-        ~text:"The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. This takes the place of the gigabytes long, ever-growing blockchain used for validation in previous cryptocurrencies. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."
+        ~text:"The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. This takes the place of the gigabytes long, ever-growing blockchain used for validation in other cryptocurrencies. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."
         ~alt_text:"The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client on your device."
         ()
   in
