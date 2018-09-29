@@ -512,7 +512,6 @@ let merkle_tree num_layers_to_show =
         pos.x)
     in
     let avg_x = List.reduce_exn xs ~f:(fun a b -> a +. b) /. (Float.of_int (List.length xs)) in
-    printf "%f\n" avg_x;
     let specs = List.map specs ~f:(fun spec -> 
         match spec with
         | Spec.Account spec -> 
@@ -769,7 +768,7 @@ let state_html
   let down_maintenance =
     if Time.Span.(age > (Time.Span.of_sec 180.0)) 
     then 
-     (printf "state age: %s\n" (Time.Span.to_string age);
+     (printf "most recent protocol state age: %s\n" (Time.Span.to_string age);
      [let heading_style =
       Style.(of_class ("fw4 darksnow tc mt0 mb4 f4 bg-lemoncurry br3 shadow-subtle pa3 dib lh-copy"))
     in
