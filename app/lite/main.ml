@@ -627,7 +627,7 @@ let merkle_tree num_layers_to_show =
             | Spec.Account _ -> None )
       in
       let tooltip =
-        Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"Once a client has a protocol state and a proof for a protocol state, they can get the balance in an account with only a minimal amount of extra data due to the representation of the database as a merkle tree. To get the value in a particular account, a client needs the account properties and a merkle path from the database merkle root in the protocol state. Because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data." ()
+        Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"Once a client has a protocol state and a proof for a protocol state, they can get the balance in an account with only a minimal amount of extra data. To get the value in a particular account, a client needs the account properties and a merkle path from the database merkle root in the protocol state. Because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data." ()
       in
       hoverable state (
       Node.div [Style.just "flex items-center flex-column flex-row-ns justify-center"]
