@@ -428,7 +428,9 @@ let demo () =
       | `Real s ->
         Some (Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns w-100") ("/static/img/demo/" ^ s) `Free)
     in
-    let important_text = Important_text.create ~title:(`Left title) ~content in
+    let important_text =
+      Important_text.create ~title:(`Left title) ~content
+    in
     Compound_chunk.create ~variant:`No_image_on_small ~important_text ~image ~image_positioning:Image_positioning.Right ()
   in
   let top scheme =
@@ -438,19 +440,30 @@ let demo () =
       ~pages:
       [ comic
         ~title:"What is this?"
-        ~content:["This is an interactive demo of the Coda testnet. Coda is a cryptocurrency *so lightweight*, it can even run in your browser."
-        ; "On this page you can learn more about Coda, the testnet, and how the protocol works."
+        ~content:[
+          "This is a fully-verifying state explorer for the Coda testnet. \
+           Coda is so lightweight, it can even run in your browser."
+        ; "On this page you can learn more about Coda, the testnet, \
+           and how the protocol works."
         ]
         ~img:`None ()
       ; comic
          ~title:"Problem"
          ~content:[
-           "Cryptocurrencies are growing increasingly large. As this happens, *today decentralization is threatened*, as users are increasingly forced to use cryptocurrency through powerful trusted third parties." ]
+           "To verify cryptocurrencies today you need a powerful computer, a fast
+            internet connection, and GBs of disk space. And because verification
+            means checking every transaction that happens, resource requirements
+            only grow as usage increases.";
+           "These resource requirements force most users to delegate trust to powerful \
+            third parties, \
+            making truly decentralized verification a thing of the past." ]
          ~img:(`Real "problem.png") ()
       ; comic
         ~title:"Coda"
         ~content:[
-          "Coda is a new cryptocurrency with constant, low resource requirements. Its so efficient it can even run in your browser."]
+          "In contrast, the resource requirments for verifying \
+           Coda are very low and don't increase with time."
+          ; "Coda is so efficient it can even run in your browser."]
         (*~img:(`Custom (div [Style.(render (of_class "flex"))]
             [ Image.draw ("/static/img/demo/your-hands.png") (`Fixed (350, 400))
             ]))*)
@@ -458,14 +471,17 @@ let demo () =
       ; comic
         ~title:"Coda"
         ~content:[
-          "Because resource requirements are constant, it will stay decentralized and in the hands of its users, even at scale. "]
+          "Because of its efficiency, \
+           Coda stays decentralized and in the hands of its users, even at scale."]
         ~img:(`Real "net-hand.png") ()
       ; comic
-        ~title:"Coda Protocol Demo"
+        ~title:"Coda State Explorer"
         ~content:
-[ "This demo is showing a *live, browser-verified* copy of the Coda protocol testnet."
+          [ "Below is the live state of the Coda protocol testnet.
+            Your browser is fully verifying the integrity state, and is essentially
+            acting as a full node."
 
-; "When released, Coda will put users back in control of cryptocurrency. Its our first step towards building computer systems that put users back in control of their digital lives." ]
+; "Coda puts its users back in control of their cryptocurrency. It's our first step towards building computer systems that put users back in control of their digital lives." ]
         ~img:`None 
         ()
       ]
@@ -477,7 +493,7 @@ let demo () =
     let open Html_concise in
     Section.section'
       ~heading_size:`Large
-      ~heading:"Live Demo"
+      ~heading:"State Explorer"
       (div [Style.(render (of_class "flex justify-center min-h7")); id "block-explorer"] [])
       scheme
   in
