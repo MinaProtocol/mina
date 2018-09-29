@@ -15,7 +15,7 @@ module App_stage = struct
   [@@deriving sexp]
 end
 
-let image_url s = "/static/img/demo/" ^ s
+let image_url s = "/static/img/testnet/" ^ s
 
 module Story = struct
   module Cell = struct

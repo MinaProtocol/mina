@@ -132,7 +132,7 @@ module Links = struct
 
   let jobs = ("Jobs", "jobs.html", "jobs")
 
-  let demo = ("Demo", "demo.html", "demo")
+  let testnet = ("Testnet", "testnet.html", "testnet")
 end
 
 module Input_button = struct
@@ -234,7 +234,7 @@ module Navbar = struct
           [class_ "flex justify-around w-75"]
           [ (let name, url, label = Links.blog in
              a' ~style:Visibility.no_mobile ~open_new_tab:true url [text name] label)
-          ; (let name, url, label = Links.demo in
+          ; (let name, url, label = Links.testnet in
              a' url [text name] label)
           ; a' ~style:Visibility.only_large "index.html#community"
               [text "Community"] "community"

@@ -418,7 +418,7 @@ let jobs () =
   let sections = [top] in
   wrap ~page_label:(Links.(label jobs)) ~fixed_footer:true sections
 
-let demo () =
+let testnet () =
   let comic ~title ~content ~img () =
     let image =
       match img with
@@ -426,7 +426,7 @@ let demo () =
       | `Placeholder -> Some (Image.placeholder 400 400)
       | `Custom elem -> Some elem
       | `Real s ->
-        Some (Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns w-100") ("/static/img/demo/" ^ s) `Free)
+        Some (Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns w-100") ("/static/img/testnet/" ^ s) `Free)
     in
     let important_text =
       Important_text.create ~title:(`Left title) ~content
@@ -465,7 +465,7 @@ let demo () =
            Coda are very low and don't increase with time."
           ; "Coda is so efficient it can even run in your browser."]
         (*~img:(`Custom (div [Style.(render (of_class "flex"))]
-            [ Image.draw ("/static/img/demo/your-hands.png") (`Fixed (350, 400))
+            [ Image.draw ("/static/img/testnet/your-hands.png") (`Fixed (350, 400))
             ]))*)
         ~img:(`Real "your-hands.png") ()
       ; comic
@@ -502,7 +502,7 @@ let demo () =
     ~headers:(
       [ Html.link ~href:"https://csshake.surge.sh/csshake.min.css"
       ])
-    ~fixed_footer:false ~page_label:(Links.(label demo)) sections
+    ~fixed_footer:false ~page_label:(Links.(label testnet)) sections
 
 let job_post name description =
   let content scheme =
@@ -530,7 +530,7 @@ let site () : Site.t Deferred.t =
     ( List.map position_files ~f:file
     @ [ file (File.of_html ~name:"index.html" home)
       ; file (File.of_html ~name:"jobs.html" (jobs ()))
-      ; file (File.of_html ~name:"demo.html" (demo ()))
+      ; file (File.of_html ~name:"testnet.html" (testnet ()))
       ; file (File.of_html ~name:"privacy.html" Privacy_policy.content)
       ; file (File.of_html ~name:"tos.html" Tos.content)
       ; file (File.of_path "static/favicon.ico")

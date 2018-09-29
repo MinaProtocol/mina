@@ -654,10 +654,6 @@ let merkle_tree num_layers_to_show =
     in
     rendered
 
-let images = "/web-demo-art/"
-
-let image_url s = images ^ s
-
 module Bottom_ctas = struct
   let a_style =
     Style.of_class "bg-ocean f4 darksnow no-underline ph3 br3 shadow-small2 dib hover-bg-darkocean"
