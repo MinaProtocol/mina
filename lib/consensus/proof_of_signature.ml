@@ -137,7 +137,7 @@ struct
     External_transition.Make (Ledger_builder_diff) (Protocol_state)
 
   let generate_transition ~previous_protocol_state ~blockchain_state
-      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ ~ledger:_ =
+      ~local_state:_ ~time:_ ~keypair:_ ~transactions:_ =
     let previous_consensus_state =
       Protocol_state.consensus_state previous_protocol_state
     in
@@ -192,7 +192,7 @@ struct
       Consensus_state.({length= l2; _}) ~logger:_ ~time_received:_ =
     if l1 >= l2 then `Keep else `Take
 
-  let lock_transition _ _ ~local_state:_ = ()
+  let lock_transition _ _ ~ledger:_ ~local_state:_ = ()
 
   let genesis_protocol_state =
     Protocol_state.create_value

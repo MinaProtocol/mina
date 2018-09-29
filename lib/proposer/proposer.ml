@@ -27,6 +27,7 @@ module Make (Inputs : Inputs_intf) :
    and type transaction := Inputs.Transaction.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
+   and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
@@ -107,13 +108,16 @@ struct
       Time.now time_controller |> Time.to_span_since_epoch |> Time.Span.to_ms
     in
     let%map protocol_state, consensus_transition_data =
-      Consensus_mechanism.generate_transition ~previous_protocol_state
-        ~blockchain_state ~consensus_local_state ~time ~keypair
+      Consensus_mechanism.generate_transition
+        ~previous_protocol_state
+        ~blockchain_state
+        ~local_state:consensus_local_state
+        ~time
+        ~keypair
         ~transactions:
           ( Ledger_builder_diff.With_valid_signatures_and_proofs.transactions
               diff
             :> Transaction.t list )
-        ~ledger:(Ledger_builder.ledger ledger_builder)
     in
     let snark_transition =
       Snark_transition.create_value

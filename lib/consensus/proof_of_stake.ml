@@ -877,7 +877,8 @@ struct
 
   (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
   let generate_transition ~(previous_protocol_state: Protocol_state.value)
-      ~blockchain_state ~local_state ~time ~keypair ~transactions:_ ~ledger_hash =
+      ~blockchain_state ~local_state ~time ~keypair ~transactions:_ =
+    let open Local_state in
     let open Consensus_state in
     let open Epoch_data in
     let open Signature_lib.Keypair in
@@ -890,7 +891,7 @@ struct
     let ledger =
       match local_state.last_epoch_ledger with
       | Some ledger -> ledger
-      | None        -> genesis_ledger
+      | None        -> Inputs.genesis_ledger
     in
     let%bind my_account_location =
       Coda_base.Ledger.location_of_key ledger
@@ -982,6 +983,8 @@ struct
     else `Keep
 
   let lock_transition prev next ~ledger ~local_state =
+    let open Local_state in
+    let open Consensus_state in
     (if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
       local_state.last_epoch_ledger <- local_state.curr_epoch_ledger;
       local_state.curr_epoch_ledger <- Some (Coda_base.Ledger.copy ledger)))

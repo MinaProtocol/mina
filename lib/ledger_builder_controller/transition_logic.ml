@@ -6,9 +6,53 @@ module type Inputs_intf = sig
     type t [@@deriving sexp, eq, compare]
   end
 
+  module Ledger_hash : sig
+    type t [@@deriving sexp, eq]
+  end
+
+  module Ledger_builder_hash : sig
+    type t [@@deriving eq, sexp, compare]
+  end
+
+  module Frozen_ledger_hash : sig
+    type t [@@deriving eq, bin_io, sexp, eq]
+  end
+
+  module Blockchain_state : sig
+    type value [@@deriving eq]
+
+    val ledger_hash : value -> Frozen_ledger_hash.t
+
+    val ledger_builder_hash : value -> Ledger_builder_hash.t
+  end
+
   module Consensus_mechanism : sig
+    module Local_state : sig
+      type t
+    end
+
     module Consensus_state : sig
       type value
+    end
+
+    module Protocol_state : sig
+      type value [@@deriving sexp]
+
+      val previous_state_hash : value -> State_hash.t
+
+      val blockchain_state : value -> Blockchain_state.value
+
+      val consensus_state : value -> Consensus_state.value
+
+      val equal_value : value -> value -> bool
+
+      val hash : value -> State_hash.t
+    end
+
+    module External_transition : sig
+      type t [@@deriving eq, sexp, compare, bin_io]
+
+      val protocol_state : t -> Protocol_state.value
     end
 
     val select :
@@ -19,71 +63,41 @@ module type Inputs_intf = sig
       -> [`Keep | `Take]
   end
 
-  module Protocol_state : sig
-    type value [@@deriving sexp]
-
-    val consensus_state : value -> Consensus_mechanism.Consensus_state.value
-
-    val equal_value : value -> value -> bool
-
-    val hash : value -> State_hash.t
-  end
-
-  module Ledger_hash : sig
-    type t [@@deriving sexp, eq]
-  end
-
-  module Frozen_ledger_hash : sig
-    type t [@@deriving sexp, eq]
-  end
-
-  module External_transition : sig
-    type t [@@deriving eq, sexp, compare, bin_io]
-
-    val target_state : t -> Protocol_state.value
-
-    val ledger_hash : t -> Frozen_ledger_hash.t
-
-    val is_parent_of :
-         child:(t, State_hash.t) With_hash.t
-      -> parent:(t, State_hash.t) With_hash.t
-      -> bool
-  end
-
   module Tip : sig
     type t [@@deriving sexp]
 
     type state_hash = State_hash.t
 
-    val state : t -> Protocol_state.value
+    val state : t -> Consensus_mechanism.Protocol_state.value
 
     val copy : t -> t
 
     val transition_unchecked :
          t
-      -> (External_transition.t, state_hash) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, state_hash) With_hash.t
       -> (t, state_hash) With_hash.t Deferred.t
 
     val is_parent_of :
-         child:(External_transition.t, state_hash) With_hash.t
+         child:(Consensus_mechanism.External_transition.t, state_hash) With_hash.t
       -> parent:(t, state_hash) With_hash.t
       -> bool
 
     val is_materialization_of :
          (t, state_hash) With_hash.t
-      -> (External_transition.t, state_hash) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, state_hash) With_hash.t
       -> bool
 
     val assert_materialization_of :
          (t, state_hash) With_hash.t
-      -> (External_transition.t, state_hash) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, state_hash) With_hash.t
       -> unit
   end
 
   module Transition_logic_state :
     Transition_logic_state.S
     with type tip := Tip.t
-     and type external_transition := External_transition.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type external_transition := Consensus_mechanism.External_transition.t
      and type state_hash := State_hash.t
 
   module Step : sig
@@ -91,7 +105,7 @@ module type Inputs_intf = sig
 
     val step :
          (Tip.t, State_hash.t) With_hash.t
-      -> (External_transition.t, State_hash.t) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
       -> (Tip.t, State_hash.t) With_hash.t Deferred.Or_error.t
   end
 
@@ -101,8 +115,8 @@ module type Inputs_intf = sig
     val sync :
          t
       -> Transition_logic_state.t
-      -> (External_transition.t, State_hash.t) With_hash.t
-      -> ( (External_transition.t, State_hash.t) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
+      -> ( (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
          , Transition_logic_state.Change.t list )
          Job.t
   end
@@ -151,15 +165,21 @@ end
 module Make (Inputs : Inputs_intf) :
   S
   with type catchup := Inputs.Catchup.t
-   and type transition := Inputs.External_transition.t
+   and type transition := Inputs.Consensus_mechanism.External_transition.t
    and type transition_logic_state := Inputs.Transition_logic_state.t
    and type handler_state_change := Inputs.Transition_logic_state.Change.t
    and type tip := Inputs.Tip.t
-   and type state := Inputs.Protocol_state.value
+   and type state := Inputs.Consensus_mechanism.Protocol_state.value
    and type state_hash := Inputs.State_hash.t =
 struct
   open Inputs
+  open Consensus_mechanism
   open Transition_logic_state
+
+  let transition_is_parent_of ~child:{With_hash.data= child; hash= _}
+      ~parent:{With_hash.hash= parent_state_hash; data= _} =
+    State_hash.equal parent_state_hash
+      (External_transition.protocol_state child |> Protocol_state.previous_state_hash)
 
   (* HACK: To prevent a DoS from healthy nodes trying to gossip the same
    * transition, there's an extra piece of mutable state here that we adjust
@@ -239,7 +259,7 @@ struct
         type t = (External_transition.t, State_hash.t) With_hash.t
         [@@deriving sexp]
 
-        let target = With_hash.map ~f:External_transition.target_state
+        let target = With_hash.map ~f:External_transition.protocol_state
       end)
 
   let create state parent_log : t =
@@ -278,7 +298,7 @@ struct
       let work =
         (* Adjust the locked_ledger if necessary *)
         let%bind locked_tip =
-          if External_transition.is_parent_of ~child:new_head ~parent:old_head
+          if transition_is_parent_of ~child:new_head ~parent:old_head
           then
             let locked_tip = With_hash.map locked_tip ~f:Tip.copy in
             transition_unchecked locked_tip.data new_head
@@ -347,7 +367,7 @@ struct
             Transition_tree.find_map ktree ~f:
               (fun ({With_hash.data= trans; hash= _} as trans_with_hash) ->
                 if p_trans trans_with_hash then
-                  Some (External_transition.target_state trans)
+                  Some (External_transition.protocol_state trans)
                 else None )
           in
           match maybe_state with
@@ -400,7 +420,7 @@ struct
                         last_transition ;
                       Ok
                         ( longest_branch_tip
-                        , External_transition.target_state
+                        , External_transition.protocol_state
                             (With_hash.data last_transition) ) )
           | None ->
               return
@@ -421,7 +441,7 @@ struct
     | None -> (
         let source_state = Tip.state (With_hash.data longest_branch_tip) in
         let target_state =
-          External_transition.target_state
+          External_transition.protocol_state
             (With_hash.data transition_with_hash)
         in
         if
@@ -451,8 +471,10 @@ struct
           | `Keep -> return ([], None)
           | `Take ->
               let lh =
-                External_transition.ledger_hash
-                  (With_hash.data transition_with_hash)
+                With_hash.data transition_with_hash
+                |> External_transition.protocol_state
+                |> Protocol_state.blockchain_state
+                |> Blockchain_state.ledger_hash
               in
               Logger.debug t.log
                 !"Branch catchup for transition: lh:%{sexp: \
@@ -463,17 +485,20 @@ struct
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition_with_hash ~parent:(fun x ->
-            External_transition.is_parent_of ~child:transition_with_hash
+            transition_is_parent_of ~child:transition_with_hash
               ~parent:x )
       with
       | `No_parent -> (
           let best_tip = locked_and_best old_tree |> snd in
           match
             Consensus_mechanism.select
-              ( transition_with_hash |> With_hash.data
-              |> External_transition.target_state
+              ( transition_with_hash
+              |> With_hash.data
+              |> External_transition.protocol_state
               |> Protocol_state.consensus_state )
-              ( best_tip |> With_hash.data |> External_transition.target_state
+              ( best_tip
+              |> With_hash.data
+              |> External_transition.protocol_state
               |> Protocol_state.consensus_state )
               ~logger:log ~time_received
           with
@@ -486,11 +511,6 @@ struct
       | `Added new_tree ->
           let old_locked_head, old_best_tip = locked_and_best old_tree in
           let new_head, new_tip = locked_and_best new_tree in
-          (* TODO: ask bkase if this is the correct place to put this *)
-          Consensus_mechanism.lock_transition
-            (old_head.data |> External_Transition.protocol_state |> Protocol_state.consensus_state)
-            (new_head.data |> External_Transition.protocol_state |> Protocol_state.consensus_state)
-            ~local_state:consensus_local_state
           if
             With_hash.compare External_transition.compare State_hash.compare
               old_locked_head new_head
