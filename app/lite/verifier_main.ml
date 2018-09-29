@@ -2,23 +2,24 @@ open Verifier
 open Core_kernel
 open Lite_base
 
-let state_and_instance_hash =
+let state_and_instance_hash ~wrap_vk =
   let salt (s: Hash_prefixes.t) =
     Pedersen.State.salt Lite_params.pedersen_params (s :> string)
   in
   let acc =
     Pedersen.State.update_fold
       (salt Hash_prefixes.transition_system_snark)
-      (Proof_system.Verification_key.fold Lite_params.wrap_vk)
+      (Proof_system.Verification_key.fold wrap_vk)
   in
   let hash_state s =
     Pedersen.digest_fold
       (salt Hash_prefixes.protocol_state)
       (Lite_base.Protocol_state.fold s)
   in
-  fun state ->
-    let state_hash = hash_state state in
-    (state_hash, Pedersen.digest_fold acc (Pedersen.Digest.fold state_hash))
+  stage (
+    fun state ->
+      let state_hash = hash_state state in
+      (state_hash, Pedersen.digest_fold acc (Pedersen.Digest.fold state_hash)))
 
 let wrap_pvk =
   Proof_system.Verification_key.Processed.create Lite_params.wrap_vk
@@ -26,7 +27,7 @@ let wrap_pvk =
 (* TODO: This changes when the curves get flipped *)
 let to_wrap_input instance_hash = Snarkette.Mnt6.Fq.to_bigint instance_hash
 
-let verify_chain pvk ({protocol_state; ledger; proof}: Lite_chain.t) =
+let verify_chain pvk state_and_instance_hash ({protocol_state; ledger; proof}: Lite_chain.t) =
   let check b lab = if b then Ok () else Or_error.error_string lab in
   let open Or_error.Let_syntax in
   let lb_ledger_hash =
@@ -46,7 +47,6 @@ let get_verification_key on_sucess on_error =
   let url = sprintf !"%s/client_verification_key" Web_response.s3_link in
   Web_response.get url
     (fun s ->
-      (* let s = String.slice s 0 (String.length s - 1) in *)
       let vk = Binable.of_string (module Proof_system.Verification_key) (B64.decode s) in
       on_sucess vk )
     on_error
@@ -57,7 +57,7 @@ let () =
       get_verification_key (fun vk ->
       let pvk = Proof_system.Verification_key.Processed.create vk in
       let ((chain, _) as query) = Query.of_string (Js.to_string message) in
-      let res = verify_chain pvk chain in
+      let res = verify_chain pvk (unstage (state_and_instance_hash ~wrap_vk:vk)) chain in
       Worker.post_message (Js.string (Response.to_string (query, res))) )
       (fun _ -> ())
   )
