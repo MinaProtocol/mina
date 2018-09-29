@@ -762,7 +762,7 @@ let state_html
   in
   let explanation =
     let heading_style =
-      Style.(of_class "silver tc mt0 mb4 f5 fw3")
+      Style.(of_class "silver tc mt0 mb4 f5 mw6 center fw3")
     in
     Node.h2 [Style.render heading_style] [Node.text "The properties below constitute the full, live Coda protocol state and are being fully verified in your browser. Explore the components to learn more." ]
   in
