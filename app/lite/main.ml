@@ -709,7 +709,7 @@ let state_html
         ()
   in
   let state_tooltip =
-    Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"The zk-SNARK proof validates the entire protocol state. For simplicities sake, this demo uses \"proof of signature\", where producing a valid snark for an updated protocol state requires a proof of identity. An open consensus mechanism will be used in the testnet when fully released. The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed." ()
+    Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"The zk-SNARK proof validates the entire protocol state. This demo uses \"proof of signature\", where producing a valid snark for an updated protocol state requires a proof of identity. An open consensus mechanism will be used in the testnet when released. The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed." ()
   in
   let age = Time.diff (Time.now ()) (Time.of_string timestamp) in
   let down_maintenance =
