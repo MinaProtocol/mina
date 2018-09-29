@@ -237,10 +237,13 @@ module Html = struct
 
 
   module Tooltip = struct
+
+    type text_part = [ `Text of string | `New_line | `Link of (string * string) ]
+
     type t =
       { active: bool
-      ; text: string list
-      ; alt_text: string list option
+      ; text: text_part list
+      ; alt_text: text_part list option
       ; arity: [`Left | `Right]
       }
 
@@ -255,7 +258,16 @@ module Html = struct
             ]
               
     let join_text text =
-      div [] (List.join (List.intersperse (List.map text ~f:(fun text -> [ Node.text text ])) ~sep:[ (Node.create "br" [] []); (Node.create "br" [] []) ]))
+      div [] (List.join (List.map text ~f:(fun text -> 
+          match text with
+          | `Text text -> [ Node.text text ]
+          | `New_line -> [ (Node.create "br" [] []); (Node.create "br" [] []) ]
+          | `Link (text, link) -> [ Node.a  
+                                      [ Attr.href link
+                                      ; Style.(render (of_class "silver"))
+                                      ; Attr.create "target" "_blank"] 
+                                      [ Node.text text ] ]
+          )))
 
     let render_overlay {active;text;arity=_;alt_text} =
       let text =
