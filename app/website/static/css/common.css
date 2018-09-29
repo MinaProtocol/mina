@@ -51,6 +51,7 @@
 .silver { color: #8492A6; }
 .darksnow { color: #EFF2F7; }
 .ocean { color: #4782a0; }
+.darkocean { color: #144f6d; }
 .grass { color: #76cd87; }
 .bluesilver { color: #526e80; }
 .sky { color: #96cbec; }
@@ -96,6 +97,7 @@
 
 .hover-link:hover { color:#1F2D3D; }
 .hover-bg-blacklike:hover { background-color: #1F2D3D; }
+.hover-bg-darkocean:hover { background-color: #144f6d; }
 .force-word-breaks { word-spacing: 100vw; }
 
 .user-select-none { user-select: none; }

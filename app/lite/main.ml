@@ -653,6 +653,38 @@ let images = "/web-demo-art/"
 
 let image_url s = images ^ s
 
+module Bottom_ctas = struct
+  let a_style =
+    Style.of_class "bg-ocean f4 darksnow no-underline ph3 br3 shadow-small2 dib hover-bg-darkocean"
+
+  let twitter =
+    let open Node in
+    let href = Attr.href "todo" in
+    let itag = Node.create "i" in
+    let bird =
+      itag [Style.just "pl1 ml-1 ml-2-ns fab f1 f2-m f1-l fa-twitter mr3 mr2-m mr3-l"] []
+    in
+    a [href; Style.(render (a_style + of_class "pv2"))]
+      [ div [Style.just "flex items-center"]
+      [ span [] [bird]
+      ; span [] [text "Share"]
+      ]
+      ]
+
+  let testnet_status =
+    let open Node in
+    let href = Attr.href "https://status.codaprotocol.com" in
+    a [href; Style.(render (a_style + of_class "pv3"))]
+      [text "Testnet Status"]
+
+  let create () =
+    let open Node in
+    div [Style.just "mt4 flex justify-around items-center"]
+      [ testnet_status
+      ; twitter
+      ]
+end
+
 let state_html
     state
      =
@@ -772,7 +804,7 @@ let state_html
     let br = Node.create "br" in
   Node.h2 [Style.render heading_style] [Node.text "The properties below constitute the full, live Coda protocol state and are being fully verified in your browser. Explore the components to learn more."; br [] []; br [] []; Mobile_switch.create ~not_small:(Node.text "Hover over any component below to learn more.") ~small:(Node.text "Tap any component below to learn more.") ]
   in
-  let contents = [ explanation ] @ down_maintenance @ [ state_explorer ] in
+  let contents = (explanation :: down_maintenance) @ ([state_explorer ; Bottom_ctas.create () ])  in
   let page_time = Time.diff (Time.now ()) start_time in
   if (state.chain = Lite_params.genesis_chain && Time.Span.(page_time < (Time.Span.of_sec 4.0)))
   then (div [Style.(render (of_class "animate-opacity o-0"))] contents)
