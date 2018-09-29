@@ -136,6 +136,27 @@ module Links = struct
 end
 
 module Input_button = struct
+  let hack_create_i'm_tired ~label ~button_hint ~extra_style ~url ~new_tab () =
+    let open Html in
+    let open Html_concise in
+    let button_node =
+      match button_hint with
+      | `Text button_hint -> text button_hint
+      | `Node n -> n
+    in
+    node "a"
+      ([ href url
+      ; Style.(
+          render
+            ( of_class
+                "user-select-none hover-bg-black white no-underline ttu \
+                 tracked bg-silver ph2 icon-shadow br4 tc lh-copy"
+            + extra_style ))
+      ; analytics_handler label
+      ] @ (if new_tab then [ Attribute.create "target" "_blank" ] else []))
+      [button_node]
+
+
   let create ~label ~button_hint ~extra_style ~url ~new_tab () =
     let open Html in
     let open Html_concise in
@@ -339,8 +360,8 @@ module Section = struct
                   ~small:
                     (div [] [])
                   ~not_small:
-                    (Input_button.create ~button_hint:(`Node (div [Style.just "flex items-center f3"] [span [] [twitter]; span [] [text button_hint]])) ~label
-                              ~url ~extra_style:(Style.of_class "progress-button follow-button pv2") ~new_tab ())
+                    (Input_button.hack_create_i'm_tired ~button_hint:(`Node (div [Style.just "flex items-center pv2 pr2 pl3 f3"] [span [] [twitter]; span [] [text button_hint]])) ~label
+                              ~url ~extra_style:(Style.of_class "progress-button pv2") ~new_tab ())
               else
                 a [Style.(render (of_class "next-button")); href (Printf.sprintf "#item-%d" (i+1))] [div [] [text "›"]]
           in
