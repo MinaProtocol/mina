@@ -167,7 +167,7 @@ struct
                          !"%d balance not yet updated %{sexp: \
                            Currency.Balance.t option option} %d"
                          i balance diff ;
-                       if diff >= 5 then (
+                       if diff >= 7 then (
                          Logger.fatal log "balance took too long to update" ;
                          ignore (exit 1) ) ;
                        return false ))
