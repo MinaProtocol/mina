@@ -478,7 +478,7 @@ let demo () =
         ~title:"Coda State Explorer"
         ~content:
           [ "Below is the live state of the Coda protocol testnet.
-            Your browser is fully verifying the integrity state, and is essentially
+            Your browser is fully verifying the state's integrity, and is essentially
             acting as a full node."
 
 ; "Coda puts its users back in control of their cryptocurrency. It's our first step towards building computer systems that put users back in control of their digital lives." ]
