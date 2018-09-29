@@ -81,7 +81,7 @@ let rest_server_port = 8080
 let url s = sprintf "http://localhost:%d/%s" rest_server_port s
 
 let get_account _pk on_sucess on_error =
-  let url = sprintf !"%s/sample_chain" Web_response.s3_link in
+  let url = sprintf !"%s/chain" Web_response.s3_link in
   (* IF serialization does not work, please try the following code:
   
   let url = sprintf !"%s/sample_chain" s3_link in
@@ -90,7 +90,6 @@ let get_account _pk on_sucess on_error =
    *)
   Web_response.get url
     (fun s ->
-      let s = String.slice s 0 (String.length s - 1) in
       let chain = Binable.of_string (module Lite_chain) (B64.decode s) in
       on_sucess chain )
     on_error
