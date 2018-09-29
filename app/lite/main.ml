@@ -627,7 +627,7 @@ let merkle_tree num_layers_to_show =
             | Spec.Account _ -> None )
       in
       let tooltip =
-        Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"To know the state of a particular account in Coda, a client needs the database merkle root from the protocol state, a merkle path, and the account properties. Because the database is a merkle root, this information is sufficient to determine the balance in an account. And because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data." ()
+        Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"Once a client has a protocol state and a proof for a protocol state, they can get the balance in an account with only a minimal amount of extra data due to the representation of the database as a merkle tree. To get the value in a particular account, a client needs the account properties and a merkle path from the database merkle root in the protocol state. Because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data." ()
       in
       hoverable state (
       Node.div [Style.just "flex items-center flex-column flex-row-ns justify-center"]
@@ -704,12 +704,12 @@ let state_html
   let _ = ledger in
   let snark_tooltip =
     Html.Tooltip.create ~active:(Tooltip_stage.(equal Proof state.State.tooltip_stage)) ~arity:`Left
-        ~text:"While other cryptocurrencies require downloading a gigagbytes-long, ever-growing blockchain, the Coda network incrementally a 1 kilobyte zk-SNARK proof, which serves in place of the blockchain as a cryptographic certificate of the account database's integrity. The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."
-        ~alt_text:"The Coda network incrementally produces zk-SNARK proofs which server as certifications of the database. Coda doesn't need the full history. This is equivalent to downloading the entire blockchain in other cryptocurrencies"
+        ~text:"The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. This takes the place of the gigabytes long, ever-growing blockchain used for validation in previous cryptocurrencies. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."
+        ~alt_text:"The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client on your device."
         ()
   in
   let state_tooltip =
-    Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"Coda's protocol state is composed of the consensus state and the database state. Our test network is currently using \"proof of signature\", where producing a valid snark for an updated protocol state requires a priveleged private key (Coda will use a fully open consensus protocol in later versions of the testnet). The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed." ()
+    Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"The zk-SNARK proof validates the entire protocol state. For simplicities sake, this demo uses \"proof of signature\", where producing a valid snark for an updated protocol state requires a proof of identity. An open consensus mechanism will be used in the testnet when fully released. The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed." ()
   in
   let age = Time.diff (Time.now ()) (Time.of_string timestamp) in
   let down_maintenance =
