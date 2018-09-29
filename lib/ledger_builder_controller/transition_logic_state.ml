@@ -102,7 +102,8 @@ module Make (Inputs : Inputs_intf) :
   S
   with type tip := Inputs.Tip.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
-   and type external_transition := Inputs.Consensus_mechanism.External_transition.t
+   and type external_transition :=
+              Inputs.Consensus_mechanism.External_transition.t
    and type state_hash := Inputs.Tip.state_hash =
 struct
   open Inputs
@@ -152,8 +153,7 @@ struct
   let apply t = function
     | Locked_tip locked_tip ->
         let consensus_state_of_tip tip =
-          Tip.protocol_state tip
-          |> Protocol_state.consensus_state
+          Tip.protocol_state tip |> Protocol_state.consensus_state
         in
         let old_tip = t.locked_tip.data in
         let new_tip = locked_tip.data in
@@ -161,7 +161,7 @@ struct
           (consensus_state_of_tip old_tip)
           (consensus_state_of_tip new_tip)
           ~ledger:(Ledger_builder.ledger @@ Tip.ledger_builder new_tip)
-          ~local_state:t.consensus_local_state;
+          ~local_state:t.consensus_local_state ;
         {t with locked_tip}
     | Longest_branch_tip h -> {t with longest_branch_tip= h}
     | Ktree k -> {t with ktree= Some k}
@@ -185,8 +185,7 @@ struct
   let apply_all t changes =
     assert_state_valid t ;
     let t' = List.fold changes ~init:t ~f:apply in
-    assert_state_valid t' ;
-    t'
+    assert_state_valid t' ; t'
 
   let create ~consensus_local_state genesis_heavy =
     { locked_tip= genesis_heavy

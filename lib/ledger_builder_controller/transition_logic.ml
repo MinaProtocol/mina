@@ -78,7 +78,9 @@ module type Inputs_intf = sig
       -> (t, state_hash) With_hash.t Deferred.t
 
     val is_parent_of :
-         child:(Consensus_mechanism.External_transition.t, state_hash) With_hash.t
+         child:( Consensus_mechanism.External_transition.t
+               , state_hash )
+               With_hash.t
       -> parent:(t, state_hash) With_hash.t
       -> bool
 
@@ -179,7 +181,8 @@ struct
   let transition_is_parent_of ~child:{With_hash.data= child; hash= _}
       ~parent:{With_hash.hash= parent_state_hash; data= _} =
     State_hash.equal parent_state_hash
-      (External_transition.protocol_state child |> Protocol_state.previous_state_hash)
+      ( External_transition.protocol_state child
+      |> Protocol_state.previous_state_hash )
 
   (* HACK: To prevent a DoS from healthy nodes trying to gossip the same
    * transition, there's an extra piece of mutable state here that we adjust
@@ -298,8 +301,7 @@ struct
       let work =
         (* Adjust the locked_ledger if necessary *)
         let%bind locked_tip =
-          if transition_is_parent_of ~child:new_head ~parent:old_head
-          then
+          if transition_is_parent_of ~child:new_head ~parent:old_head then
             let locked_tip = With_hash.map locked_tip ~f:Tip.copy in
             transition_unchecked locked_tip.data new_head
           else return locked_tip
@@ -485,20 +487,16 @@ struct
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition_with_hash ~parent:(fun x ->
-            transition_is_parent_of ~child:transition_with_hash
-              ~parent:x )
+            transition_is_parent_of ~child:transition_with_hash ~parent:x )
       with
       | `No_parent -> (
           let best_tip = locked_and_best old_tree |> snd in
           match
             Consensus_mechanism.select
-              ( transition_with_hash
-              |> With_hash.data
+              ( transition_with_hash |> With_hash.data
               |> External_transition.protocol_state
               |> Protocol_state.consensus_state )
-              ( best_tip
-              |> With_hash.data
-              |> External_transition.protocol_state
+              ( best_tip |> With_hash.data |> External_transition.protocol_state
               |> Protocol_state.consensus_state )
               ~logger:log ~time_received
           with

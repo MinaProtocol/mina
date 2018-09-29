@@ -190,13 +190,16 @@ module type Inputs_intf = sig
              and type ledger_builder_hash := Ledger_builder_hash.t
              and type ledger_builder_aux := Ledger_builder.Aux.t
              and type ledger_hash := Ledger_hash.t
-             and type protocol_state := Consensus_mechanism.Protocol_state.value
+             and type protocol_state :=
+                        Consensus_mechanism.Protocol_state.value
   end
 
   module Store : Storage.With_checksum_intf with type location = string
 
   val verify_blockchain :
-    Protocol_state_proof.t -> Consensus_mechanism.Protocol_state.value -> bool Deferred.Or_error.t
+       Protocol_state_proof.t
+    -> Consensus_mechanism.Protocol_state.value
+    -> bool Deferred.Or_error.t
 end
 
 module Make (Inputs : Inputs_intf) : sig
@@ -207,12 +210,15 @@ module Make (Inputs : Inputs_intf) : sig
            and type ledger := Inputs.Ledger.t
            and type ledger_proof := Inputs.Ledger_builder.proof
            and type net := Inputs.Net.net
-           and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
+           and type protocol_state :=
+                      Inputs.Consensus_mechanism.Protocol_state.value
            and type ledger_hash := Inputs.Ledger_hash.t
            and type sync_query := Inputs.Sync_ledger.query
            and type sync_answer := Inputs.Sync_ledger.answer
-           and type external_transition := Inputs.Consensus_mechanism.External_transition.t
-           and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
+           and type external_transition :=
+                      Inputs.Consensus_mechanism.External_transition.t
+           and type consensus_local_state :=
+                      Inputs.Consensus_mechanism.Local_state.t
            and type tip := Inputs.Tip.t
 
   val ledger_builder_io : t -> Inputs.Net.t
@@ -304,7 +310,10 @@ end = struct
                  materialized ledger_builder's hash for transition: %{sexp: \
                  External_transition.t}"
                transition)
-          ~expect:(External_transition.protocol_state transition |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash)
+          ~expect:
+            ( External_transition.protocol_state transition
+            |> Protocol_state.blockchain_state
+            |> Blockchain_state.ledger_builder_hash )
           (Ledger_builder.hash t.ledger_builder)
 
       let transition_unchecked t
@@ -338,7 +347,8 @@ end = struct
       let is_parent_of ~child:{With_hash.data= child; hash= _}
           ~parent:{With_hash.data= _; hash= parent_hash} =
         State_hash.equal parent_hash
-          (External_transition.protocol_state child |> Protocol_state.previous_state_hash)
+          ( External_transition.protocol_state child
+          |> Protocol_state.previous_state_hash )
 
       let is_materialization_of {With_hash.data= _; hash= tip_hash}
           {With_hash.data= _; hash= transition_hash} =
@@ -353,6 +363,7 @@ end = struct
       module External_transition = External_transition
       module Tip = Tip
     end)
+
     module Ledger_hash = Ledger_hash
 
     module Catchup = Catchup.Make (struct
@@ -473,11 +484,9 @@ end = struct
     don't_wait_for
       (Linear_pipe.iter mutate_state_reader ~f:(fun (changes, transition) ->
            let old_state = Transition_logic.state t.handler in
-
            (* TODO: We can make change-resolving more intelligent if different
             * concurrent processes took different times to finish. Since we
             * serialize to one job at a time this shouldn't happen anyway though *)
-
            let new_state =
              Transition_logic_state.apply_all old_state changes
            in
@@ -506,7 +515,8 @@ end = struct
         config.external_transitions ~f:(fun (transition, time_received) ->
           let transition_with_hash =
             With_hash.of_data transition ~hash_data:(fun t ->
-                t |> External_transition.protocol_state |> Protocol_state.hash )
+                t |> External_transition.protocol_state |> Protocol_state.hash
+            )
           in
           let%bind changes, job =
             Transition_logic.on_new_transition catchup t.handler
@@ -597,7 +607,9 @@ end = struct
           hash )
       ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
         Ledger_builder_hash.equal
-          (trans |> External_transition.protocol_state |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash)
+          ( trans |> External_transition.protocol_state
+          |> Protocol_state.blockchain_state
+          |> Blockchain_state.ledger_builder_hash )
           hash )
       ~f_result:(fun {With_hash.data= tip; hash= _} -> tip.Tip.ledger_builder)
 
@@ -620,8 +632,7 @@ end = struct
             hash )
         ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
           Ledger_hash.equal
-            ( trans
-            |> External_transition.protocol_state
+            ( trans |> External_transition.protocol_state
             |> Protocol_state.blockchain_state
             |> Blockchain_state.ledger_builder_hash
             |> Ledger_builder_hash.ledger_hash )
@@ -774,8 +785,12 @@ let%test_module "test" =
           [@@deriving bin_io, sexp, fields]
 
           let of_transition_and_lb transition ledger_builder =
-            { protocol_state= Consensus_mechanism.External_transition.protocol_state transition
-            ; proof= Consensus_mechanism.External_transition.protocol_state_proof transition
+            { protocol_state=
+                Consensus_mechanism.External_transition.protocol_state
+                  transition
+            ; proof=
+                Consensus_mechanism.External_transition.protocol_state_proof
+                  transition
             ; ledger_builder }
         end
 
@@ -789,7 +804,8 @@ let%test_module "test" =
           let create states =
             let tbl = State_hash.Table.create () in
             List.iter states ~f:(fun s ->
-                State_hash.Table.add_exn tbl ~key:(Consensus_mechanism.Protocol_state.hash s)
+                State_hash.Table.add_exn tbl
+                  ~key:(Consensus_mechanism.Protocol_state.hash s)
                   ~data:s ) ;
             tbl
 

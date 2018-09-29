@@ -608,9 +608,7 @@ module Make (Inputs : Inputs_intf) = struct
         )
         |> don't_wait_for ;
         let proposer =
-          Proposer.create
-            ~parent_log:config.log
-            ~change_feeder:tips_r
+          Proposer.create ~parent_log:config.log ~change_feeder:tips_r
             ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
             ~time_controller:config.time_controller ~keypair:config.keypair
             ~consensus_local_state

@@ -112,8 +112,7 @@ struct
       ; mutable curr_epoch_ledger: Coda_base.Ledger.t option }
     [@@deriving sexp]
 
-    let create () =
-      {last_epoch_ledger= None; curr_epoch_ledger= None}
+    let create () = {last_epoch_ledger= None; curr_epoch_ledger= None}
   end
 
   module Epoch = struct
@@ -801,8 +800,7 @@ struct
       Epoch.slot_start_time curr_epoch curr_slot < time
       && Epoch.slot_end_time curr_epoch curr_slot >= time
 
-    let update
-        ~(previous_consensus_state: value)
+    let update ~(previous_consensus_state: value)
         ~(consensus_transition_data: Consensus_transition_data.value)
         ~(previous_protocol_state_hash: Coda_base.State_hash.t)
         ~(ledger_hash: Coda_base.Frozen_ledger_hash.t) : value Or_error.t =
@@ -891,7 +889,7 @@ struct
     let ledger =
       match local_state.last_epoch_ledger with
       | Some ledger -> ledger
-      | None        -> Inputs.genesis_ledger
+      | None -> Inputs.genesis_ledger
     in
     let%bind my_account_location =
       Coda_base.Ledger.location_of_key ledger
@@ -929,11 +927,13 @@ struct
     in
     let consensus_state =
       Or_error.ok_exn
-        (Consensus_state.update
-          ~previous_consensus_state
-          ~consensus_transition_data
-          ~previous_protocol_state_hash:(Protocol_state.hash previous_protocol_state)
-          ~ledger_hash:(Coda_base.Ledger.merkle_root ledger |> Coda_base.Frozen_ledger_hash.of_ledger_hash))
+        (Consensus_state.update ~previous_consensus_state
+           ~consensus_transition_data
+           ~previous_protocol_state_hash:
+             (Protocol_state.hash previous_protocol_state)
+           ~ledger_hash:
+             ( Coda_base.Ledger.merkle_root ledger
+             |> Coda_base.Frozen_ledger_hash.of_ledger_hash ))
     in
     let protocol_state =
       Protocol_state.create_value
@@ -985,16 +985,17 @@ struct
   let lock_transition prev next ~ledger ~local_state =
     let open Local_state in
     let open Consensus_state in
-    (if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
-      local_state.last_epoch_ledger <- local_state.curr_epoch_ledger;
-      local_state.curr_epoch_ledger <- Some (Coda_base.Ledger.copy ledger)))
+    if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
+      local_state.last_epoch_ledger <- local_state.curr_epoch_ledger ;
+      local_state.curr_epoch_ledger <- Some (Coda_base.Ledger.copy ledger) )
 
   (* TODO: determine correct definition of genesis state *)
   let genesis_protocol_state =
     let consensus_state =
       Or_error.ok_exn
         (Consensus_state.update
-           ~previous_consensus_state:Protocol_state.(consensus_state negative_one)
+           ~previous_consensus_state:
+             Protocol_state.(consensus_state negative_one)
            ~previous_protocol_state_hash:Protocol_state.(hash negative_one)
            ~consensus_transition_data:Snark_transition.(consensus_data genesis)
            ~ledger_hash:genesis_ledger_hash)

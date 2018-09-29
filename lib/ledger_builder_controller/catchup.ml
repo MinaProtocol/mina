@@ -85,9 +85,11 @@ module type Inputs_intf = sig
   module Tip : sig
     include Protocols.Coda_pow.Tip_intf
             with type ledger_builder := Ledger_builder.t
-             and type protocol_state := Consensus_mechanism.Protocol_state.value
+             and type protocol_state :=
+                        Consensus_mechanism.Protocol_state.value
              and type protocol_state_proof := Protocol_state_proof.t
-             and type external_transition := Consensus_mechanism.External_transition.t
+             and type external_transition :=
+                        Consensus_mechanism.External_transition.t
 
     type state_hash
 
@@ -134,7 +136,8 @@ module type Inputs_intf = sig
              and type ledger_builder_hash := Ledger_builder_hash.t
              and type ledger_builder_aux := Ledger_builder.Aux.t
              and type ledger_hash := Ledger_hash.t
-             and type protocol_state := Consensus_mechanism.Protocol_state.value
+             and type protocol_state :=
+                        Consensus_mechanism.Protocol_state.value
   end
 end
 
@@ -144,13 +147,11 @@ module Make (Inputs : Inputs_intf) = struct
 
   let ledger_hash_of_transition t =
     External_transition.protocol_state t
-    |> Protocol_state.blockchain_state
-    |> Blockchain_state.ledger_hash
+    |> Protocol_state.blockchain_state |> Blockchain_state.ledger_hash
 
   let ledger_builder_hash_of_transition t =
     External_transition.protocol_state t
-    |> Protocol_state.blockchain_state
-    |> Blockchain_state.ledger_builder_hash
+    |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash
 
   type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
 
@@ -167,7 +168,10 @@ module Make (Inputs : Inputs_intf) = struct
       transition_with_hash
     in
     let snarked_ledger_hash = ledger_hash_of_transition transition in
-    let h = Ledger_builder_hash.ledger_hash (ledger_builder_hash_of_transition transition) in
+    let h =
+      Ledger_builder_hash.ledger_hash
+        (ledger_builder_hash_of_transition transition)
+    in
     (* Lazily recreate the sync_ledger if necessary *)
     let sl : Sync_ledger.t =
       match !sl_ref with
