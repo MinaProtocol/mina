@@ -176,25 +176,28 @@ module type Init_intf = sig
 
   include Kernel_intf
 
-  val prover : Prover.t
+  val proposer_prover : [`Proposer of Prover.t | `Non_proposer]
 
   val verifier : Verifier.t
 
   val genesis_proof : Proof.t
 end
 
-let make_init (type ledger_proof) (module Config : Config_intf) (module Kernel
-    : Kernel_intf with type Ledger_proof.t = ledger_proof) :
+let make_init ~should_propose (type ledger_proof) (module Config : Config_intf)
+    (module Kernel : Kernel_intf with type Ledger_proof.t = ledger_proof) :
     (module Init_intf with type Ledger_proof.t = ledger_proof) Deferred.t =
   let open Config in
   let open Kernel in
-  let%bind prover = Prover.create ~conf_dir in
+  let%bind proposer_prover =
+    if should_propose then Prover.create ~conf_dir >>| fun p -> `Proposer p
+    else return `Non_proposer
+  in
   let%map verifier = Verifier.create ~conf_dir in
   let module Init = struct
     include Kernel
     include Config
 
-    let prover = prover
+    let proposer_prover = proposer_prover
 
     let verifier = verifier
   end in
@@ -403,7 +406,7 @@ module Make_inputs
     (Init : Init_intf)
     (Ledger_proof_verifier : Ledger_proof_verifier_intf
                              with type ledger_proof := Init.Ledger_proof.t)
-    (Store : Storage.With_checksum_intf)
+    (Store : Storage.With_checksum_intf with type location = string)
     () =
 struct
   open Init
@@ -650,13 +653,16 @@ struct
     module Prover = struct
       let prove ~prev_state ~prev_state_proof ~next_state
           (transition: Init.Consensus_mechanism.Internal_transition.t) =
-        let open Deferred.Or_error.Let_syntax in
-        Init.Prover.extend_blockchain Init.prover
-          (Init.Blockchain.create ~proof:prev_state_proof ~state:prev_state)
-          next_state
-          (Init.Consensus_mechanism.Internal_transition.snark_transition
-             transition)
-        >>| fun {Init.Blockchain.proof; _} -> proof
+        match Init.proposer_prover with
+        | `Non_proposer -> failwith "prove: Coda not run as proposer"
+        | `Proposer prover ->
+            let open Deferred.Or_error.Let_syntax in
+            Init.Prover.extend_blockchain prover
+              (Init.Blockchain.create ~proof:prev_state_proof ~state:prev_state)
+              next_state
+              (Init.Consensus_mechanism.Internal_transition.snark_transition
+                 transition)
+            >>| fun {Init.Blockchain.proof; _} -> proof
     end
 
     module Proposal_interval = struct
@@ -665,15 +671,12 @@ struct
   end)
 
   let request_work ~best_ledger_builder
-      ~(seen_jobs:
-         'a -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option)
-      ~(set_seen_jobs:
-            'a
-         -> Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
-         -> unit) (t: 'a) =
+      ~(seen_jobs: 'a -> Ledger_builder.Coordinator.State.t)
+      ~(set_seen_jobs: 'a -> Ledger_builder.Coordinator.State.t -> unit)
+      (t: 'a) =
     let lb = best_ledger_builder t in
     let maybe_instances, seen_jobs =
-      Ledger_builder.random_work_spec_chunk lb (seen_jobs t)
+      Ledger_builder.Coordinator.random_work_spec_chunk lb (seen_jobs t)
     in
     set_seen_jobs t seen_jobs ;
     Option.map maybe_instances ~f:(fun instances ->
@@ -681,7 +684,7 @@ struct
 end
 
 module Coda_with_snark
-    (Store : Storage.With_checksum_intf)
+    (Store : Storage.With_checksum_intf with type location = string)
     (Init : Init_intf with type Ledger_proof.t = Transaction_snark.t)
     () =
 struct
@@ -779,6 +782,13 @@ module type Main_intf = sig
       val merkle_root : t -> Coda_base.Ledger_hash.t
 
       val to_list : t -> Account.t list
+
+      val fold_until :
+           t
+        -> init:'accum
+        -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
+        -> finish:('accum -> 'stop)
+        -> 'stop
     end
 
     module Ledger_builder_diff : sig
@@ -844,6 +854,20 @@ module type Main_intf = sig
 
       val add : t -> Transaction.t -> unit Deferred.t
     end
+
+    module Protocol_state_proof : sig
+      type t
+    end
+
+    module Ledger_builder_hash : sig
+      type t [@@deriving sexp]
+    end
+
+    module Ledger_builder : sig
+      type t
+
+      val hash : t -> Ledger_builder_hash.t
+    end
   end
 
   module Consensus_mechanism : Consensus.Mechanism.S
@@ -879,7 +903,15 @@ module type Main_intf = sig
 
   val request_work : t -> Inputs.Snark_worker.Work.Spec.t option
 
+  val best_ledger_builder : t -> Inputs.Ledger_builder.t
+
   val best_ledger : t -> Inputs.Ledger.t
+
+  val best_tip :
+       t
+    -> Inputs.Ledger.t
+       * Inputs.Consensus_mechanism.Protocol_state.value
+       * Inputs.Protocol_state_proof.t
 
   val best_protocol_state :
     t -> Inputs.Consensus_mechanism.Protocol_state.value
@@ -904,6 +936,8 @@ module type Main_intf = sig
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
+
+  val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
 end
 
 module Run (Config_in : Config_intf) (Program : Main_intf) = struct
@@ -921,11 +955,20 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let%map account = Ledger.get ledger location in
     account.Account.balance
 
-  let get_public_keys t =
+  let get_accounts t =
     let ledger = best_ledger t in
     Ledger.to_list ledger
-    |> List.map
-         ~f:(Fn.compose Public_key.Compressed.to_base64 Account.public_key)
+
+  let string_of_public_key =
+    Fn.compose Public_key.Compressed.to_base64 Account.public_key
+
+  let get_public_keys t = get_accounts t |> List.map ~f:string_of_public_key
+
+  let get_keys_with_balances t =
+    get_accounts t
+    |> List.map ~f:(fun account ->
+           ( Account.balance account |> Currency.Balance.to_int
+           , string_of_public_key account ) )
 
   let is_valid_transaction t (txn: Transaction.t) =
     let remainder =
@@ -939,16 +982,24 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
   (** For status *)
   let txn_count = ref 0
 
-  let send_txn log t txn =
+  let schedule_transaction log t txn =
     let open Deferred.Let_syntax in
-    assert (is_valid_transaction t txn) ;
+    if not (is_valid_transaction t txn) then (
+      Core.Printf.eprintf "Invalid transaction: account balance is too low" ;
+      Core.exit 1 ) ;
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
       !"Added transaction %{sexp: Transaction.t} to pool successfully"
       txn ;
-    txn_count := !txn_count + 1 ;
+    txn_count := !txn_count + 1
+
+  let send_txn log t txn =
+    schedule_transaction log t txn ;
     Deferred.unit
+
+  let schedule_transactions log t txns =
+    List.iter txns ~f:(schedule_transaction log t)
 
   let get_nonce t (addr: Public_key.Compressed.t) =
     let open Option.Let_syntax in
@@ -982,6 +1033,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; block_count= Int.of_string (Length.to_string block_count)
     ; uptime_secs
     ; ledger_merkle_root
+    ; ledger_builder_hash=
+        best_ledger_builder t |> Ledger_builder.hash
+        |> Ledger_builder_hash.sexp_of_t |> Sexp.to_string
     ; state_hash
     ; external_transition_latency=
         Perf_histograms.report ~name:"external_transition_latency"
@@ -1031,36 +1085,46 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
         let proof = Lite_compat.proof proof in
         {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-  let setup_local_server ?rest_server_port ~coda ~log ~client_port () =
+  let clear_hist_status t = Perf_histograms.wipe () ; get_status t
+
+  let setup_local_server ?(client_whitelist= []) ?rest_server_port ~coda ~log
+      ~client_port () =
+    let client_whitelist =
+      Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
+    in
     let log = Logger.child log "client" in
     (* Setup RPC server for client interactions *)
     let client_impls =
-      [ Rpc.Rpc.implement Client_lib.Send_transaction.rpc (fun () ->
-            send_txn log coda )
+      [ Rpc.Rpc.implement Client_lib.Send_transactions.rpc (fun () ts ->
+            schedule_transactions log coda ts ;
+            Deferred.unit )
       ; Rpc.Rpc.implement Client_lib.Get_balance.rpc (fun () pk ->
             return (get_balance coda pk) )
+      ; Rpc.Rpc.implement Client_lib.Get_public_keys_with_balances.rpc
+          (fun () () -> return (get_keys_with_balances coda) )
       ; Rpc.Rpc.implement Client_lib.Get_public_keys.rpc (fun () () ->
             return (get_public_keys coda) )
       ; Rpc.Rpc.implement Client_lib.Get_nonce.rpc (fun () pk ->
             return (get_nonce coda pk) )
       ; Rpc.Rpc.implement Client_lib.Get_status.rpc (fun () () ->
-            return (get_status coda) ) ]
+            return (get_status coda) )
+      ; Rpc.Rpc.implement Client_lib.Clear_hist_status.rpc (fun () () ->
+            return (clear_hist_status coda) )
+      ; Rpc.Rpc.implement Client_lib.Get_ledger.rpc (fun () lh ->
+            get_ledger coda lh ) ]
     in
     let snark_worker_impls =
-      let solved_work_reader, solved_work_writer = Linear_pipe.create () in
-      Linear_pipe.write_without_pushback solved_work_writer () ;
       [ Rpc.Rpc.implement Snark_worker.Rpcs.Get_work.rpc (fun () () ->
-            match%map Linear_pipe.read solved_work_reader with
-            | `Ok () ->
-                let r = request_work coda in
-                ( match r with
-                | None ->
-                    Linear_pipe.write_without_pushback solved_work_writer ()
-                | Some _ -> () ) ;
-                r
-            | `Eof -> assert false )
+            let r = request_work coda in
+            Option.iter r ~f:(fun r ->
+                Logger.info log !"Get_work: %{sexp:Snark_worker.Work.Spec.t}" r
+            ) ;
+            return r )
       ; Rpc.Rpc.implement Snark_worker.Rpcs.Submit_work.rpc
           (fun () (work: Snark_worker.Work.Result.t) ->
+            Logger.info log
+              !"Submit_work: %{sexp:Snark_worker.Work.Spec.t}"
+              work.spec ;
             List.iter work.metrics ~f:(fun (total, tag) ->
                 match tag with
                 | `Merge ->
@@ -1069,10 +1133,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 | `Transition ->
                     Perf_histograms.add_span
                       ~name:"snark_worker_transition_time" total ) ;
-            let%map () =
-              Snark_pool.add_completed_work (snark_pool coda) work
-            in
-            Linear_pipe.write_without_pushback solved_work_writer () ) ]
+            Snark_pool.add_completed_work (snark_pool coda) work ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
         let merkle_path_pk = List.last_exn Genesis_ledger.pks in
@@ -1117,7 +1178,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                       |> Yojson.Safe.pretty_to_string )
                 | _ -> route_not_found () )) ) ;
     let where_to_listen =
-      Tcp.Where_to_listen.bind_to Localhost (On_port client_port)
+      Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
     in
     ignore
       (Tcp.Server.create
@@ -1126,17 +1187,25 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
              (fun net exn -> Logger.error log "%s" (Exn.to_string_mach exn)))
          where_to_listen
          (fun address reader writer ->
-           Rpc.Connection.server_with_close reader writer
-             ~implementations:
-               (Rpc.Implementations.create_exn
-                  ~implementations:(client_impls @ snark_worker_impls)
-                  ~on_unknown_rpc:`Raise)
-             ~connection_state:(fun _ -> ())
-             ~on_handshake_error:
-               (`Call
-                 (fun exn ->
-                   Logger.error log "%s" (Exn.to_string_mach exn) ;
-                   Deferred.unit )) ))
+           let address = Socket.Address.Inet.addr address in
+           if not (Set.mem client_whitelist address) then (
+             Logger.error log
+               !"Rejecting client connection from \
+                 %{sexp:Unix.Inet_addr.Blocking_sexp.t}"
+               address ;
+             Deferred.unit )
+           else
+             Rpc.Connection.server_with_close reader writer
+               ~implementations:
+                 (Rpc.Implementations.create_exn
+                    ~implementations:(client_impls @ snark_worker_impls)
+                    ~on_unknown_rpc:`Raise)
+               ~connection_state:(fun _ -> ())
+               ~on_handshake_error:
+                 (`Call
+                   (fun exn ->
+                     Logger.error log "%s" (Exn.to_string_mach exn) ;
+                     Deferred.unit )) ))
 
   let create_snark_worker ~log ~public_key ~client_port ~shutdown_on_disconnect =
     let open Snark_worker_lib in
@@ -1145,7 +1214,9 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
       Process.create_exn () ~prog:our_binary
         ~args:
           ( "internal" :: Program.snark_worker_command_name
-          :: Snark_worker.arguments ~public_key ~daemon_port:client_port
+          :: Snark_worker.arguments ~public_key
+               ~daemon_address:
+                 (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect )
     in
     let log = Logger.child log "snark_worker" in

@@ -51,7 +51,7 @@ let pks = fst @@ List.unzip extra_accounts
 
 let init_balance = 1000
 
-let initial_high_balance = Currency.Balance.of_int 10_000
+let initial_high_balance = Currency.Balance.of_int 10_000_000
 
 let initial_low_balance = Currency.Balance.of_int 100
 
@@ -73,11 +73,6 @@ let ledger =
   let create_account pk account =
     Ledger.create_new_account_exn ledger pk account
   in
-  create_account high_balance_pk
-    { Account.public_key= high_balance_pk
-    ; balance= initial_high_balance
-    ; receipt_chain_hash= Receipt.Chain_hash.empty
-    ; nonce= Account.Nonce.zero } ;
   create_account low_balance_pk
     { Account.public_key= low_balance_pk
     ; balance= initial_low_balance
@@ -89,4 +84,9 @@ let ledger =
         ; balance= Currency.Balance.of_int init_balance
         ; receipt_chain_hash= Receipt.Chain_hash.empty
         ; nonce= Account.Nonce.zero } ) ;
+  create_account high_balance_pk
+    { Account.public_key= high_balance_pk
+    ; balance= initial_high_balance
+    ; receipt_chain_hash= Receipt.Chain_hash.empty
+    ; nonce= Account.Nonce.zero } ;
   ledger

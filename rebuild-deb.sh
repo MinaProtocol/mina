@@ -20,7 +20,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libssl1.1, libprocps6, libgmp10, libffi6
+Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
 Maintainer: O1Labs <build@o1labs.org>
 Description: Coda Client
  Coda Protocol Client
@@ -30,6 +30,12 @@ mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/cli.exe ${BUILDDIR}/usr/local/bin/cli
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 cp .././app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
+
+# verification keys
+if [ -d "/tmp/cli_cache_dir" ]; then
+    mkdir -p ${BUILDDIR}/var/lib/coda
+    cp /tmp/cli_cache_dir/*_verification ${BUILDDIR}/var/lib/coda
+fi
 
 # Ugly hack #1 to patch elf interpreter to get past nix-build
 if [ ! -f /usr/bin/patchelf ]; then

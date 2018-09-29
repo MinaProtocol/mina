@@ -40,6 +40,13 @@ If developing on a VM, now is a good time to take a snapshot and save your state
 * Pull down dev container  (~7GB download, go stretch your legs)\
 `make docker` 
 
+## Building outside docker
+
+You can see the dockerfiles for the opam deps we need. You can also
+do `opam switch import opam.export`. You'll also need to
+
+`opam pin add external/ocaml-sodium`
+
 ## First code build
 
 * Change your shell path to include our scripts directory.\

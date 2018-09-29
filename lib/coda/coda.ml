@@ -408,8 +408,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Ledger_builder.t * Consensus_mechanism.External_transition.t)
         Linear_pipe.Reader.t
     ; log: Logger.t
-    ; mutable seen_jobs:
-        Ledger_proof_statement.Set.t * Ledger_proof_statement.t option
+    ; mutable seen_jobs: Ledger_builder.Coordinator.State.t
     ; ledger_builder_transition_backup_capacity: int }
 
   let run_snark_worker t = t.run_snark_worker
@@ -425,6 +424,10 @@ module Make (Inputs : Inputs_intf) = struct
   let best_tip t =
     let tip = Ledger_builder_controller.strongest_tip t.ledger_builder in
     (Ledger_builder.ledger tip.ledger_builder, tip.protocol_state, tip.proof)
+
+  let get_ledger t lh =
+    Ledger_builder_controller.local_get_ledger t.ledger_builder lh
+    |> Deferred.Or_error.map ~f:(fun (lb, _) -> Ledger_builder.ledger lb)
 
   let best_ledger t = Ledger_builder.ledger (best_ledger_builder t)
 
@@ -598,7 +601,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder
       ; strongest_ledgers= strongest_ledgers_for_api
       ; log= config.log
-      ; seen_jobs= (Ledger_proof_statement.Set.empty, None)
+      ; seen_jobs= Ledger_builder.Coordinator.State.init
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
 end

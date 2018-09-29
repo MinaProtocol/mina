@@ -3,7 +3,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
+        - image: gcr.io/o1labs-192920/ocaml-base:6ae82b5f3dabfca604d3e9cf11d7d126030a4026
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -33,7 +33,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
+        - image: gcr.io/o1labs-192920/ocaml-base:6ae82b5f3dabfca604d3e9cf11d7d126030a4026
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -46,10 +46,13 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
+                name: Enable update killing
+                command: make withupdates
+            - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Build deb Package
+                name: Build deb Package with verification keys
                 command: make deb
             - run:
                 name: Build provingkeys
@@ -60,7 +63,7 @@ jobs:
     test-runtest:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
+        - image: gcr.io/o1labs-192920/ocaml-base:6ae82b5f3dabfca604d3e9cf11d7d126030a4026
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -76,7 +79,7 @@ jobs:
     test-stake:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
+        - image: gcr.io/o1labs-192920/ocaml-base:6ae82b5f3dabfca604d3e9cf11d7d126030a4026
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -92,7 +95,7 @@ jobs:
     test-sig:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:15b442a253cf4a82b564afbf904425988e34e5e2
+        - image: gcr.io/o1labs-192920/ocaml-base:6ae82b5f3dabfca604d3e9cf11d7d126030a4026
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -104,6 +107,7 @@ jobs:
             - run:
                 name: Test make test-sigs
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
+
 
 workflows:
     version: 2

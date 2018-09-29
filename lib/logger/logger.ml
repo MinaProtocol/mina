@@ -26,14 +26,23 @@ module Message = struct
 end
 
 type t =
-  {attributes: Sexp.t String.Map.t; pid: Pid.t; host: string; path: string list}
+  { null: bool
+  ; attributes: Sexp.t String.Map.t
+  ; pid: Pid.t
+  ; host: string
+  ; path: string list }
 [@@deriving sexp, bin_io]
 
 let create () =
   { attributes= String.Map.empty
+  ; null= false
   ; pid= Unix.getpid ()
   ; host= Unix.gethostname ()
   ; path= [] }
+
+let null () =
+  let l = create () in
+  {l with null= true}
 
 let log ~level ?loc ?(attrs= []) t fmt =
   ksprintf
@@ -50,7 +59,8 @@ let log ~level ?loc ?(attrs= []) t fmt =
         ; message
         ; location= loc }
       in
-      printf !"%s\n" (Sexp.to_string_mach (Message.sexp_of_t m)) )
+      if t.null then ifprintf stdout ""
+      else printf !"%s\n" (Sexp.to_string_mach (Message.sexp_of_t m)) )
     fmt
 
 let extend t attrs =

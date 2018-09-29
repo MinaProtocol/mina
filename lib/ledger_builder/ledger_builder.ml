@@ -315,109 +315,92 @@ end = struct
     ; public_key: Compressed_public_key.t }
   [@@deriving sexp, bin_io]
 
-  let random_work_spec_chunk t
-      (seen_statements:
-        Ledger_proof_statement.Set.t * Ledger_proof_statement.t option) =
-    let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
-    let module A = Parallel_scan.Available_job in
-    let module L = Ledger_proof_statement in
-    let canonical_statement_of_job = function
-      | A.Base {Super_transaction_with_witness.statement; _} -> statement
-      | A.Merge ((_, s1), (_, s2)) ->
-          Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
-    in
-    let single_spec (job: job) =
-      match job with
-      | A.Base d ->
-          Snark_work_lib.Work.Single.Spec.Transition
-            (d.statement, d.transaction, d.witness)
-      | A.Merge ((p1, s1), (p2, s2)) ->
-          let merged = Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn in
-          Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
-    in
-    (* We currently have an invariant that work must be consecutive. In order to
-     * appease that, we admit the redundant work in the following case:
-     *
-     * Starting state where we randomly choose index 1:
-     * |_|_|x|x|_|
-     *    ^
-     *
-     * We will produce the following bundle:
-     * |_|_|x|x|_|
-     *   (y,y)
-     *
-     * When we do bundles of size k instead we can revisit this and make it more
-     * efficient.
-     *
-     * We use the following algorithm to choose the index:
-     *
-     * i <-$- [0,select0 str length)
-     * j := (rank0 str i)
-     * emit jobs@j and jobs@j+1 (if it exists)
-     *  
-     * if jobs@j+1 doesn't exist (if the last job is at j) 
-     * then we track it separately and return a chunk consisting of just one
-     * job. The last job is tracked separately and not included in the list of 
-     * seen jobs for the following two reasons:
-     * 1. It can be paired with a new job that could be appended to the list 
-     * later.
-     * 2. The chunk consisting of just the last job is not created more 
-     * than once.
-     *
-     * See meaning of rank/select from here:
-     * https://en.wikipedia.org/wiki/Succinct_data_structure
-     *)
-    let index_of_nth_occurence str n =
-      Sequence.of_list str
-      |> Sequence.filter_mapi ~f:(fun i b -> if not b then Some i else None)
-      |> Fn.flip Sequence.nth n
-    in
-    let n = List.length all_jobs in
-    let dirty_jobs =
-      List.map all_jobs ~f:(fun j ->
-          L.Set.mem (fst seen_statements) (canonical_statement_of_job j) )
-    in
-    let seen_jobs, jobs =
-      List.partition_tf all_jobs ~f:(fun j ->
-          L.Set.mem (fst seen_statements) (canonical_statement_of_job j) )
-    in
-    let seen_statements' =
-      List.map seen_jobs ~f:canonical_statement_of_job |> L.Set.of_list
-    in
-    match jobs with
-    | [] -> (None, seen_statements)
-    | _ ->
-        let i = Random.int (List.length jobs) in
-        let j = index_of_nth_occurence dirty_jobs i |> Option.value_exn in
-        (*TODO All of this will change, when we fix  #450. 
-          There'll be no more bundles! *)
-        if j + 1 < n then
-          let chunk =
-            [List.nth_exn all_jobs j; List.nth_exn all_jobs (j + 1)]
-          in
-          let new_last_job =
-            Option.fold (snd seen_statements) ~init:None ~f:(fun _ stmt ->
-                if
-                  Ledger_proof_statement.equal stmt
-                    (canonical_statement_of_job (List.last_exn all_jobs))
-                then Some stmt
-                else None )
-          in
-          ( Some (List.map chunk ~f:single_spec)
-          , ( L.Set.add seen_statements'
-                (canonical_statement_of_job @@ List.hd_exn chunk)
-            , new_last_job ) )
-        else
-          let last_job = List.nth_exn all_jobs j in
-          let last_job_eq =
-            Option.fold (snd seen_statements) ~init:false ~f:(fun _ stmt ->
-                Ledger_proof_statement.equal stmt
-                  (canonical_statement_of_job last_job) )
-          in
-          if last_job_eq then (None, seen_statements)
-          else
-            ( Some [single_spec last_job]
-            , (seen_statements', Some (canonical_statement_of_job last_job)) )
+  let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
+
+  module Coordinator = struct
+    module Job_status = struct
+      type t = Assigned of Time.t
+
+      let max_age = Time.Span.of_min 2.
+
+      let is_old t ~now =
+        match t with Assigned at_time ->
+          let delta = Time.diff now at_time in
+          Time.Span.( > ) delta max_age
+    end
+
+    module State = struct
+      module Seen_key = struct
+        module T = struct
+          type t = Ledger_proof_statement.t * Ledger_proof_statement.t option
+          [@@deriving compare, sexp]
+        end
+
+        include T
+        include Comparable.Make (T)
+      end
+
+      type t = Job_status.t Seen_key.Map.t
+
+      let init = Seen_key.Map.empty
+
+      let remove_old_assignments t =
+        let now = Time.now () in
+        Map.filter t ~f:(fun status -> not (Job_status.is_old status ~now))
+    end
+
+    let random_work_spec_chunk t (state: State.t) =
+      let state = State.remove_old_assignments state in
+      let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
+      let module A = Parallel_scan.Available_job in
+      let module L = Ledger_proof_statement in
+      let canonical_statement_of_job = function
+        | A.Base {Super_transaction_with_witness.statement; _} -> statement
+        | A.Merge ((_, s1), (_, s2)) ->
+            Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
+      in
+      let single_spec (job: job) =
+        match job with
+        | A.Base d ->
+            Snark_work_lib.Work.Single.Spec.Transition
+              (d.statement, d.transaction, d.witness)
+        | A.Merge ((p1, s1), (p2, s2)) ->
+            let merged =
+              Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
+            in
+            Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
+      in
+      let all_jobs_paired =
+        let pairs = chunks_of all_jobs ~n:2 in
+        List.map pairs ~f:(fun js ->
+            match js with
+            | [j] -> (j, None)
+            | [j1; j2] -> (j1, Some j2)
+            | _ -> failwith "error pairing jobs" )
+      in
+      let statement_pair = function
+        | j, None -> (canonical_statement_of_job j, None)
+        | j1, Some j2 ->
+            ( canonical_statement_of_job j1
+            , Some (canonical_statement_of_job j2) )
+      in
+      let unseen_jobs =
+        List.filter all_jobs_paired ~f:(fun js ->
+            not @@ Map.mem state (statement_pair js) )
+      in
+      let pair_to_list = function
+        | j, Some j' -> List.map [j; j'] ~f:single_spec
+        | j, None -> [single_spec j]
+      in
+      match unseen_jobs with
+      | [] -> (None, state)
+      | _ ->
+          let i = Random.int (List.length unseen_jobs) in
+          let x = List.nth_exn unseen_jobs i in
+          ( Some (pair_to_list x)
+          , Map.set state ~key:(statement_pair x)
+              ~data:(Assigned (Time.now ())) )
+  end
 
   let aux {scan_state; _} = scan_state
 
@@ -674,8 +657,6 @@ end = struct
         | Ok (undo, res) -> go (undo :: processed) (res :: acc) ts
     in
     go [] [] ts
-
-  let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
   let check_completed_works t (completed_works: Completed_work.t list) =
     Result_with_rollback.with_no_rollback
@@ -2160,12 +2141,13 @@ let%test_module "test" =
               let rec go i seen =
                 [%test_result : Bool.t]
                   ~message:"Exceeded time expected to exhaust random_work"
-                  ~expect:true
-                  (i <= 2 * p) ;
-                let maybe_stuff, seen = Lb.random_work_spec_chunk lb seen in
+                  ~expect:true (i <= p) ;
+                let maybe_stuff, seen =
+                  Lb.Coordinator.random_work_spec_chunk lb seen
+                in
                 match maybe_stuff with None -> () | Some _ -> go (i + 1) seen
               in
-              go 0 (S.empty, None) ) )
+              go 0 Lb.Coordinator.State.init ) )
 
     let%test_unit "Be able to include random number of transactions (One \
                    prover)" =

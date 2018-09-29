@@ -5,7 +5,7 @@ module Single : sig
     type ('statement, 'transition, 'sparse_ledger, 'ledger_proof) t =
       | Transition of 'statement * 'transition * 'sparse_ledger
       | Merge of 'statement * 'ledger_proof * 'ledger_proof
-    [@@deriving bin_io]
+    [@@deriving bin_io, sexp]
 
     val statement :
       ('statement, 'transition, 'sparse_ledger, 'ledger_proof) t -> 'statement
@@ -16,7 +16,7 @@ val proofs_per_work : int
 
 module Spec : sig
   type 'single t = {instances: 'single list; fee: Currency.Fee.Stable.V1.t}
-  [@@deriving bin_io, fields]
+  [@@deriving bin_io, fields, sexp]
 end
 
 module Result : sig

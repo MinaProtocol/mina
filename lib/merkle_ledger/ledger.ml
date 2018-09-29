@@ -37,6 +37,7 @@ end = struct
 
   type tree =
     { leafs: leafs
+    ; mutable unset_slots: Int.Set.t
     ; mutable dirty: bool
     ; mutable syncing: bool
     ; mutable nodes_height: int
@@ -60,6 +61,8 @@ end = struct
 
   let to_list = C.to_list
 
+  let fold_until = C.fold_until
+
   module Location = struct
     type t = index
   end
@@ -67,6 +70,7 @@ end = struct
   let copy t =
     let copy_tree tree =
       { leafs= Key.Table.copy tree.leafs
+      ; unset_slots= tree.unset_slots
       ; dirty= tree.dirty
       ; syncing= false
       ; nodes_height= tree.nodes_height
@@ -98,6 +102,7 @@ end = struct
     { accounts= Dyn_array.create ()
     ; tree=
         { leafs= Key.Table.create ()
+        ; unset_slots= Int.Set.empty
         ; dirty= false
         ; syncing= false
         ; nodes_height= 0
@@ -155,27 +160,26 @@ end = struct
     | Some index -> (`Existed, index)
 
   let set_at_index_exn t index account =
-    let leafs = t.tree.leafs in
-    if index < Hashtbl.length leafs then
+    if index < Dyn_array.length t.accounts then
       let old_account = Dyn_array.get t.accounts index in
       replace t index (Account.public_key old_account) account
     else failwith (index_not_found "set_at_index_exn" index)
 
   let set = set_at_index_exn
 
-  let extend_tree tree =
-    let leafs = Hashtbl.length tree.leafs in
+  let extend_tree t =
+    let leafs = Dyn_array.length t.accounts in
     if leafs <> 0 then (
       let target_height = Int.max 1 (Int.ceil_log2 leafs) in
-      let current_height = tree.nodes_height in
+      let current_height = t.tree.nodes_height in
       let additional_height = target_height - current_height in
-      tree.nodes_height <- tree.nodes_height + additional_height ;
-      tree.nodes
+      (t.tree).nodes_height <- t.tree.nodes_height + additional_height ;
+      (t.tree).nodes
       <- List.concat
-           [ tree.nodes
+           [ t.tree.nodes
            ; List.init additional_height ~f:(fun _ -> Dyn_array.create ()) ] ;
-      List.iteri tree.nodes ~f:(fun i nodes ->
-          let length = Int.pow 2 (tree.nodes_height - 1 - i) in
+      List.iteri t.tree.nodes ~f:(fun i nodes ->
+          let length = Int.pow 2 (t.tree.nodes_height - 1 - i) in
           let new_elems = length - Dyn_array.length nodes in
           Dyn_array.append
             (Dyn_array.init new_elems (fun _ -> empty_hash_at_height (i + 1)))
@@ -209,7 +213,7 @@ end = struct
 
   let recompute_tree t =
     if not (List.is_empty t.tree.dirty_indices) then (
-      extend_tree t.tree ;
+      extend_tree t ;
       (t.tree).dirty <- false ;
       let layer_dirty_indices =
         Int.Set.to_list
@@ -238,6 +242,8 @@ end = struct
 
   let merkle_root t =
     recompute_tree t ;
+    if not (Int.Set.is_empty t.tree.unset_slots) then
+      failwithf !"%{sexp:Int.Set.t} remain unset" t.tree.unset_slots () ;
     let height = t.tree.nodes_height in
     let base_root =
       match List.last t.tree.nodes with
@@ -342,18 +348,27 @@ end = struct
     let index = Addr.to_int a in
     DynArray.set l index hash
 
+  let make_space_for t total =
+    let len = Dyn_array.length t.accounts in
+    if total > len then
+      (t.tree).unset_slots
+      <- Int.Set.union t.tree.unset_slots
+           (Int.Set.of_list
+              (List.init (total - len) (fun i ->
+                   Dyn_array.add t.accounts Account.empty ;
+                   len + i )))
+
   let set_all_accounts_rooted_at_exn t a accounts =
     let height = depth - Addr.depth a in
     let first_index = Addr.to_int a lsl height in
     assert (List.length accounts <= 1 lsl height) ;
+    make_space_for t (first_index + List.length accounts) ;
     List.iteri accounts ~f:(fun i a ->
         let new_index = first_index + i in
-        (t.tree).dirty_indices <- new_index :: t.tree.dirty_indices ;
-        match key_of_index t new_index with
-        | Some pk ->
-            Key.Table.set t.tree.leafs ~key:pk ~data:new_index ;
-            Dyn_array.set t.accounts new_index a
-        | None -> allocate t (Account.public_key a) a |> ignore )
+        if Int.Set.mem t.tree.unset_slots new_index then (
+          replace t new_index Key.empty a ;
+          (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
+        else set_at_index_exn t new_index a )
 
   let get_all_accounts_rooted_at_exn t a =
     let height = depth - Addr.depth a in
