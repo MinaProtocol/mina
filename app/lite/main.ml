@@ -239,25 +239,29 @@ module Html = struct
   module Tooltip = struct
     type t =
       { active: bool
-      ; text: string
-      ; alt_text: string option
+      ; text: string list
+      ; alt_text: string list option
       ; arity: [`Left | `Right]
       }
 
     let create ~active ~text ?alt_text ~arity () =
       {text; alt_text; active; arity}
 
-    let body ?(extra_style=Style.empty) text =
+    let body ?(extra_style=Style.empty) text_node =
         div [Style.(render (of_class "mw5 b-sky shadow-subtle br3 bg-darksnow ph3 pv3 roboto lh-copy bluesilver" + extra_style))]
             [
               div [Style.(render (of_class "flex items-center" + extra_style))]
-              [Node.text text]
+              [text_node]
             ]
+              
+    let join_text text =
+      div [] (List.join (List.intersperse (List.map text ~f:(fun text -> [ Node.text text ])) ~sep:[ (Node.create "br" [] []); (Node.create "br" [] []) ]))
 
     let render_overlay {active;text;arity=_;alt_text} =
       let text =
         Option.value alt_text ~default:text
       in
+      let text = join_text text in
       let body = body ~extra_style:(Style.of_class "h-100") text in
 
       div [Style.render (if active then Style.empty else Style.of_class "dn")]
@@ -268,7 +272,7 @@ module Html = struct
         ]
 
     let render_wide {active;text;arity;alt_text=_} =
-      let body = body text in
+      let body = body (join_text text) in
       let chevron =
         match arity with
         | `Left -> "›"
@@ -627,7 +631,7 @@ let merkle_tree num_layers_to_show =
             | Spec.Account _ -> None )
       in
       let tooltip =
-        Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:"Once a client has a protocol state and a proof for a protocol state, they can get the balance in an account with only a minimal amount of extra data. To get the value in a particular account, a client needs the account properties and a merkle path from the database merkle root in the protocol state. Because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data." ()
+        Html.Tooltip.create ~active:(Tooltip_stage.(equal Account_state state.State.tooltip_stage)) ~arity:`Right ~text:["Once a client has a protocol state and a proof for a protocol state, they can get the balance in an account with only a minimal amount of extra data. To get the value in a particular account, a client needs the account properties and a merkle path from the database merkle root in the protocol state."; "Because the snark, protocol state, merkle path, and account state are of a fixed size, Coda can provide a full proof of the state of an account with just a constant (~20kb) of data."] ()
       in
       hoverable state (
       Node.div [Style.just "flex items-center flex-column flex-row-ns justify-center"]
@@ -704,12 +708,12 @@ let state_html
   let _ = ledger in
   let snark_tooltip =
     Html.Tooltip.create ~active:(Tooltip_stage.(equal Proof state.State.tooltip_stage)) ~arity:`Left
-        ~text:"The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. This takes the place of the gigabytes long, ever-growing blockchain used for validation in other cryptocurrencies. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."
-        ~alt_text:"The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client on your device."
+      ~text:["The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. This takes the place of the gigabytes long, ever-growing blockchain used for validation in other cryptocurrencies."; "Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state."]
+      ~alt_text:["The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client on your device."]
         ()
   in
   let state_tooltip =
-    Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:"The zk-SNARK proof validates the entire protocol state. This demo uses \"proof of signature\", where producing a valid snark for an updated protocol state requires a proof of identity. An open consensus mechanism will be used in the testnet when released. The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed." ()
+    Html.Tooltip.create ~active:(Tooltip_stage.(equal Blockchain_state state.State.tooltip_stage)) ~arity:`Left ~text:["The zk-SNARK proof validates the entire protocol state. This demo uses \"proof of signature\", where producing a valid snark for an updated protocol state requires a proof of identity. An open consensus mechanism will be used in the testnet when released."; "The staged and locked ledger hashes represent roots of merkle databases. Changes to accounts are reflected immediately in the staged ledger hash. The locked ledger hash is set from the staged ledger hash periodically, as snark proofs are computed."] ()
   in
   let age = Time.diff (Time.now ()) (Time.of_string timestamp) in
   let down_maintenance =
