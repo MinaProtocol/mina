@@ -40,7 +40,7 @@ struct
       in
       if i > 0 then go (i - 1) else return ()
     in
-    go 30
+    go 40
 
   let command =
     Command.async_spec ~summary:"Test that workers share states"

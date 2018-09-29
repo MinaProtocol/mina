@@ -76,7 +76,7 @@ struct
       {Lite_chain.proof; protocol_state; ledger= List.hd_exn ledgers}
     in
     let%bind () = Store.store chain_file chain in
-    Request.put request location
+    Request.put request chain_file
 
   let create () =
     let location = Config.conf_dir ^/ "snarkette-data" in
