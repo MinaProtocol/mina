@@ -81,7 +81,7 @@ let get_service () =
   |> Option.value_map ~default:`None ~f:(function "S3" -> `S3 | _ -> `None)
 
 let verification_key_location =
-  Cache_dir.autogen_path ^/ "client_verification_key"
+  Cache_dir.manual_install_path ^/ "client_verification_key"
 
 let store_verification_keys () =
   match%bind Sys.file_exists verification_key_location with

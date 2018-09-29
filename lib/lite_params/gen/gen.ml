@@ -46,7 +46,7 @@ let wrap_vk ~loc =
     if Coda_base.Insecure.key_generation then Deferred.unit
     else
       Writer.save
-        (Cache_dir.autogen_path ^/ "client_verification_key")
+        (Cache_dir.manual_install_path ^/ "client_verification_key")
         ~contents:vk_base64
   in
   let module E = Ppxlib.Ast_builder.Make (struct
