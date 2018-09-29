@@ -417,9 +417,7 @@ let hoverable ?(extra_style=Style.empty) state node target =
     Event.Ignore
   in
   let mobile_update_toggle _ =
-    printf "I'jm (kinda) inside the mobile toggle";
     if js_is_mobile_small () then (
-      printf "I'jm inside the mobile toggle";
       let target' =
         match (state.State.tooltip_stage, target) with
         | Tooltip_stage.None, _ -> target
