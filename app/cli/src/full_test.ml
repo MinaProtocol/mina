@@ -59,8 +59,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
          ~time_controller:(Inputs.Time.Controller.create ())
          ~keypair ())
   in
-  let web_service = Web_pipe.get_service () in
-  Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;
+  don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
     let rec go () =
       match Run.get_balance coda receiver_pk with
