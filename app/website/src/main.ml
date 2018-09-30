@@ -251,13 +251,7 @@ let home () =
         ~image_positioning:Image_positioning.Left ~icon_image:Icon.empty
         ~important_text:
           (Important_text.create ~title:(`Left "Compact blockchain")
-             ~content:
-               [ "Coda uses recursive composition of zk-SNARKs to compress \
-                  the whole\n                \
-                  blockchain down to the size of a few tweets."
-               ; "No one needs to store\n                \
-                  or download transaction history in order to verify the \
-                  blockchain." ])
+             ~content: Copy.problem_slide)
     ; Example.create
         ~image:(Image.draw "/static/img/phone.svg" `Free)
         ~image_positioning:Image_positioning.Right ~icon_image:Icon.empty
@@ -440,12 +434,7 @@ let testnet () =
       ~pages:
       [ comic
         ~title:"What is this?"
-        ~content:[
-          "This is a fully-verifying state explorer for the Coda testnet. \
-           Coda is so lightweight, it can even run in your browser."
-        ; "On this page you can learn more about Coda, the testnet, \
-           and how the protocol works."
-        ]
+         ~content: Copy.intro_slide 
         ~img:`None ()
       ; comic
          ~title:"Problem"
@@ -460,28 +449,18 @@ let testnet () =
          ~img:(`Real "problem.png") ()
       ; comic
         ~title:"Coda"
-        ~content:[
-          "In contrast, the resource requirments for verifying \
-           Coda are very low and don't increase with time."
-          ; "Coda is so efficient it can even run in your browser."]
+        ~content:Copy.coda_slide_1
         (*~img:(`Custom (div [Style.(render (of_class "flex"))]
             [ Image.draw ("/static/img/testnet/your-hands.png") (`Fixed (350, 400))
             ]))*)
         ~img:(`Real "your-hands.png") ()
       ; comic
         ~title:"Coda"
-        ~content:[
-          "Because of its efficiency, \
-           Coda stays decentralized and in the hands of its users, even at scale."]
+        ~content: Copy.coda_slide_2
         ~img:(`Real "net-hand.png") ()
       ; comic
         ~title:"Coda State Explorer"
-        ~content:
-          [ "Below is the live state of the Coda protocol testnet.
-            Your browser is fully verifying the state's integrity, and is essentially
-            acting as a full node."
-
-; "Coda puts its users back in control of their cryptocurrency. It's our first step towards building computer systems that put users back in control of their digital lives." ]
+        ~content:Copy.conclusion
         ~img:`None 
         ()
       ]
