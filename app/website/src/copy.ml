@@ -1,7 +1,7 @@
 
 
 let intro_slide = [
-          "This is a fully-verifying state explorer for the Coda testnet. \
+          "*This is a fully-verifying state explorer for the Coda testnet.* \
            Coda is a new cryptocurrency so lightweight, it can even run in your browser."
         ; "On this page you can learn more about Coda, the testnet, \
            and how the protocol works."

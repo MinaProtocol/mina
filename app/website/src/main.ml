@@ -64,6 +64,15 @@ module Important_text = struct
       Important_title.(content_style title, html title)
     in
     let content_length = List.length content in
+    let content = List.map content ~f:(fun c -> 
+        let strs = String.split c ~on:'*' in
+        let bold_style = Style.(render (of_class "fw6")) in
+        List.mapi strs ~f:(fun i str ->
+            if i mod 2 = 0
+            then text str
+            else (Html_concise.span [ bold_style ] [Html_concise.text str])
+          ))
+    in
     div [class_ "important-text"]
       [ Mobile_switch.create
           ~not_small:(Important_title.wrap title title_html)
@@ -77,7 +86,7 @@ module Important_text = struct
                    + if i = content_length - 1 then of_class "mb0" else empty
                  in
                  [render style])
-                 [text txt] )) ]
+                 txt )) ]
 end
 
 module Investor = struct
