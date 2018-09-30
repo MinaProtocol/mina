@@ -80,23 +80,62 @@ let get_service () =
   Unix.getenv "CODA_WEB_CLIENT_SERVICE"
   |> Option.value_map ~default:`None ~f:(function "S3" -> `S3 | _ -> `None)
 
-let verification_key_location =
-  Cache_dir.manual_install_path ^/ "client_verification_key"
+module Verification_request (Input : sig
+  val log : Logger.t
+end)
+(Request : Web_client_pipe.Put_request_intf) =
+struct
+  let file_exists filename =
+    match%map Sys.file_exists filename with
+    | `Yes -> Ok ()
+    | `No -> Or_error.errorf "Could not find file: %s" filename
+    | `Unknown ->
+        Or_error.errorf "There was an error finding file: %s" filename
 
-let store_verification_keys () =
-  match%bind Sys.file_exists verification_key_location with
-  | `No | `Unknown ->
-      Deferred.Or_error.errorf
-        !"IO ERROR: Verification key does not exist - path: %s\n\n        \
-          You should probably turn off snarks"
-        verification_key_location
-  | `Yes ->
-      let open Deferred.Or_error.Let_syntax in
-      let%bind verification_request =
-        Web_client_pipe.S3_put_request.create ()
-      in
-      Web_client_pipe.S3_put_request.put verification_request
-        verification_key_location
+  let put request path =
+    match%map Request.put request path with
+    | Ok () ->
+        Logger.trace Input.log "Successfully sent verification keys from %s"
+          path
+    | Error e ->
+        Logger.error Input.log
+          !"Failed to send varification keys: %s"
+          (Error.to_string_hum e)
+
+  let store_verification_keys () =
+    let open Web_client_pipe in
+    let client_key = "client_verification_key" in
+    let manual_path = Cache_dir.manual_install_path ^/ client_key in
+    let autogen_path = Cache_dir.autogen_path ^/ client_key in
+    Deferred.Or_error.bind (Request.create ()) ~f:(fun request ->
+        match%bind
+          Deferred.both (file_exists manual_path) (file_exists autogen_path)
+        with
+        | Ok (), Ok () ->
+            let%bind manual_contents, autogen_contents =
+              Deferred.both
+                (Reader.file_contents manual_path)
+                (Reader.file_contents autogen_path)
+            in
+            if String.equal manual_contents autogen_contents then
+              Request.put request manual_path
+            else
+              Deferred.Or_error.errorf
+                !"IO ERROR: there was a mismatch between autogen verification \
+                  keys (%s) and manual verification keys (%s). \n\
+                  Verification keys will not be sent"
+                autogen_path manual_path
+        | Ok (), Error _ -> Request.put request manual_path
+        | Error _, Ok () -> Request.put request autogen_path
+        | Error e1, Error e2 ->
+            Deferred.Or_error.errorf
+              !"IO ERROR: Could not find verification keys.\n\
+                You should probably turn off snarks \n\
+                Autogen verification keys (%s): %s \n\
+                Manual verification keys (%s): %s \n"
+              manual_path (Error.to_string_hum e1) autogen_path
+              (Error.to_string_hum e2) )
+end
 
 let run_service (type t) (module Program : Coda_intf with type t = t) coda
     ~conf_dir ~log = function
@@ -114,9 +153,10 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
         Make_broadcaster (Web_config) (Program)
           (Web_client_pipe.S3_put_request) in
       Broadcaster.run coda |> don't_wait_for ;
-      Logger.trace log "Copying verification keys %s to s3 client"
-        verification_key_location ;
-      ( match%map store_verification_keys () with
+      Logger.trace log "Attempting to send verification keys to s3 client" ;
+      let module S3_Request =
+        Verification_request (Web_config) (Web_client_pipe.S3_put_request) in
+      ( match%map S3_Request.store_verification_keys () with
       | Ok () -> Logger.trace log "Successfully sent verification keys"
       | Error e ->
           Logger.error log
