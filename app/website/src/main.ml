@@ -57,6 +57,16 @@ module Important_title = struct
   let content_style title = Style.(Styles.copytext + position title)
 end
 
+let marked_up_content content =
+  List.map content ~f:(fun c -> 
+    let strs = String.split c ~on:'*' in
+    let bold_style = Style.(render (of_class "fw6")) in
+    List.mapi strs ~f:(fun i str ->
+        if i mod 2 = 0
+        then Html_concise.text str
+        else (Html_concise.span [ bold_style ] [Html_concise.text str])
+      ))
+
 module Important_text = struct
   let create ~title ~content =
     let open Html_concise in
@@ -64,15 +74,6 @@ module Important_text = struct
       Important_title.(content_style title, html title)
     in
     let content_length = List.length content in
-    let content = List.map content ~f:(fun c -> 
-        let strs = String.split c ~on:'*' in
-        let bold_style = Style.(render (of_class "fw6")) in
-        List.mapi strs ~f:(fun i str ->
-            if i mod 2 = 0
-            then text str
-            else (Html_concise.span [ bold_style ] [Html_concise.text str])
-          ))
-    in
     div [class_ "important-text"]
       [ Mobile_switch.create
           ~not_small:(Important_title.wrap title title_html)
@@ -214,13 +215,13 @@ let home () =
         ((* TODO: Make important text have paragraph *)
          Important_text.create
            ~title:(`Left "Keeping cryptocurrency decentralized")
-           ~content:
+           ~content:(marked_up_content
              [ "Coda is the first cryptocurrency protocol with a \
                 constant-sized blockchain. Coda compresses the entire \
                 blockchain into a tiny snapshot the size of a few tweets."
              ; "That means that no matter how many transactions are \
                 performed, verifying the blockchain remains inexpensive and \
-                accessible to everyone." ])
+                accessible to everyone." ]))
       ~image:
         (Some (Mobile_switch.create
            ~not_small:
@@ -243,7 +244,7 @@ let home () =
       ~important_text:
         (Important_text.create
            ~title:(`Center "We're making the world legible at a glance")
-           ~content:
+           ~content:(marked_up_content
              [ "Coda is a cryptocurrency that can\n\
                 scale to millions of users and thousands of transactions per \
                 second while\n\
@@ -251,7 +252,7 @@ let home () =
                 will be\n\
                 able to instantly validate the state of the ledger. This is \
                 in service of our\n\
-                goal to make software transparent, legible, and respectful." ])
+                goal to make software transparent, legible, and respectful." ]))
       ~scheme ()
   in
   let examples =
@@ -260,21 +261,22 @@ let home () =
         ~image_positioning:Image_positioning.Left ~icon_image:Icon.empty
         ~important_text:
           (Important_text.create ~title:(`Left "Compact blockchain")
-             ~content: [ "Coda uses recursive composition of zk-SNARKs to compress \
+             ~content:(marked_up_content
+               [ "Coda uses recursive composition of zk-SNARKs to compress \
                   the whole\n                \
                   blockchain down to the size of a few tweets."
                ; "No one needs to store\n                \
                   or download transaction history in order to verify the \
-                  blockchain." ])
+                  blockchain." ]))
     ; Example.create
         ~image:(Image.draw "/static/img/phone.svg" `Free)
         ~image_positioning:Image_positioning.Right ~icon_image:Icon.empty
         ~important_text:
           (Important_text.create ~title:(`Right "Instant sync")
-             ~content:
+             ~content:(marked_up_content
                [ "Coda syncs instantly, allowing you to verify the blockchain \
                   even on a mobile phone. \n\
-                  Interact with the blockchain anywhere." ]) ]
+                  Interact with the blockchain anywhere." ])) ]
   in
   let job_examples =
     [ Example.create
@@ -282,32 +284,32 @@ let home () =
         ~image_positioning:Image_positioning.Left ~icon_image:Icon.empty
         ~important_text:
           (Important_text.create ~title:(`Left "Functional programming")
-             ~content:
+             ~content:(marked_up_content
                [ "A cornerstone of our approach is a focus on building\n                \
                   reliable software through the use of statically-typed \
                   functional programming languages."
                ; "This is reflected in our OCaml codebase and style of\n                \
                   structuring code around DSLs, as well as in the design of \
-                  languages we're developing for Coda." ])
+                  languages we're developing for Coda." ]))
     ; Example.create
         ~image:(Image.draw "/static/img/crypto.svg" `Free)
         ~image_positioning:Image_positioning.Right ~icon_image:Icon.empty
         ~important_text:
           (Important_text.create ~title:(`Left "Cryptography and mathematics")
-             ~content:
+             ~content:(marked_up_content
                [ "We're applying advanced cryptography, building on \
-                  fundamental research in computer science and mathematics." ])
+                  fundamental research in computer science and mathematics." ]))
     ; Example.create
         ~image:(Image.draw "/static/img/network.svg" `Free)
         ~image_positioning:Image_positioning.Left ~icon_image:Icon.empty
         ~important_text:
           (Important_text.create ~title:(`Left "Distributed systems")
-             ~content:
+             ~content:(marked_up_content
                [ "We implement state-of-the-art\n                \
                   consensus protocols and have developed\n                \
                   frameworks for describing distributed systems, enabling us \
                   to quickly\n                \
-                  iterate." ]) ]
+                  iterate." ])) ]
   in
   let protocol_design scheme =
     Section.with_examples ?heading:(Some "Protocol Design") ~content:None
@@ -448,26 +450,26 @@ let testnet () =
       ~pages:
       [ comic
         ~title:"What is this?"
-         ~content: Copy.intro_slide 
+         ~content: (marked_up_content Copy.intro_slide )
         ~img:`None ()
       ; comic
          ~title:"Problem"
-         ~content: Copy.problem_slide
+         ~content: (marked_up_content Copy.problem_slide)
          ~img:(`Real "problem.png") ()
       ; comic
         ~title:"Coda"
-        ~content:Copy.coda_slide_1
+        ~content:(marked_up_content Copy.coda_slide_1)
         (*~img:(`Custom (div [Style.(render (of_class "flex"))]
             [ Image.draw ("/static/img/testnet/your-hands.png") (`Fixed (350, 400))
             ]))*)
         ~img:(`Real "your-hands.png") ()
       ; comic
         ~title:"Coda"
-        ~content: Copy.coda_slide_2
+        ~content: (marked_up_content Copy.coda_slide_2)
         ~img:(`Real "net-hand.png") ()
       ; comic
         ~title:"Coda State Explorer"
-        ~content:Copy.conclusion
+        ~content:(marked_up_content Copy.conclusion)
         ~img:`None 
         ()
       ]
@@ -494,7 +496,7 @@ let job_post name description =
   let content scheme =
     Section.major_text
       ~important_text:
-        (Important_text.create ~title:(`Left name) ~content:[description])
+        (Important_text.create ~title:(`Left name) ~content:(marked_up_content [description]))
       ~scheme ()
   in
   wrap ~page_label:(Links.(label jobs)) [content]
