@@ -688,7 +688,7 @@ module Bottom_ctas = struct
     let open Node in
     div [Style.just "mt4 flex justify-around items-center"]
       [ testnet_status
-      ; twitter
+      (*; twitter*)
       ]
 end
 
