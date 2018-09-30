@@ -810,7 +810,7 @@ let state_html
       Style.(of_class "silver tc mt0 mb4 f5 mw6 center fw3 lh-copy")
     in
     let br = Node.create "br" in
-  Node.h2 [Style.render heading_style] [Node.text "The properties below constitute the full, live Coda protocol state and are being fully verified in your browser. Explore the components to learn more."; br [] []; br [] []; Mobile_switch.create ~not_small:(Node.text "Hover over any component below to learn more.") ~small:(Node.text "Tap any component below to learn more.") ]
+  Node.h2 [Style.render heading_style] [Node.text "The properties below constitute the full, live Coda protocol state and are being fully verified in your browser."; br [] []; br [] []; Mobile_switch.create ~not_small:(Node.text "Hover over any component below to learn more.") ~small:(Node.text "Tap any component below to learn more.") ]
   in
   let contents = (explanation :: down_maintenance) @ ([state_explorer ; Bottom_ctas.create () ])  in
   let page_time = Time.diff (Time.now ()) start_time in

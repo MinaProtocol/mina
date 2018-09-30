@@ -2,19 +2,14 @@
 
 let intro_slide = [
           "This is a fully-verifying state explorer for the Coda testnet. \
-           Coda is so lightweight, it can even run in your browser."
+           Coda is a new cryptocurrency so lightweight, it can even run in your browser."
         ; "On this page you can learn more about Coda, the testnet, \
            and how the protocol works."
         ]
 
 let problem_slide = [
-           "To verify cryptocurrencies today you need a powerful computer, a fast
-            internet connection, and GBs of disk space. And because verification
-            means checking every transaction that happens, resource requirements
-            only grow as usage increases.";
-           "These resource requirements force most users to delegate trust to powerful \
-            third parties, \
-            making truly decentralized verification a thing of the past." ]
+           "To verify cryptocurrencies today you need a powerful computer, a fast internet connection, and GBs of disk space. These resource requirements force most users to delegate trust to powerful third parties, threatening decentralization."
+             ]
 
 let coda_slide_1 = [
           "In contrast, the resource requirments for verifying \
