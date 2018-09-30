@@ -4,12 +4,12 @@ let proof_tooltip =
   [ `Text "The Coda network compresses its entire blockchain into a 1 kilobyte "
   ; `Link ("zk-SNARK", "https://en.wikipedia.org/wiki/Non-interactive_zero-knowledge_proof")
   ; `Text " proof, \
-           which serves as a cryptographic certificate of the protocol state's integrity
-    called a \"succinct blockchain\". \
-           This takes the place of the gigabytes long, ever-growing blockchain used for \
+           which serves as a cryptographic certificate of the protocol state's integrity.
+           This certificate, called a \"succinct blockchain\", \
+           takes the place of the GBs long, ever-growing blockchains used for \
            validation in other cryptocurrencies."
   ; `New_line
-  ; `Text "The Coda testnet is sending a copy of this snark live to a client in your browser, which can use the snark to verify the protocol state." ]
+  ; `Text "The Coda testnet is sending a copy of this zk-SNARK live to a client in your browser, which uses the SNARK to verify the protocol state." ]
 
 let proof_tooltip_alt = 
   [`Text "The Coda network incrementally updates a 1 kilobyte zk-SNARK proof, which serves as a cryptographic certificate of the protocol state's integrity. Because SNARKs are so small and cheap to verify, the Coda testnet can send a copy of this snark live to a client on your device."]
