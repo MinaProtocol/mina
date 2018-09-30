@@ -7,12 +7,14 @@ let intro_slide = [
            and how the protocol works."
         ]
 
-let problem_slide = [ "Coda uses recursive composition of zk-SNARKs to compress \
-                  the whole\n                \
-                  blockchain down to the size of a few tweets."
-               ; "No one needs to store\n                \
-                  or download transaction history in order to verify the \
-                  blockchain." ]
+let problem_slide = [
+           "To verify cryptocurrencies today you need a powerful computer, a fast
+            internet connection, and GBs of disk space. And because verification
+            means checking every transaction that happens, resource requirements
+            only grow as usage increases.";
+           "These resource requirements force most users to delegate trust to powerful \
+            third parties, \
+            making truly decentralized verification a thing of the past." ]
 
 let coda_slide_1 = [
           "In contrast, the resource requirments for verifying \

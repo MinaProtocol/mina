@@ -251,7 +251,12 @@ let home () =
         ~image_positioning:Image_positioning.Left ~icon_image:Icon.empty
         ~important_text:
           (Important_text.create ~title:(`Left "Compact blockchain")
-             ~content: Copy.problem_slide)
+             ~content: [ "Coda uses recursive composition of zk-SNARKs to compress \
+                  the whole\n                \
+                  blockchain down to the size of a few tweets."
+               ; "No one needs to store\n                \
+                  or download transaction history in order to verify the \
+                  blockchain." ])
     ; Example.create
         ~image:(Image.draw "/static/img/phone.svg" `Free)
         ~image_positioning:Image_positioning.Right ~icon_image:Icon.empty
@@ -438,14 +443,7 @@ let testnet () =
         ~img:`None ()
       ; comic
          ~title:"Problem"
-         ~content:[
-           "To verify cryptocurrencies today you need a powerful computer, a fast
-            internet connection, and GBs of disk space. And because verification
-            means checking every transaction that happens, resource requirements
-            only grow as usage increases.";
-           "These resource requirements force most users to delegate trust to powerful \
-            third parties, \
-            making truly decentralized verification a thing of the past." ]
+         ~content: Copy.problem_slide
          ~img:(`Real "problem.png") ()
       ; comic
         ~title:"Coda"
