@@ -680,7 +680,8 @@ module Bottom_ctas = struct
   let testnet_status =
     let open Node in
     let href = Attr.href "https://status.codaprotocol.com" in
-    a [href; Style.(render (a_style + of_class "pv3"))]
+    a [href; Style.(render (a_style + of_class "pv3")); Attr.create "target" "_blank" ]
+            
       [text "Testnet Status"]
 
   let create () =
