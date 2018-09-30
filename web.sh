@@ -2,7 +2,7 @@
 
 set -e
 
-dune b app/lite/main.bc.js app/lite/verifier_main.bc.js
+dune b app/lite/main.bc.js app/lite/verifier_main.bc.js --profile=release
 
 cp _build/default/app/lite/main.bc.js app/website/static/
 cp _build/default/app/lite/verifier_main.bc.js app/website/static/

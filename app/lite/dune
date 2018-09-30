@@ -13,5 +13,5 @@
     js_of_ocaml
     js_of_ocaml.syntax)
   (preprocess (pps ppx_jane ppx_deriving.eq js_of_ocaml-ppx))
-  (js_of_ocaml (flags --source-map --debug-info --pretty +nat.js))
+  (js_of_ocaml (flags +nat.js))
   )
