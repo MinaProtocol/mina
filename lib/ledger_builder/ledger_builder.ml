@@ -288,16 +288,6 @@ end = struct
     Ledger_proof.t with_statement Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
-  module Scan_state_with_label = struct
-    type label = Visited | Not_visited [@@deriving sexp, bin_io]
-
-    type t =
-      ( Snark_with_statement.t * label
-      , Super_transaction_with_witness.t * label )
-      Parallel_scan.State.t
-    [@@deriving sexp, bin_io]
-  end
-
   module Aux = struct
     type t =
       ( Ledger_proof.t with_statement
@@ -431,7 +421,7 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
-  (*let scan_statement (state: scan_state) :
+  let scan_statement (state: scan_state) :
       (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t =
     with_return (fun {return} ->
         let ok_or_return = function
@@ -487,118 +477,26 @@ end = struct
                               "Ledger_builder.scan_statement: Bad base \
                                statement"))) )
         in
-        match res with None -> Error `Empty | Some res -> Ok res )*)
-  (*Get the latest statement from the parallel scan state by folding over the 
-  tree. Accumulate statements in the same order as the transactions were 
-  included. In the case of incomplete merge jobs, complete it by extracting the 
-  statements from its children and then proceed. While computing the statement 
-  of merge jobs, mark the nodes that have been visited in the process so that 
-  they are not included again*)
-  let latest_statement (state: scan_state) :
-      Ledger_proof_statement.t option Or_error.t =
-    let open Or_error.Let_syntax in
-    let mark_not_visited j = (j, Scan_state_with_label.Not_visited) in
-    let not_visited job =
-      let not_visited a_opt =
-        Option.value_map ~default:true a_opt ~f:(fun a ->
-            match snd a with
-            | Scan_state_with_label.Not_visited -> true
-            | Visited -> false )
-      in
-      match job with
-      | Parallel_scan.State.Job.Base None -> false
-      | Base a -> not_visited a
-      | Merge (a, a') -> not_visited a && not_visited a'
-    in
-    let mark_visited job =
-      let mark (j, _) = (j, Scan_state_with_label.Visited) in
-      match job with
-      | Parallel_scan.State.Job.Base (Some (j, _)) ->
-          Parallel_scan.State.Job.Base
-            (Some (j, Scan_state_with_label.Visited))
-      | Merge (Some j, Some j') -> Merge (Some (mark j), Some (mark j'))
-      | Merge (None, Some j) -> Merge (None, Some (mark j))
-      | Merge (Some j, None) -> Merge (Some (mark j), None)
-      | _ -> job
-    in
-    let merge_acc acc s =
-      let open Or_error.Let_syntax in
-      let merge s1 s2 = Ledger_proof_statement.merge s1 s2 in
-      let%map m = match (acc, s) with
-        | None, _ -> Ok s
-        | _, None -> Ok acc
-        | Some s1, Some s2 ->
-          let%map m = merge s1 s2 in
-          Some m
-      in Core.printf !"merge statement = %{sexp: Ledger_proof_statement.t option} \n %!" m; m
-    in
-    let%bind (state_with_labels : Scan_state_with_label.t) =
-      Parallel_scan.State.map_with_error state ~f:(fun unlabeled_job ->
-          match unlabeled_job with
-          | Base d -> Base (Option.map ~f:mark_not_visited d)
-          | Merge (a, a') ->
-              Merge
-                ( Option.map ~f:mark_not_visited a
-                , Option.map ~f:mark_not_visited a' ) )
-    in
-    Core.printf
-      !"scan_state with labels: %{sexp: Scan_state_with_label.t} \n %!"
-      state_with_labels ;
-    let base_stmt
-        ({Super_transaction_with_witness.transaction; statement; witness}, _) =
-      let source =
-        Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root witness
-      in
-      let%bind after =
-        Or_error.try_with (fun () ->
-            Sparse_ledger.apply_super_transaction_exn witness transaction )
-      in
-      let target =
-        Frozen_ledger_hash.of_ledger_hash @@ Sparse_ledger.merkle_root after
-      in
-      let%bind fee_excess = Super_transaction.fee_excess transaction in
-      let%bind supply_increase =
-        Super_transaction.supply_increase transaction
-      in
-      let expected_statement =
-        { Ledger_proof_statement.source
-        ; target
-        ; fee_excess
-        ; supply_increase
-        ; proof_type= `Base }
-      in
-      if Ledger_proof_statement.equal statement expected_statement then
-        Ok (Some statement)
-      else
-        Error
-          (Error.of_string "Ledger_builder.scan_statement: Bad base statement")
-    in
-    let stmt_from_one_part_of_the_merge ((_, s), _) = Ok (Some s) in
-    Parallel_scan.State.fold_chronological_mutate state_with_labels
-      ~include_job:not_visited ~new_job:mark_visited
-      ~fa:stmt_from_one_part_of_the_merge ~merge_acc ~fd:base_stmt
-      ~init:(Ok None)
+        match res with None -> Error `Empty | Some res -> Ok res )
 
   let verify_scan_state ledger aux =
     Debug_assert.debug_assert (fun () ->
-        match latest_statement aux with
-        | Ok None -> ()
-        | Ok
-            (Some
-              {source= _; target; fee_excess; proof_type= _; supply_increase= _}) ->
+        match scan_statement aux with
+        | Ok {source= _; target; fee_excess; proof_type= _; supply_increase= _} ->
             [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
               fee_excess ;
             [%test_eq : Frozen_ledger_hash.t]
               (Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash)
               target
-        | Error e ->
+        | Error `Empty -> ()
+        | Error (`Error e) ->
             failwithf !":Parallel scan state corrupted %{sexp:Error.t}" e () )
 
   let statement_exn t =
-    match latest_statement t.scan_state with
-    | Ok (Some s) -> `Non_empty s
-    | Ok None -> `Empty
-    | Error e -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
+    match scan_statement t.scan_state with
+    | Ok s -> `Non_empty s
+    | Error `Empty -> `Empty
+    | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
   let of_aux_and_ledger ~snarked_ledger_hash ~public_key ~ledger ~aux =
     let check cond err =
@@ -607,12 +505,8 @@ end = struct
     in
     let open Or_error.Let_syntax in
     let%map () =
-      match latest_statement aux with
-      | Error e -> Error e
-      | Ok None -> Ok ()
-      | Ok
-          (Some
-            {fee_excess; source; target; supply_increase= _; proof_type= _}) ->
+      match scan_statement aux with
+      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
           let%map () =
             check
               (Frozen_ledger_hash.equal snarked_ledger_hash source)
@@ -630,6 +524,8 @@ end = struct
               "nonzero fee excess"
           in
           ()
+      | Error `Empty -> Ok ()
+      | Error (`Error e) -> Error e
     in
     {ledger; scan_state= aux; public_key}
 
@@ -1051,11 +947,6 @@ end = struct
 
   let apply_diff_unchecked t
       (diff: Ledger_builder_diff.With_valid_signatures_and_proofs.t) =
-    Core.printf
-      !"ledger builder: %{sexp: t} \n \
-        Diff: %{sexp: Ledger_builder_diff.With_valid_signatures_and_proofs.t} \n\
-        %! "
-      t diff ;
     let apply_pre_diff_with_at_most_two
         (pre_diff1:
           Ledger_builder_diff.With_valid_signatures_and_proofs.
@@ -2127,7 +2018,7 @@ let%test_module "test" =
       end
 
       module Config = struct
-        let transaction_capacity_log_2 = 3
+        let transaction_capacity_log_2 = 7
       end
 
       let check :
@@ -2235,7 +2126,7 @@ let%test_module "test" =
       Backtrace.elide := false ;
       let logger = Logger.create () in
       let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
-      let g = Int.gen_incl 1 (p/2) in
+      let g = Int.gen_incl 1 (p / 2) in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
@@ -2358,9 +2249,11 @@ let%test_module "test" =
         @ [[(1, 0); (1, 0); (1, 0)]] @ [[(1, 0); (1, 0)]] @ [[(1, 0); (1, 0)]]
       in
       let ledger = ref 0 in
-      Core.printf !"all ts: %{sexp: (int * int) list list} \n %!" txns ;
       let lb = Lb.create ~ledger ~self:self_pk in
       Async.Thread_safe.block_on_async_exn (fun () ->
           Deferred.List.fold ~init:() txns ~f:(fun _ ts ->
-              let%map _ = create_and_apply lb logger (Sequence.of_list ts) get_work in () ))
+              let%map _ =
+                create_and_apply lb logger (Sequence.of_list ts) get_work
+              in
+              () ) )
   end )

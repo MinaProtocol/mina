@@ -23,20 +23,7 @@ module State : sig
   val fold_chronological :
     ('a, 'd) t -> init:'acc -> f:('acc -> ('a, 'd) Job.t -> 'acc) -> 'acc
 
-  val map_with_error :
-    ('a, 'd) t -> f:(('a, 'd) Job.t -> ('b, 'c) Job.t) -> ('b, 'c) t Or_error.t
-
   val copy : ('a, 'd) t -> ('a, 'd) t
-
-  val fold_chronological_mutate :
-       ('a, 'd) t
-    -> init:'acc Or_error.t
-    -> include_job:(('a, 'd) Job.t -> bool)
-    -> new_job:(('a, 'd) Job.t -> ('a, 'd) Job.t)
-    -> fa:('a -> 'acc Or_error.t)
-    -> fd:('d -> 'acc Or_error.t)
-    -> merge_acc:('acc -> 'acc -> 'acc Or_error.t)
-    -> 'acc Or_error.t
 
   module Hash : sig
     type t = Digestif.SHA256.t

@@ -38,8 +38,12 @@ module State = struct
     let bases1 = repeat parallelism (Base None) in
     jobs.position <- -1 ;
     List.iter [merges1; bases1] ~f:(Ring_buffer.add_many jobs) ;
+    let level_pointer =
+      Array.init (parallelism_log_2 + 1) ~f:(fun i -> Int.pow 2 i - 1)
+    in
     jobs.position <- 0 ;
     { jobs
+    ; level_pointer
     ; capacity= parallelism
     ; acc= (0, None)
     ; current_data_length= 0
@@ -144,18 +148,29 @@ module State = struct
       | _, Base _ -> failwith "This shouldn't have occured"
       | _ -> false
 
-  let next_position t position =
-    let p = parallelism t in
-    if position = p - 2 then
-      let base_pos =
-        match t.base_none_pos with None -> p - 1 | Some pos -> pos
-      in
-      base_pos
-    else if position >= p - 1 then next_pos p position
-    else Int.( % ) (position + 1) (Array.length t.jobs.data)
+  let next_pos parallelism level_pointer cur_pos =
+    let levels = Int.floor_log2 parallelism + 1 in
+    let cur_level = Int.floor_log2 (cur_pos + 1) in
+    let last_node = Int.pow 2 (cur_level + 1) - 2 in
+    let first_node = Int.pow 2 cur_level - 1 in
+    if
+      (level_pointer.(cur_level) = first_node && cur_pos = last_node)
+      || cur_pos = level_pointer.(cur_level) - 1
+    then level_pointer.(Int.( % ) (cur_level + 1) levels)
+    else if cur_pos = last_node then first_node
+    else cur_pos + 1
 
-  let set_next_position t =
-    (t.jobs).position <- next_position t t.jobs.position
+  let set_next_position t level_pointer =
+    (t.jobs).position <- next_pos (parallelism t) level_pointer t.jobs.position
+
+  let incr_level_pointer t cur_pos =
+    let level = Int.floor_log2 (cur_pos + 1) in
+    if (t.level_pointer).(level) = cur_pos then
+      let last_node = Int.pow 2 (level + 1) - 2 in
+      let first_node = Int.pow 2 level - 1 in
+      if cur_pos + 1 <= last_node then (t.level_pointer).(level) <- cur_pos + 1
+      else (t.level_pointer).(level) <- first_node
+    else ()
 
   let fold_chronological t ~init ~f =
     let n = Array.length t.jobs.data in
@@ -163,164 +178,9 @@ module State = struct
       if Int.equal i n then acc
       else
         let x = (t.jobs.data).(pos) in
-        go (f acc x) (i + 1) (next_position t pos)
+        go (f acc x) (i + 1) (next_pos (parallelism t) t.level_pointer pos)
     in
     go init 0 0
-
-  let foldi_chronological t ~init ~f =
-    let n = Array.length t.jobs.data in
-    let rec go acc i pos =
-      if Int.equal i n then acc
-      else
-        let x = (t.jobs.data).(pos) in
-        go (f pos acc x) (i + 1) (next_position t pos)
-    in
-    go init 0 0
-
-  let update_cur_job t job pos : unit Or_error.t =
-    Ring_buffer.direct_update t.jobs pos ~f:(fun _ -> Ok job)
-
-  let map_with_error t ~f =
-    let open Or_error.Let_syntax in
-    let new_state =
-      create ~parallelism_log_2:(Int.floor_log2 (parallelism t))
-    in
-    let%map () =
-      foldi_chronological t ~init:(Ok ()) ~f:(fun i acc job ->
-          let%bind () = acc in
-          update_cur_job new_state (f job) i )
-    in
-    { new_state with
-      capacity= t.capacity
-    ; current_data_length= t.current_data_length
-    ; base_none_pos= t.base_none_pos }
-
-  let fold_chronological_mutate :
-         ('a, 'd) t
-      -> init:'acc Or_error.t
-      -> include_job:(('a, 'd) Job.t -> bool)
-      -> new_job:(('a, 'd) Job.t -> ('a, 'd) Job.t)
-      -> fa:('a -> 'acc Or_error.t)
-      -> fd:('d -> 'acc Or_error.t)
-      -> merge_acc:('acc -> 'acc -> 'acc Or_error.t)
-      -> 'acc Or_error.t =
-   fun state ~init ~include_job ~new_job ~fa ~fd ~merge_acc ->
-    let open Or_error.Let_syntax in
-    let job_at i = Ring_buffer.read_i state.jobs i in
-    let left_child pos =
-      let l = (pos * 2) + 1 in
-      (job_at l, l)
-    in
-    let right_child pos =
-      let r = (pos * 2) + 2 in
-      (job_at r, r)
-    in
-    let child dir parent_pos =
-      match dir  with
-      | `Left -> left_child parent_pos
-      | `Right -> right_child parent_pos
-    in
-    let right_sibling_visited i = 
-      let parent = (i-1)/2 in
-      let left, right = ((parent*2)+1, (parent*2)+2)
-      in
-      let lchild, rchild = (job_at left, job_at right) in
-      match lchild, rchild with
-      | Job.Merge (None, None) , Job.Merge (None, None) ->
-        (match (job_at (left*2 +1)) with
-        | Job.Base _ -> true
-        | _ -> false)
-      | _, _ -> 
-        if i = left && (not @@ include_job rchild )then true
-        else false
-    in
-    let rec oldest_statement (job,i) : 'b option Or_error.t =
-      let update_job_return_stmt j stmt pos =
-        if include_job j then
-          (let%bind stmt = stmt in
-          Core.printf !"updating %d \n %!" pos;
-          let%map () = update_cur_job state (new_job j) pos in
-          Some stmt)
-        else (Ok None)
-      in
-      Core.printf !"Statement from child at %d \n%!" i ;
-      match job with
-        | Job.Base (Some d) -> update_job_return_stmt job (fd d) i
-        | Job.Base None -> Ok None
-        | Job.Merge (Some a, Some a') ->
-            let%bind s = fa a and s' = fa a' in
-            update_job_return_stmt job (merge_acc s s') i
-        | Job.Merge (None, Some a') -> (
-            match%bind oldest_statement (child `Left i) with
-            | Some s ->
-                let%bind s' = fa a' in
-                update_job_return_stmt job (merge_acc s s') i
-            | None -> update_job_return_stmt job (fa a') i )
-        | Job.Merge (Some a, None) -> (
-            match%bind oldest_statement (child `Right i) with
-            | Some s' ->
-                let%bind s = fa a in
-                update_job_return_stmt job (merge_acc s s') i
-            | None -> update_job_return_stmt job (fa a) i )
-        | Job.Merge (None, None) ->
-            if right_sibling_visited i then Ok None
-            else 
-            (let%bind l = oldest_statement (child `Left i) in
-            let%bind r = oldest_statement (child `Right i) in
-            match (l, r) with
-            | None, None -> Ok None
-            | Some s, Some s' ->
-                let%map m = merge_acc s s' in
-                Some m
-            | None, s' -> Ok s'
-            | s, None -> Ok s)
-    in
-    foldi_chronological ~init state ~f:(fun i acc_s job ->
-        Core.printf !"All Position %d \n%!" i ;
-        let%bind acc = acc_s in
-        if not (include_job job) then Ok acc
-        else (
-          Core.printf !"Position %d \n%!" i ;
-          match%bind oldest_statement (job,i) with
-          | None -> Ok acc
-          | Some stmt -> merge_acc acc stmt
-          (*match job with
-          | Merge (None, Some s) -> (
-              match%bind oldest_statement `Left i with
-              | None ->
-                  let%bind stmt = fa s in
-                  merge_acc acc stmt
-              | Some s' ->
-                  let%bind stmt = fa s in
-                  let%bind m = merge_acc s' stmt in
-                  merge_acc acc m )
-          | Merge (Some s, None) -> (
-              match%bind oldest_statement `Right i with
-              | None ->
-                  let%bind stmt = fa s in
-                  merge_acc acc stmt
-              | Some s' ->
-                  let%bind stmt = fa s in
-                  let%bind m = merge_acc stmt s' in
-                  merge_acc acc m )
-          | Merge (Some a, Some b) ->
-              (let%bind s = fa a and s' = fa b in
-              let%bind m = merge_acc s s' in
-              merge_acc acc m)
-          | Merge (None, None) ->
-            (let%bind l = oldest_statement `Left i in
-            let%bind r = oldest_statement `Right i in
-            match (l, r) with
-            | None, None -> Ok acc
-            | Some s, Some s' ->
-                let%bind m = merge_acc s s' in
-                merge_acc acc m
-            | None, Some s' -> merge_acc acc s'
-            | Some s, None -> merge_acc acc s)
-          | Base (Some b) ->
-              let%bind stmt = fd b in
-              merge_acc acc stmt
-          | Base None -> Ok acc *) ))
 
   let jobs_list t =
     let rec go count t =
@@ -328,7 +188,7 @@ module State = struct
       else
         let j = Ring_buffer.read t.jobs in
         let pos = t.jobs.position in
-        set_next_position t ;
+        set_next_position t t.level_pointer ;
         (j, pos) :: go (count + 1) t
     in
     (t.jobs).position <- 0 ;
@@ -349,6 +209,9 @@ module State = struct
 
   let jobs_ready state =
     List.filter_map (read_jobs state) ~f:(fun (job, _) -> job_ready job)
+
+  let update_cur_job t job pos : unit Or_error.t =
+    Ring_buffer.direct_update t.jobs pos ~f:(fun _ -> Ok job)
 
   let update_new_job t z dir pos =
     let new_job (cur_job: ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
@@ -380,11 +243,13 @@ module State = struct
             Ok () )
           else update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2)
         in
+        let () = incr_level_pointer t cur_pos in
         let%map () = update_cur_job t (Merge (None, None)) cur_pos in
         Work.Work_done
     | true, Base (Some _), Lifted z ->
         let%bind () = update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2) in
         let%bind () = update_cur_job t (Base None) cur_pos in
+        let () = incr_level_pointer t cur_pos in
         t.base_none_pos <- Some (Option.value t.base_none_pos ~default:cur_pos) ;
         t.current_data_length <- t.current_data_length - 1 ;
         Ok Work.Work_done
@@ -397,6 +262,7 @@ module State = struct
       -> unit Or_error.t =
    fun t completed_jobs jobs_copy ->
     let open Or_error.Let_syntax in
+    let level_pointer_before_update = Array.copy t.State.level_pointer in
     match completed_jobs with
     | [] -> Ok ()
     | j :: js ->
@@ -405,7 +271,8 @@ module State = struct
           | Work.Not_done -> j :: js
           | Work.Work_done -> js
         in
-        set_next_position t ; consume t next jobs_copy
+        set_next_position t level_pointer_before_update ;
+        consume t next jobs_copy
 
   let include_one_datum state value base_pos : unit Or_error.t =
     let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
