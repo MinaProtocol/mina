@@ -27,7 +27,7 @@ module type Coda_intf = sig
   end
 
   val get_lite_chain :
-    (t -> Signature_lib.Public_key.Compressed.t list -> Web_client_pipe.chain)
+    (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
     option
 
   val best_ledger : t -> Inputs.Ledger.t
