@@ -31,11 +31,11 @@ module Daemon_cli = struct
              default_client_port)
         (optional int16)
 
-    let disable_prompt =
-      flag "disable-daemon-prompt"
+    let autostart_daemon =
+      flag "autostart-daemon"
         ~doc:
-          "Prevents daemon prompt from displaying (default: false). If \
-           connection exists to daemon, prompt will not show., regardless"
+          "Autostart Coda daemon (default: true). If a connection to the \
+           daemon does not exist, then a prompt to start it will be shown."
         no_arg
   end
 
@@ -90,23 +90,19 @@ module Daemon_cli = struct
         let%bind _ = kill p in
         failwith "Cannot connect to daemon"
 
-  let should_skip_prompt port is_prompt_disabled =
-    if is_prompt_disabled then Deferred.return true
-    else
-      let%map isatty = Unix.isatty (Reader.fd (Lazy.force reader)) in
-      not isatty
-
-  let run ~f port is_prompt_disabled arg =
+  let run ~f port is_prompt_hidden arg =
     let port = Option.value port ~default:default_client_port in
     let rec go = function
       | Start ->
-          let%bind has_daemon = does_daemon_exist port in
-          if has_daemon then go Run_client
+          if is_prompt_hidden then
+            let%bind has_daemon = does_daemon_exist port in
+            if has_daemon then go Run_client else go Run_daemon
           else
-            let%bind is_prompt_skipped =
-              should_skip_prompt port is_prompt_disabled
-            in
-            if is_prompt_skipped then go Run_daemon else go Show_menu
+            let%bind isatty = Unix.isatty (Reader.fd (Lazy.force reader)) in
+            if isatty then go Show_menu
+            else (
+              printf !"Prompt should recieve standard input from terminal\n" ;
+              go Abort )
       | Show_menu -> print_menu () ; go Select_action
       | Select_action -> (
           printf "[Y/n]: " ;
@@ -127,9 +123,9 @@ module Daemon_cli = struct
 
   let init ~f arg_flag =
     let open Command.Param.Applicative_infix in
-    Command.Param.return (fun port is_prompt_disabled arg () ->
-        run ~f port is_prompt_disabled arg )
-    <*> Flag.port <*> Flag.disable_prompt <*> arg_flag
+    Command.Param.return (fun port is_prompt_hidden arg () ->
+        run ~f port is_prompt_hidden arg )
+    <*> Flag.port <*> Flag.autostart_daemon <*> arg_flag
 end
 
 let get_balance =
