@@ -148,7 +148,7 @@ module State = struct
       | _, Base _ -> failwith "This shouldn't have occured"
       | _ -> false
 
-  (*Level_pointer stores a start iindex for each level. These are, at first, 
+  (*Level_pointer stores a start index for each level. These are, at first, 
   the indices of the first node on each level and get incremented when a job is 
   completed at the specific index. The tree is still traveresed breadth-first 
   but the order of nodes on each level is determined using the start index that 

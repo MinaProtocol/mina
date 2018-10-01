@@ -581,8 +581,6 @@ module Make (Inputs : Inputs_intf) = struct
                     [%test_eq : Frozen_ledger_hash.t]
                       (Blockchain_state.ledger_hash bc_state)
                       source ;
-                    (* THIS ASSERTION FAILS SOMETIMES
-                     * SEE CRITICAL ISSUE #658 *)
                     [%test_eq : Frozen_ledger_hash.t]
                       ( Ledger_builder.ledger ledger_builder
                       |> Ledger.merkle_root
