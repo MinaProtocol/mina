@@ -37,4 +37,5 @@ RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build 
 RUN opam install bitstring orocksdb
 RUN opam install camlp4
 RUN opam install ppx_deriving_yojson
-RUN opam install sodium
+ADD ./external/ocaml-sodium /ocaml-sodium
+RUN cd /ocaml-sodium && yes | opam pin add .

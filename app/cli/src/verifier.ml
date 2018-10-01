@@ -127,10 +127,14 @@ struct
   type t = Worker.Connection.t
 
   let create ~conf_dir =
-    Worker.spawn_exn ~on_failure:Error.raise ~shutdown_on:Disconnect
-      ~redirect_stdout:(`File_append (conf_dir ^/ "verifier-stdout"))
-      ~redirect_stderr:(`File_append (conf_dir ^/ "verifier-stderr"))
-      ~connection_state_init_arg:() ()
+    let%map connection, process =
+      Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
+        ~on_failure:Error.raise ~shutdown_on:Disconnect
+        ~connection_state_init_arg:() ()
+    in
+    File_system.dup_stdout process ;
+    File_system.dup_stderr process ;
+    connection
 
   let verify_blockchain t chain =
     Worker.Connection.run t ~f:Worker.functions.verify_blockchain ~arg:chain

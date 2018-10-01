@@ -27,7 +27,7 @@ let pedersen_params ~loc =
 
 let wrap_vk ~loc =
   let open Async in
-  let%map keys = Snark_keys.blockchain_verification () in
+  let%bind keys = Snark_keys.blockchain_verification () in
   let vk = keys.wrap in
   let module V =
     Snarky.Gm_verifier_gadget.Mnt4 (Snark_params.Tick)
@@ -36,6 +36,19 @@ let wrap_vk ~loc =
       end)
       (Snark_params.Tick.Inner_curve) in
   let vk = Lite_compat.verification_key vk in
+  let vk_base64 =
+    B64.encode
+      (Binable.to_string
+         (module Snarkette.Mnt6.Groth_maller.Verification_key)
+         vk)
+  in
+  let%map () =
+    if Coda_base.Insecure.key_generation then Deferred.unit
+    else
+      Writer.save
+        (Cache_dir.autogen_path ^/ "client_verification_key")
+        ~contents:vk_base64
+  in
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
@@ -43,13 +56,7 @@ let wrap_vk ~loc =
   [%expr
     Core_kernel.Binable.of_string
       (module Snarkette.Mnt6.Groth_maller.Verification_key)
-      (B64.decode
-         [%e
-           estring
-             (B64.encode
-                (Binable.to_string
-                   (module Snarkette.Mnt6.Groth_maller.Verification_key)
-                   vk))])]
+      (B64.decode [%e estring vk_base64])]
 
 module Proof_of_signature = Consensus.Proof_of_signature.Make (struct
   module Time = Coda_base.Block_time

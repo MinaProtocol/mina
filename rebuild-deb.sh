@@ -20,7 +20,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libssl1.1, libprocps6, libgmp10, libffi6
+Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1
 Maintainer: O1Labs <build@o1labs.org>
 Description: Coda Client
  Coda Protocol Client
