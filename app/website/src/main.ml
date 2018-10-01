@@ -252,7 +252,7 @@ let home () =
            ~title:(`Center "")
            ~content:Html_concise.([
              [ text "We're excited to announce our alpha testnet. Check out "
-             ; a [href "/testnet.html"] [ text "this page" ]; text " to learn more and get involved."
+             ; a [href "./testnet.html"; Style.(render (of_class "silver"))] [ text "this page" ]; text " to learn more and get involved."
              ]]) ())
       ~scheme ()
   in
