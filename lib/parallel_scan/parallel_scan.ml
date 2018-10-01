@@ -148,7 +148,14 @@ module State = struct
       | _, Base _ -> failwith "This shouldn't have occured"
       | _ -> false
 
-  let next_pos parallelism level_pointer cur_pos =
+  (*Level_pointer stores a start iindex for each level. These are, at first, 
+  the indices of the first node on each level and get incremented when a job is 
+  completed at the specific index. The tree is still traveresed breadth-first 
+  but the order of nodes on each level is determined using the start index that 
+  is kept track of in the level_pointer. if the cur_pos is the last node on the 
+  current level then next node is the first node on the next level otherwise 
+  return the next node on the same level*)
+  let next_position parallelism level_pointer cur_pos =
     let levels = Int.floor_log2 parallelism + 1 in
     let cur_level = Int.floor_log2 (cur_pos + 1) in
     let last_node = Int.pow 2 (cur_level + 1) - 2 in
@@ -161,15 +168,21 @@ module State = struct
     else cur_pos + 1
 
   let set_next_position t level_pointer =
-    (t.jobs).position <- next_pos (parallelism t) level_pointer t.jobs.position
+    (t.jobs).position
+    <- next_position (parallelism t) level_pointer t.jobs.position
 
+  (*On each level, the jobs are completed starting from a specific index that 
+  is stored in levels_pointer. When a job at that index is completed, it points 
+  to the next job on the same level. After the last node of the level, the 
+  index is set back to first node*)
   let incr_level_pointer t cur_pos =
-    let level = Int.floor_log2 (cur_pos + 1) in
-    if (t.level_pointer).(level) = cur_pos then
-      let last_node = Int.pow 2 (level + 1) - 2 in
-      let first_node = Int.pow 2 level - 1 in
-      if cur_pos + 1 <= last_node then (t.level_pointer).(level) <- cur_pos + 1
-      else (t.level_pointer).(level) <- first_node
+    let cur_level = Int.floor_log2 (cur_pos + 1) in
+    if (t.level_pointer).(cur_level) = cur_pos then
+      let last_node = Int.pow 2 (cur_level + 1) - 2 in
+      let first_node = Int.pow 2 cur_level - 1 in
+      if cur_pos + 1 <= last_node then (t.level_pointer).(cur_level)
+        <- cur_pos + 1
+      else (t.level_pointer).(cur_level) <- first_node
     else ()
 
   let fold_chronological t ~init ~f =
@@ -178,7 +191,8 @@ module State = struct
       if Int.equal i n then acc
       else
         let x = (t.jobs.data).(pos) in
-        go (f acc x) (i + 1) (next_pos (parallelism t) t.level_pointer pos)
+        go (f acc x) (i + 1)
+          (next_position (parallelism t) t.level_pointer pos)
     in
     go init 0 0
 
@@ -210,9 +224,6 @@ module State = struct
   let jobs_ready state =
     List.filter_map (read_jobs state) ~f:(fun (job, _) -> job_ready job)
 
-  let update_cur_job t job pos : unit Or_error.t =
-    Ring_buffer.direct_update t.jobs pos ~f:(fun _ -> Ok job)
-
   let update_new_job t z dir pos =
     let new_job (cur_job: ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
       match (dir, cur_job) with
@@ -225,6 +236,9 @@ module State = struct
       | _, Base _ -> Error (Error.of_string "impossible: we never fill base")
     in
     Ring_buffer.direct_update t.jobs pos ~f:new_job
+
+  let update_cur_job t job pos : unit Or_error.t =
+    Ring_buffer.direct_update t.jobs pos ~f:(fun _ -> Ok job)
 
   let work :
          ('a, 'd) t

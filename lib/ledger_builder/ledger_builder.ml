@@ -506,6 +506,8 @@ end = struct
     let open Or_error.Let_syntax in
     let%map () =
       match scan_statement aux with
+      | Error (`Error e) -> Error e
+      | Error `Empty -> Ok ()
       | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
           let%map () =
             check
@@ -524,8 +526,6 @@ end = struct
               "nonzero fee excess"
           in
           ()
-      | Error `Empty -> Ok ()
-      | Error (`Error e) -> Error e
     in
     {ledger; scan_state= aux; public_key}
 
@@ -2126,7 +2126,7 @@ let%test_module "test" =
       Backtrace.elide := false ;
       let logger = Logger.create () in
       let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
-      let g = Int.gen_incl 1 (p / 2) in
+      let g = Int.gen_incl 1 p in
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
       Quickcheck.test g ~trials:1000 ~f:(fun i ->
