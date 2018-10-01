@@ -16,17 +16,29 @@ let dispatch rpc query port =
       | Error exn -> return (Or_error.of_exn exn)
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
-let daemon_port_flag =
-  Command.Param.flag "daemon-port"
-    ~doc:
-      (Printf.sprintf "PORT Client to daemon local communication (default: %d)"
-         default_client_port)
-    (Command.Param.optional int16)
-
 let json_flag =
   Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
 module Daemon_cli = struct
+  module Flag = struct
+    open Command.Param
+
+    let port =
+      flag "daemon-port"
+        ~doc:
+          (Printf.sprintf
+             "PORT Client to daemon local communication (default: %d)"
+             default_client_port)
+        (optional int16)
+
+    let disable_prompt =
+      flag "disable-daemon-prompt"
+        ~doc:
+          "Prevents daemon prompt from displaying (default: false). If \
+           connection exists to daemon, prompt will not show., regardless"
+        no_arg
+  end
+
   type state =
     | Start
     | Show_menu
@@ -78,12 +90,23 @@ module Daemon_cli = struct
         let%bind _ = kill p in
         failwith "Cannot connect to daemon"
 
-  let run ~f port arg =
+  let should_skip_prompt port is_prompt_disabled =
+    if is_prompt_disabled then Deferred.return true
+    else
+      let%map isatty = Unix.isatty (Reader.fd (Lazy.force reader)) in
+      not isatty
+
+  let run ~f port is_prompt_disabled arg =
     let port = Option.value port ~default:default_client_port in
     let rec go = function
       | Start ->
           let%bind has_daemon = does_daemon_exist port in
-          if has_daemon then go Run_client else go Show_menu
+          if has_daemon then go Run_client
+          else
+            let%bind is_prompt_skipped =
+              should_skip_prompt port is_prompt_disabled
+            in
+            if is_prompt_skipped then go Run_daemon else go Show_menu
       | Show_menu -> print_menu () ; go Select_action
       | Select_action -> (
           printf "[Y/n]: " ;
@@ -104,8 +127,9 @@ module Daemon_cli = struct
 
   let init ~f arg_flag =
     let open Command.Param.Applicative_infix in
-    Command.Param.return (fun port arg () -> run ~f port arg)
-    <*> daemon_port_flag <*> arg_flag
+    Command.Param.return (fun port is_prompt_disabled arg () ->
+        run ~f port is_prompt_disabled arg )
+    <*> Flag.port <*> Flag.disable_prompt <*> arg_flag
 end
 
 let get_balance =
