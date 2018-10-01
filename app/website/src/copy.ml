@@ -18,7 +18,7 @@ let alt_problem_slide = [
 
 let coda_slide_1 = [
           "In contrast, the resource requirments for verifying \
-           Coda are very low and don't increase with time."
+           Coda are *very low* and *don't increase with time*."
           ; "Coda is so efficient it can even run in your browser."]
 
 let alt_coda_slide_1 = [
