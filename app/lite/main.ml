@@ -665,7 +665,7 @@ module Bottom_ctas = struct
 
   let twitter =
     let open Node in
-    let href = Attr.href "todo" in
+    let href = Attr.href "https://twitter.com/intent/retweet?tweet_id=1046805779976617984" in
     let itag = Node.create "i" in
     let bird =
       itag [Style.just "pl1 ml-1 ml-2-ns fab f1 f2-m f1-l fa-twitter mr3 mr2-m mr3-l"] []
@@ -688,7 +688,7 @@ module Bottom_ctas = struct
     let open Node in
     div [Style.just "mt4 flex justify-around items-center"]
       [ testnet_status
-      (*; twitter*)
+      ; twitter
       ]
 end
 
