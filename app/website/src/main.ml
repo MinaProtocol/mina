@@ -239,6 +239,17 @@ let home () =
                  [])))
       ~image_positioning:Image_positioning.Right ~scheme ()
   in
+  let testnet scheme =
+    Section.major_text ?heading:(Some "Alpha testnet")
+      ~important_text:
+        (Important_text.create
+           ~title:(`Center "")
+           ~content:Html_concise.([
+             [ text "We're excited to announce our alpha testnet. Check out "
+             ; a [href "/testnet.html"] [ text "this page" ]; text " to learn more and get involved."
+             ]]))
+      ~scheme ()
+  in
   let mission scheme =
     Section.major_text ?heading:(Some "Our Mission")
       ~important_text:
@@ -407,6 +418,7 @@ let home () =
   in
   let sections =
     [ top
+    ; testnet
     ; mission
     ; protocol_design
     ; community
