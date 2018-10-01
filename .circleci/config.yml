@@ -46,6 +46,9 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
+                name: Enable update killing
+                command: make withupdates
+            - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
@@ -104,6 +107,7 @@ jobs:
             - run:
                 name: Test make test-sigs
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-sigs
+
 
 workflows:
     version: 2
