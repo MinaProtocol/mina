@@ -1,5 +1,5 @@
-(*[%%import
-"../../../../config.mlh"]*)
+[%%import
+"../../../../config.mlh"]
 
 open Core_kernel
 open Async_kernel
@@ -473,7 +473,10 @@ end = struct
               target
         | Error `Empty -> ()
         | Error (`Error e) ->
-            failwithf !":Parallel scan state corrupted %{sexp:Error.t}" e () )
+            failwithf
+              !":Error verifying the parallel scan state after apply the \
+                diff: %{sexp:Error.t}"
+              e () )
 
   let statement_exn t =
     match scan_statement t.scan_state with
@@ -521,14 +524,14 @@ end = struct
     Ledger_builder_hash.of_aux_and_ledger_hash (Aux.hash scan_state)
       (Ledger.merkle_root ledger)
 
-  (*[%%if
+  [%%if
   log_calls]
 
   let hash t =
     Coda_debug.Call_logger.record_call "Ledger_builder.hash" ;
     hash t
 
-  [%%endif]*)
+  [%%endif]
 
   let ledger {ledger; _} = ledger
 
