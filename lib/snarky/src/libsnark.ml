@@ -30,9 +30,7 @@ module type Deletable_intf = sig
   val delete : t -> unit
 end
 
-let set_profiling =
-  foreign "camlsnark_set_profiling"
-    (bool @-> returning void)
+let set_profiling = foreign "camlsnark_set_profiling" (bool @-> returning void)
 
 let () = set_profiling false
 
