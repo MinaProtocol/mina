@@ -9,7 +9,7 @@ let intro_slide = [
 
 let problem_slide = [
            "To verify cryptocurrencies today you need a powerful computer, a fast internet connection, and GBs of disk space."
-         ; "These resource requirements force most users to delegate trust to powerful third parties, threatening decentralization."
+         ; "*These resource requirements force most users to delegate trust* to powerful third parties, threatening decentralization."
              ]
 
 let alt_problem_slide = [
