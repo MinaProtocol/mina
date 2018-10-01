@@ -68,17 +68,14 @@ let marked_up_content content =
       ))
 
 module Important_text = struct
-  let create ~title ~content =
+  let create ~title ~content ?(alt_content=None) () =
     let open Html_concise in
     let content_style, title_html =
       Important_title.(content_style title, html title)
     in
-    let content_length = List.length content in
-    div [class_ "important-text"]
-      [ Mobile_switch.create
-          ~not_small:(Important_title.wrap title title_html)
-          ~small:(Important_title.center title_html)
-      ; div [Style.render content_style]
+    let make_content content = 
+      let content_length = List.length content in
+      div [Style.render content_style]
           (List.mapi content ~f:(fun i txt ->
                p
                  (let open Style in
@@ -87,7 +84,16 @@ module Important_text = struct
                    + if i = content_length - 1 then of_class "mb0" else empty
                  in
                  [render style])
-                 txt )) ]
+                 txt ))
+    in
+    div [class_ "important-text"]
+      [ Mobile_switch.create
+          ~not_small:(Important_title.wrap title title_html)
+          ~small:(Important_title.center title_html)
+      ; Mobile_switch.create
+          ~not_small:(make_content content)
+          ~small:(make_content (Option.value alt_content ~default:content))
+      ]
 end
 
 module Investor = struct
@@ -221,7 +227,7 @@ let home () =
                 blockchain into a tiny snapshot the size of a few tweets."
              ; "That means that no matter how many transactions are \
                 performed, verifying the blockchain remains inexpensive and \
-                accessible to everyone." ]))
+                accessible to everyone." ]) ())
       ~image:
         (Some (Mobile_switch.create
            ~not_small:
@@ -247,7 +253,7 @@ let home () =
            ~content:Html_concise.([
              [ text "We're excited to announce our alpha testnet. Check out "
              ; a [href "/testnet.html"] [ text "this page" ]; text " to learn more and get involved."
-             ]]))
+             ]]) ())
       ~scheme ()
   in
   let mission scheme =
@@ -263,7 +269,7 @@ let home () =
                 will be\n\
                 able to instantly validate the state of the ledger. This is \
                 in service of our\n\
-                goal to make software transparent, legible, and respectful." ]))
+                goal to make software transparent, legible, and respectful." ]) ())
       ~scheme ()
   in
   let examples =
@@ -278,7 +284,7 @@ let home () =
                   blockchain down to the size of a few tweets."
                ; "No one needs to store\n                \
                   or download transaction history in order to verify the \
-                  blockchain." ]))
+                  blockchain." ]) ())
     ; Example.create
         ~image:(Image.draw "/static/img/phone.svg" `Free)
         ~image_positioning:Image_positioning.Right ~icon_image:Icon.empty
@@ -287,7 +293,7 @@ let home () =
              ~content:(marked_up_content
                [ "Coda syncs instantly, allowing you to verify the blockchain \
                   even on a mobile phone. \n\
-                  Interact with the blockchain anywhere." ])) ]
+                  Interact with the blockchain anywhere." ]) ()) ]
   in
   let job_examples =
     [ Example.create
@@ -301,7 +307,7 @@ let home () =
                   functional programming languages."
                ; "This is reflected in our OCaml codebase and style of\n                \
                   structuring code around DSLs, as well as in the design of \
-                  languages we're developing for Coda." ]))
+                  languages we're developing for Coda." ]) ())
     ; Example.create
         ~image:(Image.draw "/static/img/crypto.svg" `Free)
         ~image_positioning:Image_positioning.Right ~icon_image:Icon.empty
@@ -309,7 +315,7 @@ let home () =
           (Important_text.create ~title:(`Left "Cryptography and mathematics")
              ~content:(marked_up_content
                [ "We're applying advanced cryptography, building on \
-                  fundamental research in computer science and mathematics." ]))
+                  fundamental research in computer science and mathematics." ]) ())
     ; Example.create
         ~image:(Image.draw "/static/img/network.svg" `Free)
         ~image_positioning:Image_positioning.Left ~icon_image:Icon.empty
@@ -320,7 +326,7 @@ let home () =
                   consensus protocols and have developed\n                \
                   frameworks for describing distributed systems, enabling us \
                   to quickly\n                \
-                  iterate." ])) ]
+                  iterate." ]) ()) ]
   in
   let protocol_design scheme =
     Section.with_examples ?heading:(Some "Protocol Design") ~content:None
@@ -441,7 +447,7 @@ let jobs () =
   wrap ~page_label:(Links.(label jobs)) ~fixed_footer:true sections
 
 let testnet () =
-  let comic ~title ~content ~img () =
+  let comic ~title ~content ~alt_content ~img () =
     let image =
       match img with
       | `None -> None
@@ -451,7 +457,7 @@ let testnet () =
         Some (Image.draw ~style:(Style.of_class "mw6-ns mw5 h5 hauto-ns w-100") ("/static/img/testnet/" ^ s) `Free)
     in
     let important_text =
-      Important_text.create ~title:(`Left title) ~content
+      Important_text.create ~title:(`Left title) ~content ~alt_content ()
     in
     Compound_chunk.create ~variant:`No_image_on_small ~important_text ~image ~image_positioning:Image_positioning.Right ()
   in
@@ -463,14 +469,17 @@ let testnet () =
       [ comic
         ~title:"What is this?"
          ~content: (marked_up_content Copy.intro_slide )
+         ~alt_content:None
         ~img:`None ()
       ; comic
          ~title:"Problem"
          ~content: (marked_up_content Copy.problem_slide)
+         ~alt_content:(Some (marked_up_content Copy.alt_problem_slide))
          ~img:(`Real "problem.png") ()
       ; comic
         ~title:"Coda"
         ~content:(marked_up_content Copy.coda_slide_1)
+         ~alt_content:(Some (marked_up_content Copy.alt_coda_slide_1))
         (*~img:(`Custom (div [Style.(render (of_class "flex"))]
             [ Image.draw ("/static/img/testnet/your-hands.png") (`Fixed (350, 400))
             ]))*)
@@ -478,10 +487,12 @@ let testnet () =
       ; comic
         ~title:"Coda"
         ~content: (marked_up_content Copy.coda_slide_2)
+         ~alt_content:None
         ~img:(`Real "net-hand.png") ()
       ; comic
         ~title:"Coda State Explorer"
         ~content:(marked_up_content Copy.conclusion)
+         ~alt_content:(Some (marked_up_content Copy.alt_conclusion))
         ~img:`None 
         ()
       ]
@@ -508,7 +519,7 @@ let job_post name description =
   let content scheme =
     Section.major_text
       ~important_text:
-        (Important_text.create ~title:(`Left name) ~content:(marked_up_content [description]))
+        (Important_text.create ~title:(`Left name) ~content:(marked_up_content [description]) ())
       ~scheme ()
   in
   wrap ~page_label:(Links.(label jobs)) [content]

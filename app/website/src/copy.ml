@@ -12,10 +12,20 @@ let problem_slide = [
          ; "These resource requirements force most users to delegate trust to powerful third parties, threatening decentralization."
              ]
 
+let alt_problem_slide = [
+           "To verify cryptocurrencies today you need a powerful computer, fast internet, and GBs of disk space."
+         ; "These requirements force most users to delegate trust to powerful third parties, threatening decentralization." ]
+
 let coda_slide_1 = [
           "In contrast, the resource requirments for verifying \
            Coda are very low and don't increase with time."
           ; "Coda is so efficient it can even run in your browser."]
+
+let alt_coda_slide_1 = [
+          "In contrast, the resource requirments for verifying \
+           Coda are very low and don't increase with time."
+          ; "Coda is so efficient it can even run on the browser on your phone."]
+
 
 let coda_slide_2 = [
           "Because of its efficiency, \
@@ -26,3 +36,7 @@ let conclusion = [ "Below is the live state of the Coda protocol testnet.
             acting as a full node."
 
 ; "When launched, Coda will put users back in control of their cryptocurrency. It's our first step towards building computer systems that put users back in control of their digital lives." ]
+
+let alt_conclusion = [ "Below is the live state of the Coda protocol testnet, fully verified by your browser"
+
+; "Coda will put users back in control of cryptocurrency. It's our first step towards putting users back in control of their digital lives." ]

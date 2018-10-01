@@ -341,9 +341,13 @@ module Section = struct
       let controls =
         List.init (List.length pages) ~f:(fun i -> 
           let skip =
-            if i = 4
-            then (a [Style.(render (of_class "jump")); href "#item-0"] [text "start over"] )
-            else (a [Style.(render (of_class "jump")); href "#item-4"] [text "skip"] )
+            Mobile_switch.create
+              ~not_small:(
+              if i = 4
+              then (a [Style.(render (of_class "jump")); href "#item-0"] [text "start over"] )
+              else (a [Style.(render (of_class "jump")); href "#item-4"] [text "skip"] )
+            )
+              ~small: (div [] [])
           in
           let next =
               if i = 4
