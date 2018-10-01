@@ -105,9 +105,10 @@ main = do
       let logError = putStrLn . ("EROR: " ++)
       let logInfo = putStrLn . ("DBUG: " ++)
       let logData = putStrLn . ("DATA: " ++)
+      let logTrace = putStrLn . ("TRAC: " ++)
 
       logInfo $ "Creating instance"
-      kInstance <- K.createL ("127.0.0.1", myPort) (externalIp, myPort) myKey config logInfo logError
+      kInstance <- K.createL ("127.0.0.1", myPort) (externalIp, myPort) myKey config logTrace logError
 
       {- If this is an initial peer, then don't try to connect to others -}
       _ <- if length peers == 0 then return () else do
