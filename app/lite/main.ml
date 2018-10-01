@@ -670,7 +670,7 @@ module Bottom_ctas = struct
     let bird =
       itag [Style.just "pl1 ml-1 ml-2-ns fab f1 f2-m f1-l fa-twitter mr3 mr2-m mr3-l"] []
     in
-    a [href; Style.(render (a_style + of_class "pv2"))]
+    a [href; Style.(render (a_style + of_class "mt3 mt0-ns pv2"))]
       [ div [Style.just "flex items-center"]
       [ span [] [bird]
       ; span [] [text "Share"]
@@ -681,12 +681,11 @@ module Bottom_ctas = struct
     let open Node in
     let href = Attr.href "https://status.codaprotocol.com" in
     a [href; Style.(render (a_style + of_class "pv3")); Attr.create "target" "_blank" ]
-            
       [text "Testnet Status"]
 
   let create () =
     let open Node in
-    div [Style.just "mt4 flex justify-around items-center"]
+    div [Style.just "mt4 tc tl-ns flex-ns justify-around-ns items-center-ns"]
       [ testnet_status
       ; twitter
       ]
