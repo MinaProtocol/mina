@@ -46,6 +46,8 @@ module Daemon_cli = struct
     | Run_daemon
     | Run_client
     | Abort
+    | Startup_menu
+    | Autostart_daemon
 
   let reader = Reader.stdin
 
@@ -94,12 +96,16 @@ module Daemon_cli = struct
     let port = Option.value port ~default:default_client_port in
     let rec go = function
       | Start ->
-          if is_prompt_hidden then
-            let%bind has_daemon = does_daemon_exist port in
-            if has_daemon then go Run_client else go Run_daemon
+          if is_prompt_hidden then go Autostart_daemon else go Startup_menu
+      | Autostart_daemon ->
+          let%bind has_daemon = does_daemon_exist port in
+          if has_daemon then go Run_client else go Run_daemon
+      | Startup_menu ->
+          let%bind isatty = Unix.isatty (Reader.fd (Lazy.force reader)) in
+          if isatty then go Show_menu
           else
-            let%bind isatty = Unix.isatty (Reader.fd (Lazy.force reader)) in
-            if isatty then go Show_menu
+            let%bind has_daemon = does_daemon_exist port in
+            if has_daemon then go Run_client
             else (
               printf !"Prompt should recieve standard input from terminal\n" ;
               go Abort )
