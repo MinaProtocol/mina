@@ -12,8 +12,8 @@ run_unit_tests() {
 
 
 run_integration_tests() {
-  if [${WITH_SNARKS} = true]; then
-    tests=(full_test)
+  if [ "${WITH_SNARKS}" = true ]; then
+    tests=(full-test)
   else
     tests=(full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' 'coda-shared-state-test' 'coda-restart-node-test' 'transaction-snark-profiler -check-only')
   fi 
@@ -53,7 +53,7 @@ main() {
   export CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=1
 
   run_unit_tests
-  WITH_SNARKS=false
+  WITH_SNARKS=false \
   CODA_CONSENSUS_MECHANISM=proof_of_signature \
     run_integration_tests
   CODA_CONSENSUS_MECHANISM=proof_of_stake \
