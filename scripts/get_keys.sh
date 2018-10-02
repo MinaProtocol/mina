@@ -5,7 +5,7 @@ set -euxo pipefail
 # uses exising circleci GC creds
 # run as sudo
 
-# 
+# Install jq
 sudo apt install -y jq
 
 # cloud sdk debian install
@@ -25,7 +25,12 @@ echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
 # Download keys
 /usr/bin/gsutil cp gs://proving-keys-stable/* /tmp/.
 
-# Unpack keys
-mkdir -p /var/lib/coda
-cd /var/lib/coda
-tar --strip-components=2 -xvf /tmp/build-*.tar.bz2
+# Unpack keys to tmp
+tar -C / -xvf /tmp/nanobit_cache_dir.tar.bz2
+
+# Unpack key to /var/lib/coda
+# FIXME: Currently not honored by build
+#  see https://github.com/o1-labs/nanobit/issues/857
+#mkdir -p /var/lib/coda
+#cd /var/lib/coda
+#tar --strip-components=2 -xvf /tmp/build-*.tar.bz2
