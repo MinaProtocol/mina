@@ -426,7 +426,8 @@ let () =
                 , Coda_transitive_peers_test.command )
               ; (Coda_shared_prefix_test.name, Coda_shared_prefix_test.command)
               ; (Coda_restart_node_test.name, Coda_restart_node_test.command)
-              ; ("full-test", Full_test_snarks.command (module Kernel) (module Coda)) ]
+              ; ( "full-test"
+                , Full_test_snarks.command (module Kernel) (module Coda) ) ]
           in
           [("integration-tests", group)]
       else [] )
