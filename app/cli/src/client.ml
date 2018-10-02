@@ -32,7 +32,7 @@ module Daemon_cli = struct
         (optional int16)
 
     let autostart_daemon_name = "autostart-daemon"
-    
+
     let autostart_daemon =
       flag autostart_daemon_name
         ~doc:
@@ -110,8 +110,8 @@ module Daemon_cli = struct
             if has_daemon then go Run_client
             else (
               eprintf
-                !"Error: daemon not running. Start manually or pass \
-                  -%s"  Flag.autostart_daemon_name;
+                !"Error: daemon not running. Start manually or pass -%s"
+                Flag.autostart_daemon_name ;
               go Abort )
       | Show_menu -> print_menu () ; go Select_action
       | Select_action -> (
