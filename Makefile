@@ -142,11 +142,15 @@ test-runtest:
 
 test-sigs: SHELL := /bin/bash
 test-sigs:
-	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_signature run_integration_tests
+	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_signature WITH_SNARKS=false run_integration_tests
+
+test-snarks: SHELL := /bin/bash
+test-snarks:
+	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_signature WITH_SNARKS=true run_integration_tests
 
 test-stakes: SHELL := /bin/bash
 test-stakes:
-	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_stake run_integration_tests
+	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_stake WITH_SNARKS=false run_integration_tests
 
 
 ########################################
