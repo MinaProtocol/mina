@@ -26,7 +26,7 @@ echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
 /usr/bin/gsutil cp gs://proving-keys-stable/* /tmp/.
 
 # Unpack keys to tmp
-tar -C / -xvf /tmp/nanobit_cache_dir.tar.bz2
+tar -C / -xvf /tmp/build-*.tar.bz2
 
 # Unpack key to /var/lib/coda
 # FIXME: Currently not honored by build
