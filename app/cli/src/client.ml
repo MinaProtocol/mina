@@ -312,7 +312,7 @@ let read_keypair from_account =
   let open Deferred.Let_syntax in
   let perm_error = ref false in
   let%bind st = handle_open ~mkdir:false ~f:Unix.stat from_account in
-  if st.perm land 0o777 <> 0o600 then (
+  if st.perm land 0o077 <> 0 then (
     eprintf
       "Error: insecure permissions on `%s`. They should be 0600, they are %o\n\
        Hint: chmod 600 %s\n"
