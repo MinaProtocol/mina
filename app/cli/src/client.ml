@@ -31,8 +31,10 @@ module Daemon_cli = struct
              default_client_port)
         (optional int16)
 
+    let autostart_daemon_name = "autostart-daemon"
+    
     let autostart_daemon =
-      flag "autostart-daemon"
+      flag autostart_daemon_name
         ~doc:
           "Autostart Coda daemon (default: true). If a connection to the \
            daemon does not exist, then a prompt to start it will be shown."
@@ -107,7 +109,9 @@ module Daemon_cli = struct
             let%bind has_daemon = does_daemon_exist port in
             if has_daemon then go Run_client
             else (
-              printf !"Prompt should recieve standard input from terminal\n" ;
+              eprintf
+                !"Error: daemon not running. Start manually or pass \
+                  -%s"  Flag.autostart_daemon_name;
               go Abort )
       | Show_menu -> print_menu () ; go Select_action
       | Select_action -> (
