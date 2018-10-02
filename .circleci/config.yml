@@ -46,6 +46,9 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
+                name: Get Proving Keys -- make get_keys
+                command: make withkeys
+            - run:
                 name: Enable update killing
                 command: make withupdates
             - run:
