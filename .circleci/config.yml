@@ -46,7 +46,7 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
-                name: Get Proving Keys -- make get_keys
+                name: Get Proving Keys -- make withkeys
                 command: make withkeys
             - run:
                 name: Build OCaml
@@ -79,7 +79,7 @@ jobs:
                 name: Enable update killing
                 command: make withupdates
             - run:
-                name: Get proving keys
+                name: Get Proving Keys -- make withkeys
                 command: make withkeys
             - run:
                 name: Build OCaml
