@@ -57,6 +57,10 @@ withoutsnark:
 showsnark:
 	@grep 'let with_snark' lib/coda_base/insecure.ml
 
+# gets proiving keys -- only used in CI
+withkeys:
+	sudo -E scripts/get_keys.sh
+
 ########################################
 ## Lint
 
