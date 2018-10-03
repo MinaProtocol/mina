@@ -3,6 +3,7 @@
 ## Hint: export USEDOCKER=TRUE
 
 GITHASH = $(shell git rev-parse --short HEAD)
+GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
 DOCKERNAME = nanotest-$(MYUID)
@@ -129,6 +130,18 @@ codaslim:
 	@./rebuild-docker.sh codaslim Dockerfile-codaslim
 	@rm codaclient.deb
 
+bundle-keys: withsnark build
+ifneq (,$(wildcard /var/lib/coda))
+	$(error "Trying to bundle keys but /var/lib/coda exists so they won't be built")
+endif
+	$(WRAP) tar -cvjf _build/keys-$(GITLONGHASH).tar.bz2  /tmp/cli_cache_dir
+	gsutil cp -n _build/keys-$(GITLONGHASH).tar.bz2 gs://proving-keys-stable/keys-$(GITLONGHASH).tar.bz2
+
+update-keys:
+ifeq (,$(wildcard _build/keys-$(GITLONGHASH).tar.bz2))
+	$(error "Trying to update keys, but I'm not sure we've bundled them yet")
+endif
+	perl -i -p -e "s,PINNED_KEY_COMMIT=.*,PINNED_KEY_COMMIT=$(GITLONGHASH)," scripts/get_keys.sh
 
 ########################################
 ## Tests
