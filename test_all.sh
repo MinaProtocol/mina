@@ -14,15 +14,20 @@ run_unit_tests() {
 run_integration_tests() {
   if [ "${WITH_SNARKS}" = true ]; then
     tests=(full-test)
+    snark_info="WITH SNARKS"
   else
-    tests=(full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' 'coda-shared-state-test' 'coda-restart-node-test' 'transaction-snark-profiler -check-only')
+    tests=(full-test coda-peers-test coda-transitive-peers-test \
+      coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' \
+        'coda-shared-prefix-test -who-proposes 1' 'coda-shared-state-test' \
+          'coda-restart-node-test' 'transaction-snark-profiler -check-only')
+    snark_info="WITHOUT SNARKS"
   fi 
   for test in ${tests[@]}; do
     echo "------------------------------------------------------------------------------------------"
 
     date
     SECONDS=0
-    echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM} WITH SNARKS= ${WITH_SNARKS}"
+    echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM} ${snark_info}"
     set +e
     # ugly hack to clean up dead processes
     pkill -9 exe
