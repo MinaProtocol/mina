@@ -22,7 +22,7 @@ run_integration_tests() {
           'coda-restart-node-test' 'transaction-snark-profiler -check-only')
     snark_info="WITHOUT SNARKS"
   fi 
-  for test in ${tests[@]}; do
+  for test in "${tests[@]}"; do
     echo "------------------------------------------------------------------------------------------"
 
     date
