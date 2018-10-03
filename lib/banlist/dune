@@ -1,0 +1,8 @@
+(library
+ (name banlist)
+  (public_name banlist)
+  (library_flags (-linkall))
+  (libraries core async)
+  (inline_tests)
+  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (synopsis "Bans peers in the network"))
