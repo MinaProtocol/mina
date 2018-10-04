@@ -972,12 +972,10 @@ end = struct
             | None -> Yield (List.rev (x :: acc), ([], 0, seq))
             | _ -> Skip (x :: acc, i + 1, seq) )
 
-  (* TODO: Make this actually return a sequence *)
   let work_to_do scan_state : Completed_work.Statement.t Sequence.t =
-    let work_list = Parallel_scan.next_jobs ~state:scan_state in
+    let work_seq = Parallel_scan.next_jobs_sequence ~state:scan_state in
     sequence_chunks_of ~n:Completed_work.proofs_length
-    @@ Sequence.of_list
-    @@ List.map work_list ~f:(fun maybe_work ->
+    @@ Sequence.map work_seq ~f:(fun maybe_work ->
            match statement_of_job maybe_work with
            | None -> assert false
            | Some work -> work )
