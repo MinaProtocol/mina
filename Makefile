@@ -2,7 +2,7 @@
 ## Docker Wrapper 
 ## Hint: export USEDOCKER=TRUE
 
-GITHASH = $(shell git rev-parse --short HEAD)
+GITHASH = $(shell git rev-parse --short=8 HEAD)
 GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
@@ -36,7 +36,7 @@ dht: kademlia
 build:
 	$(info Starting Build)
 	ulimit -s 65536
-	$(WRAP) env CODA_COMMIT_SHA1=$(shell git rev-parse HEAD) dune build
+	$(WRAP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
 	$(info Build complete)
 
 withupdates:
@@ -94,7 +94,7 @@ coda-minikube:
 	./rebuild-minikube.sh coda Dockerfile-coda
 
 base-googlecloud:
-	./rebuild-googlecloud.sh ocaml-base Dockerfile-base $(shell git rev-parse HEAD)
+	./rebuild-googlecloud.sh ocaml-base Dockerfile-base $(GITLONGHASH)
 
 coda-googlecloud:
 	./rebuild-googlecloud.sh coda Dockerfile-coda
@@ -106,7 +106,7 @@ pull-ocaml407-googlecloud:
 	gcloud docker -- pull gcr.io/o1labs-192920/ocaml407:latest
 
 update-deps: base-googlecloud
-	./rewrite-from-dockerfile.sh ocaml-base $(shell git rev-parse HEAD)
+	./rewrite-from-dockerfile.sh ocaml-base $(GITLONGHASH)
 
 container:
 	@./container.sh restart
@@ -130,11 +130,13 @@ codaslim:
 	@./rebuild-docker.sh codaslim Dockerfile-codaslim
 	@rm codaclient.deb
 
-bundle-keys: withsnark build
+_build/keys-$(GITLONGHASH).tar.bz2: withsnark build
 ifneq (,$(wildcard /var/lib/coda))
 	$(error "Trying to bundle keys but /var/lib/coda exists so they won't be built")
 endif
 	$(WRAP) tar -cvjf _build/keys-$(GITLONGHASH).tar.bz2  /tmp/cli_cache_dir
+
+bundle-keys: withsnark build _build/keys-$(GITLONGHASH).tar.bz2
 	gsutil cp -n _build/keys-$(GITLONGHASH).tar.bz2 gs://proving-keys-stable/keys-$(GITLONGHASH).tar.bz2
 
 update-keys:
