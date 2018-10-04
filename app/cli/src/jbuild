@@ -2,7 +2,7 @@
 
 (executable
   ((name cli)
-  (public_name cli)
+  (public_name coda)
    (libraries
     ( base64
       core
