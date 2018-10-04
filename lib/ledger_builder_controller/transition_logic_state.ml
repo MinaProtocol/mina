@@ -1,6 +1,8 @@
 open Core_kernel
 
 module type S = sig
+  type consensus_local_state
+
   type external_transition
 
   type tip
@@ -32,31 +34,84 @@ module type S = sig
   val apply_all : t -> Change.t list -> t
   (** Invariant: Changes must be applied to atomically result in a consistent state *)
 
-  val create : (tip, state_hash) With_hash.t -> t
+  val create :
+       consensus_local_state:consensus_local_state
+    -> (tip, state_hash) With_hash.t
+    -> t
 end
 
-module Make (Security : sig
-  val max_depth : [`Infinity | `Finite of int]
-end) (Transition : sig
-  type t [@@deriving compare, sexp, bin_io]
-end) (Tip : sig
-  type t [@@deriving sexp]
+module type Inputs_intf = sig
+  module Security : sig
+    val max_depth : [`Infinity | `Finite of int]
+  end
 
-  type state_hash [@@deriving compare, sexp, bin_io]
+  module Ledger : sig
+    type t
+  end
 
-  val assert_materialization_of :
-       (t, state_hash) With_hash.t
-    -> (Transition.t, state_hash) With_hash.t
-    -> unit
-end) :
+  module Ledger_builder : sig
+    type t
+
+    val ledger : t -> Ledger.t
+  end
+
+  module Consensus_mechanism : sig
+    module Local_state : sig
+      type t
+    end
+
+    module Consensus_state : sig
+      type value
+    end
+
+    module Protocol_state : sig
+      type value
+
+      val consensus_state : value -> Consensus_state.value
+    end
+
+    module External_transition : sig
+      type t [@@deriving compare, sexp, bin_io]
+    end
+
+    val lock_transition :
+         Consensus_state.value
+      -> Consensus_state.value
+      -> ledger:Ledger.t
+      -> local_state:Local_state.t
+      -> unit
+  end
+
+  module Tip : sig
+    type t [@@deriving sexp]
+
+    type state_hash [@@deriving compare, sexp, bin_io]
+
+    val protocol_state : t -> Consensus_mechanism.Protocol_state.value
+
+    val ledger_builder : t -> Ledger_builder.t
+
+    val assert_materialization_of :
+         (t, state_hash) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, state_hash) With_hash.t
+      -> unit
+  end
+end
+
+module Make (Inputs : Inputs_intf) :
   S
-  with type tip := Tip.t
-   and type external_transition := Transition.t
-   and type state_hash := Tip.state_hash =
+  with type tip := Inputs.Tip.t
+   and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
+   and type external_transition :=
+              Inputs.Consensus_mechanism.External_transition.t
+   and type state_hash := Inputs.Tip.state_hash =
 struct
+  open Inputs
+  open Consensus_mechanism
+
   module Transition_tree =
     Ktree.Make (struct
-        type t = (Transition.t, Tip.state_hash) With_hash.t
+        type t = (External_transition.t, Tip.state_hash) With_hash.t
         [@@deriving compare, bin_io, sexp]
       end)
       (Security)
@@ -87,6 +142,7 @@ struct
     { locked_tip: (Tip.t, Tip.state_hash) With_hash.t
     ; longest_branch_tip: (Tip.t, Tip.state_hash) With_hash.t
     ; ktree: Transition_tree.t option
+    ; consensus_local_state: Local_state.t
     (* TODO: This impl assumes we have the original Ouroboros assumption. In
        order to work with the Praos assumption we'll need to keep a linked
        list as well at the prefix of size (#blocks possible out of order)
@@ -95,7 +151,18 @@ struct
   [@@deriving fields]
 
   let apply t = function
-    | Locked_tip h -> {t with locked_tip= h}
+    | Locked_tip locked_tip ->
+        let consensus_state_of_tip tip =
+          Tip.protocol_state tip |> Protocol_state.consensus_state
+        in
+        let old_tip = t.locked_tip.data in
+        let new_tip = locked_tip.data in
+        lock_transition
+          (consensus_state_of_tip old_tip)
+          (consensus_state_of_tip new_tip)
+          ~ledger:(Ledger_builder.ledger @@ Tip.ledger_builder new_tip)
+          ~local_state:t.consensus_local_state ;
+        {t with locked_tip}
     | Longest_branch_tip h -> {t with longest_branch_tip= h}
     | Ktree k -> {t with ktree= Some k}
 
@@ -120,6 +187,9 @@ struct
     let t' = List.fold changes ~init:t ~f:apply in
     assert_state_valid t' ; t'
 
-  let create genesis_heavy =
-    {locked_tip= genesis_heavy; longest_branch_tip= genesis_heavy; ktree= None}
+  let create ~consensus_local_state genesis_heavy =
+    { locked_tip= genesis_heavy
+    ; longest_branch_tip= genesis_heavy
+    ; ktree= None
+    ; consensus_local_state }
 end
