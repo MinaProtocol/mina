@@ -1144,7 +1144,10 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 (`Call
                   (fun net exn ->
                     Logger.error log "%s" (Exn.to_string_mach exn) ))
-              (Tcp.Where_to_listen.bind_to (Tcp.Bind_to_address.Address (Unix.Inet_addr.of_string "0.0.0.0")) (On_port rest_server_port))
+              (Tcp.Where_to_listen.bind_to
+                 (Tcp.Bind_to_address.Address
+                    (Unix.Inet_addr.of_string "0.0.0.0"))
+                 (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 let route_not_found () =
@@ -1152,9 +1155,12 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 in
                 match Uri.path uri with
                 | "/" -> Server.respond_with_file "index.html"
-                | "/web-demo-art/problem.png" -> Server.respond_with_file "web-demo-art/problem.png"
-                | "/web-demo-art/net-hand.png" -> Server.respond_with_file "web-demo-art/net-hand.png"
-                | "/web-demo-art/your-hands.png" -> Server.respond_with_file "web-demo-art/your-hands.png"
+                | "/web-demo-art/problem.png" ->
+                    Server.respond_with_file "web-demo-art/problem.png"
+                | "/web-demo-art/net-hand.png" ->
+                    Server.respond_with_file "web-demo-art/net-hand.png"
+                | "/web-demo-art/your-hands.png" ->
+                    Server.respond_with_file "web-demo-art/your-hands.png"
                 | "/logo.svg" -> Server.respond_with_file "logo.svg"
                 | "/main.css" -> Server.respond_with_file "main.css"
                 | "/_build/default/app/lite/verifier_main.bc.js" ->

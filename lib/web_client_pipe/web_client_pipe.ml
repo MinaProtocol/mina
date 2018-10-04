@@ -61,8 +61,7 @@ struct
     ; reader: Lite_base.Lite_chain.t Linear_pipe.Reader.t
     ; writer: Lite_base.Lite_chain.t Linear_pipe.Writer.t }
 
-  let write_to_storage {location; _} request
-      chain =
+  let write_to_storage {location; _} request chain =
     let chain_file = location ^/ "chain" in
     let%bind () = Store.store chain_file chain in
     Request.put request chain_file

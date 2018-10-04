@@ -105,7 +105,7 @@ let analytics =
 |literal}
 
 module Links = struct
-  let label (_,_,x) = x
+  let label (_, _, x) = x
 
   let mail = ("contact@o1labs.org", "mailto:contact@o1labs.org", "mail")
 
@@ -145,17 +145,16 @@ module Input_button = struct
       | `Node n -> n
     in
     node "a"
-      ([ href url
-      ; Style.(
-          render
-            ( of_class
-                "user-select-none hover-bg-black white no-underline ttu \
-                 tracked bg-silver ph2 icon-shadow br4 tc lh-copy"
-            + extra_style ))
-      ; analytics_handler label
-      ] @ (if new_tab then [ Attribute.create "target" "_blank" ] else []))
+      ( [ href url
+        ; Style.(
+            render
+              ( of_class
+                  "user-select-none hover-bg-black white no-underline ttu \
+                   tracked bg-silver ph2 icon-shadow br4 tc lh-copy"
+              + extra_style ))
+        ; analytics_handler label ]
+      @ if new_tab then [Attribute.create "target" "_blank"] else [] )
       [button_node]
-
 
   let create ~label ~button_hint ~extra_style ~url ~new_tab () =
     let open Html in
@@ -166,29 +165,30 @@ module Input_button = struct
       | `Node n -> n
     in
     node "a"
-      ([ href url
-      ; Style.(
-          render
-            ( of_class
-                "user-select-none hover-bg-black white no-underline ttu \
-                 tracked bg-silver icon-shadow ph3 pv3 br4 tc lh-copy"
-            + extra_style ))
-      ; analytics_handler label
-      ] @ (if new_tab then [ Attribute.create "target" "_blank" ] else []))
+      ( [ href url
+        ; Style.(
+            render
+              ( of_class
+                  "user-select-none hover-bg-black white no-underline ttu \
+                   tracked bg-silver icon-shadow ph3 pv3 br4 tc lh-copy"
+              + extra_style ))
+        ; analytics_handler label ]
+      @ if new_tab then [Attribute.create "target" "_blank"] else [] )
       [button_node]
 
-  let cta ?(extra_style="") ?(new_tab=true) ~label ~button_hint ~url () =
+  let cta ?(extra_style= "") ?(new_tab= true) ~label ~button_hint ~url () =
     let open Html in
     let open Html_concise in
-    create ~button_hint:(`Text button_hint) ~new_tab ~extra_style:(Style.of_class ("f3 ph4 pv3 " ^ extra_style)) ~label ~url ()
+    create ~button_hint:(`Text button_hint) ~new_tab
+      ~extra_style:(Style.of_class ("f3 ph4 pv3 " ^ extra_style))
+      ~label ~url ()
 
-  let fixed ?(new_tab=true) ~button_hint () =
+  let fixed ?(new_tab= true) ~button_hint () =
     let open Html in
     let open Html_concise in
     create ~button_hint:(`Text button_hint)
       ~extra_style:(Style.of_class "f5 bottomrightfixed br--top")
-      ~new_tab
-      ~label:"fixed" ~url:"https://goo.gl/forms/PTusW11oYpLKJrZH3" ()
+      ~new_tab ~label:"fixed" ~url:"https://goo.gl/forms/PTusW11oYpLKJrZH3" ()
 end
 
 module Navbar = struct
@@ -214,14 +214,13 @@ module Navbar = struct
             [] ]
     in
     let maybe_no_underline label =
-      if current_page = label then
-        Style.empty
-      else
-        Style.of_class "no-underline"
+      if current_page = label then Style.empty
+      else Style.of_class "no-underline"
     in
     let a' ?(open_new_tab= false) ?(style= Style.empty) url children label =
       a
-        Style.(of_class "fw3 silver tracked ttu" + style + (maybe_no_underline label))
+        Style.(
+          of_class "fw3 silver tracked ttu" + style + maybe_no_underline label)
         url children label open_new_tab
     in
     div
@@ -233,7 +232,8 @@ module Navbar = struct
       ; div
           [class_ "flex justify-around w-75"]
           [ (let name, url, label = Links.blog in
-             a' ~style:Visibility.no_mobile ~open_new_tab:true url [text name] label)
+             a' ~style:Visibility.no_mobile ~open_new_tab:true url [text name]
+               label)
           ; (let name, url, label = Links.testnet in
              a' url [text name] label)
           ; a' ~style:Visibility.only_large "index.html#community"
@@ -261,48 +261,51 @@ module Footer = struct
 end
 
 module Compound_chunk = struct
-  let create ?(variant=`With_image) ~important_text ~image ~image_positioning () =
+  let create ?(variant= `With_image) ~important_text ~image ~image_positioning
+      () =
     let open Html_concise in
-    match image with 
-    | None -> 
-        (div
-           [class_ "flex items-center mb5 fixed_no_img_height"]
-           [ important_text ])
+    match image with
+    | None ->
+        div
+          [class_ "flex items-center mb5 fixed_no_img_height"]
+          [important_text]
     | Some image ->
-    let left, right =
-      match image_positioning with
-      | Image_positioning.Left -> (image, important_text)
-      | Right -> (important_text, image)
-    in
-    Mobile_switch.create
-      ~not_small:
-        (div
-           [class_ "flex items-center mb5"]
-           [ div [class_ "flex w-50"] [div [class_ "mw6"] [left]]
-           ; div [class_ "flex w-50"] [div [class_ "center"] [right]] ])
-      ~small:
-        (div [class_ "w-100 center mb4"]
-             (match variant with
-             | `With_image -> [div [class_ "flex justify-center mb3"] [image]; important_text]
-             | `No_image_on_small -> [important_text])
-           )
+        let left, right =
+          match image_positioning with
+          | Image_positioning.Left -> (image, important_text)
+          | Right -> (important_text, image)
+        in
+        Mobile_switch.create
+          ~not_small:
+            (div
+               [class_ "flex items-center mb5"]
+               [ div [class_ "flex w-50"] [div [class_ "mw6"] [left]]
+               ; div [class_ "flex w-50"] [div [class_ "center"] [right]] ])
+          ~small:
+            (div [class_ "w-100 center mb4"]
+               ( match variant with
+               | `With_image ->
+                   [ div [class_ "flex justify-center mb3"] [image]
+                   ; important_text ]
+               | `No_image_on_small -> [important_text] ))
 end
 
 module Section = struct
-  let section' ?(heading_size=`Normal) ?heading ?(footer= false) content scheme =
+  let section' ?(heading_size= `Normal) ?heading ?(footer= false) content
+      scheme =
     let open Html_concise in
     let color, bg_color =
       match scheme with
       | `Light -> ("black", "bg-white")
       | `Dark -> ("silver", "bg-snow")
     in
-    let heading_font = 
-      match heading_size with
-      | `Normal -> "f5"
-      | `Large -> "f3"
+    let heading_font =
+      match heading_size with `Normal -> "f5" | `Large -> "f3"
     in
     let heading_style =
-      Style.(Styles.heading_style + of_class color + of_class ("tc mt0 mb4 " ^ heading_font))
+      let open Style in
+      Styles.heading_style + of_class color
+      + of_class ("tc mt0 mb4 " ^ heading_font)
     in
     let maybe_id =
       match heading with
@@ -332,66 +335,94 @@ module Section = struct
 
   let carousel ?heading ~pages ~scheme () =
     let open Html_concise in
-    let carousel = 
+    let carousel =
       let control_divs =
         List.mapi pages ~f:(fun i _ ->
-          div [id (Printf.sprintf "item-%d" i); Style.(render (of_class "control-operator "))] []
-        )
+            div
+              [ id (Printf.sprintf "item-%d" i)
+              ; Style.(render (of_class "control-operator ")) ]
+              [] )
       in
       let controls =
-        List.init (List.length pages) ~f:(fun i -> 
-          let skip =
-            Mobile_switch.create
-              ~not_small:(
-              if i = 4
-              then (a [Style.(render (of_class "jump")); href "#item-0"] [text "start over"] )
-              else (a [Style.(render (of_class "jump")); href "#item-4"] [text "skip"] )
-            )
-              ~small: (div [] [])
-          in
-          let next =
-              if i = 4
-              then 
+        List.init (List.length pages) ~f:(fun i ->
+            let skip =
+              Mobile_switch.create
+                ~not_small:
+                  ( if i = 4 then
+                      a
+                        [Style.(render (of_class "jump")); href "#item-0"]
+                        [text "start over"]
+                  else
+                    a
+                      [Style.(render (of_class "jump")); href "#item-4"]
+                      [text "skip"] )
+                ~small:(div [] [])
+            in
+            let next =
+              if i = 4 then
                 let button_hint, label, url, new_tab =
-                  "Follow us", "demo-follow-cta", "https://twitter.com/codaprotocol?lang=en", true
-
+                  ( "Follow us"
+                  , "demo-follow-cta"
+                  , "https://twitter.com/codaprotocol?lang=en"
+                  , true )
                 in
                 let itag = Html.node "i" in
                 let twitter =
-                  itag [Style.just "ml-1 ml-2-ns fab f1 f2-m f1-l fa-twitter mr3 mr2-m mr3-l"] []
+                  itag
+                    [ Style.just
+                        "ml-1 ml-2-ns fab f1 f2-m f1-l fa-twitter mr3 mr2-m \
+                         mr3-l" ]
+                    []
                 in
-                Mobile_switch.create
-                  ~small:
-                    (div [] [])
+                Mobile_switch.create ~small:(div [] [])
                   ~not_small:
-                    (Input_button.hack_create_i'm_tired ~button_hint:(`Node (div [Style.just "flex items-center pv2 pr2 pl3 f3"] [span [] [twitter]; span [] [text button_hint]])) ~label
-                              ~url ~extra_style:(Style.of_class "progress-button pv2") ~new_tab ())
+                    (Input_button.hack_create_i'm_tired
+                       ~button_hint:
+                         (`Node
+                           (div
+                              [Style.just "flex items-center pv2 pr2 pl3 f3"]
+                              [span [] [twitter]; span [] [text button_hint]]))
+                       ~label ~url
+                       ~extra_style:(Style.of_class "progress-button pv2")
+                       ~new_tab ())
               else
-                a [Style.(render (of_class "next-button")); href (Printf.sprintf "#item-%d" (i+1))] [div [] [text "›"]]
-          in
-          div [Style.(render (of_class "controls flex justify-left user-select-none"))]
-            ([ div []
-              (List.mapi pages ~f:(fun j _ ->
-                let selected = if j=i then " selected" else "" in
-                a [href (Printf.sprintf "#item-%d" j)
-                  ; Style.(render (of_class ("control-button" ^ selected)))]
-                [Html.text {literal|•|literal}]
-              ))
-            ; skip
-            ; next ])
-          )
+                a
+                  [ Style.(render (of_class "next-button"))
+                  ; href (Printf.sprintf "#item-%d" (i + 1)) ]
+                  [div [] [text "›"]]
+            in
+            div
+              [ Style.(
+                  render
+                    (of_class "controls flex justify-left user-select-none"))
+              ]
+              [ div []
+                  (List.mapi pages ~f:(fun j _ ->
+                       let selected = if j = i then " selected" else "" in
+                       a
+                         [ href (Printf.sprintf "#item-%d" j)
+                         ; Style.(
+                             render (of_class ("control-button" ^ selected)))
+                         ]
+                         [Html.text {literal|•|literal}] ))
+              ; skip
+              ; next ] )
       in
-      let items = 
-        List.map2_exn pages controls ~f:(fun page control -> div [Style.(render (of_class "item mt0 mb0 ml0 mr0"))] [ page; control ])
+      let items =
+        List.map2_exn pages controls ~f:(fun page control ->
+            div
+              [Style.(render (of_class "item mt0 mb0 ml0 mr0"))]
+              [page; control] )
       in
-      div [Style.(render (of_class "gallery"))]
-        (control_divs @ items)
+      div [Style.(render (of_class "gallery"))] (control_divs @ items)
     in
     section' ?heading carousel scheme
 
   let major_compound ?heading ~important_text ~image ~image_positioning ~scheme
       () =
-    section' ?heading (Compound_chunk.create ~important_text ~image ~image_positioning ()) scheme
+    section' ?heading
+      (Compound_chunk.create ~important_text ~image ~image_positioning ())
+      scheme
 
   let major_text ?heading ~important_text ~scheme () =
     let open Html_concise in
@@ -548,7 +579,8 @@ let wrap ?(headers= []) ?(fixed_footer= false) ?title ~page_label sections =
             ~href:
               "https://fonts.googleapis.com/css?family=Alegreya+Sans:300,300i,400,400i,500,500i,700,700i,800,800i,900,900i"
         ; link ~href:"/static/css/common.css"
-        ; link ~href:"/static/css/gallery.css" (* TODO: Only have this on demo *)
+        ; link ~href:"/static/css/gallery.css"
+          (* TODO: Only have this on demo *)
         ; literal
             {html|<link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.0.12/css/all.css" integrity="sha384-G0fIWCsCzJIMAVNQPfjH08cyYaUtMwjJwqiRKxxE/rx96Uroj1BtIQ6MLJuheaO9" crossorigin="anonymous">|html}
         ; literal
@@ -580,6 +612,8 @@ let wrap ?(headers= []) ?(fixed_footer= false) ?title ~page_label sections =
     in
     node "body"
       [class_ "metropolis bg-white black"]
-      [navbar; node "div" [class_ "wrapper"] reified_sections; literal {html|<script defer src="static/main.bc.js"></script>|html}]
+      [ navbar
+      ; node "div" [class_ "wrapper"] reified_sections
+      ; literal {html|<script defer src="static/main.bc.js"></script>|html} ]
   in
   node "html" [] [head; body]

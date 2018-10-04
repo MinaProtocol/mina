@@ -78,27 +78,24 @@ end
 
 let get_service () =
   Unix.getenv request_service_name
-  |> Option.value_map
-       ~default:`None
-       ~f:(function "S3" -> `S3 | path -> `Local path)
+  |> Option.value_map ~default:`None ~f:(function
+       | "S3" -> `S3
+       | path -> `Local path )
 
 let verification_key_basename = "client_verification_key"
 
 let verification_key_location () =
   let autogen = Cache_dir.autogen_path ^/ verification_key_basename in
   let manual = Cache_dir.manual_install_path ^/ verification_key_basename in
-  match%bind
-    Sys.file_exists manual
-  with
+  match%bind Sys.file_exists manual with
   | `Yes -> return (Ok manual)
   | `No | `Unknown ->
-    match%map Sys.file_exists autogen with
-    | `Yes -> Ok autogen
-    | `No | `Unknown ->
-      Or_error.errorf
-        !"IO ERROR: Verification key does not exist\n        \
-          You should probably turn off snarks"
-;;
+      match%map Sys.file_exists autogen with
+      | `Yes -> Ok autogen
+      | `No | `Unknown ->
+          Or_error.errorf
+            !"IO ERROR: Verification key does not exist\n        \
+              You should probably turn off snarks"
 
 let store_verification_keys log store =
   let res =
@@ -112,7 +109,6 @@ let store_verification_keys log store =
         Logger.error log
           !"Could not send verification keys: %s"
           (Error.to_string_hum e) )
-;;
 
 let copy ~src ~dst =
   Reader.file_contents src >>= fun contents -> Writer.save dst ~contents
@@ -123,18 +119,19 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
       Logger.trace log "Not running a web client pipe" ;
       don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))
   | `Local path ->
-      Logger.trace log "Saving chain locally at path %s" path;
+      Logger.trace log "Saving chain locally at path %s" path ;
       store_verification_keys log (fun vk_location ->
-        copy ~src:vk_location ~dst:(path ^/ verification_key_basename)
-        >>| Or_error.return);
+          copy ~src:vk_location ~dst:(path ^/ verification_key_basename)
+          >>| Or_error.return ) ;
       let get_lite_chain = Option.value_exn Program.get_lite_chain in
       Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
-        Writer.save (path ^/ "chain")
-          ~contents:(
-            B64.encode
-              (Binable.to_string (module Lite_base.Lite_chain)
-                 (get_lite_chain coda [ Genesis_ledger.high_balance_pk ]))))
-      |> don't_wait_for;
+          Writer.save (path ^/ "chain")
+            ~contents:
+              (B64.encode
+                 (Binable.to_string
+                    (module Lite_base.Lite_chain)
+                    (get_lite_chain coda [Genesis_ledger.high_balance_pk]))) )
+      |> don't_wait_for
   | `S3 ->
       Logger.trace log "Running S3 web client pipe" ;
       let module Web_config = struct
@@ -147,11 +144,11 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
           (Web_client_pipe.S3_put_request) in
       Broadcaster.run coda |> don't_wait_for ;
       store_verification_keys log (fun vk_location ->
-        let open Deferred.Or_error.Let_syntax in
-        Logger.trace log "Copying verification keys %s to s3 client"
-          vk_location ;
-        let%bind verification_request =
-          Web_client_pipe.S3_put_request.create ()
-        in
-        Web_client_pipe.S3_put_request.put verification_request
-          vk_location)
+          let open Deferred.Or_error.Let_syntax in
+          Logger.trace log "Copying verification keys %s to s3 client"
+            vk_location ;
+          let%bind verification_request =
+            Web_client_pipe.S3_put_request.create ()
+          in
+          Web_client_pipe.S3_put_request.put verification_request vk_location
+      )

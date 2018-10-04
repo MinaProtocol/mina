@@ -19,8 +19,7 @@ end
 
 module Response = struct
   module T = struct
-    type result = { state_hash : Pedersen.Digest.t }
-    [@@deriving bin_io]
+    type result = {state_hash: Pedersen.Digest.t} [@@deriving bin_io]
 
     type t = Query.t * result Or_error.t [@@deriving bin_io]
   end
