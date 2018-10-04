@@ -6,7 +6,7 @@ PROJECT='codaclient'
 
 MAJORVERSION=0
 DATE=`date +%m-%d`
-GITHASH=`git rev-parse --short HEAD`
+GITHASH=`git rev-parse --short=8 HEAD`
 
 VERSION="${MAJORVERSION}.${DATE}.${GITHASH}"
 BUILDDIR="${PROJECT}_${VERSION}"
