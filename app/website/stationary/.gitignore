@@ -8,8 +8,8 @@ setup.log
 setup.data
 _site
 myocamlbuild.ml
-**.mllib
-**/META
-**.mldylib
-**.docdir
-**.odocl
+*.mllib
+META
+*.mldylib
+*.docdir
+*.odocl
