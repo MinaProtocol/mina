@@ -6,7 +6,7 @@ PROJECT='codaclient'
 
 MAJORVERSION=0
 DATE=`date +%m-%d`
-GITHASH=`git rev-parse --short HEAD`
+GITHASH=`git rev-parse --short=8 HEAD`
 
 VERSION="${MAJORVERSION}.${DATE}.${GITHASH}"
 BUILDDIR="${PROJECT}_${VERSION}"
@@ -32,9 +32,14 @@ cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
 cp .././app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
 
 # verification keys
-if [ -d "/tmp/cli_cache_dir" ]; then
+if [ -d "/var/lib/coda" ]; then
     mkdir -p ${BUILDDIR}/var/lib/coda
-    cp /tmp/cli_cache_dir/*_verification ${BUILDDIR}/var/lib/coda
+    cp /var/lib/coda/*_verification ${BUILDDIR}/var/lib/coda
+else
+    if [ -d "/tmp/cli_cache_dir" ]; then
+        mkdir -p ${BUILDDIR}/var/lib/coda
+        cp /tmp/cli_cache_dir/*_verification ${BUILDDIR}/var/lib/coda
+    fi
 fi
 
 # Ugly hack #1 to patch elf interpreter to get past nix-build
