@@ -51,6 +51,9 @@ val next_k_jobs :
 
 val next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list
 
+val next_jobs_sequence :
+  state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t
+
 val enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t
 
 val free_space : state:('a, 'd) State.t -> int

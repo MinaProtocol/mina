@@ -203,22 +203,36 @@ module State = struct
     in
     go init 0 0
 
-  let jobs_list t =
+  let make_jobs_ordered f empty t =
     let rec go count t =
-      if count = (parallelism t * 2) - 1 then []
+      if count = (parallelism t * 2) - 1 then empty
       else
         let j = Ring_buffer.read t.jobs in
         let pos = t.jobs.position in
         set_next_position t t.level_pointer ;
-        (j, pos) :: go (count + 1) t
+        (* build list or sequence *)
+        f (j, pos) (go (count + 1) t)
     in
     (t.jobs).position <- 0 ;
     let js = go 0 t in
     (t.jobs).position <- 0 ;
     js
 
+  let jobs_list t =
+    let cons elt elts = elt :: elts in
+    make_jobs_ordered cons [] t
+
+  let jobs_sequence t =
+    let open Sequence in
+    let seq_cons elt elts = append (return elt) elts in
+    make_jobs_ordered seq_cons empty t
+
   let read_jobs t =
     List.filter (jobs_list t) ~f:(fun (_, pos) -> parent_empty t.jobs pos)
+
+  let read_jobs_sequence t =
+    Sequence.filter (jobs_sequence t) ~f:(fun (_, pos) ->
+        parent_empty t.jobs pos )
 
   let job_ready job =
     let module J = Job in
@@ -230,6 +244,10 @@ module State = struct
 
   let jobs_ready state =
     List.filter_map (read_jobs state) ~f:(fun (job, _) -> job_ready job)
+
+  let jobs_ready_sequence state =
+    Sequence.filter_map (read_jobs_sequence state) ~f:(fun (job, _) ->
+        job_ready job )
 
   let update_new_job t z dir pos =
     let new_job (cur_job: ('a, 'd) Job.t) : ('a, 'd) Job.t Or_error.t =
@@ -319,6 +337,10 @@ let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
 
 let next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list =
  fun ~state -> State.jobs_ready state
+
+let next_jobs_sequence :
+    state:('a, 'd) State.t -> ('a, 'd) Available_job.t Sequence.t =
+ fun ~state -> State.jobs_ready_sequence state
 
 let next_k_jobs :
     state:('a, 'd) State.t -> k:int -> ('a, 'd) Available_job.t list Or_error.t =

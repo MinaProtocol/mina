@@ -575,7 +575,7 @@ module type Tip_intf = sig
     { protocol_state: protocol_state
     ; proof: protocol_state_proof
     ; ledger_builder: ledger_builder }
-  [@@deriving sexp, bin_io]
+  [@@deriving sexp, bin_io, fields]
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
 end
@@ -714,7 +714,6 @@ module type Consensus_mechanism_intf = sig
     -> time:Int64.t
     -> keypair:keypair
     -> transactions:transaction list
-    -> ledger:ledger
     -> (Protocol_state.value * Consensus_transition_data.value) option
 end
 

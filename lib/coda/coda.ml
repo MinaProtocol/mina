@@ -176,6 +176,8 @@ module type Ledger_builder_controller_intf = sig
 
   type protocol_state
 
+  type consensus_local_state
+
   type t
 
   type sync_query
@@ -193,6 +195,7 @@ module type Ledger_builder_controller_intf = sig
       ; external_transitions:
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
+      ; consensus_local_state: consensus_local_state
       ; longest_tip_location: string }
     [@@deriving make]
   end
@@ -238,6 +241,8 @@ module type Proposer_intf = sig
 
   type protocol_state_proof
 
+  type consensus_local_state
+
   type time_controller
 
   type keypair
@@ -258,6 +263,7 @@ module type Proposer_intf = sig
     -> change_feeder:change Linear_pipe.Reader.t
     -> time_controller:time_controller
     -> keypair:keypair
+    -> consensus_local_state:consensus_local_state
     -> t
 
   val transitions :
@@ -375,6 +381,7 @@ module type Inputs_intf = sig
      and type internal_transition := Consensus_mechanism.Internal_transition.t
      and type external_transition := Consensus_mechanism.External_transition.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type sync_query := Sync_ledger.query
      and type sync_answer := Sync_ledger.answer
      and type ledger_hash := Ledger_hash.t
@@ -388,6 +395,7 @@ module type Inputs_intf = sig
      and type transaction := Transaction.With_valid_signature.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
      and type external_transition := Consensus_mechanism.External_transition.t
@@ -489,6 +497,7 @@ module Make (Inputs : Inputs_intf) = struct
       Linear_pipe.create ()
     in
     let net_ivar = Ivar.create () in
+    let consensus_local_state = Consensus_mechanism.Local_state.create () in
     let lbc_deferred =
       Ledger_builder_controller.create
         (Ledger_builder_controller.Config.make ~parent_log:config.log
@@ -499,6 +508,7 @@ module Make (Inputs : Inputs_intf) = struct
                    ~self:(Public_key.compress config.keypair.public_key)
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
+           ~consensus_local_state
            ~longest_tip_location:config.ledger_builder_persistant_location
            ~external_transitions:external_transitions_reader)
     in
@@ -599,6 +609,7 @@ module Make (Inputs : Inputs_intf) = struct
           Proposer.create ~parent_log:config.log ~change_feeder:tips_r
             ~get_completed_work:(Snark_pool.get_completed_work snark_pool)
             ~time_controller:config.time_controller ~keypair:config.keypair
+            ~consensus_local_state
         in
         don't_wait_for
           (Linear_pipe.transfer_id
