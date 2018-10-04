@@ -49,14 +49,15 @@ module State = struct
     ; current_data_length= 0
     ; base_none_pos= Some (parallelism - 1) }
 
-  let next_pos p cur_pos = if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
+  let next_leaf_pos p cur_pos =
+    if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
 
   (*Assuming that Base Somes are picked in the same order*)
-  let next_base_none_pos state cur_pos =
+  let next_base_pos state cur_pos =
     let p = parallelism state in
-    let new_pos = next_pos p cur_pos in
-    match Ring_buffer.read_i state.jobs new_pos with
-    | Base None -> Some new_pos
+    let next_pos = next_leaf_pos p cur_pos in
+    match Ring_buffer.read_i state.jobs next_pos with
+    | Base None -> Some next_pos
     | _ -> None
 
   let%test_unit "parallelism derived from jobs" =
@@ -155,7 +156,8 @@ module State = struct
   is kept track of in the level_pointer. if the cur_pos is the last node on the 
   current level then next node is the first node on the next level otherwise 
   return the next node on the same level*)
-  let next_position parallelism level_pointer cur_pos =
+
+  let next_position_info parallelism level_pointer cur_pos =
     let levels = Int.floor_log2 parallelism + 1 in
     let cur_level = Int.floor_log2 (cur_pos + 1) in
     let last_node = Int.pow 2 (cur_level + 1) - 2 in
@@ -163,9 +165,14 @@ module State = struct
     if
       (level_pointer.(cur_level) = first_node && cur_pos = last_node)
       || cur_pos = level_pointer.(cur_level) - 1
-    then level_pointer.(Int.( % ) (cur_level + 1) levels)
-    else if cur_pos = last_node then first_node
-    else cur_pos + 1
+    then `Next_level level_pointer.(Int.( % ) (cur_level + 1) levels)
+    else if cur_pos = last_node then `Same_level first_node
+    else `Same_level (cur_pos + 1)
+
+  let next_position parallelism level_pointer cur_pos =
+    match next_position_info parallelism level_pointer cur_pos with
+    | `Same_level pos -> pos
+    | `Next_level pos -> pos
 
   let set_next_position t level_pointer =
     (t.jobs).position
@@ -305,7 +312,7 @@ module State = struct
         | None -> Or_error.error_string "No empty leaves"
         | Some pos ->
             let%map () = include_one_datum state a pos in
-            state.base_none_pos <- next_base_none_pos state pos )
+            state.base_none_pos <- next_base_pos state pos )
 end
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
@@ -341,6 +348,97 @@ let enqueue_data : state:('a, 'd) State.t -> data:'d list -> unit Or_error.t =
     state.current_data_length <- state.current_data_length + List.length data ;
     State.include_many_data state data )
 
+let is_valid t =
+  let p = State.parallelism t in
+  let validate_leaves =
+    let fold_over_leaves ~f ~init =
+      let rec go count pos acc =
+        if count = p then acc
+        else
+          let job = Ring_buffer.read_i t.jobs pos in
+          let acc' = f acc job in
+          go (count + 1) (State.next_leaf_pos p pos) acc'
+      in
+      go 0 (Option.value_exn (State.base_none_pos t)) init
+    in
+    let empty_leaves =
+      fold_over_leaves
+        ~f:(fun count job ->
+          match job with Base None -> count + 1 | _ -> count )
+        ~init:0
+    in
+    let continuous_empty_leaves =
+      fold_over_leaves
+        ~f:(fun (continue, count) job ->
+          if continue then
+            match job with
+            | State.Job.Base None -> (continue, count + 1)
+            | _ -> (false, count)
+          else (false, count) )
+        ~init:(true, 0)
+    in
+    free_space ~state:t = empty_leaves
+    && empty_leaves = snd continuous_empty_leaves
+  in
+  let validate_levels =
+    let fold_over_a_level ~f ~init level_start =
+      let rec go pos acc =
+        let job = Ring_buffer.read_i t.jobs pos in
+        let acc' = f acc job in
+        match State.next_position_info p t.level_pointer pos with
+        | `Same_level pos' -> go pos' acc'
+        | `Next_level _ -> acc'
+      in
+      go level_start init
+    in
+    let if_start_empty_all_empty level_start =
+      let is_empty = function
+        | State.Job.Base None -> true
+        | Merge (None, None) -> true
+        | _ -> false
+      in
+      let first_job = Ring_buffer.read_i t.jobs level_start in
+      if is_empty first_job then
+        fold_over_a_level
+          ~f:(fun acc job -> acc && is_empty job)
+          ~init:true level_start
+      else true
+    in
+    let at_most_one_partial_job level_start =
+      let is_partial = function
+        | State.Job.Merge (Some _, None) -> 1
+        | _ -> 0
+      in
+      let count =
+        fold_over_a_level ~init:0
+          ~f:(fun acc job -> acc + is_partial job)
+          level_start
+      in
+      count < 2
+    in
+    Array.fold t.level_pointer ~init:true ~f:(fun acc level_start ->
+        acc
+        && if_start_empty_all_empty level_start
+        && at_most_one_partial_job level_start )
+  in
+  let has_valid_merge_jobs =
+    State.fold_chronological t ~init:true ~f:(fun acc job ->
+        acc && match job with Merge (None, Some _) -> false | _ -> acc )
+  in
+  let non_empty_tree =
+    State.fold_chronological t ~init:false ~f:(fun acc job ->
+        acc
+        ||
+        match job with
+        | Base (Some _) -> true
+        | Merge (Some _, _) -> true
+        | _ -> false )
+  in
+  Option.is_some (State.base_none_pos t)
+  && free_space ~state:t > 0
+  && has_valid_merge_jobs && non_empty_tree && validate_leaves
+  && validate_levels
+
 let fill_in_completed_jobs :
        state:('a, 'd) State.t
     -> completed_jobs:'a State.Completed_job.t list
@@ -354,6 +452,9 @@ let fill_in_completed_jobs :
   if not (fst last_acc = fst state.acc) then snd state.acc else None
 
 let last_emitted_value (state: ('a, 'd) State.t) = snd state.acc
+
+let parallelism : state:('a, 'd) State.t -> int =
+ fun ~state -> State.parallelism state
 
 (*if the transaction queue does not have at least max_slots number of slots 
 before continuing onto the next queue, split max_slots = (x,y) 
@@ -407,6 +508,7 @@ let gen :
           in
           s.acc <- (fst s.acc, f_acc tuple x) ) ;
       Or_error.ok_exn @@ enqueue_data ~state:s ~data:chunk ;
+      assert (is_valid s) ;
       s )
 
 let%test_module "scans" =
@@ -456,6 +558,7 @@ let%test_module "scans" =
         | `Ok q ->
             let ds = Queue.to_list q in
             let%bind () = step_on_free_space state w ds f f_acc in
+            assert (is_valid state) ;
             go ()
       in
       go ()
@@ -664,4 +767,50 @@ let%test_module "scans" =
               in
               assert (after_42n = expected) )
       end )
+
+    let%test_unit "Test for invalid states" =
+      let exp = 3 in
+      let not_valid = Fn.compose not is_valid in
+      let ok = Or_error.ok_exn in
+      let create_job (s: ('a, 'd) State.t) pos job =
+        Ring_buffer.direct_update s.jobs pos ~f:(fun _ -> Ok job) |> ok
+      in
+      let empty_tree = State.create ~parallelism_log_2:exp in
+      let p = State.parallelism empty_tree in
+      assert (not_valid empty_tree) ;
+      let level_i = Int.pow 2 (exp - 1) in
+      let empty_leaves = empty_tree in
+      let partial_jobs = State.copy empty_leaves in
+      let () =
+        List.fold ~init:() [level_i - 1; level_i + 1] ~f:(fun _ pos ->
+            create_job partial_jobs pos (State.Job.Merge (Some 1, None)) )
+      in
+      assert (not_valid partial_jobs) ;
+      let invalid_job = State.copy empty_leaves in
+      let () =
+        create_job invalid_job (level_i - 1) (State.Job.Merge (None, Some 1))
+      in
+      assert (not_valid invalid_job) ;
+      let empty_jobs = State.copy empty_tree in
+      let _ =
+        List.fold ~init:() [p - 1; p] ~f:(fun _ pos ->
+            create_job empty_jobs pos (Base (Some 1)) )
+      in
+      let _ = create_job empty_jobs level_i (Merge (Some 1, Some 1)) in
+      assert (not_valid empty_jobs) ;
+      let incorrect_data_length = State.copy empty_leaves in
+      let incorrect_data_length =
+        {incorrect_data_length with State.current_data_length= 4}
+      in
+      let _ =
+        List.fold ~init:() [p - 1; p] ~f:(fun _ pos ->
+            create_job incorrect_data_length pos (Base (Some 1)) )
+      in
+      assert (not_valid incorrect_data_length) ;
+      let interspersed_data = State.copy incorrect_data_length in
+      let _ =
+        List.fold ~init:() [p + 2; p + 4] ~f:(fun _ pos ->
+            create_job interspersed_data pos (Base (Some 1)) )
+      in
+      assert (not_valid interspersed_data)
   end )

@@ -64,3 +64,7 @@ val last_emitted_value : ('a, 'd) State.t -> 'a option
 
 val partition_if_overflowing :
   max_slots:int -> ('a, 'd) State.t -> [`One of int | `Two of int * int]
+
+val parallelism : state:('a, 'd) State.t -> int
+
+val is_valid : ('a, 'd) State.t -> bool
