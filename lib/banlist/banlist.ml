@@ -1,59 +1,46 @@
 open Core
 
-module type Key_value_database = sig
-  type t
-
-  type key
-
-  type value
-
-  val create : unit -> t
-
-  val close : t -> unit
-
-  val get : t -> key:key -> value option
-
-  val set : t -> key:key -> data:value -> unit
-
-  val remove : t -> key:key -> unit
-end
-
 type host = Host_and_port.t [@@deriving sexp]
 
 module type S = sig
   type t
 
-  type host
+  type peer
 
   val create : ban_threshold:int -> timeout:Time.Span.t -> t
 
-  val record : t -> host -> Offense.t -> unit Or_error.t
+  val record : t -> peer -> Offense.t -> unit Or_error.t
 
   val compute_score : Offense.t -> int
 
   val compute_punishment : t -> Offense.t list -> Punishment.t option
 
-  val ban : t -> host -> Punishment.t -> unit
+  val ban : t -> peer -> Punishment.t -> unit
 
-  val unban : t -> host -> unit
+  val unban : t -> peer -> unit
 
   val lookup :
        t
-    -> host
+    -> peer
     -> [`Normal | `Punished of Punishment.t | `Suspicious of Offense.t list]
 
   val close : t -> unit
 end
 
-module Make
-    (Suspicious : Key_value_database
-                  with type key := host
-                   and type value := Offense.t list)
-    (Punished : Key_value_database
-                with type key := host
-                 and type value := Punishment.t) (Score : sig
-        val score : Offense.t -> int
-    end) : S with type host := Host_and_port.t =
+module Make (Peer : sig
+  include Hashable.S
+
+  val sexp_of_t : t -> Sexp.t
+end)
+(Suspicious : Key_value_database.S
+              with type key := Peer.t
+               and type value := Offense.t list)
+(Punished : Key_value_database.S
+            with type key := Peer.t
+             and type value := Punishment.t) (Score : sig
+    val score : Offense.t -> int
+end) :
+  S with type peer := Peer.t =
 struct
   (* TODO: implement timeout feature *)
   type t =
@@ -75,16 +62,16 @@ struct
     if score < ban_threshold then None
     else Some (Punishment.Timeout (Time.add (Time.now ()) timeout))
 
-  let ban {punished; _} host punishment =
-    Punished.set punished ~key:host ~data:punishment
+  let ban {punished; _} peer punishment =
+    Punished.set punished ~key:peer ~data:punishment
 
-  let unban {punished; _} host = Punished.remove punished ~key:host
+  let unban {punished; _} peer = Punished.remove punished ~key:peer
 
-  let lookup {suspicious; punished; _} host =
-    match Suspicious.get suspicious ~key:host with
+  let lookup {suspicious; punished; _} peer =
+    match Suspicious.get suspicious ~key:peer with
     | Some offenses -> `Suspicious offenses
     | None ->
-        Option.map (Punished.get punished ~key:host) ~f:(fun punishment ->
+        Option.map (Punished.get punished ~key:peer) ~f:(fun punishment ->
             `Punished punishment )
         |> Option.value ~default:`Normal
 
@@ -92,59 +79,33 @@ struct
     Suspicious.close suspicious ;
     Punished.close punished
 
-  let record ({suspicious; _} as t) host offense =
+  let record ({suspicious; _} as t) peer offense =
     let write_penalty offenses =
       ( match compute_punishment t offenses with
-      | None -> Suspicious.set suspicious ~key:host ~data:offenses
-      | Some punishment -> ban t host punishment ) ;
+      | None -> Suspicious.set suspicious ~key:peer ~data:offenses
+      | Some punishment -> ban t peer punishment ) ;
       Or_error.return ()
     in
-    match lookup t host with
+    match lookup t peer with
     | `Suspicious existing_offenses ->
         write_penalty (offense :: existing_offenses)
     | `Punished _ ->
         Or_error.errorf
-          !"Peer %{sexp:host} should not be able to make more offenses since \
-            they are blacklisted"
-          host
+          !"Peer %{sexp:Peer.t} should not be able to make more offenses \
+            since they are blacklisted"
+          peer
     | `Normal -> write_penalty [offense]
-end
-
-module Mock_db = struct
-  let create () = Host_and_port.Table.create ()
-
-  let get t ~key = Host_and_port.Table.find t key
-
-  let set = Host_and_port.Table.set
-
-  let remove t ~key = Host_and_port.Table.remove t key
-
-  let close _ = ()
 end
 
 let%test_module "banlist" =
   ( module struct
-    module Suspicious :
-      Key_value_database
-      with type key := Host_and_port.t
-       and type value := Offense.t list
-       and type t = Offense.t list Host_and_port.Table.t =
-    struct
-      include Mock_db
+    module Suspicious =
+      Key_value_database.Make_mock (Host_and_port)
+        (struct
+          type t = Offense.t list
+        end)
 
-      type t = Offense.t list Host_and_port.Table.t
-    end
-
-    module Punished :
-      Key_value_database
-      with type key := Host_and_port.t
-       and type value := Punishment.t
-       and type t = Punishment.t Host_and_port.Table.t =
-    struct
-      include Mock_db
-
-      type t = Punishment.t Host_and_port.Table.t
-    end
+    module Punished = Key_value_database.Make_mock (Host_and_port) (Punishment)
 
     let ban_threshold = 100
 
@@ -159,7 +120,7 @@ let%test_module "banlist" =
         | Send_bad_aux -> ban_threshold / 4
     end
 
-    module Banlist = Make (Suspicious) (Punished) (Score)
+    module Banlist = Make (Host_and_port) (Suspicious) (Punished) (Score)
 
     let host = Host_and_port.create ~host:"127.0.0.1" ~port:0
 
