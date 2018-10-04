@@ -39,3 +39,9 @@ RUN opam install camlp4
 RUN opam install ppx_deriving_yojson
 ADD ./external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
+
+RUN opam install js_of_ocaml 
+RUN opam install js_of_ocaml-ppx
+RUN opam install virtual_dom
+
+RUN sudo apt-get install --yes pandoc
