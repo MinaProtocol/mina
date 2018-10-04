@@ -7,7 +7,7 @@ module type Time_intf = sig
   val now : unit -> t
 end
 
-module type Stat_intf = sig
+module type Punishment_intf = sig
   type t
 
   type time
@@ -17,9 +17,9 @@ end
 
 module Make
     (Time : Time_intf)
-    (Stat : Stat_intf with type time := Time.t)
-    (DB : Key_value_database.S with type value := Stat.t) :
-  Key_value_database.S with type value := Stat.t and type key := DB.key =
+    (Punishment : Punishment_intf with type time := Time.t)
+    (DB : Key_value_database.S with type value := Punishment.t) :
+  Key_value_database.S with type value := Punishment.t and type key := DB.key =
 struct
   type t = {db: DB.t}
 
@@ -31,11 +31,13 @@ struct
 
   let get {db} ~key =
     DB.get db ~key
-    |> Option.bind ~f:(fun stat ->
+    |> Option.bind ~f:(fun punishment ->
            let current_time = Time.now () in
-           if Time.compare (Stat.eviction_time stat) current_time < 0 then (
-             DB.remove db ~key ; None )
-           else Some stat )
+           if
+             Time.compare (Punishment.eviction_time punishment) current_time
+             < 0
+           then ( DB.remove db ~key ; None )
+           else Some punishment )
 
   let close {db} = DB.close db
 
@@ -66,9 +68,9 @@ end
 
 let%test_module "banlist" =
   ( module struct
-    let host = 1
+    let peer = 1
 
-    module Mock_stat = struct
+    module Mock_punishment = struct
       type t = Int64.t
 
       let eviction_time = Fn.id
@@ -77,14 +79,14 @@ let%test_module "banlist" =
     module Storage = struct
       type key = Int.t
 
-      include Key_value_database.Make_mock (Int) (Mock_stat)
+      include Key_value_database.Make_mock (Int) (Mock_punishment)
     end
 
-    module Mock_db = Make (Mock_time) (Mock_stat) (Storage)
+    module Mock_db = Make (Mock_time) (Mock_punishment) (Storage)
 
     let schedule_punishment_lookup db is_punished time =
       Mock_time.set_event time ~f:(fun _time ->
-          is_punished := Mock_db.get db ~key:host |> Option.is_some )
+          is_punished := Mock_db.get db ~key:peer |> Option.is_some )
 
     let%test_unit "time logic" =
       Mock_time.with_simulator ~f:(fun _ ->
@@ -92,7 +94,7 @@ let%test_module "banlist" =
           let db = Mock_db.create () in
           let is_punished = ref true in
           let evict_time = Int64.of_int 4 in
-          Mock_db.set db ~key:host ~data:evict_time ;
+          Mock_db.set db ~key:peer ~data:evict_time ;
           schedule_punishment_lookup db is_punished (Int64.pred evict_time) ;
           schedule_punishment_lookup db is_punished (Int64.succ evict_time) ;
           Async.Thread_safe.block_on_async_exn (fun () ->
@@ -113,8 +115,8 @@ let%test_module "banlist" =
           let new_evict_time = old_evict_time |> Int64.succ |> Int64.succ in
           schedule_punishment_lookup db is_punished (Int64.succ old_evict_time) ;
           schedule_punishment_lookup db is_punished (Int64.succ new_evict_time) ;
-          Mock_db.set db ~key:host ~data:old_evict_time ;
-          Mock_db.set db ~key:host ~data:new_evict_time ;
+          Mock_db.set db ~key:peer ~data:old_evict_time ;
+          Mock_db.set db ~key:peer ~data:new_evict_time ;
           Async.Thread_safe.block_on_async_exn (fun () ->
               let%bind () = Mock_time.tick () in
               [%test_result : Bool.t] ~message:"peer should still be banned"

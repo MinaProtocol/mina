@@ -1,28 +1,37 @@
 open Core
+open Unsigned
 
 type host = Host_and_port.t [@@deriving sexp]
+
+module Score = UInt32
+
+module Punishment_record = struct
+  type t = {score: Score.t; punishment: Punishment.t}
+
+  let evict_time {punishment; _} = Punishment.evict_time punishment
+
+  let create_timeout score = {score; punishment= Punishment.create_timeout ()}
+end
 
 module type S = sig
   type t
 
   type peer
 
-  val create : ban_threshold:int -> timeout:Time.Span.t -> t
+  type offense
 
-  val record : t -> peer -> Offense.t -> unit Or_error.t
+  type punishment
 
-  val compute_score : Offense.t -> int
+  val create : ban_threshold:int -> t
 
-  val compute_punishment : t -> Offense.t list -> Punishment.t option
+  val record : t -> peer -> offense -> unit Or_error.t
 
-  val ban : t -> peer -> Punishment.t -> unit
+  val ban : t -> peer -> punishment -> unit
 
   val unban : t -> peer -> unit
 
   val lookup :
-       t
-    -> peer
-    -> [`Normal | `Punished of Punishment.t | `Suspicious of Offense.t list]
+    t -> peer -> [`Normal | `Punished of punishment | `Suspicious of Score.t]
 
   val close : t -> unit
 end
@@ -32,127 +41,123 @@ module Make (Peer : sig
 
   val sexp_of_t : t -> Sexp.t
 end)
-(Suspicious : Key_value_database.S
+(Suspicious_db : Key_value_database.S
               with type key := Peer.t
-               and type value := Offense.t list)
-(Punished : Key_value_database.S
+               and type value := Score.t)
+(Punished_db : Key_value_database.S
             with type key := Peer.t
-             and type value := Punishment.t) (Score : sig
-    val score : Offense.t -> int
+             and type value := Punishment_record.t) (Score_mechanism : sig
+    val score : Offense.t -> Score.t
 end) :
-  S with type peer := Peer.t =
+  S
+  with type peer := Peer.t
+   and type offense := Offense.t
+   and type punishment := Punishment_record.t =
 struct
-  (* TODO: implement timeout feature *)
   type t =
-    { suspicious: Suspicious.t
-    ; punished: Punished.t
-    ; ban_threshold: int
-    ; timeout: Time.Span.t }
+    {suspicious: Suspicious_db.t; 
+    punished: Punished_db.t; 
+    ban_threshold: Score.t}
 
-  let create ~ban_threshold ~timeout =
-    let suspicious = Suspicious.create () in
-    let punished = Punished.create () in
-    {suspicious; punished; ban_threshold; timeout}
+  let create ~ban_threshold =
+    let suspicious = Suspicious_db.create () in
+    let punished = Punished_db.create () in
+    {suspicious; punished; ban_threshold= Score.of_int ban_threshold}
 
-  let compute_score = Score.score
-
-  (* TODO: Include Punishment.Forever logic *)
-  let compute_punishment {ban_threshold; timeout; _} offenses =
-    let score = List.sum (module Int) offenses ~f:compute_score in
-    if score < ban_threshold then None
-    else Some (Punishment.Timeout (Time.add (Time.now ()) timeout))
+  let compute_punishment {ban_threshold; _} score =
+    if Score.compare score ban_threshold < 0 then None
+    else Some (Punishment_record.create_timeout score)
 
   let ban {punished; _} peer punishment =
-    Punished.set punished ~key:peer ~data:punishment
+    Punished_db.set punished ~key:peer ~data:punishment
 
-  let unban {punished; _} peer = Punished.remove punished ~key:peer
+  let unban {punished; _} peer = Punished_db.remove punished ~key:peer
 
   let lookup {suspicious; punished; _} peer =
-    match Suspicious.get suspicious ~key:peer with
-    | Some offenses -> `Suspicious offenses
+    match Suspicious_db.get suspicious ~key:peer with
+    | Some score -> `Suspicious score
     | None ->
-        Option.map (Punished.get punished ~key:peer) ~f:(fun punishment ->
+        Option.map (Punished_db.get punished ~key:peer) ~f:(fun punishment ->
             `Punished punishment )
         |> Option.value ~default:`Normal
 
   let close {suspicious; punished; _} =
-    Suspicious.close suspicious ;
-    Punished.close punished
+    Suspicious_db.close suspicious ;
+    Punished_db.close punished
 
   let record ({suspicious; _} as t) peer offense =
-    let write_penalty offenses =
-      ( match compute_punishment t offenses with
-      | None -> Suspicious.set suspicious ~key:peer ~data:offenses
-      | Some punishment -> ban t peer punishment ) ;
-      Or_error.return ()
+    let write_penalty score offense =
+      let new_score = Score.add score (Score_mechanism.score offense) in
+      Or_error.return
+        ( match compute_punishment t new_score with
+        | None -> Suspicious_db.set suspicious ~key:peer ~data:new_score
+        | Some punishment -> ban t peer punishment )
     in
     match lookup t peer with
-    | `Suspicious existing_offenses ->
-        write_penalty (offense :: existing_offenses)
+    | `Suspicious score -> write_penalty score offense
     | `Punished _ ->
         Or_error.errorf
           !"Peer %{sexp:Peer.t} should not be able to make more offenses \
             since they are blacklisted"
           peer
-    | `Normal -> write_penalty [offense]
+    | `Normal -> write_penalty Score.zero offense
 end
 
 let%test_module "banlist" =
   ( module struct
-    module Suspicious =
-      Key_value_database.Make_mock (Host_and_port)
-        (struct
-          type t = Offense.t list
-        end)
-
-    module Punished = Key_value_database.Make_mock (Host_and_port) (Punishment)
+    module Suspicious_db = Key_value_database.Make_mock (Int) (Score)
+    module Punished_db =
+      Key_value_database.Make_mock (Int) (Punishment_record)
 
     let ban_threshold = 100
 
-    let timeout = Time.Span.of_sec 10.0
-
-    module Score = struct
+    module Score_mechanism = struct
       open Offense
 
-      let score = function
+      let score offense =
+        Score.of_int ( match offense with
         | Failed_to_connect -> ban_threshold + 1
         | Send_bad_hash -> ban_threshold / 2
-        | Send_bad_aux -> ban_threshold / 4
+        | Send_bad_aux -> ban_threshold / 4 )
     end
 
-    module Banlist = Make (Host_and_port) (Suspicious) (Punished) (Score)
+    let compute_score offenses =
+      List.fold offenses ~init:Score.zero ~f:(fun acc offense ->
+          let score = Score_mechanism.score offense in
+          Score.add acc score )
 
-    let host = Host_and_port.create ~host:"127.0.0.1" ~port:0
+    module Banlist = Make (Int) (Suspicious_db) (Punished_db) (Score_mechanism)
 
-    let%test "if no bans, then peer_state is normal" =
-      let t = Banlist.create ~ban_threshold ~timeout in
-      match Banlist.lookup t host with
+    let peer = 1
+
+    let%test "if no bans, then peer is normal" =
+      let t = Banlist.create ~ban_threshold in
+      match Banlist.lookup t peer with
       | `Normal -> true
       | `Suspicious _ -> false
       | `Punished _ -> false
 
-    let%test "if a host has offenses, and their combination do not exceed the \
-              threshold, then the peer is considered to be normal" =
+    let%test "if a host has offenses, and their combination do not exceed the ban \
+              threshold, then the peer is considered to be suspicious" =
       let open Offense in
-      let t = Banlist.create ~ban_threshold ~timeout in
+      let t = Banlist.create ~ban_threshold in
       let offenses = [Send_bad_hash; Send_bad_aux] in
       List.iter offenses ~f:(fun offense ->
-          Banlist.record t host offense |> Or_error.ok_exn ) ;
-      match Banlist.lookup t host with
-      | `Suspicious recorded_offenses ->
-          [%eq : Offense.t list] (List.rev offenses) recorded_offenses
+          Banlist.record t peer offense |> Or_error.ok_exn ) ;
+      match Banlist.lookup t peer with
+      | `Suspicious score -> Score.compare score (compute_score offenses) = 0
       | `Normal -> false
       | `Punished _ -> false
 
-    let%test "if a host has offenses, and their combination do not exceed the \
-              threshold, then the host is considered to be normal" =
+    let%test "if a host has offenses, and their combination does exceed the ban \
+              threshold, then the host is considered to be punished" =
       let open Offense in
-      let t = Banlist.create ~ban_threshold ~timeout in
+      let t = Banlist.create ~ban_threshold in
       let offenses = [Failed_to_connect] in
       List.iter offenses ~f:(fun offense ->
-          Banlist.record t host offense |> Or_error.ok_exn ) ;
-      match Banlist.lookup t host with
-      | `Punished (Punishment.Timeout time) ->
-          Time.Span.compare (Time.diff (Time.now ()) time) timeout < 0
+          Banlist.record t peer offense |> Or_error.ok_exn ) ;
+      match Banlist.lookup t peer with
+      | `Punished {Punishment_record.punishment= Timeout _exiction_date; _} ->
+          true
       | _ -> false
   end )
