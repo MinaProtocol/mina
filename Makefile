@@ -120,9 +120,9 @@ deb:
 	@cp _build/codaclient.deb /tmp/artifacts/.
 
 provingkeys:
-	$(WRAP) tar -cvjf _build/cli_cache_dir_$(GITHASH).tar.bz2  /tmp/cli_cache_dir
+	$(WRAP) tar -cvjf _build/coda_cache_dir_$(GITHASH).tar.bz2  /tmp/coda_cache_dir
 	@mkdir -p /tmp/artifacts
-	@cp _build/cli_cache_dir*.tar.bz2 /tmp/artifacts/.
+	@cp _build/coda_cache_dir*.tar.bz2 /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
@@ -134,7 +134,7 @@ _build/keys-$(GITLONGHASH).tar.bz2: withsnark build
 ifneq (,$(wildcard /var/lib/coda))
 	$(error "Trying to bundle keys but /var/lib/coda exists so they won't be built")
 endif
-	$(WRAP) tar -cvjf _build/keys-$(GITLONGHASH).tar.bz2  /tmp/cli_cache_dir
+	$(WRAP) tar -cvjf _build/keys-$(GITLONGHASH).tar.bz2  /tmp/coda_cache_dir
 
 bundle-keys: withsnark build _build/keys-$(GITLONGHASH).tar.bz2
 	gsutil cp -n _build/keys-$(GITLONGHASH).tar.bz2 gs://proving-keys-stable/keys-$(GITLONGHASH).tar.bz2
