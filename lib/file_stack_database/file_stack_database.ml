@@ -56,15 +56,16 @@ let%test_module "file stack database" =
       String.gen_with_length size Char.gen >>| Bigstring.of_string
 
     let with_test f =
-      let uuid = Uuid.create () in
-      let dir_name = "/tmp/merkle_database_test-" ^ Uuid.to_string uuid in
-      let stack_db_file = Filename.concat dir_name "sdb" in
       (fun () ->
-        File_system.with_temp_dirs [dir_name] ~f:(fun () ->
-            let t = Test.create ~filename:stack_db_file in
-            File_system.try_finally
-              ~f:(fun () -> f t ; Async.Deferred.unit)
-              ~finally:(fun () -> Test.destroy t ; Async.Deferred.unit) ) )
+        let open Async.Deferred.Let_syntax in
+        let%bind dir_name =
+          Async.Unix.mkdtemp (Filename.temp_dir_name ^/ "merkle_database_test")
+        in
+        let stack_db_file = Filename.concat dir_name "sdb" in
+        let t = Test.create ~filename:stack_db_file in
+        File_system.try_finally
+          ~f:(fun () -> f t ; Async.Deferred.unit)
+          ~finally:(fun () -> Test.destroy t ; Async.Deferred.unit) )
       |> Async.Thread_safe.block_on_async_exn
 
     let assert_same_stack expected_stack t =

@@ -879,11 +879,7 @@ let%test_module "test" =
                Linear_pipe.write w (x, time) )) ;
         r
 
-      let temp_folder = "~/temp"
-
-      let storage = "test_lbc_disk"
-
-      let config transitions =
+      let config transitions longest_tip_location =
         let ledger_builder_transitions = slowly_pipe_of_list transitions in
         let net_input = transitions in
         Config.make ~parent_log:(Logger.create ())
@@ -895,8 +891,7 @@ let%test_module "test" =
             { protocol_state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()
             ; ledger_builder= Inputs.Ledger_builder.create 0 }
-          ~longest_tip_location:(temp_folder ^/ storage)
-          ~consensus_local_state:()
+          ~longest_tip_location ~consensus_local_state:()
 
       let create_transition x parent strength =
         { Inputs.Consensus_mechanism.Protocol_state.previous_state_hash= parent
@@ -933,12 +928,19 @@ let%test_module "test" =
             assert (List.equal results expected ~equal:Int.equal) )
     end
 
+    open Core
     module Lbc = Make_test (Storage.Memory)
+
+    let temp_folder = Filename.temp_dir_name ^/ "lbc_test"
+
+    let memory_storage_location = temp_folder ^/ "test_lbc_disk"
 
     let%test_unit "strongest_ledgers updates appropriately when new_states \
                    flow in within tree" =
       Backtrace.elide := false ;
-      let config = Lbc.config Lbc.no_catchup_transitions in
+      let config =
+        Lbc.config Lbc.no_catchup_transitions memory_storage_location
+      in
       Lbc.assert_strongest_ledgers (Lbc.create config) ~expected:[1; 2; 5; 7]
 
     let%test_unit "strongest_ledgers updates appropriately using the network" =
@@ -953,13 +955,15 @@ let%test_module "test" =
         ; f 5 3 7
         (* Now we attach to the one from the network *) ]
       in
-      let config = Lbc.config transitions in
+      let config = Lbc.config transitions memory_storage_location in
       let lbc_deferred = Lbc.create config in
       Lbc.assert_strongest_ledgers lbc_deferred ~expected:[1; 2; 3; 5]
 
     let%test_unit "local_get_ledger can materialize a ledger locally" =
       Backtrace.elide := false ;
-      let config = Lbc.config Lbc.no_catchup_transitions in
+      let config =
+        Lbc.config Lbc.no_catchup_transitions memory_storage_location
+      in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind lbc = Lbc.create config in
           (* Drain the first few strongest_ledgers *)
@@ -987,16 +991,18 @@ let%test_module "test" =
         let writer = writer
       end)) in
       Async.Thread_safe.block_on_async_exn (fun () ->
-          File_system.with_temp_dirs [Lbc_disk.temp_folder] ~f:(fun () ->
-              let config = Lbc_disk.config Lbc_disk.no_catchup_transitions in
-              let%bind lbc = Lbc_disk.create config in
-              let%bind _ = Lbc.take_map reader 4 ~f:ignore in
-              let%map tip = Lbc_disk.For_tests.load_tip lbc config in
-              let lb =
-                Lbc_disk.strongest_tip lbc
-                |> Lbc_disk.Inputs.Tip.ledger_builder
-              in
-              assert (! (Lbc_disk.Inputs.Tip.ledger_builder tip) = !lb) ) )
+          let%bind storage_temp_folder = Async.Unix.mkdtemp temp_folder in
+          let config =
+            Lbc_disk.config Lbc_disk.no_catchup_transitions
+              (storage_temp_folder ^/ "lbc")
+          in
+          let%bind lbc = Lbc_disk.create config in
+          let%bind _ = Lbc.take_map reader 4 ~f:ignore in
+          let%map tip = Lbc_disk.For_tests.load_tip lbc config in
+          let lb =
+            Lbc_disk.strongest_tip lbc |> Lbc_disk.Inputs.Tip.ledger_builder
+          in
+          assert (! (Lbc_disk.Inputs.Tip.ledger_builder tip) = !lb) )
 
     let%test_unit "Continue from last file" =
       Backtrace.elide := false ;
@@ -1005,19 +1011,21 @@ let%test_module "test" =
         let writer = writer
       end)) in
       Async.Thread_safe.block_on_async_exn (fun () ->
-          File_system.with_temp_dirs [Lbc_disk.temp_folder] ~f:(fun () ->
-              let config = Lbc_disk.config Lbc_disk.no_catchup_transitions in
-              let%bind lbc = Lbc_disk.create config in
-              let%bind _ = Lbc.take_map reader 4 ~f:ignore in
-              let lb =
-                Lbc_disk.strongest_tip lbc
-                |> Lbc_disk.Inputs.Tip.ledger_builder
-              in
-              let config_new = Lbc_disk.config [] in
-              let%map lbc_new = Lbc_disk.create config_new in
-              let lb_new =
-                Lbc_disk.strongest_tip lbc_new
-                |> Lbc_disk.Inputs.Tip.ledger_builder
-              in
-              assert (!lb = !lb_new) ) )
+          let%bind storage_temp_folder = Async.Unix.mkdtemp temp_folder in
+          let storage_location = storage_temp_folder ^/ "lbc" in
+          let config =
+            Lbc_disk.config Lbc_disk.no_catchup_transitions storage_location
+          in
+          let%bind lbc = Lbc_disk.create config in
+          let%bind _ = Lbc.take_map reader 4 ~f:ignore in
+          let lb =
+            Lbc_disk.strongest_tip lbc |> Lbc_disk.Inputs.Tip.ledger_builder
+          in
+          let config_new = Lbc_disk.config [] storage_location in
+          let%map lbc_new = Lbc_disk.create config_new in
+          let lb_new =
+            Lbc_disk.strongest_tip lbc_new
+            |> Lbc_disk.Inputs.Tip.ledger_builder
+          in
+          assert (!lb = !lb_new) )
   end )
