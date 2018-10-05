@@ -10,7 +10,7 @@ module type S = sig
   type state_hash
 
   module Transition_tree :
-    Coda.Ktree_intf
+    Coda_lib.Ktree_intf
     with type elem := (external_transition, state_hash) With_hash.t
 
   type t
