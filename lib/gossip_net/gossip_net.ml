@@ -21,6 +21,7 @@ module type Config_intf = sig
     ; initial_peers: Host_and_port.t list
     ; me: Peer.t
     ; conf_dir: string
+    ; kademlia_mode: string
     ; parent_log: Logger.t }
   [@@deriving make]
 end
@@ -68,6 +69,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; initial_peers: Host_and_port.t list
       ; me: Peer.t
       ; conf_dir: string
+      ; kademlia_mode: string
       ; parent_log: Logger.t }
     [@@deriving make]
   end
@@ -112,7 +114,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let%map membership =
       match%map
         Membership.connect ~initial_peers:config.initial_peers ~me:config.me
-          ~conf_dir:config.conf_dir ~parent_log:log
+          ~conf_dir:config.conf_dir ~parent_log:log ~mode:config.kademlia_mode
       with
       | Ok membership -> membership
       | Error e ->

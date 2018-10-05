@@ -9,6 +9,7 @@ module type S = sig
     -> me:Peer.t
     -> parent_log:Logger.t
     -> conf_dir:string
+    -> mode:string
     -> t Deferred.Or_error.t
 
   val peers : t -> Peer.t list
@@ -61,12 +62,12 @@ module Haskell_process = struct
     let other = Host_and_port.create ~host:"1.1.1.2" ~port:8000 in
     filter_initial_peers [fst me; other] me = [other]
 
-  let create ~initial_peers ~me ~log ~conf_dir =
+  let create ~initial_peers ~me ~log ~conf_dir ~mode =
     let lock_path = Filename.concat conf_dir lock_file in
     let filtered_initial_peers = filter_initial_peers initial_peers me in
     let run_kademlia () =
       let args =
-        ["test"; cli_format me]
+        [mode; cli_format me]
         @ List.map filtered_initial_peers ~f:cli_format_initial_peer
       in
       Logger.debug log "Args: %s\n"
@@ -165,6 +166,7 @@ module Make (P : sig
     -> me:Peer.t
     -> log:Logger.t
     -> conf_dir:string
+    -> mode:string
     -> t Deferred.Or_error.t
 
   val output : t -> log:Logger.t -> string list Pipe.Reader.t
@@ -195,10 +197,10 @@ struct
       Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
     else Deferred.unit
 
-  let connect ~initial_peers ~me ~parent_log ~conf_dir =
+  let connect ~initial_peers ~me ~parent_log ~conf_dir ~mode =
     let open Deferred.Or_error.Let_syntax in
     let log = Logger.child parent_log "membership" in
-    let%map p = P.create ~initial_peers ~me ~log ~conf_dir in
+    let%map p = P.create ~initial_peers ~me ~log ~conf_dir ~mode in
     let peers = Peer.Table.create () in
     let changes_reader, changes_writer = Linear_pipe.create () in
     let first_peers_ivar = ref None in
@@ -250,7 +252,8 @@ let%test_module "Tests" =
           match%bind
             M.connect ~initial_peers:[]
               ~me:(Host_and_port.create ~host:"127.0.0.1" ~port:3001, 3000)
-              ~parent_log:(Logger.create ()) ~conf_dir:"/tmp/membership-test"
+              ~parent_log:(Logger.create ()) ~mode:"test"
+              ~conf_dir:"/tmp/membership-test"
           with
           | Ok t ->
               let acc = ref init in
@@ -271,7 +274,7 @@ let%test_module "Tests" =
 
       let kill _ = return ()
 
-      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ ~mode:_ =
         let on p = Printf.sprintf "127.0.0.1:%d key on" p in
         let off p = Printf.sprintf "127.0.0.1:%d key off" p in
         let render cmds =
@@ -296,7 +299,7 @@ let%test_module "Tests" =
         in
         ()
 
-      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ ~mode:_ =
         let open Deferred.Let_syntax in
         (* Try kademlia, then prepend test_prefix if it's missing *)
         match%bind Process.create ~prog:"./dummy.sh" ~args:[] () with
@@ -360,7 +363,7 @@ let addr i =
 
 let node me peers conf_dir =
   Haskell.connect ~initial_peers:peers ~me ~parent_log:(Logger.create ())
-    ~conf_dir
+    ~conf_dir ~mode:"test"
 
 let conf_dir = "/tmp/.kademlia-test-"
 

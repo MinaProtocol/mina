@@ -167,6 +167,7 @@ struct
               ; target_peer_count= 8
               ; conf_dir
               ; initial_peers= peers
+              ; kademlia_mode= "prod"
               ; me=
                   ( Host_and_port.create ~host ~port:discovery_port
                   , external_port )

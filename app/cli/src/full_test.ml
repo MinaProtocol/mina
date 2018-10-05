@@ -47,6 +47,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; target_peer_count= 8
         ; initial_peers= []
         ; conf_dir
+        ; kademlia_mode= "test"
         ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000) } }
   in
   let%bind coda =
