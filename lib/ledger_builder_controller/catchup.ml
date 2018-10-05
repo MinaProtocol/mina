@@ -130,7 +130,7 @@ module type Inputs_intf = sig
   end
 
   module Net : sig
-    include Coda.Ledger_builder_io_intf
+    include Coda_lib.Ledger_builder_io_intf
             with type sync_ledger_query := Sync_ledger.query
              and type sync_ledger_answer := Sync_ledger.answer
              and type ledger_builder_hash := Ledger_builder_hash.t

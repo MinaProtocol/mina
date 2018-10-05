@@ -26,6 +26,7 @@ end
 
 type ('a, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
+  ; level_pointer: int Array.t
   ; capacity: int
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
@@ -45,6 +46,7 @@ let hash
     ; current_data_length
     ; base_none_pos
     ; capacity
+    ; level_pointer
     ; recent_tree_data
     ; other_trees_data } a_to_string d_to_string =
   let h = ref (Digestif.SHA256.init ()) in
@@ -62,6 +64,8 @@ let hash
   let x = base_none_pos in
   add_string (Int.to_string capacity) ;
   add_string (Int.to_string i) ;
+  add_string
+    (Array.fold level_pointer ~init:"" ~f:(fun s a -> s ^ Int.to_string a)) ;
   ( match a with
   | None -> add_string "None"
   | Some a -> add_string (a_to_string a) ) ;
@@ -81,6 +85,8 @@ let acc s = snd s.acc
 
 let jobs s = s.jobs
 
+let level_pointer s = s.level_pointer
+
 let current_data_length s = s.current_data_length
 
 let parallelism s = (Ring_buffer.length s.jobs + 1) / 2
@@ -97,6 +103,7 @@ let copy
     ; current_data_length
     ; base_none_pos
     ; capacity
+    ; level_pointer
     ; recent_tree_data
     ; other_trees_data } =
   { jobs= Ring_buffer.copy jobs
@@ -104,5 +111,6 @@ let copy
   ; capacity
   ; current_data_length
   ; base_none_pos
+  ; level_pointer= Array.copy level_pointer
   ; recent_tree_data
   ; other_trees_data }

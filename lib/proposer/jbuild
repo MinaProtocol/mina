@@ -9,7 +9,7 @@
   (libraries
     ( core
       async
-      coda
+      coda_lib
       coda_base
       protocols
       async_extra
