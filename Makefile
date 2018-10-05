@@ -40,10 +40,10 @@ build:
 	$(info Build complete)
 
 withupdates:
-	sed -i '/let force_updates = /c\let force_updates = true' app/cli/src/cli.ml
+	sed -i '/let force_updates = /c\let force_updates = true' app/cli/src/coda.ml
 
 withoutupdates:
-	sed -i '/let force_updates = /c\let force_updates = false' app/cli/src/cli.ml
+	sed -i '/let force_updates = /c\let force_updates = false' app/cli/src/coda.ml
 
 dev: docker container build
 
