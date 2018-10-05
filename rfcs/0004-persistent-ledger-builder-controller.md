@@ -25,6 +25,28 @@ There's an existing Sync functor that takes a database module, to perform catchu
 
 Later, a cache can be introduced onto the Merkle ledger database, allowing us to perform less database queries for commonly looked up information. The details of this, however, is not addressed as part of this particular RFC.
 
+The module type for the sparse diff could be:
+
+  module type SparseDiff = sig
+    type t
+	type key
+	type value
+
+    type db = Database_intf.S.t
+
+    (* group identity, operations *)
+    val empty : t
+    val add : t -> t -> t
+	val inverse : t -> t
+
+    val insert : key -> value -> t -> t
+	val remove : key -> t -> t
+    val from_list : (key * value) list -> t
+
+    (* look up in diff; if key not present, delegate to database for locked tip *)
+    val get : db -> key -> value option
+  end
+
 # Drawbacks
 [drawbacks]: #drawbacks
 
@@ -38,5 +60,6 @@ The alternative design to this is to restructure the persistent database so that
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- How should the sparse ledger diff be represented in memory?
+- How should the sparse ledger diff be represented in memory? The choices of Map and prefix tree are mentioned above, perhaps there are others.
+- Should operations using the sparse diff be associated with the diff itself, or with the database, or outside both?
 - Should this be designed to work with a cache from the beginning, or should we revisit that later as an optimization?
