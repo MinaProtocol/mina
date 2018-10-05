@@ -43,7 +43,9 @@ module State = struct
     ; capacity= parallelism
     ; acc= (0, None)
     ; current_data_length= 0
-    ; base_none_pos= Some (parallelism - 1) }
+    ; base_none_pos= Some (parallelism - 1)
+    ; recent_tree_data= []
+    ; other_trees_data= [] }
 
   let next_pos p cur_pos = if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
 
@@ -243,6 +245,8 @@ module State = struct
         let%bind () =
           if cur_pos = 0 then (
             t.acc <- (fst t.acc |> Int.( + ) 1, Some z) ;
+            t.other_trees_data
+            <- List.take t.other_trees_data (List.length t.other_trees_data - 1) ;
             Ok () )
           else update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2)
         in
@@ -274,13 +278,20 @@ module State = struct
         set_next_position t ; consume t next jobs_copy
 
   let include_one_datum state value base_pos : unit Or_error.t =
+    let open Or_error.Let_syntax in
     let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
       match job with
       | Base None -> Ok (Base (Some value))
       | _ ->
           Or_error.error_string "Invalid job encountered while enqueuing data"
     in
-    Ring_buffer.direct_update (State.jobs state) base_pos ~f
+    let%map () = Ring_buffer.direct_update (State.jobs state) base_pos ~f in
+    let last_leaf_pos = Ring_buffer.length state.jobs - 1 in
+    if base_pos = last_leaf_pos then (
+      state.other_trees_data
+      <- (value :: state.recent_tree_data) :: state.other_trees_data ;
+      state.recent_tree_data <- [] )
+    else state.recent_tree_data <- value :: state.recent_tree_data
 
   let include_many_data (state: ('a, 'd) State.t) data : unit Or_error.t =
     List.fold ~init:(Ok ()) data ~f:(fun acc a ->
@@ -343,6 +354,9 @@ let fill_in_completed_jobs :
   if not (fst last_acc = fst state.acc) then snd state.acc else None
 
 let last_emitted_value (state: ('a, 'd) State.t) = snd state.acc
+
+let current_data (state: ('a, 'd) State.t) =
+  state.recent_tree_data :: state.other_trees_data
 
 (*if the transaction queue does not have at least max_slots number of slots 
 before continuing onto the next queue, split max_slots = (x,y) 

@@ -29,7 +29,9 @@ type ('a, 'd) t =
   ; capacity: int
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
-  ; mutable base_none_pos: int option }
+  ; mutable base_none_pos: int option
+  ; mutable recent_tree_data: 'd list
+  ; mutable other_trees_data: 'd list list }
 [@@deriving sexp, bin_io]
 
 module Hash = struct
@@ -37,8 +39,14 @@ module Hash = struct
 end
 
 (* TODO: This should really be computed iteratively *)
-let hash {jobs; acc; current_data_length; base_none_pos; capacity} a_to_string
-    d_to_string =
+let hash
+    { jobs
+    ; acc
+    ; current_data_length
+    ; base_none_pos
+    ; capacity
+    ; recent_tree_data
+    ; other_trees_data } a_to_string d_to_string =
   let h = ref (Digestif.SHA256.init ()) in
   let add_string s = h := Digestif.SHA256.feed_string !h s in
   Ring_buffer.iter jobs ~f:(function
@@ -61,6 +69,12 @@ let hash {jobs; acc; current_data_length; base_none_pos; capacity} a_to_string
   ( match x with
   | None -> add_string "None"
   | Some a -> add_string (Int.to_string a) ) ;
+  let str lst = List.fold lst ~init:"" ~f:(fun acc x -> acc ^ d_to_string x) in
+  let strs =
+    List.fold other_trees_data ~init:"" ~f:(fun acc x -> acc ^ str x)
+  in
+  add_string (str recent_tree_data) ;
+  add_string strs ;
   Digestif.SHA256.get !h
 
 let acc s = snd s.acc
@@ -73,9 +87,22 @@ let parallelism s = (Ring_buffer.length s.jobs + 1) / 2
 
 let base_none_pos s = s.base_none_pos
 
-let copy {jobs; acc; current_data_length; base_none_pos; capacity} =
+let recent_tree_data s = s.recent_tree_data
+
+let other_trees_data s = s.other_trees_data
+
+let copy
+    { jobs
+    ; acc
+    ; current_data_length
+    ; base_none_pos
+    ; capacity
+    ; recent_tree_data
+    ; other_trees_data } =
   { jobs= Ring_buffer.copy jobs
   ; acc
   ; capacity
   ; current_data_length
-  ; base_none_pos }
+  ; base_none_pos
+  ; recent_tree_data
+  ; other_trees_data }

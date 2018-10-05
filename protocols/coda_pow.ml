@@ -132,13 +132,15 @@ end
 module type Ledger_intf = sig
   type t [@@deriving sexp, bin_io]
 
+  type super_transaction
+
   module Undo : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, bin_io]
+
+    val super_transaction : t -> super_transaction Or_error.t
   end
 
   type valid_transaction
-
-  type super_transaction
 
   type ledger_hash
 

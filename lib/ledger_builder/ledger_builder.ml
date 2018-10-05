@@ -265,7 +265,7 @@ end = struct
   module Super_transaction_with_witness = struct
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
-      { transaction: Super_transaction.t
+      { transaction_with_info: Ledger.Undo.t
       ; statement: Ledger_proof_statement.t
       ; witness: Inputs.Sparse_ledger.t }
     [@@deriving sexp, bin_io]
@@ -362,8 +362,12 @@ end = struct
       let single_spec (job: job) =
         match job with
         | A.Base d ->
+            let transaction =
+              Or_error.ok_exn
+              @@ Ledger.Undo.super_transaction d.transaction_with_info
+            in
             Snark_work_lib.Work.Single.Spec.Transition
-              (d.statement, d.transaction, d.witness)
+              (d.statement, transaction, d.witness)
         | A.Merge ((p1, s1), (p2, s2)) ->
             let merged =
               Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
@@ -425,10 +429,14 @@ end = struct
               | Merge (Some (_, s1), Some (_, s2)) ->
                   merge_acc acc_statement (merge s1 s2)
               | Base None -> acc_statement
-              | Base (Some {transaction; statement; witness}) ->
+              | Base (Some {transaction_with_info; statement; witness}) ->
                   let source =
                     Frozen_ledger_hash.of_ledger_hash
                     @@ Sparse_ledger.merkle_root witness
+                  in
+                  let transaction =
+                    ok_or_return
+                    @@ Ledger.Undo.super_transaction transaction_with_info
                   in
                   let after =
                     Or_error.try_with (fun () ->
@@ -638,7 +646,10 @@ end = struct
     let%map undo, statement =
       apply_super_transaction_and_get_statement ledger s
     in
-    (undo, {Super_transaction_with_witness.transaction= s; witness; statement})
+    ( undo
+    , { Super_transaction_with_witness.transaction_with_info= undo
+      ; witness
+      ; statement } )
 
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions undos =
@@ -1704,10 +1715,12 @@ let%test_module "test" =
 
         type ledger_hash = Ledger_hash.t
 
-        type super_transaction = Super_transaction.t [@@deriving sexp]
+        type super_transaction = Super_transaction.t [@@deriving sexp, bin_io]
 
         module Undo = struct
-          type t = super_transaction [@@deriving sexp]
+          type t = super_transaction [@@deriving sexp, bin_io]
+
+          let super_transaction t = Ok t
         end
 
         let create : unit -> t = fun () -> ref 0
