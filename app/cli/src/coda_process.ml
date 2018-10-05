@@ -25,7 +25,7 @@ struct
 
   let local_config ?(transition_interval= 1000.0) ?proposal_interval ~peers
       ~discovery_port ~external_port ~program_dir ~should_propose
-      ~snark_worker_config () =
+      ~snark_worker_config ~kademlia_mode () =
     let host = "127.0.0.1" in
     let conf_dir =
       "/tmp/" ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -42,6 +42,7 @@ struct
       ; snark_worker_config
       ; peers
       ; conf_dir
+      ; kademlia_mode
       ; program_dir
       ; discovery_port }
     in
