@@ -100,7 +100,7 @@ main = do
         nonceGen  = \x -> KH.Nonce $ evalRand (generateByteString nonceSize) (mkStdGen $ makeSeed x)
         myKey     = KH.hashAddress $ nonceGen (externalIp, myPort)
         peerKeys  = (KH.hashAddress . nonceGen) <$> peers
-        config = K.defaultConfig { K.pingTime = if state = "test" then 3 else 360; K.storeValues = False }
+        config = K.defaultConfig { K.pingTime = if state == "test" then 3 else 360; K.storeValues = False }
 
     let logError = putStrLn . ("EROR: " ++)
     let logInfo = putStrLn . ("DBUG: " ++)
