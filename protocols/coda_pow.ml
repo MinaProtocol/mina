@@ -832,7 +832,11 @@ module type Inputs_intf = sig
 
   module Ledger_hash : Ledger_hash_intf
 
-  module Frozen_ledger_hash : Ledger_hash_intf
+  module Frozen_ledger_hash : sig
+    include Ledger_hash_intf
+
+    val of_ledger_hash : Ledger_hash.t -> t
+  end
 
   module Proof : sig
     type t
