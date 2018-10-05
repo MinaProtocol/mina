@@ -8,6 +8,11 @@
 
 Our style guidelines are an extension of a couple of existing style guidelines. The first is ocamlformat, and it acts as the source of truth for most of our coding style. In fact, ocamlformat is a blocker on CI, so your code must be formated by it's guidelines in order to be merged into master. Ocamlformat does not handle all important cases of style, however, as it is only defining and enforcing how code should be spaced out and indented. For anything which ocamlformat does not cover, the [janestreet styleguide](https://opensource.janestreet.com/standards/) should be referenced. This styleguide we define here is intended to be an extension of the janestreet styleguide, with more attention to detail in concern to a few specific constructs we use regularly throughout our codebase.
 
+### Mli Files
+[ocaml-mli]: #ocaml-mli
+
+A `*.mli` file should not be included for a `*.ml` file iff the `*.ml` file's automatically derived interface is different. Many `*.ml` files in our codebase consist of only signatures and a functor. In the case of those files, there is not purpose to redefining the `*.mli` file because there is no new or restricted information in that file. If a `*.ml` file contains implementations in the root structure, then a `*.mli` file should most likely be created.
+
 ### Modules
 [ocaml-modules]: #ocaml-modules
 
