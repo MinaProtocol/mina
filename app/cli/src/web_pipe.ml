@@ -116,7 +116,7 @@ let copy ~src ~dst =
 let run_service (type t) (module Program : Coda_intf with type t = t) coda
     ~conf_dir ~log = function
   | `None ->
-      Logger.trace log "Not running a web client pipe" ;
+      Logger.info log "Not running a web client pipe" ;
       don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))
   | `Local path ->
       Logger.trace log "Saving chain locally at path %s" path ;
@@ -133,7 +133,7 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
                     (get_lite_chain coda [Genesis_ledger.high_balance_pk]))) )
       |> don't_wait_for
   | `S3 ->
-      Logger.trace log "Running S3 web client pipe" ;
+      Logger.info log "Running S3 web client pipe" ;
       let module Web_config = struct
         let conf_dir = conf_dir
 

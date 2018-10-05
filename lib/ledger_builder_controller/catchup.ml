@@ -56,39 +56,54 @@ module type Inputs_intf = sig
     type t
   end
 
-  module Protocol_state : sig
-    type value
+  module Blockchain_state : sig
+    type value [@@deriving eq]
+
+    val ledger_hash : value -> Frozen_ledger_hash.t
+
+    val ledger_builder_hash : value -> Ledger_builder_hash.t
   end
 
-  module External_transition : sig
-    type t [@@deriving bin_io, eq, compare, sexp]
+  module Consensus_mechanism : sig
+    module Local_state : sig
+      type t
+    end
 
-    val target_state : t -> Protocol_state.value
+    module Protocol_state : sig
+      type value
 
-    val ledger_hash : t -> Frozen_ledger_hash.t
+      val blockchain_state : value -> Blockchain_state.value
+    end
 
-    val ledger_builder_hash : t -> Ledger_builder_hash.t
+    module External_transition : sig
+      type t [@@deriving bin_io, eq, compare, sexp]
+
+      val protocol_state : t -> Protocol_state.value
+    end
   end
 
   module Tip : sig
     include Protocols.Coda_pow.Tip_intf
             with type ledger_builder := Ledger_builder.t
-             and type protocol_state := Protocol_state.value
+             and type protocol_state :=
+                        Consensus_mechanism.Protocol_state.value
              and type protocol_state_proof := Protocol_state_proof.t
-             and type external_transition := External_transition.t
+             and type external_transition :=
+                        Consensus_mechanism.External_transition.t
 
     type state_hash
 
     val assert_materialization_of :
          (t, state_hash) With_hash.t
-      -> (External_transition.t, state_hash) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, state_hash) With_hash.t
       -> unit
   end
 
   module Transition_logic_state :
     Transition_logic_state.S
     with type tip := Tip.t
-     and type external_transition := External_transition.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type external_transition := Consensus_mechanism.External_transition.t
      and type state_hash := Tip.state_hash
 
   module Sync_ledger : sig
@@ -121,12 +136,22 @@ module type Inputs_intf = sig
              and type ledger_builder_hash := Ledger_builder_hash.t
              and type ledger_builder_aux := Ledger_builder.Aux.t
              and type ledger_hash := Ledger_hash.t
-             and type protocol_state := Protocol_state.value
+             and type protocol_state :=
+                        Consensus_mechanism.Protocol_state.value
   end
 end
 
 module Make (Inputs : Inputs_intf) = struct
   open Inputs
+  open Consensus_mechanism
+
+  let ledger_hash_of_transition t =
+    External_transition.protocol_state t
+    |> Protocol_state.blockchain_state |> Blockchain_state.ledger_hash
+
+  let ledger_builder_hash_of_transition t =
+    External_transition.protocol_state t
+    |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash
 
   type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
 
@@ -142,10 +167,10 @@ module Make (Inputs : Inputs_intf) = struct
     let {With_hash.data= transition; hash= transition_state_hash} =
       transition_with_hash
     in
-    let snarked_ledger_hash = External_transition.ledger_hash transition in
+    let snarked_ledger_hash = ledger_hash_of_transition transition in
     let h =
-      External_transition.ledger_builder_hash transition
-      |> Ledger_builder_hash.ledger_hash
+      Ledger_builder_hash.ledger_hash
+        (ledger_builder_hash_of_transition transition)
     in
     (* Lazily recreate the sync_ledger if necessary *)
     let sl : Sync_ledger.t =
@@ -182,7 +207,7 @@ module Make (Inputs : Inputs_intf) = struct
           match%map
             Interruptible.uninterruptible
               (Net.get_ledger_builder_aux_at_hash net
-                 (External_transition.ledger_builder_hash transition))
+                 (ledger_builder_hash_of_transition transition))
           with
           | Ok aux -> (
             match

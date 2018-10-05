@@ -285,7 +285,7 @@ struct
       | Num_accounts ->
           let len = MT.num_accounts mt in
           let height = Int.ceil_log2 len in
-          (* FIXME: bug when height=0 *)
+          (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
           let content_root_addr =
             funpow (MT.depth - height)
               (fun a -> Addr.child_exn a Direction.Left)
@@ -432,7 +432,7 @@ struct
   let num_accounts t n content_hash =
     let rh = Root_hash.to_hash (desired_root_exn t) in
     let height = Int.ceil_log2 n in
-    (* FIXME: bug when height=0 *)
+    (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
     if not (Hash.equal (complete_with_empties content_hash height MT.depth) rh)
     then failwith "reported content hash doesn't match desired root hash!" ;
     (* TODO: punish *)

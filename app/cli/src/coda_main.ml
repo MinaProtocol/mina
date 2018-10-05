@@ -388,7 +388,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp, bin_io, fields]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -616,14 +616,12 @@ struct
             ~public_key:(Public_key.compress keypair.public_key)
       end
 
+      module Blockchain_state = Blockchain_state
       module Consensus_mechanism = Consensus_mechanism
-      module Protocol_state = Protocol_state
-      module Blockchain_state = Coda_base.Blockchain_state
       module Protocol_state_proof = Protocol_state_proof
       module State_hash = State_hash
       module Valid_transaction = Transaction.With_valid_signature
       module Sync_ledger = Sync_ledger
-      module External_transition = External_transition
       module Internal_transition = Internal_transition
 
       let verify_blockchain proof state =
