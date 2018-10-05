@@ -158,7 +158,7 @@ struct
         let%bind (module Init) =
           make_init ~should_propose (module Config) (module Kernel)
         in
-        let module Main = Coda.Make (Init) () in
+        let module Main = Coda_lib.Make (Init) () in
         let module Run = Run (Config) (Main) in
         let net_config =
           { Main.Inputs.Net.Config.parent_log= log

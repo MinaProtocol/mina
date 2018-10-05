@@ -1,7 +1,7 @@
 (jbuild_version 1)
 
 (executable
-  ((name cli)
+  ((name coda)
   (public_name coda)
    (libraries
     ( base64
@@ -13,7 +13,7 @@
       proposer
       gossip_net
       kademlia
-      coda
+      coda_lib
       coda_numbers
       protocols
       coda_base

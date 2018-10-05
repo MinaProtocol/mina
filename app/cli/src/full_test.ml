@@ -36,7 +36,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
       (module Config)
       (module Kernel)
   in
-  let module Main = Coda.Make (Init) () in
+  let module Main = Coda_lib.Make (Init) () in
   let module Run = Run (Config) (Main) in
   let open Main in
   let net_config =
