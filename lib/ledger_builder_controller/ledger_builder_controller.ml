@@ -184,7 +184,7 @@ module type Inputs_intf = sig
   end
 
   module Net : sig
-    include Coda.Ledger_builder_io_intf
+    include Coda_lib.Ledger_builder_io_intf
             with type sync_ledger_query := Sync_ledger.query
              and type sync_ledger_answer := Sync_ledger.answer
              and type ledger_builder_hash := Ledger_builder_hash.t
@@ -203,7 +203,7 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) : sig
-  include Coda.Ledger_builder_controller_intf
+  include Coda_lib.Ledger_builder_controller_intf
           with type ledger_builder := Inputs.Ledger_builder.t
            and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
            and type internal_transition := Inputs.Internal_transition.t
