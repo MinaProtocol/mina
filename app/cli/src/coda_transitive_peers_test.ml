@@ -22,7 +22,8 @@ struct
     Coda_processes.init () ;
     let configs =
       Coda_processes.local_configs n ~program_dir
-        ~snark_worker_public_keys:None ~should_propose:(Fn.const false) ~kademlia_mode:"test"
+        ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
+        ~kademlia_mode:"test"
     in
     let%bind workers = Coda_processes.spawn_local_processes_exn configs in
     let discovery_ports, external_ports, peers =
@@ -37,7 +38,8 @@ struct
       peers ;
     let config =
       Coda_process.local_config ~peers ~external_port ~discovery_port
-        ~snark_worker_config:None ~should_propose:false ~program_dir ~kademlia_mode:"test" ()
+        ~snark_worker_config:None ~should_propose:false ~program_dir
+        ~kademlia_mode:"test" ()
     in
     let%bind worker = Coda_process.spawn_exn config in
     let%bind _ = after (Time.Span.of_sec 10.) in
