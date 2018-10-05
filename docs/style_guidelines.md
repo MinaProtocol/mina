@@ -35,7 +35,7 @@ module Account = struct
 end
 ```
 
-The module type name `S` is used for defining the root signature of a module. This is most commonly used when you have a module which contains a functor. In this case, we typically call the functor `Make` and declare the the functor returns the type `S`, putting both of these values in the same module. Looking back at our previous example, `Core_kernel`'s `Comparable` module follows this pattern: `Comparable.Make` is a functor which returns a `Comparable.S`.
+The module type name `S` is used for defining the root signature of a module. This is most commonly used when you have a module which contains a functor. In this case, we typically call the functor `Make` and declare the functor returns the type `S`, putting both of these values in the same module. Looking back at our previous example, `Core_kernel`'s `Comparable` module follows this pattern: `Comparable.Make` is a functor which returns a `Comparable.S`.
 
 #### Prefer One Type Per Module
 [ocaml-modules-singleton-types]: #ocaml-modules-singleton-types
