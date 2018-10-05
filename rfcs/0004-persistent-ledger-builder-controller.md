@@ -27,6 +27,7 @@ Later, a cache can be introduced onto the Merkle ledger database, allowing us to
 
 The module type for the sparse diff could be:
 
+```ocaml
   module type SparseDiff = sig
     type t
 	type key
@@ -46,6 +47,7 @@ The module type for the sparse diff could be:
     (* look up in diff; if key not present, delegate to database for locked tip *)
     val get : db -> key -> value option
   end
+```
 
 # Drawbacks
 [drawbacks]: #drawbacks
