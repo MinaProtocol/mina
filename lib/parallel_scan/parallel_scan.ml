@@ -487,7 +487,7 @@ let fill_in_completed_jobs :
 let last_emitted_value (state: ('a, 'd) State.t) = snd state.acc
 
 let current_data (state: ('a, 'd) State.t) =
-  state.recent_tree_data :: state.other_trees_data
+  state.recent_tree_data @ List.concat state.other_trees_data
 
 let parallelism : state:('a, 'd) State.t -> int =
  fun ~state -> State.parallelism state
@@ -651,6 +651,47 @@ let%test_module "scans" =
               | `Two (x, y) ->
                   assert (x + y = i) ;
                   assert (Option.value_exn state.base_none_pos = y + offset) )
+
+        let%test_unit "non-emitted data tracking" =
+          (* After a random number of steps, check if acc = current_state - data list*)
+          let cur_value = ref 0 in
+          let parallelism_log_2 = 3 in
+          let one = Int64.of_int 1 in
+          let state = State.create ~parallelism_log_2 in
+          let g = Int.gen_uniform_incl 0 (2 * Int.pow 2 parallelism_log_2) in
+          Quickcheck.test g ~trials:10 ~f:(fun i ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  let ones n =
+                    { Linear_pipe.Reader.pipe=
+                        Pipe.unfold ~init:n ~f:(fun count ->
+                            if count = 0 then return None
+                            else return (Some (one, count - 1)) )
+                    ; has_reader= false }
+                  in
+                  let pipe s n =
+                    step_repeatedly ~state:s ~data:(ones n) ~f:job_done
+                      ~f_acc:f_merge_up
+                  in
+                  let fill_some_data s =
+                    List.init i ~f:(fun _ -> ())
+                    |> Deferred.List.fold ~init:Int64.zero ~f:(fun v _ ->
+                           match%map Linear_pipe.read (pipe s i) with
+                           | `Eof -> v
+                           | `Ok (Some v') -> v'
+                           | `Ok None -> v )
+                  in
+                  cur_value := !cur_value + i ;
+                  let%bind _ = fill_some_data state in
+                  let acc_data =
+                    List.sum (module Int64) (current_data state) ~f:Fn.id
+                  in
+                  let acc =
+                    Option.value_map (snd state.acc) ~default:0
+                      ~f:Int64.to_int_exn
+                  in
+                  let expected = !cur_value - Int64.to_int_exn acc_data in
+                  assert (acc = expected) ;
+                  return () ) )
 
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;

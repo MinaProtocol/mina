@@ -332,12 +332,16 @@ end = struct
                 | Base None -> acc_statement
                 | Base
                     (Some
-                      { Super_transaction_with_witness.transaction
+                      { Super_transaction_with_witness.transaction_with_info
                       ; statement
                       ; witness }) ->
                     let source =
                       Frozen_ledger_hash.of_ledger_hash
                       @@ Sparse_ledger.merkle_root witness
+                    in
+                    let transaction =
+                      ok_or_return
+                      @@ Ledger.Undo.super_transaction transaction_with_info
                     in
                     let after =
                       Or_error.try_with (fun () ->
@@ -546,6 +550,31 @@ end = struct
           ()
     in
     {ledger; scan_state= aux; public_key}
+
+  let _snarked_ledger : t -> Ledger.t option Or_error.t =
+   fun {ledger; scan_state; _} ->
+    let open Or_error.Let_syntax in
+    match Parallel_scan.last_emitted_value scan_state with
+    | None -> Ok None
+    | Some (_, {target; _}) ->
+        let txns_still_being_worked_on =
+          Parallel_scan.current_data scan_state
+        in
+        let snarked_ledger = Ledger.copy ledger in
+        let%bind () =
+          List.fold_left txns_still_being_worked_on ~init:(Ok ()) ~f:
+            (fun acc t ->
+              Or_error.bind
+                (Or_error.map acc ~f:(fun _ -> t.transaction_with_info))
+                ~f:(fun u -> Ledger.undo snarked_ledger u) )
+        in
+        if
+          Frozen_ledger_hash.equal
+            ( Ledger.merkle_root snarked_ledger
+            |> Frozen_ledger_hash.of_ledger_hash )
+            target
+        then return @@ Some snarked_ledger
+        else Or_error.error_string "Error retrieving snarked ledger"
 
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
