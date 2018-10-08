@@ -17,12 +17,12 @@ let alt_problem_slide =
      parties, threatening decentralization." ]
 
 let coda_slide_1 =
-  [ "In contrast, the resource requirments for verifying Coda are *very low* \
+  [ "In contrast, the resource requirements for verifying Coda are *very low* \
      and *don't increase with time*."
   ; "Coda is so efficient it can even run in your browser." ]
 
 let alt_coda_slide_1 =
-  [ "In contrast, the resource requirments for verifying Coda are very low \
+  [ "In contrast, the resource requirements for verifying Coda are very low \
      and don't increase with time."
   ; "Coda is so efficient it can even run on the browser on your phone." ]
 
