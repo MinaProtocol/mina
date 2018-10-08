@@ -2,6 +2,7 @@ open Core
 open Unsigned
 
 module Offense = struct
+  (* TODO: add more offenses. See https://github.com/o1-labs/nanobit/issues/852 *)
   type t = Send_bad_hash | Send_bad_aux | Failed_to_connect [@@deriving eq]
 end
 
@@ -173,9 +174,10 @@ let%test_module "banlist" =
       let duration = Time.Span.of_sec 5.0
     end
 
-    module Timed_punishment_record = struct 
+    module Timed_punishment_record = struct
       type time = Time.t
-      include Punishment.Record.Make (Timeout) 
+
+      include Punishment.Record.Make (Timeout)
     end
 
     module Timed_punished_db =
@@ -186,7 +188,8 @@ let%test_module "banlist" =
         (Score_mechanism)
 
     let%test "if a peer has offenses, and their combination does exceed the \
-              ban threshold, then the peer is considered to be punished for some time" =
+              ban threshold, then the peer is considered to be punished for \
+              some time" =
       let open Async in
       Thread_safe.block_on_async_exn (fun () ->
           let t = Timed_banlist.create ~ban_threshold in
@@ -196,7 +199,7 @@ let%test_module "banlist" =
           assert (
             match Timed_banlist.lookup t peer with
             | `Punished _ -> true
-            | _ -> false) ;
+            | _ -> false ) ;
           let%map () = after Timeout.duration in
           match Timed_banlist.lookup t peer with `Normal -> true | _ -> false
       )

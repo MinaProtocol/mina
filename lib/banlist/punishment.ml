@@ -25,7 +25,7 @@ module Record = struct
   end) :
     S with type time := Time.t and type score := UInt32.t =
   struct
-    type t = {score: UInt32.t; punishment: T.t} 
+    type t = {score: UInt32.t; punishment: T.t}
 
     let eviction_time {punishment; _} =
       match punishment with Timeout time -> time | Forever -> failwith "TODO"
