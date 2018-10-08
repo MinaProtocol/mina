@@ -1,17 +1,11 @@
 open Core
 open Unsigned
 
-type host = Host_and_port.t [@@deriving sexp]
+module Offense = struct
+  type t = Send_bad_hash | Send_bad_aux | Failed_to_connect [@@deriving eq]
+end
 
 module Score = UInt32
-
-module Punishment_record = struct
-  type t = {score: Score.t; punishment: Punishment.t}
-
-  let evict_time {punishment; _} = Punishment.evict_time punishment
-
-  let create_timeout score = {score; punishment= Punishment.create_timeout ()}
-end
 
 module type S = sig
   type t
@@ -41,12 +35,13 @@ module Make (Peer : sig
 
   val sexp_of_t : t -> Sexp.t
 end)
+(Punishment_record : Punishment.Record.S with type score := UInt32.t)
 (Suspicious_db : Key_value_database.S
-              with type key := Peer.t
-               and type value := Score.t)
+                 with type key := Peer.t
+                  and type value := Score.t)
 (Punished_db : Key_value_database.S
-            with type key := Peer.t
-             and type value := Punishment_record.t) (Score_mechanism : sig
+               with type key := Peer.t
+                and type value := Punishment_record.t) (Score_mechanism : sig
     val score : Offense.t -> Score.t
 end) :
   S
@@ -55,9 +50,9 @@ end) :
    and type punishment := Punishment_record.t =
 struct
   type t =
-    {suspicious: Suspicious_db.t; 
-    punished: Punished_db.t; 
-    ban_threshold: Score.t}
+    { suspicious: Suspicious_db.t
+    ; punished: Punished_db.t
+    ; ban_threshold: Score.t }
 
   let create ~ban_threshold =
     let suspicious = Suspicious_db.create () in
@@ -106,8 +101,19 @@ end
 let%test_module "banlist" =
   ( module struct
     module Suspicious_db = Key_value_database.Make_mock (Int) (Score)
-    module Punished_db =
-      Key_value_database.Make_mock (Int) (Punishment_record)
+
+    module Mocked_punishment_record = struct
+      type t = Int.t
+
+      type time = Int.t
+
+      let eviction_time _ = 0
+
+      let create_timeout score = UInt32.to_int score
+    end
+
+    module Mocked_punished_db =
+      Key_value_database.Make_mock (Int) (Mocked_punishment_record)
 
     let ban_threshold = 100
 
@@ -115,10 +121,11 @@ let%test_module "banlist" =
       open Offense
 
       let score offense =
-        Score.of_int ( match offense with
-        | Failed_to_connect -> ban_threshold + 1
-        | Send_bad_hash -> ban_threshold / 2
-        | Send_bad_aux -> ban_threshold / 4 )
+        Score.of_int
+          ( match offense with
+          | Failed_to_connect -> ban_threshold + 1
+          | Send_bad_hash -> ban_threshold / 2
+          | Send_bad_aux -> ban_threshold / 4 )
     end
 
     let compute_score offenses =
@@ -126,38 +133,71 @@ let%test_module "banlist" =
           let score = Score_mechanism.score offense in
           Score.add acc score )
 
-    module Banlist = Make (Int) (Suspicious_db) (Punished_db) (Score_mechanism)
+    module Mocked_banlist =
+      Make (Int) (Mocked_punishment_record) (Suspicious_db)
+        (Mocked_punished_db)
+        (Score_mechanism)
 
     let peer = 1
 
     let%test "if no bans, then peer is normal" =
-      let t = Banlist.create ~ban_threshold in
-      match Banlist.lookup t peer with
+      let t = Mocked_banlist.create ~ban_threshold in
+      match Mocked_banlist.lookup t peer with
       | `Normal -> true
       | `Suspicious _ -> false
       | `Punished _ -> false
 
-    let%test "if a host has offenses, and their combination do not exceed the ban \
-              threshold, then the peer is considered to be suspicious" =
+    let%test "if a peer has offenses, and their combination do not exceed the \
+              ban threshold, then the peer is considered to be suspicious" =
       let open Offense in
-      let t = Banlist.create ~ban_threshold in
+      let t = Mocked_banlist.create ~ban_threshold in
       let offenses = [Send_bad_hash; Send_bad_aux] in
       List.iter offenses ~f:(fun offense ->
-          Banlist.record t peer offense |> Or_error.ok_exn ) ;
-      match Banlist.lookup t peer with
+          Mocked_banlist.record t peer offense |> Or_error.ok_exn ) ;
+      match Mocked_banlist.lookup t peer with
       | `Suspicious score -> Score.compare score (compute_score offenses) = 0
       | `Normal -> false
       | `Punished _ -> false
 
-    let%test "if a host has offenses, and their combination does exceed the ban \
-              threshold, then the host is considered to be punished" =
-      let open Offense in
-      let t = Banlist.create ~ban_threshold in
-      let offenses = [Failed_to_connect] in
+    let%test "if a peer has offenses, and their combination does exceed the \
+              ban threshold, then the peer is considered to be punished" =
+      let t = Mocked_banlist.create ~ban_threshold in
+      let offenses = [Offense.Failed_to_connect] in
       List.iter offenses ~f:(fun offense ->
-          Banlist.record t peer offense |> Or_error.ok_exn ) ;
-      match Banlist.lookup t peer with
-      | `Punished {Punishment_record.punishment= Timeout _exiction_date; _} ->
-          true
+          Mocked_banlist.record t peer offense |> Or_error.ok_exn ) ;
+      match Mocked_banlist.lookup t peer with
+      | `Punished _ -> true
       | _ -> false
+
+    module Timeout = struct
+      let duration = Time.Span.of_sec 5.0
+    end
+
+    module Timed_punishment_record = struct 
+      type time = Time.t
+      include Punishment.Record.Make (Timeout) 
+    end
+
+    module Timed_punished_db =
+      Punished_db.Make (Int) (Time) (Timed_punishment_record)
+        (Key_value_database.Make_mock (Int) (Timed_punishment_record))
+    module Timed_banlist =
+      Make (Int) (Timed_punishment_record) (Suspicious_db) (Timed_punished_db)
+        (Score_mechanism)
+
+    let%test "if a peer has offenses, and their combination does exceed the \
+              ban threshold, then the peer is considered to be punished for some time" =
+      let open Async in
+      Thread_safe.block_on_async_exn (fun () ->
+          let t = Timed_banlist.create ~ban_threshold in
+          let offenses = [Offense.Failed_to_connect] in
+          List.iter offenses ~f:(fun offense ->
+              Timed_banlist.record t peer offense |> Or_error.ok_exn ) ;
+          assert (
+            match Timed_banlist.lookup t peer with
+            | `Punished _ -> true
+            | _ -> false) ;
+          let%map () = after Timeout.duration in
+          match Timed_banlist.lookup t peer with `Normal -> true | _ -> false
+      )
   end )

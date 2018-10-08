@@ -16,10 +16,13 @@ module type Punishment_intf = sig
 end
 
 module Make
+    (Peer : Hashable.S)
     (Time : Time_intf)
     (Punishment : Punishment_intf with type time := Time.t)
-    (DB : Key_value_database.S with type value := Punishment.t) :
-  Key_value_database.S with type value := Punishment.t and type key := DB.key =
+    (DB : Key_value_database.S
+          with type key := Peer.t
+           and type value := Punishment.t) :
+  Key_value_database.S with type key := Peer.t and type value := Punishment.t =
 struct
   type t = {db: DB.t}
 
@@ -76,13 +79,8 @@ let%test_module "banlist" =
       let eviction_time = Fn.id
     end
 
-    module Storage = struct
-      type key = Int.t
-
-      include Key_value_database.Make_mock (Int) (Mock_punishment)
-    end
-
-    module Mock_db = Make (Mock_time) (Mock_punishment) (Storage)
+    module Storage = Key_value_database.Make_mock (Int) (Mock_punishment)
+    module Mock_db = Make (Int) (Mock_time) (Mock_punishment) (Storage)
 
     let schedule_punishment_lookup db is_punished time =
       Mock_time.set_event time ~f:(fun _time ->
