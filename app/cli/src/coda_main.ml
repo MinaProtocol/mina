@@ -1142,9 +1142,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                 (`Call
                   (fun net exn ->
                     Logger.error log "%s" (Exn.to_string_mach exn) ))
-              (Tcp.Where_to_listen.bind_to
-                 Localhost
-                  (On_port rest_server_port))
+              (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 let route_not_found () =
