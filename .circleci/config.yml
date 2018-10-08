@@ -175,6 +175,7 @@ workflows:
         jobs:
             - build
             - build_withsnark
+            - test_withsnark
             - build_public
             - test-runtest
             - test-sig
