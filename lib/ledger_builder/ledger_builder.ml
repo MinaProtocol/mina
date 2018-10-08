@@ -289,11 +289,15 @@ end = struct
   [@@deriving sexp, bin_io]
 
   module Aux = struct
-    type t =
-      ( Ledger_proof.t with_statement
-      , Super_transaction_with_witness.t )
-      Parallel_scan.State.t
-    [@@deriving sexp, bin_io]
+    module T = struct
+      type t =
+        ( Ledger_proof.t with_statement
+        , Super_transaction_with_witness.t )
+        Parallel_scan.State.t
+      [@@deriving sexp, bin_io]
+    end
+
+    include T
 
     let hash_to_string scan_state =
       ( Parallel_scan.State.hash scan_state
@@ -302,6 +306,88 @@ end = struct
         :> string )
 
     let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
+
+    let scan_statement t :
+        (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t =
+      with_return (fun {return} ->
+          let ok_or_return = function
+            | Ok x -> x
+            | Error e -> return (Error (`Error e))
+          in
+          let merge s1 s2 =
+            ok_or_return (Ledger_proof_statement.merge s1 s2)
+          in
+          let merge_acc acc s2 =
+            match acc with None -> Some s2 | Some s1 -> Some (merge s1 s2)
+          in
+          let res =
+            Parallel_scan.State.fold_chronological t ~init:None ~f:
+              (fun acc_statement job ->
+                match job with
+                | Merge (None, Some (_, s)) | Merge (Some (_, s), None) ->
+                    merge_acc acc_statement s
+                | Merge (None, None) -> acc_statement
+                | Merge (Some (_, s1), Some (_, s2)) ->
+                    merge_acc acc_statement (merge s1 s2)
+                | Base None -> acc_statement
+                | Base
+                    (Some
+                      { Super_transaction_with_witness.transaction
+                      ; statement
+                      ; witness }) ->
+                    let source =
+                      Frozen_ledger_hash.of_ledger_hash
+                      @@ Sparse_ledger.merkle_root witness
+                    in
+                    let after =
+                      Or_error.try_with (fun () ->
+                          Sparse_ledger.apply_super_transaction_exn witness
+                            transaction )
+                      |> ok_or_return
+                    in
+                    let target =
+                      Frozen_ledger_hash.of_ledger_hash
+                      @@ Sparse_ledger.merkle_root after
+                    in
+                    let expected_statement =
+                      { Ledger_proof_statement.source
+                      ; target
+                      ; fee_excess=
+                          ok_or_return
+                            (Super_transaction.fee_excess transaction)
+                      ; supply_increase=
+                          ok_or_return
+                            (Super_transaction.supply_increase transaction)
+                      ; proof_type= `Base }
+                    in
+                    if
+                      Ledger_proof_statement.equal statement expected_statement
+                    then merge_acc acc_statement statement
+                    else
+                      return
+                        (Error
+                           (`Error
+                             (Error.of_string
+                                "Ledger_builder.scan_statement: Bad base \
+                                 statement"))) )
+          in
+          match res with None -> Error `Empty | Some res -> Ok res )
+
+    let is_valid t =
+      Parallel_scan.parallelism ~state:t
+      = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
+      && Parallel_scan.is_valid t
+
+    include Binable.Of_binable (T)
+              (struct
+                type nonrec t = t
+
+                let to_binable = Fn.id
+
+                let of_binable t =
+                  assert (is_valid t) ;
+                  t
+              end)
   end
 
   type scan_state = Aux.t [@@deriving sexp, bin_io]
@@ -404,66 +490,24 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
-  let scan_statement (state: scan_state) :
-      (Ledger_proof_statement.t, [`Error of Error.t | `Empty]) Result.t =
-    with_return (fun {return} ->
-        let ok_or_return = function
-          | Ok x -> x
-          | Error e -> return (Error (`Error e))
-        in
-        let merge s1 s2 = ok_or_return (Ledger_proof_statement.merge s1 s2) in
-        let merge_acc acc s2 =
-          match acc with None -> Some s2 | Some s1 -> Some (merge s1 s2)
-        in
-        let res =
-          Parallel_scan.State.fold_chronological state ~init:None ~f:
-            (fun acc_statement job ->
-              match job with
-              | Merge (None, Some (_, s)) | Merge (Some (_, s), None) ->
-                  merge_acc acc_statement s
-              | Merge (None, None) -> acc_statement
-              | Merge (Some (_, s1), Some (_, s2)) ->
-                  merge_acc acc_statement (merge s1 s2)
-              | Base None -> acc_statement
-              | Base (Some {transaction; statement; witness}) ->
-                  let source =
-                    Frozen_ledger_hash.of_ledger_hash
-                    @@ Sparse_ledger.merkle_root witness
-                  in
-                  let after =
-                    Or_error.try_with (fun () ->
-                        Sparse_ledger.apply_super_transaction_exn witness
-                          transaction )
-                    |> ok_or_return
-                  in
-                  let target =
-                    Frozen_ledger_hash.of_ledger_hash
-                    @@ Sparse_ledger.merkle_root after
-                  in
-                  let expected_statement =
-                    { Ledger_proof_statement.source
-                    ; target
-                    ; fee_excess=
-                        ok_or_return (Super_transaction.fee_excess transaction)
-                    ; supply_increase=
-                        ok_or_return
-                          (Super_transaction.supply_increase transaction)
-                    ; proof_type= `Base }
-                  in
-                  if Ledger_proof_statement.equal statement expected_statement
-                  then merge_acc acc_statement statement
-                  else
-                    return
-                      (Error
-                         (`Error
-                           (Error.of_string
-                              "Ledger_builder.scan_statement: Bad base \
-                               statement"))) )
-        in
-        match res with None -> Error `Empty | Some res -> Ok res )
+  let verify_scan_state ledger aux =
+    Debug_assert.debug_assert (fun () ->
+        match Aux.scan_statement aux with
+        | Ok {source= _; target; fee_excess; proof_type= _; supply_increase= _} ->
+            [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
+              fee_excess ;
+            [%test_eq : Frozen_ledger_hash.t]
+              (Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash)
+              target
+        | Error `Empty -> ()
+        | Error (`Error e) ->
+            failwithf
+              !"Error verifying the parallel scan state after applying the \
+                diff. %{sexp:Error.t}"
+              e () )
 
   let statement_exn t =
-    match scan_statement t.scan_state with
+    match Aux.scan_statement t.scan_state with
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
     | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
@@ -475,7 +519,7 @@ end = struct
     in
     let open Or_error.Let_syntax in
     let%map () =
-      match scan_statement aux with
+      match Aux.scan_statement aux with
       | Error (`Error e) -> Error e
       | Error `Empty -> Ok ()
       | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
@@ -873,6 +917,7 @@ end = struct
       (* TODO: Add rollback *)
       enqueue_data_with_rollback t.scan_state data
     in
+    verify_scan_state t.ledger t.scan_state ;
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
@@ -958,6 +1003,7 @@ end = struct
       Or_error.ok_exn (fill_in_completed_work t.scan_state works)
     in
     Or_error.ok_exn (Parallel_scan.enqueue_data ~state:t.scan_state ~data) ;
+    verify_scan_state t.ledger t.scan_state ;
     res_opt
 
   let sequence_chunks_of seq ~n =
@@ -1644,6 +1690,13 @@ let%test_module "test" =
 
           let merge s1 s2 =
             let open Or_error.Let_syntax in
+            let%bind _ =
+              if Ledger_hash.equal s1.target s2.source then Ok ()
+              else
+                Or_error.errorf
+                  !"Invalid merge: target: %s source %s"
+                  s1.target s2.source
+            in
             let%map fee_excess =
               Fee.Signed.add s1.fee_excess s2.fee_excess
               |> option "Error adding fees"
@@ -2190,4 +2243,28 @@ let%test_module "test" =
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Lb.ledger lb) = expected_value) ) )
+
+    let%test_unit "Reproduce invalid statement error" =
+      (*Always at worst case number of provers*)
+      Backtrace.elide := false ;
+      let get_work (stmts: Test_input1.Completed_work.Statement.t) :
+          Test_input1.Completed_work.Checked.t option =
+        Some
+          { Test_input1.Completed_work.Checked.fee= Fee.Unsigned.zero
+          ; proofs= stmts
+          ; prover= "P" }
+      in
+      let logger = Logger.create () in
+      let txns =
+        List.init 6 ~f:(fun _ -> [])
+        @ [[(1, 0); (1, 0); (1, 0)]] @ [[(1, 0); (1, 0)]] @ [[(1, 0); (1, 0)]]
+      in
+      let ledger = ref 0 in
+      let lb = Lb.create ~ledger ~self:self_pk in
+      Async.Thread_safe.block_on_async_exn (fun () ->
+          Deferred.List.fold ~init:() txns ~f:(fun _ ts ->
+              let%map _ =
+                create_and_apply lb logger (Sequence.of_list ts) get_work
+              in
+              () ) )
   end )

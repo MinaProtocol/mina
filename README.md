@@ -53,7 +53,7 @@ do `opam switch import opam.export`. You'll also need to
 (REMEMBER to change the HOME and SOURCE directory to match yours)
 
 ```bash
-export PATH=~/src/cli/scripts:$PATH
+export PATH=path/to/coda/scripts:$PATH
 ```
 
 * Start a build (go stretch your arms)\
