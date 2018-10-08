@@ -90,8 +90,42 @@ module type Inputs_intf = sig
   end
 
   module Consensus_mechanism : sig
+    module Local_state : sig
+      type t
+    end
+
     module Consensus_state : sig
       type value
+    end
+
+    module Protocol_state : sig
+      type value [@@deriving sexp]
+
+      val create_value :
+           previous_state_hash:State_hash.t
+        -> blockchain_state:Blockchain_state.value
+        -> consensus_state:Consensus_state.value
+        -> value
+
+      val previous_state_hash : value -> State_hash.t
+
+      val blockchain_state : value -> Blockchain_state.value
+
+      val consensus_state : value -> Consensus_state.value
+
+      val equal_value : value -> value -> bool
+
+      val hash : value -> State_hash.t
+    end
+
+    module External_transition : sig
+      type t [@@deriving bin_io, eq, compare, sexp]
+
+      val protocol_state : t -> Protocol_state.value
+
+      val protocol_state_proof : t -> Protocol_state_proof.t
+
+      val ledger_builder_diff : t -> Ledger_builder_diff.t
     end
 
     (* This checks the SNARKs in State/LB and does the transition *)
@@ -102,48 +136,21 @@ module type Inputs_intf = sig
       -> logger:Logger.t
       -> time_received:Unix_timestamp.t
       -> [`Keep | `Take]
-  end
 
-  module Protocol_state : sig
-    type value [@@deriving sexp]
-
-    val create_value :
-         previous_state_hash:State_hash.t
-      -> blockchain_state:Blockchain_state.value
-      -> consensus_state:Consensus_mechanism.Consensus_state.value
-      -> value
-
-    val previous_state_hash : value -> State_hash.t
-
-    val blockchain_state : value -> Blockchain_state.value
-
-    val consensus_state : value -> Consensus_mechanism.Consensus_state.value
-
-    val equal_value : value -> value -> bool
-
-    val hash : value -> State_hash.t
-  end
-
-  module External_transition : sig
-    type t [@@deriving bin_io, eq, compare, sexp]
-
-    val protocol_state : t -> Protocol_state.value
-
-    val protocol_state_proof : t -> Protocol_state_proof.t
-
-    val ledger_builder_diff : t -> Ledger_builder_diff.t
+    val lock_transition :
+         Consensus_state.value
+      -> Consensus_state.value
+      -> ledger:Ledger.t
+      -> local_state:Local_state.t
+      -> unit
   end
 
   module Tip :
     Protocols.Coda_pow.Tip_intf
     with type ledger_builder := Ledger_builder.t
-     and type protocol_state := Protocol_state.value
+     and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := External_transition.t
-
-  module Valid_transaction : sig
-    type t [@@deriving eq, sexp, compare, bin_io]
-  end
+     and type external_transition := Consensus_mechanism.External_transition.t
 
   module Sync_ledger : sig
     type t
@@ -183,13 +190,16 @@ module type Inputs_intf = sig
              and type ledger_builder_hash := Ledger_builder_hash.t
              and type ledger_builder_aux := Ledger_builder.Aux.t
              and type ledger_hash := Ledger_hash.t
-             and type protocol_state := Protocol_state.value
+             and type protocol_state :=
+                        Consensus_mechanism.Protocol_state.value
   end
 
   module Store : Storage.With_checksum_intf with type location = string
 
   val verify_blockchain :
-    Protocol_state_proof.t -> Protocol_state.value -> bool Deferred.Or_error.t
+       Protocol_state_proof.t
+    -> Consensus_mechanism.Protocol_state.value
+    -> bool Deferred.Or_error.t
 end
 
 module Make (Inputs : Inputs_intf) : sig
@@ -200,16 +210,21 @@ module Make (Inputs : Inputs_intf) : sig
            and type ledger := Inputs.Ledger.t
            and type ledger_proof := Inputs.Ledger_builder.proof
            and type net := Inputs.Net.net
-           and type protocol_state := Inputs.Protocol_state.value
+           and type protocol_state :=
+                      Inputs.Consensus_mechanism.Protocol_state.value
            and type ledger_hash := Inputs.Ledger_hash.t
            and type sync_query := Inputs.Sync_ledger.query
            and type sync_answer := Inputs.Sync_ledger.answer
-           and type external_transition := Inputs.External_transition.t
+           and type external_transition :=
+                      Inputs.Consensus_mechanism.External_transition.t
+           and type consensus_local_state :=
+                      Inputs.Consensus_mechanism.Local_state.t
            and type tip := Inputs.Tip.t
 
   val ledger_builder_io : t -> Inputs.Net.t
 end = struct
   open Inputs
+  open Consensus_mechanism
 
   module Config = struct
     type t =
@@ -218,31 +233,17 @@ end = struct
       ; external_transitions:
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
+      ; consensus_local_state: Consensus_mechanism.Local_state.t
       ; longest_tip_location: string }
     [@@deriving make]
-  end
-
-  module External_transition = struct
-    include External_transition
-    open Protocol_state
-
-    let target_state = protocol_state
-
-    let ledger_builder_hash t =
-      protocol_state t |> blockchain_state
-      |> Blockchain_state.ledger_builder_hash
-
-    let ledger_hash t =
-      protocol_state t |> blockchain_state |> Blockchain_state.ledger_hash
-
-    let previous_state_hash t = protocol_state t |> previous_state_hash
   end
 
   module Transition_logic_inputs = struct
     module Frozen_ledger_hash = Frozen_ledger_hash
     module State_hash = State_hash
+    module Ledger_builder_hash = Ledger_builder_hash
+    module Blockchain_state = Blockchain_state
     module Consensus_mechanism = Consensus_mechanism
-    module Protocol_state = Protocol_state
 
     module Step = struct
       let step {With_hash.data= tip; hash= tip_hash}
@@ -287,15 +288,6 @@ end = struct
         ; hash= transition_target_hash }
     end
 
-    module External_transition = struct
-      include External_transition
-
-      let is_parent_of ~child:{With_hash.data= child; hash= _}
-          ~parent:{With_hash.hash= parent_state_hash; data= _} =
-        State_hash.equal parent_state_hash
-          (External_transition.previous_state_hash child)
-    end
-
     module Tip = struct
       include Tip
 
@@ -318,7 +310,10 @@ end = struct
                  materialized ledger_builder's hash for transition: %{sexp: \
                  External_transition.t}"
                transition)
-          ~expect:(External_transition.ledger_builder_hash transition)
+          ~expect:
+            ( External_transition.protocol_state transition
+            |> Protocol_state.blockchain_state
+            |> Blockchain_state.ledger_builder_hash )
           (Ledger_builder.hash t.ledger_builder)
 
       let transition_unchecked t
@@ -342,7 +337,7 @@ end = struct
         in
         let tip' =
           { t with
-            protocol_state= External_transition.target_state transition
+            protocol_state= External_transition.protocol_state transition
           ; proof= External_transition.protocol_state_proof transition }
         in
         let res = {With_hash.data= tip'; hash= transition_state_hash} in
@@ -352,15 +347,23 @@ end = struct
       let is_parent_of ~child:{With_hash.data= child; hash= _}
           ~parent:{With_hash.data= _; hash= parent_hash} =
         State_hash.equal parent_hash
-          (External_transition.previous_state_hash child)
+          ( External_transition.protocol_state child
+          |> Protocol_state.previous_state_hash )
 
       let is_materialization_of {With_hash.data= _; hash= tip_hash}
           {With_hash.data= _; hash= transition_hash} =
         State_hash.equal transition_hash tip_hash
     end
 
-    module Transition_logic_state =
-      Transition_logic_state.Make (Security) (External_transition) (Tip)
+    module Transition_logic_state = Transition_logic_state.Make (struct
+      module Security = Security
+      module Ledger = Ledger
+      module Ledger_builder = Ledger_builder
+      module Consensus_mechanism = Consensus_mechanism
+      module External_transition = External_transition
+      module Tip = Tip
+    end)
+
     module Ledger_hash = Ledger_hash
 
     module Catchup = Catchup.Make (struct
@@ -371,9 +374,8 @@ end = struct
       module Ledger_builder_hash = Ledger_builder_hash
       module Ledger_builder = Ledger_builder
       module Protocol_state_proof = Protocol_state_proof
+      module Blockchain_state = Blockchain_state
       module Consensus_mechanism = Consensus_mechanism
-      module Protocol_state = Protocol_state
-      module External_transition = External_transition
       module Tip = Tip
       module Transition_logic_state = Transition_logic_state
       module Sync_ledger = Sync_ledger
@@ -411,7 +413,7 @@ end = struct
     match%map Store.load controller longest_tip_location with
     | Ok tip_and_genesis_hash -> tip_and_genesis_hash
     | Error `No_exist ->
-        Logger.trace log
+        Logger.info log
           "File for ledger builder controller tip does not exist. Using \
            Genesis tip" ;
         {data= genesis_tip; hash= genesis_state_hash}
@@ -449,6 +451,7 @@ end = struct
     in
     let state =
       Transition_logic_state.create
+        ~consensus_local_state:config.consensus_local_state
         (With_hash.of_data tip ~hash_data:(fun tip ->
              tip.Tip.protocol_state |> Protocol_state.hash ))
     in
@@ -482,8 +485,8 @@ end = struct
       (Linear_pipe.iter mutate_state_reader ~f:(fun (changes, transition) ->
            let old_state = Transition_logic.state t.handler in
            (* TODO: We can make change-resolving more intelligent if different
-         * concurrent processes took different times to finish. Since we
-         * serialize to one job at a time this shouldn't happen anyway though *)
+            * concurrent processes took different times to finish. Since we
+            * serialize to one job at a time this shouldn't happen anyway though *)
            let new_state =
              Transition_logic_state.apply_all old_state changes
            in
@@ -512,7 +515,8 @@ end = struct
         config.external_transitions ~f:(fun (transition, time_received) ->
           let transition_with_hash =
             With_hash.of_data transition ~hash_data:(fun t ->
-                t |> External_transition.target_state |> Protocol_state.hash )
+                t |> External_transition.protocol_state |> Protocol_state.hash
+            )
           in
           let%bind changes, job =
             Transition_logic.on_new_transition catchup t.handler
@@ -536,9 +540,9 @@ end = struct
           match
             Consensus_mechanism.select
               (Protocol_state.consensus_state
-                 (Inputs.External_transition.protocol_state last_transition))
+                 (External_transition.protocol_state last_transition))
               (Protocol_state.consensus_state
-                 (Inputs.External_transition.protocol_state current_transition))
+                 (External_transition.protocol_state current_transition))
               ~logger:log ~time_received
           with
           | `Keep -> `Skip
@@ -603,7 +607,9 @@ end = struct
           hash )
       ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
         Ledger_builder_hash.equal
-          (External_transition.ledger_builder_hash trans)
+          ( trans |> External_transition.protocol_state
+          |> Protocol_state.blockchain_state
+          |> Blockchain_state.ledger_builder_hash )
           hash )
       ~f_result:(fun {With_hash.data= tip; hash= _} -> tip.Tip.ledger_builder)
 
@@ -626,7 +632,9 @@ end = struct
             hash )
         ~p_trans:(fun hash {With_hash.data= trans; hash= _} ->
           Ledger_hash.equal
-            ( External_transition.ledger_builder_hash trans
+            ( trans |> External_transition.protocol_state
+            |> Protocol_state.blockchain_state
+            |> Blockchain_state.ledger_builder_hash
             |> Ledger_builder_hash.ledger_hash )
             hash )
         ~f_result:(fun {With_hash.data= tip; hash= _} ->
@@ -720,45 +728,49 @@ let%test_module "test" =
           type value = t [@@deriving eq, sexp, bin_io, compare]
         end
 
-        module Consensus_mechanism_state = struct
-          type value = {strength: int} [@@deriving eq, sexp, bin_io, compare]
-        end
-
-        module Protocol_state = struct
-          type t =
-            { previous_state_hash: State_hash.t
-            ; blockchain_state: Blockchain_state.value
-            ; consensus_state: Consensus_mechanism_state.value }
-          [@@deriving eq, sexp, fields, bin_io, compare]
-
-          type value = t [@@deriving sexp, bin_io, eq, compare]
-
-          let hash t = t.blockchain_state.ledger_builder_hash
-
-          let create_value ~previous_state_hash ~blockchain_state
-              ~consensus_state =
-            {previous_state_hash; blockchain_state; consensus_state}
-
-          let genesis =
-            { previous_state_hash= -1
-            ; blockchain_state= {ledger_builder_hash= 0; ledger_hash= 0}
-            ; consensus_state= {strength= 0} }
-        end
-
-        module External_transition = struct
-          include Protocol_state
-
-          let protocol_state = Fn.id
-
-          let of_state = Fn.id
-
-          let ledger_builder_diff = Protocol_state.hash
-
-          let protocol_state_proof _ = ()
-        end
-
         module Consensus_mechanism = struct
-          module Consensus_state = Consensus_mechanism_state
+          module Local_state = struct
+            type t = unit
+          end
+
+          module Consensus_state = struct
+            type value = {strength: int} [@@deriving eq, sexp, bin_io, compare]
+          end
+
+          module Protocol_state = struct
+            type t =
+              { previous_state_hash: State_hash.t
+              ; blockchain_state: Blockchain_state.value
+              ; consensus_state: Consensus_state.value }
+            [@@deriving eq, sexp, fields, bin_io, compare]
+
+            type value = t [@@deriving sexp, bin_io, eq, compare]
+
+            let hash t = t.blockchain_state.ledger_builder_hash
+
+            let create_value ~previous_state_hash ~blockchain_state
+                ~consensus_state =
+              {previous_state_hash; blockchain_state; consensus_state}
+
+            let genesis =
+              { previous_state_hash= -1
+              ; blockchain_state= {ledger_builder_hash= 0; ledger_hash= 0}
+              ; consensus_state= {strength= 0} }
+          end
+
+          module External_transition = struct
+            include Protocol_state
+
+            let protocol_state = Fn.id
+
+            let of_state = Fn.id
+
+            let ledger_builder_diff = Protocol_state.hash
+
+            let protocol_state_proof _ = ()
+          end
+
+          let lock_transition _ _ ~ledger:_ ~local_state:() = ()
 
           let select Consensus_state.({strength= s1})
               Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
@@ -767,30 +779,33 @@ let%test_module "test" =
 
         module Tip = struct
           type t =
-            { protocol_state: Protocol_state.value
+            { protocol_state: Consensus_mechanism.Protocol_state.value
             ; proof: Protocol_state_proof.t
             ; ledger_builder: Ledger_builder.t }
           [@@deriving bin_io, sexp, fields]
 
           let of_transition_and_lb transition ledger_builder =
-            { protocol_state= External_transition.protocol_state transition
-            ; proof= External_transition.protocol_state_proof transition
+            { protocol_state=
+                Consensus_mechanism.External_transition.protocol_state
+                  transition
+            ; proof=
+                Consensus_mechanism.External_transition.protocol_state_proof
+                  transition
             ; ledger_builder }
         end
 
-        module Internal_transition = External_transition
-        (* Not sure if we even need this *)
-        module Valid_transaction = Int
+        module Internal_transition = Consensus_mechanism.External_transition
 
         module Net = struct
-          type t = Protocol_state.value State_hash.Table.t
+          type t = Consensus_mechanism.Protocol_state.value State_hash.Table.t
 
-          type net = Protocol_state.value list
+          type net = Consensus_mechanism.Protocol_state.value list
 
           let create states =
             let tbl = State_hash.Table.create () in
             List.iter states ~f:(fun s ->
-                State_hash.Table.add_exn tbl ~key:(Protocol_state.hash s)
+                State_hash.Table.add_exn tbl
+                  ~key:(Consensus_mechanism.Protocol_state.hash s)
                   ~data:s ) ;
             tbl
 
@@ -875,15 +890,16 @@ let%test_module "test" =
           ~net_deferred:(return net_input)
           ~external_transitions:
             (Linear_pipe.map ledger_builder_transitions
-               ~f:Inputs.External_transition.of_state)
+               ~f:Inputs.Consensus_mechanism.External_transition.of_state)
           ~genesis_tip:
-            { protocol_state= Inputs.Protocol_state.genesis
+            { protocol_state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()
             ; ledger_builder= Inputs.Ledger_builder.create 0 }
           ~longest_tip_location:(temp_folder ^/ storage)
+          ~consensus_local_state:()
 
       let create_transition x parent strength =
-        { Inputs.Protocol_state.previous_state_hash= parent
+        { Inputs.Consensus_mechanism.Protocol_state.previous_state_hash= parent
         ; blockchain_state= {ledger_builder_hash= x; ledger_hash= x}
         ; consensus_state= {strength} }
 

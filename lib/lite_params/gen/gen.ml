@@ -45,6 +45,7 @@ let wrap_vk ~loc =
   let%map () =
     if Coda_base.Insecure.key_generation then Deferred.unit
     else
+      let%bind () = Unix.mkdir ~p:() Cache_dir.autogen_path in
       Writer.save
         (Cache_dir.autogen_path ^/ "client_verification_key")
         ~contents:vk_base64

@@ -16,17 +16,31 @@ let dispatch rpc query port =
       | Error exn -> return (Or_error.of_exn exn)
       | Ok conn -> Rpc.Rpc.dispatch rpc conn query )
 
-let daemon_port_flag =
-  Command.Param.flag "daemon-port"
-    ~doc:
-      (Printf.sprintf "PORT Client to daemon local communication (default: %d)"
-         default_client_port)
-    (Command.Param.optional int16)
-
 let json_flag =
   Command.Param.(flag "json" no_arg ~doc:"Use json output (default: plaintext)")
 
 module Daemon_cli = struct
+  module Flag = struct
+    open Command.Param
+
+    let port =
+      flag "daemon-port"
+        ~doc:
+          (Printf.sprintf
+             "PORT Client to daemon local communication (default: %d)"
+             default_client_port)
+        (optional int16)
+
+    let autostart_daemon_name = "autostart-daemon"
+
+    let autostart_daemon =
+      flag autostart_daemon_name
+        ~doc:
+          "Autostart Coda daemon (default: true). If a connection to the \
+           daemon does not exist, then a prompt to start it will be shown."
+        no_arg
+  end
+
   type state =
     | Start
     | Show_menu
@@ -34,6 +48,8 @@ module Daemon_cli = struct
     | Run_daemon
     | Run_client
     | Abort
+    | Startup_menu
+    | Autostart_daemon
 
   let reader = Reader.stdin
 
@@ -78,12 +94,25 @@ module Daemon_cli = struct
         let%bind _ = kill p in
         failwith "Cannot connect to daemon"
 
-  let run ~f port arg =
+  let run ~f port is_prompt_hidden arg =
     let port = Option.value port ~default:default_client_port in
     let rec go = function
       | Start ->
+          if is_prompt_hidden then go Autostart_daemon else go Startup_menu
+      | Autostart_daemon ->
           let%bind has_daemon = does_daemon_exist port in
-          if has_daemon then go Run_client else go Show_menu
+          if has_daemon then go Run_client else go Run_daemon
+      | Startup_menu ->
+          let%bind isatty = Unix.isatty (Reader.fd (Lazy.force reader)) in
+          if isatty then go Show_menu
+          else
+            let%bind has_daemon = does_daemon_exist port in
+            if has_daemon then go Run_client
+            else (
+              eprintf
+                !"Error: daemon not running. Start manually or pass -%s"
+                Flag.autostart_daemon_name ;
+              go Abort )
       | Show_menu -> print_menu () ; go Select_action
       | Select_action -> (
           printf "[Y/n]: " ;
@@ -104,8 +133,9 @@ module Daemon_cli = struct
 
   let init ~f arg_flag =
     let open Command.Param.Applicative_infix in
-    Command.Param.return (fun port arg () -> run ~f port arg)
-    <*> daemon_port_flag <*> arg_flag
+    Command.Param.return (fun port is_prompt_hidden arg () ->
+        run ~f port is_prompt_hidden arg )
+    <*> Flag.port <*> Flag.autostart_daemon <*> arg_flag
 end
 
 let get_balance =

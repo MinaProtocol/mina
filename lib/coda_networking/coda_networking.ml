@@ -420,7 +420,7 @@ module Make (Inputs : Inputs_intf) = struct
               (* TODO *)
               Linear_pipe.write_if_open response_writer answer
           | None ->
-              Logger.trace t.log !"Querying failed, no nodes responded" ;
+              Logger.warn t.log !"Querying failed, no nodes responded" ;
               Deferred.unit )
       |> don't_wait_for
   end

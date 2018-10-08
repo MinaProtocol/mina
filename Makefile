@@ -2,7 +2,8 @@
 ## Docker Wrapper 
 ## Hint: export USEDOCKER=TRUE
 
-GITHASH = $(shell git rev-parse --short HEAD)
+GITHASH = $(shell git rev-parse --short=8 HEAD)
+GITLONGHASH = $(shell git rev-parse HEAD)
 
 MYUID = $(shell id -u)
 DOCKERNAME = nanotest-$(MYUID)
@@ -35,7 +36,7 @@ dht: kademlia
 build:
 	$(info Starting Build)
 	ulimit -s 65536
-	$(WRAP) env CODA_COMMIT_SHA1=$(shell git rev-parse HEAD) dune build
+	$(WRAP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
 	$(info Build complete)
 
 withupdates:
@@ -56,6 +57,10 @@ withoutsnark:
 
 showsnark:
 	@grep 'let with_snark' lib/coda_base/insecure.ml
+
+# gets proiving keys -- only used in CI
+withkeys:
+	sudo -E scripts/get_keys.sh
 
 ########################################
 ## Lint
@@ -89,7 +94,7 @@ coda-minikube:
 	./rebuild-minikube.sh coda Dockerfile-coda
 
 base-googlecloud:
-	./rebuild-googlecloud.sh ocaml-base Dockerfile-base $(shell git rev-parse HEAD)
+	./rebuild-googlecloud.sh ocaml-base Dockerfile-base $(GITLONGHASH)
 
 coda-googlecloud:
 	./rebuild-googlecloud.sh coda Dockerfile-coda
@@ -101,7 +106,7 @@ pull-ocaml407-googlecloud:
 	gcloud docker -- pull gcr.io/o1labs-192920/ocaml407:latest
 
 update-deps: base-googlecloud
-	./rewrite-from-dockerfile.sh ocaml-base $(shell git rev-parse HEAD)
+	./rewrite-from-dockerfile.sh ocaml-base $(GITLONGHASH)
 
 container:
 	@./container.sh restart
@@ -125,6 +130,20 @@ codaslim:
 	@./rebuild-docker.sh codaslim Dockerfile-codaslim
 	@rm codaclient.deb
 
+_build/keys-$(GITLONGHASH).tar.bz2: withsnark build
+ifneq (,$(wildcard /var/lib/coda))
+	$(error "Trying to bundle keys but /var/lib/coda exists so they won't be built")
+endif
+	$(WRAP) tar -cvjf _build/keys-$(GITLONGHASH).tar.bz2  /tmp/cli_cache_dir
+
+bundle-keys: withsnark build _build/keys-$(GITLONGHASH).tar.bz2
+	gsutil cp -n _build/keys-$(GITLONGHASH).tar.bz2 gs://proving-keys-stable/keys-$(GITLONGHASH).tar.bz2
+
+update-keys:
+ifeq (,$(wildcard _build/keys-$(GITLONGHASH).tar.bz2))
+	$(error "Trying to update keys, but I'm not sure we've bundled them yet")
+endif
+	perl -i -p -e "s,PINNED_KEY_COMMIT=.*,PINNED_KEY_COMMIT=$(GITLONGHASH)," scripts/get_keys.sh
 
 ########################################
 ## Tests
@@ -158,4 +177,4 @@ test-stakes:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim container deb dev docker kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps bundle-keys update-keys
