@@ -551,7 +551,7 @@ end = struct
     in
     {ledger; scan_state= aux; public_key}
 
-  let _snarked_ledger : t -> Ledger.t option Or_error.t =
+  let snarked_ledger : t -> Ledger.t option Or_error.t =
    fun {ledger; scan_state; _} ->
     let open Or_error.Let_syntax in
     match Parallel_scan.last_emitted_value scan_state with
@@ -2305,4 +2305,33 @@ let%test_module "test" =
                 create_and_apply lb logger (Sequence.of_list ts) get_work
               in
               () ) )
+
+    let%test_unit "Snarked ledger" =
+      Backtrace.elide := false ;
+      let logger = Logger.create () in
+      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
+      let g = Int.gen_incl 1 p in
+      let initial_ledger = ref 0 in
+      let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
+      let expected_snarked_ledger = ref 0 in
+      Quickcheck.test g ~trials:100 ~f:(fun i ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let open Deferred.Let_syntax in
+              let _old_ledger = !(Lb.ledger lb) in
+              let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
+              let ts = List.take all_ts i in
+              let%map proof, _ =
+                create_and_apply lb logger (Sequence.of_list ts) stmt_to_work
+              in
+              let from_the_proof =
+                Option.value_map ~default:!expected_snarked_ledger
+                  ~f:(fun p -> Int.of_string p.target)
+                  (Or_error.ok_exn proof)
+              in
+              expected_snarked_ledger := from_the_proof ;
+              match Or_error.ok_exn @@ Lb.snarked_ledger lb with
+              | None -> ()
+              | Some s ->
+                  (*Core.printf "expected %d actual %d \n %!" !expected_snarked_ledger !s; *)
+                  assert (!expected_snarked_ledger = !s) ) )
   end )
