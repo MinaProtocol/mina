@@ -49,16 +49,8 @@ jobs:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Build deb Package with verification keys
-                command: make deb
-            - run:
-                name: Build provingkeys
-                command: make provingkeys
-            - run:
                 name: Test make test-snarks
                 command: make test-snarks
-            - store_artifacts:
-                path: /tmp/artifacts
 
     build_withsnark:
         resource_class: large
