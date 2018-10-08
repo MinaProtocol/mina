@@ -1143,39 +1143,14 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
                   (fun net exn ->
                     Logger.error log "%s" (Exn.to_string_mach exn) ))
               (Tcp.Where_to_listen.bind_to
-                 (Tcp.Bind_to_address.Address
-                    (Unix.Inet_addr.of_string "0.0.0.0"))
-                 (On_port rest_server_port))
+                 Localhost
+                  (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 let route_not_found () =
                   Server.respond_string ~status:`Not_found "Route not found"
                 in
                 match Uri.path uri with
-                | "/" -> Server.respond_with_file "index.html"
-                | "/web-demo-art/problem.png" ->
-                    Server.respond_with_file "web-demo-art/problem.png"
-                | "/web-demo-art/net-hand.png" ->
-                    Server.respond_with_file "web-demo-art/net-hand.png"
-                | "/web-demo-art/your-hands.png" ->
-                    Server.respond_with_file "web-demo-art/your-hands.png"
-                | "/logo.svg" -> Server.respond_with_file "logo.svg"
-                | "/main.css" -> Server.respond_with_file "main.css"
-                | "/_build/default/app/lite/verifier_main.bc.js" ->
-                    Server.respond_with_file
-                      "_build/default/app/lite/verifier_main.bc.js"
-                | "/_build/default/app/lite/main.bc.js" ->
-                    Server.respond_with_file
-                      "_build/default/app/lite/main.bc.js"
-                | "/chain" -> (
-                  match get_lite_chain with
-                  | None -> route_not_found ()
-                  | Some get_lite_chain ->
-                      Server.respond_string
-                        (B64.encode
-                           (Binable.to_string
-                              (module Lite_base.Lite_chain)
-                              (get_lite_chain coda [merkle_path_pk]))) )
                 | "/status" ->
                     Server.respond_string
                       ( get_status coda |> Client_lib.Status.to_yojson
