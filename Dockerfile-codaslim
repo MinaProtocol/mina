@@ -16,4 +16,4 @@ RUN apt-get -y update && \
 COPY codaclient.deb /tmp/
 RUN dpkg -i /tmp/codaclient.deb
 
-ENTRYPOINT ["/usr/bin/dumb-init", "/usr/local/bin/cli"]
+ENTRYPOINT ["/usr/bin/dumb-init", "/usr/local/bin/coda"]

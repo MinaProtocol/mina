@@ -19,7 +19,7 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda.Proposer_intf
+  Coda_lib.Proposer_intf
   with type external_transition :=
               Inputs.Consensus_mechanism.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t

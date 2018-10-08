@@ -1,8 +1,8 @@
 (jbuild_version 1)
 
 (library
- ((name coda)
-  (public_name coda)
+ ((name coda_lib)
+  (public_name coda_lib)
   (flags (:standard -short-paths -warn-error -27-58))
   (library_flags (-linkall))
   (inline_tests)

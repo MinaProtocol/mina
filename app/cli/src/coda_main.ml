@@ -533,7 +533,7 @@ struct
   end
 
   module type S_tmp =
-    Coda.Network_intf
+    Coda_lib.Network_intf
     with type state_with_witness := State_with_witness.t
      and type ledger_builder := Ledger_builder.t
      and type protocol_state := Protocol_state.value
@@ -718,7 +718,7 @@ struct
   module Consensus_mechanism = Init.Consensus_mechanism
   module Blockchain = Init.Blockchain
   module Prover = Init.Prover
-  include Coda.Make (Inputs)
+  include Coda_lib.Make (Inputs)
 
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
@@ -746,7 +746,7 @@ struct
   module Consensus_mechanism = Init.Consensus_mechanism
   module Blockchain = Init.Blockchain
   module Prover = Init.Prover
-  include Coda.Make (Inputs)
+  include Coda_lib.Make (Inputs)
 
   let request_work =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
