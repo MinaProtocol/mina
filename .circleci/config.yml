@@ -56,7 +56,7 @@ jobs:
                 command: make provingkeys
             - run:
                 name: Test make test-snarks
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-snarks
+                command: make test-snarks
             - store_artifacts:
                 path: /tmp/artifacts
 
