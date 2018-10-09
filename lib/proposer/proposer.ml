@@ -19,7 +19,7 @@ module type Inputs_intf = sig
 end
 
 module Make (Inputs : Inputs_intf) :
-  Coda.Proposer_intf
+  Coda_lib.Proposer_intf
   with type external_transition :=
               Inputs.Consensus_mechanism.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
@@ -27,6 +27,7 @@ module Make (Inputs : Inputs_intf) :
    and type transaction := Inputs.Transaction.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
+   and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
@@ -81,7 +82,7 @@ struct
       {result; cancellation}
   end
 
-  let generate_next_state ~previous_protocol_state ~local_state
+  let generate_next_state ~previous_protocol_state ~consensus_local_state
       ~time_controller ~ledger_builder ~transactions ~get_completed_work
       ~logger ~keypair =
     let open Option.Let_syntax in
@@ -108,12 +109,11 @@ struct
     in
     let%map protocol_state, consensus_transition_data =
       Consensus_mechanism.generate_transition ~previous_protocol_state
-        ~blockchain_state ~local_state ~time ~keypair
+        ~blockchain_state ~local_state:consensus_local_state ~time ~keypair
         ~transactions:
           ( Ledger_builder_diff.With_valid_signatures_and_proofs.transactions
               diff
             :> Transaction.t list )
-        ~ledger:(Ledger_builder.ledger ledger_builder)
     in
     let snark_transition =
       Snark_transition.create_value
@@ -156,7 +156,7 @@ struct
   let transition_capacity = 64
 
   let create ~parent_log ~get_completed_work ~change_feeder ~time_controller
-      ~keypair =
+      ~keypair ~consensus_local_state =
     let logger = Logger.child parent_log "proposer" in
     let r, w = Linear_pipe.create () in
     let write_result = function
@@ -170,7 +170,6 @@ struct
           Logger.error logger "%s\n"
             Error.(to_string_hum (tag e ~tag:"signer"))
     in
-    let local_state = Consensus_mechanism.Local_state.create () in
     let create_result
         { Tip.protocol_state=
             previous_protocol_state, previous_protocol_state_proof
@@ -178,7 +177,7 @@ struct
         ; ledger_builder } =
       let open Option.Let_syntax in
       let%map protocol_state, internal_transition =
-        generate_next_state ~previous_protocol_state ~local_state
+        generate_next_state ~previous_protocol_state ~consensus_local_state
           ~time_controller ~ledger_builder ~transactions ~get_completed_work
           ~logger ~keypair
       in

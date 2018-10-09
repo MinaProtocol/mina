@@ -1,3 +1,10 @@
+# Coda
+
+Coda is a new cryptocurrency protocol with a lightweight, constant sized blockchain.
+
+* [Coda Protocol Website](https://codaprotocol.com/)
+* [Coda Protocol Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
+
 # Developer Setup
 
 ## ~~Setup Docker CE for Mac~~
@@ -53,7 +60,7 @@ do `opam switch import opam.export`. You'll also need to
 (REMEMBER to change the HOME and SOURCE directory to match yours)
 
 ```bash
-export PATH=~/src/cli/scripts:$PATH
+export PATH=path/to/coda/scripts:$PATH
 ```
 
 * Start a build (go stretch your arms)\
@@ -88,3 +95,9 @@ Container Stages:
 * ocaml-base (built by us, stored in gcr, ~7.1GB -- external dependancies and haskell)
 * nanotest (built with `make docker`, used with `make dev`, ~7.8GBm)
 
+# License
+
+This repository is distributed under the terms of the Apache 2.0 license,
+available in the LICENSE fail and online at
+https://www.apache.org/licenses/LICENSE-2.0. Commits older than 2018-10-03 do
+not have a LICENSE file or this notice, but are distributed under the same terms.

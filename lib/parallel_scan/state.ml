@@ -26,6 +26,7 @@ end
 
 type ('a, 'd) t =
   { jobs: ('a, 'd) Job.t Ring_buffer.t
+  ; level_pointer: int Array.t
   ; capacity: int
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
@@ -37,8 +38,9 @@ module Hash = struct
 end
 
 (* TODO: This should really be computed iteratively *)
-let hash {jobs; acc; current_data_length; base_none_pos; capacity} a_to_string
-    d_to_string =
+let hash
+    {jobs; acc; current_data_length; base_none_pos; capacity; level_pointer}
+    a_to_string d_to_string =
   let h = ref (Digestif.SHA256.init ()) in
   let add_string s = h := Digestif.SHA256.feed_string !h s in
   Ring_buffer.iter jobs ~f:(function
@@ -54,6 +56,8 @@ let hash {jobs; acc; current_data_length; base_none_pos; capacity} a_to_string
   let x = base_none_pos in
   add_string (Int.to_string capacity) ;
   add_string (Int.to_string i) ;
+  add_string
+    (Array.fold level_pointer ~init:"" ~f:(fun s a -> s ^ Int.to_string a)) ;
   ( match a with
   | None -> add_string "None"
   | Some a -> add_string (a_to_string a) ) ;
@@ -67,15 +71,19 @@ let acc s = snd s.acc
 
 let jobs s = s.jobs
 
+let level_pointer s = s.level_pointer
+
 let current_data_length s = s.current_data_length
 
 let parallelism s = (Ring_buffer.length s.jobs + 1) / 2
 
 let base_none_pos s = s.base_none_pos
 
-let copy {jobs; acc; current_data_length; base_none_pos; capacity} =
+let copy
+    {jobs; acc; current_data_length; base_none_pos; capacity; level_pointer} =
   { jobs= Ring_buffer.copy jobs
   ; acc
   ; capacity
   ; current_data_length
-  ; base_none_pos }
+  ; base_none_pos
+  ; level_pointer= Array.copy level_pointer }

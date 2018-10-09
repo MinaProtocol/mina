@@ -388,7 +388,7 @@ struct
       { protocol_state: Protocol_state.value
       ; proof: Protocol_state_proof.t
       ; ledger_builder: Ledger_builder.t }
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp, bin_io, fields]
 
     let of_transition_and_lb transition ledger_builder =
       { protocol_state=
@@ -533,7 +533,7 @@ struct
   end
 
   module type S_tmp =
-    Coda.Network_intf
+    Coda_lib.Network_intf
     with type state_with_witness := State_with_witness.t
      and type ledger_builder := Ledger_builder.t
      and type protocol_state := Protocol_state.value
@@ -616,14 +616,12 @@ struct
             ~public_key:(Public_key.compress keypair.public_key)
       end
 
+      module Blockchain_state = Blockchain_state
       module Consensus_mechanism = Consensus_mechanism
-      module Protocol_state = Protocol_state
-      module Blockchain_state = Coda_base.Blockchain_state
       module Protocol_state_proof = Protocol_state_proof
       module State_hash = State_hash
       module Valid_transaction = Transaction.With_valid_signature
       module Sync_ledger = Sync_ledger
-      module External_transition = External_transition
       module Internal_transition = Internal_transition
 
       let verify_blockchain proof state =
@@ -765,7 +763,7 @@ struct
   module Consensus_mechanism = Init.Consensus_mechanism
   module Blockchain = Init.Blockchain
   module Prover = Init.Prover
-  include Coda.Make (Inputs)
+  include Coda_lib.Make (Inputs)
 
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
@@ -793,7 +791,7 @@ struct
   module Consensus_mechanism = Init.Consensus_mechanism
   module Blockchain = Init.Blockchain
   module Prover = Init.Prover
-  include Coda.Make (Inputs)
+  include Coda_lib.Make (Inputs)
 
   let request_work =
     Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs

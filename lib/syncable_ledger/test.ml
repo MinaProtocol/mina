@@ -152,6 +152,12 @@ module TestL3_8 =
       let num_accts = 8
     end)
 
+module TestL16_2 =
+  Make (L16)
+    (struct
+      let num_accts = 2
+    end)
+
 module TestL16_3 =
   Make (L16)
     (struct

@@ -69,9 +69,9 @@ The banlist should be persistent, and the CLI should allow manually
 adding/removing IPs from the banlist:
 
 ```
-cli client ban add IP duration
-cli client ban remove IP
-cli client ban list
+coda client ban add IP duration
+coda client ban remove IP
+coda client ban list
 ```
 
 By default, bans will last for 1 day.

@@ -46,8 +46,8 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
-                name: Enable update killing
-                command: make withupdates
+                name: Get Proving Keys -- make withkeys
+                command: make withkeys
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
@@ -57,6 +57,36 @@ jobs:
             - run:
                 name: Build provingkeys
                 command: make provingkeys
+            - store_artifacts:
+                path: /tmp/artifacts
+
+    build_public:
+        resource_class: large
+        docker:
+        - image: gcr.io/o1labs-192920/ocaml-base:6ae82b5f3dabfca604d3e9cf11d7d126030a4026
+          auth:
+            username: _json_key
+            password: $JSON_GCLOUD_CREDENTIALS
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Enable snarks --  make withsnark
+                command: make withsnark
+            - run:
+                name: Enable update killing
+                command: make withupdates
+            - run:
+                name: Get Proving Keys -- make withkeys
+                command: make withkeys
+            - run:
+                name: Build OCaml
+                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                name: Build deb Package with verification keys
+                command: make deb
             - store_artifacts:
                 path: /tmp/artifacts
 
@@ -115,6 +145,7 @@ workflows:
         jobs:
             - build
             - build_withsnark
+            - build_public
             - test-runtest
             - test-sig
             #- test-stake

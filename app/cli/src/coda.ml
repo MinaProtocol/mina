@@ -483,6 +483,7 @@ let () =
       ; (Parallel.worker_command_name, Parallel.worker_command)
       ; ("client", Client.command) ]
     @ commands )
-  |> Command.run
+  |> Command.run ;
+  Core.exit 0
 
 let () = never_returns (Scheduler.go ())
