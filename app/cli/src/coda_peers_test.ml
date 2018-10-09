@@ -23,7 +23,7 @@ struct
     let configs =
       Coda_processes.local_configs n ~program_dir
         ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
-        ~kademlia_mode:"test"
+        ~kademlia_mode:`Test
     in
     let%bind workers = Coda_processes.spawn_local_processes_exn configs in
     let _, _, expected_peers = Coda_processes.net_configs n in

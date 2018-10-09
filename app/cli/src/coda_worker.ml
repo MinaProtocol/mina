@@ -23,7 +23,7 @@ struct
       ; should_propose: bool
       ; snark_worker_config: Snark_worker_config.t option
       ; conf_dir: string
-      ; kademlia_mode: string
+      ; kademlia_mode: [`Test | `Prod]
       ; program_dir: string
       ; external_port: int
       ; discovery_port: int

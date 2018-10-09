@@ -21,7 +21,7 @@ module type Config_intf = sig
     ; initial_peers: Host_and_port.t list
     ; me: Peer.t
     ; conf_dir: string
-    ; kademlia_mode: string
+    ; kademlia_mode: [`Test | `Prod]
     ; parent_log: Logger.t }
   [@@deriving make]
 end
@@ -69,7 +69,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; initial_peers: Host_and_port.t list
       ; me: Peer.t
       ; conf_dir: string
-      ; kademlia_mode: string
+      ; kademlia_mode: [`Test | `Prod]
       ; parent_log: Logger.t }
     [@@deriving make]
   end

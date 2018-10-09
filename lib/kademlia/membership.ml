@@ -9,7 +9,7 @@ module type S = sig
     -> me:Peer.t
     -> parent_log:Logger.t
     -> conf_dir:string
-    -> mode:string
+    -> mode:[`Prod | `Test]
     -> t Deferred.Or_error.t
 
   val peers : t -> Peer.t list
@@ -63,6 +63,7 @@ module Haskell_process = struct
     filter_initial_peers [fst me; other] me = [other]
 
   let create ~initial_peers ~me ~log ~conf_dir ~mode =
+    let mode = match mode with `Prod -> "prod" | `Test -> "test" in
     let lock_path = Filename.concat conf_dir lock_file in
     let filtered_initial_peers = filter_initial_peers initial_peers me in
     let run_kademlia () =
@@ -100,8 +101,7 @@ module Haskell_process = struct
     in
     let open Deferred.Or_error.Let_syntax in
     let args =
-      ["test"; cli_format me]
-      @ List.map initial_peers ~f:cli_format_initial_peer
+      [mode; cli_format me] @ List.map initial_peers ~f:cli_format_initial_peer
     in
     Logger.debug log "Args: %s\n"
       (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
@@ -166,7 +166,7 @@ module Make (P : sig
     -> me:Peer.t
     -> log:Logger.t
     -> conf_dir:string
-    -> mode:string
+    -> mode:[`Test | `Prod]
     -> t Deferred.Or_error.t
 
   val output : t -> log:Logger.t -> string list Pipe.Reader.t
@@ -252,7 +252,7 @@ let%test_module "Tests" =
           match%bind
             M.connect ~initial_peers:[]
               ~me:(Host_and_port.create ~host:"127.0.0.1" ~port:3001, 3000)
-              ~parent_log:(Logger.create ()) ~mode:"test"
+              ~parent_log:(Logger.create ()) ~mode:`Test
               ~conf_dir:"/tmp/membership-test"
           with
           | Ok t ->
@@ -363,7 +363,7 @@ let addr i =
 
 let node me peers conf_dir =
   Haskell.connect ~initial_peers:peers ~me ~parent_log:(Logger.create ())
-    ~conf_dir ~mode:"test"
+    ~conf_dir ~mode:`Test
 
 let conf_dir = "/tmp/.kademlia-test-"
 
