@@ -1134,7 +1134,6 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
             Snark_pool.add_completed_work (snark_pool coda) work ) ]
     in
     Option.iter rest_server_port ~f:(fun rest_server_port ->
-        let merkle_path_pk = List.last_exn Genesis_ledger.pks in
         ignore
           Cohttp_async.(
             Server.create
