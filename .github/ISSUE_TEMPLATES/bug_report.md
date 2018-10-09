@@ -3,6 +3,9 @@ name: Bug report
 about: Coda is behaving strangely? Report it so we can fix it!
 ---
 
+**Have you already searched the issue tracker to see if this bug has already
+been reported?**
+
 **Describe the bug**
 A clear and concise description of what the bug is.
 

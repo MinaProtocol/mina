@@ -3,6 +3,9 @@ name: Feature request
 about: Coda can't do something? Maybe it should!
 ---
 
+**Have you already searched the issue tracker to see if this feature has already
+been requested?**
+
 **Is your feature request related to a problem? Please describe.**
 A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
 

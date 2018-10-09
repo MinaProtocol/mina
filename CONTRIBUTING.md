@@ -7,8 +7,8 @@ little bumpy while we figure out how to smoothly run the project!
 ## Bug reports
 
 Bug reports should include, at minimal, the `coda -version` output and
-a description of the error. See the `.github/ISSUE_TEMPLATES/bug_report.md` file
-for the template used.
+a description of the error. See the [bug report
+template](.github/ISSUE_TEMPLATES/bug_report.md).
 
 All bugs need to be reproduced before they can be fixed. Anyone can try and
 reproduce a bug! If you have trouble reproducing a bug, please comment with what
@@ -21,7 +21,8 @@ Maintainers should label bug reports with `bug`, and any other relevant labels.
 
 We'll consider any feature requests, although the most successful feature
 requests usually aren't immediately posted to the issue tracker. The most
-successful feature requests start with discussion in the community!
+successful feature requests start with discussion in the community! See the
+[feature request template](.github/ISSUE_TEMPLATES/feature_request.md).
 
 Maintainers should label feature requests with `feature`, and any other relevant
 labels.
@@ -36,8 +37,10 @@ All pull requests must get _code reviewed_. Anyone can do a code review! Check
 out the [code review guide](CODE_REVIEW.md) for what to look for. Just leave
 comments on the "Files changed" view.
 
-All pull requests must be approved by at least 2 maintainers. Maintainers should
-assign reviewers to pull requests, and tag them with any relevant labels.
+All pull requests must be approved by at least 2 maintainers.
+
+Maintainers should assign reviewers to pull requests, and tag them with any
+relevant labels.
 
 ## Maintainership
 
