@@ -29,14 +29,14 @@ module type MapWithGroupOpsS = sig
 end
 
 module Test = struct
-  module Amount = Currency.Amount
+  module Amount = Currency.Amount.Signed
 
   module UserAmountMap :
-    MapWithGroupOpsS with type key = string and type value = Amount.t * bool =
+    MapWithGroupOpsS with type key = string and type value = Amount.t =
   struct
     type key = string
 
-    type value = Amount.t * bool
+    type value = Amount.t
 
     (* flag, true iff amount is negative *)
 
@@ -54,84 +54,22 @@ module Test = struct
     (* make a fresh map each time; a particular instance may be mutated *)
     let identity () = Hashtbl.create 17
 
-    let add_amounts (amount1, negative1) (amount2, negative2) =
-      match (negative1, negative2) with
-      | b1, b2 when b1 = b2 -> (
-        match Amount.add amount1 amount2 with
-        | Some sum -> (sum, negative1)
-        | None -> assert false )
-      | b1, b2 ->
-          let cmp = Amount.compare amount1 amount2 in
-          if cmp < 0 then
-            let diff =
-              match Amount.sub amount2 amount1 with
-              | Some v -> v
-              | None -> assert false
-            in
-            (diff, b2)
-          else if cmp > 0 then
-            let diff =
-              match Amount.sub amount1 amount2 with
-              | Some v -> v
-              | None -> assert false
-            in
-            (diff, b1)
-          else (Amount.zero, false)
-
-    (* arbitrarily choose flag *)
-
-    let%test "add_amounts1" =
-      let amount1 = (Amount.of_int 42, true) in
-      let amount2 = (Amount.of_int 42, false) in
-      add_amounts amount1 amount2 = (Amount.zero, false)
-
-    let%test "add_amounts2" =
-      let amount1 = (Amount.of_int 42, false) in
-      let amount2 = (Amount.of_int 42, true) in
-      add_amounts amount1 amount2 = (Amount.zero, false)
-
-    let%test "add_amounts3" =
-      let amount1 = (Amount.of_int 42, true) in
-      let amount2 = (Amount.of_int 55, true) in
-      add_amounts amount1 amount2 = (Amount.of_int 97, true)
-
-    let%test "add_amounts4" =
-      let amount1 = (Amount.of_int 42, false) in
-      let amount2 = (Amount.of_int 55, false) in
-      add_amounts amount1 amount2 = (Amount.of_int 97, false)
-
-    let%test "add_amounts5" =
-      let amount1 = (Amount.of_int 42, true) in
-      let amount2 = (Amount.of_int 55, false) in
-      add_amounts amount1 amount2 = (Amount.of_int 13, false)
-
-    let%test "add_amounts6" =
-      let amount1 = (Amount.of_int 42, false) in
-      let amount2 = (Amount.of_int 55, true) in
-      add_amounts amount1 amount2 = (Amount.of_int 13, true)
-
-    let%test "add_amounts7" =
-      let amount1 = (Amount.of_int 55, false) in
-      let amount2 = (Amount.of_int 42, true) in
-      add_amounts amount1 amount2 = (Amount.of_int 13, false)
-
-    let%test "add_amounts8" =
-      let amount1 = (Amount.of_int 55, true) in
-      let amount2 = (Amount.of_int 42, false) in
-      add_amounts amount1 amount2 = (Amount.of_int 13, true)
-
     let add map1 map2 =
       let new_map = Hashtbl.copy map1 in
       let keys2 = Hashtbl.to_seq_keys map2 in
       let sum_points key2 =
         let amount2 =
           match Hashtbl.find_opt map2 key2 with
-          | Some (v, b) -> (v, b)
+          | Some v -> v
           | None -> assert false
         in
         match Hashtbl.find_opt new_map key2 with
         | Some amount1 ->
-            let sum = add_amounts amount1 amount2 in
+            let sum =
+              match Amount.add amount1 amount2 with
+              | Some v -> v
+              | None -> assert false
+            in
             Hashtbl.replace new_map key2 sum
         | None -> Hashtbl.add new_map key2 amount2
       in
@@ -140,8 +78,7 @@ module Test = struct
     let inverse map =
       let new_map = identity () in
       Hashtbl.iter
-        (fun key (amount, negative) ->
-          Hashtbl.add new_map key (amount, not negative) )
+        (fun key amount -> Hashtbl.add new_map key (Amount.negate amount))
         map ;
       new_map
 
@@ -161,14 +98,14 @@ module Test = struct
   end
 
   let make_test_map (entries: (string * int) list) =
+    let amount_of_int n =
+      if n >= 0 then Currency.Amount.of_int n |> Amount.of_unsigned
+      else Currency.Amount.of_int (-n) |> Amount.of_unsigned |> Amount.negate
+    in
     Core.List.fold
       ~init:(UserAmountMap.identity ())
       ~f:(fun map (acct_key, amount) ->
-        let amount_t, negative =
-          if amount < 0 then (Amount.of_int (-amount), true)
-          else (Amount.of_int amount, false)
-        in
-        UserAmountMap.set map acct_key (amount_t, negative) )
+        UserAmountMap.set map acct_key (amount_of_int amount) )
       entries
 
   let test_map1 = make_test_map [("Alice", 42); ("Bob", 99); ("Charlie", 101)]
