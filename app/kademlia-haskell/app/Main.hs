@@ -85,6 +85,11 @@ hasPeers inst = do
 formatAddress :: (Show a, Show b) => a -> b -> B.ByteString -> String
 formatAddress ip port key = show ip ++ ":" ++ show port ++ ", " ++ show (B64.encode key)
 
+combineJR :: K.JoinResult -> K.JoinResult -> K.JoinResult
+combineJR K.JoinSuccess _ = K.JoinSuccess
+combineJR _ K.JoinSuccess = K.JoinSuccess
+combineJR _acc new = new
+
 {- Usage: ./$0 test '("127.0.0.1", 3000)' '("127.0.0.1", 3001)' -}
 main :: IO ()
 main = do
@@ -114,20 +119,18 @@ main = do
     _ <- if length peers == 0 then return () else do
       {- Try to join one of the peers in the peer list -}
       r <- foldM (\acc -> \((peerIp,peerPort), peerKey) ->
-        case acc of
-          K.JoinSuccess -> return acc
-          _ -> do
-            let KH.HashId peerKeyBytes = peerKey
-            when (BOOL.not $ KH.verifyAddress peerKeyBytes) $ do
-              die $ "Invalid address on initial peer: " ++ formatAddress peerIp peerPort peerKeyBytes
-            logInfo $ "Attempting to connecting to peer: " ++ formatAddress peerIp peerPort peerKeyBytes
-            r' <- connectToPeer kInstance peerIp (fromIntegral peerPort) peerKey
-            didGetPeers <- hasPeers kInstance
-            {- If someone connected to us, while we were in the process of handshaking we're in the network -}
-            let r = if didGetPeers then K.JoinSuccess else r'
-            when (r /= K.JoinSuccess) $
-                logError . ("Connection to peer failed "++) . show $ r
-            return r) K.NodeDown (zip peers peerKeys)
+        do
+          let KH.HashId peerKeyBytes = peerKey
+          when (BOOL.not $ KH.verifyAddress peerKeyBytes) $ do
+            die $ "Invalid address on initial peer: " ++ formatAddress peerIp peerPort peerKeyBytes
+          logInfo $ "Attempting to connecting to peer: " ++ formatAddress peerIp peerPort peerKeyBytes
+          r' <- connectToPeer kInstance peerIp (fromIntegral peerPort) peerKey
+          didGetPeers <- hasPeers kInstance
+          {- If someone connected to us, while we were in the process of handshaking we're in the network -}
+          let r = if didGetPeers then K.JoinSuccess else r'
+          when (r /= K.JoinSuccess) $
+              logError . ("Connection to peer failed "++) . show $ r
+          return $ combineJR acc r) K.NodeDown (zip peers peerKeys)
 
       hFlush stdout
 
