@@ -15,18 +15,18 @@ module type S = sig
 
   type offense
 
-  type punishment
+  type record
 
   val create : ban_threshold:int -> t
 
   val record : t -> peer -> offense -> unit Or_error.t
 
-  val ban : t -> peer -> punishment -> unit
+  val ban : t -> peer -> record -> unit
 
   val unban : t -> peer -> unit
 
   val lookup :
-    t -> peer -> [`Normal | `Punished of punishment | `Suspicious of Score.t]
+    t -> peer -> [`Normal | `Punished of record | `Suspicious of Score.t]
 
   val close : t -> unit
 end
@@ -48,7 +48,7 @@ end) :
   S
   with type peer := Peer.t
    and type offense := Offense.t
-   and type punishment := Punishment_record.t =
+   and type record := Punishment_record.t =
 struct
   type t =
     { suspicious: Suspicious_db.t
@@ -64,8 +64,8 @@ struct
     if Score.compare score ban_threshold < 0 then None
     else Some (Punishment_record.create_timeout score)
 
-  let ban {punished; _} peer punishment =
-    Punished_db.set punished ~key:peer ~data:punishment
+  let ban {punished; _} peer record =
+    Punished_db.set punished ~key:peer ~data:record
 
   let unban {punished; _} peer = Punished_db.remove punished ~key:peer
 
@@ -73,8 +73,8 @@ struct
     match Suspicious_db.get suspicious ~key:peer with
     | Some score -> `Suspicious score
     | None ->
-        Option.map (Punished_db.get punished ~key:peer) ~f:(fun punishment ->
-            `Punished punishment )
+        Option.map (Punished_db.get punished ~key:peer) ~f:(fun record ->
+            `Punished record )
         |> Option.value ~default:`Normal
 
   let close {suspicious; punished; _} =
@@ -87,7 +87,7 @@ struct
       Or_error.return
         ( match compute_punishment t new_score with
         | None -> Suspicious_db.set suspicious ~key:peer ~data:new_score
-        | Some punishment -> ban t peer punishment )
+        | Some record -> ban t peer record )
     in
     match lookup t peer with
     | `Suspicious score -> write_penalty score offense

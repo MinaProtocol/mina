@@ -7,7 +7,7 @@ module type Time_intf = sig
   val now : unit -> t
 end
 
-module type Punishment_intf = sig
+module type Punishment_record_intf = sig
   type t
 
   type time
@@ -18,11 +18,13 @@ end
 module Make
     (Peer : Hashable.S)
     (Time : Time_intf)
-    (Punishment : Punishment_intf with type time := Time.t)
+    (Punishment_record : Punishment_record_intf with type time := Time.t)
     (DB : Key_value_database.S
           with type key := Peer.t
-           and type value := Punishment.t) :
-  Key_value_database.S with type key := Peer.t and type value := Punishment.t =
+           and type value := Punishment_record.t) :
+  Key_value_database.S
+  with type key := Peer.t
+   and type value := Punishment_record.t =
 struct
   type t = {db: DB.t}
 
@@ -34,13 +36,13 @@ struct
 
   let get {db} ~key =
     DB.get db ~key
-    |> Option.bind ~f:(fun punishment ->
+    |> Option.bind ~f:(fun record ->
            let current_time = Time.now () in
            if
-             Time.compare (Punishment.eviction_time punishment) current_time
+             Time.compare (Punishment_record.eviction_time record) current_time
              < 0
            then ( DB.remove db ~key ; None )
-           else Some punishment )
+           else Some record )
 
   let close {db} = DB.close db
 
