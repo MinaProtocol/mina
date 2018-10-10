@@ -173,7 +173,7 @@ struct
         let old_tip = t.locked_tip.data in
         let new_tip = locked_tip.data in
         let snarked_ledger_hash =
-          Tip.protocol_state new_tip |> Protocol_state.blockchain_state
+          Tip.protocol_state old_tip |> Protocol_state.blockchain_state
           |> Blockchain_state.ledger_hash
         in
         lock_transition
