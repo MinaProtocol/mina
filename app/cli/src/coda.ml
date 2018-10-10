@@ -241,8 +241,7 @@ let () =
     let try_later hrs =
       Async.Clock.run_after (Time.Span.of_hr hrs)
         (fun () -> ensure_testnet_id_still_good () |> don't_wait_for)
-        () ;
-      Deferred.unit
+        ()
     in
     if force_updates then
       match%bind
@@ -254,10 +253,11 @@ let () =
           Logger.error log
             "exception while trying to fetch testnet_id, trying again in 6 \
              minutes" ;
-          try_later 0.10
+          try_later 0.10 ;
+          Deferred.unit
       | Ok (resp, body) ->
           if resp.status <> `OK then (
-            try_later 0.10 |> don't_wait_for ;
+            try_later 0.10 ;
             Logger.error log
               "HTTP response status %s while getting testnet id, checking \
                again in 6 minutes."
@@ -290,7 +290,7 @@ let () =
                 if
                   List.exists valid_ids ~f:(fun remote_id ->
                       Git_sha.equal sha remote_id )
-                then try_later 1.0
+                then (try_later 1.0 ; Deferred.unit)
                 else finish commit_id body_string
     else Deferred.unit
   in
