@@ -514,7 +514,45 @@ end = struct
                 diff. %{sexp:Error.t}"
               e () )
 
+  let snarked_ledger : t -> Frozen_ledger_hash.t -> Ledger.t Or_error.t =
+   fun {ledger; scan_state; _} expected_target ->
+    let open Or_error.Let_syntax in
+    let txns_still_being_worked_on =
+          Parallel_scan.current_data scan_state
+    in
+    Debug_assert.debug_assert (fun () -> 
+      [%test_pred : int] 
+        ( (>=) ((Inputs.Config.transaction_capacity_log_2 + 1)*2) )
+        (List.length txns_still_being_worked_on));
+    let snarked_ledger = Ledger.copy ledger in
+    let%bind () =
+          List.fold_left txns_still_being_worked_on ~init:(Ok ()) ~f:
+            (fun acc t ->
+              Or_error.bind
+                (Or_error.map acc ~f:(fun _ -> t.transaction_with_info))
+                ~f:(fun u -> Ledger.undo snarked_ledger u) )
+    in
+    let snarked_ledger_hash = Ledger.merkle_root snarked_ledger
+      |> Frozen_ledger_hash.of_ledger_hash
+    in
+    if not (Frozen_ledger_hash.equal snarked_ledger_hash expected_target) then
+      Or_error.errorf !"Error materializing the snarked ledger for the hash %{sexp:Frozen_ledger_hash.t}: " expected_target
+    else
+      match Parallel_scan.last_emitted_value scan_state with
+      | None -> return snarked_ledger 
+      | Some (_, {target; _}) ->
+        if
+         Frozen_ledger_hash.equal snarked_ledger_hash target
+        then return snarked_ledger
+        else Or_error.errorf !"Last snarked ledger (%{sexp: Frozen_ledger_hash.t}) is different from the one being requested ((%{sexp: Frozen_ledger_hash.t}))" target expected_target
+
+  let verify_snarked_ledger t frozen_ledger_hash =
+    match snarked_ledger t frozen_ledger_hash with
+    | Ok _ -> Ok ()
+    | Error e -> Or_error.error_string ("Could not verify the snarked ledger.\n" ^ (Error.to_string_hum e))
+
   let statement_exn t =
+    (*Or_error.ok_exn (verify_snarked_ledger t frozen_ledger_hash);*)
     match Aux.scan_statement t.scan_state with
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
@@ -526,7 +564,7 @@ end = struct
       else Ok ()
     in
     let open Or_error.Let_syntax in
-    let%map () =
+    let%bind () =
       match Aux.scan_statement aux with
       | Error (`Error e) -> Error e
       | Error `Empty -> Ok ()
@@ -549,32 +587,9 @@ end = struct
           in
           ()
     in
-    {ledger; scan_state= aux; public_key}
-
-  let snarked_ledger : t -> Ledger.t option Or_error.t =
-   fun {ledger; scan_state; _} ->
-    let open Or_error.Let_syntax in
-    match Parallel_scan.last_emitted_value scan_state with
-    | None -> Ok None
-    | Some (_, {target; _}) ->
-        let txns_still_being_worked_on =
-          Parallel_scan.current_data scan_state
-        in
-        let snarked_ledger = Ledger.copy ledger in
-        let%bind () =
-          List.fold_left txns_still_being_worked_on ~init:(Ok ()) ~f:
-            (fun acc t ->
-              Or_error.bind
-                (Or_error.map acc ~f:(fun _ -> t.transaction_with_info))
-                ~f:(fun u -> Ledger.undo snarked_ledger u) )
-        in
-        if
-          Frozen_ledger_hash.equal
-            ( Ledger.merkle_root snarked_ledger
-            |> Frozen_ledger_hash.of_ledger_hash )
-            target
-        then return @@ Some snarked_ledger
-        else Or_error.error_string "Error retrieving snarked ledger"
+    let t = {ledger; scan_state= aux; public_key} in
+    let%map () = verify_snarked_ledger t snarked_ledger_hash
+    in t
 
   let copy {scan_state; ledger; public_key} =
     { scan_state= Parallel_scan.State.copy scan_state
@@ -2323,15 +2338,13 @@ let%test_module "test" =
               let%map proof, _ =
                 create_and_apply lb logger (Sequence.of_list ts) stmt_to_work
               in
-              let from_the_proof =
-                Option.value_map ~default:!expected_snarked_ledger
-                  ~f:(fun p -> Int.of_string p.target)
+              let last_snarked_ledger, the_hash  =
+                Option.value_map ~default:(!expected_snarked_ledger, Int.to_string !expected_snarked_ledger) 
+                  ~f:(fun p -> (Int.of_string p.target, p.target))
                   (Or_error.ok_exn proof)
               in
-              expected_snarked_ledger := from_the_proof ;
-              match Or_error.ok_exn @@ Lb.snarked_ledger lb with
-              | None -> ()
-              | Some s ->
+              expected_snarked_ledger := last_snarked_ledger ;
+              let materialized_ledger = Or_error.ok_exn @@ Lb.snarked_ledger lb the_hash in
                   (*Core.printf "expected %d actual %d \n %!" !expected_snarked_ledger !s; *)
-                  assert (!expected_snarked_ledger = !s) ) )
+              assert (!expected_snarked_ledger = !materialized_ledger) ) )
   end )
