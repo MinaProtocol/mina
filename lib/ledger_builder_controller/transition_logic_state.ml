@@ -41,6 +41,11 @@ module type S = sig
 end
 
 module type Inputs_intf = sig
+
+  module Frozen_ledger_hash : sig
+    type t
+  end
+
   module Security : sig
     val max_depth : [`Infinity | `Finite of int]
   end
@@ -53,6 +58,14 @@ module type Inputs_intf = sig
     type t
 
     val ledger : t -> Ledger.t
+
+    val snarked_ledger : t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t
+  end
+
+  module Blockchain_state : sig
+    type value [@@deriving eq]
+
+    val ledger_hash : value -> Frozen_ledger_hash.t
   end
 
   module Consensus_mechanism : sig
@@ -68,6 +81,8 @@ module type Inputs_intf = sig
       type value
 
       val consensus_state : value -> Consensus_state.value
+
+      val blockchain_state : value -> Blockchain_state.value
     end
 
     module External_transition : sig
@@ -77,7 +92,7 @@ module type Inputs_intf = sig
     val lock_transition :
          Consensus_state.value
       -> Consensus_state.value
-      -> ledger:Ledger.t
+      -> snarked_ledger:(unit -> Ledger.t Or_error.t)
       -> local_state:Local_state.t
       -> unit
   end
@@ -157,10 +172,12 @@ struct
         in
         let old_tip = t.locked_tip.data in
         let new_tip = locked_tip.data in
+        let snarked_ledger_hash = Tip.protocol_state new_tip |> Protocol_state.blockchain_state |> Blockchain_state.ledger_hash 
+        in
         lock_transition
           (consensus_state_of_tip old_tip)
           (consensus_state_of_tip new_tip)
-          ~ledger:(Ledger_builder.ledger @@ Tip.ledger_builder new_tip)
+          ~snarked_ledger:(fun () -> Ledger_builder.snarked_ledger (Tip.ledger_builder new_tip) ~snarked_ledger_hash)
           ~local_state:t.consensus_local_state ;
         {t with locked_tip}
     | Longest_branch_tip h -> {t with longest_branch_tip= h}
