@@ -76,7 +76,8 @@ module type Inputs_intf = sig
       -> Ledger_builder_diff.t
       -> (Frozen_ledger_hash.t * proof) option Deferred.Or_error.t
 
-    val snarked_ledger : t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t
+    val snarked_ledger :
+      t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t
   end
 
   module Protocol_state_proof : sig
@@ -714,8 +715,11 @@ let%test_module "test" =
             t := x ;
             return (Ok (Some (x, ())))
 
-          let snarked_ledger : t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
-            fun t ~snarked_ledger_hash:_ -> Ok !t
+          let snarked_ledger :
+                 t
+              -> snarked_ledger_hash:Frozen_ledger_hash.t
+              -> Ledger.t Or_error.t =
+           fun t ~snarked_ledger_hash:_ -> Ok !t
         end
 
         module State_hash = struct

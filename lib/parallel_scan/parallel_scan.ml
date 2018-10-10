@@ -662,41 +662,43 @@ let%test_module "scans" =
             (List.init 20 ~f:(fun _ -> ()))
             ~init:()
             ~f:( *)
-          let g = Int.gen_incl 1 ((Int.pow 2 parallelism_log_2)/2) in
+          let g = Int.gen_incl 1 (Int.pow 2 parallelism_log_2 / 2) in
           Quickcheck.test g ~trials:1000 ~f:(fun i ->
-            Async.Thread_safe.block_on_async_exn (fun () ->
-              (*let i = free_space ~state - 1 in*)
-              let data = List.init i ~f:(fun _ -> one) in
-              let jobs = next_jobs ~state in
-              let jobs_done = List.map jobs ~f:job_done in
-              let old_tuple = state.acc in
-              let _ =
-                Option.bind
-                  ( Or_error.ok_exn
-                  @@ fill_in_completed_jobs ~state ~completed_jobs:jobs_done )
-                  ~f:(fun x ->
-                    let merged =
-                      if Option.is_some (snd old_tuple) then
-                        f_merge_up old_tuple x
-                      else snd state.acc
-                    in
-                    state.acc <- (fst state.acc, merged) ;
-                    merged )
-              in
-              let _ = Or_error.ok_exn @@ enqueue_data ~state ~data in
-              cur_value := !cur_value + i ;
-              let acc_data =
-                List.sum (module Int64) (current_data state) ~f:Fn.id
-              in
-              let acc =
-                Option.value_map (snd state.acc) ~default:0 ~f:Int64.to_int_exn
-              in
-              let expected = !cur_value - Int64.to_int_exn acc_data in
-              (*Core.printf !"state: %{sexp: (Int64.t, Int64.t) State.t} \n %!" state;*)
-              assert (acc = expected) ;
-              assert (List.length state.other_trees_data < parallelism_log_2);
-              return ()
-              ))
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  (*let i = free_space ~state - 1 in*)
+                  let data = List.init i ~f:(fun _ -> one) in
+                  let jobs = next_jobs ~state in
+                  let jobs_done = List.map jobs ~f:job_done in
+                  let old_tuple = state.acc in
+                  let _ =
+                    Option.bind
+                      ( Or_error.ok_exn
+                      @@ fill_in_completed_jobs ~state
+                           ~completed_jobs:jobs_done )
+                      ~f:(fun x ->
+                        let merged =
+                          if Option.is_some (snd old_tuple) then
+                            f_merge_up old_tuple x
+                          else snd state.acc
+                        in
+                        state.acc <- (fst state.acc, merged) ;
+                        merged )
+                  in
+                  let _ = Or_error.ok_exn @@ enqueue_data ~state ~data in
+                  cur_value := !cur_value + i ;
+                  let acc_data =
+                    List.sum (module Int64) (current_data state) ~f:Fn.id
+                  in
+                  let acc =
+                    Option.value_map (snd state.acc) ~default:0
+                      ~f:Int64.to_int_exn
+                  in
+                  let expected = !cur_value - Int64.to_int_exn acc_data in
+                  (*Core.printf !"state: %{sexp: (Int64.t, Int64.t) State.t} \n %!" state;*)
+                  assert (acc = expected) ;
+                  assert (
+                    List.length state.other_trees_data < parallelism_log_2 ) ;
+                  return () ) )
 
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;

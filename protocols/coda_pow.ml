@@ -563,7 +563,8 @@ module type Ledger_builder_intf = sig
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
 
-  val snarked_ledger : t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
+  val snarked_ledger :
+    t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
 end
 
 module type Tip_intf = sig
