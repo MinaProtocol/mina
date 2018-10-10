@@ -25,7 +25,8 @@ struct
     (discovery_ports, external_ports, peers)
 
   let local_configs ?(transition_interval= 1000.0) ?proposal_interval
-      ?(should_propose= Fn.const true) n ~program_dir ~snark_worker_public_keys =
+      ?(should_propose= Fn.const true) n ~program_dir ~snark_worker_public_keys
+      ~kademlia_mode =
     let discovery_ports, external_ports, peers = net_configs n in
     let peers = [] :: List.drop peers 1 in
     let args =
@@ -46,7 +47,7 @@ struct
                       ; port= 20000 + i } ) )
           in
           Coda_process.local_config ?proposal_interval ~peers ~discovery_port
-            ~external_port ~snark_worker_config ~program_dir
+            ~external_port ~snark_worker_config ~program_dir ~kademlia_mode
             ~should_propose:(should_propose i) () )
     in
     configs

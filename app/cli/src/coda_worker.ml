@@ -23,6 +23,7 @@ struct
       ; should_propose: bool
       ; snark_worker_config: Snark_worker_config.t option
       ; conf_dir: string
+      ; kademlia_mode: [`Test | `Prod]
       ; program_dir: string
       ; external_port: int
       ; discovery_port: int
@@ -130,6 +131,7 @@ struct
           ; conf_dir
           ; program_dir
           ; external_port
+          ; kademlia_mode
           ; peers
           ; discovery_port } =
         let log = Logger.create () in
@@ -167,6 +169,7 @@ struct
               ; target_peer_count= 8
               ; conf_dir
               ; initial_peers= peers
+              ; kademlia_mode
               ; me=
                   ( Host_and_port.create ~host ~port:discovery_port
                   , external_port )

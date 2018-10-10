@@ -1,8 +1,8 @@
--- This file has been generated from package.yaml by hpack version 0.20.0.
+-- This file has been generated from package.yaml by hpack version 0.28.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d5ae62d83e02c542d51f26cfbd71f3735cfbcccec6325dff36f0f08fa4584e97
+-- hash: 47614289d905c95dcc6dd71525cbe6bcfd3ceaf8e2b528d24721e677d91ea02a
 
 name:           kademlia-haskell
 version:        0.1.0.0
@@ -15,7 +15,6 @@ license:        MIT
 license-file:   LICENSE
 build-type:     Simple
 cabal-version:  >= 1.10
-
 extra-source-files:
     ChangeLog.md
     README.md

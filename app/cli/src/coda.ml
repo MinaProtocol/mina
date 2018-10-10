@@ -204,6 +204,7 @@ let daemon (type ledger_proof) (module Kernel
                ; target_peer_count= 8
                ; conf_dir
                ; initial_peers
+               ; kademlia_mode= `Prod
                ; me } }
          in
          let%map coda =

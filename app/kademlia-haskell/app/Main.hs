@@ -85,6 +85,11 @@ hasPeers inst = do
 formatAddress :: (Show a, Show b) => a -> b -> B.ByteString -> String
 formatAddress ip port key = show ip ++ ":" ++ show port ++ ", " ++ show (B64.encode key)
 
+combineJR :: K.JoinResult -> K.JoinResult -> K.JoinResult
+combineJR K.JoinSuccess _ = K.JoinSuccess
+combineJR _ K.JoinSuccess = K.JoinSuccess
+combineJR _acc new = new
+
 {- Usage: ./$0 test '("127.0.0.1", 3000)' '("127.0.0.1", 3001)' -}
 main :: IO ()
 main = do
@@ -93,70 +98,67 @@ main = do
      -  1. Securely randomly generate nonces (you'll need to actually connect to the peers to 
      -     figure out their key, instead of computing it from their IP)
      -}
-    when (state == "test") $ do
-      let ((externalIp, myPort) : peers') = map read rest
-      gen <- getStdGen
-      let
-          peers = evalRand (shuffleM peers') gen
-          nonceGen  = \x -> KH.Nonce $ evalRand (generateByteString nonceSize) (mkStdGen $ makeSeed x)
-          myKey     = KH.hashAddress $ nonceGen (externalIp, myPort)
-          peerKeys  = (KH.hashAddress . nonceGen) <$> peers
-          config = K.defaultConfig { K.storeValues = False }
+    let ((externalIp, myPort) : peers') = map read rest
+    gen <- getStdGen
+    let
+        peers = evalRand (shuffleM peers') gen
+        nonceGen  = \x -> KH.Nonce $ evalRand (generateByteString nonceSize) (mkStdGen $ makeSeed x)
+        myKey     = KH.hashAddress $ nonceGen (externalIp, myPort)
+        peerKeys  = (KH.hashAddress . nonceGen) <$> peers
+        config = K.defaultConfig { K.pingTime = if state == "test" then 3 else 360, K.storeValues = False }
 
-      let logError = putStrLn . ("EROR: " ++)
-      let logInfo = putStrLn . ("DBUG: " ++)
-      let logData = putStrLn . ("DATA: " ++)
-      let logTrace = putStrLn . ("TRAC: " ++)
+    let logError = putStrLn . ("EROR: " ++)
+    let logInfo = putStrLn . ("DBUG: " ++)
+    let logData = putStrLn . ("DATA: " ++)
+    let logTrace = putStrLn . ("TRAC: " ++)
 
-      logInfo $ "Creating instance"
-      kInstance <- K.createL ("127.0.0.1", myPort) (externalIp, myPort) myKey config logTrace logError
+    logInfo $ "Creating instance"
+    kInstance <- K.createL ("127.0.0.1", myPort) (externalIp, myPort) myKey config logTrace logError
 
-      {- If this is an initial peer, then don't try to connect to others -}
-      _ <- if length peers == 0 then return () else do
-        {- Try to join one of the peers in the peer list -}
-        r <- foldM (\acc -> \((peerIp,peerPort), peerKey) ->
-          case acc of
-            K.JoinSuccess -> return acc
-            _ -> do
-              let KH.HashId peerKeyBytes = peerKey
-              when (BOOL.not $ KH.verifyAddress peerKeyBytes) $ do
-                die $ "Invalid address on initial peer: " ++ formatAddress peerIp peerPort peerKeyBytes
-              logInfo $ "Attempting to connecting to peer: " ++ formatAddress peerIp peerPort peerKeyBytes
-              r' <- connectToPeer kInstance peerIp (fromIntegral peerPort) peerKey
-              didGetPeers <- hasPeers kInstance
-              {- If someone connected to us, while we were in the process of handshaking we're in the network -}
-              let r = if didGetPeers then K.JoinSuccess else r'
-              when (r /= K.JoinSuccess) $
-                  logError . ("Connection to peer failed "++) . show $ r
-              return r) K.NodeDown (zip peers peerKeys)
-
-        hFlush stdout
-
-        when (r /= K.JoinSuccess) $
-          die "All peers failed to respond!"
-
-      logInfo $ "Dumping initial live peers"
-      {- Dump all live peers first, after joining the network -}
-      firstDump <- K.dumpPeers kInstance
-      let peersFromDump d = fst <$> d
-      let initialPeers = peersFromDump firstDump
-      when (length initialPeers /= 0) $
-        mapM_ logData $ (dumpFormat Live) <$> initialPeers
+    {- If this is an initial peer, then don't try to connect to others -}
+    _ <- if length peers == 0 then return () else do
+      {- Try to join one of the peers in the peer list -}
+      r <- foldM (\acc -> \((peerIp,peerPort), peerKey) ->
+        do
+          let KH.HashId peerKeyBytes = peerKey
+          when (BOOL.not $ KH.verifyAddress peerKeyBytes) $ do
+            die $ "Invalid address on initial peer: " ++ formatAddress peerIp peerPort peerKeyBytes
+          logInfo $ "Attempting to connecting to peer: " ++ formatAddress peerIp peerPort peerKeyBytes
+          r' <- connectToPeer kInstance peerIp (fromIntegral peerPort) peerKey
+          didGetPeers <- hasPeers kInstance
+          {- If someone connected to us, while we were in the process of handshaking we're in the network -}
+          let r = if didGetPeers then K.JoinSuccess else r'
+          when (r /= K.JoinSuccess) $
+              logError . ("Connection to peer failed "++) . show $ r
+          return $ combineJR acc r) K.NodeDown (zip peers peerKeys)
 
       hFlush stdout
 
-      {- Forever, once a second, check to see if anything changed, and dump it -}
-      foreverM (\oldPeers -> do
-        _ <- threadDelay 1000000
-        currDump <- K.dumpPeers kInstance
-        let currPeers = peersFromDump currDump
-        let (newLives, newDeads) = (currPeers \\ oldPeers, oldPeers \\ currPeers)
-        when (length newLives /= 0) $ do
-          mapM_ logData $ (dumpFormat Live) <$> newLives
-        when (length newDeads /= 0) $ do
-          mapM_ logData $ (dumpFormat Dead) <$> newDeads
-        hFlush stdout
-        return currPeers) initialPeers
+      when (r /= K.JoinSuccess) $
+        die "All peers failed to respond!"
 
-      {- Finally, close -}
-      K.close kInstance
+    logInfo $ "Dumping initial live peers"
+    {- Dump all live peers first, after joining the network -}
+    firstDump <- K.dumpPeers kInstance
+    let peersFromDump d = fst <$> d
+    let initialPeers = peersFromDump firstDump
+    when (length initialPeers /= 0) $
+      mapM_ logData $ (dumpFormat Live) <$> initialPeers
+
+    hFlush stdout
+
+    {- Forever, once a second, check to see if anything changed, and dump it -}
+    foreverM (\oldPeers -> do
+      _ <- threadDelay 1000000
+      currDump <- K.dumpPeers kInstance
+      let currPeers = peersFromDump currDump
+      let (newLives, newDeads) = (currPeers \\ oldPeers, oldPeers \\ currPeers)
+      when (length newLives /= 0) $ do
+        mapM_ logData $ (dumpFormat Live) <$> newLives
+      when (length newDeads /= 0) $ do
+        mapM_ logData $ (dumpFormat Dead) <$> newDeads
+      hFlush stdout
+      return currPeers) initialPeers
+
+    {- Finally, close -}
+    K.close kInstance

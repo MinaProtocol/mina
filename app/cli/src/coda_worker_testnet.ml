@@ -238,6 +238,7 @@ struct
       Coda_processes.local_configs n ~proposal_interval ~program_dir
         ~should_propose
         ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
+        ~kademlia_mode:`Test
     in
     let%map workers = Coda_processes.spawn_local_processes_exn configs in
     let transaction_reader, transaction_writer = Linear_pipe.create () in
