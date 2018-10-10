@@ -53,8 +53,12 @@ mkdir -p ${BUILDDIR}/app/kademlia-haskell/result/bin/
 ln -s /usr/local/bin/kademlia ${BUILDDIR}/app/kademlia-haskell/result/bin/kademlia
 
 # Bash autocompletion for coda
+# NOTE: We do not list bash-completion as a required package, 
+#       but it needs to be present for this to be effective
 mkdir -p ${BUILDDIR}/etc/bash_completion.d
-env COMMAND_OUTPUT_INSTALLATION_BASH=1 ${BUILDDIR}/usr/local/bin/coda  > ${BUILDDIR}/etc/bash_completion.d/coda
+cwd=$(pwd)
+export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
+env COMMAND_OUTPUT_INSTALLATION_BASH=1 coda  > ${BUILDDIR}/etc/bash_completion.d/coda
 
 # Build the package
 dpkg-deb --build ${BUILDDIR}
