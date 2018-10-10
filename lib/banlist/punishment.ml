@@ -1,8 +1,7 @@
 open Core_kernel
-open Unsigned
 
 module T = struct
-  type t = Timeout of Time.t | Forever
+  type t = Timeout of Time.t | Forever [@@deriving bin_io]
 end
 
 include T
@@ -23,9 +22,15 @@ module Record = struct
   module Make (Timeout : sig
     val duration : Time.Span.t
   end) :
-    S with type time := Time.t and type score := UInt32.t =
+    sig
+      include S
+
+      include Binable.S with type t := t
+    end
+    with type time := Time.t
+     and type score := Score.t =
   struct
-    type t = {score: UInt32.t; punishment: T.t}
+    type t = {score: Score.t; punishment: T.t} [@@deriving bin_io]
 
     let eviction_time {punishment; _} =
       match punishment with Timeout time -> time | Forever -> failwith "TODO"
