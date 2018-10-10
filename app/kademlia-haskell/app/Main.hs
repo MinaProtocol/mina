@@ -16,8 +16,7 @@ import qualified Network.Kademlia          as K
 import qualified Network.Kademlia.HashNodeId as KH
 import           System.Environment        (getArgs)
 import           System.Exit               (die)
-import           System.Random             (mkStdGen, getStdGen)
-import           System.Random.Shuffle     (shuffleM)
+import           System.Random             (mkStdGen)
 import           System.IO                 (stdout, hFlush)
 
 data Pong = Pong
@@ -90,18 +89,18 @@ main :: IO ()
 main = do
     (state : rest) <- getArgs
     {- TODO: When we implement (state == "prod"):
-     -  1. Securely randomly generate nonces (you'll need to actually connect to the peers to 
-     -     figure out their key, instead of computing it from their IP)
+     -  1. Don't just cycle through all the peers in order
+     -  2. Make sure that nonces are securely randomly generated
+     -  3. Make the ping time WAY slower (use the kDefaultConfig raw -- ala
+     -    Cardano) ~1hour heartbeats
      -}
     when (state == "test") $ do
-      let ((externalIp, myPort) : peers') = map read rest
-      gen <- getStdGen
+      let ((externalIp, myPort) : peers) = map read rest
       let
-          peers = evalRand (shuffleM peers') gen
           nonceGen  = \x -> KH.Nonce $ evalRand (generateByteString nonceSize) (mkStdGen $ makeSeed x)
           myKey     = KH.hashAddress $ nonceGen (externalIp, myPort)
           peerKeys  = (KH.hashAddress . nonceGen) <$> peers
-          config = K.defaultConfig { K.storeValues = False }
+          config = K.defaultConfig { K.pingTime = 2, K.storeValues = False }
 
       let logError = putStrLn . ("EROR: " ++)
       let logInfo = putStrLn . ("DBUG: " ++)
