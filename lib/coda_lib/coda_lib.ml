@@ -309,20 +309,6 @@ module type State_with_witness_intf = sig
   val forget_witness : t -> state
 end
 
-module type Lite_chain_client_data_intf = sig
-  type t
-
-  type proof
-
-  type ledger
-
-  type state
-
-  type key
-
-  val create : (proof -> ledger -> state -> key list -> t) option
-end
-
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
@@ -409,13 +395,6 @@ module type Inputs_intf = sig
 
     val proof : Protocol_state_proof.t
   end
-
-  module Lite_chain_client_data :
-    Lite_chain_client_data_intf
-    with type ledger := Ledger.t
-     and type proof := Protocol_state_proof.t
-     and type state := Consensus_mechanism.Protocol_state.value
-     and type key := Public_key.Compressed.t
 end
 
 module Make (Inputs : Inputs_intf) = struct
@@ -634,10 +613,4 @@ module Make (Inputs : Inputs_intf) = struct
       ; seen_jobs= Ledger_builder.Coordinator.State.init
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
-
-  let get_lite_chain :
-      (t -> Public_key.Compressed.t list -> Lite_chain_client_data.t) option =
-    Option.map Lite_chain_client_data.create ~f:(fun create t keys ->
-        let ledger, state, proof = best_tip t in
-        create proof ledger state keys )
 end

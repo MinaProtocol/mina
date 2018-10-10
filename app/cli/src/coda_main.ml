@@ -668,51 +668,6 @@ struct
     end
   end)
 
-  module Lite_chain_client_data = struct
-    type t = Web_client_pipe.chain
-
-    type chain
-
-    let create =
-      Option.map Consensus_mechanism.Consensus_state.to_lite ~f:
-        (fun consensus_proof_to_lite
-        proof
-        ledger
-        (state: Consensus_mechanism.Protocol_state.value)
-        pks
-        ->
-          let empty_ledger =
-            Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
-              (Lite_compat.digest
-                 ( Ledger.merkle_root ledger
-                   :> Snark_params.Tick.Pedersen.Digest.t ))
-          in
-          let ledgers =
-            List.map pks ~f:(fun key ->
-                let loc =
-                  Option.value_exn (Ledger.location_of_key ledger key)
-                in
-                Lite_lib.Sparse_ledger.add_path empty_ledger
-                  (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
-                  (Lite_compat.public_key key)
-                  (Lite_compat.account
-                     (Option.value_exn (Ledger.get ledger loc))) )
-          in
-          let protocol_state =
-            { Lite_base.Protocol_state.previous_state_hash=
-                Lite_compat.digest
-                  ( Consensus_mechanism.Protocol_state.previous_state_hash state
-                    :> Snark_params.Tick.Pedersen.Digest.t )
-            ; blockchain_state=
-                Lite_compat.blockchain_state
-                  (Consensus_mechanism.Protocol_state.blockchain_state state)
-            ; consensus_state=
-                consensus_proof_to_lite
-                  (Consensus_mechanism.Protocol_state.consensus_state state) }
-          in
-          ({proof= Lite_compat.proof proof; ledgers; protocol_state} : t) )
-  end
-
   let request_work ~best_ledger_builder
       ~(seen_jobs: 'a -> Ledger_builder.Coordinator.State.t)
       ~(set_seen_jobs: 'a -> Ledger_builder.Coordinator.State.t -> unit)
@@ -803,10 +758,6 @@ module type Main_intf = sig
   module Inputs : sig
     module Time : Protocols.Coda_pow.Time_intf
 
-    module Ledger_hash : sig
-      type t [@@deriving sexp]
-    end
-
     module Ledger : sig
       type t [@@deriving sexp]
 
@@ -817,9 +768,16 @@ module type Main_intf = sig
 
       val get : t -> Ledger.Location.t -> Account.t option
 
+      val merkle_path :
+           t
+        -> Ledger.Location.t
+        -> [`Left of Merkle_hash.t | `Right of Merkle_hash.t] list
+
       val num_accounts : t -> int
 
-      val merkle_root : t -> Ledger_hash.t
+      val depth : int
+
+      val merkle_root : t -> Coda_base.Ledger_hash.t
 
       val to_list : t -> Account.t list
 
@@ -956,6 +914,12 @@ module type Main_intf = sig
   val best_protocol_state :
     t -> Inputs.Consensus_mechanism.Protocol_state.value
 
+  val best_tip :
+       t
+    -> Inputs.Ledger.t
+       * Inputs.Consensus_mechanism.Protocol_state.value
+       * Proof.t
+
   val peers : t -> Kademlia.Peer.t list
 
   val strongest_ledgers :
@@ -970,9 +934,6 @@ module type Main_intf = sig
   val snark_worker_command_name : string
 
   val ledger_builder_ledger_proof : t -> Inputs.Ledger_proof.t option
-
-  val get_lite_chain :
-    (t -> Public_key.Compressed.t list -> Web_client_pipe.chain) option
 
   val get_ledger : t -> Ledger_builder_hash.t -> Ledger.t Deferred.Or_error.t
 end
@@ -1087,6 +1048,41 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     ; run_snark_worker= run_snark_worker t
     ; propose= should_propose t }
 
+  let get_lite_chain :
+      (t -> Public_key.Compressed.t list -> Lite_base.Lite_chain.t) option =
+    Option.map Consensus_mechanism.Consensus_state.to_lite ~f:
+      (fun consensus_state_to_lite t pks ->
+        let ledger, state, proof = best_tip t in
+        let ledger =
+          List.fold pks
+            ~f:(fun acc key ->
+              let loc = Option.value_exn (Ledger.location_of_key ledger key) in
+              Lite_lib.Sparse_ledger.add_path acc
+                (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
+                (Lite_compat.public_key key)
+                (Lite_compat.account (Option.value_exn (Ledger.get ledger loc)))
+              )
+            ~init:
+              (Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
+                 (Lite_compat.digest
+                    ( Ledger.merkle_root ledger
+                      :> Snark_params.Tick.Pedersen.Digest.t )))
+        in
+        let protocol_state : Lite_base.Protocol_state.t =
+          { previous_state_hash=
+              Lite_compat.digest
+                ( Consensus_mechanism.Protocol_state.previous_state_hash state
+                  :> Snark_params.Tick.Pedersen.Digest.t )
+          ; blockchain_state=
+              Lite_compat.blockchain_state
+                (Consensus_mechanism.Protocol_state.blockchain_state state)
+          ; consensus_state=
+              consensus_state_to_lite
+                (Consensus_mechanism.Protocol_state.consensus_state state) }
+        in
+        let proof = Lite_compat.proof proof in
+        {Lite_base.Lite_chain.proof; ledger; protocol_state} )
+
   let clear_hist_status t = Perf_histograms.wipe () ; get_status t
 
   let setup_local_server ?(client_whitelist= []) ?rest_server_port ~coda ~log
@@ -1148,14 +1144,15 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
               (Tcp.Where_to_listen.bind_to Localhost (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
+                let route_not_found () =
+                  Server.respond_string ~status:`Not_found "Route not found"
+                in
                 match Uri.path uri with
                 | "/status" ->
                     Server.respond_string
                       ( get_status coda |> Client_lib.Status.to_yojson
                       |> Yojson.Safe.pretty_to_string )
-                | _ ->
-                    Server.respond_string ~status:`Not_found "Route not found"
-                )) ) ;
+                | _ -> route_not_found () )) ) ;
     let where_to_listen =
       Tcp.Where_to_listen.bind_to All_addresses (On_port client_port)
     in

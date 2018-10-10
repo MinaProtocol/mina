@@ -3,8 +3,12 @@
   (public_name lite_lib)
   (preprocess (pps ppx_jane ppx_deriving.eq))
   (libraries
+    base
     hash_prefixes
+    pedersen_lib
+    fold_lib
     sparse_ledger_lib
+    snarkette
     lite_base
     lite_params
     bin_prot))
