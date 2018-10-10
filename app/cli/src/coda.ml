@@ -30,7 +30,7 @@ let default_external_port = 8302
 
 let daemon (type ledger_proof) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
-    : Coda_intf with type ledger_proof = ledger_proof) =
+    : Coda_intf with type ledger_proof = ledger_proof) log =
   let open Command.Let_syntax in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir =
@@ -149,7 +149,6 @@ let daemon (type ledger_proof) (module Kernel
                ~host:(Unix.Inet_addr.to_string inet_addr)
                ~port:(Host_and_port.port addr) )
        in
-       let log = Logger.create () in
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
        in
@@ -229,6 +228,7 @@ let daemon (type ledger_proof) (module Kernel
 
 let () =
   Random.self_init () ;
+  let log = Logger.create () in
   let exit1 ?msg =
     match msg with
     | None -> Core.exit 1
@@ -238,41 +238,62 @@ let () =
   in
   let rec ensure_testnet_id_still_good () =
     let open Cohttp_async in
+    let recheck_soon = 0.1 in
+    let recheck_later = 1.0 in
     let try_later hrs =
       Async.Clock.run_after (Time.Span.of_hr hrs)
-        (fun () -> don't_wait_for @@ ensure_testnet_id_still_good ())
+        (fun () -> ensure_testnet_id_still_good () |> don't_wait_for)
         ()
     in
     if force_updates then
-      let%bind resp, body =
-        Client.get (Uri.of_string "http://updates.o1test.net/testnet_id")
-      in
-      if resp.status <> `OK then (
-        try_later 0.10 ;
-        eprintf
-          "Error %s while getting testnet id, checking again in 6 minutes."
-          (Cohttp.Code.string_of_status resp.status) ;
-        Deferred.unit )
-      else
-        let%map body_string = Body.to_string body in
-        (* Maybe the Git_sha.of_string is a bit gratuitous *)
-        let remote_id = Git_sha.of_string @@ String.strip body_string in
-        let finish local_id remote_id =
-          let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
-          exit1
-            ~msg:
-              (sprintf
-                 "The version for the testnet has changed. I am %s, I should \
-                  be %s. Please download the latest Coda software at \
-                  https://github.com/codaprotocol/coda/releases"
-                 ( local_id |> Option.map ~f:str
-                 |> Option.value ~default:"[COMMIT_SHA1 not set]" )
-                 (str remote_id))
-        in
-        match commit_id with
-        | None -> finish None remote_id
-        | Some sha when Git_sha.equal sha remote_id -> try_later 1.0
-        | Some _ -> finish commit_id remote_id
+      match%bind
+        Monitor.try_with_or_error (fun () ->
+            Client.get (Uri.of_string "http://updates.o1test.net/testnet_id")
+        )
+      with
+      | Error e ->
+          Logger.error log
+            "exception while trying to fetch testnet_id, trying again in 6 \
+             minutes" ;
+          try_later recheck_soon ;
+          Deferred.unit
+      | Ok (resp, body) ->
+          if resp.status <> `OK then (
+            try_later recheck_soon ;
+            Logger.error log
+              "HTTP response status %s while getting testnet id, checking \
+               again in 6 minutes."
+              (Cohttp.Code.string_of_status resp.status) ;
+            Deferred.unit )
+          else
+            let%bind body_string = Body.to_string body in
+            let valid_ids =
+              String.split ~on:'\n' body_string
+              |> List.map ~f:(Fn.compose Git_sha.of_string String.strip)
+            in
+            (* Maybe the Git_sha.of_string is a bit gratuitous *)
+            let finish local_id remote_ids =
+              let str x = Git_sha.sexp_of_t x |> Sexp.to_string in
+              exit1
+                ~msg:
+                  (sprintf
+                     "The version for the testnet has changed, and this \
+                      client (version %s) is no longer compatible. Please \
+                      download the latest Coda software!\n\
+                      Valid versions:\n\
+                      %s"
+                     ( local_id |> Option.map ~f:str
+                     |> Option.value ~default:"[COMMIT_SHA1 not set]" )
+                     remote_ids)
+            in
+            match commit_id with
+            | None -> finish None body_string
+            | Some sha ->
+                if
+                  List.exists valid_ids ~f:(fun remote_id ->
+                      Git_sha.equal sha remote_id )
+                then ( try_later recheck_later ; Deferred.unit )
+                else finish commit_id body_string
     else Deferred.unit
   in
   ensure_testnet_id_still_good () |> don't_wait_for ;
@@ -401,7 +422,7 @@ let () =
             () =
           Coda_with_snark (Storage.Disk) (Init) ()
       end in
-      ("daemon", daemon (module Kernel) (module Coda))
+      ("daemon", daemon (module Kernel) (module Coda) log)
       ::
       ( if Insecure.integration_tests then
           let module Coda_peers_test =
@@ -437,7 +458,7 @@ let () =
             () =
           Coda_without_snark (Init) ()
       end in
-      ("daemon", daemon (module Kernel) (module Coda))
+      ("daemon", daemon (module Kernel) (module Coda) log)
       ::
       ( if Insecure.integration_tests then
           let module Coda_peers_test =
