@@ -25,6 +25,16 @@
     font-weight: 400;
     font-style: normal;
 }
+@font-face {
+    font-family: 'metropolis';
+    src: url('/static/font/metropolis-regular-webfont.woff2') format('woff2'),
+         url('/static/font/metropolis-regular-webfont.woff') format('woff');
+    font-weight: 500;
+    font-style: normal;
+}
+
+@import url('https://fonts.googleapis.com/css?family=Roboto');
+.roboto { font-family:'roboto', Arial, Helvetica, sans-serif; }
 
 
 .f8 { font-size:0.625rem; }
@@ -32,26 +42,62 @@
   .f7-ns { font-size:0.75rem; }
 }
 
-.black { color: #1F2D3D; }
+.hauto { height: auto; }
+@media screen and (min-width:30em) {
+  .hauto-ns { height:auto; }
+}
+
+.blacklike { color: #1F2D3D; }
 .silver { color: #8492A6; }
 .darksnow { color: #EFF2F7; }
+.ocean { color: #4782a0; }
+.darkocean { color: #144f6d; }
+.grass { color: #76cd87; }
+.bluesilver { color: #526e80; }
+.sky { color: #96cbec; }
 
+.wb { word-break: break-all; }
+
+.bg-grass { background-color: #76cd87; }
+.bg-sky { background-color: #96cbec; }
+.bg-ocean { background-color: #4882a0; }
 .bg-darksnow { background-color: #EFF2F7; }
 .bg-snow { background-color: #F9FAFC; }
 .bg-white { background-color: #fff; }
 .bg-extradarksnow { background-color: #E5E9F2; }
 .bg-silver { background-color: #8492A6; }
+.bg-dullgrey { background-color: #bcbcbc; }
+.bg-brightred { background-color: #ef5b5b; }
+.bg-lemoncurry { background-color: #D19C1D; }
+
+.b-silver { border: solid 1px #8192a8; }
+.b-darksnow { border: solid 1px #EFF2F7; }
+.b-grass { border: solid 1px #76bb81; }
+.b-sky {  border: solid 1px #96cbec; }
 
 .mw55 { max-width: 20rem; }
 @media screen and (min-width:30em) {
   .mw55-ns { max-width: 20rem; }
 }
 
+.min-h7 { min-height: 48rem; }
+
+.w01 { width: 0.75rem; }
+.h01 { height: 0.75rem; }
+
+.h6 { height: 32rem; }
+
+@media screen and (min-width:30em) {
+  .minw5-ns { min-width: 16rem; }
+  .minw6-ns { min-width: 32rem; }
+}
+
 .bxs-bb { box-sizing: border-box; }
 .bxs-cb { box-sizing: content-box; }
 
 .hover-link:hover { color:#1F2D3D; }
-.hover-bg-black:hover { background-color: #1F2D3D; }
+.hover-bg-blacklike:hover { background-color: #1F2D3D; }
+.hover-bg-darkocean:hover { background-color: #144f6d; }
 .force-word-breaks { word-spacing: 100vw; }
 
 .user-select-none { user-select: none; }
@@ -63,6 +109,31 @@
   .ml-1-ns {margin-left:-.25rem;}
   .ml-2-ns {margin-left:-.5rem;}
   .ml-3-ns {margin-left:-1rem;}
+}
+
+@media screen and (min-width:80em) {
+  .flex-ll { display: flex; }
+  .mr4-ll { margin-right: 2rem; }
+}
+
+.silver-gradient {
+  background-image: linear-gradient(#8392a7, #8392a7), linear-gradient(to bottom, rgba(26, 26, 26, 0.1), rgba(0, 0, 0, 0.5));
+}
+.grass-gradient {
+  background-image: linear-gradient(#76bb81, #76bb81), linear-gradient(to bottom, rgba(26, 26, 26, 0.1), rgba(0, 0, 0, 0.5));
+}
+.shadow-subtle {
+  box-shadow: 0 2px 30px 0 rgba(0, 0, 0, 0.12);
+}
+.shadow-small1 {
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.2);
+}
+.shadow-small2 {
+  box-shadow: 0 0 4px 0 rgba(0, 0, 0, 0.5);
+}
+
+.mobile-jank-fix {
+ -webkit-tap-highlight-color: rgba(0,0,0,0);
 }
 
 .investors-grid {
@@ -123,4 +194,16 @@
   position: fixed;
   bottom: 0px;
   width: 100%;
+}
+
+.animate-opacity {
+  -webkit-transition: opacity .1s;
+  -o-transition: opacity .1s;
+  transition: opacity .1s;
+}
+
+.record-title-padding {
+  padding-top: 2px;
+  padding-bottom: 8px;
+
 }
