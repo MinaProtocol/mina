@@ -142,12 +142,13 @@ let daemon (type ledger_proof) (module Kernel
        let%bind initial_peers =
          Deferred.List.map ~how:(`Max_concurrent_jobs 8) initial_peers_raw ~f:
            (fun addr ->
-             let%map inet_addr =
-               Unix.Inet_addr.of_string_or_getbyname (Host_and_port.host addr)
-             in
-             Host_and_port.create
+            let host = Host_and_port.host addr in
+            match%bind Monitor.try_with_or_error (fun () -> Unix.Inet_addr.of_string_or_getbyname host) with
+            | Ok inet_addr ->
+             return (Host_and_port.create
                ~host:(Unix.Inet_addr.to_string inet_addr)
-               ~port:(Host_and_port.port addr) )
+               ~port:(Host_and_port.port addr))
+            | Error e -> eprintf "Error: failed to look up address for %s\n" host ; exit 1)
        in
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
