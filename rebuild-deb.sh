@@ -52,6 +52,15 @@ sudo patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2  ${BUILDDIR}/usr/loc
 mkdir -p ${BUILDDIR}/app/kademlia-haskell/result/bin/
 ln -s /usr/local/bin/kademlia ${BUILDDIR}/app/kademlia-haskell/result/bin/kademlia
 
+# Bash autocompletion for coda
+# NOTE: We do not list bash-completion as a required package, 
+#       but it needs to be present for this to be effective
+mkdir -p ${BUILDDIR}/etc/bash_completion.d
+cwd=$(pwd)
+export PATH=${cwd}/${BUILDDIR}/usr/local/bin/:${PATH}
+env COMMAND_OUTPUT_INSTALLATION_BASH=1 coda  > ${BUILDDIR}/etc/bash_completion.d/coda
+
+# Build the package
 dpkg-deb --build ${BUILDDIR}
 
 ln -s -f ${BUILDDIR}.deb codaclient.deb
