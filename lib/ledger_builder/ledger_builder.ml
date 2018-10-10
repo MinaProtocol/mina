@@ -555,7 +555,6 @@ end = struct
               target expected_target
 
   let statement_exn t =
-    (*Or_error.ok_exn (verify_snarked_ledger t frozen_ledger_hash);*)
     match Aux.scan_statement t.scan_state with
     | Ok s -> `Non_empty s
     | Error `Empty -> `Empty
@@ -568,12 +567,12 @@ end = struct
     in
     let open Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =
-      Core.printf "verifying snarked ledger\n" ;
       match snarked_ledger t ~snarked_ledger_hash with
       | Ok _ -> Ok ()
       | Error e ->
           Or_error.error_string
-            ("Could not verify the snarked ledger.\n" ^ Error.to_string_hum e)
+            ( "Error verifying snarked ledger hash from the ledger.\n"
+            ^ Error.to_string_hum e )
     in
     let%bind () =
       match Aux.scan_statement aux with
@@ -2340,7 +2339,7 @@ let%test_module "test" =
       let initial_ledger = ref 0 in
       let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
       let expected_snarked_ledger = ref 0 in
-      Quickcheck.test g ~trials:100 ~f:(fun i ->
+      Quickcheck.test g ~trials:50 ~f:(fun i ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let open Deferred.Let_syntax in
               let _old_ledger = !(Lb.ledger lb) in
@@ -2361,6 +2360,5 @@ let%test_module "test" =
               let materialized_ledger =
                 Or_error.ok_exn @@ Lb.snarked_ledger lb ~snarked_ledger_hash
               in
-              (*Core.printf "expected %d actual %d \n %!" !expected_snarked_ledger !s; *)
               assert (!expected_snarked_ledger = !materialized_ledger) ) )
   end )
