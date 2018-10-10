@@ -103,18 +103,40 @@ let daemon (type ledger_proof) (module Kernel
          else Sys.home_directory () >>| compute_conf_dir
        in
        Parallel.init_master () ;
-       let external_port =
-         Option.value ~default:default_external_port external_port
+       let%bind config = match%map Monitor.try_with_or_error
+       (fun () ->
+        let%bind r = Reader.open_file (conf_dir ^/ "daemon.toml") in
+        let%map contents = Pipe.to_list (Reader.lines r) >>| fun ss -> String.concat ~sep:"\n" ss in
+        Toml.Parser.(from_string contents |> unsafe)) with
+       | Ok c -> Some c
+       | Error e -> (Logger.error log "couldn't read daemon config: %s" (Error.to_string_mach e) ; None)
+       in
+       let maybe_from_config (type a) (lens : (TomlTypes.value, a) TomlLenses.lens) (keyname:string) (actual_value:a option) : a option =
+        match actual_value with
+        | Some v -> Some v
+        | None -> (match config with
+          | Some config -> (match TomlLenses.(get config (key keyname |-- lens)) with
+            | Some cv -> Some cv
+            | None -> (Logger.trace log "I looked in the config file for %s but didn't find it"  keyname ; None))
+          | None -> None)
+       in
+       let or_from_config lens keyname actual_value ~default = Option.value (maybe_from_config lens keyname actual_value) ~default in
+       let external_port : int =
+         or_from_config TomlLenses.int "external-port" ~default:default_external_port external_port
        in
        let client_port =
-         Option.value ~default:default_client_port client_port
+         or_from_config TomlLenses.int "client-port" ~default:default_client_port client_port
        in
        let should_propose_flag =
-         Option.value ~default:false should_propose_flag
+         or_from_config TomlLenses.bool "propose" ~default:false should_propose_flag
        in
        let transaction_capacity_log_2 =
-         Option.value ~default:3 transaction_capacity_log_2
+         or_from_config TomlLenses.int "txn-capacity" ~default:3 transaction_capacity_log_2
        in
+       let rest_server_port =
+         maybe_from_config TomlLenses.int "rest-port" rest_server_port
+       in
+       let peers = List.concat [peers ; List.map ~f:Host_and_port.of_string @@ or_from_config TomlLenses.(array |-- strings) "peers" None ~default:[]] in
        let proposal_interval =
          Option.value ~default:(Time.Span.of_ms 5000.)
            (Option.map proposal_interval ~f:(fun millis ->

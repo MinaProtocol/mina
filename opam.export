@@ -114,6 +114,7 @@ spawn	v0.12.0	installed
 splittable_random	v0.11.0	installed
 stdio	v0.11.0	installed
 stringext	1.5.0	installed
+toml	5.0.0	installed
 topkg	0.9.1	installed
 travis-opam	1.3.0	root
 typerep	v0.11.0	installed
