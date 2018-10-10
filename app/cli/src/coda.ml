@@ -290,7 +290,7 @@ let () =
                 if
                   List.exists valid_ids ~f:(fun remote_id ->
                       Git_sha.equal sha remote_id )
-                then (try_later 1.0 ; Deferred.unit)
+                then ( try_later 1.0 ; Deferred.unit )
                 else finish commit_id body_string
     else Deferred.unit
   in
