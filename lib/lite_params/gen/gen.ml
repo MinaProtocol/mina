@@ -14,15 +14,17 @@ let pedersen_params ~loc =
         let g, _, _, _ = arr.(i) in
         estring
           (B64.encode
-             (Binable.to_string (module Snarkette.Mnt6.G1) (Lite_compat.g1 g)))
-    )
+             (Binable.to_string
+                (module Lite_base.Crypto_params.Tock.G1)
+                (Lite_compat.g1 g))) )
     |> E.pexp_array
   in
   [%expr
     Array.map
       (fun s ->
-        Core_kernel.Binable.of_string (module Snarkette.Mnt6.G1) (B64.decode s)
-        )
+        Core_kernel.Binable.of_string
+          (module Lite_base.Crypto_params.Tock.G1)
+          (B64.decode s) )
       [%e arr_expr]]
 
 let wrap_vk ~loc =
@@ -39,7 +41,7 @@ let wrap_vk ~loc =
   let vk_base64 =
     B64.encode
       (Binable.to_string
-         (module Snarkette.Mnt6.Groth_maller.Verification_key)
+         (module Lite_base.Crypto_params.Tock.Groth_maller.Verification_key)
          vk)
   in
   let%map () =
@@ -56,7 +58,7 @@ let wrap_vk ~loc =
   let open E in
   [%expr
     Core_kernel.Binable.of_string
-      (module Snarkette.Mnt6.Groth_maller.Verification_key)
+      (module Lite_base.Crypto_params.Tock.Groth_maller.Verification_key)
       (B64.decode [%e estring vk_base64])]
 
 module Proof_of_signature = Consensus.Proof_of_signature.Make (struct

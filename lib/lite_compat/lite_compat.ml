@@ -1,22 +1,25 @@
 open Core
+module Tick = Snark_params.Tick
+module Tock = Snark_params.Tock
+module LTock = Lite_base.Crypto_params.Tock
 
-let field : Snark_params.Tick.Field.t -> Snarkette.Mnt6.Fq.t =
-  Fn.compose Snarkette.Mnt6.Fq.of_string Snark_params.Tick.Field.to_string
+let field : Tick.Field.t -> LTock.Fq.t =
+  Fn.compose LTock.Fq.of_string Tick.Field.to_string
 
 let digest = field
 
-let twist_field x : Snarkette.Mnt6.Fq3.t =
+let twist_field x : LTock.Fq3.t =
   let module V = Snark_params.Tick_curve.Field.Vector in
   let c i = field (V.get x i) in
   (c 0, c 1, c 2)
 
-let g1 (t: Snark_params.Tick.Inner_curve.t) : Snarkette.Mnt6.G1.t =
-  let x, y = Snark_params.Tick.Inner_curve.to_coords t in
-  {x= field x; y= field y; z= Snarkette.Mnt6.Fq.one}
+let g1 (t: Tick.Inner_curve.t) : LTock.G1.t =
+  let x, y = Tick.Inner_curve.to_coords t in
+  {x= field x; y= field y; z= LTock.Fq.one}
 
-let g2 (t: Snarky.Libsnark.Mnt6.G2.t) : Snarkette.Mnt6.G2.t =
+let g2 (t: Snarky.Libsnark.Mnt6.G2.t) : LTock.G2.t =
   let x, y = Snarky.Libsnark.Mnt6.G2.to_coords t in
-  {x= twist_field x; y= twist_field y; z= Snarkette.Mnt6.Fq3.one}
+  {x= twist_field x; y= twist_field y; z= LTock.Fq3.one}
 
 let g1_vector v =
   let module V = Snark_params.Tick.Inner_curve.Vector in
@@ -26,8 +29,8 @@ let verification_key vk =
   let open Snarky.Libsnark.Mnt6.GM_verification_key_accessors in
   let g_alpha = g_alpha vk |> g1 in
   let h_beta = h_beta vk |> g2 in
-  let g_alpha_h_beta = Snarkette.Mnt6.Pairing.reduced_pairing g_alpha h_beta in
-  { Snarkette.Mnt6.Groth_maller.Verification_key.h= h vk |> g2
+  let g_alpha_h_beta = LTock.Pairing.reduced_pairing g_alpha h_beta in
+  { LTock.Groth_maller.Verification_key.h= h vk |> g2
   ; g_alpha
   ; h_beta
   ; g_alpha_h_beta
@@ -35,7 +38,7 @@ let verification_key vk =
   ; h_gamma= h_gamma vk |> g2
   ; query= query vk |> g1_vector }
 
-let proof proof : Snarkette.Mnt6.Groth_maller.Proof.t =
+let proof proof : LTock.Groth_maller.Proof.t =
   let module P = Snarky.Libsnark.Mnt6.GM_proof_accessors in
   {a= P.a proof |> g1; b= P.b proof |> g2; c= P.c proof |> g1}
 
@@ -46,8 +49,8 @@ let merkle_path :
        list =
   let f (e: Coda_base.Ledger.Path.elem) =
     match e with
-    | `Left h -> `Left (digest (h :> Snark_params.Tick.Pedersen.Digest.t))
-    | `Right h -> `Right (digest (h :> Snark_params.Tick.Pedersen.Digest.t))
+    | `Left h -> `Left (digest (h :> Tick.Pedersen.Digest.t))
+    | `Right h -> `Right (digest (h :> Tick.Pedersen.Digest.t))
   in
   List.map ~f
 
@@ -73,15 +76,14 @@ let account (account: Coda_base.Account.value) : Lite_base.Account.t =
   ; nonce= account_nonce account.nonce
   ; balance= balance account.balance
   ; receipt_chain_hash=
-      digest (account.receipt_chain_hash :> Snark_params.Tick.Pedersen.Digest.t)
-  }
+      digest (account.receipt_chain_hash :> Tick.Pedersen.Digest.t) }
 
 let ledger_hash (h: Coda_base.Ledger_hash.t) : Lite_base.Ledger_hash.t =
-  digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+  digest (h :> Tick.Pedersen.Digest.t)
 
 let frozen_ledger_hash (h: Coda_base.Frozen_ledger_hash.t) :
     Lite_base.Ledger_hash.t =
-  digest (h :> Snark_params.Tick.Pedersen.Digest.t)
+  digest (h :> Tick.Pedersen.Digest.t)
 
 let ledger_builder_hash (h: Coda_base.Ledger_builder_hash.t) =
   { Lite_base.Ledger_builder_hash.ledger_hash=
