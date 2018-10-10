@@ -152,7 +152,9 @@ let daemon (type ledger_proof) (module Kernel
                    (Host_and_port.create
                       ~host:(Unix.Inet_addr.to_string inet_addr)
                       ~port:(Host_and_port.port addr))
-             | Error _e ->
+             | Error e ->
+                 Logger.error log "getaddr exception: %s"
+                   (Error.to_string_mach e) ;
                  eprintf "Error: failed to look up address for %s\n" host ;
                  exit 1 )
        in
