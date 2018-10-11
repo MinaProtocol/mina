@@ -28,8 +28,8 @@ module Make
 struct
   type t = {db: DB.t}
 
-  let create () =
-    let db = DB.create () in
+  let create ~directory =
+    let db = DB.create ~directory in
     {db}
 
   let set {db} ~key ~data = DB.set db ~key ~data
@@ -91,7 +91,7 @@ let%test_module "banlist" =
     let%test_unit "time logic" =
       Mock_time.with_simulator ~f:(fun _ ->
           let _ = Mock_time.now () in
-          let db = Mock_db.create () in
+          let db = Mock_db.create ~directory:"" in
           let is_punished = ref true in
           let evict_time = Int64.of_int 4 in
           Mock_db.set db ~key:peer ~data:evict_time ;
@@ -109,7 +109,7 @@ let%test_module "banlist" =
                    evict (regardless)" =
       Mock_time.with_simulator ~f:(fun _ ->
           let _ = Mock_time.now () in
-          let db = Mock_db.create () in
+          let db = Mock_db.create ~directory:"" in
           let is_punished = ref true in
           let old_evict_time = Int64.of_int 4 in
           let new_evict_time = old_evict_time |> Int64.succ |> Int64.succ in
