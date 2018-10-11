@@ -136,11 +136,11 @@ struct
         let log =
           Logger.child log ("host: " ^ host ^ ":" ^ Int.to_string external_port)
         in
-        let%bind () = File_system.create_dir conf_dir in
+        let%bind conf_temp_dir = Unix.mkdtemp conf_dir in
         let module Config = struct
           let logger = log
 
-          let conf_dir = conf_dir
+          let conf_dir = conf_temp_dir
 
           let lbc_tree_max_depth = `Finite 50
 
@@ -165,7 +165,7 @@ struct
           ; gossip_net_params=
               { Main.Inputs.Net.Gossip_net.Config.timeout= Time.Span.of_sec 1.
               ; target_peer_count= 8
-              ; conf_dir
+              ; conf_dir= conf_temp_dir
               ; initial_peers= peers
               ; me=
                   ( Host_and_port.create ~host ~port:discovery_port
@@ -176,9 +176,11 @@ struct
           Main.create
             (Main.Config.make ~log ~net_config ~should_propose
                ~run_snark_worker:(Option.is_some snark_worker_config)
-               ~ledger_builder_persistant_location:"ledger_builder"
-               ~transaction_pool_disk_location:"transaction_pool"
-               ~snark_pool_disk_location:"snark_pool"
+               ~ledger_builder_persistant_location:
+                 (conf_temp_dir ^/ "ledger_builder")
+               ~transaction_pool_disk_location:
+                 (conf_temp_dir ^/ "transaction_pool")
+               ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
                ~time_controller:(Main.Inputs.Time.Controller.create ())
                ~keypair:Config.keypair ())
         in

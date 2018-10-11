@@ -28,7 +28,8 @@ struct
       ~snark_worker_config () =
     let host = "127.0.0.1" in
     let conf_dir =
-      "/tmp/" ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
+      Filename.temp_dir_name
+      ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
     in
     let config =
       { Coda_worker.Input.host
