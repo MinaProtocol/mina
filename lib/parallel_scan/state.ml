@@ -30,7 +30,9 @@ type ('a, 'd) t =
   ; capacity: int
   ; mutable acc: int * 'a option
   ; mutable current_data_length: int
-  ; mutable base_none_pos: int option }
+  ; mutable base_none_pos: int option
+  ; mutable recent_tree_data: 'd list
+  ; mutable other_trees_data: 'd list list }
 [@@deriving sexp, bin_io]
 
 module Hash = struct
@@ -39,7 +41,7 @@ end
 
 (* TODO: This should really be computed iteratively *)
 let hash
-    {jobs; acc; current_data_length; base_none_pos; capacity; level_pointer}
+    {jobs; acc; current_data_length; base_none_pos; capacity; level_pointer; _}
     a_to_string d_to_string =
   let h = ref (Digestif.SHA256.init ()) in
   let add_string s = h := Digestif.SHA256.feed_string !h s in
@@ -79,11 +81,24 @@ let parallelism s = (Ring_buffer.length s.jobs + 1) / 2
 
 let base_none_pos s = s.base_none_pos
 
+let recent_tree_data s = s.recent_tree_data
+
+let other_trees_data s = s.other_trees_data
+
 let copy
-    {jobs; acc; current_data_length; base_none_pos; capacity; level_pointer} =
+    { jobs
+    ; acc
+    ; current_data_length
+    ; base_none_pos
+    ; capacity
+    ; level_pointer
+    ; recent_tree_data
+    ; other_trees_data } =
   { jobs= Ring_buffer.copy jobs
   ; acc
   ; capacity
   ; current_data_length
   ; base_none_pos
-  ; level_pointer= Array.copy level_pointer }
+  ; level_pointer= Array.copy level_pointer
+  ; recent_tree_data
+  ; other_trees_data }

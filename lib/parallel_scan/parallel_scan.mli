@@ -71,3 +71,5 @@ val partition_if_overflowing :
 val parallelism : state:('a, 'd) State.t -> int
 
 val is_valid : ('a, 'd) State.t -> bool
+
+val current_data : ('a, 'd) State.t -> 'd list

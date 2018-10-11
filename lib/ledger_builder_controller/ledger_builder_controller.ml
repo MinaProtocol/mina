@@ -75,6 +75,9 @@ module type Inputs_intf = sig
          t
       -> Ledger_builder_diff.t
       -> (Frozen_ledger_hash.t * proof) option Deferred.Or_error.t
+
+    val snarked_ledger :
+      t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t
   end
 
   module Protocol_state_proof : sig
@@ -140,7 +143,7 @@ module type Inputs_intf = sig
     val lock_transition :
          Consensus_state.value
       -> Consensus_state.value
-      -> ledger:Ledger.t
+      -> snarked_ledger:(unit -> Ledger.t Or_error.t)
       -> local_state:Local_state.t
       -> unit
   end
@@ -360,8 +363,10 @@ end = struct
       module Ledger = Ledger
       module Ledger_builder = Ledger_builder
       module Consensus_mechanism = Consensus_mechanism
+      module Blockchain_state = Blockchain_state
       module External_transition = External_transition
       module Tip = Tip
+      module Frozen_ledger_hash = Frozen_ledger_hash
     end)
 
     module Ledger_hash = Ledger_hash
@@ -709,6 +714,12 @@ let%test_module "test" =
           let apply (t: t) (x: Ledger_builder_diff.t) =
             t := x ;
             return (Ok (Some (x, ())))
+
+          let snarked_ledger :
+                 t
+              -> snarked_ledger_hash:Frozen_ledger_hash.t
+              -> Ledger.t Or_error.t =
+           fun t ~snarked_ledger_hash:_ -> Ok !t
         end
 
         module State_hash = struct
@@ -770,7 +781,7 @@ let%test_module "test" =
             let protocol_state_proof _ = ()
           end
 
-          let lock_transition _ _ ~ledger:_ ~local_state:() = ()
+          let lock_transition _ _ ~snarked_ledger:_ ~local_state:() = ()
 
           let select Consensus_state.({strength= s1})
               Consensus_state.({strength= s2}) ~logger:_ ~time_received:_ =
