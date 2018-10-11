@@ -3,7 +3,7 @@
 import jinja2
 
 test_names= [
-  'full-test',
+  'full-tests',
   'coda-peers-test',
   'coda-transitive-peers-test',
   'coda-block-production-test',
