@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async_kernel
 open Coda_base
 open Coda_main
@@ -11,12 +11,14 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     : Coda_intf.S with type ledger_proof = ledger_proof) : unit Deferred.t =
   Parallel.init_master () ;
   let log = Logger.create () in
-  let conf_dir = "/tmp" in
+  let%bind temp_conf_dir =
+    Async.Unix.mkdtemp (Filename.temp_dir_name ^/ "full_test_config")
+  in
   let keypair = Keypair.of_private_key_exn Genesis_ledger.high_balance_sk in
   let module Config = struct
     let logger = log
 
-    let conf_dir = conf_dir
+    let conf_dir = temp_conf_dir
 
     let lbc_tree_max_depth = `Finite 50
 
@@ -46,16 +48,16 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; parent_log= log
         ; target_peer_count= 8
         ; initial_peers= []
-        ; conf_dir
+        ; conf_dir= temp_conf_dir
         ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000) } }
   in
   let%bind coda =
     Main.create
       (Main.Config.make ~log ~net_config ~should_propose:should_propose_bool
          ~run_snark_worker:with_snark
-         ~ledger_builder_persistant_location:"ledger_builder"
-         ~transaction_pool_disk_location:"transaction_pool"
-         ~snark_pool_disk_location:"snark_pool"
+         ~ledger_builder_persistant_location:(temp_conf_dir ^/ "ledger_builder")
+         ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
+         ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())
          ~keypair ())
   in
