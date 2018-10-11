@@ -151,8 +151,8 @@ endif
 render:
 	cd .circleci; python2 render.py > config.yml
 
-check_render:
-	cd .circleci; [ "$(python2 render.py)" == "$(cat config.yml)" ]
+check-render:
+	cd .circleci; ./check_render.sh
 
 test:
 	$(WRAP) make test-all
