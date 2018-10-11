@@ -73,7 +73,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
   if("${OPT_FLAGS}" STREQUAL "")
     set(
       OPT_FLAGS
-      "-ggdb3 -O2 -march=native -mtune=native"
+      "-ggdb3 -O2 -march=westmere -mtune=skylake-avx512"
     )
   endif()
 endif()
