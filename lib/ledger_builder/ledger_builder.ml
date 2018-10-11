@@ -979,7 +979,7 @@ end = struct
       enqueue_data_with_rollback t.scan_state data
     in
     verify_scan_state t.ledger t.scan_state ;
-    Core.printf !"Scan State: %{sexp: scan_state} \n %!" t.scan_state; 
+    Core.printf !"Scan State: %{sexp: scan_state} \n %!" t.scan_state ;
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
@@ -1066,7 +1066,7 @@ end = struct
     in
     Or_error.ok_exn (Parallel_scan.enqueue_data ~state:t.scan_state ~data) ;
     verify_scan_state t.ledger t.scan_state ;
-    Core.printf !"Scan State: %{sexp: scan_state} \n %!" t.scan_state;
+    Core.printf !"Scan State: %{sexp: scan_state} \n %!" t.scan_state ;
     res_opt
 
   let sequence_chunks_of seq ~n =
