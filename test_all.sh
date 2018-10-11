@@ -19,12 +19,7 @@ run_integration_tests() {
     SECONDS=0
     echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM}"
     set +e
-    # ugly hack to clean up dead processes
-    pkill -9 exe
-    pkill -9 kademlia
-    pkill -9 coda
-    sleep 1
-    dune exec coda -- integration-tests $test 2>&1 >> test.log
+    ./test_integration_test.sh $test 2>&1 >> test.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
     if [ $OUT -eq 0 ];then
