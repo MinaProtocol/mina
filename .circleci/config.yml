@@ -132,6 +132,9 @@ jobs:
         steps:
             - checkout
             - run:
+                name: Check .circleci Render
+                command: make check-render
+            - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
