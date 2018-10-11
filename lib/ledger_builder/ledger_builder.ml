@@ -498,7 +498,7 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
-  let verify_scan_state' error_prefix ledger aux snarked_ledger_hash =
+  let verify_scan_state error_prefix ledger aux snarked_ledger_hash =
     let open Or_error.Let_syntax in
     let check cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
@@ -525,14 +525,14 @@ end = struct
         in
         ()
 
-  let verify_scan_state ledger aux =
+  let verify_scan_state_after_apply ledger aux =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
     match Parallel_scan.last_emitted_value aux with
-    | None -> verify_scan_state' error_prefix ledger aux None
+    | None -> verify_scan_state error_prefix ledger aux None
     | Some (_, {Ledger_proof_statement.target; _}) ->
-        verify_scan_state' error_prefix ledger aux (Some target)
+        verify_scan_state error_prefix ledger aux (Some target)
 
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
@@ -591,7 +591,7 @@ end = struct
             ^ Error.to_string_hum e )
     in
     let%bind () =
-      verify_scan_state' "Ledger_hash.of_aux_and_ledger" ledger aux
+      verify_scan_state "Ledger_hash.of_aux_and_ledger" ledger aux
         (Some snarked_ledger_hash)
     in
     let t = {ledger; scan_state= aux; public_key} in
@@ -976,7 +976,7 @@ end = struct
       enqueue_data_with_rollback t.scan_state data
     in
     let%map () =
-      verify_scan_state t.ledger t.scan_state
+      verify_scan_state_after_apply t.ledger t.scan_state
       |> Result_with_rollback.of_or_error
     in
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
@@ -1064,7 +1064,7 @@ end = struct
       Or_error.ok_exn (fill_in_completed_work t.scan_state works)
     in
     Or_error.ok_exn (Parallel_scan.enqueue_data ~state:t.scan_state ~data) ;
-    Or_error.ok_exn (verify_scan_state t.ledger t.scan_state) ;
+    Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
     res_opt
 
   let sequence_chunks_of seq ~n =

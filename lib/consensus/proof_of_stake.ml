@@ -986,7 +986,9 @@ struct
     let open Local_state in
     let open Consensus_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
-      let ledger = Or_error.ok_exn (snarked_ledger ()) in
+      let ledger =
+        match snarked_ledger () with Ok l -> l | Error e -> Error.raise e
+      in
       local_state.last_epoch_ledger <- local_state.curr_epoch_ledger ;
       local_state.curr_epoch_ledger <- Some ledger )
 
