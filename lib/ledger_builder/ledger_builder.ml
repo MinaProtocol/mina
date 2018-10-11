@@ -498,21 +498,41 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
+  let verify_scan_state' error_prefix ledger aux snarked_ledger_hash =
+    let open Or_error.Let_syntax in
+    let check cond err =
+      if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
+    in
+    match Aux.scan_statement aux with
+    | Error (`Error e) -> Error e
+    | Error `Empty -> Ok ()
+    | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
+        let%map () =
+          Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
+              check
+                (Frozen_ledger_hash.equal hash source)
+                "did not connect with snarked ledger hash" )
+        and () =
+          check
+            (Frozen_ledger_hash.equal
+               (Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash)
+               target)
+            "incorrect statement target hash"
+        and () =
+          check
+            (Fee.Signed.equal Fee.Signed.zero fee_excess)
+            "nonzero fee excess"
+        in
+        ()
+
   let verify_scan_state ledger aux =
-    Debug_assert.debug_assert (fun () ->
-        match Aux.scan_statement aux with
-        | Ok {source= _; target; fee_excess; proof_type= _; supply_increase= _} ->
-            [%test_eq : Currency.Fee.Signed.t] Currency.Fee.Signed.zero
-              fee_excess ;
-            [%test_eq : Frozen_ledger_hash.t]
-              (Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash)
-              target
-        | Error `Empty -> ()
-        | Error (`Error e) ->
-            failwithf
-              !"Error verifying the parallel scan state after applying the \
-                diff. %{sexp:Error.t}"
-              e () )
+    let error_prefix =
+      "Error verifying the parallel scan state after applying the diff."
+    in
+    match Parallel_scan.last_emitted_value aux with
+    | None -> verify_scan_state' error_prefix ledger aux None
+    | Some (_, {Ledger_proof_statement.target; _}) ->
+        verify_scan_state' error_prefix ledger aux (Some target)
 
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
@@ -561,10 +581,6 @@ end = struct
     | Error (`Error e) -> failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
   let of_aux_and_ledger ~snarked_ledger_hash ~public_key ~ledger ~aux =
-    let check cond err =
-      if not cond then Or_error.errorf "Ledger_hash.of_aux_and_ledger: %s" err
-      else Ok ()
-    in
     let open Or_error.Let_syntax in
     let verify_snarked_ledger t snarked_ledger_hash =
       match snarked_ledger t ~snarked_ledger_hash with
@@ -575,27 +591,8 @@ end = struct
             ^ Error.to_string_hum e )
     in
     let%bind () =
-      match Aux.scan_statement aux with
-      | Error (`Error e) -> Error e
-      | Error `Empty -> Ok ()
-      | Ok {fee_excess; source; target; supply_increase= _; proof_type= _} ->
-          let%map () =
-            check
-              (Frozen_ledger_hash.equal snarked_ledger_hash source)
-              "did not connect with snarked ledger hash"
-          and () =
-            check
-              (Frozen_ledger_hash.equal
-                 ( Ledger.merkle_root ledger
-                 |> Frozen_ledger_hash.of_ledger_hash )
-                 target)
-              "incorrect statement target hash"
-          and () =
-            check
-              (Fee.Signed.equal Fee.Signed.zero fee_excess)
-              "nonzero fee excess"
-          in
-          ()
+      verify_scan_state' "Ledger_hash.of_aux_and_ledger" ledger aux
+        (Some snarked_ledger_hash)
     in
     let t = {ledger; scan_state= aux; public_key} in
     let%map () = verify_snarked_ledger t snarked_ledger_hash in
@@ -974,12 +971,14 @@ end = struct
           eprintf !"Unexpected error: %s %{sexp:Error.t}\n%!" __LOC__ e ) ;
       Result_with_rollback.of_or_error r
     in
-    let%map () =
+    let%bind () =
       (* TODO: Add rollback *)
       enqueue_data_with_rollback t.scan_state data
     in
-    verify_scan_state t.ledger t.scan_state ;
-    Core.printf !"Scan State: %{sexp: scan_state} \n %!" t.scan_state ;
+    let%map () =
+      verify_scan_state t.ledger t.scan_state
+      |> Result_with_rollback.of_or_error
+    in
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
@@ -1065,8 +1064,7 @@ end = struct
       Or_error.ok_exn (fill_in_completed_work t.scan_state works)
     in
     Or_error.ok_exn (Parallel_scan.enqueue_data ~state:t.scan_state ~data) ;
-    verify_scan_state t.ledger t.scan_state ;
-    Core.printf !"Scan State: %{sexp: scan_state} \n %!" t.scan_state ;
+    Or_error.ok_exn (verify_scan_state t.ledger t.scan_state) ;
     res_opt
 
   let sequence_chunks_of seq ~n =

@@ -41,14 +41,8 @@ end
 
 (* TODO: This should really be computed iteratively *)
 let hash
-    { jobs
-    ; acc
-    ; current_data_length
-    ; base_none_pos
-    ; capacity
-    ; level_pointer
-    ; recent_tree_data
-    ; other_trees_data } a_to_string d_to_string =
+    {jobs; acc; current_data_length; base_none_pos; capacity; level_pointer; _}
+    a_to_string d_to_string =
   let h = ref (Digestif.SHA256.init ()) in
   let add_string s = h := Digestif.SHA256.feed_string !h s in
   Ring_buffer.iter jobs ~f:(function
@@ -73,12 +67,6 @@ let hash
   ( match x with
   | None -> add_string "None"
   | Some a -> add_string (Int.to_string a) ) ;
-  let str lst = List.fold lst ~init:"" ~f:(fun acc x -> acc ^ d_to_string x) in
-  let strs =
-    List.fold other_trees_data ~init:"" ~f:(fun acc x -> acc ^ str x)
-  in
-  add_string (str recent_tree_data) ;
-  add_string strs ;
   Digestif.SHA256.get !h
 
 let acc s = snd s.acc
