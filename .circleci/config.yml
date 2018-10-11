@@ -133,7 +133,7 @@ jobs:
             - checkout
             - run:
                 name: Install python -- hack
-                command: sudo apt install -y python
+                command: sudo apt install -y python python-jinja2
             - run:
                 name: Check .circleci Render
                 command: make check-render
