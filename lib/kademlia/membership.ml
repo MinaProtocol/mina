@@ -242,15 +242,20 @@ struct
   let stop t = P.kill t.p
 end
 
+module Haskell = Make (Haskell_process)
+
 let%test_module "Tests" =
   ( module struct
+    open Core
+
     let fold_membership (module M : S) : init:'b -> f:('b -> 'a -> 'b) -> 'b =
      fun ~init ~f ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           match%bind
             M.connect ~initial_peers:[]
               ~me:(Host_and_port.create ~host:"127.0.0.1" ~port:3001, 3000)
-              ~parent_log:(Logger.create ()) ~conf_dir:"/tmp/membership-test"
+              ~parent_log:(Logger.create ())
+              ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
           with
           | Ok t ->
               let acc = ref init in
@@ -351,66 +356,63 @@ let%test_module "Tests" =
     let%test "Dummy Script" =
       (* Just make sure the dummy is outputting things *)
       fold_membership (module M) ~init:false ~f:(fun b _e -> b || true)
-  end )
 
-module Haskell = Make (Haskell_process)
+    let addr i =
+      ( Host_and_port.of_string (Printf.sprintf "127.0.0.1:%d" (3006 + i))
+      , 3005 + i )
 
-let addr i =
-  (Host_and_port.of_string (Printf.sprintf "127.0.0.1:%d" (3006 + i)), 3005 + i)
+    let node me peers conf_dir =
+      Haskell.connect ~initial_peers:peers ~me ~parent_log:(Logger.create ())
+        ~conf_dir
 
-let node me peers conf_dir =
-  Haskell.connect ~initial_peers:peers ~me ~parent_log:(Logger.create ())
-    ~conf_dir
+    let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"
 
-let conf_dir = "/tmp/.kademlia-test-"
+    let retry n f =
+      let rec go i =
+        try f () with e -> if i = 0 then raise e else go (i - 1)
+      in
+      go n
 
-let retry n f =
-  let rec go i = try f () with e -> if i = 0 then raise e else go (i - 1) in
-  go n
+    let%test_unit "connect" =
+      (* This flakes 1 in 20 times, so try a couple times if it fails *)
+      let connection_test () =
+        let open Deferred.Let_syntax in
+        let wait_sec s = Async.(after (Time.Span.of_sec s)) in
+        File_system.with_temp_dir (conf_dir ^ "1") ~f:(fun conf_dir_1 ->
+            File_system.with_temp_dir (conf_dir ^ "2") ~f:(fun conf_dir_2 ->
+                let%bind _n0 = node (addr 0) [] conf_dir_1
+                and _n1 = node (addr 1) [fst (addr 0)] conf_dir_2 in
+                let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
+                let%bind n0_peers =
+                  Deferred.any
+                    [ Haskell.first_peers n0
+                    ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
+                in
+                assert (List.length n0_peers <> 0) ;
+                let%bind n1_peers =
+                  Deferred.any
+                    [ Haskell.first_peers n1
+                    ; Deferred.map (wait_sec 5.) ~f:(fun () -> []) ]
+                in
+                assert (List.length n1_peers <> 0) ;
+                assert (
+                  List.hd_exn n0_peers = addr 1
+                  && List.hd_exn n1_peers = addr 0 ) ;
+                let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
+                Deferred.unit ) )
+      in
+      retry 3 (fun () -> Async.Thread_safe.block_on_async_exn connection_test)
 
-let%test_unit "connect" =
-  (* This flakes 1 in 20 times, so try a couple times if it fails *)
-  retry 3 (fun () ->
+    let%test_unit "lockfile does not exist after connection calling stop" =
       Async.Thread_safe.block_on_async_exn (fun () ->
+          let open Async in
           let open Deferred.Let_syntax in
-          let conf_dir_1 = conf_dir ^ "1" and conf_dir_2 = conf_dir ^ "2" in
-          let wait_sec s =
-            let open Core in
-            Async.(after (Time.Span.of_sec s))
-          in
-          let%bind () = Async.Unix.mkdir ~p:() conf_dir_1 in
-          let%bind () = Async.Unix.mkdir ~p:() conf_dir_2 in
-          File_system.with_temp_dirs [conf_dir_1; conf_dir_2] ~f:(fun () ->
-              let%bind _n0 = node (addr 0) [] conf_dir_1
-              and _n1 = node (addr 1) [fst (addr 0)] conf_dir_2 in
-              let n0, n1 = (Or_error.ok_exn _n0, Or_error.ok_exn _n1) in
-              let%bind n0_peers =
-                Deferred.any
-                  [ Haskell.first_peers n0
-                  ; Deferred.map (wait_sec 10.) ~f:(fun () -> []) ]
-              in
-              assert (List.length n0_peers <> 0) ;
-              let%bind n1_peers =
-                Deferred.any
-                  [ Haskell.first_peers n1
-                  ; Deferred.map (wait_sec 5.) ~f:(fun () -> []) ]
-              in
-              assert (List.length n1_peers <> 0) ;
-              assert (
-                List.hd_exn n0_peers = addr 1 && List.hd_exn n1_peers = addr 0
-              ) ;
-              let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
-              Deferred.unit ) ) )
-
-let%test_unit "lockfile does not exist after connection calling stop" =
-  Async.Thread_safe.block_on_async_exn (fun () ->
-      let open Async in
-      let open Deferred.Let_syntax in
-      File_system.with_temp_dirs [conf_dir] ~f:(fun () ->
-          let%bind n = node (addr 1) [] conf_dir >>| Or_error.ok_exn in
-          let lock_path = Filename.concat conf_dir lock_file in
-          let%bind yes_result = Sys.file_exists lock_path in
-          assert (`Yes = yes_result) ;
-          let%bind () = Haskell.stop n in
-          let%bind no_result = Sys.file_exists lock_path in
-          return (assert (`No = no_result)) ) )
+          File_system.with_temp_dir conf_dir ~f:(fun temp_dir ->
+              let%bind n = node (addr 1) [] temp_dir >>| Or_error.ok_exn in
+              let lock_path = Filename.concat temp_dir lock_file in
+              let%bind yes_result = Sys.file_exists lock_path in
+              assert (`Yes = yes_result) ;
+              let%bind () = Haskell.stop n in
+              let%map no_result = Sys.file_exists lock_path in
+              assert (`No = no_result) ) )
+  end )
