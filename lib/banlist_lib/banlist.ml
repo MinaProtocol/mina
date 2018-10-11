@@ -1,12 +1,9 @@
 open Core
-open Unsigned
 
 module Offense = struct
   (* TODO: add more offenses. See https://github.com/o1-labs/nanobit/issues/852 *)
   type t = Send_bad_hash | Send_bad_aux | Failed_to_connect [@@deriving eq]
 end
-
-module Score = UInt32
 
 module type S = sig
   type t
@@ -17,7 +14,8 @@ module type S = sig
 
   type record
 
-  val create : ban_threshold:int -> t
+  val create :
+    suspicious_dir:string -> punished_dir:string -> ban_threshold:int -> t
 
   val record : t -> peer -> offense -> unit Or_error.t
 
@@ -36,7 +34,7 @@ module Make (Peer : sig
 
   val sexp_of_t : t -> Sexp.t
 end)
-(Punishment_record : Punishment.Record.S with type score := UInt32.t)
+(Punishment_record : Punishment.Record.S with type score := Score.t)
 (Suspicious_db : Key_value_database.S
                  with type key := Peer.t
                   and type value := Score.t)
@@ -55,9 +53,9 @@ struct
     ; punished: Punished_db.t
     ; ban_threshold: Score.t }
 
-  let create ~ban_threshold =
-    let suspicious = Suspicious_db.create () in
-    let punished = Punished_db.create () in
+  let create ~suspicious_dir ~punished_dir ~ban_threshold =
+    let suspicious = Suspicious_db.create ~directory:suspicious_dir in
+    let punished = Punished_db.create ~directory:punished_dir in
     {suspicious; punished; ban_threshold= Score.of_int ban_threshold}
 
   let compute_punishment {ban_threshold; _} score =
@@ -99,6 +97,11 @@ struct
     | `Normal -> write_penalty Score.zero offense
 end
 
+module Key_value_database = Key_value_database
+module Punished_db = Punished_db
+module Punishment = Punishment
+module Score = Score
+
 let%test_module "banlist" =
   ( module struct
     module Suspicious_db = Key_value_database.Make_mock (Int) (Score)
@@ -110,7 +113,7 @@ let%test_module "banlist" =
 
       let eviction_time _ = 0
 
-      let create_timeout score = UInt32.to_int score
+      let create_timeout score = Score.to_int score
     end
 
     module Mocked_punished_db =
@@ -134,8 +137,31 @@ let%test_module "banlist" =
           let score = Score_mechanism.score offense in
           Score.add acc score )
 
+    module Make_test (Peer : sig
+      include Hashable.S
+
+      val sexp_of_t : t -> Sexp.t
+    end)
+    (Punishment_record : Punishment.Record.S with type score := Score.t)
+    (Suspicious_db : Key_value_database.S
+                     with type key := Peer.t
+                      and type value := Score.t)
+    (Punished_db : Key_value_database.S
+                   with type key := Peer.t
+                    and type value := Punishment_record.t)
+                                                         (Score_mechanism : sig
+        val score : Offense.t -> Score.t
+    end) =
+    struct
+      include Make (Peer) (Punishment_record) (Suspicious_db) (Punished_db)
+                (Score_mechanism)
+
+      let create ~ban_threshold =
+        create ~suspicious_dir:"" ~punished_dir:"" ~ban_threshold
+    end
+
     module Mocked_banlist =
-      Make (Int) (Mocked_punishment_record) (Suspicious_db)
+      Make_test (Int) (Mocked_punishment_record) (Suspicious_db)
         (Mocked_punished_db)
         (Score_mechanism)
 
@@ -184,7 +210,8 @@ let%test_module "banlist" =
       Punished_db.Make (Int) (Time) (Timed_punishment_record)
         (Key_value_database.Make_mock (Int) (Timed_punishment_record))
     module Timed_banlist =
-      Make (Int) (Timed_punishment_record) (Suspicious_db) (Timed_punished_db)
+      Make_test (Int) (Timed_punishment_record) (Suspicious_db)
+        (Timed_punished_db)
         (Score_mechanism)
 
     let%test "if a peer has offenses, and their combination does exceed the \
