@@ -7,7 +7,7 @@ module type S = sig
 
   type value
 
-  val create : unit -> t
+  val create : directory:string -> t
 
   val close : t -> unit
 
@@ -26,7 +26,7 @@ module Make_mock
 struct
   type t = Value.t Key.Table.t
 
-  let create () = Key.Table.create ()
+  let create ~directory:_ = Key.Table.create ()
 
   let get t ~key = Key.Table.find t key
 
