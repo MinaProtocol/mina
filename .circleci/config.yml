@@ -139,7 +139,7 @@ jobs:
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: coda-peers-test
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature test_integration_test coda-peers-test
+                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ./test_integration_test.sh coda-peers-test
             - run:
                 name: 'coda-shared-prefix-test -who-proposes 0'
                 command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature test_integration_test 'coda-shared-prefix-test -who-proposes 0'
