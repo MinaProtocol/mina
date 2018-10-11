@@ -37,16 +37,10 @@ module type Storage_intf = sig
   val store : location -> data -> unit Deferred.t
 end
 
-type chain =
-  { protocol_state: Lite_base.Protocol_state.t
-  ; proof: Lite_base.Proof.t
-  ; ledgers: Lite_lib.Sparse_ledger.t list }
-[@@deriving bin_io]
-
 module type Chain_intf = sig
   type data
 
-  val create : data -> chain
+  val create : data -> Lite_base.Lite_chain.t
 end
 
 module Make
@@ -64,17 +58,11 @@ struct
 
   type t =
     { location: string
-    ; reader: chain Linear_pipe.Reader.t
-    ; writer: chain Linear_pipe.Writer.t }
+    ; reader: Lite_base.Lite_chain.t Linear_pipe.Reader.t
+    ; writer: Lite_base.Lite_chain.t Linear_pipe.Writer.t }
 
-  let write_to_storage {location; _} request
-      {protocol_state; proof; ledgers; _} =
+  let write_to_storage {location; _} request chain =
     let chain_file = location ^/ "chain" in
-    (* HACK: we are just passing in the proposer path for this demo *)
-    assert (List.length ledgers = 1) ;
-    let chain =
-      {Lite_chain.proof; protocol_state; ledger= List.hd_exn ledgers}
-    in
     let%bind () = Store.store chain_file chain in
     Request.put request chain_file
 

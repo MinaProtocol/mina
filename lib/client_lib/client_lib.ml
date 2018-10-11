@@ -178,8 +178,7 @@ module String_list_formatter = struct
     List.mapi pks ~f:(fun i pk ->
         let i = i + 1 in
         let padding = String.init (max_padding - log10 i) ~f:(fun _ -> ' ') in
-        let cleaned_string = String.slice pk 0 (String.length pk - 2) in
-        sprintf "%s%i, %s" padding i cleaned_string )
+        sprintf "%s%i, %s" padding i pk )
     |> String.concat ~sep:"\n"
 end
 

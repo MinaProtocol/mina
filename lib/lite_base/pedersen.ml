@@ -1,3 +1,2 @@
-open Snarkette
-open Mnt6
+open Crypto_params.Tock
 include Pedersen_lib.Pedersen.Make (Fq) (G1)

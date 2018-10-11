@@ -16,6 +16,8 @@
       coda_lib
       coda_numbers
       protocols
+      lite_lib
+      lite_compat
       coda_base
       test_util
       ledger_builder
