@@ -228,6 +228,7 @@ let daemon (type ledger_proof) (module Kernel
 
 let () =
   Random.self_init () ;
+  Ctypes.(Foreign.(foreign "omp_set_num_threads" (int @-> returning void))) 1 ;
   let log = Logger.create () in
   let exit1 ?msg =
     match msg with
