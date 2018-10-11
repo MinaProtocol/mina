@@ -308,13 +308,6 @@ module Haskell = struct
   end
 
   include Make (Haskell_process) (Banlist)
-
-  (* TODO: banlist should be created outside of this module *)
-  let create_banlist () = Banlist.create ~suspicious_dir:"" ~punished_dir:""
-
-  let connect ~initial_peers ~me ~parent_log ~conf_dir =
-    connect ~initial_peers ~me ~parent_log ~conf_dir
-      ~banlist:(create_banlist ())
 end
 
 let%test_module "Tests" =
@@ -488,18 +481,19 @@ let%test_module "Tests" =
                   File_system.with_temp_dir (conf_dir ^ "2") ~f:
                     (fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
 
+    let create_banlist () =
+      Haskell.Banlist.create ~suspicious_dir:"" ~punished_dir:""
+
     let%test_unit "connect" =
       (* This flakes 1 in 20 times, so try a couple times if it fails *)
       run_connection_test ~f:(fun conf_dir_1 conf_dir_2 ->
           let open Deferred.Let_syntax in
           let%bind n0 =
-            Haskell.For_tests.node (addr 0) [] conf_dir_1
-              (Haskell.create_banlist ())
+            Haskell.For_tests.node (addr 0) [] conf_dir_1 (create_banlist ())
           and n1 =
             Haskell.For_tests.node (addr 1)
               [fst (addr 0)]
-              conf_dir_2
-              (Haskell.create_banlist ())
+              conf_dir_2 (create_banlist ())
           in
           let%bind n0_peers =
             Deferred.any
@@ -584,7 +578,7 @@ let%test_module "Tests" =
                   banner_conf_dir banlist
               and normal_node =
                 Haskell.For_tests.node normal_addr [] normal_conf_dir
-                  (Haskell.create_banlist ())
+                  (create_banlist ())
               in
               let%bind initial_discovered_peers =
                 Deferred.any
@@ -625,8 +619,7 @@ let%test_module "Tests" =
           let open Deferred.Let_syntax in
           File_system.with_temp_dir conf_dir ~f:(fun temp_dir ->
               let%bind n =
-                Haskell.For_tests.node (addr 1) [] temp_dir
-                  (Haskell.create_banlist ())
+                Haskell.For_tests.node (addr 1) [] temp_dir (create_banlist ())
               in
               let lock_path = Filename.concat temp_dir lock_file in
               let%bind yes_result = Sys.file_exists lock_path in

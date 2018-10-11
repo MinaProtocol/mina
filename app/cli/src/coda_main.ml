@@ -889,7 +889,8 @@ module type Main_intf = sig
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
-      ; keypair: Keypair.t }
+      ; keypair: Keypair.t
+      ; banlist: Banlist.t }
     [@@deriving make]
   end
 
