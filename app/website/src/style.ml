@@ -10,3 +10,5 @@ let of_class s = [s]
 let empty = []
 
 let render t = Html_concise.(class_ (String.concat ~sep:" " t))
+
+let just = Fn.compose render of_class
