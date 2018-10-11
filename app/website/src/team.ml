@@ -122,13 +122,12 @@ let core () =
        Illinois Engineering."
   and paul_steckler =
     plain "Paul Steckler" "Protocol Engineer"
-      "Paul is a functional programmer and researcher. In the \
-       academic realm, he's followed his interest in PLs, type systems, and \
-       formal verification through collaborations with INRIA, the MIT PLV \
-       Group, and NICTA. He also worked on the initial implementation of \
-       Alacris, a cryptocurrency solution layered on top of existing \
-       blockchains. He holds a PhD in computer science from Northeastern \
-       University."
+      "Paul is a functional programmer and researcher. In the academic realm, \
+       he's followed his interest in PLs, type systems, and formal \
+       verification through collaborations with INRIA, the MIT PLV Group, and \
+       NICTA. He also worked on the initial implementation of Alacris, a \
+       cryptocurrency solution layered on top of existing blockchains. He \
+       holds a PhD in computer science from Northeastern University."
   and nacera =
     plain "Nacera Rodstein" "Operations Associate"
       "Nacera has had a career spanning startups, medium sized companies, and \
