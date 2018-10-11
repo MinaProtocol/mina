@@ -120,13 +120,15 @@ let core () =
        companies, consumer electronics, large scale websites and network \
        analytics companies.  He has a MS and BS from the University of \
        Illinois Engineering."
-  and rebekah =
-    plain "Rebekah Mercer" "Protocol Researcher"
-      "Rebekah is a PhD student at Aarhus University, where she is advised by \
-       Claudio Orlandi and Ivan Damgård. Her research revolves around \
-       cryptography and privacy, particularly privacy in cryptocurrencies. \
-       Rebekah holds an MSc in Information Security from UCL and a BSc in \
-       Mathematics from the University of Manchester."
+  and paul_steckler =
+    plain "Paul Steckler" "Protocol Engineer"
+      "Paul is a functional programmer and researcher. In the \
+       academic realm, he's followed his interest in PLs, type systems, and \
+       formal verification through collaborations with INRIA, the MIT PLV \
+       Group, and NICTA. He also worked on the initial implementation of \
+       Alacris, a cryptocurrency solution layered on top of existing \
+       blockchains. He holds a PhD in computer science from Northeastern \
+       University."
   and nacera =
     plain "Nacera Rodstein" "Operations Associate"
       "Nacera has had a career spanning startups, medium sized companies, and \
@@ -157,7 +159,7 @@ Joseph is an assistant professor at NYU. His research has spanned a variety of t
        cryptography of cryptocurrencies. He has done research on zero \
        knowledge proofs (Bulletproofs), verifiable delay functions, super \
        light clients, confidential smart contracts and proofs of solvency."
-  and paul =
+  and paul_davison =
     advisor "Paul Davison"
       "Paul Davison is the CEO of CoinList - the leading platform for high \
        quality, compliant token sales and airdrops. Prior to CoinList, Paul \
@@ -187,10 +189,10 @@ She holds a MSc from Magdalen College, Oxford, and an AB from Harvard, where she
     ; nathan
     ; john
     ; joel
-    ; rebekah
+    ; paul_steckler
     ; nacera
     ; joe
     ; akis
     ; benedikt
     ; jill
-    ; paul ]
+    ; paul_davison ]
