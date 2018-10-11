@@ -70,25 +70,37 @@ struct
       { transaction: Transaction.t
       ; previous_empty_accounts: Public_key.Compressed.t list
       ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
 
     type fee_transfer =
       { fee_transfer: Fee_transfer.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
 
     type coinbase =
       { coinbase: Coinbase.t
       ; previous_empty_accounts: Public_key.Compressed.t list }
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
 
     type varying =
       | Transaction of transaction
       | Fee_transfer of fee_transfer
       | Coinbase of coinbase
-    [@@deriving sexp]
+    [@@deriving sexp, bin_io]
 
-    type t = {previous_hash: Ledger_hash.t; varying: varying} [@@deriving sexp]
+    type t = {previous_hash: Ledger_hash.t; varying: varying}
+    [@@deriving sexp, bin_io]
+
+    let super_transaction : t -> Super_transaction.t Or_error.t =
+     fun {varying; _} ->
+      let open Or_error.Let_syntax in
+      match varying with
+      | Transaction tr ->
+          Option.value_map ~default:(Or_error.error_string "Bad signature")
+            (Transaction.check tr.transaction) ~f:(fun x ->
+              Ok (Super_transaction.Transaction x) )
+      | Fee_transfer f -> Ok (Fee_transfer f.fee_transfer)
+      | Coinbase c -> Ok (Coinbase c.coinbase)
   end
 
   (* someday: It would probably be better if we didn't modify the receipt chain hash
@@ -177,7 +189,7 @@ struct
     remove_accounts_exn t previous_empty_accounts
 
   (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-  let apply_coinbase t ({proposer; fee_transfer} as cb: Coinbase.t) =
+  let apply_coinbase t ({proposer; fee_transfer; _} as cb: Coinbase.t) =
     let get_or_initialize pk =
       let initial_account = Account.initialize pk in
       match get_or_create_account_exn t pk (Account.initialize pk) with
@@ -215,7 +227,7 @@ struct
   (* Don't have to be atomic here because these should never fail. In fact, none of
    the undo functions should ever return an error. This should be fixed in the types. *)
   let undo_coinbase t
-      {Undo.coinbase= {proposer; fee_transfer}; previous_empty_accounts} =
+      {Undo.coinbase= {proposer; fee_transfer; _}; previous_empty_accounts} =
     let proposer_reward =
       match fee_transfer with
       | None -> Protocols.Coda_praos.coinbase_amount
