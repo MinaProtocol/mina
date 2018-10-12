@@ -47,7 +47,9 @@ module State = struct
     ; capacity= parallelism
     ; acc= (0, None)
     ; current_data_length= 0
-    ; base_none_pos= Some (parallelism - 1) }
+    ; base_none_pos= Some (parallelism - 1)
+    ; recent_tree_data= []
+    ; other_trees_data= [] }
 
   let next_leaf_pos p cur_pos =
     if cur_pos = (2 * p) - 2 then p - 1 else cur_pos + 1
@@ -279,6 +281,8 @@ module State = struct
         let%bind () =
           if cur_pos = 0 then (
             t.acc <- (fst t.acc |> Int.( + ) 1, Some z) ;
+            t.other_trees_data
+            <- List.take t.other_trees_data (List.length t.other_trees_data - 1) ;
             Ok () )
           else update_new_job t z (dir cur_pos) ((cur_pos - 1) / 2)
         in
@@ -314,13 +318,20 @@ module State = struct
         consume t next jobs_copy
 
   let include_one_datum state value base_pos : unit Or_error.t =
+    let open Or_error.Let_syntax in
     let f (job: ('a, 'd) State.Job.t) : ('a, 'd) State.Job.t Or_error.t =
       match job with
       | Base None -> Ok (Base (Some value))
       | _ ->
           Or_error.error_string "Invalid job encountered while enqueuing data"
     in
-    Ring_buffer.direct_update (State.jobs state) base_pos ~f
+    let%map () = Ring_buffer.direct_update (State.jobs state) base_pos ~f in
+    let last_leaf_pos = Ring_buffer.length state.jobs - 1 in
+    if base_pos = last_leaf_pos then (
+      state.other_trees_data
+      <- (value :: state.recent_tree_data) :: state.other_trees_data ;
+      state.recent_tree_data <- [] )
+    else state.recent_tree_data <- value :: state.recent_tree_data
 
   let include_many_data (state: ('a, 'd) State.t) data : unit Or_error.t =
     List.fold ~init:(Ok ()) data ~f:(fun acc a ->
@@ -474,6 +485,9 @@ let fill_in_completed_jobs :
   if not (fst last_acc = fst state.acc) then snd state.acc else None
 
 let last_emitted_value (state: ('a, 'd) State.t) = snd state.acc
+
+let current_data (state: ('a, 'd) State.t) =
+  state.recent_tree_data @ List.concat state.other_trees_data
 
 let parallelism : state:('a, 'd) State.t -> int =
  fun ~state -> State.parallelism state
@@ -637,6 +651,54 @@ let%test_module "scans" =
               | `Two (x, y) ->
                   assert (x + y = i) ;
                   assert (Option.value_exn state.base_none_pos = y + offset) )
+
+        let%test_unit "non-emitted data tracking" =
+          (* After a random number of steps, check if acc = current_state - data list*)
+          let cur_value = ref 0 in
+          let parallelism_log_2 = 4 in
+          let one = Int64.of_int 1 in
+          let state = State.create ~parallelism_log_2 in
+          (*List.fold
+            (List.init 20 ~f:(fun _ -> ()))
+            ~init:()
+            ~f:( *)
+          let g = Int.gen_incl 1 (Int.pow 2 parallelism_log_2 / 2) in
+          Quickcheck.test g ~trials:1000 ~f:(fun i ->
+              Async.Thread_safe.block_on_async_exn (fun () ->
+                  (*let i = free_space ~state - 1 in*)
+                  let data = List.init i ~f:(fun _ -> one) in
+                  let jobs = next_jobs ~state in
+                  let jobs_done = List.map jobs ~f:job_done in
+                  let old_tuple = state.acc in
+                  let _ =
+                    Option.bind
+                      ( Or_error.ok_exn
+                      @@ fill_in_completed_jobs ~state
+                           ~completed_jobs:jobs_done )
+                      ~f:(fun x ->
+                        let merged =
+                          if Option.is_some (snd old_tuple) then
+                            f_merge_up old_tuple x
+                          else snd state.acc
+                        in
+                        state.acc <- (fst state.acc, merged) ;
+                        merged )
+                  in
+                  let _ = Or_error.ok_exn @@ enqueue_data ~state ~data in
+                  cur_value := !cur_value + i ;
+                  let acc_data =
+                    List.sum (module Int64) (current_data state) ~f:Fn.id
+                  in
+                  let acc =
+                    Option.value_map (snd state.acc) ~default:0
+                      ~f:Int64.to_int_exn
+                  in
+                  let expected = !cur_value - Int64.to_int_exn acc_data in
+                  (*Core.printf !"state: %{sexp: (Int64.t, Int64.t) State.t} \n %!" state;*)
+                  assert (acc = expected) ;
+                  assert (
+                    List.length state.other_trees_data < parallelism_log_2 ) ;
+                  return () ) )
 
         let%test_unit "scan can be initialized from intermediate state" =
           Backtrace.elide := false ;

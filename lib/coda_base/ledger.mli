@@ -12,25 +12,28 @@ module Undo : sig
     { transaction: Transaction.t
     ; previous_empty_accounts: Public_key.Compressed.t list
     ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   type fee_transfer =
     { fee_transfer: Fee_transfer.t
     ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   type coinbase =
     { coinbase: Coinbase.t
     ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
   type varying =
     | Transaction of transaction
     | Fee_transfer of fee_transfer
     | Coinbase of coinbase
-  [@@deriving sexp]
+  [@@deriving sexp, bin_io]
 
-  type t = {previous_hash: Ledger_hash.t; varying: varying} [@@deriving sexp]
+  type t = {previous_hash: Ledger_hash.t; varying: varying}
+  [@@deriving sexp, bin_io]
+
+  val super_transaction : t -> Super_transaction.t Or_error.t
 end
 
 val create_new_account_exn : t -> Public_key.Compressed.t -> Account.t -> unit
