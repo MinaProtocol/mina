@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+
+cd $SCRIPTPATH/../_build
+
 PROJECT='codaclient'
 
 MAJORVERSION=0
@@ -10,8 +14,6 @@ GITHASH=`git rev-parse --short=8 HEAD`
 
 VERSION="${MAJORVERSION}.${DATE}.${GITHASH}"
 BUILDDIR="${PROJECT}_${VERSION}"
-
-cd ./_build
 
 mkdir -p ${BUILDDIR}/DEBIAN
 cat << EOF > ${BUILDDIR}/DEBIAN/control
