@@ -3,7 +3,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:f487b0862b3d0201a6e46d933afc441e01cf60a3
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -33,7 +33,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:f487b0862b3d0201a6e46d933afc441e01cf60a3
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -63,7 +63,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:f487b0862b3d0201a6e46d933afc441e01cf60a3
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -93,7 +93,7 @@ jobs:
     test-runtest:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:f487b0862b3d0201a6e46d933afc441e01cf60a3
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -109,7 +109,7 @@ jobs:
     test-stake:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:f487b0862b3d0201a6e46d933afc441e01cf60a3
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -125,7 +125,7 @@ jobs:
     test-sig:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:f487b0862b3d0201a6e46d933afc441e01cf60a3
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -143,31 +143,31 @@ jobs:
             
             - run:
                 name: full-test | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'full-test'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'full-test'
             - run:
                 name: coda-peers-test | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'coda-peers-test'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-peers-test'
             - run:
                 name: coda-transitive-peers-test | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'coda-transitive-peers-test'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-transitive-peers-test'
             - run:
                 name: coda-block-production-test | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'coda-block-production-test'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-block-production-test'
             - run:
                 name: coda-shared-prefix-test -who-proposes 0 | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'coda-shared-prefix-test -who-proposes 0'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-prefix-test -who-proposes 0'
             - run:
                 name: coda-shared-prefix-test -who-proposes 1 | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'coda-shared-prefix-test -who-proposes 1'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-prefix-test -who-proposes 1'
             - run:
                 name: coda-shared-state-test | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'coda-shared-state-test'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-state-test'
             - run:
                 name: coda-restart-node-test | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'coda-restart-node-test'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-restart-node-test'
             - run:
                 name: transaction-snark-profiler -check-only | proof_of_signature
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../test_integration_test.sh 'transaction-snark-profiler -check-only'
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'transaction-snark-profiler -check-only'
 
 workflows:
     version: 2
