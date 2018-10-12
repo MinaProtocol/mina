@@ -76,31 +76,31 @@ check-format:
 ## Containers and container management
 
 docker:
-	./scripts/rebuild-docker.sh nanotest Dockerfile
+	./scripts/rebuild-docker.sh nanotest dockerfiles/Dockerfile
 
 ci-base-docker:
-	./scripts/rebuild-docker.sh o1labs/ci-base Dockerfile-ci-base
+	./scripts/rebuild-docker.sh o1labs/ci-base dockerfiles/Dockerfile-ci-base
 
 coda-docker:
-	./scripts/rebuild-docker.sh coda Dockerfile-coda
+	./scripts/rebuild-docker.sh coda dockerfiles/Dockerfile-coda
 
 base-docker:
-	./scripts/rebuild-docker.sh ocaml-base Dockerfile-base
+	./scripts/rebuild-docker.sh ocaml-base dockerfiles/Dockerfile-base
 
 base-minikube:
-	./scripts/rebuild-minikube.sh ocaml-base Dockerfile-base
+	./scripts/rebuild-minikube.sh ocaml-base dockerfiles/Dockerfile-base
 
 coda-minikube:
-	./scripts/rebuild-minikube.sh coda Dockerfile-coda
+	./scripts/rebuild-minikube.sh coda dockerfiles/Dockerfile-coda
 
 base-googlecloud:
-	./scripts/rebuild-googlecloud.sh ocaml-base Dockerfile-base $(GITLONGHASH)
+	./scripts/rebuild-googlecloud.sh ocaml-base dockerfiles/Dockerfile-base $(GITLONGHASH)
 
 coda-googlecloud:
-	./scripts/rebuild-googlecloud.sh coda Dockerfile-coda
+	./scripts/rebuild-googlecloud.sh coda dockerfiles/Dockerfile-coda
 
 ocaml407-googlecloud:
-	./scripts/rebuild-googlecloud.sh ocaml407 Dockerfile-ocaml407
+	./scripts/rebuild-googlecloud.sh ocaml407 dockerfiles/Dockerfile-ocaml407
 
 pull-ocaml407-googlecloud:
 	gcloud docker -- pull gcr.io/o1labs-192920/ocaml407:latest
@@ -127,7 +127,7 @@ provingkeys:
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
 	@cp src/_build/codaclient.deb .
-	@./scripts/rebuild-docker.sh codaslim Dockerfile-codaslim
+	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
 	@rm codaclient.deb
 
 src/_build/keys-$(GITLONGHASH).tar.bz2: withsnark build

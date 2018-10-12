@@ -10,6 +10,6 @@ fi
 
 project=$(gcloud config get-value project)
 
-perl -i -p -e 's,FROM.*,FROM gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/../Dockerfile
-perl -i -p -e 's,FROM.*,FROM gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/../Dockerfile-coda
+perl -i -p -e 's,FROM.*,FROM gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/../dockerfiles/Dockerfile
+perl -i -p -e 's,FROM.*,FROM gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/../dockerfiles/Dockerfile-coda
 perl -i -p -e 's,image:.*,image: gcr.io/'$project'/'$1':'$2',' $SCRIPTPATH/../.circleci/config.yml.jinja
