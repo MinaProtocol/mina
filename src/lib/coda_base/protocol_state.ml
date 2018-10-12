@@ -1,5 +1,5 @@
 [%%import
-"../../../../config.mlh"]
+"../../config.mlh"]
 
 open Core_kernel
 open Snark_params.Tick
