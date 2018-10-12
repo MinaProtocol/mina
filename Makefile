@@ -41,23 +41,23 @@ build:
 	$(info Build complete)
 
 withupdates:
-	sed -i '/let force_updates = /c\let force_updates = true' app/cli/src/coda.ml
+	sed -i '/let force_updates = /c\let force_updates = true' src/app/cli/src/coda.ml
 
 withoutupdates:
-	sed -i '/let force_updates = /c\let force_updates = false' app/cli/src/coda.ml
+	sed -i '/let force_updates = /c\let force_updates = false' src/app/cli/src/coda.ml
 
 dev: docker container build
 
 # snark tunable
 
 withsnark:
-	sed -i '/let with_snark =/c\let with_snark = true' lib/coda_base/insecure.ml
+	sed -i '/let with_snark =/c\let with_snark = true' src/lib/coda_base/insecure.ml
 
 withoutsnark:
-	sed -i '/let with_snark =/c\let with_snark = false' lib/coda_base/insecure.ml
+	sed -i '/let with_snark =/c\let with_snark = false' src/lib/coda_base/insecure.ml
 
 showsnark:
-	@grep 'let with_snark' lib/coda_base/insecure.ml
+	@grep 'let with_snark' src/lib/coda_base/insecure.ml
 
 # gets proiving keys -- only used in CI
 withkeys:
@@ -67,10 +67,10 @@ withkeys:
 ## Lint
 
 reformat:
-	$(WRAP) dune exec app/reformat/reformat.exe -- -path .
+	cd src; $(WRAP) dune exec app/reformat/reformat.exe -- -path .
 
 check-format:
-	$(WRAP) dune exec app/reformat/reformat.exe -- -path . -check
+	cd src; $(WRAP) dune exec app/reformat/reformat.exe -- -path . -check
 
 
 ########################################
