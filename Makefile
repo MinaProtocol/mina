@@ -148,10 +148,10 @@ endif
 ########################################
 ## Tests
 
-render:
+render-circleci:
 	cd .circleci; python2 render.py > config.yml
 
-check-render:
+check-render-circleci:
 	cd .circleci; ./check_render.sh
 
 test:

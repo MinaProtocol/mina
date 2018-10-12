@@ -19,9 +19,6 @@ jobs:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Install python -- hack
-                command: sudo apt install -y python
-            - run:
                 name: Count OCaml Warns
                 command: ./scripts/buildwarns.py /tmp/buildocaml.log
             - run:
@@ -132,11 +129,8 @@ jobs:
         steps:
             - checkout
             - run:
-                name: Install python -- hack
-                command: sudo apt install -y python python-jinja2
-            - run:
                 name: Check .circleci Render
-                command: make check-render
+                command: make check-render-circleci
             - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
