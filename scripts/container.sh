@@ -27,7 +27,7 @@ if [[ $1 == "restart" ]]; then
     echo "Starting new dev container - $DOCKERNAME"
     NAME=$(docker run \
       -p 127.0.0.1:8080:8080 \
-      --volume $SCRIPTPATH:/home/opam/app \
+      --volume $SCRIPTPATH/..:/home/opam/app \
       --user $MYUID:$MYGID \
       --name $DOCKERNAME \
       --detach \
