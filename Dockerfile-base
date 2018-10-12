@@ -45,3 +45,4 @@ RUN opam install js_of_ocaml-ppx
 RUN opam install virtual_dom
 
 RUN sudo apt-get install --yes pandoc
+RUN sudo apt-get install --yes python python-jinja2
