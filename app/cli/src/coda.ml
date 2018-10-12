@@ -161,7 +161,9 @@ let daemon (type ledger_proof) (module Kernel
                  return None )
        in
        let%bind () =
-         if List.length peers <> 0 && List.length initial_peers = 0 then (eprintf "Error: failed to connect to any peers\n" ; exit 1)
+         if List.length peers <> 0 && List.length initial_peers = 0 then (
+           eprintf "Error: failed to connect to any peers\n" ;
+           exit 1 )
          else Deferred.unit
        in
        let%bind ip =
