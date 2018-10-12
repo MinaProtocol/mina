@@ -4,6 +4,8 @@ open Coda_base
 open Blockchain_snark
 open Cli_lib
 open Coda_main
+
+module YJ = Yojson.Safe
 module Git_sha = Client_lib.Git_sha
 
 let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
@@ -111,7 +113,7 @@ let daemon (type ledger_proof) (module Kernel
                  Pipe.to_list (Reader.lines r)
                  >>| fun ss -> String.concat ~sep:"\n" ss
                in
-               Yojson.Safe.from_string ~fname:"daemon.json" contents )
+               YJ.from_string ~fname:"daemon.json" contents )
          with
          | Ok c -> Some c
          | Error e ->
@@ -120,10 +122,10 @@ let daemon (type ledger_proof) (module Kernel
              Logger.warn log "failed to read daemon.json, not using it" ;
              None
        in
-       let maybe_from_config (type a) (f: Yojson.Safe.json -> a option)
+       let maybe_from_config (type a) (f: YJ.json -> a option)
            (keyname: string) (actual_value: a option) : a option =
          let open Option.Let_syntax in
-         let open Yojson.Safe.Util in
+         let open YJ.Util in
          match actual_value with
          | Some v -> Some v
          | None ->
@@ -140,23 +142,23 @@ let daemon (type ledger_proof) (module Kernel
              default
        in
        let external_port : int =
-         or_from_config Yojson.Safe.Util.to_int_option "external-port"
+         or_from_config YJ.Util.to_int_option "external-port"
            ~default:default_external_port external_port
        in
        let client_port =
-         or_from_config Yojson.Safe.Util.to_int_option "client-port"
+         or_from_config YJ.Util.to_int_option "client-port"
            ~default:default_client_port client_port
        in
        let should_propose_flag =
-         or_from_config Yojson.Safe.Util.to_bool_option "propose"
+         or_from_config YJ.Util.to_bool_option "propose"
            ~default:false should_propose_flag
        in
        let transaction_capacity_log_2 =
-         or_from_config Yojson.Safe.Util.to_int_option "txn-capacity"
+         or_from_config YJ.Util.to_int_option "txn-capacity"
            ~default:3 transaction_capacity_log_2
        in
        let rest_server_port =
-         maybe_from_config Yojson.Safe.Util.to_int_option "rest-port"
+         maybe_from_config YJ.Util.to_int_option "rest-port"
            rest_server_port
        in
        let peers =
@@ -165,7 +167,7 @@ let daemon (type ledger_proof) (module Kernel
            ; List.map ~f:Host_and_port.of_string
              @@ or_from_config
                   (Fn.compose Option.some
-                     (Yojson.Safe.Util.convert_each Yojson.Safe.Util.to_string))
+                     (YJ.Util.convert_each YJ.Util.to_string))
                   "peers" None ~default:[] ]
        in
        let proposal_interval =
