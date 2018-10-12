@@ -39,6 +39,4 @@ RUN opam install camlp4
 RUN opam install ppx_deriving_yojson
 ADD ./external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
-RUN cd /home/opam/opam-repository && git fetch && git checkout 1.2
-RUN opam update
 RUN opam install toml
