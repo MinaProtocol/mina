@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 
-cd $SCRIPTPATH/../_build
+cd $SCRIPTPATH/../src/_build
 
 PROJECT='codaclient'
 
@@ -29,9 +29,9 @@ Description: Coda Client
 EOF
 
 mkdir -p ${BUILDDIR}/usr/local/bin
-cp ./default/src/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
-cp ./default/src/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
-cp ../src/app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
+cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
+cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
+cp ../app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
 
 # verification keys
 if [ -d "/var/lib/coda" ]; then
