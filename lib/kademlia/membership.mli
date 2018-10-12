@@ -1,7 +1,7 @@
 open Async_kernel
 open Core_kernel
 
-module type S = sig
+module Haskell : sig
   type t
 
   val connect :
@@ -19,5 +19,3 @@ module type S = sig
 
   val stop : t -> unit Deferred.t
 end
-
-module Haskell : S
