@@ -4,7 +4,6 @@ open Coda_base
 open Blockchain_snark
 open Cli_lib
 open Coda_main
-
 module YJ = Yojson.Safe
 module Git_sha = Client_lib.Git_sha
 
@@ -150,16 +149,15 @@ let daemon (type ledger_proof) (module Kernel
            ~default:default_client_port client_port
        in
        let should_propose_flag =
-         or_from_config YJ.Util.to_bool_option "propose"
-           ~default:false should_propose_flag
+         or_from_config YJ.Util.to_bool_option "propose" ~default:false
+           should_propose_flag
        in
        let transaction_capacity_log_2 =
-         or_from_config YJ.Util.to_int_option "txn-capacity"
-           ~default:3 transaction_capacity_log_2
+         or_from_config YJ.Util.to_int_option "txn-capacity" ~default:3
+           transaction_capacity_log_2
        in
        let rest_server_port =
-         maybe_from_config YJ.Util.to_int_option "rest-port"
-           rest_server_port
+         maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
        in
        let peers =
          List.concat
