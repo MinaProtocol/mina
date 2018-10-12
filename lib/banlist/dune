@@ -1,8 +1,0 @@
-(library
- (name banlist)
-  (public_name banlist)
-  (library_flags (-linkall))
-  (libraries core async time_simulator)
-  (inline_tests)
-  (preprocess (pps ppx_jane ppx_deriving.eq))
-  (synopsis "Track banned and suspicious peers"))
