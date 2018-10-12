@@ -11,7 +11,7 @@ GITHASH=`git rev-parse --short=8 HEAD`
 VERSION="${MAJORVERSION}.${DATE}.${GITHASH}"
 BUILDDIR="${PROJECT}_${VERSION}"
 
-cd _build
+cd src/_build
 
 mkdir -p ${BUILDDIR}/DEBIAN
 cat << EOF > ${BUILDDIR}/DEBIAN/control
