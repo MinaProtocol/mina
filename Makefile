@@ -36,8 +36,7 @@ dht: kademlia
 build:
 	$(info Starting Build)
 	ulimit -s 65536
-	cd src
-	$(WRAP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
+	cd src ; $(WRAP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
 	$(info Build complete)
 
 withupdates:
