@@ -28,7 +28,7 @@ clean:
 
 kademlia:
 	@# FIXME: Bash wrap here is awkward but required to get nix-env
-	$(WRAP) bash -c "source ~/.profile && cd app/kademlia-haskell && nix-build release2.nix"
+	$(WRAP) bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
 
 # Alias
 dht: kademlia
@@ -164,15 +164,18 @@ test-all: | test-runtest \
 
 test-runtest: SHELL := /bin/bash
 test-runtest:
-	source test_all.sh ; run_unit_tests
+	source test_all.sh ; cd src ; run_unit_tests
 
 test-sigs: SHELL := /bin/bash
 test-sigs:
-	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_signature run_integration_tests
+	source test_all.sh ; cd src ; CODA_CONSENSUS_METHOD=proof_of_signature run_integration_tests
 
 test-stakes: SHELL := /bin/bash
 test-stakes:
-	source test_all.sh ; CODA_CONSENSUS_METHOD=proof_of_stake run_integration_tests
+	source test_all.sh ; cd src ; CODA_CONSENSUS_METHOD=proof_of_stake run_integration_tests
+
+web:
+	./web.sh
 
 
 ########################################
