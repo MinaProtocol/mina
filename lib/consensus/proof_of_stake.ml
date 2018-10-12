@@ -982,12 +982,15 @@ struct
       else `Keep
     else `Keep
 
-  let lock_transition prev next ~ledger ~local_state =
+  let lock_transition prev next ~snarked_ledger ~local_state =
     let open Local_state in
     let open Consensus_state in
     if not (Epoch.equal prev.curr_epoch next.curr_epoch) then (
+      let ledger =
+        match snarked_ledger () with Ok l -> l | Error e -> Error.raise e
+      in
       local_state.last_epoch_ledger <- local_state.curr_epoch_ledger ;
-      local_state.curr_epoch_ledger <- Some (Coda_base.Ledger.copy ledger) )
+      local_state.curr_epoch_ledger <- Some ledger )
 
   (* TODO: determine correct definition of genesis state *)
   let genesis_protocol_state =

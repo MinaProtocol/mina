@@ -103,7 +103,7 @@ module type S = sig
   val lock_transition :
        Consensus_state.value
     -> Consensus_state.value
-    -> ledger:Coda_base.Ledger.t
+    -> snarked_ledger:(unit -> Coda_base.Ledger.t Or_error.t)
     -> local_state:Local_state.t
     -> unit
   (**
