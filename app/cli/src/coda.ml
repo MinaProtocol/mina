@@ -111,7 +111,7 @@ let daemon (type ledger_proof) (module Kernel
                  Pipe.to_list (Reader.lines r)
                  >>| fun ss -> String.concat ~sep:"\n" ss
                in
-               Yojson.Safe.from_string ~fname:"daemon.json" contents)
+               Yojson.Safe.from_string ~fname:"daemon.json" contents )
          with
          | Ok c -> Some c
          | Error e ->
@@ -120,17 +120,16 @@ let daemon (type ledger_proof) (module Kernel
              Logger.warn log "failed to read daemon.json, not using it" ;
              None
        in
-       let maybe_from_config (type a)
-           (f: Yojson.Safe.json -> a option) (keyname: string)
-           (actual_value: a option) : a option =
+       let maybe_from_config (type a) (f: Yojson.Safe.json -> a option)
+           (keyname: string) (actual_value: a option) : a option =
          let open Option.Let_syntax in
          let open Yojson.Safe.Util in
          match actual_value with
          | Some v -> Some v
          | None ->
-            let%bind config = config in
-            let%bind json_val = to_option Fn.id (member keyname config) in
-            f json_val
+             let%bind config = config in
+             let%bind json_val = to_option Fn.id (member keyname config) in
+             f json_val
        in
        let or_from_config map keyname actual_value ~default =
          match maybe_from_config map keyname actual_value with
@@ -149,21 +148,24 @@ let daemon (type ledger_proof) (module Kernel
            ~default:default_client_port client_port
        in
        let should_propose_flag =
-         or_from_config Yojson.Safe.Util.to_bool_option "propose" ~default:false
-           should_propose_flag
+         or_from_config Yojson.Safe.Util.to_bool_option "propose"
+           ~default:false should_propose_flag
        in
        let transaction_capacity_log_2 =
-         or_from_config Yojson.Safe.Util.to_int_option "txn-capacity" ~default:3
-           transaction_capacity_log_2
+         or_from_config Yojson.Safe.Util.to_int_option "txn-capacity"
+           ~default:3 transaction_capacity_log_2
        in
        let rest_server_port =
-         maybe_from_config Yojson.Safe.Util.to_int_option "rest-port" rest_server_port
+         maybe_from_config Yojson.Safe.Util.to_int_option "rest-port"
+           rest_server_port
        in
        let peers =
          List.concat
            [ peers
            ; List.map ~f:Host_and_port.of_string
-             @@ or_from_config (Fn.compose Option.some (Yojson.Safe.Util.convert_each Yojson.Safe.Util.to_string))
+             @@ or_from_config
+                  (Fn.compose Option.some
+                     (Yojson.Safe.Util.convert_each Yojson.Safe.Util.to_string))
                   "peers" None ~default:[] ]
        in
        let proposal_interval =
