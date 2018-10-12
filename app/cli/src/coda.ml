@@ -196,12 +196,12 @@ let daemon (type ledger_proof) (module Kernel
            Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
              (fun k -> `With_public_key k )
          in
-         let banlist_dir_name = Filename.concat conf_dir "banlist" in
+         let banlist_dir_name = conf_dir ^/ "banlist" in
          let%bind () = Async.Unix.mkdir banlist_dir_name in
-         let%bind suspicious_dir =
-           Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
-         in
-         let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
+         let suspicious_dir = banlist_dir_name ^/ "suspicious" in
+         let punished_dir = banlist_dir_name ^/ "banned" in
+         let%bind () = Async.Unix.mkdir suspicious_dir in
+         let%bind () = Async.Unix.mkdir punished_dir in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
