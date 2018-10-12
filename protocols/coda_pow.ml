@@ -132,13 +132,15 @@ end
 module type Ledger_intf = sig
   type t [@@deriving sexp, bin_io]
 
+  type super_transaction
+
   module Undo : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, bin_io]
+
+    val super_transaction : t -> super_transaction Or_error.t
   end
 
   type valid_transaction
-
-  type super_transaction
 
   type ledger_hash
 
@@ -560,6 +562,9 @@ module type Ledger_builder_intf = sig
   end
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
+
+  val snarked_ledger :
+    t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
 end
 
 module type Tip_intf = sig
