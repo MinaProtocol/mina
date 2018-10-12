@@ -1,5 +1,5 @@
 [%%import
-"../../../../../config.mlh"]
+"../../../config.mlh"]
 
 open Core
 open Ctypes

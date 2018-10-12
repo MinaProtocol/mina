@@ -1,5 +1,5 @@
 [%%import
-"../../../../config.mlh"]
+"../../config.mlh"]
 
 module Bignum_bigint = Bigint
 open Core_kernel
