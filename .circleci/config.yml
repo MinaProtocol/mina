@@ -3,7 +3,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:00bd64dcf1b4d171a26bcc26775c78181c2e726d
+        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -30,7 +30,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:00bd64dcf1b4d171a26bcc26775c78181c2e726d
+        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -60,7 +60,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:00bd64dcf1b4d171a26bcc26775c78181c2e726d
+        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -90,7 +90,7 @@ jobs:
     test-runtest:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:00bd64dcf1b4d171a26bcc26775c78181c2e726d
+        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -106,7 +106,7 @@ jobs:
     test-stake:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:00bd64dcf1b4d171a26bcc26775c78181c2e726d
+        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -122,7 +122,7 @@ jobs:
     test-sig:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:00bd64dcf1b4d171a26bcc26775c78181c2e726d
+        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
