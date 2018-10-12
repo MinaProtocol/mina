@@ -19,6 +19,9 @@ jobs:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
+                name: Build Website
+                command: make web
+            - run:
                 name: Count OCaml Warns
                 command: ./scripts/buildwarns.py /tmp/buildocaml.log
             - run:
