@@ -25,7 +25,7 @@ let wrap_pvk =
   Proof_system.Verification_key.Processed.create Lite_params.wrap_vk
 
 (* TODO: This changes when the curves get flipped *)
-let to_wrap_input instance_hash = Snarkette.Mnt6.Fq.to_bigint instance_hash
+let to_wrap_input instance_hash = Snarkette.Mnt6_80.Fq.to_bigint instance_hash
 
 let verify_chain pvk state_and_instance_hash
     ({protocol_state; ledger; proof}: Lite_chain.t) =

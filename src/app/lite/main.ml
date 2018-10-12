@@ -129,8 +129,8 @@ let color_of_hash (h: Pedersen.Digest.t) : string =
     if n < 10 then Char.of_int_exn (Char.to_int '0' + n)
     else Char.of_int_exn (Char.to_int 'A' + (n - 10))
   in
-  let module N = Snarkette.Mnt6.N in
-  let n = Snarkette.Mnt6.Fq.to_bigint h in
+  let module N = Snarkette.Mnt6_80.N in
+  let n = Snarkette.Mnt6_80.Fq.to_bigint h in
   let byte i =
     let bit ~start j =
       if N.test_bit n (start + (8 * i) + j) then 1 lsl j else 0
@@ -416,7 +416,7 @@ module Html = struct
 end
 
 let field_to_base64 =
-  Fn.compose Fold_lib.Fold.bool_t_to_string Snarkette.Mnt6.Fq.fold_bits
+  Fn.compose Fold_lib.Fold.bool_t_to_string Snarkette.Mnt6_80.Fq.fold_bits
   |> Fn.compose B64.encode
 
 let hash_colors = [|"#76cd87"; "#4782a0"; "#ac80a0"; "#89aae6"; "#3685b5"|]
