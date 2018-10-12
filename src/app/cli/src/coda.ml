@@ -197,11 +197,11 @@ let daemon (type ledger_proof) (module Kernel
              (fun k -> `With_public_key k )
          in
          let banlist_dir_name = conf_dir ^/ "banlist" in
-         let%bind () = Async.Unix.mkdir banlist_dir_name in
+         let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
          let suspicious_dir = banlist_dir_name ^/ "suspicious" in
          let punished_dir = banlist_dir_name ^/ "banned" in
-         let%bind () = Async.Unix.mkdir suspicious_dir in
-         let%bind () = Async.Unix.mkdir punished_dir in
+         let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
+         let%bind () = Async.Unix.mkdir ~p:() punished_dir in
          let banlist =
            Coda_base.Banlist.create ~suspicious_dir ~punished_dir
          in
