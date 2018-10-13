@@ -104,7 +104,7 @@ jobs:
                 command: source ~/.profile && make kademlia
             - run:
                 name: Test make test-runtest
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-runtest
+                command: source ~/.profile && make test-runtest
 
     test-stake:
         resource_class: large
@@ -120,7 +120,7 @@ jobs:
                 command: source ~/.profile && make kademlia
             - run:
                 name: Test make test-stakes
-                command: source ~/.profile && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" make test-stakes
+                command: source ~/.profile && make test-stakes
 
     test-sig:
         resource_class: large
@@ -143,7 +143,7 @@ jobs:
             {% for test in tests %}
             - run:
                 name: {{ test.friendly }}
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD={{test.mechanism}} ../scripts/test_integration_test.sh '{{test.name}}'{% endfor %}
+                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD={{test.mechanism}} ../scripts/test_integration_test.sh '{{test.name}}'{% endfor %}
 
 workflows:
     version: 2
