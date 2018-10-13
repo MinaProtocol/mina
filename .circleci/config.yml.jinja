@@ -3,7 +3,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -19,7 +19,7 @@ jobs:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
-                name: Build Website
+                name: Build Website -- make web
                 command: make web
             - run:
                 name: Count OCaml Warns
@@ -33,7 +33,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -63,7 +63,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -93,7 +93,7 @@ jobs:
     test-runtest:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -109,7 +109,7 @@ jobs:
     test-stake:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -125,7 +125,7 @@ jobs:
     test-sig:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a1800fc58dc79864a99ae2ea0a6829efe4e2a70a
+        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -143,7 +143,7 @@ jobs:
             {% for test in tests %}
             - run:
                 name: {{ test.friendly }}
-                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD={{test.mechanism}} ../test_integration_test.sh '{{test.name}}'{% endfor %}
+                command: source ~/.profile && cd src && PATH="$PATH:$(nix-shell . --run 'dirname $(which spirv-val)')" CODA_CONSENSUS_METHOD={{test.mechanism}} ../scripts/test_integration_test.sh '{{test.name}}'{% endfor %}
 
 workflows:
     version: 2

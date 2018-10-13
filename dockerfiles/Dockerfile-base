@@ -31,13 +31,13 @@ RUN opam install yojson menhir bignum
 RUN opam install async_ssl cohttp cohttp-async
 RUN opam install extlib rpc_parallel
 
-ADD ./app/kademlia-haskell/prefetch /prefetch
+ADD ./src/app/kademlia-haskell/prefetch /prefetch
 RUN sudo chown -R opam /prefetch
 RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix
 RUN opam install bitstring orocksdb
 RUN opam install camlp4
 RUN opam install ppx_deriving_yojson
-ADD ./external/ocaml-sodium /ocaml-sodium
+ADD ./src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
 
 RUN opam install js_of_ocaml 

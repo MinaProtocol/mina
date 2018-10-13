@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
+
+cd $SCRIPTPATH/../src/_build
+
 PROJECT='codaclient'
 
 MAJORVERSION=0
@@ -10,8 +14,6 @@ GITHASH=`git rev-parse --short=8 HEAD`
 
 VERSION="${MAJORVERSION}.${DATE}.${GITHASH}"
 BUILDDIR="${PROJECT}_${VERSION}"
-
-cd src/_build
 
 mkdir -p ${BUILDDIR}/DEBIAN
 cat << EOF > ${BUILDDIR}/DEBIAN/control
@@ -29,7 +31,7 @@ EOF
 mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
-cp .././app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
+cp ../app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
 
 # verification keys
 if [ -d "/var/lib/coda" ]; then
