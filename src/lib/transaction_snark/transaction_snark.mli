@@ -21,7 +21,7 @@ module Statement : sig
     ; supply_increase: Currency.Amount.Stable.V1.t
     ; fee_excess: Currency.Fee.Signed.Stable.V1.t
     ; proof_type: Proof_type.t }
-  [@@deriving sexp, bin_io, hash, compare, eq]
+  [@@deriving sexp, bin_io, hash, compare, eq, fields]
 
   val gen : t Quickcheck.Generator.t
 

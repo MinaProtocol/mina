@@ -28,29 +28,33 @@ module type Inputs_intf = sig
     type t [@@deriving sexp]
   end
 
-  module Ledger_builder : sig
+  module Ledger_builder_diff : sig
     type t
-
-    type proof
-
-    module Aux : sig
-      type t [@@deriving bin_io]
-
-      val hash : t -> Ledger_builder_aux_hash.t
-    end
-
-    val ledger : t -> Ledger.t
-
-    val hash : t -> Ledger_builder_hash.t
-
-    val of_aux_and_ledger :
-         snarked_ledger_hash:Frozen_ledger_hash.t
-      -> ledger:Ledger.t
-      -> aux:Aux.t
-      -> t Or_error.t
-
-    val copy : t -> t
   end
+
+  module Ledger_proof : sig
+    type t
+  end
+
+  module Private_key : Protocols.Coda_pow.Private_key_intf
+
+  module Public_key :
+    Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
+
+  module Keypair :
+    Protocols.Coda_pow.Keypair_intf
+    with type public_key := Public_key.t
+     and type private_key := Private_key.t
+
+  module Ledger_builder :
+    Protocols.Coda_pow.Ledger_builder_base_intf
+    with type ledger_builder_hash := Ledger_builder_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type diff := Ledger_builder_diff.t
+     and type ledger_proof := Ledger_proof.t
+     and type ledger := Ledger.t
+     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type public_key := Public_key.Compressed.t
 
   module Protocol_state_proof : sig
     type t
@@ -82,20 +86,21 @@ module type Inputs_intf = sig
     end
   end
 
-  module Tip : sig
-    include Protocols.Coda_pow.Tip_intf
-            with type ledger_builder := Ledger_builder.t
-             and type protocol_state :=
-                        Consensus_mechanism.Protocol_state.value
-             and type protocol_state_proof := Protocol_state_proof.t
-             and type external_transition :=
-                        Consensus_mechanism.External_transition.t
+  module Tip :
+    Protocols.Coda_pow.Tip_intf
+    with type ledger_builder := Ledger_builder.t
+     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state_proof := Protocol_state_proof.t
+     and type external_transition := Consensus_mechanism.External_transition.t
 
-    type state_hash
+  module State_hash : sig
+    type t
+  end
 
+  module Tip_ops : sig
     val assert_materialization_of :
-         (t, state_hash) With_hash.t
-      -> (Consensus_mechanism.External_transition.t, state_hash) With_hash.t
+         (Tip.t, State_hash.t) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
       -> unit
   end
 
@@ -104,7 +109,7 @@ module type Inputs_intf = sig
     with type tip := Tip.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type external_transition := Consensus_mechanism.External_transition.t
-     and type state_hash := Tip.state_hash
+     and type state_hash := State_hash.t
 
   module Sync_ledger : sig
     type t
@@ -153,13 +158,17 @@ module Make (Inputs : Inputs_intf) = struct
     External_transition.protocol_state t
     |> Protocol_state.blockchain_state |> Blockchain_state.ledger_builder_hash
 
-  type t = {net: Net.t; log: Logger.t; sl_ref: Sync_ledger.t option ref}
+  type t =
+    { net: Net.t
+    ; log: Logger.t
+    ; sl_ref: Sync_ledger.t option ref
+    ; public_key: Public_key.Compressed.t }
 
-  let create net parent_log =
-    {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None}
+  let create ~net ~parent_log ~public_key =
+    {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None; public_key}
 
   (* Perform the `Sync interruptible work *)
-  let do_sync {net; log; sl_ref} (state: Transition_logic_state.t)
+  let do_sync {net; log; sl_ref; public_key} (state: Transition_logic_state.t)
       transition_with_hash =
     let {With_hash.data= locked_tip; hash= _} =
       Transition_logic_state.locked_tip state
@@ -188,7 +197,7 @@ module Make (Inputs : Inputs_intf) = struct
       | Some sl -> sl
     in
     let open Interruptible.Let_syntax in
-    let ivar : (External_transition.t, Tip.state_hash) With_hash.t Ivar.t =
+    let ivar : (External_transition.t, State_hash.t) With_hash.t Ivar.t =
       Ivar.create ()
     in
     Logger.debug log
@@ -211,8 +220,8 @@ module Make (Inputs : Inputs_intf) = struct
           with
           | Ok aux -> (
             match
-              Ledger_builder.of_aux_and_ledger ~snarked_ledger_hash ~ledger
-                ~aux
+              Ledger_builder.of_aux_and_ledger ~public_key ~snarked_ledger_hash
+                ~ledger ~aux
             with
             (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
@@ -227,7 +236,7 @@ module Make (Inputs : Inputs_intf) = struct
                   { With_hash.data= Tip.of_transition_and_lb transition lb
                   ; hash= transition_state_hash }
                 in
-                Tip.assert_materialization_of new_tip transition_with_hash ;
+                Tip_ops.assert_materialization_of new_tip transition_with_hash ;
                 Logger.debug log
                   !"Successfully caught up to full ledger-builder %{sexp: \
                     Ledger_builder_hash.t}"

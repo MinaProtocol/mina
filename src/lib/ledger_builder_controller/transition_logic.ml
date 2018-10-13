@@ -1,5 +1,6 @@
 open Core_kernel
 open Async_kernel
+open Protocols
 
 module type Inputs_intf = sig
   module State_hash : sig
@@ -14,8 +15,16 @@ module type Inputs_intf = sig
     type t [@@deriving eq, sexp, compare]
   end
 
+  module Ledger_builder_diff : sig
+    type t [@@deriving sexp]
+  end
+
   module Frozen_ledger_hash : sig
     type t [@@deriving eq, bin_io, sexp, eq]
+  end
+
+  module Protocol_state_proof : sig
+    type t
   end
 
   module Blockchain_state : sig
@@ -53,6 +62,10 @@ module type Inputs_intf = sig
       type t [@@deriving eq, sexp, compare, bin_io]
 
       val protocol_state : t -> Protocol_state.value
+
+      val ledger_builder_diff : t -> Ledger_builder_diff.t
+
+      val protocol_state_proof : t -> Protocol_state_proof.t
     end
 
     val select :
@@ -63,7 +76,46 @@ module type Inputs_intf = sig
       -> [`Keep | `Take]
   end
 
-  module Tip : sig
+  module Private_key : Protocols.Coda_pow.Private_key_intf
+
+  module Public_key :
+    Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
+
+  module Keypair :
+    Protocols.Coda_pow.Keypair_intf
+    with type public_key := Public_key.t
+     and type private_key := Private_key.t
+
+  module Ledger_proof : sig
+    type t
+  end
+
+  module Ledger : sig
+    type t
+  end
+
+  module Ledger_builder_aux_hash : sig
+    type t
+  end
+
+  module Ledger_builder :
+    Coda_pow.Ledger_builder_base_intf
+    with type ledger_builder_hash := Ledger_builder_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type diff := Ledger_builder_diff.t
+     and type ledger_proof := Ledger_proof.t
+     and type ledger := Ledger.t
+     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type public_key := Public_key.Compressed.t
+
+  module Tip :
+    Coda_pow.Tip_intf
+    with type ledger_builder := Ledger_builder.t
+     and type external_transition := Consensus_mechanism.External_transition.t
+     and type protocol_state := Consensus_mechanism.Protocol_state.value
+     and type protocol_state_proof := Protocol_state_proof.t
+
+  (*
     type t [@@deriving sexp]
 
     type state_hash = State_hash.t
@@ -94,6 +146,7 @@ module type Inputs_intf = sig
       -> (Consensus_mechanism.External_transition.t, state_hash) With_hash.t
       -> unit
   end
+*)
 
   module Transition_logic_state :
     Transition_logic_state.S
@@ -121,6 +174,26 @@ module type Inputs_intf = sig
       -> ( (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
          , Transition_logic_state.Change.t list )
          Job.t
+  end
+
+  module Tip_ops : sig
+    val assert_materialization_of :
+         (Tip.t, State_hash.t) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
+      -> unit
+
+    val transition_unchecked :
+         Tip.t
+      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
+      -> (Tip.t, State_hash.t) With_hash.t Deferred.t
+
+    val is_parent_of :
+         child:(Consensus_mechanism.External_transition.t, 'a) With_hash.t
+      -> parent:('b, State_hash.t) With_hash.t
+      -> bool
+
+    val is_materialization_of :
+      ('a, State_hash.t) With_hash.t -> ('b, State_hash.t) With_hash.t -> bool
   end
 end
 
@@ -280,7 +353,7 @@ struct
       Job.t
 
     let transition_unchecked h t =
-      Interruptible.uninterruptible (Tip.transition_unchecked h t)
+      Interruptible.uninterruptible (Tip_ops.transition_unchecked h t)
 
     let run (t: t0) new_tree old_tree new_best_path _logger _transition =
       let locked_tip = Transition_logic_state.locked_tip t.state
@@ -310,7 +383,7 @@ struct
         let tip, path =
           match
             Path.findi new_best_path ~f:(fun _ x ->
-                Tip.is_materialization_of longest_branch_tip x )
+                Tip_ops.is_materialization_of longest_branch_tip x )
           with
           | None -> (With_hash.map locked_tip ~f:Tip.copy, new_best_path)
           | Some (i, _) ->
@@ -338,7 +411,7 @@ struct
         in
         match result with
         | Some tip ->
-            Tip.assert_materialization_of tip last_transition ;
+            Tip_ops.assert_materialization_of tip last_transition ;
             [ Transition_logic_state.Change.Longest_branch_tip tip
             ; Transition_logic_state.Change.Ktree new_tree ]
         | None -> []
@@ -441,13 +514,15 @@ struct
     and ktree = Transition_logic_state.ktree t.state in
     match ktree with
     | None -> (
-        let source_state = Tip.state (With_hash.data longest_branch_tip) in
+        let source_state =
+          Tip.protocol_state (With_hash.data longest_branch_tip)
+        in
         let target_state =
           External_transition.protocol_state
             (With_hash.data transition_with_hash)
         in
         if
-          Tip.is_parent_of ~child:transition_with_hash
+          Tip_ops.is_parent_of ~child:transition_with_hash
             ~parent:longest_branch_tip
         then (
           (* Bootstrap from genesis *)

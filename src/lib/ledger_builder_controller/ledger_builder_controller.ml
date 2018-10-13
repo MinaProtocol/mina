@@ -2,6 +2,16 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
+  module Private_key : Protocols.Coda_pow.Private_key_intf
+
+  module Public_key :
+    Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
+
+  module Keypair :
+    Protocols.Coda_pow.Keypair_intf
+    with type public_key := Public_key.t
+     and type private_key := Private_key.t
+
   module State_hash : sig
     type t [@@deriving eq, sexp, compare, bin_io]
 
@@ -42,42 +52,6 @@ module type Inputs_intf = sig
 
   module Ledger_builder_aux_hash : sig
     type t [@@deriving sexp]
-  end
-
-  module Ledger_builder : sig
-    type t
-
-    type proof
-
-    module Aux : sig
-      type t [@@deriving bin_io]
-
-      val hash : t -> Ledger_builder_aux_hash.t
-    end
-
-    val ledger : t -> Ledger.t
-
-    val create : Ledger.t -> t
-
-    val of_aux_and_ledger :
-         snarked_ledger_hash:Frozen_ledger_hash.t
-      -> ledger:Ledger.t
-      -> aux:Aux.t
-      -> t Or_error.t
-
-    val copy : t -> t
-
-    val hash : t -> Ledger_builder_hash.t
-
-    val aux : t -> Aux.t
-
-    val apply :
-         t
-      -> Ledger_builder_diff.t
-      -> (Frozen_ledger_hash.t * proof) option Deferred.Or_error.t
-
-    val snarked_ledger :
-      t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t
   end
 
   module Protocol_state_proof : sig
@@ -148,6 +122,28 @@ module type Inputs_intf = sig
       -> unit
   end
 
+  module Ledger_proof_statement : sig
+    type t
+
+    val target : t -> Frozen_ledger_hash.t
+  end
+
+  module Ledger_proof : sig
+    type t
+
+    val statement : t -> Ledger_proof_statement.t
+  end
+
+  module Ledger_builder :
+    Protocols.Coda_pow.Ledger_builder_base_intf
+    with type ledger_builder_hash := Ledger_builder_hash.t
+     and type frozen_ledger_hash := Frozen_ledger_hash.t
+     and type diff := Ledger_builder_diff.t
+     and type ledger_proof := Ledger_proof.t
+     and type ledger := Ledger.t
+     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+     and type public_key := Public_key.Compressed.t
+
   module Tip :
     Protocols.Coda_pow.Tip_intf
     with type ledger_builder := Ledger_builder.t
@@ -211,7 +207,7 @@ module Make (Inputs : Inputs_intf) : sig
            and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
            and type internal_transition := Inputs.Internal_transition.t
            and type ledger := Inputs.Ledger.t
-           and type ledger_proof := Inputs.Ledger_builder.proof
+           and type ledger_proof := Inputs.Ledger_proof.t
            and type net := Inputs.Net.net
            and type protocol_state :=
                       Inputs.Consensus_mechanism.Protocol_state.value
@@ -223,6 +219,7 @@ module Make (Inputs : Inputs_intf) : sig
            and type consensus_local_state :=
                       Inputs.Consensus_mechanism.Local_state.t
            and type tip := Inputs.Tip.t
+           and type keypair := Inputs.Keypair.t
 
   val ledger_builder_io : t -> Inputs.Net.t
 end = struct
@@ -237,18 +234,97 @@ end = struct
           (External_transition.t * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: Tip.t
       ; consensus_local_state: Consensus_mechanism.Local_state.t
-      ; longest_tip_location: string }
+      ; longest_tip_location: string
+      ; keypair: Keypair.t }
     [@@deriving make]
   end
 
+  module Tip_ops = struct
+    let assert_materialization_of {With_hash.data= t; hash= tip_state_hash}
+        {With_hash.data= transition; hash= transition_state_hash} =
+      [%test_result : State_hash.t]
+        ~message:
+          "Protocol state in tip should be the target state of the transition"
+        ~expect:transition_state_hash tip_state_hash ;
+      [%test_result : Ledger_builder_hash.t]
+        ~message:
+          (Printf.sprintf
+             !"Ledger_builder_hash inside protocol state inconsistent with \
+               materialized ledger_builder's hash for transition: %{sexp: \
+               External_transition.t}"
+             transition)
+        ~expect:
+          ( External_transition.protocol_state transition
+          |> Protocol_state.blockchain_state
+          |> Blockchain_state.ledger_builder_hash )
+        (Ledger_builder.hash t.Tip.ledger_builder)
+
+    let transition_unchecked t
+        ( {With_hash.data= transition; hash= transition_state_hash} as
+        transition_with_hash ) =
+      let%map () =
+        let open Deferred.Let_syntax in
+        match%map
+          Ledger_builder.apply t.Tip.ledger_builder
+            (External_transition.ledger_builder_diff transition)
+        with
+        | Ok None -> ()
+        | Ok (Some _) -> ()
+        (* We've already verified that all the patches can be
+          applied successfully before we added to the ktree, so we
+          can force-unwrap here *)
+        | Error e ->
+            failwithf
+              "We should have already verified patches can be applied: %s"
+              (Error.to_string_hum e) ()
+      in
+      let tip' =
+        { t with
+          Tip.protocol_state= External_transition.protocol_state transition
+        ; proof= External_transition.protocol_state_proof transition }
+      in
+      let res = {With_hash.data= tip'; hash= transition_state_hash} in
+      assert_materialization_of res transition_with_hash ;
+      res
+
+    let is_parent_of ~child:{With_hash.data= child; hash= _}
+        ~parent:{With_hash.data= _; hash= parent_hash} =
+      State_hash.equal parent_hash
+        ( External_transition.protocol_state child
+        |> Protocol_state.previous_state_hash )
+
+    let is_materialization_of {With_hash.data= _; hash= tip_hash}
+        {With_hash.data= _; hash= transition_hash} =
+      State_hash.equal transition_hash tip_hash
+  end
+
   module Transition_logic_inputs = struct
+    module Private_key = Private_key
+    module Public_key = Public_key
+    module Keypair = Keypair
+    module Ledger_proof = Ledger_proof
+    module Ledger = Ledger
+    module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Frozen_ledger_hash = Frozen_ledger_hash
     module State_hash = State_hash
     module Ledger_builder_hash = Ledger_builder_hash
     module Blockchain_state = Blockchain_state
     module Consensus_mechanism = Consensus_mechanism
+    module Ledger_builder = Ledger_builder
+    module Protocol_state_proof = Protocol_state_proof
+    module Ledger_builder_diff = Ledger_builder_diff
+    module Tip = Tip
+    module Tip_ops = Tip_ops
 
     module Step = struct
+      let apply' t diff =
+        Deferred.Or_error.map
+          (Ledger_builder.apply t diff)
+          ~f:
+            (Option.map ~f:(fun proof ->
+                 ( Ledger_proof.statement proof |> Ledger_proof_statement.target
+                 , proof ) ))
+
       let step {With_hash.data= tip; hash= tip_hash}
           {With_hash.data= transition; hash= transition_target_hash} =
         let open Deferred.Or_error.Let_syntax in
@@ -261,7 +337,7 @@ end = struct
         in
         let%bind ledger_hash =
           match%map
-            Ledger_builder.apply tip.ledger_builder
+            apply' tip.ledger_builder
               (External_transition.ledger_builder_diff transition)
           with
           | Some (h, _) -> h
@@ -291,73 +367,6 @@ end = struct
         ; hash= transition_target_hash }
     end
 
-    module Tip = struct
-      include Tip
-
-      type state_hash = State_hash.t [@@deriving sexp, bin_io, compare]
-
-      let state tip = tip.protocol_state
-
-      let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
-
-      let assert_materialization_of {With_hash.data= t; hash= tip_state_hash}
-          {With_hash.data= transition; hash= transition_state_hash} =
-        [%test_result : State_hash.t]
-          ~message:
-            "Protocol state in tip should be the target state of the transition"
-          ~expect:transition_state_hash tip_state_hash ;
-        [%test_result : Ledger_builder_hash.t]
-          ~message:
-            (Printf.sprintf
-               !"Ledger_builder_hash inside protocol state inconsistent with \
-                 materialized ledger_builder's hash for transition: %{sexp: \
-                 External_transition.t}"
-               transition)
-          ~expect:
-            ( External_transition.protocol_state transition
-            |> Protocol_state.blockchain_state
-            |> Blockchain_state.ledger_builder_hash )
-          (Ledger_builder.hash t.ledger_builder)
-
-      let transition_unchecked t
-          ( {With_hash.data= transition; hash= transition_state_hash} as
-          transition_with_hash ) =
-        let%map () =
-          let open Deferred.Let_syntax in
-          match%map
-            Ledger_builder.apply t.ledger_builder
-              (External_transition.ledger_builder_diff transition)
-          with
-          | Ok None -> ()
-          | Ok (Some _) -> ()
-          (* We've already verified that all the patches can be
-            applied successfully before we added to the ktree, so we
-            can force-unwrap here *)
-          | Error e ->
-              failwithf
-                "We should have already verified patches can be applied: %s"
-                (Error.to_string_hum e) ()
-        in
-        let tip' =
-          { t with
-            protocol_state= External_transition.protocol_state transition
-          ; proof= External_transition.protocol_state_proof transition }
-        in
-        let res = {With_hash.data= tip'; hash= transition_state_hash} in
-        assert_materialization_of res transition_with_hash ;
-        res
-
-      let is_parent_of ~child:{With_hash.data= child; hash= _}
-          ~parent:{With_hash.data= _; hash= parent_hash} =
-        State_hash.equal parent_hash
-          ( External_transition.protocol_state child
-          |> Protocol_state.previous_state_hash )
-
-      let is_materialization_of {With_hash.data= _; hash= tip_hash}
-          {With_hash.data= _; hash= transition_hash} =
-        State_hash.equal transition_hash tip_hash
-    end
-
     module Transition_logic_state = Transition_logic_state.Make (struct
       module Security = Security
       module Ledger = Ledger
@@ -366,12 +375,21 @@ end = struct
       module Blockchain_state = Blockchain_state
       module External_transition = External_transition
       module Tip = Tip
+      module Tip_ops = Tip_ops
+      module State_hash = State_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
     end)
 
     module Ledger_hash = Ledger_hash
 
     module Catchup = Catchup.Make (struct
+      module Private_key = Private_key
+      module Public_key = Public_key
+      module Keypair = Keypair
+      module State_hash = State_hash
+      module Tip_ops = Tip_ops
+      module Ledger_proof = Ledger_proof
+      module Ledger_builder_diff = Ledger_builder_diff
       module Ledger_hash = Ledger_hash
       module Frozen_ledger_hash = Frozen_ledger_hash
       module Ledger = Ledger
@@ -462,7 +480,10 @@ end = struct
     in
     let%map net = config.net_deferred in
     let net = Net.create net in
-    let catchup = Catchup.create net log in
+    let catchup =
+      Catchup.create ~net ~parent_log:log
+        ~public_key:(Public_key.compress config.keypair.public_key)
+    in
     (* Here we effectfully listen to transitions and emit what we belive are
        the strongest ledger_builders *)
     let strongest_ledgers_reader, strongest_ledgers_writer =
@@ -500,9 +521,9 @@ end = struct
              not
                (Protocol_state.equal_value
                   ( old_state |> Transition_logic_state.longest_branch_tip
-                  |> With_hash.data |> Tip.state )
+                  |> With_hash.data |> Tip.protocol_state )
                   ( new_state |> Transition_logic_state.longest_branch_tip
-                  |> With_hash.data |> Tip.state ))
+                  |> With_hash.data |> Tip.protocol_state ))
            then (
              let {With_hash.data= tip; hash= _} =
                Transition_logic_state.longest_branch_tip new_state
@@ -666,6 +687,45 @@ let%test_module "test" =
         module Ledger_hash = Int
         module Frozen_ledger_hash = Int
 
+        module Ledger_proof_statement = struct
+          type t = Frozen_ledger_hash.t
+
+          let target t = t
+        end
+
+        module Ledger_proof = struct
+          type t = Ledger_proof_statement.t
+
+          let statement t = t
+        end
+
+        module Private_key = struct
+          type t = unit
+        end
+
+        module Public_key = struct
+          module Private_key = Private_key
+
+          module Compressed = struct
+            module T = struct
+              type t = unit [@@deriving compare, sexp, bin_io]
+            end
+
+            include T
+            include Comparable.Make (T)
+          end
+
+          type t = unit [@@deriving sexp]
+
+          let compress t = t
+
+          let of_private_key_exn t = t
+        end
+
+        module Keypair = struct
+          type t = {public_key: Public_key.t; private_key: Private_key.t}
+        end
+
         module Ledger_builder_hash = struct
           include Int
 
@@ -700,20 +760,21 @@ let%test_module "test" =
 
           let ledger t = !t
 
-          let create x = ref x
+          let create ~ledger ~self:_ = ref ledger
 
           let copy t = ref !t
 
           let hash t = !t
 
-          let of_aux_and_ledger ~snarked_ledger_hash:_ ~ledger ~aux:_ =
-            Ok (create ledger)
+          let of_aux_and_ledger ~snarked_ledger_hash:_ ~public_key:_ ~ledger
+              ~aux:_ =
+            Ok (create ~ledger ~self:())
 
           let aux t = !t
 
           let apply (t: t) (x: Ledger_builder_diff.t) =
             t := x ;
-            return (Ok (Some (x, ())))
+            return (Ok (Some x))
 
           let snarked_ledger :
                  t
@@ -794,6 +855,9 @@ let%test_module "test" =
             ; proof: Protocol_state_proof.t
             ; ledger_builder: Ledger_builder.t }
           [@@deriving bin_io, sexp, fields]
+
+          let copy t =
+            {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
 
           let of_transition_and_lb transition ledger_builder =
             { protocol_state=
@@ -901,8 +965,10 @@ let%test_module "test" =
           ~genesis_tip:
             { protocol_state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()
-            ; ledger_builder= Inputs.Ledger_builder.create 0 }
+            ; ledger_builder= Inputs.Ledger_builder.create ~ledger:0 ~self:()
+            }
           ~longest_tip_location ~consensus_local_state:()
+          ~keypair:{Inputs.Keypair.public_key= (); private_key= ()}
 
       let create_transition x parent strength =
         { Inputs.Consensus_mechanism.Protocol_state.previous_state_hash= parent

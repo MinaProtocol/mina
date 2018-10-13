@@ -100,15 +100,19 @@ module type Inputs_intf = sig
   module Tip : sig
     type t [@@deriving sexp]
 
-    type state_hash [@@deriving compare, sexp, bin_io]
-
     val protocol_state : t -> Consensus_mechanism.Protocol_state.value
 
     val ledger_builder : t -> Ledger_builder.t
+  end
 
+  module State_hash : sig
+    type t [@@deriving compare, sexp, bin_io]
+  end
+
+  module Tip_ops : sig
     val assert_materialization_of :
-         (t, state_hash) With_hash.t
-      -> (Consensus_mechanism.External_transition.t, state_hash) With_hash.t
+         (Tip.t, State_hash.t) With_hash.t
+      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
       -> unit
   end
 end
@@ -119,22 +123,22 @@ module Make (Inputs : Inputs_intf) :
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type external_transition :=
               Inputs.Consensus_mechanism.External_transition.t
-   and type state_hash := Inputs.Tip.state_hash =
+   and type state_hash := Inputs.State_hash.t =
 struct
   open Inputs
   open Consensus_mechanism
 
   module Transition_tree =
     Ktree.Make (struct
-        type t = (External_transition.t, Tip.state_hash) With_hash.t
+        type t = (External_transition.t, State_hash.t) With_hash.t
         [@@deriving compare, bin_io, sexp]
       end)
       (Security)
 
   module Change = struct
     type t =
-      | Locked_tip of (Tip.t, Tip.state_hash) With_hash.t
-      | Longest_branch_tip of (Tip.t, Tip.state_hash) With_hash.t
+      | Locked_tip of (Tip.t, State_hash.t) With_hash.t
+      | Longest_branch_tip of (Tip.t, State_hash.t) With_hash.t
       | Ktree of Transition_tree.t
     [@@deriving sexp]
   end
@@ -154,8 +158,8 @@ struct
    *    the root and longest_branch with Tip.t's.
    *)
   type t =
-    { locked_tip: (Tip.t, Tip.state_hash) With_hash.t
-    ; longest_branch_tip: (Tip.t, Tip.state_hash) With_hash.t
+    { locked_tip: (Tip.t, State_hash.t) With_hash.t
+    ; longest_branch_tip: (Tip.t, State_hash.t) With_hash.t
     ; ktree: Transition_tree.t option
     ; consensus_local_state: Local_state.t
     (* TODO: This impl assumes we have the original Ouroboros assumption. In
@@ -197,12 +201,12 @@ struct
           match Transition_tree.longest_path ktree with
           | [] -> failwith "Impossible, paths are non-empty"
           | [x] ->
-              Tip.assert_materialization_of t.locked_tip x ;
-              Tip.assert_materialization_of t.longest_branch_tip x
+              Tip_ops.assert_materialization_of t.locked_tip x ;
+              Tip_ops.assert_materialization_of t.longest_branch_tip x
           | x :: y :: rest ->
               let last = List.last_exn (y :: rest) in
-              Tip.assert_materialization_of t.locked_tip x ;
-              Tip.assert_materialization_of t.longest_branch_tip last )
+              Tip_ops.assert_materialization_of t.locked_tip x ;
+              Tip_ops.assert_materialization_of t.longest_branch_tip last )
 
   let apply_all t changes =
     assert_state_valid t ;
