@@ -10,7 +10,6 @@ run_unit_tests() {
   dune runtest --verbose -j${myprocs}
 }
 
-
 run_integration_tests() {
   for test in full-test coda-peers-test coda-transitive-peers-test coda-block-production-test 'coda-shared-prefix-test -who-proposes 0' 'coda-shared-prefix-test -who-proposes 1' 'coda-shared-state-test' 'coda-restart-node-test' 'transaction-snark-profiler -check-only'; do
     echo "------------------------------------------------------------------------------------------"
@@ -19,7 +18,7 @@ run_integration_tests() {
     SECONDS=0
     echo "TESTING ${test} USING ${CODA_CONSENSUS_MECHANISM}"
     set +e
-    ./test_integration_test.sh $test 2>&1 >> test.log
+    ../scripts/test_integration_test.sh $test 2>&1 >> test.log
     OUT=$?
     echo "TESTING ${test} took ${SECONDS} seconds"
     if [ $OUT -eq 0 ];then
