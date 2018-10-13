@@ -160,6 +160,13 @@ struct
         in
         let module Main = Coda.Make (Init) () in
         let module Run = Run (Config) (Main) in
+        let banlist_dir_name = conf_temp_dir ^/ "banlist" in
+        let%bind () = Async.Unix.mkdir banlist_dir_name in
+        let%bind suspicious_dir =
+          Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
+        in
+        let%bind punished_dir = Unix.mkdtemp (banlist_dir_name ^/ "banned") in
+        let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
         let net_config =
           { Main.Inputs.Net.Config.parent_log= log
           ; gossip_net_params=
@@ -170,7 +177,8 @@ struct
               ; me=
                   ( Host_and_port.create ~host ~port:discovery_port
                   , external_port )
-              ; parent_log= log } }
+              ; parent_log= log
+              ; banlist } }
         in
         let%bind coda =
           Main.create
@@ -182,7 +190,7 @@ struct
                  (conf_temp_dir ^/ "transaction_pool")
                ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
                ~time_controller:(Main.Inputs.Time.Controller.create ())
-               ~keypair:Config.keypair ())
+               ~keypair:Config.keypair () ~banlist)
         in
         Option.iter snark_worker_config ~f:(fun config ->
             let run_snark_worker = `With_public_key config.public_key in

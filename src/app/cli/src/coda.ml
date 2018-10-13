@@ -266,6 +266,15 @@ let daemon (type ledger_proof) (module Kernel
            Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
              (fun k -> `With_public_key k )
          in
+         let banlist_dir_name = conf_dir ^/ "banlist" in
+         let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
+         let suspicious_dir = banlist_dir_name ^/ "suspicious" in
+         let punished_dir = banlist_dir_name ^/ "banned" in
+         let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
+         let%bind () = Async.Unix.mkdir ~p:() punished_dir in
+         let banlist =
+           Coda_base.Banlist.create ~suspicious_dir ~punished_dir
+         in
          let net_config =
            { Inputs.Net.Config.parent_log= log
            ; gossip_net_params=
@@ -274,7 +283,8 @@ let daemon (type ledger_proof) (module Kernel
                ; target_peer_count= 8
                ; conf_dir
                ; initial_peers
-               ; me } }
+               ; me
+               ; banlist } }
          in
          let%map coda =
            Run.create
@@ -286,7 +296,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~keypair ())
+                ~keypair () ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

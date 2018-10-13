@@ -467,7 +467,10 @@ module Make (Inputs : Inputs_intf) = struct
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Time.Controller.t
-      ; keypair: Keypair.t }
+      ; keypair: Keypair.t
+      ; banlist: Coda_base.Banlist.t
+      (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
+      }
     [@@deriving make]
   end
 
