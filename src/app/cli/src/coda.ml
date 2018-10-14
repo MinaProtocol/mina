@@ -193,14 +193,31 @@ let daemon (type ledger_proof) (module Kernel
                  []
        in
        let%bind initial_peers =
-         Deferred.List.map ~how:(`Max_concurrent_jobs 8) initial_peers_raw ~f:
-           (fun addr ->
-             let%map inet_addr =
-               Unix.Inet_addr.of_string_or_getbyname (Host_and_port.host addr)
-             in
-             Host_and_port.create
-               ~host:(Unix.Inet_addr.to_string inet_addr)
-               ~port:(Host_and_port.port addr) )
+         Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
+           initial_peers_raw ~f:(fun addr ->
+             let host = Host_and_port.host addr in
+             match%bind
+               Monitor.try_with_or_error (fun () ->
+                   Unix.Inet_addr.of_string_or_getbyname host )
+             with
+             | Ok inet_addr ->
+                 return
+                 @@ Some
+                      (Host_and_port.create
+                         ~host:(Unix.Inet_addr.to_string inet_addr)
+                         ~port:(Host_and_port.port addr))
+             | Error e ->
+                 Logger.trace log "getaddr exception: %s"
+                   (Error.to_string_mach e) ;
+                 Logger.error log "failed to look up address for %s, skipping"
+                   host ;
+                 return None )
+       in
+       let%bind () =
+         if List.length peers <> 0 && List.length initial_peers = 0 then (
+           eprintf "Error: failed to connect to any peers\n" ;
+           exit 1 )
+         else Deferred.unit
        in
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
