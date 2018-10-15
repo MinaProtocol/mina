@@ -50,10 +50,6 @@ if [ ! -f /usr/bin/patchelf ]; then
 fi
 sudo patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2  ${BUILDDIR}/usr/local/bin/coda-kademlia
 
-# Ugly hack #2 to support expected location of kademlia binary
-mkdir -p ${BUILDDIR}/app/kademlia-haskell/result/bin/
-ln -s /usr/local/bin/coda-kademlia ${BUILDDIR}/app/kademlia-haskell/result/bin/kademlia
-
 # Bash autocompletion for coda
 # NOTE: We do not list bash-completion as a required package, 
 #       but it needs to be present for this to be effective
