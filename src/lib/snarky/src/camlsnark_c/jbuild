@@ -23,7 +23,7 @@ pwd
 pushd libsnark-caml
   mkdir -p build
   pushd build
-    cmake -DMULTICORE=ON -DUSE_PT_COMPRESSION=OFF ..
+    cmake -DMULTICORE=ON -DUSE_PT_COMPRESSION=OFF -DWITH_SUPERCOP=OFF -DWITH_PROCPS=OFF ..
     make -j12
 
     mkdir _stubs_build

@@ -1,8 +1,11 @@
 add_subdirectory(gtest EXCLUDE_FROM_ALL)
 
+find_package(OpenSSL REQUIRED)
+
 if(${CURVE} STREQUAL "BN128")
   include_directories(ate-pairing/include)
   include_directories(xbyak)
+  include_directories(${OPENSSL_INCLUDE_DIR})
   add_library(
     zm
     STATIC
@@ -10,6 +13,7 @@ if(${CURVE} STREQUAL "BN128")
     ate-pairing/src/zm.cpp
     ate-pairing/src/zm2.cpp
   )
+  target_link_libraries(zm ${OPENSSL_LIBRARIES})
 endif()
 
 if("${WITH_SUPERCOP}")
