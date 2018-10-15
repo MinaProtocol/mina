@@ -40,7 +40,7 @@ There are a multitude of naming issues which plague our codebase. Some names are
 |-----------------------|------------------------------------------------------|-----------------------------|
 | `Snark_transition`    | Subset of `Full_state_transition` that is snarked         | `Provable_full_state_transition` |
 | `Internal_transition` | State transition on full states                      | `Full_state_transition`          |
-| `External_transition` | State transition on lite states; sent to other nodes | `Lite_state_transition`          |
+| `External_transition` | State transition on lite states; sent to other nodes | `State_summaryt_transition`          |
 
 ### Transactions
 
@@ -69,7 +69,7 @@ There are a multitude of naming issues which plague our codebase. Some names are
 | `Snark_worker`              | Generates `Transaction_work`s                                                      | `Snarker`             |
 | `Prover`                    | Proves `Full_state_transition`s                                                 | "                     |
 | `Verifier`                   | Verifies `Full_state_transition_snark`s                                          | "                     |
-| `Micro_client`               | A node which only tracks `Lite_state` a limited number of account balances | "                     |
+| `Micro_client`               | A node which only tracks `State_summary` a limited number of account balances | "                     |
 
 # Drawbacks
 [drawbacks]: #drawbacks
