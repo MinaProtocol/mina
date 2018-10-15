@@ -31,7 +31,7 @@ There are a multitude of naming issues which plague our codebase. Some names are
 | `Ledger_builder_aux`  | Auxillary datastructure of `Pending_account_db`            | `Work_queue`           |
 | `Blockchain_state`    | State of `Account_db` root and `Pending_account_db` root at a block          | `Account_db_state`         |
 | `Consensus_state`     | Consensus mechanism specific state at a block               | "                      |
-| `Protocol_state`      | The `Account_db_state` and `Consensus_state` at a block        | `Lite_state`           |
+| `Protocol_state`      | The `Account_db_state` and `Consensus_state` at a block        | `State_summary`           |
 | `Tip`                 | The `Protocol_state` and `Pending_account_db` at a block | `Full_state`           |
 
 ### Transitions
