@@ -1,124 +1,7 @@
 open Core_kernel
 
-module type S = sig
-  type consensus_local_state
-
-  type external_transition
-
-  type tip
-
-  type state_hash
-
-  module Transition_tree :
-    Coda_lib.Ktree_intf
-    with type elem := (external_transition, state_hash) With_hash.t
-
-  type t
-
-  val locked_tip : t -> (tip, state_hash) With_hash.t
-
-  val longest_branch_tip : t -> (tip, state_hash) With_hash.t
-
-  val ktree : t -> Transition_tree.t option
-
-  val assert_state_valid : t -> unit
-
-  module Change : sig
-    type t =
-      | Locked_tip of (tip, state_hash) With_hash.t
-      | Longest_branch_tip of (tip, state_hash) With_hash.t
-      | Ktree of Transition_tree.t
-    [@@deriving sexp]
-  end
-
-  val apply_all : t -> Change.t list -> t
-  (** Invariant: Changes must be applied to atomically result in a consistent state *)
-
-  val create :
-       consensus_local_state:consensus_local_state
-    -> (tip, state_hash) With_hash.t
-    -> t
-end
-
-module type Inputs_intf = sig
-  module Frozen_ledger_hash : sig
-    type t
-  end
-
-  module Security : sig
-    val max_depth : [`Infinity | `Finite of int]
-  end
-
-  module Ledger : sig
-    type t
-  end
-
-  module Ledger_builder : sig
-    type t
-
-    val ledger : t -> Ledger.t
-
-    val snarked_ledger :
-      t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t
-  end
-
-  module Blockchain_state : sig
-    type value [@@deriving eq]
-
-    val ledger_hash : value -> Frozen_ledger_hash.t
-  end
-
-  module Consensus_mechanism : sig
-    module Local_state : sig
-      type t
-    end
-
-    module Consensus_state : sig
-      type value
-    end
-
-    module Protocol_state : sig
-      type value
-
-      val consensus_state : value -> Consensus_state.value
-
-      val blockchain_state : value -> Blockchain_state.value
-    end
-
-    module External_transition : sig
-      type t [@@deriving compare, sexp, bin_io]
-    end
-
-    val lock_transition :
-         Consensus_state.value
-      -> Consensus_state.value
-      -> snarked_ledger:(unit -> Ledger.t Or_error.t)
-      -> local_state:Local_state.t
-      -> unit
-  end
-
-  module Tip : sig
-    type t [@@deriving sexp]
-
-    val protocol_state : t -> Consensus_mechanism.Protocol_state.value
-
-    val ledger_builder : t -> Ledger_builder.t
-  end
-
-  module State_hash : sig
-    type t [@@deriving compare, sexp, bin_io]
-  end
-
-  module Tip_ops : sig
-    val assert_materialization_of :
-         (Tip.t, State_hash.t) With_hash.t
-      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
-      -> unit
-  end
-end
-
-module Make (Inputs : Inputs_intf) :
-  S
+module Make (Inputs : Inputs.Base.S) :
+  Transition_logic_state_intf.S
   with type tip := Inputs.Tip.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type external_transition :=
@@ -127,6 +10,8 @@ module Make (Inputs : Inputs_intf) :
 struct
   open Inputs
   open Consensus_mechanism
+  module Ops = Tip_ops.Make(Inputs)
+  include Ops
 
   module Transition_tree =
     Ktree.Make (struct
@@ -201,12 +86,12 @@ struct
           match Transition_tree.longest_path ktree with
           | [] -> failwith "Impossible, paths are non-empty"
           | [x] ->
-              Tip_ops.assert_materialization_of t.locked_tip x ;
-              Tip_ops.assert_materialization_of t.longest_branch_tip x
+              assert_materialization_of t.locked_tip x ;
+              assert_materialization_of t.longest_branch_tip x
           | x :: y :: rest ->
               let last = List.last_exn (y :: rest) in
-              Tip_ops.assert_materialization_of t.locked_tip x ;
-              Tip_ops.assert_materialization_of t.longest_branch_tip last )
+              assert_materialization_of t.locked_tip x ;
+              assert_materialization_of t.longest_branch_tip last )
 
   let apply_all t changes =
     assert_state_valid t ;

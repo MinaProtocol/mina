@@ -577,44 +577,43 @@ struct
 
   module Ledger_builder_controller = struct
     module Inputs = struct
-      module Security = struct
-        let max_depth = Init.lbc_tree_max_depth
-      end
+        module Security = struct
+          let max_depth = Init.lbc_tree_max_depth
+        end
 
-      module Tip = Tip
-      module Store = Store
-      module Snark_pool = Snark_pool
+        module Tip = Tip
+        module Snark_pool = Snark_pool
 
+        module Ledger_hash = Ledger_hash
+        module Frozen_ledger_hash = Frozen_ledger_hash
+        module Ledger_proof = Transaction_snark
+        module Private_key = Private_key
+
+        module Public_key = struct
+          module Private_key = Private_key
+          include Public_key
+        end
+
+        module Keypair = Keypair
+        module Ledger_proof_statement = Ledger_proof_statement
+        module Ledger_builder_hash = Ledger_builder_hash
+        module Ledger = Ledger
+        module Ledger_builder_diff = Ledger_builder_diff
+        module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+        module Ledger_builder = Ledger_builder
+        module Blockchain_state = Blockchain_state
+        module Consensus_mechanism = Consensus_mechanism
+        module Protocol_state_proof = Protocol_state_proof
+        module State_hash = State_hash
+        module Valid_transaction = Transaction.With_valid_signature
+        module Internal_transition = Internal_transition
       module Net = struct
         type net = Net.t
 
         include Net.Ledger_builder_io
       end
-
-      module Ledger_hash = Ledger_hash
-      module Frozen_ledger_hash = Frozen_ledger_hash
-      module Ledger_proof = Transaction_snark
-      module Private_key = Private_key
-
-      module Public_key = struct
-        module Private_key = Private_key
-        include Public_key
-      end
-
-      module Keypair = Keypair
-      module Ledger_proof_statement = Ledger_proof_statement
-      module Ledger_builder_hash = Ledger_builder_hash
-      module Ledger = Ledger
-      module Ledger_builder_diff = Ledger_builder_diff
-      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-      module Ledger_builder = Ledger_builder
-      module Blockchain_state = Blockchain_state
-      module Consensus_mechanism = Consensus_mechanism
-      module Protocol_state_proof = Protocol_state_proof
-      module State_hash = State_hash
-      module Valid_transaction = Transaction.With_valid_signature
+      module Store = Store
       module Sync_ledger = Sync_ledger
-      module Internal_transition = Internal_transition
 
       let verify_blockchain proof state =
         Init.Verifier.verify_blockchain Init.verifier {proof; state}

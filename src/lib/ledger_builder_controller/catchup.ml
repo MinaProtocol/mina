@@ -1,154 +1,20 @@
 open Core_kernel
 open Async_kernel
 
-module type Inputs_intf = sig
-  module Ledger_hash : sig
-    type t [@@deriving sexp]
-  end
-
-  module Frozen_ledger_hash : sig
-    type t [@@deriving sexp]
-  end
-
-  module Ledger : sig
-    type t
-
-    val copy : t -> t
-
-    val merkle_root : t -> Ledger_hash.t
-  end
-
-  module Ledger_builder_hash : sig
-    type t [@@deriving eq, sexp]
-
-    val ledger_hash : t -> Ledger_hash.t
-  end
-
-  module Ledger_builder_aux_hash : sig
-    type t [@@deriving sexp]
-  end
-
-  module Ledger_builder_diff : sig
-    type t
-  end
-
-  module Ledger_proof : sig
-    type t
-  end
-
-  module Private_key : Protocols.Coda_pow.Private_key_intf
-
-  module Public_key :
-    Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
-
-  module Keypair :
-    Protocols.Coda_pow.Keypair_intf
-    with type public_key := Public_key.t
-     and type private_key := Private_key.t
-
-  module Ledger_builder :
-    Protocols.Coda_pow.Ledger_builder_base_intf
-    with type ledger_builder_hash := Ledger_builder_hash.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type diff := Ledger_builder_diff.t
-     and type ledger_proof := Ledger_proof.t
-     and type ledger := Ledger.t
-     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
-     and type public_key := Public_key.Compressed.t
-
-  module Protocol_state_proof : sig
-    type t
-  end
-
-  module Blockchain_state : sig
-    type value [@@deriving eq]
-
-    val ledger_hash : value -> Frozen_ledger_hash.t
-
-    val ledger_builder_hash : value -> Ledger_builder_hash.t
-  end
-
-  module Consensus_mechanism : sig
-    module Local_state : sig
-      type t
-    end
-
-    module Protocol_state : sig
-      type value
-
-      val blockchain_state : value -> Blockchain_state.value
-    end
-
-    module External_transition : sig
-      type t [@@deriving bin_io, eq, compare, sexp]
-
-      val protocol_state : t -> Protocol_state.value
-    end
-  end
-
-  module Tip :
-    Protocols.Coda_pow.Tip_intf
-    with type ledger_builder := Ledger_builder.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := Consensus_mechanism.External_transition.t
-
-  module State_hash : sig
-    type t
-  end
-
-  module Tip_ops : sig
-    val assert_materialization_of :
-         (Tip.t, State_hash.t) With_hash.t
-      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
-      -> unit
-  end
+module Make (Inputs : sig
+  include Inputs.Synchronizing.S
 
   module Transition_logic_state :
-    Transition_logic_state.S
-    with type tip := Tip.t
-     and type consensus_local_state := Consensus_mechanism.Local_state.t
-     and type external_transition := Consensus_mechanism.External_transition.t
-     and type state_hash := State_hash.t
-
-  module Sync_ledger : sig
-    type t
-
-    type answer [@@deriving bin_io]
-
-    type query [@@deriving bin_io]
-
-    val create : Ledger.t -> parent_log:Logger.t -> t
-
-    val answer_writer : t -> (Ledger_hash.t * answer) Linear_pipe.Writer.t
-
-    val query_reader : t -> (Ledger_hash.t * query) Linear_pipe.Reader.t
-
-    val destroy : t -> unit
-
-    val fetch :
-         t
-      -> Ledger_hash.t
-      -> [ `Ok of Ledger.t
-         | `Target_changed of Ledger_hash.t option * Ledger_hash.t ]
-         Deferred.t
-  end
-
-  module Net : sig
-    include Coda_lib.Ledger_builder_io_intf
-            with type sync_ledger_query := Sync_ledger.query
-             and type sync_ledger_answer := Sync_ledger.answer
-             and type ledger_builder_hash := Ledger_builder_hash.t
-             and type ledger_builder_aux := Ledger_builder.Aux.t
-             and type ledger_hash := Ledger_hash.t
-             and type protocol_state :=
-                        Consensus_mechanism.Protocol_state.value
-  end
-end
-
-module Make (Inputs : Inputs_intf) = struct
+   Transition_logic_state_intf.S
+   with type tip := Tip.t
+    and type consensus_local_state := Consensus_mechanism.Local_state.t
+    and type external_transition := Consensus_mechanism.External_transition.t
+    and type state_hash := State_hash.t
+end) = struct
   open Inputs
   open Consensus_mechanism
+  module Ops = Tip_ops.Make(Inputs)
+  open Ops
 
   let ledger_hash_of_transition t =
     External_transition.protocol_state t
@@ -236,7 +102,7 @@ module Make (Inputs : Inputs_intf) = struct
                   { With_hash.data= Tip.of_transition_and_lb transition lb
                   ; hash= transition_state_hash }
                 in
-                Tip_ops.assert_materialization_of new_tip transition_with_hash ;
+                assert_materialization_of new_tip transition_with_hash ;
                 Logger.debug log
                   !"Successfully caught up to full ledger-builder %{sexp: \
                     Ledger_builder_hash.t}"
