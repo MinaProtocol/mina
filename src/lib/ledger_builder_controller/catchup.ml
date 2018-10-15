@@ -160,6 +160,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   (* Perform the `Sync interruptible work *)
   let do_sync {net; log; sl_ref} (state: Transition_logic_state.t)
+      ~(state_mutator:
+         Transition_logic_state.Change.t list -> External_transition.t -> unit)
       transition_with_hash =
     let {With_hash.data= locked_tip; hash= _} =
       Transition_logic_state.locked_tip state
@@ -233,26 +235,29 @@ module Make (Inputs : Inputs_intf) = struct
                     Ledger_builder_hash.t}"
                   (Ledger_builder.hash lb) ;
                 let open Transition_logic_state.Change in
-                [Ktree new_tree; Locked_tip new_tip; Longest_branch_tip new_tip]
+                state_mutator
+                  [ Ktree new_tree
+                  ; Locked_tip new_tip
+                  ; Longest_branch_tip new_tip ]
+                  (With_hash.data transition_with_hash)
             | Error e ->
                 Logger.faulty_peer log
                   "Malicious aux data received from net %s"
-                  (Error.to_string_hum e) ;
-                (* TODO: Retry? see #361 *)
-                [] )
+                  (Error.to_string_hum e)
+                (* TODO: Retry? see #361 *) )
           | Error e ->
               Logger.faulty_peer log "Network failed to send aux %s"
-                (Error.to_string_hum e) ;
-              [] )
+                (Error.to_string_hum e) )
       | `Target_changed (old_target, new_target) ->
           Logger.debug log
             !"Existing sync-ledger target_changed from %{sexp: Ledger_hash.t \
               option} to %{sexp: Ledger_hash.t}"
             old_target new_target ;
-          return []
+          return ()
     in
     (work, ivar)
 
-  let sync (t: t) (state: Transition_logic_state.t) transition_with_hash =
-    Job.create transition_with_hash ~f:(do_sync t state)
+  let sync (t: t) (state: Transition_logic_state.t) ~state_mutator
+      transition_with_hash =
+    Job.create transition_with_hash ~f:(do_sync ~state_mutator t state)
 end
