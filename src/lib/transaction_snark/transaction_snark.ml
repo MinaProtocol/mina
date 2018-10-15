@@ -305,7 +305,7 @@ module Statement = struct
       ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
-    [@@deriving sexp, bin_io, hash, compare, eq]
+    [@@deriving sexp, bin_io, hash, compare, eq, fields]
 
     let option lab =
       Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
