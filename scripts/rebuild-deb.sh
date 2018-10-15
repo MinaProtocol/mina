@@ -31,7 +31,7 @@ EOF
 mkdir -p ${BUILDDIR}/usr/local/bin
 cp ./default/app/cli/src/coda.exe ${BUILDDIR}/usr/local/bin/coda
 cp ./default/app/logproc/src/logproc.exe ${BUILDDIR}/usr/local/bin/logproc
-cp ../app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/kademlia
+cp ../app/kademlia-haskell/result/bin/kademlia ${BUILDDIR}/usr/local/bin/coda-kademlia
 
 # verification keys
 if [ -d "/var/lib/coda" ]; then
@@ -48,11 +48,7 @@ fi
 if [ ! -f /usr/bin/patchelf ]; then
     sudo apt install patchelf
 fi
-sudo patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2  ${BUILDDIR}/usr/local/bin/kademlia
-
-# Ugly hack #2 to support expected location of kademlia binary
-mkdir -p ${BUILDDIR}/app/kademlia-haskell/result/bin/
-ln -s /usr/local/bin/kademlia ${BUILDDIR}/app/kademlia-haskell/result/bin/kademlia
+sudo patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2  ${BUILDDIR}/usr/local/bin/coda-kademlia
 
 # Bash autocompletion for coda
 # NOTE: We do not list bash-completion as a required package, 
