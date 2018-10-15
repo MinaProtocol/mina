@@ -2,76 +2,14 @@
 
 open Core
 open Util
+open Coda_spec
 open Snark_params.Tick
 open Snark_bits
 open Bitstring_lib
 open Tuple_lib
 open Fold_lib
 
-module type Basic = sig
-  type t = private Pedersen.Digest.t
-  [@@deriving bin_io, sexp, eq, compare, hash]
-
-  val gen : t Quickcheck.Generator.t
-
-  val to_bytes : t -> string
-
-  val length_in_triples : int
-
-  val ( = ) : t -> t -> bool
-
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
-
-      include Hashable_binable with type t := t
-    end
-  end
-
-  type var
-
-  val var_of_hash_unpacked : Pedersen.Checked.Digest.Unpacked.var -> var
-
-  val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
-
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
-  val typ : (var, t) Typ.t
-
-  val assert_equal : var -> var -> (unit, _) Checked.t
-
-  val equal_var : var -> var -> (Boolean.var, _) Checked.t
-
-  val var_of_t : t -> var
-
-  include Bits_intf.S with type t := t
-
-  include Hashable.S with type t := t
-
-  val fold : t -> bool Triple.t Fold.t
-end
-
-module type Full_size = sig
-  include Basic
-
-  val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
-
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> var
-
-  val of_hash : Pedersen.Digest.t -> t
-end
-
-module type Small = sig
-  include Basic
-
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> (var, _) Checked.t
-
-  val of_hash : Pedersen.Digest.t -> t Or_error.t
-end
-
-module Make_basic (M : sig
-  val length_in_bits : int
-end) =
+module Make_base (M : sig val length_in_bits : int end) : Hash_intf.Base.S =
 struct
   module Stable = struct
     module V1 = struct
@@ -191,8 +129,8 @@ struct
     {store; read; alloc; check}
 end
 
-module Make_full_size () = struct
-  include Make_basic (struct
+module Make_full_size () : Hash_intf.Full_size.S = struct
+  include Make_base (struct
     let length_in_bits = Field.size_in_bits
   end)
 
@@ -210,11 +148,11 @@ end
 
 module Make_small (M : sig
   val length_in_bits : int
-end) =
+end) : Hash_intf.Small.S =
 struct
   let () = assert (M.length_in_bits < Field.size_in_bits)
 
-  include Make_basic (M)
+  include Make_base (M)
   open Let_syntax
 
   let var_of_hash_packed digest =

@@ -1,16 +1,31 @@
 open Core_kernel
 open Async_kernel
 
+(* TODO: update signature in currency? *)
+module Fee = struct
+  module Unsigned = struct
+    include Currency.Fee
+
+    include (
+      Currency.Fee.Stable.V1 :
+        module type of Currency.Fee.Stable.V1 with type t := t )
+  end
+
+  module Signed = struct
+    include Currency.Fee.Signed
+
+    include (
+      Currency.Fee.Signed.Stable.V1 :
+        module type of Currency.Fee.Signed.Stable.V1
+        with type t := t
+         and type ('a, 'b) t_ := ('a, 'b) t_ )
+  end
+end
+
 module type Security_intf = sig
   val max_depth : [`Infinity | `Finite of int]
   (** In production we set this to (hopefully a prefix of) k for our consensus
    * mechanism; infinite is for tests *)
-end
-
-module type Time_controller_intf = sig
-  type t
-
-  val create : unit -> t
 end
 
 module type Sok_message_intf = sig
@@ -23,66 +38,6 @@ module type Sok_message_intf = sig
   type t
 
   val create : fee:Currency.Fee.t -> prover:public_key_compressed -> t
-end
-
-module type Time_intf = sig
-  module Stable : sig
-    module V1 : sig
-      type t [@@deriving sexp, bin_io]
-    end
-  end
-
-  module Controller : Time_controller_intf
-
-  type t [@@deriving sexp]
-
-  type t0 = t
-
-  module Span : sig
-    type t
-
-    val of_time_span : Core_kernel.Time.Span.t -> t
-
-    val to_ms : t -> Int64.t
-
-    val of_ms : Int64.t -> t
-
-    val ( < ) : t -> t -> bool
-
-    val ( > ) : t -> t -> bool
-
-    val ( >= ) : t -> t -> bool
-
-    val ( <= ) : t -> t -> bool
-
-    val ( = ) : t -> t -> bool
-  end
-
-  module Timeout : sig
-    type 'a t
-
-    val create : Controller.t -> Span.t -> f:(t0 -> 'a) -> 'a t
-
-    val to_deferred : 'a t -> 'a Deferred.t
-
-    val peek : 'a t -> 'a option
-
-    val cancel : Controller.t -> 'a t -> 'a -> unit
-  end
-
-  val to_span_since_epoch : t -> Span.t
-
-  val of_span_since_epoch : Span.t -> t
-
-  val diff : t -> t -> Span.t
-
-  val sub : t -> Span.t -> t
-
-  val add : t -> Span.t -> t
-
-  val modulus : t -> Span.t -> Span.t
-
-  val now : Controller.t -> t
 end
 
 module type Ledger_hash_intf = sig
@@ -157,130 +112,12 @@ module type Ledger_intf = sig
   val undo : t -> Undo.t -> unit Or_error.t
 end
 
-module Fee = struct
-  module Unsigned = struct
-    include Currency.Fee
-
-    include (
-      Currency.Fee.Stable.V1 :
-        module type of Currency.Fee.Stable.V1 with type t := t )
-  end
-
-  module Signed = struct
-    include Currency.Fee.Signed
-
-    include (
-      Currency.Fee.Signed.Stable.V1 :
-        module type of Currency.Fee.Signed.Stable.V1
-        with type t := t
-         and type ('a, 'b) t_ := ('a, 'b) t_ )
-  end
-end
-
 module type Snark_pool_proof_intf = sig
   module Statement : sig
     type t [@@deriving sexp, bin_io]
   end
 
   type t [@@deriving sexp, bin_io]
-end
-
-module type Transaction_intf = sig
-  type t [@@deriving sexp, compare, eq, bin_io]
-
-  type public_key
-
-  module With_valid_signature : sig
-    type nonrec t = private t [@@deriving sexp, compare, eq]
-  end
-
-  val check : t -> With_valid_signature.t option
-
-  val fee : t -> Fee.Unsigned.t
-
-  val sender : t -> public_key
-
-  val receiver : t -> public_key
-end
-
-module type Private_key_intf = sig
-  type t
-end
-
-module type Compressed_public_key_intf = sig
-  type t [@@deriving sexp, bin_io, compare]
-
-  include Comparable.S with type t := t
-end
-
-module type Public_key_intf = sig
-  module Private_key : Private_key_intf
-
-  type t [@@deriving sexp]
-
-  module Compressed : Compressed_public_key_intf
-
-  val of_private_key_exn : Private_key.t -> t
-
-  val compress : t -> Compressed.t
-end
-
-module type Keypair_intf = sig
-  type private_key
-
-  type public_key
-
-  type t = {public_key: public_key; private_key: private_key}
-end
-
-module type Fee_transfer_intf = sig
-  type t [@@deriving sexp, compare, eq]
-
-  type public_key
-
-  type single = public_key * Fee.Unsigned.t
-
-  val of_single : public_key * Fee.Unsigned.t -> t
-
-  val of_single_list : (public_key * Fee.Unsigned.t) list -> t list
-
-  val receivers : t -> public_key list
-end
-
-module type Coinbase_intf = sig
-  type public_key
-
-  type fee_transfer
-
-  type t = private
-    { proposer: public_key
-    ; amount: Currency.Amount.t
-    ; fee_transfer: fee_transfer option }
-  [@@deriving sexp, bin_io, compare, eq]
-
-  val create :
-       amount:Currency.Amount.t
-    -> proposer:public_key
-    -> fee_transfer:fee_transfer option
-    -> t Or_error.t
-end
-
-module type Super_transaction_intf = sig
-  type valid_transaction
-
-  type fee_transfer
-
-  type coinbase
-
-  type t =
-    | Transaction of valid_transaction
-    | Fee_transfer of fee_transfer
-    | Coinbase of coinbase
-  [@@deriving sexp, compare, eq, bin_io]
-
-  val fee_excess : t -> Fee.Signed.t Or_error.t
-
-  val supply_increase : t -> Currency.Amount.t Or_error.t
 end
 
 module type Ledger_proof_statement_intf = sig
@@ -802,38 +639,31 @@ module Proof_carrying_data = struct
 end
 
 module type Inputs_intf = sig
-  module Time : Time_intf
+  module Private_key : Coda_spec.Signature_intf.Private_key.S
 
-  module Private_key : Private_key_intf
+  module Public_key : Coda_spec.Signature_intf.Public_key.S
+    with module Private_key = Private_key
 
-  module Compressed_public_key : Compressed_public_key_intf
+  module Keypair : Coda_spec.Signature_intf.Keypair.S
+    with module Private_key = Private_key
+     and module Public_key = Public_key
 
-  module Public_key :
-    Public_key_intf
-    with module Private_key := Private_key
-     and module Compressed = Compressed_public_key
+  module Payment : Coda_spec.Transaction_intf.Payment.S
+    with module Public_key = Public_key
 
-  module Keypair :
-    Keypair_intf
-    with type private_key := Private_key.t
-     and type public_key := Public_key.t
+  module Fee_transfer : Coda_spec.Transaction_intf.Fee_transfer.S
+    with module Public_key = Public_key
 
-  module Transaction :
-    Transaction_intf with type public_key := Public_key.Compressed.t
+  module Coinbase : Coda_spec.Transaction_intf.Coinbase.S
+    with module Public_key = Public_key
+     and module Fee_transfer = Fee_transfer
 
-  module Fee_transfer :
-    Fee_transfer_intf with type public_key := Public_key.Compressed.t
+  module Transaction : Coda_spec.Transaction_intf.S
+    with module Valid_payment = Payment.With_valid_signature
+     and module Fee_transfer = Fee_transfer
+     and module Coinbase = Coinbase
 
-  module Coinbase :
-    Coinbase_intf
-    with type public_key := Public_key.Compressed.t
-     and type fee_transfer := Fee_transfer.single
-
-  module Super_transaction :
-    Super_transaction_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
-     and type fee_transfer := Fee_transfer.t
-     and type coinbase := Coinbase.t
+  module Time : Coda_spec.Time_intf.S
 
   module Ledger_hash : Ledger_hash_intf
 
@@ -868,7 +698,7 @@ module type Inputs_intf = sig
 
   module Ledger :
     Ledger_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
+    with type valid_transaction := Payment.With_valid_signature.t
      and type super_transaction := Super_transaction.t
      and type ledger_hash := Ledger_hash.t
 

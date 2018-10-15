@@ -1,7 +1,8 @@
 open Core_kernel
+open Coda_spec
+open Coda_numbers
 open Tuple_lib
 open Fold_lib
-open Coda_numbers
 
 module type S = sig
   module Local_state : sig
@@ -18,27 +19,7 @@ module type S = sig
     val genesis : value
   end
 
-  module Consensus_state : sig
-    type value [@@deriving hash, eq, compare, bin_io, sexp]
-
-    include Snark_params.Tick.Snarkable.S with type value := value
-
-    val genesis : value
-
-    val length_in_triples : int
-
-    val var_to_triples :
-         var
-      -> ( Snark_params.Tick.Boolean.var Triple.t list
-         , _ )
-         Snark_params.Tick.Checked.t
-
-    val fold : value -> bool Triple.t Fold.t
-
-    val length : value -> Length.t
-
-    val to_lite : (value -> Lite_base.Consensus_state.t) option
-  end
+  module Consensus_state : State_intf.Consensus.S
 
   module Protocol_state :
     Coda_base.Protocol_state.S with module Consensus_state = Consensus_state

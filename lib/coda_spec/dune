@@ -1,0 +1,12 @@
+(library
+  (public_name coda_spec)
+  (name coda_spec)
+  (libraries
+    core_kernel
+    fold_lib
+    tuple_lib
+    currency
+    coda_numbers
+    snark_params
+    snark_bits
+    lite_base))

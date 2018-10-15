@@ -2,83 +2,20 @@
 "../../../../config.mlh"]
 
 open Core_kernel
+open Coda_spec
+open Coda_numbers
 open Snark_params.Tick
 open Tuple_lib
 open Fold_lib
-open Coda_numbers
 
-module type Consensus_state_intf = sig
-  type value [@@deriving hash, compare, bin_io, sexp]
-
-  include Snarkable.S with type value := value
-
-  val equal_value : value -> value -> bool
-
-  val compare_value : value -> value -> int
-
-  val genesis : value
-
-  val length_in_triples : int
-
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
-  val fold : value -> bool Triple.t Fold.t
-
-  val length : value -> Length.t
-  (** For status *)
-
-  val to_lite : (value -> Lite_base.Consensus_state.t) option
-end
-
-module type S = sig
-  module Consensus_state : Consensus_state_intf
-
-  type ('a, 'b, 'c) t [@@deriving bin_io, sexp]
-
-  type value =
-    (State_hash.Stable.V1.t, Blockchain_state.value, Consensus_state.value) t
-  [@@deriving bin_io, sexp]
-
-  type var = (State_hash.var, Blockchain_state.var, Consensus_state.var) t
-
-  include Snarkable.S with type value := value and type var := var
-
-  include Hashable.S with type t := value
-
-  val equal_value : value -> value -> bool
-
-  val compare_value : value -> value -> int
-
-  val create_value :
-       previous_state_hash:State_hash.Stable.V1.t
-    -> blockchain_state:Blockchain_state.t
-    -> consensus_state:Consensus_state.value
-    -> value
-
-  val create_var :
-       previous_state_hash:State_hash.var
-    -> blockchain_state:Blockchain_state.var
-    -> consensus_state:Consensus_state.var
-    -> var
-
-  val previous_state_hash : ('a, _, _) t -> 'a
-
-  val blockchain_state : (_, 'a, _) t -> 'a
-
-  val consensus_state : (_, _, 'a) t -> 'a
-
-  val negative_one : value
-
-  val length_in_triples : int
-
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
-  val hash : value -> State_hash.Stable.V1.t
-end
-
-module Make (Consensus_state : Consensus_state_intf) :
-  S with module Consensus_state = Consensus_state =
+module Make (Consensus_state : State_intf.Consensus.S) :
+  State_intf.Protocol.S
+  with module Hash = State_hash
+   and module Blockchain_state = Blockchain_state
+   and module Consensus_state = Consensus_state =
 struct
+  module Hash = State_hash
+  module Blockchain_state = Blockchain_state
   module Consensus_state = Consensus_state
 
   type ('state_hash, 'blockchain_state, 'consensus_state) t =
