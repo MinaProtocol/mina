@@ -86,7 +86,7 @@ struct
   open Inputs
   open Consensus_mechanism
   open Transition_logic_state
-  module Ops = Tip_ops.Make(Inputs)
+  module Ops = Tip_ops.Make (Inputs)
   open Ops
 
   let transition_is_parent_of ~child:{With_hash.data= child; hash= _}
@@ -359,9 +359,7 @@ struct
           External_transition.protocol_state
             (With_hash.data transition_with_hash)
         in
-        if
-          is_parent_of ~child:transition_with_hash
-            ~parent:longest_branch_tip
+        if is_parent_of ~child:transition_with_hash ~parent:longest_branch_tip
         then (
           (* Bootstrap from genesis *)
           let tree = Transition_tree.singleton transition_with_hash in

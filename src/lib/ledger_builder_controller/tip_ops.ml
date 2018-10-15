@@ -62,4 +62,3 @@ module Make (Inputs : Inputs.Base.S) = struct
       {With_hash.data= _; hash= transition_hash} =
     State_hash.equal transition_hash tip_hash
 end
-

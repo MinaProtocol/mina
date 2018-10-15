@@ -10,7 +10,7 @@ module Make (Inputs : Inputs.Base.S) :
 struct
   open Inputs
   open Consensus_mechanism
-  module Ops = Tip_ops.Make(Inputs)
+  module Ops = Tip_ops.Make (Inputs)
   include Ops
 
   module Transition_tree =

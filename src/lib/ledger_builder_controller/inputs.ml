@@ -3,161 +3,162 @@ open Async_kernel
 
 module Base = struct
   module type S = sig
+    module Security : Protocols.Coda_pow.Security_intf
 
-  module Security : Protocols.Coda_pow.Security_intf
+    module Private_key : Protocols.Coda_pow.Private_key_intf
 
-  module Private_key : Protocols.Coda_pow.Private_key_intf
+    module Public_key :
+      Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
 
-  module Public_key :
-    Protocols.Coda_pow.Public_key_intf with module Private_key = Private_key
+    module Keypair :
+      Protocols.Coda_pow.Keypair_intf
+      with type public_key := Public_key.t
+       and type private_key := Private_key.t
 
-  module Keypair :
-    Protocols.Coda_pow.Keypair_intf
-    with type public_key := Public_key.t
-     and type private_key := Private_key.t
+    module State_hash : sig
+      type t [@@deriving eq, sexp, compare, bin_io]
 
-  module State_hash : sig
-    type t [@@deriving eq, sexp, compare, bin_io]
+      val to_bits : t -> bool list
+    end
 
-    val to_bits : t -> bool list
-  end
+    module Ledger_hash : sig
+      type t [@@deriving eq, bin_io, sexp, eq]
+    end
 
-  module Ledger_hash : sig
-    type t [@@deriving eq, bin_io, sexp, eq]
-  end
+    module Frozen_ledger_hash : sig
+      type t [@@deriving eq, bin_io, sexp, eq]
+    end
 
-  module Frozen_ledger_hash : sig
-    type t [@@deriving eq, bin_io, sexp, eq]
-  end
+    module Ledger_builder_hash : sig
+      type t [@@deriving eq, sexp, compare]
 
-  module Ledger_builder_hash : sig
-    type t [@@deriving eq, sexp, compare]
+      val ledger_hash : t -> Ledger_hash.t
+    end
 
-    val ledger_hash : t -> Ledger_hash.t
-  end
+    module Ledger_builder_diff : sig
+      type t [@@deriving sexp, bin_io]
+    end
 
-  module Ledger_builder_diff : sig
-    type t [@@deriving sexp, bin_io]
-  end
+    module Internal_transition : sig
+      type t [@@deriving sexp]
+    end
 
-  module Internal_transition : sig
-    type t [@@deriving sexp]
-  end
+    module Ledger : sig
+      type t
 
-  module Ledger : sig
-    type t
+      val copy : t -> t
 
-    val copy : t -> t
+      val merkle_root : t -> Ledger_hash.t
+    end
 
-    val merkle_root : t -> Ledger_hash.t
-  end
+    module Ledger_builder_aux_hash : sig
+      type t [@@deriving sexp]
+    end
 
-  module Ledger_builder_aux_hash : sig
-    type t [@@deriving sexp]
-  end
-
-  module Protocol_state_proof : sig
-    type t
-  end
-
-  module Blockchain_state : sig
-    type value [@@deriving eq]
-
-    val ledger_hash : value -> Frozen_ledger_hash.t
-
-    val ledger_builder_hash : value -> Ledger_builder_hash.t
-  end
-
-  module Consensus_mechanism : sig
-    module Local_state : sig
+    module Protocol_state_proof : sig
       type t
     end
 
-    module Consensus_state : sig
-      type value
+    module Blockchain_state : sig
+      type value [@@deriving eq]
+
+      val ledger_hash : value -> Frozen_ledger_hash.t
+
+      val ledger_builder_hash : value -> Ledger_builder_hash.t
     end
 
-    module Protocol_state : sig
-      type value [@@deriving sexp]
+    module Consensus_mechanism : sig
+      module Local_state : sig
+        type t
+      end
 
-      val create_value :
-           previous_state_hash:State_hash.t
-        -> blockchain_state:Blockchain_state.value
-        -> consensus_state:Consensus_state.value
-        -> value
+      module Consensus_state : sig
+        type value
+      end
 
-      val previous_state_hash : value -> State_hash.t
+      module Protocol_state : sig
+        type value [@@deriving sexp]
 
-      val blockchain_state : value -> Blockchain_state.value
+        val create_value :
+             previous_state_hash:State_hash.t
+          -> blockchain_state:Blockchain_state.value
+          -> consensus_state:Consensus_state.value
+          -> value
 
-      val consensus_state : value -> Consensus_state.value
+        val previous_state_hash : value -> State_hash.t
 
-      val equal_value : value -> value -> bool
+        val blockchain_state : value -> Blockchain_state.value
 
-      val hash : value -> State_hash.t
+        val consensus_state : value -> Consensus_state.value
+
+        val equal_value : value -> value -> bool
+
+        val hash : value -> State_hash.t
+      end
+
+      module External_transition : sig
+        type t [@@deriving bin_io, eq, compare, sexp]
+
+        val protocol_state : t -> Protocol_state.value
+
+        val protocol_state_proof : t -> Protocol_state_proof.t
+
+        val ledger_builder_diff : t -> Ledger_builder_diff.t
+      end
+
+      (* This checks the SNARKs in State/LB and does the transition *)
+
+      val select :
+           Consensus_state.value
+        -> Consensus_state.value
+        -> logger:Logger.t
+        -> time_received:Unix_timestamp.t
+        -> [`Keep | `Take]
+
+      val lock_transition :
+           Consensus_state.value
+        -> Consensus_state.value
+        -> snarked_ledger:(unit -> Ledger.t Or_error.t)
+        -> local_state:Local_state.t
+        -> unit
     end
 
-    module External_transition : sig
-      type t [@@deriving bin_io, eq, compare, sexp]
+    module Ledger_proof_statement : sig
+      type t
 
-      val protocol_state : t -> Protocol_state.value
-
-      val protocol_state_proof : t -> Protocol_state_proof.t
-
-      val ledger_builder_diff : t -> Ledger_builder_diff.t
+      val target : t -> Frozen_ledger_hash.t
     end
 
-    (* This checks the SNARKs in State/LB and does the transition *)
+    module Ledger_proof : sig
+      type t
 
-    val select :
-         Consensus_state.value
-      -> Consensus_state.value
-      -> logger:Logger.t
-      -> time_received:Unix_timestamp.t
-      -> [`Keep | `Take]
+      val statement : t -> Ledger_proof_statement.t
+    end
 
-    val lock_transition :
-         Consensus_state.value
-      -> Consensus_state.value
-      -> snarked_ledger:(unit -> Ledger.t Or_error.t)
-      -> local_state:Local_state.t
-      -> unit
-  end
+    module Ledger_builder :
+      Protocols.Coda_pow.Ledger_builder_base_intf
+      with type ledger_builder_hash := Ledger_builder_hash.t
+       and type frozen_ledger_hash := Frozen_ledger_hash.t
+       and type diff := Ledger_builder_diff.t
+       and type ledger_proof := Ledger_proof.t
+       and type ledger := Ledger.t
+       and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
+       and type public_key := Public_key.Compressed.t
 
-  module Ledger_proof_statement : sig
-    type t
-
-    val target : t -> Frozen_ledger_hash.t
-  end
-
-  module Ledger_proof : sig
-    type t
-
-    val statement : t -> Ledger_proof_statement.t
-  end
-
-  module Ledger_builder :
-    Protocols.Coda_pow.Ledger_builder_base_intf
-    with type ledger_builder_hash := Ledger_builder_hash.t
-     and type frozen_ledger_hash := Frozen_ledger_hash.t
-     and type diff := Ledger_builder_diff.t
-     and type ledger_proof := Ledger_proof.t
-     and type ledger := Ledger.t
-     and type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
-     and type public_key := Public_key.Compressed.t
-
-  module Tip :
-    Protocols.Coda_pow.Tip_intf
-    with type ledger_builder := Ledger_builder.t
-     and type protocol_state := Consensus_mechanism.Protocol_state.value
-     and type protocol_state_proof := Protocol_state_proof.t
-     and type external_transition := Consensus_mechanism.External_transition.t
+    module Tip :
+      Protocols.Coda_pow.Tip_intf
+      with type ledger_builder := Ledger_builder.t
+       and type protocol_state := Consensus_mechanism.Protocol_state.value
+       and type protocol_state_proof := Protocol_state_proof.t
+       and type external_transition :=
+                  Consensus_mechanism.External_transition.t
   end
 end
 
 module Synchronizing = struct
   module type S = sig
     include Base.S
+
     module Sync_ledger : sig
       type t
 
@@ -212,4 +213,3 @@ module type S = sig
     -> Consensus_mechanism.Protocol_state.value
     -> bool Deferred.Or_error.t
 end
-

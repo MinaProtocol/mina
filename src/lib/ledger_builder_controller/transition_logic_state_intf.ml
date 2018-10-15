@@ -37,4 +37,3 @@ module type S = sig
     -> (tip, state_hash) With_hash.t
     -> t
 end
-

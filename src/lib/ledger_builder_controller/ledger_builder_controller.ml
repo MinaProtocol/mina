@@ -3,6 +3,7 @@ open Async_kernel
 
 module Make (Inputs : Inputs.S) : sig
   open Inputs
+
   include Coda_lib.Ledger_builder_controller_intf
           with type ledger_builder := Ledger_builder.t
            and type ledger_builder_hash := Ledger_builder_hash.t
@@ -10,15 +11,13 @@ module Make (Inputs : Inputs.S) : sig
            and type ledger := Ledger.t
            and type ledger_proof := Ledger_proof.t
            and type net := Net.net
-           and type protocol_state :=
-                      Consensus_mechanism.Protocol_state.value
+           and type protocol_state := Consensus_mechanism.Protocol_state.value
            and type ledger_hash := Ledger_hash.t
            and type sync_query := Sync_ledger.query
            and type sync_answer := Sync_ledger.answer
            and type external_transition :=
                       Consensus_mechanism.External_transition.t
-           and type consensus_local_state :=
-                      Consensus_mechanism.Local_state.t
+           and type consensus_local_state := Consensus_mechanism.Local_state.t
            and type tip := Tip.t
            and type keypair := Keypair.t
 
@@ -662,8 +661,7 @@ let%test_module "test" =
           ~genesis_tip:
             { protocol_state= Consensus_mechanism.Protocol_state.genesis
             ; proof= ()
-            ; ledger_builder= Ledger_builder.create ~ledger:0 ~self:()
-            }
+            ; ledger_builder= Ledger_builder.create ~ledger:0 ~self:() }
           ~longest_tip_location ~consensus_local_state:()
           ~keypair:{Keypair.public_key= (); private_key= ()}
 

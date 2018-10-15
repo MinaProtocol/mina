@@ -5,15 +5,16 @@ module Make (Inputs : sig
   include Inputs.Synchronizing.S
 
   module Transition_logic_state :
-   Transition_logic_state_intf.S
-   with type tip := Tip.t
-    and type consensus_local_state := Consensus_mechanism.Local_state.t
-    and type external_transition := Consensus_mechanism.External_transition.t
-    and type state_hash := State_hash.t
-end) = struct
+    Transition_logic_state_intf.S
+    with type tip := Tip.t
+     and type consensus_local_state := Consensus_mechanism.Local_state.t
+     and type external_transition := Consensus_mechanism.External_transition.t
+     and type state_hash := State_hash.t
+end) =
+struct
   open Inputs
   open Consensus_mechanism
-  module Ops = Tip_ops.Make(Inputs)
+  module Ops = Tip_ops.Make (Inputs)
   open Ops
 
   let ledger_hash_of_transition t =
