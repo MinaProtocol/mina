@@ -19,6 +19,9 @@ jobs:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
+                name: rm snark_params
+                command: rm -rf src/_build/default/lib/snark_params
+            - run:
                 name: Build Website -- make web
                 command: make web
             - run:
