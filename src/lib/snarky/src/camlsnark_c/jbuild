@@ -24,7 +24,7 @@ pushd libsnark-caml
   mkdir -p build
   pushd build
     cmake -DMULTICORE=ON -DUSE_PT_COMPRESSION=OFF ..
-    make -j12
+    make -j$(nproc)
 
     mkdir _stubs_build
 
