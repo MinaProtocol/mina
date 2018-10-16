@@ -220,7 +220,7 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
   let dn = Filename.dirname path in
   let%bind parent_exists =
     match%bind
-      Monitor.try_with (fun () ->
+      Monitor.try_with ~extract_exn:true (fun () ->
           let%bind stat = Unix.stat dn in
           if stat.kind <> `Directory then (
             eprintf
