@@ -64,6 +64,14 @@ export PATH=path/to/coda/scripts:$PATH
 * Start a build (go stretch your arms)\
 `make dev`
 
+## Docker Image Family Tree
+
+Container Stages:
+* [ocaml/ocaml:debian-stable](https://hub.docker.com/r/ocaml/ocaml/) (community image, ~856MB) 
+* ocaml407 (built by us, stored in gcr, ~1.7GB)
+* ocaml-base (built by us, stored in gcr, ~7.1GB -- external dependencies and haskell)
+* nanotest (built with `make docker`, used with `make dev`, ~7.8GB)
+
 ### Customizing your dev environment for autocomplete/merlin
 
 * If you use vim, add this snippet in your vimrc to use merlin.\
@@ -123,6 +131,24 @@ with `dune`, so you need to add them manually:
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles.
+
+## Common dune tasks
+
+To run unit tests for a single library, do `dune runtest lib/$LIBNAME`.
+
+You can use `dune exec coda` to build and run `coda`. This is especially useful
+in the form of `dune exec coda -- integration-tests $SOME_TEST`.
+
+You might see a build error like this:
+
+```
+Error: Files external/digestif/src-c/.digestif_c.objs/digestif.cmx
+       and external/digestif/src-c/.digestif_c.objs/rakia.cmx
+       make inconsistent assumptions over implementation Rakia
+```
+
+You can work around it with `rm -r _build/default/src/$OFFENDING_PATH` and a rebuild.
+Here, the offending path is `external/digestif/src-c/.diestif_c.objs`.
 
 ## Docker Image Family Tree
 
