@@ -23,8 +23,7 @@ What should have happened instead of the bug?
 
 **Output of `coda -version`**: Fill this in!
 
-**Log file**: Upload `debug.log` to https://gist.github.com/ and link here.
-[Need help finding the log file?](link to help).
+**Log file**: Upload `debug.log` (`coda client log-location` tells you where it is) to https://gist.github.com/ and link here.
 
 **Additional context**: any other notes? is this related to other issues? did
 anyone in Discord have anything to add?
