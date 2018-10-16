@@ -8,6 +8,7 @@ A good pull request:
 
 ## OCaml things
 
+- Are the [style guidelines](style_guidelines.md) being followed?
 - Do the signatures make sense? Are they minimal and reusable?
 - Does anything need to be functored over?
 - Are there any error cases that aren't handled correctly?

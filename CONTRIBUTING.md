@@ -13,7 +13,8 @@ template](.github/ISSUE_TEMPLATES/bug_report.md).
 All bugs need to be reproduced before they can be fixed. Anyone can try and
 reproduce a bug! If you have trouble reproducing a bug, please comment with what
 you tried. If it doesn't reproduce using exactly the steps in the issue report,
-please write a comment describing your new steps to reproduce.
+please write a comment describing your new steps to reproduce, or what environment
+setup you had to do to reproduce.
 
 Maintainers should label bug reports with `bug`, and any other relevant labels.
 
@@ -34,32 +35,26 @@ be reformatted, builds Coda in its various configurations, and runs all the
 tests.
 
 All pull requests must get _code reviewed_. Anyone can do a code review! Check
-out the [code review guide](CODE_REVIEW.md) for what to look for. Just leave
+out the [code review guide](docs/code_review.md) for what to look for. Just leave
 comments on the "Files changed" view.
 
-All pull requests must be approved by at least 2 maintainers.
+All pull requests must be approved by at least one member of the "core eng"
+team on github.
 
 Maintainers should assign reviewers to pull requests, and tag them with any
 relevant labels.
 
-## Maintainership
-
-The maintainers are the people responsible for making sure the project runs
-smoothly and that the software is held to a high standard of quality.
-Responsibilities include code review, issue management, etc. You could be a
-maintainer someday! We haven't decided how to handle this yet, but in general
-maintainers will already have an established history of being generally helpful,
-whether that comes to issue triage and followup, code reviews, bug fixes,
-documentation changes, etc.
-
 ## Documentation
 
-There are two main pieces of Coda documentation:
+There are three main pieces of Coda documentation:
 
-1. The `docs` directory, which has prose documentation of various sorts. This
+1. The [`docs`](docs/) directory, which has prose documentation of various sorts. This
    doesn't exist yet, but it should by the time this repo is made public!
-2. Inline code comments. There are very few of these, and we don't run ocamldoc
-   anyway.
+2. The `README.md` files in various directories. These explain the contents of that
+   directory at a high level: the purpose of the library, design constraints, anything else
+   specific to that directory.
+3. Inline code comments. There are very few of these, and we don't currently run ocamldoc
+   so they won't be exposed even as we write them. This should change eventually.
 
 Changes to the software should come with changes to the documentation.
 
@@ -70,8 +65,25 @@ how we work together, or the protocol. To make an RFC, just copy the
 `0000-template.md` to `0000-shortname.md` and fill it out! Then, open a pull
 request where the title starts with `[RFC]`. The idea is that we can discuss the
 RFC and come to consensus on what to do. Not all RFCs are merged, only the ones
-that we agree to implement. There is very little formal process around this
-right now.
+that we agree to implement.
+
+This process isn't final, but in general:
+
+1. RFCs will be open for at least a week for discussion.
+2. Once discussion has slowed down or there is consensus, the core eng team 
+   will initiate a "Final Comment Period". This will include the core eng's
+   "merge disposition" (merge/don't merge). The FCP comment should be based
+   on information and arguments already present in the RFC thread. At the 
+   end of the FCP, the core eng team decides to do another FCP, leave the FCP
+   state for continued discussion, or resolve the RFC by merging/closing
+   (whichever the announced disposition was).
+
+RFCs do not have to come with an implementation, and the RFC author isn't
+required to implement the PR.
+
+RFCs generally describe the design of a feature. As the code corresponding to
+the RFC changes, the RFC should be updated to reflect the current state of the
+code.
 
 This is loosely inspired by the Rust RFC process, Python PEPs, and IETF RFCs.
 
