@@ -468,26 +468,58 @@ module type Ledger_builder_transition_intf = sig
   val forget : With_valid_signatures_and_proofs.t -> t
 end
 
-module type Ledger_builder_intf = sig
+module type Ledger_builder_base_intf = sig
   type t [@@deriving sexp, bin_io]
 
   type diff
-
-  type valid_diff
 
   type ledger_builder_aux_hash
 
   type ledger_builder_hash
 
-  type ledger_hash
-
   type frozen_ledger_hash
+
+  type ledger_proof
 
   type public_key
 
   type ledger
 
-  type ledger_proof
+  module Aux : sig
+    type t [@@deriving bin_io]
+
+    val hash : t -> ledger_builder_aux_hash
+  end
+
+  val ledger : t -> ledger
+
+  val create : ledger:ledger -> self:public_key -> t
+
+  val of_aux_and_ledger :
+       snarked_ledger_hash:frozen_ledger_hash
+    -> public_key:public_key
+    -> ledger:ledger
+    -> aux:Aux.t
+    -> t Or_error.t
+
+  val copy : t -> t
+
+  val hash : t -> ledger_builder_hash
+
+  val aux : t -> Aux.t
+
+  val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
+
+  val snarked_ledger :
+    t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
+end
+
+module type Ledger_builder_intf = sig
+  include Ledger_builder_base_intf
+
+  type valid_diff
+
+  type ledger_hash
 
   type super_transaction
 
@@ -503,17 +535,9 @@ module type Ledger_builder_intf = sig
 
   type completed_work
 
-  val copy : t -> t
-
-  val hash : t -> ledger_builder_hash
-
   val ledger : t -> ledger
 
-  val create : ledger:ledger -> self:public_key -> t
-
   val current_ledger_proof : t -> ledger_proof option
-
-  val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
 
   (* This should memoize the snark verifications *)
 
@@ -525,21 +549,6 @@ module type Ledger_builder_intf = sig
     -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
        * [`Ledger_proof of (ledger_proof * ledger_proof_statement) option]
-
-  module Aux : sig
-    type t [@@deriving bin_io]
-
-    val hash : t -> ledger_builder_aux_hash
-  end
-
-  val aux : t -> Aux.t
-
-  val of_aux_and_ledger :
-       snarked_ledger_hash:frozen_ledger_hash
-    -> public_key:public_key
-    -> ledger:ledger
-    -> aux:Aux.t
-    -> t Or_error.t
 
   module Coordinator : sig
     module State : sig
@@ -562,9 +571,6 @@ module type Ledger_builder_intf = sig
   end
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
-
-  val snarked_ledger :
-    t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
 end
 
 module type Tip_intf = sig
@@ -583,6 +589,8 @@ module type Tip_intf = sig
   [@@deriving sexp, bin_io, fields]
 
   val of_transition_and_lb : external_transition -> ledger_builder -> t
+
+  val copy : t -> t
 end
 
 module type Blockchain_state_intf = sig

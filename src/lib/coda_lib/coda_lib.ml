@@ -188,6 +188,8 @@ module type Ledger_builder_controller_intf = sig
 
   type ledger_hash
 
+  type keypair
+
   module Config : sig
     type t =
       { parent_log: Logger.t
@@ -196,7 +198,8 @@ module type Ledger_builder_controller_intf = sig
           (external_transition * Unix_timestamp.t) Linear_pipe.Reader.t
       ; genesis_tip: tip
       ; consensus_local_state: consensus_local_state
-      ; longest_tip_location: string }
+      ; longest_tip_location: string
+      ; keypair: keypair }
     [@@deriving make]
   end
 
@@ -373,6 +376,7 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
      and type ledger_proof := Ledger_proof.t
      and type tip := Tip.t
+     and type keypair := Keypair.t
 
   module Proposer :
     Proposer_intf
@@ -492,7 +496,8 @@ module Make (Inputs : Inputs_intf) = struct
              ; proof= Genesis.proof }
            ~consensus_local_state
            ~longest_tip_location:config.ledger_builder_persistant_location
-           ~external_transitions:external_transitions_reader)
+           ~external_transitions:external_transitions_reader
+           ~keypair:config.keypair)
     in
     let%bind net =
       Net.create config.net_config
