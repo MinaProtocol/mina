@@ -161,8 +161,10 @@ module Make (Inputs : Inputs_intf) = struct
   (* Perform the `Sync interruptible work *)
   let do_sync {net; log; sl_ref} (state: Transition_logic_state.t)
       ~(state_mutator:
-         Transition_logic_state.Change.t list -> External_transition.t -> unit)
-      transition_with_hash =
+            Transition_logic_state.t
+         -> Transition_logic_state.Change.t list
+         -> External_transition.t
+         -> unit) transition_with_hash =
     let {With_hash.data= locked_tip; hash= _} =
       Transition_logic_state.locked_tip state
     in
@@ -235,7 +237,7 @@ module Make (Inputs : Inputs_intf) = struct
                     Ledger_builder_hash.t}"
                   (Ledger_builder.hash lb) ;
                 let open Transition_logic_state.Change in
-                state_mutator
+                state_mutator state
                   [ Ktree new_tree
                   ; Locked_tip new_tip
                   ; Longest_branch_tip new_tip ]

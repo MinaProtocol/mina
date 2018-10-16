@@ -400,11 +400,7 @@ end = struct
     ; store_controller: (Tip.t, State_hash.t) With_hash.t Store.Controller.t
     ; handler: Transition_logic.t
     ; strongest_ledgers_reader:
-        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t
-    ; strongest_ledgers_writer:
-        (Ledger_builder.t * External_transition.t) Linear_pipe.Writer.t
-    ; store_tip_reader: Tip.t Linear_pipe.Reader.t
-    ; store_tip_writer: Tip.t Linear_pipe.Writer.t }
+        (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
 
   let strongest_tip t =
     let state = Transition_logic.state t.handler in
@@ -478,18 +474,15 @@ end = struct
       ; log
       ; store_controller
       ; strongest_ledgers_reader
-      ; strongest_ledgers_writer
-      ; store_tip_reader
-      ; store_tip_writer
       ; handler= Transition_logic.create state log }
     in
     don't_wait_for
       (Linear_pipe.iter (Transition_logic.strongest_tip t.handler) ~f:
          (fun (tip, transition) ->
-           Linear_pipe.force_write_maybe_drop_head ~capacity:1
-             t.store_tip_writer t.store_tip_reader tip ;
+           Linear_pipe.force_write_maybe_drop_head ~capacity:1 store_tip_writer
+             store_tip_reader tip ;
            Deferred.return
-           @@ Linear_pipe.write_or_exn ~capacity:5 t.strongest_ledgers_writer
+           @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
                 t.strongest_ledgers_reader
                 (tip.ledger_builder, transition) )) ;
     don't_wait_for
@@ -539,18 +532,15 @@ end = struct
           ( (({Job.input= current_transition_with_hash; _} as job), _) as
           job_with_time )
           ->
-            match replace last job_with_time with
-            | `Skip -> return last
-            | `Cancel_and_do_next ->
-                Option.iter last ~f:(fun (input, ivar) ->
-                    Ivar.fill_if_empty ivar input ) ;
-                let w, this_ivar = Job.run job in
-                let%map () =
-                  match%bind w.Interruptible.d with
-                  | Ok () -> Deferred.unit
-                  | Error () -> Deferred.unit
-                in
-                Some (current_transition_with_hash, this_ivar) )
+            Deferred.return
+              ( match replace last job_with_time with
+              | `Skip -> last
+              | `Cancel_and_do_next ->
+                  Option.iter last ~f:(fun (input, ivar) ->
+                      Ivar.fill_if_empty ivar input ) ;
+                  let w, this_ivar = Job.run job in
+                  let () = Deferred.upon w.Interruptible.d ignore in
+                  Some (current_transition_with_hash, this_ivar) ) )
       >>| ignore ) ;
     t
 

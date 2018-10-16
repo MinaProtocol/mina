@@ -117,7 +117,8 @@ module type Inputs_intf = sig
     val sync :
          t
       -> Transition_logic_state.t
-      -> state_mutator:(   Transition_logic_state.Change.t list
+      -> state_mutator:(   Transition_logic_state.t
+                        -> Transition_logic_state.Change.t list
                         -> Consensus_mechanism.External_transition.t
                         -> unit)
       -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
@@ -258,19 +259,19 @@ struct
 
   let strongest_tip {strongest_tip_reader; _} = strongest_tip_reader
 
-  let mutate_state t changes transition =
+  let mutate_state t old_state changes transition =
     (* TODO: We can make change-resolving more intelligent if different
     * concurrent processes took different times to finish. Since we
     * serialize to one job at a time this shouldn't happen anyway though *)
     let old_longest_branch_tip =
-      t.state |> Transition_logic_state.longest_branch_tip
+      old_state |> Transition_logic_state.longest_branch_tip
     in
     let new_longest_branch_tip =
       List.find_map changes ~f:(function
         | Transition_logic_state.Change.Longest_branch_tip tip -> Some tip
         | _ -> None )
     in
-    let new_state = Transition_logic_state.apply_all t.state changes in
+    let new_state = Transition_logic_state.apply_all old_state changes in
     t.state <- new_state ;
     match new_longest_branch_tip with
     | None -> ()
@@ -319,9 +320,10 @@ struct
       Interruptible.uninterruptible (Tip.transition_unchecked h t)
 
     let run (t: t0) new_tree old_tree new_best_path _logger _transition =
-      let locked_tip = Transition_logic_state.locked_tip t.state
+      let old_state = t.state in
+      let locked_tip = Transition_logic_state.locked_tip old_state
       and longest_branch_tip =
-        Transition_logic_state.longest_branch_tip t.state
+        Transition_logic_state.longest_branch_tip old_state
       in
       let new_head, _new_tip = locked_and_best new_tree in
       let old_head, _old_tip = locked_and_best old_tree in
@@ -379,7 +381,7 @@ struct
               [ Transition_logic_state.Change.Longest_branch_tip tip
               ; Transition_logic_state.Change.Ktree new_tree ]
             in
-            mutate_state t changes (With_hash.data last_transition)
+            mutate_state t old_state changes (With_hash.data last_transition)
         | None -> ()
       in
       (work, ivar)
@@ -392,10 +394,11 @@ struct
   end
 
   let local_get_tip t ~p_tip ~p_trans =
-    let locked_tip = Transition_logic_state.locked_tip t.state
-    and ktree = Transition_logic_state.ktree t.state
+    let old_state = t.state in
+    let locked_tip = Transition_logic_state.locked_tip old_state
+    and ktree = Transition_logic_state.ktree old_state
     and longest_branch_tip =
-      Transition_logic_state.longest_branch_tip t.state
+      Transition_logic_state.longest_branch_tip old_state
     in
     match ktree with
     | None ->
@@ -436,6 +439,7 @@ struct
                 !"Attempting a local path traversal to last_transition \
                   %{sexp: (External_transition.t, State_hash.t) With_hash.t}"
                 last_transition ;
+              assert (p_tip (Transition_logic_state.longest_branch_tip old_state)) ;
               let job =
                 Path_traversal.create t ktree ktree path t.log last_transition
               in
@@ -444,9 +448,6 @@ struct
               | Error _ ->
                   failwith "We are never cancelling, so it can't be cancelled"
               | Ok () ->
-                  assert (
-                    p_tip (Transition_logic_state.longest_branch_tip t.state)
-                  ) ;
                   Logger.trace t.log
                     !"Successfully path traversed to last_transition %{sexp: \
                       (External_transition.t, State_hash.t) With_hash.t}"
@@ -463,8 +464,9 @@ struct
       :
       ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t option
       Deferred.t =
-    let longest_branch_tip = Transition_logic_state.longest_branch_tip t.state
-    and ktree = Transition_logic_state.ktree t.state in
+    let old_state = t.state in
+    let longest_branch_tip = Transition_logic_state.longest_branch_tip old_state
+    and ktree = Transition_logic_state.ktree old_state in
     match ktree with
     | None -> (
         let source_state = Tip.state (With_hash.data longest_branch_tip) in
@@ -485,7 +487,8 @@ struct
                 ; Transition_logic_state.Change.Longest_branch_tip tip
                 ; Transition_logic_state.Change.Locked_tip tip ]
               in
-              mutate_state t changes (With_hash.data transition_with_hash) ;
+              mutate_state t old_state changes
+                (With_hash.data transition_with_hash) ;
               None
           | Error e ->
               (* TODO: Punish sender *)
@@ -514,7 +517,7 @@ struct
               return
                 (Some
                    (Catchup.sync ~state_mutator:(mutate_state t) catchup
-                      t.state transition_with_hash)) )
+                      old_state transition_with_hash)) )
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition_with_hash ~parent:(fun x ->
@@ -536,7 +539,7 @@ struct
               return
                 (Some
                    (Catchup.sync ~state_mutator:(mutate_state t) catchup
-                      t.state transition_with_hash))
+                      old_state transition_with_hash))
           | `Take -> return None )
       | `Repeat -> return None
       | `Added new_tree ->
@@ -550,7 +553,8 @@ struct
                  old_best_tip new_tip
                = 0
           then (
-            mutate_state t [Transition_logic_state.Change.Ktree new_tree]
+            mutate_state t old_state
+              [Transition_logic_state.Change.Ktree new_tree]
               (With_hash.data new_tip) ;
             return None )
           else
