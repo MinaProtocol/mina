@@ -387,6 +387,7 @@ module Make (Inputs : Inputs_intf) = struct
       of the peers that couldn't answer a particular query and won't try them
       again. *)
       let retry_max = 6 in
+      let retry_interval = Time.Span.of_ms 200. in
       let rec answer_query ctr peers_tried query =
         let peers =
           Gossip_net.random_peers_except t.gossip_net 3 ~except:peers_tried
@@ -428,7 +429,9 @@ module Make (Inputs : Inputs_intf) = struct
         | None ->
             Logger.info t.log !"None of the peers I asked knew; trying more" ;
             if ctr > retry_max then Deferred.unit
-            else answer_query (ctr + 1) peers_tried query
+            else
+              let%bind () = Clock.after retry_interval in
+              answer_query (ctr + 1) peers_tried query
       in
       Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
         ~f:(answer_query 0 (Peer.Hash_set.of_list []))
