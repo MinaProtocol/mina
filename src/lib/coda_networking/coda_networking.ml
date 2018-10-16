@@ -383,45 +383,55 @@ module Make (Inputs : Inputs_intf) = struct
 
     (* TODO: Check whether responses are good or not. *)
     let glue_sync_ledger t query_reader response_writer =
-      Linear_pipe.iter_unordered ~max_concurrency:8 query_reader ~f:
-        (fun query ->
-          let peers = Gossip_net.random_peers t.gossip_net 3 in
-          Logger.trace t.log
-            !"SL: Querying the following peers %{sexp: Peer.t list}"
-            peers ;
-          match%bind
-            find_map peers ~f:(fun peer ->
-                Logger.trace t.log
-                  !"Asking %{sexp: Peer.t} query regarding ledger_hash \
-                    %{sexp: Ledger_hash.t}"
-                  peer (fst query) ;
-                match%map
-                  Gossip_net.query_peer t.gossip_net peer
-                    Rpcs.Answer_sync_ledger_query.dispatch_multi query
-                with
-                | Ok (Ok answer) ->
-                    Logger.trace t.log
-                      !"Received answer from peer %{sexp: Peer.t} on \
-                        ledger_hash %{sexp: Ledger_hash.t}"
-                      peer (fst answer) ;
-                    Some answer
-                | Ok (Error e) ->
-                    Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
-                    None
-                | Error err ->
-                    Logger.warn t.log "Network error: %s"
-                      (Error.to_string_mach err) ;
-                    None )
-          with
-          | Some answer ->
+      (* We attempt to query 3 random peers, retry_max times. We keep track
+      of the peers that couldn't answer a particular query and won't try them
+      again. *)
+      let retry_max = 6 in
+      let rec answer_query ctr peers_tried query =
+        let peers =
+          Gossip_net.random_peers_except t.gossip_net 3 ~except:peers_tried
+        in
+        Logger.trace t.log
+          !"SL: Querying the following peers %{sexp: Peer.t list}"
+          peers ;
+        match%bind
+          find_map peers ~f:(fun peer ->
               Logger.trace t.log
-                !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
-                (fst answer) ;
-              (* TODO *)
-              Linear_pipe.write_if_open response_writer answer
-          | None ->
-              Logger.warn t.log !"Querying failed, no nodes responded" ;
-              Deferred.unit )
+                !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
+                  Ledger_hash.t}"
+                peer (fst query) ;
+              match%map
+                Gossip_net.query_peer t.gossip_net peer
+                  Rpcs.Answer_sync_ledger_query.dispatch_multi query
+              with
+              | Ok (Ok answer) ->
+                  Logger.trace t.log
+                    !"Received answer from peer %{sexp: Peer.t} on \
+                      ledger_hash %{sexp: Ledger_hash.t}"
+                    peer (fst answer) ;
+                  Some answer
+              | Ok (Error e) ->
+                  Logger.info t.log "Rpc error: %s" (Error.to_string_mach e) ;
+                  Hash_set.add peers_tried peer ;
+                  None
+              | Error err ->
+                  Logger.warn t.log "Network error: %s"
+                    (Error.to_string_mach err) ;
+                  None )
+        with
+        | Some answer ->
+            Logger.trace t.log
+              !"Succeeding with answer on ledger_hash %{sexp: Ledger_hash.t}"
+              (fst answer) ;
+            (* TODO *)
+            Linear_pipe.write_if_open response_writer answer
+        | None ->
+            Logger.info t.log !"None of the peers I asked knew; trying more" ;
+            if ctr > retry_max then Deferred.unit
+            else answer_query (ctr + 1) peers_tried query
+      in
+      Linear_pipe.iter_unordered ~max_concurrency:8 query_reader
+        ~f:(answer_query 0 (Peer.Hash_set.of_list []))
       |> don't_wait_for
   end
 end
