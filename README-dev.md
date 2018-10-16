@@ -68,14 +68,6 @@ export PATH=path/to/coda/scripts:$PATH
 * Start a build (go stretch your arms)\
 `make dev`
 
-## Docker Image Family Tree
-
-Container Stages:
-* [ocaml/ocaml:debian-stable](https://hub.docker.com/r/ocaml/ocaml/) (community image, ~856MB) 
-* ocaml407 (built by us, stored in gcr, ~1.7GB)
-* ocaml-base (built by us, stored in gcr, ~7.1GB -- external dependencies and haskell)
-* nanotest (built with `make docker`, used with `make dev`, ~7.8GB)
-
 ### Customizing your dev environment for autocomplete/merlin
 
 * If you use vim, add this snippet in your vimrc to use merlin.\
