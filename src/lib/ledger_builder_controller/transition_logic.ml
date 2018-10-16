@@ -350,7 +350,8 @@ struct
                 !"Attempting a local path traversal to last_transition \
                   %{sexp: (External_transition.t, State_hash.t) With_hash.t}"
                 last_transition ;
-              assert (p_tip (Transition_logic_state.longest_branch_tip old_state)) ;
+              assert (
+                p_tip (Transition_logic_state.longest_branch_tip old_state) ) ;
               let job =
                 Path_traversal.create t ktree ktree path t.log last_transition
               in
@@ -376,7 +377,8 @@ struct
       ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t option
       Deferred.t =
     let old_state = t.state in
-    let longest_branch_tip = Transition_logic_state.longest_branch_tip old_state
+    let longest_branch_tip =
+      Transition_logic_state.longest_branch_tip old_state
     and ktree = Transition_logic_state.ktree old_state in
     match ktree with
     | None -> (
