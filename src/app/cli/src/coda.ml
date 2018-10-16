@@ -193,14 +193,31 @@ let daemon (type ledger_proof) (module Kernel
                  []
        in
        let%bind initial_peers =
-         Deferred.List.map ~how:(`Max_concurrent_jobs 8) initial_peers_raw ~f:
-           (fun addr ->
-             let%map inet_addr =
-               Unix.Inet_addr.of_string_or_getbyname (Host_and_port.host addr)
-             in
-             Host_and_port.create
-               ~host:(Unix.Inet_addr.to_string inet_addr)
-               ~port:(Host_and_port.port addr) )
+         Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
+           initial_peers_raw ~f:(fun addr ->
+             let host = Host_and_port.host addr in
+             match%bind
+               Monitor.try_with_or_error (fun () ->
+                   Unix.Inet_addr.of_string_or_getbyname host )
+             with
+             | Ok inet_addr ->
+                 return
+                 @@ Some
+                      (Host_and_port.create
+                         ~host:(Unix.Inet_addr.to_string inet_addr)
+                         ~port:(Host_and_port.port addr))
+             | Error e ->
+                 Logger.trace log "getaddr exception: %s"
+                   (Error.to_string_mach e) ;
+                 Logger.error log "failed to look up address for %s, skipping"
+                   host ;
+                 return None )
+       in
+       let%bind () =
+         if List.length peers <> 0 && List.length initial_peers = 0 then (
+           eprintf "Error: failed to connect to any peers\n" ;
+           exit 1 )
+         else Deferred.unit
        in
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
@@ -249,6 +266,15 @@ let daemon (type ledger_proof) (module Kernel
            Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
              (fun k -> `With_public_key k )
          in
+         let banlist_dir_name = conf_dir ^/ "banlist" in
+         let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
+         let suspicious_dir = banlist_dir_name ^/ "suspicious" in
+         let punished_dir = banlist_dir_name ^/ "banned" in
+         let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
+         let%bind () = Async.Unix.mkdir ~p:() punished_dir in
+         let banlist =
+           Coda_base.Banlist.create ~suspicious_dir ~punished_dir
+         in
          let net_config =
            { Inputs.Net.Config.parent_log= log
            ; gossip_net_params=
@@ -257,7 +283,8 @@ let daemon (type ledger_proof) (module Kernel
                ; target_peer_count= 8
                ; conf_dir
                ; initial_peers
-               ; me } }
+               ; me
+               ; banlist } }
          in
          let%map coda =
            Run.create
@@ -269,7 +296,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~keypair ())
+                ~keypair () ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

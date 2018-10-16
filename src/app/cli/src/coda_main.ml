@@ -397,6 +397,8 @@ struct
           Consensus_mechanism.External_transition.protocol_state_proof
             transition
       ; ledger_builder }
+
+    let copy t = {t with ledger_builder= Ledger_builder.copy t.ledger_builder}
   end
 
   let keypair = Init.keypair
@@ -580,8 +582,30 @@ struct
       end
 
       module Tip = Tip
-      module Store = Store
       module Snark_pool = Snark_pool
+      module Ledger_hash = Ledger_hash
+      module Frozen_ledger_hash = Frozen_ledger_hash
+      module Ledger_proof = Transaction_snark
+      module Private_key = Private_key
+
+      module Public_key = struct
+        module Private_key = Private_key
+        include Public_key
+      end
+
+      module Keypair = Keypair
+      module Ledger_proof_statement = Ledger_proof_statement
+      module Ledger_builder_hash = Ledger_builder_hash
+      module Ledger = Ledger
+      module Ledger_builder_diff = Ledger_builder_diff
+      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
+      module Ledger_builder = Ledger_builder
+      module Blockchain_state = Blockchain_state
+      module Consensus_mechanism = Consensus_mechanism
+      module Protocol_state_proof = Protocol_state_proof
+      module State_hash = State_hash
+      module Valid_transaction = Transaction.With_valid_signature
+      module Internal_transition = Internal_transition
 
       module Net = struct
         type net = Net.t
@@ -589,40 +613,8 @@ struct
         include Net.Ledger_builder_io
       end
 
-      module Ledger_hash = Ledger_hash
-      module Frozen_ledger_hash = Frozen_ledger_hash
-      module Ledger_builder_hash = Ledger_builder_hash
-      module Ledger = Ledger
-      module Ledger_builder_diff = Ledger_builder_diff
-      module Ledger_builder_aux_hash = Ledger_builder_aux_hash
-
-      module Ledger_builder = struct
-        include Ledger_builder
-
-        type proof = Ledger_proof.t
-
-        let create ledger =
-          create ~ledger ~self:(Public_key.compress keypair.public_key)
-
-        let apply t diff =
-          Deferred.Or_error.map
-            (Ledger_builder.apply t diff)
-            ~f:
-              (Option.map ~f:(fun proof ->
-                   ((Ledger_proof.statement proof).target, proof) ))
-
-        let of_aux_and_ledger =
-          of_aux_and_ledger
-            ~public_key:(Public_key.compress keypair.public_key)
-      end
-
-      module Blockchain_state = Blockchain_state
-      module Consensus_mechanism = Consensus_mechanism
-      module Protocol_state_proof = Protocol_state_proof
-      module State_hash = State_hash
-      module Valid_transaction = Transaction.With_valid_signature
+      module Store = Store
       module Sync_ledger = Sync_ledger
-      module Internal_transition = Internal_transition
 
       let verify_blockchain proof state =
         Init.Verifier.verify_blockchain Init.verifier {proof; state}
@@ -889,7 +881,8 @@ module type Main_intf = sig
       ; snark_pool_disk_location: string
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
-      ; keypair: Keypair.t }
+      ; keypair: Keypair.t
+      ; banlist: Banlist.t }
     [@@deriving make]
   end
 
