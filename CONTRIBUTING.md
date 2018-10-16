@@ -4,6 +4,9 @@ Thank you for your interest in contributing to Coda 😁. This file outlines
 various parts of our process. Coda is still very young, so things might be a
 little bumpy while we figure out how to smoothly run the project!
 
+If you haven't seen it yet, the [developer README](README-dev.md) has the
+basic setup you need to get up and running to build and edit Coda.
+
 ## Bug reports
 
 Bug reports should include, at minimal, the `coda -version` output and

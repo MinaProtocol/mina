@@ -5,6 +5,10 @@ Coda is a new cryptocurrency protocol with a lightweight, constant sized blockch
 * [Coda Protocol Website](https://codaprotocol.com/)
 * [Coda Protocol Roadmap](https://github.com/orgs/CodaProtocol/projects/1)
 
+If you haven't seen it yet, [CONTRIBUTING.md](CONTRIBUTING.md) has information
+about our development process and how to contribute. If you just want to build
+Coda, this is the right file!
+
 # Building Coda
 
 Building Coda can be slightly involved. There are many C library dependencies that need
