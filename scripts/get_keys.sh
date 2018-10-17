@@ -22,7 +22,7 @@ echo $JSON_GCLOUD_CREDENTIALS > google_creds.json
 /usr/bin/gcloud auth activate-service-account --key-file=google_creds.json
 /usr/bin/gcloud config set project $(cat google_creds.json | jq -r .project_id)
 
-PINNED_KEY_COMMIT=06b5c1841fd0ebbaac15221c2becf81ec910737f
+PINNED_KEY_COMMIT=c92e84c97abc239feb54b758de6cde98b9a6ef58
 
 # Download keys
 /usr/bin/gsutil cp gs://proving-keys-stable/keys-$PINNED_KEY_COMMIT.tar.bz2 /tmp/.
