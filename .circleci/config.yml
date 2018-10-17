@@ -113,6 +113,9 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
+                name: Get stable SNARK keys - make withkeys
+                command: source ~/.profile && make withkeys
+            - run:
                 name: Test make test-runtest
                 command: source ~/.profile && make test-runtest
 
@@ -128,6 +131,9 @@ jobs:
             - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
+            - run:
+                name: Get stable SNARK keys - make withkeys
+                command: source ~/.profile && make withkeys
             - run:
                 name: Test make test-stakes
                 command: source ~/.profile && make test-stakes
@@ -148,9 +154,11 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
+                name: Get stable SNARK keys - make withkeys
+                command: source ~/.profile && make withkeys
+            - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
-            
             - run:
                 name: Running test - full-test | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'full-test'
