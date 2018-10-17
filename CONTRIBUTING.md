@@ -90,6 +90,28 @@ code.
 
 This is loosely inspired by the Rust RFC process, Python PEPs, and IETF RFCs.
 
+## Release process
+
+Create a PR to merge master into testnet. Once that is approved by CI and checked in...
+
+```
+git checkout testnet
+git tag testnet-v0.$WHATEVER_IS_NEXT
+git push testnet-v0.$WHATEVER_IS_NEXT
+```
+
+Eventually, we will have a "stable" or "mainnet" branch. Once we do, the process will look like:
+
+Create a PR to merge testnet into stable. Once that is approved by CI and checked in...
+
+```
+git checkout stable
+git tag v1.$WHATEVER_IS_NEXT
+git push v1.$WHATEVER_IS_NEXT
+```
+
+And then do the above steps for testnet. Don't forget to deploy!
+
 ## Issue/PR label guide
 
 We use them, although currently in a somewhat ad-hoc way. Please see
