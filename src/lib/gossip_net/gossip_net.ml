@@ -44,6 +44,8 @@ module type S = sig
 
   val random_peers : t -> int -> Peer.t list
 
+  val random_peers_except : t -> int -> except:Peer.Hash_set.t -> Peer.t list
+
   val peers : t -> Peer.t list
 
   val query_peer :
@@ -194,6 +196,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         if List.length !to_broadcast = 0 then `Done else `Continue )
 
   let random_peers t n = random_sublist (Hash_set.to_list t.peers) n
+
+  let random_peers_except t n ~(except: Peer.Hash_set.t) =
+    let new_peers = Hash_set.(diff t.peers except |> to_list) in
+    random_sublist new_peers n
 
   let query_peer t (peer: Peer.t) rpc query =
     Logger.trace t.log !"Querying peer %{sexp: Peer.t}" peer ;
