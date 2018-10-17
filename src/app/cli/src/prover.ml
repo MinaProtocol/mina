@@ -77,7 +77,8 @@ struct
             let module Wrap = Keys.Wrap in
             Tock.prove
               (Tock.Keypair.pk Wrap.keys)
-              (Wrap.input ()) {Wrap.Prover_state.proof} Wrap.main (embed hash)
+              Wrap.input {Wrap.Prover_state.proof} Wrap.main
+              (Wrap_input.of_tick_field hash)
 
           let extend_blockchain (chain: Blockchain.t)
               (next_state: Keys.Consensus_mechanism.Protocol_state.value)
@@ -101,8 +102,8 @@ struct
           let verify state proof =
             Tock.verify proof
               (Tock.Keypair.vk Wrap.keys)
-              (Wrap.input ())
-              (embed (Keys.Step.instance_hash state))
+              Wrap.input
+              (Wrap_input.of_tick_field (Keys.Step.instance_hash state))
         end in
         (module M : S))
 

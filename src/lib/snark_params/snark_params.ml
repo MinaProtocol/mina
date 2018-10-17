@@ -1,8 +1,8 @@
 open Core_kernel
 open Bitstring_lib
 open Snark_bits
-module Tick_curve = Crypto_params.Tick_curve
-module Tock_curve = Crypto_params.Tock_curve
+module Tick_backend = Crypto_params.Tick_backend
+module Tock_backend = Crypto_params.Tock_backend
 
 module Extend (Impl : Snarky.Snark_intf.S) = struct
   include Impl
@@ -39,8 +39,9 @@ module Extend (Impl : Snarky.Snark_intf.S) = struct
   end
 end
 
-module Tock0 = Extend (Snarky.Snark.Make (Tock_curve))
+module Tock0 = Extend (Crypto_params.Tock0)
 module Tick0 = Extend (Crypto_params.Tick0)
+module Wrap_input = Crypto_params.Wrap_input
 
 module Make_inner_curve_scalar
     (Impl : Snark_intf.S)
@@ -107,7 +108,6 @@ struct
   type var = Field.Checked.t * Field.Checked.t
 
   module Scalar = Make_inner_curve_scalar (Impl) (Other_impl)
-  module Coefficients = Coefficients
 
   let find_y x =
     let y2 =
@@ -120,7 +120,7 @@ module Tock = struct
   include (Tock0 : module type of Tock0 with module Proof := Tock0.Proof)
 
   module Inner_curve = struct
-    include Snarky.Backends.Mnt4.Group
+    include Tock_backend.Inner_curve
 
     include Sexpable.Of_sexpable (struct
                 type t = Field.t * Field.t [@@deriving sexp]
@@ -134,7 +134,7 @@ module Tock = struct
               end)
 
     include Make_inner_curve_aux (Tock0) (Tick0)
-              (Snarky.Libsnark.Curves.Mnt4.G1.Coefficients)
+              (Tock_backend.Inner_curve.Coefficients)
 
     let ctypes_typ = typ
 
@@ -143,7 +143,7 @@ module Tock = struct
     module Checked = struct
       include Snarky.Curves.Make_weierstrass_checked (Tock0) (Scalar)
                 (struct
-                  include Snarky.Backends.Mnt4.Group
+                  include Tock_backend.Inner_curve
 
                   let scale = scale_field
                 end)
@@ -160,16 +160,19 @@ module Tock = struct
 
     let dummy = Dummy_values.Tock.proof
   end
+
+  module Verifier_gadget =
+    Snarky.Gm_verifier_gadget.Make (Tock0) (Tock_backend) (Tock_backend)
+      (Tick_backend)
+      (struct
+        let input_size = 1
+
+        let fqe_size_in_field_elements = 2
+      end)
+      (Inner_curve)
 end
 
 module Tick = struct
-  module Sha256 =
-    Snarky.Sha256.Make (struct
-        let prefix = Tick_curve.prefix
-      end)
-      (Tick0)
-      (Tick_curve)
-
   include (Tick0 : module type of Tick0 with module Field := Tick0.Field)
 
   module Field = struct
@@ -183,25 +186,10 @@ module Tick = struct
       Quickcheck.Generator.map
         Bignum_bigint.(gen_incl zero (Tick0.Field.size - one))
         ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
-
-    let rec compare_bitstring xs0 ys0 =
-      match (xs0, ys0) with
-      | true :: xs, true :: ys | false :: xs, false :: ys ->
-          compare_bitstring xs ys
-      | false :: _, true :: _ -> `LT
-      | true :: _, false :: _ -> `GT
-      | [], [] -> `EQ
-      | _ :: _, [] | [], _ :: _ ->
-          failwith "compare_bitstrings: Different lengths"
-
-    let () =
-      let main_size_proxy = List.rev (unpack (negate one)) in
-      let other_size_proxy = List.rev Tock.Field.(unpack (negate one)) in
-      assert (compare_bitstring main_size_proxy other_size_proxy = `LT)
   end
 
   module Inner_curve = struct
-    include Crypto_params.Inner_curve
+    include Crypto_params.Tick_backend.Inner_curve
 
     include Sexpable.Of_sexpable (struct
                 type t = Field.t * Field.t [@@deriving sexp]
@@ -215,7 +203,7 @@ module Tick = struct
               end)
 
     include Make_inner_curve_aux (Tick0) (Tock0)
-              (Snarky.Libsnark.Curves.Mnt6.G1.Coefficients)
+              (Tick_backend.Inner_curve.Coefficients)
 
     let ctypes_typ = typ
 
@@ -224,7 +212,7 @@ module Tick = struct
     module Checked = struct
       include Snarky.Curves.Make_weierstrass_checked (Tick0) (Scalar)
                 (struct
-                  include Crypto_params.Inner_curve
+                  include Crypto_params.Tick_backend.Inner_curve
 
                   let scale = scale_field
                 end)
@@ -257,6 +245,16 @@ module Tick = struct
   end
 
   module Util = Snark_util.Make (Tick0)
+
+  module Verifier_gadget =
+    Snarky.Gm_verifier_gadget.Make (Tick0) (Tick_backend) (Tick_backend)
+      (Tock_backend)
+      (struct
+        let input_size = Tock0.Data_spec.(size [Wrap_input.typ])
+
+        let fqe_size_in_field_elements = 3
+      end)
+      (Inner_curve)
 end
 
 let embed (x: Tick.Field.t) : Tock.Field.t =

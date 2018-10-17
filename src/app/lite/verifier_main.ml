@@ -24,8 +24,8 @@ let state_and_instance_hash ~wrap_vk =
 let wrap_pvk =
   Proof_system.Verification_key.Processed.create Lite_params.wrap_vk
 
-(* TODO: This changes when the curves get flipped *)
-let to_wrap_input instance_hash = Snarkette.Mnt6_80.Fq.to_bigint instance_hash
+let to_wrap_input instance_hash =
+  Lite_base.Crypto_params.Tock.fq_to_scalars instance_hash
 
 let verify_chain pvk state_and_instance_hash
     ({protocol_state; ledger; proof}: Lite_chain.t) =
@@ -41,7 +41,7 @@ let verify_chain pvk state_and_instance_hash
       "Incorrect ledger hash"
   in
   let state_hash, instance_hash = state_and_instance_hash protocol_state in
-  let%map () = Proof_system.verify pvk [to_wrap_input instance_hash] proof in
+  let%map () = Proof_system.verify pvk (to_wrap_input instance_hash) proof in
   {Verifier.Response.state_hash}
 
 let get_verification_key on_sucess on_error =

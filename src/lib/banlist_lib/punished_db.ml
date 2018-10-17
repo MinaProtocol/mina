@@ -88,12 +88,14 @@ let%test_module "banlist" =
       Mock_time.set_event time ~f:(fun _time ->
           is_punished := Mock_db.get db ~key:peer |> Option.is_some )
 
+    let simulated_elapse_ms_to_change_state = 10240
+
     let%test_unit "time logic" =
       Mock_time.with_simulator ~f:(fun _ ->
           let _ = Mock_time.now () in
           let db = Mock_db.create ~directory:"" in
           let is_punished = ref true in
-          let evict_time = Int64.of_int 4 in
+          let evict_time = Int64.of_int simulated_elapse_ms_to_change_state in
           Mock_db.set db ~key:peer ~data:evict_time ;
           schedule_punishment_lookup db is_punished (Int64.pred evict_time) ;
           schedule_punishment_lookup db is_punished (Int64.succ evict_time) ;
@@ -111,7 +113,9 @@ let%test_module "banlist" =
           let _ = Mock_time.now () in
           let db = Mock_db.create ~directory:"" in
           let is_punished = ref true in
-          let old_evict_time = Int64.of_int 4 in
+          let old_evict_time =
+            Int64.of_int simulated_elapse_ms_to_change_state
+          in
           let new_evict_time = old_evict_time |> Int64.succ |> Int64.succ in
           schedule_punishment_lookup db is_punished (Int64.succ old_evict_time) ;
           schedule_punishment_lookup db is_punished (Int64.succ new_evict_time) ;
