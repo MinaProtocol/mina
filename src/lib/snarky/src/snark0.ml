@@ -124,17 +124,17 @@ module Make_basic (Backend : Backend_intf.S) = struct
 
     let hash = Hash.of_fold hash_fold_t
 
-    let sexp_of_t x =
-      Bignum_bigint.sexp_of_t (Bigint.to_bignum_bigint (Bigint.of_field x))
+    let to_bignum_bigint = Fn.compose Bigint.to_bignum_bigint Bigint.of_field
 
-    let t_of_sexp s =
-      Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.t_of_sexp s))
+    let of_bignum_bigint = Fn.compose Bigint.to_field Bigint.of_bignum_bigint
 
-    let to_string x =
-      Bignum_bigint.to_string (Bigint.to_bignum_bigint (Bigint.of_field x))
+    let sexp_of_t = Fn.compose Bignum_bigint.sexp_of_t to_bignum_bigint
 
-    let of_string s =
-      Bigint.to_field (Bigint.of_bignum_bigint (Bignum_bigint.of_string s))
+    let t_of_sexp = Fn.compose of_bignum_bigint Bignum_bigint.t_of_sexp
+
+    let to_string = Fn.compose Bignum_bigint.to_string to_bignum_bigint
+
+    let of_string = Fn.compose of_bignum_bigint Bignum_bigint.of_string
 
     include Binable.Of_binable (Bigint)
               (struct
@@ -894,6 +894,40 @@ module Make_basic (Backend : Backend_intf.S) = struct
       R1CS_constraint_system.set_auxiliary_input_size system
         auxiliary_input_size ;
       system
+
+    let constraint_count (t: (_, _) t) : int =
+      let next_auxiliary = ref 1 in
+      let alloc_var () =
+        let v = Backend.Var.create !next_auxiliary in
+        incr next_auxiliary ; v
+      in
+      let rec go : type a s. int -> (a, s) t -> int * a =
+       fun count t0 ->
+        match t0 with
+        | Pure x -> (count, x)
+        | With_constraint_system (_f, k) -> go count k
+        | As_prover (_x, k) -> go count k
+        | Add_constraint (c, t) -> go (count + 1) t
+        | Next_auxiliary k -> go count (k !next_auxiliary)
+        | With_label (s, t, k) ->
+            let count', y = go count t in
+            go count' (k y)
+        | With_state (_p, _and_then, t_sub, k) ->
+            let count', y = go count t_sub in
+            go count' (k y)
+        | With_handler (_h, t, k) ->
+            let count, x = go count t in
+            go count (k x)
+        | Clear_handler (t, k) ->
+            let count, x = go count t in
+            go count (k x)
+        | Exists ({alloc; check; _}, _c, k) ->
+            let var = Typ.Alloc.run alloc alloc_var in
+            (* TODO: Push a label onto the stack here *)
+            let count, () = go count (check var) in
+            go count (k {Handle.var; value= None})
+      in
+      fst (go 0 t)
 
     let auxiliary_input (type s) ~num_inputs (t0: (unit, s) t) (s0: s)
         (input: Field.Vector.t) : Field.Vector.t =
