@@ -219,19 +219,30 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
   let open Unix.Error in
   let dn = Filename.dirname path in
   let%bind parent_exists =
-    match%bind Sys.is_directory ~follow_symlinks:true dn with
-    | `No ->
-        eprintf "Error: %s is not a directory\n" dn ;
+    match%bind
+      Monitor.try_with ~extract_exn:true (fun () ->
+          let%bind stat = Unix.stat dn in
+          if stat.kind <> `Directory then (
+            eprintf
+              "Error: %s exists and is not a directory, can't store keys there\n"
+              dn ;
+            exit 1 )
+          else return true )
+    with
+    | Ok x -> return x
+    | Error (Unix.Unix_error (ENOENT, _, _)) -> return false
+    | Error (Unix.Unix_error (e, _, _)) ->
+        eprintf "Error: could not stat %s: %s, not making keys\n" dn
+          (message e) ;
         exit 1
-    | `Unknown -> return false
-    | `Yes -> return true
+    | Error e -> raise e
   in
   let%bind () =
     match%bind
       Monitor.try_with ~extract_exn:true (fun () ->
           if not parent_exists && mkdir then
             let%bind () = Unix.mkdir ~p:() dn in
-            Unix.chmod dn 700
+            Unix.chmod dn 0o700
           else if not parent_exists then (
             eprintf
               "Error: %s does not exist\nHint: mkdir -p %s; chmod 700 %s\n" dn
