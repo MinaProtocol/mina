@@ -41,6 +41,13 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
   let module Main = Coda.Make (Init) () in
   let module Run = Run (Config) (Main) in
   let open Main in
+  let banlist_dir_name = temp_conf_dir ^/ "banlist" in
+  let%bind () = Async.Unix.mkdir banlist_dir_name in
+  let%bind suspicious_dir =
+    Async.Unix.mkdtemp (banlist_dir_name ^/ "suspicious")
+  in
+  let%bind punished_dir = Async.Unix.mkdtemp (banlist_dir_name ^/ "banned") in
+  let banlist = Coda_base.Banlist.create ~suspicious_dir ~punished_dir in
   let net_config =
     { Inputs.Net.Config.parent_log= log
     ; gossip_net_params=
@@ -49,7 +56,8 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; target_peer_count= 8
         ; initial_peers= []
         ; conf_dir= temp_conf_dir
-        ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000) } }
+        ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000)
+        ; banlist } }
   in
   let%bind coda =
     Main.create
@@ -59,7 +67,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())
-         ~keypair ())
+         ~keypair () ~banlist)
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =

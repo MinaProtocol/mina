@@ -11,11 +11,7 @@ let tick_input () =
   let open Tick in
   Data_spec.[Field.typ]
 
-let tick_input_size = Tick.Data_spec.size (tick_input ())
-
-let wrap_input () =
-  let open Tock in
-  Data_spec.[Field.typ]
+let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
 let provide_witness' typ ~f =
   Tick.(provide_witness typ As_prover.(map get_state ~f))
@@ -305,7 +301,7 @@ module Statement = struct
       ; supply_increase: Currency.Amount.Stable.V1.t
       ; fee_excess: Currency.Fee.Signed.Stable.V1.t
       ; proof_type: Proof_type.t }
-    [@@deriving sexp, bin_io, hash, compare, eq]
+    [@@deriving sexp, bin_io, hash, compare, eq, fields]
 
     let option lab =
       Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -391,9 +387,6 @@ let base_top_hash = construct_input ~proof_type:`Base
 
 let merge_top_hash wrap_vk_bits =
   construct_input ~proof_type:(`Merge wrap_vk_bits)
-
-let embed (x: Tick.Field.t) : Tock.Field.t =
-  Tock.Field.project (Tick.Field.unpack x)
 
 module Verification_keys = struct
   type t =
@@ -637,7 +630,7 @@ end
 
 module Transition_data = struct
   type t =
-    { proof: Proof_type.t * Tock_curve.Proof.t
+    { proof: Proof_type.t * Tock_backend.Proof.t
     ; supply_increase: Amount.t
     ; fee_excess: Amount.Signed.t
     ; sok_digest: Sok_message.Digest.t }
@@ -650,7 +643,7 @@ module Merge = struct
 
   module Prover_state = struct
     type t =
-      { tock_vk: Tock_curve.Verification_key.t
+      { tock_vk: Tock_backend.Verification_key.t
       ; sok_digest: Sok_message.Digest.t
       ; ledger_hash1: bool list
       ; ledger_hash2: bool list
@@ -662,7 +655,7 @@ module Merge = struct
 
   let input = tick_input
 
-  let wrap_input_size = Tock.Data_spec.size (wrap_input ())
+  let wrap_input_size = Tock.Data_spec.size wrap_input
 
   let wrap_input_typ = Typ.list ~length:Tock.Field.size_in_bits Boolean.typ
 
@@ -675,12 +668,7 @@ module Merge = struct
           ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
           ~init:s ss
 
-  module Verifier =
-    Snarky.Gm_verifier_gadget.Mnt4 (Tick)
-      (struct
-        let input_size = wrap_input_size
-      end)
-      (Inner_curve)
+  module Verifier = Tick.Verifier_gadget
 
   let check_snark ~get_proof tock_vk tock_vk_data input =
     let%bind vk_data, result =
@@ -765,12 +753,10 @@ module Merge = struct
               |> Pedersen.Checked.Section.to_initial_segment_digest_exn |> fst
               )
             ~else_:with_vk_top_hash
-        >>= Pedersen.Checked.Digest.choose_preimage
-        >>| fun x ->
-        Bitstring_lib.Bitstring.Lsb_first.of_list (x :> Boolean.var list) )
+        >>= Wrap_input.Checked.tick_field_to_scalars )
     in
     let get_proof s = get_transition_data s |> Transition_data.proof |> snd in
-    check_snark ~get_proof tock_vk tock_vk_data [input]
+    check_snark ~get_proof tock_vk tock_vk_data input
 
   let state1_offset =
     Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
@@ -936,7 +922,7 @@ module Verification = struct
             merge_top_hash ~sok_digest wrap_vk_bits ~state1:source
               ~state2:target ~fee_excess ~supply_increase
       in
-      Tock.verify proof keys.wrap (wrap_input ()) (embed input)
+      Tock.verify proof keys.wrap wrap_input (Wrap_input.of_tick_field input)
 
     let verify t ~message =
       Sok_message.Digest.equal t.sok_digest (Sok_message.digest message)
@@ -1025,17 +1011,14 @@ module Verification = struct
                 (List.length wrap_vk_bits) )
             ()
       in
-      let%bind top_hash =
-        Pedersen.Checked.Digest.choose_preimage digest
-        >>| fun x -> (x :> Boolean.var list)
-      in
+      let%bind input = Wrap_input.Checked.tick_field_to_scalars digest in
       let%map result =
         let%bind vk_data, result =
           Merge.Verifier.All_in_one.check_proof
             ~get_vk:(As_prover.return keys.wrap)
             ~get_proof
             (Merge.Verifier.Verification_key.Checked.constant wrap_vk)
-            [Bitstring_lib.Bitstring.Lsb_first.of_list top_hash]
+            input
         in
         let%map () =
           let open Merge.Verifier.Verification_key_data.Checked in
@@ -1054,13 +1037,7 @@ module Wrap (Vk : sig
 end) =
 struct
   open Tock
-
-  module Verifier =
-    Snarky.Gm_verifier_gadget.Mnt6 (Tock)
-      (struct
-        let input_size = tick_input_size
-      end)
-      (Tock.Inner_curve)
+  module Verifier = Tock.Verifier_gadget
 
   let merge_vk = Verifier.Verification_key.of_verification_key Vk.merge
 
@@ -1073,7 +1050,7 @@ struct
     Verifier.Verification_key_data.full_data_of_verification_key Vk.base
 
   module Prover_state = struct
-    type t = {proof_type: Proof_type.t; proof: Tick_curve.Proof.t}
+    type t = {proof_type: Proof_type.t; proof: Tick_backend.Proof.t}
     [@@deriving fields]
   end
 
@@ -1084,13 +1061,10 @@ struct
    constraints pass iff
    (b1, b2, .., bn) = unpack input,
    there is a proof making one of [ base_vk; merge_vk ] accept (b1, b2, .., bn) *)
-  let main input =
+  let main (input: Wrap_input.var) =
     let open Let_syntax in
     with_label __LOC__
-      (let%bind input =
-         Field.Checked.choose_preimage_var input
-           ~length:Tick_curve.Field.size_in_bits
-       in
+      (let%bind input = Wrap_input.Checked.to_scalar input in
        let%bind is_base =
          provide_witness' Boolean.typ ~f:(fun {Prover_state.proof_type; _} ->
              Proof_type.is_base proof_type )
@@ -1111,7 +1085,7 @@ struct
                       | `Base -> Vk.base
                       | `Merge -> Vk.merge ))
               ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
-              [Bitstring_lib.Bitstring.Lsb_first.of_list input])
+              [input])
        in
        let%bind () =
          with_label __LOC__
@@ -1121,7 +1095,7 @@ struct
        in
        Boolean.Assert.is_true result)
 
-  let create_keys () = generate_keypair ~exposing:(wrap_input ()) main
+  let create_keys () = generate_keypair ~exposing:wrap_input main
 
   let cached =
     let load =
@@ -1138,7 +1112,7 @@ struct
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
       ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
-      ~input:(constraint_system ~exposing:(wrap_input ()) main)
+      ~input:(constraint_system ~exposing:wrap_input main)
       ~create_env:Keypair.generate
 end
 
@@ -1223,8 +1197,8 @@ struct
 
   let wrap proof_type proof input =
     let prover_state = {Wrap.Prover_state.proof; proof_type} in
-    Tock.prove keys.proving.wrap (wrap_input ()) prover_state Wrap.main
-      (embed input)
+    Tock.prove keys.proving.wrap wrap_input prover_state Wrap.main
+      (Wrap_input.of_tick_field input)
 
   let merge_proof sok_digest ledger_hash1 ledger_hash2 ledger_hash3
       transition12 transition23 =
@@ -1657,8 +1631,8 @@ let%test_module "transaction_snark" =
           in
           let state3 = Sparse_ledger.merkle_root sparse_ledger in
           let proof13 = merge ~sok_digest proof12 proof23 |> Or_error.ok_exn in
-          Tock.verify proof13.proof keys.verification.wrap (wrap_input ())
-            (embed
+          Tock.verify proof13.proof keys.verification.wrap wrap_input
+            (Wrap_input.of_tick_field
                (merge_top_hash ~sok_digest ~state1 ~state2:state3
                   ~supply_increase:Amount.zero ~fee_excess:total_fees
                   wrap_vk_bits)) )

@@ -511,6 +511,8 @@ module type Basic = sig
     (('a, 's) As_prover.t, 's) Checked.t -> 's -> ('s * 'a) Or_error.t
 
   val check : ('a, 's) Checked.t -> 's -> bool
+
+  val constraint_count : (_, _) Checked.t -> int
 end
 
 module type S = sig

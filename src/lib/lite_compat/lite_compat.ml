@@ -9,7 +9,7 @@ let field : Tick.Field.t -> LTock.Fq.t =
 let digest = field
 
 let twist_field x : LTock.Fq3.t =
-  let module V = Snark_params.Tick_curve.Field.Vector in
+  let module V = Snark_params.Tick_backend.Field.Vector in
   let c i = field (V.get x i) in
   (c 0, c 1, c 2)
 
@@ -18,7 +18,7 @@ let g1 (t: Tick.Inner_curve.t) : LTock.G1.t =
   {x= field x; y= field y; z= LTock.Fq.one}
 
 let g2 (t: Snarky.Libsnark.Mnt6.G2.t) : LTock.G2.t =
-  let x, y = Snarky.Libsnark.Mnt6.G2.to_coords t in
+  let x, y = Crypto_params.Tick_backend.Inner_twisted_curve.to_coords t in
   {x= twist_field x; y= twist_field y; z= LTock.Fq3.one}
 
 let g1_vector v =
@@ -26,7 +26,7 @@ let g1_vector v =
   Array.init (V.length v) ~f:(fun i -> g1 (V.get v i))
 
 let verification_key vk =
-  let open Snarky.Libsnark.Mnt6.GM_verification_key_accessors in
+  let open Crypto_params.Tock_backend.Full.GM_verification_key_accessors in
   let g_alpha = g_alpha vk |> g1 in
   let h_beta = h_beta vk |> g2 in
   let g_alpha_h_beta = LTock.Pairing.reduced_pairing g_alpha h_beta in
@@ -39,7 +39,7 @@ let verification_key vk =
   ; query= query vk |> g1_vector }
 
 let proof proof : LTock.Groth_maller.Proof.t =
-  let module P = Snarky.Libsnark.Mnt6.GM_proof_accessors in
+  let module P = Crypto_params.Tock_backend.Full.GM_proof_accessors in
   {a= P.a proof |> g1; b= P.b proof |> g2; c= P.c proof |> g1}
 
 let merkle_path :

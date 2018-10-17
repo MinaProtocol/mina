@@ -1456,6 +1456,38 @@ module Mnt6 = struct
       (G2)
 end
 
+module Mnt4_128_0 = Make_full (struct
+  let prefix = "camlsnark_mnt4128"
+end)
+
+module Mnt6_128_0 = Make_full (struct
+  let prefix = "camlsnark_mnt6128"
+end)
+
+module Mnt4_128 = struct
+  include Mnt4_128_0
+  module G2 = Make_G2 (Prefix) (Mnt6_128_0.Field)
+  include Make_G1 (Prefix) (Mnt4_128_0.Field) (Mnt4_128_0.Bigint.R)
+            (Mnt6_128_0.Field)
+  module GM_proof_accessors =
+    Make_GM_proof_accessors (Prefix) (GM.Proof) (Group) (G2)
+  module GM_verification_key_accessors =
+    Make_GM_verification_key_accessors (Prefix) (GM.Verification_key) (Group)
+      (G2)
+end
+
+module Mnt6_128 = struct
+  include Mnt6_128_0
+  module G2 = Make_G2 (Prefix) (Mnt4_128_0.Field)
+  include Make_G1 (Prefix) (Mnt6_128_0.Field) (Mnt6_128_0.Bigint.R)
+            (Mnt4_128_0.Field)
+  module GM_proof_accessors =
+    Make_GM_proof_accessors (Prefix) (GM.Proof) (Group) (G2)
+  module GM_verification_key_accessors =
+    Make_GM_verification_key_accessors (Prefix) (GM.Verification_key) (Group)
+      (G2)
+end
+
 module type S = sig
   val prefix : string
 
@@ -1806,31 +1838,43 @@ module Curves = struct
     in
     (mk "x", mk "y")
 
-  module Mnt4_ = struct
+  module Make_coefficients (Base_field : sig
+    type t
+
+    val typ : t Ctypes.typ
+  end) (M : sig
+    val curve_name : string
+  end) =
+  struct
+    let prefix = sprintf "camlsnark_%s_coeff" M.curve_name
+
+    let a = mk_coeff Base_field.typ (with_prefix prefix "a")
+
+    let b = mk_coeff Base_field.typ (with_prefix prefix "b")
+  end
+
+  module Mnt4 = struct
     module G1 = struct
       let generator = mk_generator Mnt6.Field.typ Mnt6.Field.delete "mnt4_G1"
 
-      module Coefficients = struct
-        let prefix = "camlsnark_mnt4_G1_coeff"
-
-        let a = mk_coeff Mnt6.Field.typ (with_prefix prefix "a")
-
-        let b = mk_coeff Mnt6.Field.typ (with_prefix prefix "b")
-      end
+      module Coefficients =
+        Make_coefficients (Mnt6.Field)
+          (struct
+            let curve_name = "mnt4_G1"
+          end)
     end
   end
 
   module Mnt6 = struct
     module G1 = struct
-      let generator = mk_generator Mnt4.Field.typ Mnt4.Field.delete "mnt6_G1"
+      let generator =
+        mk_generator Mnt4_0.Field.typ Mnt4_0.Field.delete "mnt6_G1"
 
-      module Coefficients = struct
-        let prefix = "camlsnark_mnt6_G1_coeff"
-
-        let a = mk_coeff Mnt4.Field.typ (with_prefix prefix "a")
-
-        let b = mk_coeff Mnt4.Field.typ (with_prefix prefix "b")
-      end
+      module Coefficients =
+        Make_coefficients (Mnt4_0.Field)
+          (struct
+            let curve_name = "mnt6_G1"
+          end)
     end
 
     let final_exponent_last_chunk_abs_of_w0 =
@@ -1844,5 +1888,23 @@ module Curves = struct
            Mnt6.Bigint.Q.typ)
   end
 
-  module Mnt4 = Mnt4_
+  module Mnt4_128 = struct
+    module G1 = struct
+      module Coefficients =
+        Make_coefficients (Mnt6_128_0.Field)
+          (struct
+            let curve_name = "mnt4128_G1"
+          end)
+    end
+  end
+
+  module Mnt6_128 = struct
+    module G1 = struct
+      module Coefficients =
+        Make_coefficients (Mnt4_128_0.Field)
+          (struct
+            let curve_name = "mnt6128_G1"
+          end)
+    end
+  end
 end

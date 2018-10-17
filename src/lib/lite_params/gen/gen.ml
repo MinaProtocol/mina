@@ -31,12 +31,7 @@ let wrap_vk ~loc =
   let open Async in
   let%bind keys = Snark_keys.blockchain_verification () in
   let vk = keys.wrap in
-  let module V =
-    Snarky.Gm_verifier_gadget.Mnt4 (Snark_params.Tick)
-      (struct
-        let input_size = 1
-      end)
-      (Snark_params.Tick.Inner_curve) in
+  let module V = Snark_params.Tick.Verifier_gadget in
   let vk = Lite_compat.verification_key vk in
   let vk_base64 =
     B64.encode

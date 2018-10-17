@@ -4,6 +4,7 @@ open Coda_base
 open Blockchain_snark
 open Cli_lib
 open Coda_main
+module YJ = Yojson.Safe
 module Git_sha = Client_lib.Git_sha
 
 let commit_id = Option.map [%getenv "CODA_COMMIT_SHA1"] ~f:Git_sha.of_string
@@ -103,17 +104,69 @@ let daemon (type ledger_proof) (module Kernel
          else Sys.home_directory () >>| compute_conf_dir
        in
        Parallel.init_master () ;
-       let external_port =
-         Option.value ~default:default_external_port external_port
+       let%bind config =
+         match%map
+           Monitor.try_with_or_error ~extract_exn:true (fun () ->
+               let%bind r = Reader.open_file (conf_dir ^/ "daemon.json") in
+               let%map contents =
+                 Pipe.to_list (Reader.lines r)
+                 >>| fun ss -> String.concat ~sep:"\n" ss
+               in
+               YJ.from_string ~fname:"daemon.json" contents )
+         with
+         | Ok c -> Some c
+         | Error e ->
+             Logger.trace log "error reading daemon.json: %s"
+               (Error.to_string_mach e) ;
+             Logger.warn log "failed to read daemon.json, not using it" ;
+             None
+       in
+       let maybe_from_config (type a) (f: YJ.json -> a option)
+           (keyname: string) (actual_value: a option) : a option =
+         let open Option.Let_syntax in
+         let open YJ.Util in
+         match actual_value with
+         | Some v -> Some v
+         | None ->
+             let%bind config = config in
+             let%bind json_val = to_option Fn.id (member keyname config) in
+             f json_val
+       in
+       let or_from_config map keyname actual_value ~default =
+         match maybe_from_config map keyname actual_value with
+         | Some x -> x
+         | None ->
+             Logger.info log "didn't find %s in the config file, using default"
+               keyname ;
+             default
+       in
+       let external_port : int =
+         or_from_config YJ.Util.to_int_option "external-port"
+           ~default:default_external_port external_port
        in
        let client_port =
-         Option.value ~default:default_client_port client_port
+         or_from_config YJ.Util.to_int_option "client-port"
+           ~default:default_client_port client_port
        in
        let should_propose_flag =
-         Option.value ~default:false should_propose_flag
+         or_from_config YJ.Util.to_bool_option "propose" ~default:false
+           should_propose_flag
        in
        let transaction_capacity_log_2 =
-         Option.value ~default:3 transaction_capacity_log_2
+         or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
+           transaction_capacity_log_2
+       in
+       let rest_server_port =
+         maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
+       in
+       let peers =
+         List.concat
+           [ peers
+           ; List.map ~f:Host_and_port.of_string
+             @@ or_from_config
+                  (Fn.compose Option.some
+                     (YJ.Util.convert_each YJ.Util.to_string))
+                  "peers" None ~default:[] ]
        in
        let proposal_interval =
          Option.value ~default:(Time.Span.of_ms 5000.)
@@ -140,14 +193,31 @@ let daemon (type ledger_proof) (module Kernel
                  []
        in
        let%bind initial_peers =
-         Deferred.List.map ~how:(`Max_concurrent_jobs 8) initial_peers_raw ~f:
-           (fun addr ->
-             let%map inet_addr =
-               Unix.Inet_addr.of_string_or_getbyname (Host_and_port.host addr)
-             in
-             Host_and_port.create
-               ~host:(Unix.Inet_addr.to_string inet_addr)
-               ~port:(Host_and_port.port addr) )
+         Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
+           initial_peers_raw ~f:(fun addr ->
+             let host = Host_and_port.host addr in
+             match%bind
+               Monitor.try_with_or_error (fun () ->
+                   Unix.Inet_addr.of_string_or_getbyname host )
+             with
+             | Ok inet_addr ->
+                 return
+                 @@ Some
+                      (Host_and_port.create
+                         ~host:(Unix.Inet_addr.to_string inet_addr)
+                         ~port:(Host_and_port.port addr))
+             | Error e ->
+                 Logger.trace log "getaddr exception: %s"
+                   (Error.to_string_mach e) ;
+                 Logger.error log "failed to look up address for %s, skipping"
+                   host ;
+                 return None )
+       in
+       let%bind () =
+         if List.length peers <> 0 && List.length initial_peers = 0 then (
+           eprintf "Error: failed to connect to any peers\n" ;
+           exit 1 )
+         else Deferred.unit
        in
        let%bind ip =
          match ip with None -> Find_ip.find () | Some ip -> return ip
@@ -196,6 +266,15 @@ let daemon (type ledger_proof) (module Kernel
            Option.value_map run_snark_worker_flag ~default:`Don't_run ~f:
              (fun k -> `With_public_key k )
          in
+         let banlist_dir_name = conf_dir ^/ "banlist" in
+         let%bind () = Async.Unix.mkdir ~p:() banlist_dir_name in
+         let suspicious_dir = banlist_dir_name ^/ "suspicious" in
+         let punished_dir = banlist_dir_name ^/ "banned" in
+         let%bind () = Async.Unix.mkdir ~p:() suspicious_dir in
+         let%bind () = Async.Unix.mkdir ~p:() punished_dir in
+         let banlist =
+           Coda_base.Banlist.create ~suspicious_dir ~punished_dir
+         in
          let net_config =
            { Inputs.Net.Config.parent_log= log
            ; gossip_net_params=
@@ -204,7 +283,8 @@ let daemon (type ledger_proof) (module Kernel
                ; target_peer_count= 8
                ; conf_dir
                ; initial_peers
-               ; me } }
+               ; me
+               ; banlist } }
          in
          let%map coda =
            Run.create
@@ -216,7 +296,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~keypair ())
+                ~keypair () ~banlist)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

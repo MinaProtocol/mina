@@ -21,7 +21,8 @@ module type Config_intf = sig
     ; initial_peers: Host_and_port.t list
     ; me: Peer.t
     ; conf_dir: string
-    ; parent_log: Logger.t }
+    ; parent_log: Logger.t
+    ; banlist: Coda_base.Banlist.t }
   [@@deriving make]
 end
 
@@ -42,6 +43,8 @@ module type S = sig
     t -> msg -> (unit -> [`Done | `Continue] Deferred.t) Staged.t
 
   val random_peers : t -> int -> Peer.t list
+
+  val random_peers_except : t -> int -> except:Peer.Hash_set.t -> Peer.t list
 
   val peers : t -> Peer.t list
 
@@ -68,7 +71,8 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
       ; initial_peers: Host_and_port.t list
       ; me: Peer.t
       ; conf_dir: string
-      ; parent_log: Logger.t }
+      ; parent_log: Logger.t
+      ; banlist: Coda_base.Banlist.t }
     [@@deriving make]
   end
 
@@ -112,7 +116,7 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
     let%map membership =
       match%map
         Membership.connect ~initial_peers:config.initial_peers ~me:config.me
-          ~conf_dir:config.conf_dir ~parent_log:log
+          ~conf_dir:config.conf_dir ~parent_log:log ~banlist:config.banlist
       with
       | Ok membership -> membership
       | Error e ->
@@ -192,6 +196,10 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
         if List.length !to_broadcast = 0 then `Done else `Continue )
 
   let random_peers t n = random_sublist (Hash_set.to_list t.peers) n
+
+  let random_peers_except t n ~(except: Peer.Hash_set.t) =
+    let new_peers = Hash_set.(diff t.peers except |> to_list) in
+    random_sublist new_peers n
 
   let query_peer t (peer: Peer.t) rpc query =
     Logger.trace t.log !"Querying peer %{sexp: Peer.t}" peer ;

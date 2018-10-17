@@ -7,7 +7,7 @@
   (library_flags (-linkall))
   (inline_tests)
   (libraries
-    ( snarky bignum_bigint ))
+    ( snarky bignum_bigint crypto_params_init ))
   (preprocess (pps (ppx_jane)))
   (synopsis "Cryptographic parameters")))
 

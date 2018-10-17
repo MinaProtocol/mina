@@ -40,12 +40,11 @@ module type S = sig
     val keys : Tock.Keypair.t
 
     val input :
-         unit
-      -> ('a, 'b, Tock.Field.var -> 'a, Tock.Field.t -> 'b) Tock.Data_spec.t
+      ('a, 'b, Wrap_input.var -> 'a, Wrap_input.t -> 'b) Tock.Data_spec.t
 
     module Prover_state = Wrap_prover_state
 
-    val main : Tock.Field.var -> (unit, Prover_state.t) Tock.Checked.t
+    val main : Wrap_input.var -> (unit, Prover_state.t) Tock.Checked.t
   end
 end
 

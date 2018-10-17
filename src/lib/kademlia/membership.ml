@@ -48,6 +48,20 @@ let lock_file = "kademlia.lock"
 let write_lock_file lock_path pid =
   Async.Writer.save lock_path ~contents:(Pid.to_string pid)
 
+let keep_trying :
+    f:('a -> 'b Deferred.Or_error.t) -> 'a list -> 'b Deferred.Or_error.t =
+ fun ~f xs ->
+  let open Deferred.Let_syntax in
+  let rec go e xs : 'b Deferred.Or_error.t =
+    match xs with
+    | [] -> return e
+    | x :: xs ->
+        match%bind f x with
+        | Ok r -> return (Ok r)
+        | Error e -> go (Error e) xs
+  in
+  go (Or_error.error_string "empty input") xs
+
 module Haskell_process = struct
   open Async
 
@@ -92,14 +106,25 @@ module Haskell_process = struct
         (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
       (* This is where nix dumps the haskell artifact *)
       let kademlia_binary = "app/kademlia-haskell/result/bin/kademlia" in
+      (* This is where you'd manually install kademlia *)
+      let coda_kademlia = "coda-kademlia" in
       let open Deferred.Let_syntax in
-      (* Try kademlia, then prepend test_prefix if it's missing *)
-      Deferred.Or_error.map
-        ~f:(fun process -> {process; lock_path})
-        ( match%bind Process.create ~prog:kademlia_binary ~args () with
-        | Ok p -> return (Or_error.return p)
-        | Error _ ->
-            Process.create ~prog:(test_prefix ^ kademlia_binary) ~args () )
+      match%map
+        keep_trying
+          [ Unix.getenv "CODA_KADEMLIA_PATH"
+            |> Option.value ~default:coda_kademlia
+          ; kademlia_binary
+          ; test_prefix ^ kademlia_binary ]
+          ~f:(fun prog -> Process.create ~prog ~args ())
+        |> Deferred.Or_error.map ~f:(fun process -> {process; lock_path})
+      with
+      | Ok p -> Ok p
+      | Error e ->
+          Or_error.error_string
+            ( "If you are a dev, did you forget to `make kademlia` and set \
+               CODA_KADEMLIA_PATH? Try \
+               CODA_KADEMLIA_PATH=$PWD/src/app/kademlia-haskell/result/bin/kademlia "
+            ^ Error.to_string_hum e )
     in
     let kill_locked_process ~log =
       match%bind Sys.file_exists lock_path with
@@ -308,13 +333,6 @@ module Haskell = struct
   end
 
   include Make (Haskell_process) (Banlist)
-
-  (* TODO: banlist should be created outside of this module *)
-  let create_banlist () = Banlist.create ~suspicious_dir:"" ~punished_dir:""
-
-  let connect ~initial_peers ~me ~parent_log ~conf_dir =
-    connect ~initial_peers ~me ~parent_log ~conf_dir
-      ~banlist:(create_banlist ())
 end
 
 let%test_module "Tests" =
@@ -401,12 +419,9 @@ let%test_module "Tests" =
         ()
 
       let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
-        let open Deferred.Let_syntax in
-        (* Try kademlia, then prepend test_prefix if it's missing *)
-        match%bind Process.create ~prog:"./dummy.sh" ~args:[] () with
-        | Ok p -> return (Or_error.return p)
-        | Error _ ->
-            Process.create ~prog:(test_prefix ^ "./dummy.sh") ~args:[] ()
+        (* Try dummy, then prepend test_prefix if it's missing *)
+        keep_trying ["./dummy.sh"; test_prefix ^ "./dummy.sh"] ~f:(fun prog ->
+            Process.create ~prog ~args:[] () )
 
       let output t ~log:_log =
         Pipe.map (Reader.pipe (Process.stdout t)) ~f:String.split_lines
@@ -488,18 +503,19 @@ let%test_module "Tests" =
                   File_system.with_temp_dir (conf_dir ^ "2") ~f:
                     (fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
 
+    let create_banlist () =
+      Haskell.Banlist.create ~suspicious_dir:"" ~punished_dir:""
+
     let%test_unit "connect" =
       (* This flakes 1 in 20 times, so try a couple times if it fails *)
       run_connection_test ~f:(fun conf_dir_1 conf_dir_2 ->
           let open Deferred.Let_syntax in
           let%bind n0 =
-            Haskell.For_tests.node (addr 0) [] conf_dir_1
-              (Haskell.create_banlist ())
+            Haskell.For_tests.node (addr 0) [] conf_dir_1 (create_banlist ())
           and n1 =
             Haskell.For_tests.node (addr 1)
               [fst (addr 0)]
-              conf_dir_2
-              (Haskell.create_banlist ())
+              conf_dir_2 (create_banlist ())
           in
           let%bind n0_peers =
             Deferred.any
@@ -584,7 +600,7 @@ let%test_module "Tests" =
                   banner_conf_dir banlist
               and normal_node =
                 Haskell.For_tests.node normal_addr [] normal_conf_dir
-                  (Haskell.create_banlist ())
+                  (create_banlist ())
               in
               let%bind initial_discovered_peers =
                 Deferred.any
@@ -625,8 +641,7 @@ let%test_module "Tests" =
           let open Deferred.Let_syntax in
           File_system.with_temp_dir conf_dir ~f:(fun temp_dir ->
               let%bind n =
-                Haskell.For_tests.node (addr 1) [] temp_dir
-                  (Haskell.create_banlist ())
+                Haskell.For_tests.node (addr 1) [] temp_dir (create_banlist ())
               in
               let lock_path = Filename.concat temp_dir lock_file in
               let%bind yes_result = Sys.file_exists lock_path in

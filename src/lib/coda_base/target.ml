@@ -10,7 +10,7 @@ end
 
 include Stable.V1
 module Field = Tick.Field
-module Bigint = Tick_curve.Bigint.R
+module Bigint = Tick_backend.Bigint.R
 
 let bit_length = Snark_params.target_bit_length
 
