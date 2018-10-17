@@ -255,7 +255,11 @@ end = struct
                   Option.iter last ~f:(fun (input, ivar) ->
                       Ivar.fill_if_empty ivar input ) ;
                   let w, this_ivar = Job.run job in
-                  let () = Deferred.upon w.Interruptible.d ignore in
+                  let () =
+                    Deferred.upon w.Interruptible.d (function
+                      | Ok () -> Logger.trace log "Job is completed"
+                      | Error () -> Logger.trace log "Job is destroyed" )
+                  in
                   Some (current_transition_with_hash, this_ivar) ) )
       >>| ignore ) ;
     t
@@ -706,8 +710,8 @@ let%test_module "test" =
           let%bind lbc = Lbc.create config in
           (* Drain the first few strongest_ledgers *)
           let%bind _ = Lbc.take_map (Lbc.strongest_ledgers lbc) 4 ~f:ignore in
-          match%map Lbc.local_get_ledger lbc 7 with
-          | Ok (lb, _s) -> assert (!lb = 7)
+          match%map Lbc.local_get_ledger lbc 6 with
+          | Ok (lb, _s) -> assert (!lb = 6)
           | Error e ->
               failwithf "Unexpected error %s" (Error.to_string_hum e) () )
 

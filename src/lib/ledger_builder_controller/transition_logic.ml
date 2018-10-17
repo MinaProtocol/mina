@@ -25,7 +25,7 @@ module type Inputs_intf = sig
 
     val sync :
          t
-      -> Transition_logic_state.t
+      -> old_state:Transition_logic_state.t
       -> state_mutator:(   Transition_logic_state.t
                         -> Transition_logic_state.Change.t list
                         -> Consensus_mechanism.External_transition.t
@@ -156,7 +156,6 @@ struct
             t.data <- None ) )
   end
 
-  (* TODO: propogate mutate_function into everything that is getting mutated *)
   type t =
     { mutable state: Transition_logic_state.t
     ; log: Logger.t
@@ -193,11 +192,8 @@ struct
                (old_longest_branch_tip |> With_hash.data |> Tip.protocol_state)
                (new_longest_branch_tip |> With_hash.data |> Tip.protocol_state))
         then
-          don't_wait_for
-            (Linear_pipe.write t.strongest_tip_writer
-               (With_hash.data new_longest_branch_tip, transition))
-
-  type t0 = t
+          Linear_pipe.write_without_pushback t.strongest_tip_writer
+            (With_hash.data new_longest_branch_tip, transition)
 
   module Path =
     Path.Make (struct
@@ -225,13 +221,13 @@ struct
     (List.hd_exn path, List.last_exn path)
 
   module Path_traversal = struct
-    type t = ((External_transition.t, State_hash.t) With_hash.t, unit) Job.t
+    type 'a t = ((External_transition.t, State_hash.t) With_hash.t, 'a) Job.t
 
     let transition_unchecked h t =
       Interruptible.uninterruptible (transition_unchecked h t)
 
-    let run (t: t0) new_tree old_tree new_best_path _logger _transition =
-      let old_state = t.state in
+    let run old_state ~on_success ~map_result new_tree old_tree new_best_path
+        logger _transition =
       let locked_tip = Transition_logic_state.locked_tip old_state
       and longest_branch_tip =
         Transition_logic_state.longest_branch_tip old_state
@@ -268,9 +264,7 @@ struct
         in
         let last_transition = List.last_exn path.Path.path in
         (* Now step over the path *)
-        assert (
-          State_hash.equal (With_hash.hash tip)
-            (With_hash.hash path.Path.source) ) ;
+        assert (is_materialization_of tip path.Path.source) ;
         let%map result =
           List.fold path.Path.path ~init:(Interruptible.return (Some tip)) ~f:
             (fun work curr ->
@@ -281,27 +275,28 @@ struct
                   | Ok tip -> return (Some tip)
                   | Error e ->
                       (* TODO: Punish sender *)
-                      Logger.warn t.log "Recieved malicious transition %s"
+                      Logger.warn logger "Recieved malicious transition %s"
                         (Error.to_string_hum e) ;
                       return None )
         in
         match result with
         | Some tip ->
             assert_materialization_of tip last_transition ;
-            let changes =
-              [ Transition_logic_state.Change.Longest_branch_tip tip
-              ; Transition_logic_state.Change.Ktree new_tree ]
-            in
-            mutate_state t old_state changes (With_hash.data last_transition)
-        | None -> ()
+            Some
+              (on_success ~longest_branch:tip ~ktree:new_tree
+                 ~transition:last_transition)
+        | None -> None
       in
-      (work, ivar)
+      (Interruptible.map ~f:map_result work, ivar)
 
-    let create (t: t0) new_tree old_tree new_best_path (logger: Logger.t)
+    let create ~on_success ~map_result old_state new_tree old_tree
+        new_best_path (logger: Logger.t)
         (transition_with_hash:
-          (External_transition.t, State_hash.t) With_hash.t) : t =
+          (External_transition.t, State_hash.t) With_hash.t) : 'a t =
       Job.create transition_with_hash
-        ~f:(run t new_tree old_tree new_best_path logger)
+        ~f:
+          (run old_state new_tree old_tree new_best_path logger ~on_success
+             ~map_result)
   end
 
   let local_get_tip t ~p_tip ~p_trans =
@@ -350,24 +345,30 @@ struct
                 !"Attempting a local path traversal to last_transition \
                   %{sexp: (External_transition.t, State_hash.t) With_hash.t}"
                 last_transition ;
-              assert (
-                p_tip (Transition_logic_state.longest_branch_tip old_state) ) ;
               let job =
-                Path_traversal.create t ktree ktree path t.log last_transition
+                Path_traversal.create old_state ktree ktree path t.log
+                  last_transition
+                  ~on_success:(fun ~longest_branch ~ktree:_ ~transition:_ ->
+                    longest_branch )
+                  ~map_result:(function
+                      | None -> Or_error.error_string "Path traversing failed"
+                      | Some longest_branch_tip ->
+                          assert (p_tip longest_branch_tip) ;
+                          Logger.trace t.log
+                            !"Successfully path traversed to last_transition \
+                              %{sexp: (External_transition.t, State_hash.t) \
+                              With_hash.t}"
+                            last_transition ;
+                          Ok
+                            ( longest_branch_tip
+                            , External_transition.protocol_state
+                                (With_hash.data last_transition) ))
               in
               let w, _ = Job.run job in
               match%map w.d with
               | Error _ ->
                   failwith "We are never cancelling, so it can't be cancelled"
-              | Ok () ->
-                  Logger.trace t.log
-                    !"Successfully path traversed to last_transition %{sexp: \
-                      (External_transition.t, State_hash.t) With_hash.t}"
-                    last_transition ;
-                  Ok
-                    ( longest_branch_tip
-                    , External_transition.protocol_state
-                        (With_hash.data last_transition) ) )
+              | Ok result -> result )
           | None ->
               return
                 (Or_error.error_string "Not found locally within our ktree")
@@ -430,7 +431,7 @@ struct
               return
                 (Some
                    (Catchup.sync ~state_mutator:(mutate_state t) catchup
-                      old_state transition_with_hash)) )
+                      ~old_state transition_with_hash)) )
     | Some old_tree ->
       match
         Transition_tree.add old_tree transition_with_hash ~parent:(fun x ->
@@ -452,7 +453,7 @@ struct
               return
                 (Some
                    (Catchup.sync ~state_mutator:(mutate_state t) catchup
-                      old_state transition_with_hash))
+                      ~old_state transition_with_hash))
           | `Take -> return None )
       | `Repeat -> return None
       | `Added new_tree ->
@@ -476,8 +477,17 @@ struct
             in
             return
               (Some
-                 (Path_traversal.create t new_tree old_tree new_best_path t.log
-                    transition_with_hash))
+                 (Path_traversal.create old_state new_tree old_tree
+                    new_best_path t.log transition_with_hash
+                    ~on_success:(fun ~longest_branch ~ktree ~transition ->
+                      let changes =
+                        [ Transition_logic_state.Change.Longest_branch_tip
+                            longest_branch
+                        ; Transition_logic_state.Change.Ktree ktree ]
+                      in
+                      mutate_state t old_state changes
+                        (With_hash.data transition) )
+                    ~map_result:(fun _ -> ())))
 
   let on_new_transition catchup ({pending_target; _} as t) transition_with_hash
       ~(time_received: Unix_timestamp.t) :

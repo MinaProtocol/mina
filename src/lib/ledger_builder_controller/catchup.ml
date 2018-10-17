@@ -35,14 +35,15 @@ struct
     {net; log= Logger.child parent_log __MODULE__; sl_ref= ref None; public_key}
 
   (* Perform the `Sync interruptible work *)
-  let do_sync {net; log; sl_ref; public_key} (state: Transition_logic_state.t)
+  let do_sync {net; log; sl_ref; public_key}
+      ~(old_state: Transition_logic_state.t)
       ~(state_mutator:
             Transition_logic_state.t
          -> Transition_logic_state.Change.t list
          -> External_transition.t
          -> unit) transition_with_hash =
     let {With_hash.data= locked_tip; hash= _} =
-      Transition_logic_state.locked_tip state
+      Transition_logic_state.locked_tip old_state
     in
     let {With_hash.data= transition; hash= transition_state_hash} =
       transition_with_hash
@@ -113,7 +114,7 @@ struct
                     Ledger_builder_hash.t}"
                   (Ledger_builder.hash lb) ;
                 let open Transition_logic_state.Change in
-                state_mutator state
+                state_mutator old_state
                   [ Ktree new_tree
                   ; Locked_tip new_tip
                   ; Longest_branch_tip new_tip ]
@@ -135,7 +136,7 @@ struct
     in
     (work, ivar)
 
-  let sync (t: t) (state: Transition_logic_state.t) ~state_mutator
+  let sync (t: t) ~(old_state: Transition_logic_state.t) ~state_mutator
       transition_with_hash =
-    Job.create transition_with_hash ~f:(do_sync ~state_mutator t state)
+    Job.create transition_with_hash ~f:(do_sync ~old_state ~state_mutator t)
 end
