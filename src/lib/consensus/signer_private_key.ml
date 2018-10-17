@@ -1,5 +1,3 @@
-open Signature_lib
-
 (* This file should be replaced with the production version when building
    for production *)
 
