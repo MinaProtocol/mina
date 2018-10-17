@@ -1,6 +1,7 @@
 open Core
 open Async
 open Coda_base
+open Signature_lib
 
 let request_service_name = "CODA_WEB_CLIENT_SERVICE"
 
@@ -47,9 +48,11 @@ struct
 
   let create coda =
     let open Base in
+    let open Keypair in
     let get_lite_chain_exn = get_lite_chain |> Option.value_exn in
     (* HACK: we are just passing in the proposer path for this demo *)
-    let keys = [Coda_base.Genesis_ledger.high_balance_pk] in
+    let keypair = Genesis_ledger.largest_account_keypair_exn () in
+    let keys = [Public_key.compress keypair.public_key] in
     get_lite_chain_exn coda keys
 end
 
@@ -119,18 +122,21 @@ let run_service (type t) (module Program : Coda_intf with type t = t) coda
       Logger.info log "Not running a web client pipe" ;
       don't_wait_for (Linear_pipe.drain (Program.strongest_ledgers coda))
   | `Local path ->
+      let open Keypair in
       Logger.trace log "Saving chain locally at path %s" path ;
       store_verification_keys log (fun vk_location ->
           copy ~src:vk_location ~dst:(path ^/ verification_key_basename)
           >>| Or_error.return ) ;
       let get_lite_chain = Option.value_exn Program.get_lite_chain in
+      let keypair = Genesis_ledger.largest_account_keypair_exn () in
       Linear_pipe.iter (Program.strongest_ledgers coda) ~f:(fun _ ->
           Writer.save (path ^/ "chain")
             ~contents:
               (B64.encode
                  (Binable.to_string
                     (module Lite_base.Lite_chain)
-                    (get_lite_chain coda [Genesis_ledger.high_balance_pk]))) )
+                    (get_lite_chain coda
+                       [Public_key.compress keypair.public_key]))) )
       |> don't_wait_for
   | `S3 ->
       Logger.info log "Running S3 web client pipe" ;

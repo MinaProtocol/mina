@@ -84,8 +84,8 @@ module Make (Inputs : Inputs_intf) :
    and type state_hash := Inputs.State_hash.t =
 struct
   open Inputs
-  open Consensus_mechanism
   open Transition_logic_state
+  open Consensus_mechanism
   module Ops = Tip_ops.Make (Inputs)
   open Ops
 

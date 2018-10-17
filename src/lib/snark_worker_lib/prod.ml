@@ -79,5 +79,3 @@ module Inputs = struct
 end
 
 module Worker = Worker.Make (Inputs)
-
-let command_name = "snark-worker-prod"

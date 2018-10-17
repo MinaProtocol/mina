@@ -6,7 +6,7 @@ open Ctypes
 open Foreign
 
 [%%if
-log_calls]
+call_logger]
 
 let foreign name t =
   let f = foreign name t in
