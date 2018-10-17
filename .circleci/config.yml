@@ -159,6 +159,7 @@ jobs:
             - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            
             - run:
                 name: Running test - full-test | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'full-test'
