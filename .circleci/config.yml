@@ -1,3 +1,4 @@
+# WARNING: config.yml file is generated from config.yml.jinja
 version: 2
 jobs:
     build:
@@ -60,6 +61,9 @@ jobs:
             - run:
                 name: Build provingkeys
                 command: make provingkeys
+            - run:
+                name: Store Genesis keys
+                command: make genesiskeys
             - store_artifacts:
                 path: /tmp/artifacts
 
@@ -79,7 +83,7 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
-                name: Enable update killing
+                name: Enable update checking
                 command: make withupdates
             - run:
                 name: Get Proving Keys -- make withkeys
@@ -90,6 +94,9 @@ jobs:
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
+            - run:
+                name: Store Genesis keys
+                command: make genesiskeys
             - store_artifacts:
                 path: /tmp/artifacts
 
@@ -145,31 +152,31 @@ jobs:
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             
             - run:
-                name: full-test | proof_of_signature
+                name: Running test - full-test | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'full-test'
             - run:
-                name: coda-peers-test | proof_of_signature
+                name: Running test - coda-peers-test | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-peers-test'
             - run:
-                name: coda-transitive-peers-test | proof_of_signature
+                name: Running test - coda-transitive-peers-test | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-transitive-peers-test'
             - run:
-                name: coda-block-production-test | proof_of_signature
+                name: Running test - coda-block-production-test | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-block-production-test'
             - run:
-                name: coda-shared-prefix-test -who-proposes 0 | proof_of_signature
+                name: Running test - coda-shared-prefix-test -who-proposes 0 | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-prefix-test -who-proposes 0'
             - run:
-                name: coda-shared-prefix-test -who-proposes 1 | proof_of_signature
+                name: Running test - coda-shared-prefix-test -who-proposes 1 | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-prefix-test -who-proposes 1'
             - run:
-                name: coda-shared-state-test | proof_of_signature
+                name: Running test - coda-shared-state-test | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-shared-state-test'
             - run:
-                name: coda-restart-node-test | proof_of_signature
+                name: Running test - coda-restart-node-test | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'coda-restart-node-test'
             - run:
-                name: transaction-snark-profiler -check-only | proof_of_signature
+                name: Running test - transaction-snark-profiler -check-only | proof_of_signature
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD=proof_of_signature ../scripts/test_integration_test.sh 'transaction-snark-profiler -check-only'
 
 workflows:
