@@ -25,5 +25,5 @@ What should have happened instead of the bug?
 
 **Log file**: Upload `debug.log` (`coda client log-location` tells you where it is) to https://gist.github.com/ and link here.
 
-**Additional context**: any other notes? is this related to other issues? did
+**Additional context**: Any other notes? Is this related to other issues? Did
 anyone in Discord have anything to add?
