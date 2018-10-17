@@ -5,7 +5,7 @@ files play.
 
 - `rfcs/`
   This directory contains all accepted RFCs (or "requests for comments") made according
-  to the [RFC process]
+  to the [RFC process](CONTRIBUTING.md#RFCs)
 - `docs/`
   Documentation for the code and processes for contributing are here.
 - `src/`
@@ -29,7 +29,7 @@ files play.
       This is the coda client/daemon. It is what you use to run a staker, a snarker, or a simple client 
       for sending and receiving transactions.
     - `website/`
-      The [Coda Protocol](codaprotocol.com) website.
+      The [Coda Protocol](https://codaprotocol.com) website.
     - `reformat/`
       This program runs `ocamlformat` on most of the files in the source tree, with a few exceptions.
     - `logproc/`
