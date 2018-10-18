@@ -69,8 +69,6 @@ struct
 
     val generate_witness : t -> Other_curve.Verification_key.t -> unit
   end = struct
-    (* Verification_key
-       -> (array of G1 vars -> array of xs * array of ys *)
     type t = unit ptr
 
     let typ = ptr void
@@ -158,17 +156,6 @@ struct
 
     let base_g1_count = 2
 
-    (*
-    let characterizing_length, sign_length =
-      let g1_count = 2 + (1 + Info.input_size) in
-      let g2_count = 3 in
-      let gt_count = 1 in
-      ( (g1_count * 1)
-        + (g2_count * Info.fqe_size_in_field_elements)
-        + (gt_count * Info.fqe_size_in_field_elements)
-      , g1_count + g2_count + gt_count )
-
-*)
     let lengths ~g1_count =
       let g2_count = 3 in
       let gt_count = 1 in
@@ -319,8 +306,14 @@ struct
       in
       let characterizing_up_to_sign =
         let chars = Verification_key_var.characterizing_elts_up_to_sign vk in
-        assert (
-          Field.Vector.length chars = query_g1_size + characterizing_length ) ;
+        if
+          not
+            (Field.Vector.length chars = query_g1_size + characterizing_length)
+        then
+          failwithf "of_verification_key: Expected %d + %d, got %d"
+            query_g1_size characterizing_length
+            (Field.Vector.length chars)
+            () ;
         List.init characterizing_length ~f:(fun i ->
             Field.Vector.get chars (query_g1_size + i) )
       in

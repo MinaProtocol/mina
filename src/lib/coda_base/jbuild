@@ -34,3 +34,8 @@
   (preprocessor_deps ("../../config.mlh"))
   (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.ord)))
   (synopsis "Snarks and friends necessary for keypair generation")))
+
+(rule
+ ((targets (sample_keypairs.ml))
+  (deps    (gen/gen.exe))
+  (action  (run ${<} ${@}))))

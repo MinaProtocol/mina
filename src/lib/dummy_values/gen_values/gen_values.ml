@@ -16,8 +16,8 @@ module Curve_name = struct
     | Tock -> "Tock"
 
   let backend = function
-    | Tick -> (module Crypto_params.Tick_curve : Snarky.Backend_intf.S)
-    | Tock -> (module Crypto_params.Tock_curve : Snarky.Backend_intf.S)
+    | Tick -> (module Crypto_params.Tick_backend : Snarky.Backend_intf.S)
+    | Tock -> (module Crypto_params.Tock_backend : Snarky.Backend_intf.S)
 end
 
 module Make (B : Snarky.Backend_intf.S) (M : sig val name : Curve_name.t end) = struct
@@ -37,7 +37,21 @@ module Make (B : Snarky.Backend_intf.S) (M : sig val name : Curve_name.t end) = 
   let vk_string, pk_string =
     let open Impl in
     let kp =
-      generate_keypair Data_spec.[Boolean.typ] (fun b -> Boolean.Assert.is_true b)
+      match M.name with
+      | Tick ->
+        generate_keypair Data_spec.[Boolean.typ]
+          (fun b -> Boolean.Assert.is_true b)
+      | Tock ->
+        (* Hack *)
+        let n = Crypto_params.Tock0.Data_spec.(size [ Crypto_params.Wrap_input.typ ]) in
+        match n with
+        | 1 ->
+          generate_keypair Data_spec.[Boolean.typ]
+            (fun b1 -> Boolean.Assert.is_true b1)
+        | 2 ->
+          generate_keypair Data_spec.[Boolean.typ; Boolean.typ]
+            (fun b1 b2 -> Boolean.Assert.is_true b1)
+        | _ -> assert false
     in
     Verification_key.to_string (Keypair.vk kp),
     Proving_key.to_string (Keypair.pk kp)
@@ -48,7 +62,7 @@ module Make (B : Snarky.Backend_intf.S) (M : sig val name : Curve_name.t end) = 
     let module E = Ppxlib.Ast_builder.Make(struct let loc = loc end) in
     let open E in
     let curve_name = Curve_name.to_string name in
-    let curve_module_name = sprintf "Crypto_params.%s_curve" curve_name in
+    let curve_module_name = sprintf "Crypto_params.%s_backend" curve_name in
     let of_string_expr submodule_name str =
       [%expr
         [%e pexp_ident (ident (curve_module_name ^. submodule_name ^. "of_string"))]

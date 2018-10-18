@@ -1,3 +1,4 @@
+# WARNING: config.yml file is generated from config.yml.jinja
 version: 2
 jobs:
     build:
@@ -60,6 +61,9 @@ jobs:
             - run:
                 name: Build provingkeys
                 command: make provingkeys
+            - run:
+                name: Store Genesis keys
+                command: make genesiskeys
             - store_artifacts:
                 path: /tmp/artifacts
 
@@ -79,7 +83,7 @@ jobs:
                 name: Enable snarks --  make withsnark
                 command: make withsnark
             - run:
-                name: Enable update killing
+                name: Enable update checking
                 command: make withupdates
             - run:
                 name: Get Proving Keys -- make withkeys
@@ -90,6 +94,9 @@ jobs:
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
+            - run:
+                name: Store Genesis keys
+                command: make genesiskeys
             - store_artifacts:
                 path: /tmp/artifacts
 
@@ -106,6 +113,9 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
+                name: Get stable SNARK keys - make withkeys
+                command: source ~/.profile && make withkeys
+            - run:
                 name: Test make test-runtest
                 command: source ~/.profile && make test-runtest
 
@@ -121,6 +131,9 @@ jobs:
             - run:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
+            - run:
+                name: Get stable SNARK keys - make withkeys
+                command: source ~/.profile && make withkeys
             - run:
                 name: Test make test-stakes
                 command: source ~/.profile && make test-stakes
@@ -141,11 +154,14 @@ jobs:
                 name: Build Haskell
                 command: source ~/.profile && make kademlia
             - run:
+                name: Get stable SNARK keys - make withkeys
+                command: source ~/.profile && make withkeys
+            - run:
                 name: Build OCaml
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             {% for test in tests %}
             - run:
-                name: {{ test.friendly }}
+                name: Running test - {{ test.friendly }}
                 command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD={{test.mechanism}} ../scripts/test_integration_test.sh '{{test.name}}'{% endfor %}
 
 workflows:

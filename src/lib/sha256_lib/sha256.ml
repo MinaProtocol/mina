@@ -13,10 +13,10 @@ let bits_to_string bs =
 
 module Gadget =
   Snarky.Sha256.Make (struct
-      let prefix = Tick_curve.prefix
+      let prefix = Tick_backend.prefix
     end)
     (Tick)
-    (Tick_curve)
+    (Tick_backend)
 
 let nearest_multiple ~of_:n k =
   let r = k mod n in
@@ -24,7 +24,6 @@ let nearest_multiple ~of_:n k =
 
 let pad zero bits =
   let n = List.length bits in
-  assert (n <= Gadget.Block.length_in_bits) ;
   let padding_length =
     nearest_multiple ~of_:Gadget.Block.length_in_bits n - n
   in
