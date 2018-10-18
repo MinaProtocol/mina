@@ -310,6 +310,8 @@ module type Ledger_proof_intf = sig
 
   type t [@@deriving sexp, bin_io]
 
+  val create : statement:statement -> sok_digest:sok_digest -> proof:proof -> t
+
   val statement_target : statement -> ledger_hash
 
   val statement : t -> statement
@@ -548,7 +550,7 @@ module type Ledger_builder_intf = sig
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of (ledger_proof * ledger_proof_statement) option]
+       * [`Ledger_proof of ledger_proof option]
 
   module Coordinator : sig
     module State : sig
