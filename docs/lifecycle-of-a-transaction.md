@@ -122,7 +122,7 @@ Check out [transaction_payload.mli](../src/lib/coda_base/transaction_payload.mli
 
 (TODO: @ihm can you correct any details I mess up here)
 
-We use [Schnorr signatures](https://en.wikipedia.org/wiki/Schnorr_signature). A [Schnorr signature](https://en.wikipedia.org/wiki/Schnorr_signature) is an element in a [group](https://en.wikipedia.org/wiki/Group_(mathematics). Our group is a point on an [eliptic curve](https://en.wikipedia.org/wiki/Elliptic_curve). So what is a signature? Open up [signature lib's checked.ml](../src/lib/signature_lib/checked.ml) and scroll to `module Signature` within `module type S`. It's a point on a curve, aka a pair of two `curve_scalar` values. To sign we give a [private key](#private-key) and a message, we can verify a signature on a message with a [public key](#public-key).
+We use [Schnorr signatures](https://en.wikipedia.org/wiki/Schnorr_signature). A [Schnorr signature](https://en.wikipedia.org/wiki/Schnorr_signature) is an element in a [group](https://en.wikipedia.org/wiki/Group_(mathematics). Our group is a point on an [eliptic curve](https://en.wikipedia.org/wiki/Elliptic_curve). So what is a signature? Open up [signature lib's checked.ml](../src/lib/signature_lib/checked.ml) and scroll to `module Signature` within `module type S`. It's a non-zeor point on a curve, aka a pair of two `curve_scalar` values. To sign we give a [private key](#private-key) and a message, we can verify a signature on a message with a [public key](#public-key).
 
 This is the first time we see heavily functored code so I want to dig into this:
 
@@ -162,19 +162,66 @@ end
 <a name="snark-checked"></a>
 ### Custom SNARK circuit logic
 
-This is also the first time we see custom
-
-<a name="public-key"></a>
-## Public key
+This is also the first time we see custom SNARK circuit logic. A pattern we've been using is to scope all operations that you'd want to run inside a SNARK under a submodule `module Checked`. I don't want to dive into any of these operations, but just know when you see `module Checked` it means "this is stuff we do in a SNARK."
 
 <a name="private-key"></a>
 ## Private key
 
+In [private_key.ml](../src/lib/signature_lib/private_key.ml) we see a private key is a `Tick.Inner_curve.Scalar.t` or a  scalar on an elliptic curve. Let's break it down more precisely: Because we rely on [recursive zkSNARKs](https://eprint.iacr.org/2014/595) we actually have two elliptic curves called `Tick` and `Tock`. Most of our logic happens within `Tick` (TODO: @ihm expand on this). [Schnorr signatures](#signature) demand we use scalars for our private key.
+
+<a name="public-key"></a>
+## Public key
+
+The public key corresponding to a [private key](#private-key) `p` is just $one^p$ in other words $one*one*one ...{p times}... one$. We can see this in [public_key.ml](../src/lib/signature_lib/public_key.ml). Remember group elements are non-zero curve points which is why we also `include Non_zero_curve_point`
+
+Public keys can also be compressed -- see [public_key.mli](../src/lib/signature_lib/public_key.mli). A point on an elliptic curve can unambiguously be represented by a single scalar field element and a boolean. This is the representation we use into the [transaction payload](#transaction-payload) because it's more efficient inside of SNARK circuits.
+
 <a name="currency"></a>
 ## Currency
 
+In [currency.mli](../src/lib/currency/currency.mli), we define [nominal types](https://en.wikipedia.org/wiki/Nominal_type_system) for fee, amount, and balance that handles overflow and underflow properly. Everything is backed by 64bit unsigned integers for now. Notice, that we again include SNARK circuit operations under the [Checked](#snark-checked) submodules within each of the types.
+
 <a name="account"></a>
 ## Account
+
+Transactions are can be applied successfully only if certain properties hold of the account of the sender (and the receiver's balance doesn't overflow).
+
+Checkout [account.ml](../src/lib/coda_base/account.ml), an account is a record with a [public key](#public-key) (the owner of the account), a [balance](#currency), a [nonce](#account-nonce), and a [receipt chain hash](#receipt-chain-hash).
+
+A transaction is valid if:
+
+1. The signature is valid w.r.t. the public key of the sender
+2. The sender has enough balance to pay out the fee and the amount
+3. The reciever has enough room for the amount s.t. there won't be an overflow
+4. The [account nonce](#account-nonce) matches the nonce inside the transaction.
+
+When we apply a transaction we also cons it onto the [receipt chain](#receipt-chain-hash), and increment the account nonce.
+
+Fees are handled out-of-band see the [fee excess system](#fee-excess).
+
+This is encoded inside the SNARK in [transaction_snark.ml](../src/lib/transaction_snark/transaction_snark.ml), specifically the `apply_tagged_transaction` function, although you'll need to look at how the bool flags are set in the `is_normal` case.
+
+It's captured outside the SNARK here: (TODO: where is this? Ledger_builder somewhere?)
+
+<a name="account-nonce"></a>
+### Account Nonce
+
+The [account_nonce.mli](../src/lib/coda_numbers/account_nonce.mli) is just a [nominal type](https://en.wikipedia.org/wiki/Nominal_type_system) around a natural number. This is used for protection against double-application of transactions.
+The account nonce is incremented in the sender's the account whenever a transaction is applied.
+
+<a name="receipt-chain-hash"></a>
+### Receipt Chain Hash
+
+The [receipt.mli](../src/lib/coda_base/receipt.mli) chain hash is the top hash of a [merkle list](#merkle-list) of transaction payloads. This is used to prove that you actually sent a transaction to someone. Since Coda doesn't keep transaction history, this is how you can prove to someone that your transaction went through.
+
+How does it work?
+
+<a name="merkle-list"></a>
+#### Merkle List
+
+A merkle list is like a [merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) but with one branch. As long as you keep your merkle list hashes, you can prove that any individual piece of data was part of the list if you know for sure what the top hash is.
+
+If it's important to prove your transaction went through, you ask the receiver to start recording receipt chain hashs, and hand your transaction payload over to the receiver. He can then check the top hash of their receipt chain to see if it includes your payload.
 
 <a name="daemon"></a>
 ## Daemon
