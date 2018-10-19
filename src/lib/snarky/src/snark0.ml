@@ -61,10 +61,7 @@ module Make_basic (Backend : Backend_intf.S) = struct
     include Binable.Of_stringable (Verification_key)
   end
 
-  module Proving_key = struct
-    include Proving_key
-    include Binable.Of_stringable (Proving_key)
-  end
+  module Proving_key = Proving_key
 
   module Keypair = struct
     type t = {pk: Proving_key.t; vk: Verification_key.t}
