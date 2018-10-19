@@ -25,90 +25,15 @@ In the body of `send_txn` we build a transaction and send it over to the [daemon
 <a name="transaction"></a>
 ## Transaction
 
-In [transaction.mli](../src/lib/coda_base/transaction.mli), you'll see a couple important things. (1) we break down transactions into a [transaction payload](#transaction-payload) (the part that needs to be [signed](#signature)) and the rest. and (2) you see the type defined in what will seem to be a strange manner, but is a common pattern in our codebase. I'd like to break it down:
+In [transaction.mli](../src/lib/coda_base/transaction.mli), you'll see a couple important things. (1) we break down transactions into a [transaction payload](#transaction-payload) (the part that needs to be [signed](#signature)) and the rest. and (2) you see the type defined in what will seem to be a strange manner, but is a common pattern in our codebase.
 
-(TODO: Should we move these asides into an appendix?)
-
-### Parameterized records
-
-```ocaml
-type ('payload, 'pk, 'signature) t_ =
-  {payload: 'payload; sender: 'pk; signature: 'signature}
-[@@deriving eq, sexp, hash]
-
-type t = (Payload.t, Public_key.t, Signature.t) t_
-[@@deriving eq, sexp, hash]
-
-(* ... *)
-
-type var = (Payload.var, Public_key.var, Signature.var) t_
-```
-
-We're defining a base type `t_` with type variables for all types of record fields. Then we define the record using these type variables. Finally, we instantiate the record with `type t`, this is the OCaml type. And also `type var` this is the type of this value in a SNARK circuit. We'll cover this more later. Whenever we want something to be programmable from within a SNARK circuit we define it in this manner so we can reuse the record definition across both types.
-
-There is some talk of moving to OCaml objects to do this sort of thing so we don't need to deal with positional arguments. Perhaps I (@bkase) will write up an RFC for that at some point.
-
-<a name="ppx_deriving"></a>
-### Ppx_deriving
-
-This is the first time we've seen a [ppx_deriving](https://github.com/ocaml-ppx/ppx_deriving) macro. Here we use some deriving fields from [ppx_jane](https://github.com/janestreet/ppx_jane) as well.
-
-I want to point out one other pattern that appears often in our codebase:
-
-### Stable.V1
-
-```ocaml
-module Stable : sig
-  module V1 : sig
-    type t = (* ... *)
-    [@@deriving bin_io, (*...*)]
-  end
-end
-```
-
-Whenever a type is serializable, it's important for us to maintain backwards compatibility once we have a stable release. Ideally, we wouldn't define `bin_io` on any types outside of `Stable.V1`.
-
-<a name="quickcheck-gen"></a>
-### Property based tests
-
-[Core](https://opensource.janestreet.com/core/) has an implementation of [QuickCheck](https://blog.janestreet.com/quickcheck-for-core/) that we use whenever we can in unit tests. Here we see we have a `Quickcheck.Generator.t` for transactions.
-
-```ocaml
-(* Generate a single transaction between
- * $a, b \in keys$
- * for fee $\in [0,max_fee]$
- * and an amount $\in [1,max_amount]$
- *)
-
-val gen :
-     keys:Signature_keypair.t array
-  -> max_amount:int
-  -> max_fee:int
-  -> t Quickcheck.Generator.t
-```
-
-### Typesafe invariants (help with naming this section)
-
-Often times in Coda, we need to perform very important checks on certain pieces of data.
-For example, we need to confirm that the signature is valid on a transaction we recieve over the network.
-Such checks can be expensive, so we only want to do them once, but we want to remember that we've done them.
-
-```ocaml
-module With_valid_signature : sig
-  type nonrec t = private t [@@deriving sexp, eq, bin_io]
-
-  (*...*)
-end
-
-val check : t -> With_valid_signature.t option
-```
-
-Here we define `With_valid_signature` (usage will be `Transaction.With_valid_signature.t`) using `type nonrec t = private t` to allow upcasting to a `Transaction.t`, but prevent downcasting. The _only_ way to turn a `Transaction.t` into a `Transaction.With_valid_signature.t` is to `check` it. Now the compiler will catch our mistakes.
-
-<a name="unit-test"></a>
-### Unit tests
-
-Last general thing before we move on -- we use [ppx_inline_test](https://github.com/janestreet/ppx_inline_test) for unit testing. Of course whenever we can, we combine that with `QuickCheck`. In [transaction.ml](../src/lib/coda_base/transaction.mli), we have property that asserts the signatures we create are valid.
+For more see:
+* [Parameterized records](code-idiosyncrasies.md#parameterized-records)
+* [Ppx deriving](code-idiosyncrasies.md#ppx_deriving)
+* [Stable.V1](code-idiosyncrasies.md#stable-v1)
+* [Property based tests](code-idiosyncrasies.md#quickcheck-gen)
+* [Typesafe Invariants](code-idiosyncrasies.md#typesafe-invariants)
+* [Unit Tests](code-idiosyncrasies.md#unit-tests)
 
 Let's dig into the Transaction payload:
 
@@ -124,45 +49,7 @@ Check out [transaction_payload.mli](../src/lib/coda_base/transaction_payload.mli
 
 We use [Schnorr signatures](https://en.wikipedia.org/wiki/Schnorr_signature). A [Schnorr signature](https://en.wikipedia.org/wiki/Schnorr_signature) is an element in a [group](https://en.wikipedia.org/wiki/Group_(mathematics). Our group is a point on an [eliptic curve](https://en.wikipedia.org/wiki/Elliptic_curve). So what is a signature? Open up [signature lib's checked.ml](../src/lib/signature_lib/checked.ml) and scroll to `module Signature` within `module type S`. It's a non-zeor point on a curve, aka a pair of two `curve_scalar` values. To sign we give a [private key](#private-key) and a message, we can verify a signature on a message with a [public key](#public-key).
 
-This is the first time we see heavily functored code so I want to dig into this:
-
-### Functors
-
-We are in the process of migrating to using module signature equalities -- see [the style guidelines](style_guidelines.md#functor-signature-equalities) and [the rfc for rationale](../rfcs/0004-style-guidelines.md), but we still have a lot of code using type substitutions (`with type foo := bar`).
-
-Here's an example of a definition using type substitutions. First we define the resulting module type of the functor, keeping all types we'll be functoring in abstract.
-
-```ocaml
-module type S = sig
-  type boolean_var
-  type curve
-  type curve_var
-  (*...*)
-end
-```
-
-Then we define the functor:
-
-```ocaml
-module Schnorr
-  (Impl : Snark_intf.S)
-  (Curve : sig (*...*) end)
-  (Message : Message_intf
-    with type boolean_var := Impl.Boolean.var
-    (*...*))
-: S with type boolean_var := Impl.Boolean.var
-     and type curve := Curve.t
-     and type curve_var := Curve.var
-     (*...*)
-= struct
-  (* here we implement the signature described in S *)
-end
-```
-
-<a name="snark-checked"></a>
-### Custom SNARK circuit logic
-
-This is also the first time we see custom SNARK circuit logic. A pattern we've been using is to scope all operations that you'd want to run inside a SNARK under a submodule `module Checked`. I don't want to dive into any of these operations, but just know when you see `module Checked` it means "this is stuff we do in a SNARK."
+This is the first time we see heavily functored code, so see [functors](code-idiosyncrasies.md#functors) if you're confused. This is also the first time we see custom SNARK circuit logic, see [custom SNARK circuit logic](code-idiosyncrasies.md#snark-checked) for more.
 
 <a name="private-key"></a>
 ## Private key
@@ -217,28 +104,57 @@ The [receipt.mli](../src/lib/coda_base/receipt.mli) chain hash is the top hash o
 How does it work?
 
 <a name="merkle-list"></a>
-#### Merkle List
-
 A merkle list is like a [merkle tree](https://en.wikipedia.org/wiki/Merkle_tree) but with one branch. As long as you keep your merkle list hashes, you can prove that any individual piece of data was part of the list if you know for sure what the top hash is.
 
 If it's important to prove your transaction went through, you ask the receiver to start recording receipt chain hashs, and hand your transaction payload over to the receiver. He can then check the top hash of their receipt chain to see if it includes your payload.
 
+## Take a break!
+
+We've fully described all the components of a `Transaction.t`. Congrats on making it this far!
+
+After a break, we'll be ready to dive into the daemon code.
+
 <a name="daemon"></a>
 ## Daemon
 
+The coda daemon is defined inline in [coda.ml](../src/app/cli/src/coda.ml). Search for the `daemon` function to see the CLI flags we use there. The daemon is optionally auto-started by the client if it doesn't already exist. We get configuration from a JSON configuration file (try first from `-f`, then from `$XDG_CONFIG_DIR/coda/daemon.json`, then from `/etc/coda/daemon.json`). We do a lot of setup here which leads up to invoking `Coda_main.Coda.Make` and then `Run`ing it. The details of those are described below.
+
+When we have the `Run` modulle, we can make an instance of the coda daemon at the value level, and set up any background processes and services.
+
+<a name="main"></a>
 ## Main
 
-### Client_rpc
+By the time you're reading this, hopefully we've tamed the beast that is [coda_main.ml](../src/app/cli/src/coda_main.ml). Here we wire the system together at the module level. What does this mean? We instantiate all the functors for the different subcomponents of the daemon. Eventually we create something that conforms to `Main_intf` (in this same file).
 
+<a name="run"></a>
 ### Run functor
 
-### Instantiating the world
+At the bottom of [coda_main.ml](../src/app/cli/src/coda_main.ml), we define a `Run` functor that finally has the other side of the `rpc` call that the client makes to `send_txn`. Run contains the server-side implementations of all the RPC calls the client makes. It also is responsible for logic of setting up any RPC/webservers servers and background processes.
+
+Let's assume we have an instance of `Run.t` already created, and we'll circle back later.
+
+<a name="client-rpc"></a>
+### Client_rpc
+
+In [client_lib.ml](../src/lib/client_lib/client_lib.ml), we define the concrete RPC calls that the client uses to communicate to the daemon. We use [Async](https://opensource.janestreet.com/async/)'s RPC library for this. `Send_transactions` defined the RPC call we use to send the transaction: the query type is the input -- the transactions we want to send -- and the response is the output -- in this case `unit`, because we don't get any meaningful feedback other than "the transaction has been enqueued" on success.
 
 ### Schedule transaction into Transaction pool
 
+Back in [coda_main.ml](../src/app/cli/src/coda_main.ml), we invoke `send_txn` in [Run](#run), that delegates to `schedule_transaction` -- here we enqueue the transaction into the [Transaction Pool](#transaction-pool).
+
+<a name="coda-lib"></a>
 ## Coda_lib
 
-Connects to network and proposer
+To create a `Run` instance we'll need to go to [coda_lib.ml](../src/lib/coda_lib/coda_lib.ml) where we wire all subsystems together at the value level. This is in contrast to [coda_main.ml](#main) where we wire all the subsystems together at the module level.
+
+It's here where we can trace the path of the transaction from the transaction pool forwards. Let's sketch that out before diving deeper into each of the subsystems:
+
+1. The transaction pool broadcasts diffs through to the network
+2. 
+
+## Transaction Pool
+
+Open up [transaction_pool.ml](../src/lib/transaction_poll/transaction_pool.ml)
 
 ## Network
 
