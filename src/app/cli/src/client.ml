@@ -30,15 +30,6 @@ module Daemon_cli = struct
              "PORT Client to daemon local communication (default: %d)"
              default_client_port)
         (optional int16)
-
-    let autostart_daemon_name = "autostart-daemon"
-
-    let autostart_daemon =
-      flag autostart_daemon_name
-        ~doc:
-          "Autostart Coda daemon (default: true). If a connection to the \
-           daemon does not exist, then a prompt to start it will be shown."
-        no_arg
   end
 
   type state = Start | Run_client | Abort | No_daemon
@@ -78,7 +69,7 @@ module Daemon_cli = struct
         let%bind _ = kill p in
         failwith "Cannot connect to daemon"
 
-  let run ~f port is_prompt_hidden arg =
+  let run ~f port arg =
     let port = Option.value port ~default:default_client_port in
     let rec go = function
       | Start ->
@@ -94,9 +85,9 @@ module Daemon_cli = struct
 
   let init ~f arg_flag =
     let open Command.Param.Applicative_infix in
-    Command.Param.return (fun port is_prompt_hidden arg () ->
-        run ~f port is_prompt_hidden arg )
-    <*> Flag.port <*> Flag.autostart_daemon <*> arg_flag
+    Command.Param.return (fun port arg () ->
+        run ~f port arg )
+    <*> Flag.port <*> arg_flag
 end
 
 let get_balance =
