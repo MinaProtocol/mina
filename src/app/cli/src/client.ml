@@ -30,25 +30,9 @@ module Daemon_cli = struct
              "PORT Client to daemon local communication (default: %d)"
              default_client_port)
         (optional int16)
-
-    let autostart_daemon_name = "autostart-daemon"
-
-    let autostart_daemon =
-      flag autostart_daemon_name
-        ~doc:
-          "Autostart Coda daemon (default: true). If a connection to the \
-           daemon does not exist, then a prompt to start it will be shown."
-        no_arg
   end
 
-  type state =
-    | Start
-    | Show_menu
-    | Select_action
-    | Run_daemon
-    | Run_client
-    | Abort
-    | Startup_menu
+  type state = Start | Run_client | Abort | No_daemon
 
   let reader = Reader.stdin
 
@@ -62,14 +46,6 @@ module Daemon_cli = struct
 
   let kill p =
     Process.run_exn () ~prog:"kill" ~args:[Pid.to_string @@ Process.pid p]
-
-  let print_menu () =
-    printf
-      "%!Before starting a client command, you will need to start the Coda \
-       daemon.\n\
-       Would you like to run the daemon?\n\
-       -----------------------------------\n\n\
-       %!"
 
   let timeout = Time.Span.of_sec 10.0
 
@@ -93,35 +69,15 @@ module Daemon_cli = struct
         let%bind _ = kill p in
         failwith "Cannot connect to daemon"
 
-  let run ~f port is_prompt_hidden arg =
+  let run ~f port arg =
     let port = Option.value port ~default:default_client_port in
     let rec go = function
       | Start ->
           let%bind has_daemon = does_daemon_exist port in
-          if has_daemon then go Run_client
-          else if is_prompt_hidden then go Run_daemon
-          else go Startup_menu
-      | Startup_menu ->
-          let%bind isatty = Unix.isatty (Reader.fd (Lazy.force reader)) in
-          if isatty then go Show_menu
-          else (
-            eprintf
-              !"Error: daemon not running. Start manually or pass -%s"
-              Flag.autostart_daemon_name ;
-            go Abort )
-      | Show_menu -> print_menu () ; go Select_action
-      | Select_action -> (
-          printf "[Y/n]: " ;
-          match%bind Reader.read_line (Lazy.force reader) with
-          | `Eof -> go Select_action
-          | `Ok input ->
-            match String.capitalize input with
-            | "Y" | "YES" | "" -> go Run_daemon
-            | "N" | "NO" -> go Abort
-            | _ -> go Select_action )
-      | Run_daemon ->
-          let%bind () = invoke_daemon port in
-          go Run_client
+          if has_daemon then go Run_client else go No_daemon
+      | No_daemon ->
+          Print.printf !"Error: daemon not running. See `coda daemon`\n" ;
+          go Abort
       | Run_client -> f port arg
       | Abort -> Deferred.unit
     in
@@ -129,9 +85,8 @@ module Daemon_cli = struct
 
   let init ~f arg_flag =
     let open Command.Param.Applicative_infix in
-    Command.Param.return (fun port is_prompt_hidden arg () ->
-        run ~f port is_prompt_hidden arg )
-    <*> Flag.port <*> Flag.autostart_daemon <*> arg_flag
+    Command.Param.return (fun port arg () -> run ~f port arg)
+    <*> Flag.port <*> arg_flag
 end
 
 let get_balance =
