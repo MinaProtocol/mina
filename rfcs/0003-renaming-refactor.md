@@ -13,63 +13,63 @@ There are a multitude of naming issues which plague our codebase. Some names are
 
 ### Merkle trees
 
-| Current Name      | Description                                  | New Name            |
-|-------------------|----------------------------------------------|---------------------|
+| Current Name      | Description                                  | New Name                |
+|-------------------|----------------------------------------------|-------------------------|
 | `Ledger`          | Interface into merkle tree of account states | `Account_db`            |
-| `Ledger_hash`     | Root hash of a `Account_db`                      | `Account_db_root`       |
-| `Merkle_ledger`   | In memory implementation of `Account_db`         | `Volatile_account_db`  |
-| `Merkle_database` | On disk implementation of `Account_db`           | `Persistent_account_db` |
-| `Syncable_ledger` | Wrapper of `Account_db` to sync over network     | `Sync_account_db`       |
-| `Genesis_ledger`  | The initial `Account_db` for the protocol        | `Genesis_account_db`    |
+| `Ledger_hash`     | Root hash of a `Account_db`                  | `Account_db_root`       |
+| `Merkle_ledger`   | In memory implementation of `Account_db`     | `Volatile_account_db`   |
+| `Merkle_database` | On disk implementation of `Account_db`       | `Persistent_account_db` |
+| `Syncable_ledger` | Wrapper of `Account_db` to sync over network | `Sync_account_db`       |
+| `Genesis_ledger`  | The initial `Account_db` for the protocol    | `Genesis_account_db`    |
 
 ### States
 
-| Current Name          | Description                                                | New Name               |
-|-----------------------|------------------------------------------------------------|------------------------|
-| `Parallel_scan_state` | State of a series of parallel scan trees                   | "                      |
-| `Ledger_builder`      | State of `Parallel_scan_state` + `Transaction_work`                | `Pending_account_db`   |
-| `Ledger_builder_aux`  | Auxillary datastructure of `Pending_account_db`            | `Work_queue`           |
-| `Blockchain_state`    | State of `Account_db` root and `Pending_account_db` root at a block          | `Account_db_state`         |
-| `Consensus_state`     | Consensus mechanism specific state at a block               | "                      |
-| `Protocol_state`      | The `Account_db_state` and `Consensus_state` at a block        | `State_summary`           |
-| `Tip`                 | The `Protocol_state` and `Pending_account_db` at a block | `Full_state`           |
+| Current Name          | Description                                                               | New Name               |
+|-----------------------|---------------------------------------------------------------------------|------------------------|
+| `Parallel_scan_state` | State of a series of parallel scan trees                                  | "                      |
+| `Ledger_builder`      | State of `Parallel_scan_state` + `Transaction_work`                       | `Pending_account_db`   |
+| `Ledger_builder_aux`  | Auxillary datastructure of `Pending_account_db`                           | `Work_queue`           |
+| `Blockchain_state`    | State of `Account_db` root and `Pending_account_db` root at a block       | `Account_db_state`     |
+| `Consensus_state`     | Consensus mechanism specific state at a block                             | "                      |
+| `Protocol_state`      | The `Account_db_state` and `Consensus_state` at a block                   | "                      |
+| `Tip`                 | The `Protocol_state` and `Pending_account_db` at a block                  | `Full_state`           |
 
 ### Transitions
 
-| Current Name          | Description                                          | New Name                    |
-|-----------------------|------------------------------------------------------|-----------------------------|
-| `Snark_transition`    | Subset of `Full_state_transition` that is snarked         | `Provable_full_state_transition` |
+| Current Name          | Description                                          | New Name                         |
+|-----------------------|------------------------------------------------------|----------------------------------|
+| `Snark_transition`    | Subset of `Full_state_transition` that is snarked    | `Provable_full_state_transition` |
 | `Internal_transition` | State transition on full states                      | `Full_state_transition`          |
-| `External_transition` | State transition on lite states; sent to other nodes | `State_summaryt_transition`          |
+| `External_transition` | State transition on lite states; sent to other nodes | `Protocol_state_transition`      |
 
 ### Transactions
 
-| Current Name        | Description                                            | New Name            |
-|---------------------|--------------------------------------------------------|---------------------|
-| `Super_transaction` | ADT for all types of account state transitions         | `Transaction`               |
-| `Transaction`       | Transaction for payment between accounts               | `Payment`       |
-| `Fee_transfer`      | Transaction for distributing work fees                 | `Fee`           |
-| `Coinbase`          | Transaction for new currency added each `Block_trans`  | `Coinbase`      |
+| Current Name        | Description                                            | New Name      |
+|---------------------|--------------------------------------------------------|---------------|
+| `Super_transaction` | ADT for all types of account state transitions         | `Transaction` |
+| `Transaction`       | Transaction for payment between accounts               | `Payment`     |
+| `Fee_transfer`      | Transaction for distributing work fees                 | `Fee`         |
+| `Coinbase`          | Transaction for new currency added each `Block_trans`  | `Coinbase`    |
 
 ### Snarks
 
-| Current Name          | Description                                                      | New Name                 |
-|-----------------------|------------------------------------------------------------------|--------------------------|
-| `Statement`           | A snark proving the application of a single `Txn` to an `Acc_db` | `Transaction_statement`          |
-| `Work`                | A collection of one or two `Txn_statement`s                      | `Transcation_work`               |
-| `Transaction_snark`   | The snark which proves `Txn_statement`s                          | `Transaction_snark`              |
+| Current Name          | Description                                                      | New Name                      |
+|-----------------------|------------------------------------------------------------------|-------------------------------|
+| `Statement`           | A snark proving the application of a single `Txn` to an `Acc_db` | `Transaction_statement`       |
+| `Work`                | A collection of one or two `Txn_statement`s                      | `Transcation_work`            |
+| `Transaction_snark`   | The snark which proves `Txn_statement`s                          | `Transaction_snark`           |
 | `Blockchain_snark`    | The snark which proves `Full_state_trans`s on `Full_state`s      | `Full_state_transition_snark` |
 
 ### Primary components
 
-| Current Name                | Description                                                               | New Name              |
-|-----------------------------|---------------------------------------------------------------------------|-----------------------|
-| `Ledger_builder_controller` | Maintains locked `Full_state` and forks of potential future `Full_state`s  | `Full_state_frontier` |
-| `Proposer`                  | Proposes new blocks                                                        | "                     |
-| `Snark_worker`              | Generates `Transaction_work`s                                                      | `Snarker`             |
-| `Prover`                    | Proves `Full_state_transition`s                                                 | "                     |
-| `Verifier`                   | Verifies `Full_state_transition_snark`s                                          | "                     |
-| `Micro_client`               | A node which only tracks `State_summary` a limited number of account balances | "                     |
+| Current Name                | Description                                                                    | New Name              |
+|-----------------------------|--------------------------------------------------------------------------------|-----------------------|
+| `Ledger_builder_controller` | Maintains locked `Full_state` and forks of potential future `Full_state`s      | `Full_state_frontier` |
+| `Proposer`                  | Proposes new blocks                                                            | "                     |
+| `Snark_worker`              | Generates `Transaction_work`s                                                  | `Snarker`             |
+| `Prover`                    | Proves `Full_state_transition`s                                                | "                     |
+| `Verifier`                  | Verifies `Full_state_transition_snark`s                                        | "                     |
+| `Micro_client`              | A node which only tracks `State_summary` a limited number of account balances  | "                     |
 
 # Drawbacks
 [drawbacks]: #drawbacks
