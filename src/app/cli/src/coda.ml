@@ -90,7 +90,7 @@ let daemon (type ledger_proof) (module Kernel
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
-         Option.value ~default:(home ^/ ".current-config") conf_dir
+         Option.value ~default:(home ^/ ".coda-config") conf_dir
        in
        let%bind conf_dir =
          if is_background then (
