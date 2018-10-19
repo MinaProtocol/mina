@@ -100,11 +100,11 @@ module type Transaction_pool_intf = sig
 
   type pool_diff
 
-  type transaction_with_valid_signature
+  type valid_payment
 
-  type transaction
+  type payment
 
-  val transactions : t -> transaction_with_valid_signature Sequence.t
+  val valid_payments : t -> valid_payment Sequence.t
 
   val broadcasts : t -> pool_diff Linear_pipe.Reader.t
 
@@ -114,7 +114,7 @@ module type Transaction_pool_intf = sig
     -> incoming_diffs:pool_diff Linear_pipe.Reader.t
     -> t Deferred.t
 
-  val add : t -> transaction -> unit Deferred.t
+  val add : t -> payment -> unit Deferred.t
 end
 
 module type Snark_pool_intf = sig
@@ -229,7 +229,7 @@ module type Proposer_intf = sig
 
   type ledger_builder
 
-  type transaction
+  type valid_payment
 
   type external_transition
 
@@ -251,7 +251,7 @@ module type Proposer_intf = sig
     type t =
       { protocol_state: protocol_state * protocol_state_proof
       ; ledger_builder: ledger_builder
-      ; transactions: transaction Sequence.t }
+      ; payments: valid_payment Sequence.t }
   end
 
   type change = Tip_change of Tip.t
@@ -335,9 +335,9 @@ module type Inputs_intf = sig
 
   module Transaction_pool :
     Transaction_pool_intf
-    with type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
-     and type transaction := Transaction.t
+    with type valid_payment :=
+                Payment.With_valid_signature.t
+     and type payment := Payment.t
 
   module Sync_ledger : sig
     type query [@@deriving bin_io]
@@ -378,7 +378,7 @@ module type Inputs_intf = sig
     Proposer_intf
     with type ledger_hash := Ledger_hash.t
      and type ledger_builder := Ledger_builder.t
-     and type transaction := Transaction.With_valid_signature.t
+     and type valid_payment := Payment.With_valid_signature.t
      and type protocol_state := Consensus_mechanism.Protocol_state.value
      and type protocol_state_proof := Protocol_state_proof.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
@@ -545,7 +545,7 @@ module Make (Inputs : Inputs_intf) = struct
          Linear_pipe.write_without_pushback tips_w
            (Proposer.Tip_change
               { protocol_state= (tip.protocol_state, tip.proof)
-              ; transactions= Transaction_pool.transactions transaction_pool
+              ; payments= Transaction_pool.valid_payments transaction_pool
               ; ledger_builder= tip.ledger_builder })) ;
         Linear_pipe.transfer strongest_ledgers_for_miner tips_w ~f:
           (fun (ledger_builder, transition) ->
@@ -581,7 +581,7 @@ module Make (Inputs : Inputs_intf) = struct
                   , Consensus_mechanism.External_transition.
                     protocol_state_proof transition )
               ; ledger_builder
-              ; transactions= Transaction_pool.transactions transaction_pool }
+              ; payments= Transaction_pool.valid_payments transaction_pool }
         )
         |> don't_wait_for ;
         let proposer =

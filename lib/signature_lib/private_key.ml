@@ -8,6 +8,8 @@ end
 
 include T
 
+let to_curve_scalar = Fn.id
+
 let create () =
   (* This calls into libsnark which uses /dev/urandom *)
   Tick.Inner_curve.Scalar.random ()

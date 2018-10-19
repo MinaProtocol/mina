@@ -1,28 +1,111 @@
 open Core_kernel
 open Currency
+open Fold_lib
+open Tuple_lib
+open Snark_params.Tick
+open Coda_numbers
 
 module Payment = struct
+  module Payload = struct
+    module type S = sig
+      module Compressed_public_key : Signature_intf.Public_key.Compressed.S
+
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving hash]
+          include Binable.S with type t := t
+          include Equal.S with type t := t
+          include Sexpable.S with type t := t
+        end
+      end
+
+      type t = Stable.V1.t [@@deriving hash]
+      include Binable.S with type t := t
+      include Equal.S with type t := t
+      include Sexpable.S with type t := t
+
+      val dummy : t
+      val gen : t Quickcheck.Generator.t
+
+      val create :
+           receiver:Compressed_public_key.t
+        -> amount:Amount.t
+        -> fee:Fee.t
+        -> nonce:Account_nonce.t
+        -> t
+      val receiver : t -> Compressed_public_key.t
+      val amount : t -> Amount.t
+      val fee : t -> Fee.t
+      val nonce : t -> Account_nonce.t
+
+      include Snarkable.S with type value := t
+
+      val length_in_triples : int
+
+      val to_triples : t -> bool Triple.t list
+
+      val fold : t -> bool Triple.t Fold.t
+
+      val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+
+      val var_of_t : t -> var
+    end
+  end
+
   module With_valid_signature = struct
     module type S = sig
-      type t [@@deriving sexp, compare, eq]
+      type t
+      include Sexpable.S with type t := t
+      include Equal.S with type t := t
+      val compare : t -> t -> int
+
+      val gen :
+           keys:Keypair.t array
+        -> max_amount:int
+        -> max_fee:int
+        -> t Quickcheck.Generator.t
     end
   end
 
   module type S = sig
-    module Public_key : Signature_intf.Public_key.S
+    module Keypair : Signature_intf.Keypair.S
+    module Payload : Payload.S
+      with module Compressed_public_key = Keypair.Public_key.Compressed
+    module Signature : Signature_intf.S
 
-    type t [@@deriving sexp, compare, eq, bin_io]
+    module Stable : sig
+      module V1 : sig
+        type t
+      end
+    end
+
+    type t = Stable.V1.t
+
+    include Sexpable.S with type t := t
+    include Equal.S with type t := t
+    include Binable.S with type t := t
+    val compare : t -> t -> int
+
+    val payload : t -> Payload.t
+    val sender : t -> Keypair.Public_key.t
+    val signature : t -> Signature.Signature.t
+
+    include Snarkable.S with type value := t
 
     module With_valid_signature : With_valid_signature.S
       with type t = private t
 
+    val gen :
+         keys:Keypair.t array
+      -> max_amount:int
+      -> max_fee:int
+      -> t Quickcheck.Generator.t
+
     val check : t -> With_valid_signature.t option
 
-    val fee : t -> Fee.t
+    val sign : Keypair.t -> Payload.t -> With_valid_signature.t
 
-    val sender : t -> Public_key.t
-
-    val receiver : t -> Public_key.t
+    val public_keys : t -> Keypair.Public_key.Compressed.t list
   end
 end
 

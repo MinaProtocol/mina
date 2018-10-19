@@ -7,8 +7,9 @@ open Snark_params.Tick
 module Blockchain = struct
   module type S = sig
     module Time : Time_intf.S
-    module Ledger_builder_hash : Hash_intf.Ledger_builder.S
-    module Frozen_ledger_hash : Hash_intf.Frozen_ledger.S
+    module Ledger_builder_hash : Ledger_builder_hash_intf.S
+    module Frozen_ledger_hash : Ledger_hash_intf.Frozen.S
+    module Hash : Hash_intf.Full_size.S
 
     type ('ledger_builder_hash, 'ledger_hash, 'time) t_
     [@@deriving sexp, eq, compare]
@@ -44,8 +45,6 @@ module Blockchain = struct
                         t_
              and type value := value
 
-    module Hash = State_hash
-
     val create_value :
          ledger_builder_hash:Ledger_builder_hash.Stable.V1.t
       -> ledger_hash:Frozen_ledger_hash.Stable.V1.t
@@ -65,7 +64,6 @@ module Blockchain = struct
     module Message : Signature_intf.Message.S
     module Signature : Signature_intf.S
       with module Message = Message
-       and module Shifted = Snark_params.Tick.Inner_curve.Checked.Shifted
   end
 end
 

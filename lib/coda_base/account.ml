@@ -1,5 +1,4 @@
 open Core
-open Import
 open Coda_numbers
 open Snark_params
 open Tick
@@ -7,6 +6,9 @@ open Let_syntax
 open Currency
 open Snark_bits
 open Fold_lib
+
+module Compressed_public_key = Signature_lib.Public_key.Compressed
+module Receipt_chain_hash = Receipt_chain_hash
 
 module Index = struct
   type t = int [@@deriving bin_io]
@@ -22,6 +24,9 @@ module Index = struct
 
     let set v i b = if b then v lor (one lsl i) else v land lnot (one lsl i)
   end
+
+  let to_int = Fn.id
+  let of_int = Fn.id
 
   include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
 
@@ -40,10 +45,10 @@ module Stable = struct
     [@@deriving fields, sexp, bin_io, eq]
 
     type t =
-      ( Public_key.Compressed.Stable.V1.t
+      ( Compressed_public_key.Stable.V1.t
       , Balance.Stable.V1.t
       , Nonce.Stable.V1.t
-      , Receipt.Chain_hash.Stable.V1.t )
+      , Receipt_chain_hash.Stable.V1.t )
       t_
     [@@deriving sexp, bin_io, eq]
   end
@@ -51,22 +56,32 @@ end
 
 include Stable.V1
 
+let create ~public_key ~balance ~nonce ~receipt_chain_hash =
+  {public_key; balance; nonce; receipt_chain_hash}
+
 type var =
-  ( Public_key.Compressed.var
+  ( Compressed_public_key.var
   , Balance.var
   , Nonce.Unpacked.var
-  , Receipt.Chain_hash.var )
+  , Receipt_chain_hash.var )
   t_
 
+let create_var = create
+
+let var_public_key = public_key
+let var_balance = balance
+let var_nonce = nonce
+let var_receipt_chain_hash = receipt_chain_hash
+
 type value =
-  (Public_key.Compressed.t, Balance.t, Nonce.t, Receipt.Chain_hash.t) t_
+  (Compressed_public_key.t, Balance.t, Nonce.t, Receipt_chain_hash.t) t_
 [@@deriving sexp]
 
 let initialize public_key : t =
   { public_key
   ; balance= Balance.zero
   ; nonce= Nonce.zero
-  ; receipt_chain_hash= Receipt.Chain_hash.empty }
+  ; receipt_chain_hash= Receipt_chain_hash.empty }
 
 let empty_hash =
   Pedersen.digest_fold
@@ -76,10 +91,10 @@ let empty_hash =
 let typ : (var, value) Typ.t =
   let spec =
     let open Data_spec in
-    [ Public_key.Compressed.typ
+    [ Compressed_public_key.typ
     ; Balance.typ
     ; Nonce.Unpacked.typ
-    ; Receipt.Chain_hash.typ ]
+    ; Receipt_chain_hash.typ ]
   in
   let of_hlist
         : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) H_list.t
@@ -95,15 +110,15 @@ let typ : (var, value) Typ.t =
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
 let var_of_t ({public_key; balance; nonce; receipt_chain_hash}: value) =
-  { public_key= Public_key.Compressed.var_of_t public_key
+  { public_key= Compressed_public_key.var_of_t public_key
   ; balance= Balance.var_of_t balance
   ; nonce= Nonce.Unpacked.var_of_value nonce
-  ; receipt_chain_hash= Receipt.Chain_hash.var_of_t receipt_chain_hash }
+  ; receipt_chain_hash= Receipt_chain_hash.var_of_t receipt_chain_hash }
 
 let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
-  let%map public_key = Public_key.Compressed.var_to_triples public_key
+  let%map public_key = Compressed_public_key.var_to_triples public_key
   and receipt_chain_hash =
-    Receipt.Chain_hash.var_to_triples receipt_chain_hash
+    Receipt_chain_hash.var_to_triples receipt_chain_hash
   in
   let balance = Balance.var_to_triples balance in
   let nonce = Nonce.Unpacked.var_to_triples nonce in
@@ -111,25 +126,23 @@ let var_to_triples {public_key; balance; nonce; receipt_chain_hash} =
 
 let fold_bits ({public_key; balance; nonce; receipt_chain_hash}: t) =
   let open Fold in
-  Public_key.Compressed.fold public_key
+  Compressed_public_key.fold public_key
   +> Balance.fold balance +> Nonce.fold nonce
-  +> Receipt.Chain_hash.fold receipt_chain_hash
+  +> Receipt_chain_hash.fold receipt_chain_hash
 
 let hash_prefix = Hash_prefix.account
 
 let hash t = Pedersen.hash_fold hash_prefix (fold_bits t)
 
 let empty =
-  { public_key= Public_key.Compressed.empty
+  { public_key= Compressed_public_key.empty
   ; balance= Balance.zero
   ; nonce= Nonce.zero
-  ; receipt_chain_hash= Receipt.Chain_hash.empty }
+  ; receipt_chain_hash= Receipt_chain_hash.empty }
 
 let digest t = Pedersen.State.digest (hash t)
 
 let empty_hash = digest empty
-
-let pubkey t = t.public_key
 
 module Checked = struct
   let hash t =

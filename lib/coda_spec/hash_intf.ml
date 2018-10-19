@@ -1,5 +1,6 @@
 open Core_kernel
 open Snark_params.Tick
+open Bitstring_lib
 open Fold_lib
 open Tuple_lib
 open Snark_bits
@@ -10,6 +11,8 @@ module Base = struct
     [@@deriving bin_io, sexp, eq, compare, hash]
 
     val gen : t Quickcheck.Generator.t
+
+    val of_hash : Pedersen.Digest.t -> t
 
     val to_bytes : t -> string
 
@@ -27,11 +30,22 @@ module Base = struct
 
     type var
 
+    val create_var :
+         digest:Pedersen.Checked.Digest.var
+      -> bits:Boolean.var Bitstring.Lsb_first.t option
+      -> var
+
+    val var_digest : var -> Pedersen.Checked.Digest.var
+
+    val var_bits : var -> Boolean.var Bitstring.Lsb_first.t option
+
     val var_of_hash_unpacked : Pedersen.Checked.Digest.Unpacked.var -> var
 
     val var_to_hash_packed : var -> Pedersen.Checked.Digest.var
 
     val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+
+    val unpack : Pedersen.Checked.Digest.var -> (Boolean.var list, _) Checked.t
 
     val typ : (var, t) Typ.t
 
@@ -40,6 +54,8 @@ module Base = struct
     val equal_var : var -> var -> (Boolean.var, _) Checked.t
 
     val var_of_t : t -> var
+
+    val length_in_bits : int
 
     include Bits_intf.S with type t := t
 
@@ -56,8 +72,6 @@ module Full_size = struct
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
     val var_of_hash_packed : Pedersen.Checked.Digest.var -> var
-
-    val of_hash : Pedersen.Digest.t -> t
   end
 end
 
@@ -68,70 +82,5 @@ module Small = struct
     val var_of_hash_packed : Pedersen.Checked.Digest.var -> (var, _) Checked.t
 
     val of_hash : Pedersen.Digest.t -> t Or_error.t
-  end
-end
-
-module Blockchain_state = struct
-  module type S = Full_size.S
-end
-
-module Protocol_state = struct
-  module type S = Full_size.S
-end
-
-module Ledger = struct
-  module type S = Full_size.S
-end
-
-module Frozen_ledger = struct
-  module type S = Full_size.S
-end
-
-module Ledger_builder = struct
-  module type S = sig
-    module Ledger_hash : Ledger.S
-
-    type t
-
-    module Stable : sig
-      module V1 : sig
-        type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
-
-        include Hashable_binable with type t := t
-      end
-    end
-
-    val dummy : t
-
-    include Hashable.S with type t := t
-    include Snarkable.S with type value := t
-
-    val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
-    val length_in_triples : int
-
-    val fold : t -> bool Triple.t Fold.t
-
-    module Aux_hash : sig
-      type t
-
-      module Stable : sig
-        module V1 : sig
-          type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
-        end
-      end
-
-      val of_bytes : string -> t
-
-      val to_bytes : t -> string
-
-      val dummy : t
-    end
-
-    val ledger_hash : t -> Ledger_hash.t
-
-    val aux_hash : t -> Aux_hash.t
-
-    val of_aux_and_ledger_hash : Aux_hash.t -> Ledger_hash.t -> t
   end
 end

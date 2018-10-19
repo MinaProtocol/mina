@@ -9,4 +9,5 @@
     coda_numbers
     snark_params
     snark_bits
-    lite_base))
+    lite_base)
+  (preprocess (pps ppx_jane ppx_deriving.std)))

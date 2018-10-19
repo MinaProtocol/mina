@@ -1,3 +1,1 @@
-include Ledger_hash_intf.S
-
-val of_ledger_hash : Ledger_hash.t -> t
+include Coda_spec.Ledger_hash_intf.Frozen.S

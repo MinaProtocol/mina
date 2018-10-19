@@ -1,6 +1,7 @@
 open Core
 open Import
 open Snark_params.Tick
+open Coda_numbers
 
 include Sparse_ledger_lib.Sparse_ledger.Make (struct
             include Merkle_hash
@@ -57,30 +58,25 @@ let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
   let sender_idx = find_index_exn t (Public_key.compress sender) in
   let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in
-  assert (Account.Nonce.equal sender_account.nonce nonce) ;
+  assert (Account_nonce.equal (Account.nonce sender_account) nonce) ;
   if not Insecure.fee_collection then
     failwith "Bundle.Sparse_ledger: Insecure.fee_collection" ;
   let open Currency in
   let t =
-    set_exn t sender_idx
-      { sender_account with
-        nonce= Account.Nonce.succ sender_account.nonce
-      ; balance=
-          (let open Option in
-          value_exn
-            (let open Let_syntax in
-            let%bind total = Amount.add_fee amount fee in
-            Balance.sub_amount sender_account.balance total))
-      ; receipt_chain_hash=
-          Receipt.Chain_hash.cons payload sender_account.receipt_chain_hash }
+    set_exn t sender_idx (
+      Account.create
+        ~public_key:(Account.public_key sender_account)
+        ~nonce:(Account_nonce.succ (Account.nonce sender_account))
+        ~balance:(Option.value_exn (Option.bind (Amount.add_fee amount fee) ~f:(Balance.sub_amount (Account.balance sender_account))))
+        ~receipt_chain_hash:(Receipt_chain_hash.cons payload (Account.receipt_chain_hash sender_account)))
   in
   let receiver_account = get_exn t receiver_idx in
-  set_exn t receiver_idx
-    { receiver_account with
-      public_key= receiver
-    ; balance=
-        Option.value_exn (Balance.add_amount receiver_account.balance amount)
-    }
+  set_exn t receiver_idx (
+    Account.create
+      ~public_key:receiver
+      ~nonce:(Account.nonce receiver_account)
+      ~balance:(Option.value_exn (Balance.add_amount (Account.balance receiver_account) amount))
+      ~receipt_chain_hash:(Account.receipt_chain_hash receiver_account))
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee): Fee_transfer.single) =
@@ -137,16 +133,17 @@ let handler t =
   stage (fun (With {request; respond}) ->
       match request with
       | Ledger_hash.Get_element idx ->
-          let elt = get_exn !ledger idx in
-          let path = (path_exn idx :> Pedersen.Digest.t list) in
+          let i = Account.Index.to_int idx in
+          let elt = get_exn !ledger i in
+          let path = (path_exn i :> Pedersen.Digest.t list) in
           respond (Provide (elt, path))
       | Ledger_hash.Get_path idx ->
-          let path = (path_exn idx :> Pedersen.Digest.t list) in
+          let path = (path_exn (Account.Index.to_int idx) :> Pedersen.Digest.t list) in
           respond (Provide path)
       | Ledger_hash.Set (idx, account) ->
-          ledger := set_exn !ledger idx account ;
+          ledger := set_exn !ledger (Account.Index.to_int idx) account ;
           respond (Provide ())
       | Ledger_hash.Find_index pk ->
           let index = find_index_exn !ledger pk in
-          respond (Provide index)
+          respond (Provide (Account.Index.of_int index))
       | _ -> unhandled )

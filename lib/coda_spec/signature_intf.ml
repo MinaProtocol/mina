@@ -1,9 +1,23 @@
 open Core_kernel
-open Snark_params
+open Snark_params.Tick
+open Fold_lib
+open Tuple_lib
 
 module Private_key = struct
   module type S = sig
     type t
+    include Binable.S with type t := t
+    include Sexpable.S with type t := t
+
+    val create : unit -> t
+
+    val gen : t Quickcheck.Generator.t
+
+    val to_curve_scalar : t -> Inner_curve.Scalar.t
+
+    val to_base64 : t -> string
+
+    val of_base64_exn : string -> t
   end
 end
 
@@ -12,17 +26,73 @@ module Public_key = struct
     module type S = sig
       module Private_key : Private_key.S
 
-      type t [@@deriving sexp]
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving hash]
+          include Binable.S with type t := t
+          include Equal.S with type t := t
+          include Sexpable.S with type t := t
+        end
+      end
+
+      type t = Stable.V1.t [@@deriving hash]
+      include Binable.S with type t := t
+      include Equal.S with type t := t
+      include Sexpable.S with type t := t
+      include Snarkable.S with type value := t
+
+      val var_of_t : t -> var
 
       val of_private_key_exn : Private_key.t -> t
+
+      val of_bigstring : Bigstring.t -> t Or_error.t
+
+      val to_bigstring : t -> Bigstring.t
+
+      val to_curve_pair : t -> Field.t * Field.t
     end
   end
 
   module Compressed = struct
     module type S = sig
-      type t [@@deriving sexp, bin_io, compare]
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving hash]
+          include Binable.S with type t := t
+          include Equal.S with type t := t
+          include Sexpable.S with type t := t
+        end
+      end
 
-      include Comparable.S with type t := t
+      type t = Stable.V1.t [@@deriving hash]
+      include Binable.S with type t := t
+      include Equal.S with type t := t
+      include Sexpable.S with type t := t
+      include Snarkable.S with type value := t
+
+      val gen : t Quickcheck.Generator.t
+
+      val empty : t
+
+      val length_in_triples : int
+
+      val var_of_t : t -> var
+
+      val fold : t -> bool Triple.t Fold.t
+
+      val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+
+      val of_base64_exn : string -> t
+
+      val to_base64 : t -> string
+
+      module Checked : sig
+        val equal : var -> var -> (Boolean.var, _) Checked.t
+
+        module Assert : sig
+          val equal : var -> var -> (unit, _) Checked.t
+        end
+      end
     end
   end
 
@@ -32,6 +102,14 @@ module Public_key = struct
     module Compressed : Compressed.S
 
     val compress : t -> Compressed.t
+
+    val decompress : Compressed.t -> t option
+
+    val decompress_exn : Compressed.t -> t
+
+    val compress_var : var -> (Compressed.var, _) Checked.t
+
+    val decompress_var : Compressed.var -> (var, _) Checked.t
   end
 end
 
@@ -40,19 +118,30 @@ module Keypair = struct
     module Private_key : Private_key.S
     module Public_key : Public_key.S
 
-    type t = {public_key: Public_key.t; private_key: Private_key.t}
+    type t
+
+    val create : unit -> t
+
+    val of_private_key_exn : Private_key.t -> t
+
+    val private_key : t -> Private_key.t
+
+    val public_key : t -> Public_key.t
   end
 end
 
 module Message = struct
   module type S = sig
-    module Snarky_impl : Snarky.Snark_intf
-    open Snarky_impl
+    module Payload : sig
+      type t
+      type var
+    end
 
-    type t
     type var
 
-    val hash : t -> nonce:bool list -> Inner_curve.Scalar.t
+    val var_of_payload : Payload.var -> (var, _) Checked.t
+
+    val hash : Payload.t -> nonce:bool list -> Inner_curve.Scalar.t
 
     val hash_checked :
       var -> nonce:Boolean.var list -> (Inner_curve.Scalar.var, _) Checked.t
@@ -60,14 +149,9 @@ module Message = struct
 end
 
 module type S = sig
-  (* TODO: create better snarky interfaces *)
-  module Snarky_impl : Snarky.Snark_intf
-  open Snarky_impl
-
-  type 'a shifted = (module Inner_curve.Checked.Shifted with type t = 'a)
+  type 'a shifted = (module Inner_curve.Checked.Shifted.S with type t = 'a)
 
   module Message : Message.S
-    with module Snarky_impl = Snarky_impl
 
   module Signature : sig
     type t = Inner_curve.Scalar.t * Inner_curve.Scalar.t
@@ -114,17 +198,9 @@ module type S = sig
 
   val compress : Inner_curve.t -> bool list
 
-  val sign : Private_key.t -> Message.t -> Signature.t
+  val sign : Private_key.t -> Message.Payload.t -> Signature.t
 
   val shamir_sum : Inner_curve.Scalar.t * Inner_curve.t -> Inner_curve.Scalar.t * Inner_curve.t -> Inner_curve.t
 
-  val verify : Signature.t -> Public_key.t -> Message.t -> bool
-end
-
-module Tick = struct
-  module type S = S with module Snarky_impl = Tick
-end
-
-module Tock = struct
-  module type S = S with module Snarky_impl = Tock
+  val verify : Signature.t -> Public_key.t -> Message.Payload.t -> bool
 end

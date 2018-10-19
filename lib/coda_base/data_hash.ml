@@ -24,6 +24,8 @@ struct
 
   include Stable.V1
 
+  let of_hash = Fn.id
+
   let to_bytes t =
     Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
 
@@ -49,6 +51,12 @@ struct
     { digest: Pedersen.Checked.Digest.var
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
 
+  let create_var ~digest ~bits = {digest; bits}
+
+  let var_digest {digest; _} = digest
+
+  let var_bits {bits; _} = bits
+
   let var_of_t t =
     let n = Bigint.of_field t in
     { digest= Field.Checked.constant t
@@ -62,8 +70,7 @@ struct
 
   let var_of_hash_unpacked unpacked =
     { digest= Pedersen.Checked.Digest.Unpacked.project unpacked
-    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list))
-    }
+    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list)) }
 
   let var_to_hash_packed {digest; _} = digest
 
@@ -134,16 +141,14 @@ module Make_full_size () : Hash_intf.Full_size.S = struct
     let length_in_bits = Field.size_in_bits
   end)
 
-  let var_of_hash_packed digest = {digest; bits= None}
-
-  let of_hash = Fn.id
+  let var_of_hash_packed digest = create_var ~digest ~bits:None
 
   let if_ cond ~then_ ~else_ =
     let open Let_syntax in
     let%map digest =
-      Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
+      Field.Checked.if_ cond ~then_:(var_digest then_) ~else_:(var_digest else_)
     in
-    {digest; bits= None}
+    create_var ~digest ~bits:None
 end
 
 module Make_small (M : sig
@@ -157,13 +162,13 @@ struct
 
   let var_of_hash_packed digest =
     let%map bits = unpack digest in
-    {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
+    create_var ~digest ~bits:(Some (Bitstring.Lsb_first.of_list bits))
 
   let max = Bignum_bigint.(two_to_the length_in_bits - one)
 
   let of_hash x =
     if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max then
-      Ok x
+      Ok (of_hash x)
     else
       Or_error.errorf
         !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > \

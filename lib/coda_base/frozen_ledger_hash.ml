@@ -1,8 +1,4 @@
 open Core_kernel
-open Import
-open Snark_params
-open Snarky
-open Tick
+module Ledger_hash = Ledger_hash
 include Ledger_hash
-
-let of_ledger_hash (h: Ledger_hash.t) : t = h
+let of_ledger_hash = Fn.id

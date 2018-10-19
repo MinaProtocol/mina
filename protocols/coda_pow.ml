@@ -87,15 +87,13 @@ end
 module type Ledger_intf = sig
   type t [@@deriving sexp, bin_io]
 
-  type super_transaction
+  type transaction
 
   module Undo : sig
     type t [@@deriving sexp, bin_io]
 
-    val super_transaction : t -> super_transaction Or_error.t
+    val transaction : t -> transaction Or_error.t
   end
-
-  type valid_transaction
 
   type ledger_hash
 
@@ -107,7 +105,7 @@ module type Ledger_intf = sig
 
   val merkle_root : t -> ledger_hash
 
-  val apply_super_transaction : t -> super_transaction -> Undo.t Or_error.t
+  val apply_transaction : t -> transaction -> Undo.t Or_error.t
 
   val undo : t -> Undo.t -> unit Or_error.t
 end
@@ -326,9 +324,9 @@ module type Ledger_builder_intf = sig
 
   type ledger_proof
 
-  type super_transaction
+  type transaction
 
-  type transaction_with_valid_signature
+  type valid_payment
 
   type statement
 
@@ -357,7 +355,7 @@ module type Ledger_builder_intf = sig
   val create_diff :
        t
     -> logger:Logger.t
-    -> transactions_by_fee:transaction_with_valid_signature Sequence.t
+    -> transactions_by_fee:valid_payment Sequence.t
     -> get_completed_work:(statement -> completed_work option)
     -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
@@ -389,7 +387,7 @@ module type Ledger_builder_intf = sig
          t
       -> State.t
       -> ( ledger_proof_statement
-         , super_transaction
+         , transaction
          , sparse_ledger
          , ledger_proof )
          Snark_work_lib.Work.Single.Spec.t
@@ -649,7 +647,7 @@ module type Inputs_intf = sig
      and module Public_key = Public_key
 
   module Payment : Coda_spec.Transaction_intf.Payment.S
-    with module Public_key = Public_key
+    with module Keypair = Keypair
 
   module Fee_transfer : Coda_spec.Transaction_intf.Fee_transfer.S
     with module Public_key = Public_key
@@ -698,8 +696,7 @@ module type Inputs_intf = sig
 
   module Ledger :
     Ledger_intf
-    with type valid_transaction := Payment.With_valid_signature.t
-     and type super_transaction := Super_transaction.t
+    with type transaction := Transaction.t
      and type ledger_hash := Ledger_hash.t
 
   module Ledger_builder_aux_hash : Ledger_builder_aux_hash_intf
@@ -750,7 +747,7 @@ Merge Snark:
     Ledger_builder_diff_intf
     with type transaction := Transaction.t
      and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+                Payment.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
@@ -772,14 +769,14 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
-     and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+     and type valid_payment :=
+                Payment.With_valid_signature.t
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
      and type ledger_proof_statement := Ledger_proof_statement.t
      and type ledger_proof_statement_set := Ledger_proof_statement.Set.t
-     and type super_transaction := Super_transaction.t
+     and type transaction := Transaction.t
 
   module Ledger_builder_transition :
     Ledger_builder_transition_intf

@@ -3,17 +3,17 @@ open Snark_params
 open Fold_lib
 open Bitstring_lib
 
-module Message = struct
+include Signature_lib.Checked.Schnorr (struct
   module Scalar = Tick.Inner_curve.Scalar
   open Tick
 
-  type t = Transaction_payload.t
+  module Payload = Payment_payload
 
   type var = Pedersen.Checked.Section.t
 
   let var_of_payload payload =
     let open Let_syntax in
-    let%bind bs = Transaction_payload.var_to_triples payload in
+    let%bind bs = Payment_payload.var_to_triples payload in
     Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
       ~start:Hash_prefix.length_in_triples
 
@@ -21,7 +21,7 @@ module Message = struct
     let d =
       Pedersen.digest_fold Hash_prefix.signature
         Fold.(
-          Transaction_payload.fold t +> group3 ~default:false (of_list nonce))
+          Payment_payload.fold t +> group3 ~default:false (of_list nonce))
     in
     Scalar.of_bits (Sha256_lib.Sha256.digest (Field.unpack d))
 
@@ -44,7 +44,7 @@ module Message = struct
                 ~default:Boolean.false_ nonce)
              ~start:
                ( Hash_prefix.length_in_triples
-               + Transaction_payload.length_in_triples )
+               + Payment_payload.length_in_triples )
          in
          let d, _ =
            Pedersen.Checked.Section.to_initial_segment_digest final
@@ -55,7 +55,4 @@ module Message = struct
        let%bind bs = Pedersen.Checked.Digest.choose_preimage digest in
        let%map d = Sha256_lib.Sha256.Checked.digest (bs :> Boolean.var list) in
        Bitstring.Lsb_first.of_list (d :> Boolean.var list))
-end
-
-include Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
-          (Message)
+end)

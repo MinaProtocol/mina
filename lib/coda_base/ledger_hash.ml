@@ -1,10 +1,12 @@
 open Core
-open Import
 open Snark_params
 open Snarky
 open Tick
 open Let_syntax
 open Currency
+
+module Account = Account
+module Compressed_public_key = Signature_lib.Public_key.Compressed
 
 module Merkle_tree = Snarky.Merkle_tree.Checked(Tick)(struct
     type value = Pedersen.Checked.Digest.t
@@ -44,16 +46,16 @@ type _ Request.t +=
   | Get_path    : Account.Index.t -> path Request.t
   | Get_element : Account.Index.t -> (Account.t * path) Request.t
   | Set         : Account.Index.t * Account.t -> unit Request.t
-  | Find_index  : Public_key.Compressed.t -> Account.Index.t Request.t
+  | Find_index  : Compressed_public_key.t -> Account.Index.t Request.t
 
 let reraise_merkle_requests (With { request; respond }) =
   match request with
   | Merkle_tree.Get_path addr ->
-    respond (Reraise (Get_path addr))
+    respond (Reraise (Get_path (Account.Index.of_int addr)))
   | Merkle_tree.Set (addr, account) ->
-    respond (Reraise (Set (addr, account)))
+    respond (Reraise (Set (Account.Index.of_int addr, account)))
   | Merkle_tree.Get_element addr ->
-    respond (Reraise (Get_element addr))
+    respond (Reraise (Get_element (Account.Index.of_int addr)))
   | _ -> unhandled
 
 
@@ -67,6 +69,8 @@ let reraise_merkle_requests (With { request; respond }) =
    which is [t] but with the account [f account] at path [addr].
 *)
 let modify_account t pk ~(filter:Account.var -> (unit, _) Checked.t) ~f =
+  failwith "ABSOLUTELY DO NOT FORGET TODO"
+  (*
   with_label __LOC__ begin
     let%bind addr =
       request_witness Account.Index.Unpacked.typ
@@ -81,6 +85,7 @@ let modify_account t pk ~(filter:Account.var -> (unit, _) Checked.t) ~f =
       reraise_merkle_requests
     >>| var_of_hash_packed
   end
+   *)
 
 (*
    [modify_account_send t pk ~f] implements the following spec:
@@ -90,8 +95,9 @@ let modify_account t pk ~(filter:Account.var -> (unit, _) Checked.t) ~f =
    which is [t] but with the account [f account] at path [addr].
 *)
 let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(fun account ->
-        let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
-        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
+        let public_key = Account.var_public_key account in
+        let%bind account_already_there = Compressed_public_key.Checked.equal public_key pk in
+        let%bind account_not_there = Compressed_public_key.Checked.equal public_key Compressed_public_key.(var_of_t empty) in
         let%bind fee_transfer = Boolean.(account_not_there && is_fee_transfer) in
         Boolean.Assert.any [account_already_there; fee_transfer]
 ) ~f
@@ -104,7 +110,8 @@ let modify_account_send t pk ~is_fee_transfer ~f = modify_account t pk ~filter:(
    which is [t] but with the account [f account] at path [addr].
 *)
 let modify_account_recv t pk ~f = modify_account t pk ~filter:(fun account ->
-        let%bind account_already_there = Public_key.Compressed.Checked.equal account.public_key pk in
-        let%bind account_not_there = Public_key.Compressed.Checked.equal account.public_key Public_key.Compressed.(var_of_t empty) in
+        let public_key = Account.var_public_key account in
+        let%bind account_already_there = Compressed_public_key.Checked.equal public_key pk in
+        let%bind account_not_there = Compressed_public_key.Checked.equal public_key Compressed_public_key.(var_of_t empty) in
         Boolean.Assert.any [account_already_there; account_not_there]
 ) ~f
