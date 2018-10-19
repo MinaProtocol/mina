@@ -491,6 +491,10 @@ module type Ledger_builder_base_intf = sig
     type t [@@deriving bin_io]
 
     val hash : t -> ledger_builder_aux_hash
+
+    val verify_merge_proofs : t -> bool Deferred.t
+
+    val is_valid : t -> bool
   end
 
   val ledger : t -> ledger

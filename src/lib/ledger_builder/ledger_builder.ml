@@ -322,10 +322,11 @@ end = struct
             Parallel_scan.State.fold_chronological t ~init:None ~f:
               (fun acc_statement job ->
                 match job with
-                | Merge (None, Some {Ledger_proof_with_verification.data=p; _}) | Merge (Some {data=p; _}, None) ->
+                | Merge (None, Some {Ledger_proof_with_verification.data= p; _})
+                 |Merge (Some {data= p; _}, None) ->
                     Ledger_proof.statement p |> merge_acc acc_statement
                 | Merge (None, None) -> acc_statement
-                | Merge (Some {data=p1; _}, Some {data=p2; _}) ->
+                | Merge (Some {data= p1; _}, Some {data= p2; _}) ->
                     merge_acc acc_statement
                       (merge
                          (Ledger_proof.statement p1)
@@ -382,6 +383,19 @@ end = struct
       Parallel_scan.parallelism ~state:t
       = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
       && Parallel_scan.is_valid t
+
+    let verify_merge_proofs t =
+      let jobs = Parallel_scan.get_merge_nodes ~state:t in
+      Deferred.Sequence.for_all jobs ~f:(function
+        | Base _ -> failwith "Merge nodes should only be retrieved"
+        | Merge (left, right) ->
+            List.filter_opt [left; right]
+            |> Deferred.List.for_all ~f:
+                 (fun {Ledger_proof_with_verification.data= proof; prover; fee}
+                 ->
+                   let message = Sok_message.create ~fee ~prover in
+                   Inputs.Ledger_proof_verifier.verify ~message proof
+                     (Ledger_proof.statement proof) ) )
 
     include Binable.Of_binable (T)
               (struct
@@ -446,7 +460,7 @@ end = struct
       let module A = Parallel_scan.Available_job in
       let canonical_statement_of_job = function
         | A.Base {Super_transaction_with_witness.statement; _} -> statement
-        | A.Merge ({Ledger_proof_with_verification.data=p1; _}, {data=p2; _ }) ->
+        | A.Merge ({Ledger_proof_with_verification.data= p1; _}, {data= p2; _}) ->
             Ledger_proof_statement.merge
               (Ledger_proof.statement p1)
               (Ledger_proof.statement p2)
@@ -461,7 +475,7 @@ end = struct
             in
             Snark_work_lib.Work.Single.Spec.Transition
               (d.statement, transaction, d.witness)
-        | A.Merge ({data=p1; _}, {data=p2; _ }) ->
+        | A.Merge ({data= p1; _}, {data= p2; _}) ->
             let s1 = Ledger_proof.statement p1
             and s2 = Ledger_proof.statement p2 in
             let merged =
@@ -636,13 +650,14 @@ end = struct
     ; ledger
     ; public_key= self }
 
-  let current_ledger_proof t = 
-    Option.map (Parallel_scan.last_emitted_value t.scan_state) ~f:Ledger_proof_with_verification.data
-    
+  let current_ledger_proof t =
+    Option.map
+      (Parallel_scan.last_emitted_value t.scan_state)
+      ~f:Ledger_proof_with_verification.data
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
-    | Merge ({Ledger_proof_with_verification.data=p1; _}, {data=p2; _}) ->
+    | Merge ({Ledger_proof_with_verification.data= p1; _}, {data= p2; _}) ->
         let stmt1 = Ledger_proof.statement p1
         and stmt2 = Ledger_proof.statement p2 in
         let open Option.Let_syntax in
@@ -671,7 +686,7 @@ end = struct
         Ok
           (Lifted
              {Ledger_proof_with_verification.data= ledger_proof; prover; fee})
-    | Merge ({data=p; _}, {data=p'; _}) ->
+    | Merge ({data= p; _}, {data= p'; _}) ->
         let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
         let open Or_error.Let_syntax in
         let%map fee_excess =
@@ -711,14 +726,14 @@ end = struct
     in
     let%bind scanable_work_list =
       map2_or_error next_jobs
-        (List.concat_map works ~f:(
-          fun {Completed_work.fee; proofs; prover} ->
-             List.map proofs ~f:(fun proof -> (fee, proof, prover)) 
-             ))
+        (List.concat_map works ~f:(fun {Completed_work.fee; proofs; prover} ->
+             List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
         ~f:completed_work_to_scanable_work
     in
-    let%map result = (Parallel_scan.fill_in_completed_jobs ~state
-      ~completed_jobs:scanable_work_list) in
+    let%map result =
+      Parallel_scan.fill_in_completed_jobs ~state
+        ~completed_jobs:scanable_work_list
+    in
     Option.map result ~f:Ledger_proof_with_verification.data
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =

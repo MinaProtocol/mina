@@ -419,6 +419,10 @@ let%test_module "test" =
             type t = int [@@deriving bin_io]
 
             let hash t = t
+
+            let verify_merge_proofs _ = Deferred.return true
+
+            let is_valid _ = true
           end
 
           type proof = ()
