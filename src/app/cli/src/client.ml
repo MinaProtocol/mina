@@ -41,11 +41,7 @@ module Daemon_cli = struct
         no_arg
   end
 
-  type state =
-    | Start
-    | Run_client
-    | Abort
-    | No_daemon 
+  type state = Start | Run_client | Abort | No_daemon
 
   let reader = Reader.stdin
 
@@ -87,11 +83,10 @@ module Daemon_cli = struct
     let rec go = function
       | Start ->
           let%bind has_daemon = does_daemon_exist port in
-          if has_daemon then go Run_client
-          else go No_daemon
+          if has_daemon then go Run_client else go No_daemon
       | No_daemon ->
-        Print.printf !"Error: daemon not running. See `coda daemon`\n";
-        go Abort
+          Print.printf !"Error: daemon not running. See `coda daemon`\n" ;
+          go Abort
       | Run_client -> f port arg
       | Abort -> Deferred.unit
     in
