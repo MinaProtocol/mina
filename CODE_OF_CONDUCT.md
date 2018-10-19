@@ -57,17 +57,13 @@ If a community member engages in unacceptable behavior, the community organizers
 
 ## 7. Reporting Guidelines
 
-If you are subject to or witness unacceptable behavior, or have any other concerns, please notify a community organizer as soon as possible. [TODO: CONTACT_INFO_HERE].
-
-[TODO: LINK_TO_REPORTING_GUIDELINES]
+If you are subject to or witness unacceptable behavior, or have any other concerns, please notify us as soon as possible by emailing conduct@o1labs.org. Please see the [Reporting Guidelines](./docs/reporting_guidelines.md).
 
 Additionally, community organizers are available to help community members engage with local law enforcement or to otherwise help those experiencing unacceptable behavior feel safe. In the context of in-person events, organizers will also provide escorts as desired by the person experiencing distress.
 
 ## 8. Addressing Grievances
 
-If you feel you have been falsely or unfairly accused of violating this Code of Conduct, you should notify [TODO: GOVERNING_BODY] with a concise description of your grievance. Your grievance will be handled in accordance with our existing governing policies. [TODO: LINK_TO_POLICY]
-
-[NOTE: Every organization's governing policies should dictate how you handle warnings and expulsions of community members. It is strongly recommended that you mention those policies here or in Section 7 and that you include a mechanism for addressing grievances.]
+If you feel you have been falsely or unfairly accused of violating this Code of Conduct, you should notify the O(1) Labs board with a concise description of your grievance.
 
 ## 9. Scope
 
@@ -77,11 +73,11 @@ This code of conduct and its related procedures also applies to unacceptable beh
 
 ## 10. Contact info
 
-[TODO: YOUR CONTACT INFO HERE -- this should be a single person or a small team who can respond to issues directly]
+O(1) Labs board, board@o1labs.org
 
 ## 11. License and attribution
 
-The Citizen Code of Conduct is distributed by [Stumptown Syndicate](http://stumptownsyndicate.org) under a [Creative Commons Attribution-ShareAlike license](http://creativecommons.org/licenses/by-sa/3.0/). 
+The Citizen Code of Conduct is distributed by [Stumptown Syndicate](http://stumptownsyndicate.org) under a [Creative Commons Attribution-ShareAlike license](http://creativecommons.org/licenses/by-sa/3.0/).
 
 Portions of text derived from the [Django Code of Conduct](https://www.djangoproject.com/conduct/) and the [Geek Feminism Anti-Harassment Policy](http://geekfeminism.wikia.com/wiki/Conference_anti-harassment/Policy).
 
