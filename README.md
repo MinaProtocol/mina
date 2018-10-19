@@ -7,6 +7,10 @@ Coda is a new cryptocurrency protocol with a lightweight, constant sized blockch
 
 Please see our [developer README](README-dev.md) if you are interested in building coda from source code.
 
+We have a [Discord server]( https://discord.gg/ShKhA7J)! Please come by if you
+need help or have questions. You might also be interested in the [OCaml
+Discord](https://discordapp.com/invite/cCYQbqN), for general OCaml help.
+
 FIXME: Add some user documentation here.
 
 # Getting started

@@ -259,11 +259,7 @@ module Make (Inputs : Inputs.S) : sig
 end = struct
   open Inputs
 
-  type 'a with_statement = 'a * Ledger_proof_statement.t
-  [@@deriving sexp, bin_io]
-
   module Super_transaction_with_witness = struct
-    (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction_with_info: Ledger.Undo.t
       ; statement: Ledger_proof_statement.t
@@ -271,27 +267,29 @@ end = struct
     [@@deriving sexp, bin_io]
   end
 
-  (* TODO: This is redundant right now, the transaction snark has the statement
-   inside of it. *)
-  module Snark_with_statement = struct
-    type t = Ledger_proof.t with_statement [@@deriving sexp, bin_io]
+  module Ledger_proof_with_verification = struct
+    type t =
+      { data: Ledger_proof.t
+      ; prover: Compressed_public_key.t
+      ; fee: Currency.Fee.t }
+    [@@deriving sexp, bin_io, fields]
   end
 
   type job =
-    ( Ledger_proof.t with_statement
+    ( Ledger_proof_with_verification.t
     , Super_transaction_with_witness.t )
     Parallel_scan.Available_job.t
   [@@deriving sexp_of]
 
   type parallel_scan_completed_job =
     (*For the parallel scan*)
-    Ledger_proof.t with_statement Parallel_scan.State.Completed_job.t
+    Ledger_proof_with_verification.t Parallel_scan.State.Completed_job.t
   [@@deriving sexp, bin_io]
 
   module Aux = struct
     module T = struct
       type t =
-        ( Ledger_proof.t with_statement
+        ( Ledger_proof_with_verification.t
         , Super_transaction_with_witness.t )
         Parallel_scan.State.t
       [@@deriving sexp, bin_io]
@@ -301,7 +299,7 @@ end = struct
 
     let hash_to_string scan_state =
       ( Parallel_scan.State.hash scan_state
-          (Binable.to_string (module Snark_with_statement))
+          (Binable.to_string (module Ledger_proof_with_verification))
           (Binable.to_string (module Super_transaction_with_witness))
         :> string )
 
@@ -324,11 +322,15 @@ end = struct
             Parallel_scan.State.fold_chronological t ~init:None ~f:
               (fun acc_statement job ->
                 match job with
-                | Merge (None, Some (_, s)) | Merge (Some (_, s), None) ->
-                    merge_acc acc_statement s
+                | Merge (None, Some {Ledger_proof_with_verification.data= p; _})
+                 |Merge (Some {data= p; _}, None) ->
+                    Ledger_proof.statement p |> merge_acc acc_statement
                 | Merge (None, None) -> acc_statement
-                | Merge (Some (_, s1), Some (_, s2)) ->
-                    merge_acc acc_statement (merge s1 s2)
+                | Merge (Some {data= p1; _}, Some {data= p2; _}) ->
+                    merge_acc acc_statement
+                      (merge
+                         (Ledger_proof.statement p1)
+                         (Ledger_proof.statement p2))
                 | Base None -> acc_statement
                 | Base
                     (Some
@@ -381,6 +383,19 @@ end = struct
       Parallel_scan.parallelism ~state:t
       = Int.pow 2 (Config.transaction_capacity_log_2 + 1)
       && Parallel_scan.is_valid t
+
+    let verify_merge_proofs t =
+      let jobs = Parallel_scan.get_merge_nodes ~state:t in
+      Deferred.Sequence.for_all jobs ~f:(function
+        | Base _ -> failwith "Merge nodes should only be retrieved"
+        | Merge (left, right) ->
+            List.filter_opt [left; right]
+            |> Deferred.List.for_all ~f:
+                 (fun {Ledger_proof_with_verification.data= proof; prover; fee}
+                 ->
+                   let message = Sok_message.create ~fee ~prover in
+                   Inputs.Ledger_proof_verifier.verify ~message proof
+                     (Ledger_proof.statement proof) ) )
 
     include Binable.Of_binable (T)
               (struct
@@ -443,11 +458,13 @@ end = struct
       let state = State.remove_old_assignments state in
       let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
       let module A = Parallel_scan.Available_job in
-      let module L = Ledger_proof_statement in
       let canonical_statement_of_job = function
         | A.Base {Super_transaction_with_witness.statement; _} -> statement
-        | A.Merge ((_, s1), (_, s2)) ->
-            Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
+        | A.Merge ({Ledger_proof_with_verification.data= p1; _}, {data= p2; _}) ->
+            Ledger_proof_statement.merge
+              (Ledger_proof.statement p1)
+              (Ledger_proof.statement p2)
+            |> Or_error.ok_exn
       in
       let single_spec (job: job) =
         match job with
@@ -458,7 +475,9 @@ end = struct
             in
             Snark_work_lib.Work.Single.Spec.Transition
               (d.statement, transaction, d.witness)
-        | A.Merge ((p1, s1), (p2, s2)) ->
+        | A.Merge ({data= p1; _}, {data= p2; _}) ->
+            let s1 = Ledger_proof.statement p1
+            and s2 = Ledger_proof.statement p2 in
             let merged =
               Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
             in
@@ -498,7 +517,7 @@ end = struct
 
   let aux {scan_state; _} = scan_state
 
-  let verify_scan_state error_prefix ledger aux snarked_ledger_hash =
+  let verify_scan_state error_prefix ledger (aux: Aux.t) snarked_ledger_hash =
     let open Or_error.Let_syntax in
     let check cond err =
       if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
@@ -525,14 +544,18 @@ end = struct
         in
         ()
 
-  let verify_scan_state_after_apply ledger aux =
+  let get_target {Ledger_proof_with_verification.data; _} =
+    let {Ledger_proof_statement.target; _} = Ledger_proof.statement data in
+    target
+
+  let verify_scan_state_after_apply ledger (aux: Aux.t) =
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
     match Parallel_scan.last_emitted_value aux with
     | None -> verify_scan_state error_prefix ledger aux None
-    | Some (_, {Ledger_proof_statement.target; _}) ->
-        verify_scan_state error_prefix ledger aux (Some target)
+    | Some proof ->
+        verify_scan_state error_prefix ledger aux (Some (get_target proof))
 
   let snarked_ledger :
       t -> snarked_ledger_hash:Frozen_ledger_hash.t -> Ledger.t Or_error.t =
@@ -564,7 +587,8 @@ end = struct
     else
       match Parallel_scan.last_emitted_value scan_state with
       | None -> return snarked_ledger
-      | Some (_, {target; _}) ->
+      | Some proof ->
+          let target = get_target proof in
           if Frozen_ledger_hash.equal snarked_ledger_hash target then
             return snarked_ledger
           else
@@ -627,12 +651,15 @@ end = struct
     ; public_key= self }
 
   let current_ledger_proof t =
-    let res_opt = Parallel_scan.last_emitted_value t.scan_state in
-    Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
+    Option.map
+      (Parallel_scan.last_emitted_value t.scan_state)
+      ~f:Ledger_proof_with_verification.data
 
   let statement_of_job : job -> Ledger_proof_statement.t option = function
     | Base {statement; _} -> Some statement
-    | Merge ((_, stmt1), (_, stmt2)) ->
+    | Merge ({Ledger_proof_with_verification.data= p1; _}, {data= p2; _}) ->
+        let stmt1 = Ledger_proof.statement p1
+        and stmt2 = Ledger_proof.statement p2 in
         let open Option.Let_syntax in
         let%bind () =
           Option.some_if
@@ -649,11 +676,18 @@ end = struct
         ; fee_excess
         ; proof_type= `Merge }
 
-  let completed_work_to_scanable_work (job: job) (proof: Ledger_proof.t) :
+  let completed_work_to_scanable_work (job: job) (fee, current_proof, prover) :
       parallel_scan_completed_job Or_error.t =
+    let sok_digest = Ledger_proof.sok_digest current_proof
+    and proof = Ledger_proof.underlying_proof current_proof in
     match job with
-    | Base {statement; _} -> Ok (Lifted (proof, statement))
-    | Merge ((_, s), (_, s')) ->
+    | Base {statement; _} ->
+        let ledger_proof = Ledger_proof.create ~statement ~sok_digest ~proof in
+        Ok
+          (Lifted
+             {Ledger_proof_with_verification.data= ledger_proof; prover; fee})
+    | Merge ({data= p; _}, {data= p'; _}) ->
+        let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
         let open Or_error.Let_syntax in
         let%map fee_excess =
           Fee.Signed.add s.fee_excess s'.fee_excess
@@ -662,13 +696,18 @@ end = struct
           Currency.Amount.add s.supply_increase s'.supply_increase
           |> option "Error adding supply_increases"
         in
+        let statement =
+          { Ledger_proof_statement.source= s.source
+          ; target= s'.target
+          ; supply_increase
+          ; fee_excess
+          ; proof_type= `Merge }
+        in
         Parallel_scan.State.Completed_job.Merged
-          ( proof
-          , { Ledger_proof_statement.source= s.source
-            ; target= s'.target
-            ; supply_increase
-            ; fee_excess
-            ; proof_type= `Merge } )
+          { Ledger_proof_with_verification.data=
+              Ledger_proof.create ~statement ~sok_digest ~proof
+          ; prover
+          ; fee }
 
   let verify ~message job proof =
     match statement_of_job job with
@@ -679,19 +718,23 @@ end = struct
   let total_proofs (works: Completed_work.t list) =
     List.sum (module Int) works ~f:(fun w -> List.length w.proofs)
 
-  let fill_in_completed_work (state: scan_state) (works: Completed_work.t list)
-      : Ledger_proof.t with_statement option Or_error.t =
+  let fill_in_completed_work (state: Aux.t) (works: Completed_work.t list) :
+      Ledger_proof.t option Or_error.t =
     let open Or_error.Let_syntax in
     let%bind next_jobs =
       Parallel_scan.next_k_jobs ~state ~k:(total_proofs works)
     in
     let%bind scanable_work_list =
       map2_or_error next_jobs
-        (List.concat_map works ~f:(fun work -> work.proofs))
+        (List.concat_map works ~f:(fun {Completed_work.fee; proofs; prover} ->
+             List.map proofs ~f:(fun proof -> (fee, proof, prover)) ))
         ~f:completed_work_to_scanable_work
     in
-    Parallel_scan.fill_in_completed_jobs ~state
-      ~completed_jobs:scanable_work_list
+    let%map result =
+      Parallel_scan.fill_in_completed_jobs ~state
+        ~completed_jobs:scanable_work_list
+    in
+    Option.map result ~f:Ledger_proof_with_verification.data
 
   let enqueue_data_with_rollback state data : unit Result_with_rollback.t =
     Result_with_rollback.of_or_error @@ Parallel_scan.enqueue_data ~state ~data
@@ -979,7 +1022,7 @@ end = struct
       verify_scan_state_after_apply t.ledger t.scan_state
       |> Result_with_rollback.of_or_error
     in
-    Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
+    res_opt
 
   let apply t witness = Result_with_rollback.run (apply_diff t witness)
 
@@ -1804,6 +1847,8 @@ let%test_module "test" =
         let sok_digest _ = ()
 
         let statement = Fn.id
+
+        let create ~statement ~sok_digest:_ ~proof:_ = statement
       end
 
       module Ledger_proof_verifier = struct

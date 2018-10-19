@@ -12,4 +12,13 @@ let run ({input; fn; after}: ('input, 'output) t) =
   let interruptible, ivar = fn input in
   (Interruptible.finally interruptible ~f:after, ivar)
 
+let map ({input; fn; after}: ('input, 'output) t) ~f =
+  { input
+  ; fn=
+      Fn.compose
+        (fun (interruptible, ivar) ->
+          (Interruptible.map ~f interruptible, ivar) )
+        fn
+  ; after }
+
 let after {input; fn; after} ~f = {input; fn; after= Fn.compose after f}
