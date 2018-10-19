@@ -31,6 +31,8 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
     let transaction_capacity_log_2 = 3
 
     let commit_id = None
+
+    let work_selection = Protocols.Coda_pow.Work_selection.Seq
   end in
   let should_propose_bool = true in
   let%bind (module Init) =

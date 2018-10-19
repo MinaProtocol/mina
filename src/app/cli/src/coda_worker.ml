@@ -22,6 +22,7 @@ struct
       ; transition_interval: float
       ; should_propose: bool
       ; snark_worker_config: Snark_worker_config.t option
+      ; work_selection: Protocols.Coda_pow.Work_selection.t
       ; conf_dir: string
       ; program_dir: string
       ; external_port: int
@@ -127,6 +128,7 @@ struct
           ; should_propose
           ; transition_interval
           ; snark_worker_config
+          ; work_selection
           ; conf_dir
           ; program_dir
           ; external_port
@@ -154,6 +156,8 @@ struct
           let transaction_capacity_log_2 = 3
 
           let commit_id = None
+
+          let work_selection = work_selection
         end in
         let%bind (module Init) =
           make_init ~should_propose (module Config) (module Kernel)
