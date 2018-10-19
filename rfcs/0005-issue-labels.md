@@ -7,9 +7,10 @@ several categories of label, and how to use them.
 # Detailed design
 [detailed-design]: #detailed-design
 
-Here are the categories of issue label:
+Here are the categories of issue label. Each label is composed of the category
+name and the label name. For example, `area-snark` or `priority-critical`.
 
-- "Area". This narrows general area of the codebase or feature that this
+- `area-`. This narrows general area of the codebase or feature that this
   issue impacts.
 
   - `snark`
@@ -29,7 +30,7 @@ Here are the categories of issue label:
   - `testnet`
   - `sdk`
 
-- "Impact". This describes the general impact of the issue.
+- `impact-`. This describes the general impact of the issue.
 
   - `crash`: there's a crash
   - `slow`: our code is slower than it could be
@@ -40,16 +41,14 @@ Here are the categories of issue label:
   - `dos`: liable to a remote denial of service attack
   - `insecure`: an attacker can exploit this for nefarious ends
 
-- "Experience"/"Effort". This estimates how much experience (with OCaml/the
+- `effort-`. This estimates how much experience (with OCaml/the
   codebase/whatever) is necessary to resolve an issue.
 
   - `easy`: not much experience necessary
   - `medium`: some experience necessary
   - `hard`: a lot of experience necessary, will be challenging
-  - `mentored`: this issue has someone who can mentor contributors through
-    fixing it
 
-- "Category". General, broad-stroke categories useful for filtering the issue
+- `category-`. General, broad-stroke categories useful for filtering the issue
   list.
 
   - `bug`
@@ -62,15 +61,17 @@ Here are the categories of issue label:
     take someone already familiar with the codebase less than around half
     an hour to implement it.
   - `regression`: this issue was previously already fixed.
+  - `mentored`: this issue has someone who can mentor contributors through
+    fixing it
   - `duplicate`
 
-- "Priority". How urgent it is to fix the issue.
+- `priority-`. How urgent it is to fix the issue.
 
   - `low`
   - `high`
   - `critical`
 
-- "Status". This indicates something about the current status of the issue.
+- `status-`. This indicates something about the current status of the issue.
 
   - `needs-repro`: needs to be reproduced
   - `cannot-repro`: reproduction attempts failed
@@ -100,14 +101,3 @@ should apply labels to new issues as appropriate.
 - Electron: https://github.com/electron/electron/labels
 - Tezos: https://gitlab.com/tezos/tezos/labels
 - ZCash: https://github.com/zcash/zcash/labels
-
-# Unresolved questions
-[unresolved-questions]: #unresolved-questions
-
-- How should we distinguish between categories? Two primary options are:
-
-  1. Long form. `Area: Kademlia`
-  2. Abbreviated. `A-kademlia`
-
-Abbreviated labels contain no whitespace, which makes them easier to use with
-the issue search syntax.
