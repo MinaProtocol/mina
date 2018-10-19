@@ -85,8 +85,7 @@ module Daemon_cli = struct
 
   let init ~f arg_flag =
     let open Command.Param.Applicative_infix in
-    Command.Param.return (fun port arg () ->
-        run ~f port arg )
+    Command.Param.return (fun port arg () -> run ~f port arg)
     <*> Flag.port <*> arg_flag
 end
 
