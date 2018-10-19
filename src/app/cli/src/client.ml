@@ -300,6 +300,10 @@ let privkey_path_flag =
     ~doc:"FILE File to write private key into (public key will be FILE.pub)"
     (required file)
 
+let privkey_read_path_flag =
+  let open Command.Param in
+  flag "privkey-path" ~doc:"FILE File to read private key from" (required file)
+
 let read_keypair from_account =
   let open Deferred.Let_syntax in
   let perm_error = ref false in
@@ -345,7 +349,7 @@ let batch_send_txns =
   end in
   let arg =
     let open Command.Let_syntax in
-    let%map_open privkey_path = privkey_path_flag
+    let%map_open privkey_path = privkey_read_path_flag
     and transactions_path = anon ("transactions-file" %: string) in
     (privkey_path, transactions_path)
   in
@@ -414,7 +418,7 @@ let send_txn =
   let flag =
     let open Command.Param in
     return (fun a b c d -> (a, b, c, d))
-    <*> address_flag <*> privkey_path_flag <*> fee_flag <*> amount_flag
+    <*> address_flag <*> privkey_read_path_flag <*> fee_flag <*> amount_flag
   in
   Command.async ~summary:"Send transaction to an address"
     (Daemon_cli.init flag ~f:(fun port (address, from_account, fee, amount) ->
@@ -452,7 +456,7 @@ let wrap_key =
 let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
-    let%map_open privkey_path = privkey_path_flag in
+    let%map_open privkey_path = privkey_read_path_flag in
     fun () ->
       let open Deferred.Let_syntax in
       let%map kp =
