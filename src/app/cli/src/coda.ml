@@ -90,7 +90,7 @@ let daemon (type ledger_proof) (module Kernel
      fun () ->
        let open Deferred.Let_syntax in
        let compute_conf_dir home =
-         Option.value ~default:(home ^/ ".current-config") conf_dir
+         Option.value ~default:(home ^/ ".coda-config") conf_dir
        in
        let%bind conf_dir =
          if is_background then (
@@ -153,7 +153,7 @@ let daemon (type ledger_proof) (module Kernel
            should_propose_flag
        in
        let transaction_capacity_log_2 =
-         or_from_config YJ.Util.to_int_option "txn-capacity" ~default:3
+         or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
            transaction_capacity_log_2
        in
        let rest_server_port =

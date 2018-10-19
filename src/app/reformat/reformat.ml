@@ -8,6 +8,7 @@ let whitelist =
   ; "lib/coda_base/blockchain_state.ml"
   ; "lib/coda_base/ledger_hash.ml"
   ; "lib/coda_base/public_key.ml"
+  ; "lib/coda_base/gen/gen.ml"
   ; "lib/snarky/src/request.ml"
   ; "lib/snarky/src/request.mli"
   ; "lib/spirv/generator.ml"

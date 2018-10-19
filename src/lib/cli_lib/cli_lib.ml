@@ -55,7 +55,10 @@ struct
   let arg_type =
     Command.Arg_type.create (fun s ->
         try Key.of_base64_exn s with e ->
-          failwithf "Couldn't read %s %s -- here's a sample one: %s" Key.name
+          failwithf
+            "Couldn't read %s (Invalid key format) %s -- here's a sample one: \
+             %s"
+            Key.name
             (Error.to_string_hum (Error.of_exn e))
             (Key.to_base64 (Key.random ()))
             () )
@@ -72,7 +75,10 @@ let public_key_compressed =
   Pk.arg_type
 
 let public_key =
-  Command.Arg_type.map public_key_compressed ~f:Public_key.decompress_exn
+  Command.Arg_type.map public_key_compressed ~f:(fun pk ->
+      match Public_key.decompress pk with
+      | None -> failwith "Invalid key"
+      | Some pk' -> pk' )
 
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)

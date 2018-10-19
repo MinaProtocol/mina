@@ -1,0 +1,11 @@
+(library (
+  (name        crypto_params_init)
+  (public_name crypto_params.init)
+  (libraries
+    (snarky))
+  (preprocess (pps (ppx_jane)))
+  )
+)
+
+(jbuild_version 1)
+
