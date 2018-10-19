@@ -13,3 +13,5 @@ val delete : t -> unit
 val of_string_don't_delete : string -> t
 
 val of_char_pointer_don't_delete : char Ctypes.ptr -> int -> t
+
+val to_bigstring : t -> Core.Bigstring.t
