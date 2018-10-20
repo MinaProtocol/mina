@@ -873,8 +873,8 @@ end = struct
     ( new_data
     , diff.completed_works
     , coinbase_work
-    , List.length coinbase
-    , List.length payments )
+    , List.length payments
+    , List.length coinbase )
 
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_diff t (diff: Ledger_builder_diff.t) ~logger =
@@ -943,10 +943,10 @@ end = struct
       |> Result_with_rollback.of_or_error
     in
     Logger.info logger
-      "Diff info:\n\
-       No of transactions included: %d\n\
-       Coinbase parts: %d\n\
-       Work count: %d\n"
+      "Block info: \
+       No of transactions included:%d \
+       Coinbase parts:%d \
+       Work count:%d"
       txn_count cb_parts_count (List.length works) ;
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
