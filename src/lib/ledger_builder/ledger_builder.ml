@@ -943,10 +943,8 @@ end = struct
       |> Result_with_rollback.of_or_error
     in
     Logger.info logger
-      "Block info: \
-       No of transactions included:%d \
-       Coinbase parts:%d \
-       Work count:%d"
+      "Block info: No of transactions included:%d Coinbase parts:%d Work \
+       count:%d"
       txn_count cb_parts_count (List.length works) ;
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
