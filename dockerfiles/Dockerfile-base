@@ -16,7 +16,8 @@ RUN sudo apt-get install --yes libgmp-dev
 RUN sudo apt-get install --yes libgmp3-dev
 RUN sudo apt-get install --yes libboost-dev
 RUN sudo apt-get install --yes libboost-program-options-dev
-RUN sudo apt-get install --yes librocksdb4.5 librocksdb-dev
+RUN sudo apt-get install --yes libsnappy-dev
+RUN sudo apt-get install --yes libleveldb-dev
 RUN sudo apt-get install --yes zlib1g-dev libsodium-dev
 
 RUN opam update -y && opam upgrade -y
@@ -31,10 +32,11 @@ RUN opam install yojson menhir bignum
 RUN opam install async_ssl cohttp cohttp-async
 RUN opam install extlib rpc_parallel
 
+
 ADD ./src/app/kademlia-haskell/prefetch /prefetch
 RUN sudo chown -R opam /prefetch
 RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix
-RUN opam install bitstring orocksdb
+RUN opam install bitstring leveldb
 RUN opam install camlp4
 RUN opam install ppx_deriving_yojson
 ADD ./src/external/ocaml-sodium /ocaml-sodium

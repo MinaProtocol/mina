@@ -19,7 +19,7 @@ module Record = struct
     val create_timeout : score -> t
   end
 
-  (* Added binable to make it easy to serialize Record into Rocksdb *)
+  (* Added binable to make it easy to serialize Record into key-value database *)
   module Make (Timeout : sig
     val duration : Time.Span.t
   end) :
