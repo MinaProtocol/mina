@@ -1,4 +1,4 @@
-include Core
+open Core
 
 module type S = sig
   type account
