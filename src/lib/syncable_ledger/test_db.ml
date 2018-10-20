@@ -21,8 +21,9 @@ struct
   end
 
   module L = struct
+    module Location = Merkle_ledger.Location.Make (Depth)
     module MT =
-      Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth)
+      Merkle_ledger.Database.Make (Key) (Account) (Hash) (Depth) (Location)
         (In_memory_kvdb)
         (In_memory_sdb)
         (Storage_locations)
@@ -34,7 +35,7 @@ struct
 
     type account = Account.t
 
-    type key = MT.location
+    type key = Location.t
 
     type addr = Addr.t
 

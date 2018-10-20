@@ -9,8 +9,9 @@ let%test_module "Database integration test" =
       let depth = 4
     end
 
+    module Location = Merkle_ledger.Location.Make (Depth)
     module DB =
-      Database.Make (Key) (Account) (Hash) (Depth) (In_memory_kvdb)
+      Database.Make (Key) (Account) (Hash) (Depth) (Location) (In_memory_kvdb)
         (In_memory_sdb)
         (Storage_locations)
     module Ledger = Ledger.Make (Key) (Account) (Hash) (Depth)

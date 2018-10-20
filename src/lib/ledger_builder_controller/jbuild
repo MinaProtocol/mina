@@ -8,5 +8,5 @@
   (inline_tests)
   (libraries (core storage debug_assert logger protocols coda_lib async async_extra interruptible unix_timestamp))
   (preprocess (pps (ppx_jane ppx_deriving.std)))
-  (synopsis "Ledger builder controlelr manages ledger-builders attached to blocks")))
+  (synopsis "Ledger builder controller manages ledger-builders attached to blocks")))
 

@@ -31,7 +31,7 @@ module type S = sig
     -> 'stop
 
   module Location : sig
-    type t
+    type t (* TODO: [@@deriving sexp, compare, hash] *)
   end
 
   val location_of_key : t -> key -> Location.t option
