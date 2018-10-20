@@ -43,15 +43,15 @@ end = struct
     include Inputs
 
     module Step = struct
-      let apply' t diff =
+      let apply' t diff logger =
         Deferred.Or_error.map
-          (Ledger_builder.apply t diff)
+          (Ledger_builder.apply t diff ~logger)
           ~f:
             (Option.map ~f:(fun proof ->
                  ( Ledger_proof.statement proof |> Ledger_proof_statement.target
                  , proof ) ))
 
-      let step {With_hash.data= tip; hash= tip_hash}
+      let step logger {With_hash.data= tip; hash= tip_hash}
           {With_hash.data= transition; hash= transition_target_hash} =
         let open Deferred.Or_error.Let_syntax in
         let old_state = tip.Tip.protocol_state in
@@ -65,6 +65,7 @@ end = struct
           match%map
             apply' tip.ledger_builder
               (External_transition.ledger_builder_diff transition)
+              logger
           with
           | Some (h, _) -> h
           | None ->
@@ -437,7 +438,7 @@ let%test_module "test" =
 
           let aux t = !t
 
-          let apply (t: t) (x: Ledger_builder_diff.t) =
+          let apply (t: t) (x: Ledger_builder_diff.t) ~logger:_ =
             t := x ;
             return (Ok (Some x))
 

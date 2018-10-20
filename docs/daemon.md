@@ -24,3 +24,5 @@ command-line flags. These flags are supported in the config file:
 - `rest-port` int
 - `peers` string list. This does not get overridden by `-peer` arguments.
   Instead, `-peer` arguments are added to this list.
+- `work-selection` seq|rand Choose work sequentially (seq) or randomly (rand) \
+            (default: seq)
