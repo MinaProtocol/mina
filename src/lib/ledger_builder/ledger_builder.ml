@@ -827,6 +827,15 @@ end = struct
     in
     option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
 
+  module Prediff_info = struct
+    type ('data, 'work) t =
+      { data: 'data
+      ; work: 'work list
+      ; coinbase_work: 'work list
+      ; payments_count: int
+      ; coinbase_parts_count: int }
+  end
+
   let apply_pre_diff t coinbase_parts (diff: Ledger_builder_diff.diff) =
     let open Result_with_rollback.Let_syntax in
     let%bind payments =
@@ -870,11 +879,11 @@ end = struct
     let%map new_data =
       update_ledger_and_get_statements t.ledger super_transactions
     in
-    ( new_data
-    , diff.completed_works
-    , coinbase_work
-    , List.length payments
-    , List.length coinbase )
+    { Prediff_info.data= new_data
+    ; work= diff.completed_works
+    ; coinbase_work
+    ; payments_count= List.length payments
+    ; coinbase_parts_count= List.length coinbase }
 
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
   let apply_diff t (diff: Ledger_builder_diff.t) ~logger =
@@ -906,24 +915,24 @@ end = struct
         (Ledger_builder_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
-    let%bind data, works, txn_count, cb_parts_count =
+    let%bind data, works, payments_count, cb_parts_count =
       Either.value_map diff.pre_diffs
         ~first:(fun d ->
-          let%map data, works, cb_works, txn_count, cb_parts_count =
+          let%map { data
+                  ; work
+                  ; coinbase_work
+                  ; payments_count
+                  ; coinbase_parts_count } =
             apply_pre_diff_with_at_most_one d
           in
-          (data, cb_works @ works, txn_count, cb_parts_count) )
+          (data, work @ coinbase_work, payments_count, coinbase_parts_count) )
         ~second:(fun d ->
-          let%bind data1, works1, cb_works1, txn_count1, cb_parts_count1 =
-            apply_pre_diff_with_at_most_two (fst d)
-          in
-          let%map data2, works2, cb_works2, txn_count2, cb_parts_count2 =
-            apply_pre_diff_with_at_most_one (snd d)
-          in
-          ( data1 @ data2
-          , works1 @ cb_works1 @ cb_works2 @ works2
-          , txn_count1 + txn_count2
-          , cb_parts_count1 + cb_parts_count2 ) )
+          let%bind p1 = apply_pre_diff_with_at_most_two (fst d) in
+          let%map p2 = apply_pre_diff_with_at_most_one (snd d) in
+          ( p1.data @ p2.data
+          , p1.work @ p1.coinbase_work @ p2.coinbase_work @ p2.work
+          , p1.payments_count + p2.payments_count
+          , p1.coinbase_parts_count + p2.coinbase_parts_count ) )
     in
     let%bind () = check_completed_works t works in
     let%bind res_opt =
@@ -945,7 +954,7 @@ end = struct
     Logger.info logger
       "Block info: No of transactions included:%d Coinbase parts:%d Work \
        count:%d"
-      txn_count cb_parts_count (List.length works) ;
+      payments_count cb_parts_count (List.length works) ;
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
   let apply t witness ~logger =
