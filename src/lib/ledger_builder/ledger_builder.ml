@@ -925,7 +925,7 @@ end = struct
                   ; coinbase_parts_count } =
             apply_pre_diff_with_at_most_one d
           in
-          (data, work @ coinbase_work, payments_count, coinbase_parts_count) )
+          (data, coinbase_work @ work, payments_count, coinbase_parts_count) )
         ~second:(fun d ->
           let%bind p1 = apply_pre_diff_with_at_most_two (fst d) in
           let%map p2 = apply_pre_diff_with_at_most_one (snd d) in
