@@ -15,7 +15,8 @@ module type Inputs_intf = sig
     (* This checks the SNARKs in State/LB and does the transition *)
 
     val step :
-         (Tip.t, State_hash.t) With_hash.t
+         Logger.t
+      -> (Tip.t, State_hash.t) With_hash.t
       -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
       -> (Tip.t, State_hash.t) With_hash.t Deferred.Or_error.t
   end
@@ -224,8 +225,8 @@ struct
   module Path_traversal = struct
     type 'a t = ((External_transition.t, State_hash.t) With_hash.t, 'a) Job.t
 
-    let transition_unchecked h t =
-      Interruptible.uninterruptible (transition_unchecked h t)
+    let transition_unchecked h t logger =
+      Interruptible.uninterruptible (transition_unchecked h t logger)
 
     let run old_state ~on_success new_tree old_tree new_best_path logger
         _transition =
@@ -241,7 +242,7 @@ struct
       in
       let step tip_with_hash transition_with_hash =
         Interruptible.lift
-          (Step.step tip_with_hash transition_with_hash)
+          (Step.step logger tip_with_hash transition_with_hash)
           (Deferred.map (Ivar.read ivar) ~f:ignore)
       in
       let work =
@@ -249,7 +250,7 @@ struct
         let%bind locked_tip =
           if transition_is_parent_of ~child:new_head ~parent:old_head then
             let locked_tip = With_hash.map locked_tip ~f:Tip.copy in
-            transition_unchecked locked_tip.data new_head
+            transition_unchecked locked_tip.data new_head logger
           else return locked_tip
         in
         (* Now adjust the longest_branch_tip *)
@@ -393,7 +394,9 @@ struct
         then (
           (* Bootstrap from genesis *)
           let tree = Transition_tree.singleton transition_with_hash in
-          match%bind Step.step longest_branch_tip transition_with_hash with
+          match%bind
+            Step.step t.log longest_branch_tip transition_with_hash
+          with
           | Ok tip ->
               let changes =
                 [ Transition_logic_state.Change.Ktree tree

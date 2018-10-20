@@ -48,6 +48,12 @@ let daemon (type ledger_proof) (module Kernel
      and run_snark_worker_flag =
        flag "run-snark-worker" ~doc:"KEY Run the SNARK worker with a key"
          (optional public_key_compressed)
+     and work_selection_flag =
+       flag "work-selection"
+         ~doc:
+           "seq|rand Choose work sequentially (seq) or randomly (rand) \
+            (default: seq)"
+         (optional work_selection)
      and external_port =
        flag "external-port"
          ~doc:
@@ -159,6 +165,13 @@ let daemon (type ledger_proof) (module Kernel
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
        in
+       let work_selection =
+         or_from_config
+           (Fn.compose Option.return
+              (Fn.compose work_selection_val YJ.Util.to_string))
+           "work-selection" ~default:Protocols.Coda_pow.Work_selection.Seq
+           work_selection_flag
+       in
        let peers =
          List.concat
            [ peers
@@ -251,6 +264,8 @@ let daemon (type ledger_proof) (module Kernel
          let transaction_capacity_log_2 = transaction_capacity_log_2
 
          let commit_id = commit_id
+
+         let work_selection = work_selection
        end in
        let%bind (module Init) =
          make_init ~should_propose:should_propose_flag

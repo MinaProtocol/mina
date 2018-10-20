@@ -95,4 +95,14 @@ let txn_nonce =
 
 let default_client_port = 8301
 
+let work_selection_val =
+  let open Protocols in
+  function
+    | "seq" -> Coda_pow.Work_selection.Seq
+    | "rand" -> Coda_pow.Work_selection.Random
+    | _ -> failwith "Invalid work selection"
+
+let work_selection =
+  Command.Arg_type.map Command.Param.string ~f:work_selection_val
+
 module Secret_box = Secret_box
