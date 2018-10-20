@@ -23,8 +23,7 @@ struct
   type t =
     { parent: Base.t option ref
     ; account_tbl: Account.t Location.Table.t
-    ; hash_tbl: Hash.t Location.Addr.Table.t
-    }
+    ; hash_tbl: Hash.t Location.Addr.Table.t }
 
   let set_parent t parent = t.parent := Some parent
 
