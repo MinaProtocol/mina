@@ -17,7 +17,7 @@ jobs:
                 command: source ~/.profile && make kademlia
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=dev make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: rm snark_params
                 command: rm -rf src/_build/default/lib/snark_params
@@ -53,7 +53,7 @@ jobs:
                 command: make withkeys
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
@@ -86,7 +86,7 @@ jobs:
                 command: make withkeys
             - run:
                 name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                command: eval `opam config env` && DUNE_PROFILE=testnet make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Build deb Package with verification keys
                 command: make deb
@@ -109,44 +109,29 @@ jobs:
                 name: Test make test-runtest
                 command: source ~/.profile && make test-runtest
 
-    test-stake:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
-            - run:
-                name: Test make test-stakes
-                command: source ~/.profile && make test-stakes
-
-    test-sig:
-        resource_class: large
-        docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
-        steps:
-            - checkout
-            - run:
-                name: Check .circleci Render
-                command: make check-render-circleci
-            - run:
-                name: Build Haskell
-                command: source ~/.profile && make kademlia
-            - run:
-                name: Build OCaml
-                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
-            {% for test in tests %}
-            - run:
-                name: {{ test.friendly }}
-                command: source ~/.profile && cd src && CODA_CONSENSUS_METHOD={{test.mechanism}} ../scripts/test_integration_test.sh '{{test.name}}'{% endfor %}
+    {%for test in tests%}
+    test_{{test}}:
+      resource_class: large
+      docker:
+      - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+        auth:
+          username: _json_key
+          password: $JSON_GCLOUD_CREDENTIALS
+      steps:
+          - checkout
+          - run:
+              name: Check .circleci Render
+              command: make check-render-circleci
+          - run:
+              name: Build Haskell
+              command: source ~/.profile && make kademlia
+          - run:
+              name: Build OCaml
+              command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
+          - run:
+              name: Execute Tests
+              command: source ~/.profile && source scripts/test_all.sh && cd src/ && 'run_{{test}}'
+    {%endfor%}
 
 workflows:
     version: 2
@@ -155,9 +140,9 @@ workflows:
             - build
             - build_withsnark
             - build_public
-            - test-runtest
-            - test-sig
-            #- test-stake
+            {%for test in tests%}
+            - test_{{test}}
+            {%endfor%}
     # NOTES: Save this idea for later (nightly/scheduled workflows)
     # nightly:
     #     triggers:
@@ -168,4 +153,3 @@ workflows:
     #                     only: master
     #     jobs:
     #         - build_withsnark
-

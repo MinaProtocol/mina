@@ -1,3 +1,6 @@
+[%%import
+"../../../config.mlh"]
+
 open Core
 open Async
 open Coda_base
@@ -92,10 +95,19 @@ struct
                with type worker_state := Worker_state.t
                 and type connection_state := Connection_state.t) =
       struct
+        [%%if
+        with_snark]
+
         let verify_blockchain (w: Worker_state.t) (chain: Blockchain.t) =
           let%map (module M) = Worker_state.get w in
-          if Insecure.verify_blockchain then true
-          else M.verify_wrap chain.state chain.proof
+          M.verify_wrap chain.state chain.proof
+
+        [%%else]
+
+        let verify_blockchain (w: Worker_state.t) (chain: Blockchain.t) =
+          Deferred.return true
+
+        [%%endif]
 
         let verify_transaction_snark (w: Worker_state.t) (p, message) =
           let%map (module M) = Worker_state.get w in

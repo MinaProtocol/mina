@@ -8,6 +8,10 @@ GITLONGHASH = $(shell git rev-parse HEAD)
 MYUID = $(shell id -u)
 DOCKERNAME = nanotest-$(MYUID)
 
+ifeq ($(DUNE_PROFILE),)
+DUNE_PROFILE := dev
+endif
+
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
@@ -36,7 +40,7 @@ dht: kademlia
 build:
 	$(info Starting Build)
 	ulimit -s 65536
-	cd src ; $(WRAP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
+	cd src ; $(WRAP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 withupdates:
@@ -66,10 +70,10 @@ withkeys:
 ## Lint
 
 reformat:
-	cd src; $(WRAP) dune exec app/reformat/reformat.exe -- -path .
+	cd src; $(WRAP) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 check-format:
-	cd src; $(WRAP) dune exec app/reformat/reformat.exe -- -path . -check
+	cd src; $(WRAP) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
 
 
 ########################################
@@ -167,11 +171,11 @@ test-runtest:
 
 test-sigs: SHELL := /bin/bash
 test-sigs:
-	source scripts/test_all.sh ; cd src ; CODA_CONSENSUS_METHOD=proof_of_signature run_integration_tests
+	source scripts/test_all.sh ; cd src ; run_all_sig_integration_tests
 
 test-stakes: SHELL := /bin/bash
 test-stakes:
-	source scripts/test_all.sh ; cd src ; CODA_CONSENSUS_METHOD=proof_of_stake run_integration_tests
+	source scripts/test_all.sh ; cd src ; run_all_stake_integration_tests
 
 web:
 	./scripts/web.sh

@@ -240,7 +240,7 @@ struct
       Curve.Scalar.equal h' h
 
   [%%if
-  log_calls]
+  call_logger]
 
   let verify s pk m =
     Coda_debug.Call_logger.record_call "Signature_lib.Schnorr.verify" ;
