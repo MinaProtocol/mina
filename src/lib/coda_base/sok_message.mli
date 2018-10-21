@@ -6,7 +6,7 @@ open Tuple_lib
 open Import
 
 type t = {fee: Currency.Fee.t; prover: Public_key.Compressed.t}
-[@@deriving bin_io]
+[@@deriving bin_io, sexp]
 
 val create : fee:Currency.Fee.t -> prover:Public_key.Compressed.t -> t
 

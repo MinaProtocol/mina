@@ -420,8 +420,6 @@ let%test_module "test" =
 
             let hash t = t
 
-            let verify_merge_proofs _ = Deferred.return true
-
             let is_valid _ = true
           end
 
@@ -437,7 +435,7 @@ let%test_module "test" =
 
           let of_aux_and_ledger ~snarked_ledger_hash:_ ~public_key:_ ~ledger
               ~aux:_ =
-            Ok (create ~ledger ~self:())
+            Deferred.return (Ok (create ~ledger ~self:()))
 
           let aux t = !t
 

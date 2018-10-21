@@ -344,11 +344,6 @@ module State = struct
             state.base_none_pos <- next_base_pos state pos )
 end
 
-let get_merge_nodes : state:('a, 'd) State.t -> ('a, 'd) State.Job.t Sequence.t =
- fun ~state ->
-  Sequence.range 0 (state.capacity - 1)
-  |> Sequence.map ~f:(fun pos -> Ring_buffer.read_i state.jobs pos)
-
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create
 
 let next_jobs : state:('a, 'd) State.t -> ('a, 'd) Available_job.t list =

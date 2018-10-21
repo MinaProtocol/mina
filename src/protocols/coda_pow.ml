@@ -20,7 +20,7 @@ module type Sok_message_intf = sig
     type t
   end
 
-  type t
+  type t [@@deriving bin_io, sexp]
 
   val create : fee:Currency.Fee.t -> prover:public_key_compressed -> t
 end
@@ -492,8 +492,6 @@ module type Ledger_builder_base_intf = sig
 
     val hash : t -> ledger_builder_aux_hash
 
-    val verify_merge_proofs : t -> bool Deferred.t
-
     val is_valid : t -> bool
   end
 
@@ -506,7 +504,7 @@ module type Ledger_builder_base_intf = sig
     -> public_key:public_key
     -> ledger:ledger
     -> aux:Aux.t
-    -> t Or_error.t
+    -> t Or_error.t Deferred.t
 
   val copy : t -> t
 
@@ -552,9 +550,10 @@ module type Ledger_builder_intf = sig
     -> logger:Logger.t
     -> transactions_by_fee:transaction_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
-    -> valid_diff
+    -> ( valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of ledger_proof option]
+       * [`Ledger_proof of ledger_proof option] )
+       Deferred.t
 
   module Coordinator : sig
     module State : sig
@@ -576,7 +575,8 @@ module type Ledger_builder_intf = sig
          * State.t
   end
 
-  val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
+  val statement_exn :
+    t -> [`Non_empty of ledger_proof_statement | `Empty] Deferred.t
 end
 
 module type Tip_intf = sig

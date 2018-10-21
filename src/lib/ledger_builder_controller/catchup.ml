@@ -49,10 +49,12 @@ struct
       transition_with_hash
     in
     let snarked_ledger_hash = ledger_hash_of_transition transition in
+    let open Interruptible.Let_syntax in
     let build_lb ~aux ~ledger =
-      match
-        Ledger_builder.of_aux_and_ledger ~public_key ~snarked_ledger_hash
-          ~ledger ~aux
+      match%bind
+        Interruptible.uninterruptible
+          (Ledger_builder.of_aux_and_ledger ~public_key ~snarked_ledger_hash
+             ~ledger ~aux)
       with
       (* TODO: We'll need the full history in order to trust that
                the ledger builder we get is actually valid. See #285 *)
@@ -101,7 +103,6 @@ struct
           sl
       | Some sl -> sl
     in
-    let open Interruptible.Let_syntax in
     let ivar : (External_transition.t, State_hash.t) With_hash.t Ivar.t =
       Ivar.create ()
     in
@@ -123,19 +124,7 @@ struct
               (Net.get_ledger_builder_aux_at_hash net
                  (ledger_builder_hash_of_transition transition))
           with
-          | Ok aux ->
-              let%bind is_valid =
-                Interruptible.uninterruptible
-                  Ledger_builder.Aux.(
-                    if is_valid aux then
-                      Ledger_builder.Aux.verify_merge_proofs aux
-                    else Deferred.return false)
-              in
-              if not is_valid then (
-                Logger.faulty_peer log
-                  "Network sent an aux containing an invalid proof" ;
-                return () )
-              else build_lb ~aux ~ledger
+          | Ok aux -> build_lb ~aux ~ledger
           | Error e ->
               Logger.faulty_peer log "Network failed to send aux %s"
                 (Error.to_string_hum e) ;

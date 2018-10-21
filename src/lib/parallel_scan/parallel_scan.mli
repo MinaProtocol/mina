@@ -44,8 +44,6 @@ module Available_job : sig
   type ('a, 'd) t = Base of 'd | Merge of 'a * 'a [@@deriving sexp]
 end
 
-val get_merge_nodes : state:('a, 'd) State.t -> ('a, 'd) State.Job.t Sequence.t
-
 val start : parallelism_log_2:int -> ('a, 'd) State.t
 
 val next_k_jobs :
