@@ -120,7 +120,7 @@ deb:
 	@cp src/_build/codaclient.deb /tmp/artifacts/.
 
 provingkeys:
-	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /tmp/coda_cache_dir
+	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/.
 
