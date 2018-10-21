@@ -1,8 +1,23 @@
+[%%import
+"../../../config.mlh"]
+
 open Ppxlib
 open Asttypes
 open Parsetree
 open Longident
 open Core
+
+(* TODO: refactor to do compile time selection *)
+[%%if
+with_snark]
+
+let use_dummy_values = false
+
+[%%else]
+
+let use_dummy_values = true
+
+[%%endif]
 
 module type S = sig
   val base_hash_expr : Parsetree.expression
@@ -62,7 +77,6 @@ end
 open Async
 
 let main () =
-  let use_dummy_values = Coda_base.Insecure.key_generation in
   let target = Sys.argv.(1) in
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
   let loc = Ppxlib.Location.none in
@@ -73,6 +87,7 @@ let main () =
       Consensus.Proof_of_signature.Make (struct
         module Time = Coda_base.Block_time
         module Proof = Coda_base.Proof
+        module Genesis_ledger = Genesis_ledger
 
         let proposal_interval = Time.Span.of_ms @@ Int64.of_int 5000
 

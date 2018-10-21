@@ -207,6 +207,8 @@ end
 module Balance : sig
   include Basic
 
+  val to_amount : t -> Amount.t
+
   val add_amount : t -> Amount.t -> t option
 
   val sub_amount : t -> Amount.t -> t option
