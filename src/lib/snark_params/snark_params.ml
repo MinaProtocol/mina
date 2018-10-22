@@ -269,7 +269,7 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
   in
   go Tock.Field.one Tock.Field.zero 0
 
-let ledger_depth = 10
+let ledger_depth = 30
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.
