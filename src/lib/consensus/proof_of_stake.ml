@@ -383,17 +383,22 @@ struct
     end
 
     module Threshold = struct
-      include Bignum_bigint
+      open Bignum_bigint
 
       let of_uint64_exn = Fn.compose of_int64_exn UInt64.to_int64
 
-      let create ~my_stake ~total_stake =
-        let my_stake = Balance.to_uint64 my_stake in
-        let total_stake = Amount.to_uint64 total_stake in
-        let stake_ratio = of_uint64_exn (UInt64.div my_stake total_stake) in
-        stake_ratio * pow (of_int 2) (of_int 256)
+      let c = of_int 1
 
-      let satisfies threshold output = of_bits_lsb output <= threshold
+      (*  Check if
+          vrf_output / 2^256 <= c * my_stake / total_currency
+
+          So that we don't have to do division we check
+
+          vrf_output * total_currency <= c * my_stake * 2^256
+      *)
+      let is_satisfied ~my_stake ~total_stake vrf_output =
+        of_bits_lsb vrf_output * of_uint64_exn (Amount.to_uint64 total_stake)
+        <= shift_left (c * of_uint64_exn (Balance.to_uint64 my_stake)) 256
     end
 
     include Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group)
@@ -915,10 +920,8 @@ struct
     in
     let%map () =
       if
-        Vrf.Threshold.satisfies
-          (Vrf.Threshold.create ~my_stake:my_currency
-             ~total_stake:total_currency)
-          proposer_vrf_result
+        Vrf.Threshold.is_satisfied ~my_stake:my_currency
+          ~total_stake:total_currency proposer_vrf_result
       then Some ()
       else None
     in
