@@ -4,11 +4,14 @@ open Bitstring_lib
 open Fold_lib
 open Tuple_lib
 open Snark_bits
+open Common
 
 module Base = struct
   module type S = sig
     type t = private Pedersen.Digest.t
-    [@@deriving bin_io, sexp, eq, compare, hash]
+    include Protocol_object.Full.S with type t := t
+    include Bits_intf.S with type t := t
+    include Hashable.S with type t := t
 
     val gen : t Quickcheck.Generator.t
 
@@ -22,8 +25,7 @@ module Base = struct
 
     module Stable : sig
       module V1 : sig
-        type nonrec t = t [@@deriving bin_io, sexp, compare, eq, hash]
-
+        include Protocol_object.Full.S with type t = t
         include Hashable_binable with type t := t
       end
     end
@@ -56,10 +58,6 @@ module Base = struct
     val var_of_t : t -> var
 
     val length_in_bits : int
-
-    include Bits_intf.S with type t := t
-
-    include Hashable.S with type t := t
 
     val fold : t -> bool Triple.t Fold.t
   end

@@ -2,24 +2,23 @@ open Core_kernel
 open Snark_params.Tick
 open Fold_lib
 open Tuple_lib
+open Common
 
 module type S = sig
   module Ledger_hash : Ledger_hash_intf.S
 
-  type t
-
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, sexp, eq, compare, hash]
-
+      include Protocol_object.Full.S
       include Hashable_binable with type t := t
     end
   end
 
-  val dummy : t
-
+  type t = Stable.V1.t
   include Hashable.S with type t := t
   include Snarkable.S with type value := t
+
+  val dummy : t
 
   val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 

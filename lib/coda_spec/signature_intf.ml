@@ -2,6 +2,7 @@ open Core_kernel
 open Snark_params.Tick
 open Fold_lib
 open Tuple_lib
+open Common
 
 module Private_key = struct
   module type S = sig
@@ -27,18 +28,10 @@ module Public_key = struct
       module Private_key : Private_key.S
 
       module Stable : sig
-        module V1 : sig
-          type t [@@deriving hash]
-          include Binable.S with type t := t
-          include Equal.S with type t := t
-          include Sexpable.S with type t := t
-        end
+        module V1 : Protocol_object.Hashable.S
       end
 
-      type t = Stable.V1.t [@@deriving hash]
-      include Binable.S with type t := t
-      include Equal.S with type t := t
-      include Sexpable.S with type t := t
+      include Protocol_object.Hashable.S with type t = Stable.V1.t
       include Snarkable.S with type value := t
 
       val var_of_t : t -> var
@@ -56,18 +49,10 @@ module Public_key = struct
   module Compressed = struct
     module type S = sig
       module Stable : sig
-        module V1 : sig
-          type t [@@deriving hash]
-          include Binable.S with type t := t
-          include Equal.S with type t := t
-          include Sexpable.S with type t := t
-        end
+        module V1 : Protocol_object.Full.S
       end
 
-      type t = Stable.V1.t [@@deriving hash]
-      include Binable.S with type t := t
-      include Equal.S with type t := t
-      include Sexpable.S with type t := t
+      include Protocol_object.Full.S with type t = Stable.V1.t
       include Snarkable.S with type value := t
 
       val gen : t Quickcheck.Generator.t
@@ -154,10 +139,9 @@ module type S = sig
   module Message : Message.S
 
   module Signature : sig
-    type t = Inner_curve.Scalar.t * Inner_curve.Scalar.t
+    include Protocol_object.Hashable.S with type t = Inner_curve.Scalar.t * Inner_curve.Scalar.t
     type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var
     val typ : (var, t) Typ.t
-    include Sexpable.S with type t := t
   end
 
   (* TODO: unify keys with primary interfaces *)

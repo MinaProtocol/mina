@@ -5,7 +5,7 @@ open Signature_lib
 module Fee = Currency.Fee
 module Payload = Payment_payload
 module Keypair = Keypair
-module Signature = Signature
+module Signature = Schnorr
 
 module Stable = struct
   module V1 = struct
@@ -14,7 +14,7 @@ module Stable = struct
     [@@deriving bin_io, eq, sexp, hash, fields]
 
     type t =
-      (Payload.Stable.V1.t, Public_key.Stable.V1.t, Signature.Stable.V1.t) t_
+      (Payload.Stable.V1.t, Public_key.Stable.V1.t, Schnorr.Signature.t) t_
     [@@deriving bin_io, eq, sexp, hash]
 
     type with_seed = string * t [@@deriving hash]
@@ -38,7 +38,7 @@ include Stable.V1
 
 type value = t
 
-type var = (Payload.var, Public_key.var, Signature.var) t_
+type var = (Payload.var, Public_key.var, Schnorr.Signature.var) t_
 
 let public_keys ({payload; sender; _}: value) =
   [Payload.receiver payload; Public_key.compress sender]
@@ -51,11 +51,11 @@ let sign (kp: Keypair.t) (payload: Payload.t) : t =
 let typ : (var, t) Typ.t =
   let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
   let of_hlist
-        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_ =
-    H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
+        : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) Snarky.H_list.t -> ('a, 'b, 'c) t_ =
+    Snarky.H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
   in
   let to_hlist {payload; sender; signature} =
-    H_list.[payload; sender; signature]
+    Snarky.H_list.[payload; sender; signature]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -78,9 +78,11 @@ let gen ~keys ~max_amount ~max_fee =
   sign sender payload
 
 module With_valid_signature = struct
-  type t = Stable.V1.t [@@deriving sexp, eq, bin_io]
+  module Public_key = Keypair.Public_key
+  module Payload = Payload
+  module Signature = Signature
 
-  let compare = Stable.V1.compare
+  include Stable.V1
 
   let gen = gen
 end

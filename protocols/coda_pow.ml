@@ -650,11 +650,10 @@ module type Inputs_intf = sig
     with module Keypair = Keypair
 
   module Fee_transfer : Coda_spec.Transaction_intf.Fee_transfer.S
-    with module Public_key = Public_key
+    with module Compressed_public_key = Public_key.Compressed
 
   module Coinbase : Coda_spec.Transaction_intf.Coinbase.S
-    with module Public_key = Public_key
-     and module Fee_transfer = Fee_transfer
+    with module Fee_transfer = Fee_transfer
 
   module Transaction : Coda_spec.Transaction_intf.S
     with module Valid_payment = Payment.With_valid_signature

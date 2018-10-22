@@ -1,7 +1,7 @@
 open Core
-open Import
+module Compressed_public_key = Signature_lib.Public_key.Compressed
 
-type single = Public_key.Compressed.t * Currency.Fee.Stable.V1.t
+type single = Compressed_public_key.t * Currency.Fee.Stable.V1.t
 [@@deriving bin_io, sexp, compare, eq]
 
 type t = One of single | Two of single * single

@@ -1,18 +1,2 @@
-open Core_kernel
-open Import
-
-type single = Public_key.Compressed.t * Currency.Fee.t
-[@@deriving bin_io, sexp, compare, eq]
-
-type t = One of single | Two of single * single
-[@@deriving bin_io, sexp, compare, eq]
-
-val to_list : t -> single list
-
-val of_single : single -> t
-
-val of_single_list : single list -> t list
-
-val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
-
-val receivers : t -> Public_key.Compressed.t list
+include Coda_spec.Transaction_intf.Fee_transfer.S
+  with module Compressed_public_key = Signature_lib.Public_key.Compressed

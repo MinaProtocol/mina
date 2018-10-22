@@ -47,13 +47,13 @@ let typ : (var, t) Typ.t =
     [Compressed_public_key.typ; Amount.typ; Fee.typ; Account_nonce.Unpacked.typ]
   in
   let of_hlist
-        : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) H_list.t
+        : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) Snarky.H_list.t
           -> ('a, 'b, 'c, 'd) t_ =
-    let open H_list in
+    let open Snarky.H_list in
     fun [receiver; amount; fee; nonce] -> {receiver; amount; fee; nonce}
   in
   let to_hlist {receiver; amount; fee; nonce} =
-    H_list.[receiver; amount; fee; nonce]
+    Snarky.H_list.[receiver; amount; fee; nonce]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist

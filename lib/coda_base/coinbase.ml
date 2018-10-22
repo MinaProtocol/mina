@@ -1,9 +1,10 @@
 open Core
-open Import
+module Fee_transfer = Fee_transfer
+module Compressed_public_key = Fee_transfer.Compressed_public_key
 
 module T = struct
   type t =
-    { proposer: Public_key.Compressed.t
+    { proposer: Compressed_public_key.t
     ; amount: Currency.Amount.t
     ; fee_transfer: Fee_transfer.single option }
   [@@deriving sexp, bin_io, compare, eq]

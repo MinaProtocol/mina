@@ -97,14 +97,14 @@ let typ : (var, value) Typ.t =
     ; Receipt_chain_hash.typ ]
   in
   let of_hlist
-        : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) H_list.t
+        : 'a 'b 'c 'd.    (unit, 'a -> 'b -> 'c -> 'd -> unit) Snarky.H_list.t
           -> ('a, 'b, 'c, 'd) t_ =
-    let open H_list in
+    let open Snarky.H_list in
     fun [public_key; balance; nonce; receipt_chain_hash] ->
       {public_key; balance; nonce; receipt_chain_hash}
   in
   let to_hlist {public_key; balance; nonce; receipt_chain_hash} =
-    H_list.[public_key; balance; nonce; receipt_chain_hash]
+    Snarky.H_list.[public_key; balance; nonce; receipt_chain_hash]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist

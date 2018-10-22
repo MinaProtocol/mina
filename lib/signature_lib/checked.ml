@@ -12,11 +12,11 @@ module Schnorr (Message : Signature_intf.Message.S) : Signature_intf.S with modu
   module Message = Message
 
   module Signature = struct
-    type 'a t_ = 'a * 'a [@@deriving sexp]
+    type 'a t_ = 'a * 'a [@@deriving bin_io, eq, hash, sexp]
 
     type var = Inner_curve.Scalar.var t_
 
-    type t = Inner_curve.Scalar.t t_ [@@deriving sexp]
+    type t = Inner_curve.Scalar.t t_ [@@deriving bin_io, eq, hash, sexp]
 
     let typ : (var, t) Typ.t =
       let typ = Inner_curve.Scalar.typ in

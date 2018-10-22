@@ -1,6 +1,44 @@
 open Core
 open Unsigned
 
+module type Key_value_database = sig
+  type t
+
+  val copy : t -> t
+
+  val create : directory:string -> t
+
+  val destroy : t -> unit
+
+  val get : t -> key:Bigstring.t -> Bigstring.t option
+
+  val set : t -> key:Bigstring.t -> data:Bigstring.t -> unit
+
+  val delete : t -> key:Bigstring.t -> unit
+end
+
+module type Stack_database = sig
+  type t
+
+  val copy : t -> t
+
+  val create : filename:string -> t
+
+  val destroy : t -> unit
+
+  val push : t -> Bigstring.t -> unit
+
+  val pop : t -> Bigstring.t option
+
+  val length : t -> int
+end
+
+module type Storage_locations = sig
+  val key_value_db_dir : string
+
+  val stack_db_file : string
+end
+
 module Make (Key : sig
   include Intf.Key
 

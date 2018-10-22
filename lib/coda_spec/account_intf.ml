@@ -7,6 +7,7 @@ open Coda_numbers
 module Index = struct
   module type S = sig
     type t
+    include Binable.S with type t := t
 
     module Vector : sig
       type t
@@ -20,11 +21,6 @@ module Index = struct
       val set : t -> int -> bool -> t
     end
 
-    val to_int : t -> int
-
-    val of_int : int -> t
-
-    include Binable.S with type t := t
     include Bits_intf.S with type t := t
     include Bits_intf.Snarkable.Small
       with type ('a, 'b) typ := ('a, 'b) Typ.t
@@ -35,6 +31,10 @@ module Index = struct
        and type Unpacked.var = Boolean.var list
        and type Unpacked.value = Vector.t
        and type comparison_result := Field.Checked.comparison_result
+
+    val to_int : t -> int
+
+    val of_int : int -> t
   end
 end
 

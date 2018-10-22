@@ -484,7 +484,7 @@ module Make (Inputs : Inputs_intf) = struct
            ~genesis_tip:
              { ledger_builder=
                  Ledger_builder.create ~ledger:Genesis.ledger
-                   ~self:(Public_key.compress config.keypair.public_key)
+                   ~self:(Public_key.compress (Keypair.public_key config.keypair))
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
            ~consensus_local_state

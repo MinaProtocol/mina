@@ -12,7 +12,7 @@ let empty =
 
 let cons payload t =
   Pedersen.digest_fold Hash_prefix.receipt_chain
-    Fold.(Transaction.Payload.fold payload +> fold t)
+    Fold.(Payment_payload.fold payload +> fold t)
   |> of_hash
 
 module Checked = struct
@@ -36,7 +36,7 @@ module Checked = struct
       Pedersen.Checked.Section.extend init bs
         ~start:
           ( Hash_prefix.length_in_triples
-          + Transaction.Payload.length_in_triples )
+          + Payment_payload.length_in_triples )
     in
     let%map s = Pedersen.Checked.Section.disjoint_union_exn payload with_t in
     let digest, _ =
@@ -47,7 +47,7 @@ end
 
 let%test_unit "checked-unchecked equivalence" =
   let open Quickcheck in
-  test ~trials:20 (Generator.tuple2 gen Transaction_payload.gen) ~f:
+  test ~trials:20 (Generator.tuple2 gen Payment_payload.gen) ~f:
     (fun (base, payload) ->
       let unchecked = cons payload base in
       let checked =
@@ -55,7 +55,7 @@ let%test_unit "checked-unchecked equivalence" =
           let open Snark_params.Tick.Let_syntax in
           let%bind payload =
             Schnorr.Message.var_of_payload
-              (Transaction_payload.var_of_t payload)
+              (Payment_payload.var_of_t payload)
           in
           let%map res = Checked.cons ~payload (var_of_t base) in
           As_prover.read typ res
