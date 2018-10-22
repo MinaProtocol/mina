@@ -157,14 +157,15 @@ module Tagged_transaction = struct
         Amount.Signed.create ~sgn:Sgn.Neg ~magnitude
     | Coinbase ->
         assert (
-          Amount.( <= ) t.payload.amount Protocols.Coda_praos.coinbase_amount
-        ) ;
+          Amount.( <= )
+            (Amount.add_fee t.payload.amount t.payload.fee |> Option.value_exn)
+            Protocols.Coda_praos.coinbase_amount ) ;
         Currency.Amount.Signed.zero
 
-  let supply_increase ((tag, _t): t) =
+  let supply_increase ((tag, t): t) =
     match tag with
     | Normal | Fee_transfer -> Amount.zero
-    | Coinbase -> Protocols.Coda_praos.coinbase_amount
+    | Coinbase -> t.payload.amount
 
   module Checked = struct
     type changes =
@@ -183,7 +184,7 @@ module Tagged_transaction = struct
              (x1, x2))
         in
         let is_coinbase = Tag.Checked.is_coinbase tag in
-        let%map excess, sender_delta =
+        let%bind excess, sender_delta =
           let%bind non_coinbase_case =
             with_label __LOC__
               (let%bind amount_plus_fee =
@@ -213,32 +214,21 @@ module Tagged_transaction = struct
             with_label __LOC__
               (* If tag = Coinbase:
 
-                "sender" gets (coinbase_amount - amount)
+                "receiver" gets the coinbase amount and sender the fee transfer
                 excess is zero *)
-              (let%map proposer_reward =
-                 let%bind res, `Underflow underflow =
-                   Amount.Checked.sub_flagged
-                     (Amount.var_of_t Protocols.Coda_praos.coinbase_amount)
-                     t.payload.amount
-                 in
-                 let%map () =
-                   (* Only need to check that the subtraction actually succeeded in
-                     the coinbase case. *)
-                   Boolean.Assert.any
-                     [Boolean.not underflow; Boolean.not is_coinbase]
-                 in
-                 res
-               in
-               let excess =
+              (let excess =
                  Amount.Signed.Checked.constant Amount.Signed.zero
                in
-               (excess, Amount.Signed.Checked.of_unsigned proposer_reward))
+               return
+                 ( excess
+                 , Amount.Signed.Checked.of_unsigned
+                     (Amount.Checked.of_fee t.payload.fee) ))
           in
           if_ is_coinbase ~then_:coinbase_case ~else_:non_coinbase_case
         in
-        let supply_increase =
-          Amount.Checked.if_value is_coinbase
-            ~then_:Protocols.Coda_praos.coinbase_amount ~else_:Amount.zero
+        let%map supply_increase =
+          Amount.Checked.if_ is_coinbase ~then_:t.payload.amount
+            ~else_:(Amount.var_of_t Amount.zero)
         in
         {excess; sender_delta; supply_increase})
   end
@@ -271,17 +261,18 @@ module Transition = struct
   let to_tagged_transaction = function
     | Fee_transfer t -> Fee_transfer.to_tagged_transaction t
     | Transaction t -> (Normal, (t :> Transaction.t))
-    | Coinbase {proposer; fee_transfer} ->
-        let receiver, amount =
+    | Coinbase {proposer; fee_transfer; amount} ->
+        let sender, fee =
           Option.value ~default:(proposer, Fee.zero) fee_transfer
         in
         let t : Transaction.t =
           { payload=
-              { receiver
-              ; amount= Amount.of_fee amount
-              ; fee= Fee.zero
+              { receiver= proposer
+              ; amount
+              (*reward*)
+              ; fee
               ; nonce= Account.Nonce.zero }
-          ; sender= Public_key.decompress_exn proposer
+          ; sender= Public_key.decompress_exn sender
           ; signature= dummy_signature }
         in
         (Coinbase, t)

@@ -189,7 +189,7 @@ struct
     remove_accounts_exn t previous_empty_accounts
 
   (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-  let apply_coinbase t ({proposer; fee_transfer; _} as cb: Coinbase.t) =
+  let apply_coinbase t ({proposer; fee_transfer; amount} as cb: Coinbase.t) =
     let get_or_initialize pk =
       let initial_account = Account.initialize pk in
       match get_or_create_account_exn t pk (Account.initialize pk) with
@@ -197,29 +197,26 @@ struct
       | `Existed, location -> (location, get t location |> Option.value_exn, [])
     in
     let open Or_error.Let_syntax in
-    let%bind proposer_reward, emptys1, receiver_update =
-      match fee_transfer with
-      | None -> return (Protocols.Coda_praos.coinbase_amount, [], None)
-      | Some (receiver, fee) ->
+    let%bind emptys1, receiver_update =
+      Option.value_map
+        ~default:(Ok ([], None))
+        fee_transfer
+        ~f:(fun (receiver, fee) ->
           (* This assertion will pass because of how coinbase super transactions are produced by Ledger_builder.apply_diff *)
           assert (not @@ Public_key.Compressed.equal receiver proposer) ;
-          let fee = Amount.of_fee fee in
-          let%bind proposer_reward =
-            error_opt "Coinbase fee transfer too large"
-              (Amount.sub Protocols.Coda_praos.coinbase_amount fee)
-          in
           let receiver_location, receiver_account, emptys =
             get_or_initialize receiver
           in
-          let%map balance = add_amount receiver_account.balance fee in
-          ( proposer_reward
-          , emptys
-          , Some (receiver_location, {receiver_account with balance}) )
+          let%map balance =
+            add_amount receiver_account.balance (Amount.of_fee fee)
+          in
+          (emptys, Some (receiver_location, {receiver_account with balance}))
+          )
     in
     let proposer_location, proposer_account, emptys2 =
       get_or_initialize proposer
     in
-    let%map balance = add_amount proposer_account.balance proposer_reward in
+    let%map balance = add_amount proposer_account.balance amount in
     set t proposer_location {proposer_account with balance} ;
     Option.iter receiver_update ~f:(fun (l, a) -> set t l a) ;
     {Undo.coinbase= cb; previous_empty_accounts= emptys1 @ emptys2}
@@ -227,11 +224,10 @@ struct
   (* Don't have to be atomic here because these should never fail. In fact, none of
    the undo functions should ever return an error. This should be fixed in the types. *)
   let undo_coinbase t
-      {Undo.coinbase= {proposer; fee_transfer; _}; previous_empty_accounts} =
-    let proposer_reward =
-      match fee_transfer with
-      | None -> Protocols.Coda_praos.coinbase_amount
-      | Some (receiver, fee) ->
+      {Undo.coinbase= {proposer; fee_transfer; amount}; previous_empty_accounts}
+      =
+    let () =
+      Option.value_map ~default:() fee_transfer ~f:(fun (receiver, fee) ->
           let fee = Amount.of_fee fee in
           let receiver_location =
             Or_error.ok_exn (location_of_key' t "receiver" receiver)
@@ -243,9 +239,7 @@ struct
             { receiver_account with
               balance=
                 Option.value_exn
-                  (Balance.sub_amount receiver_account.balance fee) } ;
-          Amount.sub Protocols.Coda_praos.coinbase_amount fee
-          |> Option.value_exn
+                  (Balance.sub_amount receiver_account.balance fee) } )
     in
     let proposer_location =
       Or_error.ok_exn (location_of_key' t "receiver" proposer)
@@ -256,8 +250,8 @@ struct
     set t proposer_location
       { proposer_account with
         balance=
-          Option.value_exn
-            (Balance.sub_amount proposer_account.balance proposer_reward) } ;
+          Option.value_exn (Balance.sub_amount proposer_account.balance amount)
+      } ;
     remove_accounts_exn t previous_empty_accounts
 
   let undo_transaction ledger
