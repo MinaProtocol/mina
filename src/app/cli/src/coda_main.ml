@@ -728,12 +728,13 @@ struct
 
   let request_work ~best_ledger_builder
       ~(seen_jobs: 'a -> Work_selector.State.t)
-      ~(set_seen_jobs: 'a -> Work_selector.State.t -> unit) (t: 'a) =
+      ~(set_seen_jobs: 'a -> Work_selector.State.t -> unit) (t: 'a)
+      (fee: Fee.Unsigned.t) =
     let lb = best_ledger_builder t in
     let instances, seen_jobs = Work_selector.work lb (seen_jobs t) in
     set_seen_jobs t seen_jobs ;
     if List.is_empty instances then None
-    else Some {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
+    else Some {Snark_work_lib.Work.Spec.instances; fee}
 end
 
 module Coda_with_snark
@@ -777,8 +778,9 @@ struct
 
   let snark_worker_command_name = Snark_worker_lib.Prod.command_name
 
-  let request_work =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+  let request_work t =
+    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs t
+      (snarking_fee t)
 end
 
 module Coda_without_snark
@@ -803,8 +805,9 @@ struct
   module Prover = Init.Prover
   include Coda_lib.Make (Inputs)
 
-  let request_work =
-    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs
+  let request_work t =
+    Inputs.request_work ~best_ledger_builder ~seen_jobs ~set_seen_jobs t
+      t.snarking_fee
 
   let snark_worker_command_name = Snark_worker_lib.Debug.command_name
 end
@@ -945,7 +948,8 @@ module type Main_intf = sig
       ; ledger_builder_transition_backup_capacity: int [@default 10]
       ; time_controller: Inputs.Time.Controller.t
       ; keypair: Keypair.t
-      ; banlist: Banlist.t }
+      ; banlist: Banlist.t
+      ; snarking_fee: Currency.Fee.t }
     [@@deriving make]
   end
 

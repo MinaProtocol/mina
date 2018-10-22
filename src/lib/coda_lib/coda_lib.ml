@@ -431,7 +431,8 @@ module Make (Inputs : Inputs_intf) = struct
         Linear_pipe.Reader.t
     ; log: Logger.t
     ; mutable seen_jobs: Work_selector.State.t
-    ; ledger_builder_transition_backup_capacity: int }
+    ; ledger_builder_transition_backup_capacity: int
+    ; snarking_fee: Currency.Fee.t }
 
   let run_snark_worker t = t.run_snark_worker
 
@@ -463,6 +464,8 @@ module Make (Inputs : Inputs_intf) = struct
 
   let peers t = Net.peers t.net
 
+  let snarking_fee t = t.snarking_fee
+
   let ledger_builder_ledger_proof t =
     let lb = best_ledger_builder t in
     Ledger_builder.current_ledger_proof lb
@@ -483,6 +486,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; time_controller: Time.Controller.t
       ; keypair: Keypair.t
       ; banlist: Coda_base.Banlist.t
+      ; snarking_fee: Currency.Fee.t
       (* TODO: Pass banlist to modules discussed in Ban Reasons issue: https://github.com/CodaProtocol/coda/issues/852 *)
       }
     [@@deriving make]
@@ -630,5 +634,6 @@ module Make (Inputs : Inputs_intf) = struct
       ; log= config.log
       ; seen_jobs= Work_selector.State.init
       ; ledger_builder_transition_backup_capacity=
-          config.ledger_builder_transition_backup_capacity }
+          config.ledger_builder_transition_backup_capacity
+      ; snarking_fee= config.snarking_fee }
 end

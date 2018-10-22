@@ -92,6 +92,12 @@ let daemon (type ledger_proof) (module Kernel
          (optional int)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
+     and fee =
+       flag "fee"
+         ~doc:
+           "FEE Amount a worker wants to get compensated for generating a \
+            snark proof"
+         (optional int)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -161,6 +167,10 @@ let daemon (type ledger_proof) (module Kernel
        let transaction_capacity_log_2 =
          or_from_config YJ.Util.to_int_option "txn-capacity" ~default:8
            transaction_capacity_log_2
+       in
+       let snarking_fee =
+         or_from_config YJ.Util.to_int_option "fee" ~default:0 fee
+         |> Currency.Fee.of_int
        in
        let rest_server_port =
          maybe_from_config YJ.Util.to_int_option "rest-port" rest_server_port
@@ -311,7 +321,7 @@ let daemon (type ledger_proof) (module Kernel
                 ~transaction_pool_disk_location:(conf_dir ^/ "transaction_pool")
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~time_controller:(Inputs.Time.Controller.create ())
-                ~keypair () ~banlist)
+                ~keypair () ~banlist ~snarking_fee)
          in
          let web_service = Web_pipe.get_service () in
          Web_pipe.run_service (module Run) coda web_service ~conf_dir ~log ;

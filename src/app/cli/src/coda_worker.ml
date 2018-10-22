@@ -184,6 +184,7 @@ struct
               ; parent_log= log
               ; banlist } }
         in
+        let snarking_fee = Currency.Fee.of_int 0 in
         let%bind coda =
           Main.create
             (Main.Config.make ~log ~net_config ~should_propose
@@ -194,7 +195,7 @@ struct
                  (conf_temp_dir ^/ "transaction_pool")
                ~snark_pool_disk_location:(conf_temp_dir ^/ "snark_pool")
                ~time_controller:(Main.Inputs.Time.Controller.create ())
-               ~keypair:Config.keypair () ~banlist)
+               ~snarking_fee ~keypair:Config.keypair () ~banlist)
         in
         Option.iter snark_worker_config ~f:(fun config ->
             let run_snark_worker = `With_public_key config.public_key in

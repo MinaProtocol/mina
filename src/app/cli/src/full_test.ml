@@ -61,6 +61,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
         ; me= (Host_and_port.of_string "127.0.0.1:8001", 8000)
         ; banlist } }
   in
+  let snarking_fee = Currency.Fee.of_int 0 in
   let%bind coda =
     Main.create
       (Main.Config.make ~log ~net_config ~should_propose:should_propose_bool
@@ -69,7 +70,7 @@ let run_test (type ledger_proof) (with_snark: bool) (module Kernel
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
          ~time_controller:(Inputs.Time.Controller.create ())
-         ~keypair () ~banlist)
+         ~keypair () ~banlist ~snarking_fee)
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
   let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
