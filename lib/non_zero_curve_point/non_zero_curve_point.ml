@@ -14,6 +14,8 @@ include Comparable.Make_binable (Stable.V1)
 
 type var = Tick.Field.var * Tick.Field.var
 
+let empty = (Tick.Field.zero, Tick.Field.zero)
+
 let var_of_t (x, y) =
   (Tick.Field.Checked.constant x, Tick.Field.Checked.constant y)
 

@@ -3,6 +3,7 @@ open Currency
 open Snark_bits
 open Snark_params.Tick
 open Coda_numbers
+open Common
 
 module Index = struct
   module type S = sig
@@ -62,18 +63,10 @@ module type S = sig
   module Index : Index.S
 
   module Stable : sig
-    module V1 : sig
-      type t
-      include Binable.S with type t := t
-      include Equal.S with type t := t
-      include Sexpable.S with type t := t
-    end
+    module V1 : Protocol_object.S
   end
 
-  type t = Stable.V1.t
-  include Binable.S with type t := t
-  include Equal.S with type t := t
-  include Sexpable.S with type t := t
+  include Protocol_object.S with type t = Stable.V1.t
 
   val create :
        public_key:Compressed_public_key.t

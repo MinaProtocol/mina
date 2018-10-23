@@ -1,83 +1,23 @@
-open Core
+open Core_kernel
 open Bitstring
+open Coda_spec
 
-module type S = sig
-  type t [@@deriving sexp, bin_io, hash, eq, compare]
-
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io, hash, eq, compare]
-    end
-  end
-
-  include Hashable.S with type t := t
-
-  val of_byte_string : string -> t
-
-  val of_directions : Direction.t list -> t
-
-  val root : unit -> t
-
-  val slice : t -> int -> int -> t
-
-  val get : t -> int -> int
-
-  val copy : t -> t
-
-  val parent : t -> t Or_error.t
-
-  val child : t -> Direction.t -> t Or_error.t
-
-  val child_exn : t -> Direction.t -> t
-
-  val parent_exn : t -> t
-
-  val dirs_from_root : t -> Direction.t list
-
-  val sibling : t -> t
-
-  val next : t -> t Option.t
-
-  val is_parent_of : t -> maybe_child:t -> bool
-
-  val serialize : t -> Bigstring.t
-
-  val pp : Format.formatter -> t -> unit
-
-  module Range : sig
-    type nonrec t = t * t
-
-    val fold :
-         ?stop:[`Inclusive | `Exclusive]
-      -> t
-      -> init:'a
-      -> f:(Stable.V1.t -> 'a -> 'a)
-      -> 'a
-
-    val subtree_range : Stable.V1.t -> t
-  end
-
-  val depth : t -> int
-
-  val height : t -> int
-
-  val to_int : t -> int
-
-  val of_int_exn : int -> t
-end
-
-module Make (Input : sig
-  val depth : int
-end) :
-  S =
+module Make
+    (Depth : Ledger_intf.Depth.S)
+  : Ledger_intf.Address.S
+      with module Direction = Direction =
 struct
+  module Direction = Direction
+
+  let max_depth = Depth.t
+
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
 
-  let path_byte_count = byte_count_of_bits Input.depth
+  let path_byte_count = byte_count_of_bits max_depth
 
   let depth = bitstring_length
 
-  let height path = Input.depth - depth path
+  let height path = max_depth - depth path
 
   let get = get
 
@@ -177,7 +117,7 @@ struct
   let parent_exn = Fn.compose Or_error.ok_exn parent
 
   let child (path: t) dir : t Or_error.t =
-    if bitstring_length path >= Input.depth then
+    if bitstring_length path >= max_depth then
       Or_error.error_string "The address length cannot be greater than depth"
     else
       let dir_bit = Direction.to_bool dir in
@@ -193,11 +133,11 @@ struct
            acc + ((if get path index <> 0 then 1 else 0) lsl i) )
 
   let of_int_exn index =
-    if index >= 1 lsl Input.depth then failwith "Index is too large"
+    if index >= 1 lsl max_depth then failwith "Index is too large"
     else
-      let buf = create_bitstring Input.depth in
+      let buf = create_bitstring max_depth in
       Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
-        (Input.depth - 1) 0
+        (max_depth - 1) 0
       |> Sequence.fold ~init:index ~f:(fun i pos ->
              Bitstring.put buf pos (i % 2) ;
              i / 2 )
@@ -283,7 +223,7 @@ struct
   let%test_unit "parent_exn(child_exn(node)) = node" =
     Quickcheck.test ~sexp_of:[%sexp_of : Direction.t List.t * Direction.t]
       (Quickcheck.Generator.tuple2
-         (Direction.gen_var_length_list Input.depth)
+         (Direction.gen_var_length_list max_depth)
          Direction.gen)
       ~f:(fun (path, direction) ->
         let address = of_directions path in
@@ -291,19 +231,19 @@ struct
 
   let%test_unit "to_index(of_index_exn(i)) = i" =
     Quickcheck.test ~sexp_of:[%sexp_of : int]
-      (Int.gen_incl 0 ((1 lsl Input.depth) - 1))
+      (Int.gen_incl 0 ((1 lsl max_depth) - 1))
       ~f:(fun index ->
         [%test_result : int] ~expect:index (to_int @@ of_int_exn index) )
 
   let%test_unit "of_index_exn(to_index(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
-      (Direction.gen_list Input.depth) ~f:(fun directions ->
+      (Direction.gen_list max_depth) ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result : t] ~expect:address (of_int_exn @@ to_int address) )
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
-      (Direction.gen_var_length_list ~start:1 Input.depth) ~f:
+      (Direction.gen_var_length_list ~start:1 max_depth) ~f:
       (fun directions ->
         let address = of_directions directions in
         [%test_result : t] ~expect:address (sibling @@ sibling address) )
@@ -312,14 +252,14 @@ end
 let%test_module "Address" =
   ( module struct
     module Test4 = Make (struct
-      let depth = 4
+      let t = 4
     end)
 
     module Test16 = Make (struct
-      let depth = 16
+      let t = 16
     end)
 
     module Test30 = Make (struct
-      let depth = 30
+      let t = 30
     end)
   end )

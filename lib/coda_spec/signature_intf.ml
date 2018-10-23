@@ -23,6 +23,14 @@ module Private_key = struct
 end
 
 module Public_key = struct
+  module Minimal = struct
+    module type S = sig
+      include Protocol_object.Hashable.S
+
+      val empty : t
+    end
+  end
+
   module Base = struct
     module type S = sig
       module Private_key : Private_key.S
@@ -31,7 +39,7 @@ module Public_key = struct
         module V1 : Protocol_object.Hashable.S
       end
 
-      include Protocol_object.Hashable.S with type t = Stable.V1.t
+      include Minimal.S with type t = Stable.V1.t
       include Snarkable.S with type value := t
 
       val var_of_t : t -> var
@@ -53,6 +61,7 @@ module Public_key = struct
       end
 
       include Protocol_object.Full.S with type t = Stable.V1.t
+      include Hashable.S_binable with type t := t
       include Snarkable.S with type value := t
 
       val gen : t Quickcheck.Generator.t

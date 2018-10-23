@@ -5,6 +5,6 @@
   (public_name merkle_ledger)
   (flags (:standard -short-paths -warn-error -6-33-27-9-58))
   (library_flags (-linkall))
-  (libraries (core bitstring integers extlib immutable_array dyn_array merkle_address direction coda_spec))
-  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.show)))
+  (libraries (core_kernel bitstring integers extlib immutable_array dyn_array coda_spec))
+  (preprocess (pps (ppx_jane ppx_deriving.eq ppx_deriving.show bitstring.ppx)))
   (synopsis "Implementation of different account databases")))

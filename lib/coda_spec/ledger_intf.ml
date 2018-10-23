@@ -10,12 +10,16 @@ end
 
 module Hash = struct
   module type S = sig
+    module Account : Account_intf.S
+
     type t = private Pedersen.Digest.t
     include Protocol_object.Full.S with type t := t
 
     val empty : t
 
     val merge : height:int -> t -> t -> t
+
+    val of_account : Account.t -> t
 
     val of_digest : Pedersen.Digest.t -> t
   end
@@ -39,7 +43,7 @@ module Direction = struct
     val flip : t -> t
 
     val gen : t Quickcheck.Generator.t
-    val gen_var_length_list : ?state:int -> int -> t list Quickcheck.Generator.t
+    val gen_var_length_list : ?start:int -> int -> t list Quickcheck.Generator.t
     val gen_list : int -> t list Quickcheck.Generator.t
     val shrinker : t Quickcheck.Shrinker.t
   end
@@ -136,13 +140,15 @@ end
 
 module Base = struct
   module type S = sig
+    module Depth : Depth.S
     module Account : Account_intf.S
     module Root_hash : Ledger_hash_intf.S
     module Hash : Hash.S
-    module Addr : Address.S
+      with module Account = Account
+    module Address : Address.S
     module Path : Path.S
       with module Hash = Hash
-       and module Direction = Addr.Direction
+       and module Direction = Address.Direction
     module Location : Location.S
 
     include Binable.S
@@ -180,21 +186,21 @@ module Base = struct
 
     val get_at_index_exn : t -> int -> Account.t
 
-    val get_inner_hash_at_addr_exn : t -> Addr.t -> Hash.t
+    val get_inner_hash_at_addr_exn : t -> Address.t -> Hash.t
 
-    val get_all_accounts_rooted_at_exn : t -> Addr.t -> Account.t list
+    val get_all_accounts_rooted_at_exn : t -> Address.t -> Account.t list
 
     val set_at_index_exn : t -> int -> Account.t -> unit
 
-    val set_inner_hash_at_addr_exn : t -> Addr.t -> Hash.t -> unit
+    val set_inner_hash_at_addr_exn : t -> Address.t -> Hash.t -> unit
 
-    val set_all_accounts_rooted_at_exn : t -> Addr.t -> Account.t list -> unit
+    val set_all_accounts_rooted_at_exn : t -> Address.t -> Account.t list -> unit
 
     val index_of_key_exn : t -> Account.Compressed_public_key.t -> int
 
     val merkle_path : t -> Location.t -> Path.t
 
-    val merkle_path_at_addr_exn : t -> Addr.t -> Path.t
+    val merkle_path_at_addr_exn : t -> Address.t -> Path.t
 
     val merkle_path_at_index_exn : t -> int -> Path.t
 
@@ -203,6 +209,11 @@ module Base = struct
     val make_space_for : t -> int -> unit
 
     val copy : t -> t
+
+    (* TODO: hide *)
+    module For_tests : sig
+      val get_leaf_hash_at_addr : t -> Address.t -> Hash.t
+    end
   end
 end
 

@@ -1,4 +1,3 @@
 (library
   (name hash_prefixes)
-  (public_name hash_prefixes)
-  )
+  (public_name hash_prefixes))

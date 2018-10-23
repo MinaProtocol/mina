@@ -1,7 +1,8 @@
-open Core
+open Core_kernel
 open Unsigned
+open Coda_spec
 
-module type Key_value_database = sig
+module type Key_value_database_intf = sig
   type t
 
   val copy : t -> t
@@ -17,7 +18,7 @@ module type Key_value_database = sig
   val delete : t -> key:Bigstring.t -> unit
 end
 
-module type Stack_database = sig
+module type Stack_database_intf = sig
   type t
 
   val copy : t -> t
@@ -33,32 +34,34 @@ module type Stack_database = sig
   val length : t -> int
 end
 
-module type Storage_locations = sig
+module type Storage_locations_intf = sig
   val key_value_db_dir : string
 
   val stack_db_file : string
 end
 
-module Make (Key : sig
-  include Intf.Key
+module type Inputs_intf = sig
+  module Depth : Ledger_intf.Depth.S
+  module Account : Account_intf.S
+  module Root_hash : Ledger_hash_intf.S
+  module Hash : Ledger_intf.Hash.S
+  module Kvdb : Key_value_database_intf
+  module Sdb : Stack_database_intf
+  module Storage_locations : Storage_locations_intf
+end
 
-  val to_string : t -> string
-end)
-(Account : Intf.Account with type key := Key.t)
-(Hash : Intf.Hash with type account := Account.t)
-(Depth : Intf.Depth)
-(Kvdb : Intf.Key_value_database)
-(Sdb : Intf.Stack_database)
-(Storage_locations : Intf.Storage_locations) : sig
-  include Database_intf.S
-          with type account := Account.t
-           and type hash := Hash.t
-           and type key := Key.t
-end = struct
+module Make
+    (Inputs : Inputs_intf)
+  : Ledger_intf.S
+    with module Account = Inputs.Account
+     and module Root_hash = Inputs.Root_hash
+     and module Hash = Inputs.Hash =
+struct
+  open Inputs
+
   (* The max depth of a merkle tree can never be greater than 253. *)
-  include Depth
-
-  let () = assert (Depth.depth < 0xfe)
+  let depth = Depth.t
+  let () = assert (depth < 0xfe)
 
   type error =
     | Account_location_not_found
@@ -66,11 +69,8 @@ end = struct
     | Malformed_database
   [@@deriving sexp]
 
-  module Path = Merkle_path.Make (Hash)
-
-  module Addr = Merkle_address.Make (struct
-    let depth = Depth.depth
-  end)
+  module Path = Path.Make (Hash)
+  module Address = Address.Make (Depth)
 
   (* Locations are a bitstring prefixed by a byte. In the case of accounts, the prefix
    * byte is 0xfe. In the case of a hash node in the merkle tree, the prefix is between
@@ -86,7 +86,7 @@ end = struct
 
       let account = UInt8.of_int 0xfe
 
-      let hash depth = UInt8.of_int (Depth.depth - depth)
+      let hash d = UInt8.of_int (depth - d)
     end
 
     type t =
@@ -94,8 +94,8 @@ end = struct
                                  fun fmt bstr ->
                                    Format.pp_print_string fmt
                                      (Bigstring.to_string bstr)]
-      | Account of Addr.t
-      | Hash of Addr.t
+      | Account of Address.t
+      | Hash of Address.t
     [@@deriving sexp]
 
     let is_generic = function Generic _ -> true | _ -> false
@@ -108,17 +108,17 @@ end = struct
       | Generic _ ->
           raise (Invalid_argument "height: generic location has no height")
       | Account _ -> 0
-      | Hash path -> Addr.height path
+      | Hash path -> Address.height path
 
-    let path : t -> Addr.t = function
+    let path : t -> Address.t = function
       | Generic _ ->
           raise (Invalid_argument "generic location has no directions")
       | Account path | Hash path -> path
 
-    let root_hash : t = Hash (Addr.root ())
+    let root_hash : t = Hash (Address.root ())
 
     let last_direction path =
-      Direction.of_bool (Addr.get path (Addr.depth path - 1) <> 0)
+      Direction.of_bool (Address.get path (Address.depth path - 1) <> 0)
 
     let build_generic (data: Bigstring.t) : t = Generic data
 
@@ -127,12 +127,12 @@ end = struct
       let data = Bigstring.sub str ~pos:1 ~len:(Bigstring.length str - 1) in
       if prefix = Prefix.generic then Result.return (Generic data)
       else
-        let path = Addr.of_byte_string (Bigstring.to_string data) in
-        let slice_path = Addr.slice path 0 in
+        let path = Address.of_byte_string (Bigstring.to_string data) in
+        let slice_path = Address.slice path 0 in
         if prefix = Prefix.account then
-          Result.return (Account (slice_path Depth.depth))
-        else if UInt8.to_int prefix <= Depth.depth then
-          Result.return (Hash (slice_path (Depth.depth - UInt8.to_int prefix)))
+          Result.return (Account (slice_path depth))
+        else if UInt8.to_int prefix <= depth then
+          Result.return (Hash (slice_path (depth - UInt8.to_int prefix)))
         else Result.fail ()
 
     let prefix_bigstring prefix src =
@@ -151,13 +151,13 @@ end = struct
     let serialize = function
       | Generic data -> prefix_bigstring Prefix.generic data
       | Account path ->
-          assert (Addr.depth path = Depth.depth) ;
-          prefix_bigstring Prefix.account (Addr.serialize path)
+          assert (Address.depth path = depth) ;
+          prefix_bigstring Prefix.account (Address.serialize path)
       | Hash path ->
-          assert (Addr.depth path <= Depth.depth) ;
+          assert (Address.depth path <= depth) ;
           prefix_bigstring
-            (Prefix.hash (Addr.depth path))
-            (Addr.serialize path)
+            (Prefix.hash (Address.depth path))
+            (Address.serialize path)
 
     let parent : t -> t = function
       | Generic _ ->
@@ -165,22 +165,22 @@ end = struct
       | Account _ ->
           raise (Invalid_argument "parent: account locations have no parent")
       | Hash path ->
-          assert (Addr.depth path > 0) ;
-          Hash (Addr.parent_exn path)
+          assert (Address.depth path > 0) ;
+          Hash (Address.parent_exn path)
 
     let next : t -> t Option.t = function
       | Generic _ ->
           raise
             (Invalid_argument "next: generic locations have no next location")
       | Account path ->
-          Addr.next path |> Option.map ~f:(fun next -> Account next)
-      | Hash path -> Addr.next path |> Option.map ~f:(fun next -> Hash next)
+          Address.next path |> Option.map ~f:(fun next -> Account next)
+      | Hash path -> Address.next path |> Option.map ~f:(fun next -> Hash next)
 
     let sibling : t -> t = function
       | Generic _ ->
           raise (Invalid_argument "sibling: generic locations have no sibling")
-      | Account path -> Account (Addr.sibling path)
-      | Hash path -> Hash (Addr.sibling path)
+      | Account path -> Account (Address.sibling path)
+      | Hash path -> Hash (Address.sibling path)
 
     let order_siblings (location: t) (base: 'a) (sibling: 'a) : 'a * 'a =
       match last_direction (path location) with
@@ -201,10 +201,10 @@ end = struct
 
   let empty_hashes =
     let empty_hashes =
-      Array.create ~len:(Depth.depth + 1) Hash.empty_account
+      Array.create ~len:(depth + 1) Hash.empty_account
     in
     let rec loop last_hash height =
-      if height <= Depth.depth then (
+      if height <= depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
@@ -245,23 +245,23 @@ end = struct
     assert (Location.is_hash location) ;
     set_bin mdb location Hash.bin_size_t Hash.bin_write_t new_hash ;
     let height = Location.height location in
-    if height < Depth.depth then
+    if height < depth then
       let sibling_hash = get_hash mdb (Location.sibling location) in
       let parent_hash =
         let left_hash, right_hash =
           Location.order_siblings location new_hash sibling_hash
         in
-        assert (height <= Depth.depth) ;
+        assert (height <= depth) ;
         Hash.merge ~height left_hash right_hash
       in
       set_hash mdb (Location.parent location) parent_hash
 
   let get_inner_hash_at_addr_exn mdb address =
-    assert (Addr.depth address <= Depth.depth) ;
+    assert (Address.depth address <= depth) ;
     get_hash mdb (Location.Hash address)
 
   let set_inner_hash_at_addr_exn mdb address hash =
-    assert (Addr.depth address <= Depth.depth) ;
+    assert (Address.depth address <= depth) ;
     set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
   let make_space_for t tot = ()
@@ -288,8 +288,8 @@ end = struct
       | None ->
           let first_location =
             Location.Account
-              ( Addr.of_directions
-              @@ List.init Depth.depth ~f:(fun _ -> Direction.Left) )
+              ( Address.of_directions
+              @@ List.init depth ~f:(fun _ -> Direction.Left) )
           in
           set_raw mdb location (Location.serialize first_location) ;
           Result.return first_location
@@ -334,11 +334,11 @@ end = struct
     let gen_account_location =
       let open Quickcheck.Let_syntax in
       let build_account (path: Direction.t list) =
-        assert (List.length path = Depth.depth) ;
-        Location.Account (Addr.of_directions path)
+        assert (List.length path = depth) ;
+        Location.Account (Address.of_directions path)
       in
       let%map dirs =
-        Quickcheck.Generator.list_with_length Depth.depth Direction.gen
+        Quickcheck.Generator.list_with_length depth Direction.gen
       in
       build_account dirs
   end
@@ -352,14 +352,14 @@ end = struct
   let index_of_key_exn mdb key =
     let location = location_of_key mdb key |> Option.value_exn in
     let addr = Location.to_path_exn location in
-    Addr.to_int addr
+    Address.to_int addr
 
   let get_at_index_exn mdb index =
-    let addr = Addr.of_int_exn index in
+    let addr = Address.of_int_exn index in
     get mdb (Location.Account addr) |> Option.value_exn
 
   let set_at_index_exn mdb index account =
-    let addr = Addr.of_int_exn index in
+    let addr = Address.of_int_exn index in
     set mdb (Location.Account addr) account
 
   let get_or_create_account mdb key account =
@@ -382,20 +382,20 @@ end = struct
   let num_accounts t =
     match Account_location.last_location_address t with
     | None -> 0
-    | Some addr -> Addr.to_int addr - Sdb.length t.sdb + 1
+    | Some addr -> Address.to_int addr - Sdb.length t.sdb + 1
 
   let get_all_accounts_rooted_at_exn mdb address =
-    let first_node, last_node = Addr.Range.subtree_range address in
+    let first_node, last_node = Address.Range.subtree_range address in
     let result =
-      Addr.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
+      Address.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
           let account = get mdb (Location.Account bit_index) in
           account :: acc )
     in
     List.rev_filter_map result ~f:Fn.id
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
-    let first_node, last_node = Addr.Range.subtree_range address in
-    Addr.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
+    let first_node, last_node = Address.Range.subtree_range address in
+    Address.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
         function
       | head :: tail ->
           set mdb (Location.Account bit_index) head ;
@@ -415,7 +415,7 @@ end = struct
       match Account_location.last_location_address t with
       | None -> init
       | Some last_addr ->
-          let last = Addr.to_int last_addr in
+          let last = Address.to_int last_addr in
           Sequence.range ~stop:`inclusive 0 last
           |> Sequence.map ~f:(get_at_index_exn t)
           |> Sequence.fold ~init ~f
@@ -439,7 +439,7 @@ end = struct
     in
     assert (Location.is_hash location) ;
     let rec loop k =
-      if Location.height k >= Depth.depth then []
+      if Location.height k >= depth then []
       else
         let sibling = Location.sibling k in
         let sibling_dir = Location.last_direction (Location.path k) in
@@ -452,6 +452,6 @@ end = struct
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
   let merkle_path_at_index_exn t index =
-    let addr = Addr.of_int_exn index in
+    let addr = Address.of_int_exn index in
     merkle_path_at_addr_exn t addr
 end

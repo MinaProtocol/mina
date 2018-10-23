@@ -1,42 +1,45 @@
-open Core
+open Core_kernel
+open Coda_spec
+
+module type Inputs_intf = sig
+  module Depth : Ledger_intf.Depth.S
+  module Account : Account_intf.S
+  module Root_hash : Ledger_hash_intf.S
+  module Hash : Ledger_intf.Hash.S
+    with module Account = Account
+end
 
 (* SOMEDAY: handle empty wallets *)
 module Make
-    (Key : Intf.Key) (Account : sig
-        type t [@@deriving sexp, bin_io]
+    (Inputs : Inputs_intf)
+  : Ledger_intf.Base.S
+      with module Account = Inputs.Account
+       and module Root_hash = Inputs.Root_hash
+       and module Hash = Inputs.Hash =
+struct
+  include Inputs
+  module Compressed_public_key = Account.Compressed_public_key
+  module Path = Path.Make (Hash)
+  module Address = Address.Make (Depth)
 
-        include Intf.Account with type t := t and type key := Key.t
-    end)
-    (Hash : sig
-              type t [@@deriving sexp, hash, compare, bin_io]
+  type error =
+    | Account_location_not_found
+    | Out_of_leaves
+    | Malformed_database
+  [@@deriving sexp]
 
-              include Intf.Hash with type t := t
-            end
-            with type account := Account.t) (Depth : sig
-        val depth : int
-    end) : sig
-  include Ledger_intf.S
-          with type hash := Hash.t
-           and type account := Account.t
-           and type key := Key.t
-
-  module For_tests : sig
-    val get_leaf_hash_at_addr : t -> Addr.t -> Hash.t
-  end
-end = struct
-  include Depth
-  module Addr = Merkle_address.Make (Depth)
+  let depth = Depth.t
 
   type index = int
 
-  type leafs = int Key.Table.t [@@deriving sexp, bin_io]
+  type leaves = int Compressed_public_key.Table.t [@@deriving sexp, bin_io]
 
   type accounts = Account.t Dyn_array.t [@@deriving sexp, bin_io]
 
   type nodes = Hash.t Dyn_array.t list [@@deriving sexp, bin_io]
 
   type tree =
-    { leafs: leafs
+    { leaves: leaves
     ; mutable unset_slots: Int.Set.t
     ; mutable dirty: bool
     ; mutable syncing: bool
@@ -59,6 +62,8 @@ end = struct
     let iter = `Define_using_fold
   end)
 
+  let empty_account_hash = Hash.of_account Account.empty
+
   let to_list = C.to_list
 
   let fold_until = C.fold_until
@@ -69,7 +74,7 @@ end = struct
 
   let copy t =
     let copy_tree tree =
-      { leafs= Key.Table.copy tree.leafs
+      { leaves= Compressed_public_key.Table.copy tree.leaves
       ; unset_slots= tree.unset_slots
       ; dirty= tree.dirty
       ; syncing= false
@@ -79,12 +84,8 @@ end = struct
     in
     {accounts= Dyn_array.copy t.accounts; tree= copy_tree t.tree}
 
-  module Path = Merkle_path.Make (Hash)
-
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights =
-      Array.create ~len:(depth + 1) Hash.empty_account
-    in
+    let empty_hash_at_heights = Array.create ~len:(depth + 1) empty_account_hash in
     let rec go i =
       if i <= depth then (
         let h = empty_hash_at_heights.(i - 1) in
@@ -97,11 +98,11 @@ end = struct
 
   let empty_hash_at_height d = memoized_empty_hash_at_height.(d)
 
-  (* if depth = N, leafs = 2^N *)
+  (* if depth = N, leaves = 2^N *)
   let create () =
     { accounts= Dyn_array.create ()
     ; tree=
-        { leafs= Key.Table.create ()
+        { leaves= Compressed_public_key.Table.create ()
         ; unset_slots= Int.Set.empty
         ; dirty= false
         ; syncing= false
@@ -109,13 +110,13 @@ end = struct
         ; nodes= []
         ; dirty_indices= [] } }
 
-  let num_accounts t = Key.Table.length t.tree.leafs
+  let num_accounts t = Compressed_public_key.Table.length t.tree.leaves
 
   let key_of_index t index =
     if index >= Dyn_array.length t.accounts then None
     else Some (Dyn_array.get t.accounts index |> Account.public_key)
 
-  let location_of_key t key = Hashtbl.find t.tree.leafs key
+  let location_of_key t key = Hashtbl.find t.tree.leaves key
 
   let key_of_index_exn t index = Option.value_exn (key_of_index t index)
 
@@ -136,14 +137,14 @@ end = struct
 
   let replace t index old_key account =
     Dyn_array.set t.accounts index account ;
-    Hashtbl.remove t.tree.leafs old_key ;
-    Hashtbl.set t.tree.leafs ~key:(Account.public_key account) ~data:index ;
+    Hashtbl.remove t.tree.leaves old_key ;
+    Hashtbl.set t.tree.leaves ~key:(Account.public_key account) ~data:index ;
     (t.tree).dirty_indices <- index :: t.tree.dirty_indices
 
   let allocate t key account =
     let merkle_index = Dyn_array.length t.accounts in
     Dyn_array.add t.accounts account ;
-    Hashtbl.set t.tree.leafs ~key ~data:merkle_index ;
+    Hashtbl.set t.tree.leaves ~key ~data:merkle_index ;
     (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
     merkle_index
 
@@ -151,13 +152,11 @@ end = struct
     match location_of_key t key with
     | None ->
         let new_index = allocate t key account in
-        let max_accounts = 1 lsl Depth.depth in
-        if new_index > 1 lsl Depth.depth then
-          failwith
-            (sprintf "Reached max capacity for number of accounts %d"
-               max_accounts)
-        else (`Added, new_index)
-    | Some index -> (`Existed, index)
+        let max_accounts = 1 lsl depth in
+        if new_index > 1 lsl depth then
+          Result.Error Out_of_leaves
+        else Result.Ok (`Added, new_index)
+    | Some index -> Result.Ok (`Existed, index)
 
   let set_at_index_exn t index account =
     if index < Dyn_array.length t.accounts then
@@ -168,9 +167,9 @@ end = struct
   let set = set_at_index_exn
 
   let extend_tree t =
-    let leafs = Dyn_array.length t.accounts in
-    if leafs <> 0 then (
-      let target_height = Int.max 1 (Int.ceil_log2 leafs) in
+    let leaves = Dyn_array.length t.accounts in
+    if leaves <> 0 then (
+      let target_height = Int.max 1 (Int.ceil_log2 leaves) in
       let current_height = t.tree.nodes_height in
       let additional_height = target_height - current_height in
       (t.tree).nodes_height <- t.tree.nodes_height + additional_height ;
@@ -208,8 +207,8 @@ end = struct
 
   let get_leaf_hash t i =
     if i < Dyn_array.length t.accounts then
-      Hash.hash_account (Dyn_array.get t.accounts i)
-    else Hash.empty_account
+      Hash.of_account (Dyn_array.get t.accounts i)
+    else empty_account_hash
 
   let recompute_tree t =
     if not (List.is_empty t.tree.dirty_indices) then (
@@ -232,7 +231,7 @@ end = struct
       in
       let least = List.hd_exn indices in
       assert (least = num_accounts t - len) ;
-      List.iter keys ~f:(fun k -> Key.Table.remove t.tree.leafs k) ;
+      List.iter keys ~f:(fun k -> Compressed_public_key.Table.remove t.tree.leaves k) ;
       Dyn_array.delete_range t.accounts least len ;
       (* TODO: fixup hashes in a less terrible way *)
       (t.tree).dirty_indices <- List.init least ~f:(fun i -> i) ;
@@ -247,7 +246,7 @@ end = struct
     let height = t.tree.nodes_height in
     let base_root =
       match List.last t.tree.nodes with
-      | None -> Hash.empty_account
+      | None -> empty_account_hash
       | Some a -> Dyn_array.get a 0
     in
     let rec go i hash =
@@ -286,8 +285,8 @@ end = struct
       in
       let leaf_hash_idx = index lxor 1 in
       let leaf_hash =
-        if leaf_hash_idx >= Hashtbl.length t.tree.leafs then Hash.empty_account
-        else Hash.hash_account (Dyn_array.get t.accounts leaf_hash_idx)
+        if leaf_hash_idx >= Hashtbl.length t.tree.leaves then empty_account_hash
+        else Hash.of_account (Dyn_array.get t.accounts leaf_hash_idx)
       in
       let is_left = index mod 2 = 0 in
       let non_root_nodes = List.take t.tree.nodes (depth - 1) in
@@ -302,17 +301,17 @@ end = struct
   let merkle_path = merkle_path_at_index_exn
 
   module For_tests = struct
-    let get_leaf_hash_at_addr t addr = get_leaf_hash t (Addr.to_int addr)
+    let get_leaf_hash_at_addr t addr = get_leaf_hash t (Address.to_int addr)
   end
 
   (* FIXME: Probably this will cause an error *)
   let merkle_path_at_addr_exn t a =
-    assert (Addr.depth a = Depth.depth - 1) ;
-    merkle_path_at_index_exn t (Addr.to_int a)
+    assert (Address.depth a = depth - 1) ;
+    merkle_path_at_index_exn t (Address.to_int a)
 
   let set_at_addr_exn t addr acct =
-    assert (Addr.depth addr = Depth.depth - 1) ;
-    set_at_index_exn t (Addr.to_int addr) acct
+    assert (Address.depth addr = depth - 1) ;
+    set_at_index_exn t (Address.to_int addr) acct
 
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
@@ -325,10 +324,10 @@ end = struct
     go (empty_hash_at_height start_height) hash start_height
 
   let get_inner_hash_at_addr_exn t a =
-    let adepth = Addr.depth a in
+    let adepth = Address.depth a in
     assert (adepth < depth) ;
-    let height = Addr.height a in
-    let index = Addr.to_int a in
+    let height = Address.height a in
+    let index = Address.to_int a in
     let layer = List.nth t.tree.nodes (height - 1) in
     let layer_len = Option.value_map ~f:DynArray.length ~default:0 layer in
     recompute_tree t ;
@@ -341,11 +340,11 @@ end = struct
     else empty_hash_at_height height
 
   let set_inner_hash_at_addr_exn t a hash =
-    let path_length = Addr.depth a in
+    let path_length = Address.depth a in
     assert (path_length < depth) ;
     (t.tree).dirty <- true ;
     let l = List.nth_exn t.tree.nodes (depth - path_length - 1) in
-    let index = Addr.to_int a in
+    let index = Address.to_int a in
     DynArray.set l index hash
 
   let make_space_for t total =
@@ -354,25 +353,25 @@ end = struct
       (t.tree).unset_slots
       <- Int.Set.union t.tree.unset_slots
            (Int.Set.of_list
-              (List.init (total - len) (fun i ->
+              (List.init (total - len) ~f:(fun i ->
                    Dyn_array.add t.accounts Account.empty ;
                    len + i )))
 
   let set_all_accounts_rooted_at_exn t a accounts =
-    let height = depth - Addr.depth a in
-    let first_index = Addr.to_int a lsl height in
+    let height = depth - Address.depth a in
+    let first_index = Address.to_int a lsl height in
     assert (List.length accounts <= 1 lsl height) ;
     make_space_for t (first_index + List.length accounts) ;
     List.iteri accounts ~f:(fun i a ->
         let new_index = first_index + i in
         if Int.Set.mem t.tree.unset_slots new_index then (
-          replace t new_index Key.empty a ;
+          replace t new_index Compressed_public_key.empty a ;
           (t.tree).unset_slots <- Int.Set.remove t.tree.unset_slots new_index )
         else set_at_index_exn t new_index a )
 
   let get_all_accounts_rooted_at_exn t a =
-    let height = depth - Addr.depth a in
-    let first_index = Addr.to_int a lsl height in
+    let height = depth - Address.depth a in
+    let first_index = Address.to_int a lsl height in
     let count = min (1 lsl height) (num_accounts t - first_index) in
     let subarr = Dyn_array.sub t.accounts first_index count in
     Dyn_array.to_list subarr
