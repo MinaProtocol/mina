@@ -1,0 +1,12 @@
+digraph G {
+  rankdir=LR;
+
+  "Consensus.next_proposal" -> wait_for_proposal [label="`Propose t"];
+  wait_for_proposal -> "Consensus.generate_transition";
+  "Consensus.generate_transition" -> prove;
+  prove -> external_transition_pipe;
+  prove -> "Consensus.next_proposal";
+
+  "Consensus.next_proposal" -> wait_to_check [label="`Check_again t"];
+  wait_to_check -> "Consensus.next_proposal";
+}
