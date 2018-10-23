@@ -119,7 +119,7 @@ jobs:
                 name: Test make test-runtest
                 command: source ~/.profile && make test-runtest
 
-    test_withsnark:
+    test-withsnark:
         resource_class: large
         docker:
         - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc

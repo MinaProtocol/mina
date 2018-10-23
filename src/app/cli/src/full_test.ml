@@ -6,7 +6,7 @@ open Signature_lib
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
-let run_test (type ledger_proof) (with_snark_worker: bool) (module Kernel
+let run_test (type ledger_proof) (module Kernel
     : Kernel_intf with type Ledger_proof.t = ledger_proof) (module Coda
     : Coda_intf.S with type ledger_proof = ledger_proof) : unit Deferred.t =
   Parallel.init_master () ;
@@ -67,7 +67,7 @@ let run_test (type ledger_proof) (with_snark_worker: bool) (module Kernel
   let%bind coda =
     Main.create
       (Main.Config.make ~log ~net_config ~should_propose:should_propose_bool
-         ~run_snark_worker:with_snark_worker
+         ~run_snark_worker:true
          ~ledger_builder_persistant_location:(temp_conf_dir ^/ "ledger_builder")
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
@@ -231,8 +231,4 @@ let command (type ledger_proof) (module Kernel
   let open Core in
   let open Async in
   Command.async ~summary:"Full coda end-to-end test"
-    (let open Command.Let_syntax in
-    let%map_open with_snark_worker =
-      flag "with-snark-worker" no_arg ~doc:"Produce snarks"
-    in
-    fun () -> run_test with_snark_worker (module Kernel) (module Coda))
+    (Command.Param.return (fun () -> run_test (module Kernel) (module Coda)))
