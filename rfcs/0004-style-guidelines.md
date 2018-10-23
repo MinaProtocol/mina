@@ -86,3 +86,77 @@ Replacement equality `:=` has the advantage that the generated signature is narr
 Now, let's take a look at type equalities vs module equalities. Type equalities provide a finer grain of atomicity. Module equalities typically require less equality statements, but at the cost that the grain of atomicity is defined on a per signature basis. Let's think about an example to help make this clearer. Let's say we have 4 modules: `A`, `B`, `C`, and `D`. `B` depends on `A`, and `D` depends on all three modules `A`, `B`, and `C`. Using type equality, we would need to say that a functor creating `D` returns `D_intf with type a = B.a and type b = B.t and type c = C.t` (assuming `B` uses the same pattern for `A` as `D` does for `A`, `B`, and `C`). However, if we instead use module equalities, the returning interface of the `D` functor could be expressed as `D_intf with module B = B and module C = C`. We do not need to express an equality on `D_intf.A` since `D_intf.B` contains `D_intf.B.A` and `D_intf.B = B`, therefor `D_intf.B.A = B.A`. This scales much better as more and more dependencies are nested. With type equality, every layer we go up in dependencies requires more and more equality declarations.
 
 As mentioned earlier, the disadvantage of using module equalities is that the grain of atomicity for a dependency becomes tied to the decomposition of its signatures. Right now, in our codebase, we don't do much signature decomposition. However, independent of this issue, we should move towards decomposing signatures anyway. In fact, it's part of the janestreet styleguide. Signatures should almost never be written entirely by hand, but instead should compose smaller, finer grained signatures in order to build up the majority of what it requires. Using this pattern, we can still limit the surfaced requirements of dependencies while gaining the advantages of module equality. When viewed from this perspective, in fact, tying the grain of atomicity to the signature decomposition of a dependency actually becomes a pro instead of a con, since we as developers get more control over the level of abstraction our signatures should have over the underlying structure.
+
+## Module dependencies and stubbing
+[stubbing-modules]: #stubbing-modules
+
+OCaml signatures have a nice compositional property. When we define two signatures:
+
+```ocaml
+module Base = struct
+  module type S = sig
+    type t
+    val a : t -> t
+  end
+end
+
+module type S = sig
+  include Base.S
+  val b : t -> t
+end
+```
+
+Modules conforming to `S` conform to `Base.S` for free:
+
+```ocaml
+module Foo = struct
+  type t = int
+  let a x = x
+  let b x = x
+end
+
+module Foo1 : Base.S = Foo
+module Foo2 : S = Foo
+```
+
+It seems on the surface like this may be a really nice feature for making it easier to test modules that are functored over dependencies:
+
+```ocaml
+module Make
+  (Dep1 : Dep1.Base.S)
+  (Dep2 : Dep2.Base.S)
+= struct
+  (*...*)
+end
+
+let%test_module = (module struct
+  module Foo =
+    Make (Test_dep1) (Test_dep2)
+
+  (* the rest of the unit tests *)
+end)
+```
+
+Now we only need to implement a stub for the features we use in our module and not all of `Dep1.S` (just `Dep1.Base.S`). However, this doesn't play nicely with our preferred method for handling functor signature equality. Unforunately, one would need to play a very complicated dance to prove to the compiler that (for example):
+
+```ocaml
+module type Ledger_full = sig
+  module A : A.S
+  (* ... *)
+end
+
+module type Ledger_base = sig
+  module A : A.Base.S
+  (* ... *)
+end
+
+module Ledger : Ledger_full = Real_ledger
+
+(* this doesn't work! *)
+module Ledger2 : Ledger_base = Ledger
+```
+
+There are ways around this, but they either make us regress back to the pitfalls of the functor signature type substitution problems that we had in `coda_main.ml` or require a very complicated dance of extra signatures to pull off.
+
+The easy solution is to instead always make full test stubs and always use the full `A.S` signature on inner modules -- i.e. `Test_dep1` conforms to `Dep1.S` not `Dep1.Base.S` and we prefer `Ledger_full`. If you don't need a particular function, stub it with `failwith`, since these are only used in tests, it's okay to crash if we make a change. And the test stubs are now universal across all usages of the module in functor parameters.
+
