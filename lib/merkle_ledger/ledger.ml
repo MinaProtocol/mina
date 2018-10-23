@@ -112,16 +112,11 @@ struct
 
   let num_accounts t = Compressed_public_key.Table.length t.tree.leaves
 
-(* TODO: DELETE
-  let key_of_index t index =
+  let _key_of_index t index =
     if index >= Dyn_array.length t.accounts then None
     else Some (Dyn_array.get t.accounts index |> Account.public_key)
 
-*)
   let location_of_key t key = Hashtbl.find t.tree.leaves key
-
-  (*   TODO: DELETE
-       let key_of_index_exn t index = Option.value_exn (key_of_index t index) *)
 
   let index_of_key_exn t key = Option.value_exn (location_of_key t key)
 
@@ -265,12 +260,6 @@ struct
         go (i - 1) hash
     in
     Root_hash.of_hash (go (depth - height) base_root :> Snark_params.Tick.Pedersen.Digest.t)
-
-(*   TODO: DELETE let hash t = Root_hash.hash (merkle_root t) *)
-
-(*   TODO: DELETE let hash_fold_t state t = Ppx_hash_lib.Std.Hash.fold_int state (hash t) *)
-
-(*   TODO: DELETE let compare t t' = Root_hash.compare (merkle_root t) (merkle_root t') *)
 
   let merkle_path_at_index_exn t index =
     if index >= Dyn_array.length t.accounts then
