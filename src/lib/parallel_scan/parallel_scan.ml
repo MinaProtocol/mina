@@ -342,6 +342,23 @@ module State = struct
         | Some pos ->
             let%map () = include_one_datum state a pos in
             state.base_none_pos <- next_base_pos state pos )
+
+  module Deferred = struct
+    let fold_chronological_until t ~init ~f ~finish =
+      let n = Array.length t.jobs.data in
+      let rec go acc i pos =
+        if Int.equal i n then Deferred.return acc
+        else
+          let open Container.Continue_or_stop in
+          let x = (t.jobs.data).(pos) in
+          match%bind f acc x with
+          | Continue subresult ->
+              go subresult (i + 1)
+                (next_position (parallelism t) t.level_pointer pos)
+          | Stop aborted_value -> finish aborted_value
+      in
+      go init 0 0
+  end
 end
 
 let start : type a d. parallelism_log_2:int -> (a, d) State.t = State.create

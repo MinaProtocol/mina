@@ -1,4 +1,5 @@
 open Core_kernel
+open Async_kernel
 
 module Ring_buffer : sig
   type 'a t [@@deriving sexp, bin_io]
@@ -30,6 +31,17 @@ module State : sig
   end
 
   val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
+
+  module Deferred : sig
+    val fold_chronological_until :
+         ('a, 'd) t
+      -> init:'acc
+      -> f:(   'acc
+            -> ('a, 'd) Job.t
+            -> ('acc, 'stop) Container.Continue_or_stop.t Deferred.t)
+      -> finish:('stop -> 'acc Deferred.t)
+      -> 'acc Deferred.t
+  end
 end
 
 module type Spec_intf = sig

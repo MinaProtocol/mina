@@ -1,5 +1,6 @@
 (library
  (name debug_assert)
   (public_name debug_assert)
+  (libraries async_kernel)
   (synopsis "Debug assertion library")
  )
