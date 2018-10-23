@@ -15,15 +15,25 @@ module Make
              and type location := Location.t
              and type account := Account.t) =
 struct
-  module For_tests = Base.For_tests
+  type account = Account.t
+
+  type hash = Hash.t
+
+  type key = Key.t
+
+  type location = Location.t
+
   module Path = Base.Path
-  module Addr = Base.Addr
+  module Addr = Location.Addr
   module Db_error = Base.Db_error
+  module For_tests = Base.For_tests
+
+  type parent = Base.t option ref
 
   type t =
-    { parent: Base.t option ref
+    { parent: parent
     ; account_tbl: Account.t Location.Table.t
-    ; hash_tbl: Hash.t Location.Addr.Table.t }
+    ; hash_tbl: Hash.t Addr.Table.t }
 
   let set_parent t parent = t.parent := Some parent
 
@@ -34,7 +44,7 @@ struct
   let create () =
     { parent= ref None
     ; account_tbl= Location.Table.create ()
-    ; hash_tbl= Location.Addr.Table.create () }
+    ; hash_tbl= Addr.Table.create () }
 
   (* getter, setter, so we don't rely on a particular implementation *)
   let find_account t location = Location.Table.find t.account_tbl location
@@ -45,10 +55,10 @@ struct
   let remove_account t location = Location.Table.remove t.account_tbl location
 
   (* don't rely on a particular implementation *)
-  let find_hash t address = Location.Addr.Table.find t.hash_tbl address
+  let find_hash t address = Addr.Table.find t.hash_tbl address
 
   let set_hash t address hash =
-    Location.Addr.Table.set t.hash_tbl ~key:address ~data:hash
+    Addr.Table.set t.hash_tbl ~key:address ~data:hash
 
   (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
   let get t location =
@@ -60,7 +70,7 @@ struct
      the hash might be from the parent or the mask 
      *)
   let addresses_and_hashes_from_merkle_path t merkle_path account_address
-      account_hash : (Location.Addr.t * Hash.t) list =
+      account_hash : (Addr.t * Hash.t) list =
     let get_addresses_hashes height accum node =
       let last_address, last_hash =
         match List.hd accum with
@@ -68,7 +78,7 @@ struct
         | None -> failwith "addresses_and_hashes_from_merkle_path: empty accum"
       in
       let next_address =
-        match Location.Addr.parent last_address with
+        match Addr.parent last_address with
         | Ok addr -> addr
         | Error _s ->
             failwith
@@ -79,7 +89,7 @@ struct
          the mask is updated. Check whether our hash mask has an entry for corresponding address 
          in the path, and use it if present
          *)
-      let merkle_node_address = Location.Addr.sibling last_address in
+      let merkle_node_address = Addr.sibling last_address in
       let mask_hash = find_hash t merkle_node_address in
       match node with
       | `Left parent_hash ->
@@ -168,13 +178,13 @@ struct
     Base.set_batch (get_parent t) account_data ;
     (* TODO: do we worry about this code being interrupted, leading to inconsistent state? *)
     Location.Table.clear t.account_tbl ;
-    Location.Addr.Table.clear t.hash_tbl
+    Addr.Table.clear t.hash_tbl
 
   (* copy tables in t; use same parent *)
   let copy t =
     { t with
       account_tbl= Location.Table.copy t.account_tbl
-    ; hash_tbl= Location.Addr.Table.copy t.hash_tbl }
+    ; hash_tbl= Addr.Table.copy t.hash_tbl }
 
   (* types/modules/operations/values we delegate to parent *)
 

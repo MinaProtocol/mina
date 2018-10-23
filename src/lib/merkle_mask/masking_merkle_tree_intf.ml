@@ -4,6 +4,8 @@
 module type S = sig
   include Base_merkle_tree_intf.S
 
+  type parent
+
   (* get hash from mask, if present, else from its parent *)
 
   val get_hash : t -> Addr.t -> hash option
@@ -11,6 +13,18 @@ module type S = sig
   (* commit all state to the parent, flush state locally *)
 
   val commit : t -> unit
+
+  (* tell mask about parent *)
+
+  val set_parent : t -> parent -> unit
+
+  (* remove parent *)
+
+  val unset_parent : t -> unit
+
+  (* get mask parent *)
+
+  val get_parent : t -> parent
 
   (* called when parent sets an account; update local state *)
 

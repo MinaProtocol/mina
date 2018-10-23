@@ -11,22 +11,17 @@ module Make
             with type account := Account.t
              and type hash := Hash.t
              and type location := Location.t
-             and type key := Key.t) =
+             and type key := Key.t) (Mask : sig
+        include Masking_merkle_tree_intf.S
+                with type account := Account.t
+                 and type location := Location.t
+                 and type hash := Hash.t
+                 and type key := Key.t
+                 and type parent := Base.t
+    end) =
 struct
   include Base
-
-  module Masking_tree : sig
-    include Masking_merkle_tree_intf.S
-            with type account := Account.t
-             and type location := Location.t
-             and type hash := Hash.t
-             and type key := Key.t
-
-    val set_parent : t -> Base.t -> unit
-
-    val unset_parent : t -> unit
-  end =
-    Masking_merkle_tree.Make (Key) (Account) (Hash) (Location) (Base)
+  module Masking_tree = Mask
 
   (* registered masks *)
 
