@@ -103,5 +103,5 @@ end
 #### Module dependencies and stubbing
 [stubbing-modules]: #stubbing-modules
 
-Do not depend on subsets of module interfaces in functor arguments. Prefer depending on the full specification. When making Test module stubs, it's acceptable to `failwith` the functions your unit tests aren't touching. If a change is made that does touch them, a test will fail and it's obvious where it needs to be updated. Moreover, test stubs are now reusable everywhere such a dependency is used. See the [style rfc](../rfcs/0004-style-guidelines.md#stubbing-modules) for more rationale and discussion of alternatives.
+Do not depend on subsets of module interfaces in functor arguments. Prefer depending on the full specification. In the short term, when making Test module stubs, it's acceptable to `failwith` the functions your unit tests aren't touching. If a change is made that does touch them, a test will fail and it's obvious where it needs to be updated. In the long term, we'll move towards having complete test stubs. Additionally, as opposed to making stubs on subsets, test stubs are now reusable everywhere such a dependency is used. See the [style rfc](../rfcs/0004-style-guidelines.md#stubbing-modules) for more rationale and discussion of alternatives.
 

@@ -137,7 +137,7 @@ let%test_module = (module struct
 end)
 ```
 
-Now we only need to implement a stub for the features we use in our module and not all of `Dep1.S` (just `Dep1.Base.S`). However, this doesn't play nicely with our preferred method for handling functor signature equality. Unforunately, one would need to play a very complicated dance to prove to the compiler that (for example):
+Now we only need to implement a stub for the features we use in our module and not all of `Dep1.S` (just `Dep1.Base.S`). However, this doesn't play nicely with our preferred method for handling functor signature equality. Unfortunately, given for example the following signatures:
 
 ```ocaml
 module type Ledger_full = sig
@@ -149,14 +149,11 @@ module type Ledger_base = sig
   module A : A.Base.S
   (* ... *)
 end
-
-module Ledger : Ledger_full = Real_ledger
-
-(* this doesn't work! *)
-module Ledger2 : Ledger_base = Ledger
 ```
+
+One would need to play a very complicated dance to prove that the `A` within something that uses `Ledger_base`, is the same `A` as the one in `Ledger_full` even if you start by creating a full `A`.
 
 There are ways around this, but they either make us regress back to the pitfalls of the functor signature type substitution problems that we had in `coda_main.ml` or require a very complicated dance of extra signatures to pull off.
 
-The easy solution is to instead always make full test stubs and always use the full `A.S` signature on inner modules -- i.e. `Test_dep1` conforms to `Dep1.S` not `Dep1.Base.S` and we prefer `Ledger_full`. If you don't need a particular function, stub it with `failwith`, since these are only used in tests, it's okay to crash if we make a change. And the test stubs are now universal across all usages of the module in functor parameters.
+The easy solution is to instead always make full test stubs and always use the full `A.S` signature on inner modules -- i.e. `Test_dep1` conforms to `Dep1.S` not `Dep1.Base.S` and we prefer `Ledger_full`. In the short term, if you don't need a particular function, stub it with `failwith` -- since these are only used in tests, it's okay to crash if we make a change. Eventually we'll have full test stubs. And the test stubs are now universal across all usages of the module in functor parameters.
 
