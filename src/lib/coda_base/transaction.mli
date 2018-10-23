@@ -42,7 +42,7 @@ val gen :
   -> t Quickcheck.Generator.t
 
 module With_valid_signature : sig
-  type nonrec t = private t [@@deriving sexp, eq, bin_io]
+  type nonrec t = private t [@@deriving sexp, eq]
 
   val compare : seed:string -> t -> t -> int
 
