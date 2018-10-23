@@ -1,5 +1,5 @@
 open Core_kernel
-open Import
+open Signature_lib
 
 let pk = Public_key.Compressed.of_base64_exn
 
@@ -76,17 +76,17 @@ let ledger =
   create_account low_balance_pk
     { Account.public_key= low_balance_pk
     ; balance= initial_low_balance
-    ; receipt_chain_hash= Receipt.Chain_hash.empty
-    ; nonce= Account.Nonce.zero } ;
+    ; receipt_chain_hash= Receipt_chain_hash.empty
+    ; nonce= Coda_numbers.Account_nonce.zero } ;
   List.fold pks ~init:() ~f:(fun _ pk ->
       create_account pk
         { Account.public_key= pk
         ; balance= Currency.Balance.of_int init_balance
-        ; receipt_chain_hash= Receipt.Chain_hash.empty
-        ; nonce= Account.Nonce.zero } ) ;
+        ; receipt_chain_hash= Receipt_chain_hash.empty
+        ; nonce= Coda_numbers.Account_nonce.zero } ) ;
   create_account high_balance_pk
     { Account.public_key= high_balance_pk
     ; balance= initial_high_balance
-    ; receipt_chain_hash= Receipt.Chain_hash.empty
-    ; nonce= Account.Nonce.zero } ;
+    ; receipt_chain_hash= Receipt_chain_hash.empty
+    ; nonce= Coda_numbers.Account_nonce.zero } ;
   ledger

@@ -44,7 +44,7 @@ module type Inputs_intf = sig
   module Depth : Ledger_intf.Depth.S
   module Account : Account_intf.S
   module Root_hash : Ledger_hash_intf.S
-  module Hash : Ledger_intf.Hash.S
+  module Hash : Ledger_intf.Hash.S with module Account = Account
   module Kvdb : Key_value_database_intf
   module Sdb : Stack_database_intf
   module Storage_locations : Storage_locations_intf
@@ -52,12 +52,12 @@ end
 
 module Make
     (Inputs : Inputs_intf)
-  : Ledger_intf.S
+  : Ledger_intf.Base.S
     with module Account = Inputs.Account
      and module Root_hash = Inputs.Root_hash
      and module Hash = Inputs.Hash =
 struct
-  open Inputs
+  include Inputs
 
   (* The max depth of a merkle tree can never be greater than 253. *)
   let depth = Depth.t
@@ -197,11 +197,12 @@ struct
     let sdb = Sdb.create ~filename:Storage_locations.stack_db_file in
     {kvdb; sdb}
 
-  let destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
+  let _destroy {kvdb; sdb} = Kvdb.destroy kvdb ; Sdb.destroy sdb
 
   let empty_hashes =
+    let empty_account_hash = Hash.of_digest Account.empty_hash in
     let empty_hashes =
-      Array.create ~len:(depth + 1) Hash.empty_account
+      Array.create ~len:(depth + 1) empty_account_hash
     in
     let rec loop last_hash height =
       if height <= depth then (
@@ -209,7 +210,7 @@ struct
         empty_hashes.(height) <- hash ;
         loop hash (height + 1) )
     in
-    loop Hash.empty_account 1 ;
+    loop empty_account_hash 1 ;
     Immutable_array.of_array empty_hashes
 
   let get_raw {kvdb; _} location =
@@ -264,11 +265,11 @@ struct
     assert (Address.depth address <= depth) ;
     set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
-  let make_space_for t tot = ()
+  let make_space_for _t _tot = ()
 
   module Account_location = struct
     let build_location key =
-      Location.build_generic (Bigstring.of_string ("$" ^ Key.to_string key))
+      Location.build_generic (Bigstring.of_string ("$" ^ Account.Compressed_public_key.to_base64 key))
 
     let get mdb key =
       match get_generic mdb (build_location key) with
@@ -331,7 +332,9 @@ struct
     | Ok location -> Some location
 
   module For_tests = struct
-    let gen_account_location =
+    let get_leaf_hash_at_addr _t _addr = failwith "TODO"
+
+    let _gen_account_location =
       let open Quickcheck.Let_syntax in
       let build_account (path: Direction.t list) =
         assert (List.length path = depth) ;
@@ -347,7 +350,7 @@ struct
     set_bin mdb location Account.bin_size_t Account.bin_write_t account ;
     set_hash mdb
       (Location.Hash (Location.path location))
-      (Hash.hash_account account)
+      (Hash.of_account account)
 
   let index_of_key_exn mdb key =
     let location = location_of_key mdb key |> Option.value_exn in
@@ -425,7 +428,9 @@ struct
 
   let to_list = C.to_list
 
-  let merkle_root mdb = get_hash mdb Location.root_hash
+  let merkle_root mdb =
+    Root_hash.of_hash
+      (get_hash mdb Location.root_hash :> Snark_params.Tick.Pedersen.Digest.t)
 
   let copy {kvdb; sdb} = {kvdb= Kvdb.copy kvdb; sdb= Sdb.copy sdb}
 
@@ -444,7 +449,7 @@ struct
         let sibling = Location.sibling k in
         let sibling_dir = Location.last_direction (Location.path k) in
         let hash = get_hash mdb sibling in
-        Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
+        Direction.map sibling_dir ~left:(Path.Direction.Left, hash) ~right:(Right, hash)
         :: loop (Location.parent k)
     in
     loop location

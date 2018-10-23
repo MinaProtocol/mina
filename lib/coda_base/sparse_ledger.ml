@@ -1,17 +1,24 @@
 open Core
-open Import
 open Snark_params.Tick
 open Coda_numbers
 
 include Sparse_ledger_lib.Sparse_ledger.Make (struct
             include Merkle_hash
           end)
-          (Public_key.Compressed.Stable.V1)
+          (Signature_lib.Public_key.Compressed.Stable.V1)
           (struct
             include Account.Stable.V1
 
             let hash = Fn.compose Merkle_hash.of_digest Account.digest
           end)
+
+let conv_path  =
+  List.map ~f:(function
+    | (Ledger.Path.Direction.Left, x) -> `Left x
+    | (Right, x) -> `Right x)
+
+let ledger_merkle_path ledger loc =
+  conv_path (Ledger.merkle_path ledger loc)
 
 let of_ledger_subset_exn (ledger: Ledger.t) keys =
   let new_keys, sparse =
@@ -21,12 +28,12 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
         | Some loc ->
             ( new_keys
             , add_path sl
-                (Ledger.merkle_path ledger loc)
+                (ledger_merkle_path ledger loc)
                 key
                 (Ledger.get ledger loc |> Option.value_exn) )
         | None ->
             let path, acct = Ledger.create_empty ledger key in
-            (key :: new_keys, add_path sl path key acct) )
+            (key :: new_keys, add_path sl (conv_path path) key acct) )
       ~init:
         ( []
         , of_hash ~depth:Ledger.depth
@@ -35,13 +42,14 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
   in
   Ledger.remove_accounts_exn ledger new_keys ;
   Debug_assert.debug_assert (fun () ->
-      [%test_eq : Ledger_hash.t]
+      [%test_eq : Ledger.Root_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger_hash.of_hash) ) ;
+        ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger.Root_hash.of_hash) ) ;
   sparse
 
 let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
   let keygen () =
+    let open Signature_lib in
     let privkey = Private_key.create () in
     (privkey, Public_key.of_private_key_exn privkey |> Public_key.compress)
   in
@@ -53,9 +61,9 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
     (Ledger.merkle_root ledger)
     ((merkle_root sl :> Pedersen.Digest.t) |> Ledger_hash.of_hash)
 
-let apply_transaction_exn t ({sender; payload; signature= _}: Transaction.t) =
-  let {Transaction_payload.amount; fee; receiver; nonce} = payload in
-  let sender_idx = find_index_exn t (Public_key.compress sender) in
+let apply_payment_exn t ({sender; payload; signature= _}: Payment.t) =
+  let {Payment_payload.amount; fee; receiver; nonce} = payload in
+  let sender_idx = find_index_exn t (Signature_lib.Public_key.compress sender) in
   let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in
   assert (Account_nonce.equal (Account.nonce sender_account) nonce) ;
@@ -91,9 +99,9 @@ let apply_fee_transfer_exn =
             (Balance.add_amount account.balance (Amount.of_fee fee)) }
   in
   fun t transfer ->
-    List.fold (Fee_transfer.to_list transfer) ~f:apply_single ~init:t
+    List.fold (Fee_transfer.to_single_list transfer) ~f:apply_single ~init:t
 
-let apply_coinbase_exn t ({proposer; fee_transfer}: Coinbase.t) =
+let apply_coinbase_exn t ({proposer; fee_transfer; amount}: Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
@@ -106,21 +114,21 @@ let apply_coinbase_exn t ({proposer; fee_transfer}: Coinbase.t) =
   in
   let proposer_reward, t =
     match fee_transfer with
-    | None -> (Protocols.Coda_praos.coinbase_amount, t)
+    | None -> (amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
         let reward =
-          Amount.sub Protocols.Coda_praos.coinbase_amount fee
+          Amount.sub amount fee
           |> Option.value_exn
         in
         (reward, add_to_balance t receiver fee)
   in
   add_to_balance t proposer proposer_reward
 
-let apply_super_transaction_exn t transition =
+let apply_transaction_exn t transition =
   match transition with
-  | Super_transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
-  | Transaction tr -> apply_transaction_exn t (tr :> Transaction.t)
+  | Transaction.Fee_transfer tr -> apply_fee_transfer_exn t tr
+  | Valid_payment tr -> apply_payment_exn t (tr :> Payment.t)
   | Coinbase c -> apply_coinbase_exn t c
 
 let merkle_root t = Ledger_hash.of_hash (merkle_root t :> Pedersen.Digest.t)

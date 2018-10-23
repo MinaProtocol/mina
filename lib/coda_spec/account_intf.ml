@@ -57,16 +57,29 @@ module Receipt_chain_hash = struct
 end
 
 module type S = sig
-  module Receipt_chain_hash : Hash_intf.Full_size.S
+  module Receipt_chain_hash : Receipt_chain_hash.S
   module Compressed_public_key : Signature_intf.Public_key.Compressed.S
 
   module Index : Index.S
 
+  type ('pk, 'amount, 'nonce, 'receipt_chain_hash) t_ =
+    { public_key: 'pk
+    ; balance: 'amount
+    ; nonce: 'nonce
+    ; receipt_chain_hash: 'receipt_chain_hash }
+
+  type t =
+    ( Compressed_public_key.t
+    , Balance.t
+    , Coda_numbers.Account_nonce.t
+    , Receipt_chain_hash.t )
+    t_
+
   module Stable : sig
-    module V1 : Protocol_object.S
+    module V1 : Protocol_object.S with type t = t
   end
 
-  include Protocol_object.S with type t = Stable.V1.t
+  include Protocol_object.S with type t := t
 
   val create :
        public_key:Compressed_public_key.t

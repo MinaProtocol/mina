@@ -1,3 +1,11 @@
+
+include Coda_spec.State_intf.Blockchain.S
+  with module Time = Block_time
+   and module Ledger_builder_hash = Ledger_builder_hash
+   and module Frozen_ledger_hash = Frozen_ledger_hash
+   and module Hash = State_hash
+            
+(*
 open Core_kernel
 open Coda_numbers
 open Snark_params
@@ -58,22 +66,9 @@ val fold : t -> bool Triple.t Fold.t
 val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
 module Message :
-  Signature_lib.Checked.Message_intf
-  with type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
-   and type boolean_var := Tick.Boolean.var
-   and type curve_scalar := Inner_curve.Scalar.t
-   and type curve_scalar_var := Inner_curve.Scalar.var
-   and type t = t
-   and type var = var
+  Coda_spec.Signature_intf.Message.S
+  with type Payload.t = t
+   and type Payload.var = var
 
 module Signature :
-  Signature_lib.Checked.S
-  with type ('a, 'b) typ := ('a, 'b) Tick.Typ.t
-   and type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
-   and type boolean_var := Tick.Boolean.var
-   and type curve := Snark_params.Tick.Inner_curve.t
-   and type curve_var := Snark_params.Tick.Inner_curve.var
-   and type curve_scalar := Snark_params.Tick.Inner_curve.Scalar.t
-   and type curve_scalar_var := Snark_params.Tick.Inner_curve.Scalar.var
-   and module Message := Message
-   and module Shifted := Snark_params.Tick.Inner_curve.Checked.Shifted
+  Coda_spec.Signature_intf.S with module Message = Message *)

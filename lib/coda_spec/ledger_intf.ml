@@ -15,8 +15,6 @@ module Hash = struct
     type t = private Pedersen.Digest.t
     include Protocol_object.Full.S with type t := t
 
-    val empty : t
-
     val merge : height:int -> t -> t -> t
 
     val of_account : Account.t -> t
@@ -151,7 +149,8 @@ module Base = struct
        and module Direction = Address.Direction
     module Location : Location.S
 
-    include Binable.S
+    type t
+
     include Sexpable.S with type t := t
 
     type error =
@@ -161,7 +160,9 @@ module Base = struct
 
     val location_of_key : t -> Account.Compressed_public_key.t -> Location.t option
 
-    val get_or_create_account_exn : t -> Account.Compressed_public_key.t -> Account.t -> ([`Added | `Existed] * Location.t, error) Result.t
+    val get_or_create_account : t -> Account.Compressed_public_key.t -> Account.t -> ([`Added | `Existed] * Location.t, error) Result.t
+
+    val get_or_create_account_exn : t -> Account.Compressed_public_key.t -> Account.t -> [`Added | `Existed] * Location.t
 
     val create : unit -> t
 
@@ -172,13 +173,6 @@ module Base = struct
     val merkle_root : t -> Root_hash.t
 
     val to_list : t -> Account.t list
-
-    val fold_until :
-         t
-      -> init:'accum
-      -> f:('accum -> Account.t -> ('accum, 'stop) Base.Continue_or_stop.t)
-      -> finish:('accum -> 'stop)
-      -> 'stop
 
     val get : t -> Location.t -> Account.t option
 
@@ -217,6 +211,13 @@ module Base = struct
   end
 end
 
+module Base_binable = struct
+  module type S = sig
+    include Base.S
+    include Binable.S with type t := t
+  end
+end
+
 module Undo = struct
   (* TODO: decompose and generalize undo signature *)
   (*
@@ -246,9 +247,10 @@ module Undo = struct
     module Payment : Transaction_intf.Payment.S
       with module Keypair = Keypair
     module Transaction : Transaction_intf.S
-      with module Valid_payment = Payment.With_valid_signature
+       with module Public_key = Keypair.Public_key
+      and module Payment = Payment
     module Receipt_chain_hash : Account_intf.Receipt_chain_hash.S
-    module Ledger_hash : Ledger_hash_intf.S
+    module Root_hash : Ledger_hash_intf.S
 
     type payment =
       { payment: Payment.t
@@ -272,10 +274,10 @@ module Undo = struct
       | Coinbase of coinbase
     [@@deriving sexp, bin_io]
 
-    type t = {previous_hash: Ledger_hash.t; varying: varying}
+    type t = {previous_hash: Root_hash.t; varying: varying}
     [@@deriving sexp, bin_io]
 
-    val super_transaction : t -> Transaction.t Or_error.t
+    val transaction : t -> Transaction.t Or_error.t
   end
 end
 
@@ -287,26 +289,26 @@ module type S = sig
   module Payment : Transaction_intf.Payment.S
     with module Keypair = Keypair
   module Transaction : Transaction_intf.S
-    with module Valid_payment = Payment.With_valid_signature
-  module Ledger_hash : Ledger_hash_intf.S
+     with module Public_key = Keypair.Public_key
+      and module Payment = Payment
 
   module Undo : Undo.S
     with module Keypair = Keypair
      and module Payment = Payment
      and module Transaction = Transaction
-     and module Ledger_hash = Ledger_hash
+     and module Root_hash = Root_hash
 
   val create_empty : t -> Keypair.Public_key.Compressed.t -> Path.t * Account.t
 
   val create_new_account_exn : t -> Keypair.Public_key.Compressed.t -> Account.t -> unit
 
-  val apply_payment : t -> Payment.t -> Undo.payment Or_error.t
+  val apply_payment : t -> Payment.With_valid_signature.t -> Undo.payment Or_error.t
 
-  val apply_super_transaction : t -> Transaction.t -> Undo.t Or_error.t
+  val apply_transaction : t -> Transaction.t -> Undo.t Or_error.t
 
   val undo : t -> Undo.t -> unit Or_error.t
 
-  val merkle_root_after_transaction_exn : t -> Payment.With_valid_signature.t -> Ledger_hash.t
+  val merkle_root_after_payment_exn : t -> Payment.With_valid_signature.t -> Root_hash.t
 end
 
 module Genesis = struct

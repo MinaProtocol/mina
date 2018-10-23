@@ -1,5 +1,5 @@
 module type S = sig
-  module Protocol_state : Protocol_state.S
+  module Protocol_state : Coda_spec.State_intf.Protocol.S
 
   module Ledger_builder_diff : sig
     type t [@@deriving sexp, bin_io]
@@ -19,13 +19,13 @@ module type S = sig
 
   val ledger_builder_diff : t -> Ledger_builder_diff.t
 
-  val timestamp : t -> Block_time.t
+  val timestamp : t -> Protocol_state.Blockchain_state.Time.t
 end
 
 module Make (Ledger_builder_diff : sig
   type t [@@deriving sexp, bin_io]
 end)
-(Protocol_state : Protocol_state.S) :
+(Protocol_state : Coda_spec.State_intf.Protocol.S) :
   S
   with module Protocol_state = Protocol_state
    and module Ledger_builder_diff = Ledger_builder_diff =
@@ -51,5 +51,5 @@ struct
 
   let timestamp {protocol_state; _} =
     Protocol_state.blockchain_state protocol_state
-    |> Blockchain_state.timestamp
+    |> Protocol_state.Blockchain_state.timestamp
 end

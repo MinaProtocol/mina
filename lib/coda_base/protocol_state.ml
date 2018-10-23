@@ -39,7 +39,6 @@ struct
   type var = (State_hash.var, Blockchain_state.var, Consensus_state.var) t
 
   module Proof = Proof
-  module Hash = State_hash
 
   let equal_value =
     equal State_hash.equal Blockchain_state.equal Consensus_state.equal_value
@@ -56,6 +55,8 @@ struct
   let blockchain_state {blockchain_state; _} = blockchain_state
 
   let consensus_state {consensus_state; _} = consensus_state
+
+  module H_list = Snarky.H_list
 
   let to_hlist {previous_state_hash; blockchain_state; consensus_state} =
     H_list.[previous_state_hash; blockchain_state; consensus_state]

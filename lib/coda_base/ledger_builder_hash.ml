@@ -3,6 +3,8 @@ open Fold_lib
 open Tuple_lib
 open Snark_params.Tick
 
+module Ledger_hash = Ledger_hash
+
 module Aux_hash = struct
   let length_in_bits = 256
 

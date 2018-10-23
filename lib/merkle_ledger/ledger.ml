@@ -12,7 +12,7 @@ end
 (* SOMEDAY: handle empty wallets *)
 module Make
     (Inputs : Inputs_intf)
-  : Ledger_intf.Base.S
+  : Ledger_intf.Base_binable.S
       with module Account = Inputs.Account
        and module Root_hash = Inputs.Root_hash
        and module Hash = Inputs.Hash =
@@ -27,6 +27,8 @@ struct
     | Out_of_leaves
     | Malformed_database
   [@@deriving sexp]
+
+  exception Error_exception of error
 
   let depth = Depth.t
 
@@ -65,8 +67,6 @@ struct
   let empty_account_hash = Hash.of_account Account.empty
 
   let to_list = C.to_list
-
-  let fold_until = C.fold_until
 
   module Location = struct
     type t = index
@@ -112,13 +112,16 @@ struct
 
   let num_accounts t = Compressed_public_key.Table.length t.tree.leaves
 
+(* TODO: DELETE
   let key_of_index t index =
     if index >= Dyn_array.length t.accounts then None
     else Some (Dyn_array.get t.accounts index |> Account.public_key)
 
+*)
   let location_of_key t key = Hashtbl.find t.tree.leaves key
 
-  let key_of_index_exn t index = Option.value_exn (key_of_index t index)
+  (*   TODO: DELETE
+       let key_of_index_exn t index = Option.value_exn (key_of_index t index) *)
 
   let index_of_key_exn t key = Option.value_exn (location_of_key t key)
 
@@ -148,15 +151,20 @@ struct
     (t.tree).dirty_indices <- merkle_index :: t.tree.dirty_indices ;
     merkle_index
 
-  let get_or_create_account_exn t key account =
+  let get_or_create_account t key account =
     match location_of_key t key with
     | None ->
         let new_index = allocate t key account in
         let max_accounts = 1 lsl depth in
-        if new_index > 1 lsl depth then
+        if new_index > max_accounts then
           Result.Error Out_of_leaves
         else Result.Ok (`Added, new_index)
     | Some index -> Result.Ok (`Existed, index)
+
+  let get_or_create_account_exn t key account =
+    match get_or_create_account t key account with
+    | Error e -> raise (Error_exception e)
+    | Ok x -> x
 
   let set_at_index_exn t index account =
     if index < Dyn_array.length t.accounts then
@@ -239,7 +247,7 @@ struct
       (t.tree).nodes <- [] ;
       recompute_tree t )
 
-  let merkle_root t =
+  let merkle_root t : Root_hash.t =
     recompute_tree t ;
     if not (Int.Set.is_empty t.tree.unset_slots) then
       failwithf !"%{sexp:Int.Set.t} remain unset" t.tree.unset_slots () ;
@@ -256,13 +264,13 @@ struct
         let hash = Hash.merge ~height hash (empty_hash_at_height height) in
         go (i - 1) hash
     in
-    go (depth - height) base_root
+    Root_hash.of_hash (go (depth - height) base_root :> Snark_params.Tick.Pedersen.Digest.t)
 
-  let hash t = Hash.hash (merkle_root t)
+(*   TODO: DELETE let hash t = Root_hash.hash (merkle_root t) *)
 
-  let hash_fold_t state t = Ppx_hash_lib.Std.Hash.fold_int state (hash t)
+(*   TODO: DELETE let hash_fold_t state t = Ppx_hash_lib.Std.Hash.fold_int state (hash t) *)
 
-  let compare t t' = Hash.compare (merkle_root t) (merkle_root t')
+(*   TODO: DELETE let compare t t' = Root_hash.compare (merkle_root t) (merkle_root t') *)
 
   let merkle_path_at_index_exn t index =
     if index >= Dyn_array.length t.accounts then
@@ -281,7 +289,7 @@ struct
               else empty_hash_at_height height
             in
             go (height + 1) (addr lsr 1) layers
-              ((if is_left then `Left hash else `Right hash) :: acc)
+              ((if is_left then (Path.Direction.Left, hash) else (Right, hash)) :: acc)
       in
       let leaf_hash_idx = index lxor 1 in
       let leaf_hash =
@@ -292,11 +300,11 @@ struct
       let non_root_nodes = List.take t.tree.nodes (depth - 1) in
       let base_path, base_path_height =
         go 1 (index lsr 1) non_root_nodes
-          [(if is_left then `Left leaf_hash else `Right leaf_hash)]
+          [(if is_left then (Left, leaf_hash) else (Right, leaf_hash))]
       in
       List.rev_append base_path
         (List.init (depth - base_path_height) ~f:(fun i ->
-             `Left (empty_hash_at_height (i + base_path_height)) )) )
+             (Path.Direction.Left, (empty_hash_at_height (i + base_path_height))) )) )
 
   let merkle_path = merkle_path_at_index_exn
 
@@ -309,10 +317,12 @@ struct
     assert (Address.depth a = depth - 1) ;
     merkle_path_at_index_exn t (Address.to_int a)
 
+(* TODO: DELETE
   let set_at_addr_exn t addr acct =
     assert (Address.depth addr = depth - 1) ;
     set_at_index_exn t (Address.to_int addr) acct
 
+*)
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
       if height = result_height then prev_hash

@@ -11,8 +11,18 @@ module Payment = struct
     module type S = sig
       module Compressed_public_key : Signature_intf.Public_key.Compressed.S
 
+      type ('pk, 'amount, 'fee, 'nonce) t_ =
+        {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
+
       module Stable : sig
         module V1 : Protocol_object.Hashable.S
+          with
+          type t =
+            ( Compressed_public_key.Stable.V1.t
+            , Currency.Amount.Stable.V1.t
+            , Currency.Fee.Stable.V1.t
+            , Coda_numbers.Account_nonce.Stable.V1.t )
+            t_
       end
 
       type t = Stable.V1.t
@@ -88,7 +98,6 @@ module Payment = struct
       with type t = private t
        and module Public_key = Keypair.Public_key
        and module Payload = Payload
-       and module Signature = Signature
 
     val gen :
          keys:Keypair.t array
@@ -108,13 +117,17 @@ module Fee_transfer = struct
   module type S = sig
     module Compressed_public_key : Signature_intf.Public_key.Compressed.S
 
-    include Protocol_object.S
-
     type single = Compressed_public_key.t * Fee.t [@@deriving sexp, bin_io, compare, eq]
+
+    type t = One of single | Two of single * single
+
+    include Protocol_object.S with type t := t
 
     val of_single : single -> t
 
     val of_single_list : single list -> t list
+
+    val to_single_list : t -> single list
 
     val receivers : t -> Compressed_public_key.t list
 
@@ -126,7 +139,12 @@ module Coinbase = struct
   module type S = sig
     module Fee_transfer : Fee_transfer.S
 
-    include Protocol_object.S
+    type t = private
+      { proposer: Fee_transfer.Compressed_public_key.t
+      ; amount: Currency.Amount.t
+      ; fee_transfer: Fee_transfer.single option }
+
+    include Protocol_object.S with type t := t
 
     val create :
          amount:Amount.t
@@ -141,14 +159,17 @@ module Coinbase = struct
 end
 
 module type S = sig
-  module Valid_payment : Payment.With_valid_signature.S
+  module Public_key : Signature_intf.Public_key.S
+
+  module Payment : Payment.S with module Keypair.Public_key = Public_key
+
   module Fee_transfer : Fee_transfer.S
-    with module Compressed_public_key = Valid_payment.Public_key.Compressed
+    with module Compressed_public_key = Public_key.Compressed
   module Coinbase : Coinbase.S
     with module Fee_transfer = Fee_transfer
 
   type t =
-    | Valid_payment of Valid_payment.t
+    | Valid_payment of Payment.With_valid_signature.t
     | Fee_transfer of Fee_transfer.t
     | Coinbase of Coinbase.t
   include Protocol_object.S with type t := t

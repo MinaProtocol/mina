@@ -83,8 +83,6 @@ module With_valid_signature = struct
   module Signature = Signature
 
   include Stable.V1
-
-  let gen = gen
 end
 
 let check_signature ({payload; sender; signature}: t) =

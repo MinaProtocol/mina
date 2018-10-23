@@ -7,6 +7,9 @@ open Let_syntax
 open Fold_lib
 open Bitstring_lib
 
+module Ledger_builder_hash = Ledger_builder_hash
+module Frozen_ledger_hash = Frozen_ledger_hash
+
 module Digest = Pedersen.Digest
 
 let all_but_last_exn xs = fst (split_last_exn xs)
@@ -38,6 +41,8 @@ type value = t [@@deriving bin_io, sexp, eq, compare, hash]
 
 let create_value ~ledger_builder_hash ~ledger_hash ~timestamp =
   { ledger_builder_hash; ledger_hash; timestamp }
+
+module H_list = Snarky.H_list
 
 let to_hlist { ledger_builder_hash; ledger_hash; timestamp } =
   H_list.([ ledger_builder_hash; ledger_hash; timestamp ])
@@ -90,9 +95,15 @@ let genesis =
 module Message = struct
   open Tick
 
-  type nonrec t = t
+  module Payload = struct
+    type nonrec t = t
 
-  type nonrec var = var
+    type nonrec var = var
+  end
+
+  type var = Payload.var
+
+  let var_of_payload = return
 
   let hash t ~nonce =
     let d =
@@ -118,4 +129,5 @@ module Message = struct
        Bitstring.Lsb_first.of_list (List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits))
 end
 
-module Signature = Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve) (Message)
+module Time = Block_time
+module Signature = Signature_lib.Checked.Schnorr (Message)

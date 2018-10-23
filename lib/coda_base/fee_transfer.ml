@@ -7,7 +7,7 @@ type single = Compressed_public_key.t * Currency.Fee.Stable.V1.t
 type t = One of single | Two of single * single
 [@@deriving bin_io, sexp, compare, eq]
 
-let to_list = function One x -> [x] | Two (x, y) -> [x; y]
+let to_single_list = function One x -> [x] | Two (x, y) -> [x; y]
 
 let of_single s = One s
 
@@ -28,4 +28,4 @@ let fee_excess = function
     | Some res ->
         Ok (Currency.Fee.Signed.negate @@ Currency.Fee.Signed.of_unsigned res)
 
-let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)
+let receivers t = List.map (to_single_list t) ~f:(fun (pk, _) -> pk)
