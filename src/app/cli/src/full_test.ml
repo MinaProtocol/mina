@@ -211,10 +211,10 @@ let run_test (type ledger_proof) (module Kernel
     in
     test_sending_transaction new_sender_sk Genesis_ledger.low_balance_pk
   in
-  if Insecure.with_snark then (
+  if Insecure.with_snark then
     let accounts = List.take extra_accounts 2 in
     let pks = fst @@ List.unzip accounts in
-    test_multiple_txns accounts pks 7. )
+    test_multiple_txns accounts pks 7.
   else
     let new_sender, rest_accounts = List.split_n extra_accounts 1 in
     let new_sender_pk = fst (List.hd_exn new_sender) in

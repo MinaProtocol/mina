@@ -139,7 +139,7 @@ jobs:
                 command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
             - run:
                 name: Test make test-withsnark
-                command: make test-withsnark
+                command: source ~/.profile && make test-withsnark
 
     test-stake:
         resource_class: large
