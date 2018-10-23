@@ -180,7 +180,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source test_all.sh ; cd src; CODA_CONSENSUS_METHOD=proof_of_signature WITH_SNARKS=true run_integration_tests
+	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_METHOD=proof_of_signature WITH_SNARKS=true run_integration_tests
 
 web:
 	./scripts/web.sh
