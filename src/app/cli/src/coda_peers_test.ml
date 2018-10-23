@@ -19,10 +19,12 @@ struct
     let n = 3 in
     let log = Logger.create () in
     let log = Logger.child log name in
+    let work_selection = Protocols.Coda_pow.Work_selection.Seq in
     Coda_processes.init () ;
     let configs =
       Coda_processes.local_configs n ~program_dir
         ~snark_worker_public_keys:None ~should_propose:(Fn.const false)
+        ~work_selection
     in
     let%bind workers = Coda_processes.spawn_local_processes_exn configs in
     let _, _, expected_peers = Coda_processes.net_configs n in

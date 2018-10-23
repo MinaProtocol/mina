@@ -26,12 +26,13 @@ module Make (Inputs : Inputs.Base.S) = struct
 
   let transition_unchecked t
       ( {With_hash.data= transition; hash= transition_state_hash} as
-      transition_with_hash ) =
+      transition_with_hash ) logger =
     let%map () =
       let open Deferred.Let_syntax in
       match%map
         Ledger_builder.apply t.Tip.ledger_builder
           (External_transition.ledger_builder_diff transition)
+          ~logger
       with
       | Ok None -> ()
       | Ok (Some _) -> ()
