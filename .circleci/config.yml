@@ -119,6 +119,28 @@ jobs:
                 name: Test make test-runtest
                 command: source ~/.profile && make test-runtest
 
+    test-withsnark:
+        resource_class: large
+        docker:
+        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+          auth:
+            username: _json_key
+            password: $JSON_GCLOUD_CREDENTIALS
+        steps:
+            - checkout
+            - run:
+                name: Build Haskell
+                command: source ~/.profile && make kademlia
+            - run:
+                name: Enable snarks --  make withsnark
+                command: make withsnark
+            - run:
+                name: Build OCaml
+                command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+            - run:
+                name: Test make test-withsnark
+                command: source ~/.profile && make test-withsnark
+
     test-stake:
         resource_class: large
         docker:
@@ -197,6 +219,7 @@ workflows:
             - build_public
             - test-runtest
             - test-sig
+            - test-withsnark
             #- test-stake
     # NOTES: Save this idea for later (nightly/scheduled workflows)
     # nightly:
