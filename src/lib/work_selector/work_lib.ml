@@ -45,7 +45,7 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
   end
 
   let pair_to_list = function j, Some j' -> [j; j'] | j, None -> [j]
-  
+
   let check_competable_offer ~snark_pool ~fee (statement1, maybe_statement_2) =
     let statements = pair_to_list (statement1, maybe_statement_2) in
     Option.value_map ~default:true
