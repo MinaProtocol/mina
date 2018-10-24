@@ -489,12 +489,17 @@ struct
     Linear_pipe.iter t.answers ~f:(fun a -> handle_answer a ; Deferred.unit)
 
   let new_goal t h =
+    let should_skip = match t.desired_root with
+    | None -> false
+    | Some h' -> Root_hash.equal h h'
+    in
+    if not should_skip then (
     Ivar.fill_if_empty t.validity_listener
       (`Target_changed (t.desired_root, h)) ;
     t.validity_listener <- Ivar.create () ;
     t.desired_root <- Some h ;
     Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h) |> ignore ;
-    Linear_pipe.write_without_pushback t.queries (h, Num_accounts)
+    Linear_pipe.write_without_pushback t.queries (h, Num_accounts)) else Logger.info t.log "new_goal to same hash, not doing anything"
 
   let wait_until_valid t h =
     if not (Root_hash.equal h (desired_root_exn t)) then
