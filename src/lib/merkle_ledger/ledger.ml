@@ -27,7 +27,7 @@ end = struct
   include Depth
   module Addr = Merkle_address.Make (Depth)
 
-  type index = int
+  type index = int [@@deriving sexp, compare, hash]
 
   type leafs = int Key.Table.t [@@deriving sexp, bin_io]
 
@@ -64,7 +64,7 @@ end = struct
   let fold_until = C.fold_until
 
   module Location = struct
-    type t = index
+    type t = index [@@deriving sexp, compare, hash]
   end
 
   let copy t =
@@ -354,7 +354,7 @@ end = struct
       (t.tree).unset_slots
       <- Int.Set.union t.tree.unset_slots
            (Int.Set.of_list
-              (List.init (total - len) (fun i ->
+              (List.init (total - len) ~f:(fun i ->
                    Dyn_array.add t.accounts Account.empty ;
                    len + i )))
 
