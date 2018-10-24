@@ -315,16 +315,6 @@ end
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
-  module Work_selector :
-    Coda_pow.Work_selector_intf
-    with type ledger_builder := Ledger_builder.t
-     and type work :=
-                ( Ledger_proof_statement.t
-                , Super_transaction.t
-                , Sparse_ledger.t
-                , Ledger_proof.t )
-                Snark_work_lib.Work.Single.Spec.t
-
   module Proof_carrying_state : sig
     type t =
       ( Consensus_mechanism.Protocol_state.value
@@ -345,6 +335,18 @@ module type Inputs_intf = sig
     Snark_pool_intf
     with type completed_work_statement := Completed_work.Statement.t
      and type completed_work_checked := Completed_work.Checked.t
+
+  module Work_selector :
+    Coda_pow.Work_selector_intf
+    with type ledger_builder := Ledger_builder.t
+     and type work :=
+                ( Ledger_proof_statement.t
+                , Super_transaction.t
+                , Sparse_ledger.t
+                , Ledger_proof.t )
+                Snark_work_lib.Work.Single.Spec.t
+     and type snark_pool := Snark_pool.t
+     and type fee := Currency.Fee.t
 
   module Transaction_pool :
     Transaction_pool_intf

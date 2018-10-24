@@ -45,6 +45,30 @@ module Make (Inputs : Inputs.Inputs_intf) = struct
   end
 
   let pair_to_list = function j, Some j' -> [j; j'] | j, None -> [j]
+  
+  let check_competable_offer ~snark_pool ~fee (statement1, maybe_statement_2) =
+    let statements = pair_to_list (statement1, maybe_statement_2) in
+    Option.value_map ~default:true
+      (Inputs.Snark_pool.get_completed_work snark_pool statements) ~f:
+      (fun priced_proof ->
+        let competing_fee = Inputs.Completed_work.fee priced_proof in
+        Inputs.Fee.compare fee competing_fee < 0 )
+
+  module For_tests = struct
+    let to_pair = function
+      | [x] -> (x, None)
+      | [x1; x2] -> (x1, Some x2)
+      | _ -> failwith "Should contain one or two elements"
+
+    type statement = Inputs.Ledger_proof_statement.t
+
+    let check_competable_offer ~snark_pool ~fee works =
+      check_competable_offer ~snark_pool ~fee (statement_pair (to_pair works))
+  end
+
+  let get_expensive_work ~snark_pool ~fee jobs =
+    List.filter jobs
+      ~f:(Fn.compose (check_competable_offer ~snark_pool ~fee) statement_pair)
 
   let all_works (ledger_builder: Inputs.Ledger_builder.t) (state: State.t) =
     let state = State.remove_old_assignments state in
