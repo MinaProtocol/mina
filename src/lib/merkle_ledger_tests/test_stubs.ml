@@ -110,8 +110,6 @@ end
 module Key = struct
   module T = struct
     type t = string [@@deriving sexp, compare, hash, bin_io]
-
-    type key = t [@@deriving sexp, bin_io]
   end
 
   let empty = ""
