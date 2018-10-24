@@ -6,6 +6,14 @@ module type S = sig
 
   type parent
 
+  (* for testing *)
+
+  val location_in_mask : t -> location -> bool
+
+  (* for testing *)
+
+  val address_in_mask : t -> Addr.t -> bool
+
   (* get hash from mask, if present, else from its parent *)
 
   val get_hash : t -> Addr.t -> hash option

@@ -64,11 +64,6 @@ module Make (Depth : Intf.Depth) = struct
     | Account _ -> 0
     | Hash path -> Addr.height path
 
-  let path : t -> Addr.t = function
-    | Generic _ ->
-        raise (Invalid_argument "generic location has no directions")
-    | Account path | Hash path -> path
-
   let root_hash : t = Hash (Addr.root ())
 
   let last_direction path =
@@ -97,8 +92,7 @@ module Make (Depth : Intf.Depth) = struct
     dst
 
   let to_path_exn = function
-    | Account path -> path
-    | Hash path -> path
+    | Account path | Hash path -> path
     | Generic _ ->
         raise (Invalid_argument "to_path_exn: generic does not have a path")
 
@@ -134,7 +128,7 @@ module Make (Depth : Intf.Depth) = struct
     | Hash path -> Hash (Addr.sibling path)
 
   let order_siblings (location: t) (base: 'a) (sibling: 'a) : 'a * 'a =
-    match last_direction (path location) with
+    match last_direction (to_path_exn location) with
     | Left -> (base, sibling)
     | Right -> (sibling, base)
 end

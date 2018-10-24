@@ -41,6 +41,8 @@ struct
 
   let get_parent t = Option.value_exn !(t.parent)
 
+  let has_parent t = Option.is_some !(t.parent)
+
   let create () =
     { parent= ref None
     ; account_tbl= Location.Table.create ()
@@ -62,13 +64,17 @@ struct
 
   (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
   let get t location =
+    if not (has_parent t) then failwith "get: mask does not have a parent" ;
     match find_account t location with
     | Some account -> Some account
     | None -> Base.get (get_parent t) location
 
-  (* for a Merkle path, get addresses and hash for each node
-     the hash might be from the parent or the mask 
-     *)
+  (* for tests, observe whether location is in mask *)
+  let location_in_mask t location = Option.is_some (find_account t location)
+
+  (* given a Merkle path given by the mask parent and an account address, calculate addresses and hash for each node affected 
+     by the account hash; that is, along the path from the account address to root
+   *)
   let addresses_and_hashes_from_merkle_path t merkle_path account_address
       account_hash : (Addr.t * Hash.t) list =
     let get_addresses_hashes height accum node =
@@ -92,16 +98,12 @@ struct
       let merkle_node_address = Addr.sibling last_address in
       let mask_hash = find_hash t merkle_node_address in
       match node with
-      | `Left parent_hash ->
-          let hash =
-            match mask_hash with Some h -> h | None -> parent_hash
-          in
-          (next_address, Hash.merge ~height hash last_hash) :: accum
-      | `Right parent_hash ->
-          let hash =
-            match mask_hash with Some h -> h | None -> parent_hash
-          in
-          (next_address, Hash.merge ~height last_hash hash) :: accum
+      | `Left h ->
+          let sibling_hash = Option.value mask_hash ~default:h in
+          (next_address, Hash.merge ~height last_hash sibling_hash) :: accum
+      | `Right h ->
+          let sibling_hash = Option.value mask_hash ~default:h in
+          (next_address, Hash.merge ~height sibling_hash last_hash) :: accum
     in
     List.foldi merkle_path
       ~init:[(account_address, account_hash)]
@@ -111,9 +113,10 @@ struct
      need to update both account and hash pieces of the mask
      *)
   let set t location account =
+    if not (has_parent t) then failwith "set: mask does not have a parent" ;
     set_account t location account ;
-    let account_hash = Hash.hash_account account in
     let account_address = Location.to_path_exn location in
+    let account_hash = Hash.hash_account account in
     let merkle_path = Base.merkle_path (get_parent t) location in
     let addresses_and_hashes =
       addresses_and_hashes_from_merkle_path t merkle_path account_address
@@ -121,7 +124,7 @@ struct
     in
     List.iter addresses_and_hashes ~f:(fun (addr, hash) -> set_hash t addr hash)
 
-  (* if the mask's parent sets an account, we can prune an entry in the mask if the balance in the parent
+  (* if the mask's parent sets an account, we can prune an entry in the mask if the account in the parent
      is the same in the mask
      *)
   let parent_set_notify t location account merkle_path =
@@ -150,6 +153,8 @@ struct
         let hash = Base.get_inner_hash_at_addr_exn (get_parent t) addr in
         Some hash
       with _ -> None
+
+  let address_in_mask t addr = Option.is_some (find_hash t addr)
 
   (* batch operations
      TODO: rely on availability of batch operations in Base for speed

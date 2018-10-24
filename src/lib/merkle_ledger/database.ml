@@ -202,14 +202,14 @@ end = struct
   let set mdb location account =
     set_bin mdb location Account.bin_size_t Account.bin_write_t account ;
     set_hash mdb
-      (Location.Hash (Location.path location))
+      (Location.Hash (Location.to_path_exn location))
       (Hash.hash_account account)
 
   let set_batch mdb locations_accounts =
     set_bin_batch mdb Account.bin_size_t Account.bin_write_t locations_accounts ;
     let set_one_hash (location, account) =
       set_hash mdb
-        (Location.Hash (Location.path location))
+        (Location.Hash (Location.to_path_exn location))
         (Hash.hash_account account)
     in
     (* TODO: is there something better we can do? *)
@@ -300,7 +300,7 @@ end = struct
   let merkle_path mdb location =
     let location =
       if Location.is_account location then
-        Location.Hash (Location.path location)
+        Location.Hash (Location.to_path_exn location)
       else location
     in
     assert (Location.is_hash location) ;
@@ -308,7 +308,7 @@ end = struct
       if Location.height k >= Depth.depth then []
       else
         let sibling = Location.sibling k in
-        let sibling_dir = Location.last_direction (Location.path k) in
+        let sibling_dir = Location.last_direction (Location.to_path_exn k) in
         let hash = get_hash mdb sibling in
         Direction.map sibling_dir ~left:(`Left hash) ~right:(`Right hash)
         :: loop (Location.parent k)

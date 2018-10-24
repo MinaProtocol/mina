@@ -29,8 +29,6 @@ module type S = sig
 
   val height : t -> int
 
-  val path : t -> Addr.t
-
   val root_hash : t
 
   val last_direction : Addr.t -> Direction.t
