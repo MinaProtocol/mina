@@ -310,8 +310,9 @@ end = struct
         sprintf !"Ledger_builder.scan_statement_and_verify: %s" description
       in
       let with_error ~f message =
-        Deferred.Result.map_error (f ()) ~f:(fun _ ->
-            Error.of_string (write_error message) )
+        Deferred.Result.map_error (f ()) ~f:(fun e ->
+            Error.createf !"%s: %{sexp:Error.t}"
+            (write_error message) e )
       in
       let merge_acc ~verify_proof (acc: Ledger_proof_statement.t option) s2 :
           Ledger_proof_statement.t option Deferred.Or_error.t =
@@ -408,22 +409,19 @@ end = struct
                   Deferred.Or_error.error_string
                     (write_error "Bad base statement") )
       in
+      let open Container.Continue_or_stop in
       let res =
-        let open Container.Continue_or_stop in
-        Parallel_scan.State.Deferred.fold_chronological_until t ~init:(Ok None)
-          ~finish:(fun x -> Deferred.return (Error x))
+        Parallel_scan.State.Deferred.fold_chronological_until t ~init:(None)
           ~f:(fun acc job ->
-            match acc with
-            | Ok subresult -> (
-                match%map fold_step subresult job with
-                | Ok next -> Continue (Ok next)
-                | Error e -> Stop e )
-            | Error e -> Deferred.return (Stop e) )
+            match%map fold_step acc job with
+                | Ok next -> Continue (next)
+                | Error e -> Stop e
+             )
       in
       match%map res with
-      | Ok None -> Error `Empty
-      | Ok (Some res) -> Ok res
-      | Error e -> Error (`Error e)
+      | Continue None -> Error `Empty
+      | Continue (Some res) -> Ok res
+      | Stop e -> Error (`Error e)
 
     let is_valid t =
       Parallel_scan.parallelism ~state:t
@@ -1050,7 +1048,7 @@ end = struct
       enqueue_data_with_rollback t.scan_state data
     in
     let%map () =
-      Deferred.bind ~f:Result_with_rollback.of_or_error
+      Result_with_rollback.with_no_rollback
         (verify_scan_state_after_apply t.ledger t.scan_state)
     in
     res_opt

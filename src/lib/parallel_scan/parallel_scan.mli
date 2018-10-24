@@ -39,8 +39,7 @@ module State : sig
       -> f:(   'acc
             -> ('a, 'd) Job.t
             -> ('acc, 'stop) Container.Continue_or_stop.t Deferred.t)
-      -> finish:('stop -> 'acc Deferred.t)
-      -> 'acc Deferred.t
+      -> ('acc, 'stop) Container.Continue_or_stop.t Deferred.t
   end
 end
 

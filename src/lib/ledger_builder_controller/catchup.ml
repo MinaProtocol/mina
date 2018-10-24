@@ -49,8 +49,8 @@ struct
       transition_with_hash
     in
     let snarked_ledger_hash = ledger_hash_of_transition transition in
-    let open Interruptible.Let_syntax in
     let build_lb ~aux ~ledger =
+      let open Interruptible.Let_syntax in
       match%bind
         Interruptible.uninterruptible
           (Ledger_builder.of_aux_and_ledger ~public_key ~snarked_ledger_hash
@@ -110,6 +110,7 @@ struct
       !"Attempting to catchup to ledger-hash %{sexp: Ledger_hash.t}"
       h ;
     let work =
+      let open Interruptible.Let_syntax in
       match%bind
         Interruptible.lift (Sync_ledger.fetch sl h)
           (Deferred.map (Ivar.read ivar) ~f:ignore)

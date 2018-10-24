@@ -561,7 +561,7 @@ module Make (Inputs : Inputs_intf) = struct
               Consensus_mechanism.External_transition.protocol_state transition
             in
             let%bind () =
-              Debug_assert.debug_deferred_assert (fun () ->
+              Debug_assert.debug_assert_deferred (fun () ->
                   match%map Ledger_builder.statement_exn ledger_builder with
                   | `Empty -> ()
                   | `Non_empty
