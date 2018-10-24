@@ -75,16 +75,23 @@ let run_test (type ledger_proof) (module Kernel
          ~keypair () ~banlist)
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
-  let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
+  let wait_until_cond ~(f: t -> bool) ~(timeout: Float.t) =
     let rec go () =
-      match Run.get_balance coda receiver_pk with
-      | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
-          return ()
-      | _ ->
-          let%bind () = after (Time_ns.Span.of_sec 10.) in
-          go ()
+      if f coda then return ()
+      else
+        let%bind () = after (Time_ns.Span.of_sec 10.) in
+        go ()
     in
-    Deferred.any [after (Time_ns.Span.of_min 3.); go ()]
+    Deferred.any [after (Time_ns.Span.of_min timeout); go ()]
+  in
+  let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
+    let cond t =
+      match Run.get_balance t receiver_pk with
+      | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
+          true
+      | _ -> false
+    in
+    wait_until_cond ~f:cond ~timeout:3.
   in
   let open Genesis_ledger in
   let assert_balance pk amount =
@@ -175,20 +182,14 @@ let run_test (type ledger_proof) (module Kernel
         send_txn_update_balance_sheet (snd key_pair) sender_pk receiver
           (f_amount i) acc (Currency.Fee.of_int 0) )
   in
+  let block_count t =
+    Run.best_protocol_state t
+    |> Inputs.Consensus_mechanism.Protocol_state.consensus_state
+    |> Inputs.Consensus_mechanism.Consensus_state.length
+  in
   let wait_for_proof_or_timeout timeout () =
-    let rec go () =
-      if Option.is_some @@ Run.For_tests.ledger_proof coda then (
-        Core.printf "Ledger_proof emitted\n %!" ;
-        return true )
-      else
-        let%bind () = after (Time_ns.Span.of_sec 10.) in
-        go ()
-    in
-    let timeout =
-      let%map () = after (Time_ns.Span.of_min timeout) in
-      false
-    in
-    Deferred.any [timeout; go ()]
+    let cond t = Option.is_some @@ Run.For_tests.ledger_proof t in
+    wait_until_cond ~f:cond ~timeout
   in
   let test_multiple_txns key_pairs pks timeout =
     let balance_sheet =
@@ -200,10 +201,11 @@ let run_test (type ledger_proof) (module Kernel
           Currency.Amount.of_int ((i + 1) * 10) )
     in
     (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
-    let%map emitted = wait_for_proof_or_timeout timeout () in
-    assert emitted ;
+    let%map () = wait_for_proof_or_timeout timeout () in
+    assert (Option.is_some @@ Run.For_tests.ledger_proof coda) ;
     Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
-        assert_balance key data )
+        assert_balance key data ) ;
+    block_count coda
   in
   let test_duplicate_txns new_sender_sk =
     let%bind () =
@@ -214,9 +216,12 @@ let run_test (type ledger_proof) (module Kernel
   if Insecure.with_snark then
     let accounts = List.take extra_accounts 2 in
     let pks = fst @@ List.unzip accounts in
-    let%bind () = test_multiple_txns accounts pks 7. in
-    (*wait for sometime for the ledger_proof to be verified*)
-    after (Time_ns.Span.of_sec 30.)
+    let%bind block_count' = test_multiple_txns accounts pks 7. in
+    (*wait for a block after the ledger_proof is emitted*)
+    let%map () =
+      wait_until_cond ~f:(fun t -> block_count t > block_count') ~timeout:1.
+    in
+    assert (block_count coda > block_count')
   else
     let new_sender, rest_accounts = List.split_n extra_accounts 1 in
     let new_sender_pk = fst (List.hd_exn new_sender) in
@@ -224,7 +229,7 @@ let run_test (type ledger_proof) (module Kernel
     let rest_pks = fst @@ List.unzip rest_accounts in
     assert_balance new_sender_pk (Currency.Balance.of_int init_balance) ;
     assert_balance low_balance_pk initial_low_balance ;
-    let%bind () = test_multiple_txns rest_accounts rest_pks 3. in
+    let%bind _ = test_multiple_txns rest_accounts rest_pks 3. in
     test_duplicate_txns new_sender_sk
 
 let command (type ledger_proof) (module Kernel
