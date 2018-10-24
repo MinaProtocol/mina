@@ -32,7 +32,7 @@ module type S = sig
 
   (* get mask parent *)
 
-  val get_parent : t -> parent
+  val get_parent_exn : t -> parent
 
   (* called when parent sets an account; update local state *)
 

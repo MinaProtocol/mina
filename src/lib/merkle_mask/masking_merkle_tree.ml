@@ -39,7 +39,7 @@ struct
 
   let unset_parent t = t.parent := None
 
-  let get_parent t = Option.value_exn !(t.parent)
+  let get_parent_exn t = Option.value_exn !(t.parent)
 
   let has_parent t = Option.is_some !(t.parent)
 
@@ -67,7 +67,7 @@ struct
     if not (has_parent t) then failwith "get: mask does not have a parent" ;
     match find_account t location with
     | Some account -> Some account
-    | None -> Base.get (get_parent t) location
+    | None -> Base.get (get_parent_exn t) location
 
   (* for tests, observe whether location is in mask *)
   let location_in_mask t location = Option.is_some (find_account t location)
@@ -75,20 +75,21 @@ struct
   (* given a Merkle path given by the mask parent and an account address, calculate addresses and hash for each node affected 
      by the account hash; that is, along the path from the account address to root
    *)
-  let addresses_and_hashes_from_merkle_path t merkle_path account_address
+  let addresses_and_hashes_from_merkle_path_exn t merkle_path account_address
       account_hash : (Addr.t * Hash.t) list =
     let get_addresses_hashes height accum node =
       let last_address, last_hash =
         match List.hd accum with
         | Some elt -> elt
-        | None -> failwith "addresses_and_hashes_from_merkle_path: empty accum"
+        | None ->
+            failwith "addresses_and_hashes_from_merkle_path_exn: empty accum"
       in
       let next_address =
         match Addr.parent last_address with
         | Ok addr -> addr
         | Error _s ->
             failwith
-              "addresses_and_hashes_from_merkle_path: could not get next \
+              "addresses_and_hashes_from_merkle_path_exn: could not get next \
                address"
       in
       (* the Merkle path is provided by the mask's parent; some hashes may be out-of-date after
@@ -117,9 +118,9 @@ struct
     set_account t location account ;
     let account_address = Location.to_path_exn location in
     let account_hash = Hash.hash_account account in
-    let merkle_path = Base.merkle_path (get_parent t) location in
+    let merkle_path = Base.merkle_path (get_parent_exn t) location in
     let addresses_and_hashes =
-      addresses_and_hashes_from_merkle_path t merkle_path account_address
+      addresses_and_hashes_from_merkle_path_exn t merkle_path account_address
         account_hash
     in
     List.iter addresses_and_hashes ~f:(fun (addr, hash) -> set_hash t addr hash)
@@ -137,8 +138,8 @@ struct
           let account_address = Location.to_path_exn location in
           let account_hash = Hash.empty_account in
           let addresses_and_hashes =
-            addresses_and_hashes_from_merkle_path t merkle_path account_address
-              account_hash
+            addresses_and_hashes_from_merkle_path_exn t merkle_path
+              account_address account_hash
           in
           List.iter addresses_and_hashes ~f:(fun (addr, hash) ->
               set_hash t addr hash ) )
@@ -150,7 +151,7 @@ struct
     | Some hash -> Some hash
     | None ->
       try
-        let hash = Base.get_inner_hash_at_addr_exn (get_parent t) addr in
+        let hash = Base.get_inner_hash_at_addr_exn (get_parent_exn t) addr in
         Some hash
       with _ -> None
 
@@ -160,27 +161,27 @@ struct
      TODO: rely on availability of batch operations in Base for speed
      *)
   (* NB: rocksdb does not support batch reads; should we offer this? *)
-  let get_batch t locations =
+  let get_batch_exn t locations =
     List.map locations ~f:(fun location -> get t location)
 
   (* TODO: maybe create a new hash table from the alist, then merge *)
-  let set_batch _t locations_and_accounts =
+  let set_batch t locations_and_accounts =
     List.iter locations_and_accounts ~f:(fun (location, account) ->
-        set _t location account )
+        set t location account )
 
   (* NB: rocksdb does not support batch reads; is this needed? *)
-  let get_hash_batch t addrs =
+  let get_hash_batch_exn t addrs =
     List.map addrs ~f:(fun addr ->
         match find_hash t addr with
         | Some account -> Some account
         | None ->
-          try Some (Base.get_inner_hash_at_addr_exn (get_parent t) addr)
+          try Some (Base.get_inner_hash_at_addr_exn (get_parent_exn t) addr)
           with _ -> None )
 
   (* transfer state from mask to parent; flush local state *)
   let commit t =
     let account_data = Location.Table.to_alist t.account_tbl in
-    Base.set_batch (get_parent t) account_data ;
+    Base.set_batch (get_parent_exn t) account_data ;
     (* TODO: do we worry about this code being interrupted, leading to inconsistent state? *)
     Location.Table.clear t.account_tbl ;
     Addr.Table.clear t.hash_tbl
@@ -193,51 +194,52 @@ struct
 
   (* types/modules/operations/values we delegate to parent *)
 
-  let delegate_to_parent f t = get_parent t |> f
+  let delegate_to_parent_exn f t = get_parent_exn t |> f
 
-  let make_space_for = delegate_to_parent Base.make_space_for
+  let make_space_for = delegate_to_parent_exn Base.make_space_for
 
-  let merkle_root = delegate_to_parent Base.merkle_root
+  let merkle_root = delegate_to_parent_exn Base.merkle_root
 
   let get_all_accounts_rooted_at_exn =
-    delegate_to_parent Base.get_all_accounts_rooted_at_exn
+    delegate_to_parent_exn Base.get_all_accounts_rooted_at_exn
 
   let set_all_accounts_rooted_at_exn =
-    delegate_to_parent Base.set_all_accounts_rooted_at_exn
+    delegate_to_parent_exn Base.set_all_accounts_rooted_at_exn
 
   let set_inner_hash_at_addr_exn =
-    delegate_to_parent Base.set_inner_hash_at_addr_exn
+    delegate_to_parent_exn Base.set_inner_hash_at_addr_exn
 
   let get_inner_hash_at_addr_exn =
-    delegate_to_parent Base.get_inner_hash_at_addr_exn
+    delegate_to_parent_exn Base.get_inner_hash_at_addr_exn
 
-  let merkle_path_at_addr_exn = delegate_to_parent Base.merkle_path_at_addr_exn
+  let merkle_path_at_addr_exn =
+    delegate_to_parent_exn Base.merkle_path_at_addr_exn
 
-  let num_accounts = delegate_to_parent Base.num_accounts
+  let num_accounts = delegate_to_parent_exn Base.num_accounts
 
-  let remove_accounts_exn = delegate_to_parent Base.remove_accounts_exn
+  let remove_accounts_exn = delegate_to_parent_exn Base.remove_accounts_exn
 
   let merkle_path_at_index_exn =
-    delegate_to_parent Base.merkle_path_at_index_exn
+    delegate_to_parent_exn Base.merkle_path_at_index_exn
 
-  let merkle_path = delegate_to_parent Base.merkle_path
+  let merkle_path = delegate_to_parent_exn Base.merkle_path
 
   let get_or_create_account_exn =
-    delegate_to_parent Base.get_or_create_account_exn
+    delegate_to_parent_exn Base.get_or_create_account_exn
 
-  let get_or_create_account = delegate_to_parent Base.get_or_create_account
+  let get_or_create_account = delegate_to_parent_exn Base.get_or_create_account
 
-  let index_of_key_exn = delegate_to_parent Base.index_of_key_exn
+  let index_of_key_exn = delegate_to_parent_exn Base.index_of_key_exn
 
-  let set_at_index_exn = delegate_to_parent Base.set_at_index_exn
+  let set_at_index_exn = delegate_to_parent_exn Base.set_at_index_exn
 
-  let get_at_index_exn = delegate_to_parent Base.get_at_index_exn
+  let get_at_index_exn = delegate_to_parent_exn Base.get_at_index_exn
 
-  let to_list = delegate_to_parent Base.to_list
+  let to_list = delegate_to_parent_exn Base.to_list
 
-  let destroy = delegate_to_parent Base.destroy
+  let destroy = delegate_to_parent_exn Base.destroy
 
-  let location_of_key = delegate_to_parent Base.location_of_key
+  let location_of_key = delegate_to_parent_exn Base.location_of_key
 
   let sexp_of_location = Location.sexp_of_t
 

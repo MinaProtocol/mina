@@ -38,7 +38,7 @@ struct
         mask_children := List.take head (ndx - 1) @ tail ;
         Mask.unset_parent mask
 
-  (* a set calls the Base implementation set, then notifies the mask childen, if they're registered *)
+  (* a set calls the Base implementation set, then notifies registered mask childen *)
   let set t location account =
     Base.set t location account ;
     List.iter !mask_children ~f:(fun child_mask ->
