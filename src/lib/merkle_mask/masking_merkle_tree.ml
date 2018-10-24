@@ -42,14 +42,6 @@ struct
   module Attached = struct
     type nonrec t = t
 
-    type nonrec account = account
-
-    type nonrec location = location
-
-    type nonrec hash = hash
-
-    type nonrec key = key
-
     module Path = Base.Path
     module Db_error = Base.Db_error
     module For_tests = Base.For_tests
