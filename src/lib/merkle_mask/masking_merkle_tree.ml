@@ -193,48 +193,51 @@ struct
 
   (* types/modules/operations/values we delegate to parent *)
 
-  let make_space_for t = Base.make_space_for (get_parent t)
+  let delegate_to_parent f t = get_parent t |> f
 
-  let merkle_root t = Base.merkle_root (get_parent t)
+  let make_space_for = delegate_to_parent Base.make_space_for
 
-  let get_all_accounts_rooted_at_exn t =
-    Base.get_all_accounts_rooted_at_exn (get_parent t)
+  let merkle_root = delegate_to_parent Base.merkle_root
 
-  let set_all_accounts_rooted_at_exn t =
-    Base.set_all_accounts_rooted_at_exn (get_parent t)
+  let get_all_accounts_rooted_at_exn =
+    delegate_to_parent Base.get_all_accounts_rooted_at_exn
 
-  let set_inner_hash_at_addr_exn t =
-    Base.set_inner_hash_at_addr_exn (get_parent t)
+  let set_all_accounts_rooted_at_exn =
+    delegate_to_parent Base.set_all_accounts_rooted_at_exn
 
-  let get_inner_hash_at_addr_exn t =
-    Base.get_inner_hash_at_addr_exn (get_parent t)
+  let set_inner_hash_at_addr_exn =
+    delegate_to_parent Base.set_inner_hash_at_addr_exn
 
-  let merkle_path_at_addr_exn t = Base.merkle_path_at_addr_exn (get_parent t)
+  let get_inner_hash_at_addr_exn =
+    delegate_to_parent Base.get_inner_hash_at_addr_exn
 
-  let num_accounts t = Base.num_accounts (get_parent t)
+  let merkle_path_at_addr_exn = delegate_to_parent Base.merkle_path_at_addr_exn
 
-  let remove_accounts_exn t = Base.remove_accounts_exn (get_parent t)
+  let num_accounts = delegate_to_parent Base.num_accounts
 
-  let merkle_path_at_index_exn t = Base.merkle_path_at_index_exn (get_parent t)
+  let remove_accounts_exn = delegate_to_parent Base.remove_accounts_exn
 
-  let merkle_path t = Base.merkle_path (get_parent t)
+  let merkle_path_at_index_exn =
+    delegate_to_parent Base.merkle_path_at_index_exn
 
-  let get_or_create_account_exn t =
-    Base.get_or_create_account_exn (get_parent t)
+  let merkle_path = delegate_to_parent Base.merkle_path
 
-  let get_or_create_account t = Base.get_or_create_account (get_parent t)
+  let get_or_create_account_exn =
+    delegate_to_parent Base.get_or_create_account_exn
 
-  let index_of_key_exn t = Base.index_of_key_exn (get_parent t)
+  let get_or_create_account = delegate_to_parent Base.get_or_create_account
 
-  let set_at_index_exn t = Base.set_at_index_exn (get_parent t)
+  let index_of_key_exn = delegate_to_parent Base.index_of_key_exn
 
-  let get_at_index_exn t = Base.get_at_index_exn (get_parent t)
+  let set_at_index_exn = delegate_to_parent Base.set_at_index_exn
 
-  let to_list t = Base.to_list (get_parent t)
+  let get_at_index_exn = delegate_to_parent Base.get_at_index_exn
 
-  let destroy t = Base.destroy (get_parent t)
+  let to_list = delegate_to_parent Base.to_list
 
-  let location_of_key t = Base.location_of_key (get_parent t)
+  let destroy = delegate_to_parent Base.destroy
+
+  let location_of_key = delegate_to_parent Base.location_of_key
 
   let sexp_of_location = Location.sexp_of_t
 
