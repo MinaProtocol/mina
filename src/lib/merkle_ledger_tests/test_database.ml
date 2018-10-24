@@ -19,9 +19,7 @@ let%test_module "test functor on in memory databases" =
 
       module Addr : Merkle_address.S
 
-      module type DB_extra = DB with type location := Location.t
-
-      module MT : DB_extra
+      module MT : DB with type location := Location.t
 
       val with_instance : (MT.t -> 'a) -> 'a
     end
@@ -292,9 +290,7 @@ let%test_module "test functor on in memory databases" =
       module Location = Merkle_ledger.Location.Make (Depth)
       module Addr = Location.Addr
 
-      module type DB_extra = DB with type location := Location.t
-
-      module MT : DB_extra =
+      module MT : DB with type location := Location.t =
         Database.Make (Key) (Account) (Hash) (Depth) (Location)
           (In_memory_kvdb)
           (In_memory_sdb)
@@ -306,7 +302,6 @@ let%test_module "test functor on in memory databases" =
         f mdb
     end)
 
-    (*
     module Depth_4 = struct
       let depth = 4
     end
@@ -317,5 +312,5 @@ let%test_module "test functor on in memory databases" =
       let depth = 30
     end
 
-    module Mdb_d30 = Make_db (Depth_30) *)
+    module Mdb_d30 = Make_db (Depth_30)
   end )

@@ -13,5 +13,5 @@ module type S = sig
 
   val register_mask : t -> mask -> unit
 
-  val unregister_mask : mask -> unit
+  val unregister_mask_exn : mask -> unit
 end

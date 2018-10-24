@@ -29,7 +29,7 @@ struct
     mask_children := mask :: !mask_children ;
     Mask.set_parent mask t
 
-  let unregister_mask mask =
+  let unregister_mask_exn mask =
     match List.findi !mask_children ~f:(fun _ndx elt -> elt = mask) with
     | None -> failwith "unregister_mask: no such registered mask"
     | Some (ndx, _mask) ->
