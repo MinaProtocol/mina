@@ -4,14 +4,16 @@
 module type S = sig
   include Base_merkle_tree_intf.S
 
-  type mask
+  type unattached_mask
+
+  type attached_mask
 
   (* registering a mask makes it an active child of the parent Merkle tree 
      - reads to the mask that fail are delegated to the parent
      - writes to the parent notify the child mask
    *)
 
-  val register_mask : t -> mask -> unit
+  val register_mask : t -> unattached_mask -> attached_mask
 
-  val unregister_mask_exn : mask -> unit
+  val unregister_mask_exn : attached_mask -> unattached_mask
 end

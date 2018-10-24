@@ -26,8 +26,9 @@ struct
   let mask_children = ref []
 
   let register_mask t mask =
-    mask_children := mask :: !mask_children ;
-    Mask.set_parent mask t
+    let attached_mask = Mask.set_parent mask t in
+    mask_children := attached_mask :: !mask_children ;
+    attached_mask
 
   let unregister_mask_exn mask =
     match List.findi !mask_children ~f:(fun _ndx elt -> elt = mask) with
@@ -36,12 +37,13 @@ struct
         let head, tail = List.split_n !mask_children ndx in
         (* splice out mask *)
         mask_children := List.take head (ndx - 1) @ tail ;
-        Mask.unset_parent mask
+        Mask.Attached.unset_parent mask
 
   (* a set calls the Base implementation set, then notifies registered mask childen *)
   let set t location account =
     Base.set t location account ;
     List.iter !mask_children ~f:(fun child_mask ->
         let merkle_path = Base.merkle_path t location in
-        Mask.parent_set_notify child_mask location account merkle_path )
+        Mask.Attached.parent_set_notify child_mask location account merkle_path
+    )
 end

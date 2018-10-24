@@ -2,39 +2,63 @@
 (* the type of a Merkle tree mask associated with a parent Merkle tree *)
 
 module type S = sig
-  include Base_merkle_tree_intf.S
+  type t
+
+  type unattached = t
 
   type parent
 
-  (* for testing *)
+  type account
 
-  val location_in_mask : t -> location -> bool
+  type location
 
-  (* for testing *)
+  type hash
 
-  val address_in_mask : t -> Addr.t -> bool
+  type key
 
-  (* get hash from mask, if present, else from its parent *)
+  module Addr : Merkle_address.S
 
-  val get_hash : t -> Addr.t -> hash option
+  (* create a mask with no parent *)
 
-  (* commit all state to the parent, flush state locally *)
+  val create : unit -> t
 
-  val commit : t -> unit
+  module Attached : sig
+    include Base_merkle_tree_intf.S
+            with type account := account
+             and type location := location
+             and type hash := hash
+             and type key := key
+
+    (* for testing *)
+
+    val location_in_mask : t -> location -> bool
+
+    (* for testing *)
+
+    val address_in_mask : t -> Addr.t -> bool
+
+    (* get hash from mask, if present, else from its parent *)
+
+    val get_hash : t -> Addr.t -> hash option
+
+    (* commit all state to the parent, flush state locally *)
+
+    val commit : t -> unit
+
+    (* remove parent *)
+
+    val unset_parent : t -> unattached
+
+    (* get mask parent *)
+
+    val get_parent : t -> parent
+
+    (* called when parent sets an account; update local state *)
+
+    val parent_set_notify : t -> location -> account -> Path.t -> unit
+  end
 
   (* tell mask about parent *)
 
-  val set_parent : t -> parent -> unit
-
-  (* remove parent *)
-
-  val unset_parent : t -> unit
-
-  (* get mask parent *)
-
-  val get_parent_exn : t -> parent
-
-  (* called when parent sets an account; update local state *)
-
-  val parent_set_notify : t -> location -> account -> Path.t -> unit
+  val set_parent : unattached -> parent -> Attached.t
 end

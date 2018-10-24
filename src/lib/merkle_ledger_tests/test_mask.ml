@@ -21,7 +21,9 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type location := Location.t
 
       module Mask :
-        Merkle_mask.Masking_merkle_tree_intf.S with module Addr = Location.Addr
+        Merkle_mask.Masking_merkle_tree_intf.S
+        with module Addr = Location.Addr
+         and module Attached.Addr = Location.Addr
         with type account := Account.t
          and type location := Location.t
          and type key := Key.t
@@ -35,12 +37,16 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type location := Location.t
          and type key := Key.t
          and type hash := Hash.t
-         and type mask := Mask.t
+         and type unattached_mask := Mask.t
+         and type attached_mask := Mask.Attached.t
 
       val with_instances : (Maskable.t -> Mask.t -> 'a) -> 'a
     end
 
     module Make (Test : Test_intf) = struct
+      module Maskable = Test.Maskable
+      module Mask = Test.Mask
+
       let directions =
         let rec add_direction count b accum =
           if count >= Test.depth then accum
@@ -56,27 +62,13 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       let dummy_account = Account.create "not_really_a_public_key" 1000
 
-      let%test "parent must be set in mask for set" =
-        Test.with_instances (fun _maskable mask ->
-            try
-              Test.Mask.set mask dummy_location dummy_account ;
-              false
-            with Failure _ -> true )
-
-      let%test "parent must be set in mask for get" =
-        Test.with_instances (fun _maskable mask ->
-            try
-              ignore (Test.Mask.get mask dummy_location) ;
-              false
-            with Failure _ -> true )
-
       let%test "parent, mask agree on set" =
         Test.with_instances (fun maskable mask ->
-            Test.Maskable.register_mask maskable mask ;
-            Test.Maskable.set maskable dummy_location dummy_account ;
-            Test.Mask.set mask dummy_location dummy_account ;
-            let maskable_result = Test.Maskable.get maskable dummy_location in
-            let mask_result = Test.Mask.get mask dummy_location in
+            let attached_mask = Maskable.register_mask maskable mask in
+            Maskable.set maskable dummy_location dummy_account ;
+            Mask.Attached.set attached_mask dummy_location dummy_account ;
+            let maskable_result = Maskable.get maskable dummy_location in
+            let mask_result = Mask.Attached.get attached_mask dummy_location in
             Option.is_some maskable_result
             && Option.is_some mask_result
             &&
@@ -86,48 +78,49 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       let compare_maskable_mask_hashes ?(check_hash_in_mask= false) maskable
           mask addr =
-        let root = Test.Mask.Addr.root () in
+        let root = Mask.Attached.Addr.root () in
         let rec test_hashes_at_address addr =
-          (not check_hash_in_mask || Test.Mask.address_in_mask mask addr)
+          (not check_hash_in_mask || Mask.Attached.address_in_mask mask addr)
           &&
-          let maybe_mask_hash = Test.Mask.get_hash mask addr in
+          let maybe_mask_hash = Mask.Attached.get_hash mask addr in
           Option.is_some maybe_mask_hash
           &&
           let mask_hash = Option.value_exn maybe_mask_hash in
           let maskable_hash =
-            Test.Maskable.get_inner_hash_at_addr_exn maskable addr
+            Maskable.get_inner_hash_at_addr_exn maskable addr
           in
           Hash.equal mask_hash maskable_hash
           &&
-          if Test.Mask.Addr.equal root addr then true
-          else test_hashes_at_address (Test.Mask.Addr.parent_exn addr)
+          if Mask.Addr.equal root addr then true
+          else test_hashes_at_address (Mask.Attached.Addr.parent_exn addr)
         in
         test_hashes_at_address addr
 
       let%test "parent, mask agree on hashes; set in both mask and parent" =
         Test.with_instances (fun maskable mask ->
-            Test.Maskable.register_mask maskable mask ;
+            let attached_mask = Maskable.register_mask maskable mask in
             (* set in both parent and mask *)
-            Test.Maskable.set maskable dummy_location dummy_account ;
-            Test.Mask.set mask dummy_location dummy_account ;
+            Maskable.set maskable dummy_location dummy_account ;
+            Mask.Attached.set attached_mask dummy_location dummy_account ;
             (* verify all hashes to root are same in mask and parent *)
-            compare_maskable_mask_hashes ~check_hash_in_mask:true maskable mask
-              dummy_address )
+            compare_maskable_mask_hashes ~check_hash_in_mask:true maskable
+              attached_mask dummy_address )
 
       let%test "parent, mask agree on hashes; set only in parent" =
         Test.with_instances (fun maskable mask ->
-            Test.Maskable.register_mask maskable mask ;
+            let attached_mask = Maskable.register_mask maskable mask in
             (* set only in parent *)
-            Test.Maskable.set maskable dummy_location dummy_account ;
+            Maskable.set maskable dummy_location dummy_account ;
             (* verify all hashes to root are same in mask and parent *)
-            compare_maskable_mask_hashes maskable mask dummy_address )
+            compare_maskable_mask_hashes maskable attached_mask dummy_address
+        )
 
       let%test "mask delegates to parent" =
         Test.with_instances (fun maskable mask ->
-            Test.Maskable.register_mask maskable mask ;
+            let attached_mask = Maskable.register_mask maskable mask in
             (* set to parent, get from mask *)
-            Test.Maskable.set maskable dummy_location dummy_account ;
-            let mask_result = Test.Mask.get mask dummy_location in
+            Maskable.set maskable dummy_location dummy_account ;
+            let mask_result = Mask.Attached.get attached_mask dummy_location in
             Option.is_some mask_result
             &&
             let mask_account = Option.value_exn mask_result in
@@ -135,14 +128,27 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       let%test "mask prune after parent notification" =
         Test.with_instances (fun maskable mask ->
-            Test.Maskable.register_mask maskable mask ;
+            let attached_mask = Maskable.register_mask maskable mask in
             (* set to mask *)
-            Test.Mask.set mask dummy_location dummy_account ;
+            Mask.Attached.set attached_mask dummy_location dummy_account ;
             (* verify account is in mask *)
-            if Test.Mask.location_in_mask mask dummy_location then (
-              Test.Maskable.set maskable dummy_location dummy_account ;
+            if Mask.Attached.location_in_mask attached_mask dummy_location then (
+              Maskable.set maskable dummy_location dummy_account ;
               (* verify account pruned from mask *)
-              not (Test.Mask.location_in_mask mask dummy_location) )
+              not (Mask.Attached.location_in_mask attached_mask dummy_location) )
+            else false )
+
+      let%test "commit puts mask contents in parent, flushes mask" =
+        Test.with_instances (fun maskable mask ->
+            let attached_mask = Maskable.register_mask maskable mask in
+            (* set to mask *)
+            Mask.Attached.set attached_mask dummy_location dummy_account ;
+            (* verify account is in mask *)
+            if Mask.Attached.location_in_mask attached_mask dummy_location then (
+              Mask.Attached.commit attached_mask ;
+              (* verify account no longer in mask but is in parent *)
+              not (Mask.Attached.location_in_mask attached_mask dummy_location)
+              && Option.is_some (Maskable.get maskable dummy_location) )
             else false )
     end
 
@@ -171,7 +177,9 @@ let%test_module "Test mask connected to underlying Merkle tree" =
 
       (* the mask tree *)
       module Mask :
-        Merkle_mask.Masking_merkle_tree_intf.S with module Addr = Location.Addr
+        Merkle_mask.Masking_merkle_tree_intf.S
+        with module Addr = Location.Addr
+         and module Attached.Addr = Location.Addr
         with type account := Account.t
          and type location := Location.t
          and type key := Key.t
@@ -188,7 +196,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
          and type location := Location.t
          and type key := Key.t
          and type hash := Hash.t
-         and type mask := Mask.t =
+         and type unattached_mask := Mask.t
+         and type attached_mask := Mask.Attached.t =
         Merkle_mask.Maskable_merkle_tree.Make (Key) (Account) (Hash) (Location)
           (Base_db)
           (Mask)
