@@ -11,6 +11,7 @@ DOCKERNAME = nanotest-$(MYUID)
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
+ WRAPSRC = docker exec --workdir /home/opam/app/src -it $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
  WRAP =
@@ -36,7 +37,7 @@ dht: kademlia
 build:
 	$(info Starting Build)
 	ulimit -s 65536
-	cd src ; $(WRAP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
+	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build
 	$(info Build complete)
 
 withupdates:
@@ -66,10 +67,10 @@ withkeys:
 ## Lint
 
 reformat:
-	cd src; $(WRAP) dune exec app/reformat/reformat.exe -- -path .
+	cd src; $(WRAPSRC) dune exec app/reformat/reformat.exe -- -path .
 
 check-format:
-	cd src; $(WRAP) dune exec app/reformat/reformat.exe -- -path . -check
+	cd src; $(WRAPSRC) dune exec app/reformat/reformat.exe -- -path . -check
 
 
 ########################################
