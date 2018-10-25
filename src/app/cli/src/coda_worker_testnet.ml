@@ -229,7 +229,7 @@ struct
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-  let test ?(proposal_interval= 4000) log n should_propose
+  let test ?(proposal_interval= 10000) log n should_propose
       snark_work_public_keys work_selection =
     let log = Logger.child log "worker_testnet" in
     let%bind program_dir = Unix.getcwd () in
