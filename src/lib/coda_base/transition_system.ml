@@ -54,8 +54,6 @@ module Make (Digest : sig
     Tick.Snarkable.Bits.Lossy
     with type Packed.var = Tick.Field.Checked.t
      and type Packed.value = Tick.Pedersen.Digest.t
-
-  module Tock : Tock.Snarkable.Bits.Lossy with type Packed.value = Tock.Field.t
 end)
 (System : S) =
 struct
@@ -65,15 +63,13 @@ struct
 
   let step_input_size = Tick.Data_spec.size (step_input ())
 
-  let wrap_input () = Tock.Data_spec.[Digest.Tock.Packed.typ]
-
   module Step_base = struct
     open System
 
     module Prover_state = struct
       type t =
-        { wrap_vk: Tock_curve.Verification_key.t
-        ; prev_proof: Tock_curve.Proof.t
+        { wrap_vk: Tock_backend.Verification_key.t
+        ; prev_proof: Tock_backend.Proof.t
         ; prev_state: State.value
         ; update: Update.value }
       [@@deriving fields]
@@ -88,12 +84,7 @@ struct
 
     let wrap_vk_typ = Typ.list ~length:wrap_vk_length Boolean.typ
 
-    module Verifier =
-      Snarky.Gm_verifier_gadget.Mnt4 (Tick)
-        (struct
-          let input_size = Tock.Data_spec.size (wrap_input ())
-        end)
-        (Tick.Inner_curve)
+    module Verifier = Tick.Verifier_gadget
 
     let wrap_vk_triple_length =
       bit_length_to_triple_length
@@ -127,14 +118,13 @@ struct
          in
          let%bind prev_top_hash =
            compute_top_hash wrap_vk_section prev_state_hash_trips
-           >>= Digest.Tick.choose_preimage_var
-           >>| Digest.Tick.Unpacked.var_to_bits
+           >>= Wrap_input.Checked.tick_field_to_scalars
          in
          let%bind other_wrap_vk_data, result =
            Verifier.All_in_one.check_proof wrap_vk
              ~get_vk:As_prover.(map get_state ~f:Prover_state.wrap_vk)
              ~get_proof:As_prover.(map get_state ~f:Prover_state.prev_proof)
-             [Bitstring_lib.Bitstring.Lsb_first.of_list prev_top_hash]
+             prev_top_hash
          in
          let%map () =
            Verifier.Verification_key_data.Checked.Assert.equal wrap_vk_data
@@ -194,19 +184,14 @@ struct
   end
 
   module Wrap_base (Step_vk : Step_vk_intf) = struct
-    let input = wrap_input
-
     open Tock
 
-    module Verifier =
-      Snarky.Gm_verifier_gadget.Mnt6 (Tock)
-        (struct
-          let input_size = step_input_size
-        end)
-        (Tock.Inner_curve)
+    let input = Tock.Data_spec.[Wrap_input.typ]
+
+    module Verifier = Tock.Verifier_gadget
 
     module Prover_state = struct
-      type t = {proof: Tick_curve.Proof.t} [@@deriving fields]
+      type t = {proof: Tick_backend.Proof.t} [@@deriving fields]
     end
 
     let step_vk_data =
@@ -216,21 +201,19 @@ struct
     let step_vk_bits = Verifier.Verification_key_data.to_bits step_vk_data
 
     (* TODO: Use an online verifier here *)
-    let main (input: Digest.Tock.Packed.var) =
+    let main (input: Wrap_input.var) =
       let open Let_syntax in
       with_label __LOC__
         (let%bind vk_data, result =
            (* The use of choose_preimage here is justified since we feed it to the verifier, which doesn't
              depend on which unpacking is provided. *)
-           let%bind input =
-             Digest.Tock.(choose_preimage_var input >>| Unpacked.var_to_bits)
-           in
+           let%bind input = Wrap_input.Checked.to_scalar input in
            Verifier.All_in_one.check_proof
              Verifier.Verification_key.(
                Checked.constant (of_verification_key Step_vk.verification_key))
              ~get_vk:(As_prover.return Step_vk.verification_key)
              ~get_proof:As_prover.(map get_state ~f:Prover_state.proof)
-             [Bitstring_lib.Bitstring.Lsb_first.of_list input]
+             [input]
          in
          let%bind () =
            let open Verifier.Verification_key_data.Checked in

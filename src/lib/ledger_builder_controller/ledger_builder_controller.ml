@@ -42,15 +42,15 @@ end = struct
     include Inputs
 
     module Step = struct
-      let apply' t diff =
+      let apply' t diff logger =
         Deferred.Or_error.map
-          (Ledger_builder.apply t diff)
+          (Ledger_builder.apply t diff ~logger)
           ~f:
             (Option.map ~f:(fun proof ->
                  ( Ledger_proof.statement proof |> Ledger_proof_statement.target
                  , proof ) ))
 
-      let step {With_hash.data= tip; hash= tip_hash}
+      let step logger {With_hash.data= tip; hash= tip_hash}
           {With_hash.data= transition; hash= transition_target_hash} =
         let open Deferred.Or_error.Let_syntax in
         let old_state = tip.Tip.protocol_state in
@@ -64,6 +64,7 @@ end = struct
           match%map
             apply' tip.ledger_builder
               (External_transition.ledger_builder_diff transition)
+              logger
           with
           | Some (h, _) -> h
           | None ->
@@ -110,8 +111,8 @@ end = struct
     { ledger_builder_io: Net.t
     ; log: Logger.t
     ; store_controller: (Tip.t, State_hash.t) With_hash.t Store.Controller.t
-    ; mutable handler: Transition_logic.t
-    ; strongest_ledgers:
+    ; handler: Transition_logic.t
+    ; strongest_ledgers_reader:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
 
   let strongest_tip t =
@@ -183,17 +184,23 @@ end = struct
     let strongest_ledgers_reader, strongest_ledgers_writer =
       Linear_pipe.create ()
     in
+    let store_tip_reader, store_tip_writer = Linear_pipe.create () in
     let t =
       { ledger_builder_io= net
       ; log
       ; store_controller
-      ; strongest_ledgers= strongest_ledgers_reader
+      ; strongest_ledgers_reader
       ; handler= Transition_logic.create state log }
     in
-    let mutate_state_reader, mutate_state_writer = Linear_pipe.create () in
-    let store_tip_reader, store_tip_writer = Linear_pipe.create () in
-    don't_wait_for (Linear_pipe.drain store_tip_reader) ;
-    (*
+    don't_wait_for
+      (Linear_pipe.iter (Transition_logic.strongest_tip t.handler) ~f:
+         (fun (tip, transition) ->
+           Linear_pipe.force_write_maybe_drop_head ~capacity:1 store_tip_writer
+             store_tip_reader tip ;
+           Deferred.return
+           @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
+                t.strongest_ledgers_reader
+                (tip.ledger_builder, transition) )) ;
     don't_wait_for
       (Linear_pipe.iter store_tip_reader ~f:(fun tip ->
            let open With_hash in
@@ -202,36 +209,6 @@ end = struct
            in
            Store.store store_controller config.longest_tip_location
              tip_with_genesis_hash )) ;
-     *)
-    (* The mutation "thread" *)
-    don't_wait_for
-      (Linear_pipe.iter mutate_state_reader ~f:(fun (changes, transition) ->
-           let old_state = Transition_logic.state t.handler in
-           (* TODO: We can make change-resolving more intelligent if different
-            * concurrent processes took different times to finish. Since we
-            * serialize to one job at a time this shouldn't happen anyway though *)
-           let new_state =
-             Transition_logic_state.apply_all old_state changes
-           in
-           t.handler <- Transition_logic.create new_state log ;
-           if
-             not
-               (Protocol_state.equal_value
-                  ( old_state |> Transition_logic_state.longest_branch_tip
-                  |> With_hash.data |> Tip.protocol_state )
-                  ( new_state |> Transition_logic_state.longest_branch_tip
-                  |> With_hash.data |> Tip.protocol_state ))
-           then (
-             let {With_hash.data= tip; hash= _} =
-               Transition_logic_state.longest_branch_tip new_state
-             in
-             Linear_pipe.force_write_maybe_drop_head ~capacity:1
-               store_tip_writer store_tip_reader tip ;
-             Deferred.return
-             @@ Linear_pipe.write_or_exn ~capacity:5 strongest_ledgers_writer
-                  strongest_ledgers_reader
-                  (tip.ledger_builder, transition) )
-           else Deferred.return () )) ;
     (* Handle new transitions *)
     let possibly_jobs =
       Linear_pipe.filter_map_unordered ~max_concurrency:1
@@ -241,15 +218,9 @@ end = struct
                 t |> External_transition.protocol_state |> Protocol_state.hash
             )
           in
-          let%bind changes, job =
+          let%map job =
             Transition_logic.on_new_transition catchup t.handler
               transition_with_hash ~time_received
-          in
-          let%map () =
-            match changes with
-            | [] -> return ()
-            | changes ->
-                Linear_pipe.write mutate_state_writer (changes, transition)
           in
           Option.map job ~f:(fun job -> (job, time_received)) )
     in
@@ -274,26 +245,22 @@ end = struct
     don't_wait_for
       ( Linear_pipe.fold possibly_jobs ~init:None ~f:
           (fun last
-          ( ( ( { Job.input=
-                    {With_hash.data= current_transition; hash= _} as
-                    current_transition_with_hash; _ } as job )
-            , _ ) as job_with_time )
+          ( (({Job.input= current_transition_with_hash; _} as job), _) as
+          job_with_time )
           ->
-            match replace last job_with_time with
-            | `Skip -> return last
-            | `Cancel_and_do_next ->
-                Option.iter last ~f:(fun (input, ivar) ->
-                    Ivar.fill_if_empty ivar input ) ;
-                let w, this_ivar = Job.run job in
-                let () =
-                  Deferred.upon w.Interruptible.d (function
-                    | Ok [] -> ()
-                    | Ok changes ->
-                        Linear_pipe.write_without_pushback mutate_state_writer
-                          (changes, current_transition)
-                    | Error () -> () )
-                in
-                return (Some (current_transition_with_hash, this_ivar)) )
+            Deferred.return
+              ( match replace last job_with_time with
+              | `Skip -> last
+              | `Cancel_and_do_next ->
+                  Option.iter last ~f:(fun (input, ivar) ->
+                      Ivar.fill_if_empty ivar input ) ;
+                  let w, this_ivar = Job.run job in
+                  let () =
+                    Deferred.upon w.Interruptible.d (function
+                      | Ok () -> Logger.trace log "Job is completed"
+                      | Error () -> Logger.trace log "Job is destroyed" )
+                  in
+                  Some (current_transition_with_hash, this_ivar) ) )
       >>| ignore ) ;
     t
 
@@ -307,7 +274,8 @@ end = struct
       tip
   end
 
-  let strongest_ledgers {strongest_ledgers; _} = strongest_ledgers
+  let strongest_ledgers {strongest_ledgers_reader; _} =
+    strongest_ledgers_reader
 
   let local_get_ledger' t hash ~p_tip ~p_trans ~f_result =
     let open Deferred.Or_error.Let_syntax in
@@ -469,7 +437,7 @@ let%test_module "test" =
 
           let aux t = !t
 
-          let apply (t: t) (x: Ledger_builder_diff.t) =
+          let apply (t: t) (x: Ledger_builder_diff.t) ~logger:_ =
             t := x ;
             return (Ok (Some x))
 

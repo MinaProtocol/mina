@@ -1,0 +1,198 @@
+[
+  {
+    "name": "area-build",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-catchup",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-client",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-consensus",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-cryptography",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-daemon",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-docs",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-gossip",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-kademlia",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-monitoring",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-proposer",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-protocol",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-sdk",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-snark",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-snarker",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-testnet",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-tests",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-ux",
+    "color": "#9791a0"
+  },
+  {
+    "name": "area-website",
+    "color": "#9791a0"
+  },
+  {
+    "name": "category-bug",
+    "color": "#293844"
+  },
+  {
+    "name": "category-cosmetic",
+    "color": "#293844"
+  },
+  {
+    "name": "category-duplicate",
+    "color": "#293844"
+  },
+  {
+    "name": "category-enhancement",
+    "color": "#293844"
+  },
+  {
+    "name": "category-feature-request",
+    "color": "#293844"
+  },
+  {
+    "name": "category-mentored",
+    "color": "#293844"
+  },
+  {
+    "name": "category-quick-fix",
+    "color": "#293844"
+  },
+  {
+    "name": "category-refactor",
+    "color": "#293844"
+  },
+  {
+    "name": "category-regression",
+    "color": "#293844"
+  },
+  {
+    "name": "category-rfc",
+    "color": "#293844"
+  },
+  {
+    "name": "effort-easy",
+    "color": "#e89c5f"
+  },
+  {
+    "name": "effort-hard",
+    "color": "#9f0000"
+  },
+  {
+    "name": "effort-medium",
+    "color": "#dd7623"
+  },
+  {
+    "name": "impact-bandwidth",
+    "color": "#d8aeae"
+  },
+  {
+    "name": "impact-crash",
+    "color": "#d8aeae"
+  },
+  {
+    "name": "impact-disk",
+    "color": "#d8aeae"
+  },
+  {
+    "name": "impact-dos",
+    "color": "#d8aeae"
+  },
+  {
+    "name": "impact-insecure",
+    "color": "#d8aeae"
+  },
+  {
+    "name": "impact-latency",
+    "color": "#d8aeae"
+  },
+  {
+    "name": "impact-memory",
+    "color": "#d8aeae"
+  },
+  {
+    "name": "impact-slow",
+    "color": "#d8aeae"
+  },
+  {
+    "name": "planning-after-testnet",
+    "color": "#a0e81b"
+  },
+  {
+    "name": "planning-for-testnet",
+    "color": "#fbca04"
+  },
+  {
+    "name": "priority-critical",
+    "color": "#ff0000"
+  },
+  {
+    "name": "priority-high",
+    "color": "#ea2c48"
+  },
+  {
+    "name": "priority-low",
+    "color": "#a991ff"
+  },
+  {
+    "name": "status-cannot-repro",
+    "color": "#b3b994"
+  },
+  {
+    "name": "status-needs-info",
+    "color": "#b3b994"
+  },
+  {
+    "name": "status-needs-repro",
+    "color": "#b3b994"
+  },
+  {
+    "name": "status-needs-rfc",
+    "color": "#b3b994"
+  }
+]

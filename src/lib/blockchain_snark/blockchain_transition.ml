@@ -240,7 +240,7 @@ struct
           ~digest_input:
             (Fn.compose Md5.to_hex Tock.R1CS_constraint_system.digest)
           ~create_env:Tock.Keypair.generate
-          ~input:(Tock.constraint_system ~exposing:(Wrap.input ()) Wrap.main)
+          ~input:(Tock.constraint_system ~exposing:Wrap.input Wrap.main)
       in
       let%map wrap_vk, wrap_pk = Cached.run wrap_cached in
       let location : Location.t =

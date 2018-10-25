@@ -18,6 +18,7 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     let snark_work_public_keys i = None in
     let%bind testnet =
       Coda_worker_testnet.test log n should_propose snark_work_public_keys
+        Protocols.Coda_pow.Work_selection.Seq
     in
     after (Time.Span.of_sec 30.)
 

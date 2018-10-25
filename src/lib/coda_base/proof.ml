@@ -7,9 +7,9 @@ module Stable = struct
     module T = struct
       type t = Tock.Proof.t
 
-      let to_string = Tock_curve.Proof.to_string
+      let to_string = Tock_backend.Proof.to_string
 
-      let of_string = Tock_curve.Proof.of_string
+      let of_string = Tock_backend.Proof.of_string
     end
 
     include T

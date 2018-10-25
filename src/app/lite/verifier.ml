@@ -1,6 +1,6 @@
 open Core_kernel
 open Lite_base
-module Proof_system = Snarkette.Mnt6_80.Groth_maller
+module Proof_system = Lite_base.Crypto_params.Tock.Groth_maller
 
 module Make_stringable_of_base64_binable (T : Binable.S) = struct
   let to_string = Fn.compose B64.encode (Binable.to_string (module T))

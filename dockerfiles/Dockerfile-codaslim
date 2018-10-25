@@ -1,6 +1,6 @@
 FROM debian:stretch-slim
 
-# Dependancies
+# Dependencies
 RUN apt-get -y update && \
   DEBIAN_FRONTEND=noninteractive apt-get -y upgrade && \
   DEBIAN_FRONTEND=noninteractive apt-get -y install \

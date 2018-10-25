@@ -226,7 +226,7 @@ module Make (Kernel : Kernel_intf) = struct
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
   let test ?(proposal_interval= 1000) log n should_propose
-      snark_work_public_keys =
+      snark_work_public_keys work_selection =
     let log = Logger.child log "worker_testnet" in
     let%bind program_dir = Unix.getcwd () in
     Coda_processes.init () ;
@@ -234,6 +234,7 @@ module Make (Kernel : Kernel_intf) = struct
       Coda_processes.local_configs n ~proposal_interval ~program_dir
         ~should_propose
         ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
+        ~work_selection
     in
     let%map workers = Coda_processes.spawn_local_processes_exn configs in
     let transaction_reader, transaction_writer = Linear_pipe.create () in

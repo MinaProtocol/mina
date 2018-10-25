@@ -308,6 +308,16 @@ end
 module type Inputs_intf = sig
   include Coda_pow.Inputs_intf
 
+  module Work_selector :
+    Coda_pow.Work_selector_intf
+    with type ledger_builder := Ledger_builder.t
+     and type work :=
+                ( Ledger_proof_statement.t
+                , Super_transaction.t
+                , Sparse_ledger.t
+                , Ledger_proof.t )
+                Snark_work_lib.Work.Single.Spec.t
+
   module Proof_carrying_state : sig
     type t =
       ( Consensus_mechanism.Protocol_state.value
@@ -411,7 +421,7 @@ module Make (Inputs : Inputs_intf) = struct
         (Ledger_builder.t * Consensus_mechanism.External_transition.t)
         Linear_pipe.Reader.t
     ; log: Logger.t
-    ; mutable seen_jobs: Ledger_builder.Coordinator.State.t
+    ; mutable seen_jobs: Work_selector.State.t
     ; ledger_builder_transition_backup_capacity: int }
 
   let run_snark_worker t = t.run_snark_worker
@@ -600,7 +610,7 @@ module Make (Inputs : Inputs_intf) = struct
       ; ledger_builder
       ; strongest_ledgers= strongest_ledgers_for_api
       ; log= config.log
-      ; seen_jobs= Ledger_builder.Coordinator.State.init
+      ; seen_jobs= Work_selector.State.init
       ; ledger_builder_transition_backup_capacity=
           config.ledger_builder_transition_backup_capacity }
 end

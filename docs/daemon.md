@@ -1,6 +1,6 @@
 # Care and feeding of your Coda daemon
 
-Right now the default config directory is hardcoded to `~/.current-config`. 
+Right now the default config directory is hardcoded to `~/.coda-config`. 
 This will be fixed eventually. In the meantime, you can pass `-config-directory`
 to the daemon to look there.
 
@@ -24,3 +24,5 @@ command-line flags. These flags are supported in the config file:
 - `rest-port` int
 - `peers` string list. This does not get overridden by `-peer` arguments.
   Instead, `-peer` arguments are added to this list.
+- `work-selection` seq|rand Choose work sequentially (seq) or randomly (rand) \
+            (default: seq)

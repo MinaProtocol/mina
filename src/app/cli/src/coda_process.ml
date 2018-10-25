@@ -21,7 +21,7 @@ module Make (Kernel : Kernel_intf) = struct
 
   let local_config ?(transition_interval= 1000.0) ?proposal_interval ~peers
       ~discovery_port ~external_port ~program_dir ~should_propose
-      ~snark_worker_config () =
+      ~snark_worker_config ~work_selection () =
     let host = "127.0.0.1" in
     let conf_dir =
       Filename.temp_dir_name
@@ -37,6 +37,7 @@ module Make (Kernel : Kernel_intf) = struct
       ; transition_interval
       ; external_port
       ; snark_worker_config
+      ; work_selection
       ; peers
       ; conf_dir
       ; program_dir

@@ -170,12 +170,36 @@ module type Config_intf = sig
   (** Capacity of transactions per block *)
 
   val commit_id : Client_lib.Git_sha.t option
+
+  val work_selection : Protocols.Coda_pow.Work_selection.t
+end
+
+module type Make_work_selector_intf = sig
+  module Make (Inputs : Work_selector.Inputs.Inputs_intf) :
+    Protocols.Coda_pow.Work_selector_intf
+    with type ledger_builder := Inputs.Ledger_builder.t
+     and type work :=
+                ( Inputs.Ledger_proof_statement.t
+                , Inputs.Super_transaction.t
+                , Inputs.Sparse_ledger.t
+                , Inputs.Ledger_proof.t )
+                Snark_work_lib.Work.Single.Spec.t
 end
 
 module type Init_intf = sig
   include Config_intf
 
   include Kernel_intf
+
+  module Make_work_selector (Inputs : Work_selector.Inputs.Inputs_intf) :
+    Protocols.Coda_pow.Work_selector_intf
+    with type ledger_builder := Inputs.Ledger_builder.t
+     and type work :=
+                ( Inputs.Ledger_proof_statement.t
+                , Inputs.Super_transaction.t
+                , Inputs.Sparse_ledger.t
+                , Inputs.Ledger_proof.t )
+                Snark_work_lib.Work.Single.Spec.t
 
   val proposer_prover : [`Proposer of Prover.t | `Non_proposer]
 
@@ -193,6 +217,35 @@ let make_init ~should_propose (module Config : Config_intf) (module Kernel
     else return `Non_proposer
   in
   let%map verifier = Verifier.create ~conf_dir in
+  let (module Selector : Make_work_selector_intf) =
+    match work_selection with
+    | Seq ->
+        ( module struct
+          module Make (Inputs : Work_selector.Inputs.Inputs_intf) :
+            Protocols.Coda_pow.Work_selector_intf
+            with type ledger_builder := Inputs.Ledger_builder.t
+             and type work :=
+                        ( Inputs.Ledger_proof_statement.t
+                        , Inputs.Super_transaction.t
+                        , Inputs.Sparse_ledger.t
+                        , Inputs.Ledger_proof.t )
+                        Snark_work_lib.Work.Single.Spec.t =
+          Work_selector.Sequence.Make (Inputs)
+        end )
+    | Random ->
+        ( module struct
+          module Make (Inputs : Work_selector.Inputs.Inputs_intf) :
+            Protocols.Coda_pow.Work_selector_intf
+            with type ledger_builder := Inputs.Ledger_builder.t
+             and type work :=
+                        ( Inputs.Ledger_proof_statement.t
+                        , Inputs.Super_transaction.t
+                        , Inputs.Sparse_ledger.t
+                        , Inputs.Ledger_proof.t )
+                        Snark_work_lib.Work.Single.Spec.t =
+          Work_selector.Random.Make (Inputs)
+        end )
+  in
   let module Init = struct
     include Kernel
     include Config
@@ -200,6 +253,8 @@ let make_init ~should_propose (module Config : Config_intf) (module Kernel
     let proposer_prover = proposer_prover
 
     let verifier = verifier
+
+    module Make_work_selector = Selector.Make
   end in
   (module Init : Init_intf)
 
@@ -653,17 +708,25 @@ struct
     end
   end)
 
+  module Work_selector_inputs = struct
+    module Ledger_proof_statement = Ledger_proof_statement
+    module Sparse_ledger = Sparse_ledger
+    module Super_transaction = Super_transaction
+    module Ledger_hash = Ledger_hash
+    module Ledger_proof = Ledger_proof
+    module Ledger_builder = Ledger_builder
+  end
+
+  module Work_selector = Make_work_selector (Work_selector_inputs)
+
   let request_work ~best_ledger_builder
-      ~(seen_jobs: 'a -> Ledger_builder.Coordinator.State.t)
-      ~(set_seen_jobs: 'a -> Ledger_builder.Coordinator.State.t -> unit)
-      (t: 'a) =
+      ~(seen_jobs: 'a -> Work_selector.State.t)
+      ~(set_seen_jobs: 'a -> Work_selector.State.t -> unit) (t: 'a) =
     let lb = best_ledger_builder t in
-    let maybe_instances, seen_jobs =
-      Ledger_builder.Coordinator.random_work_spec_chunk lb (seen_jobs t)
-    in
+    let instances, seen_jobs = Work_selector.work lb (seen_jobs t) in
     set_seen_jobs t seen_jobs ;
-    Option.map maybe_instances ~f:(fun instances ->
-        {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero} )
+    if List.is_empty instances then None
+    else Some {Snark_work_lib.Work.Spec.instances; fee= Fee.Unsigned.zero}
 end
 
 [%%if

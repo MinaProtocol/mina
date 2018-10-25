@@ -38,9 +38,14 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
 
     let genesis_proof = Precomputed_values.base_proof
 
-    let transaction_capacity_log_2 = 3
+    let transaction_capacity_log_2 =
+      if with_snark then 1
+        (*this works because we don't have prover fees. Once we have that, the transaction_capacity_log_2 has to be at least 2 for transactions to be included*)
+      else 3
 
     let commit_id = None
+
+    let work_selection = Protocols.Coda_pow.Work_selection.Seq
   end in
   let should_propose_bool = true in
   let%bind (module Init) =
@@ -72,7 +77,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   let%bind coda =
     Main.create
       (Main.Config.make ~log ~net_config ~should_propose:should_propose_bool
-         ~run_snark_worker:with_snark
+         ~run_snark_worker:true
          ~ledger_builder_persistant_location:(temp_conf_dir ^/ "ledger_builder")
          ~transaction_pool_disk_location:(temp_conf_dir ^/ "transaction_pool")
          ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
@@ -80,18 +85,25 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
          ~keypair () ~banlist)
   in
   don't_wait_for (Linear_pipe.drain (Main.strongest_ledgers coda)) ;
-  let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
+  let wait_until_cond ~(f: t -> bool) ~(timeout: Float.t) =
     let rec go () =
-      match Run.get_balance coda receiver_pk with
-      | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
-          return ()
-      | _ ->
-          let%bind () = after (Time_ns.Span.of_sec 10.) in
-          go ()
+      if f coda then return ()
+      else
+        let%bind () = after (Time_ns.Span.of_sec 10.) in
+        go ()
     in
-    Deferred.any [after (Time_ns.Span.of_min 3.); go ()]
+    Deferred.any [after (Time_ns.Span.of_min timeout); go ()]
   in
-  let assert_balance pk amount =
+  let _balance_change_or_timeout ~initial_receiver_balance receiver_pk =
+    let cond t =
+      match Run.get_balance t receiver_pk with
+      | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
+          true
+      | _ -> false
+    in
+    wait_until_cond ~f:cond ~timeout:3.
+  in
+  let _assert_balance pk amount =
     match Run.get_balance coda pk with
     | Some balance ->
         if not (Currency.Balance.equal balance amount) then
@@ -114,11 +126,9 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   Run.run_snark_worker ~log ~client_port run_snark_worker ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
-  (* Check if high balance account has expected balance *)
-  (* Note: This is much less than half of the high balance account so we can test
-   *       transaction replays being prohibited
-   *)
-  let send_amount = Currency.Amount.of_int 10 in
+  failwith "TODO"
+(*  (* No proof emitted by the parallel scan at the begining *)
+  assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
   let receiver =
     Genesis_ledger.find_new_account_record_exn
       [largest_account_keypair.public_key]
@@ -147,8 +157,11 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
            (Genesis_ledger.keypair_of_account_record_exn (sk, account), account)
        )
   in
-  (* No proof emitted by the parallel scan at the begining *)
-  assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
+
+  (* Note: This is much less than half of the high balance account so we can test
+   *       transaction replays being prohibited
+   *)
+  let send_amount = Currency.Amount.of_int 10 in
   (* Send money to someone *)
   let build_txn amount sender_sk receiver_pk fee =
     let nonce = Run.get_nonce coda (pk_of_sk sender_sk) |> Option.value_exn in
@@ -204,66 +217,67 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     let%map () = Run.send_txn log coda (transaction :> Transaction.t) in
     new_balance_sheet'
   in
-  let send_txns balance_sheet f_amount =
-    Deferred.List.foldi other_accounts ~init:balance_sheet ~f:
-      (fun i acc (sender_keypair, _) ->
-        let receiver_keypair, _ =
+  let send_txns key_pairs pks balance_sheet f_amount =
+    Deferred.List.foldi key_pairs ~init:balance_sheet ~f:(fun i acc key_pair ->
+        let sender_pk = fst key_pair in
+        let receiver =
           List.random_element_exn
-            (List.filter other_accounts ~f:(fun (keypair, _) ->
-                 not
-                   (Public_key.equal keypair.public_key
-                      sender_keypair.public_key) ))
+            (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
         in
         send_txn_update_balance_sheet sender_keypair.private_key
           (Public_key.compress sender_keypair.public_key)
           (Public_key.compress receiver_keypair.public_key)
           (f_amount i) acc (Currency.Fee.of_int 0) )
   in
-  let wait_for_proof_or_timeout () =
-    let rec go () =
-      if Option.is_some @@ Run.For_tests.ledger_proof coda then (
-        Core.printf "Ledger_proof emitted\n %!" ;
-        return true )
-      else
-        let%bind () = after (Time_ns.Span.of_sec 10.) in
-        go ()
-    in
-    let timeout =
-      let%map () = after (Time_ns.Span.of_min 3.) in
-      false
-    in
-    Deferred.any [timeout; go ()]
+  let block_count t =
+    Run.best_protocol_state t
+    |> Inputs.Consensus_mechanism.Protocol_state.consensus_state
+    |> Inputs.Consensus_mechanism.Consensus_state.length
   in
-  (*Include multiple transactions in a block*)
-  let balance_sheet =
-    Public_key.Compressed.Map.of_alist_exn
-      (List.map other_accounts ~f:(fun (keypair, account) ->
+  let wait_for_proof_or_timeout timeout () =
+    let cond t = Option.is_some @@ Run.For_tests.ledger_proof t in
+    wait_until_cond ~f:cond ~timeout
+  in
+  let test_multiple_txns key_pairs pks timeout =
+    let balance_sheet =
+       (List.map other_accounts ~f:(fun (keypair, account) ->
            (Public_key.compress keypair.public_key, Account.balance account) ))
+    in
+    let%bind updated_balance_sheet =
+      send_txns key_pairs pks balance_sheet (fun i ->
+          Currency.Amount.of_int ((i + 1) * 10) )
+    in
+    (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
+    let%map () = wait_for_proof_or_timeout timeout () in
+    assert (Option.is_some @@ Run.For_tests.ledger_proof coda) ;
+    Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
+        assert_balance key data ) ;
+    block_count coda
   in
-  let%bind updated_balance_sheet =
-    send_txns balance_sheet (fun i -> Currency.Amount.of_int ((i + 1) * 10))
+  let test_duplicate_txns new_sender_sk =
+    let%bind () =
+      test_sending_transaction sender_keypair.private_key (Public_key.compress receiver_keypair.public_key)
+    in
+    test_sending_transaction sender_keypair.private_key (Public_key.compress receiver_keypair.public_key) new_sender_sk low_balance_pk
   in
-  (* After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
-  let%bind emitted = wait_for_proof_or_timeout () in
-  assert emitted ;
-  Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
-      assert_balance key data ) ;
-  (* test duplicate transactions *)
-  let%bind () =
-    test_sending_transaction sender_keypair.private_key
-      (Public_key.compress receiver_keypair.public_key)
-  in
-  let%bind () =
-    test_sending_transaction sender_keypair.private_key
-      (Public_key.compress receiver_keypair.public_key)
-  in
-  (* wait for a second proof to be emitted; this makes the test run longer, allowing us to run through more cases in proof of stake *)
-  let%bind emitted = wait_for_proof_or_timeout () in
-  assert emitted ;
-  Deferred.unit
+  let extra_accounts = List.drop Genesis_ledger.accounts 2 in
+  if with_snark then
+    let accounts = List.take extra_accounts 2 in
+    let pks = fst @@ List.unzip accounts in
+    let%bind block_count' = test_multiple_txns accounts pks 7. in
+    (*wait for a block after the ledger_proof is emitted*)
+    let%map () =
+      wait_until_cond ~f:(fun t -> block_count t > block_count') ~timeout:1.
+    in
+    assert (block_count coda > block_count')
+  else
+    let%bind _ = test_multiple_txns accounts other_accounts 3. in
+    test_duplicate_txns sender_keypair.private_key
+    *)
 
 let command (module Kernel : Kernel_intf) =
   let open Core in
   let open Async in
   Command.async_spec ~summary:"Full coda end-to-end test" Command.Spec.empty
     (fun () -> run_test (module Kernel) )
+

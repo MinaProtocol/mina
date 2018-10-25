@@ -15,6 +15,7 @@ endif
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
+ WRAPSRC = docker exec --workdir /home/opam/app/src -it $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
  WRAP =
@@ -40,7 +41,7 @@ dht: kademlia
 build:
 	$(info Starting Build)
 	ulimit -s 65536
-	cd src ; $(WRAP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
+	cd src ; $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 withupdates:
@@ -70,11 +71,10 @@ withkeys:
 ## Lint
 
 reformat:
-	cd src; $(WRAP) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
 
 check-format:
-	cd src; $(WRAP) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
-
+	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
 
 ########################################
 ## Containers and container management
@@ -124,9 +124,13 @@ deb:
 	@cp src/_build/codaclient.deb /tmp/artifacts/.
 
 provingkeys:
-	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /tmp/coda_cache_dir
+	$(WRAP) tar -cvjf src/_build/coda_cache_dir_$(GITHASH).tar.bz2  /var/lib/coda
 	@mkdir -p /tmp/artifacts
 	@cp src/_build/coda_cache_dir*.tar.bz2 /tmp/artifacts/.
+
+genesiskeys:
+	@mkdir -p /tmp/artifacts
+	@cp src/_build/default/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
@@ -176,6 +180,10 @@ test-sigs:
 test-stakes: SHELL := /bin/bash
 test-stakes:
 	source scripts/test_all.sh ; cd src ; run_all_stake_integration_tests
+
+test-withsnark: SHELL := /bin/bash
+test-withsnark:
+	source scripts/test_all.sh ; cd src; WITH_SNARKS=true run_integration_tests
 
 web:
 	./scripts/web.sh

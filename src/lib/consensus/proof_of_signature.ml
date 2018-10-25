@@ -7,9 +7,7 @@ open Signature_lib
 module Global_public_key = struct
   let compressed =
     match Signer_private_key.mode with
-    | `Dev ->
-        Public_key.Compressed.of_base64_exn
-          "KA0mFlIh+GxTxmv22OLTSuKS+7by7RFp1wBPdQnlxmCA/GaZf+8AAAAB"
+    | `Dev -> fst Sample_keypairs.keypairs.(0)
     | `Prod ->
         Public_key.Compressed.of_base64_exn
           "KBWuaAm5Sl5jH/dlpiTKQeUUsty/4Rq6Xz2Py2Y2i/VweJmDHwUAAAAB"

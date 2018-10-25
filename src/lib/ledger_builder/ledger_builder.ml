@@ -407,94 +407,48 @@ end = struct
 
   let chunks_of xs ~n = List.groupi xs ~break:(fun i _ _ -> i mod n = 0)
 
-  module Coordinator = struct
-    module Job_status = struct
-      type t = Assigned of Time.t
+  let sequence_chunks_of seq ~n =
+    Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
+        if i = n then Yield (List.rev acc, ([], 0, seq))
+        else
+          match Sequence.next seq with
+          | None -> Done
+          | Some (x, seq) ->
+            match (*allow a chunk of 1 proof as well*)
+                  Sequence.next seq with
+            | None -> Yield (List.rev (x :: acc), ([], 0, seq))
+            | _ -> Skip (x :: acc, i + 1, seq) )
 
-      let max_age = Time.Span.of_min 2.
-
-      let is_old t ~now =
-        match t with Assigned at_time ->
-          let delta = Time.diff now at_time in
-          Time.Span.( > ) delta max_age
-    end
-
-    module State = struct
-      module Seen_key = struct
-        module T = struct
-          type t = Ledger_proof_statement.t * Ledger_proof_statement.t option
-          [@@deriving compare, sexp]
-        end
-
-        include T
-        include Comparable.Make (T)
-      end
-
-      type t = Job_status.t Seen_key.Map.t
-
-      let init = Seen_key.Map.empty
-
-      let remove_old_assignments t =
-        let now = Time.now () in
-        Map.filter t ~f:(fun status -> not (Job_status.is_old status ~now))
-    end
-
-    let random_work_spec_chunk t (state: State.t) =
-      let state = State.remove_old_assignments state in
-      let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
-      let module A = Parallel_scan.Available_job in
-      let module L = Ledger_proof_statement in
-      let canonical_statement_of_job = function
-        | A.Base {Super_transaction_with_witness.statement; _} -> statement
-        | A.Merge ((_, s1), (_, s2)) ->
-            Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
-      in
-      let single_spec (job: job) =
-        match job with
-        | A.Base d ->
-            let transaction =
-              Or_error.ok_exn
-              @@ Ledger.Undo.super_transaction d.transaction_with_info
-            in
-            Snark_work_lib.Work.Single.Spec.Transition
-              (d.statement, transaction, d.witness)
-        | A.Merge ((p1, s1), (p2, s2)) ->
-            let merged =
-              Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
-            in
-            Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
-      in
-      let all_jobs_paired =
-        let pairs = chunks_of all_jobs ~n:2 in
-        List.map pairs ~f:(fun js ->
-            match js with
-            | [j] -> (j, None)
-            | [j1; j2] -> (j1, Some j2)
-            | _ -> failwith "error pairing jobs" )
-      in
-      let statement_pair = function
-        | j, None -> (canonical_statement_of_job j, None)
-        | j1, Some j2 ->
-            ( canonical_statement_of_job j1
-            , Some (canonical_statement_of_job j2) )
-      in
-      let unseen_jobs =
-        List.filter all_jobs_paired ~f:(fun js ->
-            not @@ Map.mem state (statement_pair js) )
-      in
-      let pair_to_list = function
-        | j, Some j' -> List.map [j; j'] ~f:single_spec
-        | j, None -> [single_spec j]
-      in
-      match unseen_jobs with
-      | [] -> (None, state)
-      | _ ->
-          let i = Random.int (List.length unseen_jobs) in
-          let x = List.nth_exn unseen_jobs i in
-          ( Some (pair_to_list x)
-          , Map.set state ~key:(statement_pair x)
-              ~data:(Assigned (Time.now ())) )
-  end
+  let all_work_pairs t =
+    let all_jobs = Parallel_scan.next_jobs ~state:t.scan_state in
+    let module A = Parallel_scan.Available_job in
+    let module L = Ledger_proof_statement in
+    let single_spec (job: job) =
+      match job with
+      | A.Base d ->
+          let transaction =
+            Or_error.ok_exn
+            @@ Ledger.Undo.super_transaction d.transaction_with_info
+          in
+          Snark_work_lib.Work.Single.Spec.Transition
+            (d.statement, transaction, d.witness)
+      | A.Merge ((p1, s1), (p2, s2)) ->
+          let merged = Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn in
+          Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
+    in
+    let all_jobs_paired =
+      let pairs = chunks_of all_jobs ~n:2 in
+      List.map pairs ~f:(fun js ->
+          match js with
+          | [j] -> (j, None)
+          | [j1; j2] -> (j1, Some j2)
+          | _ -> failwith "error pairing jobs" )
+    in
+    let job_pair_to_work_spec_pair = function
+      | j, Some j' -> (single_spec j, Some (single_spec j'))
+      | j, None -> (single_spec j, None)
+    in
+    List.map all_jobs_paired ~f:job_pair_to_work_spec_pair
 
   let aux {scan_state; _} = scan_state
 
@@ -873,6 +827,15 @@ end = struct
     in
     option "budget did not suffice" (Fee.Unsigned.sub budget work_fee)
 
+  module Prediff_info = struct
+    type ('data, 'work) t =
+      { data: 'data
+      ; work: 'work list
+      ; coinbase_work: 'work list
+      ; payments_count: int
+      ; coinbase_parts_count: int }
+  end
+
   let apply_pre_diff t coinbase_parts (diff: Ledger_builder_diff.diff) =
     let open Result_with_rollback.Let_syntax in
     let%bind payments =
@@ -916,10 +879,14 @@ end = struct
     let%map new_data =
       update_ledger_and_get_statements t.ledger super_transactions
     in
-    (new_data, diff.completed_works, coinbase_work)
+    { Prediff_info.data= new_data
+    ; work= diff.completed_works
+    ; coinbase_work
+    ; payments_count= List.length payments
+    ; coinbase_parts_count= List.length coinbase }
 
   (* TODO: when we move to a disk-backed db, this should call "Ledger.commit_changes" at the end. *)
-  let apply_diff t (diff: Ledger_builder_diff.t) =
+  let apply_diff t (diff: Ledger_builder_diff.t) ~logger =
     let open Result_with_rollback.Let_syntax in
     let apply_pre_diff_with_at_most_two
         (pre_diff1: Ledger_builder_diff.diff_with_at_most_two_coinbase) =
@@ -948,19 +915,24 @@ end = struct
         (Ledger_builder_hash.equal diff.prev_hash (hash t))
       |> Result_with_rollback.of_or_error
     in
-    let%bind data, works =
+    let%bind data, works, payments_count, cb_parts_count =
       Either.value_map diff.pre_diffs
         ~first:(fun d ->
-          let%map data, works, cb_works = apply_pre_diff_with_at_most_one d in
-          (data, cb_works @ works) )
+          let%map { data
+                  ; work
+                  ; coinbase_work
+                  ; payments_count
+                  ; coinbase_parts_count } =
+            apply_pre_diff_with_at_most_one d
+          in
+          (data, coinbase_work @ work, payments_count, coinbase_parts_count) )
         ~second:(fun d ->
-          let%bind data1, works1, cb_works1 =
-            apply_pre_diff_with_at_most_two (fst d)
-          in
-          let%map data2, works2, cb_works2 =
-            apply_pre_diff_with_at_most_one (snd d)
-          in
-          (data1 @ data2, works1 @ cb_works1 @ cb_works2 @ works2) )
+          let%bind p1 = apply_pre_diff_with_at_most_two (fst d) in
+          let%map p2 = apply_pre_diff_with_at_most_one (snd d) in
+          ( p1.data @ p2.data
+          , p1.work @ p1.coinbase_work @ p2.coinbase_work @ p2.work
+          , p1.payments_count + p2.payments_count
+          , p1.coinbase_parts_count + p2.coinbase_parts_count ) )
     in
     let%bind () = check_completed_works t works in
     let%bind res_opt =
@@ -979,9 +951,14 @@ end = struct
       verify_scan_state_after_apply t.ledger t.scan_state
       |> Result_with_rollback.of_or_error
     in
+    Logger.info logger
+      "Block info: No of transactions included:%d Coinbase parts:%d Work \
+       count:%d"
+      payments_count cb_parts_count (List.length works) ;
     Option.map res_opt ~f:(fun (snark, _stmt) -> snark)
 
-  let apply t witness = Result_with_rollback.run (apply_diff t witness)
+  let apply t witness ~logger =
+    Result_with_rollback.run (apply_diff t witness ~logger)
 
   let forget_work_opt = Option.map ~f:Completed_work.forget
 
@@ -1066,18 +1043,6 @@ end = struct
     Or_error.ok_exn (Parallel_scan.enqueue_data ~state:t.scan_state ~data) ;
     Or_error.ok_exn (verify_scan_state_after_apply t.ledger t.scan_state) ;
     res_opt
-
-  let sequence_chunks_of seq ~n =
-    Sequence.unfold_step ~init:([], 0, seq) ~f:(fun (acc, i, seq) ->
-        if i = n then Yield (List.rev acc, ([], 0, seq))
-        else
-          match Sequence.next seq with
-          | None -> Done
-          | Some (x, seq) ->
-            match (*allow a chunk of 1 proof as well*)
-                  Sequence.next seq with
-            | None -> Yield (List.rev (x :: acc), ([], 0, seq))
-            | _ -> Skip (x :: acc, i + 1, seq) )
 
   let work_to_do scan_state : Completed_work.Statement.t Sequence.t =
     let work_seq = Parallel_scan.next_jobs_sequence ~state:scan_state in
@@ -2123,7 +2088,7 @@ let%test_module "test" =
           ~get_completed_work:stmt_to_work
       in
       let%map ledger_proof =
-        Lb.apply lb (Test_input1.Ledger_builder_diff.forget diff)
+        Lb.apply lb (Test_input1.Ledger_builder_diff.forget diff) ~logger
       in
       (ledger_proof, Test_input1.Ledger_builder_diff.forget diff)
 
@@ -2230,38 +2195,6 @@ let%test_module "test" =
               assert_at_least_coinbase_added x cb ;
               let expected_value = expected_ledger x all_ts old_ledger in
               assert (!(Lb.ledger lb) = expected_value) ) )
-
-    let%test_unit "Random workspec chunk doesn't send same things again" =
-      (*Always at worst case number of provers*)
-      let logger = Logger.create () in
-      Backtrace.elide := false ;
-      let p = Int.pow 2 (Test_input1.Config.transaction_capacity_log_2 + 1) in
-      let g = Int.gen_incl 1 p in
-      let initial_ledger = ref 0 in
-      let lb = Lb.create ~ledger:initial_ledger ~self:self_pk in
-      let module S = Test_input1.Ledger_proof_statement.Set in
-      Quickcheck.test g ~trials:100 ~f:(fun i ->
-          Async.Thread_safe.block_on_async_exn (fun () ->
-              let open Deferred.Let_syntax in
-              let all_ts = txns p (fun x -> (x + 1) * 100) (fun _ -> 4) in
-              let ts = List.take all_ts i in
-              let%map _, _ =
-                create_and_apply lb logger (Sequence.of_list ts) stmt_to_work
-              in
-              (* A bit of a roundabout way to check, but essentially, if it
-               * does not give repeats then our loop will not iterate more than
-               * parallelism times. See random work description for
-               * explanation. *)
-              let rec go i seen =
-                [%test_result : Bool.t]
-                  ~message:"Exceeded time expected to exhaust random_work"
-                  ~expect:true (i <= p) ;
-                let maybe_stuff, seen =
-                  Lb.Coordinator.random_work_spec_chunk lb seen
-                in
-                match maybe_stuff with None -> () | Some _ -> go (i + 1) seen
-              in
-              go 0 Lb.Coordinator.State.init ) )
 
     let%test_unit "Be able to include random number of transactions (One \
                    prover)" =

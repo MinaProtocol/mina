@@ -329,6 +329,10 @@ module type Ledger_proof_verifier_intf = sig
   val verify : ledger_proof -> statement -> message:message -> bool Deferred.t
 end
 
+module Work_selection = struct
+  type t = Seq | Random [@@deriving bin_io]
+end
+
 module type Completed_work_intf = sig
   type proof
 
@@ -508,7 +512,8 @@ module type Ledger_builder_base_intf = sig
 
   val aux : t -> Aux.t
 
-  val apply : t -> diff -> ledger_proof option Deferred.Or_error.t
+  val apply :
+    t -> diff -> logger:Logger.t -> ledger_proof option Deferred.Or_error.t
 
   val snarked_ledger :
     t -> snarked_ledger_hash:frozen_ledger_hash -> ledger Or_error.t
@@ -550,27 +555,36 @@ module type Ledger_builder_intf = sig
        * [`Hash_after_applying of ledger_builder_hash]
        * [`Ledger_proof of (ledger_proof * ledger_proof_statement) option]
 
-  module Coordinator : sig
-    module State : sig
-      type t
-
-      val init : t
-    end
-
-    val random_work_spec_chunk :
-         t
-      -> State.t
-      -> ( ledger_proof_statement
+  val all_work_pairs :
+       t
+    -> ( ( ledger_proof_statement
          , super_transaction
          , sparse_ledger
          , ledger_proof )
          Snark_work_lib.Work.Single.Spec.t
-         list
-         option
-         * State.t
-  end
+       * ( ledger_proof_statement
+         , super_transaction
+         , sparse_ledger
+         , ledger_proof )
+         Snark_work_lib.Work.Single.Spec.t
+         option )
+       list
 
   val statement_exn : t -> [`Non_empty of ledger_proof_statement | `Empty]
+end
+
+module type Work_selector_intf = sig
+  type ledger_builder
+
+  type work
+
+  module State : sig
+    type t
+
+    val init : t
+  end
+
+  val work : ledger_builder -> State.t -> work list * State.t
 end
 
 module type Tip_intf = sig
