@@ -11,13 +11,13 @@ end)
 (Location : Location_intf.S)
 (Kvdb : Intf.Key_value_database)
 (Sdb : Intf.Stack_database)
-(Storage_locations : Intf.Storage_locations) : sig
-  include Database_intf.S with module Addr = Location.Addr
-          with type account := Account.t
-           and type hash := Hash.t
-           and type key := Key.t
-           and type location := Location.t
-end = struct
+(Storage_locations : Intf.Storage_locations) :
+  Database_intf.S with module Addr = Location.Addr
+  with type account := Account.t
+   and type hash := Hash.t
+   and type key := Key.t
+   and type location := Location.t =
+struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   include Depth
 
