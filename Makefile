@@ -183,7 +183,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; WITH_SNARKS=true run_integration_tests
+	source scripts/test_all.sh ; cd src; WITH_SNARKS=true run_integration_test
 
 web:
 	./scripts/web.sh
