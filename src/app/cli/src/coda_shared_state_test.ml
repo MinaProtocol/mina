@@ -36,8 +36,8 @@ module Make (Kernel : Kernel_intf) : Integration_test_intf.S = struct
     let send_amount = Currency.Amount.of_int 10 in
     let fee = Currency.Fee.of_int 0 in
     let%bind testnet =
-      Coda_worker_testnet.test log n should_propose snark_work_public_keys
-        Protocols.Coda_pow.Work_selection.Seq
+      Coda_worker_testnet.test ~proposal_interval:4000 log n should_propose
+        snark_work_public_keys Protocols.Coda_pow.Work_selection.Seq
     in
     let rec go i =
       let%bind () = after (Time.Span.of_sec 1.) in

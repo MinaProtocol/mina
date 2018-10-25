@@ -233,6 +233,7 @@ module Make (Kernel : Kernel_intf) = struct
     let configs =
       Coda_processes.local_configs n ~proposal_interval ~program_dir
         ~should_propose
+        ~transition_interval:(Float.of_int proposal_interval)
         ~snark_worker_public_keys:(Some (List.init n snark_work_public_keys))
         ~work_selection
     in
