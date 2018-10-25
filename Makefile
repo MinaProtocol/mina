@@ -183,7 +183,7 @@ test-stakes:
 
 test-withsnark: SHELL := /bin/bash
 test-withsnark:
-	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_MECHANISM=proof_of_stake WITH_SNARKS=true run_integration_test full-test
+	source scripts/test_all.sh ; cd src; CODA_CONSENSUS_MECHANISM=proof_of_signature WITH_SNARKS=true run_integration_test full-test
 
 web:
 	./scripts/web.sh

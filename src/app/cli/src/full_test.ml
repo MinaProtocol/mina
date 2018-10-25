@@ -108,9 +108,10 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     | Some balance ->
         if not (Currency.Balance.equal balance amount) then
           failwithf
-            !"Balance in account %{sexp: Currency.Balance.t} is not asserted \
-              balance %{sexp: Currency.Balance.t}"
-            balance amount ()
+            !"Balance in account (%{sexp: Public_key.Compressed.t}) %{sexp: \
+              Currency.Balance.t} is not asserted balance %{sexp: \
+              Currency.Balance.t}"
+            pk balance amount ()
     | None ->
         failwith
           (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
@@ -128,35 +129,6 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   let%bind () = Async.after (Time.Span.of_ms 100.) in
   (* No proof emitted by the parallel scan at the begining *)
   assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
-  let receiver =
-    Genesis_ledger.find_new_account_record_exn
-      [largest_account_keypair.public_key]
-  in
-  let receiver_keypair =
-    Genesis_ledger.keypair_of_account_record_exn receiver
-  in
-  let sender =
-    Genesis_ledger.find_new_account_record_exn
-      [largest_account_keypair.public_key; receiver_keypair.public_key]
-  in
-  let sender_keypair = Genesis_ledger.keypair_of_account_record_exn sender in
-  let other_accounts =
-    List.filter Genesis_ledger.accounts ~f:(fun (_, account) ->
-        let reserved_public_keys =
-          [ largest_account_keypair.public_key
-          ; receiver_keypair.public_key
-          ; sender_keypair.public_key ]
-        in
-        not
-          (List.exists reserved_public_keys ~f:(fun pk ->
-               Public_key.equal pk
-                 (Public_key.decompress_exn @@ Account.public_key account) ))
-    )
-    |> List.map ~f:(fun (sk, account) ->
-           (Genesis_ledger.keypair_of_account_record_exn (sk, account), account)
-       )
-  in
-
   (* Note: This is much less than half of the high balance account so we can test
    *       transaction replays being prohibited
    *)
@@ -216,16 +188,15 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     let%map () = Run.send_txn log coda (transaction :> Transaction.t) in
     new_balance_sheet'
   in
-  let send_txns key_pairs pks balance_sheet f_amount =
-    Deferred.List.foldi key_pairs ~init:balance_sheet ~f:(fun i acc key_pair ->
-        let sender_pk = fst key_pair in
+  let send_txns accounts pks balance_sheet f_amount =
+    Deferred.List.foldi accounts ~init:balance_sheet ~f:
+      (fun i acc ((keypair: Signature_lib.Keypair.t), _) ->
+        let sender_pk = Public_key.compress keypair.public_key in
         let receiver =
           List.random_element_exn
             (List.filter pks ~f:(fun pk -> not (pk = sender_pk)))
         in
-        send_txn_update_balance_sheet sender_keypair.private_key
-          (Public_key.compress sender_keypair.public_key)
-          (Public_key.compress receiver_keypair.public_key)
+        send_txn_update_balance_sheet keypair.private_key sender_pk receiver
           (f_amount i) acc (Currency.Fee.of_int 0) )
   in
   let block_count t =
@@ -237,13 +208,16 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     let cond t = Option.is_some @@ Run.For_tests.ledger_proof t in
     wait_until_cond ~f:cond ~timeout
   in
-  let test_multiple_txns key_pairs pks timeout =
+  let test_multiple_txns accounts pks timeout =
     let balance_sheet =
-       (List.map other_accounts ~f:(fun (keypair, account) ->
-           (Public_key.compress keypair.public_key, Account.balance account) ))
+      Public_key.Compressed.Map.of_alist_exn
+        (List.map accounts ~f:
+           (fun ((keypair: Signature_lib.Keypair.t), account) ->
+             (Public_key.compress keypair.public_key, Account.balance account)
+         ))
     in
     let%bind updated_balance_sheet =
-      send_txns key_pairs pks balance_sheet (fun i ->
+      send_txns accounts pks balance_sheet (fun i ->
           Currency.Amount.of_int ((i + 1) * 10) )
     in
     (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
@@ -253,25 +227,62 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
         assert_balance key data ) ;
     block_count coda
   in
-  let test_duplicate_txns new_sender_sk =
+  let test_duplicate_txns (sender_keypair: Signature_lib.Keypair.t)
+      (receiver_keypair: Signature_lib.Keypair.t) =
     let%bind () =
-      test_sending_transaction sender_keypair.private_key (Public_key.compress receiver_keypair.public_key)
+      test_sending_transaction sender_keypair.private_key
+        (Public_key.compress receiver_keypair.public_key)
     in
-    test_sending_transaction sender_keypair.private_key (Public_key.compress receiver_keypair.public_key) new_sender_sk low_balance_pk
+    test_sending_transaction sender_keypair.private_key
+      (Public_key.compress receiver_keypair.public_key)
   in
-  let extra_accounts = List.drop Genesis_ledger.accounts 2 in
+  let pks accounts =
+    List.map accounts ~f:(fun ((keypair: Signature_lib.Keypair.t), _) ->
+        Public_key.compress keypair.public_key )
+  in
+  (*Need some accounts from the genesis ledger to test transaction replays and 
+  sending multiple transactions*)
+  let receiver_keypair =
+    let receiver =
+      Genesis_ledger.find_new_account_record_exn
+        [largest_account_keypair.public_key]
+    in
+    Genesis_ledger.keypair_of_account_record_exn receiver
+  in
+  let sender_keypair =
+    let sender =
+      Genesis_ledger.find_new_account_record_exn
+        [largest_account_keypair.public_key; receiver_keypair.public_key]
+    in
+    Genesis_ledger.keypair_of_account_record_exn sender
+  in
+  let other_accounts =
+    List.filter Genesis_ledger.accounts ~f:(fun (_, account) ->
+        let reserved_public_keys =
+          [ largest_account_keypair.public_key
+          ; receiver_keypair.public_key
+          ; sender_keypair.public_key ]
+        in
+        not
+          (List.exists reserved_public_keys ~f:(fun pk ->
+               Public_key.equal pk
+                 (Public_key.decompress_exn @@ Account.public_key account) ))
+    )
+    |> List.map ~f:(fun (sk, account) ->
+           (Genesis_ledger.keypair_of_account_record_exn (sk, account), account)
+       )
+  in
   if with_snark then
-    let accounts = List.take extra_accounts 2 in
-    let pks = fst @@ List.unzip accounts in
-    let%bind block_count' = test_multiple_txns accounts pks 7. in
+    let accounts = List.take other_accounts 2 in
+    let%bind block_count' = test_multiple_txns accounts (pks accounts) 7. in
     (*wait for a block after the ledger_proof is emitted*)
     let%map () =
       wait_until_cond ~f:(fun t -> block_count t > block_count') ~timeout:1.
     in
     assert (block_count coda > block_count')
   else
-    let%bind _ = test_multiple_txns accounts other_accounts 3. in
-    test_duplicate_txns sender_keypair.private_key
+    let%bind _ = test_multiple_txns other_accounts (pks other_accounts) 3. in
+    test_duplicate_txns sender_keypair receiver_keypair
 
 let command (module Kernel : Kernel_intf) =
   let open Core in
