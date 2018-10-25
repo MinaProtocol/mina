@@ -22,8 +22,7 @@ struct
   include Base
 
   (* registered masks *)
-
-  let mask_children = ref []
+  let (mask_children: Mask.Attached.t list ref) = ref []
 
   let register_mask t mask =
     let attached_mask = Mask.set_parent mask t in
@@ -41,7 +40,7 @@ struct
         mask_children := List.take head (ndx - 1) @ tail ;
         Mask.Attached.unset_parent mask
 
-  (* a set calls the Base implementation set, then notifies registered mask childen *)
+  (** a set calls the Base implementation set, notifies registered mask childen *)
   let set t location account =
     Base.set t location account ;
     List.iter !mask_children ~f:(fun child_mask ->

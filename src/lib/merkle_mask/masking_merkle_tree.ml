@@ -1,9 +1,8 @@
-(* merkle_masking.ml -- implements a mask in front of a Merkle tree; see RFC 0004 and docs/specs/merkle_tree.md *)
+(* masking_merkle_tree.ml -- implements a mask in front of a Merkle tree; see RFC 0004 and docs/specs/merkle_tree.md *)
 
 open Core
 
-(* the type of a Merkle tree mask; it's a Merkle tree, with some additional operations *)
-
+(* builds a Merkle tree mask; it's a Merkle tree, with some additional operations *)
 module Make
     (Key : Merkle_ledger.Intf.Key)
     (Account : Merkle_ledger.Intf.Account with type key := Key.t)
@@ -25,22 +24,21 @@ struct
 
   module Addr = Location.Addr
 
-  type parent = Base.t option
-
   type t =
-    { parent: parent
-    ; account_tbl: Account.t Location.Table.t
-    ; hash_tbl: Hash.t Addr.Table.t }
+    {account_tbl: Account.t Location.Table.t; hash_tbl: Hash.t Addr.Table.t}
 
   type unattached = t
 
   let create () =
-    { parent= None
-    ; account_tbl= Location.Table.create ()
-    ; hash_tbl= Addr.Table.create () }
+    {account_tbl= Location.Table.create (); hash_tbl= Addr.Table.create ()}
 
   module Attached = struct
-    type nonrec t = t
+    type parent = Base.t
+
+    type t =
+      { parent: parent
+      ; account_tbl: Account.t Location.Table.t
+      ; hash_tbl: Hash.t Addr.Table.t }
 
     module Path = Base.Path
     module Db_error = Base.Db_error
@@ -52,14 +50,9 @@ struct
         "Mask.Attached.create: cannot create an attached mask; use \
          Mask.create and Mask.set_parent"
 
-    let unset_parent t =
-      {parent= None; account_tbl= t.account_tbl; hash_tbl= t.hash_tbl}
+    let unset_parent t = {account_tbl= t.account_tbl; hash_tbl= t.hash_tbl}
 
-    let get_parent t = Option.value_exn t.parent
-
-    (* should never raise an exception, types enforce parent exists *)
-
-    let has_parent t = Option.is_some t.parent
+    let get_parent t = t.parent
 
     (* getter, setter, so we don't rely on a particular implementation *)
     let find_account t location = Location.Table.find t.account_tbl location
@@ -78,7 +71,6 @@ struct
 
     (* a read does a lookup in the account_tbl; if that fails, delegate to parent *)
     let get t location =
-      if not (has_parent t) then failwith "get: mask does not have a parent" ;
       match find_account t location with
       | Some account -> Some account
       | None -> Base.get (get_parent t) location
@@ -125,7 +117,6 @@ struct
      need to update both account and hash pieces of the mask
        *)
     let set t location account =
-      if not (has_parent t) then failwith "set: mask does not have a parent" ;
       set_account t location account ;
       let account_address = Location.to_path_exn location in
       let account_hash = Hash.hash_account account in
@@ -266,5 +257,5 @@ struct
   end
 
   let set_parent t parent =
-    {parent= Some parent; account_tbl= t.account_tbl; hash_tbl= t.hash_tbl}
+    {Attached.parent; account_tbl= t.account_tbl; hash_tbl= t.hash_tbl}
 end

@@ -1,6 +1,6 @@
 (* maskable_merkle_tree_intf.ml *)
-(* the type of a Merkle tree that can have associated mask children *)
 
+(** the type of a Merkle tree that can have associated mask children *)
 module type S = sig
   include Base_merkle_tree_intf.S
 
@@ -16,4 +16,5 @@ module type S = sig
   val register_mask : t -> unattached_mask -> attached_mask
 
   val unregister_mask_exn : attached_mask -> unattached_mask
+  (** raises an exception if mask is not registered *)
 end
