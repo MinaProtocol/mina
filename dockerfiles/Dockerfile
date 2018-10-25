@@ -1,22 +1,25 @@
-FROM gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+FROM codaprotocol/coda:base
+#FROM gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
 
-ENV PATH "/home/opam/.opam/4.07.0/bin:$PATH"
-ENV CAML_LD_LIBRARY_PATH "/home/opam/.opam/4.07.0/lib/stublibs"
-ENV MANPATH "/home/opam/.opam/4.07.0/man:"
-ENV PERL5LIB "/home/opam/.opam/4.07.0/lib/perl5"
-ENV OCAML_TOPLEVEL_PATH "/home/opam/.opam/4.07.0/lib/toplevel"
+ENV OPAM_HOME            "/home/opam/.opam/4.07"
+ENV PATH                 "${OPAM_HOME}/bin:$PATH"
+ENV CAML_LD_LIBRARY_PATH "${OPAM_HOME}/lib/stublibs"
+ENV MANPATH              "${OPAM_HOME}/man:"
+ENV PERL5LIB             "${OPAM_HOME}/lib/perl5"
+ENV OCAML_TOPLEVEL_PATH  "${OPAM_HOME}/lib/toplevel"
 
-RUN sudo apt-get install --yes python
-RUN CLOUDSDK_CORE_DISABLE_PROMPTS=1 curl https://sdk.cloud.google.com | bash
-RUN ~/google-cloud-sdk/bin/gcloud --quiet components update
-RUN ~/google-cloud-sdk/bin/gcloud components install kubectl
+# python and google not needed
+#RUN sudo apt-get install --yes python
+#RUN CLOUDSDK_CORE_DISABLE_PROMPTS=1 curl https://sdk.cloud.google.com | bash
+#RUN ~/google-cloud-sdk/bin/gcloud --quiet components update
+#RUN ~/google-cloud-sdk/bin/gcloud components install kubectl
 
 WORKDIR /home/opam/app
 
 ENV TERM=xterm-256color
 ENV PATH "~/google-cloud-sdk/bin:$PATH"
 
-# Utility to adjust uid to match host OS
+# FIXUID: Utility to adjust uid to match host OS
 # https://github.com/boxboat/fixuid
 
 ENV FIXUID_SHA256 d4555f5ba21298819af24ed351851a173fff02b9c0bd5dfcef32f7e22ef06401
