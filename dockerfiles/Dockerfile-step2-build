@@ -52,7 +52,7 @@ RUN opam install \
     yojson
 
 # Source copy of ocaml-sodium (modified for static linking)
-ADD ./src/external/ocaml-sodium /ocaml-sodium
+ADD ../src/external/ocaml-sodium /ocaml-sodium
 RUN cd /ocaml-sodium && yes | opam pin add .
 
 
@@ -65,6 +65,6 @@ RUN sudo bash  -c 'echo "build-users-group =" > /etc/nix/nix.conf'
 ENV USER opam
 RUN cd /home/opam && curl https://nixos.org/nix/install | sh
 
-ADD ./src/app/kademlia-haskell/prefetch /prefetch
+ADD ../src/app/kademlia-haskell/prefetch /prefetch
 RUN sudo chown -R opam /prefetch
 RUN cd /prefetch && . /home/opam/.nix-profile/etc/profile.d/nix.sh && nix-build prefetch.nix
