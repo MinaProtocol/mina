@@ -417,16 +417,21 @@ struct
     in
     go (empty_hash_at_height start_height) hash start_height
 
+  let ask_query t q =
+    Logger.trace t.log
+      !"asking %{sexp:query} at %{sexp:Root_hash.t}"
+      (snd q) (fst q) ;
+    Linear_pipe.write_without_pushback t.queries q
+
   let handle_node t addr exp_hash =
     if Addr.depth addr >= MT.depth - Subtree_height.subtree_height then (
       expect_content t addr exp_hash ;
-      Linear_pipe.write_without_pushback t.queries
-        (desired_root_exn t, What_contents addr) )
+      ask_query t (desired_root_exn t, What_contents addr) )
     else (
       expect_children t addr exp_hash ;
-      Linear_pipe.write_without_pushback t.queries
+      ask_query t
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Left)) ;
-      Linear_pipe.write_without_pushback t.queries
+      ask_query t
         (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
 
   let num_accounts t n content_hash =
@@ -448,7 +453,9 @@ struct
      node to never be verified *)
   let main_loop t =
     let handle_answer (root_hash, a) =
-      Logger.trace t.log !"Handle answer for %{sexp: Root_hash.t}" root_hash ;
+      Logger.trace t.log
+        !"Handle answer %{sexp:answer} for %{sexp: Root_hash.t}"
+        a root_hash ;
       if not (Root_hash.equal root_hash (desired_root_exn t)) then (
         Logger.trace t.log
           !"My desired root was %{sexp: Root_hash.t}, so I'm ignoring %{sexp: \

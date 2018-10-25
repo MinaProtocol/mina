@@ -52,14 +52,14 @@ struct
     let seen_queries = ref [] in
     let sr = SR.create l2 (fun q -> seen_queries := q :: !seen_queries) in
     don't_wait_for
-      (Linear_pipe.iter_unordered ~max_concurrency:3 qr ~f:
+      (Linear_pipe.iter_unordered ~max_concurrency:9 qr ~f:
          (fun (_hash, query) ->
            let answ = SR.answer_query sr query in
            let%bind () =
              if match query with What_contents _ -> true | _ -> false then
                Clock_ns.after
-                 (Time_ns.Span.randomize (Time_ns.Span.of_ms 0.2)
-                    ~percent:(Percent.of_percentage 20.))
+                 (Time_ns.Span.randomize (Time_ns.Span.of_ms 0.6)
+                    ~percent:(Percent.of_percentage 50.))
              else Deferred.unit
            in
            Linear_pipe.write aw (desired_root, answ) )) ;
@@ -130,6 +130,10 @@ module L10 = Test_ledger.Make (struct
   let depth = 10
 end)
 
+module L30 = Test_ledger.Make (struct
+  let depth = 30
+end)
+
 let%test_unit "exhaustive depth=10 testing" =
   for i = 3 to 1 lsl 10 do
     let module M =
@@ -184,6 +188,42 @@ module TestL16_1025 =
 
 module TestL16_65536 =
   Make (L16)
+    (struct
+      let num_accts = 65536
+    end)
+
+module TestL30_2 =
+  Make (L30)
+    (struct
+      let num_accts = 2
+    end)
+
+module TestL30_3 =
+  Make (L30)
+    (struct
+      let num_accts = 3
+    end)
+
+module TestL30_20 =
+  Make (L30)
+    (struct
+      let num_accts = 20
+    end)
+
+module TestL30_1024 =
+  Make (L30)
+    (struct
+      let num_accts = 1024
+    end)
+
+module TestL30_1025 =
+  Make (L30)
+    (struct
+      let num_accts = 80
+    end)
+
+module TestL30_65536 =
+  Make (L30)
     (struct
       let num_accts = 65536
     end)

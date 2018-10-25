@@ -83,7 +83,7 @@ struct
         !"lengths: %{sexp: int list} shared_prefix: %{sexp: string option} \
           shared_prefix_age: %d"
         lengths newest_shared shared_prefix_age ;
-      if not (shared_prefix_age <= 5) then (
+      if not (shared_prefix_age <= 10) then (
         Logger.fatal log "prefix too old" ;
         ignore (exit 1) ) ;
       ()
@@ -229,7 +229,7 @@ struct
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-  let test ?(proposal_interval= 1000) log n should_propose
+  let test ?(proposal_interval= 4000) log n should_propose
       snark_work_public_keys work_selection =
     let log = Logger.child log "worker_testnet" in
     let%bind program_dir = Unix.getcwd () in
