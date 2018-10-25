@@ -16,8 +16,7 @@ base_actions = [
 
 tests = [
    {'friendly': 'Sig Tests', 'name': 'all_sig_integration_tests', 'env_str': "CODA_CONSENSUS_MECHANISM=proof_of_signature CODA_PROPOSAL_INTERVAL=1000", 'actions': base_actions},
-   {'friendly': 'Stake Tests', 'name': 'all_stake_integration_tests', 'env_str': "CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8", 'actions': base_actions},
-   {'friendly': 'Epoch Stake Test', 'name': 'epoch_stake_integration_test', 'env_str': "CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=2 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=2", 'actions': ['full-test']}
+   {'friendly': 'Stake Tests', 'name': 'all_stake_integration_tests', 'env_str': "CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8", 'actions': base_actions}
 ]
 
 # Render it

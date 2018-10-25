@@ -236,29 +236,6 @@ jobs:
               name: Running test - Stake Tests | transaction-snark-profiler -check-only
               command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=24 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=8 'run_integration_test' 'transaction-snark-profiler -check-only' 
       
-    test-epoch_stake_integration_test:
-      resource_class: large
-      docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-        auth:
-          username: _json_key
-          password: $JSON_GCLOUD_CREDENTIALS
-      steps:
-          - checkout
-          - run:
-              name: Check .circleci Render
-              command: make check-render-circleci
-          - run:
-              name: Build Haskell
-              command: source ~/.profile && make kademlia
-          - run:
-              name: Build OCaml
-              command: eval `opam config env` && DUNE_PROFILE=test make build 2>&1 | tee /tmp/buildocaml.log
-            
-          - run:
-              name: Running test - Epoch Stake Test | full-test
-              command: source ~/.profile && source scripts/test_all.sh && cd src/ && CODA_CONSENSUS_MECHANISM=proof_of_stake CODA_SLOT_INTERVAL=1000 CODA_UNFORKABLE_TRANSITION_COUNT=2 CODA_PROBABLE_SLOTS_PER_TRANSITION_COUNT=2 'run_integration_test' 'full-test' 
-      
 
 workflows:
     version: 2
@@ -271,8 +248,6 @@ workflows:
             - test-all_sig_integration_tests
             
             - test-all_stake_integration_tests
-            
-            - test-epoch_stake_integration_test
             
             - test-withsnark
             - test-unit-test
