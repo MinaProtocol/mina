@@ -129,6 +129,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   (* TODO: DON'T LAND; FOR NOW JUST PASS SO WE CAN TEST CI *)
   (* failwith "TODO" *)
   return ()
+
 (*  (* No proof emitted by the parallel scan at the begining *)
   assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
   let receiver =
@@ -282,4 +283,3 @@ let command (module Kernel : Kernel_intf) =
   let open Async in
   Command.async_spec ~summary:"Full coda end-to-end test" Command.Spec.empty
     (fun () -> run_test (module Kernel) )
-
