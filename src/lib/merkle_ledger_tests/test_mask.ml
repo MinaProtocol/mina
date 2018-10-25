@@ -80,7 +80,8 @@ let%test_module "Test mask connected to underlying Merkle tree" =
           mask addr =
         let root = Mask.Attached.Addr.root () in
         let rec test_hashes_at_address addr =
-          (not check_hash_in_mask || Mask.Attached.address_in_mask mask addr)
+          ( not check_hash_in_mask
+          || Mask.Attached.For_testing.address_in_mask mask addr )
           &&
           let maybe_mask_hash = Mask.Attached.get_hash mask addr in
           Option.is_some maybe_mask_hash
@@ -132,10 +133,15 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* set to mask *)
             Mask.Attached.set attached_mask dummy_location dummy_account ;
             (* verify account is in mask *)
-            if Mask.Attached.location_in_mask attached_mask dummy_location then (
+            if
+              Mask.Attached.For_testing.location_in_mask attached_mask
+                dummy_location
+            then (
               Maskable.set maskable dummy_location dummy_account ;
               (* verify account pruned from mask *)
-              not (Mask.Attached.location_in_mask attached_mask dummy_location) )
+              not
+                (Mask.Attached.For_testing.location_in_mask attached_mask
+                   dummy_location) )
             else false )
 
       let%test "commit puts mask contents in parent, flushes mask" =
@@ -144,10 +150,15 @@ let%test_module "Test mask connected to underlying Merkle tree" =
             (* set to mask *)
             Mask.Attached.set attached_mask dummy_location dummy_account ;
             (* verify account is in mask *)
-            if Mask.Attached.location_in_mask attached_mask dummy_location then (
+            if
+              Mask.Attached.For_testing.location_in_mask attached_mask
+                dummy_location
+            then (
               Mask.Attached.commit attached_mask ;
               (* verify account no longer in mask but is in parent *)
-              not (Mask.Attached.location_in_mask attached_mask dummy_location)
+              not
+                (Mask.Attached.For_testing.location_in_mask attached_mask
+                   dummy_location)
               && Option.is_some (Maskable.get maskable dummy_location) )
             else false )
 

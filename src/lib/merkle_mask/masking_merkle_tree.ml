@@ -44,8 +44,8 @@ struct
 
     module Path = Base.Path
     module Db_error = Base.Db_error
-    module For_tests = Base.For_tests
     module Addr = Location.Addr
+    module For_tests = Base.For_tests
 
     let create () =
       failwith
@@ -57,7 +57,7 @@ struct
 
     let get_parent t = Option.value_exn t.parent
 
-    (* should never raise an exception *)
+    (* should never raise an exception, types enforce parent exists *)
 
     let has_parent t = Option.is_some t.parent
 
@@ -82,9 +82,6 @@ struct
       match find_account t location with
       | Some account -> Some account
       | None -> Base.get (get_parent t) location
-
-    (* for tests, observe whether location is in mask *)
-    let location_in_mask t location = Option.is_some (find_account t location)
 
     (* given a Merkle path given by the mask parent and an account address, calculate addresses and hash for each node affected 
      by the account hash; that is, along the path from the account address to root
@@ -170,8 +167,6 @@ struct
           Some hash
         with _ -> None
 
-    let address_in_mask t addr = Option.is_some (find_hash t addr)
-
     (* batch operations
      TODO: rely on availability of batch operations in Base for speed
        *)
@@ -206,6 +201,13 @@ struct
       { t with
         account_tbl= Location.Table.copy t.account_tbl
       ; hash_tbl= Addr.Table.copy t.hash_tbl }
+
+    module For_testing = struct
+      let location_in_mask t location =
+        Option.is_some (find_account t location)
+
+      let address_in_mask t addr = Option.is_some (find_hash t addr)
+    end
 
     (* types/modules/operations/values we delegate to parent *)
 
