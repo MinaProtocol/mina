@@ -94,7 +94,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     in
     Deferred.any [after (Time_ns.Span.of_min timeout); go ()]
   in
-  let _balance_change_or_timeout ~initial_receiver_balance receiver_pk =
+  let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
     let cond t =
       match Run.get_balance t receiver_pk with
       | Some b when not (Currency.Balance.equal b initial_receiver_balance) ->
@@ -103,7 +103,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
     in
     wait_until_cond ~f:cond ~timeout:3.
   in
-  let _assert_balance pk amount =
+  let assert_balance pk amount =
     match Run.get_balance coda pk with
     | Some balance ->
         if not (Currency.Balance.equal balance amount) then
@@ -126,11 +126,7 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   Run.run_snark_worker ~log ~client_port run_snark_worker ;
   (* Let the system settle *)
   let%bind () = Async.after (Time.Span.of_ms 100.) in
-  (* TODO: DON'T LAND; FOR NOW JUST PASS SO WE CAN TEST CI *)
-  (* failwith "TODO" *)
-  return ()
-
-(*  (* No proof emitted by the parallel scan at the begining *)
+  (* No proof emitted by the parallel scan at the begining *)
   assert (Option.is_none @@ Run.For_tests.ledger_proof coda) ;
   let receiver =
     Genesis_ledger.find_new_account_record_exn
@@ -276,7 +272,6 @@ let run_test (module Kernel : Kernel_intf) : unit Deferred.t =
   else
     let%bind _ = test_multiple_txns accounts other_accounts 3. in
     test_duplicate_txns sender_keypair.private_key
-    *)
 
 let command (module Kernel : Kernel_intf) =
   let open Core in
