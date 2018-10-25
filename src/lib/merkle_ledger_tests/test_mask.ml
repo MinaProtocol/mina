@@ -150,6 +150,18 @@ let%test_module "Test mask connected to underlying Merkle tree" =
               not (Mask.Attached.location_in_mask attached_mask dummy_location)
               && Option.is_some (Maskable.get maskable dummy_location) )
             else false )
+
+      let%test "register and unregister mask" =
+        Test.with_instances (fun maskable mask ->
+            let (attached_mask : Mask.Attached.t) =
+              Maskable.register_mask maskable mask
+            in
+            try
+              let (_unattached_mask : Mask.t) =
+                Maskable.unregister_mask_exn attached_mask
+              in
+              true
+            with Failure _ -> false )
     end
 
     module type Depth_S = sig

@@ -31,7 +31,9 @@ struct
     attached_mask
 
   let unregister_mask_exn mask =
-    match List.findi !mask_children ~f:(fun _ndx elt -> elt = mask) with
+    match
+      List.findi !mask_children ~f:(fun _ndx elt -> phys_equal elt mask)
+    with
     | None -> failwith "unregister_mask: no such registered mask"
     | Some (ndx, _mask) ->
         let head, tail = List.split_n !mask_children ndx in
