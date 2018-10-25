@@ -142,37 +142,24 @@ with the hashes in the bottomost N-1 internal nodes).
 *)
 
 module Make
-    (Addr : Merkle_address.S) (Account : sig
-        type t [@@deriving bin_io, sexp]
-    end) (Hash : sig
-      type t [@@deriving bin_io, sexp, eq]
-
-      include Merkle_ledger.Intf.Hash
-              with type account := Account.t
-               and type t := t
-    end) (Root_hash : sig
-      type t [@@deriving eq, sexp]
-
-      val to_hash : t -> Hash.t
-    end)
-    (MT : Merkle_ledger.Syncable_intf.S
-          with type hash := Hash.t
-           and type root_hash := Root_hash.t
-           and type addr := Addr.t
-           and type account := Account.t) (Subtree_height : sig
+    (MT : Coda_spec.Ledger_intf.S) (Subtree_height : sig
         val subtree_height : int
     end) :
   S
   with type merkle_tree := MT.t
-   and type hash := Hash.t
-   and type root_hash := Root_hash.t
-   and type addr := Addr.t
-   and type merkle_path := MT.path
-   and type account := Account.t =
+   and type hash := MT.Hash.t
+   and type root_hash := MT.Root_hash.t
+   and type addr := MT.Address.t
+   and type merkle_path := MT.Path.t
+   and type account := MT.Account.t =
 struct
+  open MT
+
   type diff = unit
 
   type index = int
+
+  module Addr = Address
 
   (* TODO #434: This is a waste of memory. *)
   module Valid :
@@ -194,7 +181,7 @@ struct
         match dirs with
         | d :: ds -> (
             let accessor =
-              match d with Direction.Left -> fst | Direction.Right -> snd
+              match d with Path.Direction.Left -> fst | Right -> snd
             in
             match !node with
             | Leaf (Some (Fresh, _)) ->
@@ -243,7 +230,7 @@ struct
         match dirs with
         | d :: ds -> (
             let accessor =
-              match d with Direction.Left -> fst | Direction.Right -> snd
+              match d with Path.Direction.Left -> fst | Right -> snd
             in
             match !node with
             | Leaf _ -> None
@@ -288,7 +275,7 @@ struct
           (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
           let content_root_addr =
             funpow (MT.depth - height)
-              (fun a -> Addr.child_exn a Direction.Left)
+              (fun a -> Addr.child_exn a Path.Direction.Left)
               (Addr.root ())
           in
           Num_accounts (len, MT.get_inner_hash_at_addr_exn mt content_root_addr)
@@ -384,7 +371,7 @@ struct
     match children with
     | [(l1, h1); (l2, h2)] ->
         let (l1, h1), (l2, h2) =
-          if List.last_exn (Addr.dirs_from_root l1) = Direction.Left then
+          if List.last_exn (Addr.dirs_from_root l1) = Path.Direction.Left then
             ((l1, h1), (l2, h2))
           else ((l2, h2), (l1, h1))
         in
@@ -405,7 +392,7 @@ struct
     let rec go prev ctr =
       if ctr = h then prev else go (Hash.merge ~height:ctr prev prev) (ctr + 1)
     in
-    go Hash.empty_account 0
+    go (Hash.of_digest Account.empty_hash) 0
 
   let complete_with_empties hash start_height result_height =
     let rec go cur_empty prev_hash height =
@@ -425,12 +412,17 @@ struct
     else (
       expect_children t addr exp_hash ;
       Linear_pipe.write_without_pushback t.queries
-        (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Left)) ;
+        ( desired_root_exn t
+        , What_hash (Addr.child_exn addr Path.Direction.Left) ) ;
       Linear_pipe.write_without_pushback t.queries
-        (desired_root_exn t, What_hash (Addr.child_exn addr Direction.Right)) )
+        ( desired_root_exn t
+        , What_hash (Addr.child_exn addr Path.Direction.Right) ) )
+
+  let hash_of_root_hash (rh: Root_hash.t) =
+    Hash.of_digest (rh :> Snark_params.Tick.Pedersen.Digest.t)
 
   let num_accounts t n content_hash =
-    let rh = Root_hash.to_hash (desired_root_exn t) in
+    let rh = hash_of_root_hash (desired_root_exn t) in
     let height = Int.ceil_log2 n in
     (* FIXME: bug when height=0 https://github.com/o1-labs/nanobit/issues/365 *)
     if not (Hash.equal (complete_with_empties content_hash height MT.depth) rh)
@@ -493,7 +485,7 @@ struct
       (`Target_changed (t.desired_root, h)) ;
     t.validity_listener <- Ivar.create () ;
     t.desired_root <- Some h ;
-    Valid.set t.validity (Addr.root ()) (Stale, Root_hash.to_hash h) |> ignore ;
+    Valid.set t.validity (Addr.root ()) (Stale, hash_of_root_hash h) |> ignore ;
     Linear_pipe.write_without_pushback t.queries (h, Num_accounts)
 
   let wait_until_valid t h =

@@ -6,7 +6,9 @@ open Core_kernel
 open Snark_params.Tick
 open Coda_spec
 
-module Schnorr (Message : Signature_intf.Message.S) : Signature_intf.S with module Message = Message = struct
+module Schnorr (Message : Signature_intf.Message.S) :
+  Signature_intf.S with module Message = Message =
+struct
   type 'a shifted = (module Inner_curve.Checked.Shifted.S with type t = 'a)
 
   module Message = Message
@@ -53,7 +55,9 @@ module Schnorr (Message : Signature_intf.Message.S) : Signature_intf.S with modu
       else
         let acc = Inner_curve.double acc in
         let acc =
-          match (Inner_curve.Scalar.test_bit sp i, Inner_curve.Scalar.test_bit sq i) with
+          match
+            (Inner_curve.Scalar.test_bit sp i, Inner_curve.Scalar.test_bit sq i)
+          with
           | true, false -> Inner_curve.add p acc
           | false, true -> Inner_curve.add q acc
           | true, true -> Inner_curve.add pq acc

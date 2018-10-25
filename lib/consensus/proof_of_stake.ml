@@ -23,7 +23,7 @@ module type Inputs_intf = sig
 
       val ( + ) : t -> t -> t
 
-      val ( * ) : t -> t -> t
+      val ( * ) : int -> t -> t
     end
 
     val ( < ) : t -> t -> bool
@@ -259,14 +259,14 @@ struct
         t
 
       let to_hlist {epoch; slot; seed; lock_checkpoint} =
-        Coda_base.H_list.[epoch; slot; seed; lock_checkpoint]
+        Snarky.H_list.[epoch; slot; seed; lock_checkpoint]
 
       let of_hlist :
              ( unit
              , 'epoch -> 'slot -> 'epoch_seed -> 'state_hash -> unit )
-             Coda_base.H_list.t
+             Snarky.H_list.t
           -> ('epoch, 'slot, 'epoch_seed, 'state_hash) t =
-       fun Coda_base.H_list.([epoch; slot; seed; lock_checkpoint]) ->
+       fun Snarky.H_list.([epoch; slot; seed; lock_checkpoint]) ->
         {epoch; slot; seed; lock_checkpoint}
 
       let data_spec =
@@ -411,13 +411,12 @@ struct
 
     type var = (Coda_base.Frozen_ledger_hash.var, Amount.var) t
 
-    let to_hlist {hash; total_currency} =
-      Coda_base.H_list.[hash; total_currency]
+    let to_hlist {hash; total_currency} = Snarky.H_list.[hash; total_currency]
 
     let of_hlist :
-           (unit, 'ledger_hash -> 'total_currency -> unit) Coda_base.H_list.t
+           (unit, 'ledger_hash -> 'total_currency -> unit) Snarky.H_list.t
         -> ('ledger_hash, 'total_currency) t =
-     fun Coda_base.H_list.([hash; total_currency]) -> {hash; total_currency}
+     fun Snarky.H_list.([hash; total_currency]) -> {hash; total_currency}
 
     let data_spec =
       Snark_params.Tick.Data_spec.[Coda_base.Frozen_ledger_hash.typ; Amount.typ]
@@ -478,7 +477,7 @@ struct
       t
 
     let to_hlist {ledger; seed; start_checkpoint; lock_checkpoint; length} =
-      Coda_base.H_list.[ledger; seed; start_checkpoint; lock_checkpoint; length]
+      Snarky.H_list.[ledger; seed; start_checkpoint; lock_checkpoint; length]
 
     let of_hlist :
            ( unit
@@ -488,13 +487,13 @@ struct
              -> 'protocol_state_hash
              -> 'length
              -> unit )
-           Coda_base.H_list.t
+           Snarky.H_list.t
         -> ('ledger, 'seed, 'protocol_state_hash, 'length) t =
-     fun Coda_base.H_list.([ ledger
-                           ; seed
-                           ; start_checkpoint
-                           ; lock_checkpoint
-                           ; length ]) ->
+     fun Snarky.H_list.([ ledger
+                        ; seed
+                        ; start_checkpoint
+                        ; lock_checkpoint
+                        ; length ]) ->
       {ledger; seed; start_checkpoint; lock_checkpoint; length}
 
     let data_spec =
@@ -555,8 +554,10 @@ struct
           Epoch_ledger.genesis
           (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
       ; seed= Epoch_seed.(of_hash zero)
-      ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
-      ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
+      ; start_checkpoint=
+          Coda_base.State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
+      ; lock_checkpoint=
+          Coda_base.State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
       ; length= Length.zero }
 
     let update_pair (last_data, curr_data) ~prev_epoch ~next_epoch ~next_slot
@@ -569,7 +570,9 @@ struct
           , { seed= Epoch_seed.(of_hash zero)
             ; ledger= {hash= ledger_hash; total_currency}
             ; start_checkpoint= prev_protocol_state_hash
-            ; lock_checkpoint= Coda_base.State_hash.(of_hash zero)
+            ; lock_checkpoint=
+                Coda_base.State_hash.of_hash
+                  Snark_params.Tick.Pedersen.zero_hash
             ; length= Length.zero } )
         else (last_data, curr_data)
       in
@@ -599,7 +602,9 @@ struct
               { seed= Epoch_seed.(var_of_t (of_hash zero))
               ; ledger= {hash= ledger_hash; total_currency}
               ; start_checkpoint= prev_protocol_state_hash
-              ; lock_checkpoint= Coda_base.State_hash.(var_of_t (of_hash zero))
+              ; lock_checkpoint=
+                  (let open Coda_base.State_hash in
+                  var_of_t (of_hash Snark_params.Tick.Pedersen.zero_hash))
               ; length= Length.Unpacked.var_of_value Length.zero }
             ~else_:curr_data
         in
@@ -643,12 +648,12 @@ struct
       ; proposer_vrf_result= List.init 256 ~f:(fun _ -> false) }
 
     let to_hlist {epoch; slot; proposer_vrf_result} =
-      Coda_base.H_list.[epoch; slot; proposer_vrf_result]
+      Snarky.H_list.[epoch; slot; proposer_vrf_result]
 
     let of_hlist :
-           (unit, 'epoch -> 'slot -> 'vrf_result -> unit) Coda_base.H_list.t
+           (unit, 'epoch -> 'slot -> 'vrf_result -> unit) Snarky.H_list.t
         -> ('epoch, 'slot, 'vrf_result) t =
-     fun Coda_base.H_list.([epoch; slot; proposer_vrf_result]) ->
+     fun Snarky.H_list.([epoch; slot; proposer_vrf_result]) ->
       {epoch; slot; proposer_vrf_result}
 
     let data_spec =
@@ -704,7 +709,7 @@ struct
         ; curr_slot
         ; last_epoch_data
         ; curr_epoch_data } =
-      let open Coda_base.H_list in
+      let open Snarky.H_list in
       [ length
       ; total_currency
       ; curr_epoch
@@ -721,14 +726,14 @@ struct
              -> 'epoch_data
              -> 'epoch_data
              -> unit )
-           Coda_base.H_list.t
+           Snarky.H_list.t
         -> ('length, 'amount, 'epoch, 'slot, 'epoch_data) t =
-     fun Coda_base.H_list.([ length
-                           ; total_currency
-                           ; curr_epoch
-                           ; curr_slot
-                           ; last_epoch_data
-                           ; curr_epoch_data ]) ->
+     fun Snarky.H_list.([ length
+                        ; total_currency
+                        ; curr_epoch
+                        ; curr_slot
+                        ; last_epoch_data
+                        ; curr_epoch_data ]) ->
       { length
       ; total_currency
       ; curr_epoch
@@ -893,7 +898,7 @@ struct
     in
     let%bind my_account_location =
       Coda_base.Ledger.location_of_key ledger
-        (Signature_lib.Public_key.compress keypair.public_key)
+        Signature_lib.(Public_key.compress (Keypair.public_key keypair))
     in
     let my_currency =
       Coda_base.Ledger.get ledger my_account_location
@@ -911,7 +916,9 @@ struct
           previous_consensus_state.last_epoch_data.lock_checkpoint }
     in
     let proposer_vrf_result =
-      Vrf.eval ~private_key:keypair.private_key vrf_message
+      Vrf.eval
+        ~private_key:(Signature_lib.Keypair.private_key keypair)
+        vrf_message
     in
     let%map () =
       if

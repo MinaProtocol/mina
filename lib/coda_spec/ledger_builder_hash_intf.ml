@@ -10,12 +10,15 @@ module type S = sig
   module Stable : sig
     module V1 : sig
       include Protocol_object.Full.S
+
       include Hashable_binable with type t := t
     end
   end
 
   type t = Stable.V1.t
+
   include Hashable.S with type t := t
+
   include Snarkable.S with type value := t
 
   val dummy : t

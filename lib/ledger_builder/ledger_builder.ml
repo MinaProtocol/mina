@@ -23,7 +23,8 @@ let map2_or_error xs ys ~f =
   go xs ys []
 
 module Make_completed_work
-    (Compressed_public_key : Compressed_public_key_intf) (Ledger_proof : sig
+    (Compressed_public_key : Coda_spec.Signature_intf.Public_key.Compressed.S)
+                                                                             (Ledger_proof : sig
         type t [@@deriving sexp, bin_io]
     end) (Ledger_proof_statement : sig
       type t [@@deriving sexp, bin_io, hash, compare]
@@ -86,10 +87,11 @@ module Make_diff (Inputs : sig
     with type ledger_builder_aux_hash := Ledger_builder_aux_hash.t
      and type ledger_hash := Ledger_hash.t
 
-  module Compressed_public_key : Compressed_public_key_intf
+  module Compressed_public_key :
+    Coda_spec.Signature_intf.Public_key.Compressed.Object.S
 
-  module Transaction :
-    Transaction_intf with type public_key := Compressed_public_key.t
+  module Payment :
+    Coda_spec.Transaction_intf.Payment.Object_with_valid_signature.S
 
   module Completed_work :
     Completed_work_intf
@@ -98,9 +100,9 @@ module Make_diff (Inputs : sig
      and type proof := Ledger_proof.t
 end) :
   Coda_pow.Ledger_builder_diff_intf
-  with type transaction := Inputs.Transaction.t
-   and type transaction_with_valid_signature :=
-              Inputs.Transaction.With_valid_signature.t
+  with type payment := Inputs.Payment.t
+   and type payment_with_valid_signature :=
+              Inputs.Payment.With_valid_signature.t
    and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
    and type public_key := Inputs.Compressed_public_key.t
    and type completed_work := Inputs.Completed_work.t
@@ -133,7 +135,7 @@ struct
   end
 
   type diff =
-    {completed_works: Completed_work.t list; transactions: Transaction.t list}
+    {completed_works: Completed_work.t list; transactions: Payment.t list}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
@@ -159,7 +161,7 @@ struct
   module With_valid_signatures_and_proofs = struct
     type diff =
       { completed_works: Completed_work.Checked.t list
-      ; transactions: Transaction.With_valid_signature.t list }
+      ; transactions: Payment.With_valid_signature.t list }
     [@@deriving sexp]
 
     type diff_with_at_most_two_coinbase =
@@ -193,7 +195,7 @@ struct
   let forget_diff
       {With_valid_signatures_and_proofs.completed_works; transactions} =
     { completed_works= List.map ~f:Completed_work.forget completed_works
-    ; transactions= (transactions :> Transaction.t list) }
+    ; transactions= (transactions :> Payment.t list) }
 
   let forget_work_opt = Option.map ~f:Completed_work.forget
 
@@ -245,8 +247,8 @@ module Make (Inputs : Inputs.S) : sig
            and type ledger_builder_hash := Inputs.Ledger_builder_hash.t
            and type public_key := Inputs.Compressed_public_key.t
            and type ledger := Inputs.Ledger.t
-           and type transaction_with_valid_signature :=
-                      Inputs.Transaction.With_valid_signature.t
+           and type valid_payment :=
+                      Inputs.Transaction.Payment.With_valid_signature.t
            and type statement := Inputs.Completed_work.Statement.t
            and type completed_work := Inputs.Completed_work.Checked.t
            and type ledger_proof := Inputs.Ledger_proof.t
@@ -255,14 +257,17 @@ module Make (Inputs : Inputs.S) : sig
            and type ledger_proof_statement := Inputs.Ledger_proof_statement.t
            and type ledger_proof_statement_set :=
                       Inputs.Ledger_proof_statement.Set.t
-           and type super_transaction := Inputs.Super_transaction.t
+           and type transaction := Inputs.Transaction.t
 end = struct
   open Inputs
+  module Coinbase = Transaction.Coinbase
+  module Fee_transfer = Transaction.Fee_transfer
+  module Payment = Transaction.Payment
 
   type 'a with_statement = 'a * Ledger_proof_statement.t
   [@@deriving sexp, bin_io]
 
-  module Super_transaction_with_witness = struct
+  module Transaction_with_witness = struct
     (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
     type t =
       { transaction_with_info: Ledger.Undo.t
@@ -279,7 +284,7 @@ end = struct
 
   type job =
     ( Ledger_proof.t with_statement
-    , Super_transaction_with_witness.t )
+    , Transaction_with_witness.t )
     Parallel_scan.Available_job.t
   [@@deriving sexp_of]
 
@@ -292,7 +297,7 @@ end = struct
     module T = struct
       type t =
         ( Ledger_proof.t with_statement
-        , Super_transaction_with_witness.t )
+        , Transaction_with_witness.t )
         Parallel_scan.State.t
       [@@deriving sexp, bin_io]
     end
@@ -302,7 +307,7 @@ end = struct
     let hash_to_string scan_state =
       ( Parallel_scan.State.hash scan_state
           (Binable.to_string (module Snark_with_statement))
-          (Binable.to_string (module Super_transaction_with_witness))
+          (Binable.to_string (module Transaction_with_witness))
         :> string )
 
     let hash t = Ledger_builder_aux_hash.of_bytes (hash_to_string t)
@@ -332,7 +337,7 @@ end = struct
                 | Base None -> acc_statement
                 | Base
                     (Some
-                      { Super_transaction_with_witness.transaction_with_info
+                      { Transaction_with_witness.transaction_with_info
                       ; statement
                       ; witness }) ->
                     let source =
@@ -341,11 +346,11 @@ end = struct
                     in
                     let transaction =
                       ok_or_return
-                      @@ Ledger.Undo.super_transaction transaction_with_info
+                      @@ Ledger.Undo.transaction transaction_with_info
                     in
                     let after =
                       Or_error.try_with (fun () ->
-                          Sparse_ledger.apply_super_transaction_exn witness
+                          Sparse_ledger.apply_transaction_exn witness
                             transaction )
                       |> ok_or_return
                     in
@@ -357,11 +362,10 @@ end = struct
                       { Ledger_proof_statement.source
                       ; target
                       ; fee_excess=
-                          ok_or_return
-                            (Super_transaction.fee_excess transaction)
+                          ok_or_return (Transaction.fee_excess transaction)
                       ; supply_increase=
                           ok_or_return
-                            (Super_transaction.supply_increase transaction)
+                            (Transaction.supply_increase transaction)
                       ; proof_type= `Base }
                     in
                     if
@@ -445,7 +449,7 @@ end = struct
       let module A = Parallel_scan.Available_job in
       let module L = Ledger_proof_statement in
       let canonical_statement_of_job = function
-        | A.Base {Super_transaction_with_witness.statement; _} -> statement
+        | A.Base {Transaction_with_witness.statement; _} -> statement
         | A.Merge ((_, s1), (_, s2)) ->
             Ledger_proof_statement.merge s1 s2 |> Or_error.ok_exn
       in
@@ -454,7 +458,7 @@ end = struct
         | A.Base d ->
             let transaction =
               Or_error.ok_exn
-              @@ Ledger.Undo.super_transaction d.transaction_with_info
+              @@ Ledger.Undo.transaction d.transaction_with_info
             in
             Snark_work_lib.Work.Single.Spec.Transition
               (d.statement, transaction, d.witness)
@@ -704,14 +708,14 @@ end = struct
                | None -> return (Or_error.error_string "Fee overflow")
                | Some res -> res )) )
 
-  let apply_super_transaction_and_get_statement ledger s =
+  let apply_transaction_and_get_statement ledger s =
     let open Or_error.Let_syntax in
-    let%bind fee_excess = Super_transaction.fee_excess s
-    and supply_increase = Super_transaction.supply_increase s in
+    let%bind fee_excess = Transaction.fee_excess s
+    and supply_increase = Transaction.supply_increase s in
     let source =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
-    let%map undo = Ledger.apply_super_transaction ledger s in
+    let%map undo = Ledger.apply_transaction ledger s in
     ( undo
     , { Ledger_proof_statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
@@ -719,28 +723,26 @@ end = struct
       ; supply_increase
       ; proof_type= `Base } )
 
-  let apply_super_transaction_and_get_witness ledger s =
+  let apply_transaction_and_get_witness ledger s =
     let public_keys = function
-      | Super_transaction.Fee_transfer t -> Fee_transfer.receivers t
-      | Transaction t ->
-          let t = (t :> Transaction.t) in
-          [Transaction.sender t; Transaction.receiver t]
+      | Transaction.Fee_transfer t -> Transaction.Fee_transfer.receivers t
+      | Valid_payment t ->
+          let t = (t :> Transaction.Payment.t) in
+          Transaction.Payment.public_keys t
       | Coinbase c ->
           let ft_receivers =
             Option.value_map c.fee_transfer ~default:[] ~f:(fun ft ->
-                Fee_transfer.receivers (Fee_transfer.of_single ft) )
+                Transaction.Fee_transfer.receivers
+                  (Transaction.Fee_transfer.of_single ft) )
           in
           c.proposer :: ft_receivers
     in
     let open Or_error.Let_syntax in
     let witness = Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) in
-    let%map undo, statement =
-      apply_super_transaction_and_get_statement ledger s
-    in
+    let%map undo, statement = apply_transaction_and_get_statement ledger s in
     ( undo
-    , { Super_transaction_with_witness.transaction_with_info= undo
-      ; witness
-      ; statement } )
+    , {Transaction_with_witness.transaction_with_info= undo; witness; statement}
+    )
 
   let update_ledger_and_get_statements ledger ts =
     let undo_transactions undos =
@@ -752,7 +754,7 @@ end = struct
             { Result_with_rollback.result= Ok (List.rev acc)
             ; rollback= Call (fun () -> undo_transactions processed) }
       | t :: ts ->
-        match apply_super_transaction_and_get_witness ledger t with
+        match apply_transaction_and_get_witness ledger t with
         | Error e ->
             undo_transactions processed ;
             Result_with_rollback.error e
@@ -792,7 +794,7 @@ end = struct
             Option.value_exn (Fee.Unsigned.add f1 f2) )
         (* TODO: This creates a weird incentive to have a small public_key *)
         |> Map.to_alist ~key_order:`Increasing
-        |> Fee_transfer.of_single_list )
+        |> Transaction.Fee_transfer.of_single_list )
 
   (*A Coinbase is a single transaction that accommodates the coinbase amount
   and a fee transfer for the work required to add the coinbase. Unlike a 
@@ -862,11 +864,11 @@ end = struct
         let amt = Currency.Amount.of_fee w1.fee in
         two_parts amt (Some w1) w2
 
-  let fee_remainder (payments: Transaction.With_valid_signature.t list)
+  let fee_remainder (payments: Payment.With_valid_signature.t list)
       completed_works =
     let open Or_error.Let_syntax in
     let%bind budget =
-      sum_fees payments ~f:(fun t -> Transaction.fee (t :> Transaction.t))
+      sum_fees payments ~f:(fun t -> Payment.fee (t :> Payment.t))
     in
     let%bind work_fee =
       sum_fees completed_works ~f:(fun {Completed_work.fee; _} -> fee)
@@ -879,7 +881,7 @@ end = struct
       let%map payments' =
         List.fold_until diff.transactions ~init:[]
           ~f:(fun acc t ->
-            match Transaction.check t with
+            match Payment.check t with
             | Some t -> Continue (t :: acc)
             | None ->
                 (* TODO: punish *)
@@ -908,13 +910,13 @@ end = struct
       create_fee_transfers diff.completed_works delta t.public_key
       |> Result_with_rollback.of_or_error
     in
-    let super_transactions =
-      List.map payments ~f:(fun t -> Super_transaction.Transaction t)
-      @ List.map coinbase ~f:(fun t -> Super_transaction.Coinbase t)
-      @ List.map fee_transfers ~f:(fun t -> Super_transaction.Fee_transfer t)
+    let transactions =
+      List.map payments ~f:(fun t -> Transaction.Valid_payment t)
+      @ List.map coinbase ~f:(fun t -> Transaction.Coinbase t)
+      @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
     in
     let%map new_data =
-      update_ledger_and_get_statements t.ledger super_transactions
+      update_ledger_and_get_statements t.ledger transactions
     in
     (new_data, diff.completed_works, coinbase_work)
 
@@ -1003,16 +1005,15 @@ end = struct
     let fee_transfers =
       Or_error.ok_exn (create_fee_transfers txn_works delta t.public_key)
     in
-    let super_transactions =
-      List.map payments ~f:(fun t -> Super_transaction.Transaction t)
-      @ List.map coinbase_parts ~f:(fun t -> Super_transaction.Coinbase t)
-      @ List.map fee_transfers ~f:(fun t -> Super_transaction.Fee_transfer t)
+    let transactions =
+      List.map payments ~f:(fun t -> Transaction.Valid_payment t)
+      @ List.map coinbase_parts ~f:(fun t -> Transaction.Coinbase t)
+      @ List.map fee_transfers ~f:(fun t -> Transaction.Fee_transfer t)
     in
     let new_data =
-      List.map super_transactions ~f:(fun s ->
+      List.map transactions ~f:(fun s ->
           let _undo, t =
-            Or_error.ok_exn
-              (apply_super_transaction_and_get_witness t.ledger s)
+            Or_error.ok_exn (apply_transaction_and_get_witness t.ledger s)
           in
           t )
     in
@@ -1120,7 +1121,7 @@ end = struct
       ; queue_consumption: Queue_consumption.t
       ; available_queue_space: int
       ; work_done: int
-      ; transactions: (Transaction.With_valid_signature.t * Ledger.Undo.t) list
+      ; transactions: (Payment.With_valid_signature.t * Ledger.Undo.t) list
       ; completed_works: Completed_work.Checked.t list
       ; coinbase_parts:
           ( Completed_work.Checked.t Ledger_builder_diff.At_most_two.t
@@ -1139,16 +1140,15 @@ end = struct
 
     let coinbase_added t = t.queue_consumption.coinbase_part_count > 0
 
-    let add_transaction t ((txv: Transaction.With_valid_signature.t), undo) =
-      let tx = (txv :> Transaction.t) in
+    let add_transaction t ((txv: Payment.With_valid_signature.t), undo) =
+      let tx = (txv :> Payment.t) in
       let open Or_error.Let_syntax in
       let%bind budget =
         option "overflow"
-          (Fee.Signed.add t.budget
-             (Fee.Signed.of_unsigned @@ Transaction.fee tx))
+          (Fee.Signed.add t.budget (Fee.Signed.of_unsigned @@ Payment.fee tx))
       in
       let q =
-        if Currency.Fee.equal (Transaction.fee tx) Currency.Fee.zero then
+        if Currency.Fee.equal (Payment.fee tx) Currency.Fee.zero then
           t.queue_consumption
         else Queue_consumption.add_fee_transfer t.queue_consumption t.self_pk
       in
@@ -1187,10 +1187,10 @@ end = struct
         in
         {t with queue_consumption; coinbase_parts}
 
-    let enough_work_for_txn t (txv: Transaction.With_valid_signature.t) =
-      let tx = (txv :> Transaction.t) in
+    let enough_work_for_txn t (txv: Payment.With_valid_signature.t) =
+      let tx = (txv :> Payment.t) in
       let q =
-        if Currency.Fee.equal (Transaction.fee tx) Currency.Fee.zero then
+        if Currency.Fee.equal (Payment.fee tx) Currency.Fee.zero then
           t.queue_consumption
         else Queue_consumption.add_fee_transfer t.queue_consumption t.self_pk
       in
@@ -1261,7 +1261,7 @@ end = struct
     type t =
       { resources: Resources.t
       ; work_to_do: Completed_work.Statement.t Sequence.t
-      ; txns_to_include: Transaction.With_valid_signature.t Sequence.t }
+      ; txns_to_include: Payment.With_valid_signature.t Sequence.t }
   end
 
   let add_work work resources get_completed_work =
@@ -1282,8 +1282,8 @@ end = struct
         Resources.add_work_for_coinbase resources w
     | None -> Error (Error.of_string "Work not found")
 
-  let add_transaction ledger txn resources =
-    match Ledger.apply_super_transaction ledger (Transaction txn) with
+  let add_payment ledger txn resources =
+    match Ledger.apply_transaction ledger (Valid_payment txn) with
     | Error _ -> Ok resources
     | Ok undo ->
       match Resources.add_transaction resources (txn, undo) with
@@ -1307,10 +1307,10 @@ end = struct
 
   let rec check_resources_add_txns logger get_completed_work ledger
       (valid: Resource_util.t) (current: Resource_util.t) =
-    let add_transaction t ts ws =
+    let add_payment t ts ws =
       let r_transaction =
         log_error_and_return_value logger
-          (add_transaction ledger t current.resources)
+          (add_payment ledger t current.resources)
           current.resources
       in
       let new_res_util =
@@ -1332,13 +1332,13 @@ end = struct
     with
     | None, None, _ ->
         (valid, txns_not_included valid.resources current.resources)
-    | None, Some (t, ts), true -> add_transaction t ts Sequence.empty
+    | None, Some (t, ts), true -> add_payment t ts Sequence.empty
     | Some (w, ws), Some (t, ts), true -> (
         let enough_work_added_to_include_one_more =
           Resources.enough_work_for_txn current.resources t
         in
         if enough_work_added_to_include_one_more then
-          add_transaction t ts (Sequence.append (Sequence.singleton w) ws)
+          add_payment t ts (Sequence.append (Sequence.singleton w) ws)
         else
           match add_work w current.resources get_completed_work with
           | Ok r_work ->
@@ -1556,7 +1556,7 @@ end = struct
           Second (make_diff_with_two res1, make_diff_with_one res2)
 
   let create_diff t ~logger
-      ~(transactions_by_fee: Transaction.With_valid_signature.t Sequence.t)
+      ~(transactions_by_fee: Payment.With_valid_signature.t Sequence.t)
       ~(get_completed_work:
          Completed_work.Statement.t -> Completed_work.Checked.t option) =
     (* TODO: Don't copy *)
@@ -1585,7 +1585,10 @@ let%test_module "test" =
   ( module struct
     module Test_input1 = struct
       open Coda_pow
-      module Compressed_public_key = String
+
+      module Compressed_public_key = struct
+        include String
+      end
 
       module Sok_message = struct
         module Digest = Unit
@@ -1594,7 +1597,9 @@ let%test_module "test" =
         let create ~fee:_ ~prover:_ = ()
       end
 
-      module Transaction = struct
+      module Payment = struct
+        module Compressed_public_key = Compressed_public_key
+
         type fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
         type txn_amt = int [@@deriving sexp, bin_io, compare, eq]
@@ -1607,8 +1612,12 @@ let%test_module "test" =
 
         include T
 
+        let seeded_compare ~seed:_ = compare
+
         module With_valid_signature = struct
           type t = T.t [@@deriving sexp, bin_io, compare, eq]
+
+          let seeded_compare ~seed:_ = compare
         end
 
         let check : t -> With_valid_signature.t option = fun i -> Some i
@@ -1619,9 +1628,13 @@ let%test_module "test" =
         let sender _ = "S"
 
         let receiver _ = "R"
+
+        let public_keys t = [sender t; receiver t]
       end
 
       module Fee_transfer = struct
+        module Compressed_public_key = Compressed_public_key
+
         type public_key = Compressed_public_key.t
         [@@deriving sexp, bin_io, compare, eq]
 
@@ -1632,7 +1645,7 @@ let%test_module "test" =
         type t = One of single | Two of single * single
         [@@deriving bin_io, sexp, compare, eq]
 
-        let to_list = function One x -> [x] | Two (x, y) -> [x; y]
+        let to_single_list = function One x -> [x] | Two (x, y) -> [x; y]
 
         let of_single t = One t
 
@@ -1655,10 +1668,18 @@ let%test_module "test" =
         let fee_excess_int t =
           Fee.Unsigned.to_int (Or_error.ok_exn @@ fee_excess t)
 
-        let receivers t = List.map (to_list t) ~f:(fun (pk, _) -> pk)
+        let fee_excess =
+          Fn.compose
+            (Or_error.map ~f:(fun x ->
+                 Fee.Signed.create ~sgn:Sgn.Neg ~magnitude:x ))
+            fee_excess
+
+        let receivers t = List.map (to_single_list t) ~f:(fun (pk, _) -> pk)
       end
 
       module Coinbase = struct
+        module Fee_transfer = Fee_transfer
+
         type public_key = string [@@deriving sexp, bin_io, compare, eq]
 
         type fee_transfer = Fee_transfer.single
@@ -1694,8 +1715,13 @@ let%test_module "test" =
             Or_error.error_string "Coinbase.create: fee transfer was too high"
       end
 
-      module Super_transaction = struct
-        type valid_transaction = Transaction.With_valid_signature.t
+      module Transaction = struct
+        module Compressed_public_key = Compressed_public_key
+        module Coinbase = Coinbase
+        module Fee_transfer = Fee_transfer
+        module Payment = Payment
+
+        type valid_payment = Payment.With_valid_signature.t
         [@@deriving sexp, bin_io, compare, eq]
 
         type fee_transfer = Fee_transfer.t
@@ -1706,24 +1732,21 @@ let%test_module "test" =
         type unsigned_fee = Fee.Unsigned.t [@@deriving sexp, bin_io, compare]
 
         type t =
-          | Transaction of valid_transaction
+          | Valid_payment of valid_payment
           | Fee_transfer of fee_transfer
           | Coinbase of coinbase
         [@@deriving sexp, bin_io, compare, eq]
 
         let fee_excess : t -> Fee.Signed.t Or_error.t =
          fun t ->
-          let open Or_error.Let_syntax in
           match t with
-          | Transaction t' ->
-              Ok (Currency.Fee.Signed.of_unsigned (Transaction.fee t'))
-          | Fee_transfer f ->
-              let%map fee = Fee_transfer.fee_excess f in
-              Currency.Fee.Signed.negate (Currency.Fee.Signed.of_unsigned fee)
+          | Valid_payment t' ->
+              Ok (Currency.Fee.Signed.of_unsigned (Payment.fee t'))
+          | Fee_transfer f -> Fee_transfer.fee_excess f
           | Coinbase t -> Coinbase.fee_excess t
 
         let supply_increase = function
-          | Transaction _ | Fee_transfer _ -> Ok Currency.Amount.zero
+          | Valid_payment _ | Fee_transfer _ -> Ok Currency.Amount.zero
           | Coinbase t -> Coinbase.supply_increase t
       end
 
@@ -1818,12 +1841,12 @@ let%test_module "test" =
 
         type ledger_hash = Ledger_hash.t
 
-        type super_transaction = Super_transaction.t [@@deriving sexp, bin_io]
+        type transaction = Transaction.t [@@deriving sexp, bin_io]
 
         module Undo = struct
-          type t = super_transaction [@@deriving sexp, bin_io]
+          type t = transaction [@@deriving sexp, bin_io]
 
-          let super_transaction t = Ok t
+          let transaction t = Ok t
         end
 
         let create : unit -> t = fun () -> ref 0
@@ -1834,32 +1857,32 @@ let%test_module "test" =
 
         let num_accounts _ = 0
 
-        let apply_super_transaction : t -> Undo.t -> Undo.t Or_error.t =
+        let apply_transaction : t -> Undo.t -> Undo.t Or_error.t =
          fun t s ->
           match s with
-          | Transaction t' ->
+          | Valid_payment t' ->
               t := !t + fst t' ;
-              Or_error.return (Super_transaction.Transaction t')
+              Or_error.return (Transaction.Valid_payment t')
           | Fee_transfer f ->
               let t' = Fee_transfer.fee_excess_int f in
               t := !t + t' ;
-              Or_error.return (Super_transaction.Fee_transfer f)
+              Or_error.return (Transaction.Fee_transfer f)
           | Coinbase c ->
               t := !t + Currency.Amount.to_int c.amount ;
-              Or_error.return (Super_transaction.Coinbase c)
+              Or_error.return (Transaction.Coinbase c)
 
-        let undo_super_transaction : t -> super_transaction -> unit Or_error.t =
+        let undo_transaction : t -> transaction -> unit Or_error.t =
          fun t s ->
           let v =
             match s with
-            | Transaction t' -> fst t'
+            | Valid_payment t' -> fst t'
             | Fee_transfer f -> Fee_transfer.fee_excess_int f
             | Coinbase c -> Currency.Amount.to_int c.amount
           in
           t := !t - v ;
           Or_error.return ()
 
-        let undo t (txn: Undo.t) = undo_super_transaction t txn
+        let undo t (txn: Undo.t) = undo_transaction t txn
       end
 
       module Sparse_ledger = struct
@@ -1871,9 +1894,9 @@ let%test_module "test" =
 
         let merkle_root t = Ledger.merkle_root (ref t)
 
-        let apply_super_transaction_exn t txn =
+        let apply_transaction_exn t txn =
           let l : Ledger.t = ref t in
-          Or_error.ok_exn (Ledger.apply_super_transaction l txn) |> ignore ;
+          Or_error.ok_exn (Ledger.apply_transaction l txn) |> ignore ;
           !l
       end
 
@@ -1948,10 +1971,9 @@ let%test_module "test" =
         type completed_work_checked = Completed_work.Checked.t
         [@@deriving sexp, bin_io, compare]
 
-        type transaction = Transaction.t [@@deriving sexp, bin_io, compare]
+        type payment = Payment.t [@@deriving sexp, bin_io, compare]
 
-        type transaction_with_valid_signature =
-          Transaction.With_valid_signature.t
+        type payment_with_valid_signature = Payment.With_valid_signature.t
         [@@deriving sexp, bin_io, compare]
 
         type public_key = Compressed_public_key.t
@@ -1988,7 +2010,7 @@ let%test_module "test" =
         end
 
         type diff =
-          {completed_works: completed_work list; transactions: transaction list}
+          {completed_works: completed_work list; transactions: payment list}
         [@@deriving sexp, bin_io]
 
         type diff_with_at_most_two_coinbase =
@@ -2014,7 +2036,7 @@ let%test_module "test" =
         module With_valid_signatures_and_proofs = struct
           type diff =
             { completed_works: completed_work_checked list
-            ; transactions: transaction_with_valid_signature list }
+            ; transactions: payment_with_valid_signature list }
           [@@deriving sexp]
 
           type diff_with_at_most_two_coinbase =
@@ -2048,7 +2070,7 @@ let%test_module "test" =
         let forget_diff
             {With_valid_signatures_and_proofs.completed_works; transactions} =
           { completed_works= List.map ~f:Completed_work.forget completed_works
-          ; transactions= (transactions :> Transaction.t list) }
+          ; transactions= (transactions :> Payment.t list) }
 
         let forget_work_opt = Option.map ~f:Completed_work.forget
 

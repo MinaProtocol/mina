@@ -27,7 +27,8 @@ struct
       Tick.Pedersen.digest_fold Hash_prefix.transition_system_snark
         Fold.(
           group3 ~default:false (of_list self)
-          +> State_hash.fold (Consensus_mechanism.Protocol_state.hash state))
+          +> Consensus_mechanism.Protocol_state.Hash.fold
+               (Consensus_mechanism.Protocol_state.hash state))
 
   let embed (x: Tick.Field.t) : Tock.Field.t =
     let n = Tick.Bigint.of_field x in

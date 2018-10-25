@@ -2,6 +2,7 @@ open Snark_params.Tick
 
 module type S = sig
   module Account : Account_intf.S
+
   module Compressed_public_key : Signature_intf.Public_key.Compressed.S
 
   include Hash_intf.Full_size.S
@@ -33,6 +34,9 @@ module Frozen = struct
     module Ledger_hash : S
 
     include S
+            with module Account = Ledger_hash.Account
+             and module Compressed_public_key = Ledger_hash.
+                                                Compressed_public_key
 
     val of_ledger_hash : Ledger_hash.t -> t
   end

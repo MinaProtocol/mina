@@ -7,15 +7,23 @@ open Snark_params.Tick
 module Blockchain = struct
   module type S = sig
     module Time : Time_intf.S
+
     module Ledger_builder_hash : Ledger_builder_hash_intf.S
+
     module Frozen_ledger_hash : Ledger_hash_intf.Frozen.S
+
     module Hash : Hash_intf.Full_size.S
 
-    type ('ledger_builder_hash, 'ledger_hash, 'time) t_
+    type ('ledger_builder_hash, 'ledger_hash, 'time) t_ =
+      { ledger_builder_hash: 'ledger_builder_hash
+      ; ledger_hash: 'ledger_hash
+      ; timestamp: 'time }
     [@@deriving sexp, eq, compare]
 
     val ledger_builder_hash : ('a, _, _) t_ -> 'a
+
     val ledger_hash : (_, 'a, _) t_ -> 'a
+
     val timestamp : (_, _, 'a) t_ -> 'a
 
     type t = (Ledger_builder_hash.t, Frozen_ledger_hash.t, Time.t) t_
@@ -61,9 +69,13 @@ module Blockchain = struct
 
     val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
 
-    module Message : Signature_intf.Message.S
-    module Signature : Signature_intf.S
-      with module Message = Message
+    module Message :
+      Signature_intf.Message.S
+      with type Payload.t = t
+       and type Payload.var = var
+       and type var = var
+
+    module Signature : Signature_intf.S with module Message = Message
   end
 end
 
@@ -94,7 +106,9 @@ end
 module Protocol = struct
   module type S = sig
     module Hash : Hash_intf.Full_size.S
+
     module Blockchain_state : Blockchain.S
+
     module Consensus_state : Consensus.S
 
     type ('a, 'b, 'c) t [@@deriving bin_io, sexp]

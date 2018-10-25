@@ -25,8 +25,7 @@ end
 
 include Stable.V1
 
-let create ~receiver ~amount ~fee ~nonce =
-  {receiver; amount; fee; nonce}
+let create ~receiver ~amount ~fee ~nonce = {receiver; amount; fee; nonce}
 
 let dummy =
   { receiver= Compressed_public_key.empty
@@ -93,7 +92,9 @@ let%test_unit "to_bits" =
   let open Test_util in
   with_randomness 123456789 (fun () ->
       let input =
-        { receiver= (Private_key.create () |> Public_key.of_private_key_exn |> Public_key.compress)
+        { receiver=
+            Private_key.create () |> Public_key.of_private_key_exn
+            |> Public_key.compress
         ; amount= Amount.of_int (Random.int Int.max_value)
         ; fee= Fee.of_int (Random.int Int.max_value_30_bits)
         ; nonce= Account_nonce.random () }

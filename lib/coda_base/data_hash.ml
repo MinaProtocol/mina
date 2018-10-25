@@ -9,7 +9,10 @@ open Bitstring_lib
 open Tuple_lib
 open Fold_lib
 
-module Make_base (M : sig val length_in_bits : int end) : Hash_intf.Base.S =
+module Make_base (M : sig
+  val length_in_bits : int
+end) :
+  Hash_intf.Base.S =
 struct
   module Stable = struct
     module V1 = struct
@@ -70,7 +73,8 @@ struct
 
   let var_of_hash_unpacked unpacked =
     { digest= Pedersen.Checked.Digest.Unpacked.project unpacked
-    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list)) }
+    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list))
+    }
 
   let var_to_hash_packed {digest; _} = digest
 
@@ -146,14 +150,16 @@ module Make_full_size () : Hash_intf.Full_size.S = struct
   let if_ cond ~then_ ~else_ =
     let open Let_syntax in
     let%map digest =
-      Field.Checked.if_ cond ~then_:(var_digest then_) ~else_:(var_digest else_)
+      Field.Checked.if_ cond ~then_:(var_digest then_)
+        ~else_:(var_digest else_)
     in
     create_var ~digest ~bits:None
 end
 
 module Make_small (M : sig
   val length_in_bits : int
-end) : Hash_intf.Small.S =
+end) :
+  Hash_intf.Small.S =
 struct
   let () = assert (M.length_in_bits < Field.size_in_bits)
 

@@ -13,6 +13,7 @@ module Hash = struct
     module Account : Account_intf.S
 
     type t = private Pedersen.Digest.t
+
     include Protocol_object.Full.S with type t := t
 
     val merge : height:int -> t -> t -> t
@@ -26,23 +27,32 @@ end
 module Direction = struct
   module type S = sig
     type t = Left | Right
+
     include Equal.S with type t := t
+
     include Sexpable.S with type t := t
 
     val map : left:'a -> right:'a -> t -> 'a
 
     val to_bool : t -> bool
+
     val of_bool : bool -> t
 
     val to_int : t -> int
+
     val of_int : int -> t option
+
     val of_int_exn : int -> t
 
     val flip : t -> t
 
     val gen : t Quickcheck.Generator.t
-    val gen_var_length_list : ?start:int -> int -> t list Quickcheck.Generator.t
+
+    val gen_var_length_list :
+      ?start:int -> int -> t list Quickcheck.Generator.t
+
     val gen_list : int -> t list Quickcheck.Generator.t
+
     val shrinker : t Quickcheck.Shrinker.t
   end
 end
@@ -56,6 +66,7 @@ module Address = struct
     end
 
     include Protocol_object.Full.S with type t = Stable.V1.t
+
     include Hashable.S with type t := t
 
     val of_byte_string : string -> t
@@ -116,14 +127,17 @@ end
 module Path = struct
   module type S = sig
     module Direction : Direction.S
+
     module Hash : Hash.S
 
     module Elem : sig
       type t = Direction.t * Hash.t
+
       include Sexpable.S with type t := t
     end
 
     type t = Elem.t list
+
     include Sexpable.S with type t := t
 
     val implied_root : t -> Hash.t -> Hash.t
@@ -139,14 +153,18 @@ end
 module Base = struct
   module type S = sig
     module Depth : Depth.S
+
     module Account : Account_intf.S
+
     module Root_hash : Ledger_hash_intf.S
-    module Hash : Hash.S
-      with module Account = Account
+
+    module Hash : Hash.S with module Account = Account
+
     module Address : Address.S
-    module Path : Path.S
-      with module Hash = Hash
-       and module Direction = Address.Direction
+
+    module Path :
+      Path.S with module Hash = Hash and module Direction = Address.Direction
+
     module Location : Location.S
 
     type t
@@ -158,11 +176,20 @@ module Base = struct
       | Out_of_leaves
       | Malformed_database
 
-    val location_of_key : t -> Account.Compressed_public_key.t -> Location.t option
+    val location_of_key :
+      t -> Account.Compressed_public_key.t -> Location.t option
 
-    val get_or_create_account : t -> Account.Compressed_public_key.t -> Account.t -> ([`Added | `Existed] * Location.t, error) Result.t
+    val get_or_create_account :
+         t
+      -> Account.Compressed_public_key.t
+      -> Account.t
+      -> ([`Added | `Existed] * Location.t, error) Result.t
 
-    val get_or_create_account_exn : t -> Account.Compressed_public_key.t -> Account.t -> [`Added | `Existed] * Location.t
+    val get_or_create_account_exn :
+         t
+      -> Account.Compressed_public_key.t
+      -> Account.t
+      -> [`Added | `Existed] * Location.t
 
     val create : unit -> t
 
@@ -188,7 +215,8 @@ module Base = struct
 
     val set_inner_hash_at_addr_exn : t -> Address.t -> Hash.t -> unit
 
-    val set_all_accounts_rooted_at_exn : t -> Address.t -> Account.t list -> unit
+    val set_all_accounts_rooted_at_exn :
+      t -> Address.t -> Account.t list -> unit
 
     val index_of_key_exn : t -> Account.Compressed_public_key.t -> int
 
@@ -205,8 +233,11 @@ module Base = struct
     val copy : t -> t
 
     (* TODO: hide *)
+
     module For_tests : sig
       val get_leaf_hash_at_addr : t -> Address.t -> Hash.t
+
+      val gen_account_location : Location.t Quickcheck.Generator.t
     end
   end
 end
@@ -214,6 +245,7 @@ end
 module Base_binable = struct
   module type S = sig
     include Base.S
+
     include Binable.S with type t := t
   end
 end
@@ -244,12 +276,16 @@ module Undo = struct
 
   module type S = sig
     module Keypair : Signature_intf.Keypair.S
-    module Payment : Transaction_intf.Payment.S
-      with module Keypair = Keypair
-    module Transaction : Transaction_intf.S
-       with module Public_key = Keypair.Public_key
-      and module Payment = Payment
+
+    module Payment : Transaction_intf.Payment.S with module Keypair = Keypair
+
+    module Transaction :
+      Transaction_intf.S
+      with module Public_key = Keypair.Public_key
+       and module Payment = Payment
+
     module Receipt_chain_hash : Account_intf.Receipt_chain_hash.S
+
     module Root_hash : Ledger_hash_intf.S
 
     type payment =
@@ -282,17 +318,21 @@ module Undo = struct
 end
 
 module type S = sig
-  include Base.S
+  include Base_binable.S
 
-  module Keypair : Signature_intf.Keypair.S
+  module Keypair :
+    Signature_intf.Keypair.S
     with module Public_key.Compressed = Account.Compressed_public_key
-  module Payment : Transaction_intf.Payment.S
-    with module Keypair = Keypair
-  module Transaction : Transaction_intf.S
-     with module Public_key = Keypair.Public_key
-      and module Payment = Payment
 
-  module Undo : Undo.S
+  module Payment : Transaction_intf.Payment.S with module Keypair = Keypair
+
+  module Transaction :
+    Transaction_intf.S
+    with module Public_key = Keypair.Public_key
+     and module Payment = Payment
+
+  module Undo :
+    Undo.S
     with module Keypair = Keypair
      and module Payment = Payment
      and module Transaction = Transaction
@@ -300,20 +340,24 @@ module type S = sig
 
   val create_empty : t -> Keypair.Public_key.Compressed.t -> Path.t * Account.t
 
-  val create_new_account_exn : t -> Keypair.Public_key.Compressed.t -> Account.t -> unit
+  val create_new_account_exn :
+    t -> Keypair.Public_key.Compressed.t -> Account.t -> unit
 
-  val apply_payment : t -> Payment.With_valid_signature.t -> Undo.payment Or_error.t
+  val apply_payment :
+    t -> Payment.With_valid_signature.t -> Undo.payment Or_error.t
 
   val apply_transaction : t -> Transaction.t -> Undo.t Or_error.t
 
   val undo : t -> Undo.t -> unit Or_error.t
 
-  val merkle_root_after_payment_exn : t -> Payment.With_valid_signature.t -> Root_hash.t
+  val merkle_root_after_payment_exn :
+    t -> Payment.With_valid_signature.t -> Root_hash.t
 end
 
 module Genesis = struct
   module type S = sig
     module Ledger : S
+
     val t : Ledger.t
   end
 end

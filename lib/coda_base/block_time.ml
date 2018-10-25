@@ -20,6 +20,7 @@ module Controller = struct
   let create () = ()
 end
 
+include Comparable.Make_binable (Stable.V1)
 include Stable.V1
 
 type t0 = t
@@ -57,7 +58,7 @@ module Span = struct
 
   let ( + ) = UInt64.Infix.( + )
 
-  let ( * ) = UInt64.Infix.( * )
+  let ( * ) x t = UInt64.Infix.( * ) (UInt64.of_int x) t
 
   let ( < ) = UInt64.( < )
 

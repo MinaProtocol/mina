@@ -2,6 +2,8 @@ open Core
 open Signature_lib
 open Coda_base
 open Snark_params
+open Coda_numbers
+module Kp = Signature_lib.Keypair
 
 (* We're just profiling, so okay to monkey-patch here *)
 module Sparse_ledger = struct
@@ -14,34 +16,40 @@ let create_ledger_and_transactions num_transitions =
   let open Tick in
   let num_accounts = 4 in
   let ledger = Ledger.create () in
-  let keys =
-    Array.init num_accounts ~f:(fun _ -> Signature_lib.Keypair.create ())
-  in
+  let keys = Array.init num_accounts ~f:(fun _ -> Kp.create ()) in
   Array.iter keys ~f:(fun k ->
-      let public_key = Public_key.compress k.public_key in
+      let public_key =
+        Public_key.compress (Signature_lib.Keypair.public_key k)
+      in
       Ledger.create_new_account_exn ledger public_key
         { public_key
         ; balance= Currency.Balance.of_int 10_000
-        ; receipt_chain_hash= Receipt.Chain_hash.empty
-        ; nonce= Account.Nonce.zero } ) ;
+        ; receipt_chain_hash= Receipt_chain_hash.empty
+        ; nonce= Account_nonce.zero } ) ;
   let txn from_kp (to_kp: Signature_lib.Keypair.t) amount fee nonce =
-    let payload : Transaction.Payload.t =
-      {receiver= Public_key.compress to_kp.public_key; fee; amount; nonce}
+    let payload : Payment.Payload.t =
+      { receiver= Public_key.compress (Signature_lib.Keypair.public_key to_kp)
+      ; fee
+      ; amount
+      ; nonce }
     in
-    Transaction.sign from_kp payload
+    Payment.sign from_kp payload
   in
   let nonces =
     Public_key.Compressed.Table.of_alist_exn
       (List.map (Array.to_list keys) ~f:(fun k ->
-           (Public_key.compress k.public_key, Account.Nonce.zero) ))
+           ( Public_key.compress (Signature_lib.Keypair.public_key k)
+           , Account_nonce.zero ) ))
   in
-  let random_transaction () : Transaction.With_valid_signature.t =
+  let random_transaction () : Payment.With_valid_signature.t =
     let sender_idx = Random.int num_accounts in
     let sender = keys.(sender_idx) in
     let receiver = keys.(Random.int num_accounts) in
-    let sender_pk = Public_key.compress sender.public_key in
+    let sender_pk =
+      Public_key.compress (Signature_lib.Keypair.public_key sender)
+    in
     let nonce = Hashtbl.find_exn nonces sender_pk in
-    Hashtbl.change nonces sender_pk ~f:(Option.map ~f:Account.Nonce.succ) ;
+    Hashtbl.change nonces sender_pk ~f:(Option.map ~f:Account_nonce.succ) ;
     let fee = Currency.Fee.of_int (1 + Random.int 100) in
     let amount = Currency.Amount.of_int (1 + Random.int 100) in
     txn sender receiver amount fee nonce
@@ -56,19 +64,20 @@ let create_ledger_and_transactions num_transitions =
         let open Currency.Fee in
         let total_fee =
           List.fold transactions ~init:zero ~f:(fun acc t ->
-              Option.value_exn (add acc (t :> Transaction.t).payload.fee) )
+              Option.value_exn (add acc (t :> Payment.t).payload.fee) )
         in
-        Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
+        Fee_transfer.One
+          (Public_key.compress (Kp.public_key keys.(0)), total_fee)
       in
       let coinbase =
         Coinbase.create ~amount:Protocols.Coda_praos.coinbase_amount
-          ~proposer:(Public_key.compress keys.(0).public_key)
+          ~proposer:(Public_key.compress (Kp.public_key keys.(0)))
           ~fee_transfer:None
         |> Or_error.ok_exn
       in
       let transitions =
         List.map transactions ~f:(fun t ->
-            Transaction_snark.Transition.Transaction t )
+            Transaction_snark.Transition.Valid_payment t )
         @ [Coinbase coinbase; Fee_transfer fee_transfer]
       in
       (ledger, transitions)
@@ -76,15 +85,15 @@ let create_ledger_and_transactions num_transitions =
       let a =
         txn keys.(0) keys.(1)
           (Currency.Amount.of_int 10)
-          Currency.Fee.zero Account.Nonce.zero
+          Currency.Fee.zero Account_nonce.zero
       in
       let b =
         txn keys.(0) keys.(1)
           (Currency.Amount.of_int 10)
           Currency.Fee.zero
-          (Account.Nonce.succ Account.Nonce.zero)
+          (Account_nonce.succ Account_nonce.zero)
       in
-      (ledger, [Transaction a; Transaction b])
+      (ledger, [Valid_payment a; Valid_payment b])
 
 let time thunk =
   let start = Time.now () in
@@ -105,7 +114,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
     List.fold_map transitions ~init:(Time.Span.zero, sparse_ledger0) ~f:
       (fun (max_span, sparse_ledger) t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_super_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
         let span, proof =
           time (fun () ->
@@ -146,7 +155,7 @@ let check_base_snarks sparse_ledger0
     in
     List.fold transitions ~init:sparse_ledger0 ~f:(fun sparse_ledger t ->
         let sparse_ledger' =
-          Sparse_ledger.apply_super_transaction_exn sparse_ledger t
+          Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
         let () =
           Transaction_snark.check_transition ~sok_message
@@ -166,9 +175,9 @@ let run profiler num_transactions =
       (List.concat_map transitions ~f:(fun t ->
            match t with
            | Fee_transfer t ->
-               List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
-           | Transaction t ->
-               let t = (t :> Transaction.t) in
+               List.map (Fee_transfer.to_single_list t) ~f:(fun (pk, _) -> pk)
+           | Valid_payment t ->
+               let t = (t :> Payment.t) in
                [t.payload.receiver; Public_key.compress t.sender]
            | Coinbase {proposer; fee_transfer} ->
                proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))

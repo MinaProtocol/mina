@@ -2,10 +2,8 @@ open Core_kernel
 open Bitstring
 open Coda_spec
 
-module Make
-    (Depth : Ledger_intf.Depth.S)
-  : Ledger_intf.Address.S
-      with module Direction = Direction =
+module Make (Depth : Ledger_intf.Depth.S) :
+  Ledger_intf.Address.S with module Direction = Direction =
 struct
   module Direction = Direction
 
@@ -243,8 +241,7 @@ struct
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of : Direction.t list]
-      (Direction.gen_var_length_list ~start:1 max_depth) ~f:
-      (fun directions ->
+      (Direction.gen_var_length_list ~start:1 max_depth) ~f:(fun directions ->
         let address = of_directions directions in
         [%test_result : t] ~expect:address (sibling @@ sibling address) )
 end

@@ -42,25 +42,31 @@ end
 
 module type Inputs_intf = sig
   module Depth : Ledger_intf.Depth.S
+
   module Account : Account_intf.S
+
   module Root_hash : Ledger_hash_intf.S
+
   module Hash : Ledger_intf.Hash.S with module Account = Account
+
   module Kvdb : Key_value_database_intf
+
   module Sdb : Stack_database_intf
+
   module Storage_locations : Storage_locations_intf
 end
 
-module Make
-    (Inputs : Inputs_intf)
-  : Ledger_intf.Base.S
-    with module Account = Inputs.Account
-     and module Root_hash = Inputs.Root_hash
-     and module Hash = Inputs.Hash =
+module Make (Inputs : Inputs_intf) :
+  Ledger_intf.Base.S
+  with module Account = Inputs.Account
+   and module Root_hash = Inputs.Root_hash
+   and module Hash = Inputs.Hash =
 struct
   include Inputs
 
   (* The max depth of a merkle tree can never be greater than 253. *)
   let depth = Depth.t
+
   let () = assert (depth < 0xfe)
 
   type error =
@@ -201,9 +207,7 @@ struct
 
   let empty_hashes =
     let empty_account_hash = Hash.of_digest Account.empty_hash in
-    let empty_hashes =
-      Array.create ~len:(depth + 1) empty_account_hash
-    in
+    let empty_hashes = Array.create ~len:(depth + 1) empty_account_hash in
     let rec loop last_hash height =
       if height <= depth then (
         let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
@@ -269,7 +273,8 @@ struct
 
   module Account_location = struct
     let build_location key =
-      Location.build_generic (Bigstring.of_string ("$" ^ Account.Compressed_public_key.to_base64 key))
+      Location.build_generic
+        (Bigstring.of_string ("$" ^ Account.Compressed_public_key.to_base64 key))
 
     let get mdb key =
       match get_generic mdb (build_location key) with
@@ -334,7 +339,7 @@ struct
   module For_tests = struct
     let get_leaf_hash_at_addr _t _addr = failwith "TODO"
 
-    let _gen_account_location =
+    let gen_account_location =
       let open Quickcheck.Let_syntax in
       let build_account (path: Direction.t list) =
         assert (List.length path = depth) ;
@@ -390,7 +395,8 @@ struct
   let get_all_accounts_rooted_at_exn mdb address =
     let first_node, last_node = Address.Range.subtree_range address in
     let result =
-      Address.Range.fold (first_node, last_node) ~init:[] ~f:(fun bit_index acc ->
+      Address.Range.fold (first_node, last_node) ~init:[] ~f:
+        (fun bit_index acc ->
           let account = get mdb (Location.Account bit_index) in
           account :: acc )
     in
@@ -398,8 +404,8 @@ struct
 
   let set_all_accounts_rooted_at_exn mdb address (accounts: Account.t list) =
     let first_node, last_node = Address.Range.subtree_range address in
-    Address.Range.fold (first_node, last_node) ~init:accounts ~f:(fun bit_index ->
-        function
+    Address.Range.fold (first_node, last_node) ~init:accounts ~f:
+      (fun bit_index -> function
       | head :: tail ->
           set mdb (Location.Account bit_index) head ;
           tail
@@ -449,7 +455,9 @@ struct
         let sibling = Location.sibling k in
         let sibling_dir = Location.last_direction (Location.path k) in
         let hash = get_hash mdb sibling in
-        Direction.map sibling_dir ~left:(Path.Direction.Left, hash) ~right:(Right, hash)
+        Direction.map sibling_dir
+          ~left:(Path.Direction.Left, hash)
+          ~right:(Right, hash)
         :: loop (Location.parent k)
     in
     loop location

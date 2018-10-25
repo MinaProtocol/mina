@@ -12,13 +12,12 @@ include Sparse_ledger_lib.Sparse_ledger.Make (struct
             let hash = Fn.compose Merkle_hash.of_digest Account.digest
           end)
 
-let conv_path  =
+let conv_path =
   List.map ~f:(function
-    | (Ledger.Path.Direction.Left, x) -> `Left x
-    | (Right, x) -> `Right x)
+    | Ledger.Path.Direction.Left, x -> `Left x
+    | Right, x -> `Right x )
 
-let ledger_merkle_path ledger loc =
-  conv_path (Ledger.merkle_path ledger loc)
+let ledger_merkle_path ledger loc = conv_path (Ledger.merkle_path ledger loc)
 
 let of_ledger_subset_exn (ledger: Ledger.t) keys =
   let new_keys, sparse =
@@ -44,7 +43,8 @@ let of_ledger_subset_exn (ledger: Ledger.t) keys =
   Debug_assert.debug_assert (fun () ->
       [%test_eq : Ledger.Root_hash.t]
         (Ledger.merkle_root ledger)
-        ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger.Root_hash.of_hash) ) ;
+        ((merkle_root sparse :> Pedersen.Digest.t) |> Ledger.Root_hash.of_hash)
+  ) ;
   sparse
 
 let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
@@ -63,7 +63,9 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 
 let apply_payment_exn t ({sender; payload; signature= _}: Payment.t) =
   let {Payment_payload.amount; fee; receiver; nonce} = payload in
-  let sender_idx = find_index_exn t (Signature_lib.Public_key.compress sender) in
+  let sender_idx =
+    find_index_exn t (Signature_lib.Public_key.compress sender)
+  in
   let receiver_idx = find_index_exn t receiver in
   let sender_account = get_exn t sender_idx in
   assert (Account_nonce.equal (Account.nonce sender_account) nonce) ;
@@ -71,20 +73,27 @@ let apply_payment_exn t ({sender; payload; signature= _}: Payment.t) =
     failwith "Bundle.Sparse_ledger: Insecure.fee_collection" ;
   let open Currency in
   let t =
-    set_exn t sender_idx (
-      Account.create
-        ~public_key:(Account.public_key sender_account)
-        ~nonce:(Account_nonce.succ (Account.nonce sender_account))
-        ~balance:(Option.value_exn (Option.bind (Amount.add_fee amount fee) ~f:(Balance.sub_amount (Account.balance sender_account))))
-        ~receipt_chain_hash:(Receipt_chain_hash.cons payload (Account.receipt_chain_hash sender_account)))
+    set_exn t sender_idx
+      (Account.create
+         ~public_key:(Account.public_key sender_account)
+         ~nonce:(Account_nonce.succ (Account.nonce sender_account))
+         ~balance:
+           (Option.value_exn
+              (Option.bind
+                 (Amount.add_fee amount fee)
+                 ~f:(Balance.sub_amount (Account.balance sender_account))))
+         ~receipt_chain_hash:
+           (Receipt_chain_hash.cons payload
+              (Account.receipt_chain_hash sender_account)))
   in
   let receiver_account = get_exn t receiver_idx in
-  set_exn t receiver_idx (
-    Account.create
-      ~public_key:receiver
-      ~nonce:(Account.nonce receiver_account)
-      ~balance:(Option.value_exn (Balance.add_amount (Account.balance receiver_account) amount))
-      ~receipt_chain_hash:(Account.receipt_chain_hash receiver_account))
+  set_exn t receiver_idx
+    (Account.create ~public_key:receiver
+       ~nonce:(Account.nonce receiver_account)
+       ~balance:
+         (Option.value_exn
+            (Balance.add_amount (Account.balance receiver_account) amount))
+       ~receipt_chain_hash:(Account.receipt_chain_hash receiver_account))
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee): Fee_transfer.single) =
@@ -117,10 +126,7 @@ let apply_coinbase_exn t ({proposer; fee_transfer; amount}: Coinbase.t) =
     | None -> (amount, t)
     | Some (receiver, fee) ->
         let fee = Amount.of_fee fee in
-        let reward =
-          Amount.sub amount fee
-          |> Option.value_exn
-        in
+        let reward = Amount.sub amount fee |> Option.value_exn in
         (reward, add_to_balance t receiver fee)
   in
   add_to_balance t proposer proposer_reward
@@ -146,7 +152,9 @@ let handler t =
           let path = (path_exn i :> Pedersen.Digest.t list) in
           respond (Provide (elt, path))
       | Ledger_hash.Get_path idx ->
-          let path = (path_exn (Account.Index.to_int idx) :> Pedersen.Digest.t list) in
+          let path =
+            (path_exn (Account.Index.to_int idx) :> Pedersen.Digest.t list)
+          in
           respond (Provide path)
       | Ledger_hash.Set (idx, account) ->
           ledger := set_exn !ledger (Account.Index.to_int idx) account ;

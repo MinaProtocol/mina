@@ -335,8 +335,7 @@ module type Inputs_intf = sig
 
   module Transaction_pool :
     Transaction_pool_intf
-    with type valid_payment :=
-                Payment.With_valid_signature.t
+    with type valid_payment := Payment.With_valid_signature.t
      and type payment := Payment.t
 
   module Sync_ledger : sig
@@ -484,7 +483,8 @@ module Make (Inputs : Inputs_intf) = struct
            ~genesis_tip:
              { ledger_builder=
                  Ledger_builder.create ~ledger:Genesis.ledger
-                   ~self:(Public_key.compress (Keypair.public_key config.keypair))
+                   ~self:
+                     (Public_key.compress (Keypair.public_key config.keypair))
              ; protocol_state= Genesis.state
              ; proof= Genesis.proof }
            ~consensus_local_state
@@ -581,8 +581,7 @@ module Make (Inputs : Inputs_intf) = struct
                   , Consensus_mechanism.External_transition.
                     protocol_state_proof transition )
               ; ledger_builder
-              ; payments= Transaction_pool.valid_payments transaction_pool }
-        )
+              ; payments= Transaction_pool.valid_payments transaction_pool } )
         |> don't_wait_for ;
         let proposer =
           Proposer.create ~parent_log:config.log ~change_feeder:tips_r

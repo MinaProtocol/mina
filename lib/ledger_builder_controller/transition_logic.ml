@@ -2,10 +2,6 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
-  module State_hash : sig
-    type t [@@deriving sexp, eq, compare]
-  end
-
   module Ledger_hash : sig
     type t [@@deriving sexp, eq]
   end
@@ -36,9 +32,11 @@ module type Inputs_intf = sig
     end
 
     module Protocol_state : sig
+      module Hash : Coda_spec.Common.Protocol_object.Full.S
+
       type value [@@deriving sexp]
 
-      val previous_state_hash : value -> State_hash.t
+      val previous_state_hash : value -> Hash.t
 
       val blockchain_state : value -> Blockchain_state.value
 
@@ -46,7 +44,7 @@ module type Inputs_intf = sig
 
       val equal_value : value -> value -> bool
 
-      val hash : value -> State_hash.t
+      val hash : value -> Hash.t
     end
 
     module External_transition : sig
@@ -66,7 +64,7 @@ module type Inputs_intf = sig
   module Tip : sig
     type t [@@deriving sexp]
 
-    type state_hash = State_hash.t
+    type state_hash = Consensus_mechanism.Protocol_state.Hash.t
 
     val state : t -> Consensus_mechanism.Protocol_state.value
 
@@ -100,15 +98,18 @@ module type Inputs_intf = sig
     with type tip := Tip.t
      and type consensus_local_state := Consensus_mechanism.Local_state.t
      and type external_transition := Consensus_mechanism.External_transition.t
-     and type state_hash := State_hash.t
+     and type state_hash := Consensus_mechanism.Protocol_state.Hash.t
 
   module Step : sig
     (* This checks the SNARKs in State/LB and does the transition *)
 
     val step :
-         (Tip.t, State_hash.t) With_hash.t
-      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
-      -> (Tip.t, State_hash.t) With_hash.t Deferred.Or_error.t
+         (Tip.t, Consensus_mechanism.Protocol_state.Hash.t) With_hash.t
+      -> ( Consensus_mechanism.External_transition.t
+         , Consensus_mechanism.Protocol_state.Hash.t )
+         With_hash.t
+      -> (Tip.t, Consensus_mechanism.Protocol_state.Hash.t) With_hash.t
+         Deferred.Or_error.t
   end
 
   module Catchup : sig
@@ -117,8 +118,12 @@ module type Inputs_intf = sig
     val sync :
          t
       -> Transition_logic_state.t
-      -> (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
-      -> ( (Consensus_mechanism.External_transition.t, State_hash.t) With_hash.t
+      -> ( Consensus_mechanism.External_transition.t
+         , Consensus_mechanism.Protocol_state.Hash.t )
+         With_hash.t
+      -> ( ( Consensus_mechanism.External_transition.t
+           , Consensus_mechanism.Protocol_state.Hash.t )
+           With_hash.t
          , Transition_logic_state.Change.t list )
          Job.t
   end
@@ -172,11 +177,12 @@ module Make (Inputs : Inputs_intf) :
    and type handler_state_change := Inputs.Transition_logic_state.Change.t
    and type tip := Inputs.Tip.t
    and type state := Inputs.Consensus_mechanism.Protocol_state.value
-   and type state_hash := Inputs.State_hash.t =
+   and type state_hash := Inputs.Consensus_mechanism.Protocol_state.Hash.t =
 struct
   open Inputs
   open Consensus_mechanism
   open Transition_logic_state
+  module State_hash = Protocol_state.Hash
 
   let transition_is_parent_of ~child:{With_hash.data= child; hash= _}
       ~parent:{With_hash.hash= parent_state_hash; data= _} =

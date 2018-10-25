@@ -1,5 +1,4 @@
 open Core
-
 module Public_key = Signature_lib.Public_key
 module Payment = Payment
 module Fee_transfer = Fee_transfer
@@ -13,7 +12,7 @@ type t =
 
 let fee_excess = function
   | Valid_payment t ->
-      Ok (Currency.Fee.Signed.of_unsigned (Payment.Payload.fee (Payment.With_valid_signature.payload t)))
+      Ok (Currency.Fee.Signed.of_unsigned (t :> Payment.t).payload.fee)
   | Fee_transfer t -> Fee_transfer.fee_excess t
   | Coinbase t -> Coinbase.fee_excess t
 

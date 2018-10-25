@@ -1,11 +1,9 @@
-
 include Coda_spec.State_intf.Blockchain.S
-  with module Time = Block_time
-   and module Ledger_builder_hash = Ledger_builder_hash
-   and module Frozen_ledger_hash = Frozen_ledger_hash
-   and module Hash = State_hash
-            
-(*
+        with module Time = Block_time
+         and module Ledger_builder_hash = Ledger_builder_hash
+         and module Frozen_ledger_hash = Frozen_ledger_hash
+         and module Hash = State_hash
+(* TODO DELETE
 open Core_kernel
 open Coda_numbers
 open Snark_params

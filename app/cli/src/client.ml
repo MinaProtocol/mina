@@ -3,6 +3,7 @@ open Async
 open Cli_lib
 open Signature_lib
 open Coda_base
+open Coda_numbers
 
 let of_local_port port = Host_and_port.create ~host:"127.0.0.1" ~port
 
@@ -197,7 +198,7 @@ let get_nonce_cmd =
              eprintf "Failed to get nonce: %s\n" e ;
              exit 1
          | Ok nonce ->
-             printf "%s\n" (Account.Nonce.to_string nonce) ;
+             printf "%s\n" (Account_nonce.to_string nonce) ;
              exit 0 ))
 
 let status =
@@ -252,7 +253,7 @@ let handle_open ~mkdir ~(f: string -> 'a Deferred.t) path : 'a Deferred.t =
       exit 1
   | Error e -> raise e
 
-let write_keypair {Keypair.private_key; public_key; _} privkey_path
+let write_keypair {Keypair.private_key; public_key} privkey_path
     ~(password: unit -> Bytes.t Deferred.t) =
   let%bind privkey_f =
     handle_open ~mkdir:true ~f:Writer.open_file privkey_path
@@ -413,15 +414,15 @@ let batch_send_txns =
     let%bind nonce0 = get_nonce_exn keypair.public_key port in
     let _, ts =
       List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
-          ( Account.Nonce.succ nonce
-          , Transaction.sign keypair
+          ( Account_nonce.succ nonce
+          , Payment.sign keypair
               { receiver= Public_key.Compressed.of_base64_exn receiver
               ; amount
               ; fee
               ; nonce } ) )
     in
     dispatch_with_message Client_lib.Send_transactions.rpc
-      (ts :> Transaction.t list)
+      (ts :> Payment.t list)
       port
       ~success:(fun () -> "Successfully enqueued transactions in pool")
       ~error:(fun e ->
@@ -457,12 +458,12 @@ let send_txn =
          let%bind nonce = get_nonce_exn sender_kp.public_key port in
          let receiver_compressed = Public_key.compress address in
          let fee = Option.value ~default:(Currency.Fee.of_int 1) fee in
-         let payload : Transaction.Payload.t =
+         let payload : Payment.Payload.t =
            {receiver= receiver_compressed; amount; fee; nonce}
          in
-         let txn = Transaction.sign sender_kp payload in
+         let txn = Payment.sign sender_kp payload in
          dispatch_with_message Client_lib.Send_transactions.rpc
-           [(txn :> Transaction.t)]
+           [(txn :> Payment.t)]
            port
            ~success:(fun () -> "Successfully enqueued transaction in pool")
            ~error:(fun e ->

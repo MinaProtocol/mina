@@ -67,7 +67,8 @@ let public_key_compressed =
 
     let name = "public key"
 
-    let random () = Public_key.compress (Keypair.create ()).public_key
+    let random () =
+      Public_key.compress (Keypair.public_key (Keypair.create ()))
   end) in
   Pk.arg_type
 
@@ -84,8 +85,8 @@ let txn_amount =
   Command.Arg_type.map Command.Param.string ~f:Currency.Amount.of_string
 
 let txn_nonce =
-  let open Coda_base in
-  Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
+  Command.Arg_type.map Command.Param.string
+    ~f:Coda_numbers.Account_nonce.of_string
 
 let default_client_port = 8301
 

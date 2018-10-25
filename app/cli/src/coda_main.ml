@@ -51,27 +51,28 @@ module type Ledger_proof_verifier_intf = sig
     -> bool Deferred.t
 end
 
-module Transaction = struct
+module Payment = struct
   include (
-    Transaction :
-      module type of Transaction
-      with module With_valid_signature := Transaction.With_valid_signature )
+    Payment :
+      module type of Payment
+      with module With_valid_signature := Payment.With_valid_signature )
 
-  let fee (t: t) = t.payload.Transaction.Payload.fee
+  let fee (t: t) = t.payload.Payment.Payload.fee
 
   let receiver (t: t) = t.payload.receiver
 
-  let sender (t: t) = Public_key.compress t.sender
+  (*   TODO: DELETE let sender (t: t) = Public_key.compress t.sender *)
 
   let seed = Secure_random.string ()
 
-  let compare t1 t2 = Transaction.Stable.V1.compare ~seed t1 t2
+  let compare t1 t2 = seeded_compare ~seed t1 t2
 
   module With_valid_signature = struct
     module T = struct
-      include Transaction.With_valid_signature
+      include Payment.With_valid_signature
 
-      let compare t1 t2 = Transaction.With_valid_signature.compare ~seed t1 t2
+      let compare t1 t2 =
+        Payment.With_valid_signature.seeded_compare ~seed t1 t2
     end
 
     include T
@@ -96,14 +97,14 @@ module type Kernel_intf = sig
      and type completed_work := Completed_work.t
      and type public_key := Public_key.Compressed.t
      and type ledger_builder_hash := Ledger_builder_hash.t
-     and type transaction := Transaction.t
-     and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+     and type payment := Payment.t
+     and type payment_with_valid_signature := Payment.With_valid_signature.t
 
   module Consensus_mechanism :
     Consensus.Mechanism.S
     with type Internal_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
      and type External_transition.Ledger_builder_diff.t = Ledger_builder_diff.t
+     and module Protocol_state.Blockchain_state = Coda_base.Blockchain_state
 
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism
@@ -128,7 +129,9 @@ module Make_kernel
               with type Internal_transition.Ledger_builder_diff.t =
                           Ledger_builder_diff.t
                and type External_transition.Ledger_builder_diff.t =
-                          Ledger_builder_diff.t) :
+                          Ledger_builder_diff.t
+               and module Protocol_state.Blockchain_state = Coda_base.
+                                                            Blockchain_state) :
   Kernel_intf with type Ledger_proof.t = Ledger_proof.t =
 struct
   module Ledger_proof = Ledger_proof
@@ -137,12 +140,12 @@ struct
       (Ledger_proof_statement)
 
   module Ledger_builder_diff = Ledger_builder.Make_diff (struct
+    module Payment = Payment
     module Ledger_proof = Ledger_proof
     module Ledger_hash = Ledger_hash
     module Ledger_builder_hash = Ledger_builder_hash
     module Ledger_builder_aux_hash = Ledger_builder_aux_hash
     module Compressed_public_key = Public_key.Compressed
-    module Transaction = Transaction
     module Completed_work = Completed_work
   end)
 
@@ -220,11 +223,12 @@ module Make_inputs0
 struct
   open Protocols.Coda_pow
   open Init
+  module Payment = Payment
   module Consensus_mechanism = Consensus_mechanism
   module Protocol_state = Consensus_mechanism.Protocol_state
-  module Protocol_state_hash = State_hash.Stable.V1
+  module Protocol_state_hash = Protocol_state.Hash
 
-  module Time : Time_intf with type t = Block_time.t = Block_time
+  module Time : Coda_spec.Time_intf.S with type t = Block_time.t = Block_time
 
   module Time_close_validator = struct
     let limit = Block_time.Span.of_time_span (Core.Time.Span.of_sec 15.)
@@ -270,18 +274,24 @@ struct
   module Fee_transfer = Coda_base.Fee_transfer
   module Coinbase = Coda_base.Coinbase
 
-  module Super_transaction = struct
+  module Transaction = struct
+    module Public_key = Public_key
+    module Compressed_public_key = Public_key.Compressed
+    module Fee_transfer = Fee_transfer
+    module Coinbase = Coinbase
+    module Payment = Payment
+
     module T = struct
       type t = Transaction_snark.Transition.t =
-        | Transaction of Transaction.With_valid_signature.t
+        | Valid_payment of Payment.With_valid_signature.t
         | Fee_transfer of Fee_transfer.t
         | Coinbase of Coinbase.t
       [@@deriving compare, eq]
     end
 
-    let fee_excess = Super_transaction.fee_excess
+    let fee_excess = Transaction.fee_excess
 
-    let supply_increase = Super_transaction.supply_increase
+    let supply_increase = Transaction.supply_increase
 
     include T
 
@@ -365,7 +375,7 @@ struct
   module Internal_transition = Consensus_mechanism.Internal_transition
 
   module Transaction_pool = struct
-    module Pool = Transaction_pool.Make (Transaction)
+    module Pool = Transaction_pool.Make (Payment)
     include Network_pool.Make (Pool) (Pool.Diff)
 
     type pool_diff = Pool.Diff.t [@@deriving bin_io]
@@ -374,7 +384,7 @@ struct
     let load ~parent_log ~disk_location:_ ~incoming_diffs =
       return (create ~parent_log ~incoming_diffs)
 
-    let transactions t = Pool.transactions (pool t)
+    let valid_payments t = Pool.transactions (pool t)
 
     (* TODO: This causes the signature to get checked twice as it is checked
    below before feeding it to add *)
@@ -420,7 +430,6 @@ struct
   module Ledger_proof_verifier = Ledger_proof_verifier
   module Ledger_hash = Ledger_hash
   module Frozen_ledger_hash = Frozen_ledger_hash
-  module Transaction = Transaction
   module Public_key = Public_key
   module Compressed_public_key = Public_key.Compressed
   module Private_key = Private_key
@@ -540,7 +549,12 @@ struct
      and type ledger_builder_hash := Ledger_builder_hash.t
 
   module Sync_ledger =
-    Syncable_ledger.Make (Ledger.Addr) (Account)
+    Syncable_ledger.Make (Ledger)
+      (struct
+        let subtree_height = 3
+      end)
+
+  (* TODO: DELETE (Ledger.Address) (Account)
       (struct
         include Merkle_hash
 
@@ -561,7 +575,7 @@ struct
       end)
       (struct
         let subtree_height = 3
-      end)
+      end) *)
 
   module Net = Coda_networking.Make (struct
     include Inputs0
@@ -620,7 +634,7 @@ struct
       module Consensus_mechanism = Consensus_mechanism
       module Protocol_state_proof = Protocol_state_proof
       module State_hash = State_hash
-      module Valid_transaction = Transaction.With_valid_signature
+      module Valid_transaction = Payment.With_valid_signature
       module Sync_ledger = Sync_ledger
       module Internal_transition = Internal_transition
 
@@ -641,7 +655,6 @@ struct
     module Ledger_proof_statement = Ledger_proof_statement
     module Ledger_hash = Ledger_hash
     module Frozen_ledger_hash = Frozen_ledger_hash
-    module Transaction = Transaction
     module Public_key = Public_key
     module Private_key = Private_key
     module Keypair = Keypair
@@ -756,7 +769,7 @@ end
 
 module type Main_intf = sig
   module Inputs : sig
-    module Time : Protocols.Coda_pow.Time_intf
+    module Time : Coda_spec.Time_intf.S
 
     module Ledger : sig
       type t [@@deriving sexp]
@@ -768,10 +781,7 @@ module type Main_intf = sig
 
       val get : t -> Ledger.Location.t -> Account.t option
 
-      val merkle_path :
-           t
-        -> Ledger.Location.t
-        -> [`Left of Merkle_hash.t | `Right of Merkle_hash.t] list
+      val merkle_path : t -> Ledger.Location.t -> Coda_base.Ledger.Path.t
 
       val num_accounts : t -> int
 
@@ -799,6 +809,7 @@ module type Main_intf = sig
                   Ledger_builder_diff.t
        and type External_transition.Ledger_builder_diff.t =
                   Ledger_builder_diff.t
+       and module Protocol_state.Blockchain_state = Coda_base.Blockchain_state
 
     module Net : sig
       type t
@@ -829,7 +840,7 @@ module type Main_intf = sig
       type statement
     end
 
-    module Super_transaction : sig
+    module Transaction : sig
       type t
     end
 
@@ -837,7 +848,7 @@ module type Main_intf = sig
       Snark_worker_lib.Intf.S
       with type proof := Ledger_proof.t
        and type statement := Ledger_proof.statement
-       and type transition := Super_transaction.t
+       and type transition := Transaction.t
        and type sparse_ledger := Sparse_ledger.t
 
     module Snark_pool : sig
@@ -850,7 +861,7 @@ module type Main_intf = sig
     module Transaction_pool : sig
       type t
 
-      val add : t -> Transaction.t -> unit Deferred.t
+      val add : t -> Payment.t -> unit Deferred.t
     end
 
     module Protocol_state_proof : sig
@@ -868,7 +879,9 @@ module type Main_intf = sig
     end
   end
 
-  module Consensus_mechanism : Consensus.Mechanism.S
+  module Consensus_mechanism :
+    Consensus.Mechanism.S
+    with module Protocol_state.Blockchain_state = Coda_base.Blockchain_state
 
   module Blockchain :
     Blockchain.S with module Consensus_mechanism = Consensus_mechanism
@@ -968,7 +981,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
            ( Account.balance account |> Currency.Balance.to_int
            , string_of_public_key account ) )
 
-  let is_valid_transaction t (txn: Transaction.t) =
+  let is_valid_transaction t (txn: Payment.t) =
     let remainder =
       let open Option.Let_syntax in
       let%bind balance = get_balance t (Public_key.compress txn.sender)
@@ -988,7 +1001,7 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let txn_pool = transaction_pool t in
     don't_wait_for (Transaction_pool.add txn_pool txn) ;
     Logger.info log
-      !"Added transaction %{sexp: Transaction.t} to pool successfully"
+      !"Added transaction %{sexp: Payment.t} to pool successfully"
       txn ;
     txn_count := !txn_count + 1
 
@@ -1017,7 +1030,8 @@ module Run (Config_in : Config_intf) (Program : Main_intf) = struct
     let state = best_protocol_state t in
     let state_hash =
       Consensus_mechanism.Protocol_state.hash state
-      |> [%sexp_of : State_hash.t] |> Sexp.to_string
+      |> [%sexp_of : Consensus_mechanism.Protocol_state.Hash.t]
+      |> Sexp.to_string
     in
     let block_count =
       state |> Consensus_mechanism.Protocol_state.consensus_state

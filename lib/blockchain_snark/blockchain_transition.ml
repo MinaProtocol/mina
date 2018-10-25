@@ -119,7 +119,9 @@ module Keys = struct
 end
 
 module Make
-    (Consensus_mechanism : Consensus.Mechanism.S)
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with module Protocol_state.Blockchain_state = Coda_base.
+                                                                         Blockchain_state)
     (T : Transaction_snark.Verification.S) =
 struct
   module Blockchain = Blockchain_state.Make (Consensus_mechanism)
@@ -136,8 +138,6 @@ struct
           module type of Blockchain with module Checked := Blockchain.Checked )
 
       include (U : module type of U with module Checked := U.Checked)
-
-      module Hash = Coda_base.State_hash
 
       module Checked = struct
         include Blockchain.Checked

@@ -17,7 +17,7 @@ module type Inputs_intf = sig
 
       val ( + ) : t -> t -> t
 
-      val ( * ) : t -> t -> t
+      val ( * ) : int -> t -> t
     end
 
     val ( < ) : t -> t -> bool

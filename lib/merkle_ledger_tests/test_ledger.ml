@@ -1,3 +1,4 @@
+(* TODO: Re-enable
 open Core
 open Unsigned
 module Intf = Merkle_ledger.Intf
@@ -356,4 +357,4 @@ let%test_module "test functor on in memory databases" =
       copy rl ;
       copy lr ;
       assert (L16.num_accounts l2 = 8)
-  end )
+  end ) *)

@@ -46,7 +46,7 @@ module Inputs = struct
     let arg_type = Cli_lib.public_key_compressed
   end
 
-  module Super_transaction = Coda_base.Super_transaction
+  module Transaction = Coda_base.Transaction
   module Sparse_ledger = Coda_base.Sparse_ledger
 
   (* TODO: Use public_key once SoK is implemented *)

@@ -20,9 +20,13 @@ module type S = sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, bin_io]
+      type nonrec t = t [@@deriving sexp, bin_io, eq, compare, hash]
     end
   end
+
+  include Comparable.S_binable with type t := t
+
+  val length_in_triples : int
 
   module Bits : Bits_intf.S with type t := t
 
@@ -41,6 +45,10 @@ module type S = sig
     val to_ms : t -> Int64.t
 
     val of_ms : Int64.t -> t
+
+    val ( + ) : t -> t -> t
+
+    val ( * ) : int -> t -> t
 
     val ( < ) : t -> t -> bool
 
@@ -76,6 +84,10 @@ module type S = sig
   val add : t -> Span.t -> t
 
   val modulus : t -> Span.t -> Span.t
+
+  val of_time : Time.t -> t
+
+  val to_time : t -> Time.t
 
   val now : Controller.t -> t
 end

@@ -9,8 +9,12 @@ module Balance = struct
 end
 
 module Account = struct
+  module Compressed_public_key = struct
+    include String
+  end
+
   type t =
-    { public_key: string
+    { public_key: Compressed_public_key.t
     ; balance: Balance.t
            [@printer
              fun fmt balance ->
@@ -58,9 +62,7 @@ module Hash = struct
   let empty_account = hash_account Account.empty
 end
 
-module Intf = Merkle_ledger.Intf
-
-module In_memory_kvdb : Intf.Key_value_database = struct
+module In_memory_kvdb : Merkle_ledger.Database.Key_value_database_intf = struct
   type t = (string, Bigstring.t) Hashtbl.t
 
   let create ~directory:_ = Hashtbl.create (module String)
@@ -76,7 +78,7 @@ module In_memory_kvdb : Intf.Key_value_database = struct
   let copy tbl = Hashtbl.copy tbl
 end
 
-module In_memory_sdb : Intf.Stack_database = struct
+module In_memory_sdb : Merkle_ledger.Database.Stack_database_intf = struct
   type t = Bigstring.t list ref
 
   let create ~filename:_ = ref []
@@ -97,7 +99,9 @@ module In_memory_sdb : Intf.Stack_database = struct
   let copy stack = ref !stack
 end
 
-module Storage_locations : Intf.Storage_locations = struct
+module Storage_locations :
+  Merkle_ledger.Database.Storage_locations_intf =
+struct
   (* TODO: The names of these values should be dynamically generated per test run*)
   let stack_db_file = ""
 

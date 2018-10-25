@@ -3,19 +3,20 @@ open Coda_spec
 
 module type Inputs_intf = sig
   module Depth : Ledger_intf.Depth.S
+
   module Account : Account_intf.S
+
   module Root_hash : Ledger_hash_intf.S
-  module Hash : Ledger_intf.Hash.S
-    with module Account = Account
+
+  module Hash : Ledger_intf.Hash.S with module Account = Account
 end
 
 (* SOMEDAY: handle empty wallets *)
-module Make
-    (Inputs : Inputs_intf)
-  : Ledger_intf.Base_binable.S
-      with module Account = Inputs.Account
-       and module Root_hash = Inputs.Root_hash
-       and module Hash = Inputs.Hash =
+module Make (Inputs : Inputs_intf) :
+  Ledger_intf.Base_binable.S
+  with module Account = Inputs.Account
+   and module Root_hash = Inputs.Root_hash
+   and module Hash = Inputs.Hash =
 struct
   include Inputs
   module Compressed_public_key = Account.Compressed_public_key
@@ -85,7 +86,9 @@ struct
     {accounts= Dyn_array.copy t.accounts; tree= copy_tree t.tree}
 
   let empty_hash_at_heights depth =
-    let empty_hash_at_heights = Array.create ~len:(depth + 1) empty_account_hash in
+    let empty_hash_at_heights =
+      Array.create ~len:(depth + 1) empty_account_hash
+    in
     let rec go i =
       if i <= depth then (
         let h = empty_hash_at_heights.(i - 1) in
@@ -151,8 +154,7 @@ struct
     | None ->
         let new_index = allocate t key account in
         let max_accounts = 1 lsl depth in
-        if new_index > max_accounts then
-          Result.Error Out_of_leaves
+        if new_index > max_accounts then Result.Error Out_of_leaves
         else Result.Ok (`Added, new_index)
     | Some index -> Result.Ok (`Existed, index)
 
@@ -234,7 +236,8 @@ struct
       in
       let least = List.hd_exn indices in
       assert (least = num_accounts t - len) ;
-      List.iter keys ~f:(fun k -> Compressed_public_key.Table.remove t.tree.leaves k) ;
+      List.iter keys ~f:(fun k ->
+          Compressed_public_key.Table.remove t.tree.leaves k ) ;
       Dyn_array.delete_range t.accounts least len ;
       (* TODO: fixup hashes in a less terrible way *)
       (t.tree).dirty_indices <- List.init least ~f:(fun i -> i) ;
@@ -259,7 +262,8 @@ struct
         let hash = Hash.merge ~height hash (empty_hash_at_height height) in
         go (i - 1) hash
     in
-    Root_hash.of_hash (go (depth - height) base_root :> Snark_params.Tick.Pedersen.Digest.t)
+    Root_hash.of_hash
+      (go (depth - height) base_root :> Snark_params.Tick.Pedersen.Digest.t)
 
   let merkle_path_at_index_exn t index =
     if index >= Dyn_array.length t.accounts then
@@ -278,11 +282,13 @@ struct
               else empty_hash_at_height height
             in
             go (height + 1) (addr lsr 1) layers
-              ((if is_left then (Path.Direction.Left, hash) else (Right, hash)) :: acc)
+              ( (if is_left then (Path.Direction.Left, hash) else (Right, hash))
+              :: acc )
       in
       let leaf_hash_idx = index lxor 1 in
       let leaf_hash =
-        if leaf_hash_idx >= Hashtbl.length t.tree.leaves then empty_account_hash
+        if leaf_hash_idx >= Hashtbl.length t.tree.leaves then
+          empty_account_hash
         else Hash.of_account (Dyn_array.get t.accounts leaf_hash_idx)
       in
       let is_left = index mod 2 = 0 in
@@ -293,12 +299,16 @@ struct
       in
       List.rev_append base_path
         (List.init (depth - base_path_height) ~f:(fun i ->
-             (Path.Direction.Left, (empty_hash_at_height (i + base_path_height))) )) )
+             (Path.Direction.Left, empty_hash_at_height (i + base_path_height))
+         )) )
 
   let merkle_path = merkle_path_at_index_exn
 
   module For_tests = struct
     let get_leaf_hash_at_addr t addr = get_leaf_hash t (Address.to_int addr)
+
+    let gen_account_location =
+      Quickcheck.Generator.create (fun ~size:_ _ -> failwith "Unimplemented")
   end
 
   (* FIXME: Probably this will cause an error *)
@@ -306,7 +316,7 @@ struct
     assert (Address.depth a = depth - 1) ;
     merkle_path_at_index_exn t (Address.to_int a)
 
-(* TODO: DELETE
+  (* TODO: DELETE
   let set_at_addr_exn t addr acct =
     assert (Address.depth addr = depth - 1) ;
     set_at_index_exn t (Address.to_int addr) acct

@@ -1,8 +1,5 @@
 open Core_kernel
 open Coda_spec
-open Coda_numbers
-open Tuple_lib
-open Fold_lib
 
 module type S = sig
   module Local_state : sig
@@ -22,7 +19,8 @@ module type S = sig
   module Consensus_state : State_intf.Consensus.S
 
   module Protocol_state :
-    Coda_base.Protocol_state.S with module Consensus_state = Consensus_state
+    Coda_spec.State_intf.Protocol.S
+    with module Consensus_state = Consensus_state
 
   module Snark_transition :
     Coda_base.Snark_transition.S
@@ -43,7 +41,7 @@ module type S = sig
     -> local_state:Local_state.t
     -> time:Unix_timestamp.t
     -> keypair:Signature_lib.Keypair.t
-    -> transactions:Coda_base.Transaction.t list
+    -> transactions:Coda_base.Payment.t list
     -> (Protocol_state.value * Consensus_transition_data.value) option
   (**
    * Generate a new protocol state and consensus specific transition data
@@ -61,7 +59,7 @@ module type S = sig
 
   val next_state_checked :
        Consensus_state.var
-    -> Coda_base.State_hash.var
+    -> Protocol_state.Hash.var
     -> Snark_transition.var
     -> (Consensus_state.var, _) Snark_params.Tick.Checked.t
   (**

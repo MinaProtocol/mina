@@ -23,11 +23,13 @@ module Rpcs (Inputs : sig
      and type ledger_hash := Ledger_hash.t
 
   module Protocol_state : sig
+    module Hash : Coda_spec.Hash_intf.Full_size.S
+
     type value [@@deriving bin_io]
 
     val equal_value : value -> value -> bool
 
-    val hash : value -> State_hash.t
+    val hash : value -> Hash.t
 
     val blockchain_state : value -> Blockchain_state.value
   end
@@ -183,11 +185,13 @@ module type Inputs_intf = sig
      and type ledger_hash := Ledger_hash.t
 
   module Protocol_state : sig
+    module Hash : Coda_spec.Hash_intf.Full_size.S
+
     type value [@@deriving bin_io]
 
     val equal_value : value -> value -> bool
 
-    val hash : value -> State_hash.t
+    val hash : value -> Hash.t
 
     val blockchain_state : value -> Blockchain_state.value
   end

@@ -6,7 +6,6 @@ open Bitstring_lib
 include Signature_lib.Checked.Schnorr (struct
   module Scalar = Tick.Inner_curve.Scalar
   open Tick
-
   module Payload = Payment_payload
 
   type var = Pedersen.Checked.Section.t
@@ -20,8 +19,7 @@ include Signature_lib.Checked.Schnorr (struct
   let hash t ~nonce =
     let d =
       Pedersen.digest_fold Hash_prefix.signature
-        Fold.(
-          Payment_payload.fold t +> group3 ~default:false (of_list nonce))
+        Fold.(Payment_payload.fold t +> group3 ~default:false (of_list nonce))
     in
     Scalar.of_bits (Sha256_lib.Sha256.digest (Field.unpack d))
 

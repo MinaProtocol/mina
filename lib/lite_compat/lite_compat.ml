@@ -47,10 +47,10 @@ let merkle_path :
     -> [ `Left of Lite_base.Pedersen.Digest.t
        | `Right of Lite_base.Pedersen.Digest.t ]
        list =
-  let f (e: Coda_base.Ledger.Path.elem) =
+  let f ((e, h): Coda_base.Ledger.Path.Elem.t) =
     match e with
-    | `Left h -> `Left (digest (h :> Tick.Pedersen.Digest.t))
-    | `Right h -> `Right (digest (h :> Tick.Pedersen.Digest.t))
+    | Left -> `Left (digest (h :> Tick.Pedersen.Digest.t))
+    | Right -> `Right (digest (h :> Tick.Pedersen.Digest.t))
   in
   List.map ~f
 
@@ -61,9 +61,9 @@ let public_key ({x; is_odd}: Signature_lib.Public_key.Compressed.t) :
 let length =
   Fn.compose Lite_base.Length.t_of_sexp Coda_numbers.Length.sexp_of_t
 
-let account_nonce : Coda_base.Account.Nonce.t -> Lite_base.Account.Nonce.t =
+let account_nonce : Coda_numbers.Account_nonce.t -> Lite_base.Account.Nonce.t =
   Fn.compose Lite_base.Account.Nonce.t_of_sexp
-    Coda_base.Account.Nonce.sexp_of_t
+    Coda_numbers.Account_nonce.sexp_of_t
 
 let balance : Currency.Balance.t -> Lite_base.Account.Balance.t =
   Fn.compose Lite_base.Account.Balance.t_of_sexp Currency.Balance.sexp_of_t

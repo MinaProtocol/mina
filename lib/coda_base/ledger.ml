@@ -2,30 +2,26 @@ open Core
 open Snark_params
 open Currency
 open Signature_lib
-
 module Account_nonce = Coda_numbers.Account_nonce
 
 module type Inputs_intf = sig
   module Keypair : Coda_spec.Signature_intf.Keypair.S
-  module Transaction : Coda_spec.Transaction_intf.S
-    with module Public_key = Keypair.Public_key
-  module Ledger : Coda_spec.Ledger_intf.Base_binable.S
+
+  module Transaction :
+    Coda_spec.Transaction_intf.S with module Public_key = Keypair.Public_key
+
+  module Ledger :
+    Coda_spec.Ledger_intf.Base_binable.S
     with module Account.Compressed_public_key = Keypair.Public_key.Compressed
-     and module Account.Receipt_chain_hash.Payment_payload = Transaction.Payment.Payload
+     and module Account.Receipt_chain_hash.Payment_payload = Transaction.
+                                                             Payment.Payload
 end
 
-module Make
-    (Inputs : Inputs_intf)
-=
-struct
+module Make (Inputs : Inputs_intf) = struct
   include Inputs
-
   open Inputs.Transaction
-
   module Payment = Payment
-
   module Receipt_chain_hash = Inputs.Ledger.Account.Receipt_chain_hash
-
   include Ledger
 
   let create_new_account_exn t pk account =
@@ -125,7 +121,7 @@ struct
   (* someday: It would probably be better if we didn't modify the receipt chain hash
    in the case that the sender is equal to the receiver, but it complicates the SNARK, so
    we don't for now. *)
-  let apply_payment_unchecked ledger (payment : Payment.t) =
+  let apply_payment_unchecked ledger (payment: Payment.t) =
     let sender = Public_key.compress (Payment.sender payment) in
     let payload = Payment.payload payment in
     let {Payment.Payload.fee; amount; receiver; nonce} = payload in
@@ -163,8 +159,7 @@ struct
         {receiver_account with balance= receiver_balance'} ;
       {undo with previous_empty_accounts}
 
-  let apply_payment ledger
-      (transaction: Payment.With_valid_signature.t) =
+  let apply_payment ledger (transaction: Payment.With_valid_signature.t) =
     apply_payment_unchecked ledger (transaction :> Payment.t)
 
   let process_fee_transfer t (transfer: Fee_transfer.t) ~modify_balance =
@@ -224,8 +219,7 @@ struct
           assert (not @@ Public_key.Compressed.equal receiver proposer) ;
           let fee = Amount.of_fee fee in
           let%bind proposer_reward =
-            error_opt "Coinbase fee transfer too large"
-              (Amount.sub amount fee)
+            error_opt "Coinbase fee transfer too large" (Amount.sub amount fee)
           in
           let receiver_location, receiver_account, emptys =
             get_or_initialize receiver
@@ -280,11 +274,11 @@ struct
     remove_accounts_exn t previous_empty_accounts
 
   let undo_payment ledger
-      { Undo.payment
-      ; previous_empty_accounts
-      ; previous_receipt_chain_hash } =
+      {Undo.payment; previous_empty_accounts; previous_receipt_chain_hash} =
     let sender = Public_key.compress (Payment.sender payment) in
-    let {Payment.Payload.fee; amount; receiver; nonce} = Payment.payload payment in
+    let {Payment.Payload.fee; amount; receiver; nonce} =
+      Payment.payload payment
+    in
     let open Or_error.Let_syntax in
     let%bind sender_location = location_of_key' ledger "sender" sender in
     let%bind sender_account = get' ledger "sender" sender_location in
@@ -332,8 +326,7 @@ struct
     Or_error.map
       ( match t with
       | Valid_payment txn ->
-          Or_error.map (apply_payment ledger txn) ~f:(fun u ->
-              Undo.Payment u )
+          Or_error.map (apply_payment ledger txn) ~f:(fun u -> Undo.Payment u)
       | Fee_transfer t ->
           Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
               Undo.Fee_transfer u )
@@ -369,17 +362,15 @@ end
 
 module Inputs = struct
   module Keypair = Signature_lib.Keypair
-
   module Transaction = Transaction
 
   module Ledger = struct
     module Inputs = struct
       module Depth = struct
-                let t = ledger_depth
-              end
+        let t = ledger_depth
+      end
 
       module Account = Account
-
       module Root_hash = Ledger_hash
       module Hash = Merkle_hash
     end

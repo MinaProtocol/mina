@@ -24,13 +24,13 @@ module Make (Inputs : Inputs_intf) :
               Inputs.Consensus_mechanism.External_transition.t
    and type ledger_hash := Inputs.Ledger_hash.t
    and type ledger_builder := Inputs.Ledger_builder.t
-   and type transaction := Inputs.Transaction.With_valid_signature.t
    and type protocol_state := Inputs.Consensus_mechanism.Protocol_state.value
    and type protocol_state_proof := Inputs.Protocol_state_proof.t
    and type consensus_local_state := Inputs.Consensus_mechanism.Local_state.t
    and type completed_work_statement := Inputs.Completed_work.Statement.t
    and type completed_work_checked := Inputs.Completed_work.Checked.t
    and type time_controller := Inputs.Time.Controller.t
+   and type valid_payment := Inputs.Payment.With_valid_signature.t
    and type keypair := Inputs.Keypair.t =
 struct
   open Inputs
@@ -113,7 +113,7 @@ struct
         ~transactions:
           ( Ledger_builder_diff.With_valid_signatures_and_proofs.transactions
               diff
-            :> Transaction.t list )
+            :> Payment.t list )
     in
     let snark_transition =
       Snark_transition.create_value
@@ -141,8 +141,7 @@ struct
       { protocol_state:
           Protocol_state.value * Protocol_state_proof.t sexp_opaque
       ; ledger_builder: Ledger_builder.t sexp_opaque
-      ; transactions: Transaction.With_valid_signature.t Sequence.t sexp_opaque
-      }
+      ; payments: Payment.With_valid_signature.t Sequence.t sexp_opaque }
     [@@deriving sexp_of]
   end
 
@@ -173,13 +172,13 @@ struct
     let create_result
         { Tip.protocol_state=
             previous_protocol_state, previous_protocol_state_proof
-        ; transactions
+        ; payments
         ; ledger_builder } =
       let open Option.Let_syntax in
       let%map protocol_state, internal_transition =
         generate_next_state ~previous_protocol_state ~consensus_local_state
-          ~time_controller ~ledger_builder ~transactions ~get_completed_work
-          ~logger ~keypair
+          ~time_controller ~ledger_builder ~transactions:payments
+          ~get_completed_work ~logger ~keypair
       in
       let result =
         External_transition_result.create ~previous_protocol_state

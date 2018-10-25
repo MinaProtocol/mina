@@ -3,15 +3,19 @@
 open Core_kernel
 open Snark_params
 open Tick
-open Coda_base
 open Let_syntax
+open Coda_base
 
-module Make (Consensus_mechanism : Consensus.Mechanism.S) :
+module Make
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with module Protocol_state.Blockchain_state = Coda_base.
+                                                                         Blockchain_state) :
   Blockchain_state_intf.S
   with module Consensus_mechanism := Consensus_mechanism =
 struct
   module Protocol_state = Consensus_mechanism.Protocol_state
   module Snark_transition = Consensus_mechanism.Snark_transition
+  module Blockchain_state = Protocol_state.Blockchain_state
 
   let check cond msg =
     if not cond then Or_error.errorf "Blockchain_state.update: %s" msg
@@ -20,9 +24,11 @@ struct
   module type Update_intf = sig
     module Checked : sig
       val update :
-           State_hash.var * Protocol_state.var
+           Protocol_state.Hash.var * Protocol_state.var
         -> Snark_transition.var
-        -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
+        -> ( Protocol_state.Hash.var
+             * Protocol_state.var
+             * [`Success of Boolean.var]
            , _ )
            Checked.t
     end
@@ -52,9 +58,11 @@ struct
       *)
       let update
           ((previous_state_hash, previous_state):
-            State_hash.var * Protocol_state.var)
+            Protocol_state.Hash.var * Protocol_state.var)
           (transition: Snark_transition.var) :
-          ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
+          ( Protocol_state.Hash.var
+            * Protocol_state.var
+            * [`Success of Boolean.var]
           , _ )
           Tick.Checked.t =
         with_label __LOC__
@@ -107,7 +115,7 @@ struct
              |> Pedersen.Checked.Section.disjoint_union_exn state_partial
              >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
            in
-           ( State_hash.var_of_hash_packed state_hash
+           ( Protocol_state.Hash.var_of_hash_packed state_hash
            , new_state
            , `Success good_body ))
     end
@@ -120,12 +128,12 @@ struct
            (Field.Checked.constant
               ( Protocol_state.hash Consensus_mechanism.genesis_protocol_state
                 :> Field.t ))
-           (State_hash.var_to_hash_packed h))
+           (Protocol_state.Hash.var_to_hash_packed h))
 
     let hash (t: Protocol_state.var) =
       with_label __LOC__
         ( Protocol_state.var_to_triples t
         >>= Pedersen.Checked.digest_triples ~init:Hash_prefix.protocol_state
-        >>| State_hash.var_of_hash_packed )
+        >>| Protocol_state.Hash.var_of_hash_packed )
   end
 end

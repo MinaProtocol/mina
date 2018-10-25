@@ -1,4 +1,5 @@
 open Core
+open Merkle_ledger
 
 module type Ledger_intf = sig
   type t

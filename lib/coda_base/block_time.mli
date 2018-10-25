@@ -4,6 +4,8 @@ open Snark_bits
 open Tuple_lib
 open Fold_lib
 
+include Coda_spec.Time_intf.S with type Controller.t = unit
+(* TODO DELETE
 type t [@@deriving sexp, eq]
 
 type t0 = t
@@ -111,4 +113,4 @@ val of_time : Time.t -> t
 
 val to_time : t -> Time.t
 
-val now : Controller.t -> t
+val now : Controller.t -> t *)

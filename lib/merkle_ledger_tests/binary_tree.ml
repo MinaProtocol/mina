@@ -1,12 +1,12 @@
 open Core
 
-module Make (Account : sig
-  type t
-end)
-(Hash : Merkle_ledger.Intf.Hash with type account := Account.t) (Depth : sig
-    val depth : int
-end) =
+module Make
+    (Hash : Coda_spec.Ledger_intf.Hash.S) (Depth : sig
+        val depth : int
+    end) =
 struct
+  module Account = Hash.Account
+
   type t = Node of {hash: Hash.t; left: t; right: t} | Leaf of Hash.t
   [@@deriving sexp]
 
@@ -37,10 +37,10 @@ struct
     let max_num_accts = 1 lsl Depth.depth in
     let num_empty_hashes = max_num_accts - List.length list in
     let empty_hashes =
-      List.init num_empty_hashes ~f:(fun _ -> Hash.empty_account)
+      List.init num_empty_hashes ~f:(fun _ -> Hash.of_digest Account.empty_hash)
     in
     let tree, remaining_nodes, _ =
-      go (List.map ~f:Hash.hash_account list @ empty_hashes) max_num_accts
+      go (List.map ~f:Hash.of_account list @ empty_hashes) max_num_accts
     in
     assert (remaining_nodes = []) ;
     tree
@@ -53,6 +53,7 @@ struct
     | Node {hash; left; right} ->
         function
           | [] -> hash
-          | Direction.Left :: xs -> get_inner_hash_at_addr_exn left xs
-          | Direction.Right :: xs -> get_inner_hash_at_addr_exn right xs
+          | Merkle_ledger.Direction.Left :: xs ->
+              get_inner_hash_at_addr_exn left xs
+          | Right :: xs -> get_inner_hash_at_addr_exn right xs
 end

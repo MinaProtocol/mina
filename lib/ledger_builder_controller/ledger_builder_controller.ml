@@ -2,12 +2,6 @@ open Core_kernel
 open Async_kernel
 
 module type Inputs_intf = sig
-  module State_hash : sig
-    type t [@@deriving eq, sexp, compare, bin_io]
-
-    val to_bits : t -> bool list
-  end
-
   module Security : Protocols.Coda_pow.Security_intf
 
   module Ledger_hash : sig
@@ -102,15 +96,17 @@ module type Inputs_intf = sig
     end
 
     module Protocol_state : sig
+      module Hash : Coda_spec.Common.Protocol_object.Full.S
+
       type value [@@deriving sexp]
 
       val create_value :
-           previous_state_hash:State_hash.t
+           previous_state_hash:Hash.t
         -> blockchain_state:Blockchain_state.value
         -> consensus_state:Consensus_state.value
         -> value
 
-      val previous_state_hash : value -> State_hash.t
+      val previous_state_hash : value -> Hash.t
 
       val blockchain_state : value -> Blockchain_state.value
 
@@ -118,7 +114,7 @@ module type Inputs_intf = sig
 
       val equal_value : value -> value -> bool
 
-      val hash : value -> State_hash.t
+      val hash : value -> Hash.t
     end
 
     module External_transition : sig
@@ -228,6 +224,7 @@ module Make (Inputs : Inputs_intf) : sig
 end = struct
   open Inputs
   open Consensus_mechanism
+  module State_hash = Protocol_state.Hash
 
   module Config = struct
     type t =
@@ -243,7 +240,6 @@ end = struct
 
   module Transition_logic_inputs = struct
     module Frozen_ledger_hash = Frozen_ledger_hash
-    module State_hash = State_hash
     module Ledger_builder_hash = Ledger_builder_hash
     module Blockchain_state = Blockchain_state
     module Consensus_mechanism = Consensus_mechanism
@@ -279,7 +275,7 @@ end = struct
             && Frozen_ledger_hash.equal ledger_hash
                  ( new_state |> Protocol_state.blockchain_state
                  |> Blockchain_state.ledger_hash )
-            && State_hash.equal tip_hash
+            && Protocol_state.Hash.equal tip_hash
                  (new_state |> Protocol_state.previous_state_hash)
           then Deferred.return (Ok ())
           else Deferred.Or_error.error_string "TODO: Punish"
@@ -294,7 +290,8 @@ end = struct
     module Tip = struct
       include Tip
 
-      type state_hash = State_hash.t [@@deriving sexp, bin_io, compare]
+      type state_hash = Protocol_state.Hash.t
+      [@@deriving sexp, bin_io, compare]
 
       let state tip = tip.protocol_state
 
@@ -302,7 +299,7 @@ end = struct
 
       let assert_materialization_of {With_hash.data= t; hash= tip_state_hash}
           {With_hash.data= transition; hash= transition_state_hash} =
-        [%test_result : State_hash.t]
+        [%test_result : Protocol_state.Hash.t]
           ~message:
             "Protocol state in tip should be the target state of the transition"
           ~expect:transition_state_hash tip_state_hash ;
@@ -349,13 +346,13 @@ end = struct
 
       let is_parent_of ~child:{With_hash.data= child; hash= _}
           ~parent:{With_hash.data= _; hash= parent_hash} =
-        State_hash.equal parent_hash
+        Protocol_state.Hash.equal parent_hash
           ( External_transition.protocol_state child
           |> Protocol_state.previous_state_hash )
 
       let is_materialization_of {With_hash.data= _; hash= tip_hash}
           {With_hash.data= _; hash= transition_hash} =
-        State_hash.equal transition_hash tip_hash
+        Protocol_state.Hash.equal transition_hash tip_hash
     end
 
     module Transition_logic_state = Transition_logic_state.Make (struct
@@ -397,7 +394,8 @@ end = struct
   type t =
     { ledger_builder_io: Net.t
     ; log: Logger.t
-    ; store_controller: (Tip.t, State_hash.t) With_hash.t Store.Controller.t
+    ; store_controller:
+        (Tip.t, Protocol_state.Hash.t) With_hash.t Store.Controller.t
     ; mutable handler: Transition_logic.t
     ; strongest_ledgers:
         (Ledger_builder.t * External_transition.t) Linear_pipe.Reader.t }
@@ -724,8 +722,6 @@ let%test_module "test" =
 
         module State_hash = struct
           include Int
-
-          let to_bits t = [t <> 0]
         end
 
         module Protocol_state_proof = Unit
@@ -749,6 +745,8 @@ let%test_module "test" =
           end
 
           module Protocol_state = struct
+            module Hash = State_hash
+
             type t =
               { previous_state_hash: State_hash.t
               ; blockchain_state: Blockchain_state.value

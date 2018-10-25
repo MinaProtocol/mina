@@ -1,7 +1,6 @@
 open Core
 open Snark_params.Tick
 open Fold_lib
-
 module Payment_payload = Payment_payload
 
 include Data_hash.Make_full_size ()
@@ -35,8 +34,7 @@ module Checked = struct
       let%bind bs = var_to_triples t in
       Pedersen.Checked.Section.extend init bs
         ~start:
-          ( Hash_prefix.length_in_triples
-          + Payment_payload.length_in_triples )
+          (Hash_prefix.length_in_triples + Payment_payload.length_in_triples)
     in
     let%map s = Pedersen.Checked.Section.disjoint_union_exn payload with_t in
     let digest, _ =
@@ -54,8 +52,7 @@ let%test_unit "checked-unchecked equivalence" =
         let comp =
           let open Snark_params.Tick.Let_syntax in
           let%bind payload =
-            Schnorr.Message.var_of_payload
-              (Payment_payload.var_of_t payload)
+            Schnorr.Message.var_of_payload (Payment_payload.var_of_t payload)
           in
           let%map res = Checked.cons ~payload (var_of_t base) in
           As_prover.read typ res

@@ -3,7 +3,7 @@
 (library
  ((name consensus)
   (public_name consensus)
-  (flags (:standard -short-paths -warn-error -32))
+  (flags (:standard -short-paths -warn-error -32-33))
   (inline_tests)
   (library_flags (-linkall))
   (libraries

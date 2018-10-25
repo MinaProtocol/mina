@@ -7,7 +7,9 @@ open Common
 module Private_key = struct
   module type S = sig
     type t
+
     include Binable.S with type t := t
+
     include Sexpable.S with type t := t
 
     val create : unit -> t
@@ -15,6 +17,10 @@ module Private_key = struct
     val gen : t Quickcheck.Generator.t
 
     val to_curve_scalar : t -> Inner_curve.Scalar.t
+
+    val to_bigstring : t -> Bigstring.t
+
+    val of_bigstring_exn : Bigstring.t -> t
 
     val to_base64 : t -> string
 
@@ -40,6 +46,7 @@ module Public_key = struct
       end
 
       include Minimal.S with type t = Stable.V1.t
+
       include Snarkable.S with type value := t
 
       val var_of_t : t -> var
@@ -55,14 +62,34 @@ module Public_key = struct
   end
 
   module Compressed = struct
+    module Object = struct
+      module type S = sig
+        type t
+
+        include Comparable.S with type t := t
+
+        include Protocol_object.Full.S with type t := t
+      end
+    end
+
     module type S = sig
+      type ('field, 'boolean) t_ = {x: 'field; is_odd: 'boolean}
+
+      type t = (Field.t, bool) t_
+
+      include Object.S with type t := t
+
       module Stable : sig
-        module V1 : Protocol_object.Full.S
+        module V1 : Protocol_object.Full.S with type t = t
       end
 
-      include Protocol_object.Full.S with type t = Stable.V1.t
+      include Protocol_object.Full.S with type t := t
+
       include Hashable.S_binable with type t := t
-      include Snarkable.S with type value := t
+
+      include Snarkable.S
+              with type value := t
+               and type var = (Field.var, Boolean.var) t_
 
       val gen : t Quickcheck.Generator.t
 
@@ -110,9 +137,10 @@ end
 module Keypair = struct
   module type S = sig
     module Private_key : Private_key.S
+
     module Public_key : Public_key.S
 
-    type t
+    type t = {public_key: Public_key.t; private_key: Private_key.t}
 
     val create : unit -> t
 
@@ -128,6 +156,7 @@ module Message = struct
   module type S = sig
     module Payload : sig
       type t
+
       type var
     end
 
@@ -148,12 +177,16 @@ module type S = sig
   module Message : Message.S
 
   module Signature : sig
-    include Protocol_object.Hashable.S with type t = Inner_curve.Scalar.t * Inner_curve.Scalar.t
+    include Protocol_object.Hashable.S
+            with type t = Inner_curve.Scalar.t * Inner_curve.Scalar.t
+
     type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var
+
     val typ : (var, t) Typ.t
   end
 
   (* TODO: unify keys with primary interfaces *)
+
   module Private_key : sig
     type t = Inner_curve.Scalar.t
   end
@@ -193,7 +226,10 @@ module type S = sig
 
   val sign : Private_key.t -> Message.Payload.t -> Signature.t
 
-  val shamir_sum : Inner_curve.Scalar.t * Inner_curve.t -> Inner_curve.Scalar.t * Inner_curve.t -> Inner_curve.t
+  val shamir_sum :
+       Inner_curve.Scalar.t * Inner_curve.t
+    -> Inner_curve.Scalar.t * Inner_curve.t
+    -> Inner_curve.t
 
   val verify : Signature.t -> Public_key.t -> Message.Payload.t -> bool
 end

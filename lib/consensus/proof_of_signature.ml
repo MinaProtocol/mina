@@ -3,6 +3,7 @@ open Coda_numbers
 open Coda_base
 open Fold_lib
 open Signature_lib
+module H_list = Snarky.H_list
 
 module Global_public_key = struct
   let compressed =
@@ -18,7 +19,7 @@ module Global_public_key = struct
 end
 
 module type Inputs_intf = sig
-  module Time : Protocols.Coda_pow.Time_intf
+  module Time : Coda_spec.Time_intf.S
 
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
@@ -32,7 +33,8 @@ module Make (Inputs : Inputs_intf) :
   with type Internal_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
-              Inputs.Ledger_builder_diff.t =
+              Inputs.Ledger_builder_diff.t
+   and module Protocol_state.Blockchain_state = Coda_base.Blockchain_state =
 struct
   open Inputs
   module Ledger_builder_diff = Ledger_builder_diff
@@ -46,9 +48,10 @@ struct
   module Consensus_transition_data = struct
     type 'signature t_ = {signature: 'signature} [@@deriving bin_io, sexp]
 
-    type value = Signature.Stable.V1.t t_ [@@deriving bin_io, sexp]
+    type value = Blockchain_state.Signature.Signature.t t_
+    [@@deriving bin_io, sexp]
 
-    type var = Signature.var t_
+    type var = Blockchain_state.Signature.Signature.var t_
 
     let to_hlist {signature} = H_list.[signature]
 

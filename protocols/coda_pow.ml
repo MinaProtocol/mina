@@ -206,9 +206,9 @@ module type Completed_work_intf = sig
 end
 
 module type Ledger_builder_diff_intf = sig
-  type transaction
+  type payment
 
-  type transaction_with_valid_signature
+  type payment_with_valid_signature
 
   type ledger_builder_hash
 
@@ -231,8 +231,7 @@ module type Ledger_builder_diff_intf = sig
     val increase : 'a t -> 'a list -> 'a t Or_error.t
   end
 
-  type diff =
-    {completed_works: completed_work list; transactions: transaction list}
+  type diff = {completed_works: completed_work list; transactions: payment list}
   [@@deriving sexp, bin_io]
 
   type diff_with_at_most_two_coinbase =
@@ -256,7 +255,7 @@ module type Ledger_builder_diff_intf = sig
   module With_valid_signatures_and_proofs : sig
     type diff =
       { completed_works: completed_work_checked list
-      ; transactions: transaction_with_valid_signature list }
+      ; transactions: payment_with_valid_signature list }
     [@@deriving sexp]
 
     type diff_with_at_most_two_coinbase =
@@ -279,12 +278,12 @@ module type Ledger_builder_diff_intf = sig
       ; creator: public_key }
     [@@deriving sexp]
 
-    val transactions : t -> transaction_with_valid_signature list
+    val transactions : t -> payment_with_valid_signature list
   end
 
   val forget : With_valid_signatures_and_proofs.t -> t
 
-  val transactions : t -> transaction list
+  val transactions : t -> payment list
 end
 
 module type Ledger_builder_transition_intf = sig
@@ -455,7 +454,7 @@ module type Consensus_mechanism_intf = sig
 
   type ledger_builder_diff
 
-  type transaction
+  type payment
 
   type sok_digest
 
@@ -553,7 +552,7 @@ module type Consensus_mechanism_intf = sig
     -> local_state:Local_state.t
     -> time:Int64.t
     -> keypair:keypair
-    -> transactions:transaction list
+    -> transactions:payment list
     -> (Protocol_state.value * Consensus_transition_data.value) option
 end
 
@@ -639,25 +638,29 @@ end
 module type Inputs_intf = sig
   module Private_key : Coda_spec.Signature_intf.Private_key.S
 
-  module Public_key : Coda_spec.Signature_intf.Public_key.S
-    with module Private_key = Private_key
+  module Public_key :
+    Coda_spec.Signature_intf.Public_key.S with module Private_key = Private_key
 
-  module Keypair : Coda_spec.Signature_intf.Keypair.S
+  module Keypair :
+    Coda_spec.Signature_intf.Keypair.S
     with module Private_key = Private_key
      and module Public_key = Public_key
 
-  module Payment : Coda_spec.Transaction_intf.Payment.S
-    with module Keypair = Keypair
+  module Payment :
+    Coda_spec.Transaction_intf.Payment.S with module Keypair = Keypair
 
-  module Fee_transfer : Coda_spec.Transaction_intf.Fee_transfer.S
+  module Fee_transfer :
+    Coda_spec.Transaction_intf.Fee_transfer.S
     with module Compressed_public_key = Public_key.Compressed
 
-  module Coinbase : Coda_spec.Transaction_intf.Coinbase.S
+  module Coinbase :
+    Coda_spec.Transaction_intf.Coinbase.S
     with module Fee_transfer = Fee_transfer
 
-  module Transaction : Coda_spec.Transaction_intf.S
+  module Transaction :
+    Coda_spec.Transaction_intf.S
     with module Public_key = Public_key
-      and module Payment = Payment
+     and module Payment = Payment
      and module Fee_transfer = Fee_transfer
      and module Coinbase = Coinbase
 
@@ -745,9 +748,8 @@ Merge Snark:
 
   module Ledger_builder_diff :
     Ledger_builder_diff_intf
-    with type transaction := Transaction.t
-     and type transaction_with_valid_signature :=
-                Payment.With_valid_signature.t
+    with type payment := Payment.t
+     and type payment_with_valid_signature := Payment.With_valid_signature.t
      and type ledger_builder_hash := Ledger_builder_hash.t
      and type public_key := Public_key.Compressed.t
      and type completed_work := Completed_work.t
@@ -769,8 +771,7 @@ Merge Snark:
      and type public_key := Public_key.Compressed.t
      and type ledger := Ledger.t
      and type ledger_proof := Ledger_proof.t
-     and type valid_payment :=
-                Payment.With_valid_signature.t
+     and type valid_payment := Payment.With_valid_signature.t
      and type statement := Completed_work.Statement.t
      and type completed_work := Completed_work.Checked.t
      and type sparse_ledger := Sparse_ledger.t
@@ -802,7 +803,7 @@ Merge Snark:
      and type blockchain_state := Blockchain_state.value
      and type proof := Proof.t
      and type ledger_builder_diff := Ledger_builder_diff.t
-     and type transaction := Transaction.t
+     and type payment := Payment.t
      and type sok_digest := Sok_message.Digest.t
      and type ledger := Ledger.t
      and type keypair := Keypair.t

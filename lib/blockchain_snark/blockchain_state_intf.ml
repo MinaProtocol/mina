@@ -9,9 +9,10 @@ module type S = sig
   module type Update_intf = sig
     module Checked : sig
       val update :
-           State_hash.var * Consensus_mechanism.Protocol_state.var
+           Consensus_mechanism.Protocol_state.Hash.var
+           * Consensus_mechanism.Protocol_state.var
         -> Consensus_mechanism.Snark_transition.var
-        -> ( State_hash.var
+        -> ( Consensus_mechanism.Protocol_state.Hash.var
              * Consensus_mechanism.Protocol_state.var
              * [`Success of Boolean.var]
            , _ )
@@ -23,8 +24,10 @@ module type S = sig
 
   module Checked : sig
     val hash :
-      Consensus_mechanism.Protocol_state.var -> (State_hash.var, _) Checked.t
+         Consensus_mechanism.Protocol_state.var
+      -> (Consensus_mechanism.Protocol_state.Hash.var, _) Checked.t
 
-    val is_base_hash : State_hash.var -> (Boolean.var, _) Checked.t
+    val is_base_hash :
+      Consensus_mechanism.Protocol_state.Hash.var -> (Boolean.var, _) Checked.t
   end
 end

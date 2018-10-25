@@ -1,5 +1,5 @@
 module type Inputs_intf = sig
-  module Time : Protocols.Coda_pow.Time_intf
+  module Time : Coda_spec.Time_intf.S
 
   module Ledger_builder_diff : sig
     type t [@@deriving bin_io, sexp]
@@ -14,3 +14,4 @@ module Make (Inputs : Inputs_intf) :
               Inputs.Ledger_builder_diff.t
    and type External_transition.Ledger_builder_diff.t =
               Inputs.Ledger_builder_diff.t
+   and module Protocol_state.Blockchain_state = Coda_base.Blockchain_state

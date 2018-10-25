@@ -1,11 +1,8 @@
 open Core_kernel
 open Coda_spec
 
-module Make
-    (Hash : Ledger_intf.Hash.S)
-  : Ledger_intf.Path.S
-      with module Direction = Direction
-       and module Hash = Hash =
+module Make (Hash : Ledger_intf.Hash.S) :
+  Ledger_intf.Path.S with module Direction = Direction and module Hash = Hash =
 struct
   module Direction = Direction
   module Hash = Hash
@@ -20,7 +17,7 @@ struct
     List.fold t ~init:(leaf_hash, 0) ~f:(fun (acc, height) (dir, hash) ->
         let acc =
           match dir with
-          | Direction.Left  -> Hash.merge ~height acc hash
+          | Direction.Left -> Hash.merge ~height acc hash
           | Direction.Right -> Hash.merge ~height hash acc
         in
         (acc, height + 1) )

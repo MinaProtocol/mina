@@ -8,27 +8,19 @@ open Common
 
 module Payment = struct
   module Payload = struct
-    module type S = sig
+    module type Base = sig
       module Compressed_public_key : Signature_intf.Public_key.Compressed.S
 
-      type ('pk, 'amount, 'fee, 'nonce) t_ =
-        {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
+      type t
 
       module Stable : sig
-        module V1 : Protocol_object.Hashable.S
-          with
-          type t =
-            ( Compressed_public_key.Stable.V1.t
-            , Currency.Amount.Stable.V1.t
-            , Currency.Fee.Stable.V1.t
-            , Coda_numbers.Account_nonce.Stable.V1.t )
-            t_
+        module V1 : Protocol_object.Hashable.S with type t = t
       end
 
-      type t = Stable.V1.t
       include Protocol_object.Hashable.S with type t := t
 
       val dummy : t
+
       val gen : t Quickcheck.Generator.t
 
       val create :
@@ -37,9 +29,13 @@ module Payment = struct
         -> fee:Fee.t
         -> nonce:Account_nonce.t
         -> t
+
       val receiver : t -> Compressed_public_key.t
+
       val amount : t -> Amount.t
+
       val fee : t -> Fee.t
+
       val nonce : t -> Account_nonce.t
 
       include Snarkable.S with type value := t
@@ -54,56 +50,128 @@ module Payment = struct
 
       val var_of_t : t -> var
     end
+
+    module type S = sig
+      module Compressed_public_key : Signature_intf.Public_key.Compressed.S
+
+      type ('pk, 'amount, 'fee, 'nonce) t_ =
+        {receiver: 'pk; amount: 'amount; fee: 'fee; nonce: 'nonce}
+
+      include Base
+              with module Compressed_public_key := Compressed_public_key
+               and type t =
+                          ( Compressed_public_key.Stable.V1.t
+                          , Currency.Amount.Stable.V1.t
+                          , Currency.Fee.Stable.V1.t
+                          , Coda_numbers.Account_nonce.Stable.V1.t )
+                          t_
+               and type var =
+                          ( Compressed_public_key.var
+                          , Currency.Amount.var
+                          , Currency.Fee.var
+                          , Coda_numbers.Account_nonce.Unpacked.var )
+                          t_
+    end
   end
 
   module Object = struct
     module type S = sig
       include Protocol_object.S
-      val compare : seed:string -> t -> t -> int
+
+      val seeded_compare : seed:string -> t -> t -> int
+    end
+  end
+
+  module With_valid_signature = struct
+    module type S = sig
+      include Object.S
+    end
+  end
+
+  module Object_with_valid_signature = struct
+    module type S = sig
+      module Compressed_public_key :
+        Signature_intf.Public_key.Compressed.Object.S
+
+      include Object.S
+
+      module With_valid_signature :
+        With_valid_signature.S with type t = private t
+    end
+  end
+
+  module For_ledger_builder = struct
+    module type S = sig
+      include Object_with_valid_signature.S
+
+      val fee : t -> Currency.Fee.t
+
+      val check : t -> With_valid_signature.t option
+
+      val public_keys : t -> Compressed_public_key.t list
     end
   end
 
   module Base = struct
     module type S = sig
-      module Public_key : Signature_intf.Public_key.S
-      module Payload : Payload.S
-        with module Compressed_public_key = Public_key.Compressed
+      type ('payload, 'pk, 'signature) t_ =
+        {payload: 'payload; sender: 'pk; signature: 'signature}
+
+      module Compressed_public_key : Signature_intf.Public_key.Compressed.S
+
+      module Public_key :
+        Signature_intf.Public_key.S
+        with module Compressed = Compressed_public_key
+
+      module Payload :
+        Payload.S with module Compressed_public_key = Public_key.Compressed
+
       module Signature : Signature_intf.S
 
       include Object.S
+              with type t = (Payload.t, Public_key.t, Signature.Signature.t) t_
 
       val payload : t -> Payload.t
+
       val sender : t -> Public_key.t
+
       val signature : t -> Signature.Signature.t
     end
-  end
-
-  module With_valid_signature = struct
-    module type S = Base.S
   end
 
   module type S = sig
     module Keypair : Signature_intf.Keypair.S
 
+    include Base.S
+            with module Compressed_public_key = Keypair.Public_key.Compressed
+             and module Public_key = Keypair.Public_key
+
     module Stable : sig
-      module V1 : Object.S
+      module V1 :
+        Object.S
+        with type t =
+                    ( Payload.Stable.V1.t
+                    , Keypair.Public_key.Stable.V1.t
+                    , Signature.Signature.t )
+                    t_
     end
 
-    include Base.S
-      with type t = Stable.V1.t
-       and module Public_key := Keypair.Public_key
-    include Snarkable.S with type value := t
-
-    module With_valid_signature : With_valid_signature.S
-      with type t = private t
-       and module Public_key = Keypair.Public_key
-       and module Payload = Payload
+    include Snarkable.S
+            with type value := t
+             and type var =
+                        ( Payload.var
+                        , Keypair.Public_key.var
+                        , Signature.Signature.var )
+                        t_
 
     val gen :
          keys:Keypair.t array
       -> max_amount:int
       -> max_fee:int
       -> t Quickcheck.Generator.t
+
+    module With_valid_signature :
+      With_valid_signature.S with type t = private t
 
     val check : t -> With_valid_signature.t option
 
@@ -115,13 +183,15 @@ end
 
 module Fee_transfer = struct
   module type S = sig
-    module Compressed_public_key : Signature_intf.Public_key.Compressed.S
+    module Compressed_public_key :
+      Signature_intf.Public_key.Compressed.Object.S
 
-    type single = Compressed_public_key.t * Fee.t [@@deriving sexp, bin_io, compare, eq]
+    type single = Compressed_public_key.t * Fee.t
+    [@@deriving sexp, bin_io, compare, eq]
 
     type t = One of single | Two of single * single
 
-    include Protocol_object.S with type t := t
+    include Protocol_object.Comparable.S with type t := t
 
     val of_single : single -> t
 
@@ -144,7 +214,7 @@ module Coinbase = struct
       ; amount: Currency.Amount.t
       ; fee_transfer: Fee_transfer.single option }
 
-    include Protocol_object.S with type t := t
+    include Protocol_object.Comparable.S with type t := t
 
     val create :
          amount:Amount.t
@@ -158,23 +228,61 @@ module Coinbase = struct
   end
 end
 
+module Base = struct
+  module type S = sig
+    module Compressed_public_key :
+      Signature_intf.Public_key.Compressed.Object.S
+
+    module Payment :
+      Payment.Object_with_valid_signature.S
+      with module Compressed_public_key = Compressed_public_key
+
+    module Fee_transfer :
+      Fee_transfer.S with module Compressed_public_key = Compressed_public_key
+
+    module Coinbase : Coinbase.S with module Fee_transfer = Fee_transfer
+
+    type t =
+      | Valid_payment of Payment.With_valid_signature.t
+      | Fee_transfer of Fee_transfer.t
+      | Coinbase of Coinbase.t
+
+    include Protocol_object.S with type t := t
+
+    val fee_excess : t -> Fee.Signed.t Or_error.t
+
+    val supply_increase : t -> Amount.t Or_error.t
+  end
+end
+
+module For_ledger_builder = struct
+  module type S = sig
+    module Compressed_public_key :
+      Signature_intf.Public_key.Compressed.Object.S
+
+    module Payment :
+      Payment.For_ledger_builder.S
+      with module Compressed_public_key = Compressed_public_key
+
+    include Base.S
+            with module Compressed_public_key := Compressed_public_key
+             and module Payment := Payment
+  end
+end
+
 module type S = sig
   module Public_key : Signature_intf.Public_key.S
 
   module Payment : Payment.S with module Keypair.Public_key = Public_key
 
-  module Fee_transfer : Fee_transfer.S
-    with module Compressed_public_key = Public_key.Compressed
-  module Coinbase : Coinbase.S
-    with module Fee_transfer = Fee_transfer
+  module Fee_transfer :
+    Fee_transfer.S with module Compressed_public_key = Public_key.Compressed
 
-  type t =
-    | Valid_payment of Payment.With_valid_signature.t
-    | Fee_transfer of Fee_transfer.t
-    | Coinbase of Coinbase.t
-  include Protocol_object.S with type t := t
+  module Coinbase : Coinbase.S with module Fee_transfer = Fee_transfer
 
-  val fee_excess : t -> Fee.Signed.t Or_error.t
-
-  val supply_increase : t -> Amount.t Or_error.t
+  include Base.S
+          with module Compressed_public_key := Public_key.Compressed
+           and module Payment := Payment
+           and module Fee_transfer := Fee_transfer
+           and module Coinbase := Coinbase
 end

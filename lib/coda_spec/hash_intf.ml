@@ -9,9 +9,12 @@ open Common
 module Base = struct
   module type S = sig
     type t = private Pedersen.Digest.t
+
     include Protocol_object.Full.S with type t := t
+
     include Bits_intf.S with type t := t
-    include Hashable.S with type t := t
+
+    include Hashable.S_binable with type t := t
 
     val gen : t Quickcheck.Generator.t
 
@@ -26,6 +29,7 @@ module Base = struct
     module Stable : sig
       module V1 : sig
         include Protocol_object.Full.S with type t = t
+
         include Hashable_binable with type t := t
       end
     end

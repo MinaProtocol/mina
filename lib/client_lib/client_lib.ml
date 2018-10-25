@@ -4,7 +4,7 @@ open Coda_base
 open Signature_lib
 
 module Send_transactions = struct
-  type query = Transaction.Stable.V1.t list [@@deriving bin_io]
+  type query = Payment.Stable.V1.t list [@@deriving bin_io]
 
   type response = unit [@@deriving bin_io]
 
@@ -40,7 +40,8 @@ end
 module Get_nonce = struct
   type query = Public_key.Compressed.Stable.V1.t [@@deriving bin_io]
 
-  type response = Account.Nonce.Stable.V1.t option [@@deriving bin_io]
+  type response = Coda_numbers.Account_nonce.Stable.V1.t option
+  [@@deriving bin_io]
 
   type error = unit [@@deriving bin_io]
 

@@ -4,24 +4,12 @@ open Protocols
 module type S = sig
   open Coda_pow
 
-  module Compressed_public_key : Compressed_public_key_intf
+  module Compressed_public_key :
+    Coda_spec.Signature_intf.Public_key.Compressed.Object.S
 
   module Transaction :
-    Coda_pow.Transaction_intf with type public_key := Compressed_public_key.t
-
-  module Fee_transfer :
-    Coda_pow.Fee_transfer_intf with type public_key := Compressed_public_key.t
-
-  module Coinbase :
-    Coda_pow.Coinbase_intf
-    with type public_key := Compressed_public_key.t
-     and type fee_transfer := Fee_transfer.single
-
-  module Super_transaction :
-    Coda_pow.Super_transaction_intf
-    with type valid_transaction := Transaction.With_valid_signature.t
-     and type fee_transfer := Fee_transfer.t
-     and type coinbase := Coinbase.t
+    Coda_spec.Transaction_intf.For_ledger_builder.S
+    with module Compressed_public_key = Compressed_public_key
 
   module Ledger_hash : Coda_pow.Ledger_hash_intf
 
@@ -63,8 +51,7 @@ module type S = sig
   module Ledger :
     Coda_pow.Ledger_intf
     with type ledger_hash := Ledger_hash.t
-     and type super_transaction := Super_transaction.t
-     and type valid_transaction := Transaction.With_valid_signature.t
+     and type transaction := Transaction.t
 
   module Sparse_ledger : sig
     type t [@@deriving sexp, bin_io]
@@ -73,7 +60,7 @@ module type S = sig
 
     val merkle_root : t -> Ledger_hash.t
 
-    val apply_super_transaction_exn : t -> Super_transaction.t -> t
+    val apply_transaction_exn : t -> Transaction.t -> t
   end
 
   module Ledger_builder_aux_hash : Coda_pow.Ledger_builder_aux_hash_intf
@@ -93,9 +80,9 @@ module type S = sig
     Coda_pow.Ledger_builder_diff_intf
     with type completed_work := Completed_work.t
      and type completed_work_checked := Completed_work.Checked.t
-     and type transaction := Transaction.t
-     and type transaction_with_valid_signature :=
-                Transaction.With_valid_signature.t
+     and type payment := Transaction.Payment.t
+     and type payment_with_valid_signature :=
+                Transaction.Payment.With_valid_signature.t
      and type public_key := Compressed_public_key.t
      and type ledger_builder_hash := Ledger_builder_hash.t
 

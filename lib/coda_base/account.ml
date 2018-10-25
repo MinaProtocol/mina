@@ -6,7 +6,6 @@ open Let_syntax
 open Currency
 open Snark_bits
 open Fold_lib
-
 module Compressed_public_key = Signature_lib.Public_key.Compressed
 module Receipt_chain_hash = Receipt_chain_hash
 
@@ -26,6 +25,7 @@ module Index = struct
   end
 
   let to_int = Fn.id
+
   let of_int = Fn.id
 
   include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
@@ -69,8 +69,11 @@ type var =
 let create_var = create
 
 let var_public_key = public_key
+
 let var_balance = balance
+
 let var_nonce = nonce
+
 let var_receipt_chain_hash = receipt_chain_hash
 
 type value =

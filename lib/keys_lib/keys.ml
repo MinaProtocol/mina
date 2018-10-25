@@ -57,7 +57,11 @@ let bc_pk = lazy (Snark_keys.blockchain_proving ())
 
 let bc_vk = lazy (Snark_keys.blockchain_verification ())
 
-module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
+module Make
+    (Consensus_mechanism : Consensus.Mechanism.S
+                           with module Protocol_state.Blockchain_state = Coda_base.
+                                                                         Blockchain_state) =
+struct
   module type S = S with module Consensus_mechanism = Consensus_mechanism
 
   let keys = Set_once.create ()
@@ -123,7 +127,7 @@ module Make (Consensus_mechanism : Consensus.Mechanism.S) = struct
               in
               fun state ->
                 Tick.Pedersen.digest_fold s
-                  (State_hash.fold
+                  (Consensus_mechanism.Protocol_state.Hash.fold
                      (Consensus_mechanism.Protocol_state.hash state))
 
             module Verification_key = struct
