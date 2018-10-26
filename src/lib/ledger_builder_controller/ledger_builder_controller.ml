@@ -7,7 +7,6 @@ module Make (Inputs : Inputs.S) : sig
   include Coda_lib.Ledger_builder_controller_intf
           with type ledger_builder := Ledger_builder.t
            and type ledger_builder_hash := Ledger_builder_hash.t
-           and type internal_transition := Internal_transition.t
            and type ledger := Ledger.t
            and type ledger_proof := Ledger_proof.t
            and type net := Net.net
@@ -457,18 +456,16 @@ let%test_module "test" =
 
         module Protocol_state_proof = Unit
 
-        module Blockchain_state = struct
-          type t =
-            { ledger_builder_hash: Ledger_builder_hash.t
-            ; ledger_hash: Ledger_hash.t }
-          [@@deriving eq, sexp, fields, bin_io, compare]
-
-          type value = t [@@deriving eq, sexp, bin_io, compare]
-        end
-
         module Consensus_mechanism = struct
           module Local_state = struct
             type t = unit
+          end
+
+          module Blockchain_state = struct
+            type value =
+              { ledger_builder_hash: Ledger_builder_hash.t
+              ; ledger_hash: Ledger_hash.t }
+            [@@deriving eq, sexp, fields, bin_io, compare]
           end
 
           module Consensus_state = struct
@@ -534,8 +531,6 @@ let%test_module "test" =
                   transition
             ; ledger_builder }
         end
-
-        module Internal_transition = Consensus_mechanism.External_transition
 
         module Net = struct
           type t = Consensus_mechanism.Protocol_state.value State_hash.Table.t
@@ -630,14 +625,14 @@ let%test_module "test" =
             (Linear_pipe.map ledger_builder_transitions
                ~f:Consensus_mechanism.External_transition.of_state)
           ~genesis_tip:
-            { protocol_state= Consensus_mechanism.Protocol_state.genesis
+            { protocol_state= Inputs.Consensus_mechanism.Protocol_state.genesis
             ; proof= ()
             ; ledger_builder= Ledger_builder.create ~ledger:0 ~self:() }
           ~longest_tip_location ~consensus_local_state:()
           ~keypair:{Keypair.public_key= (); private_key= ()}
 
       let create_transition x parent strength =
-        { Consensus_mechanism.Protocol_state.previous_state_hash= parent
+        { Inputs.Consensus_mechanism.Protocol_state.previous_state_hash= parent
         ; blockchain_state= {ledger_builder_hash= x; ledger_hash= x}
         ; consensus_state= {strength} }
 
@@ -716,6 +711,7 @@ let%test_module "test" =
           | Error e ->
               failwithf "Unexpected error %s" (Error.to_string_hum e) () )
 
+    (*
     module Broadcastable_storage_disk (Pipe : sig
       val writer : [`Finished_write] Linear_pipe.Writer.t
     end) =
@@ -726,7 +722,8 @@ let%test_module "test" =
         let%bind () = store controller location data in
         Linear_pipe.write Pipe.writer `Finished_write
     end
-
+       *)
+    (*
     let%test_unit "Files get saved" =
       Backtrace.elide := false ;
       let reader, writer = Linear_pipe.create () in
@@ -776,4 +773,5 @@ let%test_module "test" =
                 |> Lbc_disk.Inputs.Tip.ledger_builder
               in
               assert (!lb = !lb_new) ) )
+       *)
   end )

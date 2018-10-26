@@ -562,7 +562,7 @@ end = struct
       (Ledger.merkle_root ledger)
 
   [%%if
-  log_calls]
+  call_logger]
 
   let hash t =
     Coda_debug.Call_logger.record_call "Ledger_builder.hash" ;

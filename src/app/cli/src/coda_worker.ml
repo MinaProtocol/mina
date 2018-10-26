@@ -5,11 +5,7 @@ open Signature_lib
 open Coda_main
 open Signature_lib
 
-module Make
-    (Ledger_proof : Ledger_proof_intf)
-    (Kernel : Kernel_intf with type Ledger_proof.t = Ledger_proof.t)
-    (Coda : Coda_intf.S with type ledger_proof = Ledger_proof.t) =
-struct
+module Make (Kernel : Kernel_intf) = struct
   module Snark_worker_config = struct
     type t = {port: int; public_key: Public_key.Compressed.t}
     [@@deriving bin_io]
@@ -146,10 +142,7 @@ struct
 
           let lbc_tree_max_depth = `Finite 50
 
-          let transition_interval = Time.Span.of_ms transition_interval
-
-          let keypair =
-            Keypair.of_private_key_exn Genesis_ledger.high_balance_sk
+          let keypair = Genesis_ledger.largest_account_keypair_exn ()
 
           let genesis_proof = Precomputed_values.base_proof
 
@@ -162,7 +155,7 @@ struct
         let%bind (module Init) =
           make_init ~should_propose (module Config) (module Kernel)
         in
-        let module Main = Coda.Make (Init) () in
+        let module Main = Coda_main.Make_coda (Init) in
         let module Run = Run (Config) (Main) in
         let banlist_dir_name = conf_temp_dir ^/ "banlist" in
         let%bind () = Async.Unix.mkdir banlist_dir_name in
