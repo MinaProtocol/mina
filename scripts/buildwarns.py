@@ -51,20 +51,14 @@ for key, value in sorted(percode.iteritems(), reverse=True, key=lambda (k,v): (v
 print '=' * 80
 print 'Warnings by file'
 for key, value in sorted(perfile.iteritems(), reverse=True, key=lambda (k,v): (v,k)):
-    try:
-        print value, key
-    except KeyError:
-        continue
+    print value, key
 
 print '=' * 80
 print 'Warnings detail per file'
 # Walk per file again, but read from full data
 for key, value in sorted(perfile.iteritems(), reverse=True, key=lambda (k,v): (v,k)):
     print '-'*80
-    try:
-        print key
-    except KeyError:
-        continue
+    print key
     for k in fulldata[key]:
         if k is not 'total':
             print "\t", fulldata[key][k], errorcodes[k]

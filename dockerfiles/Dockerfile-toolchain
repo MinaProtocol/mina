@@ -36,32 +36,6 @@ RUN opam update -y && opam upgrade -y
 RUN opam depext -i dune
 ADD /src/opam.export .
 RUN opam switch import opam.export ; rm opam.export
-# RUN opam install \
-#     async \
-#     async_ssl \
-#     bignum \
-#     bitstring \
-#     camlp4 \
-#     cohttp \
-#     cohttp-async \
-#     core \
-#     ctypes \
-#     ctypes-foreign \
-#     extlib \
-#     js_of_ocaml \
-#     js_of_ocaml-ppx \
-#     menhir \
-#     merlin \
-#     num \
-#     ocamlformat \
-#     ocp-indent \
-#     orocksdb \
-#     ppx_deriving \
-#     ppx_deriving_yojson \
-#     rpc_parallel \
-#     utop \
-#     virtual_dom \
-#     yojson
 
 # Source copy of ocaml-sodium (modified for static linking)
 ADD /src/external/ocaml-sodium /ocaml-sodium

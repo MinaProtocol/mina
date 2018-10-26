@@ -79,7 +79,6 @@ check-format:
 ## Containers and container management
 
 # customized local docker
-# fixme 'nanotest'
 docker:
 	docker build --file dockerfiles/Dockerfile --tag codabuilder .
 
