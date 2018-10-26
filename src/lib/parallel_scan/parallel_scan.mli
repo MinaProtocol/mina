@@ -32,6 +32,13 @@ module State : sig
 
   val hash : ('a, 'd) t -> ('a -> string) -> ('d -> string) -> Hash.t
 
+  val fold_chronological_until :
+       ('a, 'd) t
+    -> init:'acc
+    -> f:('acc -> ('a, 'd) Job.t -> ('acc, 'stop) Container.Continue_or_stop.t)
+    -> finish:('acc -> 'stop)
+    -> 'stop
+
   module Deferred : sig
     val fold_chronological_until :
          ('a, 'd) t
@@ -39,7 +46,8 @@ module State : sig
       -> f:(   'acc
             -> ('a, 'd) Job.t
             -> ('acc, 'stop) Container.Continue_or_stop.t Deferred.t)
-      -> ('acc, 'stop) Container.Continue_or_stop.t Deferred.t
+      -> finish:('acc -> 'stop Deferred.t)
+      -> 'stop Deferred.t
   end
 end
 

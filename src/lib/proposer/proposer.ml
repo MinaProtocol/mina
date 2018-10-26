@@ -85,11 +85,12 @@ struct
   let generate_next_state ~previous_protocol_state ~consensus_local_state
       ~time_controller ~ledger_builder ~transactions ~get_completed_work
       ~logger ~keypair =
-    Ledger_builder.create_diff ledger_builder ~logger
-      ~transactions_by_fee:transactions ~get_completed_work
-    >>| fun ( diff
-            , `Hash_after_applying next_ledger_builder_hash
-            , `Ledger_proof ledger_proof_opt ) ->
+    let ( diff
+        , `Hash_after_applying next_ledger_builder_hash
+        , `Ledger_proof ledger_proof_opt ) =
+      Ledger_builder.create_diff ledger_builder ~logger
+        ~transactions_by_fee:transactions ~get_completed_work
+    in
     let open Option.Let_syntax in
     let next_ledger_hash =
       Option.value_map ledger_proof_opt
@@ -174,7 +175,7 @@ struct
             previous_protocol_state, previous_protocol_state_proof
         ; transactions
         ; ledger_builder } =
-      let open Deferred.Option.Let_syntax in
+      let open Option.Let_syntax in
       let%map protocol_state, internal_transition =
         generate_next_state ~previous_protocol_state ~consensus_local_state
           ~time_controller ~ledger_builder ~transactions ~get_completed_work
@@ -200,10 +201,9 @@ struct
       in
       let time_till_transition = Time.diff time_of_next_transition time_now in
       Logger.info logger !"Scheduling signing on a new tip %{sexp: Tip.t}" tip ;
-      Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
-      let%map signed_tip = create_result tip in
       Time.Timeout.create time_controller time_till_transition ~f:(fun _ ->
-          signed_tip )
+          Logger.info logger !"Starting to sign tip %{sexp: Tip.t}" tip ;
+          create_result tip )
     in
     don't_wait_for
       ( match%bind Pipe.read change_feeder.Linear_pipe.Reader.pipe with
@@ -212,15 +212,15 @@ struct
           Logger.info logger
             !"Signer got initial change with tip %{sexp: Tip.t}"
             initial_tip ;
-          let%bind initial_transition = schedule_transition initial_tip in
-          Linear_pipe.fold change_feeder ~init:initial_transition ~f:
+          Linear_pipe.fold change_feeder
+            ~init:(schedule_transition initial_tip) ~f:
             (fun scheduled_transition (Tip_change tip) ->
               ( match Time.Timeout.peek scheduled_transition with
               | None | Some None ->
                   Time.Timeout.cancel time_controller scheduled_transition None
               | Some (Some result) -> External_transition_result.cancel result
               ) ;
-              schedule_transition tip )
+              return (schedule_transition tip) )
           >>| ignore ) ;
     {transitions= r}
 end

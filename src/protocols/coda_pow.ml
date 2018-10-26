@@ -550,10 +550,9 @@ module type Ledger_builder_intf = sig
     -> logger:Logger.t
     -> transactions_by_fee:transaction_with_valid_signature Sequence.t
     -> get_completed_work:(statement -> completed_work option)
-    -> ( valid_diff
+    -> valid_diff
        * [`Hash_after_applying of ledger_builder_hash]
-       * [`Ledger_proof of ledger_proof option] )
-       Deferred.t
+       * [`Ledger_proof of ledger_proof option]
 
   module Coordinator : sig
     module State : sig
