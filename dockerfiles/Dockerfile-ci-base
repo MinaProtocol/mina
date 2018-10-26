@@ -1,6 +1,0 @@
-FROM python:3.6.4-stretch
-
-RUN curl -L -o /tmp/docker-17.03.0-ce.tgz https://download.docker.com/linux/static/stable/x86_64/docker-17.03.0-ce.tgz && tar -xz -C /tmp -f /tmp/docker-17.03.0-ce.tgz && mv /tmp/docker/* /usr/bin
-
-RUN CLOUDSDK_CORE_DISABLE_PROMPTS=1 curl https://sdk.cloud.google.com | bash
-

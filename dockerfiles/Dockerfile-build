@@ -1,4 +1,5 @@
-FROM gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
+# This will start a build inside a container
+FROM codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
 
 WORKDIR /app
 ADD ./ /app

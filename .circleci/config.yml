@@ -4,10 +4,7 @@ jobs:
     build:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
+        - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
         steps:
             - checkout
             - run:
@@ -37,10 +34,7 @@ jobs:
     build_withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
+        - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
         steps:
             - checkout
             - run:
@@ -70,10 +64,7 @@ jobs:
     build_public:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:a41ac5a782b453cc5163e75b7d4e29ebac708cc6
-          auth:
-            username: _json_key
-            password: $JSON_GCLOUD_CREDENTIALS
+        - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
         steps:
             - checkout
             - run:
@@ -103,10 +94,7 @@ jobs:
     test-unit-test:
        resource_class: large
        docker:
-       - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-         auth:
-           username: _json_key
-           password: $JSON_GCLOUD_CREDENTIALS
+       - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
        steps:
            - checkout
            - run:
@@ -122,7 +110,7 @@ jobs:
     test-withsnark:
         resource_class: large
         docker:
-        - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
+        - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
           auth:
             username: _json_key
             password: $JSON_GCLOUD_CREDENTIALS
@@ -145,10 +133,7 @@ jobs:
     test-all_sig_integration_tests:
       resource_class: large
       docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-        auth:
-          username: _json_key
-          password: $JSON_GCLOUD_CREDENTIALS
+      - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
       steps:
           - checkout
           - run:
@@ -192,10 +177,7 @@ jobs:
     test-all_stake_integration_tests:
       resource_class: large
       docker:
-      - image: gcr.io/o1labs-192920/ocaml-base:ed1e6ed8322aab807b7959756abc6c9258e711fc
-        auth:
-          username: _json_key
-          password: $JSON_GCLOUD_CREDENTIALS
+      - image: codaprotocol/coda:toolchain-7882157f7c6c7bd5def2b0b5a18541bc1b5e0f4f
       steps:
           - checkout
           - run:
